@@ -22,8 +22,6 @@ fingerprints, you can add fingerprints too.
 ## Details
 
 - The Security keys card isn't in Settings on Windows.
-- The security key manager comes from Firefox. It works in Sval the same
-  way it does in Firefox.
 - Signing in with a passkey or a security key works on every platform. The
   site asks for your passkey or key, and you follow the site's steps.
 

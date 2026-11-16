@@ -3,7 +3,7 @@ title: What an agent can and can't reach
 description: An agent works only in its own Workspace, under rules you set for its app, and why Sval draws the lines where it does.
 ---
 
-Sval has no AI of its own, and Firefox's AI features are turned off. An AI
+Sval has no built-in AI. An AI
 app you already use can browse in Sval for you. Sval decides what the app
 can reach, and the app never decides that for itself.
 

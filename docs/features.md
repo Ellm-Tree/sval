@@ -119,8 +119,9 @@ control of what you see and what is sent to websites.
   a group, playing sound, in picture-in-picture or a call, set to Keep Awake,
   or holding text you typed. This is off by default.
 - **Light or dark themes.** Choose Automatic, Light, or Dark in Settings ›
-  Appearance › Theme. Websites that support both follow your choice. Settings,
-  Firefox's built-in pages, error pages, and dialogs all match Sval's look.
+  Appearance › Theme. Websites that support both follow your choice.
+  Settings, error pages, dialogs, and the rest of Sval's built-in pages
+  share one look.
   Websites that don't style their own scrollbars get the same thin
   scrollbar as the Workspace panel.
 
@@ -633,7 +634,7 @@ control of what you see and what is sent to websites.
   ([how to connect an extension to a desktop app](native-messaging-hosts.md)).
 - **Passkeys and security keys.** Sites can use passkeys and hardware security
   keys. On macOS and Linux, Settings › Privacy and protection › Manage
-  security keys opens Firefox's security key manager, where you can set a
+  security keys opens the security key manager, where you can set a
   key's PIN, manage its passkeys, and add fingerprints.
 
 ## Extensions
@@ -685,8 +686,8 @@ control of what you see and what is sent to websites.
 
 ## Agents
 
-- **Bring your own AI, or none.** Sval has no built-in AI, and Firefox's AI
-  features are turned off. If you want an assistant, the one you already use
+- **Bring your own AI, or none.** Sval has no built-in AI. If you want an
+  assistant, the one you already use
   can work with Sval, under your rules.
 - **Let AI apps use the browser.** Turn on agent access in Settings. AI apps
   on your computer can then drive Sval: Claude Code, Claude Desktop, the

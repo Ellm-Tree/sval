@@ -103,7 +103,7 @@ check.
   each site's cookies to that site.
 - The size line says how much space site data and the cache take up.
 - **Clear browsing data**, **Clear data for specific sites**, and **Manage
-  exceptions** each open Firefox's own dialog for that task.
+  exceptions** each open a dialog for that task.
 - **Clear cookies and site data every time you close Sval.** Sval clears
   cookies and site data each time you quit.
 
@@ -164,12 +164,13 @@ following a list Mozilla publishes.
 
 ## HTTPS-Only Mode
 
-This is Firefox's own setting. HTTPS-Only Mode allows only secure
-connections to websites, and asks you before connecting insecurely. The
-choices are **Enable HTTPS-Only Mode in all windows**, **Enable HTTPS-Only
-Mode in private windows only**, and **Don't enable HTTPS-Only Mode**. The
-last one is the default. **Manage Exceptions…** lists the sites you let load
-insecurely.
+Sval opens the secure version of every site that has one. HTTPS-Only Mode
+decides what happens when a site has no secure version. With it on, Sval
+shows a warning first, and you choose whether to open the site. The choices
+are **Enable HTTPS-Only Mode in all windows**, **Enable HTTPS-Only Mode in
+private windows only**, and **Don't enable HTTPS-Only Mode**. The last one
+is the default. **Manage Exceptions…** lists the sites you let open
+without a secure connection.
 
 ## Secure DNS
 
@@ -197,8 +198,8 @@ from Mozilla. When this is off, Sval doesn't download the list.
 
 ## Deceptive content and dangerous software protection
 
-This is Firefox's own setting. **Block dangerous and deceptive content** is
-on by default. Under it are **Block dangerous downloads** and **Warn you
+**Block dangerous and deceptive content** is on by default. Sval warns you
+before it opens a site known for scams or malware. Under it are **Block dangerous downloads** and **Warn you
 about unwanted and uncommon software**.
 
 ## Password manager and Security keys
@@ -207,7 +208,7 @@ See [Passwords](/docs/reference/passwords/).
 
 ## History
 
-This is Firefox's own setting. The choices are **Remember history**,
+The choices are **Remember history**,
 **Customize history**, and **Never remember history**.
 
 ## Advanced
@@ -234,4 +235,7 @@ This is Firefox's own setting. The choices are **Remember history**,
 </Since>
 
 - Under Bookmarklets, **Run bookmarklets from Favorites** is on by default.
-- **Certificates** and **Proxy settings** are Firefox's own settings.
+- **Certificates.** You choose the certificates Sval uses to check secure
+  connections, and the security devices that hold them.
+- **Proxy settings.** You set how Sval connects to the internet through a
+  proxy.

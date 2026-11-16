@@ -19,7 +19,8 @@ Every site gets these settings until you make a choice for it.
   site settings menu: **Ask**, **Allow**, or **Block**. Pop-ups offer
   **Allow** or **Block**, and start blocked. The other permissions start on
   **Ask**, so a site asks before it uses one.
-- **Pause notifications until Sval restarts** is Firefox's own setting.
+- **Pause notifications until Sval restarts.** No site can show you a
+  notification until you quit Sval.
 
 ## Your sites
 
@@ -73,8 +74,9 @@ address Choices for shows:
 - **Cookies and site data.** This lists each place that holds the site's
   data, with its size and a **Clear** button. **Clear everywhere** asks you
   to confirm, then signs you out of the site in every Workspace.
-  **Manage data…** and **Manage exceptions…** open Firefox's dialogs for
-  all sites.
+  **Manage data…** lists the data every site keeps. **Manage exceptions…**
+  lists the sites you always allow or block from using cookies, and the
+  sites you allow only until you quit.
 - **Forget this site.** After you confirm, Sval clears everything it keeps
   for the site, in every Workspace. **Forget…** lists what Sval clears on
   every device and on this device.
