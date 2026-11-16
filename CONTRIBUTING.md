@@ -163,7 +163,7 @@ there.
 
 Sval's own files are AGPL-3.0-only with the Sval App Store Permission
 (decisions 0111 and 0119). Mozilla's files and Sval's modifications of them
-stay MPL 2.0. `LICENSE` explains the layout. A file Sval writes starts, after
+stay MPL 2.0. `LICENSING.md` explains the layout. A file Sval writes starts, after
 any shebang or XML declaration, with `SPDX-License-Identifier: AGPL-3.0-only
 WITH AdditionRef-sval-app-store` and `Copyright 2026 Ellm Tree, Inc.` in its
 own comment syntax. A file copied from Mozilla keeps its MPL header exactly and

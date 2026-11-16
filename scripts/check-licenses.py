@@ -5,7 +5,7 @@
 
     scripts/check-licenses.py
 
-LICENSE explains the repository's licenses. REUSE.toml, at the root, is the classification:
+LICENSING.md explains the repository's licenses. REUSE.toml, at the root, is the classification:
 it names every Mozilla-derived file, the reserved brand art, the third-party
 logos, and the Sval files that cannot carry a comment. A file it does not name
 is Sval's own work and must carry Sval's notice in its first lines, with the

@@ -130,4 +130,4 @@ it.
 
 Sval's name and brand art are reserved, so a modified version has to use its
 own name and art. [`TRADEMARKS.md`](TRADEMARKS.md) explains the details, and
-[`LICENSE`](LICENSE) sets out which license covers which files.
+[`LICENSING.md`](LICENSING.md) sets out which license covers which files.

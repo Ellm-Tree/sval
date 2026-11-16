@@ -1436,7 +1436,7 @@ Sval the only non-Safari browser with it.
 ### 8.1 Repository
 
 One repository holds the fork and its engine (decision 0111). Its layout and
-licensing are in `CONTRIBUTING.md` ("Layout", "License notices") and `LICENSE`.
+licensing are in `CONTRIBUTING.md` ("Layout", "License notices") and `LICENSING.md`.
 
 ### 8.2 The build
 
@@ -2291,7 +2291,7 @@ Items keep their numbers, because other documents cite them.
 
 1. **License.** Sval's own files, the engine included, are AGPL-3.0-only with
    the Sval App Store Permission, in one repository, with no CLA (decisions
-   0111 and 0119). Mozilla's files keep MPL 2.0. `LICENSE` explains the layout.
+   0111 and 0119). Mozilla's files keep MPL 2.0. `LICENSING.md` explains the layout.
 2. **Linux is a v1 target** (§12).
 
    2a. **Linux packages:** a tarball, a .deb and an .rpm (decision 0094).

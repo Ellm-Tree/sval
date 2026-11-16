@@ -1,6 +1,6 @@
 # Sval's name and logo
 
-Sval's code is open source (`LICENSE`), and anyone may fork it. Its name,
+Sval's code is open source (`LICENSING.md`), and anyone may fork it. Its name,
 "Sval", and its logo and other brand art (`branding/sval/LICENSE`) are
 Ellm Tree, Inc.'s, so that a build nobody at Sval made cannot present itself as
 Sval. This is the policy for using them. Mozilla's trademark policy applies
