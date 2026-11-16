@@ -1,0 +1,6 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+# Git runs this with core.hooksPath set to .githooks, which
+# scripts/new-worktree.sh sets in the repository's shared config.
+exec python3 "$(git rev-parse --show-toplevel)/scripts/check-commit-msg.py" --file "$1"

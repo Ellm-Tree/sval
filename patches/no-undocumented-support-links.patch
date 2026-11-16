@@ -1,0 +1,282 @@
+Sval: remove the Learn more links that have no page on Sval's site
+
+app.support.baseURL is Sval's support address, and Firefox's UI appends a
+support article's slug to it. Sval's site has a page for some of those
+slugs; these links name one it has none for, so they would open a page
+that does not exist. Each link goes, and the setting, notice, panel or
+error page around it stays: Picture-in-Picture, spell checking and
+Windows single sign-on in settings, the decoder and speech-dispatcher
+notices, the add-on permissions policy banner, the data loss prevention
+panel, and the certificate time errors and site-not-found error pages.
+
+With no time-errors link left, the bundled offline copy of that article,
+which NetErrorParent shows when the article's address fails to load, has
+no way in, so it is not packaged.
+
+diff --git a/browser/actors/DecoderDoctorParent.sys.mjs b/browser/actors/DecoderDoctorParent.sys.mjs
+index ae99347cd2..8f57771bbb 100644
+--- a/browser/actors/DecoderDoctorParent.sys.mjs
++++ b/browser/actors/DecoderDoctorParent.sys.mjs
+@@ -65,19 +65,6 @@ export class DecoderDoctorParent extends JSWindowActorParent {
+     return "";
+   }
+ 
+-  getSumoForLearnHowButton({ type, decoderDoctorReportId }) {
+-    if (
+-      type == "platform-decoder-not-found" &&
+-      decoderDoctorReportId == "MediaWMFNeeded"
+-    ) {
+-      return "fix-video-audio-problems-firefox-windows";
+-    }
+-    if (type == "cannot-initialize-pulseaudio") {
+-      return "fix-common-audio-and-video-issues";
+-    }
+-    return "";
+-  }
+-
+   getEndpointForReportIssueButton(type) {
+     if (type == "decode-error" || type == "decode-warning") {
+       return Services.prefs.getStringPref(
+@@ -196,25 +183,6 @@ export class DecoderDoctorParent extends JSWindowActorParent {
+       }
+ 
+       let buttons = [];
+-      let sumo = this.getSumoForLearnHowButton({ type, decoderDoctorReportId });
+-      if (sumo) {
+-        LOG_DD(`sumo=${sumo}`);
+-        buttons.push({
+-          label: lazy.gNavigatorBundle.GetStringFromName(
+-            "decoder.noCodecs.button"
+-          ),
+-          supportPage: sumo,
+-          callback() {
+-            let clickedInPref = Services.prefs.getBoolPref(
+-              buttonClickedPref,
+-              false
+-            );
+-            if (!clickedInPref) {
+-              Services.prefs.setBoolPref(buttonClickedPref, true);
+-            }
+-          },
+-        });
+-      }
+       let endpoint = this.getEndpointForReportIssueButton(type);
+       if (endpoint) {
+         LOG_DD(`endpoint=${endpoint}`);
+diff --git a/browser/actors/SpeechDispatcherParent.sys.mjs b/browser/actors/SpeechDispatcherParent.sys.mjs
+index d1f334a034..f9e6a68e5f 100644
+--- a/browser/actors/SpeechDispatcherParent.sys.mjs
++++ b/browser/actors/SpeechDispatcherParent.sys.mjs
+@@ -64,9 +64,6 @@ export class SpeechDispatcherParent extends JSWindowActorParent {
+     }
+ 
+     let buttons = [
+-      {
+-        supportPage: "speechd-setup",
+-      },
+       {
+         "l10n-id": "speech-dispatcher-dismiss-button",
+         callback: () => {
+diff --git a/browser/base/content/appmenu-viewcache.inc.xhtml b/browser/base/content/appmenu-viewcache.inc.xhtml
+index 4f1a7223d2..69f8c2555a 100644
+--- a/browser/base/content/appmenu-viewcache.inc.xhtml
++++ b/browser/base/content/appmenu-viewcache.inc.xhtml
+@@ -861,12 +861,7 @@
+       <hbox class="panel-header">
+         <html:h1 id="content-analysis-header" data-l10n-id="content-analysis-panel-title"/>
+       </hbox>
+-      <description id="content-analysis-panel-description">
+-        <html:a is="moz-support-link"
+-                data-l10n-name="info"
+-                class="learnMore"
+-                support-page="data-loss-prevention"/>
+-      </description>
++      <description id="content-analysis-panel-description"/>
+     </vbox>
+   </panelview>
+ 
+diff --git a/browser/components/preferences/config/languages.mjs b/browser/components/preferences/config/languages.mjs
+index 7dd8ff65d5..fe339e6ec5 100644
+--- a/browser/components/preferences/config/languages.mjs
++++ b/browser/components/preferences/config/languages.mjs
+@@ -959,7 +959,6 @@ SettingGroupManager.registerGroups({
+       {
+         id: "checkSpelling",
+         l10nId: "check-user-spelling",
+-        supportPage: "how-do-i-use-firefox-spell-checker",
+       },
+       {
+         id: "downloadDictionaries",
+diff --git a/browser/components/preferences/config/passwords-autofill.mjs b/browser/components/preferences/config/passwords-autofill.mjs
+index f381110b25..691d4ac655 100644
+--- a/browser/components/preferences/config/passwords-autofill.mjs
++++ b/browser/components/preferences/config/passwords-autofill.mjs
+@@ -729,7 +729,6 @@ SettingGroupManager.registerGroups({
+       {
+         id: "allowWindowSSO",
+         l10nId: "forms-windows-sso",
+-        supportPage: "windows-sso",
+       },
+       {
+         id: "manageSavedPasswords",
+diff --git a/browser/components/preferences/config/tabs-browsing.mjs b/browser/components/preferences/config/tabs-browsing.mjs
+index ccdff4f8e3..cad7886454 100644
+--- a/browser/components/preferences/config/tabs-browsing.mjs
++++ b/browser/components/preferences/config/tabs-browsing.mjs
+@@ -735,7 +735,6 @@ SettingGroupManager.registerGroups({
+       {
+         id: "pictureInPictureToggleEnabled",
+         l10nId: "browsing-picture-in-picture-toggle-enabled-2",
+-        supportPage: "picture-in-picture",
+         items: [
+           {
+             id: "pictureInPictureEnableWhenSwitchingTabs",
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index 02232e08d4..734594b533 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -1319,7 +1319,7 @@ content-analysis-indicator-tooltip =
+ content-analysis-panel-title = Data protection
+ # Variables:
+ #   $agentName (String): The name of the DLP agent that is connected
+-content-analysis-panel-text-styled = Your organization uses <b>{ $agentName }</b> to protect against data loss. <a data-l10n-name="info">Learn more</a>
++content-analysis-panel-text-styled = Your organization uses <b>{ $agentName }</b> to protect against data loss.
+ 
+ ## Unified extensions (toolbar) button
+ 
+diff --git a/browser/locales/en-US/chrome/browser/browser.properties b/browser/locales/en-US/chrome/browser/browser.properties
+index 19db9193f0..49f3098b3c 100644
+--- a/browser/locales/en-US/chrome/browser/browser.properties
++++ b/browser/locales/en-US/chrome/browser/browser.properties
+@@ -283,7 +283,6 @@ emeNotifications.unknownDRMSoftware = Unknown
+ # LOCALIZATION NOTE (customizeMode.tabTitle): %S is brandShortName
+ customizeMode.tabTitle = Customize %S
+ 
+-decoder.noCodecs.button = Learn how
+ decoder.noCodecs.accesskey = L
+ decoder.noCodecsLinux.message = To play video, you may need to install the required video codecs.
+ decoder.noHWAcceleration.message = To improve video quality, you may need to install Microsoft’s Media Feature Pack.
+diff --git a/toolkit/actors/NetErrorParent.sys.mjs b/toolkit/actors/NetErrorParent.sys.mjs
+index 0ed7b63c28..2c63c329dd 100644
+--- a/toolkit/actors/NetErrorParent.sys.mjs
++++ b/toolkit/actors/NetErrorParent.sys.mjs
+@@ -179,7 +179,7 @@ export class NetErrorParent extends EscapablePageParent {
+   }
+ 
+   displayOfflineSupportPage(supportPageSlug) {
+-    const AVAILABLE_PAGES = ["connection-not-secure", "time-errors"];
++    const AVAILABLE_PAGES = ["connection-not-secure"];
+     if (!AVAILABLE_PAGES.includes(supportPageSlug)) {
+       console.log(
+         `[Not supported] Offline support is not yet available for ${supportPageSlug} errors.`
+diff --git a/toolkit/content/errors/cert-errors.mjs b/toolkit/content/errors/cert-errors.mjs
+index b66113ecd1..224d306daf 100644
+--- a/toolkit/content/errors/cert-errors.mjs
++++ b/toolkit/content/errors/cert-errors.mjs
+@@ -134,10 +134,6 @@ export const CERT_ERRORS = [
+         dataL10nId: "fp-certerror-expired-what-can-you-do-body",
+         dataL10nArgs: { date: null },
+       },
+-      learnMore: {
+-        dataL10nId: "fp-learn-more-about-time-related-errors",
+-        supportPage: "time-errors",
+-      },
+       showViewCertificate: true,
+       showDateTime: true,
+     },
+@@ -169,10 +165,6 @@ export const CERT_ERRORS = [
+         dataL10nId: "fp-certerror-expired-what-can-you-do-body",
+         dataL10nArgs: { date: null },
+       },
+-      learnMore: {
+-        dataL10nId: "fp-learn-more-about-time-related-errors",
+-        supportPage: "time-errors",
+-      },
+       showViewCertificate: true,
+       showDateTime: true,
+     },
+@@ -549,8 +541,6 @@ export const CERT_ERRORS = [
+       titleL10nId: "clockSkewError-title",
+       whatCanYouDoL10nId: "fp-certerror-clock-skew-what-can-you-do-body",
+       whatCanYouDoL10nArgs: { now: null },
+-      learnMoreL10nId: "fp-learn-more-about-time-related-errors",
+-      learnMoreSupportPage: "time-errors",
+     },
+     hasNoUserFix: false,
+   },
+diff --git a/toolkit/content/errors/net-errors.mjs b/toolkit/content/errors/net-errors.mjs
+index 22949dcec5..f6bbadc748 100644
+--- a/toolkit/content/errors/net-errors.mjs
++++ b/toolkit/content/errors/net-errors.mjs
+@@ -357,8 +357,6 @@ export const NET_ERRORS = [
+         "neterror-dns-not-found-hint-check-network-2",
+         "neterror-dns-not-found-hint-firewall-2",
+       ],
+-      learnMoreL10nId: "neterror-learn-more-link",
+-      learnMoreSupportPage: "server-not-found-connection-problem",
+     },
+     hasNoUserFix: false,
+     checkTrrOnly: true,
+diff --git a/toolkit/content/errors/pkix-errors.mjs b/toolkit/content/errors/pkix-errors.mjs
+index 4edec8a335..9189c72028 100644
+--- a/toolkit/content/errors/pkix-errors.mjs
++++ b/toolkit/content/errors/pkix-errors.mjs
+@@ -90,10 +90,6 @@ export const PKIX_ERRORS = [
+         dataL10nId: "fp-certerror-pkix-not-yet-valid-what-can-you-do-body",
+         dataL10nArgs: { date: null },
+       },
+-      learnMore: {
+-        dataL10nId: "fp-learn-more-about-time-related-errors",
+-        supportPage: "time-errors",
+-      },
+       showViewCertificate: true,
+     },
+     hasNoUserFix: false,
+@@ -124,10 +120,6 @@ export const PKIX_ERRORS = [
+         dataL10nId: "fp-certerror-pkix-not-yet-valid-what-can-you-do-body",
+         dataL10nArgs: { date: null },
+       },
+-      learnMore: {
+-        dataL10nId: "fp-learn-more-about-time-related-errors",
+-        supportPage: "time-errors",
+-      },
+       showViewCertificate: true,
+     },
+     hasNoUserFix: false,
+diff --git a/toolkit/content/jar.mn b/toolkit/content/jar.mn
+index 92bc1d8697..4011e38a9f 100644
+--- a/toolkit/content/jar.mn
++++ b/toolkit/content/jar.mn
+@@ -200,7 +200,6 @@ toolkit.jar:
+    content/global/lit-select-control.mjs        (widgets/lit-select-control.mjs)
+    content/global/neterror/aboutNetErrorCodes.js                    (neterror/aboutNetErrorCodes.js)
+    content/global/neterror/supportpages/connection-not-secure.html  (neterror/supportpages/connection-not-secure.html)
+-   content/global/neterror/supportpages/time-errors.html            (neterror/supportpages/time-errors.html)
+    content/global/errors/error-registry.mjs                         (errors/error-registry.mjs)
+    content/global/errors/error-lookup.mjs                           (errors/error-lookup.mjs)
+    content/global/errors/cert-errors.mjs                            (errors/cert-errors.mjs)
+diff --git a/toolkit/locales/en-US/toolkit/neterror/certError.ftl b/toolkit/locales/en-US/toolkit/neterror/certError.ftl
+index e0433267c2..27f76330ac 100644
+--- a/toolkit/locales/en-US/toolkit/neterror/certError.ftl
++++ b/toolkit/locales/en-US/toolkit/neterror/certError.ftl
+@@ -248,7 +248,6 @@ fp-certerror-transparency-what-can-you-do-body = Probably nothing, since it’s
+ 
+ fp-learn-more-about-secure-connection-failures = Learn more about secure connection failures
+ fp-learn-more-about-cert-issues = Learn more about these kinds of certificate issues
+-fp-learn-more-about-time-related-errors = Learn more about troubleshooting time-related errors
+ 
+ # This string appears after the following string: "What makes the site look dangerous?" (fp-certerror-why-site-dangerous)
+ # Variables:
+diff --git a/toolkit/mozapps/extensions/content/components/addon-permissions-list.mjs b/toolkit/mozapps/extensions/content/components/addon-permissions-list.mjs
+index 0758789f60..088a279faa 100644
+--- a/toolkit/mozapps/extensions/content/components/addon-permissions-list.mjs
++++ b/toolkit/mozapps/extensions/content/components/addon-permissions-list.mjs
+@@ -23,8 +23,6 @@ function createPolicyPermissionsBanner() {
+   banner.classList.add("addon-permissions-policy-banner");
+   banner.setAttribute("type", "info");
+   banner.messageL10nId = "addon-permissions-managed-by-policy";
+-  banner.supportPage =
+-    "managed-browser-firefox#w_why-some-features-may-be-disabled";
+   return banner;
+ }
+ 

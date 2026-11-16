@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Video page</title></head>
+<body>
+<video id="call" width="640" height="360" muted></video>
+<canvas id="source" width="640" height="360"></canvas>
+<script>
+  // A call tile: a controls-less <video> playing a live stream, as a video
+  // call page shows one.
+  const canvas = document.getElementById("source");
+  const context = canvas.getContext("2d");
+  let hue = 0;
+  setInterval(() => {
+    hue = (hue + 10) % 360;
+    context.fillStyle = `hsl(${hue} 60% 50%)`;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }, 50);
+  const video = document.getElementById("call");
+  video.srcObject = canvas.captureStream();
+  video.play();
+</script>
+</body></html>

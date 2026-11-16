@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: existence
+message: "'%s' is a stiff transition. Start the sentence with its subject."
+level: error
+ignorecase: false
+tokens:
+  - Moreover
+  - Furthermore
+  - Additionally

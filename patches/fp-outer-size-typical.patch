@@ -1,0 +1,68 @@
+Sval: report the outer window as the inner size plus a typical toolbar
+
+A new RFPTarget, WindowOuterSizeTypical, makes outerWidth/outerHeight the
+top window's inner size plus the chrome of a default window, so neither the
+user's toolbar layout nor RFPTarget::WindowOuterSize's outer == inner tell
+reaches a page. It reads the same BrowsingContext::TopInnerSizeSpoofedForRFP
+WindowOuterSize uses, which nsPresContext::UpdateInnerSizeSpoofedForRFP
+keeps current for every top-level document, so a protected frame under a top
+site that is not still reads a real size. In fullscreen a window has no
+chrome, so outer is inner, decided as nsScreen::IsFullscreen decides it.
+
+The chrome is SvalRFPService::GetSpoofedOuterSize: 85 CSS px of toolbars,
+derived from the default theme's CSS (the tab strip's --tab-min-height and
+--tab-block-margin, the navigation bar's --urlbar-min-height and
+--urlbar-padding-block, the toolbox border), with Windows' invisible 8px
+resize borders added there. The figures come from the stylesheets and were
+not measured on each platform.
+
+No chrome API can change what nsGlobalWindowOuter::GetOuterSize reports.
+
+diff --git a/dom/base/nsGlobalWindowOuter.cpp b/dom/base/nsGlobalWindowOuter.cpp
+index e6e2e98e36..1e9618ec65 100644
+--- a/dom/base/nsGlobalWindowOuter.cpp
++++ b/dom/base/nsGlobalWindowOuter.cpp
+@@ -169,6 +169,8 @@
+ #include "nsIXULRuntime.h"
+ #include "nsPIWindowWatcher.h"
+ #include "nsQueryObject.h"
++#include "nsRFPService.h"
++#include "mozilla/GeckoBindings.h"
+ #include "nsServiceManagerUtils.h"
+ #include "nsThreadUtils.h"
+ #include "xpcprivate.h"
+@@ -3514,6 +3516,17 @@ CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,
+     return {};
+   }
+ 
++  if (nsIGlobalObject::ShouldResistFingerprinting(
++          aCallerType, RFPTarget::WindowOuterSizeTypical)) {
++    if (BrowsingContext* bc = GetBrowsingContext()) {
++      return SvalRFPService::GetSpoofedOuterSize(
++          bc->TopInnerSizeSpoofedForRFP(),
++          mDoc && Gecko_MediaFeatures_GetDisplayMode(mDoc) ==
++                      StyleDisplayMode::Fullscreen);
++    }
++    return {};
++  }
++
+   // Windows showing documents in RDM panes and any subframes within them
+   // return the simulated device size.
+   if (mDoc) {
+diff --git a/layout/base/nsPresContext.cpp b/layout/base/nsPresContext.cpp
+index 9ce1d7dd9f..0247a77af7 100644
+--- a/layout/base/nsPresContext.cpp
++++ b/layout/base/nsPresContext.cpp
+@@ -1442,8 +1442,10 @@ void nsPresContext::SetOverrideDPPX(float aDPPX) {
+ }
+ 
+ void nsPresContext::UpdateInnerSizeSpoofedForRFP() {
+-  if (!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) ||
+-      !mDocument->GetBrowsingContext() ||
++  // Written for every top-level document, protected or not: a frame from
++  // another site may be protected under a top site that is not, and reads
++  // the top's size through BrowsingContext::TopInnerSizeSpoofedForRFP.
++  if (!mDocument->GetBrowsingContext() ||
+       !mDocument->GetBrowsingContext()->IsTop()) {
+     return;
+   }

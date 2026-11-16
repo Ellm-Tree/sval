@@ -1,0 +1,35 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* Inside `screenshots-preview`'s shadow tree, loaded as a user sheet
+   (`SvalPageStyle.styleDialog`), so it reaches the shadow tree and needs
+   `!important` to win over the component's rules. The buttons head the
+   card, and the image scrolls in the space below them, with the card's
+   padding on every side. Firefox sets each part in the viewport's units,
+   which together overflow it. */
+
+.image-view {
+  height: 100% !important;
+}
+
+.preview-buttons {
+  box-sizing: border-box !important;
+  width: auto !important;
+  flex: none !important;
+  padding: 16px 20px 12px !important;
+}
+
+#preview-image-container {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 20px 20px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+}
+
+#preview-image {
+  display: block !important;
+}

@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+#include "nsISupports.idl"
+
+webidl Element;
+
+/**
+ * What Places asks Sval as it records a visit a page makes, in the parent
+ * process: only Sval knows which workspace a tab is in.
+ */
+[scriptable, uuid(b7e3c1a4-6d2f-4f0e-8c95-2a1d7e4b9f30)]
+interface nsISvalVisitWorkspaces : nsISupports
+{
+  /**
+   * The id of the workspace aBrowser's page is in, or null when it is in
+   * none.
+   */
+  AUTF8String workspaceOfBrowser(in Element aBrowser);
+};

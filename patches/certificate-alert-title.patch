@@ -1,0 +1,41 @@
+Sval: the certificate alerts raised in C++ take the manager's name as title
+
+Importing a certificate reports through
+nsNSSCertificateDB::DisplayCertificateAlert, which passes no title, so the
+prompt service titles the dialog "Alert". It passes Certificates, the
+title the certificate manager's own errors take.
+
+diff --git a/security/manager/locales/en-US/chrome/pipnss/pipnss.properties b/security/manager/locales/en-US/chrome/pipnss/pipnss.properties
+index b0dbea12c4..32da7cce2a 100644
+--- a/security/manager/locales/en-US/chrome/pipnss/pipnss.properties
++++ b/security/manager/locales/en-US/chrome/pipnss/pipnss.properties
+@@ -116,6 +116,7 @@ certErrorCodePrefix3=Error code: %S
+ P12DefaultNickname=Imported Certificate
+ CertUnknown=Unknown
+ CertNoEmailAddress=(no email address)
++CertAlertTitle=Certificates
+ CaCertExists=This certificate is already installed as a certificate authority.
+ NotACACert=This is not a certificate authority certificate, so it can’t be imported into the certificate authority list.
+ UserCertIgnoredNoPrivateKey=This personal certificate can’t be installed because you do not own the corresponding private key which was created when the certificate was requested.
+diff --git a/security/manager/ssl/nsNSSCertificateDB.cpp b/security/manager/ssl/nsNSSCertificateDB.cpp
+index 01c6406a20..ddb653ba6d 100644
+--- a/security/manager/ssl/nsNSSCertificateDB.cpp
++++ b/security/manager/ssl/nsNSSCertificateDB.cpp
+@@ -538,6 +538,8 @@ void nsNSSCertificateDB::DisplayCertificateAlert(nsIInterfaceRequestor* ctx,
+   // This shall be replaced by embedding ovverridable prompts
+   // as discussed in bug 310446, and should make use of certToShow.
+ 
++  nsAutoString tmpTitle;
++  GetPIPNSSBundleString("CertAlertTitle", tmpTitle);
+   nsAutoString tmpMessage;
+   GetPIPNSSBundleString(stringID, tmpMessage);
+   nsCOMPtr<nsIPrompt> prompt(do_GetInterface(my_ctx));
+@@ -545,7 +547,7 @@ void nsNSSCertificateDB::DisplayCertificateAlert(nsIInterfaceRequestor* ctx,
+     return;
+   }
+ 
+-  prompt->Alert(nullptr, tmpMessage.get());
++  prompt->Alert(tmpTitle.get(), tmpMessage.get());
+ }
+ 
+ NS_IMETHODIMP

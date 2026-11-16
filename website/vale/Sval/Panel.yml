@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# "Panel" passes after "Workspace" or "Workspaces", and in Firefox's
+# Privacy and Security panel.
+extends: existence
+message: "Say Workspace where things live, and 'Workspace panel' for the sidebar itself."
+level: error
+nonword: true
+tokens:
+  - '(?i)(?<!workspace )(?<!workspaces )(?<!security )\bpanels?\b'

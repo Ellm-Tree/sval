@@ -1,0 +1,83 @@
+---
+title: Troubleshooting and data collection
+description: What Sval keeps and sends when something goes wrong, from the log file to the feedback form and crash reports.
+---
+
+Your feedback and crash reports leave your computer only when you send
+them. They go to Sval's own server.
+
+## The Send Feedback form
+
+**Send Feedback**, at the bottom of the Workspace panel, opens the form. In the menu
+bar, **Help › Send Feedback…** opens it too. Some error
+messages have a **Send Report…** button. That button opens the form with a
+line about the error.
+
+- **The message box.** This box takes your message. **Send** needs at least 10
+  characters.
+- **Email (optional).** This field takes an email address for a reply.
+  Nothing else in the report identifies you. Sval's server doesn't keep
+  your IP address.
+- **Sent with your feedback.** This lists each part of the report with its
+  size, and the total size. Each part has a box and a **View** button. View
+  shows exactly what that part sends. **Back** returns to the list.
+- **Cancel.** The form closes and Sval throws your draft away.
+- **Send.** Sval sends the report. While it sends, the button reads
+  **Sending…**. After a failure, it reads **Send Again**.
+
+If you close the form any other way, Sval keeps your draft until you quit.
+Once the report is sent, the form says **Thanks, your feedback was sent.**
+It gives a reference, and **Close** closes the form.
+
+### The parts of the report
+
+- **Sval version and your system.** Sval always sends this part.
+- **Sval's error log.** This part holds recent warnings and errors from
+  Sval and from the browser's own code. The log leaves out addresses, file paths, and names.
+- **Sval's state.** This says whether sync is working. It counts your
+  Workspaces, groups, tabs, and pins. It also gives your
+  protection settings and how long Sval has been running. It holds no
+  names, titles, or addresses.
+- **Browser settings you've changed.** This lists each setting that isn't
+  at its default, with its value. A setting that holds text, such as your
+  home page, shows only as "(changed)".
+- **Installed extensions.** For each extension, this gives the name, ID,
+  and version. It also says whether the extension is on and whether it
+  works with Sval. It doesn't send the extensions' files or settings.
+- **Graphics card and driver.** This names your graphics card and its
+  driver version. It says which hardware acceleration features are on, and
+  how many displays you have, with their scaling.
+- **Crash list.** This shows when you've had a crash in the last three
+  days. It holds the id and time of each crash.
+- **A crash snapshot.** Each of those crashes gets a snapshot. The
+  snapshot is a copy of the crashed process's memory and the libraries it
+  had loaded. It can include parts of pages you had open. When you already
+  sent a crash from its dialog, its snapshot shows **Sent**.
+
+Every part except crash snapshots starts checked. When a part would take
+the report over 25 MB, the part says **Too large to send**.
+
+## Crash reports
+
+- **The Sval Crash Reporter dialog.** This opens after Sval crashes. The
+  box for telling Sval about the crash starts unchecked, and so does
+  **Include the address of the page I was on.** Sval sends the report only
+  when you check the first box. The dialog remembers your last choice.
+- **The crashed tab's page.** This page opens in a tab that crashed.
+  **Send an automated crash report so we can fix issues like this** starts
+  unchecked. **Restore This Tab** reloads the page. If the box is checked,
+  it also sends the report.
+
+## The log file
+
+Sval keeps its own warnings and errors, and the browser's, in
+`sval-log.txt` in Sval's data folder. The log never includes a Workspace,
+group, or tab name, a web address, a file path, or a secret. When the file
+is full, Sval moves it to `sval-log-old.txt` and starts a new one.
+
+## About Sval in Settings › Advanced
+
+- **Diagnostics log level.** This sets how much Sval writes to the browser
+  console: **Off**, **Errors**, **Warnings**, **Info**, **Debug**, or
+  **Everything**. It starts at Warnings. Whatever you choose, the log file
+  keeps warnings and errors.

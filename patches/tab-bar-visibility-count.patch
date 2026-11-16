@@ -1,0 +1,26 @@
+Sval: count a window's visible tabs only where the tab bar update uses it
+
+TabBarVisibility.update runs on every tab close and counted the
+window's visible tabs each time, a filter over every tab once the close
+had dropped tabbrowser's cache of them. Only a popup or taskbar-tab
+window reads the count, so closing a thousand tabs in an ordinary
+window walked the strip a thousand times for nothing. Sval releases a
+Workspace's tabs this way on every switch away from it.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index db6d409597..68c2823558 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -10150,8 +10150,10 @@ var TabBarVisibility = {
+       Services.prefs.getBoolPref("sidebar.verticalTabs", false);
+ 
+     // When `gBrowser` has not been initialized, we're opening a new window and
+-    // assume only a single tab is loading.
+-    let hasSingleTab = !gBrowser || gBrowser.visibleTabs.length == 1;
++    // assume only a single tab is loading. Sval: only a single tab window
++    // asks, and counting the visible tabs walks every tab on each close.
++    let hasSingleTab =
++      isSingleTabWindow && (!gBrowser || gBrowser.visibleTabs.length == 1);
+ 
+     // To prevent tabs being lost, hiding the tabs toolbar should only work
+     // when only a single tab is visible or tabs are displayed elsewhere.

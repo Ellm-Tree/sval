@@ -1,0 +1,236 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The About dialog (`aboutDialog.xhtml`) in Sval's design: the user's card
+ * (`about-dialog.js`) or the globe, the wordmark, what Sval is, and the
+ * update state and links in a well.
+ *
+ * The dialog is always Midnight, the edge colour of the brand art, because
+ * the wordmark and the card are drawn light on dark. Under forced colours
+ * the system's colours take over.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-type.css");
+
+#aboutDialog {
+  font: 14px/1.5 var(--sval-font);
+}
+
+#aboutDialogContainer {
+  min-width: 720px;
+}
+
+#clientBox {
+  gap: 40px;
+  padding: 40px 44px 32px;
+}
+
+/* --------------------------------------------------------- the card */
+
+#leftBox {
+  flex: none;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  min-width: 210px;
+  min-height: 0;
+  margin: 0;
+  background-image: url("chrome://browser/content/sval/home/mark.svg");
+  background-size: 176px auto;
+  background-position: center;
+
+  &:has(> #svalCard) {
+    background-image: none;
+  }
+}
+
+/* The card's own size, held before it is drawn so the window lays out
+ * around it. */
+#svalCard {
+  appearance: none;
+  width: 210px;
+  height: 340px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-palette-neon);
+    outline-offset: 4px;
+  }
+}
+
+#svalCardName {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ------------------------------------------------- what Sval is */
+
+#rightBox {
+  justify-content: center;
+  max-width: 420px;
+  margin: 0;
+  padding-top: 72px;
+  background-size: auto 52px;
+  background-position: 0 0;
+}
+
+#svalTagline {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+#svalDescription {
+  margin: 0 0 24px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------- the well */
+
+#detailsBox {
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+}
+
+#updateBox {
+  row-gap: 6px;
+}
+
+#updateDeck {
+  font-weight: 600;
+}
+
+#version {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The deck's buttons, one shown at a time, are its primary action. */
+#checkForUpdatesButton,
+#downloadAndInstallButton,
+#updateButton {
+  appearance: none;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font: 600 14px var(--sval-font);
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-palette-neon);
+    outline-offset: 2px;
+  }
+}
+
+#updateInfo > .text-blurb {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+#aboutDialogHelpLink,
+#submit-feedback {
+  margin: 0;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ------------------------------------------------- the foot */
+
+#bottomBox {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+
+  > hbox {
+    display: contents;
+  }
+}
+
+#svalCopyright,
+#bottomBox .bottom-link {
+  margin: 0;
+}
+
+#trademark {
+  display: none;
+}
+
+/* ------------------------------------------------- the colours */
+
+@media not (forced-colors) {
+  #aboutDialogContainer {
+    background: radial-gradient(circle at 150px 45%, rgb(31 107 255 / 0.28), transparent 260px), var(--sval-palette-ink-950);
+    color: #ffffff;
+    color-scheme: dark;
+  }
+
+  #svalCardName,
+  #bottomBox {
+    color: var(--sval-palette-ink-400);
+  }
+
+  #svalTagline {
+    color: var(--sval-palette-neon);
+  }
+
+  #svalDescription,
+  #version {
+    color: var(--sval-palette-ink-300);
+  }
+
+  #detailsBox {
+    background-color: rgb(var(--sval-palette-wash-dark) / 0.06);
+    border-color: rgb(var(--sval-palette-wash-dark) / 0.1);
+  }
+
+  #checkForUpdatesButton,
+  #downloadAndInstallButton,
+  #updateButton {
+    background: var(--sval-palette-blue);
+    color: #ffffff;
+
+    &:hover {
+      background: var(--sval-palette-blue-600);
+    }
+  }
+
+  #aboutDialogHelpLink,
+  #submit-feedback {
+    background-color: rgb(var(--sval-palette-wash-dark) / 0.1);
+
+    &:hover {
+      background-color: rgb(var(--sval-palette-wash-dark) / 0.16);
+    }
+
+    &:hover:active {
+      background-color: rgb(var(--sval-palette-wash-dark) / 0.22);
+    }
+  }
+
+  #bottomBox {
+    border-top: 1px solid rgb(var(--sval-palette-wash-dark) / 0.1);
+  }
+}

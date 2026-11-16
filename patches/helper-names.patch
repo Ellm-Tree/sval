@@ -1,0 +1,1550 @@
+Sval: helper executables take names of Sval's own
+
+killall and taskkill pick processes by name, and pkill by any part of one.
+Firefox's helpers have fixed names, so a command meant for an installed
+Firefox's crash helper, child processes or updater also reached Sval's. Each
+helper's name comes from MOZ_APP_NAME in toolkit/moz.configure: Firefox keeps
+Mozilla's names, which an artifact build on Mozilla's packages looks for, and
+Sval's helpers are sval-<role>, a name that contains no Firefox helper's name.
+Every consumer reads the configured name: the build, the package manifest,
+the installer and uninstaller, the artifact code, the code that launches each
+helper, and the harnesses that find them.
+
+pingsender and nmhproxy keep their names. Sval never starts either: telemetry
+upload is locked off, and the Firefox Bridge that registers nmhproxy is off.
+
+diff --git a/Cargo.lock b/Cargo.lock
+index e11e0f2a53..01748ec977 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -5270,6 +5270,7 @@ dependencies = [
+  "crash_helper_client",
+  "crash_helper_common",
+  "libc",
++ "mozbuild",
+  "mozilla-central-workspace-hack",
+  "rust-ini",
+  "serde",
+diff --git a/browser/app/Makefile.in b/browser/app/Makefile.in
+index 286ae398a1..cda4be6ee7 100644
+--- a/browser/app/Makefile.in
++++ b/browser/app/Makefile.in
+@@ -86,7 +86,7 @@ tools repackage:: $(DIST)/bin/$(MOZ_APP_NAME) $(objdir)/macbuild/Contents/MacOS-
+ 	cp -RL $(topsrcdir)/$(MOZ_BRANDING_DIRECTORY)/document.icns '$(dist_dest)/Contents/Resources/document.icns'
+ 	$(MKDIR) -p '$(dist_dest)/Contents/Library/LaunchServices'
+ ifdef MOZ_UPDATER
+-	cp -f '$(dist_dest)/Contents/MacOS/updater.app/Contents/MacOS/org.mozilla.updater' '$(dist_dest)/Contents/Library/LaunchServices/app.sval.updater'
++	cp -f '$(dist_dest)/Contents/MacOS/updater.app/Contents/MacOS/$(MOZ_UPDATER_NAME)' '$(dist_dest)/Contents/Library/LaunchServices/app.sval.updater'
+ endif
+ 	mv '$(dist_dest)/Contents/Resources/app.sval.dmgInstallHelper' '$(dist_dest)/Contents/Library/LaunchServices'
+ 	$(MKDIR) -p '$(dist_dest)/Contents/Frameworks'
+diff --git a/browser/app/macbuild/Contents/MacOS-files.in b/browser/app/macbuild/Contents/MacOS-files.in
+index 2f420f7736..a4481848fd 100644
+--- a/browser/app/macbuild/Contents/MacOS-files.in
++++ b/browser/app/macbuild/Contents/MacOS-files.in
+@@ -14,7 +14,7 @@
+ /llvm-symbolizer
+ #endif
+ #if defined(MOZ_CRASHREPORTER)
+-/crashhelper
++/@MOZ_CRASHHELPER_NAME@
+ #endif
+ /nmhproxy
+ /pingsender
+diff --git a/browser/app/macbuild/Contents/moz.build b/browser/app/macbuild/Contents/moz.build
+index 902fe5a594..b8f9b0d554 100644
+--- a/browser/app/macbuild/Contents/moz.build
++++ b/browser/app/macbuild/Contents/moz.build
+@@ -11,6 +11,7 @@ for s in (
+     "FUZZING",
+     "MOZ_CRASHREPORTER",
+     "MOZ_APP_NAME",
++    "MOZ_CRASHHELPER_NAME",
+ ):
+     if CONFIG[s]:
+         defs.append("-D%s=%s" % (s, "1" if CONFIG[s] is True else CONFIG[s]))
+diff --git a/browser/app/pbproxy/moz.build b/browser/app/pbproxy/moz.build
+index ec44327b67..0991a0018b 100644
+--- a/browser/app/pbproxy/moz.build
++++ b/browser/app/pbproxy/moz.build
+@@ -14,7 +14,8 @@ if CONFIG["OS_TARGET"] == "WINNT" and CONFIG["CC_TYPE"] in ("gcc", "clang"):
+ RCINCLUDE = "pbproxy.rc"
+ DEFINES["UNICODE"] = 1
+ DEFINES["MOZ_APP_NAME"] = 'L"{}"'.format(CONFIG["MOZ_APP_NAME"])
+-Program("private_browsing")
++DEFINES["MOZ_PRIVATE_BROWSING_NAME"] = 'L"{}"'.format(CONFIG["MOZ_PRIVATE_BROWSING_NAME"])
++Program(CONFIG["MOZ_PRIVATE_BROWSING_NAME"])
+ 
+ OS_LIBS += ["shlwapi", "user32"]
+ 
+diff --git a/browser/app/pbproxy/pbproxy.cpp b/browser/app/pbproxy/pbproxy.cpp
+index 841cd654a1..cfcdd0d43f 100644
+--- a/browser/app/pbproxy/pbproxy.cpp
++++ b/browser/app/pbproxy/pbproxy.cpp
+@@ -25,10 +25,10 @@ void raiseError(DWORD err, std::wstring uuid) {
+                               nullptr, err, 0, (LPWSTR)&winerr, 0, nullptr)) {
+     std::wstring errmsg(winerr);
+     errmsg += L"\n\n" + uuid;
+-    ::MessageBoxW(nullptr, errmsg.c_str(), MOZ_APP_NAME " private_browsing.exe",
++    ::MessageBoxW(nullptr, errmsg.c_str(), MOZ_APP_NAME L" " MOZ_PRIVATE_BROWSING_NAME L".exe",
+                   MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+   } else {
+-    ::MessageBoxW(nullptr, uuid.c_str(), MOZ_APP_NAME " private_browsing.exe",
++    ::MessageBoxW(nullptr, uuid.c_str(), MOZ_APP_NAME L" " MOZ_PRIVATE_BROWSING_NAME L".exe",
+                   MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+   }
+ }
+diff --git a/browser/components/shell/StartupOSIntegration.sys.mjs b/browser/components/shell/StartupOSIntegration.sys.mjs
+index 6b9e819110..8c956424fc 100644
+--- a/browser/components/shell/StartupOSIntegration.sys.mjs
++++ b/browser/components/shell/StartupOSIntegration.sys.mjs
+@@ -5,8 +5,8 @@
+ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+-const PRIVATE_BROWSING_BINARY = "private_browsing.exe";
+-// Index of Private Browsing icon in private_browsing.exe
++const PRIVATE_BROWSING_BINARY = AppConstants.MOZ_PRIVATE_BROWSING_NAME + ".exe";
++// Index of Private Browsing icon in the private browsing executable
+ // Must line up with IDI_PBICON_PB_PB_EXE in nsNativeAppSupportWin.h.
+ const PRIVATE_BROWSING_EXE_ICON_INDEX = 1;
+ const PREF_PRIVATE_BROWSING_SHORTCUT_CREATED =
+diff --git a/browser/components/shell/moz.build b/browser/components/shell/moz.build
+index 3bbe979eeb..7e54895569 100644
+--- a/browser/components/shell/moz.build
++++ b/browser/components/shell/moz.build
+@@ -105,6 +105,7 @@ for var in (
+     "MOZ_APP_NAME",
+     "MOZ_APP_VERSION",
+     "MOZ_DEFAULT_BROWSER_AGENT",
++    "MOZ_PRIVATE_BROWSING_NAME",
+ ):
+     DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+diff --git a/browser/components/shell/nsWindowsShellService.cpp b/browser/components/shell/nsWindowsShellService.cpp
+index db48c993f4..88caa3ff86 100644
+--- a/browser/components/shell/nsWindowsShellService.cpp
++++ b/browser/components/shell/nsWindowsShellService.cpp
+@@ -87,7 +87,7 @@ using namespace ABI::Windows::ApplicationModel::Core;
+ using namespace ABI::Windows::UI::StartScreen;
+ #endif
+ 
+-#define PRIVATE_BROWSING_BINARY L"private_browsing.exe"
++#define PRIVATE_BROWSING_BINARY L"" MOZ_PRIVATE_BROWSING_NAME ".exe"
+ 
+ #undef ACCESS_READ
+ 
+@@ -1495,7 +1495,7 @@ static nsresult FindPinnableShortcut(const nsAString& aAppUserModelId,
+     if (!PathRemoveFileSpecW(exePath)) {
+       return NS_ERROR_FAILURE;
+     }
+-    if (!PathAppendW(exePath, L"private_browsing.exe")) {
++    if (!PathAppendW(exePath, PRIVATE_BROWSING_BINARY)) {
+       return NS_ERROR_FAILURE;
+     }
+   }
+@@ -1615,7 +1615,7 @@ static bool IsCurrentAppPinnedToTaskbarSync(const nsAString& aumid) {
+   if (!PathRemoveFileSpecW(pbExePath)) {
+     return false;
+   }
+-  if (!PathAppendW(pbExePath, L"private_browsing.exe")) {
++  if (!PathAppendW(pbExePath, PRIVATE_BROWSING_BINARY)) {
+     return false;
+   }
+ 
+diff --git a/browser/installer/Makefile.in b/browser/installer/Makefile.in
+index b9cdd79e98..c675e9aa1a 100644
+--- a/browser/installer/Makefile.in
++++ b/browser/installer/Makefile.in
+@@ -60,6 +60,17 @@ DEFINES += -DMOZ_ENABLE_SKIA_PDF=$(MOZ_ENABLE_SKIA_PDF)
+ endif
+ 
+ DEFINES += -DMOZ_CHILD_PROCESS_NAME=$(MOZ_CHILD_PROCESS_NAME)
++DEFINES += -DMOZ_CRASHHELPER_NAME=$(MOZ_CRASHHELPER_NAME)
++DEFINES += -DMOZ_CRASHREPORTER_NAME=$(MOZ_CRASHREPORTER_NAME)
++DEFINES += -DMOZ_UPDATER_NAME=$(MOZ_UPDATER_NAME)
++DEFINES += -DMOZ_MAINTENANCESERVICE_NAME=$(MOZ_MAINTENANCESERVICE_NAME)
++DEFINES += -DMOZ_MAINTENANCESERVICE_INSTALLER_NAME=$(MOZ_MAINTENANCESERVICE_INSTALLER_NAME)
++DEFINES += -DMOZ_PRIVATE_BROWSING_NAME=$(MOZ_PRIVATE_BROWSING_NAME)
++DEFINES += -DMOZ_DEFAULT_AGENT_NAME=$(MOZ_DEFAULT_AGENT_NAME)
++DEFINES += -DMOZ_GLXTEST_NAME=$(MOZ_GLXTEST_NAME)
++DEFINES += -DMOZ_V4L2TEST_NAME=$(MOZ_V4L2TEST_NAME)
++DEFINES += -DMOZ_VAAPITEST_NAME=$(MOZ_VAAPITEST_NAME)
++DEFINES += -DMOZ_VULKANTEST_NAME=$(MOZ_VULKANTEST_NAME)
+ DEFINES += -DMOZ_EME_PROCESS_NAME="$(MOZ_EME_PROCESS_NAME)"
+ DEFINES += -DMOZ_GPU_PROCESS_NAME="$(MOZ_GPU_PROCESS_NAME)"
+ 
+diff --git a/browser/installer/allowed-dupes.mn b/browser/installer/allowed-dupes.mn
+index 897b472772..ff5c784439 100644
+--- a/browser/installer/allowed-dupes.mn
++++ b/browser/installer/allowed-dupes.mn
+@@ -7,9 +7,9 @@
+ 
+ # updater on osx is bug 1311194
+ LaunchServices/app.sval.updater
+-updater.app/Contents/MacOS/org.mozilla.updater
++updater.app/Contents/MacOS/@MOZ_UPDATER_NAME@
+ 
+-plugin-container.app/Contents/PkgInfo
++@MOZ_CHILD_PROCESS_NAME@.app/Contents/PkgInfo
+ updater.app/Contents/PkgInfo
+ media-plugin-helper.app/Contents/PkgInfo
+ gpu-helper.app/Contents/PkgInfo
+@@ -17,7 +17,7 @@ security-module-helper.app/Contents/PkgInfo
+ 
+ media-plugin-helper.app/Contents/MacOS/@MOZ_APP_DISPLAYNAME@ Media Plugin Helper
+ gpu-helper.app/Contents/MacOS/@MOZ_APP_DISPLAYNAME@ GPU Helper
+-plugin-container.app/Contents/MacOS/plugin-container
++@MOZ_CHILD_PROCESS_NAME@.app/Contents/MacOS/@MOZ_CHILD_PROCESS_NAME@
+ security-module-helper.app/Contents/MacOS/@MOZ_APP_DISPLAYNAME@ Security Module Helper
+ 
+ media-plugin-helper.app/Contents/Resources/English.lproj/InfoPlist.strings
+diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
+index afbf46ed1a..0f992b5dc9 100644
+--- a/browser/installer/package-manifest.in
++++ b/browser/installer/package-manifest.in
+@@ -120,7 +120,7 @@
+ ; the system's graphics capabilities and behavior.
+ ; It is separate because it may crash, and handling this within Firefox
+ ; itself would be more challenging.
+-@BINPATH@/glxtest
++@BINPATH@/@MOZ_GLXTEST_NAME@
+ @BINPATH@/@DLL_PREFIX@mozgtk@DLL_SUFFIX@
+ #ifdef MOZ_WAYLAND
+ @BINPATH@/@DLL_PREFIX@mozwayland@DLL_SUFFIX@
+@@ -128,15 +128,15 @@
+ #ifdef MOZ_ENABLE_V4L2
+ ; Similar to glxtest, this tests the hardware decoding for Video for Linux.
+ ; Currently, it doesn't ship for Firefox targeting typical Intel CPU (or compatible).
+-@BINPATH@/v4l2test
++@BINPATH@/@MOZ_V4L2TEST_NAME@
+ #endif
+ #ifdef MOZ_ENABLE_VAAPI
+ ; Similar to glxtest, this tests the capabilities of the Video Acceleration API (VA-API).
+-@BINPATH@/vaapitest
++@BINPATH@/@MOZ_VAAPITEST_NAME@
+ #endif
+ #ifdef MOZ_ENABLE_VULKAN_VIDEO
+ ; Vulkan video decode probe (device extension / codec support).
+-@BINPATH@/vulkantest
++@BINPATH@/@MOZ_VULKANTEST_NAME@
+ #endif
+ #endif
+ 
+@@ -158,11 +158,11 @@
+ ; [Base Browser Files]
+ #ifndef XP_UNIX
+ @BINPATH@/@MOZ_APP_NAME@.exe
+-@BINPATH@/firefox.VisualElementsManifest.xml
++@BINPATH@/@MOZ_APP_NAME@.VisualElementsManifest.xml
+ @BINPATH@/browser/VisualElements/VisualElements_150.png
+ @BINPATH@/browser/VisualElements/VisualElements_70.png
+-@BINPATH@/private_browsing.exe
+-@BINPATH@/private_browsing.VisualElementsManifest.xml
++@BINPATH@/@MOZ_PRIVATE_BROWSING_NAME@.exe
++@BINPATH@/@MOZ_PRIVATE_BROWSING_NAME@.VisualElementsManifest.xml
+ @BINPATH@/browser/VisualElements/PrivateBrowsing_150.png
+ @BINPATH@/browser/VisualElements/PrivateBrowsing_70.png
+ #else
+@@ -385,15 +385,15 @@ bin/libfreebl_64int_3.so
+ #ifdef XP_MACOSX
+ @BINPATH@/updater.app/
+ #else
+-@BINPATH@/updater@BIN_SUFFIX@
++@BINPATH@/@MOZ_UPDATER_NAME@@BIN_SUFFIX@
+ #endif
+ #endif
+ 
+ ; [MaintenanceService]
+ ;
+ #ifdef MOZ_MAINTENANCE_SERVICE
+-@BINPATH@/maintenanceservice.exe
+-@BINPATH@/maintenanceservice_installer.exe
++@BINPATH@/@MOZ_MAINTENANCESERVICE_NAME@.exe
++@BINPATH@/@MOZ_MAINTENANCESERVICE_INSTALLER_NAME@.exe
+ #endif
+ 
+ ; [Crash Reporter]
+@@ -402,7 +402,7 @@ bin/libfreebl_64int_3.so
+ #ifdef XP_MACOSX
+ @BINPATH@/crashreporter.app/
+ #else
+-@BINPATH@/crashreporter@BIN_SUFFIX@
++@BINPATH@/@MOZ_CRASHREPORTER_NAME@@BIN_SUFFIX@
+ #if defined(XP_WIN)
+ @BINPATH@/@DLL_PREFIX@mozwer@DLL_SUFFIX@
+ #endif
+@@ -412,7 +412,7 @@ bin/libfreebl_64int_3.so
+ ; [ crashhelper ]
+ ;
+ #ifdef MOZ_CRASHREPORTER
+-@BINPATH@/crashhelper@BIN_SUFFIX@
++@BINPATH@/@MOZ_CRASHHELPER_NAME@@BIN_SUFFIX@
+ #endif
+ 
+ ; [ Ping Sender ]
+@@ -459,7 +459,7 @@ bin/libfreebl_64int_3.so
+ #endif
+ 
+ #if defined(XP_WIN) && defined(MOZ_DEFAULT_BROWSER_AGENT)
+-@BINPATH@/default-browser-agent@BIN_SUFFIX@
++@BINPATH@/@MOZ_DEFAULT_AGENT_NAME@@BIN_SUFFIX@
+ #endif
+ 
+ #ifdef MOZ_ARTIFACT_BUILDS
+diff --git a/browser/installer/windows/moz.build b/browser/installer/windows/moz.build
+index 0c0bc60fa0..feb6945a72 100644
+--- a/browser/installer/windows/moz.build
++++ b/browser/installer/windows/moz.build
+@@ -9,6 +9,17 @@ DEFINES["MOZ_APP_BASENAME"] = CONFIG["MOZ_APP_BASENAME"]
+ DEFINES["MOZ_APP_VENDOR"] = CONFIG["MOZ_APP_VENDOR"]
+ DEFINES["MOZ_APP_DISPLAYNAME"] = CONFIG["MOZ_APP_DISPLAYNAME"]
+ DEFINES["MOZILLA_VERSION"] = CONFIG["MOZILLA_VERSION"]
++for var in (
++    "MOZ_CHILD_PROCESS_NAME",
++    "MOZ_CRASHHELPER_NAME",
++    "MOZ_CRASHREPORTER_NAME",
++    "MOZ_DEFAULT_AGENT_NAME",
++    "MOZ_MAINTENANCESERVICE_INSTALLER_NAME",
++    "MOZ_MAINTENANCESERVICE_NAME",
++    "MOZ_PRIVATE_BROWSING_NAME",
++    "MOZ_UPDATER_NAME",
++):
++    DEFINES[var] = CONFIG[var]
+ 
+ # Turn `firefox` into `Firefox`.
+ DEFINES["MOZ_TOAST_APP_NAME"] = "%s" % CONFIG["MOZ_APP_NAME"].title()
+diff --git a/browser/installer/windows/nsis/defines.nsi.in b/browser/installer/windows/nsis/defines.nsi.in
+index 648640e4e9..7b55ddfd85 100644
+--- a/browser/installer/windows/nsis/defines.nsi.in
++++ b/browser/installer/windows/nsis/defines.nsi.in
+@@ -27,7 +27,16 @@
+ !define MOZ_BUILDID           "@MOZ_BUILDID@"
+ 
+ !define FileMainEXE           "@MOZ_APP_NAME@.exe"
+-!define PrivateBrowsingEXE    "private_browsing.exe"
++!define PrivateBrowsingEXE    "@MOZ_PRIVATE_BROWSING_NAME@.exe"
++!define ChildProcessEXE       "@MOZ_CHILD_PROCESS_NAME@"
++!define CrashHelperEXE        "@MOZ_CRASHHELPER_NAME@.exe"
++!define CrashReporterEXE      "@MOZ_CRASHREPORTER_NAME@.exe"
++!define UpdaterEXE            "@MOZ_UPDATER_NAME@.exe"
++!define MaintServiceEXE       "@MOZ_MAINTENANCESERVICE_NAME@.exe"
++!define MaintServiceTmpEXE    "@MOZ_MAINTENANCESERVICE_NAME@_tmp.exe"
++!define MaintServiceOld       "@MOZ_MAINTENANCESERVICE_NAME@.old"
++!define MaintServiceInstallerEXE "@MOZ_MAINTENANCESERVICE_INSTALLER_NAME@.exe"
++!define DefaultAgentEXE       "@MOZ_DEFAULT_AGENT_NAME@.exe"
+ !define MainWindowClass       "MozillaWindowClass"
+ !define DialogWindowClass     "MozillaDialogClass"
+ !define DDEApplication        "Firefox"
+@@ -50,7 +59,7 @@
+ !define IDI_DOCUMENT_PDF_ZERO_BASED  "5"
+ 
+ ; This one is the location of the Private Browsing icon in
+-; private_browsing.exe (as opposed to @MOZ_APP_NAME@.exe)
++; ${PrivateBrowsingEXE} (as opposed to @MOZ_APP_NAME@.exe)
+ !define IDI_PBICON_PB_EXE_ZERO_BASED "0"
+ 
+ ; Sval's update service: its Windows service, its registry key, its folder
+diff --git a/browser/installer/windows/nsis/installer.nsi b/browser/installer/windows/nsis/installer.nsi
+index 20b99c1843..2f380431e9 100755
+--- a/browser/installer/windows/nsis/installer.nsi
++++ b/browser/installer/windows/nsis/installer.nsi
+@@ -508,7 +508,7 @@ Section "-Application" APP_IDX
+     ; the pre-packaged maintenance service installer.
+     ; This option can only be turned on if the user is an admin so there
+     ; is no need to use ExecShell w/ verb runas to enforce elevated.
+-    nsExec::Exec "$\"$INSTDIR\maintenanceservice_installer.exe$\""
++    nsExec::Exec "$\"$INSTDIR\${MaintServiceInstallerEXE}$\""
+   ${EndIf}
+ !endif
+ 
+@@ -534,7 +534,7 @@ Section "-Application" APP_IDX
+ 
+   StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\$R9"
+   ${CreateRegKey} "$RegHive" "$0" 0
+-  StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\plugin-container.exe"
++  StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\${ChildProcessEXE}"
+   ${CreateRegKey} "$RegHive" "$0" 0
+ 
+   ${If} $RegHive == "HKLM"
+@@ -727,7 +727,7 @@ Section "-Application" APP_IDX
+ 
+ !ifdef MOZ_DEFAULT_BROWSER_AGENT
+   ${If} $RegisterDefaultAgent != "0"
+-    ExecWait '"$INSTDIR\default-browser-agent.exe" register-task $AppUserModelID' $0
++    ExecWait '"$INSTDIR\${DefaultAgentEXE}" register-task $AppUserModelID' $0
+ 
+     ${If} $0 == 0x80070534 ; HRESULT_FROM_WIN32(ERROR_NONE_MAPPED)
+       ; The agent sometimes returns this error from trying to register the task
+@@ -737,7 +737,7 @@ Section "-Application" APP_IDX
+       ; the interactive user, which is what we want.
+       ; We use ExecInExplorer only as a fallback instead of always, because it
+       ; doesn't work in all environments; see bug 1602726.
+-      ExecInExplorer::Exec "$INSTDIR\default-browser-agent.exe" \
++      ExecInExplorer::Exec "$INSTDIR\${DefaultAgentEXE}" \
+                            /cmdargs "register-task $AppUserModelID"
+       ; We don't need Exec's return value, but don't leave it on the stack.
+       Pop $0
+diff --git a/browser/installer/windows/nsis/maintenanceservice_installer.nsi b/browser/installer/windows/nsis/maintenanceservice_installer.nsi
+index 615a8daf4b..cfe27d117d 100644
+--- a/browser/installer/windows/nsis/maintenanceservice_installer.nsi
++++ b/browser/installer/windows/nsis/maintenanceservice_installer.nsi
+@@ -58,10 +58,10 @@ Var BrandFullName
+ !include locales.nsi
+ 
+ VIAddVersionKey "FileDescription" "${MaintFullName} Installer"
+-VIAddVersionKey "OriginalFilename" "maintenanceservice_installer.exe"
++VIAddVersionKey "OriginalFilename" "${MaintServiceInstallerEXE}"
+ 
+ Name "${MaintFullName}"
+-OutFile "maintenanceservice_installer.exe"
++OutFile "${MaintServiceInstallerEXE}"
+ 
+ ; Get installation folder from registry if available
+ InstallDirRegKey HKLM "${MaintSvcKey}" ""
+@@ -137,14 +137,14 @@ Section "MaintenanceService"
+   ; maintenanceservice.exe if maintenanceservice_tmp.exe is newer.
+   ; If the service does not exist yet, we install it and drop the file on
+   ; disk as maintenanceservice.exe directly.
+-  StrCpy $TempMaintServiceName "maintenanceservice.exe"
+-  IfFileExists "$INSTDIR\maintenanceservice.exe" 0 skipAlreadyExists
+-    StrCpy $TempMaintServiceName "maintenanceservice_tmp.exe"
++  StrCpy $TempMaintServiceName "${MaintServiceEXE}"
++  IfFileExists "$INSTDIR\${MaintServiceEXE}" 0 skipAlreadyExists
++    StrCpy $TempMaintServiceName "${MaintServiceTmpEXE}"
+   skipAlreadyExists:
+ 
+   ; We always write out a copy and then decide whether to install it or
+   ; not via calling its 'install' cmdline which works by version comparison.
+-  CopyFiles /SILENT "$EXEDIR\maintenanceservice.exe" "$INSTDIR\$TempMaintServiceName"
++  CopyFiles /SILENT "$EXEDIR\${MaintServiceEXE}" "$INSTDIR\$TempMaintServiceName"
+ 
+   ; The updater.ini file is only used when performing an install or upgrade,
+   ; and only if that install or upgrade is successful.  If an old updater.ini
+@@ -245,21 +245,21 @@ FunctionEnd
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ Section "Uninstall"
+   ; Delete the service so that no updates will be attempted
+-  ExecWait '"$INSTDIR\maintenanceservice.exe" uninstall'
++  ExecWait '"$INSTDIR\${MaintServiceEXE}" uninstall'
+ 
+   Push "$INSTDIR\updater.ini"
+   Call un.RenameDelete
+-  Push "$INSTDIR\maintenanceservice.exe"
++  Push "$INSTDIR\${MaintServiceEXE}"
+   Call un.RenameDelete
+-  Push "$INSTDIR\maintenanceservice_tmp.exe"
++  Push "$INSTDIR\${MaintServiceTmpEXE}"
+   Call un.RenameDelete
+-  Push "$INSTDIR\maintenanceservice.old"
++  Push "$INSTDIR\${MaintServiceOld}"
+   Call un.RenameDelete
+   Push "$INSTDIR\Uninstall.exe"
+   Call un.RenameDelete
+   Push "$INSTDIR\update\updater.ini"
+   Call un.RenameDelete
+-  Push "$INSTDIR\update\updater.exe"
++  Push "$INSTDIR\update\${UpdaterEXE}"
+   Call un.RenameDelete
+   Push "$INSTDIR\logs\maintenanceservice.log"
+   Call un.RenameDelete
+diff --git a/browser/installer/windows/nsis/shared.nsh b/browser/installer/windows/nsis/shared.nsh
+index 97f4ffc6d6..d1df271c7f 100755
+--- a/browser/installer/windows/nsis/shared.nsh
++++ b/browser/installer/windows/nsis/shared.nsh
+@@ -238,7 +238,7 @@ FunctionEnd
+   ; where "C:\Program Files" becomes "C:\Program Files (x86)" in some cases.
+   ; It should be OK to remove the shortcut (which matches our app name) even if it isn't from this
+   ; install, as long as the file name portion of the target path matches.
+-  StrCpy $2 "\default-browser-agent.exe"
++  StrCpy $2 "\${DefaultAgentEXE}"
+   StrLen $3 $2
+   ; Select the substring to match from the end of the target path.
+   StrCpy $0 $0 $3 -$3
+@@ -1422,12 +1422,12 @@ FunctionEnd
+   Push "nssdbm3.dll"
+   Push "mozsqlite3.dll"
+   Push "xpcom.dll"
+-  Push "crashhelper.exe"
+-  Push "crashreporter.exe"
+-  Push "default-browser-agent.exe"
++  Push "${CrashHelperEXE}"
++  Push "${CrashReporterEXE}"
++  Push "${DefaultAgentEXE}"
+   Push "nmhproxy.exe"
+   Push "pingsender.exe"
+-  Push "updater.exe"
++  Push "${UpdaterEXE}"
+   Push "mozwer.dll"
+   Push "${FileMainEXE}"
+ !macroend
+diff --git a/browser/installer/windows/nsis/uninstaller.nsi b/browser/installer/windows/nsis/uninstaller.nsi
+index e56bb5a5f2..c07e9900df 100755
+--- a/browser/installer/windows/nsis/uninstaller.nsi
++++ b/browser/installer/windows/nsis/uninstaller.nsi
+@@ -427,7 +427,7 @@ Section "Uninstall"
+   ; One of the scheduled tasks that this will remove is the Background Update
+   ; Task. Ideally, this will eventually be changed so that it doesn't rely on
+   ; the WDBA. See Bug 1710143.
+-  ExecWait '"$INSTDIR\default-browser-agent.exe" uninstall $AppUserModelID'
++  ExecWait '"$INSTDIR\${DefaultAgentEXE}" uninstall $AppUserModelID'
+   ${RemoveDefaultBrowserAgentShortcut}
+ 
+   ; Delete the app exe to prevent launching the app while we are uninstalling.
+@@ -577,9 +577,10 @@ Section "Uninstall"
+     StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\${FileMainEXE}"
+     DeleteRegKey HKLM "$0"
+     DeleteRegKey HKCU "$0"
+-    ; An installed Firefox holds plugin-container.exe's ShimInclusionList
+-    ; entry under the same name, and Sval never writes the xpinstall MIME
+-    ; type Firefox registers, so both stay.
++    StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\${ChildProcessEXE}"
++    DeleteRegKey HKLM "$0"
++    DeleteRegKey HKCU "$0"
++    ; Sval never writes the xpinstall MIME type Firefox registers, so it stays.
+   ${Else}
+     ReadRegStr $R1 HKLM "$0" ""
+     ${un.RemoveQuotesFromPath} "$R1" $R1
+diff --git a/browser/installer/windows/nsis/uninstaller_helpers.nsh b/browser/installer/windows/nsis/uninstaller_helpers.nsh
+index c98e5a3d8e..4c3127e184 100644
+--- a/browser/installer/windows/nsis/uninstaller_helpers.nsh
++++ b/browser/installer/windows/nsis/uninstaller_helpers.nsh
+@@ -435,7 +435,7 @@
+       ; In the worst case, in case there is some edge case with the
+       ; IsAdmin check and the permissions check, the maintenance service
+       ; will just fail to be attempted to be installed.
+-      nsExec::Exec "$\"$INSTDIR\maintenanceservice_installer.exe$\""
++      nsExec::Exec "$\"$INSTDIR\${MaintServiceInstallerEXE}$\""
+     ${EndIf}
+   ${EndIf}
+ !endif
+@@ -460,7 +460,7 @@ ${If} $RegHive == "HKCU"
+                     "DidRegisterDefaultBrowserAgent"
+   ${If} $0 != 0
+   ${OrIf} ${Errors}
+-    ExecWait '"$INSTDIR\default-browser-agent.exe" register-task $AppUserModelID'
++    ExecWait '"$INSTDIR\${DefaultAgentEXE}" register-task $AppUserModelID'
+   ${EndIf}
+ ${EndIf}
+ !endif
+diff --git a/build/rust/mozbuild/generate_buildconfig.py b/build/rust/mozbuild/generate_buildconfig.py
+index 0efd476866..89a29a1541 100644
+--- a/build/rust/mozbuild/generate_buildconfig.py
++++ b/build/rust/mozbuild/generate_buildconfig.py
+@@ -109,6 +109,7 @@ def generate(output):
+     output.write(generate_string("MOZ_MACBUNDLE_ID"))
+     output.write(generate_string("MOZ_APP_BASENAME"))
+     output.write(generate_string("MOZ_APP_NAME"))
++    output.write(generate_string("MOZ_CRASHREPORTER_NAME"))
+     output.write(generate_string("MOZ_APP_PROFILE"))
+     output.write(generate_string("MOZ_APP_VENDOR"))
+     output.write(generate_string("MOZ_APP_VERSION"))
+diff --git a/media/gmp-clearkey/0.1/gmp-clearkey.cpp b/media/gmp-clearkey/0.1/gmp-clearkey.cpp
+index 824b6aed8c..84e435e8a1 100644
+--- a/media/gmp-clearkey/0.1/gmp-clearkey.cpp
++++ b/media/gmp-clearkey/0.1/gmp-clearkey.cpp
+@@ -128,7 +128,7 @@ static uint32_t NumExpectedHostFiles(const cdm::HostFile* aHostFiles,
+ #else
+   // On Windows we might be using the parent binary not plugin-container for the
+   // gmp processes. In which case we will have 3 not 4 files.
+-  const std::wstring plugincontainer = L"plugin-container.exe";
++  const std::wstring plugincontainer = L"" MOZ_CHILD_PROCESS_NAME;
+   for (uint32_t i = 0; i < aNumFiles; i++) {
+     const cdm::HostFile& hostFile = aHostFiles[i];
+     if (hostFile.file != cdm::kInvalidPlatformFile) {
+diff --git a/media/gmp-clearkey/0.1/moz.build b/media/gmp-clearkey/0.1/moz.build
+index 3e13c8ba1e..b93ccaaf7f 100644
+--- a/media/gmp-clearkey/0.1/moz.build
++++ b/media/gmp-clearkey/0.1/moz.build
+@@ -42,6 +42,7 @@ if CONFIG["OS_ARCH"] == "WINNT":
+     DEFINES["ENABLE_WMF"] = True
+ 
+ DEFINES["CDM_IMPLEMENTATION"] = True
++DEFINES["MOZ_CHILD_PROCESS_NAME"] = '"%s"' % CONFIG["MOZ_CHILD_PROCESS_NAME"]
+ 
+ DisableStlWrapping()
+ DEFINES["MOZ_NO_MOZALLOC"] = True
+diff --git a/python/mozbuild/mozbuild/action/test_archive.py b/python/mozbuild/mozbuild/action/test_archive.py
+index 99b7845340..38c8d7affb 100644
+--- a/python/mozbuild/mozbuild/action/test_archive.py
++++ b/python/mozbuild/mozbuild/action/test_archive.py
+@@ -50,7 +50,9 @@ TEST_HARNESS_BINS = [
+     "ssltunnel",
+     "test_stub_installer",
+     "xpcshell",
+-    "plugin-container",
++    buildconfig.substs.get("MOZ_CHILD_PROCESS_NAME", "plugin-container").removesuffix(
++        buildconfig.substs.get("BIN_SUFFIX", "")
++    ),
+ ]
+ 
+ TEST_HARNESS_DLLS = ["crashinjectdll", "mozglue", "msvcp*", "vcruntime*"]
+diff --git a/python/mozbuild/mozbuild/artifacts.py b/python/mozbuild/mozbuild/artifacts.py
+index 28881ab224..cb27f4c530 100644
+--- a/python/mozbuild/mozbuild/artifacts.py
++++ b/python/mozbuild/mozbuild/artifacts.py
+@@ -167,7 +167,7 @@ class ArtifactJob:
+         ("bin/screentopng", ("bin", "bin")),
+         ("bin/ssltunnel", ("bin", "bin")),
+         ("bin/xpcshell", ("bin", "bin")),
+-        ("bin/plugin-container", ("bin", "bin")),
++        ("bin/{child}", ("bin", "bin")),
+         ("bin/http3server", ("bin", "bin")),
+         ("bin/plugins/gmp-*/*/*", ("bin/plugins", "bin")),
+         ("bin/plugins/*", ("bin/plugins", "plugins")),
+@@ -330,7 +330,7 @@ class ArtifactJob:
+             reader = JarReader(filename)
+             for entry_filename, entry in reader.entries.items():
+                 for pattern, (src_prefix, dest_prefix) in self.test_artifact_patterns:
+-                    if not mozpath.match(entry_filename, pattern):
++                    if not mozpath.match(entry_filename, self.format_pattern(pattern)):
+                         continue
+                     destpath = mozpath.relpath(entry_filename, src_prefix)
+                     destpath = mozpath.join(dest_prefix, destpath)
+@@ -389,7 +389,7 @@ class ArtifactJob:
+                 pattern,
+                 (src_prefix, dest_prefix),
+             ) in self.test_artifact_patterns:
+-                if not mozpath.match(tar_entry_filename, pattern):
++                if not mozpath.match(tar_entry_filename, self.format_pattern(pattern)):
+                     continue
+ 
+                 destpath = mozpath.relpath(tar_entry_filename, src_prefix)
+@@ -540,6 +540,23 @@ class ArtifactJob:
+             return self._substs["MOZ_APP_NAME"]
+         return self.job_configuration.product
+ 
++    def format_pattern(self, pattern):
++        # The helpers' names follow MOZ_APP_NAME (helper_names in
++        # toolkit/moz.configure), and a build that has not configured them
++        # unpacks Mozilla's.
++        substs = self._substs or {}
++        names = {
++            "child": substs.get("MOZ_CHILD_PROCESS_NAME", "plugin-container"),
++            "crashhelper": substs.get("MOZ_CRASHHELPER_NAME", "crashhelper"),
++            "crashreporter": substs.get("MOZ_CRASHREPORTER_NAME", "crashreporter"),
++            "updater": substs.get("MOZ_UPDATER_NAME", "updater"),
++            "glxtest": substs.get("MOZ_GLXTEST_NAME", "glxtest"),
++            "v4l2test": substs.get("MOZ_V4L2TEST_NAME", "v4l2test"),
++            "vaapitest": substs.get("MOZ_VAAPITEST_NAME", "vaapitest"),
++            "vulkantest": substs.get("MOZ_VULKANTEST_NAME", "vulkantest"),
++        }
++        return pattern.format(product=self.product, **names)
++
+     @property
+     def trust_domain(self):
+         return self.job_configuration.trust_domain
+@@ -634,18 +651,18 @@ class LinuxArtifactJob(ArtifactJob):
+     job_configuration = GeckoJobConfiguration
+ 
+     _package_artifact_patterns = {
+-        "{product}/crashhelper",
+-        "{product}/crashreporter",
++        "{product}/{crashhelper}",
++        "{product}/{crashreporter}",
+         "{product}/dependentlibs.list",
+         "{product}/{product}",
+         "{product}/{product}-bin",
+         "{product}/pingsender",
+-        "{product}/plugin-container",
+-        "{product}/updater",
+-        "{product}/glxtest",
+-        "{product}/v4l2test",
+-        "{product}/vaapitest",
+-        "{product}/vulkantest",
++        "{product}/{child}",
++        "{product}/{updater}",
++        "{product}/{glxtest}",
++        "{product}/{v4l2test}",
++        "{product}/{vaapitest}",
++        "{product}/{vulkantest}",
+         "{product}/**/*.so",
+         # Preserve signatures when present.
+         "{product}/**/*.sig",
+@@ -653,7 +670,7 @@ class LinuxArtifactJob(ArtifactJob):
+ 
+     @property
+     def package_artifact_patterns(self):
+-        return {p.format(product=self.product) for p in self._package_artifact_patterns}
++        return {self.format_pattern(p) for p in self._package_artifact_patterns}
+ 
+     def process_package_artifact(self, filename, processed_filename):
+         added_entry = False
+@@ -732,15 +749,15 @@ class MacArtifactJob(ArtifactJob):
+         (
+             "Contents/MacOS",
+             [
+-                "crashhelper",
+-                "crashreporter.app/Contents/MacOS/crashreporter",
++                "{crashhelper}",
++                "crashreporter.app/Contents/MacOS/{crashreporter}",
+                 "{product}",
+                 "{product}-bin",
+                 "*.dylib",
+                 "nmhproxy",
+                 "pingsender",
+-                "plugin-container.app/Contents/MacOS/plugin-container",
+-                "updater.app/Contents/MacOS/org.mozilla.updater",
++                "{child}.app/Contents/MacOS/{child}",
++                "updater.app/Contents/MacOS/{updater}",
+                 # 'xpcshell',
+                 "XUL",
+             ],
+@@ -764,7 +781,7 @@ class MacArtifactJob(ArtifactJob):
+     def paths_no_keep_path(self):
+         formatted = []
+         for root, paths in self._paths_no_keep_path:
+-            formatted.append((root, [p.format(product=self.product) for p in paths]))
++            formatted.append((root, [self.format_pattern(p) for p in paths]))
+ 
+         return tuple(formatted)
+ 
+@@ -857,7 +874,7 @@ class WinArtifactJob(ArtifactJob):
+ 
+     @property
+     def package_artifact_patterns(self):
+-        return {p.format(product=self.product) for p in self._package_artifact_patterns}
++        return {self.format_pattern(p) for p in self._package_artifact_patterns}
+ 
+     # These are a subset of TEST_HARNESS_BINS in testing/mochitest/Makefile.in.
+     # See `ArtifactJob.test_artifact_patterns` for why the order matters.
+diff --git a/testing/mochitest/runtests.py b/testing/mochitest/runtests.py
+index 5d0070e5c6..4dcfd77a6b 100644
+--- a/testing/mochitest/runtests.py
++++ b/testing/mochitest/runtests.py
+@@ -511,9 +511,12 @@ if mozinfo.isWin:
+                 # Still an active process, so conservatively assume it's Firefox.
+                 return True
+ 
+-            return pName.value.endswith(
+-                (b"firefox.exe", b"sval.exe", b"plugin-container.exe")
+-            )
++            return pName.value.endswith((
++                b"firefox.exe",
++                b"sval.exe",
++                b"plugin-container.exe",
++                b"sval-child.exe",
++            ))
+         finally:
+             ctypes.windll.kernel32.CloseHandle(pHandle)
+ 
+diff --git a/toolkit/components/crashes/CrashService.sys.mjs b/toolkit/components/crashes/CrashService.sys.mjs
+index 94ffe0f732..5cb6ee299b 100644
+--- a/toolkit/components/crashes/CrashService.sys.mjs
++++ b/toolkit/components/crashes/CrashService.sys.mjs
+@@ -36,7 +36,7 @@ function getCrashReporterPath() {
+       ? "crashreporter.app/Contents/MacOS/"
+       : "";
+   const binSuffix = AppConstants.platform === "win" ? ".exe" : "";
+-  const exeName = binPrefix + "crashreporter" + binSuffix;
++  const exeName = binPrefix + AppConstants.MOZ_CRASHREPORTER_NAME + binSuffix;
+ 
+   let exe = Services.dirsvc.get("GreBinD", Ci.nsIFile);
+   exe.appendRelativePath(exeName);
+diff --git a/toolkit/components/maintenanceservice/moz.build b/toolkit/components/maintenanceservice/moz.build
+index 4c2ba749c7..22568406a7 100644
+--- a/toolkit/components/maintenanceservice/moz.build
++++ b/toolkit/components/maintenanceservice/moz.build
+@@ -2,7 +2,7 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-Program("maintenanceservice")
++Program(CONFIG["MOZ_MAINTENANCESERVICE_NAME"])
+ 
+ SOURCES += [
+     "maintenanceservice.cpp",
+@@ -26,6 +26,8 @@ DEFINES["UNICODE"] = True
+ DEFINES["_UNICODE"] = True
+ DEFINES["NS_NO_XPCOM"] = True
+ DEFINES["IMPL_MFBT"] = True
++for var in ("MOZ_MAINTENANCESERVICE_NAME", "MOZ_UPDATER_NAME"):
++    DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+ # Pick up nsWindowsRestart.cpp
+ LOCAL_INCLUDES += [
+diff --git a/toolkit/components/maintenanceservice/serviceinstall.cpp b/toolkit/components/maintenanceservice/serviceinstall.cpp
+index adfdb1c55f..99c73dea81 100644
+--- a/toolkit/components/maintenanceservice/serviceinstall.cpp
++++ b/toolkit/components/maintenanceservice/serviceinstall.cpp
+@@ -199,7 +199,7 @@ BOOL FixServicePath(SC_HANDLE service, LPCWSTR currentServicePath,
+   size_t currentServicePathLen = wcslen(currentServicePath);
+   bool doesServiceHaveCorrectPath =
+       currentServicePathLen > 2 &&
+-      !wcsstr(currentServicePath, L"maintenanceservice_tmp.exe") &&
++      !wcsstr(currentServicePath, L"" MOZ_MAINTENANCESERVICE_NAME "_tmp.exe") &&
+       currentServicePath[0] == L'\"' &&
+       currentServicePath[currentServicePathLen - 1] == L'\"';
+ 
+@@ -220,7 +220,7 @@ BOOL FixServicePath(SC_HANDLE service, LPCWSTR currentServicePath,
+     LOG_WARN(("Couldn't remove file spec.  (%lu)", GetLastError()));
+     return FALSE;
+   }
+-  if (!PathAppendSafe(fixedPath, L"maintenanceservice.exe")) {
++  if (!PathAppendSafe(fixedPath, L"" MOZ_MAINTENANCESERVICE_NAME ".exe")) {
+     LOG_WARN(("Couldn't append file spec.  (%lu)", GetLastError()));
+     return FALSE;
+   }
+@@ -543,8 +543,8 @@ BOOL StopService() {
+     return FALSE;
+   }
+ 
+-  // The service's executable has the same file name as an installed
+-  // Firefox's service, so its exit is awaited by process id.
++  // The service's exit is awaited by process id, which leaves out any other
++  // process with the same file name.
+   nsAutoHandle serviceProcess;
+   SERVICE_STATUS_PROCESS processStatus;
+   DWORD bytesNeeded;
+diff --git a/toolkit/components/maintenanceservice/workmonitor.cpp b/toolkit/components/maintenanceservice/workmonitor.cpp
+index b441afdb5c..88faa61c60 100644
+--- a/toolkit/components/maintenanceservice/workmonitor.cpp
++++ b/toolkit/components/maintenanceservice/workmonitor.cpp
+@@ -482,7 +482,7 @@ static bool UpdaterIsValid(LPWSTR updater, LPWSTR installDir,
+   // The installation dir that we are installing to is installDir.
+   WCHAR installDirUpdater[MAX_PATH + 1] = {L'\0'};
+   wcsncpy(installDirUpdater, installDir, MAX_PATH);
+-  if (!PathAppendSafe(installDirUpdater, L"updater.exe")) {
++  if (!PathAppendSafe(installDirUpdater, L"" MOZ_UPDATER_NAME ".exe")) {
+     LOG_WARN(("Install directory updater could not be determined."));
+     return false;
+   }
+@@ -672,7 +672,7 @@ BOOL GetSecureUpdaterPath(WCHAR serviceUpdaterPath[MAX_PATH + 1]) {
+ 
+   CreateDirectoryW(serviceUpdaterPath, nullptr);
+ 
+-  if (!PathAppendSafe(serviceUpdaterPath, L"updater.exe")) {
++  if (!PathAppendSafe(serviceUpdaterPath, L"" MOZ_UPDATER_NAME ".exe")) {
+     LOG_WARN(
+         ("Couldn't append file spec when attempting to use a secure "
+          "updater path.  (%lu)",
+@@ -935,7 +935,7 @@ BOOL ExecuteServiceCommand(int argc, LPWSTR* argv) {
+ 
+     WCHAR installDirUpdater[MAX_PATH + 1] = {L'\0'};
+     wcsncpy(installDirUpdater, installDir, MAX_PATH);
+-    result = PathAppendSafe(installDirUpdater, L"updater.exe");
++    result = PathAppendSafe(installDirUpdater, L"" MOZ_UPDATER_NAME ".exe");
+     if (!result) {
+       LOG_WARN(("Install directory updater could not be determined."));
+     }
+diff --git a/toolkit/crashreporter/client/app/Cargo.toml b/toolkit/crashreporter/client/app/Cargo.toml
+index b936ec1b7c..67db6a8071 100644
+--- a/toolkit/crashreporter/client/app/Cargo.toml
++++ b/toolkit/crashreporter/client/app/Cargo.toml
+@@ -5,6 +5,13 @@ edition = "2021"
+ 
+ [[bin]]
+ name = "crashreporter"
++path = "src/main.rs"
++
++# moz.build builds the binary MOZ_CRASHREPORTER_NAME names: crashreporter in
++# Firefox, sval-crash-reporter in Sval.
++[[bin]]
++name = "sval-crash-reporter"
++path = "src/main.rs"
+ 
+ [dependencies]
+ anyhow = "1.0"
+diff --git a/toolkit/crashreporter/client/app/Makefile.in b/toolkit/crashreporter/client/app/Makefile.in
+index 212c21ab79..477ad04e2d 100644
+--- a/toolkit/crashreporter/client/app/Makefile.in
++++ b/toolkit/crashreporter/client/app/Makefile.in
+@@ -10,7 +10,8 @@ libs::
+ 	$(NSINSTALL) -D $(DIST)/bin/crashreporter.app
+ 	rsync --archive --cvs-exclude --exclude '*.in' $(srcdir)/macos_app_bundle/ $(DIST)/bin/crashreporter.app/Contents/
+ 	$(call py_action,preprocessor crashreporter.app/Contents/Resources/English.lproj/InfoPlist.strings,-Fsubstitution --output-encoding utf-16 -DAPP_NAME='$(MOZ_APP_DISPLAYNAME)' $(srcdir)/macos_app_bundle/Resources/English.lproj/InfoPlist.strings.in -o $(DIST)/bin/crashreporter.app/Contents/Resources/English.lproj/InfoPlist.strings)
++	$(call py_action,preprocessor crashreporter.app/Contents/Info.plist,-Fsubstitution -DMOZ_CRASHREPORTER_NAME='$(MOZ_CRASHREPORTER_NAME)' $(srcdir)/macos_app_bundle/Info.plist -o $(DIST)/bin/crashreporter.app/Contents/Info.plist)
+ 	$(NSINSTALL) -D $(DIST)/bin/crashreporter.app/Contents/MacOS
+-	$(NSINSTALL) $(DIST)/bin/crashreporter $(DIST)/bin/crashreporter.app/Contents/MacOS
++	$(NSINSTALL) $(DIST)/bin/$(MOZ_CRASHREPORTER_NAME) $(DIST)/bin/crashreporter.app/Contents/MacOS
+ 
+ endif
+diff --git a/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist b/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist
+index 20e4c4c848..6cdfb51c6f 100644
+--- a/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist
++++ b/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist
+@@ -7,7 +7,7 @@
+ 	<key>CFBundleDisplayName</key>
+ 	<string>crashreporter</string>
+ 	<key>CFBundleExecutable</key>
+-	<string>crashreporter</string>
++	<string>@MOZ_CRASHREPORTER_NAME@</string>
+ 	<key>CFBundleIconFile</key>
+ 	<string>crashreporter.icns</string>
+ 	<key>CFBundleIdentifier</key>
+diff --git a/toolkit/crashreporter/client/app/moz.build b/toolkit/crashreporter/client/app/moz.build
+index 6a87ae0de5..e411ac116e 100644
+--- a/toolkit/crashreporter/client/app/moz.build
++++ b/toolkit/crashreporter/client/app/moz.build
+@@ -2,7 +2,7 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-RustProgram("crashreporter")
++RustProgram(CONFIG["MOZ_CRASHREPORTER_NAME"])
+ 
+ COMPILE_FLAGS["BASE_INCLUDES"] = []
+ HOST_COMPILE_FLAGS["BASE_INCLUDES"] = []
+diff --git a/toolkit/crashreporter/client/app/src/ui/macos/plist.rs b/toolkit/crashreporter/client/app/src/ui/macos/plist.rs
+index 77dec0e203..39da22218a 100644
+--- a/toolkit/crashreporter/client/app/src/ui/macos/plist.rs
++++ b/toolkit/crashreporter/client/app/src/ui/macos/plist.rs
+@@ -4,7 +4,8 @@
+ 
+ //! The embedded Info.plist file.
+ 
+-const DATA: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
++const DATA: &[u8] = concat!(
++    r#"<?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
+@@ -13,7 +14,9 @@ const DATA: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+ 	<key>CFBundleDisplayName</key>
+ 	<string>Crash Reporter</string>
+ 	<key>CFBundleExecutable</key>
+-	<string>crashreporter</string>
++	<string>"#,
++    env!("CARGO_BIN_NAME"),
++    r#"</string>
+ 	<key>CFBundleIdentifier</key>
+ 	<string>app.sval.crashreporter</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+@@ -31,7 +34,9 @@ const DATA: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+ 	<key>NSPrincipalClass</key>
+ 	<string>NSApplication</string>
+ </dict>
+-</plist>"#;
++</plist>"#
++)
++.as_bytes();
+ 
+ const N: usize = DATA.len();
+ 
+diff --git a/toolkit/crashreporter/crash_helper/moz.build b/toolkit/crashreporter/crash_helper/moz.build
+index cd9a5f5b42..b75c3ece92 100644
+--- a/toolkit/crashreporter/crash_helper/moz.build
++++ b/toolkit/crashreporter/crash_helper/moz.build
+@@ -42,4 +42,4 @@ else:
+         "crashhelper.cpp",
+     ]
+ 
+-    GeckoProgram("crashhelper", linkage=None)
++    GeckoProgram(CONFIG["MOZ_CRASHHELPER_NAME"], linkage=None)
+diff --git a/toolkit/crashreporter/moz.build b/toolkit/crashreporter/moz.build
+index 943300de6b..e442274b8d 100644
+--- a/toolkit/crashreporter/moz.build
++++ b/toolkit/crashreporter/moz.build
+@@ -114,6 +114,8 @@ if CONFIG["MOZ_CRASHREPORTER"]:
+ 
+     DEFINES["UNICODE"] = True
+     DEFINES["_UNICODE"] = True
++    for var in ("MOZ_CRASHHELPER_NAME", "MOZ_CRASHREPORTER_NAME"):
++        DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+     if CONFIG["MOZ_PHC"]:
+         DEFINES["MOZ_PHC"] = True
+diff --git a/toolkit/crashreporter/mozwer-rust/Cargo.toml b/toolkit/crashreporter/mozwer-rust/Cargo.toml
+index 806fad877f..a2c2633afa 100644
+--- a/toolkit/crashreporter/mozwer-rust/Cargo.toml
++++ b/toolkit/crashreporter/mozwer-rust/Cargo.toml
+@@ -9,6 +9,7 @@ license = "MPL-2.0"
+ crash_helper_client = { path = "../crash_helper_client" }
+ crash_helper_common = { path = "../crash_helper_common" }
+ libc = "0.2.0"
++mozbuild = "0.1"
+ mozilla-central-workspace-hack = { version = "0.1", features = [
+     "mozwer_s",
+ ], optional = true }
+diff --git a/toolkit/crashreporter/mozwer-rust/lib.rs b/toolkit/crashreporter/mozwer-rust/lib.rs
+index a018a993c2..c0e68c3770 100644
+--- a/toolkit/crashreporter/mozwer-rust/lib.rs
++++ b/toolkit/crashreporter/mozwer-rust/lib.rs
+@@ -344,7 +344,7 @@ fn get_process_handle(pid: DWORD) -> Result<OwnedHandle> {
+ 
+ fn launch_crash_reporter_client(install_path: &Path, crash_report: &CrashReport) {
+     // Prepare the command line
+-    let client_path = install_path.join("crashreporter.exe");
++    let client_path = install_path.join(format!("{}.exe", mozbuild::config::MOZ_CRASHREPORTER_NAME));
+ 
+     let mut cmd_line = OsString::from("\"");
+     cmd_line.push(client_path);
+diff --git a/toolkit/crashreporter/nsExceptionHandler.cpp b/toolkit/crashreporter/nsExceptionHandler.cpp
+index 1901eae919..2282eb3b8b 100644
+--- a/toolkit/crashreporter/nsExceptionHandler.cpp
++++ b/toolkit/crashreporter/nsExceptionHandler.cpp
+@@ -170,8 +170,8 @@ typedef std::wstring xpstring;
+ #  define XP_STRLEN(x) wcslen(x)
+ #  define my_strlen strlen
+ #  define my_memchr memchr
+-#  define CRASH_HELPER_FILENAME u"crashhelper.exe"_ns
+-#  define CRASH_REPORTER_FILENAME u"crashreporter.exe"_ns
++#  define CRASH_HELPER_FILENAME u"" MOZ_CRASHHELPER_NAME ".exe"_ns
++#  define CRASH_REPORTER_FILENAME u"" MOZ_CRASHREPORTER_NAME ".exe"_ns
+ #  define XP_PATH_SEPARATOR L"\\"
+ #  define XP_PATH_SEPARATOR_CHAR L'\\'
+ #  define XP_PATH_MAX (MAX_PATH + 1)
+@@ -184,8 +184,8 @@ typedef char XP_CHAR;
+ typedef std::string xpstring;
+ #  define XP_TEXT(x) x
+ #  define CONVERT_XP_CHAR_TO_UTF16(x) NS_ConvertUTF8toUTF16(x)
+-#  define CRASH_HELPER_FILENAME u"crashhelper"_ns
+-#  define CRASH_REPORTER_FILENAME u"crashreporter"_ns
++#  define CRASH_HELPER_FILENAME NS_LITERAL_STRING_FROM_CSTRING(MOZ_CRASHHELPER_NAME)
++#  define CRASH_REPORTER_FILENAME NS_LITERAL_STRING_FROM_CSTRING(MOZ_CRASHREPORTER_NAME)
+ #  define XP_PATH_SEPARATOR "/"
+ #  define XP_PATH_SEPARATOR_CHAR '/'
+ #  define XP_PATH_MAX PATH_MAX
+diff --git a/toolkit/crashreporter/test/unit/head_crashreporter.js b/toolkit/crashreporter/test/unit/head_crashreporter.js
+index 0b831ad88a..19adf81c1a 100644
+--- a/toolkit/crashreporter/test/unit/head_crashreporter.js
++++ b/toolkit/crashreporter/test/unit/head_crashreporter.js
+@@ -108,7 +108,7 @@ function getCrashReporterPath() {
+       ? "crashreporter.app/Contents/MacOS/"
+       : "";
+   const binSuffix = AppConstants.platform === "win" ? ".exe" : "";
+-  const exeName = binPrefix + "crashreporter" + binSuffix;
++  const exeName = binPrefix + AppConstants.MOZ_CRASHREPORTER_NAME + binSuffix;
+ 
+   let exe = Services.dirsvc.get("GreBinD", Ci.nsIFile);
+   exe.appendRelativePath(exeName);
+diff --git a/toolkit/modules/AppConstants.sys.mjs b/toolkit/modules/AppConstants.sys.mjs
+index a26725ead2..16c3fe4445 100644
+--- a/toolkit/modules/AppConstants.sys.mjs
++++ b/toolkit/modules/AppConstants.sys.mjs
+@@ -172,6 +172,12 @@ export var AppConstants = Object.freeze({
+   MOZ_BUILD_APP: "@MOZ_BUILD_APP@",
+   MOZ_MACBUNDLE_ID: "@MOZ_MACBUNDLE_ID@",
+   MOZ_MACBUNDLE_NAME: "@MOZ_MACBUNDLE_NAME@",
++  MOZ_CRASHREPORTER_NAME: "@MOZ_CRASHREPORTER_NAME@",
++  MOZ_MAINTENANCESERVICE_NAME: "@MOZ_MAINTENANCESERVICE_NAME@",
++  MOZ_MAINTENANCESERVICE_INSTALLER_NAME:
++    "@MOZ_MAINTENANCESERVICE_INSTALLER_NAME@",
++  MOZ_PRIVATE_BROWSING_NAME: "@MOZ_PRIVATE_BROWSING_NAME@",
++  MOZ_UPDATER_NAME: "@MOZ_UPDATER_NAME@",
+   MOZ_UPDATE_CHANNEL: "@MOZ_UPDATE_CHANNEL@",
+   MOZ_WIDGET_TOOLKIT: "@MOZ_WIDGET_TOOLKIT@",
+ 
+diff --git a/toolkit/modules/moz.build b/toolkit/modules/moz.build
+index 50d537ee49..b899ec50e1 100644
+--- a/toolkit/modules/moz.build
++++ b/toolkit/modules/moz.build
+@@ -289,6 +289,11 @@ for var in (
+     "MOZ_MACBUNDLE_ID",
+     "MOZ_MACBUNDLE_NAME",
+     "MOZ_MOZILLA_API_KEY",
++    "MOZ_CRASHREPORTER_NAME",
++    "MOZ_MAINTENANCESERVICE_NAME",
++    "MOZ_MAINTENANCESERVICE_INSTALLER_NAME",
++    "MOZ_PRIVATE_BROWSING_NAME",
++    "MOZ_UPDATER_NAME",
+     "MOZ_WIDGET_TOOLKIT",
+     "DLL_PREFIX",
+     "DLL_SUFFIX",
+diff --git a/toolkit/moz.configure b/toolkit/moz.configure
+index cf555564a8..9728c76662 100644
+--- a/toolkit/moz.configure
++++ b/toolkit/moz.configure
+@@ -3357,12 +3357,58 @@ def moz_app_remotingname(value, moz_app_name, update_channel):
+ set_config("MOZ_APP_REMOTINGNAME", moz_app_remotingname)
+ 
+ 
++# Helper executable names
++# ==============================================================
++# A process name is what killall, pkill and taskkill select by, and pkill
++# matches any part of it. So an application other than Firefox names each of
++# its helpers after itself, in a name that contains no Firefox helper's name.
++# Firefox keeps Mozilla's names, which an artifact build on Mozilla's packages
++# looks for.
++@depends(moz_app_name)
++def helper_names(app_name):
++    mozilla = {
++        "child": "plugin-container",
++        "crash-helper": "crashhelper",
++        "crash-reporter": "crashreporter",
++        "update": "updater",
++        "update-service": "maintenanceservice",
++        "update-service-installer": "maintenanceservice_installer",
++        "private-browsing": "private_browsing",
++        "default-agent": "default-browser-agent",
++        "glx-test": "glxtest",
++        "vaapi-test": "vaapitest",
++        "v4l2-test": "v4l2test",
++        "vulkan-test": "vulkantest",
++    }
++    if app_name == "firefox":
++        return mozilla
++    return {role: f"{app_name}-{role}" for role in mozilla}
++
++
++@template
++def helper_name(var, role):
++    set_config(var, depends(helper_names)(lambda names: names[role]))
++
++
++helper_name("MOZ_CRASHHELPER_NAME", "crash-helper")
++helper_name("MOZ_CRASHREPORTER_NAME", "crash-reporter")
++helper_name("MOZ_UPDATER_NAME", "update")
++helper_name("MOZ_MAINTENANCESERVICE_NAME", "update-service")
++helper_name("MOZ_MAINTENANCESERVICE_INSTALLER_NAME", "update-service-installer")
++helper_name("MOZ_PRIVATE_BROWSING_NAME", "private-browsing")
++helper_name("MOZ_DEFAULT_AGENT_NAME", "default-agent")
++helper_name("MOZ_GLXTEST_NAME", "glx-test")
++helper_name("MOZ_VAAPITEST_NAME", "vaapi-test")
++helper_name("MOZ_V4L2TEST_NAME", "v4l2-test")
++helper_name("MOZ_VULKANTEST_NAME", "vulkan-test")
++
++
+ # Child Process Name for IPC
+ # ==============================================================
+-@depends(toolkit, bin_suffix(target))
+-def moz_child_process_name(toolkit, bin_suffix):
++@depends(toolkit, bin_suffix(target), helper_names)
++def moz_child_process_name(toolkit, bin_suffix, helper_names):
+     if toolkit != "android":
+-        return f"plugin-container{bin_suffix}"
++        return helper_names["child"] + bin_suffix
+     else:
+         # We want to let Android unpack the file at install time, but it only
+         # does so if the file is named libsomething.so. The lib/ path is also
+@@ -3379,12 +3425,18 @@ set_config(
+ )
+ 
+ with only_when(target_is_osx):
+-    set_config("MOZ_CHILD_PROCESS_BUNDLE", "plugin-container.app/Contents/MacOS/")
++    set_config(
++        "MOZ_CHILD_PROCESS_BUNDLE",
++        depends(moz_child_process_name)(lambda name: f"{name}.app/Contents/MacOS/"),
++    )
+     set_config(
+         "MOZ_CHILD_PROCESS_BUNDLEID",
+         depends("--with-distribution-id")(lambda v: f"{v[0]}.plugincontainer"),
+     )
+-    set_config("MOZ_CHILD_PROCESS_BUNDLENAME", "plugin-container.app")
++    set_config(
++        "MOZ_CHILD_PROCESS_BUNDLENAME",
++        depends(moz_child_process_name)(lambda name: f"{name}.app"),
++    )
+ 
+ 
+ # Miscellaneous options
+diff --git a/toolkit/mozapps/defaultagent/ScheduledTask.cpp b/toolkit/mozapps/defaultagent/ScheduledTask.cpp
+index 2b48bcc2fe..0238930565 100644
+--- a/toolkit/mozapps/defaultagent/ScheduledTask.cpp
++++ b/toolkit/mozapps/defaultagent/ScheduledTask.cpp
+@@ -237,7 +237,7 @@ HRESULT RegisterTask(const wchar_t* uniqueToken,
+     return E_FAIL;
+   }
+   std::wstring proxyPath(installPath.get());
+-  proxyPath += L"\\default-browser-agent.exe";
++  proxyPath += L"\\" MOZ_DEFAULT_AGENT_NAME ".exe";
+ 
+   BStrPtr binaryPathBStr = BStrPtr(SysAllocString(proxyPath.c_str()));
+   ENSURE(execAction->put_Path(binaryPathBStr.get()));
+diff --git a/toolkit/mozapps/defaultagent/moz.build b/toolkit/mozapps/defaultagent/moz.build
+index 8a69b2e12f..156a57d46e 100644
+--- a/toolkit/mozapps/defaultagent/moz.build
++++ b/toolkit/mozapps/defaultagent/moz.build
+@@ -76,7 +76,12 @@ XPCSHELL_TESTS_MANIFESTS += ["tests/xpcshell/xpcshell.toml"]
+ # If defines are added to this list that are required by the Cache,
+ # SetDefaultBrowser, or their dependencies (Registry, EventLog, common),
+ # tests/gtest/moz.build will need to be updated as well.
+-for var in ("MOZ_APP_BASENAME", "MOZ_APP_DISPLAYNAME", "MOZ_APP_VENDOR"):
++for var in (
++    "MOZ_APP_BASENAME",
++    "MOZ_APP_DISPLAYNAME",
++    "MOZ_APP_VENDOR",
++    "MOZ_DEFAULT_AGENT_NAME",
++):
+     DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+ DEFINES["UNICODE"] = True
+diff --git a/toolkit/mozapps/defaultagent/proxy/moz.build b/toolkit/mozapps/defaultagent/proxy/moz.build
+index acaab7bac7..03835d98d1 100644
+--- a/toolkit/mozapps/defaultagent/proxy/moz.build
++++ b/toolkit/mozapps/defaultagent/proxy/moz.build
+@@ -2,7 +2,7 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-Program("default-browser-agent")
++Program(CONFIG["MOZ_DEFAULT_AGENT_NAME"])
+ 
+ SPHINX_TREES["default-browser-agent"] = "docs"
+ 
+diff --git a/toolkit/mozapps/installer/windows/nsis/makensis.mk b/toolkit/mozapps/installer/windows/nsis/makensis.mk
+index d081f84b38..3fe2e5cdf8 100755
+--- a/toolkit/mozapps/installer/windows/nsis/makensis.mk
++++ b/toolkit/mozapps/installer/windows/nsis/makensis.mk
+@@ -130,5 +130,5 @@ maintenanceservice_installer::
+ 	$(INSTALL) $(addprefix $(MOZILLA_DIR)/other-licenses/nsis/Plugins/,$(CUSTOM_NSIS_PLUGINS)) $(CONFIG_DIR)
+ 	cd $(CONFIG_DIR) && $(MAKENSISU) $(MAKENSISU_FLAGS) maintenanceservice_installer.nsi
+ 	$(NSINSTALL) -D $(DIST)/bin/
+-	cp $(CONFIG_DIR)/maintenanceservice_installer.exe $(DIST)/bin
++	cp $(CONFIG_DIR)/$(MOZ_MAINTENANCESERVICE_INSTALLER_NAME).exe $(DIST)/bin
+ endif
+diff --git a/toolkit/mozapps/update/common/moz.build b/toolkit/mozapps/update/common/moz.build
+index 8a1e0c688a..d30f7759c4 100644
+--- a/toolkit/mozapps/update/common/moz.build
++++ b/toolkit/mozapps/update/common/moz.build
+@@ -32,6 +32,7 @@ if CONFIG["OS_ARCH"] == "WINNT":
+ Library("updatecommon")
+ 
+ DEFINES["NS_NO_XPCOM"] = True
++DEFINES["MOZ_MAINTENANCESERVICE_NAME"] = '"%s"' % CONFIG["MOZ_MAINTENANCESERVICE_NAME"]
+ USE_STATIC_MSVCRT = True
+ 
+ if CONFIG["DISABLE_UPDATER_AUTHENTICODE_CHECK"]:
+diff --git a/toolkit/mozapps/update/common/updatehelper.cpp b/toolkit/mozapps/update/common/updatehelper.cpp
+index 9dbcd4aa79..bd0236dac8 100644
+--- a/toolkit/mozapps/update/common/updatehelper.cpp
++++ b/toolkit/mozapps/update/common/updatehelper.cpp
+@@ -318,7 +318,7 @@ BOOL StartServiceUpdate(LPCWSTR installDir) {
+   // Obtain the temp path of the maintenance service binary
+   WCHAR tmpService[MAX_PATH + 1] = {L'\0'};
+   if (!PathGetSiblingFilePath(tmpService, serviceConfig.lpBinaryPathName,
+-                              L"maintenanceservice_tmp.exe")) {
++                              L"" MOZ_MAINTENANCESERVICE_NAME "_tmp.exe")) {
+     LOG(("StartServiceUpdate: Failed to get temp bin path"));
+     return FALSE;
+   }
+@@ -331,7 +331,7 @@ BOOL StartServiceUpdate(LPCWSTR installDir) {
+   // Get the new maintenance service path from the install dir
+   WCHAR newMaintServicePath[MAX_PATH + 1] = {L'\0'};
+   wcsncpy(newMaintServicePath, installDir, MAX_PATH);
+-  PathAppendSafe(newMaintServicePath, L"maintenanceservice.exe");
++  PathAppendSafe(newMaintServicePath, L"" MOZ_MAINTENANCESERVICE_NAME ".exe");
+ 
+   // Copy the temp file in alongside the maintenace service.
+   // This is a requirement for maintenance service upgrades.
+diff --git a/toolkit/mozapps/update/tests/browser/head.js b/toolkit/mozapps/update/tests/browser/head.js
+index a5422f7c96..001fb9579a 100644
+--- a/toolkit/mozapps/update/tests/browser/head.js
++++ b/toolkit/mozapps/update/tests/browser/head.js
+@@ -14,7 +14,9 @@ const { XPIExports } = ChromeUtils.importESModule(
+ 
+ const BIN_SUFFIX = AppConstants.platform == "win" ? ".exe" : "";
+ const FILE_UPDATER_BIN =
+-  "updater" + (AppConstants.platform == "macosx" ? ".app" : BIN_SUFFIX);
++  AppConstants.platform == "macosx"
++    ? "updater.app"
++    : AppConstants.MOZ_UPDATER_NAME + BIN_SUFFIX;
+ const FILE_UPDATER_BIN_BAK = FILE_UPDATER_BIN + ".bak";
+ 
+ const LOG_FUNCTION = info;
+diff --git a/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js b/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js
+index 8195e2849c..034298974d 100644
+--- a/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js
++++ b/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js
+@@ -90,13 +90,16 @@ const FILE_HELPER_BIN =
+     : "TestAUSHelper" + mozinfo.bin_suffix;
+ const FILE_HELPER_APP =
+   AppConstants.platform == "macosx" ? "callback_app.app" : FILE_HELPER_BIN;
+-const FILE_MAINTENANCE_SERVICE_BIN = "maintenanceservice.exe";
++const FILE_MAINTENANCE_SERVICE_BIN =
++  AppConstants.MOZ_MAINTENANCESERVICE_NAME + ".exe";
+ const FILE_MAINTENANCE_SERVICE_INSTALLER_BIN =
+-  "maintenanceservice_installer.exe";
++  AppConstants.MOZ_MAINTENANCESERVICE_INSTALLER_NAME + ".exe";
+ const FILE_OLD_VERSION_MAR = "old_version.mar";
+ const FILE_PARTIAL_EXE = "partial.exe";
+ const FILE_UPDATER_BIN =
+-  "updater" + (AppConstants.platform == "macosx" ? ".app" : mozinfo.bin_suffix);
++  AppConstants.platform == "macosx"
++    ? "updater.app"
++    : AppConstants.MOZ_UPDATER_NAME + mozinfo.bin_suffix;
+ 
+ const PERFORMING_STAGED_UPDATE = "Performing a staged update";
+ const CALL_QUIT = "calling QuitProgressUI";
+@@ -2043,7 +2046,7 @@ function copyTestUpdaterToBinDir() {
+     stripQuarantineBitFromPath(updater.path);
+     updater.append("Contents");
+     updater.append("MacOS");
+-    updater.append("org.mozilla.updater");
++    updater.append(AppConstants.MOZ_UPDATER_NAME);
+   }
+   return updater;
+ }
+@@ -2950,11 +2953,13 @@ function waitServiceApps() {
+   }
+ 
+   // maintenanceservice_installer.exe is started async during updates.
+-  waitForApplicationStop("maintenanceservice_installer.exe");
++  waitForApplicationStop(FILE_MAINTENANCE_SERVICE_INSTALLER_BIN);
+   // maintenanceservice_tmp.exe is started async from the service installer.
+-  waitForApplicationStop("maintenanceservice_tmp.exe");
++  waitForApplicationStop(
++    AppConstants.MOZ_MAINTENANCESERVICE_NAME + "_tmp.exe"
++  );
+   // In case the SCM thinks the service is stopped, but process still exists.
+-  waitForApplicationStop("maintenanceservice.exe");
++  waitForApplicationStop(FILE_MAINTENANCE_SERVICE_BIN);
+ }
+ 
+ /**
+diff --git a/toolkit/mozapps/update/updater/Makefile.in b/toolkit/mozapps/update/updater/Makefile.in
+index 5792ef3628..249cfebd95 100644
+--- a/toolkit/mozapps/update/updater/Makefile.in
++++ b/toolkit/mozapps/update/updater/Makefile.in
+@@ -19,7 +19,7 @@ libs::
+ 	rsync -a -C $(DIST)/bin/Info.plist $(DIST)/bin/updater.app/Contents
+ 	$(call py_action,preprocessor updater.app/Contents/Resources/English.lproj/InfoPlist.strings,-Fsubstitution --output-encoding utf-16 -DAPP_NAME='$(MOZ_APP_DISPLAYNAME)' $(srcdir)/macbuild/Contents/Resources/English.lproj/InfoPlist.strings.in -o $(DIST)/bin/updater.app/Contents/Resources/English.lproj/InfoPlist.strings)
+ 	$(NSINSTALL) -D $(DIST)/bin/updater.app/Contents/MacOS
+-	$(NSINSTALL) $(DIST)/bin/org.mozilla.updater $(DIST)/bin/updater.app/Contents/MacOS
++	$(NSINSTALL) $(DIST)/bin/$(MOZ_UPDATER_NAME) $(DIST)/bin/updater.app/Contents/MacOS
+ 	$(NSINSTALL) -D $(DIST)/bin/updater.app/Contents/Frameworks
+ ifneq (,$(COMPILE_ENVIRONMENT))
+ 	$(NSINSTALL) $(DIST)/bin/UpdateSettings $(DIST)/bin/updater.app/Contents/Frameworks/UpdateSettings.framework
+diff --git a/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in b/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in
+index 0b220bb07e..c13c44b52e 100644
+--- a/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in
++++ b/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in
+@@ -7,7 +7,7 @@
+ 	<key>CFBundleDisplayName</key>
+ 	<string>updater</string>
+ 	<key>CFBundleExecutable</key>
+-	<string>org.mozilla.updater</string>
++	<string>@MOZ_UPDATER_NAME@</string>
+ 	<key>CFBundleIconFile</key>
+ 	<string>updater.icns</string>
+ 	<key>CFBundleIdentifier</key>
+diff --git a/toolkit/mozapps/update/updater/moz.build b/toolkit/mozapps/update/updater/moz.build
+index 7e362df573..ab95779745 100644
+--- a/toolkit/mozapps/update/updater/moz.build
++++ b/toolkit/mozapps/update/updater/moz.build
+@@ -2,10 +2,7 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
+-    Program("org.mozilla.updater")
+-else:
+-    Program("updater")
++Program(CONFIG["MOZ_UPDATER_NAME"])
+ 
+ updater_rel_path = ""
+ include("updater-common.build")
+@@ -21,6 +18,7 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
+         flags=[
+             "-Fsubstitution",
+             f"-DMOZ_MACBUNDLE_ID={CONFIG['MOZ_MACBUNDLE_ID']}",
++            f"-DMOZ_UPDATER_NAME={CONFIG['MOZ_UPDATER_NAME']}",
+             f"-DMOZ_SMAUTHORIZEDCLIENTS_REQUIREMENTS={CONFIG['MOZ_SMAUTHORIZEDCLIENTS_REQUIREMENTS']}",
+         ],
+     )
+diff --git a/toolkit/mozapps/update/updater/updater-common.build b/toolkit/mozapps/update/updater/updater-common.build
+index 39c9726cfd..a64855972c 100644
+--- a/toolkit/mozapps/update/updater/updater-common.build
++++ b/toolkit/mozapps/update/updater/updater-common.build
+@@ -129,7 +129,7 @@ if CONFIG["MOZ_ASAN"] or CONFIG["MOZ_UBSAN"] or CONFIG["MOZ_TSAN"]:
+ DEFINES["SPRINTF_H_USES_VSNPRINTF"] = True
+ DEFINES["NS_NO_XPCOM"] = True
+ DisableStlWrapping()
+-for var in ("MAR_CHANNEL_ID", "MOZ_APP_VERSION", "ACCEPTED_MAR_CHANNEL_IDS", "MOZ_APP_BASENAME"):
++for var in ("MAR_CHANNEL_ID", "MOZ_APP_VERSION", "ACCEPTED_MAR_CHANNEL_IDS", "MOZ_APP_BASENAME", "MOZ_UPDATER_NAME"):
+     DEFINES[var] = '"%s"' % CONFIG[var]
+ 
+ LOCAL_INCLUDES += [
+diff --git a/toolkit/mozapps/update/updater/updater-xpcshell/Makefile.in b/toolkit/mozapps/update/updater/updater-xpcshell/Makefile.in
+index 5a910add70..3fdf285256 100644
+--- a/toolkit/mozapps/update/updater/updater-xpcshell/Makefile.in
++++ b/toolkit/mozapps/update/updater/updater-xpcshell/Makefile.in
+@@ -28,17 +28,17 @@ ifeq (cocoa,$(MOZ_WIDGET_TOOLKIT))
+ 	$(NSINSTALL) $(srcdir)/../macos-frameworks/UpdateSettings/Info.plist  $(XPCSHELLTESTDIR)/data/updater-xpcshell.app/Contents/Frameworks/UpdateSettings.framework/Resources
+ 	rm -Rf $(XPCSHELLTESTDIR)/data/updater.app
+ 	mv $(XPCSHELLTESTDIR)/data/updater-xpcshell.app $(XPCSHELLTESTDIR)/data/updater.app
+-	mv $(XPCSHELLTESTDIR)/data/updater.app/Contents/MacOS/updater-xpcshell $(XPCSHELLTESTDIR)/data/updater.app/Contents/MacOS/org.mozilla.updater
++	mv $(XPCSHELLTESTDIR)/data/updater.app/Contents/MacOS/updater-xpcshell $(XPCSHELLTESTDIR)/data/updater.app/Contents/MacOS/$(MOZ_UPDATER_NAME)
+ 
+ ifdef MOCHITESTBROWSERDIR
+ 	rsync -a -C $(XPCSHELLTESTDIR)/data/updater.app $(MOCHITESTBROWSERDIR)/
+ endif
+ else
+ 	$(MKDIR) -p $(XPCSHELLTESTDIR)/data
+-	cp $(FINAL_TARGET)/updater-xpcshell$(BIN_SUFFIX) $(XPCSHELLTESTDIR)/data/updater$(BIN_SUFFIX)
++	cp $(FINAL_TARGET)/updater-xpcshell$(BIN_SUFFIX) $(XPCSHELLTESTDIR)/data/$(MOZ_UPDATER_NAME)$(BIN_SUFFIX)
+ ifdef MOCHITESTBROWSERDIR
+ 	$(MKDIR) -p $(MOCHITESTBROWSERDIR)
+-	cp $(FINAL_TARGET)/updater-xpcshell$(BIN_SUFFIX) $(MOCHITESTBROWSERDIR)/updater$(BIN_SUFFIX)
++	cp $(FINAL_TARGET)/updater-xpcshell$(BIN_SUFFIX) $(MOCHITESTBROWSERDIR)/$(MOZ_UPDATER_NAME)$(BIN_SUFFIX)
+ endif
+ endif
+ endif
+diff --git a/toolkit/mozapps/update/updater/updater.cpp b/toolkit/mozapps/update/updater/updater.cpp
+index b2f7aa0ffe..94238736b2 100644
+--- a/toolkit/mozapps/update/updater/updater.cpp
++++ b/toolkit/mozapps/update/updater/updater.cpp
+@@ -3842,7 +3842,7 @@ int NS_main(int argc, NS_tchar** argv) {
+                       &hkApp, nullptr);
+       RegCloseKey(hkApp);
+       if (RegCreateKeyExW(HKEY_CURRENT_USER,
+-                          L"Software\\Classes\\Applications\\updater.exe", 0,
++                          L"Software\\Classes\\Applications\\" MOZ_UPDATER_NAME ".exe", 0,
+                           nullptr, REG_OPTION_VOLATILE, KEY_SET_VALUE, nullptr,
+                           &hkApp, nullptr) == ERROR_SUCCESS) {
+         RegSetValueExW(hkApp, L"IsHostApp", 0, REG_NONE, 0, 0);
+diff --git a/toolkit/xre/glxtest/moz.build b/toolkit/xre/glxtest/moz.build
+index 66f95d9f2f..350a0429de 100644
+--- a/toolkit/xre/glxtest/moz.build
++++ b/toolkit/xre/glxtest/moz.build
+@@ -5,7 +5,7 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Core", "Widget: Gtk")
+ 
+-Program("glxtest")
++Program(CONFIG["MOZ_GLXTEST_NAME"])
+ SOURCES += [
+     "glxtest.cpp",
+ ]
+diff --git a/toolkit/xre/moz.build b/toolkit/xre/moz.build
+index 19215efcb4..c7c9b28d48 100644
+--- a/toolkit/xre/moz.build
++++ b/toolkit/xre/moz.build
+@@ -191,6 +191,7 @@ for var in (
+     "MOZ_APP_DISPLAYNAME",
+     "MOZ_APP_VENDOR",
+     "MOZ_APP_VERSION",
++    "MOZ_UPDATER_NAME",
+     "OS_TARGET",
+     "MOZ_WIDGET_TOOLKIT",
+ ):
+diff --git a/toolkit/xre/nsCommandLineServiceMac.mm b/toolkit/xre/nsCommandLineServiceMac.mm
+index 3fc9808a55..0d8bb94440 100644
+--- a/toolkit/xre/nsCommandLineServiceMac.mm
++++ b/toolkit/xre/nsCommandLineServiceMac.mm
+@@ -60,7 +60,7 @@ void SetupMacCommandLine(int& argc, char**& argv, bool forRestart) {
+     // Essentially, we are using the updater as a relauncher process.
+     NSString* updaterPath = [[path stringByDeletingLastPathComponent]
+         stringByAppendingPathComponent:
+-            @"updater.app/Contents/MacOS/org.mozilla.updater"];
++            @"updater.app/Contents/MacOS/" MOZ_UPDATER_NAME];
+     AddToCommandLine(updaterPath.UTF8String);
+     AddToCommandLine("--openAppBundle");
+   }
+@@ -68,14 +68,14 @@ void SetupMacCommandLine(int& argc, char**& argv, bool forRestart) {
+   // We adjust the path to point to the .app bundle, rather than the executable
+   // itself, to allow for the use of the NSWorkspace API for launching and
+   // relaunching the application. We intentionally exclude the
+-  // org.mozilla.updater binary because we are experiencing NSCocoaErrors of
++  // updater binary because we are experiencing NSCocoaErrors of
+   // type `kLSUnknownErr` when trying to launch the updater.app with the
+   // NSWorkspace API, at least on macOS 10.15. The updater is launched using
+   // NSTask instead. We do not experience these NSCocoaErrors on more modern
+   // versions of macOS and we may be able to switch to the NSWorkspace API once
+   // we no longer support the older versions of macOS where these errors occur.
+   // See bug 1911178.
+-  if (![path hasSuffix:@"org.mozilla.updater"] && ![path hasSuffix:@".app"]) {
++  if (![path hasSuffix:@MOZ_UPDATER_NAME] && ![path hasSuffix:@".app"]) {
+     // Ensure that the path in the first argument points to the .app bundle.
+     // This strips three last path components, for example:
+     //
+@@ -84,7 +84,7 @@ void SetupMacCommandLine(int& argc, char**& argv, bool forRestart) {
+     path = [[[path stringByDeletingLastPathComponent]
+         stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+   }
+-  if (![path hasSuffix:@"org.mozilla.updater"] && ![path hasSuffix:@".app"]) {
++  if (![path hasSuffix:@MOZ_UPDATER_NAME] && ![path hasSuffix:@".app"]) {
+     // We were unable to obtain the path to the .app bundle and are unable to
+     // build a valid command line.
+     return;
+diff --git a/toolkit/xre/nsUpdateDriver.h b/toolkit/xre/nsUpdateDriver.h
+index 709ea9e25b..d442468d0e 100644
+--- a/toolkit/xre/nsUpdateDriver.h
++++ b/toolkit/xre/nsUpdateDriver.h
+@@ -25,14 +25,14 @@ typedef PRProcess* ProcessType;
+ #endif
+ 
+ #ifdef XP_WIN
+-#  define UPDATER_BIN "updater.exe"
++#  define UPDATER_BIN MOZ_UPDATER_NAME ".exe"
+ #  define MAINTENANCE_SVC_NAME L"SvalUpdate"
+ #  define MAYBE_WAIT_TIMEOUT_MS (60U * 1000U)
+ #elif XP_MACOSX
+ #  define UPDATER_APP "updater.app"
+-#  define UPDATER_BIN "org.mozilla.updater"
++#  define UPDATER_BIN MOZ_UPDATER_NAME
+ #else
+-#  define UPDATER_BIN "updater"
++#  define UPDATER_BIN MOZ_UPDATER_NAME
+ #endif
+ 
+ /**
+diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
+index dd98bc7e64..4858494778 100644
+--- a/widget/gtk/GfxInfo.cpp
++++ b/widget/gtk/GfxInfo.cpp
+@@ -45,10 +45,10 @@
+ #define V4L2_TEST_TIMEOUT 2000
+ #define VULKAN_TEST_TIMEOUT 2000
+ 
+-#define GLX_PROBE_BINARY u"glxtest"_ns
+-#define VAAPI_PROBE_BINARY u"vaapitest"_ns
+-#define V4L2_PROBE_BINARY u"v4l2test"_ns
+-#define VULKAN_PROBE_BINARY u"vulkantest"_ns
++#define GLX_PROBE_BINARY NS_LITERAL_STRING_FROM_CSTRING(MOZ_GLXTEST_NAME)
++#define VAAPI_PROBE_BINARY NS_LITERAL_STRING_FROM_CSTRING(MOZ_VAAPITEST_NAME)
++#define V4L2_PROBE_BINARY NS_LITERAL_STRING_FROM_CSTRING(MOZ_V4L2TEST_NAME)
++#define VULKAN_PROBE_BINARY NS_LITERAL_STRING_FROM_CSTRING(MOZ_VULKANTEST_NAME)
+ 
+ namespace mozilla::widget {
+ 
+diff --git a/widget/gtk/moz.build b/widget/gtk/moz.build
+index e40a75b0dd..ba946ac3fc 100644
+--- a/widget/gtk/moz.build
++++ b/widget/gtk/moz.build
+@@ -198,8 +198,15 @@ if not CONFIG["MOZ_SYSTEM_LIBDRM"]:
+ 
+ DEFINES["CAIRO_GFX"] = True
+ 
+-DEFINES["MOZ_APP_NAME"] = '"%s"' % CONFIG["MOZ_APP_NAME"]
++for var in (
++    "MOZ_APP_NAME",
++    "MOZ_GLXTEST_NAME",
++    "MOZ_V4L2TEST_NAME",
++    "MOZ_VAAPITEST_NAME",
++    "MOZ_VULKANTEST_NAME",
++):
++    DEFINES[var] = '"%s"' % CONFIG[var]
+ DEFINES["MOZ_DISTRIBUTION_ID"] = '"%s"' % CONFIG["MOZ_DISTRIBUTION_ID"]
+ 
+ CFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
+ CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
+diff --git a/widget/gtk/v4l2test/moz.build b/widget/gtk/v4l2test/moz.build
+index 14d6152c4d..653e3c5ef0 100644
+--- a/widget/gtk/v4l2test/moz.build
++++ b/widget/gtk/v4l2test/moz.build
+@@ -5,7 +5,7 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Toolkit", "Startup and Profile System")
+ 
+-Program("v4l2test")
++Program(CONFIG["MOZ_V4L2TEST_NAME"])
+ SOURCES += [
+     "v4l2test.cpp",
+ ]
+diff --git a/widget/gtk/vaapitest/moz.build b/widget/gtk/vaapitest/moz.build
+index 7b3fa5b49d..7751f18aaf 100644
+--- a/widget/gtk/vaapitest/moz.build
++++ b/widget/gtk/vaapitest/moz.build
+@@ -5,7 +5,7 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Toolkit", "Startup and Profile System")
+ 
+-Program("vaapitest")
++Program(CONFIG["MOZ_VAAPITEST_NAME"])
+ SOURCES += [
+     "vaapitest.cpp",
+ ]
+diff --git a/widget/gtk/vulkantest/moz.build b/widget/gtk/vulkantest/moz.build
+index 1d463592e8..108da78e45 100644
+--- a/widget/gtk/vulkantest/moz.build
++++ b/widget/gtk/vulkantest/moz.build
+@@ -7,7 +7,7 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Toolkit", "Startup and Profile System")
+ 
+-Program("vulkantest")
++Program(CONFIG["MOZ_VULKANTEST_NAME"])
+ SOURCES += [
+     "vulkantest.cpp",
+ ]

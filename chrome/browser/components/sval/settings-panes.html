@@ -1,0 +1,2339 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!--
+  Sval's settings panes (spec §10.8). `settings-pane.js` moves each
+  `data-sval-pane` section into the matching category container it made in
+  `about:preferences`, and `settings.js` and each pane's `settings-*.js` run
+  them. This file is markup only: it is never loaded as a page.
+
+  Copy is short and specific: a heading, at most one line under it, and the
+  control. What a control does is its label.
+-->
+<html>
+  <body>
+    <!-- Privacy and protection is Firefox's Privacy and security category,
+         renamed (decision 1484). Each of these sections joins it beside
+         Firefox's groups, where `settings-pane.js`' SECTIONS puts it. The
+         blocking card is `SvalBlocking`'s; the fingerprinting controls are
+         Gecko prefs, through `SvalFingerprinting` (protections spec §1.5
+         and §3.3). -->
+    <section data-sval-pane="svalBlocking" class="sval-settings">
+      <section
+        id="sval-blocking"
+        class="sval-card"
+        aria-labelledby="sval-blocking-heading"
+      >
+        <h2 id="sval-blocking-heading">Ad and tracker blocking</h2>
+        <p class="sval-agents-note">
+          Sval blocks ads and trackers with filter lists. Changes take effect
+          the next time a page loads.
+        </p>
+        <fieldset
+          class="sval-blocking-level"
+          aria-describedby="sval-blocking-level-desc"
+        >
+          <legend class="sval-lead">Level</legend>
+          <div class="sval-segments">
+            <label class="sval-segment">
+              <input
+                type="radio"
+                name="sval-blocking-level"
+                value="off"
+                data-sval-key="level:off"
+              />
+              <span>No Blocking</span>
+            </label>
+            <label class="sval-segment">
+              <input
+                type="radio"
+                name="sval-blocking-level"
+                value="balanced"
+                data-sval-key="level:balanced"
+              />
+              <span>Balanced Blocking</span>
+            </label>
+            <label class="sval-segment">
+              <input
+                type="radio"
+                name="sval-blocking-level"
+                value="strict"
+                data-sval-key="level:strict"
+              />
+              <span>Strict Blocking</span>
+            </label>
+            <label class="sval-segment">
+              <input
+                type="radio"
+                name="sval-blocking-level"
+                value="custom"
+                data-sval-key="level:custom"
+              />
+              <span>Custom</span>
+            </label>
+          </div>
+          <p id="sval-blocking-level-desc" class="sval-agents-note"></p>
+        </fieldset>
+        <div id="sval-blocking-lists" class="sval-blocking-section"></div>
+        <p id="sval-blocking-status" class="sval-agents-done" role="status"></p>
+        <div id="sval-allowed" class="sval-blocking-section"></div>
+        <p id="sval-allowed-status" class="sval-agents-done" role="status"></p>
+        <!-- What the lists above may do, and the user's own list beside
+             them, so they stay in the card they change. -->
+        <details id="sval-blocking-advanced" class="sval-advanced">
+          <summary class="sval-advanced-summary">
+            <span class="sval-advanced-label">Advanced</span>
+            <span
+              class="sval-glyph sval-glyph-chevron-down"
+              aria-hidden="true"
+            ></span>
+          </summary>
+          <div class="sval-advanced-body">
+            <!-- The user's own rules (`SvalBlocking`), one more list beside the
+             level's. Trusting them with trusted scriptlets asks first, as
+             trusting an added list does. -->
+            <div id="sval-my-filters" class="sval-blocking-section">
+              <div class="sval-blocking-head">
+                <h3>My filters</h3>
+              </div>
+              <p id="sval-my-filters-note" class="sval-agents-note"></p>
+              <textarea
+                id="sval-my-filters-text"
+                class="sval-agent-add-input"
+                rows="6"
+                spellcheck="false"
+                aria-label="My filters"
+                placeholder="One rule per line, like ||ads.example.com^ or example.com##.banner"
+              ></textarea>
+              <div class="sval-code-row">
+                <button
+                  id="sval-my-filters-save"
+                  class="sval-button sval-button-primary sval-agent-small"
+                  type="button"
+                >
+                  Save
+                </button>
+              </div>
+              <p
+                id="sval-my-filters-status"
+                class="sval-status-line"
+                role="status"
+                aria-live="polite"
+              ></p>
+              <label class="sval-switch-row">
+                <span class="sval-lead"
+                  >Let My filters use trusted scriptlets</span
+                >
+                <input
+                  id="sval-my-filters-trusted"
+                  class="sval-switch"
+                  type="checkbox"
+                  role="switch"
+                />
+              </label>
+            </div>
+            <!-- Page rules (`SvalPageRules`): on by default, off here. -->
+            <label class="sval-switch-row">
+              <span class="sval-lead"
+                >Hide page elements and apply site fixes from the lists</span
+              >
+              <input
+                id="sval-page-rules"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+              />
+            </label>
+            <!-- Trusted scriptlets (`SvalBlocking`): on by default, off here. -->
+            <label class="sval-switch-row">
+              <span class="sval-lead"
+                >Use trusted scriptlets from uBlock Origin's lists and the lists
+                you trust</span
+              >
+              <input
+                id="sval-trusted-scriptlets"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+              />
+            </label>
+          </div>
+        </details>
+      </section>
+
+      <!-- Leaving Custom for a curated level replaces the custom set, and
+           trusting a list hands its publisher every site, so both confirm,
+           as unpairing does. So do resetting a site that has hidden
+           elements, which deletes its lines from My filters, forgetting a
+           site, and clearing a site's data everywhere, which signs the person
+           out; those show the tile, and the first two a well under the body.
+           The button between Cancel and the confirmation shows only when
+           allowing a synced trusted list, to allow it untrusted. -->
+      <dialog
+        id="sval-blocking-dialog"
+        class="sval-modal"
+        aria-labelledby="sval-blocking-dialog-title"
+        aria-describedby="sval-blocking-dialog-body sval-blocking-dialog-more"
+      >
+        <span id="sval-blocking-dialog-tile" class="sval-modal-tile" hidden>
+          <span class="sval-glyph sval-glyph-trash-2" aria-hidden="true"></span>
+        </span>
+        <h2 id="sval-blocking-dialog-title" class="sval-modal-title"></h2>
+        <p id="sval-blocking-dialog-body" class="sval-modal-body"></p>
+        <div
+          id="sval-blocking-dialog-more"
+          class="sval-modal-more"
+          hidden="hidden"
+        ></div>
+        <div class="sval-modal-actions">
+          <button
+            id="sval-blocking-dialog-cancel"
+            class="sval-button"
+            type="button"
+            autofocus="autofocus"
+          >
+            Cancel
+          </button>
+          <button
+            id="sval-blocking-dialog-alt"
+            class="sval-button"
+            type="button"
+            hidden="hidden"
+          ></button>
+          <button
+            id="sval-blocking-dialog-confirm"
+            class="sval-button"
+            data-tone="primary"
+            type="button"
+          ></button>
+        </div>
+      </dialog>
+    </section>
+
+    <!-- Cookies and site data, drawn by Firefox's `setting-group` from the
+         config `settings-cookies.js` registers. -->
+    <section data-sval-pane="svalCookies" class="sval-settings">
+      <setting-group groupid="svalCookies"></setting-group>
+    </section>
+
+    <section data-sval-pane="svalFingerprinting" class="sval-settings">
+      <section
+        id="sval-fp"
+        class="sval-card sval-fp-card"
+        aria-labelledby="sval-fp-heading"
+      >
+        <h2 id="sval-fp-heading">Fingerprinting</h2>
+        <p class="sval-agents-note">
+          These settings control what sites can learn about your browser and
+          device. Sval's defaults make you look like other Sval users and rarely
+          break sites. Changes take effect the next time a page loads.
+        </p>
+        <!-- Firefox's own switches for fingerprinting protection, as
+             `SvalTrackingSettings` writes them. -->
+        <label class="sval-switch-row">
+          <span class="sval-lead">Fingerprinting protection</span>
+          <select id="sval-fp-windows" class="sval-agent-select">
+            <option value="all">In every window</option>
+            <option value="private">Only in private windows</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+
+        <div class="sval-fp-strict">
+          <label for="sval-fp-strict" class="sval-fp-strict-words">
+            <span id="sval-fp-strict-title" class="sval-fp-strict-title"
+              >Strict fingerprinting protection</span
+            >
+            <span
+              id="sval-fp-strict-status"
+              class="sval-fp-strict-status"
+            ></span>
+          </label>
+          <!-- A checkbox rather than a switch: while some strict items are on
+               it reads "mixed", which a switch cannot say. -->
+          <button
+            id="sval-fp-strict"
+            class="sval-switch"
+            type="button"
+            role="checkbox"
+            aria-checked="false"
+            aria-labelledby="sval-fp-strict-title"
+            aria-describedby="sval-fp-strict-status"
+          ></button>
+        </div>
+
+        <div class="sval-fp-toolbar">
+          <span class="sval-fp-spacer"></span>
+          <button id="sval-fp-restore" class="sval-button" type="button">
+            Restore Sval's defaults
+          </button>
+        </div>
+
+        <p id="sval-fp-message" class="sval-agents-done" role="status"></p>
+
+        <div id="sval-fp-groups" class="sval-fp-groups"></div>
+
+        <!-- Each group's own switches, which Strict and Restore above set
+             too, so they stay in this card. -->
+        <details id="sval-fp-advanced" class="sval-advanced">
+          <summary class="sval-advanced-summary">
+            <span class="sval-advanced-label">Advanced</span>
+            <span
+              id="sval-fp-advanced-changed"
+              class="sval-advanced-note"
+            ></span>
+            <span
+              class="sval-glyph sval-glyph-chevron-down"
+              aria-hidden="true"
+            ></span>
+          </summary>
+          <div
+            id="sval-fp-items"
+            class="sval-advanced-body sval-fp-groups"
+          ></div>
+        </details>
+      </section>
+    </section>
+
+    <section data-sval-pane="svalSignals" class="sval-settings">
+      <!-- What Sval tells sites: a group of `SvalFingerprinting`'s, drawn by
+           `settings-fingerprinting.js` in a card of its own. -->
+      <section
+        id="sval-signals"
+        class="sval-card"
+        aria-labelledby="sval-signals-heading"
+      >
+        <h2 id="sval-signals-heading">Privacy signals</h2>
+        <div id="sval-signals-list" class="sval-fp-groups"></div>
+        <details id="sval-signals-advanced" class="sval-advanced">
+          <summary class="sval-advanced-summary">
+            <span class="sval-advanced-label">Advanced</span>
+            <span
+              class="sval-glyph sval-glyph-chevron-down"
+              aria-hidden="true"
+            ></span>
+          </summary>
+          <div
+            id="sval-signals-advanced-list"
+            class="sval-advanced-body sval-fp-groups"
+          ></div>
+        </details>
+      </section>
+    </section>
+
+    <section data-sval-pane="svalSecureDns" class="sval-settings">
+      <!-- Secure DNS, drawn by Firefox's `setting-group` from the config
+           `settings-secure-dns.js` registers. One choice for every site. -->
+      <setting-group groupid="svalSecureDns"></setting-group>
+    </section>
+
+    <section data-sval-pane="svalBreaches" class="sval-settings">
+      <!-- Breach warnings (decision 0131): the protection panel's breach card. -->
+      <section
+        id="sval-breaches"
+        class="sval-card"
+        aria-labelledby="sval-breaches-heading"
+      >
+        <h2 id="sval-breaches-heading">Data breach warnings</h2>
+        <label class="sval-switch-row">
+          <span class="sval-lead"
+            >Warn about sites with a data breach in the last year</span
+          >
+          <input
+            id="sval-breach-warnings"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-describedby="sval-breaches-note"
+          />
+        </label>
+        <p id="sval-breaches-note" class="sval-agents-note">
+          Sval checks sites against Have I Been Pwned's list of breaches,
+          downloaded from Mozilla. When this is off, Sval doesn't download the
+          list.
+        </p>
+      </section>
+    </section>
+
+    <!-- Sites (decision 1484): the defaults every site gets, then every site
+         with a choice, each leading to its own page. -->
+    <section data-sval-pane="svalSites" class="sval-settings">
+      <header class="sval-pane-head">
+        <h1 class="sval-pane-title" tabindex="-1">Sites</h1>
+      </header>
+
+      <!-- A site's page (site page spec), drawn by `settings-site-page.js`.
+           While it shows, the pane's other contents are hidden. -->
+      <section
+        id="sval-site-page"
+        class="sval-site-page"
+        aria-labelledby="sval-site-title"
+        hidden="hidden"
+      >
+        <div class="sval-site-nav">
+          <button
+            id="sval-site-back"
+            class="sval-site-back"
+            type="button"
+            aria-label="Back to Sites"
+            title="Back to Sites"
+          >
+            <span
+              class="sval-glyph sval-glyph-sc-back"
+              aria-hidden="true"
+            ></span>
+          </button>
+          <nav
+            id="sval-site-crumbs"
+            class="sval-site-crumbs"
+            aria-label="Breadcrumb"
+          >
+            <a href="#svalSites" data-crumb="sites">Sites</a>
+            <span aria-hidden="true">›</span>
+          </nav>
+        </div>
+        <header class="sval-site-head">
+          <span id="sval-site-icon" class="sval-site-icon"></span>
+          <h1 id="sval-site-title" class="sval-site-title" tabindex="-1"></h1>
+          <!-- Holds Add a host while the page has no "Choices for" select
+               (host-scoped rules spec §5). -->
+          <moz-button
+            id="sval-site-more"
+            class="sval-site-more"
+            type="icon ghost"
+            iconsrc="chrome://global/skin/icons/more.svg"
+            aria-label="More for this site"
+            title="More"
+            aria-haspopup="menu"
+            hidden="hidden"
+          ></moz-button>
+          <panel-list id="sval-site-more-menu">
+            <panel-item id="sval-site-add-host">Add an address…</panel-item>
+          </panel-list>
+        </header>
+        <div id="sval-site-scope" class="sval-site-scope" hidden="hidden"></div>
+        <p id="sval-site-nothing" class="sval-site-nothing" hidden="hidden"></p>
+        <div
+          id="sval-site-note"
+          class="sval-site-note"
+          role="note"
+          hidden="hidden"
+        >
+          <p class="sval-site-note-title">
+            Changes here last until this private window closes
+          </p>
+          <p>
+            You can change only Protections and Video and audio. Everything else
+            is read-only.
+          </p>
+        </div>
+        <div
+          id="sval-site-alert"
+          class="sval-site-alert"
+          role="alert"
+          hidden="hidden"
+        ></div>
+        <div id="sval-site-cards" class="sval-site-cards"></div>
+        <p id="sval-site-status" class="sval-visually-hidden" role="status"></p>
+      </section>
+
+      <!-- Drawn by Firefox's `setting-group` from the config
+           `settings-site-defaults.js` registers. -->
+      <setting-group groupid="svalSiteDefaults"></setting-group>
+
+      <!-- One row per site with a choice: in `SvalSiteProtections`, a
+           JavaScript rule, a permission or a line in My filters
+           (protections spec §2.3 and §4.3), with a row under it for each
+           host holding a choice of its own (decision 1980), drawn by
+           `settings-sites.js`. The rows say what differs; the site's page
+           changes it. -->
+      <section
+        id="sval-sites"
+        class="sval-card"
+        aria-labelledby="sval-sites-heading"
+      >
+        <h2 id="sval-sites-heading">Your sites</h2>
+        <p id="sval-sites-sync" class="sval-agents-note">
+          These are your choices for each site, including the ones you made with
+          the protection button in the address bar. They sync to all your
+          devices.
+        </p>
+        <div id="sval-sites-tools"></div>
+        <p
+          id="sval-sites-found"
+          class="sval-agents-note sval-sites-found"
+          role="status"
+        ></p>
+        <div id="sval-sites-body"></div>
+        <p id="sval-sites-status" class="sval-agents-done" role="status"></p>
+      </section>
+    </section>
+
+    <section data-sval-pane="svalSync" class="sval-settings">
+      <!-- `tabindex="-1"` so the page can land here without putting the caret
+           in a control. A negative index makes a focus target that Tab skips. -->
+      <h1 id="sval-settings-heading" class="sval-pane-title" tabindex="-1">
+        Sync and devices
+      </h1>
+
+      <!-- The folder this device syncs through, and the sync readout, which
+           describes that folder. The folder is device-local: it never syncs,
+           because it cannot sync through the thing it configures (spec §5.6).
+           The choice itself belongs to the panel, which owns the engine. -->
+      <section
+        class="sval-card"
+        id="sval-storage"
+        aria-labelledby="sval-storage-heading"
+      >
+        <h2 id="sval-storage-heading">Sync</h2>
+
+        <!-- Not a live region: it is redrawn on every window focus.
+             `#sval-storage-status` reports outcomes and is live. -->
+        <p id="sval-storage-text" class="sval-lead"></p>
+
+        <div id="sval-folder-field" class="sval-folder-field" hidden="hidden">
+          <span class="sval-icon sval-icon-folder" aria-hidden="true"></span>
+          <span class="sval-folder-names">
+            <span id="sval-folder-name" class="sval-folder-name"></span>
+            <span id="sval-folder-path" class="sval-folder-path"></span>
+          </span>
+        </div>
+
+        <!-- Shown on a machine with no keyring, where the sync key is kept in
+             the profile (key-storage spec, "What each system store does to
+             sval"). -->
+        <p id="sval-storage-keyring" hidden="hidden">
+          This computer has no keyring, so Sval keeps your sync key in your Sval
+          profile.
+        </p>
+
+        <!-- Shown on a Mac that syncs: the Keychain may ask before Sval reads
+             the key, and the user has to know what that prompt is for. -->
+        <p id="sval-storage-keychain" hidden="hidden">
+          Sval keeps what unlocks your sync key in your Mac's Keychain, as
+          "<span id="sval-storage-keychain-item">Sval secrets</span>". If your
+          Mac asks, choose Always Allow, or Sval stops syncing.
+        </p>
+
+        <div class="sval-actions">
+          <button id="sval-storage-choose" class="sval-button"></button>
+          <button
+            id="sval-folder-reveal"
+            class="sval-button"
+            hidden="hidden"
+          ></button>
+          <!-- Offered only while the chosen folder cannot be reached: Sval
+               never recreates a folder by itself, because it cannot tell one
+               that was deleted from a share that is not mounted (local-copy
+               spec §4.6). -->
+          <button id="sval-storage-reuse" class="sval-button" hidden="hidden">
+            Use this folder again
+          </button>
+          <!-- Stopping keeps every workspace: this device's copy lives in the
+               profile (local-copy spec §4.5). -->
+          <button
+            id="sval-storage-stop"
+            class="sval-button sval-button-quiet"
+            hidden="hidden"
+          >
+            Stop syncing
+          </button>
+        </div>
+
+        <p
+          id="sval-storage-status"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div id="sval-storage-result-actions" class="sval-result-actions"></div>
+
+        <!-- The sync readout and the one control that asks for a pass (spec
+             §6.4). The detail and its buttons are the panel's sync
+             indicator's (messages spec §3), so the readout says what the
+             footer does. Withheld while there is no folder, which the lead
+             line already says. -->
+        <div id="sval-sync-row" class="sval-sync-row" hidden="hidden">
+          <div id="sval-sync-state" class="sval-sync-state" data-state="idle">
+            <span class="sval-sync-icon" aria-hidden="true"></span>
+            <span class="sval-sync-words">
+              <span
+                id="sval-sync-status"
+                class="sval-sync-label"
+                role="status"
+                aria-live="polite"
+              ></span>
+              <span
+                id="sval-sync-last"
+                class="sval-sync-detail"
+                role="status"
+                aria-live="polite"
+              ></span>
+              <span id="sval-sync-actions" class="sval-sync-actions"></span>
+            </span>
+          </div>
+          <button id="sval-sync-now" class="sval-button sval-button-primary">
+            Sync now
+          </button>
+        </div>
+      </section>
+
+      <!--
+        This device's name, and giving another device the key to the folder
+        (spec §6.7) as a guided flow: first which device shows the code, then
+        only that path's steps, one at a time. `data-path` on the wrapper says
+        what is showing: "" the card alone, "choose" its two choices, "offer"
+        or "claim" a path; `data-step` on each step says which one.
+      -->
+      <div id="sval-devices" class="sval-devices" data-path="">
+        <section
+          id="sval-this-device"
+          class="sval-card"
+          aria-labelledby="sval-devices-heading"
+        >
+          <h2 id="sval-devices-heading">Your devices</h2>
+          <!-- Other devices show the name beside the agent workspaces that
+               came from this one. Device-local, and published by this
+               device alone. -->
+          <label class="sval-step-label" for="sval-device-name">
+            This device's name
+          </label>
+          <input
+            id="sval-device-name"
+            class="sval-code"
+            type="text"
+            size="32"
+            maxlength="64"
+            spellcheck="false"
+            autocomplete="off"
+            aria-describedby="sval-device-name-detail"
+          />
+          <p id="sval-device-name-detail" class="sval-meta">
+            Your other devices show this name next to agent Workspaces from this
+            device.
+          </p>
+
+          <!-- The flow's one precondition: the key travels through the folder
+               both devices share. -->
+          <div
+            id="sval-pairing-needs-folder"
+            class="sval-card-group"
+            hidden="hidden"
+          >
+            <p
+              id="sval-folder"
+              class="sval-lead"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <div class="sval-actions">
+              <button id="sval-pairing-go-sync" class="sval-button">
+                Go to Sync
+              </button>
+            </div>
+          </div>
+          <div id="sval-pairing-start" class="sval-card-group">
+            <p class="sval-lead">
+              Your sync folder is encrypted. Another device needs a one-time
+              code to read it.
+            </p>
+            <div class="sval-actions">
+              <button
+                id="sval-pairing-open"
+                class="sval-button sval-button-primary"
+                aria-expanded="false"
+                aria-controls="sval-pairing-choose"
+              >
+                Sync with another device
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="sval-pairing-choose"
+            class="sval-card-group sval-flow"
+            role="group"
+            hidden="hidden"
+            aria-labelledby="sval-pairing-choose-heading"
+          >
+            <div class="sval-flow-head">
+              <button id="sval-choose-back" class="sval-back">Back</button>
+            </div>
+            <h3 id="sval-pairing-choose-heading">Sync with another device</h3>
+            <div
+              id="sval-pairing-choices"
+              class="sval-choices"
+              role="group"
+              aria-labelledby="sval-pairing-choose-heading"
+            >
+              <button
+                id="sval-path-offer"
+                class="sval-choice"
+                data-path="offer"
+              >
+                <span class="sval-choice-title">This device shows a code</span>
+                <span class="sval-choice-detail">
+                  You type it on the other device.
+                </span>
+              </button>
+              <button
+                id="sval-path-claim"
+                class="sval-choice"
+                data-path="claim"
+              >
+                <span class="sval-choice-title">
+                  The other device shows a code
+                </span>
+                <span class="sval-choice-detail">You type it here.</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- This device offers its key. -->
+          <div
+            id="sval-path-offer-steps"
+            class="sval-card-group sval-flow"
+            role="group"
+            hidden="hidden"
+            aria-labelledby="sval-offer-heading"
+          >
+            <div class="sval-flow-head">
+              <button id="sval-offer-back" class="sval-back">Back</button>
+              <p id="sval-offer-progress" class="sval-progress"></p>
+            </div>
+            <h3 id="sval-offer-heading">This device shows a code</h3>
+
+            <div class="sval-step" data-step="1">
+              <h4>Use the same sync folder on the other device</h4>
+              <p id="sval-offer-folder" class="sval-lead"></p>
+              <div class="sval-actions">
+                <button
+                  id="sval-offer-start"
+                  class="sval-button sval-button-primary"
+                >
+                  Show code
+                </button>
+              </div>
+            </div>
+
+            <div
+              class="sval-step"
+              data-step="2"
+              id="sval-offer-live"
+              hidden="hidden"
+            >
+              <h4>Type this code on the other device</h4>
+              <p class="sval-lead">
+                In Settings › Sync and devices, choose "Sync with another
+                device", then "The other device shows a code".
+              </p>
+              <div class="sval-code-row">
+                <!-- Read-only rather than static text: focusable, selectable with
+                     the keyboard, and read out as a value on request. -->
+                <input
+                  id="sval-offer-code"
+                  class="sval-code"
+                  type="text"
+                  readonly="readonly"
+                  size="14"
+                  spellcheck="false"
+                  aria-label="One-time code"
+                />
+                <button id="sval-offer-copy" class="sval-button">Copy</button>
+              </div>
+              <!-- `role="timer"` is a live region whose implicit `aria-live` is
+                   `off`: readable on demand, never announced each second. -->
+              <p
+                id="sval-offer-countdown"
+                class="sval-meta"
+                role="timer"
+                aria-live="off"
+              ></p>
+              <p class="sval-meta">
+                The code can take a few minutes to reach the other device. Keep
+                this page open.
+              </p>
+              <p class="sval-warning">
+                Anyone with this code and your sync folder can read and change
+                your Workspaces.
+              </p>
+              <div class="sval-actions">
+                <button id="sval-offer-withdraw" class="sval-button">
+                  Cancel code
+                </button>
+              </div>
+            </div>
+
+            <p
+              id="sval-offer-status"
+              class="sval-status-line"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </div>
+
+          <!-- This device claims a key the other device offered. -->
+          <div
+            id="sval-path-claim-steps"
+            class="sval-card-group sval-flow"
+            role="group"
+            hidden="hidden"
+            aria-labelledby="sval-claim-heading"
+          >
+            <div class="sval-flow-head">
+              <button id="sval-claim-back" class="sval-back">Back</button>
+              <p id="sval-claim-progress" class="sval-progress"></p>
+            </div>
+            <h3 id="sval-claim-heading">The other device shows a code</h3>
+
+            <div class="sval-step" data-step="1">
+              <h4>Show a code on the other device</h4>
+              <p class="sval-lead">
+                In Settings › Sync and devices, choose "Sync with another
+                device", then "This device shows a code".
+              </p>
+              <p id="sval-claim-folder" class="sval-meta"></p>
+              <div class="sval-actions">
+                <button
+                  id="sval-claim-next"
+                  class="sval-button sval-button-primary"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+            <div class="sval-step" data-step="2" hidden="hidden">
+              <form id="sval-claim-form">
+                <label class="sval-step-label" for="sval-claim-code">
+                  Type the code it shows
+                </label>
+                <div class="sval-code-row">
+                  <input
+                    id="sval-claim-code"
+                    class="sval-code"
+                    type="text"
+                    size="14"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="XXXX-XXXX-XXXX"
+                    aria-describedby="sval-claim-status"
+                  />
+                  <button
+                    id="sval-claim-submit"
+                    class="sval-button sval-button-primary"
+                    type="submit"
+                  >
+                    Join
+                  </button>
+                  <button
+                    id="sval-claim-stop"
+                    class="sval-button sval-button-quiet"
+                    type="button"
+                    hidden="hidden"
+                  >
+                    Stop
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <p
+              id="sval-claim-status"
+              class="sval-status-line"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <div id="sval-claim-actions" class="sval-result-actions"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- The category's advanced settings: the sync key's backup, taking
+           it back from one, and setting up sync again (key-storage spec,
+           "Backup and recovery"). Shown once a sync folder is chosen; saving
+           and setting up again only on a device that syncs. -->
+      <details id="sval-sync-advanced" class="sval-advanced" hidden="hidden">
+        <summary class="sval-advanced-summary">
+          <span class="sval-advanced-label">Advanced</span>
+          <span
+            class="sval-glyph sval-glyph-chevron-down"
+            aria-hidden="true"
+          ></span>
+        </summary>
+        <div class="sval-advanced-body">
+          <section
+            id="sval-key"
+            class="sval-card"
+            aria-labelledby="sval-key-heading"
+          >
+            <h2 id="sval-key-heading">Sync key</h2>
+            <div id="sval-key-actions" class="sval-actions" hidden="hidden">
+              <p id="sval-backup-missing" class="sval-meta" hidden="hidden">
+                You haven't saved a backup.
+              </p>
+              <button id="sval-backup-save" class="sval-button">
+                Save a backup
+              </button>
+              <button
+                id="sval-set-up-again"
+                class="sval-button sval-button-quiet"
+              >
+                Set up sync again
+              </button>
+            </div>
+            <form id="sval-restore-form" class="sval-restore">
+              <label class="sval-step-label" for="sval-restore-code">
+                Restore from a backup
+              </label>
+              <div class="sval-code-row">
+                <input
+                  id="sval-restore-code"
+                  class="sval-code"
+                  type="text"
+                  size="40"
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-describedby="sval-key-status"
+                />
+                <button
+                  id="sval-restore-submit"
+                  class="sval-button"
+                  type="submit"
+                >
+                  Restore
+                </button>
+              </div>
+            </form>
+
+            <p
+              id="sval-key-status"
+              class="sval-status-line"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <div id="sval-key-result-actions" class="sval-result-actions"></div>
+          </section>
+        </div>
+      </details>
+    </section>
+
+    <!-- Joins Firefox's Home category, Workspaces, after its home page
+         group. -->
+    <section data-sval-pane="svalHomeFavorites" class="sval-settings">
+      <section class="sval-card" aria-labelledby="sval-home-heading">
+        <h2 id="sval-home-heading">Home page</h2>
+        <!-- `SvalHomePage.HOME_FAVORITES_PREF`; the home page's own switch
+             writes the same pref. -->
+        <label class="sval-switch-row">
+          <span class="sval-lead">Show Pins on the home page</span>
+          <input
+            id="sval-home-favorites"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's Home category, Workspaces, before idle tabs: the
+         Workspace switcher at the top of the panel, and how the strip shows
+         and scrolls (`SvalPanelModel.SWITCHER_PREF` and the strip's prefs).
+         Each choice applies as it is checked, and each preview is drawn by
+         `SvalAppearanceSettings._initSwitcher`. -->
+    <section data-sval-pane="svalSwitcher" class="sval-settings">
+      <section class="sval-card" aria-labelledby="sval-switcher-heading">
+        <h2 id="sval-switcher-heading">Workspace switcher</h2>
+        <div
+          class="sval-pick-cards"
+          role="radiogroup"
+          aria-labelledby="sval-switcher-heading"
+        >
+          <label class="sval-pick-card">
+            <input
+              type="radio"
+              name="sval-switcher"
+              value="menu"
+              aria-describedby="sval-switcher-menu-note"
+            />
+            <span class="sval-pick-words">
+              <span class="sval-pick-label">Menu</span>
+              <span id="sval-switcher-menu-note" class="sval-pick-note"
+                >A button above your tabs shows the Workspace you're in. Select
+                it to see a list of all your Workspaces.</span
+              >
+            </span>
+            <span
+              class="sval-pick-preview"
+              data-preview="menu"
+              aria-hidden="true"
+            ></span>
+          </label>
+          <label class="sval-pick-card">
+            <input
+              type="radio"
+              name="sval-switcher"
+              value="strip"
+              aria-describedby="sval-switcher-strip-note"
+            />
+            <span class="sval-pick-words">
+              <span class="sval-pick-label">Strip</span>
+              <span id="sval-switcher-strip-note" class="sval-pick-note"
+                >Your Workspaces sit side by side in a row above your
+                tabs.</span
+              >
+            </span>
+            <span
+              class="sval-pick-preview"
+              data-preview="strip"
+              aria-hidden="true"
+            ></span>
+          </label>
+        </div>
+        <div id="sval-strip-options" class="sval-strip-options" hidden="">
+          <h3 id="sval-strip-names-heading">The strip shows</h3>
+          <div
+            class="sval-pick-cards"
+            role="radiogroup"
+            aria-labelledby="sval-strip-names-heading"
+          >
+            <label class="sval-pick-card">
+              <input type="radio" name="sval-strip-names" value="all" />
+              <span class="sval-pick-words">
+                <span class="sval-pick-label">Icons and names</span>
+              </span>
+              <span
+                class="sval-pick-preview"
+                data-preview="all"
+                aria-hidden="true"
+              ></span>
+            </label>
+            <label class="sval-pick-card">
+              <input type="radio" name="sval-strip-names" value="current" />
+              <span class="sval-pick-words">
+                <span class="sval-pick-label"
+                  >Icons and the current Workspace's name</span
+                >
+              </span>
+              <span
+                class="sval-pick-preview"
+                data-preview="current"
+                aria-hidden="true"
+              ></span>
+            </label>
+            <label class="sval-pick-card">
+              <input
+                type="radio"
+                name="sval-strip-names"
+                value="none"
+                aria-describedby="sval-strip-names-none-note"
+              />
+              <span class="sval-pick-words">
+                <span class="sval-pick-label">Icons only</span>
+                <span id="sval-strip-names-none-note" class="sval-pick-note"
+                  >Point at an icon to see its Workspace's name.</span
+                >
+              </span>
+              <span
+                class="sval-pick-preview"
+                data-preview="none"
+                aria-hidden="true"
+              ></span>
+            </label>
+          </div>
+          <h3 id="sval-strip-wheel-heading">Scrolling over the strip</h3>
+          <div
+            class="sval-pick-cards"
+            role="radiogroup"
+            aria-labelledby="sval-strip-wheel-heading"
+          >
+            <label class="sval-pick-card">
+              <input
+                type="radio"
+                name="sval-strip-wheel"
+                value="slide"
+                aria-describedby="sval-strip-wheel-slide-note"
+              />
+              <span class="sval-pick-words">
+                <span class="sval-pick-label">Slides the strip</span>
+                <span id="sval-strip-wheel-slide-note" class="sval-pick-note"
+                  >Click a Workspace to go to it. The strip slides back when you
+                  move the pointer away.</span
+                >
+              </span>
+              <span
+                class="sval-pick-preview"
+                data-preview="slide"
+                aria-hidden="true"
+              ></span>
+            </label>
+            <label class="sval-pick-card">
+              <input
+                type="radio"
+                name="sval-strip-wheel"
+                value="switch"
+                aria-describedby="sval-strip-wheel-switch-note"
+              />
+              <span class="sval-pick-words">
+                <span class="sval-pick-label">Switches Workspaces</span>
+                <span id="sval-strip-wheel-switch-note" class="sval-pick-note"
+                  >Turning the mouse wheel moves to the next or previous
+                  Workspace, one at a time.</span
+                >
+              </span>
+              <span
+                class="sval-pick-preview"
+                data-preview="switch"
+                aria-hidden="true"
+              ></span>
+            </label>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's Home category, Workspaces, before pins: archiving
+         idle tabs, drawn by Firefox's `setting-group` from the
+         config `settings-archive.js` registers. -->
+    <section data-sval-pane="svalTabArchive" class="sval-settings">
+      <setting-group groupid="svalTabArchive"></setting-group>
+    </section>
+
+    <!-- Joins Firefox's General category after its default-browser group,
+         drawn by Firefox's `setting-group` from the config
+         `settings-warnings.js` registers. -->
+    <section data-sval-pane="svalWarnings" class="sval-settings">
+      <setting-group groupid="svalWarnings"></setting-group>
+    </section>
+
+    <!-- Joins Firefox's Home category, Workspaces, before its import and
+         export group: pins belong to a workspace. -->
+    <section data-sval-pane="svalPins" class="sval-settings">
+      <!-- Pins (pins spec §4): how many lines of them the panel shows,
+           `SvalPinsModel`'s pref. -->
+      <section class="sval-card" aria-labelledby="sval-pins-heading">
+        <h2 id="sval-pins-heading">Pins</h2>
+        <label class="sval-switch-row">
+          <span class="sval-lead">Rows of pins to show</span>
+          <select id="sval-pins-lines" class="sval-agent-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's own Appearance category, at its top: where the
+         panel sits is how sval looks. -->
+    <section data-sval-pane="svalPanelSide" class="sval-settings">
+      <section class="sval-card" aria-labelledby="sval-side-heading">
+        <h2 id="sval-side-heading">Workspace panel side</h2>
+        <div
+          class="sval-segments"
+          role="radiogroup"
+          aria-labelledby="sval-side-heading"
+        >
+          <label class="sval-segment">
+            <input type="radio" name="sval-side" value="left" />
+            <span>Left</span>
+          </label>
+          <label class="sval-segment">
+            <input type="radio" name="sval-side" value="right" />
+            <span>Right</span>
+          </label>
+        </div>
+        <p
+          id="sval-side-status"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </section>
+      <section class="sval-card" aria-labelledby="sval-hover-preview-label">
+        <!-- Firefox's tab hover preview, beside a tab's row
+             (`SvalTabHoverPreview`). -->
+        <label class="sval-switch-row">
+          <span class="sval-fp-words">
+            <span id="sval-hover-preview-label" class="sval-links-label"
+              >Show a preview when you point at a tab</span
+            >
+            <span id="sval-hover-preview-note" class="sval-agents-note"
+              >When you point at a tab, or move to it with the keyboard, Sval
+              shows the tab's title, its site, and a picture of its page next to
+              the Workspace panel.</span
+            >
+          </span>
+          <input
+            id="sval-hover-preview"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-labelledby="sval-hover-preview-label"
+            aria-describedby="sval-hover-preview-note"
+          />
+        </label>
+      </section>
+      <section class="sval-card" aria-labelledby="sval-edge-heading">
+        <h2 id="sval-edge-heading">Hidden Workspace panel</h2>
+        <!-- `SvalPanelReveal.REVEAL_PREF`. -->
+        <label class="sval-switch-row">
+          <span class="sval-lead"
+            >Show the Workspace panel when you hold the pointer at the edge of
+            the window</span
+          >
+          <input
+            id="sval-panel-reveal"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's own Appearance category, after Theme:
+         how the address bar shows where you are. -->
+    <section data-sval-pane="svalAddressBar" class="sval-settings">
+      <section class="sval-card" aria-labelledby="sval-urlbar-heading">
+        <h2 id="sval-urlbar-heading">Address bar</h2>
+        <p class="sval-agents-note">
+          Choose how much of a page's address you see in the address bar.
+        </p>
+        <div
+          class="sval-segments sval-track"
+          role="radiogroup"
+          aria-labelledby="sval-urlbar-heading"
+        >
+          <label class="sval-segment">
+            <input type="radio" name="sval-urlbar-display" value="domain" />
+            <span>Site name</span>
+          </label>
+          <label class="sval-segment">
+            <input type="radio" name="sval-urlbar-display" value="path" />
+            <span>Site and path</span>
+          </label>
+          <label class="sval-segment">
+            <input type="radio" name="sval-urlbar-display" value="full" />
+            <span>Full address</span>
+          </label>
+        </div>
+        <!-- An example page's address as the choice shows it
+             (`SvalAppearanceSettings._initAppearance`). -->
+        <div id="sval-urlbar-example" class="sval-urlbar-example">
+          <span class="sval-urlbar-host"></span
+          ><span class="sval-urlbar-tail"></span>
+        </div>
+      </section>
+      <!-- The site controls' pinnable buttons (`SvalSiteControls`): the same
+           pref as the site menu's pin buttons, and the same pin button. -->
+      <section
+        id="sval-address-pins"
+        class="sval-card"
+        aria-labelledby="sval-address-pins-heading"
+      >
+        <h2 id="sval-address-pins-heading">Pinned to the address bar</h2>
+        <p class="sval-agents-note">
+          Pinned buttons show on every site. You can also pin them from the site
+          menu.
+        </p>
+        <div class="sval-switch-row sval-address-pin">
+          <span class="sval-agent-tile"
+            ><span
+              class="sval-glyph sval-glyph-javascript"
+              aria-hidden="true"
+            ></span
+          ></span>
+          <span class="sval-agent-words">
+            <span class="sval-agent-label">JavaScript</span>
+            <span class="sval-agents-note"
+              >Turns JavaScript on or off for the site you're on, then reloads
+              the tab.</span
+            >
+          </span>
+          <button
+            id="sval-address-pin-javascript"
+            class="sval-address-pin-button"
+            type="button"
+            aria-pressed="false"
+            aria-label="Pin JavaScript to the address bar"
+          >
+            <span class="sval-glyph sval-glyph-pin" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="sval-switch-row sval-address-pin">
+          <span class="sval-agent-tile"
+            ><span
+              class="sval-glyph sval-glyph-eraser"
+              aria-hidden="true"
+            ></span
+          ></span>
+          <span class="sval-agent-words">
+            <span class="sval-agent-label">Remove from this site</span>
+            <span class="sval-agents-note"
+              >Removes something from a site every time you visit, as a rule in
+              My filters.</span
+            >
+          </span>
+          <button
+            id="sval-address-pin-remove"
+            class="sval-address-pin-button"
+            type="button"
+            aria-pressed="false"
+            aria-label="Pin Remove from this site to the address bar"
+          >
+            <span class="sval-glyph sval-glyph-pin" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="sval-switch-row sval-address-pin">
+          <span class="sval-agent-tile"
+            ><span
+              class="sval-glyph sval-glyph-scissors"
+              aria-hidden="true"
+            ></span
+          ></span>
+          <span class="sval-agent-words">
+            <span class="sval-agent-label">Snip</span>
+            <span class="sval-agents-note"
+              >Removes something from the open page until you reload.</span
+            >
+          </span>
+          <button
+            id="sval-address-pin-snip"
+            class="sval-address-pin-button"
+            type="button"
+            aria-pressed="false"
+            aria-label="Pin Snip to the address bar"
+          >
+            <span class="sval-glyph sval-glyph-pin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's own Appearance category, over the accessibility
+         groups it takes in, so that a person looking for Accessibility finds
+         them. -->
+    <section data-sval-pane="svalAccessibility" class="sval-settings">
+      <h2 class="sval-section-title">Accessibility</h2>
+    </section>
+
+    <!-- Joins Firefox's own About category, after its update settings: which
+         feed the updater reads. -->
+    <section data-sval-pane="svalUpdates" class="sval-settings">
+      <section
+        id="sval-release-candidates-card"
+        class="sval-card"
+        aria-labelledby="sval-release-candidates-heading"
+      >
+        <h2 id="sval-release-candidates-heading">Release candidates</h2>
+        <label class="sval-switch-row">
+          <span class="sval-lead">Receive release candidate updates</span>
+          <input
+            id="sval-release-candidates"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-describedby="sval-release-candidates-note"
+          />
+        </label>
+        <p id="sval-release-candidates-note" class="sval-status-line">
+          Try each release before it ships. Regular releases still arrive either
+          way.
+        </p>
+      </section>
+    </section>
+
+    <!-- Joins the end of Firefox's own About category: its advanced
+         settings, how much sval writes to the browser console (`SvalLog`)
+         and about:config. -->
+    <section data-sval-pane="svalDiagnostics" class="sval-settings">
+      <details id="sval-about-advanced" class="sval-advanced">
+        <summary class="sval-advanced-summary">
+          <span class="sval-advanced-label">Advanced</span>
+          <span
+            class="sval-glyph sval-glyph-chevron-down"
+            aria-hidden="true"
+          ></span>
+        </summary>
+        <div class="sval-advanced-body">
+          <section class="sval-card" aria-labelledby="sval-loglevel-heading">
+            <h2 id="sval-loglevel-heading">Diagnostics log level</h2>
+            <p class="sval-lead">
+              Choose how much Sval writes to the browser console.
+            </p>
+            <select
+              id="sval-loglevel"
+              class="sval-agent-select"
+              aria-labelledby="sval-loglevel-heading"
+            >
+              <option value="Off">Off</option>
+              <option value="Error">Errors</option>
+              <option value="Warn">Warnings</option>
+              <option value="Info">Info</option>
+              <option value="Debug">Debug</option>
+              <option value="All">Everything</option>
+            </select>
+          </section>
+          <section class="sval-card" aria-labelledby="sval-advanced-heading">
+            <h2 id="sval-advanced-heading">Advanced preferences</h2>
+            <p class="sval-lead">
+              The about:config page lists every preference Sval reads, including
+              the ones these settings don't show. A wrong value can stop Sval
+              from working as it should.
+            </p>
+            <button id="sval-advanced-open" class="sval-button" type="button">
+              Open about:config
+            </button>
+          </section>
+        </div>
+      </details>
+    </section>
+
+    <!-- Joins the end of Privacy and protection: its advanced settings.
+         Firefox's certificate and proxy groups are drawn by Firefox's
+         `setting-group` from Firefox's own configs. -->
+    <section data-sval-pane="svalPrivacyAdvanced" class="sval-settings">
+      <details id="sval-privacy-advanced" class="sval-advanced">
+        <summary class="sval-advanced-summary">
+          <span class="sval-advanced-label">Advanced</span>
+          <span
+            class="sval-glyph sval-glyph-chevron-down"
+            aria-hidden="true"
+          ></span>
+        </summary>
+        <div class="sval-advanced-body">
+          <!-- Firefox's tracking protection prefs (protections spec §3.3:
+               Sval's cards replace Enhanced Tracking Protection's pages, and
+               nothing they reached is lost). `settings-tracking.js` reads and
+               writes them from `SvalTrackingSettings`' `SWITCHES`. -->
+          <section
+            id="sval-tracking-more"
+            class="sval-card"
+            aria-labelledby="sval-tracking-more-heading"
+          >
+            <h2 id="sval-tracking-more-heading">More tracking protection</h2>
+            <label class="sval-switch-row">
+              <span class="sval-lead"
+                >Strip tracking parameters from the addresses you open</span
+              >
+              <input
+                id="sval-query-stripping"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+              />
+            </label>
+            <label class="sval-switch-row">
+              <span class="sval-lead">Block redirect tracking</span>
+              <input
+                id="sval-bounce-tracking"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+              />
+            </label>
+            <label class="sval-switch-row">
+              <span class="sval-lead"
+                >Never send a page's full address to the next site you go
+                to</span
+              >
+              <input
+                id="sval-referrer-trim"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+              />
+            </label>
+          </section>
+
+          <!-- `SvalFavorites.BOOKMARKLETS_PREF`. -->
+          <section
+            id="sval-bookmarklets-card"
+            class="sval-card"
+            aria-labelledby="sval-bookmarklets-heading"
+          >
+            <h2 id="sval-bookmarklets-heading">Bookmarklets</h2>
+            <label class="sval-switch-row">
+              <span class="sval-lead">Run bookmarklets from Favorites</span>
+              <input
+                id="sval-bookmarklets"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+              />
+            </label>
+          </section>
+          <setting-group groupid="certificates"></setting-group>
+          <setting-group groupid="networkProxy"></setting-group>
+        </div>
+      </details>
+    </section>
+
+    <!-- Joins Privacy and protection before its history: Sval keeps no
+         passwords, so choosing the manager that does is a
+         privacy and security choice (spec §7.3). -->
+    <section data-sval-pane="svalPasswords" class="sval-settings">
+      <section
+        class="sval-card"
+        aria-labelledby="sval-password-manager-heading"
+      >
+        <h2 id="sval-password-manager-heading">Password manager</h2>
+        <p class="sval-lead">
+          Sval doesn't keep passwords. Choose yours, and Sval adds its
+          extension.
+        </p>
+        <!-- Filled from SvalPasswordManager.choices(), which knows what each
+             platform offers. A choice applies from the button under it,
+             which says what it does: Gecko checks each radio an arrow key
+             passes, so a radio that applied would install every manager on
+             the way to the one wanted. -->
+        <div
+          id="sval-password-manager"
+          class="sval-segments"
+          role="radiogroup"
+          aria-labelledby="sval-password-manager-heading"
+        ></div>
+        <div class="sval-code-row">
+          <button
+            id="sval-password-manager-save"
+            class="sval-button sval-button-primary sval-agent-small"
+            type="button"
+          >
+            Save
+          </button>
+        </div>
+        <p
+          id="sval-password-manager-status"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </section>
+      <!-- Shown where Gecko has about:webauthn, which it registers on
+           neither Windows nor Android (`docshell/build/components.conf`). -->
+      <section
+        id="sval-security-keys"
+        class="sval-card"
+        aria-labelledby="sval-security-keys-heading"
+        hidden=""
+      >
+        <h2 id="sval-security-keys-heading">Security keys</h2>
+        <p class="sval-lead">
+          Set a hardware security key's PIN, see and remove the passkeys it
+          holds, and add fingerprints.
+        </p>
+        <button id="sval-security-keys-open" class="sval-button" type="button">
+          Manage security keys
+        </button>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's own Search category, which Sval names Search and
+         Launcher, after its search suggestions. -->
+    <section data-sval-pane="svalLauncher" class="sval-settings">
+      <!-- The Launcher's sections (launcher spec §5): their order and how
+           many rows each lists, `SvalLauncherPrefs`' prefs, drawn by
+           `settings-appearance.js`, in `sval/launcher.ftl`'s words. -->
+      <section class="sval-card" aria-labelledby="sval-launcher-heading">
+        <h2
+          id="sval-launcher-heading"
+          data-l10n-id="launcher-settings-heading"
+        ></h2>
+        <p
+          id="sval-launcher-note"
+          class="sval-lead"
+          data-l10n-id="launcher-settings-note"
+        ></p>
+        <ol
+          id="sval-launcher-sections"
+          class="sval-launcher-sections"
+          aria-describedby="sval-launcher-note"
+        ></ol>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's own Search category, which holds the engine
+         choice: it is about the engine, and one topic has one category.
+         `settings-kagi.js` shows the card while Kagi is the default engine
+         or private windows' engine, or while a Session Link is saved. -->
+    <section data-sval-pane="svalKagi" class="sval-settings">
+      <section
+        id="sval-kagi-card"
+        class="sval-card"
+        aria-labelledby="sval-kagi-heading"
+        hidden="hidden"
+      >
+        <h2 id="sval-kagi-heading">Kagi</h2>
+        <p
+          id="sval-kagi-account"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <button
+          id="sval-kagi-sign-in"
+          class="sval-button sval-button-primary"
+          type="button"
+          hidden="hidden"
+        >
+          Sign in to Kagi
+        </button>
+        <!-- Says how private windows sign in, never with what. -->
+        <p
+          id="sval-kagi-privacy-pass"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <button
+          id="sval-kagi-check-again"
+          class="sval-button sval-button-quiet"
+          type="button"
+          hidden="hidden"
+        >
+          Check again
+        </button>
+        <div id="sval-kagi-session-link" class="sval-card-group">
+          <p class="sval-lead">
+            If your Kagi plan has no Privacy Pass, paste your Session Link to
+            search in private windows.
+          </p>
+          <!-- Not read by the password manager: this page has the system
+               principal, which `LoginManagerChild` skips.
+               `autocomplete="off"` also keeps a saved login out of the
+               field. -->
+          <form id="sval-kagi-form">
+            <label class="sval-step-label" for="sval-kagi-link">
+              Kagi Session Link
+            </label>
+            <div class="sval-code-row">
+              <input
+                id="sval-kagi-link"
+                class="sval-field"
+                type="password"
+                size="32"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="https://kagi.com/search?token=…"
+                aria-describedby="sval-kagi-status"
+              />
+              <button
+                id="sval-kagi-save"
+                class="sval-button sval-button-primary"
+                type="submit"
+              >
+                Save
+              </button>
+              <button
+                id="sval-kagi-clear"
+                class="sval-button sval-button-quiet"
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
+          </form>
+          <!-- Says whether a token is stored, never what it is. -->
+          <p
+            id="sval-kagi-status"
+            class="sval-status-line"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </div>
+      </section>
+    </section>
+
+    <!-- Links (link routing spec §7): where a link from another app opens,
+         the Quick Peek, whether a new tab takes focus, and the rules that send
+         links to a workspace.
+         `settings.js` binds the switches to their prefs;
+         `settings-links.js` draws the rest. -->
+    <section data-sval-pane="svalLinks" class="sval-settings">
+      <header class="sval-pane-head">
+        <h1 class="sval-pane-title" tabindex="-1">Links</h1>
+      </header>
+
+      <section class="sval-card" aria-labelledby="sval-links-apps-heading">
+        <h2 id="sval-links-apps-heading">Links from other apps</h2>
+        <label class="sval-switch-row sval-links-row">
+          <span class="sval-fp-words">
+            <span class="sval-links-label"
+              >Open links from other apps in a Peek</span
+            >
+            <span id="sval-peek-note" class="sval-agents-note"></span>
+          </span>
+          <input
+            id="sval-peek"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-describedby="sval-peek-note"
+          />
+        </label>
+        <div id="sval-peek-idle-row" class="sval-links-row sval-links-idle">
+          <span class="sval-fp-words">
+            <label for="sval-peek-idle" class="sval-links-label"
+              >Close an idle Peek after</label
+            >
+            <span id="sval-peek-idle-note" class="sval-agents-note"></span>
+          </span>
+          <select
+            id="sval-peek-idle"
+            class="sval-agent-select sval-fp-select"
+            aria-describedby="sval-peek-idle-note"
+          >
+            <option value="60">1 hour</option>
+            <option value="360">6 hours</option>
+            <option value="1440">1 day</option>
+            <option value="10080">1 week</option>
+            <option value="0">Never</option>
+          </select>
+        </div>
+      </section>
+
+      <section
+        class="sval-card"
+        aria-labelledby="sval-links-quick-peek-heading"
+      >
+        <h2 id="sval-links-quick-peek-heading">Links in pages</h2>
+        <label class="sval-switch-row sval-links-row">
+          <span class="sval-fp-words">
+            <span id="sval-quick-peek-label" class="sval-links-label"></span>
+            <span id="sval-quick-peek-note" class="sval-agents-note"></span>
+          </span>
+          <input
+            id="sval-quick-peek"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-labelledby="sval-quick-peek-label"
+            aria-describedby="sval-quick-peek-note"
+          />
+        </label>
+        <!-- `SvalPinsModel.PINS_QUICK_PEEK_PREF`. -->
+        <label class="sval-switch-row sval-links-row">
+          <span class="sval-links-label"
+            >Open links to other sites from a pin in a Quick Peek</span
+          >
+          <input
+            id="sval-pins-quick-peek"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+        <!-- Firefox's `browser.tabs.loadInBackground`, which the switch
+             inverts. -->
+        <label class="sval-switch-row sval-links-row">
+          <span class="sval-links-label"
+            >When you open a link or media in a new tab, switch to it
+            immediately</span
+          >
+          <input
+            id="sval-switch-to-new-tabs"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+      </section>
+
+      <section
+        id="sval-link-rules"
+        class="sval-card"
+        aria-labelledby="sval-link-rules-heading"
+      >
+        <div class="sval-blocking-head">
+          <h2 id="sval-link-rules-heading">Link Docking</h2>
+          <span class="sval-fp-spacer"></span>
+          <button
+            id="sval-link-rules-add"
+            class="sval-button sval-agent-small sval-links-add"
+            type="button"
+            data-sval-key="add-rule"
+          >
+            <span class="sval-glyph sval-glyph-plus" aria-hidden="true"></span
+            >Add rule
+          </button>
+        </div>
+        <p class="sval-agents-note">
+          Links from other apps that match a rule dock in the rule's Workspace
+          as a new tab, without a Peek. The first matching rule wins.
+        </p>
+        <p class="sval-agents-note sval-links-sync">
+          <span
+            class="sval-glyph sval-glyph-folder-sync"
+            aria-hidden="true"
+          ></span>
+          <span id="sval-link-rules-sync"></span>
+        </p>
+        <div id="sval-link-rules-body"></div>
+        <p
+          id="sval-link-rules-status"
+          class="sval-agents-done"
+          role="status"
+        ></p>
+      </section>
+    </section>
+
+    <!-- Keyboard shortcuts: Sval's keys and Firefox's, in Sval's words
+         (`SvalShortcuts`). `settings-keyboard.js` draws the list as the pane
+         first shows. -->
+    <section data-sval-pane="svalKeyboard" class="sval-settings">
+      <header class="sval-pane-head">
+        <h1 class="sval-pane-title" tabindex="-1">Keyboard shortcuts</h1>
+      </header>
+      <p class="sval-lead sval-keys-lead">
+        You can change any shortcut that has a Change button.
+      </p>
+      <!-- `settings-keyboard.js` puts these in the Workspace panel's group
+           as it draws the list. -->
+      <div
+        id="sval-keys-panel-switches"
+        class="sval-keys-switches"
+        hidden="hidden"
+      >
+        <!-- Firefox's Ctrl+Tab order (`ctrlTab`): by use, or by place in the
+             panel. -->
+        <label class="sval-switch-row sval-keys-ctrl-tab">
+          <span class="sval-fp-words">
+            <!-- `settings-keyboard.js` writes the key as this platform draws
+                 it (`SvalShortcuts.shortcutText`). -->
+            <span id="sval-ctrl-tab-recent-label" class="sval-links-label"
+              ><span class="sval-ctrl-tab-key">Ctrl+Tab</span> switches to
+              recently used tabs</span
+            >
+            <span id="sval-ctrl-tab-recent-note" class="sval-agents-note"
+              >Keep holding the first key and press Tab again to go further
+              back. When this is off,
+              <span class="sval-ctrl-tab-key">Ctrl+Tab</span> goes to the next
+              tab in the Workspace.</span
+            >
+          </span>
+          <input
+            id="sval-ctrl-tab-recent"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-labelledby="sval-ctrl-tab-recent-label"
+            aria-describedby="sval-ctrl-tab-recent-note"
+          />
+        </label>
+        <!-- A sideways scroll over the panel (`SvalPanel._onPanelWheel`). -->
+        <label class="sval-switch-row">
+          <span class="sval-fp-words">
+            <span id="sval-swipe-workspaces-label" class="sval-links-label"
+              >Swipe sideways over the Workspace panel to switch
+              Workspaces</span
+            >
+            <span id="sval-swipe-workspaces-note" class="sval-agents-note"
+              >Swipe left or right with two fingers, or scroll sideways with
+              your mouse. Hold Shift to use the main wheel. Each swipe moves the
+              window by one Workspace.</span
+            >
+          </span>
+          <input
+            id="sval-swipe-workspaces"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-labelledby="sval-swipe-workspaces-label"
+            aria-describedby="sval-swipe-workspaces-note"
+          />
+        </label>
+      </div>
+      <div id="sval-keys-list" class="sval-keys-list"></div>
+      <div class="sval-keys-foot">
+        <button id="sval-keys-reset-all" class="sval-button" type="button">
+          Reset all shortcuts
+        </button>
+      </div>
+      <!-- Extensions' commands, drawn by `settings-extensions.js`. They
+           change in the add-ons page, whose editor checks a key against
+           every extension's (`ExtensionShortcutKeyMap`). -->
+      <div
+        id="sval-keys-extensions"
+        class="sval-keys-extensions"
+        hidden="hidden"
+      >
+        <p class="sval-lead sval-keys-lead">
+          Your extensions add these shortcuts.
+        </p>
+        <div id="sval-keys-extensions-list" class="sval-keys-list"></div>
+        <div class="sval-keys-foot">
+          <button
+            id="sval-keys-extensions-change"
+            class="sval-button"
+            type="button"
+          >
+            Change in the extensions page
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Extensions (decision 1479), drawn by `settings-extensions.js` from
+         the add-on manager. An extension's page takes the site page's form
+         and styles, and hides the category's list while it shows. -->
+    <section data-sval-pane="svalExtensions" class="sval-settings">
+      <header class="sval-pane-head">
+        <h1 class="sval-pane-title" tabindex="-1">Extensions</h1>
+      </header>
+
+      <section
+        id="sval-extension-page"
+        class="sval-site-page"
+        aria-labelledby="sval-extension-title"
+        hidden="hidden"
+      >
+        <div class="sval-site-nav">
+          <button
+            id="sval-extension-back"
+            class="sval-site-back"
+            type="button"
+            aria-label="Back to Extensions"
+            title="Back to Extensions"
+          >
+            <span
+              class="sval-glyph sval-glyph-sc-back"
+              aria-hidden="true"
+            ></span>
+          </button>
+          <nav class="sval-site-crumbs" aria-label="Breadcrumb">
+            <a id="sval-extension-crumb" href="#svalExtensions">Extensions</a>
+            <span aria-hidden="true">›</span>
+          </nav>
+        </div>
+        <header class="sval-site-head">
+          <span id="sval-extension-icon" class="sval-site-icon"></span>
+          <h1
+            id="sval-extension-title"
+            class="sval-site-title"
+            tabindex="-1"
+          ></h1>
+        </header>
+        <p id="sval-extension-description" class="sval-site-nothing"></p>
+        <div id="sval-extension-cards" class="sval-site-cards"></div>
+      </section>
+
+      <!-- How long a background check holds an extension update
+           (SvalUpdateDelay), drawn by Firefox's `setting-group` from the
+           config `settings-extensions.js` registers. -->
+      <setting-group groupid="svalExtensionUpdates"></setting-group>
+
+      <section
+        id="sval-extensions"
+        class="sval-card sval-agents-card"
+        aria-labelledby="sval-extensions-heading"
+      >
+        <h2 id="sval-extensions-heading">Installed</h2>
+        <div id="sval-extensions-empty" class="sval-empty" hidden="hidden">
+          <p class="sval-empty-title">No extensions yet</p>
+          <p class="sval-agents-note">
+            An extension shows up here once you install it.
+          </p>
+        </div>
+        <p
+          id="sval-extensions-message"
+          class="sval-agents-done"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div id="sval-extensions-list" class="sval-agents-list"></div>
+        <div class="sval-extensions-foot">
+          <button
+            id="sval-extensions-install"
+            class="sval-button"
+            type="button"
+          >
+            Install from file…
+          </button>
+          <button id="sval-extensions-full" class="sval-link" type="button">
+            Open the full extensions page
+          </button>
+        </div>
+      </section>
+
+      <!-- Which sites may offer to install an extension: Firefox's own
+           settings, drawn by Firefox's `setting-group` from the config
+           `settings-extensions.js` registers. -->
+      <setting-group groupid="svalExtensionInstall"></setting-group>
+
+      <!-- Removing always confirms, as unpairing an agent does. -->
+      <dialog
+        id="sval-extension-dialog"
+        class="sval-modal"
+        aria-labelledby="sval-extension-dialog-title"
+        aria-describedby="sval-extension-dialog-body"
+      >
+        <h2 id="sval-extension-dialog-title" class="sval-modal-title"></h2>
+        <p id="sval-extension-dialog-body" class="sval-modal-body"></p>
+        <div class="sval-modal-actions">
+          <button
+            id="sval-extension-dialog-cancel"
+            class="sval-button"
+            type="button"
+            autofocus="autofocus"
+          >
+            Cancel
+          </button>
+          <button
+            id="sval-extension-dialog-confirm"
+            class="sval-button sval-button-danger"
+            type="button"
+          >
+            Remove
+          </button>
+        </div>
+      </dialog>
+    </section>
+
+    <section data-sval-pane="svalAgents" class="sval-settings">
+      <header class="sval-pane-head">
+        <h1 class="sval-pane-title">Agents</h1>
+      </header>
+
+      <!-- A paired agent's page, in the site page's form: its permissions
+           (agent-control spec §5.2), drawn by `settings-agent-policy.js`.
+           While it shows, the pane's other contents are hidden. -->
+      <section
+        id="sval-agent-page"
+        class="sval-site-page"
+        aria-labelledby="sval-agent-title"
+        hidden="hidden"
+      >
+        <div class="sval-site-nav">
+          <button
+            id="sval-agent-back"
+            class="sval-site-back"
+            type="button"
+            aria-label="Back to Agents"
+            title="Back to Agents"
+          >
+            <span
+              class="sval-glyph sval-glyph-sc-back"
+              aria-hidden="true"
+            ></span>
+          </button>
+          <nav class="sval-site-crumbs" aria-label="Breadcrumb">
+            <a id="sval-agent-crumb" href="#svalAgents">Agents</a>
+            <span aria-hidden="true">›</span>
+          </nav>
+        </div>
+        <header class="sval-site-head">
+          <span class="sval-site-icon sval-agent-tile"
+            ><span
+              class="sval-glyph sval-glyph-laptop"
+              aria-hidden="true"
+            ></span
+          ></span>
+          <h1 id="sval-agent-title" class="sval-site-title" tabindex="-1"></h1>
+        </header>
+        <p id="sval-agent-meta" class="sval-site-nothing"></p>
+        <p
+          id="sval-agent-page-said"
+          class="sval-visually-hidden"
+          role="status"
+        ></p>
+        <div id="sval-agent-cards" class="sval-site-cards"></div>
+      </section>
+
+      <!-- Agent-control spec §7.2: off by default, and while it is off nothing
+           listens. -->
+      <section class="sval-card" aria-labelledby="sval-agents-heading">
+        <h2 id="sval-agents-heading">Agent access</h2>
+        <label class="sval-switch-row">
+          <span class="sval-lead">
+            Let AI agents on this computer use Sval
+          </span>
+          <input
+            id="sval-agents-enabled"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+        <!-- Whether access is on and how many agents are paired, or why access
+             is switched on with nothing listening. -->
+        <p
+          id="sval-agents-status"
+          class="sval-status-line sval-agents-status"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <!-- Site-tools spec §4.1, layer A. It can be changed only while agent
+             access is on, and keeps its value while access is off. -->
+        <div id="sval-page-tools-row" class="sval-page-tools-row">
+          <label for="sval-page-tools-enabled" class="sval-page-tools-words">
+            <span class="sval-lead">Let sites offer tools to agents</span>
+            <span class="sval-agents-note">
+              Sites can offer AI agents their own actions, like search or add to
+              cart.
+            </span>
+            <span id="sval-page-tools-note" class="sval-page-tools-note"></span>
+          </label>
+          <input
+            id="sval-page-tools-enabled"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </div>
+        <!-- "Be polite" on an agent's overlay holds the agent to this many
+             actions a second on each site. The user can untick it there. -->
+        <div class="sval-page-tools-row">
+          <label for="sval-agents-polite-rate" class="sval-page-tools-words">
+            <span class="sval-lead">Speed limit for polite agents</span>
+            <span class="sval-agents-note">
+              While Be polite is checked on an agent's overlay, the agent takes
+              at most this many actions per second on one site.
+            </span>
+          </label>
+          <input
+            id="sval-agents-polite-rate"
+            class="sval-field sval-agents-rate"
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            aria-describedby="sval-agents-polite-rate-status"
+          />
+        </div>
+        <p
+          id="sval-agents-polite-rate-status"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <!-- Agent-control spec §5.6: how long a call that reports progress
+             waits for the user's answer to an alert. -->
+        <div class="sval-page-tools-row">
+          <label for="sval-agents-wait" class="sval-page-tools-words">
+            <span class="sval-lead">How long agents wait for your answer</span>
+          </label>
+          <select id="sval-agents-wait" class="sval-agent-select">
+            <option value="300">5 minutes</option>
+            <option value="900">15 minutes</option>
+            <option value="1800">30 minutes</option>
+            <option value="3600">1 hour</option>
+            <option value="14400">4 hours</option>
+            <option value="43200">12 hours</option>
+          </select>
+        </div>
+        <!-- Decision 1998: how long an agent Workspace no session has used is
+             kept before Sval deletes it. -->
+        <div class="sval-page-tools-row">
+          <label for="sval-agents-retention" class="sval-page-tools-words">
+            <span class="sval-lead">Delete unused agent Workspaces</span>
+            <span class="sval-agents-note">
+              Sval deletes an agent's Workspace and its tabs once no session has
+              used it for this long.
+            </span>
+          </label>
+          <select id="sval-agents-retention" class="sval-agent-select">
+            <option value="7">After 7 days</option>
+            <option value="30">After 30 days</option>
+            <option value="90">After 90 days</option>
+            <option value="0">Never</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Filled by `settings-agents.js` from SvalAgentClients: the clients Sval can
+           add itself to, and for any other, the shim's path and JSON to copy
+           (sval-mcp-ships-with-sval spec §5). -->
+      <section
+        id="sval-agent-clients"
+        class="sval-card"
+        aria-labelledby="sval-agent-clients-heading"
+      >
+        <h2 id="sval-agent-clients-heading">Connect an AI app</h2>
+        <p class="sval-agents-note">
+          Connect adds Sval to the app's settings. Then restart the app. It can
+          use Sval while agent access is on.
+        </p>
+        <p
+          id="sval-agent-clients-gnome"
+          class="sval-agents-note"
+          hidden="hidden"
+        >
+          GNOME brings every new window to the front, so when an AI app starts
+          Sval, Sval opens over the window you're in. To keep it behind, run
+          <code
+            >gsettings set org.gnome.desktop.wm.preferences focus-new-windows
+            strict</code
+          >.
+        </p>
+        <p
+          id="sval-agent-clients-message"
+          class="sval-agents-done"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div id="sval-agent-clients-list"></div>
+        <h3>Other apps</h3>
+        <p class="sval-agents-note">
+          Any app that runs local MCP servers can use Sval. Add a server named
+          sval with this file as its command, or paste the JSON into the app's
+          configuration. Then restart the app.
+        </p>
+        <div class="sval-code-row">
+          <input
+            id="sval-agent-clients-path"
+            class="sval-agent-add-input"
+            type="text"
+            readonly="readonly"
+            spellcheck="false"
+            aria-label="sval-mcp's path"
+          />
+          <button
+            id="sval-agent-clients-copy-path"
+            class="sval-button sval-agent-small"
+            type="button"
+          >
+            Copy
+          </button>
+        </div>
+        <textarea
+          id="sval-agent-clients-json"
+          class="sval-agent-add-input"
+          rows="7"
+          readonly="readonly"
+          spellcheck="false"
+          aria-label="MCP configuration for Sval"
+        ></textarea>
+        <div class="sval-code-row">
+          <button
+            id="sval-agent-clients-copy-json"
+            class="sval-button sval-agent-small"
+            type="button"
+          >
+            Copy JSON
+          </button>
+        </div>
+      </section>
+
+      <!-- Filled by `settings-agents.js` from the open listener's store. While access
+           is off no store is open, so the list is hidden and the card says
+           why; pairings and policies stay on disk. -->
+      <section
+        id="sval-agents-paired"
+        class="sval-card sval-agents-card"
+        aria-labelledby="sval-agents-paired-heading"
+      >
+        <h2 id="sval-agents-paired-heading">Paired agents</h2>
+        <p id="sval-agents-off" class="sval-agents-note" hidden="hidden">
+          Agent access is off. Turn it on to see and change your paired agents.
+          Sval keeps their pairings and permissions.
+        </p>
+        <p id="sval-agents-loading" class="sval-agents-loading" hidden="hidden">
+          Loading agents…
+        </p>
+        <div id="sval-agents-empty" class="sval-empty" hidden="hidden">
+          <p class="sval-empty-title">No agents paired yet</p>
+          <p class="sval-agents-note">
+            Agents appear here once they pair with Sval.
+          </p>
+        </div>
+        <p
+          id="sval-agents-message"
+          class="sval-agents-done"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <p
+          id="sval-agents-found"
+          class="sval-visually-hidden"
+          role="status"
+        ></p>
+        <p
+          id="sval-agents-said"
+          class="sval-visually-hidden"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div id="sval-agents-list" class="sval-agents-list"></div>
+      </section>
+
+      <!-- The category's advanced settings, collapsed, at its foot. -->
+      <details id="sval-agents-advanced" class="sval-advanced">
+        <summary class="sval-advanced-summary">
+          <span class="sval-advanced-label">Advanced</span>
+          <span
+            class="sval-glyph sval-glyph-chevron-down"
+            aria-hidden="true"
+          ></span>
+        </summary>
+        <div class="sval-advanced-body">
+          <!-- What a WebDriver client opens gets a workspace and cookie jar of its
+               own (`SvalWebDriver`). This device's alone: it is a pref no sync
+               list names. -->
+          <section
+            id="sval-webdriver"
+            class="sval-card"
+            aria-labelledby="sval-webdriver-heading"
+          >
+            <h2 id="sval-webdriver-heading">WebDriver</h2>
+            <label class="sval-switch-row">
+              <span class="sval-lead">
+                Let WebDriver use your Workspaces' cookies
+              </span>
+              <input
+                id="sval-webdriver-cookies"
+                class="sval-switch"
+                type="checkbox"
+                role="switch"
+                aria-describedby="sval-webdriver-cookies-note"
+              />
+            </label>
+            <p id="sval-webdriver-cookies-note" class="sval-agents-note">
+              Normally, tabs that WebDriver opens get a Workspace and cookies of
+              their own. If you turn this on, scripts get your logins.
+            </p>
+          </section>
+        </div>
+      </details>
+
+      <!-- Unpairing always confirms. `showModal` makes it modal; Esc and a
+           click on the dimmed page cancel. -->
+      <dialog
+        id="sval-unpair-dialog"
+        class="sval-modal"
+        aria-labelledby="sval-unpair-title"
+        aria-describedby="sval-unpair-body"
+      >
+        <h2 id="sval-unpair-title" class="sval-modal-title"></h2>
+        <p id="sval-unpair-body" class="sval-modal-body"></p>
+        <!-- Shown when the agent has workspaces. Checked each time the
+             dialog opens (`askToUnpair`). -->
+        <label id="sval-unpair-workspaces" class="sval-modal-check">
+          <input id="sval-unpair-delete-workspaces" type="checkbox" />
+          <span id="sval-unpair-workspaces-label"></span>
+        </label>
+        <div class="sval-modal-actions">
+          <button
+            id="sval-unpair-cancel"
+            class="sval-button"
+            type="button"
+            autofocus="autofocus"
+          >
+            Cancel
+          </button>
+          <button
+            id="sval-unpair-confirm"
+            class="sval-button sval-button-danger"
+            type="button"
+          >
+            Unpair
+          </button>
+        </div>
+      </dialog>
+    </section>
+  </body>
+</html>

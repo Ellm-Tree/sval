@@ -1,0 +1,28 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hop</title>
+  </head>
+  <body>
+    <p>
+      Opens a blank tab that later loads the blocked site, then closes itself,
+      so the blank tab's opener is gone by the time it loads.
+    </p>
+    <script>
+      const dir = location.pathname.replace(/[^/]*$/, "");
+      const blockedURL = `https://example.org${dir}sval_agent_page2.html`;
+      const b = window.open("");
+      b.document.write(
+        `<script>setTimeout(() => (location.href = ${JSON.stringify(
+          blockedURL
+        )}), 500)<\/script>`
+      );
+      b.document.close();
+      window.close();
+    </script>
+  </body>
+</html>

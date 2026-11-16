@@ -1,0 +1,381 @@
+Sval: content-classifier features whose list ids come from a pref
+
+A feature may name a pref holding its list ids. Its engine is built from the
+pref's value and rebuilt when the pref changes. Sval's `ads` feature takes
+the lists of the user's blocking level this way; Mozilla's features keep
+their compiled ids. `allowed-domains` is an exception-only feature built
+from the user's allowed domains, listed last in the engines prefs so it
+excepts every list before it. Its exceptions beat an important block, as
+uBlock Origin lets `@@...$important` beat `$important`: adblock-rust files
+such exceptions with the others, so after an important block the service
+still consults a feature marked mOverridesImportant and counts its exception
+as important.
+
+A rebuild whose fetches settle after a newer rebuild's has its engine
+installed but never made active, since only the newest call populates the
+active lists; Sval's lists, read from disk, settle later than Mozilla's. Such a
+rebuild populates the lists again from the newest call's snapshot. Under the
+testing pref, the rebuild's notification names the features it installed,
+so a test can wait for its own rebuild.
+
+The engines prefs for normal and private windows are written together, and
+a pass per write would build a newly active feature once per write, since
+its first build has not installed an engine yet; one pass runs after the
+turn's writes.
+
+A block reports the matching feature's name as the table to
+nsIChannelClassifierService listeners, which is how Sval counts ads apart from
+trackers in the protection panel.
+
+kFeatures is a compiled table read only by this file, so no chrome API can
+add a feature or change where its lists come from.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index 13d9681f2f..e77768b990 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -59,6 +59,13 @@ constexpr nsLiteralCString kMajorExceptionListIds[] = {
+     "mozilla-major-exceptions"_ns};
+ constexpr nsLiteralCString kMinorExceptionListIds[] = {
+     "mozilla-minor-exceptions"_ns};
++// Sval: the user's allowed domains, as exception rules in a list of
++// their own.
++constexpr nsLiteralCString kAllowedDomainsListIds[] = {
++    "sval-allowed-domains"_ns};
++// Sval: backs the empty span of a feature whose ids come from its pref; an
++// empty Span's own constructor is not constexpr.
++constexpr nsLiteralCString kPrefListIds[] = {""_ns};
+ constexpr nsLiteralCString kTestBlockListIds[] = {"test_block"_ns};
+ constexpr nsLiteralCString kTestAnnotateListIds[] = {"test_annotate"_ns};
+ 
+@@ -111,6 +118,22 @@ constexpr ContentClassifierFeature kFeatures[] = {
+      Span<const nsLiteralCString>(kMajorExceptionListIds),
+      nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING, 0, 0, 0,
+      NS_OK, true},
++    // Sval: Sval's ad-blocking lists, chosen by the user's level. Blocking
++    // reports as tracking content, and the feature name reaches
++    // nsIChannelClassifierService listeners as the table, which is how Sval
++    // counts ads apart from trackers.
++    {"ads"_ns, Span<const nsLiteralCString>(kPrefListIds, size_t(0)),
++     nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING_AD,
++     nsIWebProgressListener::STATE_LOADED_LEVEL_1_TRACKING_CONTENT,
++     nsIWebProgressListener::STATE_REPLACED_TRACKING_CONTENT,
++     nsIWebProgressListener::STATE_ALLOWED_TRACKING_CONTENT,
++     NS_ERROR_TRACKING_URI, false,
++     "privacy.trackingprotection.content.ads.list_ids"},
++    // Sval: listed last in the engines prefs, so it excepts every list above.
++    {"allowed-domains"_ns,
++     Span<const nsLiteralCString>(kAllowedDomainsListIds),
++     nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING, 0, 0, 0,
++     NS_OK, true, nullptr, true},
+     // Test-only features. Their engines are built directly by the HTTP
+     // test loader (driven by the *.test_list_urls prefs) and installed
+     // into mEngines under these names. They behave like any other
+@@ -150,14 +173,17 @@ bool HasAnyActiveRemoteSettingsFeatures() {
+   return false;
+ }
+ 
+-void NotifyListsLoadedForTesting() {
++// Sval: aInstalled names the features whose engines this rebuild installed or
++// dropped, comma-separated, so a test can wait for the rebuild it caused.
++void NotifyListsLoadedForTesting(const nsACString& aInstalled = ""_ns) {
+   if (!StaticPrefs::privacy_trackingprotection_content_testing()) {
+     return;
+   }
+   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+   if (obs) {
+-    obs->NotifyObservers(
+-        nullptr, NS_CONTENT_CLASSIFIER_FILTER_LISTS_LOADED_TOPIC, nullptr);
++    obs->NotifyObservers(nullptr,
++                         NS_CONTENT_CLASSIFIER_FILTER_LISTS_LOADED_TOPIC,
++                         NS_ConvertUTF8toUTF16(aInstalled).get());
+   }
+ }
+ 
+@@ -203,6 +229,39 @@ ContentClassifierService::GetFeatureByName(const nsACString& aName) {
+   return Nothing();
+ }
+ 
++// Sval: the engines prefs are written together, for normal and for private
++// windows, and a feature whose build is still running has no engine yet, so
++// a pass per write would build it once per write. One pass after the writes
++// sees them all.
++void ContentClassifierService::ProcessListChangesSoon() {
++  MOZ_ASSERT(NS_IsMainThread());
++  if (mListChangesPending) {
++    return;
++  }
++  mListChangesPending = true;
++  RefPtr<ContentClassifierService> self = this;
++  NS_DispatchToMainThread(NS_NewRunnableFunction(
++      "ContentClassifierService::ProcessListChangesSoon", [self]() {
++        self->mListChangesPending = false;
++        self->ProcessListChanges({}, {});
++      }));
++}
++
++// static
++nsTArray<nsCString> ContentClassifierService::ListIdsFor(
++    const ContentClassifierFeature& aFeature) {
++  nsTArray<nsCString> ids;
++  if (aFeature.mListIdsPref) {
++    EnginesPrefsSnapshot::AppendFeatureNamesFromPref(aFeature.mListIdsPref,
++                                                     ids);
++    return ids;
++  }
++  for (const auto& id : aFeature.mListIds) {
++    ids.AppendElement(id);
++  }
++  return ids;
++}
++
+ // static
+ bool ContentClassifierService::IsInitialized() {
+   if (!sInstance) {
+@@ -284,10 +343,21 @@ void ContentClassifierService::OnPrefChange(const char* aPref, void*) {
+     }
+     // Reshuffles into the per-mode arrays and picks up any newly-active
+     // feature whose engine isn't built.
+-    service->ProcessListChanges({}, {});
++    service->ProcessListChangesSoon();
+     return;
+   }
+ 
++  // Sval: a feature whose list ids come from a pref is rebuilt from the
++  // pref's new value, which may name no lists at all.
++  for (const auto& feature : kFeatures) {
++    if (feature.mListIdsPref && prefStr.Equals(feature.mListIdsPref)) {
++      if (sEnabled) {
++        service->ProcessListChanges({}, {}, &feature);
++      }
++      return;
++    }
++  }
++
+   // Redownload the test_* rule lists when the prefs controlling them are
+   // updated
+   nsTArray<nsCString> testEnginesToUpdate;
+@@ -408,6 +478,19 @@ void ContentClassifierService::Init() {
+       return;
+     }
+ 
++    for (const auto& feature : kFeatures) {
++      if (!feature.mListIdsPref) {
++        continue;
++      }
++      rv = Preferences::RegisterCallback(
++          &ContentClassifierService::OnPrefChange,
++          nsDependentCString(feature.mListIdsPref));
++      if (NS_FAILED(rv)) {
++        mInitPhase = InitPhase::InitFailed;
++        return;
++      }
++    }
++
+     rv = NS_CreateBackgroundTaskQueue("ContentClassifier",
+                                       getter_AddRefs(mBuildThread));
+     if (NS_FAILED(rv)) {
+@@ -561,6 +644,13 @@ NS_IMETHODIMP ContentClassifierService::BlockShutdown(
+     Preferences::UnregisterCallback(
+         &ContentClassifierService::OnPrefChange,
+         "privacy.trackingprotection.content.annotation.engines.pbmode"_ns);
++    for (const auto& feature : kFeatures) {
++      if (feature.mListIdsPref) {
++        Preferences::UnregisterCallback(
++            &ContentClassifierService::OnPrefChange,
++            nsDependentCString(feature.mListIdsPref));
++      }
++    }
+ 
+     content_classifier_teardown_domain_resolver();
+ 
+@@ -622,13 +712,24 @@ ContentClassifierResult ContentClassifierService::ClassifyWithEngines(
+   }
+   bool matchedSoFar = false;
+   for (const auto& engine : aEngines) {
+-    ContentClassifierEngineResult er = engine->CheckNetworkRequest(
++    const ContentClassifierFeature& feature = engine->Feature();
++    // Sval: after an important block only a feature that overrides it runs.
++    if (!aIndependentEngines &&
++        result.GetStatus() == ContentClassifierResult::Status::ImportantHit &&
++        !feature.mOverridesImportant) {
++      continue;
++    }
++    ContentClassifierEngineResult checked = engine->CheckNetworkRequest(
+         aRequest, aIndependentEngines ? false : matchedSoFar);
++    ContentClassifierEngineResult er =
++        feature.mOverridesImportant && checked.Exception()
++            ? ContentClassifierEngineResult(checked.Matched(), true, true,
++                                            checked.EngineResult(), feature)
++            : checked;
+     result.Accumulate(er);
+     const auto status = result.GetStatus();
+     if (!aIndependentEngines &&
+-        (status == ContentClassifierResult::Status::ImportantException ||
+-         status == ContentClassifierResult::Status::ImportantHit)) {
++        status == ContentClassifierResult::Status::ImportantException) {
+       break;
+     }
+     if (er.Matched() && !er.Exception()) {
+@@ -788,7 +889,7 @@ net::ChannelBlockDecision ContentClassifierService::MaybeCancelChannel(
+ 
+   net::ChannelBlockDecision decision = net::ChannelBlockDecision::Allowed;
+   net::ChannelClassifierUtils::MaybeBlockChannel(
+-      aChannel, "content-classifier"_ns, "content-classifier-block"_ns,
++      aChannel, "content-classifier"_ns, blockingFeature->mName,
+       blockingFeature->mBlockingErrorCode, blockingFeature->mReplacedState,
+       blockingFeature->mAllowedState, &decision);
+   return decision;
+@@ -1000,7 +1101,8 @@ void ContentClassifierService::PruneInactiveEngines(
+ }
+ 
+ void ContentClassifierService::ProcessListChanges(
+-    const nsTArray<nsCString>& aUpdated, const nsTArray<nsCString>& aRemoved) {
++    const nsTArray<nsCString>& aUpdated, const nsTArray<nsCString>& aRemoved,
++    const ContentClassifierFeature* aRebuild) {
+   MOZ_ASSERT(NS_IsMainThread());
+ 
+   EnginesPrefsSnapshot snapshot;
+@@ -1015,9 +1117,10 @@ void ContentClassifierService::ProcessListChanges(
+       if (!activeNames.Contains(nsCString(feature.mName))) {
+         continue;
+       }
+-      bool affected = !mEngines.Contains(nsCString(feature.mName));
++      bool affected = &feature == aRebuild ||
++                      !mEngines.Contains(nsCString(feature.mName));
+       if (!affected) {
+-        for (const auto& listId : feature.mListIds) {
++        for (const auto& listId : ListIdsFor(feature)) {
+           if (aUpdated.Contains(listId) || aRemoved.Contains(listId)) {
+             affected = true;
+             break;
+@@ -1037,6 +1140,10 @@ void ContentClassifierService::ProcessListChanges(
+     // Populate / Prune / Notify so an older closure's stale snapshot
+     // can't clobber the active-engine lists set up by a newer call.
+     generation = ++mUpdateGeneration;
++    mLatestSnapshot.mCancel = snapshot.mCancel.Clone();
++    mLatestSnapshot.mCancelPBM = snapshot.mCancelPBM.Clone();
++    mLatestSnapshot.mAnnotate = snapshot.mAnnotate.Clone();
++    mLatestSnapshot.mAnnotatePBM = snapshot.mAnnotatePBM.Clone();
+     featureVersions.SetCapacity(toUpdate.Length());
+     for (const auto* feature : toUpdate) {
+       uint64_t& v = mFeatureVersions.LookupOrInsert(feature->mName);
+@@ -1165,6 +1272,8 @@ void ContentClassifierService::UpdateFeatures(
+                   }
+ 
+                   bool didFullWork = false;
++                  bool installedAny = false;
++                  nsAutoCString installed;
+                   {
+                     MutexAutoLock lock(self->mLock);
+                     if (self->mInitPhase != InitPhase::InitSucceeded) {
+@@ -1185,6 +1294,11 @@ void ContentClassifierService::UpdateFeatures(
+                       }
+                       self->InstallEngine(features[i]->mName,
+                                           std::move(builtEngines[i]));
++                      installedAny = true;
++                      if (!installed.IsEmpty()) {
++                        installed.Append(',');
++                      }
++                      installed.Append(features[i]->mName);
+                     }
+                     // Only run Populate / Prune (and the Notify below)
+                     // when this is still the latest UpdateFeatures call.
+@@ -1195,13 +1309,23 @@ void ContentClassifierService::UpdateFeatures(
+                           snapshot);
+                       self->PruneInactiveEngines(snapshot);
+                       didFullWork = true;
++                    } else if (installedAny) {
++                      // Sval: a newer call whose fetches settled first has
++                      // already populated the active lists, without the
++                      // engine this one just installed. Populate them again
++                      // from the newest snapshot so the engine is used.
++                      self->PopulateAllActiveEnginesFromPreferenceSnapshot(
++                          self->mLatestSnapshot);
++                      didFullWork = true;
+                     }
+                   }
+ 
+                   if (didFullWork) {
+                     NS_DispatchToMainThread(NS_NewRunnableFunction(
+                         "ContentClassifierService::NotifyListsLoaded",
+-                        [self]() { NotifyListsLoadedForTesting(); }));
++                        [self, installed = nsCString(installed)]() {
++                          NotifyListsLoadedForTesting(installed);
++                        }));
+                   }
+                 }));
+           });
+@@ -1302,7 +1426,7 @@ ContentClassifierService::FetchEngineDataForFeature(
+ 
+   nsTArray<RefPtr<ListBytesPromise>> fetches;
+   nsTArray<nsCString> listIdsInOrder;
+-  for (const auto& listId : aFeature.mListIds) {
++  for (const auto& listId : ListIdsFor(aFeature)) {
+     listIdsInOrder.AppendElement(listId);
+     fetches.AppendElement(FetchListBytesFromRemoteSettings(mRSClient, listId));
+   }
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index 4cb59311a7..3c43e9bcbe 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -75,6 +75,16 @@ struct ContentClassifierFeature {
+   // sanity-check that such features are listed after the features they may
+   // except in the engines pref.
+   bool mExceptionOnly;
++
++  // Sval: when set, the comma-separated list ids in this pref replace
++  // mListIds, and a change to the pref rebuilds the feature's engine.
++  const char* mListIdsPref = nullptr;
++
++  // Sval: when true, an exception from this feature beats an important block
++  // from the features before it, as uBlock Origin lets `@@…$important` beat
++  // `$important`. adblock-rust files such an exception with the others, so
++  // the service applies it.
++  bool mOverridesImportant = false;
+ };
+ 
+ enum class InitPhase {
+@@ -199,6 +209,11 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   static Maybe<const ContentClassifierFeature&> GetFeatureByName(
+       const nsACString& aName);
+ 
++  // Sval: the list ids a feature's engine is built from: mListIdsPref's
++  // value when the feature has one, otherwise mListIds.
++  static nsTArray<nsCString> ListIdsFor(
++      const ContentClassifierFeature& aFeature);
++
+   ContentClassifierResult ClassifyForCancel(
+       const ContentClassifierRequest& aRequest);
+   ContentClassifierResult ClassifyForAnnotate(
+@@ -232,9 +247,16 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   // Take a fresh pref snapshot, decide which active features need to be
+   // (re)built — either because they have no engine yet, or because one of
+   // their mListIds appears in aUpdated/aRemoved — and hand the result to
+-  // UpdateFeatures. Main thread only.
++  // UpdateFeatures. Main thread only. Sval: aRebuild, when given, is
++  // rebuilt if active, whichever lists changed.
+   void ProcessListChanges(const nsTArray<nsCString>& aUpdated,
+-                          const nsTArray<nsCString>& aRemoved);
++                          const nsTArray<nsCString>& aRemoved,
++                          const ContentClassifierFeature* aRebuild = nullptr);
++
++  // Sval: ProcessListChanges({}, {}) once, after the writes of this turn.
++  // Main thread only.
++  void ProcessListChangesSoon();
++  bool mListChangesPending = false;
+ 
+   // This rebuilds the given features,
+   // according to that preference snapshot. This also means that features that
+@@ -317,6 +339,11 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   // populated by a newer call's snapshot.
+   uint64_t mUpdateGeneration MOZ_GUARDED_BY(mLock) = 0;
+ 
++  // Sval: the snapshot of the newest ProcessListChanges call. A closure that
++  // installs an engine after that call's closure has run populates the
++  // active lists from it.
++  EnginesPrefsSnapshot mLatestSnapshot MOZ_GUARDED_BY(mLock);
++
+   // Engines to consult at classify time, split by phase (Cancel/Annotate)
+   // and PBM-ness. Refreshed alongside mEngines whenever the engines
+   // selection changes.

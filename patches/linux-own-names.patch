@@ -1,0 +1,89 @@
+Sval: Linux names that are Sval's own, apart from an installed Firefox's
+
+Firefox and Sval run side by side without touching each other's state.
+Four Linux names in Gecko are Firefox's whatever the application's
+identity:
+
+- The crash helper writes its log before Gecko gives it the data
+  directory, and guessed it as ~/.mozilla/firefox or
+  ~/.config/mozilla/firefox, so it truncated Firefox's
+  crash_helper_server.log. With a profile name it takes the directory
+  Gecko gives that build, ~/.sval. The mozbuild crate carries
+  MOZ_APP_PROFILE for it.
+- The MPRIS bus name started org.mpris.MediaPlayer2.firefox, so media
+  keys, playerctl -p firefox and desktop rules aimed at Firefox also
+  drove Sval.
+- The Wayland picture-in-picture window took the app id
+  org.mozilla.firefox, so the compositor grouped it with Firefox. It takes
+  the program name, which is the app id of Sval's other windows.
+- The GNOME search provider's result icon named Firefox's icon.
+
+diff --git a/browser/components/shell/nsGNOMEShellDBusHelper.cpp b/browser/components/shell/nsGNOMEShellDBusHelper.cpp
+index 2c3157f..e021a5a 100644
+--- a/browser/components/shell/nsGNOMEShellDBusHelper.cpp
++++ b/browser/components/shell/nsGNOMEShellDBusHelper.cpp
+@@ -227,7 +227,7 @@ static already_AddRefed<GVariant> DBusAppendSearchID(const char* aID) {
+                           g_variant_new_string(gnomeSearchTitle.get()));
+     // TODO: When running on flatpak/snap we may need to use
+     // icon like org.mozilla.Firefox or so.
+-    g_variant_builder_add(&b, "{sv}", "gicon", g_variant_new_string("firefox"));
++    g_variant_builder_add(&b, "{sv}", "gicon", g_variant_new_string("sval"));
+   }
+ 
+   return dont_AddRef(g_variant_ref_sink(g_variant_builder_end(&b)));
+diff --git a/build/rust/mozbuild/generate_buildconfig.py b/build/rust/mozbuild/generate_buildconfig.py
+index de1144d..0efd476 100644
+--- a/build/rust/mozbuild/generate_buildconfig.py
++++ b/build/rust/mozbuild/generate_buildconfig.py
+@@ -109,6 +109,7 @@ def generate(output):
+     output.write(generate_string("MOZ_MACBUNDLE_ID"))
+     output.write(generate_string("MOZ_APP_BASENAME"))
+     output.write(generate_string("MOZ_APP_NAME"))
++    output.write(generate_string("MOZ_APP_PROFILE"))
+     output.write(generate_string("MOZ_APP_VENDOR"))
+     output.write(generate_string("MOZ_APP_VERSION"))
+ 
+diff --git a/toolkit/crashreporter/crash_helper_server/src/logging/env.rs b/toolkit/crashreporter/crash_helper_server/src/logging/env.rs
+index 05cddde..45a5482 100644
+--- a/toolkit/crashreporter/crash_helper_server/src/logging/env.rs
++++ b/toolkit/crashreporter/crash_helper_server/src/logging/env.rs
+@@ -33,6 +33,13 @@ fn guess_user_app_data_dir() -> Option<PathBuf> {
+ 
+     cfg_if! {
+         if #[cfg(target_os = "linux")] {
++            // A build with a profile name keeps its data in a dotted
++            // directory of that name in the home directory
++            // (nsXREDirProvider::AppendProfilePath under MOZ_LEGACY_HOME).
++            if !config::MOZ_APP_PROFILE.is_empty() {
++                return Some(home_dir.join(format!(".{}", config::MOZ_APP_PROFILE.to_lowercase())));
++            }
++
+             use std::fs::exists;
+ 
+             let legacy_data = home_dir.join(".mozilla").join(config::MOZ_APP_NAME);
+diff --git a/widget/gtk/MPRISServiceHandler.h b/widget/gtk/MPRISServiceHandler.h
+index fb8b256..84951cb 100644
+--- a/widget/gtk/MPRISServiceHandler.h
++++ b/widget/gtk/MPRISServiceHandler.h
+@@ -12,7 +12,7 @@
+ #include "nsMimeTypes.h"
+ #include "nsString.h"
+ 
+-#define DBUS_MPRIS_SERVICE_NAME "org.mpris.MediaPlayer2.firefox"
++#define DBUS_MPRIS_SERVICE_NAME "org.mpris.MediaPlayer2.sval"
+ #define DBUS_MPRIS_OBJECT_PATH "/org/mpris/MediaPlayer2"
+ #define DBUS_MPRIS_INTERFACE "org.mpris.MediaPlayer2"
+ #define DBUS_MPRIS_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
+diff --git a/widget/gtk/nsWindowWayland.cpp b/widget/gtk/nsWindowWayland.cpp
+index d910d1f..493d725 100644
+--- a/widget/gtk/nsWindowWayland.cpp
++++ b/widget/gtk/nsWindowWayland.cpp
+@@ -2016,7 +2016,7 @@ void nsWindowWayland::MaybeCreatePipResources() {
+   mPipResources.mPipSurface = xx_pip_shell_v1_get_pip(
+       WaylandDisplayGet()->GetPipShell(), mPipResources.mXdgSurface);
+   xx_pip_v1_add_listener(mPipResources.mPipSurface, &pip_listener, this);
+-  xx_pip_v1_set_app_id(mPipResources.mPipSurface, "org.mozilla." MOZ_APP_NAME);
++  xx_pip_v1_set_app_id(mPipResources.mPipSurface, g_get_prgname());
+   wl_surface_commit(surf);
+ }
+ 

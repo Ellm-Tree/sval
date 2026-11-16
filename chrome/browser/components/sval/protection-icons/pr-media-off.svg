@@ -1,0 +1,6 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- A protection-button glyph from Sval's design, drawn as a mask in the
+   - colour of what wears it. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5.5h11.5a2 2 0 0 1 2 2v9"/><path d="M17.5 18.5H5.5a2 2 0 0 1-2-2v-9a2 2 0 0 1 1.2-1.8"/><path d="M10 9.5v5l2.6-1.7"/><path d="M3 3l18 18"/></svg>
+

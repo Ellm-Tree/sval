@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Each preset's ink under the token names Firefox's tab groups use
+ * (`tabs.css`): the base is ink on a light surface, `-invert` on a dark one,
+ * and `-pale` a light wash. They are `SvalColor`'s preset inks, so what
+ * Firefox draws of a tab group matches Sval's. Every colour Sval draws comes
+ * from `SvalColor`.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+:root {
+  --tab-group-color-red: #a9131f;
+  --tab-group-color-red-invert: #ff7e77;
+  --tab-group-color-red-pale: #fef2f1;
+
+  --tab-group-color-orange: #974c00;
+  --tab-group-color-orange-invert: #ffb481;
+  --tab-group-color-orange-pale: #fff2eb;
+
+  --tab-group-color-yellow: #695b03;
+  --tab-group-color-yellow-invert: #ffe566;
+  --tab-group-color-yellow-pale: #faf6dc;
+
+  --tab-group-color-green: #006e30;
+  --tab-group-color-green-invert: #83e499;
+  --tab-group-color-green-pale: #e5fce9;
+
+  --tab-group-color-cyan: #056774;
+  --tab-group-color-cyan-invert: #6ae1f5;
+  --tab-group-color-cyan-pale: #e3fafe;
+
+  --tab-group-color-blue: #0a4ac5;
+  --tab-group-color-blue-invert: #a5c5fe;
+  --tab-group-color-blue-pale: #f0f5fe;
+
+  --tab-group-color-purple: #7328ae;
+  --tab-group-color-purple-invert: #d1a9ff;
+  --tab-group-color-purple-pale: #f8f2fe;
+
+  --tab-group-color-pink: #a4216e;
+  --tab-group-color-pink-invert: #ffa9d2;
+  --tab-group-color-pink-pale: #fef1f8;
+
+  --tab-group-color-gray: #535c66;
+  --tab-group-color-gray-invert: #b5bfcb;
+  --tab-group-color-gray-pale: #f2f5f9;
+
+  --tab-group-color-black: #1c1f25;
+  --tab-group-color-black-invert: #d4d7e0;
+  --tab-group-color-black-pale: #f3f4f6;
+}
+
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */

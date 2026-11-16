@@ -1,0 +1,28 @@
+Sval: a tab's scoped permissions outlive its subframes
+
+PermissionManager::Observe clears every permission scoped to a tab
+(RemoveAllForBrowser) on "browsing-context-discarded" for any browsing
+context carrying the tab's BrowserId. A subframe carries its tab's
+BrowserId, and every load of a page that has frames discards them, so a
+reload or a removed iframe took away a grant SitePermissions' "allow
+now" or Sval's media button had just given, while the tab stayed. Only a
+top-level context's discard ends the tab; a replaced one is skipped
+already.
+
+diff --git a/extensions/permissions/PermissionManager.cpp b/extensions/permissions/PermissionManager.cpp
+index 91024de98..4690fa3e9 100644
+--- a/extensions/permissions/PermissionManager.cpp
++++ b/extensions/permissions/PermissionManager.cpp
+@@ -3120,7 +3120,11 @@ NS_IMETHODIMP PermissionManager::Observe(nsISupports* aSubject,
+       nsCOMPtr<nsILoadContext> loadContext = do_QueryInterface(aSubject);
+       if (loadContext) {
+         auto* bc = static_cast<BrowsingContext*>(loadContext.get());
+-        discardedBrowserId = bc->BrowserId();
++        // A subframe shares its tab's BrowserId, and goes away with every
++        // load of its parent page while the tab stays.
++        if (bc->IsTop()) {
++          discardedBrowserId = bc->BrowserId();
++        }
+       }
+     }
+   }

@@ -1,0 +1,58 @@
+Sval: the extensions menu's site switch replaces Firefox's site access items
+
+Each extension's row in the extensions menu gets a switch for the site in
+the selected tab (SvalExtensionsMenu), for MV2 and MV3 extensions alike.
+Firefox's site access items, which only MV3 extensions get, would be a
+second control for the same thing in the same row, so they are not added.
+
+diff --git a/browser/base/content/browser-addons.js b/browser/base/content/browser-addons.js
+index 270f2bb3e3..2b0e09d357 100644
+--- a/browser/base/content/browser-addons.js
++++ b/browser/base/content/browser-addons.js
+@@ -2442,8 +2442,10 @@ var gUnifiedExtensions = {
+       item.setExtension(policy.extension);
+       list.appendChild(item);
+     }
+-    // Sval: pinned extensions stay listed.
++    // Sval: pinned extensions stay listed, and each row has a switch for
++    // the selected tab's site.
+     lazy.SvalExtensionsMenu.listPinned(window, list);
++    lazy.SvalExtensionsMenu.addSwitches(window, panelview);
+ 
+     const emptyStateBox = panelview.querySelector(
+       "#unified-extensions-empty-state"
+@@ -2894,7 +2896,8 @@ var gUnifiedExtensions = {
+       }
+     }
+ 
+-    ExtensionsUI.originControlsMenu(menu, id);
++    // Sval: the row's site switch takes the place of the site access items
++    // ExtensionsUI.originControlsMenu would add here.
+ 
+     const browserAction = this.browserActionFor(WebExtensionPolicy.getByID(id));
+     if (browserAction) {
+@@ -2989,6 +2992,7 @@ var gUnifiedExtensions = {
+     );
+     if (list && this._panel?.state === "open") {
+       lazy.SvalExtensionsMenu.listPinned(window, list);
++      lazy.SvalExtensionsMenu.addSwitches(window, this._panel);
+     }
+   },
+ 
+diff --git a/browser/components/customizableui/ToolbarContextMenu.sys.mjs b/browser/components/customizableui/ToolbarContextMenu.sys.mjs
+index c3803a5d75..ebf1dce855 100644
+--- a/browser/components/customizableui/ToolbarContextMenu.sys.mjs
++++ b/browser/components/customizableui/ToolbarContextMenu.sys.mjs
+@@ -512,10 +512,8 @@ export var ToolbarContextMenu = {
+       removeExtension.disabled = !(
+         addon.permissions & lazy.AddonManager.PERM_CAN_UNINSTALL
+       );
+-
+-      if (popup.id === "toolbar-context-menu") {
+-        lazy.ExtensionsUI.originControlsMenu(popup, id);
+-      }
++      // Sval: the extensions menu's site switch takes the place of the site
++      // access items ExtensionsUI.originControlsMenu would add here.
+     }
+   },
+ 

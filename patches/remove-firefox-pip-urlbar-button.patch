@@ -1,0 +1,912 @@
+Sval: remove Firefox's Picture-in-Picture button from the address field
+
+The toggle on the video and the View:PictureInPicture key open
+Picture-in-Picture. The address field's button, the panel it opened for
+a page that disables Picture-in-Picture, and what fed them go: the
+content process's count of eligible videos per page, the parent's
+per-window-global count, its location-change hook, and the YouTube
+wrapper's eligibility override. The respect-disablePictureInPicture pref
+stays at its default for the video controls that read it.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index d55a5b052a..188b06ffc4 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -2401,7 +2401,6 @@ pref("media.videocontrols.picture-in-picture.audio-toggle.enabled", true);
+ pref("media.videocontrols.picture-in-picture.video-toggle.enabled", true);
+ pref("media.videocontrols.picture-in-picture.video-toggle.visibility-threshold", "1.0");
+ pref("media.videocontrols.picture-in-picture.keyboard-controls.enabled", true);
+-pref("media.videocontrols.picture-in-picture.urlbar-button.enabled", true);
+ pref("media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled", false);
+ pref("media.videocontrols.picture-in-picture.auto-close.enabled", true);
+ pref("media.videocontrols.picture-in-picture.auto-close.timeoutMs", 1000);
+diff --git a/browser/base/content/main-popupset.inc.xhtml b/browser/base/content/main-popupset.inc.xhtml
+index 2338bac000..f159dc25c9 100644
+--- a/browser/base/content/main-popupset.inc.xhtml
++++ b/browser/base/content/main-popupset.inc.xhtml
+@@ -875,7 +875,6 @@
+     </panel>
+   </html:template>
+ 
+-  #include ../../../toolkit/components/pictureinpicture/content/pictureInPicturePanel.inc.xhtml
+ 
+   <menupopup id="unified-extensions-context-menu">
+     <menuitem id="unified-extensions-context-menu-pin-to-toolbar"
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 063b87ea5b..5a473a0a63 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -356,13 +356,6 @@
+               <label id="userContext-label"/>
+               <image id="userContext-indicator"/>
+             </hbox>
+-            <hbox id="picture-in-picture-button"
+-                  class="urlbar-page-action"
+-                  role="button"
+-                  hidden="true">
+-              <image id="picture-in-picture-button-icon"
+-                      class="urlbar-icon"/>
+-            </hbox>
+             <hbox id="taskbar-tabs-button"
+                   class="urlbar-page-action"
+                   role="button"
+diff --git a/browser/base/content/navigator-toolbox.js b/browser/base/content/navigator-toolbox.js
+index 716f7fe46d..beb9129228 100644
+--- a/browser/base/content/navigator-toolbox.js
++++ b/browser/base/content/navigator-toolbox.js
+@@ -188,7 +188,6 @@ document.addEventListener(
+         #forward-button,
+         #reload-button ,
+         #reader-mode-button,
+-        #picture-in-picture-button,
+         #urlbar-zoom-button,
+         #star-button-box,
+         #personal-toolbar-empty-description,
+@@ -226,12 +225,6 @@ document.addEventListener(
+           }
+           break;
+ 
+-        case "picture-in-picture-button":
+-          if (isLeftClick) {
+-            PictureInPicture.toggleUrlbar(event);
+-          }
+-          break;
+-
+         case "urlbar-zoom-button":
+           if (isLeftClick) {
+             FullZoom.resetFromURLBar();
+@@ -317,7 +310,6 @@ document.addEventListener(
+ 
+       let element = event.target.closest(`
+         #reader-mode-button,
+-        #picture-in-picture-button,
+         #urlbar-zoom-button,
+         #star-button-box,
+         #personal-toolbar-empty-description,
+@@ -348,12 +340,6 @@ document.addEventListener(
+           }
+           break;
+ 
+-        case "picture-in-picture-button":
+-          if (isLikeLeftClick) {
+-            PictureInPicture.toggleUrlbar(event);
+-          }
+-          break;
+-
+         case "urlbar-zoom-button":
+           if (isLikeLeftClick) {
+             FullZoom.resetFromURLBar();
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 58f2157562..f07bb92ab3 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -72,7 +72,6 @@ category browser-window-location-change moz-src:///browser/components/urlbar/Act
+ category browser-window-location-change resource:///modules/asrouter/CFRPageActions.sys.mjs CFRPageActions.onLocationChange
+ category browser-window-location-change resource:///actors/AboutReaderParent.sys.mjs AboutReaderParent.onLocationChange
+ category browser-window-location-change resource://gre/actors/TranslationsParent.sys.mjs TranslationsParent.onLocationChange
+-category browser-window-location-change resource://gre/modules/PictureInPicture.sys.mjs PictureInPicture.onLocationChange
+ 
+ category browser-window-unload-begin chrome://browser/content/browser-customtitlebar.js CustomTitlebar.uninit
+ category browser-window-unload-begin moz-src:///browser/themes/ToolbarIconColor.sys.mjs ToolbarIconColor.uninit
+diff --git a/browser/extensions/pictureinpicture/data/picture_in_picture_overrides.js b/browser/extensions/pictureinpicture/data/picture_in_picture_overrides.js
+index 2adbfdc38b..1fda82355a 100644
+--- a/browser/extensions/pictureinpicture/data/picture_in_picture_overrides.js
++++ b/browser/extensions/pictureinpicture/data/picture_in_picture_overrides.js
+@@ -538,12 +538,10 @@ let AVAILABLE_PIP_OVERRIDES;
+       "https://*.youtube.com/*": {
+         visibilityThreshold: 0.6,
+         videoWrapperScriptPath: "video-wrappers/youtube.js",
+-        hasUrlbarEligibilityOverride: true,
+       },
+       "https://*.youtube-nocookie.com/*": {
+         visibilityThreshold: 0.9,
+         videoWrapperScriptPath: "video-wrappers/youtube.js",
+-        hasUrlbarEligibilityOverride: true,
+       },
+     },
+ 
+diff --git a/browser/extensions/pictureinpicture/video-wrappers/youtube.js b/browser/extensions/pictureinpicture/video-wrappers/youtube.js
+index a153155ec7..e7212ba1fe 100644
+--- a/browser/extensions/pictureinpicture/video-wrappers/youtube.js
++++ b/browser/extensions/pictureinpicture/video-wrappers/youtube.js
+@@ -81,10 +81,6 @@ class PictureInPictureVideoWrapper {
+     return !!video.closest(".ytd-video-preview");
+   }
+ 
+-  isUrlbarToggleEligible(video) {
+-    return !!video.closest("#movie_player");
+-  }
+-
+   setVolume(video, volume) {
+     if (this.player) {
+       this.player.setVolume(volume * 100);
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index fb562f6b88..adf752f676 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -998,22 +998,6 @@ reader-view-enter-button =
+ reader-view-close-button =
+     .aria-label = Close Reader View
+ 
+-## Picture-in-Picture urlbar button
+-## Variables:
+-##   $shortcut (String) - Keyboard shortcut to execute the command.
+-
+-picture-in-picture-urlbar-button-open =
+- .tooltiptext = Open Picture-in-Picture ({ $shortcut })
+-
+-picture-in-picture-urlbar-button-close =
+- .tooltiptext = Close Picture-in-Picture ({ $shortcut })
+-
+-picture-in-picture-panel-header = Picture-in-Picture
+-picture-in-picture-panel-headline = This website does not recommend Picture-in-Picture
+-picture-in-picture-panel-body = Videos might not display as the developer intended while Picture-in-Picture is enabled.
+-picture-in-picture-enable-toggle =
+-  .label = Enable anyway
+-
+ ## Full Screen and Pointer Lock UI
+ 
+ # Please ensure that the domain stays in the `<span data-l10n-name="domain">` markup.
+diff --git a/browser/themes/shared/browser-shared.css b/browser/themes/shared/browser-shared.css
+index 12d5982b12..89812b3b76 100644
+--- a/browser/themes/shared/browser-shared.css
++++ b/browser/themes/shared/browser-shared.css
+@@ -1493,24 +1493,6 @@ popupnotificationcontent {
+   }
+ }
+ 
+-/* Picture-in-Picture panel */
+-
+-#PictureInPicturePanel {
+-  /* Panel variables will be tokenized in bug 2017979 */
+-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+-  width: var(--menu-panel-width-wide);
+-  font: caption;
+-}
+-
+-#PictureInPicturePanelBody {
+-  gap: var(--space-small);
+-  padding: var(--space-small) var(--space-large);
+-}
+-
+-#PictureInPicturePanelFooter {
+-  margin: var(--space-small) var(--space-large) var(--space-large);
+-}
+-
+ /* AI Window Toggle Button */
+ #ai-window-toggle {
+   list-style-image: url("chrome://branding/content/icon32.png");
+diff --git a/browser/themes/shared/urlbar-searchbar.css b/browser/themes/shared/urlbar-searchbar.css
+index a54ac5e6ba..841d620dd4 100644
+--- a/browser/themes/shared/urlbar-searchbar.css
++++ b/browser/themes/shared/urlbar-searchbar.css
+@@ -1019,19 +1019,6 @@ toolbar[inactive="true"] .urlbar,
+   fill-opacity: 1;
+ }
+ 
+-/* Picture-in-Picture icon */
+-#picture-in-picture-button > .urlbar-icon {
+-  list-style-image: url("chrome://global/skin/media/picture-in-picture-open.svg");
+-}
+-
+-#picture-in-picture-button[pipactive] > .urlbar-icon {
+-  list-style-image: url("chrome://global/skin/media/picture-in-picture-closed.svg");
+-}
+-
+-#picture-in-picture-button:-moz-locale-dir(rtl) > .urlbar-icon {
+-  transform: scaleX(-1);
+-}
+-
+ /* Taskbar Tabs icon */
+ 
+ #taskbar-tabs-button > .urlbar-icon {
+diff --git a/toolkit/actors/PictureInPictureChild.sys.mjs b/toolkit/actors/PictureInPictureChild.sys.mjs
+index eb31b10af9..fb67a73c0c 100644
+--- a/toolkit/actors/PictureInPictureChild.sys.mjs
++++ b/toolkit/actors/PictureInPictureChild.sys.mjs
+@@ -44,12 +44,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   "media.videocontrols.picture-in-picture.video-toggle.always-show",
+   false
+ );
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "PIP_URLBAR_BUTTON",
+-  "media.videocontrols.picture-in-picture.urlbar-button.enabled",
+-  false
+-);
+ XPCOMUtils.defineLazyPreferenceGetter(
+   lazy,
+   "PIP_AUTO_CLOSE",
+@@ -380,19 +374,6 @@ export class PictureInPictureToggleChild extends JSWindowActorChild {
+     Services.prefs.addObserver(PIP_ENABLED_PREF, this.observerFunction);
+     Services.prefs.addObserver(TOGGLE_FIRST_SEEN_PREF, this.observerFunction);
+     Services.cpmm.sharedData.addEventListener("change", this);
+-
+-    this.urlbarToggleEligiblePipVideos = new WeakSet();
+-    this.trackingVideos = new WeakSet();
+-  }
+-
+-  receiveMessage(message) {
+-    switch (message.name) {
+-      case "PictureInPicture:UrlbarToggle": {
+-        this.urlbarToggle(message.data);
+-        break;
+-      }
+-    }
+-    return null;
+   }
+ 
+   didDestroy() {
+@@ -415,22 +396,6 @@ export class PictureInPictureToggleChild extends JSWindowActorChild {
+     this.videoWrapper?.destroy();
+     this.videoWrapper = null;
+ 
+-    for (let video of ChromeUtils.nondeterministicGetWeakSetKeys(
+-      this.urlbarToggleEligiblePipVideos
+-    )) {
+-      video.removeEventListener("emptied", this);
+-      video.removeEventListener("loadedmetadata", this);
+-      video.removeEventListener("durationchange", this);
+-    }
+-
+-    for (let video of ChromeUtils.nondeterministicGetWeakSetKeys(
+-      this.trackingVideos
+-    )) {
+-      video.removeEventListener("emptied", this);
+-      video.removeEventListener("loadedmetadata", this);
+-      video.removeEventListener("durationchange", this);
+-    }
+-
+     // ensure we don't access the state
+     this.isDestroyed = true;
+   }
+@@ -632,14 +597,6 @@ export class PictureInPictureToggleChild extends JSWindowActorChild {
+         this.onVisibilityChange(event);
+         break;
+       }
+-      case "durationchange":
+-      // Intentional fall-through
+-      case "emptied":
+-      // Intentional fall-through
+-      case "loadedmetadata": {
+-        this.updateUrlbarPipVideoEligibility(event.target);
+-        break;
+-      }
+     }
+   }
+ 
+@@ -662,95 +619,6 @@ export class PictureInPictureToggleChild extends JSWindowActorChild {
+     }
+ 
+     state.intersectionObserver.observe(video);
+-
+-    if (!lazy.PIP_URLBAR_BUTTON) {
+-      return;
+-    }
+-
+-    video.addEventListener("emptied", this);
+-    video.addEventListener("loadedmetadata", this);
+-    video.addEventListener("durationchange", this);
+-
+-    this.trackingVideos.add(video);
+-
+-    this.updateUrlbarPipVideoEligibility(video);
+-  }
+-
+-  updateUrlbarPipVideoEligibility(video) {
+-    // Bug 2041113: use a video wrapper to exclude YouTube preview videos
+-    // from being marked as urlbar PiP eligible videos. But only apply
+-    // the wrapper lazily if the hasUrlbarEligibilityOverride override exists.
+-    let override = getSiteOverrideForDocument(this.document.documentURI);
+-    if (!this.videoWrapper && override?.hasUrlbarEligibilityOverride) {
+-      this.videoWrapper = applyWrapper(this, video);
+-    }
+-    let isWrapperEligible =
+-      this.videoWrapper?.isUrlbarToggleEligible(video) ?? true;
+-    let isEligible =
+-      isWrapperEligible && PictureInPictureChild.videoIsPiPEligible(video);
+-    if (isEligible) {
+-      if (!this.urlbarToggleEligiblePipVideos.has(video)) {
+-        this.urlbarToggleEligiblePipVideos.add(video);
+-
+-        let mutationObserver = new this.contentWindow.MutationObserver(
+-          mutationList => {
+-            this.handleEligiblePipVideoMutation(mutationList);
+-          }
+-        );
+-        mutationObserver.observe(video.parentElement, { childList: true });
+-      }
+-    } else if (this.urlbarToggleEligiblePipVideos.has(video)) {
+-      this.urlbarToggleEligiblePipVideos.delete(video);
+-    }
+-
+-    let videos = ChromeUtils.nondeterministicGetWeakSetKeys(
+-      this.urlbarToggleEligiblePipVideos
+-    );
+-
+-    this.sendAsyncMessage("PictureInPicture:UpdateEligiblePipVideoCount", {
+-      pipCount: videos.length,
+-      pipDisabledCount: videos.reduce(
+-        (accumulator, currentVal) =>
+-          accumulator + (currentVal.disablePictureInPicture ? 1 : 0),
+-        0
+-      ),
+-    });
+-  }
+-
+-  handleEligiblePipVideoMutation(mutationList) {
+-    for (let mutationRecord of mutationList) {
+-      let video = mutationRecord.removedNodes[0];
+-      this.urlbarToggleEligiblePipVideos.delete(video);
+-    }
+-
+-    let videos = ChromeUtils.nondeterministicGetWeakSetKeys(
+-      this.urlbarToggleEligiblePipVideos
+-    );
+-
+-    this.sendAsyncMessage("PictureInPicture:UpdateEligiblePipVideoCount", {
+-      pipCount: videos.length,
+-      pipDisabledCount: videos.reduce(
+-        (accumulator, currentVal) =>
+-          accumulator + (currentVal.disablePictureInPicture ? 1 : 0),
+-        0
+-      ),
+-    });
+-  }
+-
+-  urlbarToggle(eventExtraKeys) {
+-    let video = ChromeUtils.nondeterministicGetWeakSetKeys(
+-      this.urlbarToggleEligiblePipVideos
+-    )[0];
+-    if (video) {
+-      let pipEvent = new this.contentWindow.CustomEvent(
+-        "MozTogglePictureInPicture",
+-        {
+-          bubbles: true,
+-          detail: { reason: "UrlBar", eventExtraKeys },
+-        }
+-      );
+-      this.contentWindow.windowUtils.dispatchEventToChromeOnly(video, pipEvent);
+-    }
+   }
+ 
+   /**
+@@ -3441,25 +3309,6 @@ class PictureInPictureChildVideoWrapper {
+     });
+   }
+ 
+-  /**
+-   * OVERRIDABLE - calls the isUrlbarToggleEligible() method defined in the site wrapper script.
+-   * Runs a fallback that returns true if the method is not overridden. This method
+-   * is meant to let sites with multiple seemingly eligible videos (e.g. YouTube's preview players)
+-   * identify whether a video should be counted toward the urlbar PiP toggle criteria.
+-   *
+-   * @param {HTMLVideoElement} video
+-   *  The originating video source element
+-   * @returns {boolean} True if the video should be counted toward the urlbar PiP toggle criteria.
+-   */
+-  isUrlbarToggleEligible(video) {
+-    return this.#callWrapperMethod({
+-      name: "isUrlbarToggleEligible",
+-      args: [video],
+-      fallback: () => true,
+-      validateRetVal: retVal => this.#isBoolean(retVal),
+-    });
+-  }
+-
+   /**
+    * OVERRIDABLE - calls the isLive() method defined in the site wrapper script. Runs a fallback implementation
+    * if the method does not exist or if an error is thrown while calling it. This method is meant to get if the
+diff --git a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+index 4829e6611e..76ae77f16f 100644
+--- a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
++++ b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+@@ -6,18 +6,12 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ 
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+-import { ShortcutUtils } from "resource://gre/modules/ShortcutUtils.sys.mjs";
+-
+ const lazy = {};
+ XPCOMUtils.defineLazyServiceGetters(lazy, {
+   WindowsUIUtils: ["@mozilla.org/windows-ui-utils;1", Ci.nsIWindowsUIUtils],
+ });
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  ASRouter:
+-    // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+-    "resource:///modules/asrouter/ASRouter.sys.mjs",
+-  PageActions: "resource:///modules/PageActions.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+ });
+ 
+@@ -48,18 +42,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   "media.videocontrols.picture-in-picture.enabled",
+   false
+ );
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "PIP_URLBAR_BUTTON",
+-  "media.videocontrols.picture-in-picture.urlbar-button.enabled",
+-  false
+-);
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "RESPECT_PIP_DISABLED",
+-  "media.videocontrols.picture-in-picture.respect-disablePictureInPicture",
+-  true
+-);
+ XPCOMUtils.defineLazyPreferenceGetter(
+   lazy,
+   "PIP_WHEN_SWITCHING_TABS",
+@@ -98,15 +80,6 @@ export class PictureInPictureToggleParent extends JSWindowActorParent {
+         PictureInPicture.openToggleContextMenu(win, aMessage.data);
+         break;
+       }
+-      case "PictureInPicture:UpdateEligiblePipVideoCount": {
+-        let { pipCount, pipDisabledCount } = aMessage.data;
+-        PictureInPicture.updateEligiblePipVideoCount(browsingContext, {
+-          pipCount,
+-          pipDisabledCount,
+-        });
+-        PictureInPicture.updateUrlbarToggle(browser);
+-        break;
+-      }
+       case "PictureInPicture:SetFirstSeen": {
+         let { dateSeconds } = aMessage.data;
+         PictureInPicture.setFirstSeen(dateSeconds);
+@@ -242,9 +215,6 @@ export var PictureInPicture = {
+   // Maps an AppWindow to the number of PiP windows it has
+   originatingWinWeakMap: new WeakMap(),
+ 
+-  // Maps a WindowGlobal to count of eligible PiP videos
+-  weakGlobalToEligiblePipCount: new WeakMap(),
+-
+   // Tracks the 1 pip window we allow to exist from video.requestPictureInPicture()
+   apiPipWindow: null,
+ 
+@@ -272,36 +242,6 @@ export var PictureInPicture = {
+     return playerWin;
+   },
+ 
+-  /**
+-   * Get the PiP panel for a browser. Create the panel if needed.
+-   *
+-   * @param {Browser} browser The current browser
+-   * @returns panel The panel element
+-   */
+-  getPanelForBrowser(browser) {
+-    let panel = browser.ownerDocument.querySelector("#PictureInPicturePanel");
+-
+-    if (!panel) {
+-      let template = browser.ownerDocument.querySelector(
+-        "#PictureInPicturePanelTemplate"
+-      );
+-      let clone = template.content.cloneNode(true);
+-      template.replaceWith(clone);
+-
+-      panel = this.getPanelForBrowser(browser);
+-      this._attachEventListeners(panel);
+-    }
+-    return panel;
+-  },
+-
+-  _attachEventListeners(panel) {
+-    panel.addEventListener("popupshown", this);
+-    panel.addEventListener("popuphidden", this);
+-    panel
+-      .querySelector("#respect-pipDisabled-switch")
+-      .addEventListener("click", this);
+-  },
+-
+   handleEvent(event) {
+     switch (event.type) {
+       case "TabSwapPictureInPicture": {
+@@ -313,15 +253,6 @@ export var PictureInPicture = {
+         this.updatePlayingDurationHistograms();
+         break;
+       }
+-      case "popupshown":
+-        this.onPipPanelShown(event);
+-        break;
+-      case "popuphidden":
+-        this.onPipPanelHidden(event);
+-        break;
+-      case "click":
+-        this.toggleRespectDisablePip(event);
+-        break;
+     }
+   },
+ 
+@@ -529,305 +460,6 @@ export var PictureInPicture = {
+     await this.closeSinglePipWindow({ reason: "Unpip", actorRef: pipActor });
+   },
+ 
+-  /**
+-   * Update the respect PiPDisabled pref value when the toggle is clicked.
+-   *
+-   * @param {Event} event The event from toggling the respect
+-   *   PiPDisabled in the PiP panel
+-   */
+-  toggleRespectDisablePip(event) {
+-    let toggle = event.target;
+-    let respectPipDisabled = !toggle.pressed;
+-
+-    Services.prefs.setBoolPref(
+-      "media.videocontrols.picture-in-picture.respect-disablePictureInPicture",
+-      respectPipDisabled
+-    );
+-
+-    Glean.pictureinpicture.disrespectDisableUrlBar.record();
+-  },
+-
+-  /**
+-   * Updates the PiP count and PiPDisabled count of eligible PiP videos for a
+-   * respective WindowGlobal.
+-   *
+-   * @param {BrowsingContext} browsingContext The BrowsingContext with eligible videos
+-   * @param {object} object
+-   *    pipCount: The number of eligible videos for the respective WindowGlobal
+-   *    pipDisabledCount: The number of disablePiP videos for the respective WindowGlobal
+-   */
+-  updateEligiblePipVideoCount(browsingContext, object) {
+-    let windowGlobal = browsingContext.currentWindowGlobal;
+-
+-    if (windowGlobal) {
+-      this.weakGlobalToEligiblePipCount.set(windowGlobal, object);
+-    }
+-  },
+-
+-  /**
+-   * A generator function that yeilds a WindowGlobal, it's respective PiP
+-   * count, and if any of the videos have PiPDisabled set.
+-   *
+-   * @param {Browser} browser The selected browser
+-   */
+-  *windowGlobalPipCountGenerator(browser) {
+-    let contextsToVisit = [browser.browsingContext];
+-    while (contextsToVisit.length) {
+-      let currentBC = contextsToVisit.pop();
+-      let windowGlobal = currentBC.currentWindowGlobal;
+-
+-      if (!windowGlobal) {
+-        continue;
+-      }
+-
+-      let { pipCount, pipDisabledCount } =
+-        this.weakGlobalToEligiblePipCount.get(windowGlobal) || {
+-          pipCount: 0,
+-          pipDisabledCount: 0,
+-        };
+-
+-      contextsToVisit.push(...currentBC.children);
+-
+-      yield { windowGlobal, pipCount, pipDisabledCount };
+-    }
+-  },
+-
+-  /**
+-   * Gets the total eligible video count and total PiPDisabled count for a
+-   * given browser.
+-   *
+-   * @param {Browser} browser The selected browser
+-   * @returns Total count of eligible PiP videos for the selected broser
+-   */
+-  getEligiblePipVideoCount(browser) {
+-    let totalPipCount = 0;
+-    let totalPipDisabled = 0;
+-
+-    for (let {
+-      pipCount,
+-      pipDisabledCount,
+-    } of this.windowGlobalPipCountGenerator(browser)) {
+-      totalPipCount += pipCount;
+-      totalPipDisabled += pipDisabledCount;
+-    }
+-
+-    return { totalPipCount, totalPipDisabled };
+-  },
+-
+-  /**
+-   * This function updates the hover text on the urlbar PiP button when we enter or exit PiP
+-   *
+-   * @param {Document} document The window document
+-   * @param {Element} pipToggle The urlbar PiP button
+-   * @param {string} dataL10nId The data l10n id of the string we want to show
+-   */
+-  updateUrlbarHoverText(document, pipToggle, dataL10nId) {
+-    let shortcut = document.getElementById("key_togglePictureInPicture");
+-
+-    document.l10n.setAttributes(pipToggle, dataL10nId, {
+-      shortcut: ShortcutUtils.prettifyShortcut(shortcut),
+-    });
+-  },
+-
+-  /**
+-   * Dispatch entry point used by the `browser-window-location-change`
+-   * category.
+-   */
+-  onLocationChange(_window, _locationURI, webProgress, _flags) {
+-    const browser = webProgress.browsingContext.embedderElement;
+-    if (!browser) {
+-      return;
+-    }
+-    this.updateUrlbarToggle(browser);
+-  },
+-
+-  /**
+-   * Toggles the visibility of the PiP urlbar button. If the total video count
+-   * is 1, then we will show the button. If any eligible video has PiPDisabled,
+-   * then the button will show. Otherwise the button is hidden.
+-   *
+-   * @param {Browser} browser The selected browser
+-   */
+-  updateUrlbarToggle(browser) {
+-    if (!lazy.PIP_ENABLED || !lazy.PIP_URLBAR_BUTTON) {
+-      return;
+-    }
+-
+-    // The browser may already be gone (e.g. tab closed) by the time the
+-    // async message that triggered this call is processed.
+-    if (!browser) {
+-      return;
+-    }
+-
+-    let win = browser.documentGlobal;
+-    if (win.closed || win.gBrowser?.selectedBrowser !== browser) {
+-      return;
+-    }
+-
+-    let { totalPipCount, totalPipDisabled } =
+-      this.getEligiblePipVideoCount(browser);
+-
+-    let pipToggle = win.document.getElementById("picture-in-picture-button");
+-    if (
+-      totalPipCount === 1 ||
+-      (totalPipDisabled > 0 && lazy.RESPECT_PIP_DISABLED)
+-    ) {
+-      pipToggle.hidden = false;
+-      lazy.PageActions.sendPlacedInUrlbarTrigger(pipToggle);
+-    } else {
+-      pipToggle.hidden = true;
+-    }
+-
+-    let browserHasPip = !!this.browserWeakMap.get(browser);
+-    if (browserHasPip) {
+-      this.setUrlbarPipIconActive(browser.documentGlobal);
+-    } else {
+-      this.setUrlbarPipIconInactive(browser.documentGlobal);
+-    }
+-  },
+-
+-  /**
+-   * Open the PiP panel if any video has PiPDisabled, otherwise finds the
+-   * correct WindowGlobal to open the eligible PiP video.
+-   *
+-   * @param {Event} event Event from clicking the PiP urlbar button
+-   */
+-  toggleUrlbar(event) {
+-    let win = event.target.documentGlobal;
+-    let browser = win.gBrowser.selectedBrowser;
+-
+-    let pipPanel = this.getPanelForBrowser(browser);
+-
+-    for (let {
+-      windowGlobal,
+-      pipCount,
+-      pipDisabledCount,
+-    } of this.windowGlobalPipCountGenerator(browser)) {
+-      if (
+-        (pipDisabledCount > 0 && lazy.RESPECT_PIP_DISABLED) ||
+-        (pipPanel && pipPanel.state !== "closed")
+-      ) {
+-        this.togglePipPanel(browser);
+-        return;
+-      } else if (pipCount === 1) {
+-        let eventExtraKeys = {};
+-        if (
+-          !Services.prefs.getBoolPref(TOGGLE_HAS_USED_PREF) &&
+-          lazy.ASRouter.initialized
+-        ) {
+-          let { messages, messageImpressions } = lazy.ASRouter.state;
+-          let pipCallouts = messages.filter(
+-            message =>
+-              message.template === "feature_callout" &&
+-              message.content.screens.some(screen =>
+-                screen.anchors.some(anchor =>
+-                  anchor.selector.includes("picture-in-picture-button")
+-                )
+-              )
+-          );
+-          if (pipCallouts.length) {
+-            // Has one of the callouts been seen in the last 48 hours?
+-            let now = Date.now();
+-            let callout = pipCallouts.some(message =>
+-              messageImpressions[message.id]?.some(
+-                impression => now - impression < 48 * 60 * 60 * 1000
+-              )
+-            );
+-            if (callout) {
+-              eventExtraKeys.callout = true;
+-            }
+-          }
+-        }
+-        let actor = windowGlobal.getActor("PictureInPictureToggle");
+-        actor.sendAsyncMessage("PictureInPicture:UrlbarToggle", eventExtraKeys);
+-        return;
+-      }
+-    }
+-  },
+-
+-  /**
+-   * Set the toggle for PiPDisabled when the panel is shown.
+-   * If the pref is set from about:config, we need to update
+-   * the toggle switch in the panel to match the pref.
+-   *
+-   * @param {Event} event The panel shown event
+-   */
+-  onPipPanelShown(event) {
+-    let toggle = event.target.querySelector("#respect-pipDisabled-switch");
+-    toggle.pressed = !lazy.RESPECT_PIP_DISABLED;
+-  },
+-
+-  /**
+-   * Update the visibility of the urlbar PiP button when the panel is hidden.
+-   * The button will show when there is more than 1 video and at least 1 video
+-   * has PiPDisabled. If we no longer want to respect PiPDisabled then we
+-   * need to check if the urlbar button should still be visible.
+-   *
+-   * @param {Event} event The panel hidden event
+-   */
+-  onPipPanelHidden(event) {
+-    this.updateUrlbarToggle(event.view.gBrowser.selectedBrowser);
+-  },
+-
+-  /**
+-   * Create the PiP panel if needed and toggle the display of the panel
+-   *
+-   * @param {Browser} browser The current browser
+-   */
+-  togglePipPanel(browser) {
+-    let pipPanel = this.getPanelForBrowser(browser);
+-
+-    if (pipPanel.state === "closed") {
+-      let anchor = browser.ownerDocument.querySelector(
+-        "#picture-in-picture-button"
+-      );
+-
+-      pipPanel.openPopup(anchor, "bottomright topright");
+-      Glean.pictureinpicture.openedMethodUrlBar.record({
+-        disableDialog: true,
+-      });
+-    } else {
+-      pipPanel.hidePopup();
+-    }
+-  },
+-
+-  /**
+-   * Sets the PiP urlbar to an active state. This changes the icon in the
+-   * urlbar button to the unpip icon.
+-   *
+-   * @param {Window} win The current Window
+-   */
+-  setUrlbarPipIconActive(win) {
+-    let pipToggle = win.document.getElementById("picture-in-picture-button");
+-    pipToggle.toggleAttribute("pipactive", true);
+-
+-    this.updateUrlbarHoverText(
+-      win.document,
+-      pipToggle,
+-      "picture-in-picture-urlbar-button-close"
+-    );
+-  },
+-
+-  /**
+-   * Sets the PiP urlbar to an inactive state. This changes the icon in the
+-   * urlbar button to the open pip icon.
+-   *
+-   * @param {Window} win The current window
+-   */
+-  setUrlbarPipIconInactive(win) {
+-    if (!win) {
+-      return;
+-    }
+-    let pipToggle = win.document.getElementById("picture-in-picture-button");
+-    pipToggle.toggleAttribute("pipactive", false);
+-
+-    this.updateUrlbarHoverText(
+-      win.document,
+-      pipToggle,
+-      "picture-in-picture-urlbar-button-open"
+-    );
+-  },
+-
+   /**
+    * Remove attribute which enables pip icon in tab
+    *
+@@ -1005,8 +637,6 @@ export var PictureInPicture = {
+     let tab = parentWin.gBrowser.getTabForBrowser(browser);
+     tab.setAttribute("pictureinpicture", true);
+ 
+-    this.setUrlbarPipIconActive(parentWin);
+-
+     tab.addEventListener("TabSwapPictureInPicture", this);
+ 
+     let pipId = gNextWindowID.toString();
+@@ -1097,7 +727,6 @@ export var PictureInPicture = {
+     // Saves the location of the Picture in Picture window
+     this.savePosition(window);
+     this.clearPipTabIcon(window);
+-    this.setUrlbarPipIconInactive(browser?.documentGlobal);
+   },
+ 
+   /**
+diff --git a/toolkit/components/pictureinpicture/content/pictureInPicturePanel.inc.xhtml b/toolkit/components/pictureinpicture/content/pictureInPicturePanel.inc.xhtml
+deleted file mode 100644
+index abf5af50bc..0000000000
+--- a/toolkit/components/pictureinpicture/content/pictureInPicturePanel.inc.xhtml
++++ /dev/null
+@@ -1,43 +0,0 @@
+-<!-- This Source Code Form is subject to the terms of the Mozilla Public
+-   - License, v. 2.0. If a copy of the MPL was not distributed with this
+-   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+-
+-<html:template id="PictureInPicturePanelTemplate">
+-  <panel
+-    id="PictureInPicturePanel"
+-    class="panel-no-padding"
+-    type="arrow"
+-    orient="vertical"
+-    level="parent"
+-    tabspecific="true"
+-  >
+-    <box class="panel-header">
+-      <html:h1>
+-        <html:span data-l10n-id="picture-in-picture-panel-header" />
+-      </html:h1>
+-    </box>
+-    <toolbarseparator />
+-    <vbox id="PictureInPicturePanelBody">
+-      <html:div data-l10n-id="picture-in-picture-panel-headline" />
+-      <html:div>
+-        <html:span
+-          class="text-deemphasized"
+-          data-l10n-id="picture-in-picture-panel-body"
+-        />
+-        <html:a
+-          is="moz-support-link"
+-          id="pip-learn-more-link"
+-          support-page="about-picture-picture-firefox"
+-        />
+-      </html:div>
+-    </vbox>
+-    <toolbarseparator />
+-    <vbox id="PictureInPicturePanelFooter">
+-      <html:moz-toggle
+-        id="respect-pipDisabled-switch"
+-        data-l10n-id="picture-in-picture-enable-toggle"
+-        data-l10n-attrs="label"
+-      />
+-    </vbox>
+-  </panel>
+-</html:template>

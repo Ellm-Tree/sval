@@ -1,0 +1,31 @@
+{
+ "items": [
+  "62D32F96-6714-4FF2-A017-0515B379AD6B",
+  {
+   "archivedAt": 815353765.5048714,
+   "reason": "manual",
+   "source": {
+    "space": {
+     "_0": "thebrowser.company.defaultPersonalSpaceID"
+    }
+   },
+   "sidebarItem": {
+    "title": null,
+    "childrenIds": [],
+    "data": {
+     "tab": {
+      "savedURL": "https://www.rei.com/c/tents",
+      "activeTabBeforeCreationID": "22C84EA3-F951-44FF-A414-B8DE20C81EF5",
+      "timeLastActiveAt": 815353666.0254841,
+      "savedTitle": "Tents | REI Co-op"
+     }
+    },
+    "isUnread": false,
+    "parentID": null,
+    "createdAt": 815353666.0246639,
+    "id": "62D32F96-6714-4FF2-A017-0515B379AD6B"
+   }
+  }
+ ],
+ "version": 1
+}

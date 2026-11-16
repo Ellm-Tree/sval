@@ -1,0 +1,106 @@
+Sval: an agent's window keeps the page it works in shown while hidden
+
+Sval's agent works in its own window, which the user may minimise or
+cover. The page the agent holds must stay visible and keep rendering
+there, as in a window on screen, while every other tab goes hidden as
+usual. Tabbrowser and its AsyncTabSwitcher decide which pages are active
+from document.hidden alone, and the switcher keeps its own record of
+each tab's layers; a page made active beside it breaks that record
+(onLayersReady's assertion). No chrome API keeps a page active in a
+hidden window: print preview, split view and Picture-in-Picture keep a
+page loaded while hidden but cannot load one, as the switcher refuses
+to load any tab while the window is hidden.
+
+Tabbrowser.keepsPageShown names the page held shown, by the attribute
+SvalAgentMarking puts on the agent's <browser>. The switcher treats a
+window whose requested tab is held shown as one on screen, so it loads
+and unloads that window's tabs through its own states. A hidden window
+paints nothing, so the tab it switched from is unloaded without waiting
+on a paint.
+Tabbrowser.pagesShownChanged applies the window's visibility to its
+pages again when the answer changes while the window is hidden.
+
+diff --git a/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs b/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+index 577e275..7aa3cc9 100644
+--- a/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
++++ b/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+@@ -317,7 +317,12 @@ export class AsyncTabSwitcher {
+   }
+ 
+   get windowHidden() {
+-    return this.window.document.hidden;
++    // Sval: a window keeping its page shown while hidden switches as one on
++    // screen (`Tabbrowser.keepsPageShown`).
++    return (
++      this.window.document.hidden &&
++      !this.tabbrowser.keepsPageShown(this.requestedTab?.linkedBrowser)
++    );
+   }
+ 
+   get tabLayerCache() {
+@@ -744,9 +749,11 @@ export class AsyncTabSwitcher {
+ 
+       let isInLayerCache = this.tabLayerCache.includes(tab);
+ 
++      // Sval: a hidden window paints nothing, so no tab of it waits on the
++      // paint that would take it off screen.
+       if (
+         state == this.STATE_LOADED &&
+-        !this.maybeVisibleTabs.has(tab) &&
++        (this.window.document.hidden || !this.maybeVisibleTabs.has(tab)) &&
+         tab !== this.lastVisibleTab &&
+         tab !== this.loadingTab &&
+         tab !== this.requestedTab &&
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index a445211..9a10535 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -8102,7 +8102,8 @@
+         return this._switcher.shouldActivateDocShell(aBrowser);
+       }
+       return (
+-        (aBrowser == this.selectedBrowser && !document.hidden) ||
++        (aBrowser == this.selectedBrowser &&
++          (!document.hidden || this.keepsPageShown(aBrowser))) ||
+         this._printPreviewBrowsers.has(aBrowser) ||
+         this.PictureInPicture.isOriginatingBrowser(aBrowser) ||
+         this.splitViewBrowsers.includes(aBrowser)
+@@ -8323,14 +8324,37 @@
+ 
+     on_visibilitychange() {
+       if (!this._switcher) {
+-        const inactive = document.hidden;
+         for (const browser of this.selectedBrowsers) {
++          const inactive = document.hidden && !this.keepsPageShown(browser);
+           browser.preserveLayers(inactive);
+           browser.docShellIsActive = !inactive;
+         }
+       }
+     }
+ 
++    /**
++     * Sval: whether `aBrowser`'s page stays shown while the window is
++     * minimised or covered. An agent's window keeps the page the agent holds
++     * shown, as SvalAgentMarking marks it, so the agent's work goes on as in
++     * a window on screen.
++     *
++     * @param {MozBrowser} aBrowser
++     * @returns {boolean}
++     */
++    keepsPageShown(aBrowser) {
++      return !!aBrowser?.hasAttribute("sval-agent-layer");
++    }
++
++    /**
++     * Sval: applies the window's visibility to its pages again, as a
++     * visibilitychange does, once `keepsPageShown` changes for one of them
++     * while the window is hidden.
++     */
++    pagesShownChanged() {
++      this.on_visibilitychange();
++      this._switcher?.handleEvent({ type: "visibilitychange" });
++    }
++
+     on_TabGroupCollapse(aEvent) {
+       aEvent.target.tabs.forEach(tab => {
+         this.removeFromMultiSelectedTabs(tab);

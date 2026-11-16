@@ -1,0 +1,33 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* about:license in Settings' look. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/pages/info.css");
+
+/* `info-pages.css` centres the body's children at their widest content's
+   width, and the list of licensed files is a table far wider than a window,
+   so the page's start sat off screen. The children take the body's width,
+   which is capped, and the license texts, which keep their own line breaks,
+   scroll in their own boxes. */
+body {
+  align-items: stretch;
+  max-width: 64em;
+  margin-inline: auto;
+}
+
+pre {
+  overflow-x: auto;
+}
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  pre {
+    padding: 16px 20px;
+    border: 1px solid var(--sval-border);
+    border-radius: var(--sval-info-radius);
+    background-color: var(--sval-card);
+    color: var(--sval-ink-body);
+    font-size: 13px;
+  }
+}

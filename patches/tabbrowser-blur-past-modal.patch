@@ -1,0 +1,26 @@
+Sval: removing the selected tab moves the selection even behind a modal
+
+tabbrowser's selectedTab setter ignores a switch while a window-modal dialog
+is open (window-modal-open). _blurTab goes through it, so a selected tab
+removed then stays selected after its browser is gone, and every later
+switch throws in AsyncTabSwitcher. Sval removes tabs behind its first-run
+dialog when a chosen folder brings a document without them, and any removal
+of the selected tab under such a dialog does the same. The guards keep the
+user from switching tabs under a dialog; a removal must still leave a tab
+that exists.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 19812924f2..e543eef46c 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -6332,7 +6332,9 @@
+     }
+ 
+     _blurTab(aTab) {
+-      this.selectedTab = this._findTabToBlurTo(aTab);
++      // Not the selectedTab setter: it ignores a switch while a window-modal
++      // dialog is open, which would leave a removed tab selected.
++      this.tabbox.selectedTab = this._findTabToBlurTo(aTab);
+     }
+ 
+     /**

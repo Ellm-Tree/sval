@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: substitution
+message: "Use US spelling: '%s' in place of '%s'."
+level: error
+ignorecase: true
+swap:
+  colours?: color
+  favourites: favorites
+  favourite: favorite
+  licences?: license
+  labelled: labeled
+  labelling: labeling
+  cancelled: canceled
+  cancelling: canceling
+  behaviours?: behavior
+  centres?: center
+  organis(?:e|es|ed|ing): organize
+  customis(?:e|es|ed|ing): customize
+  recognis(?:e|es|ed|ing): recognize

@@ -1,0 +1,30 @@
+Sval: browser_490040.js opens each window without the workspace the last one left
+
+A window takes a workspace no other window shows and opens that workspace's
+tabs (spec §10.7), and closing a window keeps its workspace once a page was
+browsed in it (decision 0101). The test's first window browses
+example.com, so each later window it opens shows that workspace, and once
+Sval restores its tab the window holds a page and is saved as a recently
+closed window, which the test counts as a window that must not be. Whether
+the tab lands before the test closes the window is a race. The harness
+removes such workspaces between files (SvalTestLeftovers.sys.mjs); a file
+has no hook between its own windows, so the test calls it before each one.
+
+diff --git a/browser/components/sessionstore/test/browser_490040.js b/browser/components/sessionstore/test/browser_490040.js
+index 50cf0587cc..30b73e668f 100644
+--- a/browser/components/sessionstore/test/browser_490040.js
++++ b/browser/components/sessionstore/test/browser_490040.js
+@@ -77,6 +77,13 @@ const STATES = [
+ 
+ add_task(async function test_bug_490040() {
+   for (let state of STATES) {
++    // Sval: the window opened below would show the workspace the last one
++    // browsed in, and restore its tab.
++    const { SvalTestLeftovers } = ChromeUtils.importESModule(
++      "resource://testing-common/SvalTestLeftovers.sys.mjs"
++    );
++    await SvalTestLeftovers.beforeFile(window);
++
+     // Ensure we can store the window if needed.
+     let startingClosedWindowCount = ss.getClosedWindowCount();
+     await pushPrefs([

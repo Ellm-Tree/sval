@@ -1,0 +1,18 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* about:compat, the web compatibility extension's page, in Settings' look.
+   It draws with colours of its own (`aboutCompat.css`), which take Sval's
+   values here. */
+
+@import url("chrome://browser/content/sval/pages/info.css");
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  :root {
+    --background-color: var(--sval-page);
+    --text-color: var(--sval-ink-body);
+    --border-color: var(--sval-border);
+    --button-background-color: transparent;
+    --selected-tab-text-color: var(--sval-accent);
+  }
+}

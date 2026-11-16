@@ -1,0 +1,28 @@
+Sval: the accessibility checks accept a gridcell whose row is in an ARIA rowgroup
+
+`isAccessibleGridcell` exempts a grid cell from the interactive-role check
+when the cell is in a row of a grid, allowing a <tbody> grouping between
+the row and the grid. WAI-ARIA's grid pattern also lets rows sit in a
+rowgroup, which Gecko maps to ROLE_ROWGROUP, and the check rejected those,
+failing a click on a cell of a valid grid (Sval's emoji picker) as one on
+nothing a keyboard or screen-reader user could reach.
+
+diff --git a/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js b/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js
+index 1aedd8cb90..0774e48e0c 100644
+--- a/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js
++++ b/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js
+@@ -547,8 +547,12 @@ this.AccessibilityUtils = (function () {
+     if (!grid) {
+       return false; // The grid cell isn't inside a grid.
+     }
+-    if (grid.role == Ci.nsIAccessibleRole.ROLE_GROUPING) {
+-      // Grid built on the HTML table may include <tbody> wrapper:
++    if (
++      grid.role == Ci.nsIAccessibleRole.ROLE_GROUPING ||
++      grid.role == Ci.nsIAccessibleRole.ROLE_ROWGROUP
++    ) {
++      // Grid built on the HTML table may include <tbody> wrapper, and an ARIA
++      // grid may group its rows in a rowgroup:
+       grid = grid.parent;
+       if (!grid || grid.role != Ci.nsIAccessibleRole.ROLE_GRID) {
+         return false; // The grid cell isn't inside a grid.

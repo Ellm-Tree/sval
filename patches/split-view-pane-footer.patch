@@ -1,0 +1,76 @@
+Sval: a split view pane's footer makes it active, and names a pane waiting for a pick
+
+An inactive pane's footer stopped every click on it, so a click there
+did not make its pane active as a click anywhere else in the pane does;
+here it stops only the menu button's (split-view spec §6.4). A pane
+showing the about:opentabs picker had no footer at all, so it read as
+an empty page; its footer shows "New pane" and keeps the menu.
+
+The split menu's Close read "Close Both Tabs" whatever the split held,
+and Firefox's own Close closes the whole split. These strings let Sval
+say "Close All Tabs" for more than two, and give the footer's menu a
+Close for its own pane (SvalWindow.sys.mjs). The footer is a private
+custom element and the strings are Fluent's, so no chrome API reaches
+either.
+
+diff --git a/browser/components/tabbrowser/content/split-view-footer.js b/browser/components/tabbrowser/content/split-view-footer.js
+index 96a6df397f..08007ff89d 100644
+--- a/browser/components/tabbrowser/content/split-view-footer.js
++++ b/browser/components/tabbrowser/content/split-view-footer.js
+@@ -95,7 +95,11 @@
+     handleEvent(e) {
+       switch (e.type) {
+         case "click":
+-          e.stopPropagation();
++          // A click on the footer makes its pane active, as a click anywhere
++          // in the pane does; the menu button opens the menu alone.
++          if (e.target === this.menuButtonElement) {
++            e.stopPropagation();
++          }
+           break;
+         case "command":
+           gBrowser.openSplitViewMenu(this.menuButtonElement);
+@@ -165,7 +169,7 @@
+      * @param {nsIURI} uri
+      */
+     #updateUri(uri) {
+-      this.hidden = uri.specIgnoringRef === "about:opentabs";
++      this.toggleAttribute("picker", uri.specIgnoringRef === "about:opentabs");
+       this.#uri = uri;
+       if (this.uriElement) {
+         this.#updateUriElement();
+@@ -176,6 +180,15 @@
+     }
+ 
+     #updateUriElement() {
++      // A pane waiting for a pick is named as one.
++      if (this.hasAttribute("picker")) {
++        document.l10n.setAttributes(
++          this.uriElement,
++          "split-view-footer-new-pane"
++        );
++        return;
++      }
++      this.uriElement.removeAttribute("data-l10n-id");
+       const uriString = this.#uri
+         ? BrowserUtils.formatURIForDisplay(this.#uri)
+         : "";
+diff --git a/browser/locales/en-US/browser/tabbrowser.ftl b/browser/locales/en-US/browser/tabbrowser.ftl
+index 45d7f0651c..2f57ba2bf1 100644
+--- a/browser/locales/en-US/browser/tabbrowser.ftl
++++ b/browser/locales/en-US/browser/tabbrowser.ftl
+@@ -512,5 +512,14 @@ split-view-menuitem-reverse-tabs =
+     .label = Reverse Tabs
+ split-view-menuitem-close-both-tabs =
+     .label = Close Both Tabs
++# Closes every tab of a split view of three or four tabs.
++split-view-menuitem-close-all-tabs =
++    .label = Close All Tabs
++# Closes the one tab whose footer opened the menu.
++split-view-menuitem-close-tab =
++    .label = Close
++# Shown in the footer of a split view pane that is waiting for the user to
++# pick its page.
++split-view-footer-new-pane = New pane
+ 
+ ##

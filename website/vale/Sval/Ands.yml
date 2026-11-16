@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# ", and" ends a list or joins two clauses. A bare "and" also sits inside
+# UI names like Privacy and Security, so only the comma form counts.
+extends: occurrence
+message: "Two ', and' joins in one sentence. Split the sentence."
+level: error
+scope: sentence
+max: 1
+token: ', and\b'

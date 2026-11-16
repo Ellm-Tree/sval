@@ -1,0 +1,98 @@
+Sval: browser_contentBlockingAllowListPrincipal.js expects private jars
+
+Each private window is a jar of its own, told apart by its userContextId
+(permissions-private-jar), so a private page's allow-list principal
+names that jar, and an exception added in one private window holds in that
+window alone. The private checks expect the origin suffix of the page's own
+jar, and the storage access task adds its private exception in the window
+it checks. The rest of the file runs as upstream's.
+
+diff --git a/toolkit/components/antitracking/test/browser/browser_contentBlockingAllowListPrincipal.js b/toolkit/components/antitracking/test/browser/browser_contentBlockingAllowListPrincipal.js
+index 7c1b710ee0..4a266e501a 100644
+--- a/toolkit/components/antitracking/test/browser/browser_contentBlockingAllowListPrincipal.js
++++ b/toolkit/components/antitracking/test/browser/browser_contentBlockingAllowListPrincipal.js
+@@ -45,6 +45,17 @@ function checkAllowListPrincipal(
+   is(principal.origin, origin, "Correct origin");
+ }
+ 
++// Sval: each private window is a jar of its own, told apart by its
++// userContextId, so a private page's origin suffix names that jar as well as
++// privateBrowsingId.
++function jarSuffix(browser, isPrivateBrowsing) {
++  return isPrivateBrowsing
++    ? ChromeUtils.originAttributesToSuffix(
++        browser.browsingContext.originAttributes
++      )
++    : "";
++}
++
+ /**
+  * Runs a given test in a normal window and in a private browsing window.
+  *
+@@ -134,7 +145,7 @@ add_task(async () => {
+         browser,
+         "content",
+         "https://example.net" +
+-          (isPrivateBrowsing ? "^privateBrowsingId=1" : "")
++          jarSuffix(browser, isPrivateBrowsing)
+       );
+     }
+   );
+@@ -166,7 +177,7 @@ add_task(async () => {
+         browser,
+         "content",
+         "https://example.com" +
+-          (isPrivateBrowsing ? "^privateBrowsingId=1" : "")
++          jarSuffix(browser, isPrivateBrowsing)
+       );
+     }
+   );
+@@ -236,7 +247,7 @@ add_task(async () => {
+         tab.linkedBrowser,
+         "content",
+         "https://example.org" +
+-          (isPrivateBrowsing ? "^privateBrowsingId=1" : "")
++          jarSuffix(browser, isPrivateBrowsing)
+       );
+ 
+       BrowserTestUtils.removeTab(tab);
+@@ -258,22 +269,18 @@ add_task(async () => {
+   ContentBlockingAllowList.add(tab.linkedBrowser);
+   BrowserTestUtils.removeTab(tab);
+ 
+-  // Creating a private window to add the content blocking allow list exception
+-  // for example.com. Note that we need to keep the private window opened to
+-  // keep the allow list exception alive.
+-  let privateWin = await BrowserTestUtils.openNewBrowserWindow({
+-    private: true,
+-  });
+-  let privateTab = await BrowserTestUtils.openNewForegroundTab(
+-    privateWin.gBrowser,
+-    "https://example.com"
+-  );
+-  ContentBlockingAllowList.add(privateTab.linkedBrowser);
+-  BrowserTestUtils.removeTab(privateTab);
+-
++  // Sval: an exception added in one private window holds in that window's jar
++  // alone, so the private run adds its own in the window it runs in, and
++  // reloads so the page loads under it.
+   await runTestInNormalAndPrivateMode(
+     "https://example.com",
+-    async (browser, _) => {
++    async (browser, isPrivateBrowsing) => {
++      if (isPrivateBrowsing) {
++        ContentBlockingAllowList.add(browser);
++        await BrowserTestUtils.reloadTab(
++          browser.documentGlobal.gBrowser.getTabForBrowser(browser)
++        );
++      }
+       // Check the usingStorageAccess flag of the top level window context. It
+       // should always be false.
+       ok(
+@@ -313,6 +320,4 @@ add_task(async () => {
+       ContentBlockingAllowList.remove(browser);
+     }
+   );
+-
+-  await BrowserTestUtils.closeWindow(privateWin);
+ });

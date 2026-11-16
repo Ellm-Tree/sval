@@ -1,0 +1,28 @@
+Sval: deprecation warnings are not shown for the application's own documents
+
+A deprecated WebIDL member warns once per document that uses it. Firefox's
+browser chrome reads Window.fullScreen across its own scripts, so every
+browser window would log "Window.fullScreen attribute is deprecated" to the
+user's console. The warning is for the authors of web pages, which still get
+it. The many chrome call sites are Mozilla's, so the one place every
+deprecation is shown is changed instead.
+
+diff --git a/dom/bindings/BindingUtils.cpp b/dom/bindings/BindingUtils.cpp
+index f7188c8585..204169ac5c 100644
+--- a/dom/bindings/BindingUtils.cpp
++++ b/dom/bindings/BindingUtils.cpp
+@@ -4040,8 +4040,12 @@ void MaybeShowDeprecationWarning(const GlobalObject& aGlobal,
+   if (NS_IsMainThread()) {
+     nsCOMPtr<nsPIDOMWindowInner> window =
+         do_QueryInterface(aGlobal.GetAsSupports());
+-    if (window && window->GetExtantDoc()) {
+-      window->GetExtantDoc()->WarnOnceAbout(aOperation);
++    Document* doc = window ? window->GetExtantDoc() : nullptr;
++    // A deprecation warning is for the authors of web pages. The
++    // application's own chrome documents read deprecated attributes such as
++    // Window.fullScreen by design.
++    if (doc && !doc->NodePrincipal()->IsSystemPrincipal()) {
++      doc->WarnOnceAbout(aOperation);
+     }
+     return;
+   }

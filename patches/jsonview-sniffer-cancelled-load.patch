@@ -1,0 +1,46 @@
+Sval: the JSON view sniffer reads no type a cancelled load lacks
+
+nsHttpChannel::CallOnStartRequest calls the content sniffers of a load that
+was cancelled before its response head was read: the response can reach the
+socket thread before the cancel, so the transaction pump still has bytes to
+peek. Such a channel has no content type, and reading it throws
+NS_ERROR_NOT_AVAILABLE, which the sniffer did not catch. Discarding a
+browsing context cancels its load, so closing a window or tab while its page
+loads logs the error; Sval closes a window whose workspace another device
+removed. A channel with no type has nothing for JSON view to claim.
+
+diff --git a/devtools/client/jsonview/Sniffer.sys.mjs b/devtools/client/jsonview/Sniffer.sys.mjs
+index 8ce83917f3..50d58bcdd1 100644
+--- a/devtools/client/jsonview/Sniffer.sys.mjs
++++ b/devtools/client/jsonview/Sniffer.sys.mjs
+@@ -23,6 +23,17 @@ function getContentDisposition(channel) {
+   }
+ }
+ 
++function getContentType(channel) {
++  try {
++    return channel.contentType;
++  } catch (e) {
++    // An HTTP channel has no type until its response head is read, and
++    // nsHttpChannel::CallOnStartRequest still calls the sniffers of a load
++    // cancelled before that, as when its browsing context is discarded.
++    return null;
++  }
++}
++
+ /**
+  * This component represents a sniffer (implements nsIContentSniffer
+  * interface) responsible for changing top level 'application/json'
+@@ -47,10 +58,10 @@ export class Sniffer {
+         // Check the response content type and if it's a valid type
+         // such as application/json or application/manifest+json
+         // change it to new internal type consumed by JSON View.
+-        if (/^application\/(?:.+\+)?json$/.test(request.contentType)) {
++        if (/^application\/(?:.+\+)?json$/.test(getContentType(request))) {
+           return JSON_VIEW_MIME_TYPE;
+         }
+-      } else if (request.contentType === JSON_VIEW_MIME_TYPE) {
++      } else if (getContentType(request) === JSON_VIEW_MIME_TYPE) {
+         return "application/json";
+       }
+     }

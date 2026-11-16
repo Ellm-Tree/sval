@@ -1,0 +1,33 @@
+Sval: the extensions and downloads popovers slide along the screen's edge
+
+Sval's header popovers reach past their button and carry a shadow margin
+(sval-header.css). An arrow panel defaults to flip="both" (panel.js), and
+where a popover reaches past the screen nsMenuPopupFrame::FlipOrResize
+finds no other side to flip to and narrows it to the screen, so its
+content is cut off. flip="slide" moves it whole instead
+(nsMenuPopupFrame::SlideOrResize), as Firefox's own menu panels do.
+
+diff --git a/browser/components/customizableui/content/panelUI.inc.xhtml b/browser/components/customizableui/content/panelUI.inc.xhtml
+index 5c248c0d49..217c7ea41b 100644
+--- a/browser/components/customizableui/content/panelUI.inc.xhtml
++++ b/browser/components/customizableui/content/panelUI.inc.xhtml
+@@ -68,6 +68,7 @@
+          type="arrow"
+          noautofocus="true"
+          position="bottomright topright"
++         flip="slide"
+          hidden="true">
+     <panelmultiview mainViewId="unified-extensions-view">
+       <panelview id="unified-extensions-view"
+diff --git a/browser/components/downloads/content/downloadsPanel.inc.xhtml b/browser/components/downloads/content/downloadsPanel.inc.xhtml
+index 5226f65de0..deb6d013d5 100644
+--- a/browser/components/downloads/content/downloadsPanel.inc.xhtml
++++ b/browser/components/downloads/content/downloadsPanel.inc.xhtml
+@@ -38,6 +38,7 @@
+        class="cui-widget-panel panel-no-padding"
+        role="group"
+        type="arrow"
++       flip="slide"
+        orient="vertical"
+        hidden="true">
+ 

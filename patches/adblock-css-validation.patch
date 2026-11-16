@@ -1,0 +1,127 @@
+Sval: adblock-rust parses procedural cosmetic filters
+
+Without its css-validation feature, adblock-rust returns a procedural filter
+such as `:has-text(...)` or `:upward(...)` as a plain hiding selector, so its
+procedural_actions are always empty and Sval's page rules never run them. The
+feature asks for cssparser 0.34 and selectors 0.26. selectors 0.26 is the
+in-tree servo/components/selectors, and build/rust/cssparser-0.34 (synced
+from Sval's chrome/) answers 0.34 with the vendored cssparser 0.37 it is built
+on, so nothing new is vendored.
+
+diff --git a/Cargo.lock b/Cargo.lock
+index b33bf2ee2b..b476723f9f 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -35,6 +35,7 @@ dependencies = [
+  "arrayvec",
+  "base64 0.22.1",
+  "bitflags 2.10.0",
++ "cssparser 0.34.0",
+  "flatbuffers",
+  "idna",
+  "itertools 0.13.0",
+@@ -45,6 +46,7 @@ dependencies = [
+  "regex",
+  "rustc-hash 1.999.999",
+  "seahash",
++ "selectors",
+  "serde",
+  "serde_json",
+  "thiserror 1.999.999",
+@@ -1535,6 +1537,13 @@ dependencies = [
+  "xpcom",
+ ]
+ 
++[[package]]
++name = "cssparser"
++version = "0.34.0"
++dependencies = [
++ "cssparser 0.37.0",
++]
++
+ [[package]]
+ name = "cssparser"
+ version = "0.37.0"
+@@ -2797,7 +2806,7 @@ name = "geckoservo"
+ version = "0.0.1"
+ dependencies = [
+  "atomic_refcell",
+- "cssparser",
++ "cssparser 0.37.0",
+  "cstr",
+  "dom",
+  "gecko-profiler",
+@@ -4496,7 +4505,7 @@ name = "malloc_size_of"
+ version = "0.0.1"
+ dependencies = [
+  "app_units",
+- "cssparser",
++ "cssparser 0.37.0",
+  "euclid",
+  "selectors",
+  "servo_arc",
+@@ -7137,7 +7146,7 @@ name = "selectors"
+ version = "0.26.0"
+ dependencies = [
+  "bitflags 2.10.0",
+- "cssparser",
++ "cssparser 0.37.0",
+  "derive_more",
+  "log",
+  "new_debug_unreachable",
+@@ -7623,7 +7632,7 @@ dependencies = [
+  "bindgen 0.69.999",
+  "bitflags 2.10.0",
+  "byteorder",
+- "cssparser",
++ "cssparser 0.37.0",
+  "derive_more",
+  "dom",
+  "euclid",
+@@ -7685,7 +7694,7 @@ version = "0.0.1"
+ dependencies = [
+  "app_units",
+  "bitflags 2.10.0",
+- "cssparser",
++ "cssparser 0.37.0",
+  "euclid",
+  "malloc_size_of",
+  "malloc_size_of_derive",
+@@ -8040,7 +8049,7 @@ dependencies = [
+ name = "to_shmem"
+ version = "0.1.0"
+ dependencies = [
+- "cssparser",
++ "cssparser 0.37.0",
+  "servo_arc",
+  "smallbitvec",
+  "smallvec",
+diff --git a/Cargo.toml b/Cargo.toml
+index 7e05eaebd7..aa24ac61ce 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -267,6 +267,11 @@ wasi_0_11 = { package = "wasi", path = "build/rust/wasi" }
+ # Patch itertools 0.13 to 0.14
+ itertools = { path = "build/rust/itertools" }
+ 
++# Sval: adblock-rust's css-validation feature on the in-tree selectors and
++# cssparser
++cssparser_0_34 = { package = "cssparser", path = "build/rust/cssparser-0.34" }
++selectors = { path = "servo/components/selectors" }
++
+ # tokio 0.29.0 includes an experimental "tracing" feature which requires
+ # backtrace ^0.3.58 and the `tokio_unstable` flag. We don't use it, and nothing
+ # else we do use requires backtrace, so dummy it out for now.
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml b/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml
+index 44cb2733b4..e22fe6ffb9 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml
++++ b/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml
+@@ -6,7 +6,7 @@ authors = ["Tim Huang <tihuang@mozilla.com>", "Benjamin VanderSloot <bvandersloo
+ license = "MPL-2.0"
+ 
+ [dependencies]
+-adblock = { version = "0.12.1", features = ["full-regex-handling", "single-thread"], default-features = false }
++adblock = { version = "0.12.1", features = ["css-validation", "full-regex-handling", "single-thread"], default-features = false }
+ cstr = "0.2"
+ nsstring = { path = "../../../../xpcom/rust/nsstring" }
+ serde_json = "1.0"

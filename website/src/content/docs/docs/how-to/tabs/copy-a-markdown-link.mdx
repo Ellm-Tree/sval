@@ -1,0 +1,37 @@
+---
+title: Copy a Markdown link
+description: Copy a tab's title and address as a Markdown link to paste into notes or chat.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Copy Markdown Link copies a tab's page as a link written in Markdown. The
+link has the page's title in square brackets, then the page's address in
+parentheses.
+
+You're writing release notes in a Codeberg issue and want to link the
+Fastmail thread where the plan was agreed.
+
+<Screenshot name="docs-tab-menu" frame="rounded" maxWidth={260} alt="A tab's menu in the Workspace, with Copy Markdown Link below Add to Favorites" />
+
+## Steps
+
+1. In the Workspace, right-click the tab, then choose **Copy Markdown Link**.
+2. Paste where you want the link.
+
+For a page titled "Release plan" at https://codeberg.org/example, Sval
+copies `[Release plan](https://codeberg.org/example)`.
+
+## Details
+
+- When a page has no title, Sval uses the page's address as the link's
+  text.
+- Sval escapes square brackets in the title, and parentheses in the
+  address, so the link stays whole.
+- Sval leaves out a user name or password written in the address.
+- A sleeping tab gives you the same link as an awake one.
+- In the menu bar, the Tab menu has Copy Markdown Link too.
+
+## Related pages
+
+- [Tabs in a Workspace](/docs/reference/tabs/)

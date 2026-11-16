@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# An agent's screenshot of a playing video. macOS's hardware decoder cannot
+# start a session for Gecko's test files in a test run (AppleVTDecoder
+# `InitializeSession`), and Gecko reads its pref once at startup, so these
+# tasks run in a browser of their own with it off, as Gecko's own media
+# browser tests do. The prefs after the first are every browser manifest's
+# baseline, which browser.toml gives the reasons for.
+[DEFAULT]
+prefs = [
+  "media.hardware-video-decoding.enabled=false",
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+]
+support-files = [
+  "head.js",
+  "sval_agent_page.html",
+  "sval_agent_page2.html",
+  "!/dom/media/test/eme_standalone.js",
+  "!/dom/media/test/gizmo.webm",
+  "!/dom/media/test/sintel-short-clearkey-subsample-encrypted-video.webm",
+]
+
+["browser_sval_agent_screenshot_video.js"]

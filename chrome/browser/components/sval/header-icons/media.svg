@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- The site controls' media button, from Sval's design, drawn in the
+   - button's colour. -->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="16"
+  height="16"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="context-fill"
+  stroke-opacity="context-fill-opacity"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+  <path d="M10 9.5v5l4-2.5z" />
+</svg>

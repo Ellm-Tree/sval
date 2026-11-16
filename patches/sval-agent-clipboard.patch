@@ -1,0 +1,90 @@
+Sval: let Sval refuse clipboard writes from a tab an agent controls
+
+An agent's input gives the page user activation, which Gecko lets a page
+spend on the system clipboard (navigator.clipboard, execCommand("copy") and a
+copy event's own data), so a page an agent works in could replace what the
+user later pastes elsewhere. Only Sval knows which tabs an agent controls, and
+the user takes control of a tab without any change content can see, so the
+decision is made in the parent: every content write reaches
+nsBaseClipboard::SetData with the window it came from, and asks Sval's
+nsISvalAgentFiles first, through SvalAgentFiles.h. No chrome API sees a
+clipboard write before it lands.
+
+A content process chooses the window a write names. ContentParent's two
+clipboard write handlers refuse a write naming another process's window, as
+its clipboard reads already do, and one naming no window, or a discarded one,
+when the process hosts a tab or frame whose writes are refused. Writes that
+legitimately name no window, as devtools' eyedropper copying a colour from a
+content process, are made in every other process.
+
+diff --git a/widget/nsBaseClipboard.cpp b/widget/nsBaseClipboard.cpp
+index f3f8a51b52..126676d177 100644
+--- a/widget/nsBaseClipboard.cpp
++++ b/widget/nsBaseClipboard.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "ContentAnalysis.h"
+ #include "mozilla/AutoRestore.h"
++#include "mozilla/SvalAgentFiles.h"
+ #include "mozilla/Components.h"
+ #include "mozilla/dom/BindingUtils.h"
+ #include "mozilla/dom/CanonicalBrowsingContext.h"
+@@ -367,6 +368,12 @@ NS_IMETHODIMP nsBaseClipboard::SetData(
+     return NS_ERROR_FAILURE;
+   }
+ 
++  // Sval: a page in a tab an agent controls does not write the clipboard.
++  if (aWindowContext && mozilla::sval::RefusesClipboardWrite(
++                            aWindowContext->GetBrowsingContext())) {
++    return NS_ERROR_DOM_NOT_ALLOWED_ERR;
++  }
++
+   if (MOZ_CLIPBOARD_LOG_ENABLED()) {
+     nsTArray<nsCString> flavors;
+     if (NS_SUCCEEDED(aTransferable->FlavorsTransferableCanImport(flavors))) {
+diff --git a/dom/ipc/ContentParent.cpp b/dom/ipc/ContentParent.cpp
+index 27105f7..4f2445b 100644
+--- a/dom/ipc/ContentParent.cpp
++++ b/dom/ipc/ContentParent.cpp
+@@ -71,6 +71,7 @@
+ #include "mozilla/StorageAccessAPIHelper.h"
+ #include "mozilla/StyleSheet.h"
+ #include "mozilla/StyleSheetInlines.h"
++#include "mozilla/SvalAgentFiles.h"
+ #include "mozilla/TaskController.h"
+ #include "mozilla/Telemetry.h"
+ #include "mozilla/TelemetryComms.h"
+@@ -3275,6 +3276,15 @@ mozilla::ipc::IPCResult ContentParent::RecvSetClipboard(
+   if (!aRequestingWindowContext.IsDiscarded()) {
+     window = aRequestingWindowContext.get_canonical();
+   }
++  // Sval: SetData checks the agent tab by the window named, so a write
++  // naming another process's window is refused, and one naming none skips
++  // that check.
++  if (window && window->GetContentParent() != this) {
++    return IPC_OK();
++  }
++  if (!window && sval::RefusesClipboardWriteWithoutWindow(this)) {
++    return IPC_OK();
++  }
+   clipboard->SetData(trans, nullptr, aWhichClipboard, window);
+   return IPC_OK();
+ }
+@@ -3595,6 +3605,17 @@ ContentParent::AllocPClipboardWriteRequestParent(
+   }
+   RefPtr<ClipboardWriteRequestParent> request =
+       MakeAndAddRef<ClipboardWriteRequestParent>(this);
++  // Sval: SetData checks the agent tab by the window named, so a write
++  // naming another process's window, or one naming none from a process
++  // beside an agent's tab, gets a request that writes nothing
++  // (ClipboardWriteRequestParent::RecvSetData without a pending write).
++  if (settingWindowContext &&
++      settingWindowContext->Canonical()->GetContentParent() != this) {
++    return request.forget();
++  }
++  if (!settingWindowContext && sval::RefusesClipboardWriteWithoutWindow(this)) {
++    return request.forget();
++  }
+   request->Init(aClipboardType, settingWindowContext);
+   return request.forget();
+ }

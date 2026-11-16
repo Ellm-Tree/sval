@@ -1,0 +1,79 @@
+Sval: the most specific domain policy entry decides whether a page runs script
+
+SvalJavascript keeps a rule per site and per host in the domain policy's
+super lists. PolicyAllowsScript read only the lists that flip
+javascript.enabled, so a host's allow could not beat its site's block while
+script is on, nor a host's block its site's allow while it is off. The
+lookup takes the entry of the most specific name in either direction
+(SvalScriptPolicy.cpp).
+
+diff --git a/caps/moz.build b/caps/moz.build
+index 8f2d442d30..c38186e949 100644
+--- a/caps/moz.build
++++ b/caps/moz.build
+@@ -51,6 +51,7 @@ UNIFIED_SOURCES += [
+     "nsScriptSecurityManager.cpp",
+     "NullPrincipal.cpp",
+     "OriginAttributes.cpp",
++    "SvalScriptPolicy.cpp",
+     "SystemPrincipal.cpp",
+ ]
+ 
+diff --git a/caps/nsScriptSecurityManager.cpp b/caps/nsScriptSecurityManager.cpp
+index afc9e17ad8..646f80a767 100644
+--- a/caps/nsScriptSecurityManager.cpp
++++ b/caps/nsScriptSecurityManager.cpp
+@@ -3,6 +3,7 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ #include "nsScriptSecurityManager.h"
++#include "SvalScriptPolicy.h"
+ 
+ #include "mozilla/SourceLocation.h"
+ #include "mozilla/StaticPrefs_extensions.h"
+@@ -1772,8 +1773,6 @@ void nsScriptSecurityManager::CloneDomainPolicy(DomainPolicyClone* aClone) {
+ 
+ NS_IMETHODIMP
+ nsScriptSecurityManager::PolicyAllowsScript(nsIURI* aURI, bool* aRv) {
+-  nsresult rv;
+-
+   // Compute our rule. If we don't have any domain policy set up that might
+   // provide exceptions to this rule, we're done.
+   *aRv = mIsJavaScriptEnabled;
+@@ -1781,33 +1780,9 @@ nsScriptSecurityManager::PolicyAllowsScript(nsIURI* aURI, bool* aRv) {
+     return NS_OK;
+   }
+ 
+-  // We have a domain policy. Grab the appropriate set of exceptions to the
+-  // rule (either the blocklist or the allowlist, depending on whether script
+-  // is enabled or disabled by default).
+-  nsCOMPtr<nsIDomainSet> exceptions;
+-  nsCOMPtr<nsIDomainSet> superExceptions;
+-  if (*aRv) {
+-    mDomainPolicy->GetBlocklist(getter_AddRefs(exceptions));
+-    mDomainPolicy->GetSuperBlocklist(getter_AddRefs(superExceptions));
+-  } else {
+-    mDomainPolicy->GetAllowlist(getter_AddRefs(exceptions));
+-    mDomainPolicy->GetSuperAllowlist(getter_AddRefs(superExceptions));
+-  }
+-
+-  bool contains;
+-  rv = exceptions->Contains(aURI, &contains);
+-  NS_ENSURE_SUCCESS(rv, rv);
+-  if (contains) {
+-    *aRv = !*aRv;
+-    return NS_OK;
+-  }
+-  rv = superExceptions->ContainsSuperDomain(aURI, &contains);
+-  NS_ENSURE_SUCCESS(rv, rv);
+-  if (contains) {
+-    *aRv = !*aRv;
+-  }
+-
+-  return NS_OK;
++  // Sval: the most specific entry decides, in either direction, so a host's
++  // rule beats its site's.
++  return mozilla::SvalPolicyAllowsScript(mDomainPolicy, aURI, *aRv, aRv);
+ }
+ 
+ const nsTArray<nsCOMPtr<nsIURI>>&

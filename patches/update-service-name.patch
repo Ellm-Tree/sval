@@ -1,0 +1,566 @@
+Sval: the update service is Sval's own, apart from Firefox's
+
+Sval keeps Mozilla's maintenance service so that updates install without a
+UAC prompt. Windows keeps one service per name, so a service under Mozilla's
+names is one service with an installed Firefox's: whichever app installs it
+first sets its name, the newer binary replaces the other's, and either app's
+uninstaller removes it for both. Every name here is Sval's: the service
+SvalUpdate, the registry key Software\Sval\UpdateService with each
+installation's certificates under it, the Programs entry SvalUpdateService,
+and the folder Sval Update Service under Program Files (x86), which holds the
+service, its logs and the updater's secure output files. Every name a user
+sees says Sval: the installer's optional components page, the service's
+display name and description, and its Programs entry with its publisher.
+
+The update root under ProgramData, which holds each installation's updates,
+the shortcut logs and the instance locks, is Sval's own too, with a UUID of
+its own for the reason commonupdatedir.cpp gives for Mozilla's.
+
+updatehelper.h names the service's for the service and the updater,
+commonupdatedir.cpp the update root, and defines.nsi both for the
+installers. The installer's ServicesHelper plugin computes an installation's
+certificate key with pathhash.cpp, so Sval builds the plugin from this tree
+(scripts/build-serviceshelper.sh) in place of Mozilla's prebuilt copy. The
+service's uninstaller leaves ProgramData\Mozilla\logs alone: Sval's service
+never logs there.
+
+diff --git a/browser/installer/windows/nsis/defines.nsi.in b/browser/installer/windows/nsis/defines.nsi.in
+index 2acc191e45..81a3df5720 100644
+--- a/browser/installer/windows/nsis/defines.nsi.in
++++ b/browser/installer/windows/nsis/defines.nsi.in
+@@ -53,6 +53,22 @@
+ ; private_browsing.exe (as opposed to @MOZ_APP_NAME@.exe)
+ !define IDI_PBICON_PB_EXE_ZERO_BASED "0"
+ 
++; Sval's update service: its Windows service, its registry key, its folder
++; under Program Files (x86) and its Programs entry. They are Sval's own, apart
++; from those of an installed Firefox's service. updatehelper.h (SVC_NAME,
++; BASE_SERVICE_REG_KEY, SVC_DIR_NAME) and serviceinstall.cpp
++; (MAINT_UNINSTALL_KEY) name the same ones for the service and the updater.
++!define MaintSvcName                "SvalUpdate"
++!define MaintSvcKey                 "Software\Sval\UpdateService"
++!define MaintSvcDir                 "Sval Update Service"
++!define MaintUninstallKey \
++  "Software\Microsoft\Windows\CurrentVersion\Uninstall\SvalUpdateService"
++
++; The folder under ProgramData that holds Sval's updates, shortcut logs and
++; instance locks, apart from an installed Firefox's. commonupdatedir.cpp
++; (ROOT_UPDATE_DIR_NAME) names the same one for the browser and the updater.
++!define UpdateRootDirName           "Sval-43d64005-7132-4159-8cf9-84d0ed938db3"
++
+ !define CERTIFICATE_NAME            "Ellm Tree, Inc."
+ ; Azure Artifact Signing issues Sval's short-lived certificates from whichever
+ ; of Microsoft's ID Verified code-signing CAs is current, and Microsoft
+diff --git a/browser/installer/windows/nsis/installer.nsi b/browser/installer/windows/nsis/installer.nsi
+index 785e5ccfba..5f449be8e1 100755
+--- a/browser/installer/windows/nsis/installer.nsi
++++ b/browser/installer/windows/nsis/installer.nsi
+@@ -1269,7 +1269,7 @@ FunctionEnd
+ !ifdef MOZ_MAINTENANCE_SERVICE
+ Function preComponents
+   ; If the service already exists, don't show this page
+-  ServicesHelper::IsInstalled "MozillaMaintenance"
++  ServicesHelper::IsInstalled "${MaintSvcName}"
+   Pop $R9
+   ${If} $R9 == 1
+     ; The service already exists so don't show this page.
+diff --git a/browser/installer/windows/nsis/maintenanceservice_installer.nsi b/browser/installer/windows/nsis/maintenanceservice_installer.nsi
+index 22b45c86a3..615a8daf4b 100644
+--- a/browser/installer/windows/nsis/maintenanceservice_installer.nsi
++++ b/browser/installer/windows/nsis/maintenanceservice_installer.nsi
+@@ -37,20 +37,18 @@ Var BrandFullName
+ !insertmacro GetParameters
+ !insertmacro GetSize
+ 
+-; The test machines use this fallback key to run tests.
+-; And anyone that wants to run tests themselves should already have
+-; this installed.
+-!define FallbackKey \
+-  "SOFTWARE\Mozilla\MaintenanceService\3932ecacee736d366d6436db0f55bce4"
+-
+-!define CompanyName "Mozilla Corporation"
++!define CompanyName "Ellm Tree, Inc."
+ !define BrandFullNameInternal ""
+ 
+ ; The following includes are custom.
+ !include defines.nsi
++; The test machines use this fallback key to run tests.
++; And anyone that wants to run tests themselves should already have
++; this installed.
++!define FallbackKey "${MaintSvcKey}\3932ecacee736d366d6436db0f55bce4"
+ ; We keep defines.nsi defined so that we get other things like
+ ; the version number, but we redefine BrandFullName
+-!define MaintFullName "Mozilla Maintenance Service"
++!define MaintFullName "Sval Update Service"
+ !ifdef BrandFullName
+ !undef BrandFullName
+ !endif
+@@ -66,20 +64,15 @@ Name "${MaintFullName}"
+ OutFile "maintenanceservice_installer.exe"
+ 
+ ; Get installation folder from registry if available
+-InstallDirRegKey HKLM "Software\Mozilla\MaintenanceService" ""
++InstallDirRegKey HKLM "${MaintSvcKey}" ""
+ 
+ SetOverwrite on
+ 
+-; serviceinstall.cpp also uses this key, in case the path is changed, update
+-; there too.
+-!define MaintUninstallKey \
+- "Software\Microsoft\Windows\CurrentVersion\Uninstall\MozillaMaintenanceService"
+-
+ ; Always install into the 32-bit location even if we have a 64-bit build.
+ ; This is because we use only 1 service for all Firefox channels.
+ ; Allow either x86 and x64 builds to exist at this location, depending on
+ ; what is the latest build.
+-InstallDir "$PROGRAMFILES32\${MaintFullName}\"
++InstallDir "$PROGRAMFILES32\${MaintSvcDir}\"
+ ShowUnInstDetails nevershow
+ 
+ ################################################################################
+@@ -198,7 +191,7 @@ Section "MaintenanceService"
+   WriteRegStr HKLM "${MaintUninstallKey}" "DisplayIcon" \
+                    "$INSTDIR\Uninstall.exe,0"
+   WriteRegStr HKLM "${MaintUninstallKey}" "DisplayVersion" "${AppVersion}"
+-  WriteRegStr HKLM "${MaintUninstallKey}" "Publisher" "Mozilla"
++  WriteRegStr HKLM "${MaintUninstallKey}" "Publisher" "Ellm Tree, Inc."
+   WriteRegStr HKLM "${MaintUninstallKey}" "Comments" "${BrandFullName}"
+   WriteRegDWORD HKLM "${MaintUninstallKey}" "NoModify" 1
+   ${GetSize} "$INSTDIR" "/S=0K" $R2 $R3 $R4
+@@ -209,9 +202,9 @@ Section "MaintenanceService"
+   ; want to install once on the first upgrade to maintenance service.
+   ; Also write out that we are currently installed, preferences will check
+   ; this value to determine if we should show the service update pref.
+-  WriteRegDWORD HKLM "Software\Mozilla\MaintenanceService" "Attempted" 1
+-  WriteRegDWORD HKLM "Software\Mozilla\MaintenanceService" "Installed" 1
+-  DeleteRegValue HKLM "Software\Mozilla\MaintenanceService" "FFPrefetchDisabled"
++  WriteRegDWORD HKLM "${MaintSvcKey}" "Attempted" 1
++  WriteRegDWORD HKLM "${MaintSvcKey}" "Installed" 1
++  DeleteRegValue HKLM "${MaintSvcKey}" "FFPrefetchDisabled"
+ 
+   ; Included here for debug purposes only.
+   ; These keys are used to bypass the installation dir is a valid installation
+@@ -294,35 +287,6 @@ Section "Uninstall"
+   Call un.RenameDelete
+   Push "$INSTDIR\logs\maintenanceservice-uninstall.log"
+   Call un.RenameDelete
+-  SetShellVarContext all
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-1.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-2.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-3.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-4.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-5.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-6.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-7.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-8.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-9.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-10.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-install.log"
+-  Call un.RenameDelete
+-  Push "$APPDATA\Mozilla\logs\maintenanceservice-uninstall.log"
+-  Call un.RenameDelete
+-  RMDir /REBOOTOK "$APPDATA\Mozilla\logs"
+-  RMDir /REBOOTOK "$APPDATA\Mozilla"
+   RMDir /REBOOTOK "$INSTDIR\logs"
+   RMDir /REBOOTOK "$INSTDIR\update"
+   RMDir /REBOOTOK "$INSTDIR\UpdateLogs"
+@@ -333,8 +297,8 @@ Section "Uninstall"
+     SetRegView 64
+   ${EndIf}
+   DeleteRegKey HKLM "${MaintUninstallKey}"
+-  DeleteRegValue HKLM "Software\Mozilla\MaintenanceService" "Installed"
+-  DeleteRegValue HKLM "Software\Mozilla\MaintenanceService" "FFPrefetchDisabled"
++  DeleteRegValue HKLM "${MaintSvcKey}" "Installed"
++  DeleteRegValue HKLM "${MaintSvcKey}" "FFPrefetchDisabled"
+   DeleteRegKey HKLM "${FallbackKey}\"
+   ${If} ${RunningX64}
+   ${OrIf} ${IsNativeARM64}
+diff --git a/browser/installer/windows/nsis/shared.nsh b/browser/installer/windows/nsis/shared.nsh
+index c5342f123c..a90f62dd8b 100755
+--- a/browser/installer/windows/nsis/shared.nsh
++++ b/browser/installer/windows/nsis/shared.nsh
+@@ -897,7 +897,7 @@ FunctionEnd
+     ; Setting the Attempted value will ensure that a new Maintenance Service
+     ; install will never be attempted again after this from updates.  The value
+     ; is used only to see if updates should attempt new service installs.
+-    WriteRegDWORD HKLM "Software\Mozilla\MaintenanceService" "Attempted" 1
++    WriteRegDWORD HKLM "${MaintSvcKey}" "Attempted" 1
+ 
+     ; These values associate the allowed certificates for the current
+     ; installation, one per issuing CA in defines.nsi.
+diff --git a/browser/installer/windows/nsis/uninstaller.nsi b/browser/installer/windows/nsis/uninstaller.nsi
+index becbb0f70c..437138d439 100755
+--- a/browser/installer/windows/nsis/uninstaller.nsi
++++ b/browser/installer/windows/nsis/uninstaller.nsi
+@@ -40,9 +40,6 @@ ManifestDPIAware true
+ ; prevents compiling of the reg write logging.
+ !define NO_LOG
+ 
+-!define MaintUninstallKey \
+- "Software\Microsoft\Windows\CurrentVersion\Uninstall\MozillaMaintenanceService"
+-
+ Var TmpVal
+ Var MaintCertKey
+ Var ShouldOpenSurvey
+@@ -241,7 +238,7 @@ Function un.UninstallServiceIfNotUsed
+   ; Figure out the number of subkeys
+   StrCpy $0 0
+   ${Do}
+-    EnumRegKey $1 HKLM "Software\Mozilla\MaintenanceService" $0
++    EnumRegKey $1 HKLM "${MaintSvcKey}" $0
+     ${If} "$1" == ""
+       ${ExitDo}
+     ${EndIf}
+diff --git a/browser/installer/windows/nsis/uninstaller_helpers.nsh b/browser/installer/windows/nsis/uninstaller_helpers.nsh
+index 587c2e1242..2a59a3f7b9 100644
+--- a/browser/installer/windows/nsis/uninstaller_helpers.nsh
++++ b/browser/installer/windows/nsis/uninstaller_helpers.nsh
+@@ -427,7 +427,7 @@
+     ${OrIf} ${IsNativeARM64}
+       SetRegView 64
+     ${EndIf}
+-    ReadRegDWORD $5 HKLM "Software\Mozilla\MaintenanceService" "Attempted"
++    ReadRegDWORD $5 HKLM "${MaintSvcKey}" "Attempted"
+     ClearErrors
+     ${If} ${RunningX64}
+     ${OrIf} ${IsNativeARM64}
+diff --git a/browser/locales/en-US/installer/custom.properties b/browser/locales/en-US/installer/custom.properties
+index 8c33192e58..7131042afb 100644
+--- a/browser/locales/en-US/installer/custom.properties
++++ b/browser/locales/en-US/installer/custom.properties
+@@ -32,8 +32,8 @@ SHORTCUTS_PAGE_TITLE=Set Up Shortcuts
+ SHORTCUTS_PAGE_SUBTITLE=Create Program Icons
+ COMPONENTS_PAGE_TITLE=Set Up Optional Components
+ COMPONENTS_PAGE_SUBTITLE=Optional Recommended Components
+-OPTIONAL_COMPONENTS_DESC=The Maintenance Service will allow you to update $BrandShortName silently in the background.
+-MAINTENANCE_SERVICE_CHECKBOX_DESC=Install &Maintenance Service
++OPTIONAL_COMPONENTS_DESC=The $BrandShortName Update Service installs updates in the background, so Windows doesn't ask for your permission each time.
++MAINTENANCE_SERVICE_CHECKBOX_DESC=Install $BrandShortName &Update Service
+ SUMMARY_PAGE_TITLE=Summary
+ SUMMARY_PAGE_SUBTITLE=Ready to start installing $BrandShortName
+ SUMMARY_INSTALLED_TO=$BrandShortName will be installed to the following location:
+diff --git a/browser/locales/en-US/updater/updater.ini b/browser/locales/en-US/updater/updater.ini
+index cc4ae5405e..0076d2933e 100644
+--- a/browser/locales/en-US/updater/updater.ini
++++ b/browser/locales/en-US/updater/updater.ini
+@@ -6,4 +6,4 @@
+ [Strings]
+ TitleText=%MOZ_APP_DISPLAYNAME% Update
+ InfoText=%MOZ_APP_DISPLAYNAME% is installing your updates and will start in a few moments…
+-MozillaMaintenanceDescription=The Mozilla Maintenance Service ensures that you have the latest and most secure version of Mozilla Firefox on your computer. Keeping Firefox up to date is very important for your online security, and Mozilla strongly recommends that you keep this service enabled.
++MozillaMaintenanceDescription=The %MOZ_APP_DISPLAYNAME% Update Service installs %MOZ_APP_DISPLAYNAME% updates in the background, so Windows doesn't ask for your permission each time. Keep it on so you get security fixes as soon as they are released.
+diff --git a/toolkit/components/maintenanceservice/serviceinstall.cpp b/toolkit/components/maintenanceservice/serviceinstall.cpp
+index 052a3ca380..4955505415 100644
+--- a/toolkit/components/maintenanceservice/serviceinstall.cpp
++++ b/toolkit/components/maintenanceservice/serviceinstall.cpp
+@@ -23,9 +23,8 @@
+ #pragma comment(lib, "version.lib")
+ 
+ // This uninstall key is defined originally in maintenanceservice_installer.nsi
+-#define MAINT_UNINSTALL_KEY                                                    \
+-  L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MozillaMaintenan" \
+-  L"ceService"
++#define MAINT_UNINSTALL_KEY \
++  L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\SvalUpdateService"
+ 
+ static BOOL UpdateUninstallerVersionString(LPWSTR versionString) {
+   HKEY uninstallKey;
+diff --git a/toolkit/components/maintenanceservice/serviceinstall.h b/toolkit/components/maintenanceservice/serviceinstall.h
+index 86feb5dbba..41cbfc142c 100644
+--- a/toolkit/components/maintenanceservice/serviceinstall.h
++++ b/toolkit/components/maintenanceservice/serviceinstall.h
+@@ -7,7 +7,7 @@
+ 
+ #include "readstrings.h"
+ 
+-#define SVC_DISPLAY_NAME L"Mozilla Maintenance Service"
++#define SVC_DISPLAY_NAME L"Sval Update Service"
+ 
+ enum SvcInstallAction { UpgradeSvc, InstallSvc, ForceInstallSvc };
+ BOOL SvcInstall(SvcInstallAction action);
+diff --git a/toolkit/components/maintenanceservice/tests/gtest/ServiceStartInteractiveOnly.cpp b/toolkit/components/maintenanceservice/tests/gtest/ServiceStartInteractiveOnly.cpp
+index 96527e6970..b985f24515 100644
+--- a/toolkit/components/maintenanceservice/tests/gtest/ServiceStartInteractiveOnly.cpp
++++ b/toolkit/components/maintenanceservice/tests/gtest/ServiceStartInteractiveOnly.cpp
+@@ -43,7 +43,7 @@ TEST(MaintenanceServiceTest, ServiceStartInteractiveOnly)
+   ASSERT_TRUE(scmHandle);
+ 
+   SC_HANDLE serviceHandle =
+-      OpenServiceW(scmHandle, L"MozillaMaintenance", SERVICE_START);
++      OpenServiceW(scmHandle, L"SvalUpdate", SERVICE_START);
+   // Automatically close the SCM when we are done with it.
+   nsAutoServiceHandle uniqueServiceHandle(serviceHandle);
+   ASSERT_FALSE(serviceHandle);
+diff --git a/toolkit/components/maintenanceservice/workmonitor.cpp b/toolkit/components/maintenanceservice/workmonitor.cpp
+index 82047d1834..b441afdb5c 100644
+--- a/toolkit/components/maintenanceservice/workmonitor.cpp
++++ b/toolkit/components/maintenanceservice/workmonitor.cpp
+@@ -719,7 +719,7 @@ BOOL DeleteSecureUpdater(WCHAR serviceUpdaterPath[MAX_PATH + 1]) {
+  * @param argc The number of arguments in argv
+  * @param argv The service command line arguments, argv[0] is automatically
+  *             included by Windows, argv[1] is unused but hardcoded to
+- *             "MozillaMaintenance", and argv[2] is the service command.
++ *             SVC_NAME, and argv[2] is the service command.
+  *
+  * @return FALSE if there was an error executing the service command.
+  */
+diff --git a/toolkit/mozapps/installer/windows/nsis/common.nsh b/toolkit/mozapps/installer/windows/nsis/common.nsh
+index 3536bb9bc9..4fd78dbfd1 100755
+--- a/toolkit/mozapps/installer/windows/nsis/common.nsh
++++ b/toolkit/mozapps/installer/windows/nsis/common.nsh
+@@ -538,7 +538,7 @@
+ 
+       ; Add our subdirectory, this is hardcoded as grandparent of the update directory in
+       ; several other places.
+-      StrCpy $0 "$0\Mozilla-1de4eec8-1241-4177-a864-e594e8d1fb38"
++      StrCpy $0 "$0\${UpdateRootDirName}"
+ 
+       Exch $0   ; Restore original $0 and put our $0 on the stack.
+     FunctionEnd
+@@ -3499,13 +3499,13 @@
+           ; inside the maintenance service path. There are several files named
+           ; with the install hash and an extension indicating the kind of file.
+           ; so use a wildcard to delete them all.
+-          Delete "$PROGRAMFILES32\Mozilla Maintenance Service\UpdateLogs\$R1.*"
++          Delete "$PROGRAMFILES32\${MaintSvcDir}\UpdateLogs\$R1.*"
+ 
+           ; If the UpdateLogs directory is now empty, then delete it.
+           ; The Maintenance Service uninstaller should do this, but it may not
+           ; be up to date enough because of bug 1665193, so doing this here as
+           ; well lets us make sure it really happens.
+-          RmDir "$PROGRAMFILES32\Mozilla Maintenance Service\UpdateLogs"
++          RmDir "$PROGRAMFILES32\${MaintSvcDir}\UpdateLogs"
+         ${EndIf}
+       ${EndIf}
+ 
+@@ -3839,7 +3839,7 @@
+  * $R8 = return filename from FindFirst / FindNext
+  * $R9 = long path to the shortcut log ini file and path to the ProgramData
+  *       directory that the application stores additional shortcut logs in
+- *       (Typically c:\ProgramData\Mozilla-1de4eec8-1241-4177-a864-e594e8d1fb38)
++ *       (Typically c:\ProgramData\Sval-43d64005-7132-4159-8cf9-84d0ed938db3)
+  */
+ !macro DeleteShortcuts
+ 
+diff --git a/toolkit/mozapps/update/UpdateService.sys.mjs b/toolkit/mozapps/update/UpdateService.sys.mjs
+index 6ae382df08..ac1facfb25 100644
+--- a/toolkit/mozapps/update/UpdateService.sys.mjs
++++ b/toolkit/mozapps/update/UpdateService.sys.mjs
+@@ -1262,7 +1262,7 @@ function isServiceInstalled() {
+     );
+     wrk.open(
+       wrk.ROOT_KEY_LOCAL_MACHINE,
+-      "SOFTWARE\\Mozilla\\MaintenanceService",
++      "SOFTWARE\\Sval\\UpdateService",
+       wrk.ACCESS_READ | wrk.WOW64_64
+     );
+     installed = wrk.readIntValue("Installed");
+diff --git a/toolkit/mozapps/update/UpdateTelemetry.sys.mjs b/toolkit/mozapps/update/UpdateTelemetry.sys.mjs
+index 2de95d586d..6851d88b22 100644
+--- a/toolkit/mozapps/update/UpdateTelemetry.sys.mjs
++++ b/toolkit/mozapps/update/UpdateTelemetry.sys.mjs
+@@ -465,7 +465,7 @@ export var AUSTLMY = {
+       );
+       wrk.open(
+         wrk.ROOT_KEY_LOCAL_MACHINE,
+-        "SOFTWARE\\Mozilla\\MaintenanceService",
++        "SOFTWARE\\Sval\\UpdateService",
+         wrk.ACCESS_READ | wrk.WOW64_64
+       );
+       // Was the service at some point installed, but is now uninstalled?
+diff --git a/toolkit/mozapps/update/common/commonupdatedir.cpp b/toolkit/mozapps/update/common/commonupdatedir.cpp
+index 0ba9fcef94..02fbbad8d7 100644
+--- a/toolkit/mozapps/update/common/commonupdatedir.cpp
++++ b/toolkit/mozapps/update/common/commonupdatedir.cpp
+@@ -43,7 +43,9 @@
+ // this problem in the future, we are including a UUID in the root update
+ // directory name to attempt to ensure that it will be created by this code and
+ // won't already exist with the wrong permissions.
+-#  define ROOT_UPDATE_DIR_NAME "Mozilla-1de4eec8-1241-4177-a864-e594e8d1fb38"
++// Sval's root is its own, apart from an installed Firefox's, with a UUID of
++// its own for the reason above. defines.nsi names it for the installers.
++#  define ROOT_UPDATE_DIR_NAME "Sval-43d64005-7132-4159-8cf9-84d0ed938db3"
+ // This describes the directory between the "Mozilla" directory and the install
+ // path hash (i.e. C:\ProgramData\Mozilla\<UPDATE_PATH_MID_DIR_NAME>\<hash>)
+ #  define UPDATE_PATH_MID_DIR_NAME "updates"
+@@ -542,7 +544,7 @@ static HRESULT GetUpdateDirectory(const wchar_t* installPath,
+   }
+ 
+   // Generate the base path
+-  // (C:\ProgramData\Mozilla-1de4eec8-1241-4177-a864-e594e8d1fb38)
++  // (C:\ProgramData\Sval-43d64005-7132-4159-8cf9-84d0ed938db3)
+   SimpleAutoString basePath;
+   size_t basePathLen =
+       wcslen(baseDirParentPath) + 1 /* path separator */ + baseDir.Length();
+@@ -560,7 +562,7 @@ static HRESULT GetUpdateDirectory(const wchar_t* installPath,
+   }
+ 
+   // Generate what we are going to call the mid-path
+-  // (C:\ProgramData\Mozilla-1de4eec8-1241-4177-a864-e594e8d1fb38\updates)
++  // (C:\ProgramData\Sval-43d64005-7132-4159-8cf9-84d0ed938db3\updates)
+   const wchar_t midPathDirName[] = NS_T(UPDATE_PATH_MID_DIR_NAME);
+   size_t midPathLen =
+       basePath.Length() + 1 /* path separator */ + wcslen(midPathDirName);
+diff --git a/toolkit/mozapps/update/common/pathhash.cpp b/toolkit/mozapps/update/common/pathhash.cpp
+index e70f69a755..0764aa750f 100644
+--- a/toolkit/mozapps/update/common/pathhash.cpp
++++ b/toolkit/mozapps/update/common/pathhash.cpp
+@@ -5,6 +5,7 @@
+ #include <windows.h>
+ #include <wincrypt.h>
+ #include "pathhash.h"
++#include "updatehelper.h"
+ 
+ /**
+  * Converts a binary sequence into a hex string
+@@ -118,9 +119,7 @@ BOOL CalculateRegistryPathFromFilePath(const LPCWSTR filePath,
+   }
+   delete[] lowercasePath;
+ 
+-  LPCWSTR baseRegPath =
+-      L"SOFTWARE\\Mozilla\\"
+-      L"MaintenanceService\\";
++  LPCWSTR baseRegPath = BASE_SERVICE_REG_KEY L"\\";
+   wcsncpy(registryPath, baseRegPath, MAX_PATH);
+   BinaryDataToHexString(hash, hashSize, registryPath + wcslen(baseRegPath));
+   delete[] hash;
+diff --git a/toolkit/mozapps/update/common/updatehelper.cpp b/toolkit/mozapps/update/common/updatehelper.cpp
+index c621204142..9dbcd4aa79 100644
+--- a/toolkit/mozapps/update/common/updatehelper.cpp
++++ b/toolkit/mozapps/update/common/updatehelper.cpp
+@@ -60,7 +60,7 @@ BOOL PathGetSiblingFilePath(LPWSTR destinationBuffer, LPCWSTR siblingFilePath,
+  *
+  * Example
+  * Destination buffer value:
+- *   C:\Program Files (x86)\Mozilla Maintenance Service\UpdateLogs
++ *   C:\Program Files (x86)\Sval Update Service\UpdateLogs
+  *
+  * @param  outBuf
+  *         A buffer of size MAX_PATH + 1 to store the result.
+@@ -79,7 +79,7 @@ BOOL GetSecureOutputDirectoryPath(LPWSTR outBuf) {
+   wcsncpy(outBuf, progFilesX86, MAX_PATH + 1);
+   CoTaskMemFree(progFilesX86);
+ 
+-  if (!PathAppendSafe(outBuf, L"Mozilla Maintenance Service")) {
++  if (!PathAppendSafe(outBuf, SVC_DIR_NAME)) {
+     return FALSE;
+   }
+ 
+@@ -439,11 +439,11 @@ LaunchServiceSoftwareUpdateCommand(int argc, LPCWSTR* argv) {
+   // The service command is the same as the updater.exe command line except
+   // it has 4 extra args:
+   // 0) The name of the service, automatically added by Windows
+-  // 1) "MozillaMaintenance" (I think this is redundant with 0)
++  // 1) SVC_NAME (I think this is redundant with 0)
+   // 2) The command being executed, which is "software-update"
+   // 3) The path to updater.exe (from argv[0])
+   LPCWSTR* updaterServiceArgv = new LPCWSTR[argc + 2];
+-  updaterServiceArgv[0] = L"MozillaMaintenance";
++  updaterServiceArgv[0] = SVC_NAME;
+   updaterServiceArgv[1] = L"software-update";
+ 
+   for (int i = 0; i < argc; ++i) {
+diff --git a/toolkit/mozapps/update/common/updatehelper.h b/toolkit/mozapps/update/common/updatehelper.h
+index 3be052d664..3fbdb5b308 100644
+--- a/toolkit/mozapps/update/common/updatehelper.h
++++ b/toolkit/mozapps/update/common/updatehelper.h
+@@ -27,9 +27,14 @@ void RemoveSecureOutputFiles(LPCWSTR patchDirPath);
+ #define PATCH_DIR_PATH L"\\updates\\0"
+ 
+ #ifdef MOZ_MAINTENANCE_SERVICE
+-#  define SVC_NAME L"MozillaMaintenance"
++// Sval's service, its registry key and its folder under Program Files (x86)
++// are its own, apart from those of an installed Firefox's service.
++// defines.nsi names the same ones for the installers.
++#  define SVC_NAME L"SvalUpdate"
+ 
+-#  define BASE_SERVICE_REG_KEY L"SOFTWARE\\Mozilla\\MaintenanceService"
++#  define BASE_SERVICE_REG_KEY L"SOFTWARE\\Sval\\UpdateService"
++
++#  define SVC_DIR_NAME L"Sval Update Service"
+ 
+ // The test only fallback key, as its name implies, is only present on machines
+ // that will use automated tests.  Since automated tests always run from a
+diff --git a/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js b/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js
+index 4e0005d793..8195e2849c 100644
+--- a/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js
++++ b/toolkit/mozapps/update/tests/data/xpcshellUtilsAUS.js
+@@ -1664,7 +1664,7 @@ function getMaintSvcDir() {
+   // This will return an empty string on our Win XP build systems.
+   let maintSvcDir = getSpecialFolderDir(CSIDL_PROGRAM_FILESX86);
+   if (maintSvcDir) {
+-    maintSvcDir.append("Mozilla Maintenance Service");
++    maintSvcDir.append("Sval Update Service");
+     debugDump(
+       "using CSIDL_PROGRAM_FILESX86 - maintenance service install " +
+         "directory path: " +
+@@ -1674,7 +1674,7 @@ function getMaintSvcDir() {
+   if (!maintSvcDir || !maintSvcDir.exists()) {
+     maintSvcDir = getSpecialFolderDir(CSIDL_PROGRAM_FILES);
+     if (maintSvcDir) {
+-      maintSvcDir.append("Mozilla Maintenance Service");
++      maintSvcDir.append("Sval Update Service");
+       debugDump(
+         "using CSIDL_PROGRAM_FILES - maintenance service install " +
+           "directory path: " +
+@@ -1892,7 +1892,7 @@ function getMockUpdRootDWin(aGetOldLocation) {
+   if (aGetOldLocation) {
+     relPathUpdates += "Mozilla";
+   } else {
+-    relPathUpdates += "Mozilla-1de4eec8-1241-4177-a864-e594e8d1fb38";
++    relPathUpdates += "Sval-43d64005-7132-4159-8cf9-84d0ed938db3";
+   }
+ 
+   relPathUpdates += "\\" + DIR_UPDATES + "\\" + gInstallDirPathHash;
+@@ -2568,7 +2568,7 @@ function shouldRunServiceTest() {
+   let isBinSigned = isBinarySigned(updaterBinPath);
+ 
+   const REG_PATH =
+-    "SOFTWARE\\Mozilla\\MaintenanceService\\" +
++    "SOFTWARE\\Sval\\UpdateService\\" +
+     "3932ecacee736d366d6436db0f55bce4";
+   let key = Cc["@mozilla.org/windows-registry-key;1"].createInstance(
+     Ci.nsIWindowsRegKey
+@@ -2599,7 +2599,7 @@ function shouldRunServiceTest() {
+   }
+ 
+   // Check to make sure the service is installed
+-  let args = ["wait-for-service-stop", "MozillaMaintenance", "10"];
++  let args = ["wait-for-service-stop", "SvalUpdate", "10"];
+   let exitValue = runTestHelperSync(args);
+   Assert.notEqual(
+     exitValue,
+@@ -2971,7 +2971,7 @@ function waitForServiceStop(aFailTest) {
+   debugDump("waiting for the maintenance service to stop if necessary");
+   // Use the helper bin to ensure the service is stopped. If not stopped, then
+   // wait for the service to stop (at most 120 seconds).
+-  let args = ["wait-for-service-stop", "MozillaMaintenance", "120"];
++  let args = ["wait-for-service-stop", "SvalUpdate", "120"];
+   let exitValue = runTestHelperSync(args);
+   Assert.notEqual(exitValue, 0xee, "the maintenance service should exist");
+   if (exitValue != 0) {
+diff --git a/toolkit/xre/nsUpdateDriver.h b/toolkit/xre/nsUpdateDriver.h
+index 254faadf63..709ea9e25b 100644
+--- a/toolkit/xre/nsUpdateDriver.h
++++ b/toolkit/xre/nsUpdateDriver.h
+@@ -26,7 +26,7 @@ typedef PRProcess* ProcessType;
+ 
+ #ifdef XP_WIN
+ #  define UPDATER_BIN "updater.exe"
+-#  define MAINTENANCE_SVC_NAME L"MozillaMaintenance"
++#  define MAINTENANCE_SVC_NAME L"SvalUpdate"
+ #  define MAYBE_WAIT_TIMEOUT_MS (60U * 1000U)
+ #elif XP_MACOSX
+ #  define UPDATER_APP "updater.app"

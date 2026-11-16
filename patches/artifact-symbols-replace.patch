@@ -1,0 +1,32 @@
+Sval: an artifact build replaces the symbols it installed before
+
+An artifact build with --enable-artifact-build-symbols writes the symbols
+archive to dist/crashreporter-symbols. Each binary's files sit under a
+directory named for its build id, and install_from_file adds files without
+removing any, so every new Gecko adds a full symbols tree beside the old
+ones. An objdir kept across builds grows by about 0.9 GB per Gecko on
+Windows until the disk fills. Only the installed binary's symbols resolve
+its stacks, so the old trees are removed before the new archive goes in.
+
+diff --git a/python/mozbuild/mozbuild/artifacts.py b/python/mozbuild/mozbuild/artifacts.py
+index cb27f4c530..61a25d6140 100644
+--- a/python/mozbuild/mozbuild/artifacts.py
++++ b/python/mozbuild/mozbuild/artifacts.py
+@@ -1706,6 +1706,17 @@ https://firefox-source-docs.mozilla.org/contributing/vcs/mercurial_bundles.html
+             "Installing from processed {processed_filename}",
+         )
+ 
++        # Symbol files sit under a directory named for the binary's build id,
++        # so installing another build's symbols writes a new tree beside the
++        # old one. Only the installed build's symbols can resolve a stack, and
++        # an objdir kept across builds otherwise grows by a full symbols tree
++        # each time.
++        symbols_suffix = self._artifact_job._symbols_archive_suffix
++        if symbols_suffix and filename.endswith(symbols_suffix):
++            shutil.rmtree(
++                mozpath.join(distdir, "crashreporter-symbols"), ignore_errors=True
++            )
++
+         with zipfile.ZipFile(processed_filename) as zf:
+             for info in zf.infolist():
+                 n = mozpath.join(distdir, info.filename)

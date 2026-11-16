@@ -1,0 +1,21 @@
+Sval: forget an overflowed item's hidden mark once it moves back to the row
+
+`OverflowableToolbar` marks an item that overflows with no width as hidden,
+so a panel holding only hidden items shows no overflow button. The mark
+outlives the item's return to the row, so an item hidden when it first
+overflowed, such as the split button before a split, counts as hidden the
+next time it overflows while shown, and the overflow button disappears with
+the item still in the panel.
+
+diff --git a/browser/components/customizableui/CustomizableUI.sys.mjs b/browser/components/customizableui/CustomizableUI.sys.mjs
+index cce04538c9..ee184e79a4 100644
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -8029,6 +8029,7 @@ class OverflowableToolbar {
+ 
+       lazy.log.debug(`Moving ${child.id} back`);
+       this.#overflowedInfo.delete(child.id);
++      this.#hiddenOverflowedNodes.delete(child);
+       let beforeNodeIndex = placements.indexOf(child.id) + 1;
+       // If this is a skipintoolbarset item, meaning it doesn't occur in the placements list,
+       // we're inserting it at the end. This will mean first-in, first-out (more or less)

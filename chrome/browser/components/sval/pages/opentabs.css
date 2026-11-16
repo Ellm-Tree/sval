@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* The split view's tab picker, about:opentabs, on Settings' canvas in
+   place of its own tinted gradient (`opentabs.css`). */
+
+@import url("chrome://browser/content/sval/pages/info.css");
+
+:root {
+  background: var(--background-color-canvas);
+}

@@ -1,0 +1,61 @@
+Sval: getUserMedia:revoke stops the camera or the microphone alone
+
+The revoke takes a window id and stops every camera and microphone in the
+window, or a `screen:` id and stops screen capture. Sval's site menu offers a
+Stop for each live device, so a `camera:` or `microphone:` id stops that
+source alone and leaves the window's other captures running.
+
+diff --git a/dom/media/MediaManager.cpp b/dom/media/MediaManager.cpp
+index 82508f935b..db85e87e1a 100644
+--- a/dom/media/MediaManager.cpp
++++ b/dom/media/MediaManager.cpp
+@@ -731,6 +731,12 @@ class GetUserMediaWindowListener {
+ 
+   void StopRawID(const nsString& removedDeviceID);
+ 
++  /**
++   * Stops every capture of one source, camera or microphone, leaving the
++   * others running.
++   */
++  void StopSource(MediaSourceEnum aSource);
++
+   void MuteOrUnmuteCameras(bool aMute);
+   void MuteOrUnmuteMicrophones(bool aMute);
+ 
+@@ -4105,6 +4111,19 @@ nsresult MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
+ 
+   } else if (!strcmp(aTopic, "getUserMedia:revoke")) {
+     uint64_t windowID;
++    const nsDependentString data(aData);
++    const bool camera = StringBeginsWith(data, u"camera:"_ns);
++    if (camera || StringBeginsWith(data, u"microphone:"_ns)) {
++      nsresult rv;
++      windowID = Substring(data, data.FindChar(':') + 1).ToInteger64(&rv);
++      MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
++      if (RefPtr<GetUserMediaWindowListener> listener =
++              GetWindowListener(windowID)) {
++        listener->StopSource(camera ? MediaSourceEnum::Camera
++                                    : MediaSourceEnum::Microphone);
++      }
++      return NS_OK;
++    }
+     if (ParseScreenColonWindowID(aData, &windowID) == MediaSourceEnum::Screen) {
+       LOG("Revoking ScreenCapture access for window {}", windowID);
+       StopScreensharing(windowID);
+@@ -5010,6 +5029,16 @@ void GetUserMediaWindowListener::StopRawID(const nsString& removedDeviceID) {
+   }
+ }
+ 
++void GetUserMediaWindowListener::StopSource(MediaSourceEnum aSource) {
++  MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread");
++
++  for (auto& l : mActiveListeners.Clone()) {
++    if (l->GetDevice()->GetMediaSource() == aSource) {
++      l->Stop();
++    }
++  }
++}
++
+ void GetUserMediaWindowListener::MuteOrUnmuteCameras(bool aMute) {
+   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread");
+ 

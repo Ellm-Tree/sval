@@ -1,0 +1,8 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- The stop square on Stop, on the card over an agent's window
+     (agent-control spec §6). It fills with the context's colour where chrome
+     sets one, and with black where it is a mask. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="context-fill black" fill-opacity="context-fill-opacity">
+  <rect x="2.5" y="2.5" width="11" height="11" rx="2"/>
+</svg>

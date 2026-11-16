@@ -1,0 +1,211 @@
+Sval: context menu items name the keys that run the same command
+
+A menu item teaches its shortcut by naming the <key> that runs the same
+command: MozMenuItem draws it as acceltext, nsMenuItemX as a macOS native
+menu's key equivalent, and XULMenuitemAccessible exposes it. Firefox's page
+menu, its text field menus and its Places menu name none, so these items
+name the keys of browser-sets.inc.xhtml and editMenuKeys.inc.xhtml. The
+text field menus open in dialogs that have no edit keys, and
+MozMenuItem._computeAccelTextFromKeyIfNeeded logs an error for a key it
+cannot find, so they name a key only where their document has it. Back, Forward, Reload and Stop
+name theirs only on macOS, where they are text items; elsewhere they are
+icons whose tooltips name the key.
+
+diff --git a/browser/base/content/browser-context.inc.xhtml b/browser/base/content/browser-context.inc.xhtml
+index 621be24e4e..825cb70d60 100644
+--- a/browser/base/content/browser-context.inc.xhtml
++++ b/browser/base/content/browser-context.inc.xhtml
+@@ -7,17 +7,21 @@
+ #ifdef XP_MACOSX
+       <menuitem id="context-back"
+                 data-l10n-id="main-context-menu-back-mac"
++                key="goBackKb"
+                 command="Browser:BackOrBackDuplicate"/>
+       <menuitem id="context-forward"
+                 data-l10n-id="main-context-menu-forward-mac"
++                key="goForwardKb"
+                 command="Browser:ForwardOrForwardDuplicate"/>
+       <menuitem id="context-reload"
+                 tooltip="dynamic-shortcut-tooltip"
+                 data-l10n-id="main-context-menu-reload-mac"
++                key="key_reload"
+                 command="Browser:ReloadOrDuplicate"/>
+       <menuitem id="context-stop"
+                 tooltip="dynamic-shortcut-tooltip"
+                 data-l10n-id="main-context-menu-stop-mac"
++                key="key_stop"
+                 command="Browser:Stop"/>
+ #else
+       <menugroup id="context-navigation">
+@@ -203,6 +207,7 @@
+                 data-l10n-id="main-context-menu-video-view-new-tab"
+                 />
+       <menuitem id="context-video-pictureinpicture"
++                key="key_togglePictureInPicture"
+                 data-l10n-id="main-context-menu-media-watch-pip"
+                 type="checkbox"
+                 />
+@@ -270,6 +275,7 @@
+                 />
+ #endif
+       <menuitem id="context-savepage"
++                key="key_savePage"
+                 data-l10n-id="main-context-menu-page-save"
+                 />
+       <menu id="fill-login" hidden="true">
+@@ -289,28 +295,35 @@
+                 />
+       <menuseparator id="passwordmgr-items-separator"/>
+       <menuitem id="context-undo"
++                key="key_undo"
+                 data-l10n-id="text-action-undo"
+                 command="cmd_undo"/>
+       <menuitem id="context-redo"
++                key="key_redo"
+                 data-l10n-id="text-action-redo"
+                 command="cmd_redo"/>
+       <menuseparator id="context-sep-redo"/>
+       <menuitem id="context-cut"
++                key="key_cut"
+                 data-l10n-id="text-action-cut"
+                 command="cmd_cut"/>
+       <menuitem id="context-copy"
++                key="key_copy"
+                 data-l10n-id="text-action-copy"
+                 command="cmd_copy"/>
+       <menuitem id="context-paste"
++                key="key_paste"
+                 data-l10n-id="text-action-paste"
+                 command="cmd_paste"/>
+       <menuitem id="context-paste-no-formatting"
+                 data-l10n-id="text-action-paste-no-formatting"
+                 command="cmd_pasteNoFormatting"/>
+       <menuitem id="context-delete"
++                key="key_delete"
+                 data-l10n-id="text-action-delete"
+                 command="cmd_delete"/>
+       <menuitem id="context-selectall"
++                key="key_selectAll"
+                 data-l10n-id="text-action-select-all"
+                 command="cmd_selectAll"/>
+       <menuitem id="context-pdfjs-comment-selection"
+@@ -361,6 +374,7 @@
+       <menuseparator id="context-sep-pdfjs-save-page"/>
+ 
+       <menuitem id="context-take-screenshot"
++                key="key_screenshot"
+                 data-l10n-id="main-context-menu-take-screenshot"/>
+       <menuseparator id="context-sep-screenshots"/>
+       <menuitem id="context-add-engine"
+@@ -431,6 +445,7 @@
+       </menu>
+       <menuseparator hidden="true" id="context-sep-bidi"/>
+       <menuitem hidden="true" id="context-bidi-text-direction-toggle"
++                key="key_switchTextDirection"
+                 data-l10n-id="main-context-menu-bidi-switch-text"
+                 command="cmd_switchTextDirection"/>
+       <menuitem hidden="true" id="context-bidi-page-direction-toggle"
+@@ -441,6 +456,7 @@
+                 data-l10n-id="main-context-menu-view-selection-source"
+                 />
+       <menuitem id="context-viewsource"
++                key="key_viewSource"
+                 data-l10n-id="main-context-menu-view-page-source"
+                 />
+       <menuitem id="context-inspect-a11y"
+@@ -448,6 +464,7 @@
+                 data-l10n-id="main-context-menu-inspect-a11y-properties"
+                 />
+       <menuitem id="context-inspect"
++                key="key_inspector"
+                 hidden="true"
+                 data-l10n-id="main-context-menu-inspect"
+                 />
+diff --git a/browser/components/places/content/placesContextMenu.inc.xhtml b/browser/components/places/content/placesContextMenu.inc.xhtml
+index 720e09ae87..28ce630e9b 100644
+--- a/browser/components/places/content/placesContextMenu.inc.xhtml
++++ b/browser/components/places/content/placesContextMenu.inc.xhtml
+@@ -102,11 +102,13 @@
+             node-type="folder"
+             closemenu="single"/>
+   <menuitem id="placesContext_delete"
++            key="key_delete"
+             data-l10n-id="text-action-delete"
+             command="placesCmd_delete"
+             closemenu="single"
+             hide-if-node-type-is-only="link|folder"/>
+   <menuitem id="placesContext_delete_history"
++            key="key_delete"
+             data-l10n-id="places-delete-page"
+             data-l10n-args='{"count":"1"}'
+             command="placesCmd_delete"
+@@ -133,6 +135,7 @@
+             node-type="link_bookmark|folder|separator|query"
+             hide-if-node-type="link_bookmark_tag|query_host|query_day|query_tag"/>
+   <menuitem id="placesContext_copy"
++            key="key_copy"
+             command="placesCmd_copy"
+             data-l10n-id="text-action-copy"
+             closemenu="single"/>
+diff --git a/toolkit/content/editMenuOverlay.js b/toolkit/content/editMenuOverlay.js
+index 0a6c279c88..d6c1023981 100644
+--- a/toolkit/content/editMenuOverlay.js
++++ b/toolkit/content/editMenuOverlay.js
+@@ -105,18 +105,20 @@ window.addEventListener("contextmenu", e => {
+ 
+   let popup = document.getElementById("textbox-contextmenu");
+   if (!popup) {
++    // A menu item names its shortcut through a key of this document's.
++    const keyAttr = id => (document.getElementById(id) ? `key="${id}"` : "");
+     MozXULElement.insertFTLIfNeeded("toolkit/global/textActions.ftl");
+     document.documentElement.appendChild(
+       MozXULElement.parseXULToFragment(`
+       <menupopup id="textbox-contextmenu" class="textbox-contextmenu">
+-        <menuitem data-l10n-id="text-action-undo" command="cmd_undo"></menuitem>
+-        <menuitem data-l10n-id="text-action-redo" command="cmd_redo"></menuitem>
++        <menuitem data-l10n-id="text-action-undo" ${keyAttr("key_undo")} command="cmd_undo"></menuitem>
++        <menuitem data-l10n-id="text-action-redo" ${keyAttr("key_redo")} command="cmd_redo"></menuitem>
+         <menuseparator></menuseparator>
+-        <menuitem data-l10n-id="text-action-cut" command="cmd_cut"></menuitem>
+-        <menuitem data-l10n-id="text-action-copy" command="cmd_copy"></menuitem>
+-        <menuitem data-l10n-id="text-action-paste" command="cmd_paste"></menuitem>
+-        <menuitem data-l10n-id="text-action-delete" command="cmd_delete"></menuitem>
+-        <menuitem data-l10n-id="text-action-select-all" command="cmd_selectAll"></menuitem>
++        <menuitem data-l10n-id="text-action-cut" ${keyAttr("key_cut")} command="cmd_cut"></menuitem>
++        <menuitem data-l10n-id="text-action-copy" ${keyAttr("key_copy")} command="cmd_copy"></menuitem>
++        <menuitem data-l10n-id="text-action-paste" ${keyAttr("key_paste")} command="cmd_paste"></menuitem>
++        <menuitem data-l10n-id="text-action-delete" ${keyAttr("key_delete")} command="cmd_delete"></menuitem>
++        <menuitem data-l10n-id="text-action-select-all" ${keyAttr("key_selectAll")} command="cmd_selectAll"></menuitem>
+         <menuitem data-l10n-id="text-action-reveal-password" type="checkbox" id="textbox-contextmenu-reveal-password" />
+       </menupopup>
+     `)
+diff --git a/toolkit/content/widgets/moz-input-box.js b/toolkit/content/widgets/moz-input-box.js
+index 464afe979a..bd5495e02d 100644
+--- a/toolkit/content/widgets/moz-input-box.js
++++ b/toolkit/content/widgets/moz-input-box.js
+@@ -9,15 +9,18 @@
+ {
+   const cachedFragments = {
+     get editMenuItems() {
++      // A menu item names its shortcut through a key of this document's.
++      const keyAttr = id =>
++        document.getElementById(id) ? `key="${id}"` : "";
+       return `
+-      <menuitem data-l10n-id="text-action-undo" cmd="cmd_undo"></menuitem>
+-      <menuitem data-l10n-id="text-action-redo" cmd="cmd_redo"></menuitem>
++      <menuitem data-l10n-id="text-action-undo" ${keyAttr("key_undo")} cmd="cmd_undo"></menuitem>
++      <menuitem data-l10n-id="text-action-redo" ${keyAttr("key_redo")} cmd="cmd_redo"></menuitem>
+       <menuseparator></menuseparator>
+-      <menuitem data-l10n-id="text-action-cut" cmd="cmd_cut"></menuitem>
+-      <menuitem data-l10n-id="text-action-copy" cmd="cmd_copy"></menuitem>
+-      <menuitem data-l10n-id="text-action-paste" cmd="cmd_paste"></menuitem>
+-      <menuitem data-l10n-id="text-action-delete" cmd="cmd_delete"></menuitem>
+-      <menuitem data-l10n-id="text-action-select-all" cmd="cmd_selectAll"></menuitem>
++      <menuitem data-l10n-id="text-action-cut" ${keyAttr("key_cut")} cmd="cmd_cut"></menuitem>
++      <menuitem data-l10n-id="text-action-copy" ${keyAttr("key_copy")} cmd="cmd_copy"></menuitem>
++      <menuitem data-l10n-id="text-action-paste" ${keyAttr("key_paste")} cmd="cmd_paste"></menuitem>
++      <menuitem data-l10n-id="text-action-delete" ${keyAttr("key_delete")} cmd="cmd_delete"></menuitem>
++      <menuitem data-l10n-id="text-action-select-all" ${keyAttr("key_selectAll")} cmd="cmd_selectAll"></menuitem>
+     `;
+     },
+     get normal() {

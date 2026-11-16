@@ -1,0 +1,34 @@
+Sval: An open Favorite's switch-to-tab row wears the star
+
+A Favorite's page that is open in a tab is offered as a switch-to-tab row,
+which `UrlbarView` draws as `type="switchtab"` whatever the result's source,
+so the star its other rows wear (`favorites-history-rows.patch`) is lost.
+Favorites are not in Places, so no provider can say the page is one, and no
+API marks another component's row. The view marks the row from
+`SvalFavoritesProvider.nameOf`, and Sval's stylesheet draws the star.
+
+diff --git a/browser/components/urlbar/content/UrlbarView.mjs b/browser/components/urlbar/content/UrlbarView.mjs
+index 8afb2bf4a7..cb3abf5cb0 100644
+--- a/browser/components/urlbar/content/UrlbarView.mjs
++++ b/browser/components/urlbar/content/UrlbarView.mjs
+@@ -16,6 +16,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   L10nCache: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
+   ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
++  SvalFavoritesProvider:
++    "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
+   UrlbarProviderOpenTabs:
+     "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+@@ -2362,6 +2364,11 @@ export class UrlbarView {
+     );
+ 
+     item.toggleAttribute("pinned", !!result.payload.isPinned);
++    item.toggleAttribute(
++      "sval-favorite",
++      result.type == lazy.UrlbarUtils.RESULT_TYPE.TAB_SWITCH &&
++        lazy.SvalFavoritesProvider.nameOf(result.payload.url) !== null
++    );
+ 
+     let sponsored =
+       result.payload.isSponsored &&

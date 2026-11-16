@@ -1,0 +1,25 @@
+Sval: closing a window does not throw for a tab no extension was given
+
+The tab tracker's _handleWindowClose reports every tab of the closing window
+as removed, and getId gives a tab with no id one through setId, which throws
+"Cannot attach ID to a tab in a closed window." A tab has no id when no
+extension was handed it, as when the window opened before the tracker's
+first getId initialized it. Sval opens and closes windows for its
+workspaces, and its tests fail on the logged error.
+
+diff --git a/browser/components/extensions/parent/ext-browser.js b/browser/components/extensions/parent/ext-browser.js
+index 91adc6bc36..0ebbe903cc 100644
+--- a/browser/components/extensions/parent/ext-browser.js
++++ b/browser/components/extensions/parent/ext-browser.js
+@@ -660,7 +660,10 @@ class TabTracker extends TabTrackerBase {
+    */
+   _handleWindowClose(window) {
+     for (let nativeTab of window.gBrowser.tabs) {
+-      if (!this.adoptedTabs.has(nativeTab)) {
++      // A tab the tracker never gave an id was never handed to an extension,
++      // so there is no removal to report, and setId refuses a tab in a
++      // closed window.
++      if (!this.adoptedTabs.has(nativeTab) && this._tabs.has(nativeTab)) {
+         this.emitRemoved(nativeTab, true);
+       }
+     }

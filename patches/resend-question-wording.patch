@@ -1,0 +1,89 @@
+Sval: the resend question says what resending does, under its own title
+
+Reloading a page that came from a form asks before sending it again.
+Firefox's question names no action in plain words and, opened in a tab,
+takes the page's address as its title, which for a failed load is
+about:neterror. It passes useTitle, as Settings' own questions do, so the
+title is the question. Only asyncConfirmEx carries extra arguments through
+nsIPromptService, so the question is asked through it and waited on as
+Prompter.openPromptSync waits.
+
+diff --git a/browser/components/prompts/PromptCollection.sys.mjs b/browser/components/prompts/PromptCollection.sys.mjs
+index e0bfce3630..847ccd6301 100644
+--- a/browser/components/prompts/PromptCollection.sys.mjs
++++ b/browser/components/prompts/PromptCollection.sys.mjs
+@@ -22,9 +22,11 @@ export class PromptCollection {
+       // That's ok, we'll use a generic version of the prompt
+     }
+ 
++    let title;
+     let message;
+     let resendLabel;
+     try {
++      title = this.stringBundles.app.GetStringFromName("confirmRepostTitle");
+       if (brandName) {
+         message = this.stringBundles.app.formatStringFromName(
+           "confirmRepostPrompt",
+@@ -52,17 +54,34 @@ export class PromptCollection {
+         Ci.nsIPromptService.BUTTON_POS_0) |
+       (Ci.nsIPromptService.BUTTON_TITLE_CANCEL *
+         Ci.nsIPromptService.BUTTON_POS_1);
+-    let buttonPressed = Services.prompt.confirmExBC(
+-      browsingContext,
+-      modalType,
+-      null,
+-      message,
+-      buttonFlags,
+-      resendLabel,
+-      null,
+-      null,
+-      null,
+-      {}
++    let buttonPressed;
++    Services.prompt
++      .asyncConfirmEx(
++        browsingContext,
++        modalType,
++        title,
++        message,
++        buttonFlags,
++        resendLabel,
++        null,
++        null,
++        null,
++        false,
++        { useTitle: true }
++      )
++      .then(
++        result => {
++          buttonPressed = result
++            .QueryInterface(Ci.nsIPropertyBag2)
++            .get("buttonNumClicked");
++        },
++        () => {
++          buttonPressed = 1;
++        }
++      );
++    Services.tm.spinEventLoopUntilOrQuit(
++      "PromptCollection.sys.mjs:confirmRepost",
++      () => buttonPressed !== undefined
+     );
+ 
+     return buttonPressed === 0;
+diff --git a/browser/locales/en-US/chrome/overrides/appstrings.properties b/browser/locales/en-US/chrome/overrides/appstrings.properties
+index 95dbfa4872..cc582c23d7 100644
+--- a/browser/locales/en-US/chrome/overrides/appstrings.properties
++++ b/browser/locales/en-US/chrome/overrides/appstrings.properties
+@@ -15,9 +15,9 @@ connectionFailure=Sval can’t establish a connection to the server at %S.
+ netInterrupt=The connection to %S was interrupted while the page was loading.
+ netTimeout=The server at %S is taking too long to respond.
+ redirectLoop=Sval has detected that the server is redirecting the request for this address in a way that will never complete.
+-## LOCALIZATION NOTE (confirmRepostPrompt): In this item, don’t translate "%S"
+-confirmRepostPrompt=To display this page, %S must send information that will repeat any action (such as a search or order confirmation) that was performed earlier.
+-resendButton.label=Resend
++confirmRepostTitle=Send the form again?
++confirmRepostPrompt=Reloading this page sends what you entered again. If it placed an order or made a payment, that could happen twice.
++resendButton.label=Send Again
+ clientSocketMisconfiguration=Sval doesn’t know how to communicate with the server.
+ netReset=The connection to the server was reset while the page was loading.
+ notCached=This document is no longer available.

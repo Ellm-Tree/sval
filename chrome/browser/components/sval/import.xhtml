@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  Sval's import page (import spec §5), shown in the browser window's modal
+  dialog by `SvalImport.askImport`, whose box has no title bar, so the page
+  carries its own title. The sources are drawn by `import-picker.js` from
+  what the readers find.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Import from another browser</title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link rel="stylesheet" href="chrome://browser/content/sval/import.css" />
+    <link rel="stylesheet" href="chrome://browser/content/sval/card/card.css" />
+    <script src="chrome://browser/content/sval/import-picker.js"></script>
+    <script src="chrome://browser/content/sval/import.js"></script>
+  </head>
+
+  <!-- `SubDialog` makes the body the dialog; the page's title names it. -->
+  <body aria-labelledby="sval-im-title">
+    <form class="sval-im" aria-labelledby="sval-im-title">
+      <h2 class="sval-im-title" id="sval-im-title">
+        Import from another browser
+      </h2>
+      <div class="sval-im-picker"></div>
+      <!-- The import running and its result (messages spec §7), drawn by
+         - `import.js` in place of the picker. -->
+      <div class="sval-im-run" hidden="hidden">
+        <ul class="sval-im-progress" aria-label="Browsers"></ul>
+        <progress
+          class="sval-im-bar"
+          aria-label="Import progress"
+          value="0"
+          max="1"
+        ></progress>
+        <div class="sval-im-result"></div>
+        <!-- The card Arc gave its user, once it has come across. -->
+        <div class="sval-im-card" hidden="hidden">
+          <p class="sval-im-card-note">
+            Welcome to Sval! As an ode to Arc, your Arc card came with you, with
+            every year you spent there. We hope Sval makes the web as pleasant
+            as Arc did.
+          </p>
+        </div>
+      </div>
+      <p class="sval-im-said sval-visually-hidden" role="status"></p>
+      <div class="sval-im-actions">
+        <button class="sval-im-cancel" type="button">Cancel</button>
+        <button
+          class="sval-im-import primary"
+          type="submit"
+          disabled="disabled"
+        >
+          Import
+        </button>
+        <button class="sval-im-done primary" type="button" hidden="hidden">
+          Done
+        </button>
+      </div>
+    </form>
+  </body>
+</html>

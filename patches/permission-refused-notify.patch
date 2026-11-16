@@ -1,0 +1,45 @@
+Sval: notify a permission request refused by a block or a Block answer
+
+`PermissionPrompt.prompt` cancels a request whose permission is blocked for
+the site, by a saved choice, a tab's temporary block or the default, and a
+Block answer cancels it too, telling nothing else. Sval's site controls show
+that the page asked and was refused (`SvalSiteControls`), so both notify
+`sval-permission-refused` with the browser and the permission's key.
+
+diff --git a/browser/modules/PermissionUI.sys.mjs b/browser/modules/PermissionUI.sys.mjs
+index 13d67eec5b..1af134fd99 100644
+--- a/browser/modules/PermissionUI.sys.mjs
++++ b/browser/modules/PermissionUI.sys.mjs
+@@ -491,6 +491,7 @@ class PermissionPrompt {
+       );
+ 
+       if (state == lazy.SitePermissions.BLOCK) {
++        this.#notifyRefused();
+         this.cancel();
+         return;
+       }
+@@ -579,6 +580,7 @@ class PermissionPrompt {
+             if (promptAction.action == lazy.SitePermissions.ALLOW) {
+               this.allow();
+             } else {
++              this.#notifyRefused();
+               this.cancel();
+             }
+           } else if (this.permissionKey) {
+@@ -610,6 +612,16 @@ class PermissionPrompt {
+     this.#showNotification(popupNotificationActions);
+   }
+ 
++  // Sval: a request refused by a block or a Block answer tells the site
++  // controls, which show that the page asked.
++  #notifyRefused() {
++    Services.obs.notifyObservers(
++      this.browser,
++      "sval-permission-refused",
++      this.permissionKey
++    );
++  }
++
+   postPrompt() {
+     let browser = this.browser;
+     let principal = this.principal;

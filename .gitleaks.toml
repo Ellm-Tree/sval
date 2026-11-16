@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# gitleaks reads this from the root of the tree it scans (`gitleaks dir .` in
+# CI's secret scan).
+[extend]
+useDefault = true
+
+# Sval's HMAC tests build their fixed vectors as a short hex string repeated,
+# `"0123456789abcdef".repeat(4)`, so Sval and sval-mcp check the same bytes. The
+# generic-api-key rule reads those as keys. A repeated literal is a test
+# fixture by construction, never a credential.
+[[allowlists]]
+description = "repeated hex literals used as HMAC test vectors"
+regexTarget = "line"
+regexes = ['''"[0-9a-f]+"\.repeat\(\d+\)''']
+
+# A patch to Firefox's browser-sets carries its XUL `<key>` elements, whose
+# `id` and `data-l10n-id` attributes the generic-api-key rule reads as an
+# assignment to a key. A `<key id="...">` element names a keyboard shortcut.
+[[allowlists]]
+description = "XUL <key> elements in patches to Firefox's shortcut sets"
+regexTarget = "line"
+regexes = ['''^[ +-]?\s*<key id="[\w-]+"''']

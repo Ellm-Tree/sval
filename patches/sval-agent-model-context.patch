@@ -1,0 +1,151 @@
+Sval: expose WebMCP's modelContext only in agent tabs
+
+Gecko gates navigator.modelContext on one global pref, so turning it on would
+expose the API to every page in every workspace: a rare trait that marks Sval
+users to trackers, and an API that changes how sites behave in the user's own
+browsing. No chrome API can scope a WebIDL gate to a tab, so this adds a
+parent-only BrowsingContext field, SvalAgentTab, that Sval sets on agent tabs,
+and replaces the API's Pref= gates with a Func= check of the pref and the
+top-level context's flag.
+
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+index 55ef835c24..d2e6dfd57a 100644
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -160,6 +160,9 @@ struct EmbedderColorSchemes {
+   /* Whether this is a captive portal tab. Should be used on top level         \
+    * browsing contexts only */                                                 \
+   FIELD(IsCaptivePortalTab, bool, {.mCanSet = CanSet::Unrestricted})           \
++  /* Sval: whether this tab belongs to an agent's workspace. Set by the parent \
++   * on top level browsing contexts only. */                                   \
++  FIELD(SvalAgentTab, bool, {.mTopOnly = true, .mCanSet = CanSet::ParentOnly}) \
+   /* Whether there's more than 1 tab / toplevel browsing context in this       \
+    * parent window. Used to determine if a given BC is allowed to resize       \
+    * and/or move the window or not. */                                         \
+@@ -1203,6 +1206,7 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+   void AddDiscardListener(std::function<void(uint64_t)>&& aListener);
+ 
+   bool IsAppTab() { return GetIsAppTab(); }
++  bool SvalAgentTab() { return GetSvalAgentTab(); }
+   bool HasSiblings() { return GetHasSiblings(); }
+ 
+   bool IsUnderHiddenEmbedderElement() const {
+diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
+index 0b4c480a11..180cbdcd0c 100644
+--- a/docshell/base/CanonicalBrowsingContext.cpp
++++ b/docshell/base/CanonicalBrowsingContext.cpp
+@@ -306,6 +306,7 @@ void CanonicalBrowsingContext::ReplacedBy(
+   Transaction txn;
+   txn.SetBrowserId(GetBrowserId());
+   txn.SetIsAppTab(GetIsAppTab());
++  txn.SetSvalAgentTab(GetSvalAgentTab());
+   txn.SetIsCaptivePortalTab(GetIsCaptivePortalTab());
+   txn.SetHasSiblings(GetHasSiblings());
+   txn.SetTopLevelCreatedByWebContent(GetTopLevelCreatedByWebContent());
+diff --git a/dom/chrome-webidl/BrowsingContext.webidl b/dom/chrome-webidl/BrowsingContext.webidl
+index d0508a8c29..71cfb722df 100644
+--- a/dom/chrome-webidl/BrowsingContext.webidl
++++ b/dom/chrome-webidl/BrowsingContext.webidl
+@@ -164,6 +164,10 @@ interface BrowsingContext {
+    */
+   [SetterThrows] attribute boolean isAppTab;
+ 
++  // Sval: whether this tab belongs to an agent's workspace, which exposes
++  // the WebMCP API to its pages (ModelContext::IsExposed).
++  [SetterThrows] attribute boolean svalAgentTab;
++
+   /**
+    * Sets whether this is BC has siblings **at the toplevel** (e.g. in a tabbed
+    * browser environment). Used to determine if web content can resize the top
+diff --git a/dom/modelcontext/ModelContext.cpp b/dom/modelcontext/ModelContext.cpp
+index 9ef24efbab..2e1236b5f8 100644
+--- a/dom/modelcontext/ModelContext.cpp
++++ b/dom/modelcontext/ModelContext.cpp
+@@ -6,8 +6,10 @@
+ 
+ #include "js/JSON.h"
+ #include "jsapi.h"
++#include "mozilla/StaticPrefs_dom.h"
+ #include "mozilla/dom/AbortFollower.h"
+ #include "mozilla/dom/AbortSignal.h"
++#include "mozilla/dom/BrowsingContext.h"
+ #include "mozilla/dom/ModelContextBinding.h"
+ #include "mozilla/dom/ModelContextClient.h"
+ #include "mozilla/dom/Promise.h"
+@@ -15,6 +17,7 @@
+ #include "mozilla/dom/ScriptSettings.h"
+ #include "nsPIDOMWindow.h"
+ #include "nsPIDOMWindowInlines.h"
++#include "xpcpublic.h"
+ 
+ namespace mozilla::dom {
+ 
+@@ -49,6 +52,19 @@ ModelContext::ModelContext(nsPIDOMWindowInner* aWindow) : mWindow(aWindow) {
+   MOZ_ASSERT(aWindow);
+ }
+ 
++/* static */
++bool ModelContext::IsExposed(JSContext* aCx, JSObject* aGlobal) {
++  if (!StaticPrefs::dom_modelcontext_enabled()) {
++    return false;
++  }
++  nsPIDOMWindowInner* win = xpc::WindowOrNull(aGlobal);
++  if (!win) {
++    return false;
++  }
++  BrowsingContext* bc = win->GetBrowsingContext();
++  return bc && bc->Top()->GetSvalAgentTab();
++}
++
+ JSObject* ModelContext::WrapObject(JSContext* aCx,
+                                    JS::Handle<JSObject*> aGivenProto) {
+   return ModelContext_Binding::Wrap(aCx, this, aGivenProto);
+diff --git a/dom/modelcontext/ModelContext.h b/dom/modelcontext/ModelContext.h
+index 9d2e2a6ebb..a4cc6f2961 100644
+--- a/dom/modelcontext/ModelContext.h
++++ b/dom/modelcontext/ModelContext.h
+@@ -21,6 +21,10 @@ class Promise;
+ 
+ class ModelContext final : public nsISupports, public nsWrapperCache {
+  public:
++  // Sval: the API is exposed only while the pref is on, and only to pages
++  // whose top level browsing context is a tab of an agent's workspace.
++  static bool IsExposed(JSContext* aCx, JSObject* aGlobal);
++
+   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(ModelContext)
+ 
+diff --git a/dom/webidl/ModelContext.webidl b/dom/webidl/ModelContext.webidl
+index 943a1908f6..a8824c1f43 100644
+--- a/dom/webidl/ModelContext.webidl
++++ b/dom/webidl/ModelContext.webidl
+@@ -33,7 +33,7 @@ dictionary InvokeToolOptions {
+   AbortSignal signal;
+ };
+ 
+-[Exposed=Window, SecureContext, Pref="dom.modelcontext.enabled"]
++[Exposed=Window, SecureContext, Func="mozilla::dom::ModelContext::IsExposed"]
+ interface ModelContext {
+   [Throws] undefined registerTool(ModelContextTool tool);
+   [Throws] undefined unregisterTool(DOMString toolName);
+@@ -48,7 +48,7 @@ interface ModelContext {
+ };
+ 
+ 
+-[Exposed=Window, SecureContext, Pref="dom.modelcontext.enabled"]
++[Exposed=Window, SecureContext, Func="mozilla::dom::ModelContext::IsExposed"]
+ interface ModelContextClient {
+   [Throws] Promise<any> requestUserInteraction(UserInteractionCallback callback);
+ };
+diff --git a/dom/webidl/Navigator.webidl b/dom/webidl/Navigator.webidl
+index d586dc5e43..3746e80bbd 100644
+--- a/dom/webidl/Navigator.webidl
++++ b/dom/webidl/Navigator.webidl
+@@ -420,6 +420,6 @@ partial interface Navigator {
+ // Model Context API
+ [SecureContext]
+ partial interface Navigator {
+-  [SameObject, Pref="dom.modelcontext.enabled"]
++  [SameObject, Func="mozilla::dom::ModelContext::IsExposed"]
+   readonly attribute ModelContext modelContext;
+ };

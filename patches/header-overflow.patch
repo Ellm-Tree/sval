@@ -1,0 +1,192 @@
+Sval: overflow the header's controls in an order, and offer no customize mode from the overflow panel
+
+Sval's header is one row that gives its controls up one at a time as the
+window narrows: an item's overflowpriority says when it leaves, and the
+panel lists what left in the row's order. The navigation buttons and
+downloads can leave, so they lose `overflows="false"`, and the downloads
+panel opens from the overflow button while its button is there, as it does
+from the panel area. An item that appears or grows in the row resizes no
+window, so the toolbar watches its items' sizes too.
+
+Sval's header has a fixed layout and closes customize mode, so the overflow
+panel's footer and its items' context menu offer no "Customize Toolbar"
+item.
+
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index a919865fb9..1390dabc5d 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -131,14 +131,14 @@
+                      context="backForwardMenu"/>
+       <toolbarbutton id="forward-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
+                      data-l10n-id="toolbar-button-forward-2"
+-                     removable="false" overflows="false"
++                     removable="false"
+                      keepbroadcastattributeswhencustomizing="true"
+                      command="Browser:ForwardOrForwardDuplicate"
+                      tooltip="forward-button-tooltip"
+                      context="backForwardMenu"/>
+       <toolbaritem id="stop-reload-button" class="chromeclass-toolbar-additional"
+                    data-l10n-id="toolbar-button-stop-reload"
+-                   removable="true" overflows="false">
++                   removable="true">
+         <toolbarbutton id="reload-button" class="toolbarbutton-1"
+                        data-l10n-id="toolbar-button-reload"
+                        command="Browser:ReloadOrDuplicate"
+@@ -402,7 +402,6 @@
+                      key="key_openDownloads"
+                      data-l10n-id="navbar-downloads"
+                      removable="true"
+-                     overflows="false"
+                      cui-areatype="toolbar"
+                      hidden="true"
+                      tooltip="dynamic-shortcut-tooltip">
+diff --git a/browser/components/customizableui/CustomizableUI.sys.mjs b/browser/components/customizableui/CustomizableUI.sys.mjs
+index 5009406c82..cce04538c9 100644
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -7460,6 +7460,14 @@ class OverflowableToolbar {
+    */
+   #hideTimeoutId = null;
+ 
++  /**
++   * Checks for overflow when an item in the toolbar appears, grows or
++   * shrinks, which resizes no window.
++   *
++   * @type {ResizeObserver|null}
++   */
++  #itemResizeObserver = null;
++
+   /**
+    * Public methods start here.
+    */
+@@ -7554,6 +7562,15 @@ class OverflowableToolbar {
+ 
+     CustomizableUI.addListener(this);
+ 
++    // The check moves items, which resizes them, so it runs after the
++    // observer's notifications are delivered.
++    this.#itemResizeObserver = new window.ResizeObserver(() =>
++      Services.tm.dispatchToMainThread(() => this.#checkOverflow())
++    );
++    for (let child of this.#target.children) {
++      this.#itemResizeObserver.observe(child);
++    }
++
+     this.#checkOverflow();
+ 
+     this.#initialized = true;
+@@ -7587,6 +7604,7 @@ class OverflowableToolbar {
+ 
+     CustomizableUI.removeListener(this);
+     CustomizableUIInternal.removePanelCloseListeners(this.#defaultListPanel);
++    this.#itemResizeObserver.disconnect();
+   }
+ 
+   /**
+@@ -7803,9 +7821,17 @@ class OverflowableToolbar {
+ 
+     let webExtList = this.#webExtList;
+ 
+-    let child = this.#target.lastElementChild;
+-    while (child && isOverflowing) {
+-      let prevChild = child.previousElementSibling;
++    // Items leave from the end of the row, except that one with a lower
++    // overflowpriority leaves before one with a higher (0 without one).
++    let priority = node => parseInt(node.getAttribute("overflowpriority")) || 0;
++    let candidates = Array.from(this.#target.children)
++      .reverse()
++      .sort((a, b) => priority(a) - priority(b));
++    let placements = gPlacements.get(this.#toolbar.id);
++    for (let child of candidates) {
++      if (!isOverflowing) {
++        break;
++      }
+ 
+       if (child.getAttribute("overflows") != "false") {
+         this.#overflowedInfo.set(child.id, targetContentWidth);
+@@ -7832,16 +7858,17 @@ class OverflowableToolbar {
+           webExtList.insertBefore(child, webExtList.firstElementChild);
+         } else {
+           child.setAttribute("cui-anchorid", this.#defaultListButton.id);
+-          this.#defaultList.insertBefore(
+-            child,
+-            this.#defaultList.firstElementChild
++          // The panel lists the items in the row's order.
++          let index = placements.indexOf(child.id);
++          let next = Array.from(this.#defaultList.children).find(
++            node => placements.indexOf(node.id) > index
+           );
++          this.#defaultList.insertBefore(child, next ?? null);
+           if (!CustomizableUI.isSpecialWidget(child.id) && childWidth) {
+             this.#toolbar.setAttribute("overflowing", "true");
+           }
+         }
+       }
+-      child = prevChild;
+       ({ isOverflowing, targetContentWidth } = await this.#getOverflowInfo());
+       // Stop if the window has closed or if we re-enter while waiting for
+       // layout.
+@@ -8283,6 +8310,9 @@ class OverflowableToolbar {
+ 
+     let nowOverflowed = this.#isOverflowList(aNode.parentNode);
+     let wasOverflowed = this.#overflowedInfo.has(aNode.id);
++    if (aNode.parentNode == this.#target) {
++      this.#itemResizeObserver?.observe(aNode);
++    }
+ 
+     // If this wasn't overflowed before...
+     if (!wasOverflowed) {
+diff --git a/browser/components/customizableui/content/panelUI.inc.xhtml b/browser/components/customizableui/content/panelUI.inc.xhtml
+index 217c7ea41b..15479d94e7 100644
+--- a/browser/components/customizableui/content/panelUI.inc.xhtml
++++ b/browser/components/customizableui/content/panelUI.inc.xhtml
+@@ -18,11 +18,6 @@
+         <toolbarseparator id="widget-overflow-fixed-separator" hidden="true"/>
+         <vbox id="widget-overflow-fixed-list" class="widget-overflow-list" hidden="true" />
+       </vbox>
+-      <toolbarseparator />
+-      <toolbarbutton command="cmd_CustomizeToolbars"
+-                      id="overflowMenu-customize-button"
+-                      class="subviewbutton panel-subview-footer-button"
+-                      data-l10n-id="toolbar-overflow-customize-button"/>
+     </panelview>
+   </panelmultiview>
+   <!-- This menu is here because not having it in the menu in which it's used flickers
+@@ -54,10 +49,6 @@
+               closemenu="single"
+               class="customize-context-removeFromPanel"
+               data-lazy-l10n-id="toolbar-context-menu-remove-from-toolbar"/>
+-    <menuseparator/>
+-    <menuitem command="cmd_CustomizeToolbars"
+-              class="viewCustomizeToolbar"
+-              data-lazy-l10n-id="toolbar-context-menu-view-customize-toolbar"/>
+   </menupopup>
+ </panel>
+ 
+diff --git a/browser/components/downloads/content/indicator.js b/browser/components/downloads/content/indicator.js
+index 4826fc2600..ab35688797 100644
+--- a/browser/components/downloads/content/indicator.js
++++ b/browser/components/downloads/content/indicator.js
+@@ -76,7 +76,8 @@ const DownloadsButton = {
+     // Determine if the indicator is located on an invisible toolbar.
+     if (
+       !isElementVisible(indicator.parentNode) &&
+-      widget.areaType == CustomizableUI.TYPE_TOOLBAR
++      widget.areaType == CustomizableUI.TYPE_TOOLBAR &&
++      !widget.forWindow(window).overflowed
+     ) {
+       return null;
+     }
+@@ -627,7 +628,10 @@ const DownloadsIndicatorView = {
+ 
+   get indicatorAnchor() {
+     let widgetGroup = CustomizableUI.getWidget("downloads-button");
+-    if (widgetGroup.areaType == CustomizableUI.TYPE_PANEL) {
++    if (
++      widgetGroup.areaType == CustomizableUI.TYPE_PANEL ||
++      widgetGroup.forWindow(window).overflowed
++    ) {
+       let overflowIcon = widgetGroup.forWindow(window).anchor;
+       return overflowIcon.icon;
+     }

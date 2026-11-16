@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- Where a private window's Kagi search goes when this month's Privacy Pass
+   - tokens are used (Kagi Privacy Pass spec). It contacts nothing. -->
+<html lang="en" class="private">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title>Kagi searches used</title>
+    <link rel="stylesheet" href="chrome://browser/content/sval/home/home.css" />
+    <script defer src="chrome://browser/content/sval/kagi-tokens.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>This month's private Kagi searches are used</h1>
+      <p id="sval-kagi-tokens-reset">
+        Private windows sign in to Kagi with Privacy Pass, and Kagi allows a set
+        number each month.
+      </p>
+      <p>Normal windows still search Kagi as usual.</p>
+    </main>
+  </body>
+</html>

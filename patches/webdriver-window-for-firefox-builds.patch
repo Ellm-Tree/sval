@@ -1,0 +1,122 @@
+Sval: WebDriver opens a window in any build with Firefox's application ID
+
+WindowManager.openBrowserWindow, which WebDriver classic's NewWindow and
+BiDi's browsingContext.create({type: "window"}) both reach, switched on
+AppInfo.name and handled only "Firefox". Sval's name is "Sval", so every
+WebDriver client failed with "openWindow() not supported in Sval". The rest
+of the remote agent, opening and closing tabs among it, tests
+AppInfo.isFirefox, which compares the application ID that Sval keeps, and so
+does this. mozilla-central's openBrowserWindow is unchanged; drop the patch
+once Mozilla fixes it. No chrome API reaches inside the remote agent, so a
+patch is the only fix.
+
+diff --git a/remote/shared/WindowManager.sys.mjs b/remote/shared/WindowManager.sys.mjs
+index 86ddb7ec76..30f66fa96f 100644
+--- a/remote/shared/WindowManager.sys.mjs
++++ b/remote/shared/WindowManager.sys.mjs
+@@ -408,60 +408,58 @@ class WindowManager {
+       userContextId = null,
+     } = options;
+ 
+-    switch (lazy.AppInfo.name) {
+-      case "Firefox": {
+-        if (openerWindow === null) {
+-          // If no opener was provided, fallback to the topmost window.
+-          openerWindow = Services.wm.getMostRecentBrowserWindow();
+-        }
+-
+-        if (!openerWindow) {
+-          throw new lazy.error.UnsupportedOperationError(
+-            `openWindow() could not find a valid opener window`
+-          );
+-        }
++    // Every Firefox build has Firefox's application ID, whatever its name.
++    if (!lazy.AppInfo.isFirefox) {
++      throw new lazy.error.UnsupportedOperationError(
++        `openWindow() not supported in ${lazy.AppInfo.name}`
++      );
++    }
+ 
+-        // Open new browser window, and wait until it is fully loaded.
+-        // Also wait for the window to be focused and activated to prevent a
+-        // race condition when promptly focusing to the original window again.
+-        const browser = await new Promise(resolveOnContentBrowserCreated =>
+-          lazy.URILoadingHelper.openTrustedLinkIn(
+-            openerWindow,
+-            "about:blank",
+-            "window",
+-            {
+-              private: isPrivate,
+-              resolveOnContentBrowserCreated,
+-              userContextId:
+-                lazy.UserContextManager.getInternalIdById(userContextId),
+-            }
+-          )
+-        );
++    if (openerWindow === null) {
++      // If no opener was provided, fallback to the topmost window.
++      openerWindow = Services.wm.getMostRecentBrowserWindow();
++    }
+ 
+-        // TODO: Both for WebDriver BiDi and classic, opening a new window
+-        // should not run the focus steps. When focus is false we should avoid
+-        // focusing the new window completely. See Bug 1766329
++    if (!openerWindow) {
++      throw new lazy.error.UnsupportedOperationError(
++        `openWindow() could not find a valid opener window`
++      );
++    }
+ 
+-        if (focus) {
+-          // Focus the currently selected tab.
+-          browser.focus();
+-        } else {
+-          // If the new window shouldn't get focused, set the
+-          // focus back to the opening window.
+-          await this.focusWindow(openerWindow);
++    // Open new browser window, and wait until it is fully loaded.
++    // Also wait for the window to be focused and activated to prevent a
++    // race condition when promptly focusing to the original window again.
++    const browser = await new Promise(resolveOnContentBrowserCreated =>
++      lazy.URILoadingHelper.openTrustedLinkIn(
++        openerWindow,
++        "about:blank",
++        "window",
++        {
++          private: isPrivate,
++          resolveOnContentBrowserCreated,
++          userContextId:
++            lazy.UserContextManager.getInternalIdById(userContextId),
+         }
++      )
++    );
+ 
+-        const chromeWindow = browser.documentGlobal;
+-        await this.waitForChromeWindowLoaded(chromeWindow);
++    // TODO: Both for WebDriver BiDi and classic, opening a new window
++    // should not run the focus steps. When focus is false we should avoid
++    // focusing the new window completely. See Bug 1766329
++
++    if (focus) {
++      // Focus the currently selected tab.
++      browser.focus();
++    } else {
++      // If the new window shouldn't get focused, set the
++      // focus back to the opening window.
++      await this.focusWindow(openerWindow);
++    }
+ 
+-        return chromeWindow;
+-      }
++    const chromeWindow = browser.documentGlobal;
++    await this.waitForChromeWindowLoaded(chromeWindow);
+ 
+-      default:
+-        throw new lazy.error.UnsupportedOperationError(
+-          `openWindow() not supported in ${lazy.AppInfo.name}`
+-        );
+-    }
++    return chromeWindow;
+   }
+ 
+   supportsWindows() {

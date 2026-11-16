@@ -1,0 +1,42 @@
+Sval: a property list dictionary can be iterated
+
+PropertyListUtils returns each dictionary as a Proxy over a Map whose
+LazyMapProxyHandler serves get, has and delete itself and returns every
+other property straight from the target. Map's methods check their receiver,
+so keys(), values(), entries(), forEach() and for...of all throw "called on
+incompatible Proxy", and a dictionary whose keys are not known in advance
+cannot be read at all. Orion's favourites.plist is one: a dictionary of
+bookmarks keyed by id.
+
+The default case binds Map's methods to the target, resolving the pending
+lazy getters first so iteration yields values.
+
+diff --git a/toolkit/modules/PropertyListUtils.sys.mjs b/toolkit/modules/PropertyListUtils.sys.mjs
+index 9425b410cc..3f831caae8 100644
+--- a/toolkit/modules/PropertyListUtils.sys.mjs
++++ b/toolkit/modules/PropertyListUtils.sys.mjs
+@@ -868,8 +868,22 @@ function LazyMapProxyHandler() {
+           };
+         case "has":
+           return key => target.has(key);
+-        default:
+-          return target[name];
++        default: {
++          // Map's own methods throw unless called on a Map, and the proxy is
++          // not one, so they run on the target. Every lazy value is resolved
++          // first, so iterating the dictionary yields values, not getters.
++          const value = target[name];
++          if (typeof value != "function") {
++            return value;
++          }
++          return (...args) => {
++            for (const key of this._lazyGetters) {
++              target.set(key, target.get(key)());
++            }
++            this._lazyGetters.clear();
++            return value.apply(target, args);
++          };
++        }
+       }
+     },
+   };

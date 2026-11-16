@@ -1,0 +1,50 @@
+Sval: General's default-browser section holds Startup's settings
+
+Settings' General shows Firefox's default-browser group and, right under it,
+Firefox's Startup group, whose one setting Sval shows is the check for the
+default browser at launch: two sections about one thing. General's
+default-browser group takes the Startup group's items, which also carry
+Windows' launch at login, and General does not list the Startup group.
+Startup's restore choice stays hidden by its own setting, because Sval's
+workspaces decide what a launch reopens (Sval spec §10.4). The group's config
+is built in Firefox's file, so no added file can change it.
+
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index c0f096e1af..8a03f2679e 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -820,11 +820,14 @@ Preferences.addSetting({
+ let accountsEnabled = Services.prefs.getBoolPref("identity.fxaccounts.enabled");
+ 
+ SettingGroupManager.registerGroups({
+-  defaultBrowserSync: window.createDefaultBrowserConfig({
+-    includeIsDefaultPane: false,
+-    inProgress: true,
+-    hiddenFromSearch: true,
+-  }),
++  // Sval: General's one default-browser section, so it holds the items of
++  // Firefox's Startup group: the check for the default at launch and, on
++  // Windows, the launch at login. Startup's restore choice is hidden in Sval
++  // by its own setting.
++  defaultBrowserSync: (config => ({
++    ...config,
++    items: [...config.items, ...window.createStartupConfig().items],
++  }))(window.createDefaultBrowserConfig({ inProgress: true })),
+   accountDisabled: {
+     inProgress: true,
+     hidden: accountsEnabled,
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index fb9478e80d..8fe1be31c1 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -412,8 +412,8 @@ const CONFIG_PANES = Object.freeze({
+       "defaultBrowserSync",
+       // Sval: General holds what had categories of its own (Sval spec §10.8).
+       // Firefox Accounts and their sync are not part of Sval (Sval spec §10.9),
+-      // so their groups are not here.
+-      "startupHome",
++      // so their groups are not here. The default-browser group holds what
++      // Firefox's Startup group adds, so that group is not here either.
+       "browserLanguage",
+       "websiteLanguage",
+       "translations",

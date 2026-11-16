@@ -1,0 +1,980 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's dialog frame: every Sval dialog shown in a browser window's modal box
+ * (`gDialogBox`) wears it. An icon tile, a title and a body, then at most one
+ * of a field or a well of details, an optional checkbox, and the buttons at
+ * the end with the primary last.
+ *
+ * The values are the Sval browser design system's, as in `sval-header.css`:
+ * Sval's brand rather than Firefox's design tokens. The page is a document of
+ * its own, so it cannot see the browser window's root. `sval-dialog-frame.js`
+ * copies the window's tint, private and agent attributes onto this page's
+ * root, and the palettes below follow `sval-header.css`: light only for an
+ * untinted, non-private, non-agent window in the light theme; violet in a
+ * private window; the window's own colour in a tinted workspace, with the
+ * text, field and button colours `SvalColor` solves for it; navy otherwise.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-type.css");
+
+:root {
+  color-scheme: dark;
+  /* The card is a surface over the window's background
+   * (`sval-tokens.css`), which each palette below names. */
+  --sval-surface-ground: var(--sval-palette-ink-850);
+  --sval-surface-dark: 1;
+  --sval-dialog-card: var(--sval-surface);
+  --sval-dialog-border: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --sval-dialog-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), 0 12px 32px rgba(0, 0, 0, 0.4);
+  --sval-dialog-text: #ffffff;
+  --sval-dialog-body: var(--sval-palette-ink-300);
+  --sval-dialog-muted: var(--sval-palette-ink-400);
+  --sval-dialog-icon-bg: rgb(var(--sval-palette-wash-dark) / 0.12);
+  --sval-dialog-icon-ink: var(--sval-palette-ink-200);
+  --sval-dialog-iso-pill-ink: var(--sval-palette-ink-950);
+  --sval-dialog-field: rgba(6, 10, 46, 0.72);
+  --sval-dialog-field-border: var(--sval-palette-ink-400);
+  --sval-dialog-focus: var(--sval-palette-neon);
+  --sval-dialog-well: rgb(var(--sval-palette-wash-dark) / 0.06);
+  --sval-dialog-well-border: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-dialog-secondary: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-dialog-secondary-hover: rgb(var(--sval-palette-wash-dark) / 0.16);
+  --sval-dialog-secondary-ink: #ffffff;
+  --sval-dialog-primary: var(--sval-palette-blue);
+  --sval-dialog-primary-hover: var(--sval-palette-blue-600);
+  --sval-dialog-danger: var(--sval-palette-red);
+  --sval-dialog-danger-hover: #b0262f;
+  --sval-dialog-error: var(--sval-palette-red-invert);
+  --sval-dialog-danger-icon-bg: rgba(229, 72, 77, 0.16);
+  --sval-dialog-danger-icon-ink: var(--sval-palette-red-invert);
+  --sval-dialog-critical: #c8202d;
+  --sval-dialog-critical-hover: #b01e2a;
+  --sval-dialog-critical-warning: var(--sval-palette-red-invert);
+}
+
+/* The palettes below are Sval's, and give way to the system's colours under
+ * forced colours (high contrast, below). */
+@media not (forced-colors) {
+  @media (prefers-color-scheme: light) {
+    :root:not([privatebrowsingmode="temporary"], [data-sval-agent], [data-sval-tint]) {
+      color-scheme: light;
+      --sval-surface-ground: var(--sval-palette-frame-light);
+      --sval-surface-dark: 0;
+      --sval-dialog-border: rgb(var(--sval-palette-wash-light) / 0.14);
+      --sval-dialog-shadow: 0 40px 100px rgb(var(--sval-palette-wash-light) / 0.28), 0 12px 32px rgb(var(--sval-palette-wash-light) / 0.14);
+      --sval-dialog-text: var(--sval-palette-ink-950);
+      --sval-dialog-body: #3a4673;
+      --sval-dialog-muted: #525e91;
+      --sval-dialog-icon-bg: rgb(var(--sval-palette-wash-light) / 0.08);
+      --sval-dialog-icon-ink: var(--sval-palette-ink-700);
+      --sval-dialog-iso-pill-ink: #ffffff;
+      --sval-dialog-field: #ffffff;
+      --sval-dialog-field-border: var(--sval-palette-ink-500);
+      --sval-dialog-focus: var(--sval-palette-blue);
+      --sval-dialog-well: rgb(var(--sval-palette-wash-light) / 0.04);
+      --sval-dialog-well-border: rgb(var(--sval-palette-wash-light) / 0.1);
+      --sval-dialog-secondary: rgb(var(--sval-palette-wash-light) / 0.07);
+      --sval-dialog-secondary-hover: rgb(var(--sval-palette-wash-light) / 0.12);
+      --sval-dialog-secondary-ink: var(--sval-palette-ink-950);
+      --sval-dialog-danger: #d93a45;
+      --sval-dialog-danger-hover: var(--sval-palette-red);
+      --sval-dialog-error: #b0262f;
+      --sval-dialog-danger-icon-bg: rgba(217, 58, 69, 0.1);
+      --sval-dialog-danger-icon-ink: var(--sval-palette-red);
+      --sval-dialog-critical-warning: #b01e2a;
+    }
+  }
+
+  /* A tinted workspace's window: the card is the window's colour, with every
+ * colour drawn on it solved for it (`SvalColor`), which
+ * `sval-dialog-frame.js` copies here. Its washes, shadows and alert inks
+ * follow the side its text is on (`data-sval-ink`). */
+  :root[data-sval-tint] {
+    --sval-surface-ground: var(--sval-tint);
+    --sval-dialog-card: var(--sval-tint);
+    --sval-dialog-text: var(--sval-tint-strong);
+    --sval-dialog-body: var(--sval-tint-body);
+    --sval-dialog-muted: var(--sval-tint-muted);
+    --sval-dialog-field: var(--sval-tint-field);
+    --sval-dialog-field-text: var(--sval-tint-field-ink);
+    --sval-dialog-field-border: var(--sval-tint-line);
+    --sval-dialog-focus: var(--sval-tint-focus);
+    --sval-dialog-secondary: var(--sval-tint-secondary);
+    --sval-dialog-secondary-ink: var(--sval-tint-secondary-ink);
+    --sval-dialog-secondary-hover: color-mix(in oklab, var(--sval-tint-secondary) 88%, var(--sval-dialog-text));
+  }
+
+  /* The error ink takes a paler red to keep 4.5:1 on the lightest of the
+ * cards light text is drawn on. */
+  :root[data-sval-ink="light"] {
+    color-scheme: dark;
+    --sval-surface-dark: 1;
+    --sval-dialog-error: #ffd0d3;
+  }
+
+  :root[data-sval-ink="dark"] {
+    color-scheme: light;
+    --sval-surface-dark: 0;
+    --sval-dialog-border: rgb(var(--sval-palette-wash-light) / 0.14);
+    --sval-dialog-shadow: 0 40px 100px rgb(var(--sval-palette-wash-light) / 0.28), 0 12px 32px rgb(var(--sval-palette-wash-light) / 0.14);
+    --sval-dialog-icon-bg: rgb(var(--sval-palette-wash-light) / 0.08);
+    --sval-dialog-icon-ink: var(--sval-palette-ink-700);
+    --sval-dialog-iso-pill-ink: #ffffff;
+    --sval-dialog-well: rgb(var(--sval-palette-wash-light) / 0.06);
+    --sval-dialog-well-border: rgb(var(--sval-palette-wash-light) / 0.14);
+    --sval-dialog-danger: var(--sval-palette-red);
+    --sval-dialog-danger-hover: #b0262f;
+    --sval-dialog-error: #7a1820;
+    --sval-dialog-danger-icon-bg: rgba(217, 58, 69, 0.12);
+    --sval-dialog-danger-icon-ink: #a5212a;
+    --sval-dialog-critical-warning: #7a1820;
+  }
+
+  /* A private window's violet, from `sval-header.css`. */
+  :root[privatebrowsingmode="temporary"] {
+    --sval-surface-ground: #1a0e45;
+    --sval-surface-dark: 1;
+    --sval-dialog-border: rgba(166, 140, 255, 0.18);
+    --sval-dialog-shadow: 0 40px 100px rgba(6, 3, 26, 0.6), 0 12px 32px rgba(6, 3, 26, 0.4);
+    --sval-dialog-body: #cfc8f0;
+    --sval-dialog-muted: #a79fd0;
+    --sval-dialog-icon-bg: rgba(166, 140, 255, 0.14);
+    --sval-dialog-icon-ink: #e2dcff;
+    --sval-dialog-iso-pill-ink: #140a34;
+    --sval-dialog-field: rgba(6, 3, 26, 0.72);
+    --sval-dialog-field-border: #a79fd0;
+    --sval-dialog-well: rgba(166, 140, 255, 0.06);
+    --sval-dialog-well-border: rgba(166, 140, 255, 0.12);
+    --sval-dialog-secondary: rgba(166, 140, 255, 0.14);
+    --sval-dialog-secondary-hover: rgba(166, 140, 255, 0.22);
+    --sval-dialog-primary: #6a55d6;
+    --sval-dialog-primary-hover: #5a46c4;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--sval-dialog-card);
+}
+
+/* The frame's parts set their own display, which `hidden` must still win. */
+.sval-dialog [hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ the frame */
+
+.sval-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+  width: 400px;
+  max-width: 100vw;
+  /* `.dialogFrame`'s default width is in ems of the window's font, which on
+   * some platforms is wider than the card, and `SubDialog` only widens the
+   * frame from there. The card fills it so no band of page shows beside it. */
+  min-width: 100%;
+  margin: 0;
+  padding: 24px;
+  border: 1px solid var(--sval-dialog-border);
+  border-radius: 20px;
+  background: var(--sval-dialog-card);
+  color: var(--sval-dialog-text);
+  font: 400 14px/1.5 var(--sval-font);
+  animation: sval-dialog-in 160ms ease-out;
+}
+
+/* A fade only: a button that moved while it appeared could take a click
+ * meant for the spot it was in. */
+@keyframes sval-dialog-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sval-dialog {
+    animation: none;
+  }
+}
+
+.sval-dialog-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.sval-dialog-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--sval-dialog-icon-bg);
+  color: var(--sval-dialog-icon-ink);
+
+  &::before {
+    content: "";
+    width: 20px;
+    height: 20px;
+    background: var(--sval-dialog-icon) center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  &[data-icon="pencil"] {
+    --sval-dialog-icon: url("chrome://browser/content/sval/dialog-icons/pencil.svg");
+  }
+
+  &[data-icon="trash"] {
+    --sval-dialog-icon: url("chrome://browser/content/sval/dialog-icons/trash-2.svg");
+  }
+
+  &[data-icon="agent"] {
+    --sval-dialog-icon: url("chrome://browser/content/sval/agent-robot.svg");
+  }
+
+  &[data-icon="key"] {
+    --sval-dialog-icon: url("chrome://browser/content/sval/icons/key-round.svg");
+  }
+
+  &[data-icon="sval"] {
+    --sval-dialog-icon: url("chrome://browser/content/sval/sval-glyph.svg");
+  }
+
+  &[data-icon="critical"] {
+    --sval-dialog-icon: url("chrome://browser/content/sval/sync-icons/critical.svg");
+  }
+}
+
+.sval-dialog[data-tone="danger"] .sval-dialog-icon {
+  background: var(--sval-dialog-danger-icon-bg);
+  color: var(--sval-dialog-danger-icon-ink);
+}
+
+.sval-dialog-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.sval-dialog-title {
+  margin: 0;
+  font: 600 17px/1.3 var(--sval-font);
+  color: var(--sval-dialog-text);
+  overflow-wrap: anywhere;
+}
+
+.sval-dialog-body {
+  margin: 0;
+  color: var(--sval-dialog-body);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.sval-dialog-warning {
+  margin: 0;
+  font-weight: 700;
+  color: var(--sval-dialog-critical-warning);
+  overflow-wrap: anywhere;
+}
+
+/* The ✕, which answers as Escape does. */
+.sval-dialog-close {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -4px -4px 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-dialog-muted);
+  cursor: pointer;
+
+  &::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    background: url("chrome://browser/content/sval/icons/x.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  &:hover {
+    background: var(--sval-dialog-secondary-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-dialog-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------ critical */
+
+/* Messages spec §9.3: a wider card with a red edge and glow, a solid red
+ * title band holding a white octagon and the title, and the body under it. */
+.sval-dialog[data-tone="critical"] {
+  --sval-dialog-shadow: 0 0 0 1px rgba(200, 32, 45, 0.7), 0 0 48px rgba(200, 32, 45, 0.45), 0 40px 100px rgba(0, 0, 0, 0.6);
+  --sval-dialog-width: 440px;
+  width: var(--sval-dialog-width);
+  padding: 0 0 24px;
+  border-color: var(--sval-dialog-critical);
+  border-radius: 18px;
+  overflow: hidden;
+  font-size: 15px;
+
+  > :not(.sval-dialog-head) {
+    margin-inline: 24px;
+  }
+
+  /* The warning reads as the body's second line. */
+  > .sval-dialog-warning {
+    margin-top: -12px;
+  }
+
+  .sval-dialog-head {
+    align-items: center;
+    padding: 18px 20px 18px 24px;
+    background: var(--sval-dialog-critical);
+    color: #ffffff;
+  }
+
+  .sval-dialog-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 0;
+    background: transparent;
+    color: #ffffff;
+
+    &::before {
+      width: 36px;
+      height: 36px;
+    }
+  }
+
+  .sval-dialog-copy {
+    padding-top: 0;
+  }
+
+  .sval-dialog-title {
+    font: 700 21px/1.25 var(--sval-font);
+    color: #ffffff;
+  }
+
+  .sval-dialog-body {
+    color: var(--sval-dialog-text);
+  }
+
+  .sval-dialog-close {
+    margin: 0 0 0 auto;
+    color: #ffffff;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    &:focus-visible {
+      outline-color: #ffffff;
+    }
+  }
+
+  .sval-dialog-btn.primary {
+    background: var(--sval-dialog-critical);
+    box-shadow: none;
+
+    &:hover:not(:disabled) {
+      background: var(--sval-dialog-critical-hover);
+    }
+  }
+}
+
+/* ------------------------------------------------------------ the field */
+
+.sval-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sval-dialog-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sval-dialog-muted);
+}
+
+.sval-dialog-input {
+  appearance: none;
+  box-sizing: border-box;
+  height: 44px;
+  margin: 0;
+  padding: 0 18px;
+  border: 1px solid var(--sval-dialog-field-border);
+  border-radius: 999px;
+  background: var(--sval-dialog-field);
+  color: var(--sval-dialog-field-text, var(--sval-dialog-text));
+  font: 400 15px var(--sval-font);
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--sval-dialog-focus);
+    box-shadow: 0 0 0 1px var(--sval-dialog-focus);
+  }
+}
+
+.sval-dialog-error {
+  font-size: 13px;
+  color: var(--sval-dialog-error);
+
+  &:empty {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------ the well */
+
+.sval-dialog-well {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sval-dialog-well-border);
+  border-radius: 14px;
+  background: var(--sval-dialog-well);
+  font-size: 13px;
+  line-height: 1.45;
+
+  /* A rule between the well's rows. */
+  > * + * {
+    padding-top: 12px;
+    border-top: 1px solid var(--sval-dialog-well-border);
+  }
+}
+
+/* The pairing alert's request line, with the pill when the answer isolates. */
+.sval-ap-request {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--sval-dialog-text);
+
+  > span:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.sval-dialog-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sval-dialog-well-border);
+  border-radius: 14px;
+  background: var(--sval-dialog-well);
+  font-size: 13px;
+  line-height: 1.4;
+
+  > dt {
+    min-width: 52px;
+    color: var(--sval-dialog-muted);
+  }
+
+  > dd {
+    margin: 0;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* A list in the same well, for what an agent's alert names. */
+.sval-dialog-list {
+  margin: 0;
+  padding: 12px 14px 12px 32px;
+  border: 1px solid var(--sval-dialog-well-border);
+  border-radius: 14px;
+  background: var(--sval-dialog-well);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------ the checkbox */
+
+.sval-dialog-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+
+  > input {
+    appearance: none;
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 1.5px solid var(--sval-dialog-field-border);
+    border-radius: 6px;
+    background: var(--sval-dialog-field);
+
+    &:checked {
+      border-color: var(--sval-dialog-primary);
+      background: var(--sval-dialog-primary);
+
+      &::before {
+        content: "";
+        width: 14px;
+        height: 14px;
+        background: url("chrome://browser/content/sval/dialog-icons/check.svg") center / contain no-repeat;
+        -moz-context-properties: fill;
+        fill: #ffffff;
+      }
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--sval-dialog-focus);
+      outline-offset: 2px;
+    }
+  }
+}
+
+/* A radio in the checkbox's row: the same field, round, with a dot. */
+.sval-dialog-check > input[type="radio"] {
+  border-radius: 50%;
+
+  &:checked {
+    background: radial-gradient(circle, #ffffff 0 4px, var(--sval-dialog-primary) 4.5px);
+
+    &::before {
+      content: none;
+    }
+  }
+}
+
+/* A group of radios in a well, under its title. A floated legend is laid
+ * out inside the box, so the well's border stays whole. */
+fieldset.sval-dialog-well {
+  min-width: 0;
+  margin: 0;
+  gap: 10px;
+
+  > legend {
+    float: left;
+    width: 100%;
+    padding: 0;
+  }
+}
+
+/* A checkbox that heads a well: a title line, then a line explaining it. The
+ * whole row toggles the box. */
+.sval-dialog-well-check {
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sval-dialog-well-border);
+  border-radius: 14px;
+  background: var(--sval-dialog-well);
+
+  > input {
+    margin-top: 1px;
+  }
+}
+
+.sval-dialog-check-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-dialog-check-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sval-dialog-text);
+}
+
+.sval-dialog-check-note {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sval-dialog-body);
+}
+
+/* The box that marks an isolated workspace (isolated workspaces spec §10),
+ * alone and in its "Isolated" pill. */
+.sval-dialog-iso-glyph,
+.sval-dialog-iso-pill::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: url("chrome://browser/content/sval/workspace-isolated.svg") center / contain no-repeat;
+}
+
+.sval-dialog-iso-glyph {
+  color: var(--sval-dialog-icon-ink);
+}
+
+.sval-dialog-iso-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px 0 5px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--sval-dialog-icon-ink);
+  color: var(--sval-dialog-iso-pill-ink);
+
+  &::before {
+    width: 11px;
+    height: 11px;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------ the buttons */
+
+.sval-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Answers too many or too long for one row, one per line. */
+.sval-dialog-actions-stacked {
+  flex-direction: column;
+  align-items: stretch;
+
+  > .sval-dialog-btn {
+    height: auto;
+    min-height: 40px;
+    padding-block: 9px;
+    line-height: 1.3;
+  }
+}
+
+/* A third answer, such as "Move out of group", sits apart at the start. */
+.sval-dialog-actions > .sval-dialog-extra {
+  margin-inline-end: auto;
+}
+
+.sval-dialog-btn {
+  appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 40px;
+  margin: 0;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sval-dialog-secondary);
+  color: var(--sval-dialog-secondary-ink);
+  font: 600 14px var(--sval-font);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--sval-dialog-secondary-hover);
+  }
+
+  &.primary {
+    padding: 0 20px;
+    background: var(--sval-dialog-primary);
+    color: #ffffff;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--sval-dialog-primary) 35%, transparent);
+
+    &:hover:not(:disabled) {
+      background: var(--sval-dialog-primary-hover);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-dialog-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-dialog[data-tone="danger"] .sval-dialog-btn.primary {
+  background: var(--sval-dialog-danger);
+  box-shadow: none;
+
+  &:hover:not(:disabled) {
+    background: var(--sval-dialog-danger-hover);
+  }
+}
+
+/* A line under the buttons, such as why Allow is not yet enabled. */
+.sval-dialog-note {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: var(--sval-dialog-muted);
+  text-align: end;
+}
+
+/* ------------------------------------------------------------ the scope menu */
+
+/* "Remember for [host]": where an agent's answer is saved (host-scoped rules
+ * spec §4). The menu opens in the card's flow, under its button, since the
+ * dialog's frame clips anything drawn past the card. */
+.sval-dialog-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sval-dialog-scope-label {
+  flex: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sval-dialog-body);
+}
+
+.sval-dialog-scope-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0 6px 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sval-dialog-secondary);
+  color: var(--sval-dialog-text);
+  font: 600 13px var(--sval-font);
+  cursor: pointer;
+
+  &:hover,
+  &[aria-expanded="true"] {
+    background: var(--sval-dialog-secondary-hover);
+  }
+
+  &[aria-expanded="true"] {
+    box-shadow: inset 0 0 0 1px var(--sval-dialog-muted);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-dialog-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-dialog-scope-value {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sval-dialog-scope-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg") center / 14px no-repeat;
+}
+
+.sval-dialog-scope-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 250px;
+  max-width: 100%;
+  margin-top: -12px;
+  padding: 6px;
+  border: 1px solid var(--sval-dialog-border);
+  border-radius: 16px;
+  background: var(--sval-dialog-card);
+  outline: none;
+}
+
+.sval-dialog-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  &[aria-selected="true"],
+  &[data-active] {
+    background: var(--sval-dialog-secondary);
+  }
+
+  .sval-dialog-scope-menu:focus-visible > &[data-active] {
+    outline: 2px solid var(--sval-dialog-focus);
+    outline-offset: -2px;
+  }
+}
+
+.sval-dialog-scope-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: url("chrome://browser/content/sval/dialog-icons/check.svg") center / 16px no-repeat;
+  -moz-context-properties: fill;
+  fill: currentColor;
+  visibility: hidden;
+
+  [aria-selected="true"] > & {
+    visibility: visible;
+  }
+}
+
+.sval-dialog-scope-words {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sval-dialog-scope-name {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.sval-dialog-scope-sub {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--sval-dialog-muted);
+}
+
+/* ------------------------------------------------------------ high contrast */
+
+/* Windows high contrast. A dialog is a chrome document, which a
+ * high-contrast theme leaves uncoloured and only `requested`
+ * (`nsPresContext::UpdateForcedColors`): `(forced-colors)` matches that and
+ * `(forced-colors: active)` does not. So the card picks the system's colours
+ * itself: Canvas for the card, Field for the field, and for the buttons
+ * the pairs Firefox's tokens give a button (`tokens-shared.css`, forced
+ * colours), the primary in ButtonText, hover in SelectedItemText with
+ * SelectedItem ink, disabled in GrayText. A Windows high-contrast theme
+ * replaces the light system colours (`PreferenceSheet::Prefs::Load`), so the
+ * card takes the light scheme. */
+@media (forced-colors) {
+  :root {
+    color-scheme: light;
+    --sval-dialog-card: Canvas;
+    --sval-dialog-border: CanvasText;
+    --sval-dialog-shadow: none;
+    --sval-dialog-text: CanvasText;
+    --sval-dialog-body: CanvasText;
+    --sval-dialog-muted: CanvasText;
+    --sval-dialog-icon-bg: Canvas;
+    --sval-dialog-icon-ink: CanvasText;
+    --sval-dialog-iso-pill-ink: Canvas;
+    --sval-dialog-field: Field;
+    --sval-dialog-field-border: ButtonText;
+    --sval-dialog-focus: CanvasText;
+    --sval-dialog-well: Canvas;
+    --sval-dialog-well-border: CanvasText;
+    --sval-dialog-secondary: ButtonFace;
+    --sval-dialog-secondary-hover: SelectedItemText;
+    --sval-dialog-secondary-ink: ButtonText;
+    --sval-dialog-primary: ButtonText;
+    --sval-dialog-primary-hover: SelectedItemText;
+    --sval-dialog-danger: ButtonText;
+    --sval-dialog-danger-hover: SelectedItemText;
+    --sval-dialog-error: CanvasText;
+    --sval-dialog-danger-icon-bg: Canvas;
+    --sval-dialog-danger-icon-ink: CanvasText;
+    --sval-dialog-critical: ButtonText;
+    --sval-dialog-critical-hover: SelectedItemText;
+    --sval-dialog-critical-warning: CanvasText;
+  }
+
+  /* The band takes the card's colours, ruled off from the body. */
+  .sval-dialog[data-tone="critical"] {
+    .sval-dialog-head {
+      border-bottom: 1px solid CanvasText;
+      background: Canvas;
+    }
+
+    .sval-dialog-icon,
+    .sval-dialog-title,
+    .sval-dialog-close {
+      color: CanvasText;
+    }
+  }
+
+  .sval-dialog-btn {
+    border: 1px solid ButtonText;
+    box-shadow: none;
+
+    &.primary {
+      border-color: ButtonFace;
+      color: ButtonFace;
+      box-shadow: none;
+    }
+
+    &:hover:not(:disabled) {
+      border-color: SelectedItem;
+      color: SelectedItem;
+    }
+  }
+
+  /* As specific as the danger primary's fill, so a disabled one shows as
+   * disabled too. GrayText is drawn on Canvas, the pair a high-contrast theme
+   * keeps apart; ButtonFace can be as translucent as GrayText (macOS's
+   * `controlColor`), which leaves the label invisible. */
+  .sval-dialog .sval-dialog-btn.primary:disabled,
+  .sval-dialog-btn:disabled {
+    opacity: 1;
+    border-color: GrayText;
+    background: Canvas;
+    color: GrayText;
+  }
+
+  .sval-dialog-input {
+    color: FieldText;
+
+    &:focus-visible {
+      outline: 2px solid CanvasText;
+      outline-offset: 2px;
+    }
+  }
+
+  .sval-dialog-check input:checked::before {
+    fill: ButtonFace;
+  }
+}

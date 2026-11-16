@@ -1,0 +1,385 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* The Downloads panel in Sval's popup style, with the workspace views
+   (`SvalDownloadsPanel`). Loaded into a window when its panel is first set
+   up. Its sizes and colours are Sval's design system's own values
+   (`sval-tokens.css`), which are Sval's brand rather than Firefox's design
+   tokens. Its accent, `--sval-dl-accent`, is the window's (`sval-header.css`). */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+#downloadsPanel {
+  --sval-dl-surface: light-dark(#ffffff, rgba(10, 17, 64, 0.97));
+  --sval-dl-border: light-dark(rgb(var(--sval-palette-wash-light) / 0.14), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-dl-text: light-dark(var(--sval-palette-ink-950), #ffffff);
+  --sval-dl-muted: light-dark(var(--sval-palette-ink-500), var(--sval-palette-ink-400));
+  --sval-dl-label: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  --sval-dl-hover: light-dark(rgb(var(--sval-palette-wash-light) / 0.08), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-dl-track: light-dark(rgb(var(--sval-palette-wash-light) / 0.06), rgb(var(--sval-palette-wash-dark) / 0.06));
+  --sval-dl-selected: light-dark(#ffffff, rgb(var(--sval-palette-wash-dark) / 0.16));
+  --sval-dl-selected-shadow: light-dark(0 1px 2px rgb(var(--sval-palette-wash-light) / 0.16), 0 0 0 1px rgb(var(--sval-palette-wash-light) / 0.08));
+  --sval-dl-selected-ink: light-dark(var(--sval-palette-ink-950), #ffffff);
+  --sval-dl-segment-ink: light-dark(#3a4673, var(--sval-palette-ink-300));
+  --sval-dl-tile: light-dark(rgb(var(--sval-palette-wash-light) / 0.08), rgb(var(--sval-palette-wash-dark) / 0.12));
+  --sval-dl-progress-track: light-dark(rgb(var(--sval-palette-wash-light) / 0.12), rgb(var(--sval-palette-wash-dark) / 0.16));
+  --sval-dl-danger: light-dark(var(--sval-palette-red), var(--sval-palette-red-invert));
+  --sval-dl-secondary: light-dark(rgb(var(--sval-palette-wash-light) / 0.07), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-dl-disc-mix: light-dark(24%, 30%);
+  --panel-background: var(--sval-dl-surface);
+  --panel-border-color: var(--sval-dl-border);
+  --panel-box-shadow: var(--sval-popup-shadow);
+  --panel-border-radius: 20px;
+  --panel-color: var(--sval-dl-text);
+}
+
+#downloadsPanel-mainView {
+  width: 400px;
+  padding: 6px;
+  font-family: var(--sval-font);
+}
+
+#sval-downloads-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  height: 32px;
+  box-sizing: border-box;
+  margin: 2px 2px 6px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--sval-dl-track);
+}
+
+.sval-downloads-view {
+  appearance: none;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-dl-segment-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &[aria-checked="true"] {
+    background: var(--sval-dl-selected);
+    box-shadow: var(--sval-dl-selected-shadow);
+    color: var(--sval-dl-selected-ink);
+    font-weight: 600;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-dl-accent);
+    outline-offset: -2px;
+  }
+}
+
+/* Rows: one height in both views. */
+#downloadsListBox > richlistitem {
+  min-height: 56px;
+  height: 56px;
+  margin: 0 0 2px;
+  padding: 0 6px 0 10px;
+  border-radius: 14px;
+  position: relative;
+
+  &:hover {
+    background-color: var(--sval-dl-hover);
+  }
+
+  & .downloadMainArea {
+    gap: 12px;
+  }
+
+  & .downloadTypeIcon {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+  }
+
+  & .downloadTarget {
+    color: var(--sval-dl-text);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+  }
+
+  & .downloadDetails {
+    color: var(--sval-dl-muted);
+    font-size: 12px;
+    line-height: 16px;
+    margin-top: 2px;
+    opacity: 1;
+  }
+
+  & .downloadProgress {
+    position: absolute;
+    inset-inline: 54px 50px;
+    bottom: 5px;
+    height: 3px;
+    margin: 0;
+    border-radius: 2px;
+    background: var(--sval-dl-progress-track);
+
+    &::-moz-progress-bar {
+      border-radius: 2px;
+      background: var(--sval-dl-accent);
+    }
+  }
+
+  & .downloadButton {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+  }
+}
+
+.sval-downloads-remove {
+  appearance: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: url("chrome://global/skin/icons/close.svg") center / 14px no-repeat;
+  -moz-context-properties: fill;
+  fill: var(--sval-dl-muted);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--sval-dl-hover);
+    fill: var(--sval-dl-text);
+  }
+
+  /* A download that has not stopped keeps its cancel button alone
+     (`DownloadsViewUI.DownloadElementShell`). */
+  richlistitem:is([state="-1"], [state="0"]) > & {
+    display: none;
+  }
+}
+
+/* Under All Workspaces, the workspace a row is from leads its status line. */
+.downloadContainer:has(> .sval-downloads-from) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+
+  & > .downloadTarget,
+  & > .downloadProgress {
+    grid-column: 1 / -1;
+  }
+
+  & > .sval-downloads-from {
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  & > .downloadDetails {
+    grid-row: 2;
+    grid-column: 2;
+    min-width: 0;
+  }
+}
+
+.sval-downloads-from {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 132px;
+  margin-top: 2px;
+  color: var(--sval-dl-label);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+
+  &::after {
+    content: "·";
+    padding: 0 5px;
+    color: var(--sval-dl-muted);
+    font-weight: 400;
+  }
+}
+
+.sval-downloads-from-name {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  .sval-downloads-from:is([data-kind="deleted"], [data-kind="unknown"]) > & {
+    font-style: italic;
+    font-weight: 500;
+  }
+}
+
+.sval-downloads-from-disc {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sval-dl-tile);
+  font-size: 10px;
+  line-height: 1;
+
+  .sval-downloads-from[data-color] > & {
+    background: color-mix(in srgb, var(--sval-dl-from-color) var(--sval-dl-disc-mix), transparent);
+  }
+
+  .sval-downloads-from:is([data-kind="agent"], [data-kind="deleted"]) > &::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background-color: var(--sval-dl-label);
+    mask: url("chrome://browser/content/sval/agent-robot.svg") center / contain no-repeat;
+  }
+
+  .sval-downloads-from[data-kind="deleted"] > &::before {
+    width: 9px;
+    height: 9px;
+    mask: none;
+    background: url("chrome://browser/content/sval/dialog-icons/trash-2.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: var(--sval-dl-label);
+  }
+}
+
+#sval-downloads-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 24px 26px;
+  text-align: center;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-downloads-empty-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--sval-dl-tile);
+
+  &::before {
+    content: "";
+    display: block;
+    width: 20px;
+    height: 20px;
+    margin: 10px;
+    background-color: var(--sval-dl-label);
+    mask: url("chrome://browser/skin/downloads/downloads.svg") center / contain no-repeat;
+  }
+}
+
+.sval-downloads-empty-title {
+  color: var(--sval-dl-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sval-downloads-empty-body {
+  max-width: 280px;
+  color: var(--sval-dl-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sval-downloads-empty-show {
+  appearance: none;
+  height: 32px;
+  margin: 10px 0 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sval-dl-secondary);
+  color: var(--sval-dl-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-dl-accent);
+  }
+}
+
+#downloadsFooterButtons {
+  flex-flow: row wrap;
+  gap: 0 4px;
+
+  & > toolbarseparator {
+    flex-basis: 100%;
+    margin: 6px 4px;
+    border-color: var(--sval-dl-border);
+  }
+
+  & > :is(#downloadsHistory, #sval-downloads-clear) {
+    flex: 1 1 0;
+    min-height: 40px;
+    margin: 0;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 500;
+    justify-content: center;
+  }
+}
+
+@media (forced-colors) {
+  #downloadsPanel {
+    --sval-dl-surface: Canvas;
+    --sval-dl-border: CanvasText;
+    --panel-box-shadow: none;
+    --sval-dl-text: CanvasText;
+    --sval-dl-muted: CanvasText;
+    --sval-dl-label: CanvasText;
+    --sval-dl-track: Canvas;
+    --sval-dl-selected: Highlight;
+    --sval-dl-selected-shadow: none;
+    --sval-dl-selected-ink: HighlightText;
+    --sval-dl-segment-ink: CanvasText;
+    --sval-dl-tile: Canvas;
+    --sval-dl-accent: Highlight;
+    --sval-dl-progress-track: CanvasText;
+    --sval-dl-danger: CanvasText;
+    --sval-dl-secondary: ButtonFace;
+  }
+
+  #sval-downloads-views {
+    border: 1px solid CanvasText;
+  }
+
+  #downloadsListBox > richlistitem:hover {
+    background-color: transparent;
+    outline: 1px solid Highlight;
+  }
+
+  .sval-downloads-remove:hover {
+    background-color: transparent;
+    outline: 1px solid Highlight;
+  }
+
+  .sval-downloads-from-disc,
+  .sval-downloads-from[data-color] > .sval-downloads-from-disc {
+    background: transparent;
+    border: 1px solid CanvasText;
+  }
+
+  .sval-downloads-empty-show {
+    border: 1px solid ButtonText;
+    color: ButtonText;
+  }
+}

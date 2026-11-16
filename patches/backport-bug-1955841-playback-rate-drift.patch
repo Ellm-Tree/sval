@@ -1,0 +1,199 @@
+Sval: AudioStream keeps its time stretcher primed across rate changes
+
+Backport of Mozilla's Bug 1955841 (mozilla-central 25937df55ca7 and its
+gtest 060aca74c0d6, Firefox 157), less its removal of an unused
+<stdio.h> include, whose context ESR 153 lacks. ESR 153 does not carry it.
+Each switch from a playback rate back to 1.0 deleted the SoundTouch
+stretcher with input still in it, and each new stretcher swallowed its
+startup latency, so the source ran ahead of the audio written: video and
+audio drifted about 25 ms further apart on each switch, as on YouTube
+between 2x and 1x. AudioStream primes a new stretcher with silence,
+flushes it on the way back to 1.0 and keeps it. TestAudioStream.cpp is
+Mozilla's gtest for the drift.
+Drop this patch when the upstream pin reaches Firefox 157.
+
+diff --git a/dom/media/AudioStream.cpp b/dom/media/AudioStream.cpp
+index 6e616e5955..1faf506104 100644
+--- a/dom/media/AudioStream.cpp
++++ b/dom/media/AudioStream.cpp
+@@ -187,6 +187,21 @@ nsresult AudioStream::EnsureTimeStretcherInitialized() {
+     mTimeStretcher->setSetting(
+         SETTING_OVERLAP_MS,
+         StaticPrefs::media_audio_playbackrate_soundtouch_overlap_ms());
++
++    const uint32_t primeFrames =
++        (StaticPrefs::media_audio_playbackrate_soundtouch_sequence_ms() +
++         StaticPrefs::media_audio_playbackrate_soundtouch_seekwindow_ms()) *
++        mAudioClock.GetInputRate() / 1000;
++    AutoTArray<AudioDataValue, 2048> silence;
++    silence.SetLength(primeFrames * mOutChannels);
++    std::fill(silence.begin(), silence.end(), AudioDataValue(0));
++    mTimeStretcher->putSamples(silence.Elements(), primeFrames);
++    const uint32_t numOut =
++        mTimeStretcher->numSamples().unverified_safe_because(
++            "Bounded by the number of frames used to prime the stretcher.");
++    MOZ_ASSERT(numOut <= primeFrames);
++    silence.SetLength(numOut * mOutChannels);
++    mTimeStretcher->receiveSamples(silence.Elements(), numOut);
+   }
+   return NS_OK;
+ }
+@@ -487,18 +502,6 @@ void AudioStream::GetUnprocessed(AudioBufferWriter& aWriter) {
+             return timeStretcher->receiveSamples(aPtr, aFrames);
+           },
+           aWriter.Available());
+-
+-      // TODO: There might be still unprocessed samples in the stretcher.
+-      // We should either remove or flush them so they won't be in the output
+-      // next time we switch a playback rate other than 1.0.
+-      mTimeStretcher->numUnprocessedSamples().copy_and_verify([](auto samples) {
+-        NS_WARNING_ASSERTION(samples == 0, "no samples");
+-      });
+-    } else {
+-      // Don't need it anymore: playbackRate is 1.0, and the time stretcher has
+-      // been flushed.
+-      delete mTimeStretcher;
+-      mTimeStretcher = nullptr;
+     }
+   }
+ 
+@@ -587,6 +590,11 @@ void AudioStream::UpdatePlaybackRateIfNeeded() {
+ 
+   EnsureTimeStretcherInitialized();
+ 
++  if (mTimeStretcher && mAudioClock.GetPlaybackRate() != 1.0f &&
++      static_cast<float>(mPlaybackRate) == 1.0f) {
++    mTimeStretcher->flush();
++  }
++
+   mAudioClock.SetPlaybackRate(mPlaybackRate);
+   mAudioClock.SetPreservesPitch(mPreservesPitch);
+ 
+diff --git a/dom/media/gtest/TestAudioStream.cpp b/dom/media/gtest/TestAudioStream.cpp
+new file mode 100644
+index 0000000000..45731500f0
+--- /dev/null
++++ b/dom/media/gtest/TestAudioStream.cpp
+@@ -0,0 +1,110 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
++ * You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include <algorithm>
++
++#include "AudioStream.h"
++#include "CubebUtils.h"
++#include "MockCubeb.h"
++#include "gtest/gtest.h"
++#include "mozilla/gtest/WaitFor.h"
++
++using namespace mozilla;
++
++namespace {
++
++class TestDataSource final : public AudioStream::DataSource {
++ public:
++  explicit TestDataSource(uint32_t aChannelCount)
++      : mChannelCount(aChannelCount) {}
++
++  void AppendFrames(uint32_t aFrames, AudioDataValue aValue) {
++    const size_t oldLength = mSamples.Length();
++    const size_t sampleCount = static_cast<size_t>(aFrames) * mChannelCount;
++    mSamples.SetLength(oldLength + sampleCount);
++    std::fill_n(mSamples.Elements() + oldLength, sampleCount, aValue);
++  }
++
++  uint32_t PendingFrames() const {
++    return (mSamples.Length() - mReadOffset) / mChannelCount;
++  }
++
++  uint32_t PopFrames(AudioDataValue* aAudio, uint32_t aFrames, bool) override {
++    const uint32_t toCopyFrames = std::min(aFrames, PendingFrames());
++    if (!toCopyFrames) {
++      return 0;
++    }
++
++    const size_t toCopySamples =
++        static_cast<size_t>(toCopyFrames) * mChannelCount;
++    PodCopy(aAudio, mSamples.Elements() + mReadOffset, toCopySamples);
++    mReadOffset += toCopySamples;
++    return toCopyFrames;
++  }
++
++  bool Ended() const override { return false; }
++
++ private:
++  const uint32_t mChannelCount;
++  nsTArray<AudioDataValue> mSamples;
++  size_t mReadOffset = 0;
++};
++
++}  // namespace
++
++TEST(TestAudioStream, PlaybackRateSwitchesDoNotAccumulateDrift)
++{
++  constexpr uint32_t rate = 44100;
++  constexpr uint32_t channelCount = 2;
++  constexpr long framesPerCallback = 256;
++
++  MockCubeb* cubeb = new MockCubeb(MockCubeb::RunningMode::Manual);
++  CubebUtils::ForceSetCubebContext(cubeb->AsCubebContext());
++
++  TestDataSource source(channelCount);
++  auto initPromise = TakeN(cubeb->StreamInitEvent(), 1);
++  RefPtr<AudioStream> audioStream =
++      new AudioStream(source, rate, channelCount,
++                      AudioConfig::ChannelLayout(channelCount).Map());
++  ASSERT_EQ(audioStream->Init(nullptr), NS_OK);
++  auto [stream] = WaitFor(initPromise).unwrap()[0];
++  audioStream->Start();
++
++  source.AppendFrames(500000, 0.5f);
++
++  constexpr int kSwitches = 20;
++  constexpr int kStretchCallbacks = 32;
++  constexpr int kDrainCallbacks = 32;
++  const uint32_t pendingBefore = source.PendingFrames();
++
++  for (int i = 0; i < kSwitches; ++i) {
++    ASSERT_EQ(audioStream->SetPlaybackRate(2.0), NS_OK);
++    for (int j = 0; j < kStretchCallbacks; ++j) {
++      ASSERT_EQ(stream->ManualDataCallback(framesPerCallback),
++                MockCubebStream::KeepProcessing::Yes);
++    }
++
++    ASSERT_EQ(audioStream->SetPlaybackRate(1.0), NS_OK);
++    for (int j = 0; j < kDrainCallbacks; ++j) {
++      ASSERT_EQ(stream->ManualDataCallback(framesPerCallback),
++                MockCubebStream::KeepProcessing::Yes);
++    }
++  }
++
++  const uint32_t totalSourceConsumed = pendingBefore - source.PendingFrames();
++  const uint32_t expectedSourceConsumed =
++      kSwitches * (kStretchCallbacks * framesPerCallback * 2 +
++                   kDrainCallbacks * framesPerCallback);
++  const int delta = static_cast<int>(totalSourceConsumed) -
++                    static_cast<int>(expectedSourceConsumed);
++
++  EXPECT_LE(delta, framesPerCallback)
++      << "Source consumed " << totalSourceConsumed << " frames, expected "
++      << expectedSourceConsumed << " (delta " << delta << " frames)";
++
++  audioStream->ShutDown();
++  stream = nullptr;
++  audioStream = nullptr;
++  CubebUtils::ForceSetCubebContext(nullptr);
++}
+diff --git a/dom/media/gtest/moz.build b/dom/media/gtest/moz.build
+index d4d9d7637f..520181740d 100644
+--- a/dom/media/gtest/moz.build
++++ b/dom/media/gtest/moz.build
+@@ -38,6 +38,7 @@ UNIFIED_SOURCES += [
+     "TestAudioSampleFormat.cpp",
+     "TestAudioSegment.cpp",
+     "TestAudioSinkWrapper.cpp",
++    "TestAudioStream.cpp",
+     "TestAudioTrackEncoder.cpp",
+     "TestAudioTrackGraph.cpp",
+     "TestBitWriter.cpp",

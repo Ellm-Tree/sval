@@ -1,0 +1,97 @@
+Sval: Settings' Theme sets the window's light or dark scheme
+
+Firefox's Website appearance control writes
+layout.css.prefers-color-scheme.content-override, which
+PreferenceSheet::Prefs::Load reads for content documents alone. A chrome
+document's scheme comes from the theme: LightweightThemeConsumer sets the
+window's BrowsingContext.prefersColorSchemeOverride and
+browser.theme.toolbar-theme, and for the default theme it picks dark from
+(-moz-system-dark-theme) only. Sval keeps the default theme (decision 0093), so
+the window stayed with the system's scheme whatever was chosen.
+
+LightweightThemeConsumer is the one writer of the window's scheme, so the
+choice is read there: Dark makes the default theme's dark variant apply, Light
+makes it light, Automatic keeps the system's. The control is renamed Theme,
+with text saying it sets Sval and what websites are told. No chrome API reaches
+the consumer's decision; a second writer of the window's override would race it.
+
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 9d21b4fa1a..66241a1d65 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -377,21 +377,21 @@ page-navigation-group =
+ language-and-appearance-header = Language and Appearance
+ 
+ appearance-group2 =
+-  .label = Website appearance
+-  .description = Some websites change their colors to match your preferences. Choose your color scheme.
++  .label = Theme
++  .description = Choose light or dark for { -brand-short-name }. Websites that offer both follow your choice.
+ 
+ preferences-web-appearance-choice-auto3 =
+-  .label = System
+-  .title = Automatically change website backgrounds and content based on your system settings and { -brand-short-name } theme.
++  .label = Automatic
++  .title = Use light or dark as your system does, for { -brand-short-name } and for websites.
+ preferences-web-appearance-choice-light2 =
+   .label = Light
+-  .title = Use a light appearance for website backgrounds and content.
++  .title = Use light for { -brand-short-name } and for websites.
+ preferences-web-appearance-choice-dark2 =
+   .label = Dark
+-  .title = Use a dark appearance for website backgrounds and content.
++  .title = Use dark for { -brand-short-name } and for websites.
+ 
+ web-appearance-group =
+-  .aria-label = Website appearance
++  .aria-label = Theme
+ 
+ # This can appear when using windows HCM or "Override colors: always" without
+ # system colors.
+diff --git a/toolkit/modules/LightweightThemeConsumer.sys.mjs b/toolkit/modules/LightweightThemeConsumer.sys.mjs
+index a2b0ab8c35..6e18b5016f 100644
+--- a/toolkit/modules/LightweightThemeConsumer.sys.mjs
++++ b/toolkit/modules/LightweightThemeConsumer.sys.mjs
+@@ -267,6 +267,17 @@ export function LightweightThemeConsumer(aDocument) {
+     () => this._update(this._lastData)
+   );
+ 
++  // Sval: Settings' Theme control writes the content override, and the
++  // window takes its scheme from the same choice: dark (0), light (1), or
++  // the system's (2).
++  XPCOMUtils.defineLazyPreferenceGetter(
++    this,
++    "SVAL_COLOR_SCHEME",
++    "layout.css.prefers-color-scheme.content-override",
++    2,
++    () => this._update(this._lastData)
++  );
++
+   Services.obs.addObserver(this, "lightweight-theme-styling-update");
+ 
+   this.darkThemeMediaQuery = this._win.matchMedia("(-moz-system-dark-theme)");
+@@ -389,7 +400,10 @@ LightweightThemeConsumer.prototype = {
+         return false;
+       }
+ 
+-      if (this.darkThemeMediaQuery?.matches) {
++      if (
++        this.SVAL_COLOR_SCHEME == 0 ||
++        (this.SVAL_COLOR_SCHEME != 1 && this.darkThemeMediaQuery?.matches)
++      ) {
+         return true;
+       }
+ 
+@@ -465,7 +479,11 @@ LightweightThemeConsumer.prototype = {
+     _setDarkModeAttributes(this._doc, root, theme, processedColors, hasTheme);
+ 
+     let toolbarColorScheme = (() => {
+-      if (useDarkTheme || themeData.darkTheme) {
++      if (
++        useDarkTheme ||
++        themeData.darkTheme ||
++        (!hasTheme && this.SVAL_COLOR_SCHEME == 1)
++      ) {
+         return useDarkTheme ? "dark" : "light";
+       }
+       switch (theme.color_scheme) {

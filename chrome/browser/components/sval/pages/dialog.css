@@ -1,0 +1,127 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Firefox's dialogs in a modal box (`SubDialog`), in Sval's dialog frame.
+   `SvalPageStyle.styleDialog` loads this after `sval-page.css` and
+   `sval-dialog.css`, so the card, its palette and the window's tint are the
+   ones Sval's own dialogs wear, and here Firefox's design tokens take that
+   palette. The root is the card: a XUL dialog's root is its `window`, which
+   `sval-dialog.css`'s `html, body` rule does not reach. Toolkit's
+   `global.css` sets a dialog root's font to the system's
+   (`:root[dialogroot]`), and a button's to the system's too, so the type is
+   set on each, the dialog's own buttons through their part. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  :root {
+    --background-color-canvas: var(--sval-dialog-card);
+    --background-color-box: var(--sval-dialog-card);
+    --panel-background-color: var(--sval-dialog-card);
+    --text-color: var(--sval-dialog-text);
+    --text-color-deemphasized: var(--sval-dialog-muted);
+    --icon-color: var(--sval-dialog-body);
+    --focus-outline-color: var(--sval-dialog-focus);
+    --border-color: var(--sval-dialog-border);
+    --color-accent-primary: var(--sval-dialog-primary);
+    --color-accent-primary-hover: var(--sval-dialog-primary-hover);
+    --color-accent-primary-active: var(--sval-dialog-primary-hover);
+    --link-color: var(--sval-dialog-focus);
+    --link-color-hover: var(--sval-dialog-focus);
+    --link-color-active: var(--sval-dialog-focus);
+    --link-color-visited: var(--sval-dialog-focus);
+
+    --button-border-radius: 999px;
+    --button-min-height: 40px;
+    --button-padding: 0 18px;
+    --button-background-color: var(--sval-dialog-secondary);
+    --button-background-color-hover: var(--sval-dialog-secondary-hover);
+    --button-background-color-active: var(--sval-dialog-secondary-hover);
+    --button-background-color-disabled: var(--sval-dialog-secondary);
+    --button-border-color: transparent;
+    --button-border-color-hover: transparent;
+    --button-border-color-active: transparent;
+    --button-border-color-disabled: transparent;
+    --button-text-color: var(--sval-dialog-secondary-ink);
+    --button-text-color-hover: var(--sval-dialog-secondary-ink);
+    --button-text-color-active: var(--sval-dialog-secondary-ink);
+    --button-background-color-primary: var(--sval-dialog-primary);
+    --button-background-color-primary-hover: var(--sval-dialog-primary-hover);
+    --button-background-color-primary-active: var(--sval-dialog-primary-hover);
+    --button-background-color-primary-disabled: var(--sval-dialog-primary);
+    --button-border-color-primary: transparent;
+    --button-border-color-primary-hover: transparent;
+    --button-border-color-primary-active: transparent;
+    --button-text-color-primary: #ffffff;
+    --button-text-color-primary-hover: #ffffff;
+    --button-text-color-primary-active: #ffffff;
+    --button-background-color-destructive: var(--sval-dialog-danger);
+    --button-background-color-destructive-hover: var(--sval-dialog-danger-hover);
+    --button-background-color-destructive-active: var(--sval-dialog-danger-hover);
+    --button-text-color-destructive: #ffffff;
+
+    --input-border-color: var(--sval-dialog-field-border);
+    --input-text-border-color: var(--sval-dialog-field-border);
+    --input-text-background-color: var(--sval-dialog-field);
+    --input-text-color: var(--sval-dialog-text);
+    --input-text-border-radius: 999px;
+    --checkbox-background-color: var(--sval-dialog-field);
+    --checkbox-border-color: var(--sval-dialog-field-border);
+    --checkbox-border-radius: 6px;
+
+    box-sizing: border-box;
+    border: 1px solid var(--sval-dialog-border);
+    border-radius: 20px;
+    background-color: var(--sval-dialog-card);
+    color: var(--sval-dialog-text);
+  }
+
+  richlistbox,
+  tree {
+    border: 1px solid var(--sval-dialog-well-border);
+    border-radius: 12px;
+    background-color: var(--sval-dialog-well);
+    color: var(--sval-dialog-body);
+  }
+
+  /* Its rows and its empty-list line would touch the rounded edge. */
+  richlistbox {
+    padding: 8px 12px;
+  }
+}
+
+:root[dialogroot],
+button,
+dialog::part(dialog-button),
+input,
+menulist,
+select,
+textarea {
+  font-family: var(--sval-font);
+}
+
+dialog::part(dialog-button) {
+  min-height: 40px;
+  font-weight: 600;
+}
+
+/* The card's type, padding and title, as `sval-dialog.css` sets them on
+   Sval's own card. The dialog's box draws no title bar, so the window's
+   title heads the card. The `<dialog>` stays clear: an opaque one covers the
+   root's rounded edge. Its content box keeps the 4px Firefox gives it for
+   focus rings (`preferences/dialog.css`), which the padding here makes up. */
+:root[dialogroot] {
+  font-size: 14px;
+  line-height: 1.5;
+
+  &[title]::before {
+    content: attr(title);
+    padding: 24px 24px 0;
+    font: 600 17px/1.3 var(--sval-font);
+    color: var(--sval-dialog-text);
+  }
+
+  > dialog {
+    padding: 4px 20px 20px;
+    background: none;
+  }
+}

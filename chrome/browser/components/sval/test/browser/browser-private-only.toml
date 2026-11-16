@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# "Always use private browsing mode" (private-windows spec). The pref has to be
+# set before the first window opens, so these run in a browser of their own.
+# The first five prefs are every browser manifest's baseline, which
+# browser.toml gives the reasons for.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+  "browser.privatebrowsing.autostart=true",
+]
+
+["browser_sval_always_private.js"]
+
+["browser_sval_site_page_always_private.js"]

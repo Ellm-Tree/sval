@@ -1,0 +1,22 @@
+Sval: the Troubleshoot Mode dialog names a string that exists
+
+safeMode.xhtml's #resetProfile box, shown after repeated startup crashes,
+names refresh-profile-instead, which browser/safeMode.ftl no longer defines,
+so Fluent rejects with "Missing message" each time the dialog translates and
+the box would show no text. The text it means is the one the dialog's
+#resetProfileInstead label already uses, skip-troubleshoot-refresh-profile.
+The id is in the dialog's markup, so no chrome API reaches it.
+
+diff --git a/browser/base/content/safeMode.xhtml b/browser/base/content/safeMode.xhtml
+index 7b452d2f19..88820a8761 100644
+--- a/browser/base/content/safeMode.xhtml
++++ b/browser/base/content/safeMode.xhtml
+@@ -45,7 +45,7 @@
+     </vbox>
+ 
+     <vbox id="resetProfile" hidden="true">
+-      <label data-l10n-id="refresh-profile-instead" />
++      <label data-l10n-id="skip-troubleshoot-refresh-profile" />
+     </vbox>
+ 
+     <separator class="thin" />

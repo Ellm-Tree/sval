@@ -1,0 +1,27 @@
+Sval: a lazy tab has no browsing context to mark as a sibling
+
+tabbrowser's _insertBrowser marks the window's two tabs' browsing contexts
+as siblings when a browser makes the window's second, and a lazy tab's
+browser has none, so the insert throws and a session restore into a window
+of one loaded and one lazy tab rejects. A lazy tab is marked when its own
+browser is inserted, by the same block.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 673057cbad..659e1d29f5 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -3040,8 +3040,12 @@
+       // If we transitioned from one browser to two browsers, we need to set
+       // hasSiblings=false on both the existing browser and the new browser.
+       if (this.tabs.length == 2) {
+-        this.tabs[0].linkedBrowser.browsingContext.hasSiblings = true;
+-        this.tabs[1].linkedBrowser.browsingContext.hasSiblings = true;
++        for (const tab of this.tabs) {
++          const context = tab.linkedBrowser.browsingContext;
++          if (context) {
++            context.hasSiblings = true;
++          }
++        }
+       } else {
+         aTab.linkedBrowser.browsingContext.hasSiblings = this.tabs.length > 1;
+       }

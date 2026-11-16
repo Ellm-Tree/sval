@@ -1,0 +1,236 @@
+Sval: Mozilla's tests load a test page where they loaded about:mozilla
+
+Sval does not build about:mozilla or about:logo
+(no-closed-about-pages.patch), so a test that opens one as an arbitrary page
+waits for a load that never comes. These tests load an ordinary page from the mochitest server.
+
+about:mozilla loads in the parent process, and two tests read its document
+there. browser_iframe_gone_mid_download.js makes its iframe in the browser
+window's own document, a parent-process document every test window has.
+browser_swapDocShells.js reads the remote page's readyState through
+SpecialPowers.spawn.
+
+browser_splitview_integer_ids.js restores a split from session state alone,
+and its restored tab loads about:about. A web page's tab is a node of Sval's
+document, and SvalTabs.keepSplits ends a split of such tabs the document
+does not hold (split-view spec §6.1), which races the test's check.
+
+A test file has no chrome API to change the page it names, so the tests
+are patched.
+
+diff --git a/browser/components/downloads/test/browser/browser_iframe_gone_mid_download.js b/browser/components/downloads/test/browser/browser_iframe_gone_mid_download.js
+index aa27a52f61..7054a2b3f9 100644
+--- a/browser/components/downloads/test/browser/browser_iframe_gone_mid_download.js
++++ b/browser/components/downloads/test/browser/browser_iframe_gone_mid_download.js
+@@ -10,12 +10,7 @@ function test_deleted_iframe(perSitePref, windowOptions = {}) {
+     );
+ 
+     let win = await BrowserTestUtils.openNewBrowserWindow(windowOptions);
+-    let tab = await BrowserTestUtils.openNewForegroundTab(
+-      win.gBrowser,
+-      "about:mozilla"
+-    );
+-
+-    let doc = tab.linkedBrowser.contentDocument;
++    let doc = win.document;
+     let iframe = doc.createElement("iframe");
+     doc.body.appendChild(iframe);
+ 
+diff --git a/browser/components/privatebrowsing/test/browser/browser_privatebrowsing_zoom.js b/browser/components/privatebrowsing/test/browser/browser_privatebrowsing_zoom.js
+index 048796e7d2..d4b7ef4403 100644
+--- a/browser/components/privatebrowsing/test/browser/browser_privatebrowsing_zoom.js
++++ b/browser/components/privatebrowsing/test/browser/browser_privatebrowsing_zoom.js
+@@ -9,11 +9,11 @@ add_task(async function test() {
+   let win = await BrowserTestUtils.openNewBrowserWindow({ private: true });
+   let tabAbout = await BrowserTestUtils.openNewForegroundTab(
+     win.gBrowser,
+-    "about:mozilla"
++    "https://example.org/browser/browser/components/privatebrowsing/test/browser/empty_file.html"
+   );
+   let tabMozilla = await BrowserTestUtils.openNewForegroundTab(
+     win.gBrowser,
+-    "about:mozilla"
++    "https://example.com/browser/browser/components/privatebrowsing/test/browser/empty_file.html"
+   );
+ 
+   let mozillaZoom = win.ZoomManager.zoom;
+diff --git a/browser/components/sessionstore/test/browser_394759_perwindowpb.js b/browser/components/sessionstore/test/browser_394759_perwindowpb.js
+index b79527d4c7..7927180bd3 100644
+--- a/browser/components/sessionstore/test/browser_394759_perwindowpb.js
++++ b/browser/components/sessionstore/test/browser_394759_perwindowpb.js
+@@ -6,7 +6,11 @@
+ 
+ const TESTS = [
+   { url: "about:config", key: "bug 394759 Non-PB", value: "uniq" + r() },
+-  { url: "about:mozilla", key: "bug 394759 PB", value: "uniq" + r() },
++  {
++    url: "https://example.com/browser/browser/components/sessionstore/test/empty.html",
++    key: "bug 394759 PB",
++    value: "uniq" + r(),
++  },
+ ];
+ 
+ function promiseTestOpenCloseWindow(aIsPrivate, aTest) {
+diff --git a/browser/components/sessionstore/test/browser_588426.js b/browser/components/sessionstore/test/browser_588426.js
+index e32867fc6b..833fc7e15d 100644
+--- a/browser/components/sessionstore/test/browser_588426.js
++++ b/browser/components/sessionstore/test/browser_588426.js
+@@ -1,13 +1,16 @@
+ /* Any copyright is dedicated to the Public Domain.
+    http://creativecommons.org/publicdomain/zero/1.0/ */
+ 
++const PAGE =
++  "https://example.com/browser/browser/components/sessionstore/test/empty.html";
++
+ function test() {
+   let state = {
+     windows: [
+       {
+         tabs: [
+           {
+-            entries: [{ url: "about:mozilla", triggeringPrincipal_base64 }],
++            entries: [{ url: PAGE, triggeringPrincipal_base64 }],
+             hidden: true,
+           },
+           {
+@@ -28,11 +31,7 @@ function test() {
+     is(win.gBrowser.visibleTabs.length, 1, "one tab is visible");
+ 
+     let tab = win.gBrowser.visibleTabs[0];
+-    is(
+-      tab.linkedBrowser.currentURI.spec,
+-      "about:mozilla",
+-      "visible tab is about:mozilla"
+-    );
++    is(tab.linkedBrowser.currentURI.spec, PAGE, "visible tab is the page");
+ 
+     finish();
+   });
+diff --git a/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js b/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js
+index c2768ed244..fc549b3d08 100644
+--- a/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js
++++ b/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js
+@@ -9,6 +9,9 @@ requestLongerTimeout(2);
+ const MAX_WINDOWS_UNDO_PREF = "browser.sessionstore.max_windows_undo";
+ const TOPIC = "sessionstore-closed-objects-changed";
+ 
++const PAGE =
++  "https://example.com/browser/browser/components/sessionstore/test/empty.html";
++
+ let notificationsCount = 0;
+ 
+ async function openWindow(url) {
+@@ -74,7 +77,7 @@ add_task(async function test_closedObjectsChangedNotifications() {
+   assertNotificationCount(2);
+ 
+   // Open a second window.
+-  let win2 = await openWindow("about:mozilla");
++  let win2 = await openWindow(PAGE);
+ 
+   info("Closing both windows.");
+   await closeWindow(win);
+@@ -122,7 +125,7 @@ add_task(async function test_closedObjectsChangedNotifications() {
+   assertNotificationCount(11);
+ 
+   info("Setting window state.");
+-  win = await openWindow("about:mozilla");
++  win = await openWindow(PAGE);
+   await awaitNotification(() => SessionStore.setWindowState(win, closedState));
+   assertNotificationCount(12);
+ 
+diff --git a/browser/components/sessionstore/test/browser_splitview_integer_ids.js b/browser/components/sessionstore/test/browser_splitview_integer_ids.js
+index 4173f6d637..795818c8e9 100644
+--- a/browser/components/sessionstore/test/browser_splitview_integer_ids.js
++++ b/browser/components/sessionstore/test/browser_splitview_integer_ids.js
+@@ -3,6 +3,8 @@
+ 
+ "use strict";
+ 
++const PAGE =
++  "https://example.com/browser/browser/components/sessionstore/test/empty.html";
+ const ORIG_STATE = SessionStore.getBrowserState();
+ 
+ registerCleanupFunction(async () => {
+@@ -29,7 +31,7 @@ add_task(async function test_fresh_session_sequential_integer_ids() {
+     "First split view ID should be 1"
+   );
+ 
+-  let tab3 = BrowserTestUtils.addTab(gBrowser, "about:mozilla");
++  let tab3 = BrowserTestUtils.addTab(gBrowser, PAGE);
+   let tab4 = BrowserTestUtils.addTab(gBrowser, "about:about");
+   await Promise.all([
+     BrowserTestUtils.browserLoaded(tab3.linkedBrowser),
+@@ -67,7 +69,7 @@ add_task(async function test_counter_persists_across_sessions() {
+ 
+   gBrowser.addTabSplitView([tab1, tab2]);
+ 
+-  let tab3 = BrowserTestUtils.addTab(gBrowser, "about:mozilla");
++  let tab3 = BrowserTestUtils.addTab(gBrowser, PAGE);
+   let tab4 = BrowserTestUtils.addTab(gBrowser, "about:about");
+   await Promise.all([
+     BrowserTestUtils.browserLoaded(tab3.linkedBrowser),
+@@ -122,7 +124,7 @@ add_task(async function test_counter_initialized_from_persisted_value() {
+           {
+             entries: [
+               {
+-                url: "about:mozilla",
++                url: "about:about",
+                 triggeringPrincipal_base64,
+               },
+             ],
+diff --git a/browser/components/sessionstore/test/browser_swapDocShells.js b/browser/components/sessionstore/test/browser_swapDocShells.js
+index 047a36c510..daafb42cf4 100644
+--- a/browser/components/sessionstore/test/browser_swapDocShells.js
++++ b/browser/components/sessionstore/test/browser_swapDocShells.js
+@@ -1,21 +1,21 @@
+ "use strict";
+ 
++const PAGE =
++  "https://example.com/browser/browser/components/sessionstore/test/empty.html";
++
+ add_task(async function () {
+-  let tab = (gBrowser.selectedTab = BrowserTestUtils.addTab(
+-    gBrowser,
+-    "about:mozilla"
+-  ));
++  let tab = (gBrowser.selectedTab = BrowserTestUtils.addTab(gBrowser, PAGE));
+   await promiseBrowserLoaded(gBrowser.selectedBrowser);
+ 
+   let win = gBrowser.replaceTabWithWindow(tab);
+   await promiseDelayedStartupFinished(win);
+-  await promiseBrowserHasURL(win.gBrowser.browsers[0], "about:mozilla");
++  await promiseBrowserHasURL(win.gBrowser.browsers[0], PAGE);
+ 
+   win.duplicateTabIn(win.gBrowser.selectedTab, "tab");
+   await promiseTabRestored(win.gBrowser.tabs[1]);
+ 
+   let browser = win.gBrowser.browsers[1];
+-  is(browser.currentURI.spec, "about:mozilla", "tab was duplicated");
++  is(browser.currentURI.spec, PAGE, "tab was duplicated");
+ 
+   await BrowserTestUtils.closeWindow(win);
+ });
+@@ -27,14 +27,13 @@ function promiseDelayedStartupFinished(win) {
+ }
+ 
+ function promiseBrowserHasURL(browser, url) {
+-  let promise = Promise.resolve();
+-
+-  if (
+-    browser.contentDocument.readyState === "complete" &&
+-    browser.currentURI.spec === url
+-  ) {
+-    return promise;
+-  }
+-
+-  return promise.then(() => promiseBrowserHasURL(browser, url));
++  return BrowserTestUtils.waitForCondition(
++    async () =>
++      browser.currentURI.spec === url &&
++      (await SpecialPowers.spawn(
++        browser,
++        [],
++        () => content.document.readyState
++      )) === "complete"
++  );
+ }

@@ -1,0 +1,67 @@
+Sval: a page cannot take the Launcher's, the panel's, Split View's or the pins' keys
+
+Sval's commands run on these keys, so a page that calls preventDefault on
+them would leave the browser without them. `reserved="true"` keeps the key
+from the page (`GlobalKeyListener::IsReservedKey`). Sval's own keys are
+reserved where `SvalShortcuts.sys.mjs` makes them.
+
+The panel's key is reserved on Windows and Linux alone. On macOS it is
+Control+Z, which a terminal in a page needs to suspend a job.
+
+diff --git a/browser/base/content/browser-sets.inc.xhtml b/browser/base/content/browser-sets.inc.xhtml
+index 76e902749e..dbc42a12e7 100644
+--- a/browser/base/content/browser-sets.inc.xhtml
++++ b/browser/base/content/browser-sets.inc.xhtml
+@@ -137,7 +137,7 @@
+     <key id="key_newNavigatorTab" data-l10n-id="tab-new-shortcut" modifiers="accel"
+          command="cmd_newNavigatorTabNoEvent" reserved="true"/>
+     <key id="focusURLBar" data-l10n-id="location-open-shortcut" command="Browser:OpenLocation"
+-         modifiers="accel"/>
++         modifiers="accel" reserved="true"/>
+ #ifndef XP_MACOSX
+     <key id="focusURLBar2" data-l10n-id="location-open-shortcut-alt" command="Browser:OpenLocation"
+          modifiers="alt"/>
+@@ -317,6 +317,7 @@
+          modifiers="control"
+ #else
+          modifiers="control,alt"
++         reserved="true"
+ #endif
+         />
+     <key id="key_gotoHistory"
+@@ -367,8 +368,8 @@
+     <key id="key_restoreLastClosedTabOrWindowOrSession" command="History:RestoreLastClosedTabOrWindowOrSession" data-l10n-id="tab-new-shortcut" modifiers="accel,shift"/>
+     <key id="key_undoCloseWindow" command="History:UndoCloseWindow" data-l10n-id="window-new-shortcut" modifiers="accel,shift"/>
+ 
+-    <key id="key_addTabSplitView" command="Browser:AddTabSplitView"/>
+-    <key id="key_separateTabSplitView" command="Browser:SeparateTabSplitView"/>
++    <key id="key_addTabSplitView" command="Browser:AddTabSplitView" reserved="true"/>
++    <key id="key_separateTabSplitView" command="Browser:SeparateTabSplitView" reserved="true"/>
+     <key id="key_duplicateTab" command="Browser:DuplicateTab"/>
+ 
+ #ifdef XP_GNOME
+@@ -377,15 +378,15 @@
+ #define NUM_SELECT_TAB_MODIFIER accel
+ #endif
+ 
+-#expand    <key id="key_selectTab1" key="1" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab2" key="2" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab3" key="3" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab4" key="4" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab5" key="5" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab6" key="6" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab7" key="7" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectTab8" key="8" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
+-#expand    <key id="key_selectLastTab" key="9" modifiers="__NUM_SELECT_TAB_MODIFIER__"/>
++#expand    <key id="key_selectTab1" key="1" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab2" key="2" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab3" key="3" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab4" key="4" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab5" key="5" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab6" key="6" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab7" key="7" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectTab8" key="8" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
++#expand    <key id="key_selectLastTab" key="9" modifiers="__NUM_SELECT_TAB_MODIFIER__" reserved="true"/>
+ 
+     <key id="key_wrCaptureCmd"
+ #ifdef XP_MACOSX

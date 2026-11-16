@@ -1,0 +1,25 @@
+Sval: a lazy tab given new state reports its new address
+
+SessionStore.restoreTab replaces a lazy tab's TAB_LAZY_STATES entry, but the
+lazy browser's currentURI getter (tabbrowser's _createLazyBrowser) returns
+the URI it cached on first read, so the tab goes on reporting its old address
+until its browser is inserted. tabbrowser's own swapBrowsersAndCloseOther
+clears that cache before it calls setTabState; this clears it where the state
+is replaced, for every caller. Sval points a restored, unloaded tab at its
+tree node's address with setTabState, and reads the address back from
+currentURI.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index ee556f32c3..af971063bb 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -6658,6 +6658,9 @@ var SessionStoreInternal = {
+         userTypedValue: tabData.userTypedValue || "",
+         userTypedClear: tabData.userTypedClear || 0,
+       });
++      // The lazy browser's currentURI getter caches the URI it last read from
++      // TAB_LAZY_STATES, so it must forget it when that state is replaced.
++      delete browser._cachedCurrentURI;
+     }
+ 
+     // Most of tabData has been restored, now continue with restoring

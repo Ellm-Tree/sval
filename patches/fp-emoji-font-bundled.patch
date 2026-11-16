@@ -1,0 +1,115 @@
+Sval: give pages the bundled emoji font under Strict
+
+A new RFPTarget, EmojiFontBundled, makes emoji fallback resolve to the
+bundled Twemoji Mozilla instead of font.name-list.emoji, so emoji render the
+same whatever the OS and its emoji font version. It is a strict control.
+gfxPlatformFontList keeps the bundled list beside the pref one, chosen per
+FontVisibilityProvider, so the target is Doc-gated and granularOverrides
+lifts it per site. The emoji pref is global and also styles the browser's
+own UI, so a pref cannot do this.
+
+Upstream ships TwemojiMozilla.ttf only on Windows and Linux; browser/fonts
+and the package manifest ship it on macOS too, where Sval's mozconfig turns
+on --enable-bundled-fonts so CoreTextFontList activates it.
+
+diff --git a/browser/fonts/moz.build b/browser/fonts/moz.build
+index 0ebf2de60f..49e3b29a2c 100644
+--- a/browser/fonts/moz.build
++++ b/browser/fonts/moz.build
+@@ -2,6 +2,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("windows", "gtk"):
++if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("windows", "gtk", "cocoa"):
+     DIST_SUBDIR = ""
+     FINAL_TARGET_FILES.fonts += ["TwemojiMozilla.ttf"]
+diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
+index 554f0c2eab..1a4fc28204 100644
+--- a/browser/installer/package-manifest.in
++++ b/browser/installer/package-manifest.in
+@@ -49,7 +49,7 @@
+ @RESPATH@/dictionaries/*
+ @RESPATH@/browser/localization/*
+ @RESPATH@/localization/*
+-#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
++#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK) || defined(XP_MACOSX)
+ @RESPATH@/fonts/*
+ #endif
+ @RESPATH@/hyphenation/*
+diff --git a/gfx/thebes/gfxPlatformFontList.cpp b/gfx/thebes/gfxPlatformFontList.cpp
+index 3cc19fd89e..4af5b7004b 100644
+--- a/gfx/thebes/gfxPlatformFontList.cpp
++++ b/gfx/thebes/gfxPlatformFontList.cpp
+@@ -2334,13 +2334,17 @@ void gfxPlatformFontList::ResolveGenericFontNames(
+ }
+ 
+ void gfxPlatformFontList::ResolveEmojiFontNames(
+-    FontVisibilityProvider* aFontVisibilityProvider,
++    FontVisibilityProvider* aFontVisibilityProvider, bool aBundled,
+     PrefFontList* aGenericFamilies) {
+   // emoji preference has no lang name
+   AutoTArray<nsCString, 4> genericFamilies;
+ 
+   nsAutoCString value;
+-  if (mFontPrefs->LookupNameList(PrefName("emoji", ""), value)) {
++  if (aBundled) {
++    // The emoji font the application ships, which renders the same whatever
++    // the OS and its version.
++    genericFamilies.AppendElement("Twemoji Mozilla"_ns);
++  } else if (mFontPrefs->LookupNameList(PrefName("emoji", ""), value)) {
+     gfxFontUtils::ParseFontList(value, genericFamilies);
+   }
+ 
+@@ -2375,11 +2379,16 @@ gfxPlatformFontList::GetPrefFontsLangGroupLocked(
+   if (aGenericType == StyleGenericFontFamily::MozEmoji ||
+       aPrefLang == eFontPrefLang_Emoji) {
+     // Emoji font has no lang
+-    PrefFontList* prefFonts = mEmojiPrefFont.get();
++    const bool bundled = aFontVisibilityProvider &&
++                         aFontVisibilityProvider->ShouldResistFingerprinting(
++                             RFPTarget::EmojiFontBundled);
++    UniquePtr<PrefFontList>& cached =
++        bundled ? mBundledEmojiPrefFont : mEmojiPrefFont;
++    PrefFontList* prefFonts = cached.get();
+     if (MOZ_UNLIKELY(!prefFonts)) {
+       prefFonts = new PrefFontList;
+-      ResolveEmojiFontNames(aFontVisibilityProvider, prefFonts);
+-      mEmojiPrefFont.reset(prefFonts);
++      ResolveEmojiFontNames(aFontVisibilityProvider, bundled, prefFonts);
++      cached.reset(prefFonts);
+     }
+     return prefFonts;
+   }
+@@ -2986,6 +2995,7 @@ void gfxPlatformFontList::ClearLangGroupPrefFontsLocked() {
+     }
+   }
+   mEmojiPrefFont = nullptr;
++  mBundledEmojiPrefFont = nullptr;
+ 
+   // Create a new FontPrefs and replace the existing one.
+   mFontPrefs = MakeUnique<FontPrefs>();
+diff --git a/gfx/thebes/gfxPlatformFontList.h b/gfx/thebes/gfxPlatformFontList.h
+index e238d16907..e832cdbd2b 100644
+--- a/gfx/thebes/gfxPlatformFontList.h
++++ b/gfx/thebes/gfxPlatformFontList.h
+@@ -956,8 +956,10 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+                                PrefFontList* aGenericFamilies)
+       MOZ_REQUIRES(mLock);
+ 
++  // aBundled resolves the bundled emoji font in place of the emoji pref
++  // (RFPTarget::EmojiFontBundled).
+   void ResolveEmojiFontNames(FontVisibilityProvider* aFontVisibilityProvider,
+-                             PrefFontList* aGenericFamilies)
++                             bool aBundled, PrefFontList* aGenericFamilies)
+       MOZ_REQUIRES(mLock);
+ 
+   void GetFontFamiliesFromGenericFamilies(
+@@ -1065,6 +1067,7 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+                        eFontPrefLang_Count>
+       mLangGroupPrefFonts MOZ_GUARDED_BY(mLock);
+   mozilla::UniquePtr<PrefFontList> mEmojiPrefFont MOZ_GUARDED_BY(mLock);
++  mozilla::UniquePtr<PrefFontList> mBundledEmojiPrefFont MOZ_GUARDED_BY(mLock);
+ 
+   // When system-wide font lookup fails for a character, cache it to skip future
+   // searches. This is an array of bitsets, one for each FontVisibility level.

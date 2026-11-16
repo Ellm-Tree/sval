@@ -1,0 +1,76 @@
+Sval: put the Picture-in-Picture toggle in the video's top corner
+
+The toggle sat at 70% of the video's height less 40px, on its right edge,
+which reads as a control floating at no particular place on the video.
+It sits in the corner instead, as far from the top as from the side
+(--pip-toggle-distanceFromVideoEdge). A site's own toggle policy
+(PictureInPictureToggleChild's policy attribute) still places it.
+
+Once the toggle is the compact icon (has-used), nothing on it says what it
+does. Hovered or focused, it shows its label in a pill that grows from the
+icon, the first-time card's label without its explainer.
+
+diff --git a/toolkit/themes/shared/media/pipToggle.css b/toolkit/themes/shared/media/pipToggle.css
+index bd09de68b9..e49f99ff22 100644
+--- a/toolkit/themes/shared/media/pipToggle.css
++++ b/toolkit/themes/shared/media/pipToggle.css
+@@ -27,7 +27,7 @@
+   color: inherit;
+   border: none;
+   text-align: unset;
+-  top: calc(70% - 40px);
++  top: var(--pip-toggle-distanceFromVideoEdge);
+   opacity: 0;
+   padding-inline: 0;
+   transition: opacity 200ms;
+@@ -397,3 +397,50 @@
+ .pip-wrapper.experiment:not([policy="hidden"]):focus-visible > .pip-expanded {
+   box-shadow: 0 0 10px rgba(0, 96, 223, 0.9);
+ }
++
++/* SVAL - PIP STYLING */
++
++/* The compact toggle is a round button, as Sval's own buttons are. Hovered
++ * or focused, it says what it does: a pill grows from it toward the video's
++ * middle and carries its label, and the toggle's icon (.pip-icon, the last
++ * child) stays on top at the pill's end. */
++.pip-wrapper[has-used][position="right"] {
++  --pip-border-radius-toggle: 999px;
++}
++
++.pip-wrapper[has-used][position="right"]:not([small-video]) > .pip-expanded {
++  display: flex;
++  height: var(--pip-icon-width-with-margins);
++  min-width: 0;
++  border: 1px solid rgba(255, 255, 255, 0.1);
++  border-radius: 999px;
++  background-color: rgba(12, 12, 13, 0.9);
++  pointer-events: none;
++}
++
++.pip-wrapper[has-used][position="right"]:not([small-video]):is(.hovering, :focus-visible) > .pip-expanded {
++  opacity: 1;
++  scale: 1;
++  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
++  padding-bottom: 0;
++  pointer-events: auto;
++}
++
++/* The pill draws the background, so the round button's own one would show
++ * as a second shape inside it. */
++.pip-wrapper[has-used][position="right"]:not([small-video]):is(.hovering, :focus-visible) > .pip-small {
++  opacity: 0;
++}
++
++.pip-wrapper[has-used][position="right"] > .pip-icon {
++  z-index: 1;
++}
++
++.pip-wrapper[has-used][position="right"] > .pip-expanded > .pip-explainer,
++.pip-wrapper[has-used][position="right"] > .pip-expanded > .pip-icon-label > .pip-icon {
++  display: none;
++}
++
++.pip-wrapper[has-used][position="right"] > .pip-expanded > .pip-icon-label > .pip-label {
++  margin-inline: 16px calc(var(--pip-icon-width-with-margins) + 8px);
++}

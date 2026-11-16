@@ -1,0 +1,580 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The address bar as the Launcher (launcher spec §3, §6, and the Launcher's
+ * design): its card, floating over the page on ⌘L (`SvalLauncher`) or
+ * dropping under the toolbar's pill in place, and its rows, whose parts
+ * `SvalLauncherRows` draws and `sval-launcher-rows.css` styles. Loaded after
+ * `sval-header.css`, whose address bar it restyles.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-launcher-rows.css");
+
+:root {
+  /* The card is a popup of the window, on the surface the header's popups
+     take (`sval-header.css`): a step off the toolbar, which a workspace's
+     tint colours. */
+  --sval-launcher-card-bg: var(--sval-popup-bg);
+  --sval-launcher-card-border: var(--panel-border-color);
+  --sval-launcher-card-shadow: var(--sval-popup-shadow);
+  --sval-launcher-scrim: var(--sval-scrim);
+  --sval-launcher-autofill: color-mix(in srgb, var(--sval-launcher-accent) 28%, transparent);
+  /* The list scrolls past this; the field and the line under it stay. */
+  --sval-launcher-list-max: min(70vh, 640px);
+}
+
+/* ---------------------------------------------------------------- rows */
+
+#urlbar {
+  --urlbarview-background-color-hover: var(--sval-launcher-hover);
+  --urlbarview-background-color-selected: var(--sval-launcher-selected);
+  --urlbarview-text-color-selected: inherit;
+}
+
+/* The Launcher's key, while the field is empty and waits for it (launcher
+   spec §8). */
+#sval-launcher-key {
+  align-self: center;
+  margin-inline: 4px 8px;
+}
+
+#sval-launcher-key[hidden],
+#urlbar:is([focused], [sval-launcher-floating]) #sval-launcher-key,
+#urlbar .urlbar-input-container:not(:has(.urlbar-input:placeholder-shown)) > #sval-launcher-key {
+  display: none;
+}
+
+#urlbar .urlbarView {
+  font-family: var(--sval-font);
+}
+
+#urlbar .urlbarView-body-inner {
+  display: flex;
+  flex-direction: column;
+  border-top: 0 !important;
+}
+
+/* The list scrolls inside the card, under a fixed field and foot. */
+#urlbar .urlbarView-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: var(--sval-launcher-list-max);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+  padding: 6px !important;
+}
+
+#urlbar .urlbarView-row {
+  position: relative;
+  border: 0;
+  border-radius: 14px;
+  color: var(--sval-launcher-muted);
+  transition: background-color var(--sval-launcher-dur) var(--sval-launcher-ease);
+
+  &:not([type="tip"], [type="dynamic"]) {
+    min-height: 40px;
+  }
+}
+
+#urlbar .urlbarView-row-inner {
+  align-items: center;
+  gap: 12px;
+  min-height: 40px !important;
+  padding-block: 0 !important;
+  padding-inline: 14px 10px !important;
+}
+
+/* One line per row, whatever the window's width. */
+#urlbar .urlbarView-results[wrap] > .urlbarView-row > .urlbarView-row-inner {
+  flex-wrap: nowrap !important;
+
+  > .urlbarView-no-wrap {
+    flex-basis: auto !important;
+  }
+
+  > .urlbarView-url {
+    margin-top: 0 !important;
+  }
+}
+
+/* The title, then its secondary text, which gives way first; the row's own
+   parts sit at its end. */
+#urlbar .urlbarView-no-wrap {
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 12px;
+  max-width: none !important;
+  min-width: 0;
+}
+
+#urlbar .urlbarView-row:not([has-url]) .urlbarView-url {
+  display: none;
+}
+
+/* The heading's words for a screen reader (`UrlbarView#updateRowLabel`),
+   which take no room in the row. */
+#urlbar .urlbarView-group-aria-label {
+  position: absolute;
+}
+
+#urlbar .urlbarView-favicon {
+  width: 16px;
+  height: 16px;
+  margin-inline: 0 !important;
+  color: var(--sval-launcher-icon);
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+/* The type icon is Firefox's badge on the favicon's end corner
+   (`view-proton.css`), placed from the favicon's start: a Favorite's star. */
+#urlbar .urlbarView-type-icon {
+  margin-inline-start: 10px !important;
+}
+
+/* An open Favorite's row wears the star its other rows do
+   (`favorites-open-tab-star.patch`). */
+#urlbar .urlbarView-row[type="switchtab"][sval-favorite] > .urlbarView-row-inner > .urlbarView-no-wrap > .urlbarView-type-icon {
+  background-image: url("chrome://browser/skin/bookmark-12.svg");
+  fill: var(--toolbarbutton-icon-fill-attention);
+}
+
+#urlbar .urlbarView-title {
+  flex: 0 1 auto;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sval-launcher-text);
+}
+
+#urlbar .urlbarView-title-separator {
+  display: none !important;
+}
+
+#urlbar :is(.urlbarView-action, .urlbarView-url) {
+  flex: 0 100 auto !important;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-inline-start: 0 !important;
+  padding-inline-start: 0 !important;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--sval-launcher-muted) !important;
+}
+
+/* You are here: a wash, a 4px bar inset 8px, and a semibold title. */
+#urlbar .urlbarView-row[selected] {
+  &::after {
+    content: "";
+    position: absolute;
+    inset-block: 8px;
+    inset-inline-start: 0;
+    width: 4px;
+    border-radius: 2px;
+    background-color: var(--sval-launcher-accent);
+  }
+
+  .urlbarView-title {
+    font-weight: 600;
+  }
+}
+
+/* Firefox's own row for an open tab, as a private window lists a pin's
+   page: its chiclet, whose icon Firefox draws in its start padding
+   (`view-proton.css`). */
+#urlbar .urlbarView-row[type="switchtab"] .urlbarView-switchToTab {
+  /* Outranks the shared rule above, whose padding would put the text under
+     the icon and whose shrink would clip the chiclet before the title. */
+  flex: none !important;
+  padding-inline-start: 24px !important;
+  background: url("chrome://browser/content/sval/header-icons/switch-tab.svg") no-repeat 4px center / 16px;
+}
+
+#urlbar .sval-launcher-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  padding-inline-start: 12px;
+}
+
+#urlbar .urlbarView-row[selected] .sval-launcher-hint {
+  display: inline-flex;
+}
+
+/* An open tab of the tree names its workspace in its chip and its hint, in
+   place of Firefox's "Switch to Tab" (`launcher-tab-rows.patch`). */
+#urlbar .urlbarView-row[sval-tab] :is(.urlbarView-action, .urlbarView-switchToTab) {
+  display: none !important;
+}
+
+/* A search names its engine only while selected. */
+#urlbar .urlbarView-row[type="search"]:not([selected]) .urlbarView-action {
+  display: none !important;
+}
+
+/* Sval's marks stand for Firefox's star badge on the favicon. */
+#urlbar .urlbarView-row:has(.sval-mark) .urlbarView-type-icon {
+  display: none !important;
+}
+
+/* The left slot of a row with no favicon of its own. */
+#urlbar .urlbarView-row[sval-icon="command"] .urlbarView-favicon {
+  content: url("chrome://browser/content/sval/icons/square-terminal.svg");
+}
+
+#urlbar .urlbarView-row[sval-icon="plus"] .urlbarView-favicon {
+  content: url("chrome://browser/content/sval/icons/plus.svg");
+}
+
+#urlbar .urlbarView-row[sval-icon="check"] .urlbarView-favicon {
+  content: url("chrome://browser/content/sval/icons/check.svg");
+}
+
+/* A workspace among a command's choices: its tint, ringed in its ink. */
+#urlbar .urlbarView-row[sval-swatch]:not([sval-icon]) .urlbarView-favicon {
+  content: linear-gradient(transparent, transparent);
+  border-radius: 4px;
+  background-color: var(--sval-launcher-tint, var(--sval-launcher-cap-fill));
+  box-shadow: inset 0 0 0 1.5px var(--sval-launcher-ink, var(--sval-launcher-cap-ring));
+}
+
+/* A command's name takes the room before its parts, and its tag and key
+   sit with them at the end. */
+#urlbar .urlbarView-dynamic-svalCommand-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#urlbar .urlbarView-dynamic-svalCommand-tag {
+  flex: none;
+  font-size: 12px;
+}
+
+#urlbar .urlbarView-row-inner[aria-disabled="true"] {
+  opacity: 0.55;
+}
+
+/* "New workspace…", after a divider. */
+#urlbar .urlbarView-row:has(> [sval-new]) {
+  margin-block-start: 7px;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: 14px;
+    top: -5px;
+    height: 1px;
+    background-color: var(--sval-launcher-divider);
+  }
+}
+
+/* Section headings: 11px uppercase over the section's first row. */
+#urlbar .urlbarView-row[label] {
+  margin-block-start: 32px;
+
+  &::before {
+    inset-inline-start: 0;
+    top: -20px;
+    margin-inline-start: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sval-launcher-muted);
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------- in place */
+
+/* The field stays in the toolbar's pill, ringed while focused, and the
+   card drops 5px below the toolbar, as wide as the pill and starting with
+   it. The pill's docked buttons stay where they are. */
+#urlbar[breakout][breakout-extend]:not([sval-launcher-floating]) {
+  margin-inline-start: 0 !important;
+  width: var(--urlbar-width) !important;
+  margin-block-start: calc((var(--urlbar-container-height) - var(--sval-control-h)) / 2) !important;
+
+  > .urlbar-background {
+    display: none;
+  }
+
+  /* The field keeps its idle place on the pill's line, where Firefox's
+     breakout would size it to the header's height. */
+  > .urlbar-input-container {
+    height: var(--sval-control-h) !important;
+    margin: 0;
+    width: 100% !important;
+    padding-block: 0 !important;
+    padding-inline: 0 4px !important;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  > .urlbarView {
+    position: absolute;
+    /* Below the field, its pill's half of the header and the nav-bar's
+       3px padding, then 5px. */
+    top: calc(100% + (var(--urlbar-container-height) - var(--sval-control-h)) / 2 + 8px);
+    inset-inline-start: calc(-1 * var(--sval-dock-w));
+    width: calc(var(--urlbar-width) + var(--sval-dock-w) + var(--sval-dock-end-w)) !important;
+    margin: 0 !important;
+    border: 1px solid var(--sval-launcher-card-border);
+    border-radius: 20px;
+    background-color: var(--sval-launcher-card-bg);
+    box-shadow: var(--sval-launcher-card-shadow);
+    overflow: clip;
+    animation: sval-launcher-fade 120ms linear;
+  }
+}
+
+#urlbar-container:has(> #urlbar[focused]:not([sval-launcher-floating]))::before {
+  outline-color: transparent;
+  border-color: var(--sval-focus);
+  box-shadow: 0 0 0 1px var(--sval-focus);
+}
+
+/* ---------------------------------------------------------------- float */
+
+/* Over the page, centred on it, 72px below the toolbar (`SvalLauncher`
+   sets the place). The field is the card's first row. */
+#urlbar[breakout][sval-launcher-floating] {
+  top: var(--sval-launcher-top) !important;
+  left: var(--sval-launcher-left) !important;
+  width: var(--sval-launcher-width) !important;
+  height: auto !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  border: 1px solid var(--sval-launcher-card-border) !important;
+  border-radius: 24px;
+  background-color: var(--sval-launcher-card-bg) !important;
+  box-shadow: var(--sval-launcher-card-shadow);
+  overflow: clip;
+  transform-origin: top center;
+  animation: sval-launcher-in 160ms var(--sval-launcher-ease);
+
+  > .urlbar-background {
+    display: none;
+  }
+
+  > .urlbar-input-container {
+    box-sizing: border-box;
+    height: 58px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 20px !important;
+    gap: 12px;
+    border-radius: 0;
+    border-bottom: 1px solid var(--sval-launcher-divider);
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .urlbar-input {
+    font-size: 18px;
+    line-height: 24px;
+    color: var(--sval-launcher-text);
+  }
+
+  .urlbar-input::placeholder {
+    color: var(--sval-launcher-muted);
+  }
+
+  .urlbar-input::selection {
+    background-color: var(--sval-launcher-autofill);
+  }
+
+  .searchmode-switcher {
+    --button-icon-fill: var(--sval-launcher-icon);
+    --icon-size: 20px;
+  }
+
+  :is(.urlbar-go-button, #page-action-buttons, #urlbar-revert-button-container, #identity-box, #tracking-protection-icon-container, #sval-protection-button) {
+    display: none !important;
+  }
+
+  > .urlbarView {
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* The card's own frame stands for the docked pill's look. */
+  #sval-urlbar-domain {
+    display: none !important;
+  }
+}
+
+/* The field's own text stays, unhidden, while it floats. */
+#urlbar[sval-launcher-floating] .urlbar-input {
+  opacity: 1 !important;
+}
+
+/* The toolbar's pill keeps the page's address, undimmed, while the field
+   floats. */
+#sval-launcher-address {
+  display: none;
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0 12px;
+  align-items: center;
+  overflow: hidden;
+  color: var(--toolbar-field-text-color);
+  font-family: var(--sval-font);
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+#urlbar-container:has(> #urlbar[sval-launcher-floating]) > #sval-launcher-address {
+  display: flex;
+}
+
+/* Over the content area only, never the toolbar or the panel. Above
+   `#tabbrowser-tabbox`, which browser-shared.css lifts to 2: at an equal
+   z-index the page still paints over it and takes its clicks. */
+#sval-launcher-scrim {
+  position: fixed;
+  z-index: 3;
+  background-color: var(--sval-launcher-scrim);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 100ms linear,
+    visibility 0s 100ms;
+
+  &[open] {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 120ms linear;
+  }
+}
+
+/* A command that picks, as a chip at the field's start, with its Back. */
+#sval-launcher-chip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0 12px 0 3px;
+  border-radius: 999px;
+  background-color: var(--sval-launcher-picked-fill);
+  box-shadow: inset 0 0 0 1px var(--sval-launcher-cap-ring);
+  color: var(--sval-launcher-text);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: sval-launcher-chip-in 120ms var(--sval-launcher-ease);
+}
+
+#sval-launcher-chip-back {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background-color: transparent;
+  color: inherit;
+
+  &::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    background-color: currentColor;
+    mask: url("chrome://browser/content/sval/protection-icons/sc-back.svg") center / contain no-repeat;
+  }
+
+  &:hover {
+    background-color: var(--sval-launcher-hover);
+  }
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@keyframes sval-launcher-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes sval-launcher-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sval-launcher-chip-in {
+  from {
+    opacity: 0;
+    translate: 8px 0;
+  }
+}
+
+/* Keyboard moves change the selection at once; the pointer's hover eases. */
+#urlbar .urlbarView-row[selected] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #urlbar[breakout][sval-launcher-floating] {
+    animation-name: sval-launcher-fade;
+  }
+
+  #sval-launcher-chip {
+    animation-name: sval-launcher-fade;
+  }
+}
+
+/* ---------------------------------------------------------------- access */
+
+@media (forced-colors) {
+  :root {
+    --sval-launcher-card-bg: Canvas;
+    --sval-launcher-card-border: CanvasText;
+    --sval-launcher-card-shadow: none;
+    --sval-launcher-scrim: transparent;
+    --sval-launcher-autofill: Highlight;
+  }
+
+  #urlbar .urlbarView-row[row-selectable]:not([selected]):hover {
+    outline: 0;
+    box-shadow: inset 0 0 0 1px CanvasText;
+  }
+
+  #urlbar .urlbarView-row[selected] {
+    background-color: Highlight;
+    color: HighlightText;
+
+    :is(.urlbarView-title, .urlbarView-url, .urlbarView-action, .urlbarView-dynamic-svalCommand-tag) {
+      color: HighlightText !important;
+    }
+
+    &::after {
+      background-color: HighlightText;
+    }
+  }
+
+  #sval-launcher-chip {
+    background-color: Canvas;
+    box-shadow: inset 0 0 0 1px CanvasText;
+    color: CanvasText;
+  }
+}

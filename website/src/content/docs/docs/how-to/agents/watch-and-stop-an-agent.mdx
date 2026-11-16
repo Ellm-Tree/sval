@@ -1,0 +1,60 @@
+---
+title: Watch and stop an agent
+description: Find an agent's window to see what it's doing, and stop it until you let it go on.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Each session of an AI app works in its own Workspace, in a window of its
+own. You can bring that window forward to watch the agent. You can also
+stop the agent at any time.
+
+<Screenshot name="features-agent" alt="A banner saying Claude is controlling this Workspace, with Take control and Stop agent buttons" />
+
+Claude Code is comparing laptop prices for you, and you see the agent
+heading to a store you don't trust. You stop the agent before it goes
+further.
+
+## Watch an agent
+
+1. Above your tabs, select the current Workspace's name.
+2. Under **Agent Workspaces**, select the agent.
+
+Sval brings the agent's window to the front. A card in the middle of the
+window names the agent and says what it's doing.
+
+## Stop an agent
+
+1. In the agent's window, select **Stop agent**.
+
+The card says **You stopped** and the agent's name. Sval ends what the agent
+was doing. Every request the agent makes fails until you let the agent go
+on. Sval tells the agent that you stopped it.
+
+## Let it go on
+
+1. In the agent's window, select **Resume**.
+
+## Details
+
+- The agent's window opens behind the window you're using, so it never takes
+  your focus.
+- While the agent works, the agent's window is dimmed. Your clicks and key
+  presses don't reach the window's pages. You can still move, resize,
+  minimize, and close the window.
+- Stopping an agent affects only the Workspace you're watching. Other
+  sessions of the same app go on working in their own Workspaces.
+- A stopped agent stays stopped after you restart Sval.
+- A stopped agent can't make a new Workspace or move to another one until
+  you select **Resume**.
+- **Be polite.** The box on the card limits the agent to a set number of
+  actions a second on each site. The box starts checked. You set the number
+  in Settings › Agents, and the number starts at 1.
+- To stop every app at once, turn off **Let AI agents on this computer use
+  Sval** in Settings › Agents.
+
+## Related pages
+
+- [Take control of an agent's Workspace](/docs/how-to/agents/take-control-of-an-agents-workspace/)
+- [Delete an agent's Workspace](/docs/how-to/agents/delete-an-agents-workspace/)
+- [Agent settings and controls](/docs/reference/agents/)

@@ -1,0 +1,281 @@
+Sval: page rules from the content classifier's engines
+
+adblock-rust already computes a page's hiding selectors, procedural actions
+and scriptlets (Engine::url_cosmetic_resources, hidden_class_id_selectors),
+but the engine crate's FFI exposes network matching only and the engines live
+inside ContentClassifierService. This exposes them, so one engine and one set
+of lists serve requests and pages:
+nsIContentClassifierService gains pageRules, the answers of the engines that
+block in the window's kind merged into one nsIContentClassifierPageRules and
+cached by address until those engines change, so a page's frames read one
+answer; hiddenClassIdSelectors; and setScriptletResources, the scriptlet
+library, parsed and stored once and shared by every engine, so installing it
+in an engine under the service's lock copies nothing. The FFI is Sval's
+page_rules.rs, a module of the engine crate, and the C++ around it is
+SvalClassifierPageRules, which ContentClassifierEngine names its friend.
+
+The engines are private to ContentClassifierService and the FFI is compiled
+Rust, so no chrome API reaches them.
+
+diff --git a/Cargo.lock b/Cargo.lock
+index f51ce893c0..260a1cd32f 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1121,6 +1121,7 @@ dependencies = [
+  "cstr",
+  "nserror",
+  "nsstring",
++ "serde_json",
+  "thin-vec",
+  "xpcom",
+ ]
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index d12932c2fa..d0be4028db 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -11,6 +11,7 @@
+ #include "MainThreadUtils.h"
+ #include "nsDebug.h"
+ #include "mozilla/ContentClassifierEngine.h"
++#include "SvalClassifierPageRules.h"  // Sval
+ #include "mozilla/ClearOnShutdown.h"
+ #include "mozilla/dom/Promise.h"
+ #include "mozilla/dom/Promise-inl.h"
+@@ -561,6 +562,7 @@ void ContentClassifierService::ShutdownRSClient() {
+   mCancelEnginesPBM.Clear();
+   mAnnotateEngines.Clear();
+   mAnnotateEnginesPBM.Clear();
++  mCosmeticCache.Clear();  // Sval
+ }
+ 
+ // static
+@@ -895,6 +897,76 @@ NS_IMETHODIMP ContentClassifierService::GetFeatureNames(
+   return NS_OK;
+ }
+ 
++// Sval: page rules. They come from the engines
++// that block in the window's kind, so one set of lists serves requests and
++// pages.
++
++NS_IMETHODIMP ContentClassifierService::PageRules(
++    const nsACString& aUrl, bool aPrivateBrowsing,
++    nsIContentClassifierPageRules** aRules) {
++  // adblock-rust's answer depends on the whole URL: its host's rules, and
++  // whether a $generichide or $elemhide exception matches the URL
++  // (Engine::url_cosmetic_resources). The engines are asked without the
++  // fragment, so an address's in-page links share one answer.
++  nsCOMPtr<nsIURI> uri;
++  nsAutoCString spec;
++  if (NS_FAILED(NS_NewURI(getter_AddRefs(uri), aUrl)) ||
++      NS_FAILED(uri->GetSpecIgnoringRef(spec))) {
++    return NS_ERROR_INVALID_ARG;
++  }
++  nsAutoCString key(spec);
++  key.Append(aPrivateBrowsing ? " p" : " n");
++  MutexAutoLock lock(mLock);
++  if (auto cached = mCosmeticCache.Lookup(key)) {
++    NS_ADDREF(*aRules = cached.Data());
++    return NS_OK;
++  }
++  RefPtr<SvalClassifierPageRules> rules = new SvalClassifierPageRules();
++  for (const auto& engine :
++       aPrivateBrowsing ? mCancelEnginesPBM : mCancelEngines) {
++    rules->Add(*engine, spec);
++  }
++  constexpr uint32_t kMaxCachedUrls = 256;
++  if (mCosmeticCache.Count() >= kMaxCachedUrls) {
++    mCosmeticCache.Clear();
++  }
++  mCosmeticCache.InsertOrUpdate(key, RefPtr{rules});
++  rules.forget(aRules);
++  return NS_OK;
++}
++
++NS_IMETHODIMP ContentClassifierService::HiddenClassIdSelectors(
++    const nsTArray<nsCString>& aClasses, const nsTArray<nsCString>& aIds,
++    const nsTArray<nsCString>& aExceptions, bool aPrivateBrowsing,
++    nsTArray<nsCString>& aSelectors) {
++  aSelectors.Clear();
++  MutexAutoLock lock(mLock);
++  for (const auto& engine :
++       aPrivateBrowsing ? mCancelEnginesPBM : mCancelEngines) {
++    (void)SvalClassifierEngine::HiddenClassIdSelectors(
++        *engine, aClasses, aIds, aExceptions, aSelectors);
++  }
++  return NS_OK;
++}
++
++NS_IMETHODIMP ContentClassifierService::SetScriptletResources(
++    const nsACString& aResourcesJson) {
++  // Parsed once, outside the lock; a library that does not parse leaves the
++  // one in use.
++  RefPtr<SvalClassifierResources> resources =
++      SvalClassifierResources::FromJson(aResourcesJson);
++  if (!resources) {
++    return NS_ERROR_INVALID_ARG;
++  }
++  MutexAutoLock lock(mLock);
++  mScriptletResources = resources;
++  mCosmeticCache.Clear();
++  for (const auto& entry : mEngines) {
++    (void)SvalClassifierEngine::UseResources(*entry.GetData(), *resources);
++  }
++  return NS_OK;
++}
++
+ // Parses a byte buffer of adblock-format filter list text into rules.
+ // Tolerates both LF and CRLF line endings; skips empty lines.
+ static void ParseFilterListRules(const nsTArray<uint8_t>& aData,
+@@ -989,6 +1061,11 @@ nsresult ContentClassifierService::InstallEngine(
+     mEngines.Remove(nsCString(aFeatureName));
+   } else {
+     MOZ_ASSERT(aEngine->Feature().mName.Equals(aFeatureName));
++    // Sval: a rebuilt engine keeps the scriptlet library, which it shares.
++    if (mScriptletResources) {
++      (void)SvalClassifierEngine::UseResources(*aEngine,
++                                               *mScriptletResources);
++    }
+     mEngines.InsertOrUpdate(nsCString(aFeatureName), std::move(aEngine));
+   }
+   return NS_OK;
+@@ -997,6 +1074,7 @@ nsresult ContentClassifierService::InstallEngine(
+ void ContentClassifierService::PopulateAllActiveEnginesFromPreferenceSnapshot(
+     const EnginesPrefsSnapshot& aPreferenceSnapshot) {
+   mLock.AssertCurrentThreadOwns();
++  mCosmeticCache.Clear();  // Sval
+   PopulateActiveEngineListFromFeatureNames(aPreferenceSnapshot.mCancel,
+                                            mCancelEngines);
+   PopulateActiveEngineListFromFeatureNames(aPreferenceSnapshot.mCancelPBM,
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index ed074520c9..906053b34b 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -30,6 +30,9 @@ class nsISerialEventTarget;
+ 
+ namespace mozilla {
+ 
++class SvalClassifierPageRules;  // Sval
++class SvalClassifierResources;  // Sval
++
+ enum class ClassifyMode { Annotate, Cancel };
+ 
+ struct ContentClassifierFeature {
+@@ -351,6 +354,16 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   nsTArray<RefPtr<ContentClassifierEngine>> mAnnotateEnginesPBM
+       MOZ_GUARDED_BY(mLock);
+ 
++  // Sval: the scriptlet library every engine is given, held once for
++  // all of them.
++  RefPtr<SvalClassifierResources> mScriptletResources MOZ_GUARDED_BY(mLock);
++
++  // Sval: pageRules answers by address, without its fragment, and window
++  // kind, cleared whenever the engines in use or the scriptlet library
++  // change, so a page's frames at one address share one merged answer.
++  nsTHashMap<nsCStringHashKey, RefPtr<SvalClassifierPageRules>> mCosmeticCache
++      MOZ_GUARDED_BY(mLock);
++
+   // RemoteSettings client for fetching filter lists. All reads and
+   // writes must happen on the main thread; each call site asserts.
+   nsCOMPtr<nsIContentClassifierRemoteSettingsClient> mRSClient;
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml b/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml
+index 2a56e9f630..44cb2733b4 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml
++++ b/toolkit/components/content-classifier/content_classifier_engine/Cargo.toml
+@@ -9,6 +9,7 @@ license = "MPL-2.0"
+ adblock = { version = "0.12.1", features = ["full-regex-handling", "single-thread"], default-features = false }
+ cstr = "0.2"
+ nsstring = { path = "../../../../xpcom/rust/nsstring" }
++serde_json = "1.0"
+ nserror = { path = "../../../../xpcom/rust/nserror" }
+ thin-vec = { version = "0.2.1", features = ["gecko-ffi"] }
+ xpcom = { path = "../../../../xpcom/rust/xpcom" }
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+index 34319071fc..8e3beef5eb 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
++++ b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+@@ -90,6 +90,9 @@ class ContentClassifierEngine final {
+       const ContentClassifierRequest& aRequest, bool aPreviouslyMatched);
+ 
+  private:
++  // Sval: page rules read the engine (SvalClassifierPageRules.h).
++  friend class SvalClassifierEngine;
++
+   ~ContentClassifierEngine() {
+     if (mEngine) {
+       content_classifier_engine_destroy(mEngine);
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs b/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs
+index ecfe964e57..ff9406cd62 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs
++++ b/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs
+@@ -18,6 +18,10 @@ pub struct ContentClassifierFFIEngine {
+     engine: Engine,
+ }
+ 
++// Sval: page rules (element hiding and scriptlets), from the same engines
++// that block requests.
++mod page_rules;
++
+ #[no_mangle]
+ pub unsafe extern "C" fn content_classifier_initialize_domain_resolver() -> nsresult {
+     let etld_service = match xpcom::get_service::<nsIEffectiveTLDService>(cstr!(
+diff --git a/toolkit/components/content-classifier/moz.build b/toolkit/components/content-classifier/moz.build
+index e65d3eebce..7b65f258e0 100644
+--- a/toolkit/components/content-classifier/moz.build
++++ b/toolkit/components/content-classifier/moz.build
+@@ -16,6 +16,14 @@ UNIFIED_SOURCES += [
+     "ContentClassifierService.cpp",
+ ]
+ 
++# Sval's page rules answer.
++XPIDL_SOURCES += [
++    "nsIContentClassifierPageRules.idl",
++]
++UNIFIED_SOURCES += [
++    "SvalClassifierPageRules.cpp",
++]
++
+ EXPORTS.mozilla += [
+     "ContentClassifierService.h",
+ ]
+diff --git a/toolkit/components/content-classifier/nsIContentClassifierService.idl b/toolkit/components/content-classifier/nsIContentClassifierService.idl
+index 25454ce09f..b9f2279e49 100644
+--- a/toolkit/components/content-classifier/nsIContentClassifierService.idl
++++ b/toolkit/components/content-classifier/nsIContentClassifierService.idl
+@@ -4,6 +4,8 @@
+ 
+ #include "nsISupports.idl"
+ 
++interface nsIContentClassifierPageRules;
++
+ /**
+  * Interface for the content classifier service. Used by the JS
+  * RemoteSettings client to notify the C++ service of filter list
+@@ -32,6 +34,28 @@ interface nsIContentClassifierService : nsISupports {
+      * filter list IDs are grouped into a single classification engine.
+      */
+     Array<ACString> getFeatureNames();
++
++    /**
++     * Sval: the page rules for a document at aUrl.
++     */
++    nsIContentClassifierPageRules pageRules(in ACString aUrl,
++                                            in boolean aPrivateBrowsing);
++
++    /**
++     * Sval: the generic hiding selectors for class and id names seen on a
++     * page, leaving out aExceptions, the union of the page's
++     * UrlSpecificResources exceptions.
++     */
++    Array<ACString> hiddenClassIdSelectors(in Array<ACString> aClasses,
++                                           in Array<ACString> aIds,
++                                           in Array<ACString> aExceptions,
++                                           in boolean aPrivateBrowsing);
++
++    /**
++     * Sval: the scriptlet library, a JSON array of adblock-rust resources.
++     * Every engine, built now or later, uses it.
++     */
++    void setScriptletResources(in ACString aResourcesJson);
+ };
+ 
+ %{C++

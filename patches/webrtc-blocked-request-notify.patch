@@ -1,0 +1,20 @@
+Sval: notify a refused camera, microphone or screen request
+
+`prompt` denies a camera, microphone or screen request whose permission is
+blocked for the site and tells nothing else, so the page fails with no sign
+in the browser. Sval's site controls show that attempt (`SvalSiteControls`),
+so the denial notifies `sval-webrtc-blocked` with the browser and the
+permission id.
+
+diff --git a/browser/actors/WebRTCParent.sys.mjs b/browser/actors/WebRTCParent.sys.mjs
+index d97d92add2..191baba914 100644
+--- a/browser/actors/WebRTCParent.sys.mjs
++++ b/browser/actors/WebRTCParent.sys.mjs
+@@ -550,6 +550,7 @@ function prompt(aActor, aBrowser, aRequest) {
+       lazy.SitePermissions.getForPrincipal(principal, permissionID, aBrowser)
+         .state == lazy.SitePermissions.BLOCK
+     ) {
++      Services.obs.notifyObservers(aBrowser, "sval-webrtc-blocked", permissionID);
+       aActor.denyRequest(aRequest);
+       return;
+     }

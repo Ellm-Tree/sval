@@ -1,0 +1,165 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* The add-ons page in Settings' look, over `sval-page.css`'s tokens. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* The way back to Settings (`SvalAddonsNav`), where Settings puts its way
+   back from a site's page: above the header, a round back button, then the
+   crumb. */
+.sval-addons-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: var(--page-main-content-width);
+  margin-inline-start: var(--main-margin-start);
+  padding-block-start: 20px;
+  color: var(--sval-ink-muted);
+  font-size: 13px;
+
+  > a {
+    color: var(--sval-ink-muted);
+    text-decoration: none;
+  }
+
+  > a:is(:hover, :focus-visible) {
+    color: var(--sval-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  > span {
+    margin-inline-start: -6px;
+  }
+}
+
+button.sval-addons-back {
+  appearance: none;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--sval-border);
+  border-radius: 50%;
+  background: none;
+  color: var(--sval-ink);
+
+  &:hover {
+    background: var(--sval-card-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* A detail view has its own back button, to the list, under this row; one
+   round back button on screen keeps it plain which way each goes, and the
+   crumb still leads to Settings. */
+#content:has(.back-button:not([hidden])) .sval-addons-back {
+  display: none;
+}
+
+/* The chevron strokes in plain black, so it is drawn as a mask in the
+   button's ink. */
+.sval-addons-back-glyph {
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask: url("chrome://browser/content/sval/protection-icons/sc-back.svg") center / contain no-repeat;
+}
+
+/* Why finding an add-on leaves Sval for Mozilla's site, under the crumb. */
+.sval-addons-source {
+  max-width: var(--page-main-content-width);
+  margin: 8px 0 0;
+  margin-inline-start: var(--main-margin-start);
+  color: var(--sval-ink-muted);
+  font-size: 13px;
+}
+
+/* The search sits on the header's line, so the crumb is the page's top. */
+.main-search {
+  padding-top: 12px;
+}
+
+/* Headings in Sval's sizes and ink, as Settings' are. */
+h1,
+.header-name {
+  color: var(--sval-ink);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h2,
+.list-section-heading {
+  color: var(--sval-ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Cards take Settings' surface, border and radius through the card tokens;
+   a hovered card takes Sval's hover surface. */
+@media not ((forced-colors) or (prefers-contrast)) {
+  addon-card:not([expanded]) > .addon.card:hover {
+    border-color: var(--sval-border-strong);
+    background: var(--sval-card-hover);
+    box-shadow: var(--sval-shadow);
+  }
+
+  .card-heading-icon,
+  .card-heading-image {
+    border-radius: 8px;
+  }
+
+  .addon-name {
+    color: var(--sval-ink);
+    font-weight: 600;
+  }
+
+  .addon-description,
+  .addon-detail-row {
+    color: var(--sval-ink-body);
+  }
+
+  .addon-detail-row {
+    border-top-color: var(--sval-border-subtle);
+  }
+
+  /* The detail view's tabs: Settings' segmented choice. */
+  .tab-group {
+    border-bottom-color: var(--sval-border);
+  }
+
+  button.tab-button {
+    border-radius: 999px;
+    color: var(--sval-ink-muted);
+    font-weight: 600;
+  }
+
+  button.tab-button[selected],
+  button.tab-button[selected]:hover {
+    border-block-color: transparent;
+    background: var(--sval-tint);
+    color: var(--sval-accent);
+  }
+
+  .category-badge {
+    background-color: var(--sval-action);
+    color: var(--sval-action-text);
+  }
+
+  .addon-inline-options {
+    border-radius: 12px;
+  }
+}

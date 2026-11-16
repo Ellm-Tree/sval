@@ -1,0 +1,47 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Element picker test page</title>
+    <style>
+      .sval-test-rail {
+        width: 300px;
+        padding: 10px;
+        margin: 10px 0;
+        background: #eee;
+      }
+      .sval-test-ad {
+        width: 200px;
+        height: 100px;
+        background: #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Some article text.</p>
+    <div class="sval-test-rail" id="rail">
+      <div class="sval-test-ad" id="ad">Ad</div>
+    </div>
+    <div class="sval-test-rail" id="other-rail"><p>More text.</p></div>
+    <img
+      id="image"
+      width="40"
+      height="40"
+      alt=""
+      src="https://example.org/browser/browser/components/sval/test/browser/sval_element_picker_image.sjs"
+    />
+    <img
+      id="local-image"
+      width="40"
+      height="40"
+      alt=""
+      src="sval_element_picker_image.sjs?same"
+    />
+    <input id="field" />
+    <iframe id="frame" width="100" height="50" srcdoc="<p>framed</p>"></iframe>
+    <div style="height: 2000px"></div>
+  </body>
+</html>

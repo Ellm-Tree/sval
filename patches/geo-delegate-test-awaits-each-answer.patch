@@ -1,0 +1,119 @@
+Sval: browser_permission_delegate_geo.js awaits each request's answer
+
+The frame posts an answer for every geolocation request, a prompt the test
+denies included. Upstream's test listens for an answer only where no prompt
+shows, so a denied prompt's "deny" can arrive after the next request's
+listener is added, and each answer after it then reaches the listener of the
+request after its own: the ALLOW check gets the DENY check's "deny", the
+intermittent of Mozilla's bug 1775949. checkGeolocation listens for every
+answer, and a prompt's caller awaits it once it has denied the prompt.
+
+diff --git a/browser/base/content/test/permissions/browser_permission_delegate_geo.js b/browser/base/content/test/permissions/browser_permission_delegate_geo.js
+index 7d07e5fa11..b59a3ec7c7 100644
+--- a/browser/base/content/test/permissions/browser_permission_delegate_geo.js
++++ b/browser/base/content/test/permissions/browser_permission_delegate_geo.js
+@@ -57,6 +57,9 @@ async function checkNotificationBothOrigins(
+   await popuphidden;
+ }
+ 
++// Clicks the frame's geolocation button. For a prompt this resolves once the
++// prompt shows, to { answered }: a promise for the frame's answer, which comes
++// once the prompt is denied. Otherwise it resolves once the answer has come.
+ async function checkGeolocation(browser, frameId, expect) {
+   let isPrompt = expect == PromptResult.PROMPT;
+   let waitForPrompt;
+@@ -67,27 +70,21 @@ async function checkGeolocation(browser, frameId, expect) {
+     );
+   }
+ 
+-  await SpecialPowers.spawn(
++  // The frame posts one answer for each request, a denied prompt's included.
++  // Each answer is awaited before the next request, so a late one cannot reach
++  // the next request's listener.
++  let answered = SpecialPowers.spawn(
+     browser,
+     [{ frameId, expect, isPrompt }],
+     async args => {
+       let frame = content.document.getElementById(args.frameId);
+ 
+-      let waitForNoPrompt = new Promise(resolve => {
+-        function onMessage(event) {
+-          // Check the result right here because there's no notification
+-          Assert.equal(
+-            event.data,
+-            args.expect,
+-            "Correct expectation for third party"
+-          );
+-          content.window.removeEventListener("message", onMessage);
+-          resolve();
+-        }
+-
+-        if (!args.isPrompt) {
+-          content.window.addEventListener("message", onMessage);
+-        }
++      let answer = new Promise(resolve => {
++        content.window.addEventListener(
++          "message",
++          event => resolve(event.data),
++          { once: true }
++        );
+       });
+ 
+       await content.SpecialPowers.spawn(frame, [], async () => {
+@@ -101,15 +98,21 @@ async function checkGeolocation(browser, frameId, expect) {
+         });
+       });
+ 
+-      if (!args.isPrompt) {
+-        await waitForNoPrompt;
+-      }
++      // The test answers every prompt by denying it.
++      Assert.equal(
++        await answer,
++        args.isPrompt ? "deny" : args.expect,
++        "Correct expectation for third party"
++      );
+     }
+   );
+ 
+   if (isPrompt) {
+     await waitForPrompt;
++    return { answered };
+   }
++  await answered;
++  return null;
+ }
+ 
+ add_setup(async function () {
+@@ -161,7 +164,7 @@ add_task(async function testUsePersistentPermissionsFirstParty() {
+     async function (browser) {
+       async function checkPermission(aPermission, aExpect) {
+         PermissionTestUtils.add(uri, "geo", aPermission);
+-        await checkGeolocation(browser, "frame", aExpect);
++        let prompt = await checkGeolocation(browser, "frame", aExpect);
+ 
+         if (aExpect == PromptResult.PROMPT) {
+           // Notification is shown, check label and deny to clean
+@@ -181,6 +184,7 @@ add_task(async function testUsePersistentPermissionsFirstParty() {
+           EventUtils.synthesizeMouseAtCenter(notification.secondaryButton, {});
+ 
+           await popuphidden;
++          await prompt.answered;
+           SitePermissions.removeFromPrincipal(null, "geo", browser);
+         }
+ 
+@@ -234,8 +238,13 @@ add_task(async function testPromptChangeLocationUnsafePermissionDelegation() {
+       });
+       await loaded;
+ 
+-      await checkGeolocation(browser, "frameAllowsAll", PromptResult.PROMPT);
++      let prompt = await checkGeolocation(
++        browser,
++        "frameAllowsAll",
++        PromptResult.PROMPT
++      );
+       await checkNotificationBothOrigins(uri.host, "test1.example.com");
++      await prompt.answered;
+ 
+       SitePermissions.removeFromPrincipal(null, "geo", browser);
+       PermissionTestUtils.remove(uri, "geo");

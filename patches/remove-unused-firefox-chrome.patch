@@ -1,0 +1,273 @@
+Sval: remove Firefox chrome Sval never shows
+
+The Firefox View and list-all-tabs buttons, the separator under the
+bookmarks menu's toolbar item, the nav bar's private-browsing label and
+pre-tabs spacer, the downloads panel's empty text, the urlbar search-mode
+dropmarker, the bookmark star, the search one-offs, about:addons' Themes
+category and about:support's Studies and Remote Experiments sections. Sval
+replaces or drops each. Their readers outside tests take a missing element:
+gTabsPanel.canOpen asks isElementVisible, which answers false for null;
+FirefoxViewHandler reaches its button only from about:firefoxview, which
+Sval does not build; CustomizableUI.buildArea skips a placed widget with no
+node; BrowserPageActions.placeActionInUrlbar returns when an action's markup
+node is missing; the categories box finds categories by name; the rest are
+read by CSS alone. The star's other readers skip it where it is null.
+UrlbarView builds no one-offs while scotchBonnet.disableOneOffs holds,
+which is Firefox's default.
+
+diff --git a/browser/base/content/browser-places.js b/browser/base/content/browser-places.js
+index 6531738de0..80a7f50942 100644
+--- a/browser/base/content/browser-places.js
++++ b/browser/base/content/browser-places.js
+@@ -209,7 +209,7 @@ var StarUI = {
+         // the tags for the url.
+         await PlacesTransactions.Remove(guidsForRemoval).transact();
+       } else {
+-        BookmarkingUI.star.removeAttribute("starred");
++        BookmarkingUI.star?.removeAttribute("starred");
+       }
+       return;
+     }
+@@ -447,7 +447,7 @@ var PlacesCommandHook = {
+         info.guid = await PlacesTransactions.NewBookmark(info).transact();
+       } else {
+         info.guid = PlacesUtils.bookmarks.unsavedGuid;
+-        BookmarkingUI.star.setAttribute("starred", "true");
++        BookmarkingUI.star?.setAttribute("starred", "true");
+       }
+ 
+       if (charset) {
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 7b2ac0dc17..f87796d500 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -36,14 +36,6 @@
+     <hbox flex="1" align="end" class="toolbar-items">
+       <toolbartabstop/>
+       <hbox id="TabsToolbar-customization-target" flex="1">
+-        <toolbarbutton id="firefox-view-button"
+-                       class="toolbarbutton-1 chromeclass-toolbar-additional"
+-                       data-l10n-id="toolbar-button-firefox-view-2"
+-                       role="button"
+-                       aria-pressed="false"
+-                       cui-areatype="toolbar"
+-                       removable="true"/>
+-
+         <tabs id="tabbrowser-tabs"
+               is="tabbrowser-tabs"
+               aria-multiselectable="true"
+@@ -91,13 +83,6 @@
+                        cui-areatype="toolbar"
+                        removable="true"/>
+ 
+-        <toolbarbutton id="alltabs-button"
+-                       class="toolbarbutton-1 chromeclass-toolbar-additional tabs-alltabs-button"
+-                       delegatesanchor="true"
+-                       badged="true"
+-                       data-l10n-id="tabs-toolbar-list-all-tabs"
+-                       closemenu="none"
+-                       removable="true"/>
+       </hbox>
+     </hbox>
+ 
+@@ -134,7 +119,6 @@
+ 
+     <html:img id="taskbar-tabs-favicon" alt="" decoding="sync" />
+ 
+-    <hbox class="titlebar-spacer" type="pre-tabs"/>
+     <toolbartabstop/>
+ 
+     <hbox id="nav-bar-customization-target" flex="1">
+@@ -433,18 +417,7 @@
+                   data-l10n-id="urlbar-page-action-button">
+               <image class="urlbar-icon"/>
+             </hbox>
+-            <hbox id="star-button-box"
+-                  hidden="true"
+-                  role="button"
+-                  class="urlbar-page-action">
+-              <image id="star-button"
+-                      class="urlbar-icon"/>
+-            </hbox>
+           </hbox>
+-          <html:div class="search-one-offs"
+-              includecurrentengine="true"
+-              disabletab="true"
+-              urlbar-slot="search-one-offs"/>
+         </html:moz-urlbar>
+         <toolbartabstop/>
+       </toolbaritem>
+@@ -541,7 +514,6 @@
+                      data-l10n-id="appmenu-menu-button-closed2"/>
+     </toolbaritem>
+     <hbox class="titlebar-spacer" type="post-tabs"/>
+-#include private-browsing-indicator.inc.xhtml
+     <toolbarbutton class="content-analysis-indicator toolbarbutton-1 content-analysis-indicator-icon"/>
+ #include titlebar-items.inc.xhtml
+   </toolbar>
+@@ -665,7 +637,6 @@
+             <menuitem id="BMB_viewBookmarksToolbar"
+                       data-l10n-id="bookmarks-tools-toolbar-visibility-menuitem"
+                       data-l10n-args='{ "isVisible": false }'/>
+-            <menuseparator/>
+             <!-- Bookmarks toolbar items -->
+           </menupopup>
+         </menu>
+diff --git a/browser/components/downloads/content/downloadsPanel.inc.xhtml b/browser/components/downloads/content/downloadsPanel.inc.xhtml
+index deb6d013d5..7653c81c21 100644
+--- a/browser/components/downloads/content/downloadsPanel.inc.xhtml
++++ b/browser/components/downloads/content/downloadsPanel.inc.xhtml
+@@ -109,8 +109,6 @@
+                      data-l10n-id="downloads-panel-items"
+                      data-l10n-attrs="style"
+                      context="downloadsContextMenu"/>
+-        <description id="emptyDownloads"
+-                     data-l10n-id="downloads-panel-empty"/>
+       </vbox>
+       <vbox id="downloadsFooter">
+         <stack>
+diff --git a/browser/components/taskbartabs/TaskbarTabsChrome.sys.mjs b/browser/components/taskbartabs/TaskbarTabsChrome.sys.mjs
+index 2f876c6acb..d9e37064bb 100644
+--- a/browser/components/taskbartabs/TaskbarTabsChrome.sys.mjs
++++ b/browser/components/taskbartabs/TaskbarTabsChrome.sys.mjs
+@@ -26,9 +26,6 @@ export const TaskbarTabsChrome = {
+     // Ensure tab strip is hidden
+     aWindow.TabBarVisibility.update();
+ 
+-    // Hide bookmark star
+-    document.getElementById("star-button-box").style.display = "none";
+-
+     // Hide fxa in the hamburger menu
+     document.documentElement.setAttribute("fxadisabled", true);
+ 
+diff --git a/browser/components/urlbar/UrlbarValueFormatter.sys.mjs b/browser/components/urlbar/UrlbarValueFormatter.sys.mjs
+index 7ccffa60be..a5ead7cf1c 100644
+--- a/browser/components/urlbar/UrlbarValueFormatter.sys.mjs
++++ b/browser/components/urlbar/UrlbarValueFormatter.sys.mjs
+@@ -559,7 +559,7 @@ export class UrlbarValueFormatter {
+ 
+     if (
+       !trimmedValue.startsWith("@") ||
+-      this.#urlbarInput.view.oneOffSearchButtons.selectedButton
++      this.#urlbarInput.view.oneOffSearchButtons?.selectedButton
+     ) {
+       return false;
+     }
+diff --git a/browser/components/urlbar/content/UrlbarInput.mjs b/browser/components/urlbar/content/UrlbarInput.mjs
+index 53ca0cf5b1..b13413c6f5 100644
+--- a/browser/components/urlbar/content/UrlbarInput.mjs
++++ b/browser/components/urlbar/content/UrlbarInput.mjs
+@@ -137,9 +137,6 @@ export class UrlbarInput extends HTMLElement {
+                it contains text even when searchmode-switcher-title is hidden. -->
+           <html:span class="urlbar-visually-hidden" aria-hidden="true">a</html:span>
+           <html:span class="searchmode-switcher-content">
+-            <html:img class="searchmode-switcher-dropmarker"
+-                      data-l10n-id="urlbar-searchmode-dropmarker2"
+-                      draggable="false" />
+             <html:span class="searchmode-switcher-title" />
+             <html:button class="searchmode-switcher-close toolbarbutton-icon close-button"
+                          data-l10n-id="urlbar-searchmode-exit-button2"
+diff --git a/browser/components/urlbar/content/UrlbarView.mjs b/browser/components/urlbar/content/UrlbarView.mjs
+index 293cd3a680..11b1f9ba82 100644
+--- a/browser/components/urlbar/content/UrlbarView.mjs
++++ b/browser/components/urlbar/content/UrlbarView.mjs
+@@ -100,7 +100,10 @@ export class UrlbarView {
+   }
+ 
+   get oneOffSearchButtons() {
+-    if (this.input.sapName != "urlbar") {
++    if (
++      this.input.sapName != "urlbar" ||
++      lazy.UrlbarPrefs.getScotchBonnetPref("scotchBonnet.disableOneOffs")
++    ) {
+       return null;
+     }
+     if (!this.#oneOffSearchButtons) {
+diff --git a/toolkit/content/aboutSupport.js b/toolkit/content/aboutSupport.js
+index 58de33cd7d..3d913633c7 100644
+--- a/toolkit/content/aboutSupport.js
++++ b/toolkit/content/aboutSupport.js
+@@ -1640,13 +1640,7 @@ var snapshotFormatters = {
+       return;
+     }
+ 
+-    const {
+-      prefStudies,
+-      addonStudies,
+-      prefRollouts,
+-      nimbusExperiments,
+-      nimbusRollouts,
+-    } = data;
++    const { prefRollouts, nimbusRollouts } = data;
+     $.append(
+       $("remote-features-tbody"),
+       prefRollouts.map(({ slug, state }) =>
+@@ -1666,17 +1660,6 @@ var snapshotFormatters = {
+         ])
+       )
+     );
+-    $.append(
+-      $("remote-experiments-tbody"),
+-      [addonStudies, prefStudies, nimbusExperiments]
+-        .flat()
+-        .map(({ userFacingName, branch }) =>
+-          $.new("tr", [
+-            $.new("td", [document.createTextNode(userFacingName)]),
+-            $.new("td", [document.createTextNode(branch?.slug || branch)]),
+-          ])
+-        )
+-    );
+   },
+ };
+ 
+diff --git a/toolkit/content/aboutSupport.xhtml b/toolkit/content/aboutSupport.xhtml
+index d574f4aaf6..7b69d4ce8b 100644
+--- a/toolkit/content/aboutSupport.xhtml
++++ b/toolkit/content/aboutSupport.xhtml
+@@ -630,27 +630,6 @@
+         </tbody>
+       </table>
+ 
+-#ifdef MOZ_NORMANDY
+-      <!-- - - - - - - - - - - - - - - - - - - - - -->
+-      <h2 class="major-section" id="remote-experiments" data-l10n-id="support-remote-experiments-title"/>
+-
+-      <table class="prefs-table">
+-        <thead class="no-copy">
+-          <th data-l10n-id="support-remote-experiments-name"/>
+-          <th data-l10n-id="support-remote-experiments-branch"/>
+-        </thead>
+-
+-        <tbody id="remote-experiments-tbody">
+-        </tbody>
+-      </table>
+-
+-      <section id="about-studies-section" class="no-copy">
+-        <p data-l10n-id="support-remote-experiments-see-about-studies">
+-          <a data-l10n-name="support-about-studies-link" href="about:studies"></a>
+-        </p>
+-      </section>
+-
+-#endif
+       <!-- - - - - - - - - - - - - - - - - - - - - -->
+ 
+       <h2 class="major-section" id="modified-key-prefs" data-l10n-id="modified-key-prefs-title"/>
+diff --git a/toolkit/mozapps/extensions/content/components/categories-box.mjs b/toolkit/mozapps/extensions/content/components/categories-box.mjs
+index e50c662d0a..48a8f33caf 100644
+--- a/toolkit/mozapps/extensions/content/components/categories-box.mjs
++++ b/toolkit/mozapps/extensions/content/components/categories-box.mjs
+@@ -51,14 +51,6 @@ const CATEGORIES = [
+     titleL10nId: "addon-category-extension-title",
+     defaultHidden: false,
+   },
+-  {
+-    name: "theme",
+-    viewId: "addons://list/theme",
+-    iconSrc: "chrome://mozapps/skin/extensions/category-themes.svg",
+-    l10nId: "addon-category-theme",
+-    titleL10nId: "addon-category-theme-title",
+-    defaultHidden: false,
+-  },
+   {
+     name: "plugin",
+     viewId: "addons://list/plugin",

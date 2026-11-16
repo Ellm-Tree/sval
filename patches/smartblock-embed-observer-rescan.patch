@@ -1,0 +1,23 @@
+Sval: a page's embed observer rescans only for an embed it was given
+
+The embed shims' MutationObserver passes every added element's
+querySelectorAll result to createShimPlaceholders, which reads an empty
+list as "search the whole document". Allowing a page's embeds puts one
+shim's embed back, the other shim's observer rescans, and the rescan
+searches only after awaiting the add-on's strings, by which time that
+shim's own unblock has put its embed back. The embed just allowed gets
+its placeholder again.
+
+diff --git a/browser/extensions/webcompat/lib/smartblock_embeds_helper.js b/browser/extensions/webcompat/lib/smartblock_embeds_helper.js
+index 1d2f6e170c..f561c1da04 100644
+--- a/browser/extensions/webcompat/lib/smartblock_embeds_helper.js
++++ b/browser/extensions/webcompat/lib/smartblock_embeds_helper.js
+@@ -411,7 +411,7 @@ const embedHelperLib = (() => {
+             // If element is not an embed, check if any children are
+             // and replace if needed
+             let maybeEmbedNodeList = node.querySelectorAll?.(embedSelector);
+-            if (maybeEmbedNodeList) {
++            if (maybeEmbedNodeList?.length) {
+               createShimPlaceholders(maybeEmbedNodeList, SHIM_INFO);
+             }
+           }

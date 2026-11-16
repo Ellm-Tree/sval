@@ -1,0 +1,146 @@
+Sval: Mozilla's tests load other pages where they loaded pages Sval removes
+
+Sval does not build about:robots or about:firefoxview
+(no-closed-about-pages.patch), so a test that opens one as an arbitrary page
+gets an error page in its place. A test that wants a page in the parent process, as about:robots
+is, loads about:license, which Sval keeps open for the notices it shows; the
+others load a page of the harness's server. A test file has no chrome API to
+change the page it names, so the tests are patched.
+
+diff --git a/browser/components/sessionstore/test/browser_615394-SSWindowState_events_duplicateTab.js b/browser/components/sessionstore/test/browser_615394-SSWindowState_events_duplicateTab.js
+index a94b056f58..2ab402e9b8 100644
+--- a/browser/components/sessionstore/test/browser_615394-SSWindowState_events_duplicateTab.js
++++ b/browser/components/sessionstore/test/browser_615394-SSWindowState_events_duplicateTab.js
+@@ -7,7 +7,7 @@ const testState = {
+     {
+       tabs: [
+         { entries: [{ url: "about:blank", triggeringPrincipal_base64 }] },
+-        { entries: [{ url: "about:robots", triggeringPrincipal_base64 }] },
++        { entries: [{ url: "https://example.com/", triggeringPrincipal_base64 }] },
+       ],
+     },
+   ],
+@@ -45,7 +45,7 @@ function test_duplicateTab() {
+       is(busyEventCount, 1);
+       is(readyEventCount, 1);
+       is(ss.getCustomTabValue(newTab, "baz"), "qux");
+-      is(newTab.linkedBrowser.currentURI.spec, "about:robots");
++      is(newTab.linkedBrowser.currentURI.spec, "https://example.com/");
+ 
+       window.removeEventListener("SSWindowStateBusy", onSSWindowStateBusy);
+       window.removeEventListener("SSWindowStateReady", onSSWindowStateReady);
+diff --git a/browser/components/sessionstore/test/browser_closedId.js b/browser/components/sessionstore/test/browser_closedId.js
+index 4a993fe6d4..e755e00587 100644
+--- a/browser/components/sessionstore/test/browser_closedId.js
++++ b/browser/components/sessionstore/test/browser_closedId.js
+@@ -75,7 +75,7 @@ add_task(async function test_closedId_order() {
+     ],
+   });
+ 
+-  let tab = await add_new_tab("about:firefoxview");
++  let tab = await add_new_tab("https://example.org/");
+ 
+   is(
+     SessionStore.getClosedTabCountForWindow(window),
+@@ -92,7 +92,7 @@ add_task(async function test_closedId_order() {
+   // this._resetClosedTabsIds in SessionStore.sys.mjs temporarily and then the "Each tab has a unique closedId" case should fail.
+   is(initialClosedId, 0, "Initial closedId is 0");
+ 
+-  await openAndCloseTab(window, "about:robots"); // closedId should be higher than the ones we just restored.
++  await openAndCloseTab(window, "https://example.com/"); // closedId should be higher than the ones we just restored.
+ 
+   let closedData = SessionStore.getClosedTabDataForWindow(window);
+   is(closedData.length, 4, "Should have data for 4 closed tabs.");
+diff --git a/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js b/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js
+index c2768ed244..55e777457d 100644
+--- a/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js
++++ b/browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js
+@@ -50,7 +50,7 @@ async function awaitNotification(callback) {
+ 
+ add_task(async function test_closedObjectsChangedNotifications() {
+   // Create a closed window so that when we do the purge we know to expect a notification
+-  await openAndCloseWindow("about:robots");
++  await openAndCloseWindow("about:license");
+ 
+   // Forget any previous closed windows or tabs from other tests that may have
+   // run in the same session.
+@@ -62,7 +62,7 @@ add_task(async function test_closedObjectsChangedNotifications() {
+   Services.obs.addObserver(countingObserver, TOPIC);
+ 
+   info("Opening and closing initial window.");
+-  await openAndCloseWindow("about:robots");
++  await openAndCloseWindow("about:license");
+   assertNotificationCount(1);
+ 
+   // Store state with a single closed window for use in later tests.
+@@ -96,7 +96,7 @@ add_task(async function test_closedObjectsChangedNotifications() {
+   assertNotificationCount(6);
+ 
+   info("Opening and closing another window.");
+-  await openAndCloseWindow("about:robots");
++  await openAndCloseWindow("about:license");
+   assertNotificationCount(7);
+ 
+   info("Setting browser state to trigger change onIdleDaily.");
+@@ -112,7 +112,7 @@ add_task(async function test_closedObjectsChangedNotifications() {
+   assertNotificationCount(9);
+ 
+   info("Opening and closing another window.");
+-  await openAndCloseWindow("about:robots");
++  await openAndCloseWindow("about:license");
+   assertNotificationCount(10);
+ 
+   info("Purging session history.");
+diff --git a/browser/components/sessionstore/test/browser_splitview_integer_ids.js b/browser/components/sessionstore/test/browser_splitview_integer_ids.js
+index 4173f6d637..f2af98914c 100644
+--- a/browser/components/sessionstore/test/browser_splitview_integer_ids.js
++++ b/browser/components/sessionstore/test/browser_splitview_integer_ids.js
+@@ -13,7 +13,7 @@ add_task(async function test_fresh_session_sequential_integer_ids() {
+   SessionStore.resetNextClosedId();
+ 
+   let tab1 = gBrowser.tabs[0];
+-  let tab2 = BrowserTestUtils.addTab(gBrowser, "about:robots");
++  let tab2 = BrowserTestUtils.addTab(gBrowser, "https://example.com/");
+   await BrowserTestUtils.browserLoaded(tab2.linkedBrowser);
+ 
+   let splitview1 = gBrowser.addTabSplitView([tab1, tab2]);
+@@ -62,7 +62,7 @@ add_task(async function test_fresh_session_sequential_integer_ids() {
+ 
+ add_task(async function test_counter_persists_across_sessions() {
+   let tab1 = gBrowser.tabs[0];
+-  let tab2 = BrowserTestUtils.addTab(gBrowser, "about:robots");
++  let tab2 = BrowserTestUtils.addTab(gBrowser, "https://example.com/");
+   await BrowserTestUtils.browserLoaded(tab2.linkedBrowser);
+ 
+   gBrowser.addTabSplitView([tab1, tab2]);
+@@ -131,7 +131,7 @@ add_task(async function test_counter_initialized_from_persisted_value() {
+           {
+             entries: [
+               {
+-                url: "about:robots",
++                url: "https://example.com/",
+                 triggeringPrincipal_base64,
+               },
+             ],
+diff --git a/devtools/client/webconsole/test/browser/browser_console.js b/devtools/client/webconsole/test/browser/browser_console.js
+index 76784cc720..a60affd4bb 100644
+--- a/devtools/client/webconsole/test/browser/browser_console.js
++++ b/devtools/client/webconsole/test/browser/browser_console.js
+@@ -25,7 +25,7 @@ add_task(async function () {
+   await pushPref("devtools.browsertoolbox.scope", "everything");
+ 
+   // Open a parent process tab to check it doesn't have impact
+-  const aboutRobotsTab = await addTab("about:robots");
++  const aboutLicenseTab = await addTab("about:license");
+   // And open the "actual" test tab
+   const tab = await addTab(TEST_URI);
+ 
+@@ -33,7 +33,7 @@ add_task(async function () {
+ 
+   info("Close tab");
+   await removeTab(tab);
+-  await removeTab(aboutRobotsTab);
++  await removeTab(aboutLicenseTab);
+ });
+ 
+ async function testMessages() {

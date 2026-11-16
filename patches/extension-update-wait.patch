@@ -1,0 +1,35 @@
+Sval: background extension updates wait the set days
+
+An automatic update can turn an extension its users trust, and Mozilla's
+blocklist catches such an update only after it ships. A background check
+asks SvalUpdateDelay whether a found extension update has waited the days
+set in Settings before it installs it. An update the user asks for, and an
+add-on of another type, installs as Firefox installs it.
+
+diff --git a/toolkit/mozapps/extensions/AddonManager.sys.mjs b/toolkit/mozapps/extensions/AddonManager.sys.mjs
+index 3d7781c0e9..8d825327c8 100644
+--- a/toolkit/mozapps/extensions/AddonManager.sys.mjs
++++ b/toolkit/mozapps/extensions/AddonManager.sys.mjs
+@@ -92,6 +92,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   Extension: "resource://gre/modules/Extension.sys.mjs",
+   ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
+   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
++  SvalUpdateDelay:
++    "moz-src:///browser/components/sval/SvalUpdateDelay.sys.mjs",
+   TelemetryUtils: "resource://gre/modules/TelemetryUtils.sys.mjs",
+   isGatedPermissionType:
+     "resource://gre/modules/addons/siteperms-addon-utils.sys.mjs",
+@@ -1407,7 +1409,12 @@ var AddonManagerInternal = {
+                     // Start installing updates when the add-on can be updated and
+                     // background updates should be applied.
+                     logger.debug("Found update for add-on ${id}", aAddon);
+-                    if (AddonManager.shouldAutoUpdate(aAddon)) {
++                    if (
++                      AddonManager.shouldAutoUpdate(aAddon) &&
++                      // Sval: an extension update waits the days set in
++                      // Settings before a background check installs it.
++                      lazy.SvalUpdateDelay.mayInstall(aAddon, aInstall.version)
++                    ) {
+                       // XXX we really should resolve when this install is done,
+                       // not when update-available check completes, no?
+                       logger.debug(`Starting upgrade install of ${aAddon.id}`);

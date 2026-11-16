@@ -1,0 +1,9 @@
+<!-- SPDX-License-Identifier: LicenseRef-sval-brand-art
+   - Copyright 2026 Ellm Tree, Inc. Reserved: see branding/sval/LICENSE. -->
+<!-- Sval's mark as a 16px monochrome glyph, in the theme's icon colour. It
+     stands in for Firefox's logo glyphs (see jar.mn). The path and its slant
+     are the app icon's "S" (branding/sval/src/masters/02-app-icon-small-16.svg),
+     framed to fill the glyph and stroked at an icon's weight. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="224 212 600 600" fill="none" stroke="context-fill" stroke-opacity="context-fill-opacity" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+  <path transform="translate(524 512) skewX(-6) translate(-534 -525)" d="M700 370 C670 322 614 300 542 300 C452 300 394 344 394 410 C394 476 454 504 540 522 C636 542 696 576 696 640 C696 708 632 750 536 750 C456 750 398 726 368 676"/>
+</svg>

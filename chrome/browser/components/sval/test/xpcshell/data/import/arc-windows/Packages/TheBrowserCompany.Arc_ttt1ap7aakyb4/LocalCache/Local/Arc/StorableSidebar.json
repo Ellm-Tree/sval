@@ -1,0 +1,808 @@
+{
+ "version": 1,
+ "sidebar": {
+  "containers": [
+   {
+    "global": {}
+   },
+   {
+    "spaces": [
+     "thebrowser.company.defaultPersonalSpaceID",
+     {
+      "containerIDs": [
+       "pinned",
+       "thebrowser.company.defaultPersonalSpacePinnedContainerID",
+       "unpinned",
+       "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID"
+      ],
+      "customInfo": {
+       "iconType": {
+        "icon": "planet"
+       }
+      },
+      "profile": {
+       "default": true
+      },
+      "id": "thebrowser.company.defaultPersonalSpaceID",
+      "newContainerIDs": [
+       {
+        "pinned": {}
+       },
+       "thebrowser.company.defaultPersonalSpacePinnedContainerID",
+       {
+        "unpinned": {
+         "_0": {
+          "shared": {}
+         }
+        }
+       },
+       "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID"
+      ]
+     },
+     "385D595A-DAF7-4064-B9CE-6C565C6D3112",
+     {
+      "profile": {
+       "default": true
+      },
+      "id": "385D595A-DAF7-4064-B9CE-6C565C6D3112",
+      "newContainerIDs": [
+       {
+        "pinned": {}
+       },
+       "B59A41DF-B83C-4811-BDD5-673A8FE4E0B9",
+       {
+        "unpinned": {
+         "_0": {
+          "shared": {}
+         }
+        }
+       },
+       "6436F4DF-0478-48D4-85B5-6CB6888369CD"
+      ],
+      "containerIDs": [
+       "pinned",
+       "B59A41DF-B83C-4811-BDD5-673A8FE4E0B9",
+       "unpinned",
+       "6436F4DF-0478-48D4-85B5-6CB6888369CD"
+      ],
+      "title": "work",
+      "customInfo": {
+       "windowTheme": {
+        "primaryColorPalette": {
+         "tintedLight": {
+          "green": 0.9882352941176471,
+          "colorSpace": "extendedSRGB",
+          "red": 0.8941176470588236,
+          "blue": 0.9254901960784314,
+          "alpha": 1
+         },
+         "shadedDark": {
+          "green": 0.4,
+          "colorSpace": "extendedSRGB",
+          "red": 0.08235294117647059,
+          "blue": 0.19215686274509805,
+          "alpha": 1
+         },
+         "shaded": {
+          "red": 0.25882352941176473,
+          "blue": 0.4549019607843137,
+          "alpha": 1,
+          "green": 0.8313725490196079,
+          "colorSpace": "extendedSRGB"
+         },
+         "midTone": {
+          "alpha": 1,
+          "green": 0.8313725490196079,
+          "colorSpace": "extendedSRGB",
+          "blue": 0.4549019607843137,
+          "red": 0.25882352941176473
+         }
+        },
+        "semanticColorPalette": {
+         "appearanceBased": {
+          "dark": {
+           "subtitle": {
+            "green": 0.49411764705882355,
+            "red": 0.4470588235294118,
+            "blue": 0.4627450980392157,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "cutoutColor": {
+            "green": 0.4,
+            "red": 0.08235294117647059,
+            "blue": 0.19215686274509805,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "hover": {
+            "alpha": 0.47843137254901963,
+            "green": 0.5647058823529412,
+            "red": 0.3333333333333333,
+            "blue": 0.4117647058823529,
+            "colorSpace": "extendedSRGB"
+           },
+           "foregroundPrimary": {
+            "alpha": 1,
+            "colorSpace": "extendedSRGB",
+            "blue": 0.9254901960784314,
+            "green": 0.9882352941176471,
+            "red": 0.8941176470588236
+           },
+           "foregroundTertiary": {
+            "green": 0.8313725490196079,
+            "red": 0.25882352941176473,
+            "blue": 0.4549019607843137,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "backgroundExtra": {
+            "alpha": 1,
+            "red": 0.011764705882352941,
+            "green": 0.058823529411764705,
+            "blue": 0.027450980392156862,
+            "colorSpace": "extendedSRGB"
+           },
+           "foregroundSecondary": {
+            "alpha": 1,
+            "green": 0.8313725490196079,
+            "red": 0.25882352941176473,
+            "blue": 0.4549019607843137,
+            "colorSpace": "extendedSRGB"
+           },
+           "maxContrastColor": {
+            "alpha": 1,
+            "red": 0.8941176470588236,
+            "green": 0.9882352941176471,
+            "blue": 0.9254901960784314,
+            "colorSpace": "extendedSRGB"
+           },
+           "background": {
+            "green": 0.11764705882352941,
+            "red": 0.023529411764705882,
+            "blue": 0.058823529411764705,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "focus": {
+            "green": 0.5176470588235295,
+            "red": 0.2627450980392157,
+            "blue": 0.34901960784313724,
+            "alpha": 0.803921568627451,
+            "colorSpace": "extendedSRGB"
+           },
+           "minContrastColor": {
+            "alpha": 1,
+            "colorSpace": "extendedSRGB",
+            "green": 0.4,
+            "red": 0.08235294117647059,
+            "blue": 0.19215686274509805
+           },
+           "title": {
+            "red": 0.8627450980392157,
+            "green": 0.9098039215686274,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB",
+            "blue": 0.8784313725490196
+           }
+          },
+          "light": {
+           "backgroundExtra": {
+            "red": 0.9921568627450981,
+            "green": 0.996078431372549,
+            "blue": 0.9921568627450981,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "background": {
+            "red": 0.9098039215686274,
+            "green": 0.9411764705882353,
+            "blue": 0.9215686274509803,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "hover": {
+            "blue": 0.8392156862745098,
+            "alpha": 1,
+            "green": 0.8784313725490196,
+            "colorSpace": "extendedSRGB",
+            "red": 0.8156862745098039
+           },
+           "foregroundTertiary": {
+            "alpha": 1,
+            "colorSpace": "extendedSRGB",
+            "red": 0.8941176470588236,
+            "green": 0.9882352941176471,
+            "blue": 0.9254901960784314
+           },
+           "title": {
+            "colorSpace": "extendedSRGB",
+            "alpha": 1,
+            "green": 0.11764705882352941,
+            "blue": 0.058823529411764705,
+            "red": 0.023529411764705882
+           },
+           "subtitle": {
+            "green": 0.7607843137254902,
+            "red": 0.6313725490196078,
+            "blue": 0.6784313725490196,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "focus": {
+            "red": 0.5411764705882353,
+            "blue": 0.596078431372549,
+            "green": 0.7019607843137254,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "foregroundSecondary": {
+            "alpha": 1,
+            "colorSpace": "extendedSRGB",
+            "red": 0.25882352941176473,
+            "green": 0.8313725490196079,
+            "blue": 0.4549019607843137
+           },
+           "foregroundPrimary": {
+            "colorSpace": "extendedSRGB",
+            "red": 0.25882352941176473,
+            "green": 0.8313725490196079,
+            "alpha": 1,
+            "blue": 0.4549019607843137
+           },
+           "cutoutColor": {
+            "blue": 0.9254901960784314,
+            "alpha": 1,
+            "green": 0.9882352941176471,
+            "colorSpace": "extendedSRGB",
+            "red": 0.8941176470588236
+           },
+           "minContrastColor": {
+            "red": 0.8941176470588236,
+            "green": 0.9882352941176471,
+            "blue": 0.9254901960784314,
+            "alpha": 1,
+            "colorSpace": "extendedSRGB"
+           },
+           "maxContrastColor": {
+            "green": 0.4,
+            "red": 0.08235294117647059,
+            "blue": 0.19215686274509805,
+            "colorSpace": "extendedSRGB",
+            "alpha": 1
+           }
+          }
+         }
+        },
+        "background": {
+         "single": {
+          "_0": {
+           "isVibrant": true,
+           "contentOverBackgroundAppearance": "light",
+           "style": {
+            "color": {
+             "_0": {
+              "blendedSingleColor": {
+               "_0": {
+                "color": {
+                 "red": 0.8941176470588236,
+                 "blue": 0.9254901960784314,
+                 "alpha": 1,
+                 "green": 0.9882352941176471,
+                 "colorSpace": "extendedSRGB"
+                },
+                "translucencyStyle": "light",
+                "modifiers": {
+                 "intensityFactor": 0.8,
+                 "noiseFactor": 0,
+                 "overlay": "grain"
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    ],
+    "topAppsContainerIDs": [
+     {
+      "default": true
+     },
+     "A4E6F5DD-BA11-4186-A283-EC41CEA8FDA6"
+    ],
+    "items": [
+     "pinnedTabsEdu",
+     {
+      "id": "pinnedTabsEdu",
+      "parentID": "thebrowser.company.arcBasicsFolderID",
+      "data": {
+       "tab": {
+        "savedURL": "https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around",
+        "savedTitle": "Pinned Tabs"
+       }
+      },
+      "childrenIds": [],
+      "createdAt": 815350650.1756935,
+      "title": "Pinned Tabs",
+      "isUnread": false
+     },
+     "arcTwitter",
+     {
+      "data": {
+       "tab": {
+        "savedURL": "https://twitter.com/arcinternet",
+        "savedTitle": "Arc"
+       }
+      },
+      "id": "arcTwitter",
+      "isUnread": false,
+      "createdAt": 815350650.1756935,
+      "title": "Arc",
+      "parentID": "thebrowser.company.arcBasics.splitViewID",
+      "childrenIds": []
+     },
+     "spacesEdu",
+     {
+      "childrenIds": [],
+      "parentID": "thebrowser.company.arcBasicsFolderID",
+      "isUnread": false,
+      "title": "Spaces",
+      "id": "spacesEdu",
+      "data": {
+       "tab": {
+        "savedTitle": "Spaces",
+        "savedURL": "https://resources.arc.net/hc/en-us/articles/19228064149143-Spaces-Distinct-Browsing-Areas"
+       }
+      },
+      "createdAt": 815350650.1756935
+     },
+     "browserCompanyYouTube",
+     {
+      "id": "browserCompanyYouTube",
+      "parentID": "thebrowser.company.arcBasicsFolderID",
+      "data": {
+       "tab": {
+        "savedURL": "https://www.youtube.com/@TheBrowserCompany/videos",
+        "savedTitle": "The Browser Company"
+       }
+      },
+      "childrenIds": [],
+      "createdAt": 815350650.1756935,
+      "title": "The Browser Company",
+      "isUnread": false
+     },
+     "4BCCCCCA-8AE5-41F8-87AA-A3A93C751F32",
+     {
+      "id": "4BCCCCCA-8AE5-41F8-87AA-A3A93C751F32",
+      "parentID": "0FD8CD62-7D3F-4261-8E4C-C70C1B04D398",
+      "data": {
+       "tab": {
+        "savedTitle": "seriouseats.com",
+        "timeLastActiveAt": 815353709.749052,
+        "savedURL": "https://www.seriouseats.com/",
+        "activeTabBeforeCreationID": "62D32F96-6714-4FF2-A017-0515B379AD6B"
+       }
+      },
+      "childrenIds": [],
+      "createdAt": 815353673.0633965,
+      "title": null,
+      "isUnread": false
+     },
+     "thebrowser.company.defaultPersonalSpacePinnedContainerID",
+     {
+      "createdAt": 815350650.1734905,
+      "title": null,
+      "isUnread": false,
+      "id": "thebrowser.company.defaultPersonalSpacePinnedContainerID",
+      "parentID": null,
+      "data": {
+       "itemContainer": {
+        "containerType": {
+         "spaceItems": {
+          "_0": "thebrowser.company.defaultPersonalSpaceID"
+         }
+        }
+       }
+      },
+      "childrenIds": [
+       "thebrowser.company.arcBasicsFolderID",
+       "FC67A295-A4E1-4534-BBA1-2AA85546B88C"
+      ]
+     },
+     "splitViewEdu",
+     {
+      "data": {
+       "tab": {
+        "savedTitle": "Split View",
+        "savedURL": "https://resources.arc.net/hc/en-us/articles/19335393146775-Split-View-View-Multiple-Tabs-at-Once"
+       }
+      },
+      "parentID": "thebrowser.company.arcBasicsFolderID",
+      "isUnread": false,
+      "createdAt": 815350650.1756935,
+      "id": "splitViewEdu",
+      "title": "Split View",
+      "childrenIds": []
+     },
+     "0FD8CD62-7D3F-4261-8E4C-C70C1B04D398",
+     {
+      "id": "0FD8CD62-7D3F-4261-8E4C-C70C1B04D398",
+      "data": {
+       "splitView": {
+        "timeLastActiveAt": 815353709.749052,
+        "focusItemID": null,
+        "layoutOrientation": "horizontal",
+        "itemWidthFactors": [],
+        "customInfo": null
+       }
+      },
+      "createdAt": 815353709.7455139,
+      "title": null,
+      "isUnread": false,
+      "childrenIds": [
+       "4BCCCCCA-8AE5-41F8-87AA-A3A93C751F32",
+       "F4C5C36D-86F3-45CC-B819-14F64C3FD8B9"
+      ],
+      "parentID": "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID"
+     },
+     "363CA7B5-E202-4AE8-9DAD-E9A7800F86DC",
+     {
+      "data": {
+       "tab": {
+        "timeLastActiveAt": 815353819.0883331,
+        "activeTabBeforeCreationID": "FA9CE923-8164-49B2-8DB3-05327E8C6254",
+        "savedURL": "https://developer.mozilla.org/en-US/",
+        "savedTitle": "MDN Web Docs"
+       }
+      },
+      "parentID": "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID",
+      "isUnread": false,
+      "createdAt": 815353819.0877075,
+      "id": "363CA7B5-E202-4AE8-9DAD-E9A7800F86DC",
+      "title": null,
+      "childrenIds": []
+     },
+     "browserCompanySubstack",
+     {
+      "id": "browserCompanySubstack",
+      "data": {
+       "tab": {
+        "savedTitle": "Keeping Tabs",
+        "savedURL": "https://browsercompany.substack.com/archive"
+       }
+      },
+      "createdAt": 815350650.1756935,
+      "title": "Keeping Tabs",
+      "isUnread": false,
+      "childrenIds": [],
+      "parentID": "thebrowser.company.arcBasics.splitViewID"
+     },
+     "6436F4DF-0478-48D4-85B5-6CB6888369CD",
+     {
+      "data": {
+       "itemContainer": {
+        "containerType": {
+         "spaceItems": {
+          "_0": "385D595A-DAF7-4064-B9CE-6C565C6D3112"
+         }
+        }
+       }
+      },
+      "parentID": null,
+      "isUnread": false,
+      "createdAt": 815353793.0602283,
+      "id": "6436F4DF-0478-48D4-85B5-6CB6888369CD",
+      "title": null,
+      "childrenIds": [
+       "498B19E3-B0B8-4C2C-8832-A486E42AC1BD",
+       "846C59E0-9788-4329-A25B-11E78E5C6838",
+       "1C335F3B-7476-4532-8414-4188098495F3"
+      ]
+     },
+     "gmail",
+     {
+      "id": "gmail",
+      "data": {
+       "tab": {
+        "savedURL": "https://mail.google.com",
+        "savedTitle": "Gmail"
+       }
+      },
+      "createdAt": 815350650.1693954,
+      "title": "Gmail",
+      "isUnread": false,
+      "childrenIds": [],
+      "parentID": "A4E6F5DD-BA11-4186-A283-EC41CEA8FDA6"
+     },
+     "A4E6F5DD-BA11-4186-A283-EC41CEA8FDA6",
+     {
+      "id": "A4E6F5DD-BA11-4186-A283-EC41CEA8FDA6",
+      "data": {
+       "itemContainer": {
+        "containerType": {
+         "topApps": {
+          "_0": {
+           "default": true
+          }
+         }
+        }
+       }
+      },
+      "createdAt": 815350650.1714802,
+      "title": null,
+      "isUnread": false,
+      "childrenIds": [
+       "gmail",
+       "googleCalendar"
+      ],
+      "parentID": null
+     },
+     "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID",
+     {
+      "data": {
+       "itemContainer": {
+        "containerType": {
+         "spaceItems": {
+          "_0": "thebrowser.company.defaultPersonalSpaceID"
+         }
+        }
+       }
+      },
+      "createdAt": 815350650.1735096,
+      "parentID": null,
+      "title": null,
+      "isUnread": false,
+      "childrenIds": [
+       "363CA7B5-E202-4AE8-9DAD-E9A7800F86DC",
+       "FA9CE923-8164-49B2-8DB3-05327E8C6254",
+       "0FD8CD62-7D3F-4261-8E4C-C70C1B04D398"
+      ],
+      "id": "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID"
+     },
+     "498B19E3-B0B8-4C2C-8832-A486E42AC1BD",
+     {
+      "data": {
+       "tab": {
+        "timeLastActiveAt": 815353928.333971,
+        "activeTabBeforeCreationID": "846C59E0-9788-4329-A25B-11E78E5C6838",
+        "savedURL": "https://developer.mozilla.org/en-US/",
+        "savedTitle": "MDN Web Docs"
+       }
+      },
+      "createdAt": 815353869.8222046,
+      "parentID": "6436F4DF-0478-48D4-85B5-6CB6888369CD",
+      "title": null,
+      "isUnread": false,
+      "childrenIds": [],
+      "id": "498B19E3-B0B8-4C2C-8832-A486E42AC1BD"
+     },
+     "importEdu",
+     {
+      "id": "importEdu",
+      "createdAt": 815350650.1756935,
+      "data": {
+       "tab": {
+        "savedTitle": "Import Bookmarks",
+        "savedURL": "https://resources.arc.net/hc/en-us/articles/19335089616791-Import-Bookmarks-Logins-History-Extensions-from-Your-Previous-Browser"
+       }
+      },
+      "title": "Import Bookmarks",
+      "isUnread": false,
+      "childrenIds": [],
+      "parentID": "thebrowser.company.arcBasicsFolderID"
+     },
+     "thebrowser.company.arcBasics.splitViewID",
+     {
+      "id": "thebrowser.company.arcBasics.splitViewID",
+      "data": {
+       "splitView": {
+        "itemWidthFactors": [],
+        "timeLastActiveAt": null,
+        "customInfo": null,
+        "focusItemID": null,
+        "layoutOrientation": "horizontal"
+       }
+      },
+      "createdAt": 815350650.1756935,
+      "title": null,
+      "isUnread": false,
+      "childrenIds": [
+       "browserCompanySubstack",
+       "arcTwitter"
+      ],
+      "parentID": "thebrowser.company.arcBasicsFolderID"
+     },
+     "E95255CD-AF0F-463B-91D1-5A230ABEF06D",
+     {
+      "createdAt": 815353652.5383053,
+      "title": null,
+      "parentID": "FC67A295-A4E1-4534-BBA1-2AA85546B88C",
+      "isUnread": false,
+      "id": "E95255CD-AF0F-463B-91D1-5A230ABEF06D",
+      "data": {
+       "tab": {
+        "savedURL": "https://en.wikipedia.org/wiki/Fjord",
+        "savedTitle": "Fjord - Wikipedia",
+        "timeLastActiveAt": 815353748.3527412
+       }
+      },
+      "childrenIds": []
+     },
+     "1C335F3B-7476-4532-8414-4188098495F3",
+     {
+      "title": null,
+      "childrenIds": [],
+      "parentID": "6436F4DF-0478-48D4-85B5-6CB6888369CD",
+      "isUnread": false,
+      "createdAt": 815353826.1101456,
+      "data": {
+       "tab": {
+        "savedURL": "https://news.ycombinator.com/",
+        "activeTabBeforeCreationID": "363CA7B5-E202-4AE8-9DAD-E9A7800F86DC",
+        "timeLastActiveAt": 815353826.1108227,
+        "savedTitle": "Hacker News"
+       }
+      },
+      "id": "1C335F3B-7476-4532-8414-4188098495F3"
+     },
+     "FC67A295-A4E1-4534-BBA1-2AA85546B88C",
+     {
+      "childrenIds": [
+       "E95255CD-AF0F-463B-91D1-5A230ABEF06D",
+       "22C84EA3-F951-44FF-A414-B8DE20C81EF5"
+      ],
+      "createdAt": 815353728.4959545,
+      "data": {
+       "list": {}
+      },
+      "isUnread": false,
+      "id": "FC67A295-A4E1-4534-BBA1-2AA85546B88C",
+      "title": "trip",
+      "parentID": "thebrowser.company.defaultPersonalSpacePinnedContainerID"
+     },
+     "F4C5C36D-86F3-45CC-B819-14F64C3FD8B9",
+     {
+      "id": "F4C5C36D-86F3-45CC-B819-14F64C3FD8B9",
+      "childrenIds": [],
+      "isUnread": false,
+      "data": {
+       "tab": {
+        "timeLastActiveAt": 815353709.749052,
+        "savedTitle": "NYT Cooking - Recipes and Cooking Guides From The New York Times",
+        "savedURL": "https://cooking.nytimes.com/",
+        "activeTabBeforeCreationID": "4BCCCCCA-8AE5-41F8-87AA-A3A93C751F32"
+       }
+      },
+      "parentID": "0FD8CD62-7D3F-4261-8E4C-C70C1B04D398",
+      "createdAt": 815353680.0777569,
+      "title": null
+     },
+     "shortcutsEdu",
+     {
+      "childrenIds": [],
+      "createdAt": 815350650.1756935,
+      "id": "shortcutsEdu",
+      "parentID": "thebrowser.company.arcBasicsFolderID",
+      "isUnread": false,
+      "title": "Shortcuts",
+      "data": {
+       "tab": {
+        "savedTitle": "Shortcuts",
+        "savedURL": "https://resources.arc.net/hc/en-us/articles/20595231349911-Shortcuts"
+       }
+      }
+     },
+     "googleCalendar",
+     {
+      "data": {
+       "tab": {
+        "savedTitle": "Google Calendar",
+        "savedURL": "https://calendar.google.com"
+       }
+      },
+      "title": "Google Calendar",
+      "createdAt": 815350650.1708488,
+      "isUnread": false,
+      "id": "googleCalendar",
+      "parentID": "A4E6F5DD-BA11-4186-A283-EC41CEA8FDA6",
+      "childrenIds": []
+     },
+     "22C84EA3-F951-44FF-A414-B8DE20C81EF5",
+     {
+      "id": "22C84EA3-F951-44FF-A414-B8DE20C81EF5",
+      "isUnread": false,
+      "data": {
+       "tab": {
+        "activeTabBeforeCreationID": "E95255CD-AF0F-463B-91D1-5A230ABEF06D",
+        "savedTitle": "OpenStreetMap",
+        "timeLastActiveAt": 815353808.2401676,
+        "savedURL": "https://www.openstreetmap.org/#map=4/38.01/-95.84"
+       }
+      },
+      "title": null,
+      "createdAt": 815353658.999937,
+      "childrenIds": [],
+      "parentID": "FC67A295-A4E1-4534-BBA1-2AA85546B88C"
+     },
+     "B59A41DF-B83C-4811-BDD5-673A8FE4E0B9",
+     {
+      "childrenIds": [],
+      "createdAt": 815353793.0602264,
+      "title": null,
+      "data": {
+       "itemContainer": {
+        "containerType": {
+         "spaceItems": {
+          "_0": "385D595A-DAF7-4064-B9CE-6C565C6D3112"
+         }
+        }
+       }
+      },
+      "parentID": null,
+      "isUnread": false,
+      "id": "B59A41DF-B83C-4811-BDD5-673A8FE4E0B9"
+     },
+     "thebrowser.company.arcBasicsFolderID",
+     {
+      "data": {
+       "list": {}
+      },
+      "id": "thebrowser.company.arcBasicsFolderID",
+      "title": "Arc Basics",
+      "createdAt": 815350650.1756935,
+      "isUnread": false,
+      "parentID": "thebrowser.company.defaultPersonalSpacePinnedContainerID",
+      "childrenIds": [
+       "pinnedTabsEdu",
+       "spacesEdu",
+       "splitViewEdu",
+       "importEdu",
+       "shortcutsEdu",
+       "browserCompanyYouTube",
+       "thebrowser.company.arcBasics.splitViewID"
+      ]
+     },
+     "FA9CE923-8164-49B2-8DB3-05327E8C6254",
+     {
+      "isUnread": false,
+      "childrenIds": [],
+      "title": null,
+      "createdAt": 815353811.9393501,
+      "id": "FA9CE923-8164-49B2-8DB3-05327E8C6254",
+      "data": {
+       "tab": {
+        "savedURL": "https://linear.app/",
+        "timeLastActiveAt": 815353811.9398937,
+        "activeTabBeforeCreationID": "22C84EA3-F951-44FF-A414-B8DE20C81EF5",
+        "savedTitle": "Linear – The system for product development"
+       }
+      },
+      "parentID": "thebrowser.company.defaultPersonalSpaceUnpinnedContainerID"
+     },
+     "846C59E0-9788-4329-A25B-11E78E5C6838",
+     {
+      "parentID": "6436F4DF-0478-48D4-85B5-6CB6888369CD",
+      "childrenIds": [],
+      "isUnread": false,
+      "id": "846C59E0-9788-4329-A25B-11E78E5C6838",
+      "title": null,
+      "data": {
+       "tab": {
+        "savedURL": "https://linear.app/",
+        "savedTitle": "Linear – The system for product development",
+        "activeTabBeforeCreationID": "1C335F3B-7476-4532-8414-4188098495F3",
+        "timeLastActiveAt": 815353868.7594395
+       }
+      },
+      "createdAt": 815353862.7114735
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,57 @@
+---
+title: Move a tab to another Workspace
+description: Send a tab or a group to another Workspace from its menu, or drag a tab into another window.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+A tab belongs to one Workspace. You can move a tab, or a whole group, to
+another Workspace.
+
+You opened a Codeberg issue while in Home, but the issue belongs with your
+Work tabs.
+
+<Screenshot name="docs-move-to-workspace" frame="rounded" maxWidth={400} alt="A tab's menu with Move to Workspace open, listing Home, Ceramics Shop, New Workspace…, and two agent Workspaces" />
+
+## Move it with the menu
+
+1. In the Workspace, right-click the tab, then choose **Move to Workspace**.
+2. Choose the Workspace you want the tab in.
+
+The tab leaves this Workspace and goes to the end of the other
+Workspace. The window stays on the Workspace it was showing.
+
+To move the tab to a Workspace that doesn't exist yet, choose **New Workspace…**
+in step 2. Sval asks for the new Workspace's name, color, and emoji, then
+moves the tab there.
+
+## Drag it to another window
+
+When the other Workspace is open in its own window:
+
+1. Drag the tab's row into the other window's Workspace panel.
+2. Drop the tab where you want it among that Workspace's tabs.
+
+The tab joins that window's Workspace where you drop it.
+
+## Details
+
+- You can move a group the same way, with everything inside it.
+  Right-click the group, then choose **Move to Workspace**.
+- To move several tabs at once, select their rows first. To add a row to
+  the selection, <kbd>⌘</kbd>-click the row (Ctrl-click on Windows and
+  Linux). To select every row in between, Shift-click. Then right-click one
+  of the selected rows.
+- Dragging into another window moves one tab at a time. It doesn't move a
+  group, a Split, or a selection of several rows.
+- A tab you move to another window in any other way, for example with an
+  extension, also joins that window's Workspace.
+- When either Workspace is isolated, Sval asks before it moves the tab. The
+  tab reloads in the other Workspace, and you might need to sign in again
+  there. See [Isolate a Workspace](/docs/how-to/workspaces/isolate-a-workspace/).
+
+## Related pages
+
+- [Open a Workspace in a new window](/docs/how-to/workspaces/open-a-workspace-in-a-new-window/)
+- [Create a Workspace](/docs/how-to/workspaces/create-a-workspace/)
+- [What an isolated Workspace keeps apart](/docs/explanation/isolated-workspaces/)

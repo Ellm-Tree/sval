@@ -1,0 +1,18 @@
+Sval: load Sval's sheet inside Screenshots' overlay
+
+The overlay draws in a shadow root in the page's anonymous content,
+which no window or page sheet reaches. One more link after
+`overlay.css` puts Sval's `sval-screenshots-overlay.css` in that root.
+
+diff --git a/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs b/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs
+index a3f628cea0..d6d73b4c85 100644
+--- a/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs
++++ b/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs
+@@ -109,6 +109,7 @@ export class ScreenshotsOverlay {
+     return `
+       <template>
+         <link rel="stylesheet" href="chrome://browser/content/screenshots/overlay/overlay.css" />
++        <link rel="stylesheet" href="chrome://browser/content/sval/sval-screenshots-overlay.css" />
+         <div id="screenshots-component">
+           <div id="preview-container" hidden>
+             <div id="face-container" tabindex="0" role="button" aria-label="${previewFaceAriaLabel.attributes[0].value}">

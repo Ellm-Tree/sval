@@ -1,0 +1,45 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+#include "nsISupports.idl"
+
+interface nsIHelperAppLauncherDialog;
+interface nsITransfer;
+
+webidl BrowsingContext;
+
+/**
+ * What Sval decides about a web page's file pickers, downloads and clipboard
+ * writes, asked in the parent process where Gecko makes them. An agent
+ * controls a tab only until the user takes it, so each answer is for the
+ * moment it is asked.
+ */
+[scriptable, uuid(69439c09-14de-4cbf-b985-d99156f3e3ee)]
+interface nsISvalAgentFiles : nsISupports
+{
+  /**
+   * Whether a file picker a page in aContext asks for is refused, as one
+   * cancelled with nothing chosen.
+   */
+  boolean refusesFilePicker(in BrowsingContext aContext);
+
+  /**
+   * Whether a write of the system clipboard by a page in aContext is
+   * refused. Every content write reaches the parent's clipboard with the
+   * window it came from: a script's, and the copy command's while the page's
+   * copy event can replace the data.
+   */
+  boolean refusesClipboardWrite(in BrowsingContext aContext);
+
+  /**
+   * The dialog that decides a download from a page in aContext, or null for
+   * the one Firefox would use.
+   */
+  nsIHelperAppLauncherDialog downloadDialog(in BrowsingContext aContext);
+
+  /**
+   * The transfer a download from a page in aContext is handed to, or null
+   * for the one Firefox would use.
+   */
+  nsITransfer downloadTransfer(in BrowsingContext aContext);
+};

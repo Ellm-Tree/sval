@@ -1,0 +1,48 @@
+Sval: a content-classifier feature that is off drops its engine and stales its builds
+
+ContentClassifierService::ProcessListChanges skipped a feature that the
+engines prefs leave out, so lists that changed while it was off marked
+nothing out of date. Turning it straight back on found its old engine
+still installed and did not rebuild it, and a build scheduled just
+before it went off, for the lists Off wrote, then installed over it:
+Sval's ads stopped blocking until some other list changed. The fix: a feature
+that is off drops its engine and bumps its version, so turning it on
+builds from the lists it names then and an older build goes stale.
+
+PruneInactiveEngines also erased an off feature's version. The next
+version then restarted at one, equal to the version a build scheduled
+before the feature went off had captured, so that build counted as
+current. The fix keeps versions past the engines they guard.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index 900c3a7178..35fee5427e 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -1301,11 +1301,9 @@ void ContentClassifierService::PruneInactiveEngines(
+       iter.Remove();
+     }
+   }
+-  for (auto iter = mFeatureVersions.Iter(); !iter.Done(); iter.Next()) {
+-    if (!activeFeatureNames.Contains(iter.Key())) {
+-      iter.Remove();
+-    }
+-  }
++  // Sval: a feature's version outlives its engine. A version that restarted
++  // when the feature turned off would let a build scheduled before that
++  // install over one scheduled after it turned back on.
+ }
+ 
+ void ContentClassifierService::ProcessListChanges(
+@@ -1323,6 +1321,12 @@ void ContentClassifierService::ProcessListChanges(
+     MutexAutoLock lock(mLock);
+     for (const auto& feature : GetFeatures()) {
+       if (!activeNames.Contains(nsCString(feature.mName))) {
++        // Sval: a feature that is off keeps no engine, and a build under way
++        // for it goes stale, so turning it on builds from the lists it names
++        // then. Its lists can change while it is off, and nothing else marks
++        // the engine it had as out of date.
++        mEngines.Remove(nsCString(feature.mName));
++        ++mFeatureVersions.LookupOrInsert(feature.mName);
+         continue;
+       }
+       bool affected = &feature == aRebuild ||

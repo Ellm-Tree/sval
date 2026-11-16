@@ -1,0 +1,39 @@
+Sval: about:home and about:newtab show Sval's home page
+
+The about: module for both pages (AboutNewTabRedirector) builds its channel
+from the activity stream's resource:// document, in the parent and in the
+privileged content process alike. No pref selects another document, and a
+chrome manifest override reaches only chrome:// URLs, so the one way to serve
+Sval's page under those addresses is this getter. Everything else stays
+Firefox's: the address bar still reads about:newtab, the preloaded new tab
+still works, and the ContentSearch actor still attaches, which is what the
+page searches through. about:privatebrowsing needs no patch: its address maps
+to a chrome:// URL, which Sval's jar.mn overrides.
+
+diff --git a/browser/components/newtab/AboutNewTabRedirector.sys.mjs b/browser/components/newtab/AboutNewTabRedirector.sys.mjs
+index 33ebe5111a..ce7b505e71 100644
+--- a/browser/components/newtab/AboutNewTabRedirector.sys.mjs
++++ b/browser/components/newtab/AboutNewTabRedirector.sys.mjs
+@@ -425,21 +425,7 @@ class BaseAboutNewTabRedirector {
+    * the newtab page has no effect on the result of this function.
+    */
+   get defaultURL() {
+-    if (this.remoteRendererEnabled) {
+-      return "resource://newtab/data/content/remote-renderer-host.html";
+-    }
+-
+-    // Generate the desired activity stream resource depending on state, e.g.,
+-    // "resource://newtab/prerendered/activity-stream.html"
+-    // "resource://newtab/prerendered/activity-stream-debug.html"
+-    // "resource://newtab/prerendered/activity-stream-noscripts.html"
+-    return [
+-      "resource://newtab/prerendered/",
+-      "activity-stream",
+-      this.activityStreamDebug && this.selfLoadingEnabled ? "-debug" : "",
+-      this.selfLoadingEnabled ? "" : "-noscripts",
+-      ".html",
+-    ].join("");
++    return "chrome://browser/content/sval/home/home.html";
+   }
+ 
+   newChannel() {

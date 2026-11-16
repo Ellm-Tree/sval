@@ -1,0 +1,15 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+     Copyright 2026 Ellm Tree, Inc. -->
+<!-- The tabs workload's page (scripts/perf/perf.py). Its title changes every
+     second, as a mail or chat tab's unread count does, which is what keeps a
+     browser's tab UI busy while nobody touches it. -->
+<html lang="en"><head><meta charset="utf-8"><title>Tab</title></head>
+<body><h1>A tab whose title counts</h1>
+<script>
+const tab = new URLSearchParams(location.search).get("tab") ?? "";
+let n = 0;
+setInterval(() => {
+  document.title = `(${++n}) Tab ${tab}`;
+}, 1000);
+</script></body></html>

@@ -1,0 +1,499 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The pins row (`SvalPinsRow`) and its popover, in the values of pins spec
+ * §12. The tile fills are the row's own; the accent, muted ink and focus are
+ * the panel's (`sval-header.css`), and nothing here takes the workspace's
+ * colour.
+ *
+ * DOM: .sval-pins > .sval-pins-lines > .sval-pins-line (a grid) >
+ * .sval-pin-slot > button.sval-pin, then a .sval-pin-refresh or
+ * .sval-pin-audio button beside it; .sval-pins-drop, .sval-pins-drop-line
+ * and .sval-pins-hairline after the lines.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:root {
+  --sval-pin-well: rgb(var(--sval-palette-wash-dark) / 0.07);
+  --sval-pin-well-hover: rgb(var(--sval-palette-wash-dark) / 0.13);
+  --sval-pin-well-selected: rgb(var(--sval-palette-wash-dark) / 0.2);
+  --sval-pin-well-selected-hover: rgb(var(--sval-palette-wash-dark) / 0.26);
+  --sval-pin-plate: rgb(var(--sval-palette-wash-dark) / 0.16);
+  --sval-pin-border-strong: rgb(var(--sval-palette-wash-dark) / 0.34);
+  --sval-pin-hairline: var(--sval-section-hairline);
+  --sval-pin-panel: var(--sidebar-background-color);
+  --sval-pin-dur: 200ms;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-sval-tint], [privatebrowsingmode="temporary"], [data-sval-agent]) {
+    --sval-pin-well: rgb(var(--sval-palette-wash-light) / 0.05);
+    --sval-pin-well-hover: rgb(var(--sval-palette-wash-light) / 0.09);
+    --sval-pin-well-selected: rgb(var(--sval-palette-wash-light) / 0.15);
+    --sval-pin-well-selected-hover: rgb(var(--sval-palette-wash-light) / 0.19);
+    --sval-pin-plate: rgb(var(--sval-palette-wash-light) / 0.1);
+    --sval-pin-border-strong: rgb(var(--sval-palette-wash-light) / 0.28);
+  }
+}
+
+:root[data-sval-ink="dark"] {
+  --sval-pin-well: rgba(6, 10, 46, 0.06);
+  --sval-pin-well-hover: rgba(6, 10, 46, 0.1);
+  --sval-pin-well-selected: rgba(6, 10, 46, 0.15);
+  --sval-pin-well-selected-hover: rgba(6, 10, 46, 0.19);
+  --sval-pin-plate: rgba(6, 10, 46, 0.1);
+  --sval-pin-border-strong: rgba(6, 10, 46, 0.28);
+}
+
+.sval-pins {
+  position: relative;
+  flex: none;
+  /* The block's 4px 8px 8px, then the hairline's own 4px below it. */
+  padding: 4px 8px 0;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-pins-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sval-pins-line {
+  display: grid;
+  gap: 4px;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: grid-template-columns var(--sval-pin-dur) var(--sval-ease);
+  }
+}
+
+.sval-pins-hairline {
+  height: 1px;
+  margin: 8px 0 4px;
+  background: var(--sval-pin-hairline);
+}
+
+/* ------------------------------------------------------------------ tile */
+
+.sval-pin-slot {
+  position: relative;
+  min-width: 0;
+  display: flex;
+}
+
+.sval-pin {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sval-pin-well);
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+
+  &:hover {
+    background: var(--sval-pin-well-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--sval-focus);
+  }
+}
+
+.sval-pin-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.sval-pin-letter {
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font: 600 13px/1 var(--sval-font);
+  color: var(--sval-accent);
+}
+
+.sval-pin-slot[data-unloaded] .sval-pin-icon {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+/* Selected: a 14×2px line 3px from the bottom under the favicon. */
+.sval-pin-slot[data-selected] > .sval-pin {
+  background: var(--sval-pin-well-selected);
+
+  &:hover {
+    background: var(--sval-pin-well-selected-hover);
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 3px;
+    inset-inline-start: calc(50% - 7px);
+    width: 14px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--sval-accent);
+  }
+}
+
+/* Off its saved page: a dot, until it is selected. */
+.sval-pin-slot[data-off]:not([data-selected]) > .sval-pin::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  inset-inline-start: calc(50% - 2px);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sval-muted);
+}
+
+/* The wide tile: the name, then " / title" while off its saved page. */
+.sval-pin-slot[data-wide] > .sval-pin {
+  justify-content: flex-start;
+  padding: 0 10px 0 9px;
+
+  &::after {
+    inset-inline-start: 12px;
+  }
+}
+
+.sval-pin-slot[data-wide]:has(> .sval-pin-refresh) > .sval-pin {
+  padding-inline-end: 38px;
+}
+
+.sval-pin-label {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+  font: 600 13px var(--sval-font);
+}
+
+/* A folder's name over its selected pin's, set as a named split's caption
+ * (`.sval-split-name`). */
+.sval-pin-label:has(> .sval-pin-folder-name) {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.sval-pin-folder-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  color: var(--text-color-deemphasized);
+}
+
+.sval-pin-name {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sval-pin-refresh {
+  position: absolute;
+  inset-inline-end: 5px;
+  top: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent url("chrome://browser/content/sval/header-icons/reload.svg") center / 16px no-repeat;
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+  color: inherit;
+  opacity: 0;
+
+  .sval-pin-slot:is(:hover, :focus-within) > & {
+    opacity: 1;
+  }
+
+  &:hover {
+    background-color: var(--sval-pin-well-selected-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--sval-focus);
+  }
+}
+
+/* Playing audio: a 14px disc at the top right; a click mutes. */
+.sval-pin-audio {
+  position: absolute;
+  top: -3px;
+  inset-inline-end: -3px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sval-popup-bg);
+  box-shadow: 0 0 0 1px var(--sval-pin-hairline);
+  color: inherit;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 2.5px;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4.7 6 9H2v6h4l5 4.3z'/%3E%3Cpath d='M16 9a5 5 0 0 1 0 6M19.4 5.6a9 9 0 0 1 0 12.8'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+
+  .sval-pin-slot[data-muted] > &::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4.7 6 9H2v6h4l5 4.3z'/%3E%3Cpath d='m22 9-6 6M16 9l6 6'/%3E%3C/svg%3E");
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+  }
+}
+
+/* Needs attention: a 7px dot at the top right, ringed in the panel, in the
+   panel's text colour, which every tint and theme keeps legible on it. */
+.sval-pin-slot[data-attention]:not([data-playing]) > .sval-pin::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sidebar-text-color);
+  box-shadow: 0 0 0 2px var(--sval-pin-panel);
+}
+
+/* ⌘ held: the first nine slots' numbers, top left, in the panel's text and
+   background colours swapped. Those are the one pair every tint and theme
+   keeps legible; the panel's `--sval-accent` is a row's accent slot. */
+.sval-pins[data-numbers] .sval-pin-slot[data-number]::before {
+  content: attr(data-number);
+  position: absolute;
+  z-index: 1;
+  top: -3px;
+  inset-inline-start: -3px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font: 600 10px/1 var(--sval-font);
+  background: var(--sidebar-text-color);
+  color: var(--sval-pin-panel);
+  pointer-events: none;
+}
+
+.sval-pin-more {
+  font: 600 13px var(--sval-font);
+  color: var(--sval-muted);
+}
+
+/* ----------------------------------------------------------------- folder */
+
+.sval-pin-plate {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--sval-pin-plate);
+  display: grid;
+  grid-template-columns: repeat(2, 11px);
+  grid-auto-rows: 11px;
+  gap: 2px;
+}
+
+.sval-pin-plate-icon {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+
+  &.sval-pin-letter {
+    font-size: 8px;
+  }
+}
+
+.sval-pin-slot[data-open] > .sval-pin {
+  background: var(--sval-pin-well-selected-hover);
+}
+
+/* The folder popover grows from its tile as the header's popovers do
+ * (`sval-header.css`, panels, which also gives the conditions the stem is
+ * drawn under): while it is open, the tile wears the popover's fill. */
+@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
+  /* As specific as the selected, open and hovered tile's own fills, and
+     after them. */
+  .sval-pin-slot[data-open] > .sval-pin[sval-stem] {
+    background: var(--sval-stem-fill);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+
+    > .sval-pin-plate {
+      background: transparent;
+    }
+  }
+}
+
+/* --------------------------------------------------------------- dragging */
+
+.sval-pin-slot[data-dragging] > .sval-pin {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--sval-pin-border-strong);
+
+  > * {
+    visibility: hidden;
+  }
+}
+
+.sval-pin-slot[data-drop-into] > .sval-pin {
+  box-shadow: inset 0 0 0 2px var(--sval-accent);
+}
+
+.sval-pins-drop-line {
+  position: absolute;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--sval-accent);
+  pointer-events: none;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* No pins: a drag of a tab shows where to drop it, and nothing else does.
+ * The row takes no room then, and the zone lies over what is below it, so
+ * no row of the tree moves under the pointer as the drag begins. */
+.sval-pins[data-empty] {
+  height: 0;
+  padding: 0;
+  z-index: 2;
+}
+
+.sval-pins-drop {
+  display: none;
+  position: absolute;
+  top: 4px;
+  inset-inline: 8px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--sval-accent);
+  border-radius: 10px;
+  /* Opaque, over the panel's own colour, since it lies over the panel. */
+  background:
+    linear-gradient(color-mix(in srgb, var(--sval-accent) 7%, transparent), color-mix(in srgb, var(--sval-accent) 7%, transparent)), var(--sval-pin-panel);
+  place-items: center;
+  font: 500 13px var(--sval-font);
+
+  .sval-pins[data-empty] > & {
+    display: grid;
+  }
+}
+
+.sval-pins[data-empty] > :is(.sval-pins-lines, .sval-pins-hairline) {
+  display: none;
+}
+
+/* ------------------------------------------------------------ 48px panel */
+
+.sval-pins[data-narrow] {
+  padding-inline: 4px;
+
+  .sval-pin {
+    height: 32px;
+  }
+
+  .sval-pin-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sval-pin-plate {
+    width: 26px;
+    height: 26px;
+    grid-template-columns: repeat(2, 9px);
+    grid-auto-rows: 9px;
+  }
+
+  .sval-pin-plate-icon {
+    width: 9px;
+    height: 9px;
+  }
+}
+
+/* ---------------------------------------------------------------- popover */
+
+/* A panel that is no arrow panel takes the system menu's colours, and on
+ * macOS no fill at all with the system's appearance (`popup.css`), which the
+ * stem's outline would be filled with. The popover takes the window's popup
+ * colours instead, as a menu does (`sval-header.css`). */
+.sval-pins-popover {
+  --panel-background-color: inherit;
+  --panel-text-color: inherit;
+  --panel-border-color: inherit;
+  --panel-border-radius: 14px;
+  --panel-padding: 8px;
+
+  @media (-moz-platform: macos) {
+    appearance: none;
+    background-color: transparent;
+  }
+}
+
+.sval-pins-popover-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sval-pins-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.sval-pins-popover-title {
+  font: 600 12px var(--sval-font);
+}
+
+.sval-pins-popover-back {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 19-7-7 7-7M19 12H5'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
+}
+
+.sval-pins-popover-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  gap: 4px;
+}

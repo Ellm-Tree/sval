@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Every host Sval may contact on its own (Sval spec §10.9).
+#
+# scripts/network-contact-test.sh launches Sval on a fresh profile, drives it,
+# and fails on any host it resolved or connected to that is not listed here.
+# Pages the test loads itself are served from localhost and never count.
+#
+# Format: <host> <status> <reason>
+#   allowed — decided and disclosed
+#   pending — decided against, and still contacted until the change named in
+#             the reason lands. The test passes and prints it, so it cannot be
+#             forgotten.
+#   opt-in  — contacted only once the user turns the feature on. Allowed in
+#             the SVAL_NETWORK_ALL_SWITCHES run; a failure in the default run,
+#             because there it would mean contact the user never chose.
+
+firefox.settings.services.mozilla.com     allowed  Remote Settings, allowlisted collections only; polled hourly, and until the first poll answers at startup and on a backoff from 30 seconds to 30 minutes, since a device publishes nothing before that poll measures its clock (decision 1714)
+firefox-settings-attachments.cdn.mozilla.net allowed Remote Settings attachments
+content-signature-2.cdn.mozilla.net       allowed  Remote Settings signature chains
+ciscobinary.openh264.org                  allowed  OpenH264, once per release; Cisco must distribute it
+versioncheck.addons.mozilla.org           allowed  extension update checks
+versioncheck-bg.addons.mozilla.org        allowed  extension update checks
+safebrowsing.googleapis.com               allowed  Safe Browsing lists, under Sval's own key
+push.services.mozilla.com                 allowed  Web Push, only while some site holds the notification permission
+download.sval.app                         allowed  update checks, once a day: the channel and platform only (decision 0110)
+duckduckgo.com                            allowed  search suggestions, from the default engine, as the user types
+edgedl.me.gvt1.com                        opt-in   Widevine, downloaded once the user allows DRM
+www.google.com                            opt-in   Widevine's download mirror
+addons.mozilla.org                        opt-in   a password manager's extension when the user chooses one
+ftp.mozilla.org                           opt-in   Mozilla's ADB extension for Android remote debugging, downloaded only when the user clicks about:debugging's Enable USB Devices; its update manifest there is checked with the extension updates until Disable USB Devices removes it (spec §10.9)
+ublockorigin.github.io                    allowed   blocking list: uBlock Origin's lists, which Balanced, the default level, uses (protections spec §1.2, decision 0102)
+easylist.to                               allowed   blocking list: EasyList and EasyPrivacy, which Balanced, the default level, uses, and EasyList Germany as its German regional list; Fanboy's Social for Strict or Custom (protections spec §1.2, decision 0102)
+secure.fanboy.co.nz                       opt-in   blocking list: Fanboy's Annoyance and EasyList Cookie lists; fetched only for lists the user's blocking level or Custom set uses (protections spec §1.2, decision 0102)
+filters.adtidy.org                        opt-in   blocking list: AdGuard's lists; fetched only for lists the user's blocking level or Custom set uses (protections spec §1.2, decision 0102)
+raw.githubusercontent.com                 allowed   blocking list: Brave's unbreak list, which Balanced, the default level, uses, several regional lists, and HaGeZi's for Strict or Custom, from their publishers' repositories (protections spec §1.2, decision 0102); and uBlock Origin's scriptlets from gorhill/uBlock at the one commit Sval pins, checked against its hashes, fetched once per pin while page rules are on and the level uses lists (protections spec §5.3, decision 0103); and Privacy Badger's groups of domains one company owns, from EFForg/privacybadger, on the lists' schedule while the level uses tracker lists (decision 1051)
+malware-filter.gitlab.io                  allowed   blocking list: curben's malicious-URL list, which Balanced, the default level, uses, and the phishing list for Strict or Custom (protections spec §1.2, decision 0102)
+small.oisd.nl                             opt-in   blocking list: oisd small; fetched only for lists the user's blocking level or Custom set uses (protections spec §1.2, decision 0102)
+big.oisd.nl                               opt-in   blocking list: oisd big; fetched only for lists the user's blocking level or Custom set uses (protections spec §1.2, decision 0102)
+easylist-downloads.adblockplus.org        allowed   blocking list: EasyList's Arabic, Indian, Italian and Spanish lists, Balanced's regional list for those languages (protections spec §1.2, decision 0102)
+cdn.jsdelivr.net                          allowed   blocking list: the Hungarian, Korean and Russian lists, Balanced's regional list for those languages (protections spec §1.2, decision 0102)
+www.void.gr                               allowed   blocking list: the Greek list, Balanced's regional list for Greek (protections spec §1.2, decision 0102)
+kagi.com                                  opt-in   Kagi search, only when the user chooses Kagi
+account.kagi.com                          opt-in   Kagi's sign-in and sign-up, where kagi.com/signin sends the user, only when they sign in to Kagi
+kagisuggest.com                           opt-in   Kagi suggestions, only when the user chooses Kagi
+dns.quad9.net                             opt-in   Secure DNS through Quad9, only once the user picks encrypted DNS (decision 0105)
+cloudflare-dns.com                        opt-in   Secure DNS through Cloudflare, only once the user picks encrypted DNS and Cloudflare (decision 0105)
+feedback.sval.app                         opt-in   Sval's feedback collector, only when the user presses Send in the Send Feedback form or ticks a crash dialog's box to send a crash report (feedback spec §7, decision 1199)

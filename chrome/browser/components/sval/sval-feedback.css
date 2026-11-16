@@ -1,0 +1,628 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The Send Feedback popover (`SvalFeedbackForm`, feedback spec §2, §4, §5):
+ * a tab over the footer's feedback button, a 12px concave corner above the
+ * tab, and the box, which grows upward from the tab's foot. The three are
+ * one painted shape on a root that paints nothing itself, so the popovers'
+ * edge and shadow filter (`sval-header.css`) traces them as one. The tab
+ * and the corner take no pointer, so the button under the tab still closes
+ * the popover.
+ *
+ * `SvalFeedbackForm.place` sets, in px: `--sval-feedback-start` from the
+ * window's edge on the panel's side to the tab's outer end,
+ * `--sval-feedback-reach` from there to the box, `--sval-feedback-bottom`
+ * from the window's foot to the tab's, and `--sval-feedback-room` the width
+ * the box may take.
+ */
+
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+.sval-feedback {
+  --sval-feedback-surface: var(--panel-background-color);
+  --sval-feedback-ok: #5ee08a;
+  --sval-feedback-warn: #ffb224;
+
+  position: fixed;
+  bottom: var(--sval-feedback-bottom);
+  left: var(--sval-feedback-start);
+  z-index: 2147483646;
+  pointer-events: none;
+  color: var(--sval-text);
+  font-family: var(--sval-font);
+  font-size: 14px;
+  -moz-window-dragging: no-drag;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &[data-side="right"] {
+    left: auto;
+    right: var(--sval-feedback-start);
+  }
+}
+
+@media not (forced-colors) {
+  @media (prefers-color-scheme: light) {
+    :root:not([privatebrowsingmode="temporary"], [data-sval-agent], [data-sval-tint]) .sval-feedback {
+      --sval-feedback-ok: #1a7f3c;
+      --sval-feedback-warn: #b86e00;
+    }
+  }
+
+  :root[data-sval-ink="dark"]:not([privatebrowsingmode="temporary"], [data-sval-agent]) .sval-feedback {
+    --sval-feedback-ok: #1a7f3c;
+    --sval-feedback-warn: #b86e00;
+  }
+}
+
+@media (forced-colors) {
+  .sval-feedback {
+    --sval-feedback-ok: CanvasText;
+    --sval-feedback-warn: CanvasText;
+  }
+
+  .sval-feedback-box {
+    border: 1px solid CanvasText;
+  }
+}
+
+.sval-feedback-tab {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  /* One px into the box, so no seam shows where they meet. */
+  width: calc(var(--sval-feedback-reach) + 1px);
+  height: 36px;
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+  background: var(--sval-feedback-surface);
+
+  /* The button's icon, drawn again over the tab that covers it. */
+  &::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 9px;
+    width: 18px;
+    height: 18px;
+    background: url("chrome://browser/content/sval/icons/message-circle.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: var(--sval-text);
+  }
+
+  [data-side="right"] > & {
+    left: auto;
+    right: 0;
+    border-radius: 0 18px 18px 0;
+
+    &::before {
+      left: auto;
+      right: 9px;
+    }
+  }
+}
+
+.sval-feedback-corner {
+  position: absolute;
+  bottom: 36px;
+  left: calc(var(--sval-feedback-reach) - 12px);
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle at 0 0, transparent 11.5px, var(--sval-feedback-surface) 12px);
+
+  [data-side="right"] > & {
+    left: auto;
+    right: calc(var(--sval-feedback-reach) - 12px);
+    background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--sval-feedback-surface) 12px);
+  }
+}
+
+.sval-feedback-box {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 840px;
+  max-width: var(--sval-feedback-room);
+  max-height: calc(100vh - 24px);
+  margin-left: var(--sval-feedback-reach);
+  padding: 20px 24px 24px;
+  border-radius: 20px 20px 20px 0;
+  background: var(--sval-feedback-surface);
+  pointer-events: auto;
+  overflow: hidden;
+
+  [data-side="right"] > & {
+    margin-left: 0;
+    margin-right: var(--sval-feedback-reach);
+    border-radius: 20px 20px 0 20px;
+  }
+
+  [data-state="sent"] > & {
+    width: 420px;
+  }
+}
+
+.sval-feedback-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sval-feedback-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+
+  [data-state="sent"] & {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &::before {
+      content: "";
+      flex: none;
+      width: 20px;
+      height: 20px;
+      background: url("chrome://browser/content/sval/icons/circle-check.svg") center / contain no-repeat;
+      -moz-context-properties: fill;
+      fill: var(--sval-feedback-ok);
+    }
+  }
+}
+
+.sval-feedback-context,
+.sval-feedback-note,
+.sval-feedback-part-description,
+.sval-feedback-part-note,
+.sval-feedback-viewer-meta,
+.sval-feedback-crash-explanation {
+  margin: 0;
+  color: var(--sval-muted);
+}
+
+.sval-feedback-context,
+.sval-feedback-note {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sval-feedback-grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 24px;
+  flex: 1 1 auto;
+  min-height: 0;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-feedback-left,
+.sval-feedback-right,
+.sval-feedback-listing,
+.sval-feedback-viewer,
+.sval-feedback-crash {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-feedback-left {
+  gap: 12px;
+}
+
+.sval-feedback-listing,
+.sval-feedback-viewer {
+  flex: 1 1 auto;
+  gap: 8px;
+}
+
+/* Sending: what was entered stays readable, and nothing in it answers. */
+.sval-feedback-left[inert],
+.sval-feedback-listing[inert],
+.sval-feedback-viewer[inert] {
+  opacity: 0.5;
+}
+
+.sval-feedback-message,
+.sval-feedback-email {
+  box-sizing: border-box;
+  margin: 0;
+  border: 1px solid var(--sval-pill-border);
+  background: var(--sval-wash);
+  color: inherit;
+  font: inherit;
+
+  &::placeholder {
+    color: var(--sval-muted);
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -1px;
+  }
+}
+
+.sval-feedback-message {
+  flex: 1 1 auto;
+  min-height: 160px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  line-height: 1.45;
+  resize: none;
+}
+
+.sval-feedback-email {
+  flex: none;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 22px;
+}
+
+.sval-feedback-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sval-feedback-list-title {
+  margin: 0;
+  color: var(--sval-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sval-feedback-list-meta,
+.sval-feedback-part-size {
+  color: var(--sval-muted);
+  font-family: var(--sval-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sval-feedback-list,
+.sval-feedback-text,
+.sval-feedback-libraries {
+  box-sizing: border-box;
+  flex: 0 1 392px;
+  height: 392px;
+  min-height: 0;
+  margin: 0;
+  border-radius: 14px;
+  background: var(--sval-wash);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+.sval-feedback-list {
+  padding: 4px;
+}
+
+.sval-feedback-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+
+  & + & {
+    border-top: 1px solid var(--sval-wash);
+  }
+}
+
+.sval-feedback-tick {
+  margin: 2px 0 0;
+
+  &:disabled {
+    opacity: 0.4;
+  }
+}
+
+.sval-feedback-part-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-feedback-part-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sval-feedback-part-title {
+  font-size: 14px;
+  font-weight: 500;
+
+  [too-large] & {
+    color: var(--sval-muted);
+  }
+}
+
+.sval-feedback-part-description,
+.sval-feedback-part-note,
+.sval-feedback-part-warning {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sval-feedback-part-warning {
+  color: var(--sval-feedback-warn);
+}
+
+.sval-feedback-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--sval-wash-strong);
+  color: var(--sval-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sval-feedback-tag-sent::before {
+  content: "✓ ";
+  color: var(--sval-feedback-ok);
+}
+
+.sval-feedback-part-size {
+  line-height: 20px;
+}
+
+.sval-feedback-view,
+.sval-feedback-back,
+.sval-feedback-action {
+  appearance: none;
+  margin: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--sval-wash);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+
+  &:hover:not(:disabled) {
+    background: var(--sval-wash-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-feedback-view {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.sval-feedback-viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sval-feedback-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  padding: 0 14px 0 10px;
+  font-size: 13px;
+
+  &::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    background: url("chrome://browser/content/sval/icons/arrow-left.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+}
+
+.sval-feedback-viewer-titles {
+  min-width: 0;
+
+  > p {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.sval-feedback-viewer-title {
+  font-weight: 600;
+}
+
+.sval-feedback-viewer-meta {
+  font-size: 12px;
+}
+
+.sval-feedback-text {
+  padding: 12px 14px;
+  font-family: var(--sval-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre;
+  user-select: text;
+}
+
+.sval-feedback-crash {
+  flex: 1 1 auto;
+  gap: 8px;
+}
+
+.sval-feedback-crash-explanation {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sval-feedback-crash-details {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sval-wash);
+  font-size: 13px;
+
+  > dt {
+    color: var(--sval-muted);
+  }
+
+  > dd {
+    margin: 0;
+    font-family: var(--sval-mono);
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+}
+
+.sval-feedback-libraries {
+  flex-basis: auto;
+  height: auto;
+  padding: 8px 14px;
+  list-style: none;
+  font-family: var(--sval-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: nowrap;
+}
+
+.sval-feedback-sent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  > p {
+    margin: 0;
+  }
+}
+
+.sval-feedback-reference {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--sval-wash);
+  font-family: var(--sval-mono);
+  font-size: 13px;
+  user-select: text;
+}
+
+.sval-feedback-failure {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sval-wash);
+
+  &[hidden] {
+    display: none;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.sval-feedback-failure-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  background: url("chrome://browser/content/sval/icons/triangle-alert.svg") center / contain no-repeat;
+  -moz-context-properties: fill;
+  fill: var(--sval-feedback-warn);
+}
+
+.sval-feedback-failure-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sval-feedback-failure-body {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sval-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sval-feedback-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 18px;
+  font-size: 14px;
+
+  &:disabled {
+    opacity: 0.4;
+  }
+}
+
+.sval-feedback-primary {
+  background: var(--sval-action);
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background: var(--sval-action);
+    filter: brightness(1.1);
+  }
+
+  &[busy]::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    background: url("chrome://browser/content/sval/icons/loader-circle.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+    animation: sval-feedback-spin 1s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+}
+
+@keyframes sval-feedback-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */

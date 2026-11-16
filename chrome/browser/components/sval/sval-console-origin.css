@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The origin label at the start of a console message, and the extension's
+ * name before an extension script's source link. The label takes the
+ * console's own badge shape (`.message-repeats`) in a quiet outline, so it
+ * reads as metadata beside the message rather than as part of it. The
+ * console follows the devtools theme through `color-scheme`, so
+ * `light-dark()` picks the palette for it. The console is a devtools
+ * document, themed by devtools' own variables rather than the browser's
+ * design tokens, so the neutral label takes its colour from those, as the
+ * console's own badges do, and the others from Sval's palette.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+@import url("chrome://browser/content/sval/sval-tokens.css");
+
+.sval-console-origin {
+  display: inline-block;
+  margin-inline-end: 1ch;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font: message-box;
+  font-family: var(--sval-font);
+  line-height: 1.35;
+  white-space: nowrap;
+  color: var(--theme-text-color-alt);
+  /* Copying a message gives the text Firefox's console would, so the label
+     stays out of the selection `getElementText` copies. */
+  user-select: none;
+}
+
+.sval-console-origin[data-origin="extension"] {
+  color: light-dark(var(--sval-palette-blue-700), var(--sval-palette-neon));
+}
+
+.sval-console-origin[data-origin="sval"] {
+  color: light-dark(var(--sval-palette-ink-600), var(--sval-palette-ink-300));
+}
+
+.sval-console-origin-source {
+  user-select: none;
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+@media (forced-colors) {
+  .sval-console-origin,
+  .sval-console-origin[data-origin] {
+    color: CanvasText;
+  }
+}

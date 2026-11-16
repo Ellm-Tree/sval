@@ -1,0 +1,28 @@
+Sval: about:license makes no claim about where the source is
+
+Firefox's paragraph under the license block says the build configuration
+page names the URL of this copy's source, and links Mozilla's instructions for
+building Firefox. Sval's builds set no source repository, so about:buildconfig
+shows none, and Mozilla's instructions build Firefox. The paragraph keeps its
+statement of the licenses alone. The text is in the page's markup, so no
+chrome API reaches it.
+
+diff --git a/toolkit/content/license.html b/toolkit/content/license.html
+index 15ec470df7..24845cb98a 100644
+--- a/toolkit/content/license.html
++++ b/toolkit/content/license.html
+@@ -24,13 +24,9 @@
+   </div>
+   <div>
+     <p>All of the <b>source code</b> to this product is
+-       available under licenses which are both
++       under licenses which are both
+        <a href="https://www.gnu.org/philosophy/free-sw.html">free</a> and
+        <a href="https://www.opensource.org/docs/definition.php">open source</a>.
+-       A URL identifying the specific source code used to create this copy can be found
+-       on the <a href="about:buildconfig">build configuration page</a>, and you can read
+-       <a href="https://firefox-source-docs.mozilla.org/contributing/contribution_quickref.html">instructions
+-       on how to download and build the code for yourself</a>.
+     </p>
+ 
+     <p>More specifically, most of the source code is available under the

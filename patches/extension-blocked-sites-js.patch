@@ -1,0 +1,319 @@
+Sval: extension JS honours the sites the user turned an extension off on
+
+The extension hands its blocked sites to every process as it hands over
+ignoreQuarantine, and holds them from its policy's creation, so no
+content script runs on a blocked site during startup. The
+declarativeNetRequest rules, a tab's host-permission data, activeTab
+grants, tab captures, menus.onShown's page data, find, navigation events
+and cookies decide access in JS without the matching
+extension-blocked-sites.patch covers, and each asks the policy whether
+the tab's site, or the cookie's, is blocked.
+
+diff --git a/browser/components/extensions/parent/ext-find.js b/browser/components/extensions/parent/ext-find.js
+index 4752b8b3dd..04539d3d23 100644
+--- a/browser/components/extensions/parent/ext-find.js
++++ b/browser/components/extensions/parent/ext-find.js
+@@ -188,6 +188,10 @@ function runFindOperation(context, params, message) {
+   ) {
+     return Promise.reject({ message: `Unable to search: ${tabId}` });
+   }
++  // Sval: the user turned the extension off on this tab's site.
++  if (context.extension.tabManager.getWrapper(tab).svalBlocked) {
++    return Promise.reject({ message: `Unable to search: ${tabId}` });
++  }
+ 
+   if (message == "HighlightResults") {
+     return runHighlight(browser, params);
+diff --git a/browser/components/extensions/parent/ext-menus.js b/browser/components/extensions/parent/ext-menus.js
+index fbce863cb2..7ef5d11006 100644
+--- a/browser/components/extensions/parent/ext-menus.js
++++ b/browser/components/extensions/parent/ext-menus.js
+@@ -1292,7 +1292,12 @@ this.menusInternal = class extends ExtensionAPIPersistent {
+         let includeSensitiveData =
+           (nativeTab &&
+             extension.tabManager.hasActiveTabPermission(nativeTab)) ||
+-          (contextUrl && extension.allowedOrigins.matches(contextUrl));
++          (contextUrl &&
++            extension.allowedOrigins.matches(contextUrl) &&
++            // Sval: the user turned the extension off on this tab's site.
++            !(
++              nativeTab && extension.tabManager.getWrapper(nativeTab).svalBlocked
++            ));
+ 
+         addMenuEventInfo(info, contextData, extension, includeSensitiveData);
+ 
+diff --git a/toolkit/components/extensions/Extension.sys.mjs b/toolkit/components/extensions/Extension.sys.mjs
+index c4344b8d87..a4d103eefa 100644
+--- a/toolkit/components/extensions/Extension.sys.mjs
++++ b/toolkit/components/extensions/Extension.sys.mjs
+@@ -67,6 +67,8 @@ const lazy = XPCOMUtils.declareLazy({
+   permissionToL10nId:
+     "resource://gre/modules/ExtensionPermissionMessages.sys.mjs",
+   QuarantinedDomains: "resource://gre/modules/ExtensionPermissions.sys.mjs",
++  SvalExtensionSites:
++    "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
+ 
+   resourceProtocol: () =>
+     Services.io
+@@ -3497,6 +3499,10 @@ export class Extension extends ExtensionData {
+ 
+     this.hasRecommendedState = !!addonData.recommendationState?.states?.length;
+ 
++    // Sval: the sites the user turned the extension off on, held from the
++    // policy's creation so no content script runs there during startup.
++    this.blockedSites = lazy.SvalExtensionSites.blockedSitesFor(this.id);
++
+     this.views = new Set();
+     this._backgroundPageFrameLoader = null;
+ 
+@@ -3834,11 +3840,30 @@ export class Extension extends ExtensionData {
+       optionalPermissions: this.optionalPermissions,
+       isPrivileged: this.isPrivileged,
+       ignoreQuarantine: this.ignoreQuarantine,
++      blockedSites: this.blockedSites,
+       hasRecommendedState: this.hasRecommendedState,
+       temporarilyInstalled: this.temporarilyInstalled,
+     };
+   }
+ 
++  /**
++   * Sval: hands the policy here and in every content process the sites the
++   * extension is off on, as a change of ignoreQuarantine is handed over.
++   *
++   * @param {string[]} sites
++   * @returns {Promise<void>} Settles once every process has them.
++   */
++  updateBlockedSites(sites) {
++    this.blockedSites = sites;
++    this.policy.blockedSites = sites;
++    this.setSharedData("", this.serialize());
++    Services.ppmm.sharedData.flush();
++    return this.broadcast("Extension:UpdateBlockedSites", {
++      id: this.id,
++      blockedSites: sites,
++    });
++  }
++
+   /**
+    * Extended serialized data which is only needed in the extensions process,
+    * and is never deserialized in web content processes.
+@@ -4120,6 +4145,7 @@ export class Extension extends ExtensionData {
+       version: this.version,
+       isPrivileged: this.isPrivileged,
+       ignoreQuarantine: this.ignoreQuarantine,
++      blockedSites: this.blockedSites,
+       hasRecommendedState: this.hasRecommendedState,
+       temporarilyInstalled: this.temporarilyInstalled,
+       allowedOrigins: new MatchPatternSet([]),
+@@ -4138,6 +4164,7 @@ export class Extension extends ExtensionData {
+       version: this.version,
+       isPrivileged: this.isPrivileged,
+       ignoreQuarantine: this.ignoreQuarantine,
++      blockedSites: this.blockedSites,
+       hasRecommendedState: this.hasRecommendedState,
+     });
+     sharedData.set("extensions/pending", pendingExtensions);
+diff --git a/toolkit/components/extensions/ExtensionDNR.sys.mjs b/toolkit/components/extensions/ExtensionDNR.sys.mjs
+index d06afbb986..208048e624 100644
+--- a/toolkit/components/extensions/ExtensionDNR.sys.mjs
++++ b/toolkit/components/extensions/ExtensionDNR.sys.mjs
+@@ -2018,6 +2018,10 @@ const NetworkIntegration = {
+         rm => rm.extension.privateBrowsingAllowed
+       );
+     }
++    // Sval: no rule of an extension acts in a tab of a site it is off on.
++    ruleManagers = ruleManagers.filter(
++      rm => !channel.blockedFor(rm.extension.policy)
++    );
+     if (ruleManagers.length && !lazy.gMatchRequestsFromOtherExtensions) {
+       const policy = channel.loadInfo.loadingPrincipal?.addonPolicy;
+       if (policy) {
+diff --git a/toolkit/components/extensions/ExtensionProcessScript.sys.mjs b/toolkit/components/extensions/ExtensionProcessScript.sys.mjs
+index 95da27b87e..bd7e7507bb 100644
+--- a/toolkit/components/extensions/ExtensionProcessScript.sys.mjs
++++ b/toolkit/components/extensions/ExtensionProcessScript.sys.mjs
+@@ -67,6 +67,7 @@ ExtensionManager = {
+     Services.cpmm.addMessageListener("Extension:UpdateUserScriptWorlds", this);
+     Services.cpmm.addMessageListener("Extension:UpdatePermissions", this);
+     Services.cpmm.addMessageListener("Extension:UpdateIgnoreQuarantine", this);
++    Services.cpmm.addMessageListener("Extension:UpdateBlockedSites", this);
+ 
+     if (lazy.isContentProcess) {
+       // eslint-disable-next-line mozilla/balanced-listeners
+@@ -151,6 +152,7 @@ ExtensionManager = {
+ 
+         isPrivileged: extension.isPrivileged,
+         ignoreQuarantine: extension.ignoreQuarantine,
++        blockedSites: extension.blockedSites ?? [],
+         hasRecommendedState: extension.hasRecommendedState,
+         temporarilyInstalled: extension.temporarilyInstalled,
+         permissions: extension.permissions,
+@@ -380,6 +382,14 @@ ExtensionManager = {
+           }
+           break;
+         }
++
++        case "Extension:UpdateBlockedSites": {
++          let policy = WebExtensionPolicy.getByID(data.id);
++          if (policy?.active) {
++            policy.blockedSites = data.blockedSites;
++          }
++          break;
++        }
+       }
+     } catch (e) {
+       Cu.reportError(e);
+diff --git a/toolkit/components/extensions/parent/ext-cookies.js b/toolkit/components/extensions/parent/ext-cookies.js
+index c812810cec..48cbe0810d 100644
+--- a/toolkit/components/extensions/parent/ext-cookies.js
++++ b/toolkit/components/extensions/parent/ext-cookies.js
+@@ -158,6 +158,17 @@ const convertCookie = ({ cookie, isPrivate }) => {
+ 
+ // Checks that the given extension has permission to set the given cookie for
+ // the given URI.
++/**
++ * Sval: whether the extension is off on the site a cookie belongs to.
++ *
++ * @param {Extension} extension
++ * @param {nsICookie} cookie
++ * @returns {boolean}
++ */
++function svalBlockedCookie(extension, cookie) {
++  return extension.policy.blockedOnTopSite(cookie.host.replace(/^\./, ""));
++}
++
+ const checkSetCookiePermissions = (extension, uri, cookie) => {
+   // Permission checks:
+   //
+@@ -187,7 +198,10 @@ const checkSetCookiePermissions = (extension, uri, cookie) => {
+     return false;
+   }
+ 
+-  if (!extension.allowedOrigins.matches(uri)) {
++  if (
++    !extension.allowedOrigins.matches(uri) ||
++    extension.policy.blockedOnTopSite(uri.host)
++  ) {
+     return false;
+   }
+ 
+@@ -494,7 +508,10 @@ const query = function* (detailsIn, props, context, allowPattern) {
+     }
+ 
+     // Check that the extension has permissions for this host.
+-    if (!context.extension.allowedOrigins.matchesCookie(cookie)) {
++    if (
++      !context.extension.allowedOrigins.matchesCookie(cookie) ||
++      svalBlockedCookie(context.extension, cookie)
++    ) {
+       return false;
+     }
+ 
+@@ -549,7 +566,10 @@ this.cookies = class extends ExtensionAPIPersistent {
+         let notify = (removed, cookie, cause) => {
+           cookie.QueryInterface(Ci.nsICookie);
+ 
+-          if (this.extension.allowedOrigins.matchesCookie(cookie)) {
++          if (
++            this.extension.allowedOrigins.matchesCookie(cookie) &&
++            !svalBlockedCookie(this.extension, cookie)
++          ) {
+             fire.async({
+               removed,
+               cookie: convertCookie({
+diff --git a/toolkit/components/extensions/parent/ext-tabs-base.js b/toolkit/components/extensions/parent/ext-tabs-base.js
+index dbe17d4b73..2ce94d5368 100644
+--- a/toolkit/components/extensions/parent/ext-tabs-base.js
++++ b/toolkit/components/extensions/parent/ext-tabs-base.js
+@@ -95,6 +95,10 @@ class TabBase {
+    * @returns {Promise<string>}
+    */
+   async capture(context, zoom, options) {
++    // Sval: the user turned the extension off on this tab's site.
++    if (this.svalBlocked) {
++      throw new ExtensionError("Missing host permission for the tab");
++    }
+     let win = this.browser.documentGlobal;
+     let scale = options?.scale || win.devicePixelRatio;
+     let rect = options?.rect && win.DOMRect.fromRect(options.rect);
+@@ -214,6 +218,7 @@ class TabBase {
+    */
+   get hasActiveTabPermission() {
+     return (
++      !this.svalBlocked &&
+       (this.extension.originControls ||
+         this.extension.hasPermission("activeTab")) &&
+       this.activeTabWindowID != null &&
+@@ -227,7 +232,27 @@ class TabBase {
+    *        @readonly
+    */
+   get matchesHostPermission() {
+-    return this.extension.allowedOrigins.matches(this._uri);
++    return !this.svalBlocked && this.extension.allowedOrigins.matches(this._uri);
++  }
++
++  /**
++   * @property {boolean} svalBlocked
++   *        Sval: true if the user turned the extension off on the site of the
++   *        tab's top-level document.
++   *        @readonly
++   */
++  get svalBlocked() {
++    // The page's principal names its site where its URL has none, as for an
++    // about:blank or blob: page a site made.
++    let principal = this.browser.contentPrincipal;
++    principal = principal?.precursorPrincipal ?? principal;
++    let host;
++    try {
++      host = (principal?.isContentPrincipal ? principal.URI : this._uri).host;
++    } catch {
++      return false;
++    }
++    return this.extension.policy.blockedOnTopSite(host);
+   }
+ 
+   /**
+@@ -2179,6 +2204,9 @@ class TabManagerBase {
+    */
+   addActiveTabPermission(nativeTab) {
+     let tab = this.getWrapper(nativeTab);
++    if (tab.svalBlocked) {
++      return;
++    }
+     if (
+       this.extension.hasPermission("activeTab") ||
+       (this.extension.originControls &&
+@@ -2224,6 +2252,9 @@ class TabManagerBase {
+    */
+   activateScripts(nativeTab) {
+     let tab = this.getWrapper(nativeTab);
++    if (tab.svalBlocked) {
++      return;
++    }
+     if (
+       this.extension.originControls &&
+       !tab.matchesHostPermission &&
+diff --git a/toolkit/components/extensions/parent/ext-webNavigation.js b/toolkit/components/extensions/parent/ext-webNavigation.js
+index 5323642c0e..7bc313d8cb 100644
+--- a/toolkit/components/extensions/parent/ext-webNavigation.js
++++ b/toolkit/components/extensions/parent/ext-webNavigation.js
+@@ -172,6 +172,19 @@ this.webNavigation = class extends ExtensionAPIPersistent {
+         if (!tabManager.canAccessTab(tab)) {
+           return;
+         }
++        // Sval: an extension off on a site gets no navigation in a tab showing
++        // the site. A top-level navigation is judged by where it goes.
++        let svalHost = "";
++        try {
++          svalHost = new URL(data.url).hostname;
++        } catch {}
++        if (
++          data.frameId === 0
++            ? extension.policy.blockedOnTopSite(svalHost)
++            : tabManager.getWrapper(tab).svalBlocked
++        ) {
++          return;
++        }
+ 
+         if (data.sourceTabBrowser) {
+           const sourceTab = tabTracker.getTabForBrowser(data.sourceTabBrowser);

@@ -1,0 +1,3428 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's header: one 52px row over the workspace panel, the two drawn as one
+ * surface.
+ *
+ *   [window buttons] [menu | panel] … [back forward reload home | address | site controls reader favorite] [downloads history] … [pinned | extensions]
+ *
+ * Firefox's default theme stays active and Sval draws every colour here, for
+ * light, dark, a tinted workspace and a private window. A tinted workspace
+ * takes the OS scheme but for two tints that are a surface of the other
+ * (`sval-panel.css`, window tint): yellow, light in the dark scheme, and
+ * black, dark in the light one.
+ *
+ * The pills are neighbouring widgets fused by id, which holds because
+ * `SvalHeader` fixes the nav-bar's widgets and their order.
+ *
+ * The values are the Sval browser design system's, as in `settings.css` and
+ * `home/home.css`: Sval's brand rather than Firefox's design tokens.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ---------------------------------------------------------------- tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-type.css");
+
+:root {
+  --sval-header-h: 52px;
+  --sval-control-h: 36px;
+  /* After the docked buttons, 6px, the 1px divider and 6px before the
+     protection button (`sval-protection.css`). */
+  --sval-dock-tail: 13px;
+  /* Between the field and the site controls. */
+  --sval-dock-end-head: 8px;
+  /* Half the window between 720px and 1080px: the pill's docked controls
+     take a fixed share of it, so a smaller pill would leave the field too
+     little room, and a larger one only stretches the field. */
+  --sval-pill-max: clamp(720px, 50vw, 1080px);
+  --sval-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  --sval-cluster-bg: rgb(var(--sval-palette-wash-light) / 0.28);
+  --sval-cluster-border: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-cluster-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --sval-pill-bg: rgba(6, 10, 46, 0.72);
+  --sval-pill-border-alpha: 0.34;
+  --sval-pill-border: rgb(var(--sval-palette-wash-dark) / var(--sval-pill-border-alpha));
+  --sval-pill-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--sval-float-box-shadow);
+  --sval-popup-shadow: 0 24px 64px rgba(3, 5, 26, 0.55);
+  --sval-popup-shadow-color: rgba(3, 5, 26, 0.55);
+  /* The shadow of what floats over the chrome: the address bar's pill, a
+     popover grown from its button and the button with it (panels, below),
+     and the Workspace and Favorites submenus. Deep on a dark surface,
+     lighter on a light one (`--sval-surface-dark`, `sval-panel.css`). A far
+     layer lifts the surface and a near one seats its edge; both drop a
+     little, so the shadow falls on every side. A drop shadow's blur is the
+     Gaussian's deviation (`CSSFilterInstance::SetAttributesForDropShadow`)
+     and a box shadow's is twice it. Three deviations out, a shadow is under
+     0.2% of its peak, so a box that floats keeps that much room on every
+     side: a nearer edge cuts the shadow off in a visible line. The reach
+     fits the 12px between a panel menu and the page's frame: past it the
+     shadow falls on the page, where a dark page hides it, and one side
+     would look cut. */
+  --sval-float-shade: calc(19 - 16 * var(--sval-surface-dark)) calc(50 - 45 * var(--sval-surface-dark)) calc(143 - 117 * var(--sval-surface-dark));
+  --sval-float-far-alpha: calc(0.25 + 0.5 * var(--sval-surface-dark));
+  --sval-float-near-alpha: calc(0.15 + 0.45 * var(--sval-surface-dark));
+  --sval-float-far: rgb(var(--sval-float-shade) / var(--sval-float-far-alpha));
+  --sval-float-near: rgb(var(--sval-float-shade) / var(--sval-float-near-alpha));
+  --sval-float-box-shadow: 0 2px 8px var(--sval-float-far), 0 1px 2px var(--sval-float-near);
+  /* The menus' edge is their only line against a toolbar of their own
+     colour. */
+  --sval-menu-shadow: 0 0 0 1px rgb(var(--sval-float-shade) / 0.5), var(--sval-float-box-shadow);
+  /* Each drop shadow shadows what the one before it drew, so the near one
+     also shadows the far one. */
+  --sval-stem-shadow: drop-shadow(0 2px 4px var(--sval-float-far)) drop-shadow(0 1px 1px var(--sval-float-near));
+  /* `--sval-stem-shadow` as box shadows, cast by a box with its 1px edge.
+     The third is the near shadow of the far one: offsets add, and
+     deviations add in quadrature. */
+  --sval-stem-box-shadow:
+    0 2px 8px 1px var(--sval-float-far), 0 1px 2px 1px var(--sval-float-near),
+    0 3px 8.25px 1px rgb(var(--sval-float-shade) / calc(var(--sval-float-far-alpha) * var(--sval-float-near-alpha)));
+  --sval-wash: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-wash-strong: rgb(var(--sval-palette-wash-dark) / 0.18);
+  /* The pressed look (header signals spec §1): a chip in the header's own
+     ink with the glyph in the header's colour, so on against off is the
+     ink's own contrast in every window, tinted ones included. */
+  --sval-on-bg: var(--toolbar-text-color);
+  --sval-on-ink: var(--toolbar-background-color);
+  --sval-on-hover: color-mix(in srgb, var(--sval-on-bg) 86%, var(--sval-on-ink));
+  /* A camera, microphone or screen in use (`SvalSiteControls`). */
+  --sval-live-bg: var(--sval-palette-neon);
+  --sval-live-hover: #a3f7ff;
+  --sval-live-ink: #03051a;
+  --sval-focus: var(--sval-palette-neon);
+  /* "You are here": the selected row's bar. */
+  --sval-accent: var(--sval-palette-neon);
+  /* A solid fill for what is chosen or on: the address bar's submit button
+     and the Privacy and Security panel's switches (`sval-protection.css`). */
+  --sval-action: var(--sval-palette-blue);
+  --sval-text: #ffffff;
+  --sval-muted: var(--sval-palette-ink-400);
+  /* Behind a window-modal dialog (`sval-dialog.css`). */
+  --sval-scrim: rgba(3, 5, 26, 0.62);
+
+  --toolbarbutton-border-radius: 999px;
+  /* A 16px icon in a 32px target at every window width, where Firefox's
+     `toolbarbuttons.css` narrows it: the address pill reaches under its
+     docked buttons by their exact width. */
+  --toolbarbutton-padding-inner: 8px;
+  --toolbarbutton-outer-padding: 0px;
+  --toolbarbutton-hover-background: var(--sval-wash);
+  --toolbarbutton-active-background: var(--sval-wash-strong);
+  --urlbar-icon-border-radius: 999px;
+  /* The selected suggestion is a wash plus a bar, never a solid fill. */
+  --urlbarView-highlight-background: var(--sval-wash);
+  --urlbarView-highlight-color: inherit;
+  --arrowpanel-border-radius: 20px;
+  --focus-outline-color: var(--sval-focus);
+}
+
+/* The address bar's minimum is Firefox's narrowest (`urlbar-searchbar.css`,
+   with its trust panel's gate on, since Sval removes the identity and trust
+   icons that gate makes room for) at every window width. The window's
+   minimum width below is built on it, and a minimum that grew with the
+   window would ask more of the row than that width holds. */
+:root {
+  --urlbar-container-min-width: 140px;
+}
+
+/* What the header's row holds once everything that overflows has
+   (`SvalHeader`, overflow order): the row's 8px padding each side, the
+   window's controls, which only macOS draws in the row (Firefox's
+   `--window-controls-size`), the 36px panel pill, the back button docked
+   in the address pill, the 45px extensions pill, the 34px overflow button
+   and the private badge. The window's minimum width (Firefox's
+   `--window-min-width`) holds that with the address bar at its minimum,
+   and is never below the 500px Firefox gives it (`browser-shared.css`).
+   The Peek window sets its own minimum (`sval-peek.css`). */
+:root:not([svalpeek]) {
+  --sval-header-controls-w: 0px;
+  --sval-header-badge-w: 0px;
+  --sval-row-kept-w: calc(2 * 8px + var(--sval-header-controls-w) + 36px + 1px + 32px + var(--sval-dock-tail) + 45px + 34px + var(--sval-header-badge-w));
+  --window-min-width: max(500px, var(--sval-row-kept-w) + var(--urlbar-container-min-width));
+
+  @media (-moz-platform: macos) {
+    --sval-header-controls-w: var(--window-controls-size);
+  }
+
+  /* The private badge and its 8px margin. */
+  &[privatebrowsingmode="temporary"] {
+    --sval-header-badge-w: 96px;
+  }
+}
+
+/* The live devices, the location button and the notices button stay in
+   the row too, shown only on a page or a moment that needs them, so the
+   window's minimum holds no room for them. Where the window is too narrow for them beside the
+   address bar at its minimum, the address bar gives them that room. */
+:root:not([svalpeek]) #urlbar-container {
+  min-width: max(0px, min(var(--urlbar-container-min-width), 100vw - var(--sval-row-kept-w) - var(--sval-live-kept-w) - var(--sval-notices-w)));
+}
+
+:root:not([svalpeek]) #nav-bar-customization-target {
+  --sval-notices-w: 0px;
+  --sval-live-kept-w: 0px;
+
+  /* Once downloads and history have overflowed, the notices button is a
+     pill of its own, as wide as the extensions pill alone. */
+  &:has(> #sval-notices-button:not([hidden])) {
+    --sval-notices-w: 45px;
+  }
+
+  /* The segment, the location button, their cluster's ends and the pill's
+     border. */
+  &:has(> :is(#sval-live-devices, #sval-location-button):not([hidden])) {
+    --sval-live-kept-w: calc(var(--sval-dock-end-head) + 4px + var(--sval-live-w, 0px) - var(--sval-live-trim) + var(--sval-location-w) + 1px);
+  }
+}
+
+/* The address bar's remote-control cue (`gRemoteControl`, browser.js) wears
+   Sval's robot, the one that marks an agent's workspace, in place of
+   Firefox's (`static-robot.png`, `urlbar-searchbar.css`). */
+:root[remotecontrol] #remote-control-icon {
+  list-style-image: url("chrome://browser/content/sval/agent-robot.svg");
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+/* The palettes below are Sval's. Under forced colours they give way to the
+   system colours Firefox's own tokens take then (`tokens-platform.css`), and
+   Sval's own colours take the system colours the high-contrast block (access,
+   below) gives them. `(forced-colors)` for the reason that block gives. */
+@media not (forced-colors) {
+  /* Every palette's popups and popovers stand off the window's background
+   by the surface step (`sval-tokens.css`), on the side its scheme sets
+   (`--sval-surface-dark`, `sval-panel.css`). */
+  :root {
+    --sval-surface-ground: var(--toolbar-background-color);
+    --panel-background-color: var(--sval-surface);
+    --sval-popup-bg: var(--sval-surface);
+  }
+
+  /* A tinted workspace: the panel and the window's popups wear the tint
+   `sval-panel.css` gives the toolbar, so everything the window opens reads as
+   part of that workspace. */
+  :root[data-sval-tint] {
+    --sidebar-background-color: var(--sval-tint);
+  }
+
+  /* Every menu takes the window's popup colours. An arrow panel inherits the
+   root's; a menu sets the system's on itself (`popup.css`), so it is pointed
+   back at the root's, as Firefox's own `.toolbar-menupopup` does. Gecko draws
+   every menu, macOS's context and button menus included (`app-sval-prefs.js`),
+   and on macOS `popup.css` gives it the system menu's appearance and
+   background (`-moz-default-appearance: menupopup`, `Menu`), cleared here.
+   On Windows 11 `menu.css` gives it the system's Mica backdrop, which paints
+   the whole popup window, the room for Sval's drawn shadow
+   (`sval-panel.css`) included, so that is cleared too, with the square
+   corner it sets. */
+  menupopup {
+    --panel-background-color: inherit;
+    --panel-text-color: inherit;
+    --panel-border-color: inherit;
+
+    @media (-moz-platform: macos) {
+      appearance: none;
+      background-color: transparent;
+    }
+
+    @media (-moz-windows-mica-popups) {
+      appearance: none;
+      --panel-border-radius: inherit;
+    }
+  }
+
+  /* A tinted window's popups take the scheme of its text with it, as the
+   window does, its address pill and text the field `SvalColor` solves for
+   the tint, and its button clusters a shade between the pill and the tint.
+   A light-text window's edges are light washes, a dark-text window's dark
+   ones, as the untinted windows' are. */
+  :root[data-sval-tint] {
+    --sidebar-text-color: var(--toolbar-text-color);
+    --panel-text-color: var(--toolbar-text-color);
+    --sval-text: var(--sval-tint-strong);
+    --sval-muted: var(--sval-tint-muted);
+    --sval-focus: var(--sval-tint-focus);
+    --sval-pill-bg: var(--sval-tint-field);
+  }
+
+  :root[data-sval-ink="light"] {
+    --panel-border-color: rgba(255, 255, 255, 0.18);
+    --sval-cluster-bg: oklch(from var(--sval-tint) calc(l - 0.05) calc(c * 0.7) h);
+    --sval-cluster-border: rgba(255, 255, 255, 0.1);
+  }
+
+  :root[data-sval-ink="light"] :is(menupopup, panel[type="arrow"]) {
+    color-scheme: dark;
+  }
+
+  :root[data-sval-ink="dark"] {
+    --panel-border-color: rgb(var(--sval-palette-wash-light) / 0.14);
+    --sval-cluster-bg: rgba(255, 255, 255, 0.5);
+    --sval-cluster-border: rgb(var(--sval-palette-wash-light) / 0.14);
+    --sval-cluster-shadow: 0 1px 2px rgb(var(--sval-palette-wash-light) / 0.08);
+    --sval-pill-border-alpha: 0.28;
+    --sval-pill-border: rgb(var(--sval-palette-wash-light) / var(--sval-pill-border-alpha));
+    --sval-pill-shadow: var(--sval-float-box-shadow);
+    --sval-popup-shadow: 0 24px 60px rgb(var(--sval-palette-wash-light) / 0.18);
+    --sval-popup-shadow-color: rgb(var(--sval-palette-wash-light) / 0.18);
+    --sval-menu-shadow: 0 0 0 1px rgb(var(--sval-palette-wash-light) / 0.12), var(--sval-float-box-shadow);
+    --sval-wash: rgb(var(--sval-palette-wash-light) / 0.08);
+    --sval-wash-strong: rgb(var(--sval-palette-wash-light) / 0.14);
+    --sval-scrim: rgba(6, 10, 46, 0.32);
+    --sval-live-bg: var(--sval-palette-blue);
+    --sval-live-hover: #1858d6;
+    --sval-live-ink: #ffffff;
+    --sval-accent: var(--sval-palette-blue);
+  }
+
+  :root[data-sval-ink="dark"] :is(menupopup, panel[type="arrow"]) {
+    color-scheme: light;
+  }
+
+  /* Untinted, dark: Sval's navy. An agent's window keeps the hue
+   `sval-panel.css` gives it. */
+  :root:not([privatebrowsingmode="temporary"], [data-sval-tint], [data-sval-agent]) {
+    --toolbox-background-color: var(--sval-palette-ink-850);
+    --toolbox-background-color-inactive: var(--sval-palette-ink-850);
+    --toolbar-background-color: var(--sval-palette-ink-850);
+    --toolbox-text-color: var(--sval-palette-ink-200);
+    --toolbox-text-color-inactive: var(--sval-palette-ink-200);
+    --toolbar-text-color: var(--sval-palette-ink-200);
+    --toolbar-field-text-color: #ffffff;
+    --toolbar-field-text-color-focus: #ffffff;
+    --sidebar-background-color: var(--sval-palette-ink-850);
+    --sidebar-text-color: var(--sval-palette-ink-200);
+    --panel-text-color: var(--sval-palette-ink-200);
+    --panel-border-color: rgb(var(--sval-palette-wash-dark) / 0.18);
+  }
+
+  /* Light and untinted: Sval's light window. */
+  @media (prefers-color-scheme: light) {
+    :root:not([privatebrowsingmode="temporary"], [data-sval-tint], [data-sval-agent]) {
+      --toolbox-background-color: var(--sval-palette-frame-light);
+      --toolbox-background-color-inactive: var(--sval-palette-frame-light);
+      --toolbar-background-color: var(--sval-palette-frame-light);
+      --sidebar-background-color: var(--sval-palette-frame-light);
+      --sval-cluster-bg: #ffffff;
+    }
+
+    :root:not([privatebrowsingmode="temporary"], [data-sval-agent], [data-sval-tint]) {
+      --toolbox-text-color: var(--sval-palette-ink-700);
+      --toolbox-text-color-inactive: var(--sval-palette-ink-700);
+      --toolbar-text-color: var(--sval-palette-ink-700);
+      --toolbar-field-text-color: var(--sval-palette-ink-950);
+      --toolbar-field-text-color-focus: var(--sval-palette-ink-950);
+      --sidebar-text-color: var(--sval-palette-ink-700);
+      --panel-text-color: var(--sval-palette-ink-700);
+      --panel-border-color: rgb(var(--sval-palette-wash-light) / 0.14);
+
+      --sval-cluster-border: rgb(var(--sval-palette-wash-light) / 0.14);
+      --sval-cluster-shadow: 0 1px 2px rgb(var(--sval-palette-wash-light) / 0.08);
+      --sval-pill-bg: #ffffff;
+      --sval-pill-border-alpha: 0.28;
+      --sval-pill-border: rgb(var(--sval-palette-wash-light) / var(--sval-pill-border-alpha));
+      --sval-pill-shadow: var(--sval-float-box-shadow);
+      --sval-popup-shadow: 0 24px 60px rgb(var(--sval-palette-wash-light) / 0.18);
+      --sval-popup-shadow-color: rgb(var(--sval-palette-wash-light) / 0.18);
+      --sval-menu-shadow: 0 0 0 1px rgb(var(--sval-palette-wash-light) / 0.12), var(--sval-float-box-shadow);
+      --sval-wash: rgb(var(--sval-palette-wash-light) / 0.08);
+      --sval-wash-strong: rgb(var(--sval-palette-wash-light) / 0.14);
+      --sval-live-bg: var(--sval-palette-blue);
+      --sval-live-hover: #1858d6;
+      --sval-live-ink: #ffffff;
+      --sval-focus: var(--sval-palette-blue);
+      --sval-accent: var(--sval-palette-blue);
+      --sval-text: var(--sval-palette-ink-950);
+      --sval-muted: var(--sval-palette-ink-500);
+      --sval-scrim: rgba(6, 10, 46, 0.32);
+    }
+  }
+
+  /* Private windows: violet, always dark. */
+  :root[privatebrowsingmode="temporary"] {
+    color-scheme: dark;
+    --toolbox-background-color: #1a0e45;
+    --toolbox-background-color-inactive: #1a0e45;
+    --toolbar-background-color: #1a0e45;
+    --toolbox-text-color: #e2dcff;
+    --toolbox-text-color-inactive: #e2dcff;
+    --toolbar-text-color: #e2dcff;
+    --sidebar-background-color: #1a0e45;
+    --sidebar-text-color: #e2dcff;
+    --panel-text-color: #e2dcff;
+    --panel-border-color: rgba(166, 140, 255, 0.18);
+
+    --sval-cluster-bg: rgba(106, 85, 214, 0.22);
+    --sval-cluster-border: rgba(166, 140, 255, 0.18);
+    --sval-pill-bg: rgba(6, 3, 26, 0.72);
+    --sval-pill-border-alpha: 0.34;
+    --sval-pill-border: rgb(166 140 255 / var(--sval-pill-border-alpha));
+    --sval-popup-shadow: 0 24px 64px rgba(6, 3, 26, 0.6);
+    --sval-popup-shadow-color: rgba(6, 3, 26, 0.6);
+    --sval-float-shade: 6 3 26;
+    --sval-wash: rgba(166, 140, 255, 0.14);
+    --sval-wash-strong: rgba(166, 140, 255, 0.22);
+    --sval-action: #6a55d6;
+    --sval-muted: #a79fd0;
+  }
+}
+
+#window-modal-dialog::backdrop {
+  background-color: var(--sval-scrim);
+}
+
+/* While the Edit Workspace dialog tries a colour on the window
+ * (`SvalPanel.previewColor`), the window is seen as it will be. */
+:root[data-sval-color-preview] #window-modal-dialog::backdrop {
+  background-color: transparent;
+}
+
+/* The critical dialog's scrim (messages spec §9.3), whatever the window's
+ * palette: the one dialog that means work is being lost. */
+#window-modal-dialog[data-sval-tone="critical"]::backdrop {
+  background: radial-gradient(circle at 50% 40%, rgba(120, 10, 20, 0.72), rgba(8, 0, 2, 0.88) 70%);
+}
+
+/* ---------------------------------------------------------------- row */
+
+/* No line under the header: the page's frame is the one edge between the
+   chrome and the page, and the panel shares the header's colour. Firefox
+   draws one (`#navigator-toolbox` in `content-area.css`). */
+#navigator-toolbox {
+  /* Above the page (`--browser-area-z-index-tabbox`, `browser-shared.css`)
+     and the panel, the overlaid one too (panel slide, below), so the
+     address bar's shadow falls over them where it reaches past the
+     header. */
+  z-index: 4 !important;
+  background-color: var(--toolbar-background-color) !important;
+  border-bottom: none !important;
+  transition: background-color 240ms var(--sval-ease);
+}
+
+#nav-bar {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-top: 0 !important;
+  /* The row's min-height counts its padding, which is its breathing room. */
+  min-height: calc(var(--sval-header-h) + 6px);
+  padding-block: 3px;
+  padding-inline: 8px;
+  /* Pills are spaced by their own margins. */
+  gap: 0;
+}
+
+/* The window buttons are fixed markup at the nav-bar's end; `order` brings
+   them to the start, before the panel toggle, with no markup change. */
+#nav-bar > .titlebar-buttonbox-container {
+  order: -1;
+  margin-inline-end: 8px;
+}
+
+#nav-bar-customization-target {
+  gap: 0;
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------- clusters */
+
+#nav-bar
+  :is(
+    #sval-panel-button,
+    #downloads-button,
+    #sval-history-button,
+    #sval-notices-button,
+    #unified-extensions-button,
+    #back-button,
+    #forward-button,
+    #stop-reload-button,
+    #home-button
+  ),
+#nav-bar-customization-target > .unified-extensions-item {
+  align-self: center;
+}
+
+#nav-bar :is(#sval-panel-button, #downloads-button, #sval-history-button, #sval-notices-button, #unified-extensions-button),
+#nav-bar-customization-target > .unified-extensions-item {
+  background-color: var(--sval-cluster-bg);
+  border-block: 1px solid var(--sval-cluster-border);
+  box-shadow: var(--sval-cluster-shadow);
+  padding: 1px;
+  margin: 0;
+}
+
+#nav-bar .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  border-radius: 999px;
+  transition: background-color 160ms var(--sval-ease);
+}
+
+/* Left pill: the panel toggle alone. */
+#sval-panel-button {
+  border-inline: 1px solid var(--sval-cluster-border);
+  border-radius: 999px;
+  padding-inline: 2px;
+  position: relative;
+}
+
+/* A toggle is on while its panel or sidebar shows, which `aria-pressed`
+   carries (`SvalHeader`), in the pressed look (header signals spec §1). */
+#nav-bar :is(#sval-panel-button, #sval-history-button)[aria-pressed="true"] > .toolbarbutton-icon {
+  background-color: var(--sval-on-bg);
+  fill: var(--sval-on-ink);
+}
+
+#nav-bar :is(#sval-panel-button, #sval-history-button)[aria-pressed="true"]:hover > .toolbarbutton-icon {
+  background-color: var(--sval-on-hover);
+}
+
+/* The records' pill, after the extensions: the notices button while it
+   shows, downloads, history. Each part is drawn only in the row; one in
+   the overflow panel takes the panel's look. The first part shown opens
+   the pill. */
+#nav-bar:not(:has(#sval-notices-button:not([hidden]))) #downloads-button,
+#nav-bar #sval-notices-button {
+  border-inline-start: 1px solid var(--sval-cluster-border);
+  border-start-start-radius: 999px;
+  border-end-start-radius: 999px;
+  padding-inline-start: 2px;
+  margin-inline-start: 8px !important;
+}
+
+/* The downloads accent, which the button and the Downloads panel
+   (`sval-downloads.css`) share. */
+:root {
+  --sval-dl-accent: light-dark(var(--sval-palette-blue), var(--sval-palette-neon));
+}
+
+/* The downloads button follows the workspace the window shows
+   (`SvalDownloadWorkspaces`): a ring for its downloads' progress, and the
+   accent with a dot once one has finished. */
+#downloads-button {
+  --sval-dl-ring-track: light-dark(rgb(var(--sval-palette-wash-light) / 0.12), rgb(var(--sval-palette-wash-dark) / 0.16));
+
+  & > .toolbarbutton-badge-stack > #downloads-indicator-progress-outer {
+    top: calc(50% - 14px);
+    left: calc(50% - 14px);
+    width: 28px;
+    height: 28px;
+    border: 0;
+  }
+
+  & #downloads-indicator-progress-inner {
+    width: 28px;
+    height: 28px;
+    background: conic-gradient(var(--sval-dl-accent) var(--download-progress-pcent), var(--sval-dl-ring-track) 0);
+    mask: radial-gradient(circle, transparent 12px, #000 12.5px);
+  }
+
+  &[attention="success"] > .toolbarbutton-badge-stack {
+    & > #downloads-indicator-anchor > #downloads-indicator-icon {
+      fill: var(--sval-dl-accent);
+    }
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      inset-inline-end: 4px;
+      width: 8px;
+      height: 8px;
+      box-sizing: border-box;
+      border: 2px solid var(--toolbar-background-color);
+      border-radius: 50%;
+      background: var(--sval-dl-accent);
+    }
+  }
+}
+
+@media (forced-colors) {
+  #downloads-button {
+    --sval-dl-accent: Highlight;
+    --sval-dl-ring-track: CanvasText;
+  }
+}
+
+/* History overflows before downloads (`SvalHeader`, overflow order), and
+   the notices button stays in the row, so the last of them in the row
+   closes the pill. */
+#nav-bar
+  :is(
+    #sval-history-button,
+    #downloads-button:not(:has(~ #sval-history-button)),
+    #sval-notices-button:not(:has(~ :is(#downloads-button, #sval-history-button)))
+  ) {
+  border-inline-end: 1px solid var(--sval-cluster-border);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+  padding-inline-end: 2px;
+}
+
+/* The address pill's docked parts, each counted while it is in the row and
+   shown: overflowed, it is in the overflow panel, and a private window
+   hides the favorite button (`SvalHeader`). Declared on the row, which
+   holds both the parts and the field that reads the widths.
+   `--sval-dock-w` is the docked start: the pill's 1px border, back and
+   each navigation button still in the row at 32px, then the tail.
+   `--sval-dock-end-w` is the docked end: while any site control shows, the
+   8px head and its cluster (its 1px borders and padding, the live
+   devices' segment, the 28px location button and the 28px buttons); while
+   the translate, reader or favorite button shows, a 1×18px divider in 4px
+   either side and their cluster (its 1px borders and padding, the translate
+   cell at 28px or 44px while the page is translated, 28px each for the
+   others) then 2px; then
+   the pill's 1px border. The live devices draw a divider in 7px at their
+   end, which they drop when they close the cluster. */
+#nav-bar-customization-target {
+  --sval-forward-w: 0px;
+  --sval-reload-w: 0px;
+  --sval-home-w: 0px;
+  --sval-site-head-w: 0px;
+  --sval-live-trim: 0px;
+  --sval-location-w: 0px;
+  --sval-translate-w: 0px;
+  --sval-media-w: 0px;
+  --sval-js-w: 0px;
+  --sval-remove-w: 0px;
+  --sval-snip-w: 0px;
+  --sval-colorshift-w: 0px;
+  --sval-site-menu-w: 0px;
+  --sval-page-head-w: 0px;
+  --sval-reader-w: 0px;
+  --sval-fav-w: 0px;
+  --sval-pill-end-w: 0px;
+  --sval-dock-w: calc(1px + 32px + var(--sval-forward-w) + var(--sval-reload-w) + var(--sval-home-w) + var(--sval-dock-tail));
+  --sval-dock-end-w: calc(
+    var(--sval-site-head-w) + var(--sval-live-w, 0px) - var(--sval-live-trim) + var(--sval-location-w) + var(--sval-translate-w) + var(--sval-media-w) +
+      var(--sval-js-w) + var(--sval-remove-w) + var(--sval-snip-w) + var(--sval-colorshift-w) + var(--sval-site-menu-w) + var(--sval-page-head-w) +
+      var(--sval-reader-w) + var(--sval-fav-w) + var(--sval-pill-end-w)
+  );
+
+  &:has(> #forward-button) {
+    --sval-forward-w: 32px;
+  }
+
+  &:has(> #stop-reload-button) {
+    --sval-reload-w: 32px;
+  }
+
+  &:has(> #home-button) {
+    --sval-home-w: 32px;
+  }
+
+  &:has(
+    > :is(
+        #sval-live-devices,
+        #sval-location-button,
+        #sval-media-button,
+        #sval-javascript-button,
+        #sval-remove-button,
+        #sval-snip-button,
+        #sval-colorshift-button,
+        #sval-site-menu-button
+      ):not([hidden])
+  ) {
+    --sval-site-head-w: calc(var(--sval-dock-end-head) + 4px);
+    --sval-pill-end-w: 1px;
+  }
+
+  &:not(
+    :has(
+      > :is(
+          #sval-location-button,
+          #sval-media-button,
+          #sval-javascript-button,
+          #sval-remove-button,
+          #sval-snip-button,
+          #sval-colorshift-button,
+          #sval-site-menu-button
+        ):not([hidden])
+    )
+  ) {
+    --sval-live-trim: 7px;
+  }
+
+  &:has(> #sval-location-button:not([hidden])) {
+    --sval-location-w: 28px;
+  }
+
+  &:has(> #translations-button:not([hidden])) {
+    --sval-translate-w: 28px;
+  }
+
+  &:has(> #translations-button[translationsactive]:not([hidden])) {
+    --sval-translate-w: 44px;
+  }
+
+  &:has(> #sval-media-button:not([hidden])) {
+    --sval-media-w: 28px;
+  }
+
+  &:has(> #sval-javascript-button:not([hidden])) {
+    --sval-js-w: 28px;
+  }
+
+  &:has(> #sval-remove-button:not([hidden])) {
+    --sval-remove-w: 28px;
+  }
+
+  &:has(> #sval-snip-button:not([hidden])) {
+    --sval-snip-w: 28px;
+  }
+
+  &:has(> #sval-colorshift-button:not([hidden])) {
+    --sval-colorshift-w: 28px;
+  }
+
+  &:has(> #sval-site-menu-button:not([hidden])) {
+    --sval-site-menu-w: 28px;
+  }
+
+  &:has(> :is(#translations-button, #reader-mode-button, #sval-favorite-button):not([hidden])) {
+    --sval-page-head-w: 15px;
+    --sval-pill-end-w: 1px;
+  }
+
+  &:has(> #reader-mode-button:not([hidden])) {
+    --sval-reader-w: 28px;
+  }
+
+  &:has(> #sval-favorite-button:not([hidden])) {
+    --sval-fav-w: 28px;
+  }
+}
+
+/* The extensions' pill: pinned extensions, a divider, then the extensions
+   button, which opens the pill when no pinned extension is in the row. */
+#nav-bar-customization-target > .unified-extensions-item:not(.unified-extensions-item + .unified-extensions-item),
+#nav-bar:not(:has(#nav-bar-customization-target > .unified-extensions-item)) #unified-extensions-button {
+  border-inline-start: 1px solid var(--sval-cluster-border);
+  border-start-start-radius: 999px;
+  border-end-start-radius: 999px;
+  padding-inline-start: 2px;
+  margin-inline-start: 8px;
+}
+
+#unified-extensions-button {
+  border-inline-end: 1px solid var(--sval-cluster-border);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+  padding-inline-end: 2px;
+}
+
+#nav-bar:has(#nav-bar-customization-target > .unified-extensions-item) #unified-extensions-button {
+  background-image: linear-gradient(var(--sval-cluster-border), var(--sval-cluster-border));
+  background-size: 1px 18px;
+  background-position: left center;
+  background-repeat: no-repeat;
+  padding-inline-start: 4px;
+}
+
+#nav-bar:has(#nav-bar-customization-target > .unified-extensions-item) #unified-extensions-button:-moz-locale-dir(rtl) {
+  background-position: right center;
+}
+
+/* ---------------------------------------------------------------- address pill */
+
+/*
+ * The pill is one shape behind three parts: the docked back, forward, reload
+ * and home buttons, the address field, and the docked site controls and
+ * favorite button, which act on the page's site. `#urlbar-container::before`
+ * draws it, reaching under the docked buttons on each side by their exact
+ * width, so its border and fill are never two boxes meeting at a seam. The
+ * field's own background is clear until it breaks out into the suggestions
+ * card.
+ */
+#nav-bar
+  :is(
+    #back-button,
+    #forward-button,
+    #stop-reload-button,
+    #home-button,
+    #sval-live-devices,
+    #sval-location-button,
+    #translations-button,
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-site-menu-button,
+    #reader-mode-button,
+    #sval-favorite-button
+  ) {
+  padding: 0 !important;
+  margin: 0 !important;
+  align-self: center;
+}
+
+#nav-bar #stop-reload-button > .toolbarbutton-1 {
+  padding: 0;
+  margin: 0;
+}
+
+#nav-bar #back-button {
+  /* Centres the pill in the row; 1px clears the pill's border. */
+  margin-inline-start: auto !important;
+  padding-inline-start: 1px !important;
+}
+
+/* The last navigation button in the row closes the docked part; a 1×18px
+   divider sits 6px after it, and the protection button 6px after that. */
+#nav-bar-customization-target
+  > :is(#back-button, #forward-button, #stop-reload-button, #home-button):not([hidden]):where(
+    :not(:has(~ :is(#forward-button, #stop-reload-button, #home-button)))
+  ) {
+  padding-inline-end: var(--sval-dock-tail) !important;
+  background-image: linear-gradient(var(--sval-pill-border), var(--sval-pill-border));
+  background-size: 1px 18px;
+  background-position: 32px center;
+  background-repeat: no-repeat;
+  background-origin: content-box;
+
+  &:-moz-locale-dir(rtl) {
+    background-position: calc(100% - 32px) center;
+  }
+}
+
+/* The site controls are one cluster inside the address pill (decision
+   0132): each part draws its slice of the cluster's fill and borders, the
+   first shown opens it 8px after the field and the last shown closes it. */
+#nav-bar
+  :is(
+    #sval-live-devices,
+    #sval-location-button,
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-site-menu-button
+  ) {
+  height: 30px;
+  box-sizing: border-box;
+  background-color: var(--sval-cluster-bg);
+  border-block: 1px solid var(--sval-cluster-border);
+}
+
+#nav-bar-customization-target
+  > :is(
+    #sval-live-devices,
+    #sval-location-button,
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-site-menu-button
+  ):not([hidden]):where(
+    :not(
+      :is(
+          #sval-live-devices,
+          #sval-location-button,
+          #sval-media-button,
+          #sval-javascript-button,
+          #sval-remove-button,
+          #sval-snip-button,
+          #sval-colorshift-button,
+          #sval-site-menu-button
+        ):not([hidden])
+        ~ *
+    )
+  ) {
+  margin-inline-start: var(--sval-dock-end-head) !important;
+  padding-inline-start: 1px !important;
+  border-inline-start: 1px solid var(--sval-cluster-border);
+  border-start-start-radius: 999px;
+  border-end-start-radius: 999px;
+}
+
+#nav-bar-customization-target
+  > :is(
+    #sval-live-devices,
+    #sval-location-button,
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-site-menu-button
+  ):not([hidden]):where(
+    :not(
+      :has(
+        ~ :is(
+            #sval-location-button,
+            #sval-media-button,
+            #sval-javascript-button,
+            #sval-remove-button,
+            #sval-snip-button,
+            #sval-colorshift-button,
+            #sval-site-menu-button
+          ):not([hidden])
+      )
+    )
+  ) {
+  padding-inline-end: 1px !important;
+  border-inline-end: 1px solid var(--sval-cluster-border);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+  background-image: none;
+}
+
+#nav-bar
+  :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button, #sval-site-menu-button)
+  > .toolbarbutton-icon {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+}
+
+/* The translate, reader and favorite buttons are the page's own cluster,
+   drawn as the site controls' is, behind a 1×18px divider 4px from each.
+   The pill's outline reaches 2px past the cluster (`--sval-dock-end-w`), so
+   the cluster sits inside it as the site controls' does. */
+#nav-bar :is(#translations-button, #reader-mode-button, #sval-favorite-button) {
+  height: 30px;
+  box-sizing: border-box;
+  background-color: var(--sval-cluster-bg);
+  border-block: 1px solid var(--sval-cluster-border);
+}
+
+#nav-bar :is(#reader-mode-button, #sval-favorite-button) > .toolbarbutton-icon {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+}
+
+#nav-bar-customization-target
+  > :is(#translations-button, #reader-mode-button, #sval-favorite-button):not([hidden]):where(
+    :not(:is(#translations-button, #reader-mode-button):not([hidden]) ~ *)
+  ) {
+  position: relative;
+  margin-inline-start: 9px !important;
+  padding-inline-start: 1px !important;
+  border-inline-start: 1px solid var(--sval-cluster-border);
+  border-start-start-radius: 999px;
+  border-end-start-radius: 999px;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: -6px;
+    inset-block: 5px;
+    width: 1px;
+    background-color: var(--sval-pill-border);
+  }
+}
+
+/* The last part shown closes the cluster. */
+#nav-bar-customization-target
+  > :is(#translations-button, #reader-mode-button, #sval-favorite-button):not([hidden]):where(
+    :not(:has(~ :is(#reader-mode-button, #sval-favorite-button):not([hidden])))
+  ) {
+  padding-inline-end: 1px !important;
+  border-inline-end: 1px solid var(--sval-cluster-border);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+}
+
+/* The pill's last part shown, the field once every docked part has
+   overflowed, centres the pill in the row with its margin. */
+#nav-bar-customization-target
+  > :is(
+    #urlbar-container,
+    #sval-live-devices,
+    #sval-location-button,
+    #translations-button,
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-site-menu-button,
+    #reader-mode-button,
+    #sval-favorite-button
+  ):not([hidden]):where(
+    :not(
+      :has(
+        ~ :is(
+            #sval-live-devices,
+            #sval-location-button,
+            #translations-button,
+            #sval-media-button,
+            #sval-javascript-button,
+            #sval-remove-button,
+            #sval-snip-button,
+            #sval-colorshift-button,
+            #sval-site-menu-button,
+            #reader-mode-button,
+            #sval-favorite-button
+          ):not([hidden])
+      )
+    )
+  ) {
+  margin-inline-end: auto !important;
+}
+
+/* A disabled button dims its icon only. */
+#nav-bar
+  :is(
+    #back-button,
+    #forward-button,
+    #reload-button,
+    #stop-button,
+    #home-button,
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-site-menu-button
+  )[disabled],
+#nav-bar :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-disabled="true"] {
+  opacity: 1;
+  fill-opacity: 0.45;
+}
+
+/* A button that can't be used stays focusable, so its description can say
+   why, but it never looks pressable. */
+#nav-bar
+  :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-disabled="true"]
+  > .toolbarbutton-icon {
+  background-color: transparent !important;
+}
+
+#urlbar-container {
+  position: relative;
+  flex: 0 1 calc(var(--sval-pill-max) - var(--sval-dock-w) - var(--sval-dock-end-w)) !important;
+  max-width: calc(var(--sval-pill-max) - var(--sval-dock-w) - var(--sval-dock-end-w));
+  margin-inline: 0 !important;
+  padding-block: 0 !important;
+}
+
+#urlbar-container::before {
+  content: "";
+  position: absolute;
+  inset-block: calc(50% - var(--sval-control-h) / 2);
+  inset-inline: calc(-1 * var(--sval-dock-w)) calc(-1 * var(--sval-dock-end-w));
+  box-sizing: border-box;
+  border-radius: 999px;
+  background-color: var(--sval-pill-bg);
+  border: 1px solid var(--sval-pill-border);
+  box-shadow: var(--sval-pill-shadow);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  pointer-events: none;
+  /* Behind the docked buttons, which are siblings in flow. */
+  z-index: -1;
+  transition:
+    border-color 160ms var(--sval-ease),
+    outline-color 160ms var(--sval-ease);
+}
+
+/* Hovering any part lights the whole pill. */
+#nav-bar-customization-target:has(
+    :is(
+      #back-button,
+      #forward-button,
+      #stop-reload-button,
+      #home-button,
+      #urlbar-container,
+      #sval-live-devices,
+      #sval-location-button,
+      #translations-button,
+      #sval-media-button,
+      #sval-javascript-button,
+      #sval-remove-button,
+      #sval-snip-button,
+      #sval-colorshift-button,
+      #sval-site-menu-button,
+      #reader-mode-button,
+      #sval-favorite-button
+    ):hover
+  )
+  > #urlbar-container::before {
+  border-color: var(--sval-focus);
+}
+
+/* Focused without suggestions: a ring outside the pill. */
+#urlbar-container:has(#urlbar[focused]:not([breakout-extend]))::before {
+  outline-color: var(--sval-focus);
+}
+
+#urlbar {
+  --urlbar-height: var(--sval-control-h);
+  --urlbar-toolbar-height: var(--sval-header-h);
+  font-family: var(--sval-font);
+}
+
+#urlbar:not([breakout-extend]) > .urlbar-background {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+#urlbar:not([breakout-extend]) > .urlbar-input-container {
+  padding-inline: 0 12px;
+}
+
+/* Docked controls at the pill's end start 8px after the field
+   (`--sval-dock-end-head`), which is all the room the field's end needs. */
+#nav-bar-customization-target:has(
+    > :is(
+        #sval-live-devices,
+        #sval-location-button,
+        #translations-button,
+        #sval-media-button,
+        #sval-javascript-button,
+        #sval-remove-button,
+        #sval-snip-button,
+        #sval-colorshift-button,
+        #sval-site-menu-button,
+        #reader-mode-button,
+        #sval-favorite-button
+      ):not([hidden])
+  )
+  #urlbar:not([breakout-extend])
+  > .urlbar-input-container {
+  padding-inline-end: 0;
+}
+
+.urlbar-input {
+  caret-color: var(--sval-focus);
+  font-size: 14px;
+}
+
+/* The loading line (`SvalLoadLine`), inside the pill's foot between its
+   rounded ends. */
+#urlbar-container > #sval-load-line {
+  inset-inline: calc(var(--sval-control-h) / 2 - var(--sval-dock-w)) calc(var(--sval-control-h) / 2 - var(--sval-dock-end-w));
+  bottom: calc(50% - var(--sval-control-h) / 2 + 1px);
+}
+
+/* The line spans its whole track, and a clip shows as much of it as the
+   load has got (`--sval-load`, 0 to 1), from the start edge. */
+.sval-load-line {
+  position: absolute;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sval-accent);
+  pointer-events: none;
+  opacity: 0;
+  clip-path: inset(0 round 1px);
+  /* A finished load runs to the end, then fades. */
+  transition:
+    clip-path 200ms var(--sval-ease),
+    opacity 200ms var(--sval-ease) 200ms;
+
+  &[loading] {
+    opacity: 1;
+    clip-path: inset(0 calc((1 - var(--sval-load)) * 100%) 0 0 round 1px);
+    transition: clip-path 300ms var(--sval-ease);
+  }
+
+  &[loading]:dir(rtl) {
+    clip-path: inset(0 0 0 calc((1 - var(--sval-load)) * 100%) round 1px);
+  }
+
+  &[instant] {
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &[loading] {
+      transition: none;
+    }
+  }
+
+  @media (forced-colors) {
+    background: Highlight;
+  }
+}
+
+/* ---------------------------------------------------------------- field parts */
+
+/* The Launcher's card, which the field opens, and its rows are
+   `sval-launcher.css`'s. */
+
+#urlbar .searchmode-switcher {
+  --button-background-color: transparent;
+  --button-min-height: 18px;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#urlbar .urlbar-go-button {
+  content: url("chrome://browser/content/sval/header-icons/forward.svg");
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border-radius: 999px;
+  background-color: var(--sval-action);
+  -moz-context-properties: fill, fill-opacity;
+  fill: #ffffff;
+  fill-opacity: 1;
+}
+
+/* ---------------------------------------------------------------- domain only */
+
+/* `SvalHeader.startWindow` adds the label and the attribute. */
+.urlbar-input-box {
+  position: relative;
+}
+
+/* The input box is one 18px line, and the label clips what it holds, so
+   it reaches 4px above and below the box for the Launcher's 20px key cap. */
+#sval-urlbar-domain {
+  display: none;
+  position: absolute;
+  inset: -4px 0;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sval-text);
+  white-space: nowrap;
+}
+
+/* The end of a host names the site it belongs to, so a host too long for
+   the label loses its start: right-to-left overflow puts the clip and its
+   ellipsis on the left, and the `<bdi dir="ltr">` inside keeps the host's
+   own text in its order. Firefox's field keeps the same end in view
+   (`UrlbarValueFormatter`'s `#ensureFormattedHostVisible`). */
+.sval-urlbar-host {
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+/* `fitAddress` reads the tail's overflow to choose how much of it fits. */
+.sval-urlbar-tail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sval-muted);
+}
+
+#sval-urlbar-key {
+  margin-inline-start: auto;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+#urlbar[sval-domain-only][pageproxystate="valid"]:not([focused]) #sval-urlbar-domain {
+  display: flex;
+}
+
+#urlbar[sval-domain-only][pageproxystate="valid"]:not([focused]) .urlbar-input {
+  opacity: 0;
+}
+
+/* ---------------------------------------------------------------- icons */
+
+#back-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/back.svg") !important;
+}
+
+#forward-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/forward.svg") !important;
+}
+
+#reload-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/reload.svg") !important;
+}
+
+#stop-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/stop.svg") !important;
+}
+
+/* While the selected tab loads, Firefox shows the stop button in reload's
+ * place (`CombinedStopReload`). It wears the reload mark, turning, and shows
+ * the stop mark to a pointer or keyboard focus, which is when a click on it
+ * would stop the load. With reduced motion it shows the stop mark throughout. */
+@media (prefers-reduced-motion: no-preference) {
+  /* `#stop-reload-button[animate]` plays Firefox's sprites between the two
+   * marks over either button's icon, and clears the icon's fill while one
+   * plays. The stop-to-reload sprite starts on the stop mark. */
+  #nav-bar #stop-reload-button > :is(#reload-button, #reload-button[displaystop] + #stop-button) {
+    > .toolbarbutton-animatable-box {
+      display: none;
+    }
+
+    > .toolbarbutton-icon {
+      fill: inherit;
+    }
+  }
+
+  #nav-bar #stop-reload-button > #reload-button[displaystop] + #stop-button {
+    &:not(:hover, :focus-visible) {
+      list-style-image: url("chrome://browser/content/sval/header-icons/reload.svg") !important;
+
+      > .toolbarbutton-icon {
+        animation: sval-busy-turn 1s linear infinite;
+      }
+    }
+  }
+}
+
+@keyframes sval-busy-turn {
+  to {
+    rotate: 1turn;
+  }
+}
+
+#home-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/home.svg") !important;
+}
+
+#sval-panel-button {
+  list-style-image: url("chrome://browser/content/sval/icons/panel-left.svg");
+}
+
+#sval-javascript-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/javascript.svg");
+}
+
+/* The media button shows whether media plays on the page: plain, or crossed
+   while blocked. Blocked after the page tried to play on a site set to Ask
+   first, it takes the dot (header signals spec §2). */
+#sval-media-button {
+  position: relative;
+  list-style-image: url("chrome://browser/content/sval/header-icons/media.svg");
+}
+
+#sval-media-button:is([sval-media="blocked"], [sval-media="refused"]) {
+  list-style-image: url("chrome://browser/content/sval/header-icons/media-off.svg");
+}
+
+/* Media playing on the page takes the live fill, the 26px chip the live
+   devices draw (header signals spec §1). */
+#nav-bar #sval-media-button[sval-playing] > .toolbarbutton-icon {
+  width: 26px;
+  height: 26px;
+  margin: 1px;
+  padding: 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background-color: var(--sval-live-bg);
+  fill: var(--sval-live-ink);
+}
+
+#nav-bar #sval-media-button[sval-playing]:hover > .toolbarbutton-icon {
+  background-color: var(--sval-live-hover);
+}
+
+/* The location button (`SvalSiteControls`): the asking cell's glyph and
+   dot while the site asks, the live fill while the tab uses location, as a
+   camera's cell has it, and the crossed glyph once the page was refused
+   (header signals spec §1). */
+#nav-bar #sval-location-button {
+  width: 28px;
+  outline: none;
+
+  > .sval-live-ask[data-state="live"] {
+    background-color: var(--sval-live-bg);
+
+    > .sval-header-glyph {
+      fill: var(--sval-live-ink);
+    }
+  }
+
+  &:hover > .sval-live-ask:not([data-state="live"]) {
+    background-color: var(--sval-wash);
+  }
+
+  &:hover > .sval-live-ask[data-state="live"] {
+    background-color: var(--sval-live-hover);
+  }
+
+  &:focus-visible > .sval-live-ask {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 1px;
+  }
+}
+
+/* The translate cell (`SvalHeader`): a 28px chip like the buttons' beside
+   it, which takes the live fill while the page is translated and then shows
+   the target language's code, or Firefox's loading arrows while the
+   translation starts, after the icon. Firefox's rules for these ids
+   (`urlbar-searchbar.css`) draw the code as a badge, which the filled chip
+   makes redundant. The cell takes the chip's width plus the cluster's edges
+   it draws, in place of the fixed width `.urlbar-page-action` gives it. */
+#nav-bar #translations-button {
+  width: auto;
+  outline: none;
+}
+
+#translations-button > .sval-translate-chip {
+  width: 28px;
+  height: 28px;
+  gap: 2px;
+  border-radius: 999px;
+  color: var(--toolbar-text-color);
+  fill: currentColor;
+
+  #translations-button:is(:hover, [open]) > & {
+    background-color: var(--toolbarbutton-hover-background);
+  }
+
+  #translations-button:focus-visible > & {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 1px;
+  }
+
+  #translations-button[translationsactive] > & {
+    width: 42px;
+    height: 26px;
+    margin-inline: 1px;
+    background-color: var(--sval-live-bg);
+    color: var(--sval-live-ink);
+  }
+
+  #translations-button[translationsactive]:is(:hover, [open]) > & {
+    background-color: var(--sval-live-hover);
+  }
+}
+
+#nav-bar #translations-button-icon {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  list-style-image: url("chrome://browser/content/sval/header-icons/languages.svg");
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+  fill-opacity: 1;
+}
+
+#nav-bar #translations-button-circle-arrows {
+  margin: 0;
+  fill: currentColor;
+}
+
+#nav-bar #translations-button-locale {
+  height: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* The element picker's buttons, which `SvalSiteControls` shows while they are
+   pinned. One takes the pressed look while its mode is on. */
+#sval-remove-button {
+  list-style-image: url("chrome://browser/content/sval/icons/eraser.svg");
+}
+
+#sval-snip-button {
+  list-style-image: url("chrome://browser/content/sval/icons/scissors.svg");
+}
+
+/* Colorshift's button, which `SvalSiteControls` shows while it is pinned,
+   pressed while Colorshift is open. */
+#sval-colorshift-button {
+  list-style-image: url("chrome://browser/content/sval/icons/palette.svg");
+}
+
+#nav-bar
+  :is(
+    #sval-remove-button[aria-pressed="true"],
+    #sval-snip-button[aria-pressed="true"],
+    #sval-colorshift-button[aria-pressed="true"],
+    #reader-mode-button[readeractive]
+  )
+  > .toolbarbutton-icon {
+  background-color: var(--sval-on-bg);
+  fill: var(--sval-on-ink);
+}
+
+#nav-bar
+  :is(
+    #sval-remove-button[aria-pressed="true"],
+    #sval-snip-button[aria-pressed="true"],
+    #sval-colorshift-button[aria-pressed="true"],
+    #reader-mode-button[readeractive]
+  ):hover
+  > .toolbarbutton-icon {
+  background-color: var(--sval-on-hover);
+}
+
+#sval-site-menu-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/sliders-horizontal.svg");
+}
+
+/* A camera, microphone or screen in use: one 26px cell each, solid, then a
+   1×16px divider before the media button. The cluster's padding reset is
+   `#nav-bar`-scoped, so this is too, to keep the divider's gap. */
+#nav-bar #sval-live-devices {
+  display: flex;
+  align-items: center;
+  padding-inline-end: 7px !important;
+  background-image: linear-gradient(var(--sval-cluster-border), var(--sval-cluster-border));
+  background-size: 1px 16px;
+  background-position: calc(100% - 3px) center;
+  background-repeat: no-repeat;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* Each live cell is a button of its own: a camera or microphone mutes and
+   unmutes, a screen opens the site menu. The asks are one button. */
+:is(.sval-live-cell, .sval-live-asks):focus-visible {
+  outline: 2px solid var(--sval-focus);
+  outline-offset: 1px;
+}
+
+.sval-live-cells {
+  display: flex;
+  height: 26px;
+  border-radius: 999px;
+  background-color: var(--sval-live-bg);
+  color: var(--sval-live-ink);
+
+  &:not([sval-live]) {
+    display: none;
+  }
+}
+
+#sval-live-devices .sval-live-cell {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+
+  &:hover {
+    background-color: var(--sval-live-hover);
+  }
+
+  > .sval-header-glyph {
+    fill: var(--sval-live-ink);
+  }
+}
+
+/* The live segment's and the location button's glyphs, from the header's
+   icon set at the 16px its buttons draw, centred in a 26px cell whose box
+   the dot's mask cuts. */
+.sval-header-glyph {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  box-sizing: border-box;
+  -moz-context-properties: fill, fill-opacity;
+  fill: var(--toolbar-text-color);
+  fill-opacity: 1;
+}
+
+/* A device the site asks for or was refused, one 26px cell each
+   (header signals spec §2): the glyph and the dot while it asks, its prompt
+   open or closed; crossed, without the dot, after the page tried to use a
+   device blocked for its site. The open prompt shows that it is open, and a chip
+   would read as the live fill beside it. */
+.sval-live-asks {
+  display: flex;
+  height: 26px;
+
+  &:empty {
+    display: none;
+  }
+}
+
+.sval-live-ask {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+
+  &:is([data-state="asking"], [data-state="waiting"]) {
+    &::after {
+      content: "";
+      position: absolute;
+      top: 1px;
+      inset-inline-end: 1px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--sval-dot, var(--sval-accent));
+      pointer-events: none;
+    }
+
+    > .sval-header-glyph {
+      mask-image: radial-gradient(circle at calc(100% - 5px) 5px, transparent 6px, #000 6.5px);
+    }
+  }
+}
+
+.sval-header-glyph[data-icon="camera"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/camera.svg");
+}
+
+.sval-header-glyph[data-icon="camera-off"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/camera-off.svg");
+}
+
+.sval-header-glyph[data-icon="mic"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/mic.svg");
+}
+
+.sval-header-glyph[data-icon="mic-off"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/mic-off.svg");
+}
+
+.sval-header-glyph[data-icon="screen"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/screen.svg");
+}
+
+.sval-header-glyph[data-icon="screen-off"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/screen-off.svg");
+}
+
+.sval-header-glyph[data-icon="location"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/location.svg");
+}
+
+.sval-header-glyph[data-icon="location-off"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/location-off.svg");
+}
+
+.sval-header-glyph[data-icon="bell"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/bell.svg");
+}
+
+.sval-header-glyph[data-icon="storage"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/storage.svg");
+}
+
+.sval-live-asks:hover .sval-live-ask {
+  background-color: var(--sval-wash);
+}
+
+#sval-javascript-button[sval-js="off"] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/javascript-off.svg");
+}
+
+#unified-extensions-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/extensions.svg") !important;
+}
+
+#reader-mode-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/book-open.svg");
+}
+
+#sval-favorite-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/star.svg");
+}
+
+#sval-favorite-button[starred] {
+  list-style-image: url("chrome://browser/content/sval/header-icons/star-filled.svg");
+}
+
+#sval-history-button {
+  list-style-image: url("chrome://browser/content/sval/header-icons/history.svg");
+}
+
+/* The notices button (`SvalNoticesButton`). */
+#sval-notices-button {
+  list-style-image: url("chrome://browser/content/sval/icons/bell.svg");
+}
+
+/* The header's one dot: look at me (header signals spec §1, §7). An 8px
+   accent dot at the icon's top right, 2px in on a 28px icon and 4px on a
+   32px one, that cuts a 2px gap in the icon beneath it with a mask, so it
+   reads on every window colour. `--sval-dot-at` is the dot's centre from
+   the icon's top and end; `--sval-dot-in` is the icon's inset in its
+   button. */
+:is(#sval-notices-button[badged], #unified-extensions-button:is([sval-notice], [attention], [sval-page-action]), #sval-media-button[sval-media="asked"]) {
+  --sval-dot-at: 6px;
+  --sval-dot-in: 0px;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: calc(var(--sval-dot-in) + var(--sval-dot-at) - 4px);
+    inset-inline-end: calc(var(--sval-dot-in) + var(--sval-dot-at) - 4px);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--sval-dot, var(--sval-accent));
+    pointer-events: none;
+  }
+
+  > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+    mask-image: radial-gradient(circle at calc(100% - var(--sval-dot-at)) var(--sval-dot-at), transparent 6px, #000 6.5px);
+  }
+
+  &:dir(rtl) > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+    mask-image: radial-gradient(circle at var(--sval-dot-at) var(--sval-dot-at), transparent 6px, #000 6.5px);
+  }
+}
+
+/* The bell and the extensions button draw a 32px icon 1px in from the
+   button's edge, as the cluster's padding puts it. */
+:is(#sval-notices-button[badged], #unified-extensions-button:is([sval-notice], [attention], [sval-page-action])) {
+  --sval-dot-at: 8px;
+  --sval-dot-in: 1px;
+}
+
+@media (forced-colors) {
+  :root {
+    --sval-dot: Highlight;
+  }
+}
+
+/* A count: what the element picker changed on the page (header signals
+   spec §1). A 13px chip at the icon's top right in the header's ink, the
+   pressed look's colours, never the accent the dot keeps for look at me. A
+   count of two characters or more is a 21px pill. The chip cuts a 2px gap
+   of its own shape in the icon beneath it with a mask, as the dot does, so
+   it reads on every window colour. `--sval-count-end` is the chip's end
+   from the icon's end. */
+#nav-bar :is(#sval-remove-button, #sval-snip-button, #sval-site-menu-button)[sval-count] {
+  --sval-count-end: 0px;
+  --sval-count-cut: radial-gradient(circle closest-side, #000 calc(100% - 0.5px), transparent 100%);
+  --sval-count-cut-w: 17px;
+  position: relative;
+
+  &[sval-count-wide] {
+    --sval-count-cut: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='25' height='17'%3E%3Crect width='25' height='17' rx='8.5'/%3E%3C/svg%3E");
+    --sval-count-cut-w: 25px;
+
+    &::after {
+      width: 21px;
+    }
+  }
+
+  &::after {
+    content: attr(sval-count);
+    position: absolute;
+    top: 0;
+    inset-inline-end: var(--sval-count-end);
+    box-sizing: border-box;
+    width: 13px;
+    height: 13px;
+    border-radius: 999px;
+    background-color: var(--sval-on-bg);
+    color: var(--sval-on-ink);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 13px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  > .toolbarbutton-icon {
+    mask-image: linear-gradient(#000, #000), var(--sval-count-cut);
+    mask-size:
+      100% 100%,
+      var(--sval-count-cut-w) 17px;
+    mask-position:
+      0 0,
+      right calc(var(--sval-count-end) - 2px) top -2px;
+    mask-repeat: no-repeat;
+    mask-composite: exclude;
+  }
+
+  &:dir(rtl) > .toolbarbutton-icon {
+    mask-position:
+      0 0,
+      left calc(var(--sval-count-end) - 2px) top -2px;
+  }
+}
+
+/* A site style on the page (site styles spec §3): a 6px dot in the count's
+   colours, centred where the count's chip centres, on the Colorshift button
+   while it is pinned and on Site settings otherwise. It marks a state, so it
+   never takes the accent the look-at-me dot keeps. A count on the button
+   takes its place. */
+#nav-bar :is(#sval-site-menu-button, #sval-colorshift-button)[sval-styled]:not([sval-count]) {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 3.5px;
+    inset-inline-end: 3.5px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--sval-on-bg);
+    pointer-events: none;
+  }
+}
+
+@media (forced-colors) {
+  #nav-bar :is(#sval-site-menu-button, #sval-colorshift-button)[sval-styled]:not([sval-count])::after {
+    background-color: ButtonText;
+  }
+}
+
+@media (forced-colors) {
+  #nav-bar :is(#sval-remove-button, #sval-snip-button, #sval-site-menu-button)[sval-count]::after {
+    background-color: ButtonText;
+    color: ButtonFace;
+  }
+}
+
+/* ---------------------------------------------------------------- private badge */
+
+:root:not([privatebrowsingmode="temporary"]) #sval-private-badge {
+  display: none;
+}
+
+#sval-private-badge {
+  align-self: center;
+  box-sizing: border-box;
+  height: 28px;
+  padding-inline: 12px;
+  margin-inline-start: 8px;
+  gap: 6px;
+  border-radius: 999px;
+  background-color: rgba(106, 85, 214, 0.4);
+  border: 1px solid rgba(166, 140, 255, 0.4);
+  color: #e2dcff;
+  font-family: var(--sval-font);
+  font-size: 12px;
+  font-weight: 600;
+
+  > label {
+    margin: 0;
+  }
+}
+
+.sval-private-badge-icon {
+  list-style-image: url("chrome://browser/content/sval/header-icons/private.svg");
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+  fill-opacity: 1;
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------------------------------------------------------------- panels */
+
+panel[type="arrow"] {
+  --panel-border-radius: 20px;
+}
+
+/* A popover grows from the button that opened it (messages spec §9.4). The
+   popover and its button are two native windows, and the popover's window
+   draws the whole of the joined shape: one SVG path in its shadow tree
+   (`sval-stem-outline`, which `SvalHeader`'s stem listeners trace from what
+   they measure) runs around the button's face, down the stem, around the
+   12px concave fillets and the content, and is filled in the popover's fill
+   and stroked once in its edge. Two windows' shares of one edge meet on
+   different device pixels wherever the display's scale is fractional,
+   because Gecko places a popup's window on whole device pixels
+   (`nsMenuPopupFrame::GetRects`) and the button need not stand on them; one
+   path in one window has no such seam. The button keeps only its fill, in
+   the popover's colour, under the window's transparent face: the path's
+   fill leaves out the face's inside and overlaps its rim, so the button's
+   label shows and no gap opens between the two fills. The content's own
+   fill and edge give way to the path, so the content's edge is not drawn
+   twice.
+
+   A header panel hangs 32px past the button's outer edge, which keeps the
+   fillets clear of its 20px corners. The workspace panel's menus keep their
+   place under their button and are at least as wide as it, so a menu as
+   wide as its button meets it flush. Where the room on a side is short, the
+   listeners narrow that side's fillet and corner, down to a square corner
+   under a stem as wide as the top edge.
+
+   The shadow is drawn as box shadows of two boxes behind the path, the
+   content's (`::before`) and the face and stem's (`::after`), because a
+   filter in a popover is painted again over its whole window whenever
+   anything in it repaints, as a menu does each time its active item moves,
+   and macOS paints a popup's window on the main thread
+   (`nsCocoaWindow::ShouldUseOffMainThreadCompositing`). A box shadow is
+   drawn outside its box alone, so none falls on the face. The feedback
+   popover (`sval-feedback.css`) is drawn in the window's own document, so a
+   filter traces its tab, corner and box as one.
+
+   The popover's window stands as far outside its content on every side as
+   the content stands below the window's top, the room above the face and
+   the face and fillet below it, and `-moz-window-input-region-margin`, one
+   length for every side, leaves that room out of the input region. A press
+   on the button, its neighbours or the shadow reaches the window below on
+   Windows and GTK as it would with the popover elsewhere; macOS ignores the
+   margin (`nsCocoaWindow.mm`), and there the stem listeners close the
+   popover on a press outside what it draws.
+
+   The attachment holds only while the stem is drawn. Under increased
+   contrast the edge is the text colour. Under forced colours the system's
+   popup and its edge stand, and a Linux desktop without transparency gets
+   square, opaque popups (`popup.css`), which leave no room around a stem.
+
+   Each shadow box is a pseudo-element that is always there, positioned
+   against its element, and sized only while the popover is open: a
+   pseudo-element that comes or goes rebuilds its element's frame
+   (`nsStyleContent::CalcDifference`), which closes an opening popup or
+   takes its anchor from under it. The outline stays in the shadow tree once
+   made, out of flow and hidden while no stem is placed. */
+:is(
+  #sval-notices-panel,
+  #unified-extensions-panel,
+  #downloadsPanel,
+  #sval-site-menu,
+  #sval-protection-panel,
+  #notification-popup,
+  #sval-favorites-menu,
+  #sval-pins-popover,
+  #sval-strip-app-menu
+) {
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+
+  &::part(sval-stem-outline) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    z-index: -1;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
+  .sval-feedback,
+  :is(
+    #sval-notices-panel,
+    #unified-extensions-panel,
+    #downloadsPanel,
+    #sval-site-menu,
+    #sval-protection-panel,
+    #notification-popup,
+    #sval-favorites-menu,
+    #sval-pins-popover,
+    #sval-strip-app-menu
+  )[sval-stem],
+  #sval-workspace-menu {
+    /* The pill's edge laid over the popover's fill, opaque whether or not
+       the fill is: the stroke's inner half lies over the fill and its outer
+       half over the window's transparent margin, and a translucent colour
+       would differ between the two. The feedback popover's filter traces
+       its edge in overlapping drop shadows, which a translucent colour would
+       darken where they overlap. */
+    --sval-stem-edge: rgb(
+      from
+        color-mix(
+          in srgb,
+          rgb(from var(--sval-pill-border) r g b / 1) calc(var(--sval-pill-border-alpha) * 100%),
+          var(--sval-stem-fill, var(--panel-background-color))
+        )
+        r g b / 1
+    );
+
+    @media (prefers-contrast) {
+      --sval-stem-edge: currentColor;
+    }
+  }
+
+  .sval-feedback {
+    filter: drop-shadow(1px 0 0 var(--sval-stem-edge)) drop-shadow(-1px 0 0 var(--sval-stem-edge)) drop-shadow(0 1px 0 var(--sval-stem-edge))
+      drop-shadow(0 -1px 0 var(--sval-stem-edge)) var(--sval-stem-shadow);
+  }
+
+  /* The Workspace menu opens over the switcher, where no stem can join it
+     to its button, and wears a stem popover's edge and shadow as box
+     shadows. */
+  #sval-workspace-menu {
+    --panel-box-shadow:
+      1px 0 0 var(--sval-stem-edge), -1px 0 0 var(--sval-stem-edge), 0 1px 0 var(--sval-stem-edge), 0 -1px 0 var(--sval-stem-edge), var(--sval-stem-box-shadow);
+    --panel-border-color: transparent;
+    /* `--sval-stem-shadow-reach` (panels, above), and the edge. */
+    --panel-box-shadow-margin: 16px;
+    -moz-window-shadow: none;
+  }
+
+  #nav-bar toolbarbutton[sval-stem] > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+    background-color: var(--sval-stem-fill);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  :is(
+    #sval-notices-panel,
+    #unified-extensions-panel,
+    #downloadsPanel,
+    #sval-site-menu,
+    #sval-protection-panel,
+    #notification-popup,
+    #sval-favorites-menu,
+    #sval-pins-popover,
+    #sval-strip-app-menu
+  )[sval-stem] {
+    --sval-fillet: 12px;
+    --panel-box-shadow:
+      1px 0 0 var(--sval-stem-edge), -1px 0 0 var(--sval-stem-edge), 0 1px 0 var(--sval-stem-edge), 0 -1px 0 var(--sval-stem-edge), var(--sval-stem-box-shadow);
+    /* The room above the face for its shadow, within the header's height.
+       The window's room on each side and below is the depth from its top
+       to the content (`--sval-stem-shadow-room`), deeper than
+       `--sval-stem-box-shadow` reaches at three deviations of its largest
+       layer (tokens, above). Gecko adds the top margin to the popup's place
+       under its anchor (`nsMenuPopupFrame::AdjustPositionForAnchorAlign`),
+       so the window starts this room above the face, and it lets the room
+       run off the screen (`nsMenuPopupFrame::GetConstraintRect`). */
+    --panel-box-shadow-margin: 24px;
+    --sval-stem-shadow-room: calc(var(--panel-box-shadow-margin) + var(--sval-stem-face-h, 0px) + var(--sval-fillet));
+    margin-top: calc(var(--sval-stem-drop, 0px) + var(--sval-fillet) - var(--sval-stem-shadow-room) + var(--sval-stem-top-trim, 0px));
+    margin-inline: calc(-1 * var(--sval-stem-shadow-room));
+    margin-bottom: calc(-1 * var(--sval-stem-shadow-room));
+    -moz-window-input-region-margin: var(--sval-stem-shadow-room);
+    --panel-border-color: transparent;
+    -moz-window-shadow: none;
+    /* `popup.css` slides an arrow panel in from 70px above its place, away
+       from the button it grows from. */
+    transition: none;
+
+    &::part(content) {
+      margin: var(--sval-stem-shadow-room);
+      margin-top: calc(var(--sval-stem-shadow-room) - var(--sval-stem-top-trim, 0px));
+      /* The room left in the window, which `SvalHeader` measures. The
+         content keeps `popup.css`'s clip, so its corners stay whole; a
+         popover with more to show scrolls what it holds (below). */
+      max-height: var(--sval-stem-room);
+      border-top-left-radius: min(var(--panel-border-radius), var(--sval-corner-left, var(--panel-border-radius)));
+      border-top-right-radius: min(var(--panel-border-radius), var(--sval-corner-right, var(--panel-border-radius)));
+    }
+  }
+
+  :is(
+    #sval-notices-panel,
+    #unified-extensions-panel,
+    #downloadsPanel,
+    #sval-site-menu,
+    #sval-protection-panel,
+    #notification-popup,
+    #sval-strip-app-menu
+  )[sval-stem] {
+    margin-inline: calc(-1 * var(--sval-stem-shadow-room) - 32px);
+    /* How far `--sval-stem-box-shadow` reaches past the content: three
+       deviations of its far layer, under 0.2% of its peak, its drop and its
+       1px spread. The popover stands this far inside its window's sides and
+       foot (`keepInWindow`, `SvalHeader`), so its shadow fades out within
+       the window. A Workspace or Favorites menu keeps its place under its
+       button, at the window's edge. An agent app's list in the strip grows
+       from a tile, as these do from a button. */
+    --sval-stem-shadow-reach: 15px;
+
+    &::part(content) {
+      min-width: calc(var(--sval-stem-w) + 2 * 32px);
+    }
+  }
+
+  :is(#sval-favorites-menu, #sval-pins-popover)[sval-stem]::part(content) {
+    min-width: var(--sval-stem-w);
+  }
+
+  /* A submenu inherits the custom properties of the menu it opens from, and
+     has no stem to take its edge: it wears the window's popup edge, which
+     the root holds as `--sval-popup-edge`. */
+  :root {
+    --sval-popup-edge: var(--panel-border-color);
+  }
+
+  @media not (prefers-contrast) {
+    #sval-favorites-menu[sval-stem] menupopup {
+      --panel-border-color: var(--sval-popup-edge);
+    }
+  }
+
+  :is(
+    #sval-notices-panel,
+    #unified-extensions-panel,
+    #downloadsPanel,
+    #sval-site-menu,
+    #sval-protection-panel,
+    #notification-popup,
+    #sval-favorites-menu,
+    #sval-pins-popover,
+    #sval-strip-app-menu
+  )[sval-stem="placed"] {
+    &::part(content) {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    &::part(sval-stem-outline) {
+      visibility: visible;
+    }
+
+    &::part(sval-stem-fill) {
+      fill: var(--panel-background-color);
+      fill-rule: evenodd;
+      stroke: none;
+    }
+
+    &::part(sval-stem-edge) {
+      fill: none;
+      stroke: var(--sval-stem-edge);
+      stroke-width: 1px;
+    }
+
+    /* Behind the outline, whose fill hides each box's shadow where the
+       other box is. */
+    &::before,
+    &::after {
+      z-index: -2;
+      box-shadow: var(--sval-stem-box-shadow);
+    }
+
+    &::before {
+      left: var(--sval-stem-body-left);
+      top: var(--sval-stem-body-top);
+      width: var(--sval-stem-body-width);
+      height: var(--sval-stem-body-height);
+      border-radius: var(--sval-stem-body-radius);
+    }
+
+    &::after {
+      left: var(--sval-stem-tab-left);
+      top: var(--sval-stem-tab-top);
+      width: var(--sval-stem-tab-width);
+      height: var(--sval-stem-tab-height);
+      border-radius: var(--sval-stem-tab-radius);
+    }
+  }
+}
+
+/* What a header popover holds scrolls when it has more to show than its
+ * room, inside the popover's rounded content (panels, above), its corners in
+ * step with the content's. A permission's value menu is a popup the site
+ * menu holds, and keeps its own. */
+:is(#sval-notices-panel, #unified-extensions-panel, #downloadsPanel, #sval-site-menu, #sval-protection-panel, #notification-popup)[sval-stem]
+  > :not(menupopup) {
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: max(0px, calc(var(--panel-border-radius) - var(--panel-padding)));
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+/* The notices popover (`SvalNoticesButton`, messages spec §5): each notice
+   a 32px tile, its sentence and its buttons, and a dismissed one a 44px row
+   that runs its main action. */
+#sval-notices-panel {
+  --button-border-radius: 999px;
+  --button-background-color-primary: var(--sval-action);
+  --button-background-color-primary-hover: var(--sval-action);
+  --button-background-color-primary-active: var(--sval-action);
+  --button-text-color-primary: #ffffff;
+  --button-background-color: var(--sval-wash);
+  --button-background-color-hover: var(--sval-wash-strong);
+  --button-text-color: var(--sval-text);
+  --panel-padding: 8px;
+  --panel-width: 384px;
+  font-family: var(--sval-font);
+}
+
+.sval-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px;
+}
+
+.sval-notice-tile {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background-color: var(--sval-wash);
+
+  &::before {
+    content: "";
+    display: block;
+    width: 16px;
+    height: 16px;
+    margin: 8px;
+    /* The icon strokes in `context-fill`, which a mask image is not given:
+       drawn as a mask, it draws nothing. */
+    background: url("chrome://browser/content/sval/icons/circle-arrow-up.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: var(--sval-accent);
+  }
+}
+
+.sval-notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sval-notice-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sval-notice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+
+  /* A label kept on one line, so a long one moves its button to a row of
+     its own rather than doubling the button's height. */
+  > .footer-button {
+    box-sizing: border-box;
+    height: 32px;
+    min-height: 32px;
+    margin: 0;
+    padding: 0 14px;
+    font: 600 13px/16px var(--sval-font);
+    white-space: nowrap;
+  }
+}
+
+button.sval-notice-row {
+  appearance: none;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:hover:active {
+    background-color: var(--sval-wash-strong);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: -2px;
+  }
+}
+
+#unified-extensions-panel .unified-extensions-item {
+  border-radius: 14px;
+  min-height: 40px;
+}
+
+/* An extension notice in the extensions panel (`SvalExtensionNotices`),
+   as messages spec §9.6 draws a result line: a 16px glyph, a 10px gap, the
+   sentence at 14px/20px in text ink, and the buttons on a row beneath,
+   indented 26px, which the glyph and the gap make. A warning sits in a
+   tinted well. */
+.sval-extension-notice {
+  --message-bar-icon-size: 16px;
+  --message-bar-icon-background-color: transparent;
+  --message-bar-container-gap: 10px;
+  --message-bar-text-color: currentColor;
+  font-size: 14px;
+  line-height: 20px;
+
+  &[type="warning"] {
+    --sval-notice-warning: light-dark(#8a5200, #ffc24d);
+    --message-bar-icon-color: var(--sval-notice-warning);
+    --message-bar-background-color: color-mix(in srgb, var(--sval-notice-warning) 14%, transparent);
+    --message-bar-border-color: transparent;
+  }
+}
+
+.sval-extension-notice-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sval-extension-notice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  &:empty {
+    display: none;
+  }
+}
+
+/* The header's one dot stands in for Firefox's attention dot. */
+#unified-extensions-button[attention] > .toolbarbutton-icon {
+  background-image: none;
+}
+
+@media (forced-colors) {
+  .sval-extension-notice[type="warning"] {
+    --message-bar-icon-color: CanvasText;
+    --message-bar-background-color: Canvas;
+    --message-bar-border-color: CanvasText;
+  }
+}
+
+/* ---------------------------------------------------------------- panel slide */
+
+/*
+ * `slide` (`SvalHeader.sys.mjs`) slides the panel, and Firefox's sidebar on
+ * its other side, with the page pushed along beside it, rather than resizing
+ * the page each frame: [sval-overlay] lifts the box out of the layout so the
+ * page changes width once, and box and page move by transforms, which the
+ * compositor runs without layout. The page's frame moves whole, its rounded
+ * corners with it. Both share one motion so they read as one kind of thing.
+ */
+:is(#sval-panel-container, #sidebar-box)[sval-overlay] {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  box-sizing: border-box;
+  width: calc(var(--sval-slide-w) + var(--sval-slide-gutter, 0px));
+  /* The gap the box keeps from the page's frame in the layout, in the
+     chrome's colour, so the page's edge stands where it will once the box
+     is back in the layout (`lift`, `SvalHeader`). */
+  border-inline-end: var(--sval-slide-gutter, 0) solid var(--toolbar-background-color);
+  /* Over `#tabbrowser-tabbox`, which browser.css lifts to 2. */
+  z-index: 3;
+}
+
+:is(#sval-panel-container[sval-placement="right"], #sidebar-box[sidebar-positionend])[sval-overlay] {
+  inset-inline: auto 0;
+  border-inline-end: none;
+  border-inline-start: var(--sval-slide-gutter, 0) solid var(--toolbar-background-color);
+}
+
+:is(#sval-panel-container, #sidebar-box) {
+  --sval-slide-out: -100%;
+  transition: transform 750ms var(--sval-ease);
+
+  &:-moz-locale-dir(rtl),
+  &:is([sval-placement="right"], [sidebar-positionend]) {
+    --sval-slide-out: 100%;
+  }
+
+  &:is([sval-placement="right"], [sidebar-positionend]):-moz-locale-dir(rtl) {
+    --sval-slide-out: -100%;
+  }
+}
+
+:is(#sval-panel-container, #sidebar-box)[sval-collapsed] {
+  transform: translateX(var(--sval-slide-out));
+  visibility: hidden;
+  transition:
+    transform 750ms var(--sval-ease),
+    visibility 0s 750ms;
+}
+
+/* ---------------------------------------------------------------- panel reveal */
+
+/*
+ * The hidden panel slides in over the page from the window's edge
+ * (`SvalPanelReveal`): the lifted box above with its slide undone, quicker
+ * than the toggle's, since a pointer waits on it. The page keeps its place,
+ * so the panel casts the shadow of what floats over it.
+ */
+#sval-panel-container[sval-collapsed][sval-reveal] {
+  box-shadow: var(--sval-float-box-shadow);
+  transition:
+    transform 250ms var(--sval-ease),
+    visibility 0s 250ms;
+}
+
+#sval-panel-container[sval-collapsed][sval-reveal="shown"] {
+  transform: none;
+  visibility: visible;
+  transition: transform 250ms var(--sval-ease);
+}
+
+/* The panel's width is the lifted box's (`lift`, `SvalHeader`), which a
+   drag of its edge does not change. */
+#sval-panel-container[sval-reveal] > .sval-panel-resizer {
+  display: none;
+}
+
+/* Where the pointer rests to slide the panel in, along the window's edge on
+ * the panel's side, while the panel is hidden and not slid in. It covers the gap the page's
+ * frame leaves (page frame, below), so it takes no clicks from the page. A
+ * full-screen window gives the page the whole screen, so there the strip
+ * takes the page's outermost column, as `#fullscr-toggler` takes its top
+ * row (`fullscreen-and-pointerlock.css`). */
+#sval-panel-edge {
+  display: none;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 6px;
+  /* Over the lifted panel and the page. */
+  z-index: 4;
+
+  :root:not([inDOMFullscreen], [chromehidden~="toolbar"])
+    #browser:has(> #sval-panel-container[sval-collapsed]:not([hidden], [sval-reveal="shown"]))
+    > &:not([hidden]) {
+    display: block;
+  }
+
+  #browser:has(> #sval-panel-container[sval-placement="right"]) > & {
+    inset-inline: auto 0;
+  }
+
+  :root[inFullscreen] & {
+    width: 1px;
+  }
+}
+
+/* The page, moved aside by each lifted box's share (`push`, `SvalHeader`).
+ * Firefox's `sidebar.css` gives it `translate: 0`. */
+#tabbrowser-tabbox {
+  --sval-push: calc(var(--sval-push-sval-panel-container, 0px) + var(--sval-push-sidebar-box, 0px));
+  translate: var(--sval-push);
+  transition:
+    translate 750ms var(--sval-ease),
+    clip-path 750ms var(--sval-ease);
+}
+
+/* While a box is lifted, the page shows only where it stands in the layout:
+ * the part pushed past its edge would pass under the box on the other side,
+ * which is clear in a see-through window. The clip moves as the page does,
+ * so its edge stays put. */
+#browser:has(> [sval-overlay]) > #tabbrowser-tabbox {
+  clip-path: inset(0 max(0px, var(--sval-push)) 0 max(0px, -1 * var(--sval-push)));
+}
+
+/* A pushed page passes under a box on its other side, which stays over it as
+ * the sliding box does. */
+#browser:has(> [sval-overlay]) > :is(#sval-panel-container, #sidebar-box, #sidebar-splitter):not([sval-overlay]) {
+  z-index: 3;
+}
+
+/* The sidebar's splitter takes no room while the sidebar is lifted, so the
+ * page changes width once, as it does for the panel. */
+#browser:has(> #sidebar-box[sval-overlay]) > #sidebar-splitter {
+  display: none;
+}
+
+/* The sidebar opens as wide as the panel, which fits the History sidebar's
+ * two workspace views side by side. Its content stands as far from the
+ * window's edge as from the page's frame, which on that side is the frame's
+ * inset (page frame, below) and the splitter's width (`--splitter-width`,
+ * `sidebar.css`). */
+#sidebar-box {
+  width: var(--size-sidebar);
+  padding-inline-start: calc(6px + 4px);
+
+  &[sidebar-positionend] {
+    padding-inline: 0 calc(6px + 4px);
+  }
+}
+
+/* The sidebar wears the chrome's colour beside the page's frame, as the
+ * workspace panel does, so the page's edge is the one line between them.
+ * Without `sidebar.revamp` Firefox draws a 1px border on the splitter's side
+ * that faces the page (`.sidebar-splitter`, `sidebar.css`). */
+#browser > #sidebar-splitter {
+  border-inline-width: 0;
+
+  /* A press takes the splitter from the sidebar's edge, across the page's
+     gap (page frame, below), to a little inside the page. It stops at the
+     sidebar's edge because the sidebar page's scrollbar runs along it
+     there. It overlaps the page by its margin and keeps `--splitter-width`
+     of room (`sidebar.css`), so the layout stays as Firefox has it. A
+     splitter draws no pseudo-element (`nsSplitterFrame` is a leaf frame). */
+  width: calc(var(--splitter-width) + 6px + 4px);
+  margin-inline: 0 calc(-6px - 4px);
+
+  #sidebar-box[sidebar-positionend] + & {
+    margin-inline: calc(-6px - 4px) 0;
+  }
+}
+
+/* ---------------------------------------------------------------- page frame */
+
+/*
+ * A page on its own sits as a split's pane does (split view, below): in the
+ * chrome's own colour, 6px in from it at the sides and foot, a rounded page
+ * with the active pane's hairline edge. Its top meets the header, whose row
+ * already leaves the address bar as much room below as above. The workspace
+ * panel wears the chrome's colour too, so the page's edge is the one line
+ * between them (`sval-panel.css`). A full-screen window and a full-screen
+ * element give the page the whole screen. Firefox places each tab's panel
+ * over the whole of the tab panels (`.browserSidebarContainer` in
+ * `content-area.css`), so the inset is the panel's own.
+ */
+:root:not([inDOMFullscreen], [inFullscreen]) #tabbrowser-tabpanels:not(:has(> .split-view-panel-active)) {
+  background: var(--toolbar-background-color);
+
+  > .browserSidebarContainer.deck-selected {
+    inset: 0 6px 6px;
+    border-radius: 8px;
+    overflow: clip;
+
+    > .browserContainer {
+      border-radius: 0;
+      outline: none;
+    }
+
+    /* The edge, over the page so the page cannot paint over it. The status
+       panel's tab and a tab's dialogs (`.dialogStack`, `content-area.css`)
+       stand over the edge. */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 1px var(--sval-pane-edge-active);
+      pointer-events: none;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- find bar */
+
+/*
+ * The find bar opens across the top of the page in the chrome's own colour,
+ * as part of the window around the page: the page's rounded frame and its
+ * edge start under it. Firefox puts the bar after the page in its
+ * `.browserContainer`, a column (`_createFindBar`, `tabbrowser.js`), and
+ * slides it in from below (`findbar.css`), so here it is ordered first and
+ * slides from above. Its height is its 28px row and 6px either side.
+ */
+#tabbrowser-tabpanels {
+  --sval-findbar-h: calc(28px + 2 * 6px);
+}
+
+.browserContainer > findbar {
+  order: -1;
+  padding-block: 6px;
+  border-top: 0;
+  background: var(--toolbar-background-color);
+  transition-property: margin-top, visibility;
+
+  &[hidden] {
+    margin-bottom: 0;
+    margin-top: calc(-1 * var(--sval-findbar-h));
+  }
+
+  .findbar-textbox {
+    height: 28px;
+    padding-inline: 12px;
+    border: 1px solid var(--sval-pill-border);
+    border-radius: 999px;
+    background-color: var(--sval-pill-bg);
+    color: var(--toolbar-text-color);
+
+    &:focus {
+      border-color: var(--sval-focus);
+      outline: none;
+      box-shadow: 0 0 0 1px var(--sval-focus);
+    }
+  }
+
+  :is(.findbar-find-previous, .findbar-find-next, .findbar-closebutton) {
+    border-radius: 999px;
+  }
+}
+
+:root:not([inDOMFullscreen]) #tabbrowser-tabpanels > :is(.browserSidebarContainer, .split-view-panel):has(> .browserContainer > findbar:not([hidden])) {
+  &::after {
+    top: var(--sval-findbar-h);
+  }
+
+  /* The page's rounded corners show the container behind them, which
+     Firefox paints in the tab panel's colour (`.browserContainer` in
+     `content-area.css`), so under the bar it takes the bar's. */
+  > .browserContainer {
+    background: var(--toolbar-background-color);
+  }
+
+  > .browserContainer > .browserStack {
+    border-start-start-radius: 8px;
+    border-start-end-radius: 8px;
+    overflow: clip;
+  }
+}
+
+/* The frame's edge follows the bar as it slides. */
+@media (prefers-reduced-motion: no-preference) {
+  #tabbrowser-tabpanels > :is(.browserSidebarContainer, .split-view-panel)::after {
+    transition: top 150ms ease-in-out;
+  }
+}
+
+/* ---------------------------------------------------------------- split view */
+
+/*
+ * A split's panes (split-view spec §6.4) sit in the chrome's own colour, 6px
+ * in from it at the sides and foot and 6px apart, each a rounded page with a
+ * hairline edge. The
+ * active pane, which the one toolbar drives, carries a 2px accent line on its
+ * top edge and a stronger edge; the others carry Firefox's footer, restyled
+ * as a bar along their foot. Shown splits only: Firefox keeps `[splitview]`
+ * on the tab panels while another tab is selected, with no pane active.
+ */
+#tabbrowser-tabpanels {
+  --sval-pane-edge: light-dark(rgb(var(--sval-palette-wash-light) / 0.08), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-pane-edge-active: light-dark(rgb(var(--sval-palette-wash-light) / 0.14), rgb(var(--sval-palette-wash-dark) / 0.18));
+  --sval-pane-divider: light-dark(rgb(var(--sval-palette-wash-light) / 0.28), rgb(var(--sval-palette-wash-dark) / 0.34));
+  --sval-pane-text: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  --sval-pane-insecure: light-dark(#c8321f, #ff7a6b);
+  --sval-pane-insecure-bg: light-dark(rgba(200, 50, 31, 0.1), rgba(255, 122, 107, 0.14));
+}
+
+:root:not([inDOMFullscreen]) #tabbrowser-tabpanels[splitview]:has(> .split-view-panel-active) {
+  /* No top gap, as for a page on its own (page frame, above). */
+  padding: 0 6px 6px;
+  background: var(--toolbar-background-color);
+
+  > .split-view-panel.split-view-panel-active {
+    margin: 0;
+    border-radius: 8px;
+    overflow: clip;
+
+    > .browserContainer {
+      border-radius: 0;
+      outline: none;
+    }
+
+    /* Firefox stacks the selected pane's page over the others for its
+       dialogs (`.split-view-panel.deck-selected > .browserContainer`,
+       `content-area.css`); here each pane clips its own, and the page's
+       stacking would hold the status panel's tab under the edge. */
+    &.deck-selected > .browserContainer {
+      z-index: auto;
+    }
+
+    /* The edge, over the page so the page cannot paint over it. The status
+       panel's tab and a tab's dialogs (`.dialogStack`, `content-area.css`)
+       stand over the edge. */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 1px var(--sval-pane-edge);
+      pointer-events: none;
+    }
+
+    &.deck-selected::after {
+      box-shadow: inset 0 0 0 1px var(--sval-pane-edge-active);
+    }
+
+    /* The active pane's line, right under the toolbar it drives. */
+    &.deck-selected::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      inset-inline: 12px;
+      z-index: 3;
+      height: 2px;
+      border-radius: 0 0 2px 2px;
+      background: var(--sval-accent);
+      pointer-events: none;
+    }
+  }
+
+  /* No pane grows past what leaves every other pane its minimum and its
+     6px gap, and panes give way down to their minimum, so a divider dragged
+     as far as it goes stops there rather than pushing panes out of view.
+     Firefox's own cap leaves room for one other pane; the columns say how
+     many there are. */
+  --sval-split-others: 1;
+
+  &:has(> .split-view-panel-active[column="2"]) {
+    --sval-split-others: 2;
+  }
+
+  &:has(> .split-view-panel-active[column="3"]) {
+    --sval-split-others: 3;
+  }
+
+  > .split-view-panel.split-view-panel-active {
+    max-width: calc(100% - var(--sval-split-others) * (var(--panel-min-width) + 6px));
+    /* A pane a divider has sized still gives way, down to its minimum,
+       when a neighbour grows, rather than holding its width. */
+    flex-shrink: 1;
+  }
+
+  /* The dividers: the gap reads as one at rest; the 4px bar washes on
+     hover, takes the accent while dragged and the focus ring from the
+     keyboard (Firefox's own splitter keys). */
+  > .split-view-splitter {
+    appearance: none;
+    box-sizing: border-box;
+    /* The 4px bar between transparent borders, which a press takes from a
+       little inside the page on either side. The margins overlap the panes
+       by all but the gap's 6px, so the splitter keeps that much room. A
+       splitter draws no pseudo-element (`nsSplitterFrame` is a leaf
+       frame). */
+    width: 16px;
+    min-width: 16px;
+    margin: 0 -5px;
+    border: solid transparent;
+    border-width: 0 6px;
+    border-radius: 8px / 2px;
+    background: transparent padding-box;
+    cursor: col-resize;
+    transition: none;
+    /* Over the panes it overlaps. */
+    position: relative;
+    z-index: 4;
+
+    &:hover {
+      background-color: var(--sval-pane-divider);
+    }
+
+    &[state="dragging"] {
+      background-color: var(--sval-accent);
+    }
+
+    &:focus-visible {
+      outline: none;
+      background:
+        linear-gradient(var(--sval-pane-divider), var(--sval-pane-divider)) padding-box,
+        linear-gradient(var(--toolbar-background-color), var(--toolbar-background-color)) center / 6px 100% no-repeat border-box,
+        linear-gradient(var(--sval-focus), var(--sval-focus)) center / 10px 100% no-repeat border-box;
+    }
+  }
+}
+
+/* An inactive pane's footer: a bar along its foot in the chrome's colour,
+   with the page's favicon and domain, a "Not secure" chip on an http page,
+   and the split menu at its end. */
+split-view-footer {
+  inset-inline: 0;
+  max-width: none;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 3px 0 8px;
+  gap: 8px;
+  border: none;
+  border-top: 1px solid var(--sval-pane-edge);
+  border-radius: 0;
+  background: var(--toolbar-background-color);
+  font-size: 12px;
+  fill: currentColor;
+
+  > .split-view-icon {
+    order: 0;
+    width: 16px;
+    height: 16px;
+  }
+
+  > .split-view-uri {
+    order: 1;
+    min-width: 0;
+    font-weight: 500;
+    color: var(--sval-pane-text);
+  }
+
+  > .split-view-security-warning {
+    order: 2;
+    flex: none;
+    height: 18px;
+    padding: 0 7px 0 5px;
+    gap: 4px;
+    border-radius: 9px;
+    color: var(--sval-pane-insecure);
+    background: var(--sval-pane-insecure-bg);
+    font-size: 11.5px;
+    font-weight: 600;
+
+    > img {
+      width: 12px;
+      height: 12px;
+      -moz-context-properties: fill;
+      fill: currentColor;
+    }
+  }
+
+  > toolbarbutton {
+    order: 3;
+    margin: 0;
+    margin-inline-start: auto;
+    width: 24px;
+    height: 22px;
+    min-width: 0;
+    padding: 0;
+    justify-content: center;
+    border-radius: 11px;
+    appearance: none;
+    background: transparent;
+
+    > .toolbarbutton-icon {
+      width: 14px;
+      height: 4px;
+      list-style-image: none;
+      background: var(--sval-muted);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 4'%3E%3Ccircle cx='1.5' cy='2' r='1.5'/%3E%3Ccircle cx='7' cy='2' r='1.5'/%3E%3Ccircle cx='12.5' cy='2' r='1.5'/%3E%3C/svg%3E")
+        center / contain no-repeat;
+    }
+
+    > .toolbarbutton-text {
+      display: none;
+    }
+
+    &:is(:hover, [open]) {
+      background: var(--sval-wash);
+    }
+  }
+}
+
+/* The split button: a pill of its own, as the panel toggle is. */
+#nav-bar #split-view-button {
+  align-self: center;
+  background-color: var(--sval-cluster-bg);
+  border: 1px solid var(--sval-cluster-border);
+  border-radius: 999px;
+  box-shadow: var(--sval-cluster-shadow);
+  padding: 1px 2px;
+  margin: 0;
+  margin-inline-start: 8px !important;
+
+  list-style-image: url("chrome://browser/content/sval/header-icons/split.svg");
+}
+
+/* ---------------------------------------------------------------- status panel */
+
+/*
+ * The address of a hovered link, and a loading page's status, in Firefox's
+ * status panel (`StatusPanel`, tabbrowser.js) at the page's foot: a tab of the
+ * chrome growing out of the frame's corner. It wears the chrome's colour, ink
+ * and scheme, the workspace's tint included, and the frame's line on the two
+ * sides that face the page, the far corner rounded as a pane's is. Where that
+ * line meets the frame's, a concave fillet turns one into the other, so the
+ * tab and the frame draw one line. The fillets are the panel's own
+ * pseudo-elements, a ring in the frame's line over a corner of the chrome's
+ * colour.
+ *
+ * Firefox flips the panel to the page's other corner (`[mirror]`, while the
+ * pointer is over it, and under an RTL locale), and every side and fillet
+ * flips with it.
+ *
+ * A framed page draws its own edge just inside itself (page frame and split
+ * view, above), along its foot too, translucent over the page. There the tab
+ * paints over that edge, so its foot and near side meet the chrome around the
+ * frame with no line of the page between them, and its near corner is the
+ * frame's. Its fillet meets the frame's line a pixel in, and a second fillet
+ * turns its far side into the page's foot. A full-screen window shows a page
+ * on its own unframed, and there the frame's line is the header's
+ * (`--sval-cluster-border`), which the workspace panel and the header draw
+ * just outside the page.
+ */
+#statuspanel {
+  --sval-status-r: 8px;
+  --sval-status-h: 24px;
+  --sval-status-edge: var(--sval-cluster-border);
+  --sval-status-bg: var(--toolbar-background-color);
+  /* The width of the frame's line inside the panel's edges. */
+  --sval-status-inset: 0px;
+  /* The fillet's radius, to the inside of its ring. */
+  --sval-status-ring: calc(var(--sval-status-r) - var(--sval-status-inset));
+  /* The corner of a fillet the ring's centre sits in, away from the frame. */
+  --sval-status-ring-x: 100%;
+  /* Where the tab stands: below the frame's edge while it is hidden, from
+     where it rises as it shows. */
+  --sval-status-drop: 0px;
+
+  font: 500 12px var(--sval-font);
+  /* What rises past the panel's foot is cut there, so the tab grows out of
+     the frame's edge rather than over what lies below. */
+  overflow: clip;
+
+  &[inactive] {
+    --sval-status-drop: calc(var(--sval-status-h) + var(--sval-status-r));
+  }
+
+  :is(.split-view-panel, :root:not([inDOMFullscreen], [inFullscreen])) & {
+    --sval-status-edge: var(--sval-pane-edge-active);
+    --sval-status-inset: 1px;
+    /* Over the frame's edge (page frame and split view, above), level with a
+       tab's dialogs, which come after it in the page's stack and so stand
+       over it. */
+    z-index: 2;
+  }
+
+  &::before,
+  :is(.split-view-panel, :root:not([inDOMFullscreen], [inFullscreen])) &::after {
+    content: "";
+    position: absolute;
+    /* Over the label, which its transform paints as a positioned box. */
+    z-index: 1;
+    /* From the panel's edge, so the corner it fills covers the frame's line
+       where the ring has turned away from it. */
+    width: calc(var(--sval-status-ring) + var(--sval-status-inset));
+    pointer-events: none;
+    transform: translateY(var(--sval-status-drop));
+    transition: transform 160ms var(--sval-ease);
+    background:
+      radial-gradient(
+        circle at var(--sval-status-ring-x) 0,
+        transparent var(--sval-status-ring),
+        var(--sval-status-edge) var(--sval-status-ring),
+        var(--sval-status-edge) calc(var(--sval-status-ring) + 1px),
+        transparent calc(var(--sval-status-ring) + 1px)
+      ),
+      radial-gradient(circle at var(--sval-status-ring-x) 0, transparent var(--sval-status-ring), var(--sval-status-bg) var(--sval-status-ring));
+  }
+
+  /* Above the label's start, which Firefox's 2em of reach for the pointer
+     (the panel's top padding) puts 2em down, its last row over the label's
+     top line, which it hides where the ring has turned away from it. Its ring
+     meets the frame's line just beyond its side. */
+  &::before {
+    top: calc(2em - var(--sval-status-ring));
+    height: calc(var(--sval-status-ring) + 1px);
+  }
+
+  /* Beside the label's far side, down to the pane's foot. Its ring turns
+     the label's side into the pane's edge, and its corner covers both lines
+     where the ring has turned away from them. */
+  :is(.split-view-panel, :root:not([inDOMFullscreen], [inFullscreen])) &::after {
+    bottom: 0;
+    height: calc(var(--sval-status-ring) + var(--sval-status-inset));
+  }
+
+  &:not([mirror]):-moz-locale-dir(ltr),
+  &[mirror]:-moz-locale-dir(rtl) {
+    &::before {
+      left: 0;
+    }
+
+    &::after {
+      right: 0;
+    }
+  }
+
+  &:not([mirror]):-moz-locale-dir(rtl),
+  &[mirror]:-moz-locale-dir(ltr) {
+    --sval-status-ring-x: 0%;
+
+    &::before {
+      right: 0;
+    }
+
+    &::after {
+      left: 0;
+    }
+  }
+}
+
+/*
+ * The frame's corner under the tab is square while the tab stands there. The
+ * frame's clip rounds the page and the tab separately, so along an
+ * anti-aliased curve the page shows through the tab; square, the corner lies
+ * wholly under the tab, which wears the chrome's colour around the frame. It
+ * squares once the tab has risen over it and rounds before the tab falls.
+ */
+:root:not([inDOMFullscreen], [inFullscreen]) #tabbrowser-tabpanels:not(:has(> .split-view-panel-active)) > .browserSidebarContainer.deck-selected,
+:root:not([inDOMFullscreen]) #tabbrowser-tabpanels[splitview]:has(> .split-view-panel-active) > .split-view-panel.split-view-panel-active {
+  &:has(#statuspanel:not([inactive], [mirror])) {
+    border-end-start-radius: 0;
+    transition: border-end-start-radius 0s 160ms;
+  }
+
+  &:has(#statuspanel[mirror]:not([inactive])) {
+    border-end-end-radius: 0;
+    transition: border-end-end-radius 0s 160ms;
+  }
+}
+
+#statuspanel-label {
+  /* The chrome's scheme, which the chrome's colours are picked in, where
+     Firefox gives the label the page's. */
+  color-scheme: inherit;
+  box-sizing: border-box;
+  height: var(--sval-status-h);
+  margin: 0;
+  padding: 0 10px;
+  /* The text's line box fills the label inside its top line. */
+  line-height: calc(var(--sval-status-h) - 1px);
+  border-width: 1px 0 0;
+  border-style: solid;
+  border-color: var(--sval-status-edge);
+  background-color: var(--sval-status-bg);
+  color: var(--toolbar-text-color);
+  transform: translateY(var(--sval-status-drop));
+  transition: transform 160ms var(--sval-ease);
+
+  /* The far side leaves room for the second fillet, which the panel's clip
+     would otherwise cut. */
+  #statuspanel:not([mirror]) > &:-moz-locale-dir(ltr),
+  #statuspanel[mirror] > &:-moz-locale-dir(rtl) {
+    border-right-width: 1px;
+    border-top-right-radius: var(--sval-status-r);
+    margin-right: var(--sval-status-ring);
+  }
+
+  #statuspanel:not([mirror]) > &:-moz-locale-dir(rtl),
+  #statuspanel[mirror] > &:-moz-locale-dir(ltr) {
+    border-left-width: 1px;
+    border-top-left-radius: var(--sval-status-r);
+    margin-left: var(--sval-status-ring);
+  }
+}
+
+/* ---------------------------------------------------------------- screenshots */
+
+/*
+ * Screenshots' buttons (`screenshots-buttons`, `ScreenshotsUtils.openPanel`)
+ * hang from the page's top corner as a tab of the chrome, as the status
+ * panel's tab rises from its foot: the chrome's colour and ink, the frame's
+ * line on the two sides that face the page, the far corner rounded, and a
+ * concave fillet where each of those lines meets the frame's. Firefox floats
+ * the buttons 8px above the panel's box, where the frame's clip cuts them.
+ *
+ * Each fillet is a square the size of the corner's radius, whose ring in the
+ * frame's line is centred on its corner away from the junction, over the
+ * chrome's colour beyond it. The frame's line runs a pixel inside the frame,
+ * so the ring is a pixel smaller than the radius and each square laps a
+ * pixel over the panel's own line, which it hides where the ring turns away.
+ */
+.screenshotsPagePanel {
+  --sval-shot-r: 8px;
+  --sval-shot-edge: var(--sval-pane-edge-active);
+  --sval-shot-bg: var(--toolbar-background-color);
+  --sval-shot-ring-x: 0%;
+
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  max-height: none;
+  border-style: solid;
+  border-color: var(--sval-shot-edge);
+  border-width: 0 0 1px;
+  border-inline-start-width: 1px;
+  border-end-start-radius: var(--sval-shot-r);
+  background-color: var(--sval-shot-bg);
+  color: var(--toolbar-text-color);
+
+  &:-moz-locale-dir(rtl) {
+    --sval-shot-ring-x: 100%;
+  }
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    width: var(--sval-shot-r);
+    height: var(--sval-shot-r);
+    pointer-events: none;
+    background:
+      radial-gradient(
+        circle at var(--sval-shot-ring-x) 100%,
+        transparent calc(var(--sval-shot-r) - 1px),
+        var(--sval-shot-edge) calc(var(--sval-shot-r) - 1px),
+        var(--sval-shot-edge) var(--sval-shot-r),
+        transparent var(--sval-shot-r)
+      ),
+      radial-gradient(circle at var(--sval-shot-ring-x) 100%, transparent calc(var(--sval-shot-r) - 1px), var(--sval-shot-bg) calc(var(--sval-shot-r) - 1px));
+  }
+
+  /* Beside the panel's near side, along the frame's top. */
+  &::before {
+    top: 0;
+    inset-inline-end: 100%;
+  }
+
+  /* Under the panel's foot, along the frame's far side. */
+  &::after {
+    top: 100%;
+    inset-inline-end: 0;
+  }
+
+  /* Under a full-screen page there is no frame to turn into. */
+  :root:is([inDOMFullscreen], [inFullscreen]) & {
+    &::before,
+    &::after {
+      display: none;
+    }
+  }
+}
+
+/* The frame's corner under the tab is square, so the page does not show
+   through the tab along the corner's anti-aliased curve. */
+.browserSidebarContainer:has(> .screenshotsPagePanel:not([hidden])) {
+  border-start-end-radius: 0 !important;
+}
+
+/* Firefox's box (`screenshots-buttons.css`) is a floating panel; the tab
+   above is its box. The two buttons are alike, the chrome's own buttons, as
+   either may be the one Screenshots focuses on opening, and that focus
+   shows as the ring alone. */
+screenshots-buttons {
+  --screenshots-icon-background-color: color-mix(in srgb, currentColor 30%, transparent);
+  --button-border-radius: 10px;
+  --button-border-color: transparent;
+  --button-border-color-hover: transparent;
+  --button-border-color-active: transparent;
+  --button-border-color-primary: transparent;
+  --button-border-color-primary-hover: transparent;
+  --button-border-color-primary-active: transparent;
+  --button-background-color: transparent;
+  --button-background-color-hover: var(--toolbarbutton-hover-background);
+  --button-background-color-active: var(--toolbarbutton-active-background);
+  --button-background-color-primary: transparent;
+  --button-background-color-primary-hover: var(--toolbarbutton-hover-background);
+  --button-background-color-primary-active: var(--toolbarbutton-active-background);
+  --button-text-color: currentColor;
+  --button-text-color-hover: currentColor;
+  --button-text-color-active: currentColor;
+  --button-text-color-primary: currentColor;
+  --button-text-color-primary-hover: currentColor;
+  --button-text-color-primary-active: currentColor;
+
+  position: static;
+  display: block;
+  padding: 6px;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: 600 13px var(--sval-font);
+}
+
+/*
+ * A tab's dialogs open over the framed page. Firefox lifts each 5px over the
+ * chrome above the page (`.dialogBox` in `content-area.css`), where the
+ * frame's clip cuts its top. One sized to the space it has (Screenshots'
+ * preview) stands in the middle of the page with room around it, over the
+ * scrim a window's dialog takes, so it reads as above the page.
+ */
+.dialogStack:not(.content-prompt-dialog) > .dialogOverlay > .dialogBox:not(.spotlightBox) {
+  margin-top: 0;
+
+  .deck-selected.split-view-panel & {
+    margin-top: 0;
+  }
+}
+
+.dialogStack:not(.content-prompt-dialog) > .dialogOverlay[topmost="true"]:has(> .dialogBox[sizeto="available"]) {
+  justify-content: center;
+  background-color: var(--sval-scrim);
+}
+
+.dialogStack:not(.content-prompt-dialog) > .dialogOverlay > .dialogBox[sizeto="available"] {
+  --box-max-width-default: calc(100% - 64px);
+  --box-max-height-default: calc(100% - 64px);
+}
+
+/* ---------------------------------------------------------------- access */
+
+@media (prefers-reduced-motion: reduce) {
+  #statuspanel,
+  #statuspanel[inactive] {
+    --sval-status-drop: 0px;
+  }
+
+  :is(#sval-panel-container, #sidebar-box),
+  :is(#sval-panel-container, #sidebar-box)[sval-collapsed],
+  #sval-panel-container[sval-collapsed][sval-reveal],
+  #sval-panel-container[sval-collapsed][sval-reveal="shown"],
+  #tabbrowser-tabbox {
+    transition: none;
+  }
+
+  #navigator-toolbox,
+  #urlbar-container::before,
+  #nav-bar .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+    transition: none;
+  }
+}
+
+/* Windows high contrast. Chrome is not colour-forced: a chrome window in a
+   high-contrast theme is only ever `requested` (`nsPresContext::
+   UpdateForcedColors`), which `(forced-colors)` matches and
+   `(forced-colors: active)` does not, so the header picks system colours
+   itself, as Firefox's own chrome does. Sval's palettes stand aside (tokens,
+   above), and Sval's own colours are the system's: hover shows as Firefox's
+   toolbar buttons' outlines, and a toggle that is on as a selected item. */
+@media (forced-colors) {
+  :root {
+    --sval-cluster-bg: transparent;
+    --sval-cluster-border: ButtonText;
+    --sval-cluster-shadow: none;
+    --sval-pill-bg: Field;
+    --sval-pill-border: ButtonText;
+    --sval-pill-shadow: none;
+    --sval-popup-bg: Canvas;
+    --sval-popup-shadow: none;
+    --sval-menu-shadow: none;
+    --sval-wash: transparent;
+    --sval-wash-strong: transparent;
+    --sval-on-bg: Highlight;
+    --sval-on-ink: HighlightText;
+    --sval-on-hover: Highlight;
+    --sval-live-bg: Highlight;
+    --sval-live-ink: HighlightText;
+    --sval-focus: CanvasText;
+    --sval-accent: SelectedItem;
+    --sval-action: ButtonText;
+    --sval-text: CanvasText;
+    --sval-muted: CanvasText;
+    /* The row is drawn on Canvas (below), so its ink is CanvasText. */
+    --toolbox-text-color: CanvasText;
+    --toolbox-text-color-inactive: CanvasText;
+    --toolbar-text-color: CanvasText;
+  }
+
+  /* Hovering the address pill, as Firefox marks a hovered field. */
+  #nav-bar-customization-target:has(
+      :is(
+        #back-button,
+        #forward-button,
+        #stop-reload-button,
+        #home-button,
+        #urlbar-container,
+        #sval-live-devices,
+        #sval-location-button,
+        #translations-button,
+        #sval-media-button,
+        #sval-javascript-button,
+        #sval-remove-button,
+        #sval-snip-button,
+        #sval-colorshift-button,
+        #sval-site-menu-button,
+        #reader-mode-button,
+        #sval-favorite-button
+      ):hover
+    )
+    > #urlbar-container::before {
+    border-color: SelectedItem;
+  }
+
+  /* The pressed look's chip takes the tokens' system colours; hovered, it
+     keeps them and takes a Canvas ring inside. */
+  #nav-bar
+    :is(
+      :is(#sval-panel-button, #sval-history-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-pressed="true"],
+      #reader-mode-button[readeractive]
+    ):hover
+    > .toolbarbutton-icon {
+    box-shadow: inset 0 0 0 2px Canvas;
+  }
+
+  #urlbar .urlbar-go-button {
+    fill: ButtonFace;
+  }
+
+  #nav-bar
+    :is(
+      #sval-panel-button,
+      #sval-location-button,
+      #translations-button,
+      #sval-media-button,
+      #sval-javascript-button,
+      #sval-remove-button,
+      #sval-snip-button,
+      #sval-colorshift-button,
+      #sval-site-menu-button,
+      #reader-mode-button,
+      #sval-favorite-button,
+      #downloads-button,
+      #sval-history-button,
+      #unified-extensions-button,
+      #back-button,
+      #forward-button,
+      #stop-reload-button,
+      #home-button
+    ),
+  #nav-bar-customization-target > .unified-extensions-item {
+    background: transparent;
+    box-shadow: none;
+    border-color: ButtonText;
+  }
+
+  #navigator-toolbox {
+    background-color: Canvas !important;
+  }
+
+  #urlbar-container::before {
+    box-shadow: none;
+    background-color: Field;
+    border-color: ButtonText;
+  }
+}
+
+/* An extension's switch for the selected tab's site, on a line of its own
+   in its row of the extensions menu (`SvalExtensionsMenu`), lined up with
+   the extension's name: the row's button padding, the icon and its gap
+   (`unified-extensions.css`). A row pinned to the toolbar takes its line
+   along, and the toolbar shows none. */
+#unified-extensions-panel .unified-extensions-item:has(> .sval-site-line) {
+  flex-wrap: wrap;
+}
+
+.unified-extensions-item > .sval-site-line {
+  flex-basis: 100%;
+  padding-block: 2px 6px;
+  padding-inline-start: calc(var(--panel-menuitem-padding-inline) + var(--uei-icon-size) + 6px + 0.5em);
+}
+
+toolbar .unified-extensions-item > .sval-site-line {
+  display: none;
+}
+
+/* The extensions menu's "Run on" line on a host with a choice of scope
+   (`SvalExtensionsMenu`): where the switches below it are saved. Its menu
+   opens in the line's flow, since the panel clips one drawn past it. */
+.sval-ext-scope-box {
+  display: flex;
+  flex-direction: column;
+  padding: 4px var(--panel-menuitem-padding-inline) 6px;
+}
+
+.sval-ext-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sval-ext-scope-lead {
+  flex: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.sval-ext-scope-box > .sval-scope-keeps {
+  padding: 4px 0 0;
+}
+
+/* An extension's pin in its row of the extensions menu
+   (`SvalExtensionsMenu`), drawn as the site menu's pin
+   (`sval-protection.css`, `.sval-site-pin`) in the menu's colours, so
+   pinning looks the same wherever it is done. A row pinned to the toolbar
+   takes its pin along, and the toolbar shows none. */
+.sval-extension-pin {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--panel-text-color);
+
+  &:hover {
+    background-color: var(--button-background-color-ghost-hover);
+  }
+
+  &[aria-pressed="true"] {
+    background-color: var(--panel-text-color);
+    color: var(--panel-background-color);
+
+    & > .sval-extension-pin-glyph {
+      mask-image: url("chrome://browser/content/sval/icons/pin-fill.svg");
+    }
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--panel-text-color) 86%, var(--panel-background-color));
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-outline-color);
+    outline-offset: 2px;
+  }
+
+  @media (forced-colors) {
+    &[aria-pressed="true"] {
+      background-color: Highlight;
+      color: HighlightText;
+    }
+  }
+}
+
+.sval-extension-pin-glyph {
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask-image: url("chrome://browser/content/sval/icons/pin.svg");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: 16px;
+}
+
+toolbar .sval-extension-pin {
+  display: none;
+}
+
+/* An extension's page action for the selected tab, on its row of the
+   extensions menu (`SvalExtensionsMenu.addPageActions`), in the pin's
+   shape: the extension's own icon, from the `--pageAction-image` that
+   `PageActions` gives it. The toolbar has no room for it. */
+.sval-page-action {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+
+  &:hover {
+    background-color: var(--button-background-color-ghost-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-outline-color);
+    outline-offset: 2px;
+  }
+}
+
+.sval-page-action-glyph {
+  width: 16px;
+  height: 16px;
+  background-image: var(--pageAction-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+}
+
+toolbar .sval-page-action {
+  display: none;
+}
+
+/* An extension's row menu opens a menu of actions, so its button shows the
+   more icon Sval uses for a menu (`home.css`) in place of Firefox's
+   settings gear. */
+#unified-extensions-panel .unified-extensions-item-menu-button.subviewbutton {
+  list-style-image: url("chrome://global/skin/icons/more.svg");
+}
+
+/* A row that says what its extension can do on the site
+   (`SvalExtensionsMenu`, `.sval-site-message`) shows that in place of
+   Firefox's message. */
+.unified-extensions-item-contents:has(> .sval-site-message) > .unified-extensions-item-message-deck {
+  display: none;
+}

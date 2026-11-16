@@ -1,0 +1,135 @@
+Sval: downloads decode Content-Encoding whatever the file's extension
+
+Backport of Mozilla's Bug 1470011 (mozilla-central bca87fa82d9e, Firefox
+154), unchanged. ESR 153 does not carry it.
+ApplyDecodingForExtension kept a gzip Content-Encoding on the saved file
+when the URL's extension matched it (.gz, .tgz, .zip, .z, .svgz), so a
+server that gzipped a .tar.gz again in transit left a doubly compressed
+file. The new pref
+network.http.decode_content_for_known_compressed_extensions, true by
+default, decodes it as Chrome does; false keeps the old behaviour. Its
+tests are in common_test_Download.js, which test_DownloadCore.js and
+test_DownloadLegacy.js run.
+Drop this patch when the upstream pin reaches Firefox 154.
+
+diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
+index 8c6f50aad8..6631a1b163 100644
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -14715,6 +14715,15 @@
+   value: 393216
+   mirror: always
+ 
++# When true (default), decode Content-Encoding (e.g. gzip) when saving to disk
++# even if the URL extension matches the encoding (.gz, .tgz, .zip, .z, .svgz),
++# avoiding double-compressed files. When false, restore the legacy behavior of
++# not decoding. See bug 610679, bug 1470011.
++- name: network.http.decode_content_for_known_compressed_extensions
++  type: RelaxedAtomicBool
++  value: true
++  mirror: always
++
+ # Whether or not we give more priority to active tab.
+ - name: network.http.active_tab_priority
+   type: RelaxedAtomicBool
+diff --git a/toolkit/components/downloads/test/unit/common_test_Download.js b/toolkit/components/downloads/test/unit/common_test_Download.js
+index 2c9e5f6a85..1c532c352d 100644
+--- a/toolkit/components/downloads/test/unit/common_test_Download.js
++++ b/toolkit/components/downloads/test/unit/common_test_Download.js
+@@ -18,6 +18,8 @@ const kDeleteTempFileOnExit = "browser.helperApps.deleteTempFileOnExit";
+ // TODO (bug 1986365): we should replace the setting of this pref with an actual
+ // test for the "new" behaviour (introduced in bug 1790641).
+ const kDeletePrivateFileFeature = "browser.download.enableDeletePrivate";
++const kDecodeContentForKnownCompressedExtensions =
++  "network.http.decode_content_for_known_compressed_extensions";
+ 
+ ChromeUtils.defineESModuleGetters(this, {
+   FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
+@@ -1898,14 +1900,60 @@ add_task(async function test_with_content_encoding() {
+ });
+ 
+ /**
+- * Checks that the file is not decoded if the extension matches the encoding.
++ * Checks that the Content-Encoding is decoded even when the file extension
++ * matches the encoding (bug 610679, bug 1470011). This is the default
++ * behavior; the legacy behavior is checked in the test below.
++ */
++add_task(async function test_with_content_encoding_matching_extension() {
++  Services.prefs.setBoolPref(kDecodeContentForKnownCompressedExtensions, true);
++
++  let sourcePath = "/test_with_content_encoding_matching_extension.gz";
++  let sourceUrl = httpUrl("test_with_content_encoding_matching_extension.gz");
++
++  function cleanup() {
++    gHttpServer.registerPathHandler(sourcePath, null);
++    Services.prefs.clearUserPref(kDecodeContentForKnownCompressedExtensions);
++  }
++  registerCleanupFunction(cleanup);
++
++  gHttpServer.registerPathHandler(sourcePath, function (aRequest, aResponse) {
++    aResponse.setHeader("Content-Type", "text/plain", false);
++    aResponse.setHeader("Content-Encoding", "gzip", false);
++    aResponse.setHeader(
++      "Content-Length",
++      "" + TEST_DATA_SHORT_GZIP_ENCODED.length,
++      false
++    );
++
++    let bos = new BinaryOutputStream(aResponse.bodyOutputStream);
++    bos.writeByteArray(TEST_DATA_SHORT_GZIP_ENCODED);
++  });
++
++  let download = await promiseStartDownload(sourceUrl);
++  await promiseDownloadStopped(download);
++
++  Assert.equal(download.progress, 100);
++  Assert.equal(download.totalBytes, TEST_DATA_SHORT_GZIP_ENCODED.length);
++
++  // Ensure the content matches the decoded test data.
++  await promiseVerifyTarget(download.target, TEST_DATA_SHORT);
++
++  cleanup();
++});
++
++/**
++ * Checks that with the legacy pref disabled, the file is not decoded if the
++ * extension matches the encoding.
+  */
+ add_task(async function test_with_content_encoding_ignore_extension() {
++  Services.prefs.setBoolPref(kDecodeContentForKnownCompressedExtensions, false);
++
+   let sourcePath = "/test_with_content_encoding_ignore_extension.gz";
+   let sourceUrl = httpUrl("test_with_content_encoding_ignore_extension.gz");
+ 
+   function cleanup() {
+     gHttpServer.registerPathHandler(sourcePath, null);
++    Services.prefs.clearUserPref(kDecodeContentForKnownCompressedExtensions);
+   }
+   registerCleanupFunction(cleanup);
+ 
+diff --git a/uriloader/exthandler/nsExternalHelperAppService.cpp b/uriloader/exthandler/nsExternalHelperAppService.cpp
+index 33d68cd511..12def1d6cc 100644
+--- a/uriloader/exthandler/nsExternalHelperAppService.cpp
++++ b/uriloader/exthandler/nsExternalHelperAppService.cpp
+@@ -18,6 +18,7 @@
+ #include "mozilla/RandomNum.h"
+ #include "mozilla/ScopeExit.h"
+ #include "mozilla/StaticPrefs_dom.h"
++#include "mozilla/StaticPrefs_network.h"
+ #include "mozilla/StaticPrefs_security.h"
+ #include "mozilla/StaticPtr.h"
+ #include "nsXULAppAPI.h"
+@@ -867,6 +868,13 @@ NS_IMETHODIMP nsExternalHelperAppService::ApplyDecodingForExtension(
+     const nsACString& aExtension, const nsACString& aEncodingType,
+     bool* aApplyDecoding) {
+   *aApplyDecoding = true;
++  // By default we decode the Content-Encoding even when the file extension
++  // matches the encoding, to avoid saving double-compressed files (bug 610679,
++  // bug 1470011). The legacy behavior can be restored via the pref.
++  if (StaticPrefs::
++          network_http_decode_content_for_known_compressed_extensions()) {
++    return NS_OK;
++  }
+   uint32_t i;
+   for (i = 0; i < std::size(nonDecodableExtensions); ++i) {
+     if (aExtension.LowerCaseEqualsASCII(

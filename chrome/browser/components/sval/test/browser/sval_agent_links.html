@@ -1,0 +1,101 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent links page</title>
+  </head>
+  <body>
+    <h1>Links</h1>
+    <a id="blocked">Blocked site</a>
+    <a id="new">New site</a>
+    <a id="redirect">Redirect to the blocked site</a>
+    <a id="tab" target="_blank">Blocked site in a new tab</a>
+    <a id="allowed-tab" target="_blank">Allowed site in a new tab</a>
+    <a id="new-tab" target="_blank">New site in a new tab</a>
+    <button id="popup">Blocked site in a new window</button>
+    <button id="blob">Blob page</button>
+    <button id="late">Blocked site later</button>
+    <button id="allowed-popup">Allowed site in a new window</button>
+    <button id="link-popup">Page with a link in a new window</button>
+    <button id="escape">Blocked site from a removed frame</button>
+    <button id="hop">Blocked site through a closed popup</button>
+    <button id="flood">Many new sites</button>
+    <button id="back" onclick="history.back()">Back</button>
+    <script>
+      // The test pages live at the same path on every test host.
+      const dir = location.pathname.replace(/[^/]*$/, "");
+      const on = host => `https://${host}${dir}sval_agent_page2.html`;
+      const blockedURL = on("example.org");
+      document.getElementById("blocked").href = blockedURL;
+      document.getElementById("new").href = on("example.net");
+      document.getElementById("redirect").href =
+        `${dir}sval_agent_redirect.sjs?${encodeURIComponent(blockedURL)}`;
+      document.getElementById("tab").href = blockedURL;
+      document.getElementById("new-tab").href = on("example.net");
+      document.getElementById("allowed-tab").href =
+        `${dir}sval_agent_page2.html`;
+      // What a click sets going finishes when the test posts "go", so the
+      // test can watch for it first.
+      let then = null;
+      addEventListener("message", event => {
+        if (event.data === "go" && then) {
+          const run = then;
+          then = null;
+          run();
+        }
+      });
+      // A blank window first, so the test can watch it before it loads.
+      document.getElementById("popup").onclick = () => {
+        const w = window.open("", "_blank", "popup,width=300,height=300");
+        then = () => (w.location = blockedURL);
+      };
+      document.getElementById("blob").onclick = () => {
+        location.href = URL.createObjectURL(
+          new Blob(["<title>Blob page</title><p>From a blob</p>"], {
+            type: "text/html",
+          })
+        );
+      };
+      document.getElementById("late").onclick = () => {
+        then = () => (location.href = blockedURL);
+      };
+      // Opens a tab from a frame, then removes the frame, so by the time the
+      // tab loads anything its opener no longer exists.
+      document.getElementById("escape").onclick = () => {
+        const frame = document.createElement("iframe");
+        document.body.append(frame);
+        const w = frame.contentWindow.open("");
+        frame.remove();
+        then = () => (w.location = blockedURL);
+      };
+      document.getElementById("allowed-popup").onclick = () =>
+        window.open(
+          `${dir}sval_agent_page2.html`,
+          "_blank",
+          "popup,width=300,height=300"
+        );
+      document.getElementById("link-popup").onclick = () =>
+        window.open(
+          `${dir}sval_agent_popup.html`,
+          "_blank",
+          "popup,width=300,height=300"
+        );
+      document.getElementById("hop").onclick = () =>
+        window.open(`${dir}sval_agent_hop.html`);
+      document.getElementById("flood").onclick = () => {
+        let i = 0;
+        const timer = setInterval(() => {
+          i++;
+          location.href = `https://10.0.0.${i}/`;
+          if (i >= 10) {
+            clearInterval(timer);
+            document.title = "flooded";
+          }
+        }, 50);
+      };
+    </script>
+  </body>
+</html>

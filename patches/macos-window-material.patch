@@ -1,0 +1,49 @@
+Sval: lay the system's material behind a see-through macOS window
+
+A Workspace colour fills a see-through window. One material behind the
+whole window, with the window's colour laid over it as one background,
+lets the chrome move without seams. A top-level window whose root is
+not opaque gets the HUD window material behind all of its content, in
+the window's appearance, which follows the root's color-scheme.
+
+diff --git a/widget/cocoa/nsCocoaWindow.mm b/widget/cocoa/nsCocoaWindow.mm
+index 8c1c0a14d2..ff3bb8e938 100644
+--- a/widget/cocoa/nsCocoaWindow.mm
++++ b/widget/cocoa/nsCocoaWindow.mm
+@@ -5857,6 +5857,36 @@ void nsCocoaWindow::SetTransparencyMode(TransparencyMode aMode) {
+   mWindow.backgroundColor =
+       isTransparent ? NSColor.clearColor : NSColor.whiteColor;
+ 
++  // A see-through top-level window shows the HUD window material behind its
++  // whole content, blended with what is behind the window and active in every
++  // window state. The material takes the window's appearance, which follows
++  // the root's color-scheme (`SetColorScheme`). It sits under the vibrant
++  // regions, whose container takes no mouse events.
++  if (mWindowType == WindowType::TopLevel && mChildView) {
++    NSView* container = mChildView.vibrancyViewsContainer;
++    NSString* const materialId = @"MOZWindowMaterial";
++    NSView* material = container.subviews.firstObject;
++    if (![material.identifier isEqualToString:materialId]) {
++      material = nil;
++    }
++    if (isTransparent && !material) {
++      NSVisualEffectView* view =
++          [[NSVisualEffectView alloc] initWithFrame:container.bounds];
++      view.identifier = materialId;
++      view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
++      view.material = NSVisualEffectMaterialHUDWindow;
++      view.blendingMode = NSVisualEffectBlendingModeBehindWindow;
++      view.state = NSVisualEffectStateActive;
++      [container addSubview:view positioned:NSWindowBelow relativeTo:nil];
++      [view release];
++    } else if (!isTransparent) {
++      [material removeFromSuperview];
++    }
++    // The material and the content's new transparency reach the screen in
++    // one transaction.
++    SuspendAsyncCATransactions();
++  }
++
+   NS_OBJC_END_TRY_IGNORE_BLOCK;
+ }
+ 

@@ -1,0 +1,122 @@
+Sval: the address bar and its settings say "favorites", not "bookmarks"
+
+Sval calls its bookmark library Favorites (import spec §6), and the
+address bar's search in it is one of the places a person meets the name: the
+search mode and its button, the result that starts one, and the setting that
+turns those suggestions on. So are the home page settings' buttons that take
+the home pages from them, and the dialog they open. Fluent has no override
+for one message of a resource, so the en-US values are changed here; the
+message ids stay.
+
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index 759a6d2638..3fc288109c 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -134,7 +134,7 @@ urlbar-tabtosearch-onboard = Select this shortcut to find what you need faster.
+ 
+ ## Local search mode indicator labels in the urlbar
+ 
+-urlbar-search-mode-bookmarks = Bookmarks
++urlbar-search-mode-bookmarks = Favorites
+ urlbar-search-mode-tabs = Tabs
+ urlbar-search-mode-history = History
+ urlbar-search-mode-actions = Actions
+@@ -257,7 +257,7 @@ search-one-offs-add-engine-menu =
+ ##    bookmarks).
+ 
+ search-one-offs-bookmarks =
+-    .tooltiptext = Bookmarks ({ $restrict })
++    .tooltiptext = Favorites ({ $restrict })
+ search-one-offs-tabs =
+     .tooltiptext = Tabs ({ $restrict })
+ search-one-offs-history =
+@@ -571,7 +571,7 @@ urlbar-placeholder-search-mode-other-engine =
+ # This placeholder is used when searching bookmarks.
+ urlbar-placeholder-search-mode-other-bookmarks =
+   .placeholder = Enter search terms
+-  .aria-label = Search bookmarks
++  .aria-label = Search favorites
+ 
+ # This placeholder is used when searching history.
+ urlbar-placeholder-search-mode-other-history =
+@@ -874,8 +874,8 @@ urlbar-searchmode-no-keyword2 =
+ 
+ urlbar-searchmode-dropmarker2 =
+     .title = Pick a Search Engine
+-urlbar-searchmode-bookmarks3 = Bookmarks
+-    .accesskey = B
++urlbar-searchmode-bookmarks3 = Favorites
++    .accesskey = F
+ urlbar-searchmode-tabs3 = Tabs
+     .accesskey = T
+ urlbar-searchmode-history3 = History
+@@ -923,7 +923,7 @@ urlbar-result-search-with-engine-keywords = {$keywords} - Search with { $engine
+ ## string or the url, like "result value - action text".
+ ## In these actions "Search" is a verb, followed by where the search is performed.
+ 
+-urlbar-result-action-search-bookmarks = Search Bookmarks
++urlbar-result-action-search-bookmarks = Search Favorites
+ urlbar-result-action-search-history = Search History
+ urlbar-result-action-search-tabs = Search Tabs
+ urlbar-result-action-search-actions = Search Actions
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 1516c920c4..3bef3ee82a 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -991,8 +991,8 @@ use-current-pages =
+     .accesskey = C
+ 
+ choose-bookmark =
+-    .label = Use Bookmark…
+-    .accesskey = B
++    .label = Use Favorite…
++    .accesskey = F
+ 
+ ## Home Section - Firefox Home Content Customization
+ 
+@@ -1117,8 +1117,8 @@ addressbar-locbar-history-option =
+     .label = Browsing history
+     .accesskey = h
+ addressbar-locbar-bookmarks-option =
+-    .label = Bookmarks
+-    .accesskey = k
++    .label = Favorites
++    .accesskey = v
+ addressbar-locbar-clipboard-option =
+     .label = Clipboard
+     .accesskey = C
+diff --git a/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl b/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl
+index aafc2b168c..70dc0b7c5c 100644
+--- a/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl
++++ b/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl
+@@ -1241,7 +1241,7 @@ home-custom-homepage-current-pages-button =
+ 
+ # Button that appears in-line after text "Replace with" (home-custom-homepage-replace-with-prompt)
+ home-custom-homepage-bookmarks-button =
+-    .label = Bookmarks…
++    .label = Favorites…
+ 
+ ## Firefox Home content
+ 
+diff --git a/browser/locales/en-US/browser/newtab/newtab.ftl b/browser/locales/en-US/browser/newtab/newtab.ftl
+index aafc2b168c..70dc0b7c5c 100644
+--- a/browser/locales/en-US/browser/newtab/newtab.ftl
++++ b/browser/locales/en-US/browser/newtab/newtab.ftl
+@@ -1241,7 +1241,7 @@ home-custom-homepage-current-pages-button =
+ 
+ # Button that appears in-line after text "Replace with" (home-custom-homepage-replace-with-prompt)
+ home-custom-homepage-bookmarks-button =
+-    .label = Bookmarks…
++    .label = Favorites…
+ 
+ ## Firefox Home content
+ 
+diff --git a/browser/locales/en-US/browser/preferences/selectBookmark.ftl b/browser/locales/en-US/browser/preferences/selectBookmark.ftl
+--- a/browser/locales/en-US/browser/preferences/selectBookmark.ftl
++++ b/browser/locales/en-US/browser/preferences/selectBookmark.ftl
+@@ -6,4 +6,4 @@ select-bookmark-window2 =
+     .title = Set Home Page
+     .style = min-width: 32em;
+ 
+-select-bookmark-desc = Choose a Bookmark to be your Home Page. If you choose a folder, the Bookmarks in that folder will be opened in Tabs.
++select-bookmark-desc = Choose a Favorite to be your Home Page. If you choose a folder, the Favorites in that folder will be opened in Tabs.

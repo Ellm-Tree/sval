@@ -1,0 +1,88 @@
+---
+title: Import from another browser
+description: Bring your open tabs, bookmarks, and history from Chrome, Safari, Arc, Firefox, or another browser into Sval.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Sval can bring over the open tabs, bookmarks, and history from the other
+browsers on this computer. Each profile, Space, or Tab Group becomes a
+Workspace. Bookmarks become Favorites.
+
+<Screenshot name="features-import-arc" maxWidth={520} frame="rounded" alt="The Import from another browser dialog: two Arc Spaces become Workspaces, one set to Isolated, with folders and history coming along" />
+
+You've used Chrome with a Work profile and a Home profile for years. You
+want both in Sval, each as its own Workspace.
+
+## Steps
+
+1. Open Settings › Workspaces.
+2. Under Import and export, select **Import data**.
+3. Check each browser you want to import from.
+4. Optional: under each browser, uncheck what you don't want, or rename a
+   Workspace.
+5. Select **Import**.
+6. When the import finishes, select **Done**.
+
+The dialog says what arrived: how many Workspaces and favorites, and
+whether your history came too.
+
+You can also open this dialog from the menu bar, with
+**File › Import From Another Browser…**. When you first set up Sval, one of
+the steps offers the same choices.
+
+## Details
+
+- Sval can import from Chrome, Edge, Brave, Vivaldi, Arc, Dia, Safari,
+  Orion, Firefox, and Zen. The dialog lists the ones Sval finds on this
+  computer, and checks the one you used last.
+- Each browser's row shows what that browser holds. To show or hide a
+  checked browser's choices, select the arrow on its row.
+- Each profile becomes a Workspace. So do Arc and Zen Spaces, Vivaldi and
+  Edge Workspaces, and Safari Tab Groups. Arc and Zen Spaces keep their color
+  and emoji.
+- To give a Workspace its own cookies and sign-ins, turn on **Isolated**
+  next to the Workspace.
+  See [Isolate a Workspace](/docs/how-to/workspaces/isolate-a-workspace/).
+- Tab groups stay grouped, with their colors. Arc and Zen folders become
+  groups too.
+- Arc's Favorites and Zen's Essentials become pins. Their splits become
+  Splits.
+- Under **Choose how to import**, you choose where bookmarks go. Choose
+  **Into Favorites**, put them in a Workspace of their own with a name you
+  give it, or choose **Don't import**.
+- To bring a browser's recent history, check **Also import history from**
+  for that browser.
+- When you import from Arc, check
+  **Archive tabs you haven't used, like Arc did** to turn on Archive idle
+  tabs with the time Arc used. Tabs Arc archived go to History, under
+  Archived tabs.
+- Dia keeps its open tabs encrypted, so Sval imports only Dia's bookmarks
+  and history. To bring Dia's tabs, choose Bookmark All Tabs… in Dia, then
+  import that folder into a Workspace.
+- Sval doesn't import passwords. When a browser you check has saved
+  passwords, the dialog can show you how to export the passwords and import
+  them into your password manager. Select **Show steps** to see how.
+- Sval reads the other browser's data without changing anything.
+
+## If something goes wrong
+
+- **Can't read Chrome while Chrome is open. Quit Chrome, then try again.**
+  On Windows, Sval can't read the tabs of Chrome, Edge, Brave, or Vivaldi
+  while that browser is running. The same message shows for Arc when Sval
+  can't read Arc's data. Quit the browser, then open the import dialog
+  again.
+- **To import from Safari, allow Sval in System Settings › Privacy &
+  Security › Full Disk Access.** Select **Open System Settings**, turn on
+  Sval, then come back to the dialog.
+- **Couldn't open Chrome's data.** Select **Try Again**, or export your
+  bookmarks from that browser as an HTML file and select **Import Bookmarks
+  File…**.
+- **Couldn't read Chrome's data.** Sval didn't understand the browser's
+  files. Select **Import Bookmarks File…**, or **Send Report…** so the
+  problem can be fixed.
+
+## Related pages
+
+- [Import a bookmarks file](/docs/how-to/import-export/import-a-bookmarks-file/)
+- [Import and export settings and controls](/docs/reference/import-export/)

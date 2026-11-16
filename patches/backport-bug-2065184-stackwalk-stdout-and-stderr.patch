@@ -1,0 +1,45 @@
+Sval: mozlog prints minidump-stackwalk's stack along with its stderr
+
+Backport of Mozilla's Bug 2065184 (mozilla-central 62cf9d6795cc, Firefox
+156), unchanged. ESR 153 does not carry it.
+mozlog's mach and TBPL formatters printed a crash's stackwalk stdout only
+when it wrote nothing to stderr, so one benign warning from
+minidump-stackwalk dropped the crash's stack from the test log.
+Drop this patch when the upstream pin reaches Firefox 156.
+
+diff --git a/testing/mozbase/mozlog/mozlog/formatters/machformatter.py b/testing/mozbase/mozlog/mozlog/formatters/machformatter.py
+index 148c72efa6..6ee867201c 100644
+--- a/testing/mozbase/mozlog/mozlog/formatters/machformatter.py
++++ b/testing/mozbase/mozlog/mozlog/formatters/machformatter.py
+@@ -555,11 +555,11 @@ class MachFormatter(base.BaseFormatter):
+                     % data["stackwalk_returncode"]
+                 )
+ 
++            if data.get("stackwalk_stdout"):
++                rv.append(data["stackwalk_stdout"])
+             if data.get("stackwalk_stderr"):
+                 rv.append("stderr from minidump-stackwalk:")
+                 rv.append(data["stackwalk_stderr"])
+-            elif data.get("stackwalk_stdout"):
+-                rv.append(data["stackwalk_stdout"])
+ 
+             if data.get("stackwalk_errors"):
+                 rv.extend(data.get("stackwalk_errors"))
+diff --git a/testing/mozbase/mozlog/mozlog/formatters/tbplformatter.py b/testing/mozbase/mozlog/mozlog/formatters/tbplformatter.py
+index 9b450c9f81..6621a0f3e5 100644
+--- a/testing/mozbase/mozlog/mozlog/formatters/tbplformatter.py
++++ b/testing/mozbase/mozlog/mozlog/formatters/tbplformatter.py
+@@ -145,11 +145,11 @@ class TbplFormatter(BaseFormatter):
+             if data.get("minidump_path"):
+                 rv.append("Crash dump filename: %s" % data["minidump_path"])
+ 
++            if data.get("stackwalk_stdout"):
++                rv.append(data["stackwalk_stdout"])
+             if data.get("stackwalk_stderr"):
+                 rv.append("stderr from minidump-stackwalk:")
+                 rv.append(data["stackwalk_stderr"])
+-            elif data.get("stackwalk_stdout"):
+-                rv.append(data["stackwalk_stdout"])
+ 
+             if data.get("stackwalk_returncode", 0) != 0:
+                 rv.append(

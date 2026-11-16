@@ -1,0 +1,357 @@
+Sval: read a globally defaulted permission denial as "prompt"
+
+A new RFPTarget, PermissionsDefaultDenyPrompt, makes navigator.permissions
+.query report "prompt", and Notification.permission "default", where the deny
+comes only from a global default (permissions.default.<type>, such as
+blocking every notification request) and the deciding principal has no
+permission entry of its own.
+
+PermissionDelegateHandler::GetPermission already decides which principal a
+document's permission comes from, so it also reports whether that answer is
+a default deny (PermissionDelegateHandler::IsDefaultDeny: no entry from
+PermissionManager::GetPermissionObject, deny from TestPermissionFromPrincipal).
+A frame whose top document is in another process reads the top's delegated
+list, which carries the same bit, computed where the top's principal is.
+GetPermissionForPermissionsAPI hides only that case. A site the user
+blocked, a deny from feature policy, and ePersistDeniedCrossOrigin's deny,
+which every user's cross-origin frame gets, all stay "denied". A worker with
+no window decides with its own principal and hides the same way.
+Notification.permission (GetNotificationPermission, for the attribute only)
+applies the same rule, so the two agree.
+
+No chrome API can change what these report.
+
+diff --git a/dom/notification/Notification.cpp b/dom/notification/Notification.cpp
+index 2c95b122d6..79ed2be81e 100644
+--- a/dom/notification/Notification.cpp
++++ b/dom/notification/Notification.cpp
+@@ -97,9 +97,12 @@ class GetPermissionRunnable final : public WorkerMainThreadRunnable {
+     nsIPrincipal* effectiveStoragePrincipal =
+         mUseRegularPrincipal ? principal
+                              : workerPrivate->GetPartitionedPrincipal();
+-    mPermission =
+-        GetNotificationPermission(principal, effectiveStoragePrincipal,
+-                                  workerPrivate->IsSecureContext(), mPurpose);
++    mPermission = GetNotificationPermission(
++        principal, effectiveStoragePrincipal, workerPrivate->IsSecureContext(),
++        mPurpose,
++        mPurpose == PermissionCheckPurpose::PermissionAttribute &&
++            workerPrivate->ShouldResistFingerprinting(
++                RFPTarget::PermissionsDefaultDenyPrompt));
+     return true;
+   }
+ 
+@@ -580,8 +583,14 @@ NotificationPermission Notification::GetPermissionInternal(
+     return NotificationPermission::Denied;
+   }
+ 
+-  return GetNotificationPermission(principal, effectiveStoragePrincipal,
+-                                   aWindow->IsSecureContext(), aPurpose);
++  // Notification.permission agrees with permissions.query, which
++  // PermissionDelegateHandler::GetPermissionForPermissionsAPI answers.
++  return GetNotificationPermission(
++      principal, effectiveStoragePrincipal, aWindow->IsSecureContext(),
++      aPurpose,
++      aPurpose == PermissionCheckPurpose::PermissionAttribute &&
++          aWindow->AsGlobal()->ShouldResistFingerprinting(
++              RFPTarget::PermissionsDefaultDenyPrompt));
+ }
+ 
+ uint32_t Notification::MaxActions(const GlobalObject& aGlobal) {
+diff --git a/dom/notification/NotificationUtils.cpp b/dom/notification/NotificationUtils.cpp
+index 7adcf382ac..244180e7c6 100644
+--- a/dom/notification/NotificationUtils.cpp
++++ b/dom/notification/NotificationUtils.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "mozilla/BasePrincipal.h"
+ #include "mozilla/Components.h"
++#include "mozilla/PermissionDelegateHandler.h"
+ #include "mozilla/StaticPrefs_dom.h"
+ #include "mozilla/dom/DOMTypes.h"
+ #include "mozilla/dom/NotificationBinding.h"
+@@ -142,7 +143,8 @@ NotificationPermission GetRawNotificationPermission(nsIPrincipal* aPrincipal) {
+ 
+ NotificationPermission GetNotificationPermission(
+     nsIPrincipal* aPrincipal, nsIPrincipal* aEffectiveStoragePrincipal,
+-    bool isSecureContext, PermissionCheckPurpose aPurpose) {
++    bool isSecureContext, PermissionCheckPurpose aPurpose,
++    bool aHideDefaultDeny) {
+   if (IsNotificationAllowedFor(aPrincipal)) {
+     return NotificationPermission::Granted;
+   }
+@@ -151,7 +153,16 @@ NotificationPermission GetNotificationPermission(
+     return NotificationPermission::Denied;
+   }
+ 
+-  return GetRawNotificationPermission(aPrincipal);
++  NotificationPermission permission = GetRawNotificationPermission(aPrincipal);
++  if (aHideDefaultDeny && permission == NotificationPermission::Denied) {
++    nsCOMPtr<nsIPermissionManager> permissionManager =
++        components::PermissionManager::Service();
++    if (PermissionDelegateHandler::IsDefaultDeny(
++            permissionManager, aPrincipal, "desktop-notification"_ns, true)) {
++      return NotificationPermission::Default;
++    }
++  }
++  return permission;
+ }
+ 
+ nsresult GetOrigin(nsIPrincipal* aPrincipal, nsString& aOrigin) {
+diff --git a/dom/notification/NotificationUtils.h b/dom/notification/NotificationUtils.h
+index ab9cc1e7f5..8ed8f527f0 100644
+--- a/dom/notification/NotificationUtils.h
++++ b/dom/notification/NotificationUtils.h
+@@ -61,11 +61,14 @@ bool IsNotificationForbiddenFor(nsIPrincipal* aPrincipal,
+                                 Document* aRequestorDoc = nullptr);
+ 
+ /**
+- * Retrieves notification permission based on the context.
++ * Retrieves notification permission based on the context. With
++ * aHideDefaultDeny, a deny that only the global default gives reads as
++ * "default" (RFPTarget::PermissionsDefaultDenyPrompt).
+  */
+ NotificationPermission GetNotificationPermission(
+     nsIPrincipal* aPrincipal, nsIPrincipal* aEffectiveStoragePrincipal,
+-    bool isSecureContext, PermissionCheckPurpose aPurpose);
++    bool isSecureContext, PermissionCheckPurpose aPurpose,
++    bool aHideDefaultDeny = false);
+ 
+ nsCOMPtr<nsINotificationStorage> GetNotificationStorage(bool isPrivate);
+ 
+diff --git a/dom/permission/PermissionStatusSink.cpp b/dom/permission/PermissionStatusSink.cpp
+index 64f138ad9d..80cc6ff89a 100644
+--- a/dom/permission/PermissionStatusSink.cpp
++++ b/dom/permission/PermissionStatusSink.cpp
+@@ -287,6 +287,7 @@ PermissionStatusSink::ComputeStateOnMainThread() {
+ 
+   nsCOMPtr<nsPIDOMWindowInner> ancestorWindow;
+   nsCOMPtr<nsIPrincipal> workerPrincipal;
++  bool shouldResistFingerprinting = false;
+ 
+   {
+     MutexAutoLock lock(mMutex);
+@@ -304,6 +305,8 @@ PermissionStatusSink::ComputeStateOnMainThread() {
+ 
+     ancestorWindow = workerPrivate->GetAncestorWindow();
+     workerPrincipal = workerPrivate->GetPrincipal();
++    shouldResistFingerprinting = workerPrivate->ShouldResistFingerprinting(
++        RFPTarget::PermissionsDefaultDenyPrompt);
+   }
+ 
+   if (ancestorWindow) {
+@@ -327,6 +330,15 @@ PermissionStatusSink::ComputeStateOnMainThread() {
+     return PermissionStatePromise::CreateAndReject(rv, __func__);
+   }
+ 
++  // A worker with no window decides with its own principal; the hiding
++  // matches PermissionDelegateHandler::GetPermissionForPermissionsAPI's.
++  if (shouldResistFingerprinting &&
++      action == nsIPermissionManager::DENY_ACTION &&
++      PermissionDelegateHandler::IsDefaultDeny(
++          permissionManager, workerPrincipal, mPermissionType, false)) {
++    action = nsIPermissionManager::PROMPT_ACTION;
++  }
++
+   return PermissionStatePromise::CreateAndResolve(action, __func__);
+ }
+ 
+diff --git a/extensions/permissions/PermissionDelegateHandler.cpp b/extensions/permissions/PermissionDelegateHandler.cpp
+index ccaa471aeb..50a43947b1 100644
+--- a/extensions/permissions/PermissionDelegateHandler.cpp
++++ b/extensions/permissions/PermissionDelegateHandler.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "nsPIDOMWindow.h"
+ #include "nsIPrincipal.h"
++#include "nsIPermission.h"
+ #include "nsContentPermissionHelper.h"
+ 
+ #include "mozilla/BasePrincipal.h"
+@@ -202,12 +203,40 @@ bool PermissionDelegateHandler::HasPermissionDelegated(
+   return true;
+ }
+ 
++/* static */
++bool PermissionDelegateHandler::IsDefaultDeny(
++    nsIPermissionManager* aPermissionManager, nsIPrincipal* aPrincipal,
++    const nsACString& aType, bool aExactHostMatch) {
++  if (!aPermissionManager || !aPrincipal) {
++    return false;
++  }
++  nsCOMPtr<nsIPermission> entry;
++  uint32_t permission = nsIPermissionManager::UNKNOWN_ACTION;
++  return NS_SUCCEEDED(aPermissionManager->GetPermissionObject(
++             aPrincipal, aType, aExactHostMatch, getter_AddRefs(entry))) &&
++         !entry &&
++         NS_SUCCEEDED(
++             aExactHostMatch
++                 ? aPermissionManager->TestExactPermissionFromPrincipal(
++                       aPrincipal, aType, &permission)
++                 : aPermissionManager->TestPermissionFromPrincipal(
++                       aPrincipal, aType, &permission)) &&
++         permission == nsIPermissionManager::DENY_ACTION;
++}
++
+ nsresult PermissionDelegateHandler::GetPermission(const nsACString& aType,
+                                                   uint32_t* aPermission,
+-                                                  bool aExactHostMatch) {
++                                                  bool aExactHostMatch,
++                                                  bool* aIsDefaultDeny) {
+   MOZ_ASSERT(mDocument);
+   MOZ_ASSERT(mPrincipal);
+ 
++  bool isDefaultDeny = false;
++  if (!aIsDefaultDeny) {
++    aIsDefaultDeny = &isDefaultDeny;
++  }
++  *aIsDefaultDeny = false;
++
+   if (mPrincipal->IsSystemPrincipal()) {
+     *aPermission = nsIPermissionManager::ALLOW_ACTION;
+     return NS_OK;
+@@ -263,6 +292,8 @@ nsresult PermissionDelegateHandler::GetPermission(const nsACString& aType,
+                           : topWC->GetDelegatedPermissions();
+       size_t idx = std::distance(sPermissionsMap, info);
+       *aPermission = list.mPermissions[idx];
++      *aIsDefaultDeny = list.mDenyIsDefault[idx] &&
++                        *aPermission == nsIPermissionManager::DENY_ACTION;
+       return NS_OK;
+     }
+   }
+@@ -270,6 +301,9 @@ nsresult PermissionDelegateHandler::GetPermission(const nsACString& aType,
+   nsresult rv =
+       (mPermissionManager->*testPermission)(principal, aType, aPermission);
+   NS_ENSURE_SUCCESS(rv, rv);
++  *aIsDefaultDeny = *aPermission == nsIPermissionManager::DENY_ACTION &&
++                    IsDefaultDeny(mPermissionManager, principal, aType,
++                                  aExactHostMatch);
+ 
+   if (*aPermission == nsIPermissionManager::UNKNOWN_ACTION && bc) {
+     uint64_t browserId = bc->Top()->BrowserId();
+@@ -288,7 +322,18 @@ nsresult PermissionDelegateHandler::GetPermission(const nsACString& aType,
+ 
+ nsresult PermissionDelegateHandler::GetPermissionForPermissionsAPI(
+     const nsACString& aType, uint32_t* aPermission) {
+-  return GetPermission(aType, aPermission, false);
++  bool isDefaultDeny = false;
++  nsresult rv = GetPermission(aType, aPermission, false, &isDefaultDeny);
++  NS_ENSURE_SUCCESS(rv, rv);
++  // Under RFPTarget::PermissionsDefaultDenyPrompt a deny that only the global
++  // default gives reads as a prompt, so a privacy-minded default is not a
++  // fingerprint. A site's own deny, and a deny from feature policy or
++  // ePersistDeniedCrossOrigin, which every user's frame gets, stay.
++  if (isDefaultDeny && mDocument->ShouldResistFingerprinting(
++                           RFPTarget::PermissionsDefaultDenyPrompt)) {
++    *aPermission = nsIPermissionManager::PROMPT_ACTION;
++  }
++  return NS_OK;
+ }
+ 
+ void PermissionDelegateHandler::PopulateAllDelegatedPermissions() {
+@@ -326,6 +371,9 @@ void PermissionDelegateHandler::PopulateAllDelegatedPermissions() {
+       }
+     }
+     list.mPermissions[idx] = permission;
++    list.mDenyIsDefault[idx] =
++        permission == nsIPermissionManager::DENY_ACTION &&
++        IsDefaultDeny(mPermissionManager, mPrincipal, type, false);
+ 
+     // Populate the exact-host-match permission.
+     permission = nsIPermissionManager::UNKNOWN_ACTION;
+@@ -340,6 +388,9 @@ void PermissionDelegateHandler::PopulateAllDelegatedPermissions() {
+       }
+     }
+     exactHostMatchList.mPermissions[idx] = permission;
++    exactHostMatchList.mDenyIsDefault[idx] =
++        permission == nsIPermissionManager::DENY_ACTION &&
++        IsDefaultDeny(mPermissionManager, mPrincipal, type, true);
+   }
+ 
+   WindowContext::Transaction txn;
+@@ -423,8 +474,15 @@ bool PermissionDelegateHandler::UpdateDelegatePermissionInternal(
+     }
+   }
+ 
+-  if (aList.mPermissions[aIdx] != permission) {
++  bool denyIsDefault =
++      permission == nsIPermissionManager::DENY_ACTION &&
++      IsDefaultDeny(
++          mPermissionManager, mPrincipal, aType,
++          aTestFunc == &nsIPermissionManager::TestExactPermissionFromPrincipal);
++  if (aList.mPermissions[aIdx] != permission ||
++      aList.mDenyIsDefault[aIdx] != denyIsDefault) {
+     aList.mPermissions[aIdx] = permission;
++    aList.mDenyIsDefault[aIdx] = denyIsDefault;
+     return true;
+   }
+ 
+diff --git a/extensions/permissions/PermissionDelegateHandler.h b/extensions/permissions/PermissionDelegateHandler.h
+index 7a41f08d41..33c2384da8 100644
+--- a/extensions/permissions/PermissionDelegateHandler.h
++++ b/extensions/permissions/PermissionDelegateHandler.h
+@@ -54,9 +54,14 @@ class PermissionDelegateHandler final : public nsIPermissionDelegateHandler {
+ 
+   typedef struct DelegatedPermissionList {
+     Array<uint32_t, DELEGATED_PERMISSION_COUNT> mPermissions;
++    // Whether each DENY_ACTION comes only from the type's global default
++    // (IsDefaultDeny), for GetPermissionForPermissionsAPI in frames whose top
++    // document is in another process.
++    Array<bool, DELEGATED_PERMISSION_COUNT> mDenyIsDefault{};
+ 
+     bool operator==(const DelegatedPermissionList& aOther) const {
+-      return mPermissions == aOther.mPermissions;
++      return mPermissions == aOther.mPermissions &&
++             mDenyIsDefault == aOther.mDenyIsDefault;
+     }
+   } DelegatedPermissionList;
+ 
+@@ -75,9 +80,21 @@ class PermissionDelegateHandler final : public nsIPermissionDelegateHandler {
+    *                    will return from this function.
+    * @param aExactHostMatch whether to look for the exact host name or also for
+    *                        subdomains that can have the same permission.
++   * @param aIsDefaultDeny if given, whether the permission is DENY_ACTION only
++   *                       because of the type's global default, on the
++   *                       principal the delegate policy decided with.
+    */
+   nsresult GetPermission(const nsACString& aType, uint32_t* aPermission,
+-                         bool aExactHostMatch);
++                         bool aExactHostMatch, bool* aIsDefaultDeny = nullptr);
++
++  /*
++   * Whether aPrincipal's aType permission is DENY_ACTION only because of the
++   * type's global default (permissions.default.<type>): the permission
++   * manager holds no entry for it, and its answer is deny.
++   */
++  static bool IsDefaultDeny(nsIPermissionManager* aPermissionManager,
++                            nsIPrincipal* aPrincipal, const nsACString& aType,
++                            bool aExactHostMatch);
+ 
+   /*
+    * Get permission state for permission api, which applied
+diff --git a/extensions/permissions/PermissionDelegateIPCUtils.h b/extensions/permissions/PermissionDelegateIPCUtils.h
+index 554e0d98f4..607c02d9b0 100644
+--- a/extensions/permissions/PermissionDelegateIPCUtils.h
++++ b/extensions/permissions/PermissionDelegateIPCUtils.h
+@@ -20,6 +20,9 @@ struct ParamTraits<
+     for (auto& permission : aParam.mPermissions) {
+       WriteParam(aWriter, permission);
+     }
++    for (bool denyIsDefault : aParam.mDenyIsDefault) {
++      WriteParam(aWriter, denyIsDefault);
++    }
+   }
+ 
+   static bool Read(MessageReader* aReader, paramType* aResult) {
+@@ -28,6 +31,11 @@ struct ParamTraits<
+         return false;
+       }
+     }
++    for (bool& denyIsDefault : aResult->mDenyIsDefault) {
++      if (!ReadParam(aReader, &denyIsDefault)) {
++        return false;
++      }
++    }
+ 
+     return true;
+   }

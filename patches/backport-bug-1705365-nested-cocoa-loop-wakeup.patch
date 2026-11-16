@@ -1,0 +1,290 @@
+Sval: a nested Cocoa event loop hands its Gecko wake-up to the loop around it
+
+Backport of Mozilla's Bug 1705365 (mozilla-central 305e4f921351 and its test
+2f8880339bc1, Firefox 161), unchanged. ESR 153 does not carry it.
+nsAppShell::ProcessGeckoEvents wakes a waiting native loop by clearing
+mRunningEventLoop. When a native event's handler spins a nested Gecko loop,
+the nested ProcessNextNativeEvent consumed that wake-up, then restored
+mRunningEventLoop to true on its way out, so the enclosing native loop went
+back to waiting with Gecko events pending until some unrelated native event
+arrived. The test adds nsICocoaAppShellTestUtils, which posts a native event
+and counts wake-ups lost this way, and test_nested_native_loop_wakeup_mac.html.
+Drop this patch when the upstream pin reaches Firefox 161.
+
+diff --git a/widget/cocoa/CustomCocoaEvents.h b/widget/cocoa/CustomCocoaEvents.h
+index 3f09f7dca0..67467f4f09 100644
+--- a/widget/cocoa/CustomCocoaEvents.h
++++ b/widget/cocoa/CustomCocoaEvents.h
+@@ -13,4 +13,7 @@
+ // Empty event, just used for prodding the event loop into responding.
+ const short kEventSubtypeNone = 0;
+ 
++// Posted by nsICocoaAppShellTestUtils::postNativeTestEvent().
++const short kEventSubtypeNativeTest = 1;
++
+ #endif /* WIDGET_COCOA_CUSTOMCOCOAEVENTS_H_ */
+diff --git a/widget/cocoa/nsAppShell.h b/widget/cocoa/nsAppShell.h
+index 4a8f4d834a..d40388bf89 100644
+--- a/widget/cocoa/nsAppShell.h
++++ b/widget/cocoa/nsAppShell.h
+@@ -13,6 +13,7 @@
+ #import <AppKit/NSApplication.h>
+ 
+ #include "nsBaseAppShell.h"
++#include "nsICocoaAppShellTestUtils.h"
+ #include "nsTArray.h"
+ 
+ class ProfilingStack;
+@@ -31,8 +32,11 @@ class nsAvailableMemoryWatcherBase;
+ 
+ @class AppShellDelegate;
+ 
+-class nsAppShell : public nsBaseAppShell {
++class nsAppShell : public nsBaseAppShell, public nsICocoaAppShellTestUtils {
+  public:
++  NS_DECL_ISUPPORTS_INHERITED
++  NS_DECL_NSICOCOAAPPSHELLTESTUTILS
++
+   NS_IMETHOD ResumeNative(void) override;
+ 
+   nsAppShell();
+@@ -87,6 +91,10 @@ class nsAppShell : public nsBaseAppShell {
+   bool mSkippedNativeCallback;
+   bool mRunningCocoaEmbedded;
+ 
++  // Incremented whenever ProcessGeckoEvents() wakes a waiting native loop.
++  uint32_t mNativeWakeups = 0;
++  uint32_t mLostNativeWakeups = 0;
++
+   int32_t mNativeEventCallbackDepth;
+   // Can be set from different threads, so must be modified atomically
+   int32_t mNativeEventScheduledDepth;
+diff --git a/widget/cocoa/nsAppShell.mm b/widget/cocoa/nsAppShell.mm
+index ed3fbdc051..7a5744e361 100644
+--- a/widget/cocoa/nsAppShell.mm
++++ b/widget/cocoa/nsAppShell.mm
+@@ -258,6 +258,14 @@ static bool PiPPlayerHandlesAccessibilityFrontmost() {
+ 
+ - (void)sendEvent:(NSEvent*)anEvent {
+   mozilla::BackgroundHangMonitor().NotifyActivity();
++  if (anEvent.type == NSEventTypeApplicationDefined &&
++      anEvent.subtype == kEventSubtypeNativeTest) {
++    if (nsCOMPtr<nsIObserverService> obs =
++            mozilla::services::GetObserverService()) {
++      obs->NotifyObservers(nullptr, "appshell-native-test-event", nullptr);
++    }
++    return;
++  }
+   [super sendEvent:anEvent];
+ }
+ 
+@@ -589,6 +597,7 @@ void nsAppShell::ProcessGeckoEvents(void* aInfo) {
+ 
+   if (self->mRunningEventLoop) {
+     self->mRunningEventLoop = false;
++    ++self->mNativeWakeups;
+ 
+     // The run loop may be sleeping -- [NSRunLoop runMode:...]
+     // won't return until it's given a reason to wake up.  Awaken it by
+@@ -789,6 +798,7 @@ bool nsAppShell::ProcessNextNativeEvent(bool aMayWait) {
+   }
+ 
+   bool wasRunningEventLoop = mRunningEventLoop;
++  uint32_t wakeupsAtEntry = mNativeWakeups;
+   mRunningEventLoop = aMayWait;
+   NSDate* waitUntil = nil;
+   if (aMayWait) waitUntil = [NSDate distantFuture];
+@@ -813,6 +823,7 @@ bool nsAppShell::ProcessNextNativeEvent(bool aMayWait) {
+     NS_ASSERTION(mAutoreleasePools && ::CFArrayGetCount(mAutoreleasePools),
+                  "No autorelease pool for native event");
+ 
++    uint32_t wakeupsBeforeWait = mNativeWakeups;
+     if (aMayWait && [[GeckoNSApplication sharedApplication] didLaunch]) {
+       currentMode = [currentRunLoop currentMode];
+       if (!currentMode) currentMode = NSDefaultRunLoopMode;
+@@ -887,6 +898,9 @@ bool nsAppShell::ProcessNextNativeEvent(bool aMayWait) {
+       eventProcessed = true;
+ #endif
+     }
++    if (mRunningEventLoop && mNativeWakeups != wakeupsBeforeWait) {
++      ++mLostNativeWakeups;
++    }
+   } while (mRunningEventLoop);
+ 
+   if (eventProcessed) {
+@@ -897,7 +911,9 @@ bool nsAppShell::ProcessNextNativeEvent(bool aMayWait) {
+     moreEvents = !!nextEvent;
+   }
+ 
+-  mRunningEventLoop = wasRunningEventLoop;
++  // A wake-up consumed by this nested loop was also meant for any enclosing
++  // native loop, so don't let it go back to waiting.
++  mRunningEventLoop = wasRunningEventLoop && mNativeWakeups == wakeupsAtEntry;
+ 
+   NS_OBJC_END_TRY_IGNORE_BLOCK;
+ 
+@@ -1058,6 +1074,34 @@ nsAppShell::OnProcessNextEvent(nsIThreadInternal* aThread, bool aMayWait) {
+   NS_OBJC_END_TRY_BLOCK_RETURN(NS_ERROR_FAILURE);
+ }
+ 
++NS_IMPL_ISUPPORTS_INHERITED(nsAppShell, nsBaseAppShell,
++                            nsICocoaAppShellTestUtils)
++
++NS_IMETHODIMP
++nsAppShell::PostNativeTestEvent() {
++  NS_OBJC_BEGIN_TRY_BLOCK_RETURN;
++
++  [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined
++                                      location:NSMakePoint(0, 0)
++                                 modifierFlags:0
++                                     timestamp:0
++                                  windowNumber:0
++                                       context:nullptr
++                                       subtype:kEventSubtypeNativeTest
++                                         data1:0
++                                         data2:0]
++           atStart:NO];
++  return NS_OK;
++
++  NS_OBJC_END_TRY_BLOCK_RETURN(NS_ERROR_FAILURE);
++}
++
++NS_IMETHODIMP
++nsAppShell::GetLostNativeWakeups(uint32_t* aResult) {
++  *aResult = mLostNativeWakeups;
++  return NS_OK;
++}
++
+ // AfterProcessNextEvent
+ //
+ // This nsIThreadObserver method is called after event processing is complete.
+diff --git a/widget/moz.build b/widget/moz.build
+index 5aaa7796e1..4e894de347 100644
+--- a/widget/moz.build
++++ b/widget/moz.build
+@@ -58,6 +58,7 @@ if toolkit in ("android", "cocoa", "gtk", "uikit", "windows"):
+ 
+ if toolkit == "cocoa":
+     XPIDL_SOURCES += [
++        "nsICocoaAppShellTestUtils.idl",
+         "nsIMacDockSupport.idl",
+         "nsIMacFinderProgress.idl",
+         "nsIMacSharingService.idl",
+diff --git a/widget/nsICocoaAppShellTestUtils.idl b/widget/nsICocoaAppShellTestUtils.idl
+new file mode 100644
+index 0000000000..ba30d32b67
+--- /dev/null
++++ b/widget/nsICocoaAppShellTestUtils.idl
+@@ -0,0 +1,26 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "nsISupports.idl"
++
++/**
++ * Test-only hooks into the Cocoa app shell's native event loop. Implemented by
++ * the app shell service "@mozilla.org/widget/appshell/mac;1".
++ */
++[scriptable, builtinclass, uuid(1398d18e-b1f2-4bb6-af24-f08d91da429d)]
++interface nsICocoaAppShellTestUtils : nsISupports
++{
++  /**
++   * Posts a native event; once the native event loop dequeues and dispatches
++   * it, observers of "appshell-native-test-event" are notified from within
++   * that dispatch.
++   */
++  void postNativeTestEvent();
++
++  /**
++   * Number of times a native event loop went back to waiting although a
++   * wake-up meant for it was consumed by a nested loop.
++   */
++  readonly attribute unsigned long lostNativeWakeups;
++};
+diff --git a/widget/tests/chrome.toml b/widget/tests/chrome.toml
+index 6d11589e1a..ab06bed0de 100644
+--- a/widget/tests/chrome.toml
++++ b/widget/tests/chrome.toml
+@@ -219,6 +219,11 @@ run-if = [
+ ]
+ support-files = ["native_menus_window.xhtml"]
+ 
++["test_nested_native_loop_wakeup_mac.html"]
++run-if = [
++  "os == 'mac'", # Cocoa widget test
++]
++
+ ["test_panel_mouse_coords.xhtml"]
+ 
+ ["test_platform_colors.xhtml"]
+diff --git a/widget/tests/test_nested_native_loop_wakeup_mac.html b/widget/tests/test_nested_native_loop_wakeup_mac.html
+new file mode 100644
+index 0000000000..8ee162965d
+--- /dev/null
++++ b/widget/tests/test_nested_native_loop_wakeup_mac.html
+@@ -0,0 +1,64 @@
++<!DOCTYPE html>
++<!-- Any copyright is dedicated to the Public Domain.
++     https://creativecommons.org/publicdomain/zero/1.0/ -->
++<html>
++<head>
++  <title>Nested event loop started from a native event does not lose the outer loop's wake-up</title>
++  <script src="chrome://mochikit/content/tests/SimpleTest/SimpleTest.js"></script>
++  <link rel="stylesheet" type="text/css" href="chrome://mochikit/content/tests/SimpleTest/test.css" />
++</head>
++<body>
++<script>
++"use strict";
++
++const TOPIC = "appshell-native-test-event";
++
++add_task(async function test_nested_native_loop_wakeup() {
++  const appShell = Cc["@mozilla.org/widget/appshell/mac;1"].getService(
++    Ci.nsICocoaAppShellTestUtils
++  );
++
++  let innerDone = false;
++  let outerDone = false;
++  let ranNested = false;
++  let innerReturnedAt = 0;
++
++  const observer = () => {
++    Services.obs.removeObserver(observer, TOPIC);
++    ranNested = true;
++    // A timer makes sure the wake-up arrives while the nested loop is
++    // blocked in the native wait, not before it starts waiting.
++    const timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
++    timer.initWithCallback(
++      () => {
++        innerDone = true;
++        outerDone = true;
++      },
++      50,
++      Ci.nsITimer.TYPE_ONE_SHOT
++    );
++    Services.tm.spinEventLoopUntil("test inner loop", () => innerDone);
++    innerReturnedAt = ChromeUtils.now();
++  };
++  Services.obs.addObserver(observer, TOPIC);
++
++  const rescue = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
++  rescue.initWithCallback(() => {}, 5000, Ci.nsITimer.TYPE_ONE_SHOT);
++
++  const lostBefore = appShell.lostNativeWakeups;
++  appShell.postNativeTestEvent();
++  Services.tm.spinEventLoopUntil("test outer loop", () => outerDone);
++  const stall = ChromeUtils.now() - innerReturnedAt;
++  rescue.cancel();
++
++  ok(ranNested, "The nested loop ran from within the native event dispatch");
++  info(`Outer loop returned ${stall.toFixed(1)} ms after the nested loop`);
++  is(
++    appShell.lostNativeWakeups - lostBefore,
++    0,
++    "The outer native loop did not go back to waiting after a nested loop consumed its wake-up"
++  );
++});
++</script>
++</body>
++</html>

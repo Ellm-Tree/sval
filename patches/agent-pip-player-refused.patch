@@ -1,0 +1,27 @@
+Sval: open no Picture-in-Picture player for a tab an agent controls
+
+The player window's controls play, pause, seek and mute the page's video,
+and take the user's input in a window of their own, so a tab an agent
+controls (the SvalAgentInControl browsing context field, which Sval's chrome
+sets) gets no player. Every way to open one, the toggle, the context menu,
+the shortcut, switching tabs and HTMLVideoElement.requestPictureInPicture(),
+asks handlePictureInPictureRequest; the page's request rejects as when the
+player does not start.
+
+diff --git a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+index e1cc8e0c1d..4829e6611e 100644
+--- a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
++++ b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+@@ -973,6 +973,12 @@ export var PictureInPicture = {
+    *   the player component inside it has finished loading.
+    */
+   async handlePictureInPictureRequest(wgp, videoData) {
++    // Sval: a page in a tab an agent controls opens no player the user's
++    // input would reach.
++    if (wgp.browsingContext.top.svalAgentInControl) {
++      return;
++    }
++
+     const isApiRequest = !!videoData.isPipApiRequest;
+ 
+     if (isApiRequest) {

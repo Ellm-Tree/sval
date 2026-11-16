@@ -1,0 +1,31 @@
+Sval: Sval is its own vendor, with its own profile directory, and Firefox's user agent
+
+MOZ_APP_VENDOR, MOZ_APP_PROFILE and MOZ_APP_UA_NAME are project flags, which
+only an imply_option in a Mozilla .configure file can set, so no mozconfig
+or branding option reaches them. All three are compiled into libxul in a
+full build. The vendor names the Windows registry keys and %APPDATA%
+directory Sval uses, and the profile names its profile directory on every
+platform: ~/Library/Application Support/Sval, %APPDATA%\Sval and ~/.sval.
+Without this, a full Sval build shares Firefox's.
+
+MOZ_APP_UA_NAME is the application name in the user agent. Left empty,
+nsHttpHandler falls back to the application's own name, Sval, and writes
+"sval/<version>" where Firefox writes "Firefox/<version>". Sval sends
+Firefox's user agent, as other Firefox forks do, so sites that recognise
+Firefox treat Sval the same.
+
+diff --git a/browser/moz.configure b/browser/moz.configure
+index 3ea3d88b93..d61496ed37 100644
+--- a/browser/moz.configure
++++ b/browser/moz.configure
+@@ -11,7 +11,9 @@ imply_option("MOZ_NORMANDY", True)
+ imply_option("MOZ_PROFILE_MIGRATOR", True)
+ 
+ 
+-imply_option("MOZ_APP_VENDOR", "Mozilla")
++imply_option("MOZ_APP_VENDOR", "Sval")
++imply_option("MOZ_APP_PROFILE", "Sval")
++imply_option("MOZ_APP_UA_NAME", "Firefox")
+ imply_option("MOZ_APP_ID", "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}")
+ # Include the DevTools client, not just the server (which is the default)
+ imply_option("MOZ_DEVTOOLS", "all")

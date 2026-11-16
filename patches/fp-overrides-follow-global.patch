@@ -1,0 +1,66 @@
+Sval: resolve granular fingerprinting overrides again when the global set changes
+
+nsRFPService::SetFingerprintingOverrides resolves each granular entry
+against the global target sets as they stand when the entries load, and
+nsRFPService::PrefChanged refreshes only the global sets. So a change to
+privacy.fingerprintingProtection.overrides (a fingerprinting setting, Strict,
+or the same pref arriving through settings sync) left every site with a
+granular entry, Mozilla's webcompat ones and Sval's per-site exceptions
+alike, on the old set until restart.
+
+FingerprintingWebCompatService already re-populates the service when its own
+prefs change; it also does so when either global overrides pref changes,
+once nsRFPService has updated (later pref observers run first). No chrome
+API reaches the service's entries: nsIRFPService only replaces them
+wholesale, and the remote ones live in the service's private state.
+
+diff --git a/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs b/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
+index ed24693986..fe971d8ab4 100644
+--- a/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
++++ b/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
+@@ -52,6 +52,13 @@ const PREF_GRANULAR_OVERRIDES_BASELINE =
+   "privacy.baselineFingerprintingProtection.granularOverrides";
+ const PREF_REMOTE_OVERRIDES_ENABLED =
+   "privacy.fingerprintingProtection.remoteOverrides.enabled";
++// nsRFPService::SetFingerprintingOverrides resolves every entry against the
++// global target sets as they are when it runs, so the entries are resolved
++// again whenever either set changes.
++const PREFS_GLOBAL_OVERRIDES = [
++  "privacy.fingerprintingProtection.overrides",
++  "privacy.baselineFingerprintingProtection.overrides",
++];
+ 
+ XPCOMUtils.defineLazyPreferenceGetter(
+   lazy,
+@@ -134,6 +141,9 @@ export class FingerprintingWebCompatService {
+     Services.prefs.addObserver(PREF_GRANULAR_OVERRIDES, this);
+     Services.prefs.addObserver(PREF_GRANULAR_OVERRIDES_BASELINE, this);
+     Services.prefs.addObserver(PREF_REMOTE_OVERRIDES_ENABLED, this);
++    for (const pref of PREFS_GLOBAL_OVERRIDES) {
++      Services.prefs.addObserver(pref, this);
++    }
+ 
+     // Register the sync event for the remote settings updates.
+     this.#rs.on("sync", async _ => {
+@@ -268,6 +278,12 @@ export class FingerprintingWebCompatService {
+   }
+ 
+   observe(subject, topic, prefName) {
++    if (PREFS_GLOBAL_OVERRIDES.includes(prefName)) {
++      // A later observer runs first (Preferences::RegisterCallbackImpl), so
++      // this waits for nsRFPService::PrefChanged to update the global sets.
++      Services.tm.dispatchToMainThread(() => this.#populateOverrides());
++      return;
++    }
+     if (
+       prefName != PREF_GRANULAR_OVERRIDES &&
+       prefName != PREF_GRANULAR_OVERRIDES_BASELINE &&
+@@ -298,5 +314,8 @@ export class FingerprintingWebCompatService {
+     Services.prefs.removeObserver(PREF_GRANULAR_OVERRIDES, this);
+     Services.prefs.removeObserver(PREF_GRANULAR_OVERRIDES_BASELINE, this);
+     Services.prefs.removeObserver(PREF_REMOTE_OVERRIDES_ENABLED, this);
++    for (const pref of PREFS_GLOBAL_OVERRIDES) {
++      Services.prefs.removeObserver(pref, this);
++    }
+   }
+ }

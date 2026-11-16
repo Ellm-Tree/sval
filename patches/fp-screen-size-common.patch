@@ -1,0 +1,96 @@
+Sval: report the screen as a common resolution at or above the real one
+
+Two RFPTargets, ScreenSizeCommon and ScreenSizeTight, make
+screen.width/height and the CSS device-width/device-height media features
+report the smallest common desktop resolution that is at least the real
+screen in both dimensions, and derive ScreenAvailToResolution's available
+screen from that size, so the screen, available screen and device size
+always agree and the window never looks larger than the screen.
+RFPTarget::ScreenRect reports the viewport instead, which makes screen equal
+the window, a known tell. ScreenSizeTight, the strict control, picks from
+four common 16:9 sizes (1366x768, 1920x1080, 2560x1440, 3840x2160), so many
+more screens report the same size; it works with or without ScreenSizeCommon
+and wins over it. Both targets are Doc-gated, so granularOverrides lifts
+them per site.
+
+The lists are SvalRFPService::GetSpoofedScreenSize, and the three sites ask
+SvalRFPService::SpoofedScreenSize, so they cannot disagree. Sources:
+StatCounter desktop screen resolution statistics
+(gs.statcounter.com/screen-resolution-stats/desktop/worldwide, September
+2026), the Steam Hardware Survey (September 2026), Apple's default scaled
+sizes for current Macs (MacBook Air 13 and 15, MacBook Pro 14 and 16, iMac 24,
+5K 27-inch), and 1920x1080 and 2560x1440 at Windows' 125% and 150% scaling. A
+screen larger than every entry is rounded up to letterboxing's 200x100 steps,
+or 1280x720 steps when tight.
+
+No chrome API can change what nsScreen and nsMediaFeatures report.
+
+diff --git a/dom/base/nsScreen.cpp b/dom/base/nsScreen.cpp
+index 3b48a7f1e2..f9aeb73081 100644
+--- a/dom/base/nsScreen.cpp
++++ b/dom/base/nsScreen.cpp
+@@ -96,7 +96,14 @@ CSSIntRect nsScreen::GetRect() {
+   if (NS_WARN_IF(!context)) {
+     return {};
+   }
+-  return CSSIntRect::FromAppUnitsRounded(context->GetRect());
++  CSSIntRect rect = CSSIntRect::FromAppUnitsRounded(context->GetRect());
++  if (auto size = SvalRFPService::SpoofedScreenSize(
++          rect.Size(), [this](RFPTarget aTarget) {
++            return ShouldResistFingerprinting(aTarget);
++          })) {
++    return {{}, *size};
++  }
++  return rect;
+ }
+ 
+ CSSIntRect nsScreen::GetAvailRect() {
+@@ -141,8 +148,18 @@ CSSIntRect nsScreen::GetAvailRect() {
+       }
+     }
+ 
++    // The available screen is derived from the screen this reports, so the
++    // two always agree.
++    nsRect screenRect = context->GetRect();
++    if (auto size = SvalRFPService::SpoofedScreenSize(
++            CSSIntRect::FromAppUnitsRounded(screenRect).Size(),
++            [this](RFPTarget aTarget) {
++              return ShouldResistFingerprinting(aTarget);
++            })) {
++      screenRect = CSSPixel::ToAppUnits(CSSIntRect({}, *size));
++    }
+     return nsRFPService::GetSpoofedScreenAvailSize(
+-        context->GetRect(), context->GetFullZoom(), IsFullscreen());
++        screenRect, context->GetFullZoom(), IsFullscreen());
+   }
+ 
+   nsDeviceContext* context = GetDeviceContext();
+diff --git a/layout/style/nsMediaFeatures.cpp b/layout/style/nsMediaFeatures.cpp
+index 1f9613b8cd..a39d07cc57 100644
+--- a/layout/style/nsMediaFeatures.cpp
++++ b/layout/style/nsMediaFeatures.cpp
+@@ -27,6 +27,7 @@
+ #include "nsIPrintSettings.h"
+ #include "nsIWidget.h"
+ #include "nsPresContext.h"
++#include "nsRFPService.h"
+ #include "nsStyleConsts.h"
+ 
+ using namespace mozilla;
+@@ -94,7 +95,15 @@ static nsSize GetDeviceSize(const Document& aDocument) {
+     return pc->GetPageSize();
+   }
+ 
+-  return pc->DeviceContext()->GetDeviceSurfaceDimensions();
++  nsSize size = pc->DeviceContext()->GetDeviceSurfaceDimensions();
++  // The same size nsScreen::GetRect reports.
++  if (auto spoofed = SvalRFPService::SpoofedScreenSize(
++          CSSPixel::FromAppUnitsRounded(size), [&aDocument](RFPTarget aTarget) {
++            return aDocument.ShouldResistFingerprinting(aTarget);
++          })) {
++    return CSSPixel::ToAppUnits(*spoofed);
++  }
++  return size;
+ }
+ 
+ bool Gecko_MediaFeatures_IsResourceDocument(const Document* aDocument) {

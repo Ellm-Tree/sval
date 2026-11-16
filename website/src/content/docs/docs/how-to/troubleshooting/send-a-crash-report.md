@@ -1,0 +1,45 @@
+---
+title: Send a crash report
+description: Send Sval a report when Sval or a tab crashes, or later from the feedback form.
+---
+
+Sval sends a crash report only when you choose to. Each crash dialog has a
+box for sending the report. The box starts unchecked.
+
+Sval crashed while you were watching a video, and you want Sval's
+developers to have what they need to fix the crash.
+
+## When Sval crashes
+
+1. In the Sval Crash Reporter dialog, check the box that tells Sval about
+   the crash.
+2. Optional: check **Include the address of the page I was on.**
+3. Select the button that restarts Sval, or the one that quits it.
+
+## When a tab crashes
+
+1. On the crashed tab's page, check
+   **Send an automated crash report so we can fix issues like this**.
+2. Select **Restore This Tab**.
+
+## Send it later
+
+1. At the bottom of the Workspace panel, select **Send Feedback**.
+2. Under Sent with your feedback, check the crash snapshot.
+3. Type a message about what happened.
+4. Select **Send**.
+
+## Details
+
+- The crash dialog remembers which boxes you checked, and checks the same
+  ones next time.
+- The feedback form lists the crashes of the last three days. If you
+  already sent a crash from the crash dialog, the crash shows as **Sent**.
+- A crash snapshot is a copy of the crashed process's memory. A snapshot
+  can include parts of pages you had open.
+- Crash reports go to Sval's own server.
+
+## Related pages
+
+- [Send feedback](/docs/how-to/troubleshooting/send-feedback/)
+- [Troubleshooting settings and controls](/docs/reference/troubleshooting/)

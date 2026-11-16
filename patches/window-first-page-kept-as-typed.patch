@@ -1,0 +1,33 @@
+Sval: a window opened for a page keeps its address until the page loads
+
+`addTab` sets a new tab's `userTypedValue` before its load starts, so a
+load stopped or refused before it commits leaves the tab with the address
+it was opened for: the address bar shows it, SessionStore saves it, and
+tabbrowser keeps it through the failed stop (`TabProgressListener`
+clears it only for a tab that is not empty). A window opened with an
+address in its arguments loads it through `openLinkIn` instead, which
+sets nothing, so the same refused load leaves the window's only tab at
+about:blank with the address gone. A peek is such a window.
+
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -971,6 +971,18 @@ var gBrowserInit = {
+           }
+         }
+ 
++        // Sval: kept as if the user typed it, as `addTab` keeps a new tab's
++        // address, so a first load that is stopped or refused before it
++        // commits leaves the window's tab holding the page it was opened for.
++        // The address bar shows a typed value from `setURI` alone, which a
++        // tab switch calls for a new tab.
++        if (
++          typeof uriToLoad == "string" &&
++          !gInitialPages.includes(uriToLoad)
++        ) {
++          gBrowser.selectedBrowser.userTypedValue = uriToLoad;
++          gURLBar.setURI();
++        }
+         try {
+           openLinkIn(uriToLoad, "current", {
+             referrerInfo: window.arguments[2] || null,

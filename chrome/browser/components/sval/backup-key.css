@@ -1,0 +1,89 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The backup of the sync key, in Sval's dialog frame (`sval-dialog.css`),
+ * whose palette variables it takes.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* `SubDialog.resizeHorizontally` sizes the box to the page's width at load,
+ * and the code wraps between its groups (`backup-key.js`) to fit it. */
+.sval-backup {
+  width: 480px;
+}
+
+.sval-backup p {
+  margin: 0;
+}
+
+.sval-backup-code {
+  font: 500 17px/1.6 var(--sval-mono);
+  letter-spacing: 0.04em;
+  color: var(--sval-dialog-text);
+  user-select: all;
+}
+
+.sval-backup-key-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  > .sval-backup-fingerprint {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.sval-backup-copy {
+  flex: none;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.sval-backup-fingerprint,
+.sval-backup-note {
+  font-size: 13px;
+  color: var(--sval-dialog-muted);
+}
+
+.sval-backup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--sval-dialog-body);
+
+  > h2 {
+    margin: 0;
+    font: 600 14px/1.4 var(--sval-font);
+    color: var(--sval-dialog-text);
+  }
+
+  > ol {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding-inline-start: 20px;
+  }
+}
+
+.sval-backup-status {
+  font-size: 13px;
+  color: var(--sval-dialog-text);
+
+  &:empty {
+    display: none;
+  }
+}
+
+@media print {
+  .sval-dialog-icon,
+  .sval-dialog-actions,
+  .sval-backup-status,
+  .sval-backup-copy {
+    display: none;
+  }
+}

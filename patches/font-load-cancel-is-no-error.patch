@@ -1,0 +1,23 @@
+Sval: a cancelled font load logs no error
+
+gfxUserFontEntry::FontDataDownloadComplete logs every unsuccessful
+download as a console error, NS_BINDING_ABORTED included. A document that
+navigates away or closes while a font of its own is loading cancels that
+load with NS_BINDING_ABORTED, so a fast click from a page logged a font
+failure that never happened. A cancelled load logs nothing.
+
+diff --git a/gfx/thebes/gfxUserFontSet.cpp b/gfx/thebes/gfxUserFontSet.cpp
+index c3ff1a8e54..3c489771f5 100644
+--- a/gfx/thebes/gfxUserFontSet.cpp
++++ b/gfx/thebes/gfxUserFontSet.cpp
+@@ -873,7 +873,9 @@ void gfxUserFontEntry::FontDataDownloadComplete(
+       fontSet->LogMessage(this, aSrcIndex,
+                           "font-display timeout, webfont not used",
+                           nsIScriptError::infoFlag, aDownloadStatus);
+-    } else {
++    } else if (aDownloadStatus != NS_BINDING_ABORTED) {
++      // A load the document cancelled, as when it navigates away, has not
++      // failed.
+       fontSet->LogMessage(this, aSrcIndex, "download failed",
+                           nsIScriptError::errorFlag, aDownloadStatus);
+     }

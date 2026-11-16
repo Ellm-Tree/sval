@@ -1,0 +1,275 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Quick Peek (`SvalQuickPeek`): the Quick Peek tab's own panel, drawn as a card over the
+ * dimmed content area, with its bar above the page. The values are the Peek
+ * design's (F1–F4), in the header's palette from `sval-header.css`.
+ *
+ * The panel stays where tabbrowser put it, so its browser keeps its page; it
+ * is taken out of the deck's flow and shown, as Firefox shows a split's
+ * panels (`tabpanels > .split-view-panel-active` in `xul.css`).
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+#tabbrowser-tabpanels[sval-quick-peek] {
+  /* The dim covers the content area only; a click on it closes the Quick Peek. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: light-dark(rgba(6, 10, 46, 0.36), rgba(3, 5, 26, 0.58));
+  }
+
+  > .sval-quick-peek-panel {
+    -moz-subtree-hidden-only-visually: 0;
+    visibility: inherit;
+    position: absolute;
+    z-index: 11;
+    top: 24px;
+    bottom: 24px;
+    /* Centred at min(88%, 1200px) wide. */
+    inset-inline: max(6%, calc((100% - 1200px) / 2));
+    width: auto;
+    max-width: none;
+    margin: 0;
+    box-sizing: border-box;
+    flex-direction: column;
+    border-radius: 12px;
+    overflow: clip;
+    background: var(--toolbar-background-color);
+    border: 1px solid light-dark(rgb(var(--sval-palette-wash-light) / 0.18), rgb(var(--sval-palette-wash-dark) / 0.16));
+    box-shadow: var(--sval-popup-shadow);
+    color: var(--toolbar-text-color);
+    font: 13px var(--sval-font);
+
+    > .browserContainer {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      margin: 0 6px 6px;
+      border: 0;
+      border-radius: 8px;
+      overflow: clip;
+      outline: none;
+      box-shadow: none;
+
+      /* The page's edge, over the page so the page cannot paint over it. */
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        border-radius: inherit;
+        box-shadow: inset 0 0 0 1px var(--sval-pane-edge);
+        pointer-events: none;
+      }
+    }
+  }
+}
+
+.sval-quick-peek-bar {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 6px;
+
+  > button {
+    display: flex;
+    flex: none;
+    align-items: center;
+    height: 32px;
+    box-sizing: border-box;
+    margin: 0;
+    border-radius: 999px;
+    font: 600 13px var(--sval-font);
+    color: inherit;
+    cursor: default;
+
+    &:focus-visible {
+      outline: 2px solid var(--sval-focus);
+      outline-offset: 1px;
+    }
+  }
+}
+
+/* "From Gmail" (pins spec §12.6): a label at the start of the bar. */
+.sval-quick-peek-from {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 12px 0 8px;
+  border-radius: 999px;
+  background: var(--sval-wash);
+  white-space: nowrap;
+
+  > .sval-quick-peek-from-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  > .sval-quick-peek-from-word {
+    color: var(--sval-muted);
+  }
+
+  > .sval-quick-peek-from-name {
+    font-weight: 600;
+  }
+}
+
+/* Text with no field around it: the Quick Peek shows its page's address and
+   offers no way to enter another (Quick Peek spec §5). */
+.sval-quick-peek-address {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-inline: 6px 0;
+}
+
+/* The shield draws each look in the header's way (header signals spec §1):
+   its glyph in the icon's ink, a connection's tone aside. */
+.sval-quick-peek-shield {
+  margin-inline-end: 2px;
+  color: var(--sval-prot-icon);
+
+  &[hidden] {
+    display: none;
+  }
+
+  &[data-tone="http"] {
+    color: var(--sval-prot-http);
+  }
+
+  &[data-tone="exc"] {
+    color: var(--sval-prot-exc);
+  }
+
+  &[data-tone="err"] {
+    color: var(--sval-prot-err);
+  }
+}
+
+.sval-quick-peek-url {
+  display: flex;
+  align-items: baseline;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* The host keeps its end in view as the address bar's does
+   (`.sval-urlbar-host` in sval-header.css), and the rest of the address
+   gives up its room first. */
+.sval-quick-peek-host {
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  font-weight: 600;
+}
+
+.sval-quick-peek-rest {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--sval-muted);
+}
+
+.sval-quick-peek-split {
+  gap: 6px;
+  padding: 0 14px 0 10px;
+  border: 1px solid var(--sval-pill-border);
+  background: transparent;
+
+  &:not([aria-disabled]):hover {
+    background: var(--sval-wash);
+  }
+
+  &[aria-disabled] {
+    opacity: 0.45;
+  }
+}
+
+/* The header's icons draw in `context-fill`, so they are painted as images
+   in the button's colour rather than used as masks. */
+.sval-quick-peek-split-icon,
+.sval-quick-peek-copy-icon,
+.sval-quick-peek-close-icon {
+  background: center / contain no-repeat;
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+}
+
+.sval-quick-peek-split-icon {
+  width: 15px;
+  height: 15px;
+  background-image: url("chrome://browser/content/sval/header-icons/split.svg");
+}
+
+.sval-quick-peek-bar > .sval-quick-peek-tab {
+  padding: 0 16px;
+  border: 0;
+  background: var(--sval-action);
+  color: #ffffff;
+
+  &:hover {
+    background: var(--sval-palette-blue-400);
+  }
+}
+
+/* Beside the address, with the bar's other buttons at its end. */
+.sval-quick-peek-bar > .sval-quick-peek-copy {
+  margin-inline-end: auto;
+}
+
+.sval-quick-peek-copy,
+.sval-quick-peek-close {
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+
+  &:hover {
+    background: var(--sval-wash);
+  }
+}
+
+.sval-quick-peek-copy-icon {
+  width: 15px;
+  height: 15px;
+  background-image: url("chrome://browser/content/sval/icons/copy.svg");
+}
+
+.sval-quick-peek-close-icon {
+  width: 16px;
+  height: 16px;
+  background-image: url("chrome://browser/content/sval/icons/x.svg");
+}
+
+/* The loading line (`sval-header.css`) along the bar's foot. */
+.sval-quick-peek-bar > .sval-quick-peek-loading {
+  bottom: 0;
+  inset-inline: 12px;
+}
+
+@media (forced-colors) {
+  #tabbrowser-tabpanels[sval-quick-peek] > .sval-quick-peek-panel {
+    border-color: CanvasText;
+  }
+
+  .sval-quick-peek-bar > button {
+    border: 1px solid ButtonText;
+  }
+}

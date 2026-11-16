@@ -1,0 +1,48 @@
+Sval: offer the FFDHE groups only when an FFDHE cipher suite is on
+
+Backport of Mozilla's Bug 1992340 (mozilla-central 7ff6b346b7e3, Firefox
+156). ESR 153 does not carry it. Upstream appends to a list of groups;
+ESR builds two fixed arrays, so the backport leaves off their last two
+entries, ffdhe2048 and ffdhe3072, while both DHE cipher suite prefs are
+off, as they are by default. ESR's supported_groups then match release
+Firefox's ClientHello.
+Drop this patch when the upstream pin reaches Firefox 156.
+
+diff --git a/security/manager/ssl/nsNSSIOLayer.cpp b/security/manager/ssl/nsNSSIOLayer.cpp
+index 46de961b37..f25e6b7ddd 100644
+--- a/security/manager/ssl/nsNSSIOLayer.cpp
++++ b/security/manager/ssl/nsNSSIOLayer.cpp
+@@ -1584,6 +1584,13 @@ static nsresult nsSSLIOLayerSetOptions(PRFileDesc* fd, bool forSTARTTLS,
+   // nsNSSCallbacks.cpp when changing the lists here.
+   unsigned int additional_shares =
+       StaticPrefs::security_tls_client_hello_send_p256_keyshare();
++  // Only include named FFDHE shares if ciphersuites that can use FFDHE are
++  // enabled. They are the last two entries of both lists below.
++  const size_t ffdheSkipped =
++      StaticPrefs::security_ssl3_dhe_rsa_aes_128_sha() ||
++              StaticPrefs::security_ssl3_dhe_rsa_aes_256_sha()
++          ? 0
++          : 2;
+   if (StaticPrefs::security_tls_enable_kyber() &&
+       range.max >= SSL_LIBRARY_VERSION_TLS_1_3) {
+     const SSLNamedGroup namedGroups[] = {
+@@ -1591,7 +1598,8 @@ static nsresult nsSSLIOLayerSetOptions(PRFileDesc* fd, bool forSTARTTLS,
+         ssl_grp_ec_secp384r1,       ssl_grp_ec_secp521r1,  ssl_grp_ffdhe_2048,
+         ssl_grp_ffdhe_3072};
+     if (SECSuccess !=
+-        SSL_NamedGroupConfig(fd, namedGroups, std::size(namedGroups))) {
++        SSL_NamedGroupConfig(fd, namedGroups,
++                             std::size(namedGroups) - ffdheSkipped)) {
+       return NS_ERROR_FAILURE;
+     }
+     additional_shares += 1;
+@@ -1601,7 +1609,8 @@ static nsresult nsSSLIOLayerSetOptions(PRFileDesc* fd, bool forSTARTTLS,
+         ssl_grp_ec_secp521r1,  ssl_grp_ffdhe_2048,   ssl_grp_ffdhe_3072};
+     // Skip the |ssl_grp_kem_mlkem768x25519| entry.
+     if (SECSuccess !=
+-        SSL_NamedGroupConfig(fd, namedGroups, std::size(namedGroups))) {
++        SSL_NamedGroupConfig(fd, namedGroups,
++                             std::size(namedGroups) - ffdheSkipped)) {
+       return NS_ERROR_FAILURE;
+     }
+   }

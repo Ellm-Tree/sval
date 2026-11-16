@@ -1,0 +1,94 @@
+Sval: Mozilla's FPP matrix tests skip private windows for granular entries
+
+fp-overrides-private-scope keeps the entries in the granular-overrides prefs
+out of private windows, because those prefs hold choices made in normal
+windows. browser_fpp_protections_matrix_2 to _4 expect such entries to apply
+in private windows too, so the private-window check of a case whose
+expectation comes from a granular entry is skipped. The rest of each case
+still runs.
+
+diff --git a/toolkit/components/resistfingerprinting/tests/browser/head-fpp-matrix.js b/toolkit/components/resistfingerprinting/tests/browser/head-fpp-matrix.js
+index b5c3b23acf..6bad072dc4 100644
+--- a/toolkit/components/resistfingerprinting/tests/browser/head-fpp-matrix.js
++++ b/toolkit/components/resistfingerprinting/tests/browser/head-fpp-matrix.js
+@@ -108,33 +108,55 @@ function generateTestCases(bfppIsGranular, fppIsGranular) {
+   const computeExpectedResults = combination => {
+     let expectedNormalBrowsing = false;
+     let expectedPrivateBrowsing = false;
++    // Sval keeps the granular-overrides prefs out of private windows
++    // in this tree, so a private expectation that comes from one is skipped.
++    let privateFromGranular = false;
+ 
+     // If FPP is enabled, it overrides everything.
+     if (combination[FPP_ENABLED_I]) {
+       expectedNormalBrowsing = combination[FPP_OVERRIDES_ENABLED_I];
+       expectedPrivateBrowsing = combination[FPP_OVERRIDES_ENABLED_I];
+-      return { expectedNormalBrowsing, expectedPrivateBrowsing };
++      privateFromGranular = fppIsGranular;
++      return {
++        expectedNormalBrowsing,
++        expectedPrivateBrowsing,
++        privateFromGranular,
++      };
+     }
+ 
+     // If FPP_PBM is enabled, it overrides bFPP in private browsing.
+     if (combination[FPP_PBM_ENABLED_I]) {
+       expectedPrivateBrowsing = combination[FPP_OVERRIDES_ENABLED_I];
++      privateFromGranular = fppIsGranular;
+       if (combination[BFPP_ENABLED_I]) {
+         expectedNormalBrowsing = combination[BFPP_OVERRIDES_ENABLED_I];
+       } else {
+         expectedNormalBrowsing = false;
+       }
+-      return { expectedNormalBrowsing, expectedPrivateBrowsing };
++      return {
++        expectedNormalBrowsing,
++        expectedPrivateBrowsing,
++        privateFromGranular,
++      };
+     }
+ 
+     // Both FPP and FPP_PBM are disabled.
+     if (combination[BFPP_ENABLED_I]) {
+       expectedNormalBrowsing = combination[BFPP_OVERRIDES_ENABLED_I];
+       expectedPrivateBrowsing = combination[BFPP_OVERRIDES_ENABLED_I];
+-      return { expectedNormalBrowsing, expectedPrivateBrowsing };
++      privateFromGranular = bfppIsGranular;
++      return {
++        expectedNormalBrowsing,
++        expectedPrivateBrowsing,
++        privateFromGranular,
++      };
+     }
+ 
+-    return { expectedNormalBrowsing, expectedPrivateBrowsing };
++    return {
++      expectedNormalBrowsing,
++      expectedPrivateBrowsing,
++      privateFromGranular,
++    };
+   };
+   for (const combination of combinations) {
+     const prefs = combination.map(
+@@ -145,6 +167,7 @@ function generateTestCases(bfppIsGranular, fppIsGranular) {
+       description: `BFPP: ${combination[BFPP_ENABLED_I]}, FPP: ${combination[FPP_ENABLED_I]}, FPP_PBM: ${combination[FPP_PBM_ENABLED_I]}, BFPP_OVERRIDES: ${combination[BFPP_OVERRIDES_ENABLED_I]}, FPP_OVERRIDES: ${combination[FPP_OVERRIDES_ENABLED_I]}, bfppIsGranular: ${bfppIsGranular}, fppIsGranular: ${fppIsGranular}`,
+       expectedNormalBrowsing: expectedVals.expectedNormalBrowsing,
+       expectedPrivateBrowsing: expectedVals.expectedPrivateBrowsing,
++      privateFromGranular: expectedVals.privateFromGranular,
+       prefs,
+     });
+   }
+@@ -162,6 +185,12 @@ async function runTestCase(
+   });
+ 
+   for (const isPBM of [false, true]) {
++    if (isPBM && testCase.privateFromGranular) {
++      info(
++        `${index}: private browsing skipped in sval. ${testCase.description}`
++      );
++      continue;
++    }
+     const win = isPBM ? privateBrowsingWindow : normalBrowsingWindow;
+     const expectedValue = isPBM
+       ? testCase.expectedPrivateBrowsing

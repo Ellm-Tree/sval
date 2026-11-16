@@ -1,0 +1,54 @@
+Sval: Accel+Shift+C copies the page's address
+
+Sval gives Accel+Shift+C to Copy Address (`SvalShortcuts.sys.mjs`). On macOS
+the Inspector keeps Cmd+Opt+C and loses its extra Cmd+Shift+C. On Windows and
+Linux Ctrl+Shift+C is the Inspector's only key, and Ctrl+Shift+I still opens
+the toolbox on the Inspector.
+
+diff --git a/devtools/startup/DevToolsStartup.sys.mjs b/devtools/startup/DevToolsStartup.sys.mjs
+index ab008a13b4..a5d5b1e065 100644
+--- a/devtools/startup/DevToolsStartup.sys.mjs
++++ b/devtools/startup/DevToolsStartup.sys.mjs
+@@ -134,12 +134,18 @@ ChromeUtils.defineLazyGetter(lazy, "KeyShortcuts", function () {
+     // The following keys are also registered in /client/definitions.js
+     // and should be synced.
+ 
+-    // Key for opening the Inspector
+-    {
+-      toolId: "inspector",
+-      shortcut: getLocalizedKeyShortcut("devtools-commandkey-inspector"),
+-      modifiers,
+-    },
++    // Sval: Accel+Shift+C is Copy Address, so the Inspector keeps its key
++    // only where that is Accel+Alt+C.
++    ...(isMac
++      ? [
++          // Key for opening the Inspector
++          {
++            toolId: "inspector",
++            shortcut: getLocalizedKeyShortcut("devtools-commandkey-inspector"),
++            modifiers,
++          },
++        ]
++      : []),
+     // Key for opening the Web Console
+     {
+       toolId: "webconsole",
+@@ -192,17 +198,6 @@ ChromeUtils.defineLazyGetter(lazy, "KeyShortcuts", function () {
+     },
+   ];
+ 
+-  if (isMac) {
+-    // Add the extra key command for macOS, so you can open the inspector with cmd+shift+C
+-    // like on Chrome DevTools.
+-    shortcuts.push({
+-      id: "inspectorMac",
+-      toolId: "inspector",
+-      shortcut: getLocalizedKeyShortcut("devtools-commandkey-inspector"),
+-      modifiers: "accel,shift",
+-    });
+-  }
+-
+   if (lazy.ProfilerMenuButton.isInNavbar()) {
+     shortcuts.push(...getProfilerKeyShortcuts());
+   }

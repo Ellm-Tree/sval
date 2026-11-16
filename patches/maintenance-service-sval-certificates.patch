@@ -1,0 +1,74 @@
+Sval: the maintenance service trusts Sval's Authenticode certificates
+
+The maintenance service runs only an updater whose signer and issuing CA
+match an entry the installer wrote to the registry. Sval is signed as
+Ellm Tree, Inc. through Azure Artifact Signing, whose certificates come
+from one of several Microsoft ID Verified CAs that Microsoft rotates, so
+the installer writes one entry per CA. The service enumerates every entry
+(DoesBinaryMatchAllowedCertificates).
+
+diff --git a/browser/installer/windows/nsis/defines.nsi.in b/browser/installer/windows/nsis/defines.nsi.in
+index a9bf2d6..b87625f 100644
+--- a/browser/installer/windows/nsis/defines.nsi.in
++++ b/browser/installer/windows/nsis/defines.nsi.in
+@@ -53,12 +53,19 @@
+ ; private_browsing.exe (as opposed to @MOZ_APP_NAME@.exe)
+ !define IDI_PBICON_PB_EXE_ZERO_BASED "0"
+ 
+-!define CERTIFICATE_NAME            "Mozilla Corporation"
+-!define CERTIFICATE_ISSUER          "DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1"
+-; Changing the name or issuer requires us to have both the old and the new
+-;  in the registry at the same time, temporarily.
+-!define CERTIFICATE_NAME_PREVIOUS   "Mozilla Corporation"
+-!define CERTIFICATE_ISSUER_PREVIOUS "DigiCert SHA2 Assured ID Code Signing CA"
++!define CERTIFICATE_NAME            "Ellm Tree, Inc."
++; Azure Artifact Signing issues Sval's short-lived certificates from whichever
++; of Microsoft's ID Verified code-signing CAs is current, and Microsoft
++; rotates them. The maintenance service accepts an updater signed by any CA
++; listed here; the release fails when the CA that signed it is not listed.
++!define CERTIFICATE_ISSUER_0        "Microsoft ID Verified CS EOC CA 01"
++!define CERTIFICATE_ISSUER_1        "Microsoft ID Verified CS EOC CA 02"
++!define CERTIFICATE_ISSUER_2        "Microsoft ID Verified CS EOC CA 03"
++!define CERTIFICATE_ISSUER_3        "Microsoft ID Verified CS EOC CA 04"
++!define CERTIFICATE_ISSUER_4        "Microsoft ID Verified CS AOC CA 01"
++!define CERTIFICATE_ISSUER_5        "Microsoft ID Verified CS AOC CA 02"
++!define CERTIFICATE_ISSUER_6        "Microsoft ID Verified CS AOC CA 03"
++!define CERTIFICATE_ISSUER_7        "Microsoft ID Verified CS AOC CA 04"
+ 
+ # LSP_CATEGORIES is the permitted LSP categories for the application. Each LSP
+ # category value is ANDed together to set multiple permitted categories.
+diff --git a/browser/installer/windows/nsis/shared.nsh b/browser/installer/windows/nsis/shared.nsh
+index b81c7ef..f0c04be 100755
+--- a/browser/installer/windows/nsis/shared.nsh
++++ b/browser/installer/windows/nsis/shared.nsh
+@@ -900,14 +900,23 @@ FunctionEnd
+     WriteRegDWORD HKLM "Software\Mozilla\MaintenanceService" "Attempted" 1
+ 
+     ; These values associate the allowed certificates for the current
+-    ; installation.
++    ; installation, one per issuing CA in defines.nsi.
+     WriteRegStr HKLM "$R0\0" "name" "${CERTIFICATE_NAME}"
+-    WriteRegStr HKLM "$R0\0" "issuer" "${CERTIFICATE_ISSUER}"
+-    ; These values associate the allowed certificates for the previous
+-    ;  installation, so that we can update from it cleanly using the
+-    ;  old updater.exe (which will still have this signature).
+-    WriteRegStr HKLM "$R0\1" "name" "${CERTIFICATE_NAME_PREVIOUS}"
+-    WriteRegStr HKLM "$R0\1" "issuer" "${CERTIFICATE_ISSUER_PREVIOUS}"
++    WriteRegStr HKLM "$R0\0" "issuer" "${CERTIFICATE_ISSUER_0}"
++    WriteRegStr HKLM "$R0\1" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\1" "issuer" "${CERTIFICATE_ISSUER_1}"
++    WriteRegStr HKLM "$R0\2" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\2" "issuer" "${CERTIFICATE_ISSUER_2}"
++    WriteRegStr HKLM "$R0\3" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\3" "issuer" "${CERTIFICATE_ISSUER_3}"
++    WriteRegStr HKLM "$R0\4" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\4" "issuer" "${CERTIFICATE_ISSUER_4}"
++    WriteRegStr HKLM "$R0\5" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\5" "issuer" "${CERTIFICATE_ISSUER_5}"
++    WriteRegStr HKLM "$R0\6" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\6" "issuer" "${CERTIFICATE_ISSUER_6}"
++    WriteRegStr HKLM "$R0\7" "name" "${CERTIFICATE_NAME}"
++    WriteRegStr HKLM "$R0\7" "issuer" "${CERTIFICATE_ISSUER_7}"
+     ${If} ${RunningX64}
+     ${OrIf} ${IsNativeARM64}
+       SetRegView lastused

@@ -1,0 +1,81 @@
+Sval: media devices the page hasn't been granted keep a constant list
+
+A new RFPTarget, MediaDevicesBeforePermission, gives enumerateDevices
+RFPTarget::MediaDevices' shape (one device, faked where the machine has
+none) for each input kind whose info the page can't see, as
+MediaDevices::CanExposeInfo answers it.
+A camera grant shows the real cameras and nothing about microphones; a
+microphone grant shows the real microphones and nothing about cameras.
+Speakers keep Gecko's own rules, which follow the microphone grant. It
+reuses MediaDevices' code in MediaDevices::FilterExposedDevices; the rest of
+the MediaDevices target (unpersisted device ids, reduced constraints,
+"Always Ask" read as prompt) stays with that target, because after a grant
+the user has consented to that kind's real list.
+
+No chrome API can change what enumerateDevices reports.
+
+diff --git a/dom/media/MediaDevices.cpp b/dom/media/MediaDevices.cpp
+index 5c4939eca5..3c3f2c97b5 100644
+--- a/dom/media/MediaDevices.cpp
++++ b/dom/media/MediaDevices.cpp
+@@ -343,14 +343,23 @@ RefPtr<MediaDeviceSetRefCnt> MediaDevices::FilterExposedDevices(
+     exposed->AppendElement(device);
+   }
+ 
+-  if (doc->ShouldResistFingerprinting(RFPTarget::MediaDevices)) {
++  // MediaDevicesBeforePermission gives the same shape to each kind whose info
++  // the page can't see yet; a granted kind, and the speakers that follow the
++  // microphone grant, keep the list Gecko exposes.
++  const bool shapeAll =
++      doc->ShouldResistFingerprinting(RFPTarget::MediaDevices);
++  const auto shaped = [&](MediaDeviceKind aKind) {
++    return shapeAll || !CanExposeInfo(aKind);
++  };
++  if (shapeAll || doc->ShouldResistFingerprinting(
++                      RFPTarget::MediaDevicesBeforePermission)) {
+     // We expose a single device of each kind.
+     // Legacy mode also achieves the same thing, except for speakers.
+     nsTHashSet<MediaDeviceKind> seenKinds;
+ 
+     for (uint32_t i = 0; i < exposed->Length(); i++) {
+       RefPtr<mozilla::MediaDevice> device = exposed->ElementAt(i);
+-      if (seenKinds.Contains(device->mKind)) {
++      if (seenKinds.Contains(device->mKind) && shaped(device->mKind)) {
+         exposed->RemoveElementAt(i);
+         i--;
+         continue;
+@@ -367,20 +376,30 @@ RefPtr<MediaDeviceSetRefCnt> MediaDevices::FilterExposedDevices(
+       // The order in which we insert the fake devices is important.
+       // Microphone is inserted first, then camera, then speaker.
+       // If we haven't seen a microphone, insert a fake one.
+-      if (!seenKinds.Contains(MediaDeviceKind::Audioinput)) {
++      if (!seenKinds.Contains(MediaDeviceKind::Audioinput) &&
++          shaped(MediaDeviceKind::Audioinput)) {
+         fakeEngine->EnumerateDevices(MediaSourceEnum::Microphone,
+                                      MediaSinkEnum::Other, fakeDevices);
+         exposed->InsertElementAt(0, fakeDevices->LastElement());
+       }
+       // If we haven't seen a camera, insert a fake one.
+-      if (!seenKinds.Contains(MediaDeviceKind::Videoinput)) {
++      if (!seenKinds.Contains(MediaDeviceKind::Videoinput) &&
++          shaped(MediaDeviceKind::Videoinput)) {
+         fakeEngine->EnumerateDevices(MediaSourceEnum::Camera,
+                                      MediaSinkEnum::Other, fakeDevices);
+-        exposed->InsertElementAt(1, fakeDevices->LastElement());
++        // The camera goes after the microphones, of which a granted page may
++        // see several.
++        size_t cameraIndex = 0;
++        while (cameraIndex < exposed->Length() &&
++               exposed->ElementAt(cameraIndex)->mKind ==
++                   MediaDeviceKind::Audioinput) {
++          cameraIndex++;
++        }
++        exposed->InsertElementAt(cameraIndex, fakeDevices->LastElement());
+       }
+       // If we haven't seen a speaker, insert a fake one.
+       if (!seenKinds.Contains(MediaDeviceKind::Audiooutput) &&
+-          mCanExposeMicrophoneInfo) {
++          mCanExposeMicrophoneInfo && shaped(MediaDeviceKind::Audiooutput)) {
+         RefPtr info = new AudioDeviceInfo(
+             nullptr, u""_ns, u""_ns, u""_ns, CUBEB_DEVICE_TYPE_OUTPUT,
+             CUBEB_DEVICE_STATE_ENABLED, CUBEB_DEVICE_PREF_ALL,

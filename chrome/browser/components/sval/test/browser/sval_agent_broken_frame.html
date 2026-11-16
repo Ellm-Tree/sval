@@ -1,0 +1,18 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Broken frame</title>
+  </head>
+  <body>
+    <p>The page loads; its frame does not.</p>
+    <!-- Firefox refuses to connect to port 1 (gBadPortList), so the frame
+     - shows an error page. The image answers late, so the frame fails while
+     - the page still loads. -->
+    <iframe src="https://example.com:1/"></iframe>
+    <img src="sval_agent_slow.sjs" alt="" />
+  </body>
+</html>

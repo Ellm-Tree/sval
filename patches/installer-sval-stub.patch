@@ -1,0 +1,25 @@
+Sval: the full installer's outer executable comes from Sval's branding
+
+The full installer is a 7-Zip self-extracting stub with the installer
+appended. Mozilla's prebuilt stubs in other-licenses/7zstub/firefox carry
+Firefox's setup.ico and name Mozilla and Firefox in their version block, and
+Windows shows both for the downloaded file. scripts/generate-branding.sh
+writes the same stubs with Sval's icon and names into the branding
+directory, and SFX_MODULE takes them from there.
+
+diff --git a/browser/installer/windows/Makefile.in b/browser/installer/windows/Makefile.in
+index 2c2d8e0b8c..40ed8f6ac8 100644
+--- a/browser/installer/windows/Makefile.in
++++ b/browser/installer/windows/Makefile.in
+@@ -6,9 +6,9 @@ include $(topsrcdir)/toolkit/mozapps/installer/package-name.mk
+ 
+ CONFIG_DIR = instgen
+ ifeq ($(TARGET_CPU), aarch64)
+-SFX_MODULE = $(topsrcdir)/other-licenses/7zstub/firefox/7zSD.ARM64.sfx
++SFX_MODULE = $(topsrcdir)/$(MOZ_BRANDING_DIRECTORY)/7zSD.ARM64.sfx
+ else
+-SFX_MODULE = $(topsrcdir)/other-licenses/7zstub/firefox/7zSD.Win32.sfx
++SFX_MODULE = $(topsrcdir)/$(MOZ_BRANDING_DIRECTORY)/7zSD.Win32.sfx
+ endif
+ 
+ INSTALLER_FILES = \

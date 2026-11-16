@@ -1,0 +1,27 @@
+Sval: a restored tab validates its page with the server
+
+SessionStore restores a tab's page through nsSHistory::ReloadCurrentEntry,
+which loads it as a history load. nsDocShellLoadState::CalculateChannelLoadFlags
+gives a history load VALIDATE_NEVER, so a tab brought back with the session
+shows the copy the cache kept from the last one, however old, until the user
+reloads it. Loading it as a reload asks the server whether the page changed,
+as reloading the tab does. Session store keeps no POST data, so the reload's
+resend prompt cannot show.
+
+diff --git a/docshell/shistory/nsSHistory.cpp b/docshell/shistory/nsSHistory.cpp
+index 1a7c5580b8..6c465a8ffb 100644
+--- a/docshell/shistory/nsSHistory.cpp
++++ b/docshell/shistory/nsSHistory.cpp
+@@ -1806,8 +1806,10 @@ nsresult nsSHistory::ReloadCurrentEntry(
+   // Notify listeners
+   NotifyListeners(mListeners, [](auto l) { l->OnHistoryGotoIndex(); });
+ 
+-  return LoadEntry(/* aSourceBrowsingContext */ nullptr, mIndex, LOAD_HISTORY,
+-                   HIST_CMD_RELOAD, aLoadResults,
++  // A reload's load type, so the restored page is validated with the server.
++  // A history load takes a cached copy without asking.
++  return LoadEntry(/* aSourceBrowsingContext */ nullptr, mIndex,
++                   LOAD_RELOAD_NORMAL, HIST_CMD_RELOAD, aLoadResults,
+                    /* aSameEpoch */ false, /* aLoadCurrentEntry */ true,
+                    /* aUserActivation */ false);
+ }

@@ -1,0 +1,99 @@
+Sval: a page in an agent's tab opens its tabs, and saves its PDFs, as the agent's
+
+A tab a page in an agent's tab asks for, by target=_blank or window.open, and
+one the user opens from a link there, by a middle or modified click or the
+context menu, open in the background of the agent's own window, whichever
+window the page is in. PDF.js's Save in an agent's tab is the agent's
+download. BrowserDOMWindow.createContentWindowInFrame,
+URILoadingHelper.openLinkIn and PdfjsParent._saveURL ask SvalAgentRouting
+first, which answers for the agents an open gate holds, and go on as Firefox
+does for every other tab.
+
+Firefox opens a page's new tab in the opener's window, selected, and from a
+popup in the frontmost full window; PdfjsParent saves with no browsing
+context on its transfer, so the download guard cannot tell whose save it is.
+No chrome API changes where a tab opens or decides that save.
+
+diff --git a/browser/modules/BrowserDOMWindow.sys.mjs b/browser/modules/BrowserDOMWindow.sys.mjs
+index f31e9f4cca..35df3819d7 100644
+--- a/browser/modules/BrowserDOMWindow.sys.mjs
++++ b/browser/modules/BrowserDOMWindow.sys.mjs
+@@ -11,6 +11,8 @@ let lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
++  SvalAgentRouting:
++    "moz-src:///browser/components/sval/SvalAgentRouting.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   TaskbarTabsUtils: "resource:///modules/taskbartabs/TaskbarTabsUtils.sys.mjs",
+   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+@@ -440,6 +442,18 @@ export class BrowserDOMWindow {
+    * @type {nsIBrowserDOMWindow["createContentWindowInFrame"]}
+    */
+   createContentWindowInFrame(aURI, aParams, aWhere, aFlags, aName) {
++    // Sval: a tab an agent's page asks for opens in the agent's window.
++    const svalRouted = lazy.SvalAgentRouting.routeNewTab(
++      this,
++      aURI,
++      aParams,
++      aWhere,
++      aFlags,
++      aName
++    );
++    if (svalRouted !== undefined) {
++      return svalRouted;
++    }
+     // Passing a null-URI to only create the content window,
+     // and pass true for aSkipLoad to prevent loading of
+     // about:blank
+diff --git a/browser/modules/URILoadingHelper.sys.mjs b/browser/modules/URILoadingHelper.sys.mjs
+index 9670928736..61cba13056 100644
+--- a/browser/modules/URILoadingHelper.sys.mjs
++++ b/browser/modules/URILoadingHelper.sys.mjs
+@@ -11,6 +11,8 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
++  SvalAgentRouting:
++    "moz-src:///browser/components/sval/SvalAgentRouting.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+ });
+ 
+@@ -467,6 +469,11 @@ export const URILoadingHelper = {
+     if (!where || !url) {
+       return;
+     }
++    // Sval: a tab opened from a link in an agent's page opens in the
++    // agent's window.
++    if (lazy.SvalAgentRouting.routeLinkOpen(window, url, where, params)) {
++      return;
++    }
+ 
+     let {
+       allowThirdPartyFixup,
+diff --git a/toolkit/components/pdfjs/content/PdfjsParent.sys.mjs b/toolkit/components/pdfjs/content/PdfjsParent.sys.mjs
+index a4cb73ec13..867a89f7ea 100644
+--- a/toolkit/components/pdfjs/content/PdfjsParent.sys.mjs
++++ b/toolkit/components/pdfjs/content/PdfjsParent.sys.mjs
+@@ -20,6 +20,10 @@ import { playSound } from "resource://gre/modules/FinderSound.sys.mjs";
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
++  SvalAgentRouting:
++    // Sval ships only the desktop browser, so toolkit may reach into it here.
++    // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++    "moz-src:///browser/components/sval/SvalAgentRouting.sys.mjs",
+   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
+   createEngine: "chrome://global/content/ml/EngineProcess.sys.mjs",
+   IndexedDB: "resource://gre/modules/IndexedDB.sys.mjs",
+@@ -569,6 +573,10 @@ export class PdfjsParent extends JSWindowActorParent {
+   }
+ 
+   _saveURL(aMsg) {
++    // Sval: a save in an agent's tab is the agent's download.
++    if (lazy.SvalAgentRouting.takePdfSave(this, aMsg)) {
++      return;
++    }
+     const { blobUrl, originalUrl, filename } = aMsg.data;
+     this.browser.documentGlobal.saveURL(
+       blobUrl /* aURL */,

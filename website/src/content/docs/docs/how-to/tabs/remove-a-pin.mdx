@@ -1,0 +1,103 @@
+---
+title: Remove a pin
+description: Keep a pin's site as a Favorite, or delete the pin.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+<Until v="0.1.0-rc.10">
+
+A pin is a Favorite that shows in the pins row. Unpinning takes the pin out
+of the row, and you keep the Favorite. Deleting removes both the pin and the
+Favorite.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+Moving a pin to Favorites takes the pin out of the pins row and puts its
+site at the end of your Favorites. Deleting a pin removes it from the pins
+row.
+
+</Since>
+
+You pinned a Codeberg project for a week of work on it, and the work is
+done.
+
+<Screenshot name="docs-pin-menu" frame="rounded" maxWidth={400} alt="The Roon pin's menu, with Unpin and Delete at the bottom" />
+
+## Keep it as a Favorite
+
+<Until v="0.1.0-rc.10">
+
+1. In the pins row, right-click the pin, then choose **Unpin**.
+
+The pin leaves the row and goes back to its place in your Favorites. If the
+pin's page was open, the page becomes a tab at the top of the list of tabs.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+1. In the pins row, right-click the pin, then choose **Move to Favorites**.
+
+The pin leaves the row and goes to the end of your Favorites. If the pin's
+page was open, the page becomes a tab at the top of the list of tabs.
+
+</Since>
+
+## Delete it
+
+1. In the pins row, right-click the pin, then choose **Delete**.
+
+The pin leaves the row, and its page closes. A message at the bottom of the
+Workspace panel offers **Undo** for 8 seconds.
+
+<Until v="0.1.0-rc.10">
+
+Once the message goes, Sval deletes the Favorite.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+Deleting a pin never deletes a Favorite with the same address.
+
+</Since>
+
+## Details
+
+<Until v="0.1.0-rc.10">
+
+- Unpin and Delete act on a pin in every Workspace and on your other
+  devices.
+- On a pinned folder, Unpin unpins the folder and everything in it. Delete
+  deletes the folder and everything in it.
+- A pin inside a pinned folder has no Unpin of its own. Delete removes that
+  pin from the folder.
+- To take back an Unpin, select Undo at the top of the Favorites menu.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- Move to Favorites and Delete act on a pin in every Workspace and on your
+  other devices.
+- While a pin is selected, the menu bar's Tab menu has
+  **Move Pin to Favorites** too.
+- When you move a pin to Favorites, Sval forgets which Workspaces showed
+  the pin. Undo puts back the Workspaces the pin showed in.
+- On a pin folder, Move to Favorites moves the pin folder and everything
+  in it. Delete deletes the pin folder and everything in it. To keep the
+  pins and lose the pin folder, choose **Move Contents to Row**.
+- A pin inside a pin folder has no Move to Favorites of its own. Delete
+  removes that pin from the pin folder.
+- To take back a Move to Favorites, select **Undo** in the message at the
+  bottom of the Workspace panel. The message stays for 8 seconds. The pin
+  goes back to its place in the row, and its open page becomes the pin's
+  page again.
+
+</Since>
+
+## Related pages
+
+- [Pin a site](/docs/how-to/tabs/pin-a-site/)
+- [Add a page to Favorites](/docs/how-to/tabs/add-a-page-to-favorites/)

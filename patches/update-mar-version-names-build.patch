@@ -1,0 +1,68 @@
+Sval: a MAR's signed product version names its build
+
+Sval releases on one ESR share MOZ_APP_VERSION, which is all the updater
+compares with the product version in a MAR's signed product information, so
+whoever writes the update feed could serve an older signed MAR of the same
+ESR. mach repackage mar writes <version>.<YYYYMMDD>.<hhmmss> from the
+package's application.ini, and the updater compares the same form of its own
+version and build ID. The build ID is split because mozilla::CompareVersions
+reads each part into an int32.
+
+diff --git a/python/mozbuild/mozbuild/repackaging/mar.py b/python/mozbuild/mozbuild/repackaging/mar.py
+index caa9fd21db..2edd3b3a8b 100644
+--- a/python/mozbuild/mozbuild/repackaging/mar.py
++++ b/python/mozbuild/mozbuild/repackaging/mar.py
+@@ -62,7 +62,19 @@ def repackage_mar(topsrcdir, package, mar, output, arch=None, mar_channel_id=Non
+         )
+ 
+         env = os.environ.copy()
+-        env["MOZ_PRODUCT_VERSION"] = get_application_ini_value(tmpdir, "App", "Version")
++        # Sval: the product version the signature covers names the build as
++        # well, as <version>.<YYYYMMDD>.<hhmmss>, which the updater compares
++        # with its own. Each part fits the int32 that mozilla::CompareVersions
++        # reads it into.
++        version = get_application_ini_value(tmpdir, "App", "Version")
++        build_id = get_application_ini_value(tmpdir, "App", "BuildID")
++        if len(build_id) != 14 or not build_id.isdigit():
++            raise Exception("Unexpected BuildID %s in application.ini" % build_id)
++        env["MOZ_PRODUCT_VERSION"] = "%s.%s.%s" % (
++            version,
++            build_id[:8],
++            build_id[8:],
++        )
+         env["MAR"] = mozpath.normpath(mar)
+         if arch:
+             env["BCJ_OPTIONS"] = " ".join(_BCJ_OPTIONS[arch])
+diff --git a/toolkit/mozapps/update/updater/updater.cpp b/toolkit/mozapps/update/updater/updater.cpp
+index c4828dba39..2621b0e60d 100644
+--- a/toolkit/mozapps/update/updater/updater.cpp
++++ b/toolkit/mozapps/update/updater/updater.cpp
+@@ -63,7 +63,9 @@
+ #  include "updaterfileutils_osx.h"
+ #endif  // XP_MACOSX
+ 
++#include "buildid.h"
+ #include "mozilla/CmdLineAndEnvUtils.h"
++#include "mozilla/HelperMacros.h"
+ #include "mozilla/UniquePtr.h"
+ #include "mozilla/UniquePtrExtensions.h"
+ #ifdef XP_WIN
+@@ -3030,8 +3032,17 @@ static void UpdateThreadFunc(void* param) {
+     if (rv == OK) {
+       rv = PopulategMARStrings();
+       if (rv == OK) {
++        // Sval: releases on one ESR share MOZ_APP_VERSION, so the version
++        // compared names the build as well, as <version>.<YYYYMMDD>.<hhmmss>,
++        // the form the MAR's signed product version takes. Each part fits
++        // the int32 that mozilla::CompareVersions reads it into.
++        static const char kBuildID[] = MOZ_STRINGIFY(MOZ_BUILDID);
++        static_assert(sizeof(kBuildID) == 15, "a build ID has 14 digits");
++        char appVersion[sizeof(MOZ_APP_VERSION) + sizeof(kBuildID) + 1];
++        snprintf(appVersion, sizeof(appVersion), "%s.%.8s.%s", MOZ_APP_VERSION,
++                 kBuildID, kBuildID + 8);
+         rv = gArchiveReader.VerifyProductInformation(
+-            gMARStrings.MARChannelID.get(), MOZ_APP_VERSION);
++            gMARStrings.MARChannelID.get(), appVersion);
+       }
+     }
+ #endif

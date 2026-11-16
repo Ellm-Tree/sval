@@ -1,0 +1,28 @@
+Sval: mozcrash prints minidump-stackwalk's stack along with its stderr
+
+Backport of Mozilla's Bug 1933057 (mozilla-central 6e195b7fe78f, Firefox
+155). ESR 153 does not carry it. Its hunk is unchanged; its context differs
+only in the crash reason line, which ESR still formats with %.
+mozcrash.check_for_crashes printed the stackwalk's stdout only when it wrote
+nothing to stderr, so one benign warning from minidump-stackwalk dropped the
+crash's stack, as mozlog's formatters did (Bug 2065184).
+Drop this patch when the upstream pin reaches Firefox 155.
+
+diff --git a/testing/mozbase/mozcrash/mozcrash/mozcrash.py b/testing/mozbase/mozcrash/mozcrash/mozcrash.py
+index 934c7718ca..c08f220bca 100644
+--- a/testing/mozbase/mozcrash/mozcrash/mozcrash.py
++++ b/testing/mozbase/mozcrash/mozcrash/mozcrash.py
+@@ -138,11 +138,11 @@ def check_for_crashes(
+             stackwalk_output.append("Process pid: {}".format(info.pid or "unknown"))
+             if info.reason:
+                 stackwalk_output.append("Mozilla crash reason: %s" % info.reason)
++            if info.stackwalk_stdout is not None:
++                stackwalk_output.append(info.stackwalk_stdout)
+             if info.stackwalk_stderr:
+                 stackwalk_output.append("stderr from minidump-stackwalk:")
+                 stackwalk_output.append(info.stackwalk_stderr)
+-            elif info.stackwalk_stdout is not None:
+-                stackwalk_output.append(info.stackwalk_stdout)
+             if info.stackwalk_retcode is not None and info.stackwalk_retcode != 0:
+                 stackwalk_output.append(
+                     f"minidump-stackwalk exited with return code {info.stackwalk_retcode}"

@@ -1,0 +1,36 @@
+Sval: the update elevation window says what it asks for
+
+The window opens when the user can't write to the app bundle. It headed
+itself Update Ready to Install, called every update a security and
+stability update, and spent four sentences on administrator privileges
+and the choices its buttons already name. It says an administrator must
+approve the update and when macOS asks for the password.
+
+diff --git a/toolkit/locales/en-US/toolkit/updates/elevation.ftl b/toolkit/locales/en-US/toolkit/updates/elevation.ftl
+index 120848f63b..a9b9874184 100644
+--- a/toolkit/locales/en-US/toolkit/updates/elevation.ftl
++++ b/toolkit/locales/en-US/toolkit/updates/elevation.ftl
+@@ -7,19 +7,13 @@ elevation-update-wizard =
+   .title = Software Update
+ elevation-details-link-label =
+   .value = Details
+-elevation-error-manual =
+-  You can update { -brand-short-name } manually by visiting this link
+-  and downloading the latest version:
+-elevation-finished-page = Update Ready to Install
++elevation-error-manual = Or download the new version and install it yourself:
++elevation-finished-page = An administrator needs to approve this update
+ elevation-finished-background-page =
+-  A security and stability update for { -brand-short-name } has been
+-  downloaded and is ready to be installed.
++  { -brand-short-name } downloaded an update that your account can’t install without an administrator.
+ elevation-finished-background = Update:
+ elevation-more-elevated =
+-  This update requires administrator privileges. The update will be
+-  installed the next time { -brand-short-name } starts. You can restart
+-  { -brand-short-name } now, continue working and restart later, or decline this
+-  update.
++  When { -brand-short-name } restarts, macOS asks for an administrator’s name and password to install the update.
+ 
+ sandbox-missing-unprivileged-namespaces = Some of { -brand-short-name }’s security features may offer less protection on your current operating system.
+ sandbox-unprivileged-namespaces-dismiss-button =

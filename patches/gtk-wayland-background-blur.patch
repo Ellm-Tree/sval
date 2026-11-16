@@ -1,0 +1,260 @@
+Sval: a toplevel window on Wayland asks the compositor to blur what is behind it
+
+A see-through window shows what is behind it through a backdrop the system
+draws: the HUD material on macOS, Acrylic on Windows, asked for by the
+root's windowsmica attribute through nsIWidget::SetMicaBackdrop. On Linux
+the compositor offers blur through ext-background-effect-v1, which KDE
+Plasma 6.7 and GNOME 51 carry. The GTK widget binds it, a toplevel window
+asks for blur on its surface while windowsmica is set, and
+-moz-windows-mica reports whether the compositor blurs, so the chrome
+offers see-through only where it shows blurred.
+
+diff --git a/widget/gtk/WaylandSurface.cpp b/widget/gtk/WaylandSurface.cpp
+index 67baf3e26c..b4cf82df7a 100644
+--- a/widget/gtk/WaylandSurface.cpp
++++ b/widget/gtk/WaylandSurface.cpp
+@@ -116,6 +116,7 @@ WaylandSurface::~WaylandSurface() {
+   MozClearPointer(mFractionalScaleListener, wp_fractional_scale_v1_destroy);
+   MozClearPointer(mCoordinatesScaleManager, xx_fractional_scale_v2_destroy);
+   MozClearPointer(mViewport, wp_viewport_destroy);
++  MozClearPointer(mBackgroundEffect, ext_background_effect_surface_v1_destroy);
+   wl_egl_window* tmp = nullptr;
+   mEGLWindow.exchange(tmp);
+   MozClearPointer(tmp, wl_egl_window_destroy);
+@@ -660,6 +661,33 @@ bool WaylandSurface::DisableUserInputLocked(
+   return true;
+ }
+ 
++void WaylandSurface::SetBackgroundBlurLocked(
++    const WaylandSurfaceLock& aProofOfLock, bool aBlur) {
++  MOZ_DIAGNOSTIC_ASSERT(&aProofOfLock == mSurfaceLock);
++  auto* manager = WaylandDisplayGet()->GetBackgroundEffectManager();
++  if (!manager || (!aBlur && !mBackgroundEffect)) {
++    return;
++  }
++  LOGWAYLAND("WaylandSurface::SetBackgroundBlurLocked() %d", aBlur);
++  if (!mBackgroundEffect) {
++    mBackgroundEffect =
++        ext_background_effect_manager_v1_get_background_effect(manager,
++                                                               mSurface);
++  }
++  wl_region* region = nullptr;
++  if (aBlur) {
++    // The compositor clips the region to the surface, so one region covers
++    // the surface at every size.
++    region = wl_compositor_create_region(WaylandDisplayGet()->GetCompositor());
++    wl_region_add(region, 0, 0, INT32_MAX, INT32_MAX);
++  }
++  ext_background_effect_surface_v1_set_blur_region(mBackgroundEffect, region);
++  if (region) {
++    wl_region_destroy(region);
++  }
++  mSurfaceNeedsCommit = true;
++}
++
+ void WaylandSurface::SetOpaqueCallbackLocked(
+     const WaylandSurfaceLock& aProofOfLock) {
+   MOZ_DIAGNOSTIC_ASSERT(&aProofOfLock == mSurfaceLock);
+diff --git a/widget/gtk/WaylandSurface.h b/widget/gtk/WaylandSurface.h
+index 05b6924785..bc15122057 100644
+--- a/widget/gtk/WaylandSurface.h
++++ b/widget/gtk/WaylandSurface.h
+@@ -339,6 +339,11 @@ class WaylandSurface final {
+   void SetParentLocked(const WaylandSurfaceLock& aProofOfLock,
+                        RefPtr<WaylandSurface> aParent);
+ 
++  // Asks the compositor to blur what is behind the whole surface, or to stop.
++  // The request lasts as long as the wl_surface, across unmap and map.
++  void SetBackgroundBlurLocked(const WaylandSurfaceLock& aProofOfLock,
++                               bool aBlur);
++
+   bool EnableColorManagementLocked(const WaylandSurfaceLock& aProofOfLock,
+                                    mozilla::gfx::YUVColorSpace aColorSpace,
+                                    gfx::TransferFunction aTransferFunction);
+@@ -550,6 +555,8 @@ class WaylandSurface final {
+   std::function<void(DMABufFormats*)> mDMABufFormatRefreshCallback;
+   RefPtr<DMABufFormats> mFormats;
+ 
++  ext_background_effect_surface_v1* mBackgroundEffect = nullptr;
++
+   // HDR support
+   bool mHDRSet = false;
+   wp_color_management_surface_v1* mColorSurface = nullptr;
+diff --git a/widget/gtk/nsLookAndFeel.cpp b/widget/gtk/nsLookAndFeel.cpp
+index 3769d099ed..d3e76340be 100644
+--- a/widget/gtk/nsLookAndFeel.cpp
++++ b/widget/gtk/nsLookAndFeel.cpp
+@@ -41,6 +41,9 @@
+ #include "gfxFontConstants.h"
+ #include "WidgetUtils.h"
+ #include "nsWindow.h"
++#ifdef MOZ_WAYLAND
++#  include "nsWaylandDisplay.h"
++#endif
+ 
+ #include "mozilla/gfx/2D.h"
+ 
+@@ -1172,6 +1175,16 @@ nsresult nsLookAndFeel::NativeGetInt(IntID aID, int32_t& aResult) {
+       aResult = 1;
+       break;
+     }
++    // A toplevel window can show the compositor's blur of what is behind it
++    // (nsWindow::SetMicaBackdrop).
++    case IntID::WindowsMica:
++      aResult = false;
++#ifdef MOZ_WAYLAND
++      aResult = GdkIsWaylandDisplay() &&
++                WaylandDisplayGet()->HasBackgroundBlur() &&
++                nsWindow::IsToplevelWindowTransparent();
++#endif
++      break;
+     case IntID::PanelAnimations:
+       aResult = [&]() -> bool {
+         if (!sCSDAvailable) {
+diff --git a/widget/gtk/nsWaylandDisplay.cpp b/widget/gtk/nsWaylandDisplay.cpp
+index 2e90d2fb32..5beab39bac 100644
+--- a/widget/gtk/nsWaylandDisplay.cpp
++++ b/widget/gtk/nsWaylandDisplay.cpp
+@@ -8,6 +8,7 @@
+ #include "base/message_loop.h"    // for MessageLoop
+ #include "base/task.h"            // for NewRunnableMethod, etc
+ #include "mozilla/gfx/Logging.h"  // for gfxCriticalNote
++#include "mozilla/LookAndFeel.h"
+ #include "mozilla/StaticMutex.h"
+ #include "mozilla/StaticPtr.h"
+ #include "mozilla/StaticPrefs_widget.h"
+@@ -530,6 +531,16 @@ void nsWaylandDisplay::SetAppMenuManager(
+ 
+ void nsWaylandDisplay::SetFixes(wl_fixes* aFixes) { mFixes = aFixes; }
+ 
++void nsWaylandDisplay::SetBackgroundBlur(bool aBlur) {
++  if (mBackgroundBlur == aBlur) {
++    return;
++  }
++  mBackgroundBlur = aBlur;
++  // -moz-windows-mica reports it (nsLookAndFeel::NativeGetInt).
++  LookAndFeel::NotifyChangedAllWindows(
++      widget::ThemeChangeKind::MediaQueriesOnly);
++}
++
+ void nsWaylandDisplay::SetCMSupportedFeature(uint32_t aFeature) {
+   LOG("nsWaylandDisplay::SetCMSupportedFeature() [%d]", aFeature);
+   switch (aFeature) {
+@@ -885,6 +896,16 @@ static void global_registry_handler(void* data, wl_registry* registry,
+         WaylandRegistryBind<wp_color_representation_manager_v1>(
+             registry, id, &wp_color_representation_manager_v1_interface, 1);
+     display->SetColorRepresentationManager(colorRepresentationManager);
++  } else if (iface.EqualsLiteral("ext_background_effect_manager_v1")) {
++    auto* manager = WaylandRegistryBind<ext_background_effect_manager_v1>(
++        registry, id, &ext_background_effect_manager_v1_interface, 1);
++    static const struct ext_background_effect_manager_v1_listener listener = {
++        [](void* aData, ext_background_effect_manager_v1*, uint32_t aFlags) {
++          static_cast<nsWaylandDisplay*>(aData)->SetBackgroundBlur(
++              aFlags & EXT_BACKGROUND_EFFECT_MANAGER_V1_CAPABILITY_BLUR);
++        }};
++    ext_background_effect_manager_v1_add_listener(manager, &listener, display);
++    display->SetBackgroundEffectManager(manager);
+   } else if (iface.EqualsLiteral("xx_pip_shell_v1")) {
+     auto* pipShell = WaylandRegistryBind<xx_pip_shell_v1>(
+         registry, id, &xx_pip_shell_v1_interface, 1);
+@@ -942,6 +963,8 @@ nsWaylandDisplay::~nsWaylandDisplay() {
+   MozClearPointer(mColorManager, wp_color_manager_v1_destroy);
+   MozClearPointer(mColorRepresentationManager,
+                   wp_color_representation_manager_v1_destroy);
++  MozClearPointer(mBackgroundEffectManager,
++                  ext_background_effect_manager_v1_destroy);
+   MozClearPointer(mWaylandSession, xx_session_v1_destroy);
+   MozClearPointer(mSessionManager, xx_session_manager_v1_destroy);
+ }
+diff --git a/widget/gtk/nsWaylandDisplay.h b/widget/gtk/nsWaylandDisplay.h
+index 714f247ac6..fa57a7edf4 100644
+--- a/widget/gtk/nsWaylandDisplay.h
++++ b/widget/gtk/nsWaylandDisplay.h
+@@ -23,6 +23,7 @@
+ #include "mozilla/widget/xdg-output-unstable-v1-client-protocol.h"
+ #include "mozilla/widget/color-management-v1-client-protocol.h"
+ #include "mozilla/widget/color-representation-v1-client-protocol.h"
++#include "mozilla/widget/ext-background-effect-v1-client-protocol.h"
+ #include "mozilla/widget/xdg-shell-client-protocol.h"
+ #include "mozilla/widget/xx-fractional-scale-v2-client-protocol.h"
+ #include "mozilla/widget/xx-pip-v1-client-protocol.h"
+@@ -137,6 +138,15 @@ class nsWaylandDisplay {
+   wp_color_representation_manager_v1* GetColorRepresentationManager() const {
+     return mColorRepresentationManager;
+   }
++  void SetBackgroundEffectManager(ext_background_effect_manager_v1* aManager) {
++    mBackgroundEffectManager = aManager;
++  }
++  ext_background_effect_manager_v1* GetBackgroundEffectManager() const {
++    return mBackgroundEffectManager;
++  }
++  void SetBackgroundBlur(bool aBlur);
++  // Whether the compositor blurs what is behind a surface that asks for it.
++  bool HasBackgroundBlur() const { return mBackgroundBlur; }
+   void SetPipShell(xx_pip_shell_v1* aShell) { mPipShell = aShell; }
+   xx_pip_shell_v1* GetPipShell() const { return mPipShell; }
+   void SetXdgWm(xdg_wm_base* aWmBase) { mWmBase = aWmBase; }
+@@ -227,6 +237,8 @@ class nsWaylandDisplay {
+   xx_fractional_scale_manager_v2* mFractionalScaleManagerV2 = nullptr;
+   wp_color_manager_v1* mColorManager = nullptr;
+   wp_color_representation_manager_v1* mColorRepresentationManager = nullptr;
++  ext_background_effect_manager_v1* mBackgroundEffectManager = nullptr;
++  bool mBackgroundBlur = false;
+   xx_pip_shell_v1* mPipShell = nullptr;
+   xdg_wm_base* mWmBase = nullptr;
+   xx_session_manager_v1* mSessionManager = nullptr;
+diff --git a/widget/gtk/nsWindow.cpp b/widget/gtk/nsWindow.cpp
+index dc188c39d5..6230e46d0d 100644
+--- a/widget/gtk/nsWindow.cpp
++++ b/widget/gtk/nsWindow.cpp
+@@ -4969,6 +4969,18 @@ gint nsWindow::GetInputRegionMarginInGdkCoords() {
+   return DevicePixelsToGdkCoordRoundDown(mInputRegion.mMargin);
+ }
+ 
++// A toplevel window's backdrop is the compositor's blur of what is behind
++// it, which shows through the parts the window paints translucent.
++void nsWindow::SetMicaBackdrop(bool aEnabled) {
++#ifdef MOZ_WAYLAND
++  if (mWindowType != WindowType::TopLevel || !mSurface) {
++    return;
++  }
++  WaylandSurfaceLock lock(mSurface);
++  mSurface->SetBackgroundBlurLocked(lock, aEnabled);
++#endif
++}
++
+ void nsWindow::SetInputRegion(const InputRegion& aInputRegion) {
+   mInputRegion = aInputRegion;
+ 
+diff --git a/widget/gtk/nsWindow.h b/widget/gtk/nsWindow.h
+index 18df35031e..acfee0b208 100644
+--- a/widget/gtk/nsWindow.h
++++ b/widget/gtk/nsWindow.h
+@@ -400,6 +400,7 @@ class nsWindow : public nsIWidget {
+   void SetTransparencyMode(TransparencyMode aMode) override;
+   TransparencyMode GetTransparencyMode() override;
+   void SetInputRegion(const InputRegion&) override;
++  void SetMicaBackdrop(bool aEnabled) override;
+ 
+   nsresult SynthesizeNativeMouseEvent(
+       LayoutDeviceIntPoint aPoint, NativeMouseMessage aNativeMessage,
+diff --git a/widget/gtk/wayland/moz.build b/widget/gtk/wayland/moz.build
+index fd6fa5822d..43575986c0 100644
+--- a/widget/gtk/wayland/moz.build
++++ b/widget/gtk/wayland/moz.build
+@@ -8,6 +8,7 @@ with Files("**"):
+ SOURCES += [
+     "color-management-v1-protocol.c",
+     "color-representation-v1-protocol.c",
++    "ext-background-effect-v1-protocol.c",
+     "fractional-scale-v1-protocol.c",
+     "gtk-primary-selection-protocol.c",
+     "idle-inhibit-unstable-v1-protocol.c",
+@@ -29,6 +30,7 @@ SOURCES += [
+ EXPORTS.mozilla.widget += [
+     "color-management-v1-client-protocol.h",
+     "color-representation-v1-client-protocol.h",
++    "ext-background-effect-v1-client-protocol.h",
+     "fractional-scale-v1-client-protocol.h",
+     "gtk-primary-selection-client-protocol.h",
+     "idle-inhibit-unstable-v1-client-protocol.h",

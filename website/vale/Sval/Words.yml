@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: substitution
+message: "Use '%s' in place of '%s'."
+level: error
+ignorecase: true
+swap:
+  beside: next to
+  first run: when you first set up Sval
+  utiliz(?:e|es|ed|ing): use
+  leverag(?:e|es|ed|ing): use
+  allows you to: lets you

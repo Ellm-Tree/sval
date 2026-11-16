@@ -1,0 +1,28 @@
+Sval: a Peek opens no sidebar
+
+A Peek is a full browser window that holds one page from another
+app, in no workspace (SvalPeek). SidebarController starts a window
+with no opener from the state the last browser window to close left
+(sidebar.backupState, in startDelayedLoad), and a link from another app
+opens its Peek with no opener, so the Peek opened whatever
+sidebar that window had open. Firefox's taskbar tab window, which also holds
+one page, is kept out of every sidebar by inSingleTabWindow: it adopts no
+state, show() and showInitially() refuse, the sidebar menu's items are
+disabled, and getUIState() gives no state to save as the backup. A Peek
+takes the same answer.
+
+diff --git a/browser/components/sidebar/browser-sidebar.js b/browser/components/sidebar/browser-sidebar.js
+index 947f026af9..c03556fb32 100644
+--- a/browser/components/sidebar/browser-sidebar.js
++++ b/browser/components/sidebar/browser-sidebar.js
+@@ -366,7 +366,9 @@ var SidebarController = {
+   get inSingleTabWindow() {
+     return (
+       !window.toolbar.visible ||
+-      window.document.documentElement.hasAttribute("taskbartab")
++      window.document.documentElement.hasAttribute("taskbartab") ||
++      // Sval: a Peek holds one page, as a taskbar tab does.
++      window.document.documentElement.hasAttribute("svalpeek")
+     );
+   },
+ 

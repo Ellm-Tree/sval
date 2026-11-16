@@ -1,0 +1,319 @@
+Sval: the content classifier parses trusted lists with adblock-rust's trusted bit
+
+uBlock Origin marks some scriptlets as needing trust, and adblock-rust gives
+them permission bit 0: a `##+js()` rule runs one only when the list it came
+from was parsed with that bit in ParseOptions.permissions. The engine crate
+parsed every list with default ParseOptions, so none ran. The service reads
+privacy.trackingprotection.content.trusted_list_ids, the lists Sval trusts,
+and hands the engine crate each rule's permission bits with its rules; the
+crate parses each run of rules with their bits into one FilterSet. A list
+that gains or loses trust rebuilds the engines that use it, through
+ProcessListChanges.
+
+The rules reach adblock-rust inside ContentClassifierService and the engine
+crate's FFI, so no chrome API can set a list's parse options.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index eabfab1942..7977a2ce53 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -67,6 +67,13 @@ constexpr nsLiteralCString kAllowedDomainsListIds[] = {
+ // Sval: backs the empty span of a feature whose ids come from its pref; an
+ // empty Span's own constructor is not constexpr.
+ constexpr nsLiteralCString kPrefListIds[] = {""_ns};
++// Sval: the lists whose rules may run scriptlets that need adblock-rust's
++// trusted permission bit, comma-separated.
++constexpr char kTrustedListIdsPref[] =
++    "privacy.trackingprotection.content.trusted_list_ids";
++// Sval: the bit adblock-rust's PermissionMask documentation gives uBlock
++// Origin's trusted scriptlets.
++constexpr uint8_t kTrustedPermission = 1;
+ constexpr nsLiteralCString kTestBlockListIds[] = {"test_block"_ns};
+ constexpr nsLiteralCString kTestAnnotateListIds[] = {"test_annotate"_ns};
+ 
+@@ -348,6 +355,29 @@ void ContentClassifierService::OnPrefChange(const char* aPref, void*) {
+     return;
+   }
+ 
++  // Sval: a list that gains or loses trust is parsed again.
++  if (prefStr.Equals(kTrustedListIdsPref)) {
++    nsTArray<nsCString> trusted;
++    EnginesPrefsSnapshot::AppendFeatureNamesFromPref(kTrustedListIdsPref,
++                                                     trusted);
++    nsTArray<nsCString> changed;
++    for (const auto& id : trusted) {
++      if (!service->mTrustedListIds.Contains(id)) {
++        changed.AppendElement(id);
++      }
++    }
++    for (const auto& id : service->mTrustedListIds) {
++      if (!trusted.Contains(id)) {
++        changed.AppendElement(id);
++      }
++    }
++    service->mTrustedListIds = std::move(trusted);
++    if (sEnabled && !changed.IsEmpty()) {
++      service->ProcessListChanges(changed, {});
++    }
++    return;
++  }
++
+   // Sval: a feature whose list ids come from a pref is rebuilt from the
+   // pref's new value, which may name no lists at all.
+   for (const auto& feature : kFeatures) {
+@@ -492,6 +522,15 @@ void ContentClassifierService::Init() {
+       }
+     }
+ 
++    rv = Preferences::RegisterCallback(&ContentClassifierService::OnPrefChange,
++                                       nsDependentCString(kTrustedListIdsPref));
++    if (NS_FAILED(rv)) {
++      mInitPhase = InitPhase::InitFailed;
++      return;
++    }
++    EnginesPrefsSnapshot::AppendFeatureNamesFromPref(kTrustedListIdsPref,
++                                                     mTrustedListIds);
++
+     rv = NS_CreateBackgroundTaskQueue("ContentClassifier",
+                                       getter_AddRefs(mBuildThread));
+     if (NS_FAILED(rv)) {
+@@ -653,6 +692,8 @@ NS_IMETHODIMP ContentClassifierService::BlockShutdown(
+             nsDependentCString(feature.mListIdsPref));
+       }
+     }
++    Preferences::UnregisterCallback(&ContentClassifierService::OnPrefChange,
++                                    nsDependentCString(kTrustedListIdsPref));
+ 
+     content_classifier_teardown_domain_resolver();
+ 
+@@ -999,7 +1040,8 @@ NS_IMETHODIMP ContentClassifierService::SetScriptletResources(
+ // Parses a byte buffer of adblock-format filter list text into rules.
+ // Tolerates both LF and CRLF line endings; skips empty lines.
+ static void ParseFilterListRules(const nsTArray<uint8_t>& aData,
+-                                 nsTArray<nsCString>& aRules) {
++                                 uint8_t aPermissions,
++                                 ContentClassifierRules& aRules) {
+   nsDependentCSubstring content(reinterpret_cast<const char*>(aData.Elements()),
+                                 aData.Length());
+   for (const auto& line : content.Split('\n')) {
+@@ -1009,7 +1051,8 @@ static void ParseFilterListRules(const nsTArray<uint8_t>& aData,
+       rule.Truncate(rule.Length() - 1);
+     }
+     if (!rule.IsEmpty()) {
+-      aRules.AppendElement(std::move(rule));
++      aRules.mRules.AppendElement(std::move(rule));
++      aRules.mPermissions.AppendElement(aPermissions);
+     }
+   }
+ }
+@@ -1062,9 +1105,9 @@ static RefPtr<ListBytesPromise> FetchListBytesFromRemoteSettings(
+ }
+ 
+ nsresult BuildEngineFromRules(const ContentClassifierFeature& aFeature,
+-                              const nsTArray<nsCString>& aRules,
++                              const ContentClassifierRules& aRules,
+                               RefPtr<ContentClassifierEngine>& aEngineOutput) {
+-  if (aRules.IsEmpty()) {
++  if (aRules.mRules.IsEmpty()) {
+     MOZ_LOG_FMT(gContentClassifierLog, LogLevel::Info,
+                 "BuildEngineFromRules - no rules for feature \"{}\"; ",
+                 aFeature.mName);
+@@ -1306,7 +1349,7 @@ void ContentClassifierService::UpdateFeatures(
+ 
+             // Collect per-feature rule arrays out of the settled promises;
+             // defer the expensive parsing / InitFromRules to mBuildThread.
+-            nsTArray<nsTArray<nsCString>> perFeatureRules;
++            nsTArray<ContentClassifierRules> perFeatureRules;
+             perFeatureRules.SetLength(features.Length());
+             if (aValue.IsResolve()) {
+               auto& settled = aValue.ResolveValue();
+@@ -1338,7 +1381,7 @@ void ContentClassifierService::UpdateFeatures(
+                   nsTArray<RefPtr<ContentClassifierEngine>> builtEngines;
+                   builtEngines.SetLength(features.Length());
+                   for (size_t i = 0; i < features.Length(); ++i) {
+-                    if (perFeatureRules[i].IsEmpty()) {
++                    if (perFeatureRules[i].mRules.IsEmpty()) {
+                       continue;
+                     }
+                     RefPtr<ContentClassifierEngine> engine;
+@@ -1504,13 +1547,16 @@ ContentClassifierService::FetchEngineDataForFeature(
+ 
+   nsTArray<RefPtr<ListBytesPromise>> fetches;
+   nsTArray<nsCString> listIdsInOrder;
++  nsTArray<uint8_t> permissionsInOrder;
+   for (const auto& listId : ListIdsFor(aFeature)) {
+     listIdsInOrder.AppendElement(listId);
++    permissionsInOrder.AppendElement(
++        mTrustedListIds.Contains(listId) ? kTrustedPermission : 0);
+     fetches.AppendElement(FetchListBytesFromRemoteSettings(mRSClient, listId));
+   }
+ 
+   if (fetches.IsEmpty()) {
+-    return EngineRulesPromise::CreateAndResolve(nsTArray<nsCString>{},
++    return EngineRulesPromise::CreateAndResolve(ContentClassifierRules{},
+                                                 __func__);
+   }
+ 
+@@ -1520,7 +1566,8 @@ ContentClassifierService::FetchEngineDataForFeature(
+   ListBytesPromise::AllSettled(GetMainThreadSerialEventTarget(), fetches)
+       ->Then(GetMainThreadSerialEventTarget(), __func__,
+              [self, result, feature = &aFeature,
+-              listIdsInOrder = std::move(listIdsInOrder)](
++              listIdsInOrder = std::move(listIdsInOrder),
++              permissionsInOrder = std::move(permissionsInOrder)](
+                  const ListBytesPromise::AllSettledPromiseType::
+                      ResolveOrRejectValue& aValue) mutable {
+                if (aValue.IsReject()) {
+@@ -1533,7 +1580,7 @@ ContentClassifierService::FetchEngineDataForFeature(
+                }
+ 
+                const auto& fetchPromises = aValue.ResolveValue();
+-               nsTArray<nsCString> rules;
++               ContentClassifierRules rules;
+                for (size_t i = 0; i < fetchPromises.Length(); ++i) {
+                  if (fetchPromises[i].IsReject()) {
+                    MOZ_LOG_FMT(gContentClassifierLog, LogLevel::Warning,
+@@ -1550,7 +1597,8 @@ ContentClassifierService::FetchEngineDataForFeature(
+                                listIdsInOrder[i], feature->mName);
+                    continue;
+                  }
+-                 ParseFilterListRules(fetchResult, rules);
++                 ParseFilterListRules(fetchResult, permissionsInOrder[i],
++                                      rules);
+                }
+                result->Resolve(std::move(rules), __func__);
+              });
+@@ -1579,7 +1627,7 @@ ContentClassifierService::FetchEngineDataForTestFeature(
+   } else {
+     MOZ_LOG(gContentClassifierLog, LogLevel::Warning,
+             ("FetchEngineDataForTestFeature - incorrect feature name"));
+-    return EngineRulesPromise::CreateAndResolve(nsTArray<nsCString>{},
++    return EngineRulesPromise::CreateAndResolve(ContentClassifierRules{},
+                                                 __func__);
+   }
+ 
+@@ -1611,9 +1659,12 @@ ContentClassifierService::FetchEngineDataForTestFeature(
+           [self = RefPtr{this}, result, filterRules = std::move(filterRules)](
+               const GenericPromise::AllSettledPromiseType::ResolveOrRejectValue&
+                   aResults) {
+-            nsTArray<nsCString> rules;
++            ContentClassifierRules rules;
+             for (const auto& fromUrl : filterRules) {
+-              rules.AppendElements(fromUrl);
++              rules.mRules.AppendElements(fromUrl);
++            }
++            for (size_t i = 0; i < rules.mRules.Length(); ++i) {
++              rules.mPermissions.AppendElement(0);
+             }
+             result->Resolve(std::move(rules), __func__);
+           });
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index b5dfbe3314..ad3f3a6fcc 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -299,7 +299,7 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+       const EnginesPrefsSnapshot& aPreferenceSnapshot);
+ 
+   // Helper type to grab a list of rules to be built into an engine
+-  using EngineRulesPromise = MozPromise<nsTArray<nsCString>, nsresult,
++  using EngineRulesPromise = MozPromise<ContentClassifierRules, nsresult,
+                                         /* IsExclusive = */ true>;
+   // Grab the list of rules for a given feature. Hits remote settings, unless it
+   // is a test_* feature, then it delegates to FetchEngineDataForTestFeature.
+@@ -342,6 +342,10 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   // populated by a newer call's snapshot.
+   uint64_t mUpdateGeneration MOZ_GUARDED_BY(mLock) = 0;
+ 
++  // Sval: the list ids in kTrustedListIdsPref, whose rules are parsed with
++  // adblock-rust's trusted permission bit. Main thread only.
++  nsTArray<nsCString> mTrustedListIds;
++
+   // Sval: the snapshot of the newest ProcessListChanges call. A closure that
+   // installs an engine after that call's closure has run populates the
+   // active lists from it.
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+index 8e3beef5eb..ff9cc0a631 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
++++ b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+@@ -66,6 +66,13 @@ class ContentClassifierRequest {
+   explicit ContentClassifierRequest(nsIChannel* aChannel);
+ };
+ 
++// Sval: a feature's rules, and for each rule the adblock-rust permission bits
++// of the list it came from.
++struct ContentClassifierRules {
++  nsTArray<nsCString> mRules;
++  nsTArray<uint8_t> mPermissions;
++};
++
+ class ContentClassifierEngine final {
+  public:
+   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ContentClassifierEngine)
+@@ -80,8 +87,9 @@ class ContentClassifierEngine final {
+     }
+   }
+ 
+-  nsresult InitFromRules(const nsTArray<nsCString>& aRules) {
+-    return content_classifier_engine_from_rules(&aRules, &mEngine);
++  nsresult InitFromRules(const ContentClassifierRules& aRules) {
++    return content_classifier_engine_from_rules(
++        &aRules.mRules, &aRules.mPermissions, &mEngine);
+   }
+ 
+   const ContentClassifierFeature& Feature() const { return mFeature; }
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs b/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs
+index ff9406cd62..6ed8fb09d0 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs
++++ b/toolkit/components/content-classifier/content_classifier_engine/src/lib.rs
+@@ -45,26 +45,39 @@ pub extern "C" fn content_classifier_teardown_domain_resolver() {
+     }
+ }
+ 
++/// Sval: `permissions` holds, for each rule, the adblock-rust permission bits
++/// of the list it came from, so that a scriptlet needing a permission runs
++/// only from a list given it.
+ #[no_mangle]
+ pub unsafe extern "C" fn content_classifier_engine_from_rules(
+     rules: &ThinVec<nsCString>,
++    permissions: &ThinVec<u8>,
+     out_engine: *mut *mut ContentClassifierFFIEngine,
+ ) -> nsresult {
+-    if out_engine.is_null() {
++    if out_engine.is_null() || permissions.len() != rules.len() {
+         return NS_ERROR_INVALID_ARG;
+     }
+ 
+-    let rules_vec: Vec<String> = rules
+-        .iter()
+-        .map(|r| String::from_utf8_lossy(r.as_ref()).to_string())
+-        .collect();
+-
+-    let engine = Engine::from_rules(
+-        rules_vec,
+-        adblock::lists::ParseOptions {
+-            ..adblock::lists::ParseOptions::default()
+-        },
+-    );
++    let mut filter_set = adblock::lists::FilterSet::new(false);
++    let mut start = 0;
++    while start < rules.len() {
++        let bits = permissions[start];
++        let mut end = start + 1;
++        while end < rules.len() && permissions[end] == bits {
++            end += 1;
++        }
++        filter_set.add_filters(
++            rules[start..end]
++                .iter()
++                .map(|r| String::from_utf8_lossy(r.as_ref()).into_owned()),
++            adblock::lists::ParseOptions {
++                permissions: adblock::resources::PermissionMask::from_bits(bits),
++                ..adblock::lists::ParseOptions::default()
++            },
++        );
++        start = end;
++    }
++    let engine = Engine::from_filter_set(filter_set, true);
+ 
+     let boxed_engine = Box::new(ContentClassifierFFIEngine { engine });
+     *out_engine = Box::into_raw(boxed_engine);

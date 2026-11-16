@@ -1,0 +1,137 @@
+Sval: mach artifact installs the test GMP plugins where the harnesses load them
+
+Backport of Mozilla's Bug 2064182 (mozilla-central e1685d244084, Firefox
+156), unchanged. ESR 153 does not carry it. ArtifactJob.test_artifact_patterns
+is a set, and a test GMP plugin's file matches both "bin/plugins/gmp-*/*/*"
+(to dist/bin) and "bin/plugins/*" (to dist/plugins). The first match wins, and
+a set's order follows string hashing, which Python randomizes in each
+process, so which of the two an artifact build used changed from one mach
+process to the next, and its processed archive kept the result. The
+mochitest harness loads the plugins from dist/bin (mochitest_options.py,
+gmp_path), and the GMP process stops with MOZ_CRASH(Plugin file does not
+exist) when the library is missing there.
+Drop this patch when the upstream pin reaches Firefox 156.
+
+diff --git a/python/mozbuild/mozbuild/artifacts.py b/python/mozbuild/mozbuild/artifacts.py
+index 548b7786ee853..ba390d03a9ea3 100644
+--- a/python/mozbuild/mozbuild/artifacts.py
++++ b/python/mozbuild/mozbuild/artifacts.py
+@@ -149,7 +149,10 @@ def _get_orig_basename(self, filename):
+     # is the prefix of the pattern relevant to its location in the archive, and
+     # dest_prefix is the prefix to be added that will yield the final path relative
+     # to dist/.
+-    test_artifact_patterns = {
++    # This must stay an ordered sequence: consumers use the first matching
++    # pattern, and some patterns overlap (a trailing `*` matches a whole
++    # subtree), so more specific patterns have to come first.
++    test_artifact_patterns = (
+         ("bin/BadCertAndPinningServer", ("bin", "bin")),
+         ("bin/DelegatedCredentialsServer", ("bin", "bin")),
+         ("bin/EncryptedClientHelloServer", ("bin", "bin")),
+@@ -168,7 +171,7 @@ def _get_orig_basename(self, filename):
+         ("bin/http3server", ("bin", "bin")),
+         ("bin/plugins/gmp-*/*/*", ("bin/plugins", "bin")),
+         ("bin/plugins/*", ("bin/plugins", "plugins")),
+-    }
++    )
+ 
+     # We can tell our input is a test archive by this suffix, which happens to
+     # be the same across platforms.
+@@ -895,7 +898,8 @@ def package_artifact_patterns(self):
+         return {p.format(product=self.product) for p in self._package_artifact_patterns}
+ 
+     # These are a subset of TEST_HARNESS_BINS in testing/mochitest/Makefile.in.
+-    test_artifact_patterns = {
++    # See `ArtifactJob.test_artifact_patterns` for why the order matters.
++    test_artifact_patterns = (
+         ("bin/BadCertAndPinningServer.exe", ("bin", "bin")),
+         ("bin/DelegatedCredentialsServer.exe", ("bin", "bin")),
+         ("bin/EncryptedClientHelloServer.exe", ("bin", "bin")),
+@@ -916,7 +920,7 @@ def package_artifact_patterns(self):
+         ("bin/plugins/gmp-*/*/*", ("bin/plugins", "bin")),
+         ("bin/plugins/*", ("bin/plugins", "plugins")),
+         ("bin/components/*", ("bin/components", "bin/components")),
+-    }
++    )
+ 
+     def process_package_artifact(self, filename, processed_filename):
+         added_entry = False
+diff --git a/python/mozbuild/mozbuild/test/test_artifacts.py b/python/mozbuild/mozbuild/test/test_artifacts.py
+index dabb6c5549669..b7492efb8d6ea 100644
+--- a/python/mozbuild/mozbuild/test/test_artifacts.py
++++ b/python/mozbuild/mozbuild/test/test_artifacts.py
+@@ -5,12 +5,17 @@
+ from unittest import TestCase, mock
+ 
+ import buildconfig
++import mozpack.path as mozpath
+ import mozunit
+ 
+ from mozbuild.artifacts import (
++    AndroidArtifactJob,
+     ArtifactJob,
+     GeckoJobConfiguration,
++    LinuxArtifactJob,
++    MacArtifactJob,
+     ThunderbirdJobConfiguration,
++    WinArtifactJob,
+ )
+ 
+ 
+@@ -76,6 +81,56 @@ def test_property_is_cached(self):
+         self.assertEqual(job.candidate_trees, expected_trees)
+ 
+ 
++class TestTestArtifactPatterns(TestCase):
++    JOB_CLASSES = (
++        ArtifactJob,
++        AndroidArtifactJob,
++        LinuxArtifactJob,
++        MacArtifactJob,
++        WinArtifactJob,
++    )
++
++    def _resolve(self, job_class, entry):
++        """Mimic how `process_tests_*_artifact` maps an archive entry: the first
++        matching pattern wins."""
++        for pattern, (src_prefix, dest_prefix) in job_class.test_artifact_patterns:
++            if mozpath.match(entry, pattern):
++                return mozpath.join(dest_prefix, mozpath.relpath(entry, src_prefix))
++        return None
++
++    def test_patterns_are_ordered(self):
++        # Several patterns overlap, so an unordered container (e.g. a set) makes
++        # the mapping depend on PYTHONHASHSEED.
++        for job_class in self.JOB_CLASSES:
++            self.assertIsInstance(
++                job_class.test_artifact_patterns, (list, tuple), job_class.__name__
++            )
++
++    def test_gmp_plugins_land_in_bin(self):
++        # The fake GMP plugin libraries must end up in dist/bin so that
++        # test_archive.py packages them; landing them in dist/plugins silently
++        # drops them from the test archive and crashes the GMP child process.
++        for job_class in self.JOB_CLASSES:
++            for entry in (
++                "bin/plugins/gmp-fake/1.0/libfake.so",
++                "bin/plugins/gmp-fakeopenh264/1.0/libfakeopenh264.so",
++                "bin/plugins/gmp-clearkey/0.1/libclearkey.so",
++            ):
++                self.assertEqual(
++                    self._resolve(job_class, entry),
++                    mozpath.join("bin", mozpath.relpath(entry, "bin/plugins")),
++                    f"{job_class.__name__}: {entry}",
++                )
++
++    def test_other_plugins_land_in_plugins(self):
++        for job_class in self.JOB_CLASSES:
++            self.assertEqual(
++                self._resolve(job_class, "bin/plugins/libnptest.so"),
++                "plugins/libnptest.so",
++                job_class.__name__,
++            )
++
++
+ class TestThunderbirdMixin(TestCase):
+     def _assert_candidate_trees(self, version_display, source_repo, expected_trees):
+         with mock.patch.object(

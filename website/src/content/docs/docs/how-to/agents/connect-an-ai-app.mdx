@@ -1,0 +1,99 @@
+---
+title: Connect an AI app to Sval
+description: Let an AI app on your computer, like Claude Code or Cursor, browse in Sval, then approve it the first time it asks.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Sval has no AI of its own. An AI app on your computer can use Sval to
+browse for you. To set that up, you turn on agent access, connect the app,
+and approve the app.
+
+You're using Claude Code to fix a login bug. You want Claude Code to open
+the site and check the fix while you watch.
+
+## Turn on agent access and connect the app
+
+1. Open Settings › Agents.
+2. Under Agent access, turn on **Let AI agents on this computer use Sval**.
+3. Under Connect an AI app, find your app, then select **Connect**.
+4. Restart the app the way Sval says. For Claude Code, start a new session.
+
+Sval adds itself to the app's settings. The app's row then says
+**Connected.**
+
+<Screenshot name="docs-connect-an-ai-app" alt="Settings › Agents › Connect an AI app: Claude Desktop and the ChatGPT desktop app and Codex ready to connect, and Claude Code and Cursor offering Fix" />
+
+## Approve the app the first time
+
+The first time the app asks to use Sval, Sval shows **Pair “Claude Code”
+with Sval?** in the window you're using.
+
+1. Check the details under the question: the app's task, which app it is,
+   the folder it started in, and when.
+2. Optional: check the box to change the kind of Workspace the app gets.
+3. Select **Pair**.
+
+The app gets its own Workspace, in a window that opens behind yours.
+
+## Details
+
+- Sval can connect Claude Code, Claude Desktop, the ChatGPT desktop app and
+  Codex, Cursor, and Mistral Vibe. If an app isn't installed, its row says
+  **Not found on this computer.**
+- You approve an app once. After that, every session of the app can use
+  Sval, from any folder, without asking again.
+- Each session of the app gets a Workspace of its own. When you resume a
+  conversation, the app can go back to the Workspace that conversation used
+  before, tabs and all.
+- The app asks for one of two kinds of Workspace. A shared Workspace uses
+  your sign-ins on every site. An isolated Workspace starts signed out of
+  every site. To pick the other kind, check the box in the pairing alert.
+- The **Pair** button turns on a moment after the alert comes to the front.
+  That way a stray key press can't approve an app. To refuse the app,
+  select **Deny** or press Escape.
+- When the app needs Sval and Sval is closed, the app starts Sval in the
+  background.
+- Agent access is a setting of this device. It doesn't sync.
+- To remove Sval from the app's settings, select **Disconnect**, then
+  restart the app.
+- On Linux with GNOME, Sval opens in front of your window when an AI app
+  starts it. The Agents page in Settings shows the command that keeps Sval
+  behind your window.
+
+## Connect another app
+
+Any app that runs local MCP servers can use Sval.
+
+1. Open Settings › Agents.
+2. Under Other apps, select **Copy JSON**.
+3. Paste the JSON into the app's MCP configuration, then restart the app.
+
+To add Sval by hand, add a server named sval. For the server's command, use
+the file path shown under Other apps. To copy that path, select **Copy**.
+
+## If something goes wrong
+
+- **This app points to a Sval that isn't on this computer.** The app's
+  settings name a copy of Sval that's gone. Select **Fix** to point the app
+  to the Sval you're using.
+- **This app points to a Sval that has moved.** Select **Connect** to
+  update the app's settings.
+- **This app has a Sval entry you changed.** Sval leaves your entry alone.
+  Select **Connect** to replace it.
+- **Sval can't read this app's settings, so it leaves them as they are.**
+  Use **Copy JSON** under Other apps and add Sval by hand.
+- **Sval couldn't change the app's settings.** Use the path or JSON under
+  Other apps.
+- **Agent access couldn't start.** The status line under the switch says
+  why. Either Sval can't read its list of paired agents, or Sval can't make
+  its agents folder private.
+- **Off. No AI agent can connect to Sval.** Agent access is off, so the app
+  can't reach Sval. Turn on **Let AI agents on this computer use Sval**.
+
+## Related pages
+
+- [Allow or block a site for an agent](/docs/how-to/agents/allow-or-block-a-site-for-an-agent/)
+- [Watch and stop an agent](/docs/how-to/agents/watch-and-stop-an-agent/)
+- [What an agent can and can't reach](/docs/explanation/agents/)
+- [Agent settings and controls](/docs/reference/agents/)

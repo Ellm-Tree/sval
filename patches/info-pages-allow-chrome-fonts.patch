@@ -1,0 +1,35 @@
+Sval: about:license and about:buildconfig allow chrome: fonts
+
+Sval draws Firefox's pages in its own typeface through SvalPageStyle, whose
+sheets declare Outfit from a chrome: URL. These two pages set a <meta> CSP of
+default-src 'none' with no font-src, and a chrome: font is subject to a
+page's CSP whichever sheet asks for it (subjectToCSP, nsCSPService.cpp), so
+the font is refused. No chrome API changes a document's own CSP, so each
+policy gains font-src chrome:.
+
+diff --git a/toolkit/content/buildconfig.html b/toolkit/content/buildconfig.html
+index 15d1e9b173..06e9945865 100644
+--- a/toolkit/content/buildconfig.html
++++ b/toolkit/content/buildconfig.html
+@@ -7,7 +7,7 @@
+ #include @TOPOBJDIR@/source-repo.h
+ <html>
+   <head>
+-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src chrome:; object-src 'none'" />
++    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src chrome:; font-src chrome:; object-src 'none'" />
+     <meta charset="UTF-8">
+     <meta name="color-scheme" content="light dark">
+     <meta name="viewport" content="width=device-width; user-scalable=false;">
+diff --git a/toolkit/content/license.html b/toolkit/content/license.html
+index ef71884220..15ec470df7 100644
+--- a/toolkit/content/license.html
++++ b/toolkit/content/license.html
+@@ -5,7 +5,7 @@
+ 
+ <html lang="en">
+   <head>
+-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src chrome:; img-src chrome:; object-src 'none'">
++    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src chrome:; img-src chrome:; font-src chrome:; object-src 'none'">
+     <meta charset="utf-8">
+     <meta name="color-scheme" content="light dark">
+     <title>Licenses</title>

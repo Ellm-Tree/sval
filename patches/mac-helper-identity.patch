@@ -1,0 +1,324 @@
+Sval: the macOS updater, its privileged helpers and the crash reporter are Sval's own
+
+Mozilla's names make these Firefox's on macOS. A privileged helper's label is
+its file in Contents/Library/LaunchServices, its job in launchd, and its files
+under /Library/PrivilegedHelperTools and /Library/LaunchDaemons, one per label
+for the whole machine. An installed Firefox's helper of the same label would
+be replaced by Sval's when either is blessed (SMJobBless), and removed for both
+when either update finishes. The updater's NSConnection name is one per
+machine too. macOS also keeps privacy decisions (Local Network, TCC) by signing
+identifier, which a helper bundle takes from its CFBundleIdentifier, so
+updater.app and crashreporter.app shared Firefox's.
+
+The updater's helper is app.sval.updater, with the connection
+app.sval.updater.server; the disk image installer's is
+app.sval.dmgInstallHelper; updater.app and crashreporter.app take app.sval.
+identifiers.
+
+The requirements Sval's app and its updater helper check each other's code
+signature against (SMPrivilegedExecutables, SMAuthorizedClients) name the
+team that signs Sval's releases, Ellm Tree's WN6TRJ4H8P; with Mozilla's, the
+elevated update refuses a Sval release's helper.
+
+diff --git a/browser/app/Makefile.in b/browser/app/Makefile.in
+index 06d3489747..286ae398a1 100644
+--- a/browser/app/Makefile.in
++++ b/browser/app/Makefile.in
+@@ -86,9 +86,9 @@ tools repackage:: $(DIST)/bin/$(MOZ_APP_NAME) $(objdir)/macbuild/Contents/MacOS-
+ 	cp -RL $(topsrcdir)/$(MOZ_BRANDING_DIRECTORY)/document.icns '$(dist_dest)/Contents/Resources/document.icns'
+ 	$(MKDIR) -p '$(dist_dest)/Contents/Library/LaunchServices'
+ ifdef MOZ_UPDATER
+-	cp -f '$(dist_dest)/Contents/MacOS/updater.app/Contents/MacOS/org.mozilla.updater' '$(dist_dest)/Contents/Library/LaunchServices'
++	cp -f '$(dist_dest)/Contents/MacOS/updater.app/Contents/MacOS/org.mozilla.updater' '$(dist_dest)/Contents/Library/LaunchServices/app.sval.updater'
+ endif
+-	mv '$(dist_dest)/Contents/Resources/org.mozilla.dmgInstallHelper' '$(dist_dest)/Contents/Library/LaunchServices'
++	mv '$(dist_dest)/Contents/Resources/app.sval.dmgInstallHelper' '$(dist_dest)/Contents/Library/LaunchServices'
+ 	$(MKDIR) -p '$(dist_dest)/Contents/Frameworks'
+ 	mv '$(dist_dest)/Contents/Resources/ChannelPrefs.framework' '$(dist_dest)/Contents/Frameworks'
+ 	printf APPLMOZB > '$(dist_dest)/Contents/PkgInfo'
+diff --git a/browser/installer/allowed-dupes.mn b/browser/installer/allowed-dupes.mn
+index 96706c155f..897b472772 100644
+--- a/browser/installer/allowed-dupes.mn
++++ b/browser/installer/allowed-dupes.mn
+@@ -6,7 +6,7 @@
+ #
+ 
+ # updater on osx is bug 1311194
+-LaunchServices/org.mozilla.updater
++LaunchServices/app.sval.updater
+ updater.app/Contents/MacOS/org.mozilla.updater
+ 
+ plugin-container.app/Contents/PkgInfo
+diff --git a/build/moz.configure/update-programs.configure b/build/moz.configure/update-programs.configure
+index ec5344f632..9dd6763713 100644
+--- a/build/moz.configure/update-programs.configure
++++ b/build/moz.configure/update-programs.configure
+@@ -89,7 +89,7 @@ def mac_prod_requirements_string(identifier):
+         f'identifier "{identifier}" and anchor apple generic and '
+         "certificate 1[field.1.2.840.113635.100.6.2.6] and "
+         "certificate leaf[field.1.2.840.113635.100.6.1.13] and "
+-        'certificate leaf[subject.OU] = "43AQ936H96"'
++        'certificate leaf[subject.OU] = "WN6TRJ4H8P"'
+     )
+ 
+ 
+@@ -122,7 +122,7 @@ def requirements_string(exec_id, relaxed):
+ @imports(_from="xml.sax.saxutils", _import="escape")
+ def generate_smprivilegedexec_requirements(relaxed):
+     requirements = ""
+-    smprivilegedexecutables_list = ["org.mozilla.dmgInstallHelper", "org.mozilla.updater"]
++    smprivilegedexecutables_list = ["app.sval.dmgInstallHelper", "app.sval.updater"]
+ 
+     for executable in smprivilegedexecutables_list:
+         requirements += f"<key>{escape(executable)}</key>"
+diff --git a/python/mozbuild/mozbuild/artifacts.py b/python/mozbuild/mozbuild/artifacts.py
+index 5bb72e9392..ce78187ab1 100644
+--- a/python/mozbuild/mozbuild/artifacts.py
++++ b/python/mozbuild/mozbuild/artifacts.py
+@@ -740,7 +740,7 @@ class MacArtifactJob(ArtifactJob):
+                 "XUL",
+             ],
+         ),
+-        ("Contents/Library/LaunchServices", ["org.mozilla.dmgInstallHelper"]),
++        ("Contents/Library/LaunchServices", ["app.sval.dmgInstallHelper"]),
+     )
+ 
+     @property
+diff --git a/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist b/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist
+index f1679a922e..20e4c4c848 100644
+--- a/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist
++++ b/toolkit/crashreporter/client/app/macos_app_bundle/Info.plist
+@@ -11,7 +11,7 @@
+ 	<key>CFBundleIconFile</key>
+ 	<string>crashreporter.icns</string>
+ 	<key>CFBundleIdentifier</key>
+-	<string>org.mozilla.crashreporter</string>
++	<string>app.sval.crashreporter</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+diff --git a/toolkit/crashreporter/client/app/src/ui/macos/plist.rs b/toolkit/crashreporter/client/app/src/ui/macos/plist.rs
+index a5bbe0aa0a..77dec0e203 100644
+--- a/toolkit/crashreporter/client/app/src/ui/macos/plist.rs
++++ b/toolkit/crashreporter/client/app/src/ui/macos/plist.rs
+@@ -15,7 +15,7 @@ const DATA: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+ 	<key>CFBundleExecutable</key>
+ 	<string>crashreporter</string>
+ 	<key>CFBundleIdentifier</key>
+-	<string>org.mozilla.crashreporter</string>
++	<string>app.sval.crashreporter</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+diff --git a/toolkit/mozapps/dmgInstallHelper/Info.plist.in b/toolkit/mozapps/dmgInstallHelper/Info.plist.in
+index e444b163e8..0d3abb5e31 100644
+--- a/toolkit/mozapps/dmgInstallHelper/Info.plist.in
++++ b/toolkit/mozapps/dmgInstallHelper/Info.plist.in
+@@ -3,7 +3,7 @@
+ <plist version="1.0">
+ <dict>
+ 	<key>CFBundleIdentifier</key>
+-	<string>org.mozilla.dmgInstallHelper</string>
++	<string>app.sval.dmgInstallHelper</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+diff --git a/toolkit/mozapps/dmgInstallHelper/Launchd.plist b/toolkit/mozapps/dmgInstallHelper/Launchd.plist
+index 21b17b3b7f..b49cba91ac 100644
+--- a/toolkit/mozapps/dmgInstallHelper/Launchd.plist
++++ b/toolkit/mozapps/dmgInstallHelper/Launchd.plist
+@@ -3,10 +3,10 @@
+ <plist version="1.0">
+ <dict>
+ 	<key>Label</key>
+-	<string>org.mozilla.dmgInstallHelper</string>
++	<string>app.sval.dmgInstallHelper</string>
+ 	<key>MachServices</key>
+ 	<dict>
+-		<key>org.mozilla.dmgInstallHelper</key>
++		<key>app.sval.dmgInstallHelper</key>
+ 		<true/>
+ 	</dict>
+ </dict>
+diff --git a/toolkit/mozapps/dmgInstallHelper/dmgInstallHelper.mm b/toolkit/mozapps/dmgInstallHelper/dmgInstallHelper.mm
+index b7e2cd81e8..ca6ea2d17a 100644
+--- a/toolkit/mozapps/dmgInstallHelper/dmgInstallHelper.mm
++++ b/toolkit/mozapps/dmgInstallHelper/dmgInstallHelper.mm
+@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
+ 
+   ListenerDelegate* delegate = [[ListenerDelegate alloc] init];
+   NSXPCListener* listener = [[NSXPCListener alloc]
+-      initWithMachServiceName:@"org.mozilla.dmgInstallHelper"];
++      initWithMachServiceName:@"app.sval.dmgInstallHelper"];
+ 
+   if (listener != nil) {
+     os_log_info(logger, "Got listener");
+@@ -420,16 +420,16 @@ static bool PerformInstallationFromDMG(NSString* bundlePath,
+ 
+   NSFileManager* manager = [NSFileManager defaultManager];
+   [manager removeItemAtPath:
+-               @"/Library/PrivilegedHelperTools/org.mozilla.dmgInstallHelper"
++               @"/Library/PrivilegedHelperTools/app.sval.dmgInstallHelper"
+                       error:nil];
+   [manager removeItemAtPath:
+-               @"/Library/LaunchDaemons/org.mozilla.dmgInstallHelper.plist"
++               @"/Library/LaunchDaemons/app.sval.dmgInstallHelper.plist"
+                       error:nil];
+ 
+   // The following call will terminate the current process due to the "remove"
+   // argument.
+   LaunchTask(@"/bin/launchctl",
+-             @[ @"remove", @"org.mozilla.dmgInstallHelper" ]);
++             @[ @"remove", @"app.sval.dmgInstallHelper" ]);
+ 
+   exit(0);
+ }
+diff --git a/toolkit/mozapps/dmgInstallHelper/moz.build b/toolkit/mozapps/dmgInstallHelper/moz.build
+index b505b24863..07b099604a 100644
+--- a/toolkit/mozapps/dmgInstallHelper/moz.build
++++ b/toolkit/mozapps/dmgInstallHelper/moz.build
+@@ -8,7 +8,7 @@ with Files("**"):
+ SPHINX_TREES["docs"] = "docs"
+ 
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
+-    Program("org.mozilla.dmgInstallHelper")
++    Program("app.sval.dmgInstallHelper")
+ 
+     SOURCES = [
+         "dmgInstallHelper.mm"
+diff --git a/toolkit/mozapps/update/common/elevation_type.cpp b/toolkit/mozapps/update/common/elevation_type.cpp
+index 0b9060795e..680a3b68c3 100644
+--- a/toolkit/mozapps/update/common/elevation_type.cpp
++++ b/toolkit/mozapps/update/common/elevation_type.cpp
+@@ -58,7 +58,7 @@ BoolResult isProcessElevated(const NS_tchar* cmd) {
+   if (!cmd) {
+     return BoolResult::False;
+   }
+-  return strstr(cmd, "/Library/PrivilegedHelperTools/org.mozilla.updater") !=
++  return strstr(cmd, "/Library/PrivilegedHelperTools/app.sval.updater") !=
+                  nullptr
+              ? BoolResult::True
+              : BoolResult::False;
+diff --git a/toolkit/mozapps/update/tests/gtest/ElevationTypeTests.cpp b/toolkit/mozapps/update/tests/gtest/ElevationTypeTests.cpp
+index 362162af19..fdca309380 100644
+--- a/toolkit/mozapps/update/tests/gtest/ElevationTypeTests.cpp
++++ b/toolkit/mozapps/update/tests/gtest/ElevationTypeTests.cpp
+@@ -153,7 +153,7 @@ TEST_F(ElevationTypeTest, IsProcessElevated_NonElevatedCmd) {
+ 
+ TEST_F(ElevationTypeTest, IsProcessElevated_ElevatedCmd) {
+   BoolResult res =
+-      isProcessElevated("/Library/PrivilegedHelperTools/org.mozilla.updater");
++      isProcessElevated("/Library/PrivilegedHelperTools/app.sval.updater");
+   EXPECT_EQ(res, BoolResult::True);
+ }
+ #endif
+diff --git a/toolkit/mozapps/update/updater/Launchd.plist b/toolkit/mozapps/update/updater/Launchd.plist
+index f0b5cef085..efadd6a342 100644
+--- a/toolkit/mozapps/update/updater/Launchd.plist
++++ b/toolkit/mozapps/update/updater/Launchd.plist
+@@ -3,7 +3,7 @@
+ <plist version="1.0">
+ <dict>
+   <key>Label</key>
+-  <string>org.mozilla.updater</string>
++  <string>app.sval.updater</string>
+   <key>RunAtLoad</key>
+   <true/>
+ </dict>
+diff --git a/toolkit/mozapps/update/updater/launchchild_osx.mm b/toolkit/mozapps/update/updater/launchchild_osx.mm
+index 56da758876..013126ebf6 100644
+--- a/toolkit/mozapps/update/updater/launchchild_osx.mm
++++ b/toolkit/mozapps/update/updater/launchchild_osx.mm
+@@ -192,7 +192,7 @@ id ConnectToUpdateServer() {
+   while (!isConnected && currTry < numRetries) {
+     @try {
+       updateServer = (id)[NSConnection
+-          rootProxyForConnectionWithRegisteredName:@"org.mozilla.updater.server"
++          rootProxyForConnectionWithRegisteredName:@"app.sval.updater.server"
+                                               host:nil
+                                    usingNameServer:[NSSocketPortNameServer
+                                                        sharedInstance]];
+@@ -236,14 +236,14 @@ void CleanupElevatedMacUpdate(bool aFailureOccurred) {
+ 
+   NSFileManager* manager = [NSFileManager defaultManager];
+   [manager
+-      removeItemAtPath:@"/Library/PrivilegedHelperTools/org.mozilla.updater"
++      removeItemAtPath:@"/Library/PrivilegedHelperTools/app.sval.updater"
+                  error:nil];
+-  [manager removeItemAtPath:@"/Library/LaunchDaemons/org.mozilla.updater.plist"
++  [manager removeItemAtPath:@"/Library/LaunchDaemons/app.sval.updater.plist"
+                       error:nil];
+ 
+   // The following call will terminate the current process due to the "remove"
+   // argument.
+-  LaunchTask(@"/bin/launchctl", @[ @"remove", @"org.mozilla.updater" ]);
++  LaunchTask(@"/bin/launchctl", @[ @"remove", @"app.sval.updater" ]);
+ }
+ 
+ // Note: Caller is responsible for freeing aArgv.
+@@ -326,7 +326,7 @@ bool ObtainUpdaterArguments(int* aArgc, char*** aArgv,
+   NSConnection* server = [NSConnection connectionWithReceivePort:serverPort
+                                                         sendPort:serverPort];
+   [server setRootObject:self];
+-  if ([server registerName:@"org.mozilla.updater.server"
++  if ([server registerName:@"app.sval.updater.server"
+             withNameServer:[NSSocketPortNameServer sharedInstance]] == NO) {
+     NSLog(@"Unable to register as DirectoryServer.");
+     NSLog(@"Is another copy running?");
+diff --git a/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in b/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in
+index 58be384061..0b220bb07e 100644
+--- a/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in
++++ b/toolkit/mozapps/update/updater/macbuild/Contents/Info.plist.in
+@@ -11,7 +11,7 @@
+ 	<key>CFBundleIconFile</key>
+ 	<string>updater.icns</string>
+ 	<key>CFBundleIdentifier</key>
+-	<string>org.mozilla.updater</string>
++	<string>app.sval.updater</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+diff --git a/toolkit/xre/MacLaunchHelper.mm b/toolkit/xre/MacLaunchHelper.mm
+index 6dec5ce49e..ae2d1a8a23 100644
+--- a/toolkit/xre/MacLaunchHelper.mm
++++ b/toolkit/xre/MacLaunchHelper.mm
+@@ -199,7 +199,7 @@ bool InstallPrivilegedHelperWithId(const char* helperId, os_log_t logger) {
+ }
+ 
+ bool InstallElevatedUpdater() {
+-  return InstallPrivilegedHelperWithId("org.mozilla.updater");
++  return InstallPrivilegedHelperWithId("app.sval.updater");
+ }
+ 
+ void AbortElevatedUpdate() {
+@@ -212,7 +212,7 @@ void AbortElevatedUpdate() {
+   while (currTry < numRetries) {
+     @try {
+       updateServer = (id)[NSConnection
+-          rootProxyForConnectionWithRegisteredName:@"org.mozilla.updater.server"
++          rootProxyForConnectionWithRegisteredName:@"app.sval.updater.server"
+                                               host:nil
+                                    usingNameServer:[NSSocketPortNameServer
+                                                        sharedInstance]];
+diff --git a/toolkit/xre/MacRunFromDmgUtils.mm b/toolkit/xre/MacRunFromDmgUtils.mm
+index d930f8f688..f89b5fa651 100644
+--- a/toolkit/xre/MacRunFromDmgUtils.mm
++++ b/toolkit/xre/MacRunFromDmgUtils.mm
+@@ -285,7 +285,7 @@ bool LaunchElevatedDmgInstall(NSString* aBundlePath, NSString* aDestPath) {
+ 
+   os_log_info(runFromDMGLogger, "Launch elevated DMG Install");
+   bool didSucceed = InstallPrivilegedHelperWithId(
+-      "org.mozilla.dmgInstallHelper", runFromDMGLogger);
++      "app.sval.dmgInstallHelper", runFromDMGLogger);
+ 
+   os_log_info(runFromDMGLogger, "Installed helper: %s",
+               didSucceed ? "Yes" : "No");
+@@ -294,7 +294,7 @@ bool LaunchElevatedDmgInstall(NSString* aBundlePath, NSString* aDestPath) {
+   }
+ 
+   NSXPCConnection* connection = [[[NSXPCConnection alloc]
+-      initWithMachServiceName:@"org.mozilla.dmgInstallHelper"
++      initWithMachServiceName:@"app.sval.dmgInstallHelper"
+                       options:NSXPCConnectionPrivileged] autorelease];
+ 
+   if (connection == nil) {

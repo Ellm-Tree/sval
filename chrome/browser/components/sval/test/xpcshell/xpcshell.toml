@@ -1,0 +1,412 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# A file that reaches the shared folder runs real helper processes and waits
+# out their deadlines, and the pairing files also derive Argon2id keys. These
+# costs grow with how busy the machine is, while the harness's 30 s per file
+# does not, so with several files at once on a loaded machine these overran
+# it. They get twice the time.
+
+# First run is off for every suite, as every harness profile is a fresh one.
+# A device publishes nothing before its first time reading (decision 1714),
+# and the harness reaches no Remote Settings server, so every profile starts
+# with a reading of no difference.
+[DEFAULT]
+firefox-appdir = "browser"
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+]
+
+# The host is a shell script, which Windows cannot run as a native host.
+["test_native_messaging_closed_host.js"]
+skip-if = ["os == 'win'"]
+
+["test_subprocess_kill_after_exit.js"]
+
+["test_sval_agent_args.js"]
+
+["test_sval_agent_brands.js"]
+
+["test_sval_agent_challenge.js"]
+
+["test_sval_agent_clients.js"]
+
+["test_sval_agent_control.js"]
+
+["test_sval_agent_gate.js"]
+
+["test_sval_agent_page_tools.js"]
+
+["test_sval_agent_policy.js"]
+
+["test_sval_agent_polite.js"]
+
+["test_sval_agent_session.js"]
+
+["test_sval_agent_store.js"]
+
+["test_sval_agent_wait.js"]
+
+["test_sval_agent_wire.js"]
+
+# Waits out the action window's 10 s and 30 s limits.
+["test_sval_agent_write_window_limits.js"]
+requesttimeoutfactor = 2
+
+["test_sval_agents_listener.js"]
+
+["test_sval_archive.js"]
+
+["test_sval_blocking.js"]
+
+["test_sval_card.js"]
+
+["test_sval_clear_site_per_jar.js"]
+
+["test_sval_clock.js"]
+
+["test_sval_clock_first_reading.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_cname_uncloaking.js"]
+
+["test_sval_color.js"]
+
+["test_sval_console_capture.js"]
+
+["test_sval_crash_folders.js"]
+
+["test_sval_data_directory.js"]
+
+["test_sval_element_candidates.js"]
+
+["test_sval_element_rules.js"]
+
+["test_sval_email_address.js"]
+
+["test_sval_engine_vocabulary.js"]
+
+["test_sval_export.js"]
+
+["test_sval_ext_bookmarks.js"]
+
+["test_sval_extension_sites.js"]
+
+["test_sval_favorite_icons.js"]
+
+["test_sval_favorites_store.js"]
+
+["test_sval_fingerprinting_choices.js"]
+
+["test_sval_firefox_assets.js"]
+
+["test_sval_first_run_model.js"]
+
+["test_sval_header.js"]
+
+["test_sval_history_failed_exchange.js"]
+head = "shared_folder_head.js history_head.js history_shared_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_history_offline_week.js"]
+head = "shared_folder_head.js history_head.js history_shared_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_history_publish_interval.js"]
+head = "shared_folder_head.js history_head.js history_shared_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_history_quit_before_announcing.js"]
+head = "shared_folder_head.js history_head.js history_shared_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_history_stops_before_places.js"]
+head = "history_head.js"
+
+["test_sval_history_sync.js"]
+head = "history_head.js"
+
+["test_sval_icloud_keychain.js"]
+
+["test_sval_identity.js"]
+
+["test_sval_import.js"]
+
+["test_sval_import_arc.js"]
+head = "import_engine_head.js"
+support-files = ["data/import/arc/**", "data/import/arc-windows/**"]
+
+["test_sval_import_arc_export.js"]
+
+["test_sval_import_chromium.js"]
+support-files = [
+  "data/import/chrome/**",
+  "data/import/edge/**",
+  "data/import/edge-windows/**",
+  "data/import/vivaldi/**",
+]
+
+["test_sval_import_firefox.js"]
+head = "import_engine_head.js"
+support-files = ["data/import/firefox/**"]
+
+["test_sval_import_html.js"]
+
+["test_sval_import_leveldb.js"]
+support-files = ["data/import/leveldb/**"]
+
+["test_sval_import_model.js"]
+
+["test_sval_import_orion.js"]
+head = "import_engine_head.js"
+support-files = ["data/import/orion/**"]
+# Orion exists on macOS only, and Firefox builds the plist reader it needs,
+# PropertyListUtils, only there.
+run-if = [
+  "os == 'mac'",
+]
+
+["test_sval_import_safari.js"]
+support-files = ["data/import/safari/**"]
+# Safari exists on macOS only, and Firefox builds the plist reader it needs,
+# PropertyListUtils, only there.
+run-if = [
+  "os == 'mac'",
+]
+
+["test_sval_import_zen.js"]
+head = "import_engine_head.js"
+support-files = ["data/import/zen/**"]
+
+["test_sval_javascript_host_rules.js"]
+
+["test_sval_kagi_keychain.js"]
+
+["test_sval_kagi_privacy_pass.js"]
+
+["test_sval_launcher_tabs_match.js"]
+head = "panel_model_head.js"
+
+["test_sval_local_addresses.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_local_settings.js"]
+
+["test_sval_log.js"]
+
+["test_sval_mac_window_order.js"]
+# The window ordering is macOS's alone (widget/cocoa).
+run-if = [
+  "os == 'mac'",
+]
+
+["test_sval_mirror.js"]
+
+# The registry is Windows's.
+["test_sval_native_manifests_key.js"]
+run-if = ["os == 'win'"]
+
+["test_sval_no_crash_ping.js"]
+
+["test_sval_pairing.js"]
+head = "pairing_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_pairing_busy.js"]
+head = "pairing_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_pairing_folder.js"]
+head = "pairing_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_pairing_forged.js"]
+head = "pairing_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_pairing_look.js"]
+
+["test_sval_panel_appearance.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_device_state.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_emoji.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_keyboard.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_menus.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_model.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_moves.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_rows.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_selection.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_sync.js"]
+head = "panel_model_head.js"
+
+["test_sval_panel_workspaces.js"]
+head = "panel_model_head.js"
+
+["test_sval_password_manager.js"]
+
+["test_sval_pins_model.js"]
+
+["test_sval_private.js"]
+
+["test_sval_push.js"]
+
+["test_sval_region.js"]
+
+["test_sval_release_candidates.js"]
+
+["test_sval_report.js"]
+
+["test_sval_restore.js"]
+head = "tabs_head.js"
+
+["test_sval_secret_store.js"]
+
+["test_sval_secure_dns.js"]
+
+["test_sval_serial_queue.js"]
+
+["test_sval_settings_engine.js"]
+
+["test_sval_settings_registry.js"]
+
+["test_sval_settings_shared.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_settings_shared_independent.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_settings_sync.js"]
+
+["test_sval_shared_folder.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_background.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_background_failed.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_background_moved.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_hang.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_hang.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_keys.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_links.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_paths.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_unreachable.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_unreadable.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_helper_version.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_own_entry.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_own_set_aside.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_peers.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_peers_idle.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_request_dir.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_step_cap.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_shared_folder_wait_joins.js"]
+head = "shared_folder_head.js"
+requesttimeoutfactor = 2
+
+["test_sval_site_protections_hosts.js"]
+
+["test_sval_site_protections_migrated.js"]
+prefs = ["browser.sval.protection.migrated=true"]
+
+["test_sval_site_protections_start.js"]
+
+["test_sval_splits.js"]
+head = "tabs_head.js panel_model_head.js"
+
+["test_sval_sync.js"]
+head = "shared_folder_head.js"
+
+["test_sval_syncable_address.js"]
+
+["test_sval_tab_actions.js"]
+
+["test_sval_tab_icons.js"]
+
+["test_sval_tabs.js"]
+head = "tabs_head.js"
+
+["test_sval_test_wait.js"]
+
+["test_sval_tracker_owners.js"]
+
+["test_sval_update_delay.js"]
+
+["test_sval_update_delay_background.js"]
+
+["test_sval_visit_workspaces.js"]

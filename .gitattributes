@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Sval is a v1 platform on Windows as well as macOS. Without this file, a
+# Windows clone with the default core.autocrlf=true converts these to CRLF,
+# and `git apply` of an LF patch against an LF upstream checkout then rejects.
+*.patch text eol=lf
+*.sh text eol=lf
+series text eol=lf
+
+# Every pull request that adds a patch appends one line to the series, and
+# two appends at one place are a conflict to plain three-way merge. `union`
+# keeps both lines. Forgejo checks pull requests with `git merge-tree` in a
+# bare repository, which reads this file only with `attr.tree = HEAD` in its
+# git config; the server sets that. Two patches whose order matters still
+# fail in `apply-patches.sh`, not silently.
+patches/series merge=union

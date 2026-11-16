@@ -1,0 +1,28 @@
+Sval: no profile reset
+
+Firefox's reset ("Refresh") makes a new profile and fills it through
+FirefoxProfileMigrator, which copies only Firefox's own files: places,
+favicons, cookies, logins, form history, bookmark backups and the dictionary.
+Sval's state in the profile, its settings and its identity among them, would
+be left behind in the old profile. ResetProfile.resetSupported is the gate
+every way to a reset asks: about:support's Refresh button, the Troubleshoot
+Mode dialog, the address bar's refresh tips and quick action, the reset prompt
+BrowserGlue shows and UITour. The policy feature profileRefresh, the chrome
+API for turning reset off, can only be disallowed by an enterprise policy, so
+the gate is patched.
+
+diff --git a/toolkit/modules/ResetProfile.sys.mjs b/toolkit/modules/ResetProfile.sys.mjs
+index 48a62ab53e..07a7b89f2a 100644
+--- a/toolkit/modules/ResetProfile.sys.mjs
++++ b/toolkit/modules/ResetProfile.sys.mjs
+@@ -53,6 +53,10 @@ export var ResetProfile = {
+    * @returns {boolean} whether reset is supported.
+    */
+   resetSupported() {
++    // Sval: a reset builds the new profile through FirefoxProfileMigrator,
++    // which copies only Firefox's own files, so it would lose Sval's state.
++    return false;
++    // eslint-disable-next-line no-unreachable
+     if (Services.policies && !Services.policies.isAllowed("profileRefresh")) {
+       return false;
+     }

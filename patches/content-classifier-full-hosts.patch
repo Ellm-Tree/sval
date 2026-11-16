@@ -1,0 +1,66 @@
+Sval: the content classifier gives adblock-rust full hosts
+
+adblock-rust's Request::preparsed takes the request's hostname and the
+source's hostname: `||sub.example.com^` rules anchor on the full host, and
+`$domain=` options match every suffix of the source host. Passing the
+registrable domain instead means no rule naming a subdomain can match, which
+is a large share of EasyList and EasyPrivacy.
+
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.cpp b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.cpp
+index 99b975ec8e..6823808035 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.cpp
++++ b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.cpp
+@@ -32,8 +32,8 @@ ContentClassifierEngineResult ContentClassifierEngine::CheckNetworkRequest(
+   nsCString exception;
+ 
+   nsresult rv = content_classifier_engine_check_network_request_preparsed(
+-      mEngine, &aRequest.mUrl, &aRequest.mSchemelessSite,
+-      &aRequest.mSourceSchemelessSite, &aRequest.mRequestType,
++      mEngine, &aRequest.mUrl, &aRequest.mHost,
++      &aRequest.mSourceHost, &aRequest.mRequestType,
+       aRequest.mThirdParty, aPreviouslyMatched, &matched, &important,
+       &exception);
+   return ContentClassifierEngineResult(matched, !exception.IsEmpty(), important,
+@@ -49,15 +49,9 @@ ContentClassifierRequest::ContentClassifierRequest(nsIChannel* aChannel)
+   rv = uri->GetSpec(mUrl);
+   if (NS_FAILED(rv)) return;
+ 
+-  nsCString host;
+-  rv = uri->GetHost(host);
+-  if (NS_FAILED(rv)) return;
+-
+-  nsCOMPtr<nsIEffectiveTLDService> eTLDService =
+-      components::EffectiveTLD::Service();
+-  if (!eTLDService) return;
+-
+-  rv = eTLDService->GetSchemelessSiteFromHost(host, mSchemelessSite);
++  // adblock-rust anchors `||host^` rules on the full request host and
++  // resolves domains itself, so it needs hosts rather than sites.
++  rv = uri->GetAsciiHost(mHost);
+   if (NS_FAILED(rv)) return;
+ 
+   nsCOMPtr<nsILoadInfo> loadInfo;
+@@ -66,7 +60,7 @@ ContentClassifierRequest::ContentClassifierRequest(nsIChannel* aChannel)
+ 
+   nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->GetLoadingPrincipal();
+   if (loadingPrincipal) {
+-    rv = loadingPrincipal->GetBaseDomain(mSourceSchemelessSite);
++    rv = loadingPrincipal->GetAsciiHost(mSourceHost);
+     if (NS_FAILED(rv)) return;
+   }
+ 
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+index 5c5a1b2bd5..34319071fc 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
++++ b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+@@ -51,8 +51,8 @@ class ContentClassifierEngineResult {
+ class ContentClassifierRequest {
+   friend class ContentClassifierEngine;
+   nsCString mUrl;
+-  nsCString mSchemelessSite;
+-  nsCString mSourceSchemelessSite;
++  nsCString mHost;
++  nsCString mSourceHost;
+   nsCString mRequestType;
+   bool mThirdParty = false;
+   bool mPrivateBrowsing = false;

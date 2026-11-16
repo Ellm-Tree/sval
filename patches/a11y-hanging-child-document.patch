@@ -1,0 +1,38 @@
+Sval: accessibility takes a hanging document off its parent's child list
+
+`OuterDocAccessible::Shutdown` detaches its child document and queues it to
+be bound to the parent again (`BindChildDocument`), but leaves it in the
+parent's `mChildDocuments`. The rebind in
+`NotificationController::WillRefresh` appends it a second time on success;
+on failure it shuts the child down, and `DocAccessible::Shutdown` removes
+only a child that has a parent, so the dead child stays listed. A
+window-modal dialog's frame goes this way when the dialog closes with
+accessibility on: after eight dialogs had opened and closed, a window's
+document listed three dead documents. When accessibility starts while such a
+dialog is up, the window's document is not yet loaded, and a listed child
+that never loads keeps it from loading: it stays busy, and its notification
+controller observes every refresh, holding vsync on until accessibility
+shuts down. Reading the state of the dead child that
+`nsIAccessibleDocument.getChildDocumentAt` returns crashes the process.
+Taking every hanging document off the list before it is bound or shut down
+keeps the list to the children in the tree.
+
+diff --git a/accessible/base/NotificationController.cpp b/accessible/base/NotificationController.cpp
+index 40a49c0605..96289c808d 100644
+--- a/accessible/base/NotificationController.cpp
++++ b/accessible/base/NotificationController.cpp
+@@ -917,6 +917,14 @@ void NotificationController::WillRefresh(mozilla::TimeStamp aTime) {
+   nsTArray<RefPtr<DocAccessible>> newChildDocs;
+   for (uint32_t idx = 0; idx < hangingDocCnt; idx++) {
+     DocAccessible* childDoc = mHangingChildDocuments[idx];
++    // A hanging document is out of this document's tree, so it is out of the
++    // list of child documents too. OuterDocAccessible::Shutdown queues its
++    // child here while the child is still listed, and DocAccessible::Shutdown
++    // takes only a bound child off the list. Left listed, the child is listed
++    // twice once bound again, or stays listed after its shutdown, and while a
++    // listed child is not completely loaded this document's load is never
++    // processed: it stays busy and observes every refresh.
++    mDocument->RemoveChildDocument(childDoc);
+     if (childDoc->IsDefunct()) {
+       continue;
+     }

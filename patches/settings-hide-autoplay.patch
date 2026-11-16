@@ -1,0 +1,22 @@
+Sval: hide Firefox's Autoplay permission row
+
+The media gate replaces Firefox's autoplay setting: Sval's protection button
+and Settings › Sites set the same autoplay-media permission per site, and the
+default lives above that list (protections spec §4.3). The row has no pref that
+hides it, so the setting config is the only lever, as for the rows
+settings-hide-removed-features hides.
+
+diff --git a/browser/components/preferences/config/permissions-data.mjs b/browser/components/preferences/config/permissions-data.mjs
+index e0b9d03f28..f95dfb8b0f 100644
+--- a/browser/components/preferences/config/permissions-data.mjs
++++ b/browser/components/preferences/config/permissions-data.mjs
+@@ -185,6 +185,9 @@ Preferences.addSetting({
+ });
+ Preferences.addSetting({
+   id: "autoplaySettingsButton",
++  // Sval: the media gate's per-site choices live in the protection button and
++  // Settings › Sites (protections spec §4.3).
++  visible: () => false,
+   onUserClick: () =>
+     showPermissionExceptions({ permissionType: "autoplay-media" }),
+ });

@@ -1,0 +1,178 @@
+Sval: what WebDriver opens never shares the user's cookie jar
+
+A window WebDriver opens gets a workspace of its own, named WebDriver and
+isolated, and its first tab opens in that workspace's jar, or in a user
+context the client made over BiDi if it names one.
+WindowManager.openBrowserWindow, which classic NewWindow and BiDi's
+browsingContext.create both reach, asks SvalWebDriver to open it. A tab a
+client opens in one of the user's windows goes to a window of WebDriver's
+instead (SvalWebDriver.tabTarget, from TabManager.addTab and from BiDi's
+browsingContext.create, whose wait for the old tab to hide must watch that
+window), and is the first tab of a window opened for it when there is none.
+browser.createUserContext reports each context it makes to SvalWebDriver,
+and those are the only jars besides its window's own that TabManager.addTab
+passes on: any other, the default one included, which BiDi names for every
+tab a client opens without naming one, gives way to the window's workspace
+jar (workspace-jar-for-new-tabs.patch). No chrome API reaches inside the
+remote agent, and the jar has to be chosen before the window or tab exists:
+Sval reopening a tab in another jar would end the client's browsing context.
+
+diff --git a/remote/shared/TabManager.sys.mjs b/remote/shared/TabManager.sys.mjs
+index b3b7693c45..9076d8a5e8 100644
+--- a/remote/shared/TabManager.sys.mjs
++++ b/remote/shared/TabManager.sys.mjs
+@@ -6,6 +6,7 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AppInfo: "chrome://remote/content/shared/AppInfo.sys.mjs",
++  SvalWebDriver: "moz-src:///browser/components/sval/SvalWebDriver.sys.mjs",
+   EventPromise: "chrome://remote/content/shared/Sync.sys.mjs",
+   MobileTabBrowser: "chrome://remote/content/shared/MobileTabBrowser.sys.mjs",
+   UserContextManager:
+@@ -129,13 +130,25 @@ class TabManagerClass {
+       tabIndex = this.getTabsForWindow(window).indexOf(referenceTab) + 1;
+     }
+ 
+-    const tabBrowser = this.getTabBrowser(window);
+-
+-    const tab = await tabBrowser.addTab("about:blank", {
+-      tabIndex,
+-      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+-      userContextId: lazy.UserContextManager.getInternalIdById(userContextId),
+-    });
++    // Sval: a WebDriver tab goes to a window of WebDriver's (SvalWebDriver),
++    // and is the first tab of one opened for it. It keeps a user context the
++    // client made over BiDi, and opens in the jar of the workspace its window
++    // shows otherwise (gBrowser.defaultUserContextId).
++    const internalId = lazy.UserContextManager.getInternalIdById(userContextId);
++    const target = await lazy.SvalWebDriver.tabTarget(window, internalId);
++    if (target.window !== window) {
++      window = target.window;
++      tabIndex = undefined;
++    }
++    const tab =
++      target.tab ??
++      (await this.getTabBrowser(window).addTab("about:blank", {
++        tabIndex,
++        triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
++        userContextId: lazy.SvalWebDriver.isClientsJar(internalId)
++          ? internalId
++          : null,
++      }));
+ 
+     if (focus) {
+       await this.selectTab(tab);
+diff --git a/remote/shared/WindowManager.sys.mjs b/remote/shared/WindowManager.sys.mjs
+index 30f66fa96f..6f83a6e7c0 100644
+--- a/remote/shared/WindowManager.sys.mjs
++++ b/remote/shared/WindowManager.sys.mjs
+@@ -12,6 +12,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   AnimationFramePromise: "chrome://remote/content/shared/Sync.sys.mjs",
+   AppInfo: "chrome://remote/content/shared/AppInfo.sys.mjs",
+   BiMap: "chrome://remote/content/shared/BiMap.sys.mjs",
++  SvalWebDriver: "moz-src:///browser/components/sval/SvalWebDriver.sys.mjs",
+   BrowsingContextListener:
+     "chrome://remote/content/shared/listeners/BrowsingContextListener.sys.mjs",
+   ChromeWindowListener:
+@@ -429,18 +430,25 @@ class WindowManager {
+     // Open new browser window, and wait until it is fully loaded.
+     // Also wait for the window to be focused and activated to prevent a
+     // race condition when promptly focusing to the original window again.
+-    const browser = await new Promise(resolveOnContentBrowserCreated =>
+-      lazy.URILoadingHelper.openTrustedLinkIn(
+-        openerWindow,
+-        "about:blank",
+-        "window",
+-        {
+-          private: isPrivate,
+-          resolveOnContentBrowserCreated,
+-          userContextId:
+-            lazy.UserContextManager.getInternalIdById(userContextId),
+-        }
+-      )
++    // Sval gives the window a workspace and cookie jar of its own.
++    const browser = await lazy.SvalWebDriver.openWindow(
++      {
++        isPrivate,
++        userContextId: lazy.UserContextManager.getInternalIdById(userContextId),
++      },
++      internalId =>
++        new Promise(resolveOnContentBrowserCreated =>
++          lazy.URILoadingHelper.openTrustedLinkIn(
++            openerWindow,
++            "about:blank",
++            "window",
++            {
++              private: isPrivate,
++              resolveOnContentBrowserCreated,
++              userContextId: internalId,
++            }
++          )
++        )
+     );
+ 
+     // TODO: Both for WebDriver BiDi and classic, opening a new window
+diff --git a/remote/webdriver-bidi/modules/root/browser.sys.mjs b/remote/webdriver-bidi/modules/root/browser.sys.mjs
+index 651f5b0a96..f6ff258e47 100644
+--- a/remote/webdriver-bidi/modules/root/browser.sys.mjs
++++ b/remote/webdriver-bidi/modules/root/browser.sys.mjs
+@@ -8,6 +8,7 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   assert: "chrome://remote/content/shared/webdriver/Assert.sys.mjs",
++  SvalWebDriver: "moz-src:///browser/components/sval/SvalWebDriver.sys.mjs",
+   Certificates: "chrome://remote/content/shared/webdriver/Certificates.sys.mjs",
+   DownloadBehaviorManager:
+     "chrome://remote/content/webdriver-bidi/DownloadBehaviorManager.sys.mjs",
+@@ -254,6 +255,8 @@ class BrowserModule extends RootBiDiModule {
+ 
+     const userContextId = lazy.UserContextManager.createContext("webdriver");
+     const internalId = lazy.UserContextManager.getInternalIdById(userContextId);
++    // Sval: the one jar besides its window's own that a WebDriver tab keeps.
++    lazy.SvalWebDriver.noteClientUserContext(internalId);
+ 
+     if (acceptInsecureCerts !== null) {
+       this.#userContextsWithInsecureCertificatesOverrides.add(internalId);
+diff --git a/remote/webdriver-bidi/modules/root/browsingContext.sys.mjs b/remote/webdriver-bidi/modules/root/browsingContext.sys.mjs
+index de27d46ebf..b7472b446d 100644
+--- a/remote/webdriver-bidi/modules/root/browsingContext.sys.mjs
++++ b/remote/webdriver-bidi/modules/root/browsingContext.sys.mjs
+@@ -9,6 +9,7 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AppInfo: "chrome://remote/content/shared/AppInfo.sys.mjs",
+   assert: "chrome://remote/content/shared/webdriver/Assert.sys.mjs",
++  SvalWebDriver: "moz-src:///browser/components/sval/SvalWebDriver.sys.mjs",
+   BrowsingContextListener:
+     "chrome://remote/content/shared/listeners/BrowsingContextListener.sys.mjs",
+   capture: "chrome://remote/content/shared/Capture.sys.mjs",
+@@ -729,6 +730,22 @@ class BrowsingContextModule extends RootBiDiModule {
+           window = lazy.TabManager.getWindowForTab(referenceTab);
+         }
+ 
++        // Sval: the tab goes to a window of WebDriver's (SvalWebDriver), and
++        // the wait below is for that window's selected tab. A window opened
++        // for it brings the tab with it.
++        const target = await lazy.SvalWebDriver.tabTarget(
++          window,
++          lazy.UserContextManager.getInternalIdById(userContext)
++        );
++        if (target.tab) {
++          browser = lazy.TabManager.getBrowserForTab(target.tab);
++          break;
++        }
++        if (target.window !== window) {
++          window = target.window;
++          referenceTab = null;
++        }
++
+         if (!background && !lazy.AppInfo.isAndroid) {
+           // When opening a new foreground tab we need to wait until the
+           // "document.visibilityState" of the currently selected tab in this
+@@ -749,6 +766,7 @@ class BrowsingContextModule extends RootBiDiModule {
+           focus: !background,
+           referenceTab,
+           userContextId: userContext,
++          window,
+         });
+         browser = lazy.TabManager.getBrowserForTab(tab);
+       }

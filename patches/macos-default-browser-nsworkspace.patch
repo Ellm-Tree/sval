@@ -1,0 +1,29 @@
+Sval: ask for the default browser through NSWorkspace from macOS 12
+
+macOS 12 deprecates LSSetDefaultHandlerForURLScheme and
+LSSetDefaultRoleHandlerForContentType for NSWorkspace's
+setDefaultApplicationAtURL, under which the user confirms the change. On
+macOS 26 one of the deprecated calls returns an error for a change the user
+accepts, so SetDefaultBrowser fails while Sval is made the default. Upstream
+already uses NSWorkspace from macOS 27; the API exists from 12.
+
+diff --git a/browser/components/shell/nsMacShellService.mm b/browser/components/shell/nsMacShellService.mm
+index 6bdf108..5e945a5 100644
+--- a/browser/components/shell/nsMacShellService.mm
++++ b/browser/components/shell/nsMacShellService.mm
+@@ -72,11 +72,10 @@ NS_IMETHODIMP
+ nsMacShellService::SetDefaultBrowser(bool aForAllUsers) {
+   // Note: We don't support aForAllUsers on Mac OS X.
+ 
+-  if (@available(macOS 27.0, *)) {
+-    // macOS 27 raises a separate prompt for each LSSetDefault* call below
+-    // resulting in multiple default browser change confirmation prompts.
+-    // The NSWorkspace API, which avoids this problem, is available on macOS
+-    // 12+, but limit its use here to macOS 27+ for now to be conservative.
++  if (@available(macOS 12.0, *)) {
++    // macOS 12 deprecates the LSSetDefault* calls below for this API, which
++    // asks the user once. Those calls can return an error for a change the
++    // user accepts, and macOS 27 raises a separate prompt for each of them.
+     // We only set the default application for the http URL scheme.
+     // Empirically, that has been shown to set the default browser and the
+     // default handler for https/http schemes and html files.

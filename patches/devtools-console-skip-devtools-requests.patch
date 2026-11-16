@@ -1,0 +1,23 @@
+Sval: the console keeps a batch's messages when DevTools made a request in it
+
+WebConsoleUI._onResourceAvailable leaves with `return` when it meets a
+network event whose cause is "devtools", before dispatchMessagesAdd sends
+the messages it built from the batch. Every message in a batch with one of
+DevTools' own requests is lost, so those requests never show in the Browser
+Console. Skipping only that event, with `continue`, keeps the rest. Mozilla's
+browser_console.js fails without this when a DevTools request lands in the
+same batch as the page's.
+
+diff --git a/devtools/client/webconsole/webconsole-ui.js b/devtools/client/webconsole/webconsole-ui.js
+index 36a612e108..0bdb68710c 100644
+--- a/devtools/client/webconsole/webconsole-ui.js
++++ b/devtools/client/webconsole/webconsole-ui.js
+@@ -533,7 +533,7 @@ class WebConsoleUI extends EventEmitter {
+         // We still don't show any request done by DevTools,
+         // but bug 2038986 intent to revise that.
+         if (resource.cause.type == "devtools") {
+-          return;
++          continue;
+         }
+         this.networkDataProvider?.onNetworkResourceAvailable(resource);
+       }

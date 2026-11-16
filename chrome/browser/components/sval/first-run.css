@@ -1,0 +1,1479 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's first run, in the Sval browser design system's visual language, as
+ * `settings.css` and `home/home.css` are: Outfit, Sval Blue as the one action
+ * colour, Neon for focus and the current step, pill buttons and fields, on
+ * the night sheet. The values are the system's tokens under their system
+ * names, because they are Sval's brand rather than Firefox's design tokens.
+ * The sheet is always dark: it opens over a fresh profile, before the user
+ * has said anything about how Sval should look.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+
+:root {
+  --sval-blue: var(--sval-palette-blue);
+  --sval-neon: var(--sval-palette-neon);
+  --ink-850: var(--sval-palette-ink-850);
+  --ink-500: var(--sval-palette-ink-500);
+  --text-strong: #ffffff;
+  --text-body: var(--sval-palette-ink-200);
+  --text-label: var(--sval-palette-ink-300);
+  --text-muted: var(--sval-palette-ink-400);
+  --border: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --border-soft: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --border-strong: rgb(var(--sval-palette-wash-dark) / 0.34);
+  --surface-card: rgb(var(--sval-palette-wash-light) / 0.28);
+  --surface-card-hover: rgb(var(--sval-palette-wash-light) / 0.44);
+  --surface-glass: rgba(6, 10, 46, 0.72);
+  --action-primary: var(--sval-blue);
+  --action-primary-hover: var(--sval-palette-blue-400);
+  --action-primary-press: var(--sval-palette-blue-600);
+  --focus-ring: var(--sval-neon);
+  --ok: #4fcf6a;
+  --warn: #ffc22a;
+  --problem: #ff7a6b;
+  --grad-glyph: linear-gradient(180deg, #2fd0ff 0%, var(--sval-palette-blue-600) 100%);
+  --glow-blue: 0 0 0 1px rgba(92, 242, 255, 0.25), 0 10px 36px rgba(31, 107, 255, 0.55);
+  --inset-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --radius-pill: 999px;
+  --ink-950: var(--sval-palette-ink-950);
+  --ink-800: #0f1a52;
+  --ink-700: var(--sval-palette-ink-700);
+  --ink-600: var(--sval-palette-ink-600);
+  --ink-300: var(--sval-palette-ink-300);
+  --surface-row: rgb(var(--sval-palette-wash-light) / 0.28);
+  --night-sky:
+    url("chrome://browser/content/sval/home/starfield-stars-only-1920x1080.svg") center / 900px auto no-repeat,
+    radial-gradient(90% 110% at 50% 30%, #13328f 0%, var(--ink-950) 100%);
+  --ease-orbit: cubic-bezier(0.22, 0.8, 0.24, 1);
+  /* The New Workspace dialog's fields (`sval-dialog.css`) at their dark
+   * values, which that sheet gives only a dark scheme: the sheet is dark
+   * whatever the system's scheme. */
+  --sval-dialog-text: #ffffff;
+  --sval-dialog-body: var(--sval-palette-ink-300);
+  --sval-dialog-muted: var(--sval-palette-ink-400);
+  --sval-dialog-field: rgba(6, 10, 46, 0.72);
+  --sval-dialog-field-border: var(--sval-palette-ink-400);
+  --sval-dialog-focus: var(--sval-palette-neon);
+  --sval-dialog-secondary: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-dialog-secondary-hover: rgb(var(--sval-palette-wash-dark) / 0.16);
+  --sval-dialog-secondary-ink: #ffffff;
+  --sval-dialog-error: var(--sval-palette-red-invert);
+  color-scheme: dark;
+}
+
+/* One size for every step (2026-11-09 spec §3): the tallest, Search with
+ * Kagi's notice, fits it without scrolling. `SubDialog` sizes the dialog to
+ * the page. */
+html,
+body {
+  width: 560px;
+  height: 660px;
+  margin: 0;
+  background: var(--ink-850);
+}
+
+.sval-fr {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  box-sizing: border-box;
+  width: 560px;
+  height: 660px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--ink-850);
+  box-shadow: var(--inset-hairline);
+  color: var(--text-body);
+  font: 400 15px/1.4 var(--sval-font);
+  overflow: hidden;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.sval-fr * {
+  box-sizing: border-box;
+}
+
+.sval-fr > section {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sval-fr p {
+  margin: 0;
+}
+
+.sval-fr [hidden] {
+  display: none;
+}
+
+.sval-fr h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.sval-fr h1:focus {
+  outline: none;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.sval-fr-head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-xlarge);
+  padding: calc(var(--space-xxlarge) + var(--space-small)) 32px 0;
+}
+
+/* The share of the path done (2026-11-09 spec §2.5), with no count. */
+.sval-fr-progress,
+.sval-fr-import-bar {
+  flex: none;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-700);
+  overflow: hidden;
+}
+
+.sval-fr-progress-fill {
+  width: calc(var(--sval-fr-share, 0) * 100%);
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--sval-neon);
+  transition: width 420ms var(--ease-orbit);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* Under the heading, 6px from it as the design has it. */
+.sval-fr-head > .sval-fr-body {
+  margin-block-start: calc(6px - var(--space-xlarge));
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* A key as a cap: the Launcher's on the introduction's frame and the
+ * welcome's tip. */
+.sval-fr-keycap,
+.sval-fr-tip > kbd {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--ink-800);
+  box-shadow: 0 3px 0 #03051a;
+  color: #ffffff;
+  font: 700 17px var(--sval-font);
+}
+
+.sval-fr-keys {
+  display: inline-flex;
+  gap: 5px;
+}
+
+/* ---------------------------------------------------------------- introduction */
+
+.sval-fr-heroes {
+  flex: none;
+}
+
+/* The introduction's welcome: Sval's mark and wordmark, large, on the
+ * night sky the scenes stand on, at the scenes' height. */
+.sval-fr-intro-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  height: 300px;
+  border-block-end: 1px solid var(--border-soft);
+  background: var(--night-sky);
+}
+
+.sval-fr-mark {
+  width: 96px;
+  height: 96px;
+  border-radius: 22.5%;
+  box-shadow: var(--glow-blue);
+}
+
+/* The wordmark master carries side bearing: the glyphs and the ™ span x 72
+ * to 313 of its 372, so the box crops to them. */
+.sval-fr-wordmark {
+  --wm-h: 56px;
+  display: block;
+  width: calc(var(--wm-h) * 241 / 99);
+  height: var(--wm-h);
+  overflow: hidden;
+
+  > img {
+    display: block;
+    width: calc(var(--wm-h) * 372 / 99);
+    height: var(--wm-h);
+    margin-inline-start: calc(var(--wm-h) * -72 / 99);
+  }
+}
+
+.sval-fr-intro-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 28px 36px 0;
+
+  > h1 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 9px;
+    font-size: 26px;
+  }
+
+  > .sval-fr-body {
+    color: var(--ink-300);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+}
+
+.sval-fr-intro > .sval-fr-actions {
+  margin-block-start: auto;
+}
+
+.sval-fr-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sval-fr button.sval-fr-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-width: 0;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
+  }
+}
+
+.sval-fr-dot-mark {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-600);
+  transition:
+    width 240ms var(--ease-orbit),
+    background-color 240ms;
+
+  [aria-current="step"] > & {
+    width: 22px;
+    background: var(--sval-neon);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- welcome */
+
+/* The greeting and the card (`card.css`, 210 by 340) side by side on the
+ * night sky the introduction's scenes stand on. The card's drawing reaches
+ * 30px past its box for its shadow, which the hero's padding holds. */
+.sval-fr-card-hero {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 40px 24px 32px;
+  border-block-end: 1px solid var(--border-soft);
+  background: var(--night-sky);
+}
+
+.sval-fr-card-slot {
+  flex: none;
+  width: calc(210px * 0.84);
+  height: calc(340px * 0.84);
+
+  > .sval-mcard {
+    zoom: 0.84;
+  }
+}
+
+.sval-fr-welcome-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+
+  > h1 {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  > .sval-fr-body {
+    color: var(--ink-300);
+    font-size: 15px;
+    line-height: 1.45;
+    text-wrap: pretty;
+  }
+}
+
+/* The rows under the greeting; an import's result lines scroll here. */
+.sval-fr-rows {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 14px 32px 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+.sval-fr-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-row);
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1.4;
+
+  > p {
+    flex: 1;
+    text-wrap: pretty;
+  }
+}
+
+.sval-fr-row-glyph {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  -moz-context-properties: fill;
+  fill: var(--sval-neon);
+}
+
+.sval-fr .sval-fr-rows button.sval-fr-set-up-sync {
+  flex: none;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.sval-fr-tip {
+  color: var(--text-body);
+  font-size: 14px;
+
+  > kbd {
+    min-width: 28px;
+    height: 28px;
+    margin-inline: 2px;
+    padding: 0 6px;
+    border-radius: 7px;
+    box-shadow: 0 2px 0 #03051a;
+    font-size: 14px;
+  }
+}
+
+/* What is being imported (2026-11-09 spec §3.7): the browsers' logos, the
+ * one being brought in, and how many have finished. */
+.sval-fr-import {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 9px;
+  padding: 12px 16px;
+}
+
+.sval-fr-import-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  > p {
+    flex: 1;
+    min-width: 0;
+  }
+
+  > p:empty {
+    display: none;
+  }
+}
+
+.sval-fr-import-logos {
+  display: flex;
+  flex: none;
+  padding-inline-end: 4px;
+}
+
+.sval-fr-import-logo {
+  width: 20px;
+  height: 20px;
+  margin-inline-end: -4px;
+  -moz-context-properties: fill;
+  fill: var(--text-body);
+}
+
+.sval-fr-import[data-state="done"] .sval-fr-progress-fill {
+  background: var(--ok);
+}
+
+.sval-fr-import[data-state="failed"] .sval-fr-import-bar {
+  display: none;
+}
+
+.sval-fr-import-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &:empty {
+    display: none;
+  }
+}
+
+.sval-fr-welcome > .sval-fr-actions {
+  padding-block: 12px 24px;
+}
+
+.sval-fr .sval-fr-actions > button.sval-fr-start {
+  height: 48px;
+  padding: 0 28px;
+  font-size: 16px;
+  box-shadow: var(--glow-blue);
+
+  &:focus-visible {
+    outline-offset: 3px;
+  }
+}
+
+/* ---------------------------------------------------------------- body */ /* ---------------------------------------------------------------- body */
+
+/* What a step offers scrolls between its header and its buttons, so on a
+ * window or text size the sheet cannot fit, every choice can still be
+ * reached and the focused one is never under the buttons. The few pixels at
+ * its foot keep a focused choice's ring inside it. */
+.sval-fr-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+  padding: 18px 32px 4px;
+  overflow-y: auto;
+  /* A choice scrolled into view keeps its focus ring, which reaches 4px
+   * past the row, inside the list. */
+  scroll-padding-block: 18px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+.sval-fr-options {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sval-fr-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 160ms,
+    border-color 160ms;
+
+  &:has(input:checked) {
+    border-color: var(--sval-neon);
+    background: rgba(31, 107, 255, 0.16);
+  }
+
+  &:hover:not(:has(input:checked, input:disabled)) {
+    border-color: var(--border-strong);
+  }
+
+  &:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:has(input:disabled) {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.sval-fr-tile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--grad-glyph);
+}
+
+.sval-fr-glyph {
+  width: 20px;
+  height: 20px;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+.sval-fr-tile > .sval-fr-glyph {
+  fill: #ffffff;
+}
+
+.sval-fr-option-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-fr-option-label {
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sval-fr-option-detail {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/* A real radio, drawn as the system's ring, so the group keeps the
+ * platform's keys and announcements (spec §7). */
+.sval-fr-option > input[type="radio"] {
+  appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid var(--ink-500);
+  border-radius: 50%;
+  background: transparent;
+  outline: none;
+
+  &:checked {
+    border-color: var(--sval-neon);
+    background: radial-gradient(circle, var(--sval-neon) 0 4px, transparent 4.5px);
+  }
+}
+
+/* Long lists: every engine, every password manager. */
+.sval-fr-options[data-dense] {
+  gap: 4px;
+
+  .sval-fr-option {
+    gap: 12px;
+    padding: 6px 14px;
+    border-radius: 12px;
+  }
+
+  .sval-fr-option-words {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .sval-fr-option-label {
+    flex: none;
+    min-width: 108px;
+    max-width: 200px;
+  }
+
+  .sval-fr-tile {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+  }
+
+  .sval-fr-tile > .sval-fr-glyph {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.sval-fr-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+
+.sval-fr-always {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------- folder */
+
+/* Where the other device's folder is chosen: a dashed zone with the button
+ * and the folder chosen beside it. */
+.sval-fr-folder-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  background: rgb(var(--sval-palette-wash-light) / 0.16);
+}
+
+/* A path outside the cloud services shows whole, wrapped wherever it must
+   break: a folder's place in the user's storage is what tells it apart from
+   another of the same name. */
+.sval-fr-folder-chosen {
+  flex: 1;
+  min-width: 0;
+}
+
+.sval-fr-folder {
+  display: block;
+  color: var(--text-body);
+  font: 13px/1.4 monospace;
+  overflow-wrap: anywhere;
+}
+
+.sval-fr .sval-fr-content button.sval-fr-use-backup {
+  align-self: flex-start;
+  height: 32px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--sval-neon);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:hover:not(:disabled) {
+    background: none;
+    color: #ffffff;
+  }
+}
+
+/* The buttons a folder's or a join's line offers, under it. */
+.sval-fr-problem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  > button {
+    height: 40px;
+    padding: 0 18px;
+    font-size: 14px;
+  }
+}
+
+/* ---------------------------------------------------------------- workspace */
+
+/* The Workspace's header as the panel will draw it (2026-11-09 spec §3.4),
+ * in the colour chosen, whose values `first-run.js` sets from the palette. */
+.sval-fr-ws-preview {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--sval-fr-ws-tint, var(--surface-row));
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+  color: var(--sval-fr-ws-body, #ffffff);
+  transition: background-color 240ms var(--ease-orbit);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.sval-fr-ws-tile {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1.5px var(--sval-fr-ws-line, var(--border-strong));
+  font-size: 17px;
+  line-height: 1;
+}
+
+.sval-fr-ws-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-fr-ws-glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+/* The New Workspace dialog's fields (`new-workspace.css`), spaced as its
+ * card spaces them. */
+.sval-fr-ws-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* The emoji picker takes the fields' place while it is open. */
+section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
+  display: none;
+}
+
+/* Dark, which is what the picker's media queries then answer
+ * (`nsSubDocumentFrame::MaybeUpdateEmbedderColorScheme`). */
+.sval-fr-emoji {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- a few more things */
+
+.sval-fr-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sval-fr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: rgb(var(--sval-palette-wash-light) / 0.2);
+}
+
+.sval-fr-card-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sval-fr-card .sval-fr-option-detail {
+  font-size: 13px;
+  text-wrap: pretty;
+}
+
+/* A two-way switch: two real radios in a sunken pill, so the group keeps
+ * the platform's arrow keys and announcements (spec §7). */
+.sval-fr-segments {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: #03051a;
+}
+
+.sval-fr-segment {
+  position: relative;
+  display: flex;
+  cursor: pointer;
+
+  > input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 56px;
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    color: var(--ink-300);
+    font-size: 14px;
+    font-weight: 700;
+    transition:
+      background-color 160ms,
+      color 160ms;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+
+  &:has(input:checked) > span {
+    border-color: var(--sval-neon);
+    background: rgba(31, 107, 255, 0.28);
+    color: #ffffff;
+  }
+
+  &:has(input:focus-visible) > span {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Under AI assistants' On, past the card's glyph, behind a hairline. */
+.sval-fr-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-inline-start: 50px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--border-soft);
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+
+  > input {
+    margin-block-start: 1px;
+  }
+}
+
+/* A checkbox drawn to match the radios. */
+.sval-fr-check > input[type="checkbox"],
+.sval-fr .sval-im-picker input[type="checkbox"] {
+  appearance: none;
+  flex: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid var(--ink-500);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+
+  &:checked {
+    border-color: var(--sval-neon);
+    background: var(--sval-neon) center / 12px no-repeat url("chrome://browser/content/sval/icons/check.svg");
+    -moz-context-properties: fill;
+    fill: var(--ink-950);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+  }
+}
+
+/* ---------------------------------------------------------------- code */
+
+.sval-fr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sval-fr-label {
+  color: var(--text-label);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sval-fr-code {
+  appearance: none;
+  height: 56px;
+  margin: 0;
+  padding: 0 24px;
+  border: 1px solid var(--ink-500);
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  color: var(--text-strong);
+  caret-color: var(--sval-neon);
+  font: 600 22px monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  &::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+
+  &[aria-invalid="true"] {
+    border-color: var(--problem);
+  }
+
+  &[aria-invalid="true"]:focus-visible {
+    outline-color: var(--problem);
+  }
+}
+
+/* A backup key wraps onto a second line, so its box has the notices'
+ * corners in place of the pill's. */
+.sval-fr-code.sval-fr-backup-key {
+  height: auto;
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  resize: none;
+}
+
+.sval-fr-error {
+  color: var(--problem);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ---------------------------------------------------------------- notices */
+
+/* A notice is one glyph and its words. Its glyph is drawn before the words,
+ * so the words are the element's whole text. */
+.sval-fr-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-card);
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1.45;
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-block: 1px;
+    background: center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  &[data-tone="info"] {
+    border-color: rgba(92, 242, 255, 0.22);
+    background: rgba(92, 242, 255, 0.06);
+
+    &::before {
+      background-image: url("chrome://browser/content/sval/icons/badge-info.svg");
+      fill: var(--sval-neon);
+    }
+  }
+
+  &[data-tone="ok"] {
+    border-color: rgba(79, 207, 106, 0.3);
+    background: rgba(79, 207, 106, 0.08);
+
+    &::before {
+      background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+      fill: var(--ok);
+    }
+  }
+
+  &[data-tone="warn"] {
+    border-color: rgba(255, 194, 42, 0.32);
+    background: rgba(255, 194, 42, 0.08);
+
+    &::before {
+      background-image: url("chrome://browser/content/sval/icons/badge-alert.svg");
+      fill: var(--warn);
+    }
+  }
+
+  &[data-tone="card"] {
+    border-color: rgba(92, 242, 255, 0.22);
+    background: rgba(92, 242, 255, 0.06);
+
+    &::before {
+      background-image: url("chrome://browser/content/sval/icons/id-card.svg");
+      fill: var(--sval-neon);
+    }
+  }
+
+  &[data-tone="neutral"]::before {
+    background-image: url("chrome://browser/content/sval/icons/clock-3.svg");
+    fill: var(--text-label);
+  }
+}
+
+/* A notice with nothing to say takes no room, but stays in the tree, so a
+ * live one announces the words it is given. */
+.sval-fr-notice:empty,
+.sval-fr-join:empty,
+.sval-fr-error:empty {
+  position: absolute;
+  padding: 0;
+  border: 0;
+
+  &::before {
+    content: none;
+  }
+}
+
+/* Kagi's row and its sign-in are one choice: the block takes the row's edge
+ * and its chosen look, and the sign-in sits inside it, under Kagi's name. */
+.sval-fr-option-block {
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  transition:
+    background-color 160ms,
+    border-color 160ms;
+
+  &:has(input:checked) {
+    border-color: rgba(92, 242, 255, 0.45);
+    background: rgba(31, 107, 255, 0.16);
+  }
+
+  > .sval-fr-option,
+  > .sval-fr-option:has(input:checked) {
+    border: 0;
+    background: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.sval-fr-kagi {
+  align-items: center;
+  /* In line with the engine's name, past its 20px icon and the row's gap. */
+  margin: 0 14px 8px 46px;
+  padding: 8px 12px;
+
+  > p {
+    flex: 1;
+  }
+}
+
+.sval-fr-kagi > button {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------- join */
+
+.sval-fr-join {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-card);
+  color: var(--text-body);
+  font-size: 15px;
+  line-height: 1.4;
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 22px;
+    height: 22px;
+    background: center / contain no-repeat url("chrome://browser/content/sval/icons/loader-circle.svg");
+    -moz-context-properties: fill;
+    fill: var(--sval-neon);
+    animation: sval-fr-spin 1s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+}
+
+section[data-join="failed"] .sval-fr-join::before,
+section[data-join="unchanged"] .sval-fr-join::before {
+  background-image: url("chrome://browser/content/sval/icons/badge-x.svg");
+  fill: var(--problem);
+  animation: none;
+}
+
+section[data-join="landed"] .sval-fr-join::before {
+  background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+  fill: var(--ok);
+  animation: none;
+}
+
+@keyframes sval-fr-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+/* The picker, the logins hand-off, an import's result lines and the New
+ * Workspace dialog's fields draw their own buttons. A hidden button is left
+ * out, since this rule's display would outrank `[hidden]`'s. */
+.sval-fr button:not([hidden], .sval-im-picker *, .sval-im-handoff *, .sval-im-result-line *, .sval-fr-ws-form *, .sval-fr-dot) {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-strong);
+  font: 700 15px/1 var(--sval-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 160ms,
+    color 160ms;
+
+  &:hover:not(:disabled) {
+    background: var(--surface-card-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.sval-fr button.primary {
+  border-color: rgba(92, 242, 255, 0.28);
+  background: var(--action-primary);
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background: var(--action-primary-hover);
+  }
+
+  &:hover:active:not(:disabled) {
+    background: var(--action-primary-press);
+  }
+}
+
+.sval-fr button.sval-fr-choose-folder {
+  flex: none;
+  height: 44px;
+  padding: 0 20px;
+}
+
+.sval-fr-choose-folder > .sval-fr-glyph {
+  width: 16px;
+  height: 16px;
+  fill: #ffffff;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.sval-fr-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 32px 28px;
+}
+
+.sval-fr-spacer {
+  flex: 1;
+}
+
+.sval-fr button.sval-fr-later,
+.sval-fr button.sval-fr-skip {
+  height: 44px;
+  margin-inline-start: -14px;
+  padding: 0 14px;
+  border-color: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+
+  &:hover:not(:disabled) {
+    background: var(--surface-card);
+    color: var(--text-strong);
+  }
+}
+
+.sval-fr button.sval-fr-back,
+.sval-fr button.sval-fr-intro-back,
+.sval-fr button.sval-fr-cancel {
+  height: 44px;
+  padding: 0 20px;
+  border-color: var(--border);
+}
+
+.sval-fr-actions > button.primary {
+  height: 44px;
+  padding: 0 22px;
+  box-shadow: 0 6px 20px rgba(31, 107, 255, 0.35);
+}
+
+/* ---------------------------------------------------------------- import */
+
+/* The picker (`import.css`) at the sheet's edges: its footer stays put, and
+ * only the list between its hairlines scrolls (import spec §5). The step's
+ * subtitle says what its definitions would. */
+section[data-step="import"] {
+  > .sval-fr-content {
+    gap: 0;
+    padding: 0;
+  }
+
+  .sval-im-defs {
+    display: none;
+  }
+
+  /* A row scrolled into view keeps its focus ring inside the list. */
+  .sval-im-list {
+    scroll-padding-block: 12px;
+  }
+
+  .sval-fr-arc-card {
+    margin: 12px 32px 0;
+  }
+
+  .sval-im-picker {
+    --sval-im-pad: 32px;
+  }
+
+  > .sval-fr-actions {
+    padding-block-start: 20px;
+  }
+}
+
+/* The logins hand-off under the managers (import spec §5.1) keeps its full
+ * height, and the manager list gives up the room instead, scrolling with at
+ * least three rows in view. The hand-off is what the user reads step by step;
+ * the list needs only the chosen row in sight. */
+section[data-step="passwordManager"]:has(.sval-fr-logins:not([hidden])) .sval-fr-options {
+  flex: 1 1 132px;
+  min-height: 132px;
+  /* Room for a row's focus ring, which reaches 4px past it, inside the
+   * list, with the rows where they would be without it. */
+  margin-inline: -4px;
+  padding: 4px;
+  scroll-padding-block: 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+.sval-fr-logins {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+/* ---------------------------------------------------------------- forced colours */
+
+/* A high-contrast theme matches `(forced-colors)` in chrome without forcing
+ * its colours on it, so the sheet takes them itself, as `sval-dialog.css`
+ * does: Canvas and CanvasText for the sheet and its words, ButtonText for
+ * every boundary, Highlight for the choice made and the current step, and
+ * GrayText for what is disabled. A theme replaces the light system colours
+ * (`PreferenceSheet::Prefs::Load`), so the sheet takes the light scheme. */
+@media (forced-colors) {
+  :root {
+    color-scheme: light;
+    --ink-850: Canvas;
+    --ink-500: ButtonText;
+    --text-strong: CanvasText;
+    --text-body: CanvasText;
+    --text-label: CanvasText;
+    --text-muted: CanvasText;
+    --border: CanvasText;
+    --border-soft: ButtonText;
+    --border-strong: ButtonText;
+    --surface-card: Canvas;
+    --surface-card-hover: Canvas;
+    --surface-glass: Field;
+    --action-primary: ButtonText;
+    --action-primary-hover: SelectedItem;
+    --action-primary-press: SelectedItem;
+    --focus-ring: CanvasText;
+    --ok: CanvasText;
+    --warn: CanvasText;
+    --problem: CanvasText;
+    --sval-blue: CanvasText;
+    --sval-neon: Highlight;
+    --grad-glyph: ButtonText;
+    --glow-blue: none;
+    --inset-hairline: none;
+  }
+
+  .sval-fr-option:has(input:checked),
+  .sval-fr-option-block:has(input:checked) {
+    border-color: Highlight;
+    background: Canvas;
+    outline: 1px solid Highlight;
+  }
+
+  .sval-fr-option-block > .sval-fr-option:has(input:checked) {
+    border-color: transparent;
+    outline: none;
+  }
+
+  .sval-fr-option:has(input:checked):has(input:focus-visible) {
+    outline: 2px solid CanvasText;
+  }
+
+  /* Its dot is a gradient, which forced colours would drop. */
+  .sval-fr-option > input[type="radio"] {
+    forced-color-adjust: none;
+  }
+
+  .sval-fr-option > input[type="radio"]:checked {
+    border-color: Highlight;
+    background: radial-gradient(circle, Highlight 0 4px, Canvas 4.5px);
+  }
+
+  .sval-fr-option:has(input:disabled) {
+    opacity: 1;
+    color: GrayText;
+
+    .sval-fr-option-label,
+    .sval-fr-option-detail {
+      color: GrayText;
+    }
+  }
+
+  .sval-fr-tile > .sval-fr-glyph {
+    fill: ButtonFace;
+  }
+
+  .sval-fr-code {
+    color: FieldText;
+  }
+
+  .sval-fr-notice[data-tone],
+  .sval-fr-join {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+
+  .sval-fr-notice[data-tone]::before,
+  .sval-fr-join::before {
+    fill: CanvasText;
+  }
+
+  .sval-fr button:not(.sval-im-picker *, .sval-im-handoff *) {
+    border-color: ButtonText;
+    box-shadow: none;
+    color: ButtonText;
+
+    &:hover:not(:disabled) {
+      border-color: SelectedItem;
+      background: Canvas;
+      color: SelectedItem;
+    }
+
+    &:disabled {
+      opacity: 1;
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+
+  .sval-fr button.primary {
+    border-color: ButtonText;
+    color: ButtonFace;
+
+    &:hover:not(:disabled) {
+      border-color: SelectedItem;
+      color: SelectedItemText;
+    }
+
+    &:disabled {
+      border-color: GrayText;
+      background: ButtonFace;
+      color: GrayText;
+    }
+  }
+
+  .sval-fr-actions > button.primary {
+    box-shadow: none;
+  }
+
+  .sval-fr button.sval-fr-later,
+  .sval-fr button.sval-fr-skip {
+    border-color: transparent;
+  }
+}

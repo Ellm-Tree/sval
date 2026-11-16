@@ -1,0 +1,77 @@
+---
+title: Keep a page from a Peek in a Workspace
+description: Move the page a link from another app opened in a Peek into one of your Workspaces.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+When Sval is your default browser, a link you open in another app, like
+Slack, Mail, or a terminal, opens in a Peek. A Peek is a small window that
+isn't part of any Workspace. Read the page and close the Peek, or open the
+page in a Workspace to keep it.
+
+A link you open inside Sval doesn't open in a Peek. To see a link's page
+without leaving yours, open the link in a
+[Quick Peek](/docs/how-to/tabs/open-a-link-in-a-quick-peek/).
+
+<Screenshot name="home-peek-mail" alt="Links from a Mail message opening as stacked Peek windows, each with an Open in Ellm Tree Workspace button" />
+
+A colleague sends you a Codeberg issue in chat. You read the issue in the Peek
+and decide it belongs with your Work tabs.
+
+## Open it in the Workspace you were using
+
+1. In the Peek's toolbar, select the button that names the Workspace, like
+   Open in Work Workspace.
+
+The page moves into that Workspace as a tab at the end of the Workspace's
+tab list. The Peek closes. If no window shows that Workspace, your
+frontmost window switches to that Workspace.
+
+## Open it in another Workspace
+
+1. In the Peek's toolbar, select the arrow next to the button that names a
+   Workspace.
+2. Choose the Workspace.
+
+To open that Workspace in a new window and leave your other windows as they
+are, select **Open in New Window** next to the Workspace, or Shift-click the
+Workspace.
+
+## Details
+
+- The button names the Workspace of the window you used last. The arrow
+  shows only when you have more than one Workspace, and lists your other
+  Workspaces.
+- When a window already shows the Workspace you choose, the page opens
+  there.
+- If no window shows that Workspace, you can also Shift-click the button
+  that names the Workspace. The Workspace opens in a new window.
+- The Peek tag, before the address bar, shows how many Peeks you have open.
+  When you have more than one, select the tag to switch to another Peek or
+  close one. You can also select **Close all peeks** there.
+- A link to an installer or another file doesn't open a Peek. The file goes
+  to your downloads.
+- In a Peek, the Launcher opens your tabs, Settings, Downloads, History,
+  Extensions, and Passwords in your main window.
+- A Peek you don't use closes after 6 hours. Its page stays in History.
+  To change the time, or turn Peeks off, see
+  [Turn Peeks off or change when they close](/docs/how-to/links/change-how-peeks-close/).
+- Sval doesn't save Peeks. When you quit Sval, your Peeks close and don't
+  come back when Sval starts again.
+
+## If something goes wrong
+
+- **Open in Work Workspace?** The Workspace you chose is isolated, or the Peek is
+  signed in as another Workspace, so the page reloads with that Workspace's
+  sign-ins. You might need to sign in again. The page also loses its back
+  history and anything you typed into it. Select **Open** to go ahead.
+- **This page can't open in Work Workspace.** To move, the page would have to load
+  again in that Workspace, and this page can't. The page stays in the Peek.
+
+## Related pages
+
+- [Dock a site's links in a Workspace](/docs/how-to/links/send-a-sites-links-to-a-workspace/)
+- [Open a new Peek window](/docs/how-to/links/open-a-new-peek-window/)
+- [Open a link in a Quick Peek](/docs/how-to/tabs/open-a-link-in-a-quick-peek/)
+- [Links settings and controls](/docs/reference/links/)

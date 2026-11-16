@@ -1,0 +1,60 @@
+Sval: the media plugin sandbox uses the common fcntl rules
+
+Backport of Mozilla's Bug 2048474 (mozilla-central 90f00be8ca2c, Firefox
+155), unchanged. ESR 153 does not carry it. The GMP policy answered every
+fcntl through its own trap, which allows only F_GETFD and F_SETFD, so it
+refused the F_GET_SEALS that Bug 2045119's shared memory check makes on
+every handle a plugin receives. The plugin process crashed on its first
+shared memory message, so ClearKey video failed to decode on Linux;
+Widevine runs in the same process. Mozilla landed this before Bug 2045119
+for that reason. Drop this patch when the upstream pin reaches Firefox
+155.
+
+diff --git a/security/sandbox/linux/SandboxFilter.cpp b/security/sandbox/linux/SandboxFilter.cpp
+index b175f93c27..737f3e74cc 100644
+--- a/security/sandbox/linux/SandboxFilter.cpp
++++ b/security/sandbox/linux/SandboxFilter.cpp
+@@ -1807,9 +1807,10 @@ UniquePtr<sandbox::bpf_dsl::Policy> GetContentSandboxPolicy(
+   return MakeUnique<ContentSandboxPolicy>(aMaybeBroker, std::move(aParams));
+ }
+ 
+-// Unlike for content, the GeckoMediaPlugin seccomp-bpf policy needs
+-// to be an effective sandbox by itself, because we allow GMP on Linux
+-// systems where that's the only sandboxing mechanism we can use.
++// The GeckoMediaPlugin seccomp-bpf policy is more delicate than the others,
++// because this process loads a closed-source binary and we've told users
++// that we prohibit it from fingerprinting them; see:
++// https://hacks.mozilla.org/2014/05/reconciling-mozillas-mission-and-w3c-eme/
+ //
+ // Be especially careful about what this policy allows.
+ class GMPSandboxPolicy : public SandboxPolicyCommon {
+@@ -1876,20 +1877,6 @@ class GMPSandboxPolicy : public SandboxPolicyCommon {
+     return 0;
+   }
+ 
+-  static intptr_t FcntlTrap(const arch_seccomp_data& aArgs, void* aux) {
+-    const auto cmd = static_cast<int>(aArgs.args[1]);
+-    switch (cmd) {
+-        // This process can't exec, so the actual close-on-exec flag
+-        // doesn't matter; have it always read as true and ignore writes.
+-      case F_GETFD:
+-        return O_CLOEXEC;
+-      case F_SETFD:
+-        return 0;
+-      default:
+-        return -ENOSYS;
+-    }
+-  }
+-
+   const SandboxOpenedFiles* mFiles;
+ 
+  public:
+@@ -1935,8 +1922,6 @@ class GMPSandboxPolicy : public SandboxPolicyCommon {
+       // Bug 1372428
+       case __NR_uname:
+         return Trap(UnameTrap, nullptr);
+-      CASES_FOR_fcntl:
+-        return Trap(FcntlTrap, nullptr);
+ 
+       // Allow the same advice values as the default policy, but return
+       // Error(ENOSYS) for other values. Because the Widevine CDM may probe

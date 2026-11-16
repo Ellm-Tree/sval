@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# cargo-mutants' settings for this crate, read by every run, CI's included.
+
+# `src/wasm.rs` holds the tests of the wasm boundary and of several sync rules
+# a host reaches only through it, so a run without the feature misses them.
+features = ["wasm"]
+
+# Optimised dependencies keep the 64 MiB Argon2id calls fast.
+additional_cargo_args = ["--config", 'profile.dev.package."*".opt-level=3']
+
+# Mutants no test can fail, matched against the names `cargo mutants --list`
+# prints. Each changes no behaviour, or changes one only a wasm host sees.
+exclude_re = [
+  # The value is shifted left by 8 before each byte joins it, so its low 8
+  # bits are zero and or and xor give the same bits.
+  'replace \| with \^ in pin_copy_guid$',
+  # A file's watermark for an id is below the copy's start whenever its
+  # stamps from that id are treated as news, and the file holds none of that
+  # id's stamps past its watermark, so none sits exactly at the start.
+  'replace < with <= in is_news_to$',
+  # Equal canonical bytes are an identical group and writer, so taking the
+  # remote one on a tie replaces it with the same value.
+  'replace > with >= in remote_group_wins$',
+  'replace > with >= in merge_untimestamped_extra$',
+  'replace > with >= in merge_agent_mark$',
+  # The unit being archived sits at `at`, and it is leaving, so the search
+  # for the next sibling that stays skips it either way.
+  'replace \+ with \* in archive_units$',
+  # The same for the node being removed: the children land between its
+  # neighbours, and it goes once they are in.
+  'replace \+ with \* in remove_keeping_children$',
+  # A sealed file of exactly a nonce has no tag, so AES-GCM refuses it as the
+  # early return does.
+  'replace < with <= in open$',
+  # The high nibble or byte is shifted clear of the low one, so `|` and `^`
+  # give the same bits.
+  'replace \| with \^ in decode$',
+  'replace \| with \^ in generate_code$',
+  # The privacypass client refuses an answer of no elements, or of more than
+  # it asked for, as the guard on the answer's count does. `finalize` has
+  # another `||` that tests do catch, so this one is named by its line, and
+  # an edit that moves it brings the mutant back to be named again.
+  '^src/privacy_pass\.rs:219:\d+: replace \|\| with && in finalize$',
+  # A walk that has visited every recorded place is on a ring whatever the
+  # comparison, and a ring places nothing.
+  'replace > with (==|>=) in KnownPlaces::place_for$',
+  # No sum of f64 shares near 100 is exactly 0.1 from it: the difference is
+  # a multiple of 2^-46, and 0.1 as an f64 is not.
+  'replace > with >= in check_shares$',
+  # A stamp equal to `now` is set to `now`, the value it holds.
+  'replace > with >= in Document::pull_back_own_stamps$',
+  # These build or need a JsValue, which only a wasm host can: the panic
+  # hook, the error a refusal throws, the sync binding, which takes its
+  # files as a JS array, and the setAppearance binding, which takes its
+  # colour as any JS value. `run_sync_to` is what `sync` runs, and
+  # `apply_op` and `color_from_json` what `setAppearance` runs, and they are
+  # tested.
+  'replace init with \(\)$',
+  'replace to_js_err -> JsValue',
+  'in SvalDocument::sync$',
+  'in SvalDocument::set_appearance$',
+  'replace SvalDocument::set_appearance -> ',
+]

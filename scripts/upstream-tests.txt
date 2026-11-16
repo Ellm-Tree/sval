@@ -1,0 +1,282 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Mozilla's own tests for the code Sval ships: the areas Sval's patches change
+# and the Firefox features Sval keeps. One test per line, then any prefs it
+# runs with, then a comment naming what it covers. scripts/upstream-tests.sh
+# prints them for scripts/test.sh, one group per set of prefs, and CI's full
+# Linux tier runs them, half of each group in each Linux half.
+#
+# A test here passes in Sval on Linux. A test of something Sval removes,
+# locks or replaces on purpose is never listed; it goes in
+# upstream-test-known-failures.txt with its reason, and a failure Sval
+# causes by mistake is an issue.
+#
+# A test that fails only on a default a user can change runs with the user's
+# other choice, so it proves that choice still works: <name>=<value>, and the
+# comment names the control that sets it. @default@ in a value is Sval's
+# default for that pref, so "@default@,-Target" is Sval's fingerprinting
+# overrides with that target's switch turned off, as Gecko applies the
+# tokens in order.
+accessible/tests/browser/e10s/browser_aria_activedescendant.js  # covers a11y-empty-relation-id
+accessible/tests/browser/e10s/browser_treeupdate_csscontentvisibility.js  # covers a11y-shadow-host-prune
+accessible/tests/browser/relations/browser_popover_and_command.js  # covers a11y-empty-relation-id
+accessible/tests/browser/relations/browser_popover_hint.js  # covers a11y-empty-relation-id
+accessible/tests/browser/relations/browser_relations_general.js  # covers a11y-empty-relation-id
+accessible/tests/browser/relations/browser_relations_general_002.js  # covers a11y-empty-relation-id
+accessible/tests/browser/relations/browser_shadow_dom_and_custom_elements.js  # covers a11y-shadow-host-prune
+accessible/tests/browser/tree/browser_shadowdom.js  # covers a11y-shadow-host-prune
+accessible/tests/mochitest/treeupdate/test_shadow_slots.html  # covers a11y-shadow-host-prune
+browser/base/content/test/general/browser_minimize.js  # covers agent-page-shown-while-hidden
+browser/base/content/test/general/browser_windowactivation.js  # covers agent-window-in-background
+browser/base/content/test/menubar/browser_file_close_tabs.js  # covers sval-menu-bar
+browser/base/content/test/outOfProcess/browser_promisefocus.js  # covers agent-focus-emulation
+browser/base/content/test/permissions/browser_permission_delegate_geo.js  # covers fp-permissions-default-deny-prompt, geo-delegate-test-awaits-each-answer
+browser/base/content/test/permissions/browser_temporary_permissions_child_clear.js  # covers backport-bug-2064718-tab-permission-removal-every-process, tab-permission-removal-site-key
+browser/base/content/test/permissions/browser_temporary_permissions_expiry.js  # covers backport-bug-2064716-site-permissions-cleared
+browser/base/content/test/popupNotifications/browser_popupNotification.js  # covers agent-overlay-popup-notifications, popups-anchor-in-sval-header
+browser/base/content/test/sanitize/browser_sanitize-history.js  # covers history-sidebar-hooks
+browser/base/content/test/sanitize/browser_sanitize-timespans.js  # covers history-sidebar-hooks
+browser/base/content/test/tabPrompts/browser_multiplePrompts.js  # covers subdialog-sval-dialog-frame
+browser/base/content/test/tabdialogs/browser_subdialog_esc.js  # covers subdialog-sval-dialog-frame
+browser/base/content/test/webrtc/browser_devices_get_user_media_in_xorigin_frame_chain.js  # covers popups-anchor-in-sval-header, webrtc-blocked-request-notify
+browser/base/content/test/webrtc/browser_devices_get_user_media_muted_on_init.js  # covers media-mute-one-window
+browser/base/content/test/webrtc/browser_global_mute_toggles.js  # covers media-mute-one-window
+browser/base/content/test/zoom/browser_zoom_commands.js  # covers remove-firefox-zoom-button
+browser/components/customizableui/test/browser_947914_button_zoomReset.js  # covers remove-firefox-zoom-button
+browser/components/downloads/test/browser/browser_about_downloads.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_basic_functionality.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_blocked_and_deleted_status.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_confirm_unblock_download.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_failed_msg.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_is_clickable.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_opens_on_click.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_opens_policy.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_overwrite.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_spam_protection.js  # covers downloads-per-workspace, download-spam-test-workspace-lists
+browser/components/downloads/test/browser/browser_download_starts_in_tmp.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_download_succeeds_with_inaccessible_tmp.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_context_menu_always_open_similar_files.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_context_menu_delete_file.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_context_menu_selection.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_jsonview.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_block.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_context_menu.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_ctrl_click.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_disable_items.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_dontshow.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_focus.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_height.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_downloads_panel_opens.js  # covers remove-firefox-menu-button, downloads-per-workspace, downloads-from-links
+browser/components/downloads/test/browser/browser_downloads_pauseResume.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_first_download_panel.js  # covers downloads-per-workspace, downloads-from-links
+browser/components/downloads/test/browser/browser_go_to_download_page.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_iframe_gone_mid_download.js  # covers downloads-per-workspace, tests-without-about-mozilla
+browser/components/downloads/test/browser/browser_image_mimetype_issues.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_indicatorDrop.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_libraryDrop.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_library_clearall.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_library_select_all.js  # covers downloads-per-workspace
+browser/components/downloads/test/browser/browser_tempfilename.js  # covers downloads-per-workspace
+browser/components/enterprisepolicies/tests/browser/browser_policies_about_policies.js  # covers policies-no-mozilla-docs-links
+browser/components/extensions/test/browser/browser_ext_browserAction_activeTab.js  # covers extension-blocked-sites-js
+browser/components/extensions/test/browser/browser_ext_find.js  # covers extension-blocked-sites-js
+browser/components/extensions/test/browser/browser_ext_tabs_autoDiscardable.js  # covers sessionstore-keeps-undiscardable
+browser/components/extensions/test/browser/browser_ext_tabs_capture_blur.js  # covers extension-blocked-sites-js
+browser/components/extensions/test/browser/browser_ext_windows_events.js  # covers ext-tab-tracker-closed-window
+browser/components/extensions/test/xpcshell/test_ext_normandyAddonStudy.js  # covers app-name
+browser/components/places/tests/browser/browser_bookmark_titles.js  # covers sval-menu-bar
+browser/components/places/tests/browser/browser_library_search.js  # covers history-sidebar-hooks
+browser/components/preferences/tests/chrome/test_setting_group.html  # covers settings-hide-removed-features
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_DownloadLastDirWithCPS.js  # covers private-window-sessions
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_downloadLastDir.js  # covers private-window-sessions
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_downloadLastDir_c.js  # covers private-window-sessions
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_downloadLastDir_toggle.js  # covers private-window-sessions
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_zoom.js  # covers tests-without-about-mozilla, private-window-sessions
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_zoomrestore.js  # covers private-window-sessions
+browser/components/resistfingerprinting/test/browser/browser_dynamical_window_rounding.js  # covers backport-bug-2054792-rfp-window-rounding-tests, rfp-letterboxing-tab-browsers-only
+browser/components/resistfingerprinting/test/browser/browser_hwconcurrency_iframes.js privacy.fingerprintingProtection=false  # covers fp-hwconcurrency-randomized; Settings, Fingerprinting: fingerprinting protection "Only in private windows", as its default case expects no protection in a normal window
+browser/components/resistfingerprinting/test/browser/browser_roundedWindow_newWindow.js  # covers backport-bug-2054792-rfp-window-rounding-tests
+browser/components/resistfingerprinting/test/mochitest/test_bug1885101_screenwindow_sizes.html  # covers fp-outer-size-typical, fp-screen-size-common
+browser/components/resistfingerprinting/test/mochitest/test_hide_gamepad_info.html  # covers fp-gamepad-id-generic
+browser/components/resistfingerprinting/test/mochitest/test_speech_synthesis.html  # covers fp-speech-voices-default
+browser/components/search/test/browser/browser_search_discovery.js  # covers opensearch-installed-host
+browser/components/sessionstore/test/browser_394759_perwindowpb.js  # covers sessionstore-unsaved-windows, tests-without-about-mozilla
+browser/components/sessionstore/test/browser_490040.js  # covers sessionstore-unsaved-windows, sessionstore-unsaved-pin-pages, sessionstore-test-windows-without-leftovers, mochitest-files-start-without-leftovers
+browser/components/sessionstore/test/browser_586068-reload.js  # covers sessionstore-restore-revalidates
+browser/components/sessionstore/test/browser_588426.js  # covers tests-without-about-mozilla, sessionstore-abandoned-restore
+browser/components/sessionstore/test/browser_595601-restore_hidden.js  # covers sessionstore-unsaved-pin-pages, sessionstore-abandoned-restore, mochitest-files-start-without-leftovers
+browser/components/sessionstore/test/browser_615394-SSWindowState_events_duplicateTab.js  # covers sessionstore-tab-values-restored, tests-without-closed-pages
+browser/components/sessionstore/test/browser_615394-SSWindowState_events_setTabState.js  # covers sessionstore-tab-values-restored, sessionstore-lazy-tab-uri
+browser/components/sessionstore/test/browser_615394-SSWindowState_events_undoCloseWindow.js  # covers sessionstore-tab-values-restored
+browser/components/sessionstore/test/browser_async_duplicate_tab.js  # covers sessionstore-tab-values-restored
+browser/components/sessionstore/test/browser_closedId.js  # covers sessionstore-tab-values-restored, sessionstore-unsaved-pin-pages, tests-without-closed-pages
+browser/components/sessionstore/test/browser_duplicate_history.js  # covers sessionstore-tab-values-restored
+browser/components/sessionstore/test/browser_duplicate_tab_in_new_window.js  # covers sessionstore-tab-values-restored, tab-move-keeps-session-key
+browser/components/sessionstore/test/browser_formdata.js  # covers sessionstore-restore-revalidates
+browser/components/sessionstore/test/browser_movePendingTabToNewWindow.js  # covers tab-move-keeps-session-key
+browser/components/sessionstore/test/browser_navigation_api_restore.js  # covers sessionstore-restore-revalidates
+browser/components/sessionstore/test/browser_pending_tabs.js  # covers sessionstore-lazy-tab-uri
+browser/components/sessionstore/test/browser_splitview_integer_ids.js  # covers split-view-four-panes, tests-without-about-mozilla, tests-without-closed-pages
+browser/components/sessionstore/test/browser_swapDocShells.js  # covers tab-move-keeps-session-key, test-profiles-sval-defaults, tests-without-about-mozilla
+browser/components/tabbrowser/test/browser/dragdrop/browser_drop_link_splitview_unselected.js  # covers split-view-four-panes
+browser/components/tabbrowser/test/browser/statuspanel/browser_show_statuspanel_idn.js  # covers status-panel-hides-on-its-own-fade
+browser/components/tabbrowser/test/browser/statuspanel/browser_show_statuspanel_twice.js  # covers status-panel-hides-on-its-own-fade
+browser/components/tabbrowser/test/browser/tabs/browser_discarded_tab_move.js  # covers tab-move-keeps-session-key, mochitest-files-start-without-leftovers, adopted-tab-keeps-default-jar
+browser/components/tabbrowser/test/browser/tabs/browser_lazy_tab_browser_events.js  # covers tabbrowser-siblings-of-a-lazy-tab
+browser/components/tabbrowser/test/browser/tabs/browser_replacewithwindow_commands.js  # covers tab-move-keeps-session-key, adopted-tab-keeps-default-jar
+browser/components/tabbrowser/test/browser/tabs/browser_replacewithwindow_dialog.js  # covers tab-move-keeps-session-key
+browser/components/tabbrowser/test/browser/tabs/browser_replacewithwindow_splitview.js  # covers split-view-footer-reconnect, tab-move-keeps-session-key, mochitest-files-start-without-leftovers
+browser/components/tabbrowser/test/browser/tabs/browser_switchtab_when_minimized.js  # covers agent-page-shown-while-hidden
+browser/components/tabbrowser/test/browser/tabs/browser_tabSuccessors.js  # covers workspace-jar-for-new-tabs, tabbrowser-blur-past-modal
+browser/components/tabbrowser/test/browser/tabs/browser_tab_detach_restore.js  # covers tab-move-keeps-session-key, mochitest-files-start-without-leftovers
+browser/components/tabbrowser/test/browser/tabs/browser_tab_dragdrop2.js  # covers tab-move-keeps-session-key
+browser/components/tabbrowser/test/browser/tabs/browser_tab_move_to_new_window_reload.js  # covers tab-move-keeps-session-key, adopted-tab-keeps-default-jar
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_resize.js  # covers split-view-four-panes, split-view-footer-reconnect
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_splitter_keyboard.js  # covers split-view-four-panes
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_splitter_keyboard_boundary.js  # covers split-view-four-panes
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_tab_order.js  # covers split-view-four-panes, split-view-footer-reconnect
+browser/components/tabbrowser/test/browser/tabs/browser_tabs_isActive.js  # covers agent-page-shown-while-hidden, quick-peek-stays-active-through-tab-switch
+browser/components/translations/tests/browser/browser_translations_full_page_panel_basics.js  # covers translations-button-in-site-controls
+browser/components/translations/tests/browser/browser_translations_full_page_panel_cancel.js  # covers translations-button-in-site-controls
+browser/components/translations/tests/browser/browser_translations_full_page_panel_never_translate_site_basic.js  # covers translations-button-in-site-controls
+browser/components/urlbar/tests/unit/test_dedupe_switchTab.js  # covers favorites-history-rows
+browser/components/urlbar/tests/unit/test_providerPlaces_duplicate_entries.js  # covers favorites-history-rows
+browser/modules/test/browser/browser_BrowserWindowTracker.js  # covers agent-window-in-background, peek-not-top-window
+browser/modules/test/browser/browser_PermissionUI.js  # covers permission-refused-notify
+browser/modules/test/browser/browser_PermissionUI_prompts.js  # covers permission-refused-notify
+browser/modules/test/browser/browser_SitePermissions.js  # covers backport-bug-2064716-site-permissions-cleared
+browser/modules/test/browser/browser_SitePermissions_tab_urls.js  # covers backport-bug-2064716-site-permissions-cleared
+devtools/client/debugger/test/mochitest/browser_dbg-call-stack.js  # covers devtools-frames-empty-activedescendant
+devtools/client/jsonview/test/browser_jsonview_chunked_json.js  # covers jsonview-sniffer-cancelled-load
+devtools/client/jsonview/test/browser_jsonview_content_type.js  # covers jsonview-sniffer-cancelled-load
+devtools/client/webconsole/test/browser/browser_console.js  # covers tests-without-closed-pages, devtools-console-skip-devtools-requests, devtools-unregister-after-process-replies, devtools-console-origin, devtools-targets-for-a-gone-watcher
+devtools/client/webconsole/test/browser/browser_console_webconsole_ctrlw_close_tab.js  # covers devtools-console-batch-after-closing
+devtools/client/webconsole/test/browser/browser_webconsole_deprecation_warning.js  # covers chrome-deprecations-not-warned
+devtools/client/webconsole/test/browser/browser_webconsole_error_with_grouped_stack.js  # covers devtools-frames-empty-activedescendant
+devtools/client/webconsole/test/browser/browser_webconsole_filters.js  # covers devtools-console-origin
+docshell/test/browser/browser_backforward_userinteraction.js  # covers backport-bug-2058297-user-interaction-in-parent
+docshell/test/browser/browser_backforward_userinteraction_about.js  # covers backport-bug-2058297-user-interaction-in-parent
+docshell/test/browser/browser_backforward_userinteraction_systemprincipal.js  # covers backport-bug-2058297-user-interaction-in-parent
+docshell/test/browser/browser_onunload_stop.js  # covers session-history-load-ids-by-entry
+docshell/test/browser/browser_purge_shistory_keeps_current.js  # covers session-history-load-ids-by-entry
+docshell/test/navigation/test_sessionhistory.html  # covers session-history-load-ids-by-entry
+dom/base/test/browser_set_focus_after_reuse_bcg.js  # covers agent-focus-emulation
+dom/base/test/chrome/test_bug418986-1.xhtml  # covers fp-screen-depth-platform
+dom/base/test/test_focus_shadow_dom_oop_iframe.html  # covers agent-focus-emulation
+dom/base/test/test_navigator_hardwareConcurrency.html  # covers fp-hwconcurrency-randomized
+dom/base/test/test_navigator_language.html privacy.fingerprintingProtection.overrides=@default@,-LanguagesPrimaryOnly  # covers fp-languages-primary-only; Settings, Fingerprinting: "Tell sites all my languages" on
+dom/documentpip/tests/browser/browser_pip_closes_once.js  # covers agent-in-control
+dom/events/test/clipboard/browser_document_command_copy.js  # covers sval-agent-clipboard
+dom/html/test/browser_input_file_picker_opening_notification.js  # covers sval-agent-files
+dom/ipc/tests/JSProcessActor/browser_getActor.js  # covers backport-bug-2056174-unregister-process-actor-in-shutdown
+dom/ipc/tests/JSProcessActor/browser_registerProcessActor.js  # covers backport-bug-2056174-unregister-process-actor-in-shutdown
+dom/media/autoplay/test/browser/browser_autoplay_policy_play_twice.js media.autoplay.site-permission-only.default=1  # covers media-autoplay-site-permission; Settings, Sites: "Allow sites to play video and audio" Always allow
+dom/media/autoplay/test/browser/browser_autoplay_policy_request_permission.js  # covers media-autoplay-site-permission
+dom/media/autoplay/test/mochitest/test_autoplay_policy_permission.html  # covers media-autoplay-site-permission
+dom/media/mediacontrol/tests/browser/browser_media_control_main_controller.js media.autoplay.site-permission-only.default=1  # covers agent-in-control; Settings, Sites: "Allow sites to play video and audio" Always allow
+dom/media/webaudio/test/test_OfflineAudioContext.html privacy.fingerprintingProtection.overrides=@default@,-AudioOutputRandomization  # covers fp-audio-output-randomization; Settings, Fingerprinting: "Audio noise" off
+dom/media/webaudio/test/test_dynamicsCompressorNode.html media.autoplay.site-permission-only.default=1 privacy.fingerprintingProtection.overrides=@default@,-AudioOutputRandomization  # covers fp-audio-output-randomization; Settings, Sites: "Allow sites to play video and audio" Always allow, so a realtime AudioContext runs; Settings, Fingerprinting: "Audio noise" off
+dom/media/webaudio/test/test_scriptProcessorNode.html media.autoplay.site-permission-only.default=1 privacy.fingerprintingProtection.overrides=@default@,-AudioOutputRandomization  # covers fp-audio-output-randomization; Settings, Sites: "Allow sites to play video and audio" Always allow, so a realtime AudioContext runs; Settings, Fingerprinting: "Audio noise" off
+dom/media/webrtc/tests/mochitests/test_enumerateDevices.html  # covers fp-media-devices-before-permission
+dom/media/webrtc/tests/mochitests/test_enumerateDevices_getUserMediaFake.html  # covers fp-media-devices-before-permission
+dom/media/webrtc/tests/mochitests/test_fingerprinting_resistance.html  # covers fp-media-devices-before-permission
+dom/media/webspeech/synth/test/test_global_queue.html privacy.fingerprintingProtection.overrides=@default@,-SpeechVoicesDefault  # covers fp-speech-voices-default; Settings, Fingerprinting: "OS default voices only" off
+dom/media/webspeech/synth/test/test_setup.html privacy.fingerprintingProtection.overrides=@default@,-SpeechVoicesDefault  # covers fp-speech-voices-default; Settings, Fingerprinting: "OS default voices only" off; it reads the voices at once, so it needs a speech test before it in its run, as in its manifest
+dom/media/webspeech/synth/test/test_speech_simple.html  # covers fp-speech-voices-default
+dom/notification/test/mochitest/test_notification_permissions.html  # covers fp-permissions-default-deny-prompt
+dom/permission/tests/test_permissions_api.html  # covers fp-permissions-default-deny-prompt
+dom/serviceworkers/test/test_controller.html  # covers service-worker-script-policy
+dom/serviceworkers/test/test_fetch_event.html  # covers service-worker-script-policy
+dom/tests/browser/browser_ConsoleStoragePBTest_perwindowpb.js  # covers mochitest-window-keeps-console
+dom/tests/mochitest/gamepad/test_gamepad.html privacy.fingerprintingProtection.overrides=@default@,-GamepadIdGeneric  # covers fp-gamepad-id-generic, agent-in-control; Settings, Fingerprinting: "Generic gamepad ids" off
+dom/workers/test/test_navigator_languages.html privacy.fingerprintingProtection.overrides=@default@,-LanguagesPrimaryOnly  # covers fp-languages-primary-only; Settings, Fingerprinting: "Tell sites all my languages" on
+dom/workers/test/test_navigator_workers_hardwareConcurrency.html  # covers fp-hwconcurrency-randomized
+extensions/permissions/test/unit/test_permmanager_defaults.js  # covers permissions-private-jar, permission-is-default
+extensions/permissions/test/unit/test_permmanager_getAllForPrincipal.js  # covers permission-is-default
+extensions/permissions/test/unit/test_permmanager_oa_strip.js  # covers permissions-private-jar
+extensions/permissions/test/unit/test_permmanager_removePermissionsWithAttributes.js  # covers permissions-private-jar
+ipc/glue/test/browser/browser_utility_memoryReport.js  # covers macos-child-real-path
+layout/style/test/chrome/test_bug418986-2.xhtml  # covers fp-screen-depth-platform
+layout/style/test/test_font_loading_api.html  # covers font-load-cancel-is-no-error
+netwerk/test/browser/browser_accept_language_override.js privacy.fingerprintingProtection.overrides=@default@,-LanguagesPrimaryOnly  # covers fp-languages-primary-only; Settings, Fingerprinting: "Tell sites all my languages" on
+netwerk/test/unit/test_addr_in_use_error.js  # covers server-socket-exclusive-address
+netwerk/test/unit/test_header_Accept-Language.js  # covers fp-languages-primary-only
+remote/shared/test/browser/browser_WindowManager.js  # covers webdriver-jar-of-its-own
+security/manager/ssl/tests/unit/test_certDB_import.js  # covers certificate-alert-title
+security/manager/ssl/tests/unit/test_cert_override_read.js  # covers cert-overrides-per-jar
+security/manager/ssl/tests/unit/test_cert_overrides.js  # covers cert-overrides-per-jar, cert-override-test-per-jar
+security/manager/ssl/tests/unit/test_sss_originAttributes.js  # covers hsts-private-jar, hsts-test-per-jar
+security/manager/ssl/tests/unit/test_sss_readstate.js  # covers hsts-private-jar
+security/manager/ssl/tests/unit/test_sss_savestate.js  # covers hsts-private-jar
+services/settings/test/unit/test_remote_settings.js browser.sval.remoteSettings.collections=  # covers remote-settings-allowlist, remote-settings-quiet-at-shutdown; about:config: the collection list cleared, as the test syncs collections of its own
+services/settings/test/unit/test_remote_settings_poll.js browser.sval.remoteSettings.collections=  # covers remote-settings-allowlist, remote-settings-quiet-at-shutdown, remote-settings-clock-skew-without-age; about:config: the collection list cleared, as the test syncs collections of its own
+toolkit/components/antitracking/test/browser/browser_allowListSeparationInPrivateAndNormalWindows.js  # covers permissions-private-jar
+toolkit/components/antitracking/test/browser/browser_contentBlockingAllowListPrincipal.js  # covers permissions-private-jar, allowlist-principal-test-private-jars
+toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtask_not_ephemeral_profile.js  # covers one-data-directory
+toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtask_profile_service_configuration.js  # covers one-data-directory
+toolkit/components/cleardata/tests/browser/browser_quota.js  # covers clear-data-pattern-per-cleaner
+toolkit/components/cleardata/tests/unit/test_certs.js  # covers cert-overrides-per-jar
+toolkit/components/cleardata/tests/unit/test_quota.js  # covers clear-data-pattern-per-cleaner
+toolkit/components/cleardata/tests/unit/test_security_settings.js  # covers hsts-private-jar
+toolkit/components/cleardata/tests/unit/test_storage_permission.js  # covers clear-data-pattern-per-cleaner
+toolkit/components/content-classifier/test/browser/browser_content_classifier_blocking.js  # covers content-classifier-full-hosts, content-classifier-page-rules, content-classifier-trusted-lists, content-classifier-waits-for-engines, content-classifier-pref-lists, content-classifier-sval-lists, backport-bug-2078831-classifier-generation-under-lock, content-classifier-sval-tracker-lists, content-classifier-cname-uncloaking
+toolkit/components/contextualidentity/tests/unit/test_basic.js  # covers workspace-identities
+toolkit/components/contextualidentity/tests/unit/test_corruptedFile.js  # covers workspace-identities
+toolkit/components/crashes/tests/xpcshell/test_crash_manager.js  # covers crash-manager-missing-folder-allowed
+toolkit/components/extensions/test/mochitest/test_ext_webnavigation.html  # covers extension-blocked-sites-js
+toolkit/components/extensions/test/xpcshell/test_WebExtensionPolicy.js  # covers extension-blocked-sites
+toolkit/components/extensions/test/xpcshell/test_ext_contentscript.js  # covers extension-blocked-sites
+toolkit/components/extensions/test/xpcshell/test_ext_cookies_onChanged.js  # covers extension-blocked-sites-js
+toolkit/components/extensions/test/xpcshell/test_ext_cookies_partitionKey.js  # covers extension-blocked-sites-js
+toolkit/components/extensions/test/xpcshell/test_ext_dnr_testMatchOutcome.js  # covers extension-blocked-sites-js
+toolkit/components/extensions/test/xpcshell/test_ext_dnr_webrequest.js  # covers extension-blocked-sites-js
+toolkit/components/extensions/test/xpcshell/test_ext_native_messaging.js  # covers native-messaging-closed-host, native-messaging-manifests
+toolkit/components/extensions/test/xpcshell/test_ext_storage_managed.js  # covers native-messaging-manifests
+toolkit/components/extensions/test/xpcshell/test_ext_webRequest_filterResponseData.js  # covers extension-blocked-sites
+toolkit/components/extensions/test/xpcshell/test_native_manifests.js  # covers native-messaging-manifests
+toolkit/components/nimbus/test/browser/browser_SharedDataMap.js  # covers nimbus-ready-rejection-handled
+toolkit/components/pdfjs/test/browser_pdfjs_download_button.js  # covers sval-agent-routing
+toolkit/components/pictureinpicture/tests/browser_contextMenu.js media.autoplay.site-permission-only.default=1  # covers agent-pip-player-refused, remove-firefox-pip-urlbar-button; Settings, Sites: "Allow sites to play video and audio" Always allow, so its play() runs
+toolkit/components/pictureinpicture/tests/browser_keyboardShortcut.js  # covers agent-pip-player-refused, pip-single-shortcut, remove-firefox-pip-urlbar-button
+toolkit/components/pictureinpicture/tests/browser_removeVideoElement.js  # covers remove-firefox-pip-urlbar-button
+toolkit/components/pictureinpicture/tests/browser_toggleOnInsertedVideo.js  # covers remove-firefox-pip-urlbar-button
+toolkit/components/pictureinpicture/tests/browser_toggleSimple.js  # covers remove-firefox-pip-urlbar-button
+toolkit/components/pictureinpicture/tests/browser_videoEmptied.js  # covers remove-firefox-pip-urlbar-button
+toolkit/components/places/tests/browser/browser_visituri.js  # covers places-visit-workspaces
+toolkit/components/places/tests/history/test_removeVisits.js  # covers places-visit-workspaces
+toolkit/components/places/tests/queries/test_containersQueries_sorting.js  # covers places-visit-workspaces
+toolkit/components/places/tests/queries/test_querySerialization.js  # covers places-visit-workspaces
+toolkit/components/places/tests/queries/test_sort-date-site-grouping.js  # covers places-visit-workspaces
+toolkit/components/resistfingerprinting/tests/browser/browser_fingerprintingRemoteOverrides.js privacy.fingerprintingProtection.remoteOverrides.enabled=true  # covers fp-sval-targets, fp-overrides-private-scope, fp-overrides-site-choices, fp-overrides-follow-global; Settings, Fingerprinting: "Mozilla's compatibility fixes" on
+toolkit/components/resistfingerprinting/tests/browser/browser_fingerprintingWebCompat.js privacy.fingerprintingProtection.remoteOverrides.enabled=true  # covers fp-sval-targets, fp-overrides-private-scope, fp-overrides-site-choices, fp-overrides-follow-global; Settings, Fingerprinting: "Mozilla's compatibility fixes" on
+toolkit/components/resistfingerprinting/tests/browser/browser_fpp_protections_matrix_2.js  # covers fpp-matrix-tests-private-scope
+toolkit/components/resistfingerprinting/tests/browser/browser_js_locale.js privacy.fingerprintingProtection.overrides=@default@,-LanguagesPrimaryOnly  # covers fp-languages-primary-only; Settings, Fingerprinting: "Tell sites all my languages" on
+toolkit/components/resistfingerprinting/tests/chrome/test_spoof_english.html  # covers fp-languages-primary-only
+toolkit/components/url-classifier/tests/browser/browser_check_channel_helper_telemetry.js  # covers content-classifier-skips-url-classifier
+toolkit/components/url-classifier/tests/browser/browser_consentmanager_annotation.js privacy.trackingprotection.urlclassifier.disable_for_channel_classifier=false  # covers content-classifier-skips-url-classifier; about:config: the URL classifier's tracking features, which the content classifier stands in for
+toolkit/components/url-classifier/tests/mochitest/test_trackingprotection_bug1157081.html privacy.trackingprotection.urlclassifier.disable_for_channel_classifier=false  # covers content-classifier-skips-url-classifier; about:config: the URL classifier's tracking features, which the content classifier stands in for
+toolkit/components/windowwatcher/test/browser_new_content_window_chromeflags.js  # covers agent-window-in-background, sval-agent-new-windows, sval-agent-routing
+toolkit/components/windowwatcher/test/browser_popup_condition_tab.js  # covers sval-agent-new-windows
+toolkit/components/windowwatcher/test/browser_popup_features_shift_click.js  # covers sval-agent-new-windows
+toolkit/content/tests/browser/browser_f7_caret_browsing.js  # covers caret-browsing-question-wording
+toolkit/content/tests/chrome/test_bug366992.xhtml  # covers context-menu-shortcuts
+toolkit/content/tests/chrome/test_edit_contextmenu.html  # covers context-menu-shortcuts
+toolkit/content/tests/chrome/test_notificationbox.xhtml  # covers notification-bar-sval-sheet
+toolkit/modules/subprocess/test/xpcshell/test_subprocess.js  # covers subprocess-kill-after-exit
+toolkit/modules/tests/xpcshell/test_UpdateUtils_url.js  # covers update-release-candidates
+toolkit/mozapps/extensions/test/xpcshell/test_update.js browser.sval.extensions.updateWaitDays=0  # covers extension-update-wait; Settings, Extensions: "Days to wait before installing extension updates" set to 0
+toolkit/mozapps/extensions/test/xpcshell/test_update_strictcompat.js browser.sval.extensions.updateWaitDays=0  # covers extension-update-wait; Settings, Extensions: "Days to wait before installing extension updates" set to 0
+toolkit/mozapps/extensions/test/xpinstall/browser_block_fullscreen_prompt.js  # covers addon-refusal-notification-id
+toolkit/mozapps/update/tests/browser/browser_aboutDialog_fc_check_noUpdate.js  # covers about-dialog-strip-mozilla-links
+toolkit/mozapps/update/tests/unit_aus_update/downloadResumeForSameAppVersion.js  # covers update-same-version-needs-newer-build
+toolkit/mozapps/update/tests/unit_aus_update/multiUpdate.js  # covers update-same-version-needs-newer-build
+toolkit/mozapps/update/tests/unit_aus_update/remoteUpdateXML.js  # covers update-same-version-needs-newer-build
+toolkit/mozapps/update/tests/unit_update_binary/marSuccessComplete.js  # covers helper-names, update-mar-version-names-build
+toolkit/mozapps/update/tests/unit_update_binary/marVersionDowngrade.js  # covers update-mar-version-names-build
+uriloader/exthandler/tests/mochitest/browser_download_open_with_internal_handler.js  # covers sval-agent-files
+uriloader/exthandler/tests/mochitest/browser_download_skips_dialog.js  # covers sval-agent-files
+uriloader/exthandler/tests/mochitest/browser_protocol_ask_dialog.js  # covers sval-agent-apps
+uriloader/exthandler/tests/mochitest/browser_shows_where_to_save_dialog.js  # covers sval-agent-files
+xpcom/tests/unit/test_bug325418.js  # covers timer-thread-wakeup-window
+xpcom/tests/unit/test_getTimers.js  # covers timer-thread-wakeup-window

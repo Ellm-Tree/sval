@@ -1,0 +1,209 @@
+Sval: keep a user's media keys, gamepads and document Picture-in-Picture
+from a tab an agent controls
+
+While an agent controls a tab, Sval's chrome stops the user's input at the
+window that shows it, but some input reaches a page without passing there.
+Media keys and the system's media controls act on the main controller
+MediaControlService picks among the active MediaControllers, gamepad input
+reaches every non-background window that listens (GamepadManager), and a
+document Picture-in-Picture window takes the user's input for the page that
+opened it, in a window of its own. This adds a parent-set BrowsingContext
+field, SvalAgentInControl, which Sval's chrome sets on such a tab, and hooks
+that hand over to Sval's SvalAgentInControl.cpp: the tab's MediaController
+is not active while the field holds, so the keys go to another tab's media;
+GamepadManager treats the tab's windows as background ones; and
+DocumentPictureInPicture::RequestWindow refuses the tab's pages, whose open
+window closes as the field is set.
+
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+index fe8240e3e2..4bfd1ab51c 100644
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -168,6 +168,11 @@ struct EmbedderColorSchemes {
+    * browsing contexts only (SvalFocusEmulation.cpp). */                       \
+   FIELD(SvalFocusEmulated, bool,                                               \
+         {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  /* Sval: whether an agent controls this tab, so that none of the user's      \
++   * input reaches its pages. Set by the parent on top level browsing          \
++   * contexts only (SvalAgentInControl.cpp). */                                \
++  FIELD(SvalAgentInControl, bool,                                              \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
+   /* Whether there's more than 1 tab / toplevel browsing context in this       \
+    * parent window. Used to determine if a given BC is allowed to resize       \
+    * and/or move the window or not. */                                         \
+@@ -1218,6 +1223,9 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+   bool IsAppTab() { return GetIsAppTab(); }
+   bool SvalAgentTab() { return GetSvalAgentTab(); }
+   bool SvalFocusEmulated() { return GetSvalFocusEmulated(); }
++  bool SvalAgentInControl() { return GetSvalAgentInControl(); }
++  // Sval: whether an agent controls the tab aWindow's page is in.
++  static bool SvalAgentControls(nsGlobalWindowInner* aWindow);
+   bool HasSiblings() { return GetHasSiblings(); }
+ 
+   bool IsUnderHiddenEmbedderElement() const {
+@@ -1427,6 +1435,8 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+ 
+   void DidSet(FieldIndex<IDX_SvalFocusEmulated>, bool aOldValue);
+ 
++  void DidSet(FieldIndex<IDX_SvalAgentInControl>, bool aOldValue);
++
+   void DidSet(FieldIndex<IDX_ShouldDelayMediaFromStart>, bool aOldValue);
+ 
+   void DidSet(FieldIndex<IDX_OverrideDPPX>, float aOldValue);
+diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
+index bc44af2abf..590843de90 100644
+--- a/docshell/base/CanonicalBrowsingContext.cpp
++++ b/docshell/base/CanonicalBrowsingContext.cpp
+@@ -308,6 +308,7 @@ void CanonicalBrowsingContext::ReplacedBy(
+   txn.SetIsAppTab(GetIsAppTab());
+   txn.SetSvalAgentTab(GetSvalAgentTab());
+   txn.SetSvalFocusEmulated(GetSvalFocusEmulated());
++  txn.SetSvalAgentInControl(GetSvalAgentInControl());
+   txn.SetIsCaptivePortalTab(GetIsCaptivePortalTab());
+   txn.SetHasSiblings(GetHasSiblings());
+   txn.SetTopLevelCreatedByWebContent(GetTopLevelCreatedByWebContent());
+diff --git a/dom/base/moz.build b/dom/base/moz.build
+index 71d1e57bf5..7a5258104d 100644
+--- a/dom/base/moz.build
++++ b/dom/base/moz.build
+@@ -480,6 +480,7 @@ UNIFIED_SOURCES += [
+     "StyledRange.cpp",
+     "StyleSheetList.cpp",
+     "SubtleCrypto.cpp",
++    "SvalAgentInControl.cpp",
+     "SvalFocusEmulation.cpp",
+     "TestUtils.cpp",
+     "Text.cpp",
+diff --git a/dom/chrome-webidl/BrowsingContext.webidl b/dom/chrome-webidl/BrowsingContext.webidl
+index 4add463e9e..7908c1c343 100644
+--- a/dom/chrome-webidl/BrowsingContext.webidl
++++ b/dom/chrome-webidl/BrowsingContext.webidl
+@@ -172,6 +172,10 @@ interface BrowsingContext {
+   // focused window, without the window's (SvalFocusEmulation.cpp).
+   [SetterThrows] attribute boolean svalFocusEmulated;
+ 
++  // Sval: whether an agent controls this tab, so that none of the user's
++  // input reaches its pages (SvalAgentInControl.cpp).
++  [SetterThrows] attribute boolean svalAgentInControl;
++
+   /**
+    * Sets whether this is BC has siblings **at the toplevel** (e.g. in a tabbed
+    * browser environment). Used to determine if web content can resize the top
+diff --git a/dom/documentpip/DocumentPictureInPicture.cpp b/dom/documentpip/DocumentPictureInPicture.cpp
+index 4e67aff86d..c32825c223 100644
+--- a/dom/documentpip/DocumentPictureInPicture.cpp
++++ b/dom/documentpip/DocumentPictureInPicture.cpp
+@@ -268,6 +268,14 @@ already_AddRefed<Promise> DocumentPictureInPicture::RequestWindow(
+     return nullptr;
+   }
+ 
++  // Sval: a page in a tab an agent controls opens no window the user's input
++  // would reach.
++  if (bc->GetSvalAgentInControl()) {
++    aRv.ThrowNotAllowedError(
++        "Document Picture-in-Picture is not available in this tab");
++    return nullptr;
++  }
++
+   // 4, 7. Require transient activation
+   WindowContext* wc = ownerWin->GetWindowContext();
+   if (!wc || !wc->ConsumeTransientUserGestureActivation()) {
+diff --git a/dom/gamepad/GamepadManager.cpp b/dom/gamepad/GamepadManager.cpp
+index 58a54ed7a7..4a29b68677 100644
+--- a/dom/gamepad/GamepadManager.cpp
++++ b/dom/gamepad/GamepadManager.cpp
+@@ -10,6 +10,7 @@
+ #include "mozilla/Services.h"
+ #include "mozilla/StaticPrefs_dom.h"
+ #include "mozilla/StaticPtr.h"
++#include "mozilla/dom/BrowsingContext.h"
+ #include "mozilla/dom/Gamepad.h"
+ #include "mozilla/dom/GamepadAxisMoveEvent.h"
+ #include "mozilla/dom/GamepadButtonEvent.h"
+@@ -279,7 +280,8 @@ void GamepadManager::NewConnectionEvent(GamepadHandle aHandle,
+ 
+       // Only send events to non-background windows
+       if (!listeners[i]->IsCurrentInnerWindow() ||
+-          listeners[i]->GetOuterWindow()->IsBackground()) {
++          listeners[i]->GetOuterWindow()->IsBackground() ||
++          BrowsingContext::SvalAgentControls(listeners[i])) {
+         continue;
+       }
+ 
+@@ -342,7 +344,8 @@ void GamepadManager::SyncGamepadState(GamepadHandle aHandle,
+                                       nsGlobalWindowInner* aWindow,
+                                       Gamepad* aGamepad) {
+   if (mShuttingDown || !mEnabled ||
+-      aWindow->ShouldResistFingerprinting(RFPTarget::Gamepad)) {
++      aWindow->ShouldResistFingerprinting(RFPTarget::Gamepad) ||
++      BrowsingContext::SvalAgentControls(aWindow)) {
+     return;
+   }
+ 
+@@ -467,6 +470,7 @@ void GamepadManager::Update(const GamepadChangeEvent& aEvent) {
+     // Only send events to non-background windows
+     if (!listeners[i]->IsCurrentInnerWindow() ||
+         listeners[i]->GetOuterWindow()->IsBackground() ||
++        BrowsingContext::SvalAgentControls(listeners[i]) ||
+         listeners[i]->ShouldResistFingerprinting(RFPTarget::Gamepad)) {
+       continue;
+     }
+@@ -553,7 +557,8 @@ bool GamepadManager::SetGamepadByEvent(const GamepadChangeEvent& aEvent,
+         for (uint32_t i = 0; i < mListeners.Length(); i++) {
+           RefPtr<Gamepad> listenerGamepad = mListeners[i]->GetGamepad(handle);
+           if (listenerGamepad && mListeners[i]->IsCurrentInnerWindow() &&
+-              !mListeners[i]->GetOuterWindow()->IsBackground()) {
++              !mListeners[i]->GetOuterWindow()->IsBackground() &&
++              !BrowsingContext::SvalAgentControls(mListeners[i])) {
+             const GamepadTouchInformation& a =
+                 body.get_GamepadTouchInformation();
+             listenerGamepad->SetTouchEvent(a.index(), a.touch_state());
+diff --git a/dom/media/mediacontrol/MediaController.cpp b/dom/media/mediacontrol/MediaController.cpp
+index 5effcf091c..dbb07eb748 100644
+--- a/dom/media/mediacontrol/MediaController.cpp
++++ b/dom/media/mediacontrol/MediaController.cpp
+@@ -399,7 +399,8 @@ bool MediaController::ShouldActivateController() const {
+   // browsing context that controller belongs to (2) controllable media enters
+   // fullscreen or PIP mode.
+   return IsAnyMediaBeingControlled() &&
+-         (IsPlaying() || IsBeingUsedInPIPModeOrFullscreen()) && !mIsActive;
++         (IsPlaying() || IsBeingUsedInPIPModeOrFullscreen()) && !mIsActive &&
++         !SvalAgentInControl();
+ }
+ 
+ bool MediaController::ShouldDeactivateController() const {
+@@ -410,6 +411,9 @@ bool MediaController::ShouldDeactivateController() const {
+   // keep controller active in order to receive media keys even if we don't have
+   // any controlled media existing, because a website might start other media
+   // when media session receives media keys.
++  if (SvalAgentInControl()) {
++    return mIsActive;
++  }
+   return !IsAnyMediaBeingControlled() && mIsActive &&
+          !mActiveMediaSessionContextId;
+ }
+diff --git a/dom/media/mediacontrol/MediaController.h b/dom/media/mediacontrol/MediaController.h
+index 45e1cddc8d..a172ecc68e 100644
+--- a/dom/media/mediacontrol/MediaController.h
++++ b/dom/media/mediacontrol/MediaController.h
+@@ -139,6 +139,10 @@ class MediaController final : public DOMEventTargetHelper,
+   // then calling any its method won't take any effect.
+   void Shutdown();
+ 
++  // Sval: activates or deactivates the controller as an agent's control of
++  // its tab changes (SvalAgentInControl.cpp).
++  void SvalAgentInControlChanged();
++
+   // This event would be notified media controller's supported media keys
+   // change.
+   MediaEventSource<nsTArray<MediaControlKey>>& SupportedKeysChangedEvent() {
+@@ -206,6 +210,9 @@ class MediaController final : public DOMEventTargetHelper,
+   void UpdateActivatedStateIfNeeded();
+   bool ShouldActivateController() const;
+   bool ShouldDeactivateController() const;
++  // Sval: whether an agent controls this controller's tab, which then takes
++  // none of the user's media keys (SvalAgentInControl.cpp).
++  bool SvalAgentInControl() const;
+ 
+   void UpdateDeactivationTimerIfNeeded();
+ 

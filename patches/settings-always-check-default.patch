@@ -1,0 +1,27 @@
+Sval: the check for the default browser at launch stays open while Sval is it
+
+Settings' "Always check if Sval is your default browser" sets
+browser.shell.checkDefaultBrowser, which DefaultBrowserCheck reads at each
+launch: it asks only when Sval is not the default. Firefox disables the
+checkbox while Firefox is the default, so a user cannot ask to be told if
+another browser takes the default later. The setting's disabled callback is
+built in Firefox's main.js, so no added file can change it.
+
+diff --git a/browser/components/preferences/main.js b/browser/components/preferences/main.js
+index 29d3f08fb7..fbdbaed8a6 100644
+--- a/browser/components/preferences/main.js
++++ b/browser/components/preferences/main.js
+@@ -534,10 +534,9 @@ Preferences.addSetting({
+    * browser is already the default browser.
+    */
+   visible: () => DefaultBrowserHelper.canCheck,
+-  disabled: (_, setting) =>
+-    !DefaultBrowserHelper.canCheck ||
+-    setting.locked ||
+-    DefaultBrowserHelper.isBrowserDefault,
++  // Sval: the check stays open while Sval is the default, so a user can ask
++  // to be told at launch if another browser takes the default later.
++  disabled: (_, setting) => !DefaultBrowserHelper.canCheck || setting.locked,
+ });
+ 
+ Preferences.addSetting({

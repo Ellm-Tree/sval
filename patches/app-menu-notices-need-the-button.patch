@@ -1,0 +1,23 @@
+Sval: no app menu notice while the app menu button is not drawn
+
+Sval's header has no app menu button, and `SvalAppNotices` gives the app
+menu's notices to Sval's own buttons instead. A doorhanger
+anchored to a button that is not drawn opens at no useful place, and a
+badge on it is never seen. `PanelUI.init` keeps its suppression callback
+private and `AppMenuNotifications` has no other consumer hook, so the
+check goes where Firefox already stands its notices down for fullscreen.
+
+diff --git a/browser/components/customizableui/content/panelUI.js b/browser/components/customizableui/content/panelUI.js
+index 4bf7f4fedf..66c5ccdefe 100644
+--- a/browser/components/customizableui/content/panelUI.js
++++ b/browser/components/customizableui/content/panelUI.js
+@@ -957,7 +957,8 @@ const PanelUI = {
+     if (
+       (window.fullScreen && FullScreen.navToolboxHidden) ||
+       document.fullscreenElement ||
+-      this._shouldSuppress()
++      this._shouldSuppress() ||
++      !this.menuButton.checkVisibility()
+     ) {
+       this._hidePopup();
+       return;

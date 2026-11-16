@@ -1,0 +1,26 @@
+Sval: Picture-in-Picture ignores a hidden page whose tab is gone
+
+With media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled
+on, a page playing a video tells the parent when it goes hidden
+(PictureInPicture:VideoTabHidden). A page made hidden as its tab closes,
+as when an agent's Workspace is removed with a video playing in its
+window, sends that message after the tab's browser has gone, and
+PictureInPictureToggleParent read the missing browser and threw. No chrome
+API reaches the actor's message handling.
+
+diff --git a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+index 76ae77f16f..2a8f12c78d 100644
+--- a/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
++++ b/toolkit/components/pictureinpicture/PictureInPicture.sys.mjs
+@@ -94,6 +94,11 @@ export class PictureInPictureToggleParent extends JSWindowActorParent {
+         if (!lazy.PIP_ENABLED || !lazy.PIP_WHEN_SWITCHING_TABS) {
+           break;
+         }
++        // Sval: a page can go hidden as its tab closes, and then its message
++        // arrives once the tab's browser is gone.
++        if (!browser) {
++          break;
++        }
+         // If the tab is still selected, then we can ignore this event
+         if (browser.documentGlobal.gBrowser.selectedBrowser == browser) {
+           break;

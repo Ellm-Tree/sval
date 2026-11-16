@@ -1,0 +1,43 @@
+Sval: nmhproxy opens the Sval it ships in
+
+nmhproxy opened the browser by the compiled-in bundle identifier, so Launch
+Services chose among every copy registered under it: an installed Sval when
+a dev build's proxy asked, since a dev build carries another identifier
+in its Info.plist. It opens its own bundle by path (bundle.rs, added beside
+it).
+
+diff --git a/browser/app/nmhproxy/src/commands.rs b/browser/app/nmhproxy/src/commands.rs
+index 13050f0bf6..4307f45906 100644
+--- a/browser/app/nmhproxy/src/commands.rs
++++ b/browser/app/nmhproxy/src/commands.rs
+@@ -191,15 +191,15 @@ fn launch_firefox<C: CommandRunner>(
+     let validated_url: String = validate_url(url)?;
+     let mut command = C::new();
+     if os == "macos" {
+-        use mozbuild::config::MOZ_MACBUNDLE_ID;
++        let app = crate::bundle::own_app()?;
+         let mut args: [&str; 2] = ["--args", "-url"];
+         if private {
+             args[1] = "-private-window";
+         }
+         command
+             .arg("-n")
+-            .arg("-b")
+-            .arg(MOZ_MACBUNDLE_ID)
++            .arg("-a")
++            .arg(&app.to_string_lossy())
+             .args(&args)
+             .arg(validated_url.as_str());
+     } else if os == "windows" {
+diff --git a/browser/app/nmhproxy/src/main.rs b/browser/app/nmhproxy/src/main.rs
+index 02351eb0f1..ba6f4e20c9 100644
+--- a/browser/app/nmhproxy/src/main.rs
++++ b/browser/app/nmhproxy/src/main.rs
+@@ -2,6 +2,7 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++mod bundle;
+ mod commands;
+ use commands::ResultCode;
+ use std::io::Error;

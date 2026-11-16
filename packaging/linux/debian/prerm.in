@@ -1,0 +1,15 @@
+#!/bin/sh -e
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+if [ "$$1" = "remove" ] || [ "$$1" = "deconfigure" ] ; then
+    update-alternatives --remove x-www-browser /usr/bin/${PKG_NAME}
+    update-alternatives --remove gnome-www-browser /usr/bin/${PKG_NAME}
+fi
+
+# postinst copied the AppArmor profile in, so dpkg does not know to remove it.
+if [ "$$1" = "remove" ] && [ -f /etc/apparmor.d/${PKG_NAME} ] ; then
+    apparmor_parser --remove /etc/apparmor.d/${PKG_NAME} > /dev/null 2>&1 || true
+    rm -f /etc/apparmor.d/${PKG_NAME}
+fi

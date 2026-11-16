@@ -1,0 +1,49 @@
+Sval: report the platform's common colour depth under RFP
+
+RFPTarget::ScreenPixelDepth and RFPTarget::CSSColorInfo report 24 bits on
+every platform. Most Macs report 30, the cap ScreenHelperCocoa puts on a
+screen's deepest window depth, so 24 makes a Mac stand out. Under these
+targets a page reads 30 on macOS and 24 elsewhere, from screen.colorDepth,
+screen.pixelDepth and the color media feature alike, so the three agree.
+
+No chrome API can change what nsScreen or the style engine reports.
+
+diff --git a/dom/base/nsScreen.cpp b/dom/base/nsScreen.cpp
+index f9aeb73081..98602f2ede 100644
+--- a/dom/base/nsScreen.cpp
++++ b/dom/base/nsScreen.cpp
+@@ -45,9 +45,8 @@ NS_IMPL_CYCLE_COLLECTION_INHERITED(nsScreen, DOMEventTargetHelper,
+                                    mScreenOrientation)
+ 
+ int32_t nsScreen::PixelDepth() {
+-  // Return 24 to prevent fingerprinting.
+   if (ShouldResistFingerprinting(RFPTarget::ScreenPixelDepth)) {
+-    return 24;
++    return SvalRFPService::kSpoofedScreenPixelDepth;
+   }
+   nsDeviceContext* context = GetDeviceContext();
+   if (NS_WARN_IF(!context)) {
+diff --git a/layout/style/nsMediaFeatures.cpp b/layout/style/nsMediaFeatures.cpp
+index a39d07cc57..cfab196809 100644
+--- a/layout/style/nsMediaFeatures.cpp
++++ b/layout/style/nsMediaFeatures.cpp
+@@ -180,14 +180,13 @@ int32_t Gecko_MediaFeatures_GetColorDepth(const Document* aDocument) {
+     return 0;
+   }
+ 
+-  // Use depth of 24 when resisting fingerprinting, or when we're not being
+-  // rendered.
++  // Use depth of 24 when we're not being rendered.
+   int32_t depth = 24;
+ 
+-  if (!aDocument->ShouldResistFingerprinting(RFPTarget::CSSColorInfo)) {
+-    if (nsDeviceContext* dx = GetDeviceContextFor(aDocument)) {
+-      depth = dx->GetDepth();
+-    }
++  if (aDocument->ShouldResistFingerprinting(RFPTarget::CSSColorInfo)) {
++    depth = SvalRFPService::kSpoofedScreenPixelDepth;
++  } else if (nsDeviceContext* dx = GetDeviceContextFor(aDocument)) {
++    depth = dx->GetDepth();
+   }
+ 
+   // The spec says to use bits *per color component*, so divide by 3,

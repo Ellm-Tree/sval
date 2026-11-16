@@ -1,0 +1,32 @@
+Sval: a WebGL context the application loses on purpose is not warned about
+
+WEBGL_lose_context.loseContext() logs "WebGL context was lost." to the
+console like any other loss. Troubleshoot.sys.mjs probes the GPU with a
+WebGL 1 and a WebGL 2 context and loses each to free it, so about:support,
+the feedback form and Report Broken Site each log the warning twice. The
+warning is for the authors of web pages, which still get it, and a loss the
+application did not ask for still warns. The caller decides: Troubleshoot's
+canvas is in a DOMParser document, which DOMParser::Constructor gives a null
+principal when its caller is the system principal.
+
+diff --git a/dom/canvas/ClientWebGLContext.cpp b/dom/canvas/ClientWebGLContext.cpp
+index 131a739bde..6da6f51f44 100644
+--- a/dom/canvas/ClientWebGLContext.cpp
++++ b/dom/canvas/ClientWebGLContext.cpp
+@@ -291,7 +291,15 @@ void ClientWebGLContext::EmulateLoseContext() const {
+ 
+ void ClientWebGLContext::OnContextLoss(
+     const webgl::ContextLossReason reason) const {
+-  JsWarning("WebGL context was lost.");
++  // The warning is for the authors of web pages. The application's own code
++  // calls WEBGL_lose_context.loseContext() to free a context it is done with,
++  // often in a document DOMParser gave a null principal, so the caller is
++  // what tells them apart. A manual loss arrives here inside that call.
++  const bool lostByChrome = reason == webgl::ContextLossReason::Manual &&
++                            nsContentUtils::ThreadsafeIsCallerChrome();
++  if (!lostByChrome) {
++    JsWarning("WebGL context was lost.");
++  }
+ 
+   RefPtr<webgl::NotLostData> notLost(mNotLost);
+   if (notLost) {

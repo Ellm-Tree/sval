@@ -1,0 +1,44 @@
+Sval: ignore audio playback messages for a browser that has gone
+
+AudioPlaybackParent.receiveMessage reads the tab's browser from
+browsingContext.top.embedderElement, which is null once the tab has
+closed, and an AudioPlayback:Stop sent as a playing tab closes arrives
+after that. It throws, logging a console error for every tab closed
+while it plays sound. didDestroy already guards the same lookup.
+
+AudioPlaybackChild sends the same message from the "audio-playback"
+observer, which can run once its window global can no longer send, and
+sendAsyncMessage then throws InvalidStateError.
+
+diff --git a/toolkit/actors/AudioPlaybackChild.sys.mjs b/toolkit/actors/AudioPlaybackChild.sys.mjs
+index 6d30d10f25..4504ab3b1d 100644
+--- a/toolkit/actors/AudioPlaybackChild.sys.mjs
++++ b/toolkit/actors/AudioPlaybackChild.sys.mjs
+@@ -13,7 +13,11 @@ export class AudioPlaybackChild extends JSWindowActorChild {
+       } else {
+         name += data === "active" ? "Start" : "Stop";
+       }
+-      this.sendAsyncMessage(name);
++      try {
++        this.sendAsyncMessage(name);
++      } catch {
++        // The window is going away, and its parent with it.
++      }
+     }
+   }
+ }
+diff --git a/toolkit/actors/AudioPlaybackParent.sys.mjs b/toolkit/actors/AudioPlaybackParent.sys.mjs
+index 16ddc94b01..5442ef7f44 100644
+--- a/toolkit/actors/AudioPlaybackParent.sys.mjs
++++ b/toolkit/actors/AudioPlaybackParent.sys.mjs
+@@ -10,6 +10,10 @@ export class AudioPlaybackParent extends JSWindowActorParent {
+   }
+   receiveMessage(aMessage) {
+     const browser = this.browsingContext.top.embedderElement;
++    // A message can arrive after the tab's browser has gone.
++    if (!browser) {
++      return;
++    }
+     switch (aMessage.name) {
+       case "AudioPlayback:Start":
+         this._hasAudioPlayback = true;

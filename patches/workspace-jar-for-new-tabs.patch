@@ -1,0 +1,49 @@
+Sval: a new tab opens in its window's workspace jar
+
+Every tab in an isolated workspace uses that workspace's cookie jar
+(isolated workspaces spec §4). A tab with no opener and no userContextId
+asked for gets gBrowser.defaultUserContextId, which Sval sets to the jar of
+the workspace the window shows. That covers every way Firefox opens a tab
+for the user, among them Cmd+T, the File menu, a favorite, history and a
+link from another app, through the one function they all reach. A tab with
+an opener still inherits the opener's jar, and an explicit userContextId
+still wins. No event fires early enough: the browser takes its origin
+attributes when the tab is created, before TabOpen.
+
+A link from another app reaches the window through BrowserDOMWindow's
+openURI with OPEN_EXTERNAL, which in Firefox asks for the default jar by id
+when it guesses none. Here it asks for none, so the tab is made in the
+workspace jar and its first request carries that jar. app-sval-prefs.js
+turns the guess off.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index c42b1a1a8d..e512377f26 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -4162,6 +4162,9 @@
+       if (userContextId == null && openerTab) {
+         userContextId = openerTab.getAttribute("usercontextid") || 0;
+       }
++      if (userContextId == null) {
++        userContextId = this.defaultUserContextId;
++      }
+ 
+       if (!noInitialLabel) {
+         if (isBlankPageURL(uriString)) {
+diff --git a/browser/modules/BrowserDOMWindow.sys.mjs b/browser/modules/BrowserDOMWindow.sys.mjs
+index 29c5b15106..46e7202713 100644
+--- a/browser/modules/BrowserDOMWindow.sys.mjs
++++ b/browser/modules/BrowserDOMWindow.sys.mjs
+@@ -247,10 +247,11 @@ export class BrowserDOMWindow {
+         "browser.link.force_default_user_context_id_for_external_opens",
+         false
+       );
++    // Sval: no jar asked for leaves the tab to its window's workspace jar.
+     var openingUserContextId =
+       (guessUserContextIdEnabled &&
+         lazy.URILoadingHelper.guessUserContextId(aURI)) ||
+-      Ci.nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID;
++      null;
+ 
+     if (aOpenWindowInfo && isExternal) {
+       console.error(

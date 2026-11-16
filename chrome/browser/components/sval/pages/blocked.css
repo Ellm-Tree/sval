@@ -1,0 +1,35 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * A site Safe Browsing blocks, drawn as the other error pages are, on a red
+ * canvas. `blockedSite.css` paints the whole page red so that a deceptive or
+ * harmful site's warning cannot be mistaken for an ordinary error, and
+ * `sval-page.css` sets the canvas token that colour comes through, so the red
+ * is set again here.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/pages/error-pages.css");
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  :root {
+    --background-color-canvas: #a4000f;
+  }
+
+  #errorPageContainer,
+  .error-description {
+    background-color: var(--sval-raised);
+  }
+
+  #errorPageContainer .title {
+    padding-top: 48px;
+    background-image: url("chrome://browser/content/sval/icons/shield-ban.svg");
+    fill: var(--sval-problem);
+  }
+
+  /* `blockedSite.css` edges every button in white, for its red canvas. */
+  .button-container button:not(.primary) {
+    border-color: var(--button-border-color);
+  }
+}

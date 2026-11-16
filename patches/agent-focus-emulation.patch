@@ -1,0 +1,218 @@
+Sval: give the tab an agent works in the focus of a focused window
+
+Pages depend on focus: form libraries validate a field on blur, comboboxes
+open on focus, and pages check document.hasFocus(). Gecko gives that only to
+the tab in the active window (nsFocusManager::SetFocusInner sends focus and
+blur and sets :focus only for an element there, and Document::HasFocus asks
+IsInActiveWindow), and it keeps one focused window per process, mirrored to
+the parent. Moving that focus into an agent's tab takes the user's keyboard,
+so no chrome API can give the agent's page focus. This adds a parent-set
+BrowsingContext field, SvalFocusEmulated, and hooks in HasFocus,
+SetFocusInner's inactive-window branch, ClearFocus and WindowLowered that
+hand over to Sval's SvalFocusEmulation.cpp. There the tab's pages hear focus
+and blur and match :focus, :focus-visible and :focus-within as in a focused
+window, with the focus manager's own NotifyFocusStateChange and
+SendFocusOrBlurEvent, while the process's focused window, the parent and the
+widgets are left alone. The emulated events are kept from the accessibility
+service, so what a screen reader follows is the real focus. Real focus wins:
+nothing is emulated while the tab is in the active window, and a tab lowered
+from it gets its emulated focus back.
+
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+index 73ef2ed478..fe8240e3e2 100644
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -163,6 +163,11 @@ struct EmbedderColorSchemes {
+   /* Sval: whether this tab belongs to an agent's workspace. Set by the parent \
+    * on top level browsing contexts only. */                                   \
+   FIELD(SvalAgentTab, bool, {.mTopOnly = true, .mCanSet = CanSet::ParentOnly}) \
++  /* Sval: whether this tab's pages have focus, as in the focused tab of a     \
++   * focused window, without the window's. Set by the parent on top level      \
++   * browsing contexts only (SvalFocusEmulation.cpp). */                       \
++  FIELD(SvalFocusEmulated, bool,                                               \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
+   /* Whether there's more than 1 tab / toplevel browsing context in this       \
+    * parent window. Used to determine if a given BC is allowed to resize       \
+    * and/or move the window or not. */                                         \
+@@ -1212,6 +1217,7 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+ 
+   bool IsAppTab() { return GetIsAppTab(); }
+   bool SvalAgentTab() { return GetSvalAgentTab(); }
++  bool SvalFocusEmulated() { return GetSvalFocusEmulated(); }
+   bool HasSiblings() { return GetHasSiblings(); }
+ 
+   bool IsUnderHiddenEmbedderElement() const {
+@@ -1419,6 +1425,8 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+   // volume of all media elements.
+   void DidSet(FieldIndex<IDX_Muted>);
+ 
++  void DidSet(FieldIndex<IDX_SvalFocusEmulated>, bool aOldValue);
++
+   void DidSet(FieldIndex<IDX_ShouldDelayMediaFromStart>, bool aOldValue);
+ 
+   void DidSet(FieldIndex<IDX_OverrideDPPX>, float aOldValue);
+diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
+index 9f8a1b5ed5..09a93d892e 100644
+--- a/docshell/base/CanonicalBrowsingContext.cpp
++++ b/docshell/base/CanonicalBrowsingContext.cpp
+@@ -305,6 +305,7 @@ void CanonicalBrowsingContext::ReplacedBy(
+   txn.SetBrowserId(GetBrowserId());
+   txn.SetIsAppTab(GetIsAppTab());
+   txn.SetSvalAgentTab(GetSvalAgentTab());
++  txn.SetSvalFocusEmulated(GetSvalFocusEmulated());
+   txn.SetIsCaptivePortalTab(GetIsCaptivePortalTab());
+   txn.SetHasSiblings(GetHasSiblings());
+   txn.SetTopLevelCreatedByWebContent(GetTopLevelCreatedByWebContent());
+diff --git a/dom/base/Document.cpp b/dom/base/Document.cpp
+index 7cef0252a5..68efc3b05d 100644
+--- a/dom/base/Document.cpp
++++ b/dom/base/Document.cpp
+@@ -4729,6 +4729,11 @@ bool Document::HasFocus(ErrorResult& rv) const {
+     return false;
+   }
+ 
++  // Sval: a tab with emulated focus (SvalFocusEmulation.cpp).
++  if (Maybe<bool> emulated = fm->SvalEmulatedHasFocus(bc)) {
++    return *emulated;
++  }
++
+   if (!fm->IsInActiveWindow(bc)) {
+     return false;
+   }
+diff --git a/dom/base/moz.build b/dom/base/moz.build
+index 06e0efa0d9..71d1e57bf5 100644
+--- a/dom/base/moz.build
++++ b/dom/base/moz.build
+@@ -480,6 +480,7 @@ UNIFIED_SOURCES += [
+     "StyledRange.cpp",
+     "StyleSheetList.cpp",
+     "SubtleCrypto.cpp",
++    "SvalFocusEmulation.cpp",
+     "TestUtils.cpp",
+     "Text.cpp",
+     "TextDirectiveCreator.cpp",
+diff --git a/dom/base/nsFocusManager.cpp b/dom/base/nsFocusManager.cpp
+index 68465fbe87..fef966433d 100644
+--- a/dom/base/nsFocusManager.cpp
++++ b/dom/base/nsFocusManager.cpp
+@@ -610,7 +610,11 @@ nsFocusManager::ClearFocus(mozIDOMWindowProxy* aWindow) {
+       }
+     }
+   } else {
++    // Sval: a tab with emulated focus hears the blur (SvalFocusEmulation.cpp).
++    RefPtr<BrowsingContext> bc = window->GetBrowsingContext();
++    RefPtr<Element> svalBefore = SvalEmulatedFocus(bc);
+     window->SetFocusedElement(nullptr);
++    SvalEmulateFocusMove(bc, svalBefore, 0);
+   }
+ 
+   LOGFOCUS(("<<ClearFocus end>>"));
+@@ -868,6 +872,12 @@ void nsFocusManager::WindowLowered(mozIDOMWindowProxy* aWindow,
+   }
+ 
+   mWindowBeingLowered = nullptr;
++
++  // Sval: a tab with emulated focus keeps it (SvalFocusEmulation.cpp).
++  if (RefPtr<BrowsingContext> bc = window->GetBrowsingContext()) {
++    RefPtr<BrowsingContext> top = bc->Top();
++    SvalFocusEmulationChanged(top, true);
++  }
+ }
+ 
+ void nsFocusManager::FocusedElementMayHaveMoved(nsIContent* aContent,
+@@ -1534,6 +1544,14 @@ static bool ShouldMatchFocusVisible(nsPIDOMWindowOuter* aWindow,
+   return false;
+ }
+ 
++// Sval: the same, for SvalFocusEmulation.cpp.
++/* static */
++bool nsFocusManager::SvalShouldMatchFocusVisible(nsPIDOMWindowOuter* aWindow,
++                                                const Element& aElement,
++                                                int32_t aFocusFlags) {
++  return ShouldMatchFocusVisible(aWindow, aElement, aFocusFlags);
++}
++
+ /* static */
+ void nsFocusManager::NotifyFocusStateChange(Element* aElement,
+                                             Element* aElementToFocus,
+@@ -2001,6 +2019,8 @@ Maybe<uint64_t> nsFocusManager::SetFocusInner(Element* aNewContent,
+   } else {
+     // otherwise, for inactive windows and when the caller cannot steal the
+     // focus, update the node in the window, and  raise the window if desired.
++    // Sval: a tab with emulated focus hears the move (SvalFocusEmulation.cpp).
++    RefPtr<Element> svalBefore = SvalEmulatedFocus(newBrowsingContext);
+     if (allowFrameSwitch) {
+       AdjustWindowFocus(newBrowsingContext, true, IsWindowVisible(newWindow),
+                         actionId, false /* aShouldClearAncestorFocus */,
+@@ -2021,6 +2041,7 @@ Maybe<uint64_t> nsFocusManager::SetFocusInner(Element* aNewContent,
+         }
+       }
+     }
++    SvalEmulateFocusMove(newBrowsingContext, svalBefore, aFlags);
+ 
+     // update the commands even when inactive so that the attributes for that
+     // window are up to date.
+@@ -3100,7 +3121,8 @@ void nsFocusManager::FireFocusOrBlurEvent(EventMessage aEventMessage,
+ 
+ #ifdef ACCESSIBILITY
+   nsAccessibilityService* accService = GetAccService();
+-  if (accService) {
++  // Sval: emulated focus is not the accessibility focus.
++  if (accService && !mSvalEmulating) {
+     if (aEventMessage == eFocus) {
+       accService->NotifyOfDOMFocus(aTarget);
+     } else {
+diff --git a/dom/base/nsFocusManager.h b/dom/base/nsFocusManager.h
+index 6b24bcbd2e..b6b3f69c33 100644
+--- a/dom/base/nsFocusManager.h
++++ b/dom/base/nsFocusManager.h
+@@ -361,6 +361,23 @@ class nsFocusManager final : public nsIFocusManager,
+   bool IsSameOrAncestor(mozilla::dom::BrowsingContext* aPossibleAncestor,
+                         mozilla::dom::BrowsingContext* aContext) const;
+ 
++  // Sval: focus emulation for a tab whose browsing context has
++  // SvalFocusEmulated, defined in SvalFocusEmulation.cpp.
++  mozilla::Maybe<bool> SvalEmulatedHasFocus(mozilla::dom::BrowsingContext* aBC);
++  MOZ_CAN_RUN_SCRIPT void SvalFocusEmulationChanged(
++      mozilla::dom::BrowsingContext* aTop, bool aEmulated);
++
++ private:
++  nsPIDOMWindowOuter* SvalEmulatedRoot(mozilla::dom::BrowsingContext* aBC);
++  already_AddRefed<mozilla::dom::Element> SvalEmulatedFocus(
++      mozilla::dom::BrowsingContext* aBC);
++  MOZ_CAN_RUN_SCRIPT void SvalEmulateFocusMove(
++      mozilla::dom::BrowsingContext* aBC, mozilla::dom::Element* aBefore,
++      int32_t aFlags);
++  static bool SvalShouldMatchFocusVisible(nsPIDOMWindowOuter* aWindow,
++                                         const mozilla::dom::Element& aElement,
++                                         int32_t aFocusFlags);
++
+  protected:
+   /**
+    * Returns the window that is the lowest common ancestor of both aWindow
+@@ -1000,6 +1017,10 @@ class nsFocusManager final : public nsIFocusManager,
+   // keep track of a window while it is being lowered
+   nsCOMPtr<nsPIDOMWindowOuter> mWindowBeingLowered;
+ 
++  // Sval: whether the events being sent are emulated focus's
++  // (SvalFocusEmulation.cpp).
++  bool mSvalEmulating = false;
++
+   // synchronized actions cannot be interrupted with events, so queue these up
+   // and fire them later.
+   nsTArray<nsDelayedBlurOrFocusEvent> mDelayedBlurFocusEvents;
+diff --git a/dom/chrome-webidl/BrowsingContext.webidl b/dom/chrome-webidl/BrowsingContext.webidl
+index 71cfb722df..4add463e9e 100644
+--- a/dom/chrome-webidl/BrowsingContext.webidl
++++ b/dom/chrome-webidl/BrowsingContext.webidl
+@@ -168,6 +168,10 @@ interface BrowsingContext {
+   // the WebMCP API to its pages (ModelContext::IsExposed).
+   [SetterThrows] attribute boolean svalAgentTab;
+ 
++  // Sval: whether this tab's pages have focus, as in the focused tab of a
++  // focused window, without the window's (SvalFocusEmulation.cpp).
++  [SetterThrows] attribute boolean svalFocusEmulated;
++
+   /**
+    * Sets whether this is BC has siblings **at the toplevel** (e.g. in a tabbed
+    * browser environment). Used to determine if web content can resize the top

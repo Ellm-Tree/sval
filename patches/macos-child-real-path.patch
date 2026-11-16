@@ -1,0 +1,32 @@
+Sval: launch macOS child processes by their real path
+
+On macOS, Gecko launches each child from the GRE directory as the parent
+saw it, so Sval started through a path with a symlink in it (mktemp's
+/var/folders, /tmp, or a user's own link) starts its children through the
+link too. A sandboxed child resolves the paths it derives from its own
+executable, and the kernel needs file-read-metadata on each symlink a path
+passes through. SandboxPolicyUtility grants none, so a utility process
+never connects: no audio decodes, and a page whose video has an audio
+track never fires load. The content, RDD, GPU and socket policies allow
+file-read-metadata on "/"; the utility and GMP policies do not.
+Resolving the GRE directory with realpath (nsIFile::Normalize, as
+nsMacUtilsImpl::GetAppPath already does for the sandbox's APP_PATH) keeps
+every child off the link without widening any sandbox.
+
+diff --git a/ipc/glue/GeckoChildProcessHost.cpp b/ipc/glue/GeckoChildProcessHost.cpp
+index 4ce81491b7..075f1ca913 100644
+--- a/ipc/glue/GeckoChildProcessHost.cpp
++++ b/ipc/glue/GeckoChildProcessHost.cpp
+@@ -564,6 +564,12 @@ mozilla::BinPathType BaseProcessLauncher::GetPathToBinary(
+     nsCOMPtr<nsIFile> childProcPath;
+     if (NS_SUCCEEDED(NS_NewLocalFile(nsDependentString(gGREBinPath),
+                                      getter_AddRefs(childProcPath)))) {
++      // Launch the child by its real path. A sandboxed child resolves every
++      // path it derives from its executable, and resolving one through a
++      // symlink needs file-read-metadata on the link, which
++      // SandboxPolicyUtility does not grant: launched through a link, a
++      // utility process never connects.
++      (void)childProcPath->Normalize();
+       // We need to use an App Bundle on OS X so that we can hide
+       // the dock icon. See Bug 557225.
+       if (NS_SUCCEEDED(childProcPath->AppendNative(bundleName)) &&

@@ -1,0 +1,13 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <mask id="s" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+      <rect width="24" height="24" fill="#fff"/>
+      <g transform="translate(12 12) scale(0.021197) skewX(-6) translate(-534 -525)">
+        <path d="M700 370 C670 322 614 300 542 300 C452 300 394 344 394 410 C394 476 454 504 540 522 C636 542 696 576 696 640 C696 708 632 750 536 750 C456 750 398 726 368 676" fill="none" stroke="#000" stroke-width="94.353" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </mask>
+  </defs>
+  <circle cx="12" cy="12" r="8.5" fill="context-fill" mask="url(#s)"/>
+</svg>

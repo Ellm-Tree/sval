@@ -1,0 +1,49 @@
+Sval: SessionStore saves no window marked unsaved
+
+A window whose custom value "sval-unsaved" is set (setCustomWindowValue) is
+left out of the session state SessionStore writes, which a restart, a crash
+and Restore Previous Session bring back, and out of the recently closed
+windows. Sval marks the windows a WebDriver client opens: their tabs live on a
+tree in memory, and a window restored from a record of one would start on
+the user's synced document and file the automation's tabs there. No chrome
+API keeps a normal window out of the session: SessionStore leaves out only
+private windows and taskbar tabs, and closing a restored one at launch
+cannot reach Restore Previous Session, which restores into a window already
+started.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index 301c379fc1..2f5a346792 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -2572,7 +2572,9 @@ var SessionStoreInternal = {
+       // 2) Flush the window.
+       // 3) When the flush is complete, revisit our decision to store the window
+       //    in _closedWindows, and add/remove as necessary.
+-      if (!winData.isPrivate && !winData.isTaskbarTab) {
++      // Sval: nor is a window marked unsaved a recently closed one.
++      const unsaved = !!winData.extData?.["sval-unsaved"];
++      if (!winData.isPrivate && !winData.isTaskbarTab && !unsaved) {
+         this.maybeSaveClosedWindow(winData, isLastWindow);
+       }
+ 
+@@ -2593,7 +2595,7 @@ var SessionStoreInternal = {
+ 
+         // Save non-private windows if they have at
+         // least one saveable tab or are the last window.
+-        if (!winData.isPrivate && !winData.isTaskbarTab) {
++        if (!winData.isPrivate && !winData.isTaskbarTab && !unsaved) {
+           this.maybeSaveClosedWindow(winData, isLastWindow);
+ 
+           if (!isLastWindow && winData.closedId > -1) {
+@@ -5642,6 +5644,11 @@ var SessionStoreInternal = {
+         // window data is still in _statesToRestore
+         continue;
+       }
++      // Sval: a window marked unsaved is in no session a restart, a crash or
++      // Restore Previous Session can bring back.
++      if (this._windows[ix].extData?.["sval-unsaved"]) {
++        continue;
++      }
+       total.push(this._windows[ix]);
+       ids.push(ix);
+       if (!this._windows[ix].isPopup) {

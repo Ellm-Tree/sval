@@ -1,0 +1,246 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's notification bar: every `<notification-message>` a browser window
+ * shows, in the tab box above the page and in the window's own box alike.
+ * One flat strip across the web view pane, its type carried by the tint, the
+ * bottom rule and the icon tile.
+ *
+ *   [ 28px icon tile ] [ message + inline link ...... ] [ buttons ] [ x ]
+ *
+ * The bar's tokens are set here, on the element, where they beat the `:host`
+ * rules of `moz-message-bar.css` and `infobar.css`, and reach its shadow root
+ * by inheritance. The buttons and the link are light DOM, so they are styled
+ * here too. What only the shadow root can change is in
+ * `notification-bar-shadow.css`.
+ *
+ * Each colour is a `light-dark()` pair, so the bar takes the scheme the
+ * window's root has: a tinted workspace sets it (`sval-panel.css`, window
+ * tint) and an untinted window follows the theme, as `sval-header.css`'s
+ * palette does. The bar never wears the workspace's tint.
+ *
+ * The values are the Sval browser design system's, as in `sval-header.css`.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ---------------------------------------------------------------- tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+
+notification-message {
+  --sval-bar-text: light-dark(var(--sval-palette-ink-950), #ffffff);
+  /* blue-700 in light: the brand blue is under 4.5:1 on every light bar. */
+  --sval-bar-link: light-dark(var(--sval-palette-blue-700), var(--sval-palette-neon));
+  --sval-bar-focus: light-dark(var(--sval-palette-blue), var(--sval-palette-neon));
+  --sval-bar-close-ink: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  --sval-bar-close-hover: light-dark(rgb(var(--sval-palette-wash-light) / 0.08), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-bar-primary: var(--sval-palette-blue);
+  --sval-bar-primary-hover: light-dark(#1a5ce0, #3d7bff);
+  --sval-bar-primary-ink: #ffffff;
+  --sval-bar-primary-hover-ink: var(--sval-bar-primary-ink);
+  --sval-bar-secondary: light-dark(rgb(var(--sval-palette-wash-light) / 0.07), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-bar-secondary-hover: light-dark(rgb(var(--sval-palette-wash-light) / 0.12), rgb(var(--sval-palette-wash-dark) / 0.16));
+  --sval-bar-secondary-ink: light-dark(var(--sval-palette-ink-950), #ffffff);
+  --sval-bar-secondary-hover-ink: var(--sval-bar-secondary-ink);
+  --sval-bar-button-border: transparent;
+
+  /* Info, and system, which looks the same. */
+  --sval-bar-bg: light-dark(#e6ecfb, #0c1446);
+  --sval-bar-rule: light-dark(rgb(var(--sval-palette-wash-light) / 0.14), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --sval-bar-tile: light-dark(rgb(var(--sval-palette-wash-light) / 0.08), rgb(var(--sval-palette-wash-dark) / 0.12));
+  --sval-bar-icon: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+}
+
+/* Solid warm darks: navy mixed with amber or red turns violet, which reads as
+ * a private window.
+ *
+ * Firefox shows two bars at info priority that are not news: a page slowing
+ * the browser down (`ProcessHangMonitor`) is a warning, and part of a page
+ * crashing (`TabCrashHandler.showSubFrameNotification`) is critical. */
+notification-message:is([type="warning"], [value="process-hang"]) {
+  --sval-bar-bg: light-dark(#fff4db, #2a2414);
+  --sval-bar-rule: light-dark(rgba(176, 106, 0, 0.24), rgba(255, 178, 36, 0.3));
+  --sval-bar-tile: light-dark(rgba(176, 106, 0, 0.14), rgba(255, 178, 36, 0.2));
+  --sval-bar-icon: light-dark(#8a5200, #ffc24d);
+}
+
+notification-message:is([type="critical"], [value="subframe-crashed"]) {
+  --sval-bar-bg: light-dark(#fdebec, #2e1519);
+  --sval-bar-rule: light-dark(rgba(196, 47, 58, 0.22), rgba(255, 138, 144, 0.32));
+  --sval-bar-tile: light-dark(rgba(217, 58, 69, 0.12), rgba(229, 72, 77, 0.24));
+  --sval-bar-icon: light-dark(var(--sval-palette-red), var(--sval-palette-red-invert));
+}
+
+/* ------------------------------------------------------------------- bar */
+
+/* Flush and flat: no radius, shadow or margin, and a rule under each bar so
+ * stacked bars stay apart with no gap. The configurable background
+ * `appendNotification` takes (`style["background-color"]`) is left out, so a
+ * bar's colour says only its type. */
+notification-message {
+  --message-bar-border-radius: 0;
+  --message-bar-icon-color: var(--sval-bar-icon);
+  --message-bar-icon-background-color: var(--sval-bar-tile);
+  --message-bar-icon-size: 16px;
+  /* The tile: the 16px icon in 6px of padding each side, 8px corners, 2px
+     down to centre it on the 32px button row. */
+  --message-bar-icon-container-height: 16px;
+  --message-bar-icon-container-padding: 6px;
+  --message-bar-icon-container-border-radius: 8px;
+  --message-bar-icon-container-margin-block-start: 2px;
+  --message-bar-actions-gap: 8px;
+  /* The link follows the message after 8px. */
+  --message-bar-message-margin-inline-end: 8px;
+
+  background-color: var(--sval-bar-bg);
+  color: var(--sval-bar-text);
+  border-style: solid;
+  border-color: var(--sval-bar-rule);
+  border-width: 0 0 1px;
+  box-shadow: none;
+  margin: 0;
+  font: 400 14px/20px var(--sval-font);
+}
+
+/* ---------------------------------------------------------------- link */
+
+/* The "Learn more" after the message: a `moz-support-link` or a XUL
+ * `text-link` (`NotificationMessage.setButtons`). Underlined, because in the
+ * dark scheme its colour alone barely tells it from the message. */
+notification-message .notification-link {
+  color: var(--sval-bar-link);
+  font-weight: 500;
+  text-decoration: underline;
+  border-radius: 4px;
+
+  &:hover,
+  &:hover:active {
+    color: var(--sval-bar-link);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--sval-bar-bg),
+      0 0 0 4px var(--sval-bar-focus);
+  }
+}
+
+/* ------------------------------------------------------------- buttons */
+
+/* Firefox's XUL buttons, `.footer-button.small-button`, restyled. The one
+ * marked primary is blue in every type: none of these actions destroys
+ * anything. */
+notification-message .notification-button.footer-button {
+  appearance: none;
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--sval-bar-button-border);
+  border-radius: 999px;
+  font: 600 13px/16px var(--sval-font);
+  white-space: nowrap;
+  background-color: var(--sval-bar-secondary);
+  color: var(--sval-bar-secondary-ink);
+
+  > .button-box > .button-text {
+    margin: 0;
+  }
+
+  &:not([disabled]):is(:hover, :hover:active, [open]) {
+    background-color: var(--sval-bar-secondary-hover);
+    color: var(--sval-bar-secondary-hover-ink);
+    border-color: var(--sval-bar-button-hover-border, var(--sval-bar-button-border));
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--sval-bar-bg),
+      0 0 0 4px var(--sval-bar-focus);
+  }
+}
+
+/* A bar's primary action: the button its caller marks primary, and the one
+ * action of a bar whose caller marks none though it is what the bar is for
+ * (Stop, Enable DRM, Submit report). A second action, such as the page-hang
+ * bar's Debug Script, stays secondary. */
+notification-message .notification-button.footer-button.primary,
+notification-message:is([value="process-hang"], [value="drmContentDisabled"], [value="subframe-crashed"])
+  .notification-button-container
+  > .notification-button.footer-button:first-child {
+  background-color: var(--sval-bar-primary);
+  color: var(--sval-bar-primary-ink);
+  border-color: var(--sval-bar-primary-border, var(--sval-bar-button-border));
+
+  &:not([disabled]):is(:hover, :hover:active, [open]) {
+    background-color: var(--sval-bar-primary-hover);
+    color: var(--sval-bar-primary-hover-ink);
+    border-color: var(--sval-bar-primary-hover-border, var(--sval-bar-button-border));
+  }
+}
+
+/* The pop-up blocker's Options button opens a menu
+ * (`PopupAndRedirectBlockerObserver`, `blockedPopupOptions`). The button
+ * carries nothing else that says so, so it is known by its string. The menu
+ * itself is the native popup, unstyled. */
+notification-message .notification-button.footer-button[data-l10n-id="popup-warning-button"] {
+  padding: 0 10px 0 14px;
+
+  &::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    margin-inline-start: 4px;
+    background: url("chrome://browser/content/sval/notification-icons/chevron-down.svg") center / 16px no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+}
+
+/* ------------------------------------------------------- high contrast */
+
+/* Windows high contrast. Chrome is never colour-forced, only `requested`,
+ * which `(forced-colors)` matches (`sval-header.css`, access), so the bar takes
+ * the system's colours itself: Canvas for the bar whatever its type, the
+ * type left to the icon, and Firefox's own button and link tokens, which hold
+ * the system colours under forced colours (`tokens-shared.css`). */
+@media (forced-colors) {
+  notification-message,
+  notification-message:is([type="warning"], [value="process-hang"]),
+  notification-message:is([type="critical"], [value="subframe-crashed"]) {
+    --sval-bar-text: CanvasText;
+    --sval-bar-link: LinkText;
+    --sval-bar-focus: var(--focus-outline-color);
+    --sval-bar-close-ink: var(--button-text-color);
+    --sval-bar-close-hover: var(--button-background-color-hover);
+    --sval-bar-primary: var(--button-background-color-primary);
+    --sval-bar-primary-hover: var(--button-background-color-primary-hover);
+    --sval-bar-primary-ink: var(--button-text-color-primary);
+    --sval-bar-primary-hover-ink: var(--button-text-color-primary-hover);
+    --sval-bar-primary-border: var(--button-border-color-primary);
+    --sval-bar-primary-hover-border: var(--button-border-color-primary-hover);
+    --sval-bar-secondary: var(--button-background-color);
+    --sval-bar-secondary-hover: var(--button-background-color-hover);
+    --sval-bar-secondary-ink: var(--button-text-color);
+    --sval-bar-secondary-hover-ink: var(--button-text-color-hover);
+    --sval-bar-button-border: var(--button-border-color);
+    --sval-bar-button-hover-border: var(--button-border-color-hover);
+    --sval-bar-bg: Canvas;
+    --sval-bar-rule: CanvasText;
+    --sval-bar-tile: Canvas;
+    --sval-bar-icon: CanvasText;
+  }
+}
+
+/* ------------------------------------------------------------ placement */
+
+/* `SvalWindow.mount` moves the bars' toolbar into the tab box, out of the
+ * navigator toolbox that DOM fullscreen hides, so it is hidden with it. */
+:root[inDOMFullscreen] #notifications-toolbar {
+  visibility: collapse;
+}

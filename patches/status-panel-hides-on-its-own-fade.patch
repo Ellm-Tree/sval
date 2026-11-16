@@ -1,0 +1,29 @@
+Sval: the status panel hides when its own fade ends
+
+StatusPanel hides the panel (hidden=true, display none) on a
+transitionend or transitioncancel that reaches it. Sval's status tab
+rises from the frame's edge with transform transitions on the label and
+the panel's pseudo-elements (sval-header.css), whose events bubble to
+the panel. A transition inside the panel ends or cancels while the
+panel's own fade still runs, so only the panel's own transition may hide
+it. No chrome API reaches the listener: StatusPanel binds it when the
+panel getter first runs.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 757cfa8430..783cda01a6 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -10170,7 +10170,12 @@ var StatusPanel = {
+     }
+   },
+ 
+-  _onTransitionEnd() {
++  _onTransitionEnd(event) {
++    // Only the panel's own fade ends its showing: transitions inside it, on
++    // its label or pseudo-elements, end or cancel while the fade still runs.
++    if (event.target != this.panel || event.pseudoElement) {
++      return;
++    }
+     if (!this.isVisible) {
+       this.panel.hidden = true;
+     }

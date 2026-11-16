@@ -1,0 +1,34 @@
+Sval: give each ClearDataService cleaner its own OriginAttributesPattern
+
+deleteDataFromSite handed the caller's pattern object to every cleaner it
+runs concurrently. StorageAccessCleaner, ShutdownExceptionsCleaner,
+PermissionsCleaner and StoragePermissionsCleaner delete userContextId (and
+privateBrowsingId) from it while permissions.isolateBy.userContext is
+false, its default. QuotaCleaner.deleteBySite filters origins after an
+await, so it read the stripped pattern and cleared the site's storage in
+every container. A clear for one container cleared them all, and the
+caller's object came back changed. Copying the pattern per cleaner in
+deleteDataFromSite fixes every cleaner at once; a chrome-side workaround
+needs one call per flag and still shares the object between a flag's
+cleaners.
+
+diff --git a/toolkit/components/cleardata/ClearDataService.sys.mjs b/toolkit/components/cleardata/ClearDataService.sys.mjs
+index f229ede675..39ea7660e4 100644
+--- a/toolkit/components/cleardata/ClearDataService.sys.mjs
++++ b/toolkit/components/cleardata/ClearDataService.sys.mjs
+@@ -2574,10 +2574,14 @@ ClearDataService.prototype = Object.freeze({
+       }
+     }
+ 
++    // Give each cleaner its own copy of the pattern. Some cleaners modify it,
++    // e.g. the permission cleaners strip fields the permission manager doesn't
++    // isolate by, and cleaners run concurrently, so a shared object would leak
++    // those changes into cleaners that read the pattern after an await.
+     return this._deleteInternal(aFlags, aCallback, aCleaner =>
+       aCleaner.deleteBySite(
+         aSchemelessSite,
+-        aOriginAttributesPattern,
++        { ...aOriginAttributesPattern },
+         aIsUserRequest
+       )
+     );

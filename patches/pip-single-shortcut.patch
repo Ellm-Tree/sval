@@ -1,0 +1,20 @@
+Sval: Picture-in-Picture keeps one shortcut on Windows and Linux
+
+Firefox gives Picture-in-Picture a second key, Accel+Shift+`}`, for
+layouts that type `]` with Shift. On the Arabic Windows layout Shift and C
+type `}`, and Gecko tries that character before the Latin C
+(`WidgetKeyboardEvent::GetShortcutKeyCandidates`), so Copy Address's
+Ctrl+Shift+C opened Picture-in-Picture there. Accel+Shift+] stays.
+
+diff --git a/browser/base/content/browser-sets.inc.xhtml b/browser/base/content/browser-sets.inc.xhtml
+index ffb5ac136d..73d3b2c9ff 100644
+--- a/browser/base/content/browser-sets.inc.xhtml
++++ b/browser/base/content/browser-sets.inc.xhtml
+@@ -254,7 +254,6 @@
+ 
+ #ifndef XP_MACOSX
+     <key id="key_togglePictureInPicture" data-l10n-id="picture-in-picture-toggle-shortcut" command="View:PictureInPicture" modifiers="accel,shift"/>
+-    <key                                 data-l10n-id="picture-in-picture-toggle-shortcut-alt" command="View:PictureInPicture" modifiers="accel,shift"/>
+ #else
+     <key id="key_togglePictureInPicture" data-l10n-id="picture-in-picture-toggle-shortcut-mac" command="View:PictureInPicture" modifiers="accel,alt,shift"/>
+     <key                                 data-l10n-id="picture-in-picture-toggle-shortcut-mac-alt" command="View:PictureInPicture" modifiers="accel,alt,shift"/>

@@ -1,0 +1,59 @@
+---
+title: Choose how much Sval blocks
+description: Pick the level of ad and tracker blocking, from No Blocking to Strict Blocking.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Sval blocks ads and trackers with filter lists. The level you choose decides
+which lists Sval uses.
+
+A news site you read keeps loading trackers from other companies, and you
+want Sval to block more of them.
+
+<Screenshot name="docs-blocking-levels" alt="Settings › Privacy and protection: Ad and tracker blocking set to Balanced Blocking, with the Ads and Trackers lists in use" />
+
+## Steps
+
+1. Open Settings › Privacy and protection.
+2. Under Ad and tracker blocking, choose a **Level**.
+
+The line under the levels describes the level you chose. The change takes
+effect the next time a page loads.
+
+## Details
+
+- **Balanced Blocking.** A new install starts on this level. It blocks ads
+  and trackers with lists that rarely break sites.
+- **Strict Blocking.** This level adds lists that block more, including
+  trackers in links, social widgets, and scam sites. Some sites might break.
+  Strict Blocking also strips tracking parameters from the addresses you
+  open.
+- **No Blocking.** Sval blocks nothing from the lists.
+- **Custom.** You start from the lists of the level you were on. Then you
+  can switch lists on or off, and add your own. See
+  [Add a filter list](/docs/how-to/privacy/add-a-filter-list/).
+- On any level other than Custom, the card shows the lists in use and who
+  publishes each one. Sval downloads each list from its publisher and keeps
+  the list updated.
+- Your level syncs to your other devices.
+- When you leave Custom for another level, Sval asks first, because the new
+  level's lists replace your custom set. Sval removes the lists you added.
+- To stop blocking on one site only, turn off that site's protections. See
+  [Turn off protections for a site](/docs/how-to/privacy/turn-off-protections-for-a-site/).
+
+## If something goes wrong
+
+- **Couldn't load this list today.** The list's publisher didn't answer.
+  Sval keeps using the copy it last downloaded.
+- **Couldn't load this list. Nothing from it is blocked yet.** Sval has never
+  downloaded the list. Sval tries again by itself.
+- **A site breaks after you choose Strict Blocking.** Turn off protections
+  for that site, or go back to **Balanced Blocking**.
+
+## Related pages
+
+- [Add a filter list](/docs/how-to/privacy/add-a-filter-list/)
+- [Stop Sval blocking a domain](/docs/how-to/privacy/stop-sval-blocking-a-domain/)
+- [Privacy and protection settings](/docs/reference/privacy/)
+- [What Sval keeps private](/docs/explanation/what-sval-keeps-private/)

@@ -1,0 +1,62 @@
+Sval: the F7 question says what F7 does, with buttons that say it
+
+Pressing F7 asks about "Caret Browsing" in a paragraph that names the
+feature before it says what it does, answered by Yes and No. The question
+says what the keyboard does, the body how to use and leave it, and the
+buttons name the answer. Not Now stays the default.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 659e1d29f5..bbd319efa9 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -8227,21 +8227,26 @@
+ 
+         try {
+           this._awaitingToggleCaretBrowsingPrompt = true;
+-          const [title, message, checkbox] =
++          const [title, message, checkbox, turnOn, notNow] =
+             this.tabLocalization.formatValuesSync([
+               "tabbrowser-confirm-caretbrowsing-title",
+               "tabbrowser-confirm-caretbrowsing-message",
+               "tabbrowser-confirm-caretbrowsing-checkbox",
++              "tabbrowser-confirm-caretbrowsing-turn-on",
++              "tabbrowser-confirm-caretbrowsing-not-now",
+             ]);
+           var buttonPressed = promptService.confirmEx(
+             window,
+             title,
+             message,
+-            // Make "No" the default:
+-            promptService.STD_YES_NO_BUTTONS |
++            // Make "Not Now" the default:
++            promptService.BUTTON_TITLE_IS_STRING *
++              promptService.BUTTON_POS_0 +
++              promptService.BUTTON_TITLE_IS_STRING *
++                promptService.BUTTON_POS_1 +
+               promptService.BUTTON_POS_1_DEFAULT,
+-            null,
+-            null,
++            turnOn,
++            notNow,
+             null,
+             checkbox,
+             checkValue
+diff --git a/browser/locales/en-US/browser/tabbrowser.ftl b/browser/locales/en-US/browser/tabbrowser.ftl
+index 2f57ba2bf1..f47b1306c1 100644
+--- a/browser/locales/en-US/browser/tabbrowser.ftl
++++ b/browser/locales/en-US/browser/tabbrowser.ftl
+@@ -150,9 +150,11 @@ tabbrowser-confirm-open-multiple-tabs-checkbox = Warn me when opening multiple t
+ 
+ ## Confirmation dialog for enabling caret browsing
+ 
+-tabbrowser-confirm-caretbrowsing-title = Caret Browsing
+-tabbrowser-confirm-caretbrowsing-message = Pressing F7 turns Caret Browsing on or off. This feature places a moveable cursor in web pages, allowing you to select text with the keyboard. Do you want to turn Caret Browsing on?
+-tabbrowser-confirm-caretbrowsing-checkbox = Do not show me this dialog box again.
++tabbrowser-confirm-caretbrowsing-title = Select text with the keyboard?
++tabbrowser-confirm-caretbrowsing-message = F7 puts a text cursor in pages. Move it with the arrow keys to select text, and press F7 again to turn it off.
++tabbrowser-confirm-caretbrowsing-checkbox = Don’t ask again
++tabbrowser-confirm-caretbrowsing-turn-on = Turn On
++tabbrowser-confirm-caretbrowsing-not-now = Not Now
+ 
+ ## Confirmation dialog for closing all duplicate tabs
+ 

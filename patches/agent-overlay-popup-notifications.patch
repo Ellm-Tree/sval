@@ -1,0 +1,28 @@
+Sval: suppress permission prompts under an agent's overlay
+
+An agent's overlay covers its window while the agent works there, and the
+notification panel is a native popup drawn above it, where the user could
+answer a page's permission prompt without taking control. Suppressed as a
+tab dialog suppresses it, the prompt stays pending and shows once the
+overlay goes. The suppression test is browser.js's own function, which the
+panel's owner reads by name, so it is patched here.
+
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index c919cf5c91..cb1e577ce8 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -695,10 +695,13 @@ function shouldSuppressPopupNotifications() {
+   // This can be removed once bug 545265 and bug 1320361 are fixed.
+   // Hide popup notifications when system tab prompts are shown so they
+   // don't cover up the prompt.
++  // Sval: and while an agent's overlay covers the window, which the
++  // notification panel would draw above.
+   return (
+     window.windowState == window.STATE_MINIMIZED ||
+     gBrowser?.selectedBrowser.hasAttribute("tabDialogShowing") ||
+-    gDialogBox?.isOpen
++    gDialogBox?.isOpen ||
++    document.documentElement.hasAttribute("sval-agent-overlay")
+   );
+ }
+ 

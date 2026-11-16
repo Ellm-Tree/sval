@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Advisories the nightly osv-scanner run accepts for engine/Cargo.lock, each
+# with the reason it cannot reach Sval.
+#
+# rsa 0.8 comes in only through blind-rsa-signatures, which Cargo.toml pins to
+# hold the version Kagi's privacypass-lib uses. The engine calls privacypass's
+# batched VOPRF over ristretto255 alone (src/privacy_pass.rs) and never an RSA
+# token type, so no rsa code runs. Both entries go when privacypass moves
+# blind-rsa-signatures to rsa 0.9.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "Marvin timing attack on RSA private-key operations. The engine performs no RSA operation."
+
+[[IgnoredVulns]]
+id = "GHSA-9c48-w39g-hm26"
+reason = "rsa 0.8 is linked through blind-rsa-signatures and never called; the fix is in rsa 0.9, which privacypass does not yet accept."
+
+# block-buffer 0.10 and crypto-bigint 0.5 come in through the RustCrypto 0.10
+# stack that privacypass, voprf, p384 and blind-rsa-signatures are built on;
+# their fixes are in the next major versions, which none of them accept at the
+# revision Cargo.toml pins. Both entries go when privacypass moves to that
+# stack.
+
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+reason = "block-buffer's position corrupts only when a caught panic interrupts it. The engine ships as wasm32-unknown-unknown, whose panics abort, and catches none."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0387"
+reason = "crypto-bigint 0.5 is the arithmetic of elliptic-curve's NIST curves. The engine runs privacypass's VOPRF over ristretto255 alone (src/privacy_pass.rs), whose arithmetic is curve25519-dalek's; from elliptic-curve it takes only the hash-based expand_message_xmd."

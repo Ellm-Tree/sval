@@ -1,0 +1,48 @@
+Sval: browser-chrome files start without the workspaces earlier files left
+
+A Sval window takes a workspace no other window shows and opens that
+workspace's tabs, and closing a window keeps its workspace once a page was
+browsed in it. A workspace an earlier file browsed in therefore outlives the
+file, and the next window a later file opens shows its tabs beside the ones
+the file put there, which Mozilla's tests count. At the end of each file the
+harness asks SvalTestLeftovers.sys.mjs to remove every workspace no window
+shows that the run did not start with, and fails the file when that fails,
+before its end is logged. The harness has no hook that runs between files, so
+only a change to Tester.nextTest reaches every file, Mozilla's included.
+
+diff --git a/testing/mochitest/browser-test.js b/testing/mochitest/browser-test.js
+index 6d5285f..1b37f16 100644
+--- a/testing/mochitest/browser-test.js
++++ b/testing/mochitest/browser-test.js
+@@ -955,6 +955,10 @@ Tester.prototype = {
+     // On first call (no currentTest yet), check for initial window state issues
+     if (!this.currentTest) {
+       this.checkWindowsState();
++      // Sval: the workspaces the run starts with are kept between files.
++      await ChromeUtils.importESModule(
++        "resource://testing-common/SvalTestLeftovers.sys.mjs"
++      ).SvalTestLeftovers.runStarts(window);
+     } else {
+       this.PerTestCoverageUtils.afterTestSync();
+ 
+@@ -1208,6 +1212,20 @@ Tester.prototype = {
+ 
+       await this.notifyProfilerOfTestEnd();
+ 
++      // Sval: a workspace this file browsed in outlives it, and the next
++      // window a file opens would show its tabs.
++      const svalLeftovers = await ChromeUtils.importESModule(
++        "resource://testing-common/SvalTestLeftovers.sys.mjs"
++      ).SvalTestLeftovers.afterFile(window);
++      if (svalLeftovers) {
++        this.currentTest.addResult(
++          new testResult({
++            name: "Sval: removing the workspaces this file left failed",
++            ex: svalLeftovers,
++          })
++        );
++      }
++
+       // Check the window state before logging testEnd so that any cleanup
+       // assertions are included in the test result, not logged after test_end.
+       this.checkWindowsState();

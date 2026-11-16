@@ -1,0 +1,150 @@
+Sval: a service worker runs only for an origin whose script the policy allows
+
+The script policy (javascript.enabled and its per-site exceptions in the
+domain policy, which SvalJavascript keeps) is read when a window global is
+made (xpc::Scriptability). Nothing in dom/serviceworkers reads it, so a site
+whose JavaScript is off would still have its registered service worker
+intercept its navigations and run on push, sync and messages: the origin's
+script would run with no page script at all.
+
+Scriptability::AllowedByPolicy answers for a principal as a window global
+would: immune (system, expanded, an extension, pdf.js, a scriptable about:
+page) or allowed by the policy. ShouldPrepareForIntercept does not hand a
+navigation to the worker of an origin it refuses, so the page loads from the
+network and is not controlled. SpawnWorkerIfNeeded refuses such a worker for
+every event, and stops one already running, so turning a site off reaches a
+worker an open tab is keeping alive. A refused fetch falls back to the
+network (ResetInterception). The registration and its caches are left alone,
+so turning the site back on brings the worker back.
+
+ServiceWorkerUpdateJob::Update fails an update or registration of such an
+origin. Its script comparison reads the cache through a sandbox of the
+origin's principal, which the policy blocks, and a blocked realm runs none of
+its promise jobs (CanRunJSCallback), so the comparison never finished. The
+soft update a controlled navigation schedules then held the scope's job
+queue, and an unregister of the scope waited behind it for good.
+
+diff --git a/dom/serviceworkers/ServiceWorkerInterceptController.cpp b/dom/serviceworkers/ServiceWorkerInterceptController.cpp
+index a36150eaf0..30dcabdd24 100644
+--- a/dom/serviceworkers/ServiceWorkerInterceptController.cpp
++++ b/dom/serviceworkers/ServiceWorkerInterceptController.cpp
+@@ -18,6 +18,7 @@
+ #include "nsIChannel.h"
+ #include "nsICookieJarSettings.h"
+ #include "nsIPrincipal.h"
++#include "xpcpublic.h"
+ #include "nsQueryObject.h"
+ 
+ namespace mozilla::dom {
+@@ -123,6 +124,12 @@ ServiceWorkerInterceptController::ShouldPrepareForIntercept(
+     return NS_OK;
+   }
+ 
++  // A page whose script the policy refuses is not handed to its service
++  // worker, which would run the origin's script without the page.
++  if (!xpc::Scriptability::AllowedByPolicy(principal)) {
++    return NS_OK;
++  }
++
+   // Check if we're in a secure context, unless service worker testing is
+   // enabled.
+   if (!nsContentUtils::ComputeIsSecureContext(aChannel) &&
+diff --git a/dom/serviceworkers/ServiceWorkerPrivate.cpp b/dom/serviceworkers/ServiceWorkerPrivate.cpp
+index 6f507b7c23..f5ce011d96 100644
+--- a/dom/serviceworkers/ServiceWorkerPrivate.cpp
++++ b/dom/serviceworkers/ServiceWorkerPrivate.cpp
+@@ -3,6 +3,7 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ #include "ServiceWorkerPrivate.h"
++#include "xpcpublic.h"
+ 
+ #include <utility>
+ 
+@@ -1314,6 +1315,21 @@ nsresult ServiceWorkerPrivate::SpawnWorkerIfNeeded(
+     const ServiceWorkerLifetimeExtension& aLifetimeExtension) {
+   AssertIsOnMainThread();
+ 
++  // An origin whose script the policy refuses runs no worker: push, sync,
++  // messages and a controlled page's fetches would otherwise run its script
++  // with no page script at all. A worker already running when its site was
++  // turned off is stopped here, at its next event. An op that extends no
++  // lifetime spawns nothing, and ShutdownInternal sends the terminate op
++  // through here while mControllerChild is still set, so stopping the worker
++  // for it would re-enter TerminateWorker without end.
++  if (mInfo && aLifetimeExtension.LifetimeExtendsIntoTheFuture() &&
++      !xpc::Scriptability::AllowedByPolicy(mInfo->Principal())) {
++    if (mControllerChild) {
++      TerminateWorker();
++    }
++    return NS_ERROR_DOM_INVALID_STATE_ERR;
++  }
++
+   // We don't need to spawn if we already have a spawned, non-terminated worker.
+   if (mControllerChild) {
+     // We only need to renew the keepalive token if we actually want to extend
+diff --git a/dom/serviceworkers/ServiceWorkerUpdateJob.cpp b/dom/serviceworkers/ServiceWorkerUpdateJob.cpp
+index 7674dc117f..03104303f3 100644
+--- a/dom/serviceworkers/ServiceWorkerUpdateJob.cpp
++++ b/dom/serviceworkers/ServiceWorkerUpdateJob.cpp
+@@ -14,6 +14,7 @@
+ #include "nsIURL.h"
+ #include "nsNetUtil.h"
+ #include "nsProxyRelease.h"
++#include "xpcpublic.h"
+ 
+ namespace mozilla::dom {
+ 
+@@ -293,6 +294,16 @@ void ServiceWorkerUpdateJob::Update() {
+     cacheName = workerInfo->CacheName();
+   }
+ 
++  // The comparison reads the cached script through a sandbox of the
++  // registration's principal, and a sandbox the script policy refuses runs
++  // none of its promise jobs (CanRunJSCallback in CycleCollectedJSContext),
++  // so it would never finish and every later job for the scope, an
++  // unregister included, would wait behind it.
++  if (!xpc::Scriptability::AllowedByPolicy(mPrincipal)) {
++    FailUpdateJob(NS_ERROR_DOM_INVALID_STATE_ERR);
++    return;
++  }
++
+   RefPtr<CompareCallback> callback = new CompareCallback(this);
+ 
+   nsresult rv = serviceWorkerScriptCache::Compare(
+diff --git a/js/xpconnect/src/XPCJSRuntime.cpp b/js/xpconnect/src/XPCJSRuntime.cpp
+index 924e318957..795ff5fd58 100644
+--- a/js/xpconnect/src/XPCJSRuntime.cpp
++++ b/js/xpconnect/src/XPCJSRuntime.cpp
+@@ -522,6 +522,16 @@ bool Scriptability::AllowedIfExists(JSObject* aScope) {
+   return realmPrivate ? realmPrivate->scriptability.Allowed() : true;
+ }
+ 
++/* static */
++bool Scriptability::AllowedByPolicy(nsIPrincipal* aPrincipal) {
++  if (PrincipalImmuneToScriptPolicy(aPrincipal)) {
++    return true;
++  }
++  bool policyAllows = false;
++  return NS_SUCCEEDED(aPrincipal->GetIsScriptAllowedByPolicy(&policyAllows)) &&
++         policyAllows;
++}
++
+ /* static */
+ Scriptability& Scriptability::Get(JSObject* aScope) {
+   return RealmPrivate::Get(aScope)->scriptability;
+diff --git a/js/xpconnect/src/xpcpublic.h b/js/xpconnect/src/xpcpublic.h
+index 0abb82d084..3968dfd223 100644
+--- a/js/xpconnect/src/xpcpublic.h
++++ b/js/xpconnect/src/xpcpublic.h
+@@ -83,6 +83,10 @@ class Scriptability {
+   // exists, then script execution is assumed to be allowed)
+   static bool AllowedIfExists(JSObject* aScope);
+ 
++  // Whether a global made for aPrincipal could run script: it is immune to
++  // the script policy, or the policy allows it.
++  static bool AllowedByPolicy(nsIPrincipal* aPrincipal);
++
+  private:
+   // Whenever a consumer wishes to prevent script from running on a global,
+   // it increments this value with a call to Block(). When it wishes to

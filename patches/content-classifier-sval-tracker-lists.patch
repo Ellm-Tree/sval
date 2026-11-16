@@ -1,0 +1,43 @@
+Sval: the trackers features take their lists from prefs
+
+Sval runs its own tracker lists, not Disconnect's. The `trackers` feature,
+which blocks, and `trackers-content`, which only annotates, read their list
+ids from prefs, as `ads` does through the content-classifier-pref-lists
+patch, whose ListIdsFor then never reaches their compiled ids.
+
+kFeatures is a compiled table read only by this file, so no chrome API can
+point a feature at other lists.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index 1c10391e34..71e2ec9d07 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -76,22 +76,26 @@ constexpr nsLiteralCString kTestBlockListIds[] = {"test_block"_ns};
+ constexpr nsLiteralCString kTestAnnotateListIds[] = {"test_annotate"_ns};
+ 
+ constexpr ContentClassifierFeature kFeatures[] = {
++    // Sval: Sval's tracker lists, from a pref like `ads`.
+     {"trackers"_ns, Span<const nsLiteralCString>(kTrackersListIds),
+      nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING,
+      nsIWebProgressListener::STATE_LOADED_LEVEL_1_TRACKING_CONTENT,
+      nsIWebProgressListener::STATE_REPLACED_TRACKING_CONTENT,
+      nsIWebProgressListener::STATE_ALLOWED_TRACKING_CONTENT,
+-     NS_ERROR_TRACKING_URI, false},
++     NS_ERROR_TRACKING_URI, false,
++     "privacy.trackingprotection.content.trackers.list_ids"},
+     // The annotation variant adds content-track-digest256, which mirrors
+     // url-classifier's promotion to STATE_LOADED_LEVEL_2_TRACKING_CONTENT
+     // when a content-track-* table matches.
++    // Sval: Sval's tracker lists and its map of trackers' owners, from a pref.
+     {"trackers-content"_ns,
+      Span<const nsLiteralCString>(kTrackersContentListIds),
+      nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING,
+      nsIWebProgressListener::STATE_LOADED_LEVEL_2_TRACKING_CONTENT,
+      nsIWebProgressListener::STATE_REPLACED_TRACKING_CONTENT,
+      nsIWebProgressListener::STATE_ALLOWED_TRACKING_CONTENT,
+-     NS_ERROR_TRACKING_URI, false},
++     NS_ERROR_TRACKING_URI, false,
++     "privacy.trackingprotection.content.trackers_content.list_ids"},
+     {"social-trackers"_ns, Span<const nsLiteralCString>(kSocialTrackersListIds),
+      nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_SOCIALTRACKING,
+      nsIWebProgressListener::STATE_LOADED_SOCIALTRACKING_CONTENT,

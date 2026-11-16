@@ -1,0 +1,200 @@
+Sval: keep the granular fingerprinting overrides out of private windows
+
+The granular-overrides prefs persist and settings sync carries them, so the
+entries in them are choices made in normal windows: fingerprinting
+protection off for a site, and per-site exceptions. nsRFPService kept one
+map for every context, so a private window took those choices too and gave
+the site real canvas, font and other values.
+
+Each nsIFingerprintingOverride says whether it applies in private browsing.
+FingerprintingWebCompatService marks the pref entries as normal-only and
+Mozilla's remote webcompat entries as applying everywhere. nsRFPService
+keeps a second map of the entries that apply in private browsing, so a
+private context reads Mozilla's fix for a site even where a local entry
+replaced it in normal windows.
+
+No chrome API reaches this: nsIRFPService takes the entries wholesale, and
+GetOverriddenFingerprintingSettingsForURI is the only place that knows
+whether the context is private.
+
+diff --git a/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs b/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
+index fe971d8ab4..16b15102d9 100644
+--- a/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
++++ b/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
+@@ -85,11 +85,18 @@ export class FingerprintingOverride {
+   classID = Components.ID("{07f45442-1806-44be-9230-12eb79de9bac}");
+   QueryInterface = ChromeUtils.generateQI(["nsIFingerprintingOverride"]);
+ 
+-  constructor(firstPartyDomain, thirdPartyDomain, overrides, isBaseline) {
++  constructor(
++    firstPartyDomain,
++    thirdPartyDomain,
++    overrides,
++    isBaseline,
++    appliesInPrivateBrowsing = true
++  ) {
+     this.firstPartyDomain = firstPartyDomain;
+     this.thirdPartyDomain = thirdPartyDomain;
+     this.overrides = overrides;
+     this.isBaseline = isBaseline;
++    this.appliesInPrivateBrowsing = appliesInPrivateBrowsing;
+   }
+ }
+ 
+@@ -213,8 +220,10 @@ export class FingerprintingWebCompatService {
+           continue;
+         }
+ 
++        // The granular prefs persist and sync, so they hold choices made in
++        // normal windows, which a private window does not take.
+         this.#granularOverrides.add(
+-          this.#createFingerprintingOverrideFrom(override, isBaseline)
++          this.#createFingerprintingOverrideFrom(override, isBaseline, false)
+         );
+       }
+     }
+@@ -248,7 +257,11 @@ export class FingerprintingWebCompatService {
+     }
+   }
+ 
+-  #createFingerprintingOverrideFrom(entry, isBaselineOverride = null) {
++  #createFingerprintingOverrideFrom(
++    entry,
++    isBaselineOverride = null,
++    appliesInPrivateBrowsing = true
++  ) {
+     // If the isBaselineOverride is not provided, we will use the value from the
+     // entry. If the entry doesn't have the isBaseline field, we will default to
+     // false.
+@@ -259,7 +272,8 @@ export class FingerprintingWebCompatService {
+       entry.firstPartyDomain,
+       entry.thirdPartyDomain,
+       entry.overrides,
+-      isBaseline
++      isBaseline,
++      appliesInPrivateBrowsing
+     );
+   }
+ 
+diff --git a/toolkit/components/resistfingerprinting/nsIFingerprintingWebCompatService.idl b/toolkit/components/resistfingerprinting/nsIFingerprintingWebCompatService.idl
+index 013280948e..54091877dd 100644
+--- a/toolkit/components/resistfingerprinting/nsIFingerprintingWebCompatService.idl
++++ b/toolkit/components/resistfingerprinting/nsIFingerprintingWebCompatService.idl
+@@ -26,6 +26,12 @@ interface nsIFingerprintingOverride : nsISupports
+    * Whether the override is baseline or FPP.
+    */
+   readonly attribute boolean isBaseline;
++
++  /**
++   * Whether the override applies to private browsing contexts as well as
++   * normal ones.
++   */
++  readonly attribute boolean appliesInPrivateBrowsing;
+ };
+ 
+ /**
+diff --git a/toolkit/components/resistfingerprinting/nsRFPService.cpp b/toolkit/components/resistfingerprinting/nsRFPService.cpp
+index 1378b4fd3a..de2c44fd78 100644
+--- a/toolkit/components/resistfingerprinting/nsRFPService.cpp
++++ b/toolkit/components/resistfingerprinting/nsRFPService.cpp
+@@ -2766,6 +2766,13 @@ nsRFPService::SetFingerprintingOverrides(
+     // The newly added one will replace the existing one for the given domain
+     // key.
+     mFingerprintingOverrides.InsertOrUpdate(domainKey, targets);
++
++    bool appliesInPrivateBrowsing = true;
++    rv = fpOverride->GetAppliesInPrivateBrowsing(&appliesInPrivateBrowsing);
++    NS_ENSURE_SUCCESS(rv, rv);
++    if (appliesInPrivateBrowsing) {
++      mPrivateFingerprintingOverrides.InsertOrUpdate(domainKey, targets);
++    }
+   }
+ 
+   if (Preferences::GetBool(
+@@ -2825,6 +2832,7 @@ NS_IMETHODIMP
+ nsRFPService::CleanAllOverrides() {
+   MOZ_ASSERT(XRE_IsParentProcess());
+   mFingerprintingOverrides.Clear();
++  mPrivateFingerprintingOverrides.Clear();
+   return NS_OK;
+ }
+ 
+@@ -2986,6 +2994,9 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+   // will take over {first-party domain, *} because the latter one has a smaller
+   // scope.
+ 
++  const auto& overrides = aIsPrivate ? service->mPrivateFingerprintingOverrides
++                                     : service->mFingerprintingOverrides;
++
+   bool isBaseline = !IsFPPEnabled(aIsPrivate);
+   auto addIsBaseline = [](nsAutoCString& aKey, bool aIsBaseline) {
+     aKey.Append(FP_OVERRIDES_DOMAIN_KEY_DELIMITER);
+@@ -2996,7 +3007,7 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+   nsAutoCString key;
+   key.Assign("*"_ns);
+   addIsBaseline(key, isBaseline);
+-  Maybe<RFPTargetSet> result = service->mFingerprintingOverrides.MaybeGet(key);
++  Maybe<RFPTargetSet> result = overrides.MaybeGet(key);
+ 
+   nsCOMPtr<nsIEffectiveTLDService> eTLDService =
+       mozilla::components::EffectiveTLD::Service();
+@@ -3023,8 +3034,7 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+     key.Append(FP_OVERRIDES_DOMAIN_KEY_DELIMITER);
+     key.Append("*"_ns);
+     addIsBaseline(key, isBaseline);
+-    Maybe<RFPTargetSet> fpOverrides =
+-        service->mFingerprintingOverrides.MaybeGet(key);
++    Maybe<RFPTargetSet> fpOverrides = overrides.MaybeGet(key);
+     if (fpOverrides) {
+       result = fpOverrides;
+     }
+@@ -3032,7 +3042,7 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+     // Test the {first-party domain} scope.
+     key.Assign(firstPartyDomain);
+     addIsBaseline(key, isBaseline);
+-    fpOverrides = service->mFingerprintingOverrides.MaybeGet(key);
++    fpOverrides = overrides.MaybeGet(key);
+     if (fpOverrides) {
+       result = std::move(fpOverrides);
+     }
+@@ -3060,8 +3070,7 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+   key.Append(FP_OVERRIDES_DOMAIN_KEY_DELIMITER);
+   key.Append("*"_ns);
+   addIsBaseline(key, isBaseline);
+-  Maybe<RFPTargetSet> fpOverrides =
+-      service->mFingerprintingOverrides.MaybeGet(key);
++  Maybe<RFPTargetSet> fpOverrides = overrides.MaybeGet(key);
+   if (fpOverrides) {
+     result = fpOverrides;
+   }
+@@ -3071,7 +3080,7 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+   key.Append(FP_OVERRIDES_DOMAIN_KEY_DELIMITER);
+   key.Append(thirdPartyDomain);
+   addIsBaseline(key, isBaseline);
+-  fpOverrides = service->mFingerprintingOverrides.MaybeGet(key);
++  fpOverrides = overrides.MaybeGet(key);
+   if (fpOverrides) {
+     result = fpOverrides;
+   }
+@@ -3081,7 +3090,7 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+   key.Append(FP_OVERRIDES_DOMAIN_KEY_DELIMITER);
+   key.Append(thirdPartyDomain);
+   addIsBaseline(key, isBaseline);
+-  fpOverrides = service->mFingerprintingOverrides.MaybeGet(key);
++  fpOverrides = overrides.MaybeGet(key);
+   if (fpOverrides) {
+     result = std::move(fpOverrides);
+   }
+diff --git a/toolkit/components/resistfingerprinting/nsRFPService.h b/toolkit/components/resistfingerprinting/nsRFPService.h
+index 638391c57e..f3413f38b1 100644
+--- a/toolkit/components/resistfingerprinting/nsRFPService.h
++++ b/toolkit/components/resistfingerprinting/nsRFPService.h
+@@ -731,6 +731,8 @@ class nsRFPService final : public nsIObserver, public nsIRFPService {
+ 
+   nsCOMPtr<nsIFingerprintingWebCompatService> mWebCompatService;
+   nsTHashMap<nsCStringHashKey, RFPTargetSet> mFingerprintingOverrides;
++  // The overrides private browsing contexts read: those that apply there.
++  nsTHashMap<nsCStringHashKey, RFPTargetSet> mPrivateFingerprintingOverrides;
+ 
+   // A helper function to create the domain key for the fingerprinting
+   // overrides. The key can be in the following five formats.

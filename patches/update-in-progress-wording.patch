@@ -1,0 +1,30 @@
+Sval: the update-in-progress question asks what its buttons answer
+
+Leaving automatic updates while one downloads asks whether to continue,
+and answers with Discard and Continue, which do not say what each does to
+the update. The question asks whether to finish the download, says the
+new setting applies after it, and the buttons name the update.
+
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index d2fbb42f7d..c8871a2445 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -810,14 +810,14 @@ update-setting-write-failure-message2 =
+ 
+     Could not write to file: { $path }
+ 
+-update-in-progress-title = Update In Progress
++update-in-progress-title = Finish the update that’s downloading?
+ 
+-update-in-progress-message = Do you want { -brand-short-name } to continue with this update?
++update-in-progress-message = Your new setting applies to the updates after this one.
+ 
+-update-in-progress-ok-button = &Discard
++update-in-progress-ok-button = &Discard Update
+ # Continue is the cancel button so pressing escape or using a platform standard
+ # method of closing the UI will not discard the update.
+-update-in-progress-cancel-button = &Continue
++update-in-progress-cancel-button = &Finish Update
+ 
+ ## Firefox support
+ 

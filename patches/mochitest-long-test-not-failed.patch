@@ -1,0 +1,40 @@
+Sval: browser-chrome fails a stalled test, not a long one
+
+Tester's time limit already tells a hang from a long test: when the limit
+passes, a test that logged a result or message in the last half of it is
+let run on (up to MAX_UNEXPECTED_TIMEOUTS more limits), and only a quiet
+one fails as "Test timed out". A long test that then passed still failed
+at its end with "This test exceeded the timeout threshold", so a test's
+length, which a runner's load decides, failed a run whose every check
+passed. The end-of-test failure becomes a log line; the stall check stays.
+
+diff --git a/testing/mochitest/browser-test.js b/testing/mochitest/browser-test.js
+index 7d2ec3b03e..eaad708162 100644
+--- a/testing/mochitest/browser-test.js
++++ b/testing/mochitest/browser-test.js
+@@ -1095,20 +1095,13 @@ Tester.prototype = {
+         }
+       }
+ 
+-      // Notify a long running test problem if it didn't end up in a timeout.
++      // A test that kept reporting past its time limit ran long but never
++      // stalled, so it is told, not failed. A stalled one has already failed
++      // as "Test timed out".
+       if (this.currentTest.unexpectedTimeouts && !this.currentTest.timedOut) {
+         let timeRan = Math.ceil((Date.now() - this.lastStartTime) / 1000);
+-        let timeoutFactor = this.currentTest.scope.__maxTimeoutFactor;
+-        let timeLimit = Math.round(gTimeoutSeconds * timeoutFactor);
+-        this.currentTest.addResult(
+-          new testResult({
+-            name:
+-              `This test exceeded the timeout threshold. It should be ` +
+-              `rewritten or split up. If that's not possible, use ` +
+-              `requestLongerTimeout(N), but only as a last resort. ` +
+-              `Test ran for ${timeRan}s, limit was ${timeLimit}s ` +
+-              `(timeout factor ${timeoutFactor}).`,
+-          })
++        this.structuredLogger.info(
++          `This test ran for ${timeRan}s without stalling.`
+         );
+       }
+ 

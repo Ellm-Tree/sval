@@ -1,0 +1,121 @@
+Sval: the domain policy decides an opaque origin by its maker, and matches a domain by scheme and host alone
+
+SvalJavascript keeps per-site JavaScript rules in the script security
+manager's domain policy (nsIDomainPolicy), the one mechanism Gecko reads when
+it makes each global (xpc::Scriptability) and already broadcasts to content
+processes; no chrome API decides scriptability per principal.
+
+Once a policy was active, Gecko's DomainSet failed for three kinds of URI, and
+Scriptability treats a failed check as "block script":
+- a URI with no host (moz-nullprincipal:, so every sandboxed frame without
+  allow-same-origin and every data: document): GetCanonicalClone's
+  SetUserPass fails. Script died there with no rule at all.
+- a host with a trailing dot: ContainsSuperDomain chopped it down to an empty
+  host, whose SetHost fails.
+- a page on a non-default port, or with a trailing dot, never matched its
+  site's entry, so a rule did not apply to it.
+
+A null principal's policy answer is its precursor's, as Sval's agent policy
+treats such a frame as its maker's site (siteOfPrincipal), so a blocked page
+cannot run script through a srcdoc or data: frame. A URI with no host that
+has no precursor names no domain and belongs to no set. The canonical form
+drops the port and a trailing dot, and the super-domain walk stops at the
+last label. Every other failure still fails closed.
+
+diff --git a/caps/BasePrincipal.cpp b/caps/BasePrincipal.cpp
+index e0ad14b8d9..107f504c2b 100644
+--- a/caps/BasePrincipal.cpp
++++ b/caps/BasePrincipal.cpp
+@@ -1562,6 +1562,15 @@ NS_IMETHODIMP
+ BasePrincipal::GetIsScriptAllowedByPolicy(bool* aIsScriptAllowedByPolicy) {
+   AssertIsOnMainThread();
+   *aIsScriptAllowedByPolicy = false;
++  // An opaque origin (a sandboxed frame, a data: document) answers as the
++  // principal that made it, so it cannot run script its maker may not.
++  if (Kind() == eNullPrincipal) {
++    nsCOMPtr<nsIPrincipal> precursor;
++    if (NS_SUCCEEDED(GetPrecursorPrincipal(getter_AddRefs(precursor))) &&
++        precursor) {
++      return precursor->GetIsScriptAllowedByPolicy(aIsScriptAllowedByPolicy);
++    }
++  }
+   nsCOMPtr<nsIURI> prinURI;
+   nsresult rv = GetURI(getter_AddRefs(prinURI));
+   if (NS_FAILED(rv) || !prinURI) {
+diff --git a/caps/DomainPolicy.cpp b/caps/DomainPolicy.cpp
+index b0b6280b90..1b549417a1 100644
+--- a/caps/DomainPolicy.cpp
++++ b/caps/DomainPolicy.cpp
+@@ -130,12 +130,36 @@ void DomainPolicy::ApplyClone(const DomainPolicyClone* aClone) {
+   CopyURIs(aClone->superAllowlist(), mSuperAllowlist);
+ }
+ 
++// A URI with no host, such as a null principal's, names no domain, so it
++// belongs to no set.
++static bool HasHost(nsIURI* aURI) {
++  nsAutoCString host;
++  return NS_SUCCEEDED(aURI->GetHost(host)) && !host.IsEmpty();
++}
++
++// A domain is its scheme and host: the port and a trailing dot on the host
++// name the same domain.
+ static already_AddRefed<nsIURI> GetCanonicalClone(nsIURI* aURI) {
+   nsCOMPtr<nsIURI> clone;
+-  nsresult rv =
+-      NS_MutateURI(aURI).SetUserPass(""_ns).SetPathQueryRef(""_ns).Finalize(
+-          clone);
+-  NS_ENSURE_SUCCESS(rv, nullptr);
++  nsresult rv = NS_MutateURI(aURI)
++                    .SetUserPass(""_ns)
++                    .SetPort(-1)
++                    .SetPathQueryRef(""_ns)
++                    .Finalize(clone);
++  if (NS_FAILED(rv)) {
++    return nullptr;
++  }
++  nsAutoCString host;
++  if (NS_FAILED(clone->GetHost(host)) || host.IsEmpty()) {
++    return nullptr;
++  }
++  if (host.Last() == '.') {
++    host.Truncate(host.Length() - 1);
++    rv = NS_MutateURI(clone).SetHost(host).Finalize(clone);
++    if (NS_FAILED(rv)) {
++      return nullptr;
++    }
++  }
+   return clone.forget();
+ }
+ 
+@@ -178,6 +202,9 @@ DomainSet::Clear() {
+ NS_IMETHODIMP
+ DomainSet::Contains(nsIURI* aDomain, bool* aContains) {
+   *aContains = false;
++  if (!HasHost(aDomain)) {
++    return NS_OK;
++  }
+   nsCOMPtr<nsIURI> clone = GetCanonicalClone(aDomain);
+   NS_ENSURE_TRUE(clone, NS_ERROR_FAILURE);
+   *aContains = mHashTable.Contains(clone);
+@@ -187,6 +214,9 @@ DomainSet::Contains(nsIURI* aDomain, bool* aContains) {
+ NS_IMETHODIMP
+ DomainSet::ContainsSuperDomain(nsIURI* aDomain, bool* aContains) {
+   *aContains = false;
++  if (!HasHost(aDomain)) {
++    return NS_OK;
++  }
+   nsCOMPtr<nsIURI> clone = GetCanonicalClone(aDomain);
+   NS_ENSURE_TRUE(clone, NS_ERROR_FAILURE);
+   nsAutoCString domain;
+@@ -200,9 +230,9 @@ DomainSet::ContainsSuperDomain(nsIURI* aDomain, bool* aContains) {
+     }
+ 
+     // Chop off everything before the first dot, or break if there are no
+-    // dots left.
++    // labels left.
+     int32_t index = domain.Find(".");
+-    if (index == kNotFound) break;
++    if (index == kNotFound || index + 1 >= int32_t(domain.Length())) break;
+     domain.Assign(Substring(domain, index + 1));
+     rv = NS_MutateURI(clone).SetHost(domain).Finalize(clone);
+     NS_ENSURE_SUCCESS(rv, rv);

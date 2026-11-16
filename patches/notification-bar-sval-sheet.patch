@@ -1,0 +1,25 @@
+Sval: load Sval's notification bar sheet inside every bar
+
+A notification bar draws inside its own shadow root, which a window
+stylesheet cannot reach: Firefox's gradient stripe (`:host(.infobar)::before`),
+the icon's image and the bar's inner layout are set there with no variable
+or part to change them. One more link beside `infobar.css` puts Sval's
+`notification-bar-shadow.css` in that root, after it.
+
+diff --git a/toolkit/content/widgets/notificationbox.js b/toolkit/content/widgets/notificationbox.js
+index 5950fb5760..c0c2cbd911 100644
+--- a/toolkit/content/widgets/notificationbox.js
++++ b/toolkit/content/widgets/notificationbox.js
+@@ -479,6 +479,12 @@
+         style.rel = "stylesheet";
+         style.href = "chrome://global/content/elements/infobar.css";
+         this.renderRoot.append(style);
++        let svalStyle = document.createElement("link");
++        svalStyle.rel = "stylesheet";
++        // Sval ships only the desktop browser, so toolkit may reach into it here.
++        // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++        svalStyle.href = "chrome://browser/content/sval/notification-bar-shadow.css";
++        this.renderRoot.append(svalStyle);
+       }
+ 
+       get control() {

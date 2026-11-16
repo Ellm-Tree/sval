@@ -1,0 +1,71 @@
+Sval: Ctrl+Tab in recently used order, without a tab strip
+
+With browser.ctrlTab.sortByRecentlyUsed on, ctrlTab.onKeyDown takes
+Ctrl+Shift+Tab to open the list of all tabs (gTabsPanel.showAllTabsPanel),
+which does nothing when gTabsPanel.canOpen is false, as when the all-tabs
+button is not shown; Sval removes the tab strip that holds it. The tabbox's
+own Ctrl+Shift+Tab is off in that mode (handleCtrlTab), so the key did
+nothing at all. It selects the previous tab instead.
+
+A tab Ctrl+Tab picks is selected on Ctrl's keyup, which Gecko does not treat
+as user input (CanTreatAsUserInput), or as its panel hides. ctrlTab.selecting
+marks those selections, so Sval's idle-tab archive counts them as the user's.
+
+diff --git a/browser/components/tabbrowser/content/browser-ctrlTab.js b/browser/components/tabbrowser/content/browser-ctrlTab.js
+index 727e21f175..077c80a58b 100644
+--- a/browser/components/tabbrowser/content/browser-ctrlTab.js
++++ b/browser/components/tabbrowser/content/browser-ctrlTab.js
+@@ -182,7 +182,7 @@ var tabPreviewPanelHelper = {
+     }
+ 
+     if (host.tabToSelect) {
+-      gBrowser.selectedTab = host.tabToSelect;
++      host.selectTab(host.tabToSelect);
+       host.tabToSelect = null;
+     }
+   },
+@@ -517,6 +517,22 @@ var ctrlTab = {
+     );
+   },
+ 
++  /**
++   * Sval: selects the tab the user picked. The pick lands after the input
++   * that made it, Ctrl's keyup, which Gecko does not treat as user input
++   * (CanTreatAsUserInput), or the panel hiding, so `selecting` tells a
++   * TabSelect listener the selection is the user's.
++   */
++  selecting: false,
++  selectTab(aTab) {
++    this.selecting = true;
++    try {
++      gBrowser.selectedTab = aTab;
++    } finally {
++      this.selecting = false;
++    }
++  },
++
+   close: function ctrlTab_close(aTabToSelect) {
+     if (!this.isOpen) {
+       return;
+@@ -527,7 +543,7 @@ var ctrlTab = {
+       this._timer = null;
+       this.suspendGUI();
+       if (aTabToSelect) {
+-        gBrowser.selectedTab = aTabToSelect;
++        this.selectTab(aTabToSelect);
+       }
+       return;
+     }
+@@ -570,6 +586,12 @@ var ctrlTab = {
+     }
+ 
+     if (event.shiftKey) {
++      // Sval: without a tab strip the list of all tabs cannot open, and the
++      // tabbox leaves Ctrl+Tab to this, so the key selects the previous tab.
++      if (!gTabsPanel.canOpen) {
++        gBrowser.tabContainer.advanceSelectedTab(-1, true);
++        return;
++      }
+       this.showAllTabs("shift-tab");
+       return;
+     }

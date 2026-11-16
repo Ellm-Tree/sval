@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# The pages scripts/perf.sh loads under the profiler, one address per line. A mix of ad-heavy
+# news, social, shopping and reference pages, so page rules and the blocking
+# engine both have work. Sites that challenge an automated browser (a bot
+# check that replaces the page after it loads) are left out, since they time
+# the challenge. The first five are also the seed profile's
+# background tabs.
+https://www.cnn.com/
+https://www.theguardian.com/international
+https://www.nytimes.com/
+https://www.reddit.com/r/programming/
+https://www.youtube.com/
+https://en.wikipedia.org/wiki/Web_browser
+https://www.theverge.com/
+https://github.com/mozilla-firefox/firefox
+https://www.allrecipes.com/
+https://www.espn.com/

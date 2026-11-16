@@ -1,0 +1,105 @@
+Sval: let Sval supply search engines and their icons
+
+The search service reads Sval's configuration from SvalSearchConfig instead of
+Mozilla's remote one, and does not follow the remote collections' sync, which
+would replace Sval's list with Mozilla's and add its overrides whenever a sync
+reached them.
+
+diff --git a/toolkit/components/search/ConfigSearchEngine.sys.mjs b/toolkit/components/search/ConfigSearchEngine.sys.mjs
+index 8dd225c707..335c21df89 100644
+--- a/toolkit/components/search/ConfigSearchEngine.sys.mjs
++++ b/toolkit/components/search/ConfigSearchEngine.sys.mjs
+@@ -20,6 +20,9 @@ import {
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+ const lazy = XPCOMUtils.declareLazy({
++  // Sval ships only the desktop browser, so toolkit may reach into it here.
++  // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++  SvalSearchConfig: "moz-src:///browser/components/sval/SvalSearchConfig.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
+   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
+@@ -618,8 +621,8 @@ export class ConfigSearchEngine extends SearchEngine {
+     let availableRecords =
+       await ConfigSearchEngine.iconHandler.getAvailableRecords(this.id);
+     if (!availableRecords.length) {
+-      console.warn("No icon found for", this.id);
+-      return null;
++      // Sval: engines Sval adds bring their own icon.
++      return lazy.SvalSearchConfig.SEARCH_ICONS[this.id] ?? null;
+     }
+ 
+     let availableSizes = availableRecords.map(r => r.imageSize);
+diff --git a/toolkit/components/search/SearchEngineSelector.sys.mjs b/toolkit/components/search/SearchEngineSelector.sys.mjs
+index 3a42b383af..3159ba2895 100644
+--- a/toolkit/components/search/SearchEngineSelector.sys.mjs
++++ b/toolkit/components/search/SearchEngineSelector.sys.mjs
+@@ -12,6 +12,9 @@
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+ const lazy = XPCOMUtils.declareLazy({
++  // Sval ships only the desktop browser, so toolkit may reach into it here.
++  // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++  SvalSearchConfig: "moz-src:///browser/components/sval/SvalSearchConfig.sys.mjs",
+   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
+   SearchDeviceType:
+     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustSearch.sys.mjs",
+@@ -103,20 +106,8 @@ export class SearchEngineSelector {
+       throw new Error("Failed to get engine data from Remote Settings");
+     }
+ 
+-    /**
+-     * Records whether the listeners have been added or not.
+-     */
+-    if (!this.#listenerAdded) {
+-      this.#remoteConfig.on("sync", this.#boundOnConfigurationUpdated);
+-      this.#remoteConfigOverrides.on(
+-        "sync",
+-        this.#boundOnConfigurationOverridesUpdated
+-      );
+-      /**
+-       * Records whether the listeners have been added or not.
+-       */
+-      this.#listenerAdded = true;
+-    }
++    // Sval: no Remote Settings sync replaces Sval's configuration or adds
++    // Mozilla's overrides.
+ 
+     this.#selector.setSearchConfig(
+       JSON.stringify({ data: this.#configuration })
+@@ -328,16 +319,10 @@ export class SearchEngineSelector {
+    *   could be obtained.
+    */
+   async #getConfiguration(firstTime = true) {
+-    let result = [];
++    // Sval: Sval's own engine list, without Mozilla's partner codes (Sval
++    // spec §10.9); scripts/generate-search-config.py writes it.
++    let result = lazy.SvalSearchConfig.SEARCH_CONFIG;
+     let failed = false;
+-    try {
+-      result = await this.#remoteConfig.get({
+-        order: "id",
+-      });
+-    } catch (ex) {
+-      lazy.logConsole.error(ex);
+-      failed = true;
+-    }
+     if (!result.length) {
+       lazy.logConsole.error("Received empty search configuration!");
+       failed = true;
+@@ -409,13 +394,8 @@ export class SearchEngineSelector {
+    *   could be obtained.
+    */
+   async #getConfigurationOverrides() {
+-    let result = [];
+-    try {
+-      result = await this.#remoteConfigOverrides.get();
+-    } catch (ex) {
+-      // This data is remote only, so we just return an empty array if it fails.
+-    }
+-    return result;
++    // Sval: Mozilla's overrides route partner engines through ad redirects.
++    return [];
+   }
+ 
+   /**

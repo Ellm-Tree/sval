@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Permissions Sval grants by default. Firefox's own list also lets
+# support.mozilla.org request a troubleshooting snapshot of the browser, and
+# lets Mozilla's sites drive UITour; Sval grants neither (Sval spec §10.9).
+#
+# Format: origin <TAB> type <TAB> capability <TAB> origin.
+
+# addons.mozilla.org's pages may offer an extension without the bar saying
+# Sval prevented the site from asking to install software
+# (AddonManagerInternal.installAddonFromWebpage, through
+# XPIInstall's isInstallAllowed). Installs Sval starts itself, such as the
+# password manager the user chooses, come from the chrome
+# (AddonManager.getInstallForURL) and never check it.
+origin	install	1	https://addons.mozilla.org

@@ -1,0 +1,138 @@
+Sval: remove Firefox's app menu button and the nav bar's post-tabs spacer
+
+Sval's header draws neither. The menu bar holds the app menu's commands
+and the notices button its update notices, and the header row is the
+titlebar, so its empty stretches drag the window. PanelUI keeps running
+for the panels it shows elsewhere, so its reads of the button tolerate
+its absence, as do CustomizeMode's, and PanelUI.show, with no anchor to
+open from, does nothing.
+ConfirmationHint.show anchors a hint whose anchor is missing to the panel
+toggle.
+
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 79bfd49a06..04f0050157 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -4731,9 +4731,7 @@ var ConfirmationHint = {
+   ) {
+     // Sval: the header draws no app menu button, so its panel toggle takes
+     // the hints Firefox anchors there.
+-    if (anchor?.id == "PanelUI-menu-button") {
+-      anchor = document.getElementById("sval-panel-button") ?? anchor;
+-    }
++    anchor ??= document.getElementById("sval-panel-button");
+ 
+     this._reset();
+ 
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 1d1f8994e2..a919865fb9 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -475,16 +475,6 @@
+       </box>
+     </toolbarbutton>
+ 
+-    <toolbaritem id="PanelUI-button"
+-                 removable="false">
+-      <toolbarbutton id="PanelUI-menu-button"
+-                     class="toolbarbutton-1"
+-                     delegatesanchor="true"
+-                     badged="true"
+-                     consumeanchor="PanelUI-button"
+-                     data-l10n-id="appmenu-menu-button-closed2"/>
+-    </toolbaritem>
+-    <hbox class="titlebar-spacer" type="post-tabs"/>
+     <toolbarbutton class="content-analysis-indicator toolbarbutton-1 content-analysis-indicator-icon"/>
+ #include titlebar-items.inc.xhtml
+   </toolbar>
+diff --git a/browser/components/customizableui/content/panelUI.js b/browser/components/customizableui/content/panelUI.js
+index 66c5ccdefe..917b1f41ee 100644
+--- a/browser/components/customizableui/content/panelUI.js
++++ b/browser/components/customizableui/content/panelUI.js
+@@ -55,8 +55,8 @@ const PanelUI = {
+     this._shouldSuppress = shouldSuppress;
+     this._initElements();
+ 
+-    this.menuButton.addEventListener("mousedown", this);
+-    this.menuButton.addEventListener("keypress", this);
++    this.menuButton?.addEventListener("mousedown", this);
++    this.menuButton?.addEventListener("keypress", this);
+ 
+     Services.obs.addObserver(this, "ai-window-state-changed");
+     Services.obs.addObserver(this, "fullscreen-nav-toolbox");
+@@ -235,8 +235,8 @@ const PanelUI = {
+     window.removeEventListener("MozDOMFullscreen:Exited", this);
+     window.removeEventListener("fullscreen", this);
+     window.removeEventListener("activate", this);
+-    this.menuButton.removeEventListener("mousedown", this);
+-    this.menuButton.removeEventListener("keypress", this);
++    this.menuButton?.removeEventListener("mousedown", this);
++    this.menuButton?.removeEventListener("keypress", this);
+     CustomizableUI.removeListener(this);
+   },
+ 
+@@ -268,6 +268,11 @@ const PanelUI = {
+    * @param aEvent the event (if any) that triggers showing the menu.
+    */
+   show(aEvent) {
++    // Sval: the header draws no app menu button, so the app menu has no
++    // anchor to open from.
++    if (!this.menuButton) {
++      return;
++    }
+     this._ensureShortcutsShown();
+     (async () => {
+       await this.ensureReady();
+@@ -958,7 +963,7 @@ const PanelUI = {
+       (window.fullScreen && FullScreen.navToolboxHidden) ||
+       document.fullscreenElement ||
+       this._shouldSuppress() ||
+-      !this.menuButton.checkVisibility()
++      !this.menuButton?.checkVisibility()
+     ) {
+       this._hidePopup();
+       return;
+@@ -1158,7 +1163,7 @@ const PanelUI = {
+ 
+   _showBadge(notification) {
+     let badgeStatus = this._getBadgeStatus(notification);
+-    this.menuButton.setAttribute("badge-status", badgeStatus);
++    this.menuButton?.setAttribute("badge-status", badgeStatus);
+   },
+ 
+   // "Banner item" here refers to an item in the hamburger panel menu. They will
+@@ -1198,7 +1203,7 @@ const PanelUI = {
+   },
+ 
+   _clearBadge() {
+-    this.menuButton.removeAttribute("badge-status");
++    this.menuButton?.removeAttribute("badge-status");
+   },
+ 
+   _clearBannerItem() {
+diff --git a/browser/components/customizableui/CustomizeMode.sys.mjs b/browser/components/customizableui/CustomizeMode.sys.mjs
+index 25eb66b96a..45361822a1 100644
+--- a/browser/components/customizableui/CustomizeMode.sys.mjs
++++ b/browser/components/customizableui/CustomizeMode.sys.mjs
+@@ -497,7 +497,9 @@ export class CustomizeMode {
+       panelHolder.appendChild(window.PanelUI.overflowFixedList);
+ 
+       window.PanelUI.overflowFixedList.toggleAttribute("customizing", true);
+-      window.PanelUI.menuButton.disabled = true;
++      if (window.PanelUI.menuButton) {
++        window.PanelUI.menuButton.disabled = true;
++      }
+       document.getElementById("nav-bar-overflow-button").disabled = true;
+ 
+       this.#transitioning = true;
+@@ -658,7 +660,9 @@ export class CustomizeMode {
+       // exit customization mode.
+       CustomizableUI.dispatchToolboxEvent("customizationending", {}, window);
+ 
+-      window.PanelUI.menuButton.disabled = false;
++      if (window.PanelUI.menuButton) {
++        window.PanelUI.menuButton.disabled = false;
++      }
+       let overflowContainer = document.getElementById(
+         "widget-overflow-mainView"
+       ).firstElementChild;

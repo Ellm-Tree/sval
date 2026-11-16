@@ -1,0 +1,41 @@
+---
+title: Delete a Workspace
+description: Delete a Workspace along with every tab and group in it.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Deleting a Workspace closes its tabs and removes its groups.
+
+A project is over, and you don't need its Workspace or its tabs.
+
+<Screenshot name="docs-workspace-menu" frame="rounded" maxWidth={200} alt="The menu for the Work Workspace: Edit…, Isolate Workspace…, and Delete Workspace…" />
+
+## Steps
+
+1. Above your tabs, right-click the Workspace's name.
+2. Choose **Delete Workspace…**.
+3. In the dialog, select **Delete Workspace**.
+
+The window goes to another Workspace. For 8 seconds, **Undo** shows at the
+bottom of the Workspace panel. Select **Undo** to put the Workspace back with
+everything in it. You can also press <kbd>⌘Z</kbd> (<kbd>Ctrl+Z</kbd> on
+Windows and Linux).
+
+## Details
+
+- The dialog says how many tabs are inside the Workspace. Deleting a
+  Workspace can't keep its tabs. To keep some of the tabs, move them to
+  another Workspace first.
+- You can't delete your last Workspace. **Delete Workspace…** is dimmed
+  when you have only one.
+- To delete a Workspace the window isn't showing, open the Workspaces list
+  and right-click that Workspace there.
+- When you delete a Workspace, Sval deletes the Workspace on your other
+  devices too.
+- Deleting an isolated Workspace also deletes its sign-ins and site data.
+
+## Related pages
+
+- [Move a tab to another Workspace](/docs/how-to/workspaces/move-a-tab-to-another-workspace/)
+- [Workspace settings and controls](/docs/reference/workspaces/)

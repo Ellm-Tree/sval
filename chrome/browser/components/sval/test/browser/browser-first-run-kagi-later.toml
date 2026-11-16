@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# A first run that chooses Kagi and closes its sign-in window unsigned. Each
+# first-run scenario runs in a browser of its own, on a fresh profile whose
+# first window opens first run at startup, because only a profile's first
+# launch is a real first run. The prefs after the first, but for the last,
+# are every browser manifest's baseline, which browser.toml gives the
+# reasons for. network.dns.localDomains sends Kagi's hosts to this machine,
+# where nothing answers, for the browser's whole life, so neither Kagi's page
+# nor a Privacy Pass refill, which can outlive the file, leaves the machine.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=true",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+  "network.dns.localDomains=kagi.com,account.kagi.com",
+]
+support-files = [
+  "head.js",
+  "sval_first_run_helpers.js",
+  "sval_first_run_dialog_helpers.js",
+]
+
+["browser_sval_first_run_kagi_later.js"]

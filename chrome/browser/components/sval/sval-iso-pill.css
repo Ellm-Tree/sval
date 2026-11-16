@@ -1,0 +1,32 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* An isolated workspace's mark beside its name (isolated workspaces spec §10),
+ * in the panel and in Settings.
+ * Ink, never the workspace's colour: no colour reads on every tint, and an
+ * uncoloured workspace has none. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+.sval-iso-pill {
+  --sval-iso-ink: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  --sval-iso-pill-ink: light-dark(#ffffff, var(--sval-palette-ink-950));
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--sval-iso-ink);
+  color: var(--sval-iso-pill-ink);
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+.sval-iso-pill::before {
+  content: "";
+  width: var(--size-item-xsmall);
+  height: var(--size-item-xsmall);
+  background: currentColor;
+  mask: url("chrome://browser/content/sval/workspace-isolated.svg") center / contain no-repeat;
+}

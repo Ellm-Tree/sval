@@ -1,0 +1,22 @@
+Sval: a blocked embed's placeholder asks Sval before it loads
+
+The placeholder's button notifies a topic Sval's protection button answers
+with a prompt, in place of opening Firefox's protections panel. A page can
+send its shim's messages itself (Shims._onMessageFromShim), so the page asks
+and the browser decides. Allowing sends Firefox's own
+smartblock:unblock-embed for each embed the page's content-blocking log
+shows replaced, as the protections panel's toggles do.
+
+diff --git a/browser/extensions/webcompat/experiment-apis/trackingProtection.js b/browser/extensions/webcompat/experiment-apis/trackingProtection.js
+index 125dc12dc5..c13e32bca8 100644
+--- a/browser/extensions/webcompat/experiment-apis/trackingProtection.js
++++ b/browser/extensions/webcompat/experiment-apis/trackingProtection.js
+@@ -310,7 +310,7 @@ this.trackingProtection = class extends ExtensionAPI {
+           let win = tab?.window;
+           Services.obs.notifyObservers(
+             win.gBrowser.selectedBrowser.browsingContext,
+-            "smartblock:open-protections-panel"
++            "sval-smartblock-embed-clicked"
+           );
+         },
+         incrementSmartblockEmbedShownTelemetry() {

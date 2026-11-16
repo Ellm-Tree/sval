@@ -1,0 +1,20 @@
+Sval: check for updates at Sval's static feed
+
+Sval serves one update.xml per channel and platform from download.sval.app,
+so the URL names only those two, and an update check tells the server
+nothing else: not the version, build, OS version, locale or distribution.
+The updater compares versions itself. The host has no configure option
+(build/moz.build defaults MOZ_APPUPDATE_HOST to aus5.mozilla.org), and the
+path is fixed here.
+
+diff --git a/build/application.ini.in b/build/application.ini.in
+index 6df1323..0cc766e 100644
+--- a/build/application.ini.in
++++ b/build/application.ini.in
+@@ -52,5 +52,5 @@ ServerURL=@MOZ_CRASHREPORTER_URL@/submit?id=@MOZ_APP_ID@&version=@MOZ_APP_VERSIO
+ 
+ #if MOZ_UPDATER
+ [AppUpdate]
+-URL=https://@MOZ_APPUPDATE_HOST@/update/6/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%SYSTEM_CAPABILITIES%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml
++URL=https://download.sval.app/update/1/%CHANNEL%/%BUILD_TARGET%/update.xml
+ #endif

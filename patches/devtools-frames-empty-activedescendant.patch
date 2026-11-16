@@ -1,0 +1,24 @@
+Sval: the stack's frame list leaves aria-activedescendant off until a frame has focus
+
+The debugger's Frames component, which the Browser Console uses to show an
+error's stack, starts with currentFrame "" and renders it as
+aria-activedescendant="". An empty idref names no element, and with
+accessibility on, resolving it calls GetElementById("") and logs "Empty
+string passed to getElementById()" against the console's own document, once
+per stack shown. The component is Mozilla's, so no chrome API reaches it.
+
+diff --git a/devtools/client/debugger/src/components/SecondaryPanes/Frames/Frames.js b/devtools/client/debugger/src/components/SecondaryPanes/Frames/Frames.js
+index bdd314f545..cdefbf75b4 100644
+--- a/devtools/client/debugger/src/components/SecondaryPanes/Frames/Frames.js
++++ b/devtools/client/debugger/src/components/SecondaryPanes/Frames/Frames.js
+@@ -320,7 +320,9 @@ class Frames extends Component {
+         onContextMenu: disableContextMenu
+           ? null
+           : e => this.onContextMenu(e, frames),
+-        "aria-activedescendant": this.state.currentFrame,
++        // currentFrame is "" until a frame takes focus, and an empty idref
++        // names no element: leave the attribute off rather than set it empty.
++        "aria-activedescendant": this.state.currentFrame || null,
+         "aria-labelledby": "call-stack-pane",
+         role: "listbox",
+         tabIndex: 0,

@@ -1,0 +1,40 @@
+Sval: web pages scroll with thin scrollbars by default
+
+Sval's own scrollers draw a thin scrollbar on a clear track. The UA sheet
+gives every page the same default, below any author style, so a page that
+styles its scrollbars keeps its own.
+
+diff --git a/layout/style/res/ua.css b/layout/style/res/ua.css
+index 037c5e20b4..78edc3d69e 100644
+--- a/layout/style/res/ua.css
++++ b/layout/style/res/ua.css
+@@ -9,6 +9,29 @@
+             them
+ */
+ 
++/* Sval: every scroller is thin, with a grey thumb on a clear track. The thumb
++ * is neutral because the root's colour does not say how dark the page behind
++ * it is. Being in the UA sheet, both lose to any author declaration.
++ * `scrollbar-color` is inherited, so the root carries it, and
++ * `scrollbar-width` is not, so every element does. The rule for colour sits
++ * outside forced colours, where UA declarations still apply
++ * (`ignored_when_colors_disabled` drops only author ones). Windows 11's thin
++ * overlay strip draws its thumb as a line until hovered
++ * (`ScrollbarDrawingWin11`), which a translucent grey leaves faint. */
++*|* {
++  scrollbar-width: thin;
++}
++
++@media not (forced-colors) {
++  :root {
++    scrollbar-color: rgb(128 128 128 / 0.6) transparent;
++
++    @media (-moz-platform: windows) and (-moz-overlay-scrollbars) {
++      scrollbar-color: rgb(128 128 128) transparent;
++    }
++  }
++}
++
+ /* Tables */
+ 
+ *|*::-moz-table {

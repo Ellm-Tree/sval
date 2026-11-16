@@ -1,0 +1,61 @@
+{
+   "checksum": "ab9b44f0489948be49db954ff27ae056",
+   "roots": {
+      "bookmark_bar": {
+         "children": [ {
+            "date_added": "13436677770733933",
+            "date_last_used": "0",
+            "guid": "c9b437d2-dd74-4039-9780-fa863569e67f",
+            "id": "7",
+            "name": "Golf Clubs, Golf Bags, and Equipment | PING",
+            "show_icon": false,
+            "source": "user_add",
+            "type": "url",
+            "url": "https://ping.com/en-us",
+            "visit_count": 1
+         } ],
+         "date_added": "13436673200263867",
+         "date_last_used": "0",
+         "date_modified": "13436677770733933",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Favorites Bar",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "other": {
+         "children": [  ],
+         "date_added": "13436673200263867",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Other Favorites",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [  ],
+         "date_added": "13436673200263867",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Mobile Favorites",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "workspaces_v2": {
+         "children": [  ],
+         "date_added": "13436673200263867",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "75aa6670-344f-549d-b742-660f029506ab",
+         "id": "5",
+         "name": "Workspaces",
+         "source": "unknown",
+         "type": "folder"
+      }
+   },
+   "version": 1
+}

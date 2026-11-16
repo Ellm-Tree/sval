@@ -1,0 +1,40 @@
+Sval: accessibility checks a shadow host's unslotted children once per walk
+
+`DocAccessible::PruneOrInsertSubtree` checked the containing shadow host's
+explicit children, and called `ContentRemoved` on each one without a frame,
+for every node it walked inside that host's shadow tree. Framing a subtree
+of a shadow tree again cost (nodes walked) x (host's children). Chrome's
+popups and panels are shadow hosts whose children have no frame while
+closed, and a long-lived window keeps every one it has built, so with an
+accessibility client on each update of the chrome took seconds late in a
+session. The walk reaches every node of the shadow tree, so checking at the
+host itself or at the insert root covers each host once.
+
+diff --git a/accessible/generic/DocAccessible.cpp b/accessible/generic/DocAccessible.cpp
+index 7e0c5dc85a..00670fc15b 100644
+--- a/accessible/generic/DocAccessible.cpp
++++ b/accessible/generic/DocAccessible.cpp
+@@ -1461,12 +1461,17 @@ bool DocAccessible::PruneOrInsertSubtree(nsIContent* aRoot,
+       aRoot->GetShadowRoot() ? aRoot : aRoot->GetContainingShadowHost();
+   if (shadowHost) {
+     // Check all explicit children in the host, if they are not slotted
+-    // then remove their accessibles and subtrees.
+-    for (nsIContent* childNode = shadowHost->GetFirstChild(); childNode;
+-         childNode = childNode->GetNextSibling()) {
+-      if (!childNode->GetPrimaryFrame() &&
+-          !nsCoreUtils::CanCreateAccessibleWithoutFrame(childNode)) {
+-        ContentRemoved(childNode);
++    // then remove their accessibles and subtrees. The walk below reaches
++    // every node of the host's shadow tree, so the host's children are
++    // checked at the host or at the insert root, once per walk, rather than
++    // again for each node inside its shadow tree.
++    if (aIsInsertRoot || shadowHost == aRoot) {
++      for (nsIContent* childNode = shadowHost->GetFirstChild(); childNode;
++           childNode = childNode->GetNextSibling()) {
++        if (!childNode->GetPrimaryFrame() &&
++            !nsCoreUtils::CanCreateAccessibleWithoutFrame(childNode)) {
++          ContentRemoved(childNode);
++        }
+       }
+     }
+ 

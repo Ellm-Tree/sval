@@ -1,0 +1,18 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+# Ubuntu 24.04 and later give unprivileged user namespaces, which Gecko's
+# sandbox needs, only to programs an AppArmor profile allows. Ubuntu's own
+# firefox profile covers Mozilla's install paths and not this one. Like
+# Ubuntu's, this profile allows everything else.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile ${PKG_NAME} /${PKG_INSTALL_PATH}/{sval,sval-bin} flags=(unconfined) {
+  userns,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/${PKG_NAME}>
+}

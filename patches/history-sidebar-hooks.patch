@@ -1,0 +1,102 @@
+Sval: hooks for the History sidebar and for history clears
+
+Sval's History sidebar lists one workspace's history, has an archived view
+that runs no Places query, and fills a device and a workspace column and a
+site folder's icon, which PlacesTreeView has no cells for. searchHistory
+asks the tree's svalHistory before and after it loads a query, and
+PlacesTreeView's getCellText and getImageSrc ask it for a cell first;
+SvalHistorySidebar gives the History sidebar's tree that object, and every
+other Places tree has none.
+
+Every history clear (Clear Recent History, clearing on shutdown, a policy)
+reaches the synced history with the scope the clear dialog chose, so the
+Sanitizer's history item runs its clear through SvalHistorySync.
+
+No chrome API changes a sidebar's query, a PlacesTreeView's cells, or what a
+history clear does.
+
+diff --git a/browser/components/places/content/historySidebar.js b/browser/components/places/content/historySidebar.js
+index 9555027ed0..3fd5a8c75a 100644
+--- a/browser/components/places/content/historySidebar.js
++++ b/browser/components/places/content/historySidebar.js
+@@ -156,6 +156,12 @@ function searchHistory(aInput) {
+   options.resultType = resultType;
+   options.includeHidden = !!aInput;
+ 
++  // Sval: the list's workspace, and the archived view, which runs no query
++  // (SvalHistorySidebar).
++  if (gHistoryTree.svalHistory?.willLoad(query) === false) {
++    return;
++  }
++
+   let timerId;
+   if (gHistoryGrouping == "lastvisited") {
+     timerId = Glean.historySidebar.lastvisitedTreeQueryTime.start();
+@@ -165,6 +171,7 @@ function searchHistory(aInput) {
+   // instead of setting the place attribute in historySidebar.xhtml
+   // otherwise, we will end up calling load() twice
+   gHistoryTree.load(query, options);
++  gHistoryTree.svalHistory?.loaded();
+ 
+   // Sometimes search is activated without an input string. For example, when
+   // the history sidbar is first opened or when a search filter is selected.
+diff --git a/browser/components/places/content/treeView.js b/browser/components/places/content/treeView.js
+index 73379b23ff..38711f8017 100644
+--- a/browser/components/places/content/treeView.js
++++ b/browser/components/places/content/treeView.js
+@@ -1559,6 +1559,12 @@ PlacesTreeView.prototype = {
+   },
+ 
+   getImageSrc: function PTV_getImageSrc(aRow, aColumn) {
++    // Sval: the History sidebar's site icons (SvalHistorySidebar).
++    const svalImage = this._tree?.svalHistory?.imageSrc(this, aRow, aColumn);
++    if (svalImage !== undefined) {
++      return svalImage;
++    }
++
+     // Only the title column has an image.
+     if (this._getColumnType(aColumn) != this.COLUMN_TYPE_TITLE) {
+       return "";
+@@ -1571,6 +1577,13 @@ PlacesTreeView.prototype = {
+   getCellValue() {},
+ 
+   getCellText: function PTV_getCellText(aRow, aColumn) {
++    // Sval: the History sidebar's device and workspace columns
++    // (SvalHistorySidebar).
++    const svalText = this._tree?.svalHistory?.cellText(this, aRow, aColumn);
++    if (svalText !== undefined) {
++      return svalText;
++    }
++
+     let node = this._getNodeForRow(aRow);
+     switch (this._getColumnType(aColumn)) {
+       case this.COLUMN_TYPE_TITLE:
+diff --git a/browser/modules/Sanitizer.sys.mjs b/browser/modules/Sanitizer.sys.mjs
+index 428353e195..2af13b1438 100644
+--- a/browser/modules/Sanitizer.sys.mjs
++++ b/browser/modules/Sanitizer.sys.mjs
+@@ -16,6 +16,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   FormHistory: "resource://gre/modules/FormHistory.sys.mjs",
+   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+   PrincipalsCollector: "resource://gre/modules/PrincipalsCollector.sys.mjs",
++  SvalHistorySync: "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs",
+ });
+ 
+ var logConsole;
+@@ -565,7 +566,15 @@ export var Sanitizer = {
+     },
+ 
+     history: {
+-      async clear(range, { progress }) {
++      // Sval: every history clear reaches the synced history with its scope
++      // (SvalHistorySync.clearsHistory).
++      clear(range, options) {
++        return lazy.SvalHistorySync.clearsHistory(range, () =>
++          this.clearOwn(range, options)
++        );
++      },
++
++      async clearOwn(range, { progress }) {
+         // TODO: This check is needed for the case that this method is invoked directly and not via the sanitizer.sanitize API.
+         // This can be removed once bug 1803799 has landed.
+         if (!gPrincipalsCollector) {

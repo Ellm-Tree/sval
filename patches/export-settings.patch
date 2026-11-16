@@ -1,0 +1,73 @@
+Sval: Export buttons beside Import in Settings
+
+Export sits next to Sval's import page in the import group (export spec §4):
+one button for the export page, and one that opens it on the complete data,
+the export of main spec §2.1's "Technical details". The group, its buttons and
+its strings are a settings config and Fluent strings, which no chrome API
+reaches.
+
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index 8613c73..36afb0f 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -676,6 +676,19 @@ Preferences.addSetting({
+     window.SvalSettings.openImport();
+   },
+ });
++// Sval: export sits beside import (export spec §4).
++Preferences.addSetting({
++  id: "data-export",
++  onUserClick() {
++    window.SvalSettings.openExport();
++  },
++});
++Preferences.addSetting({
++  id: "data-export-all",
++  onUserClick() {
++    window.SvalSettings.openExport({ target: "sval" });
++  },
++});
+ 
+ // Profiles section
+ 
+@@ -1044,6 +1057,16 @@ SettingGroupManager.registerGroups({
+         l10nId: "preferences-data-migration-button",
+         control: "moz-box-button",
+       },
++      {
++        id: "data-export",
++        l10nId: "preferences-data-export-button",
++        control: "moz-box-button",
++      },
++      {
++        id: "data-export-all",
++        l10nId: "preferences-data-export-all-button",
++        control: "moz-box-button",
++      },
+     ],
+   },
+   profilePane: {
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index e53f6ac..3b1c78c 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -209,11 +209,17 @@ disable-extension =
+     .label = Disable Extension
+ 
+ preferences-data-migration-group =
+-    .label = Import browser data
+-    .description = Bring your tabs, favorites and history from another browser.
++    .label = Import and export
++    .description = Bring your tabs, favorites and history from another browser, or take them to one.
+ preferences-data-migration-button =
+     .label = Import data
+     .accesskey = m
++preferences-data-export-button =
++    .label = Export data
++    .accesskey = x
++preferences-data-export-all-button =
++    .label = Export all { -brand-short-name } data
++    .description = Workspaces, Favorites, history and settings from this device, unencrypted
+ 
+ preferences-profiles-group-header =
+     .heading = Profiles

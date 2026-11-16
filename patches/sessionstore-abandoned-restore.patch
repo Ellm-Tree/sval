@@ -1,0 +1,26 @@
+Sval: SessionStore completes no restore its window's close abandoned
+
+Closing a window runs onClose, which resets the restoring state of each tab
+still restoring and moves the restore queue on. The load each of those tabs
+was waiting for still settles afterwards, and _restoreTabContentComplete then
+finds the tab in the closed window's gBrowser, asks _resetLocalTabRestoringState
+to reset it again, and logs "Given tab is not restoring." Sval restores a
+workspace's tabs through setTabState whenever a window opens on one, so closing
+that window before its tabs finish loading logs the error. A tab whose
+restoring state is gone has nothing left to complete.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index 6253d6590a..676f548811 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -8558,6 +8558,10 @@ var SessionStoreInternal = {
+     if (!tab) {
+       return;
+     }
++    // The restore was abandoned while it loaded, as when its window closes.
++    if (!TAB_STATE_FOR_BROWSER.has(browser)) {
++      return;
++    }
+     // Restore search mode and its search string in userTypedValue, if
+     // appropriate.
+     let cacheState = lazy.TabStateCache.get(browser.permanentKey);

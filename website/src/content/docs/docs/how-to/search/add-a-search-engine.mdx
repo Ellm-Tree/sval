@@ -1,0 +1,48 @@
+---
+title: Add a search engine
+description: Add a site's search to Sval when the engine you want isn't listed.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+If a site puts your search in its address, you can add the site as a
+search engine. Then you can search the site from the address bar, or make
+it your default.
+
+You search Codeberg often and want to reach its search from the address bar.
+
+## Steps
+
+1. Open Settings › Search and Launcher.
+2. Under Additional search engines, select **Add search engine**.
+3. In **Search engine name**, type a name.
+4. In **URL with %s in place of search term**, type the search's address,
+   with %s where the words go.
+5. Optional: in **Keyword (optional)**, type a short word, like cb.
+6. Select **Add Engine**.
+
+The engine shows in the list under Additional search engines, and in the
+Default search engine menu.
+
+<Screenshot name="docs-add-a-search-engine" frame="rounded" maxWidth={560} alt="The Add Search Engine dialog with the name Codeberg, the address https://codeberg.org/explore/repos?q=%s, and the keyword cb" />
+
+## Details
+
+- To find the address, search the site for a word, copy the address of the
+  results page, and put %s in place of the word.
+- If you gave the engine a keyword, you can search it once from the
+  address bar. Type the keyword, a space, and your search.
+- Select **Advanced** to see more fields. They're for a site that searches
+  with POST data, and for an address that gives search suggestions.
+
+## If something goes wrong
+
+- **Try including %s in place of the search term.** The address has no %s.
+  Put %s where the words you search for go.
+- **That keyword is already being used. Try a different one.** Another
+  engine has that keyword. Choose another keyword.
+
+## Related pages
+
+- [Change your search engine](/docs/how-to/search/change-your-search-engine/)
+- [Search](/docs/reference/search/)

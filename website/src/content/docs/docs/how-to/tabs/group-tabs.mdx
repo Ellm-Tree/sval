@@ -1,0 +1,86 @@
+---
+title: Group tabs
+description: Make a group in the Workspace, put tabs in it, and put groups inside other groups.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+A group keeps tabs, and other groups, together under one name in the Workspace.
+You can give a group a color and an emoji. You can also fold the group away
+when you don't need it.
+
+You have six Codeberg issues open for one release, and you want them in one
+place you can fold away.
+
+<Screenshot name="docs-group-tabs" frame="rounded" maxWidth={300} alt="A Workspace with nested groups: Research, tinted teal, inside Q4 Launch, with a Pricing pages group and a Split inside it, and Engineering and Hiring folded" />
+
+## Make an empty group
+
+1. At the top of the Workspace panel, select **New group**.
+2. Type a name in **Name**.
+3. Optional: choose an **Emoji** and a **Color**.
+4. Select **Create**.
+
+The group appears in the Workspace or group you're working in, after the
+groups already there and before the tabs.
+
+## Make a group from two tabs
+
+<Until v="0.1.0-rc.10">
+
+1. Drag one tab's row onto the middle of another tab's row.
+2. When the row reads **New group**, drop the tab.
+3. In the New group dialog, type a name, then select **Create**.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+1. Drag one tab's row onto the left half of another tab's row.
+2. When the **New group** half fills with color, drop the tab.
+3. In the New group dialog, type a name, then select **Create**.
+
+</Since>
+
+The new group takes the place of the tab you dropped on, with both tabs
+inside.
+
+## Make a group from several tabs
+
+1. In the Workspace, select the rows. <kbd>⌘</kbd>-click (Ctrl-click on Windows and Linux)
+   to add a row, or Shift-click to add every row in between.
+2. Right-click one of the selected rows, then choose **New group with selection**.
+3. Type a name, then select **Create**.
+
+## Details
+
+- To put a tab in a group, drag the tab onto a folded group's row, or among
+  an open group's tabs. You can also right-click the tab and choose
+  **Move to group**. From the keyboard, focus the tab's row and press
+  <kbd>Alt+→</kbd> to move the tab into the group above. <kbd>Alt+←</kbd>
+  moves the tab back out.
+- A group can hold other groups. Drag one group onto another, or use
+  **Move to group** on the group you're moving.
+- To make a group inside another, right-click the outer group, then choose
+  **New group**.
+- Click a group's row to fold or unfold the group. A folded group shows how
+  many tabs it holds. While you view a tab from a folded group, that tab
+  shows under the group's row.
+- To change a group's name, color, or emoji, right-click the group and
+  choose **Edit…**. To rename the group, double-click its name, or press
+  <kbd>F2</kbd>.
+- A group with a color is drawn as a tinted block around its tabs.
+- A group needs a name. **Create** won't make a group while the name is
+  empty.
+- Groups sync to your other devices along with your Workspaces. Each device
+  keeps track of which groups are folded on that device.
+- If you drop a tab on the right end of another tab's row, you get a Split
+  instead of a group. See
+  [Show tabs side by side in a Split](/docs/how-to/tabs/show-tabs-side-by-side-in-a-split/).
+
+## Related pages
+
+- [Delete a group](/docs/how-to/tabs/delete-a-group/)
+- [Act on several tabs at once](/docs/how-to/tabs/act-on-several-tabs-at-once/)
+- [Tabs in a Workspace](/docs/reference/tabs/)

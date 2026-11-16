@@ -1,0 +1,28 @@
+Sval: answer only a whole @ keyword in the restrict-keyword provider
+
+UrlbarProviderRestrictKeywordsAutofill stayed active for any part of a
+keyword such as "@bookmarks", though its startQuery answers only the
+whole keyword and a space. Active at its priority, it kept every
+lower-priority heuristic provider out, so "@b " listed nothing and
+entered no search mode until another key was typed.
+
+diff --git a/browser/components/urlbar/UrlbarProviderRestrictKeywordsAutofill.sys.mjs b/browser/components/urlbar/UrlbarProviderRestrictKeywordsAutofill.sys.mjs
+index 724f4aff5f..f681b83102 100644
+--- a/browser/components/urlbar/UrlbarProviderRestrictKeywordsAutofill.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderRestrictKeywordsAutofill.sys.mjs
+@@ -95,11 +95,10 @@ export class UrlbarProviderRestrictKeywordsAutofill extends UrlbarProvider {
+     // Returns full autofill result when user types keyword with space to
+     // enter seach mode. Example, "@history ".
+     let keywordAliases = await this.#getKeywordAliases();
+-    if (
+-      keywordAliases.some(keyword =>
+-        keyword.startsWith(queryContext.trimmedLowerCaseSearchString)
+-      )
+-    ) {
++    // Sval: only a whole keyword, which startQuery answers. A part of one
++    // that a space ends, such as "@b ", is another provider's to answer, and
++    // this provider being active would keep the lower-priority ones out.
++    if (keywordAliases.includes(queryContext.trimmedLowerCaseSearchString)) {
+       return true;
+     }
+ 

@@ -1,0 +1,2240 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The protection button and its panel (`SvalProtectionButton`), in Sval's
+ * header palette from `sval-header.css`. The values are the protection
+ * design's, which adds the tokens below to the header's.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-scope.css");
+
+:root {
+  --sval-prot-accent: var(--sval-palette-neon);
+  --sval-prot-wash: rgba(92, 242, 255, 0.16);
+  --sval-prot-well: rgb(var(--sval-palette-wash-dark) / 0.06);
+  --sval-prot-well-border: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-prot-icon: var(--sval-palette-ink-200);
+  --sval-prot-body: var(--sval-palette-ink-300);
+  --sval-prot-popup: var(--sval-surface);
+  --sval-prot-secondary: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --sval-prot-secondary-hover: rgb(var(--sval-palette-wash-dark) / 0.16);
+  --sval-prot-secondary-ink: #ffffff;
+  /* Ink on `--sval-action`, and the on switch's knob. */
+  --sval-prot-on-action: #ffffff;
+  --sval-prot-knob-on: #ffffff;
+  --sval-prot-knob-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  /* A wrong connection's colours, used by the button, the connection line,
+   * its card and the certificate view, and nowhere else (decision 0131). */
+  --sval-prot-http: #ffc53d;
+  --sval-prot-http-bg: rgba(255, 197, 61, 0.1);
+  --sval-prot-http-bd: rgba(255, 197, 61, 0.3);
+  --sval-prot-exc: #ff8f3f;
+  --sval-prot-exc-bg: rgba(255, 143, 63, 0.1);
+  --sval-prot-exc-bd: rgba(255, 143, 63, 0.32);
+  --sval-prot-err: #ff5c6c;
+  --sval-prot-err-bg: rgba(255, 92, 108, 0.1);
+  --sval-prot-err-bd: rgba(255, 92, 108, 0.34);
+  /* A breach's yellow, kept apart from the amber of a connection with no
+   * encryption: the panel's card, and the dot on the button. */
+  --sval-prot-breach: #f2dc5d;
+  --sval-prot-breach-title: #f2dc5d;
+  --sval-prot-breach-bg: rgba(242, 220, 93, 0.1);
+  --sval-prot-breach-bd: rgba(242, 220, 93, 0.36);
+  --sval-prot-danger: #e5484d;
+  --sval-prot-danger-ink: #ffffff;
+  --sval-prot-danger-text: var(--sval-palette-red-invert);
+}
+
+/* Under forced colours the panel's colours are the system's, as the
+ * header's are (`sval-header.css`, access). */
+@media not (forced-colors) {
+  @media (prefers-color-scheme: light) {
+    :root:not([privatebrowsingmode="temporary"], [data-sval-agent], [data-sval-tint]) {
+      --sval-prot-accent: var(--sval-palette-blue);
+      --sval-prot-wash: rgba(31, 107, 255, 0.12);
+      --sval-prot-well: rgb(var(--sval-palette-wash-light) / 0.04);
+      --sval-prot-well-border: rgb(var(--sval-palette-wash-light) / 0.1);
+      --sval-prot-icon: var(--sval-palette-ink-700);
+      --sval-prot-body: #3a4673;
+      --sval-prot-secondary: rgb(var(--sval-palette-wash-light) / 0.07);
+      --sval-prot-secondary-hover: rgb(var(--sval-palette-wash-light) / 0.12);
+      --sval-prot-secondary-ink: var(--sval-palette-ink-950);
+      --sval-prot-http: #9a6700;
+      --sval-prot-http-bg: rgba(154, 103, 0, 0.07);
+      --sval-prot-http-bd: rgba(154, 103, 0, 0.3);
+      --sval-prot-exc: #c2410c;
+      --sval-prot-exc-bg: rgba(194, 65, 12, 0.07);
+      --sval-prot-exc-bd: rgba(194, 65, 12, 0.3);
+      --sval-prot-err: #c8102e;
+      --sval-prot-err-bg: rgba(200, 16, 46, 0.06);
+      --sval-prot-err-bd: rgba(200, 16, 46, 0.3);
+      --sval-prot-breach: #8a6d00;
+      --sval-prot-breach-title: #5c4800;
+      --sval-prot-breach-bg: #fff6cc;
+      --sval-prot-breach-bd: rgba(160, 125, 0, 0.38);
+      --sval-prot-danger: #d93a45;
+      --sval-prot-danger-text: var(--sval-palette-red);
+    }
+  }
+
+  :root[data-sval-ink="dark"]:not([privatebrowsingmode="temporary"], [data-sval-agent]) {
+    --sval-prot-accent: var(--sval-palette-blue);
+    --sval-prot-wash: rgba(31, 107, 255, 0.12);
+    --sval-prot-well: rgb(var(--sval-palette-wash-light) / 0.04);
+    --sval-prot-well-border: rgb(var(--sval-palette-wash-light) / 0.1);
+    --sval-prot-icon: var(--sval-palette-ink-700);
+    --sval-prot-body: #3a4673;
+    --sval-prot-secondary: rgb(var(--sval-palette-wash-light) / 0.07);
+    --sval-prot-secondary-hover: rgb(var(--sval-palette-wash-light) / 0.12);
+    --sval-prot-secondary-ink: var(--sval-palette-ink-950);
+    --sval-prot-http: #9a6700;
+    --sval-prot-http-bg: rgba(154, 103, 0, 0.07);
+    --sval-prot-http-bd: rgba(154, 103, 0, 0.3);
+    --sval-prot-exc: #c2410c;
+    --sval-prot-exc-bg: rgba(194, 65, 12, 0.07);
+    --sval-prot-exc-bd: rgba(194, 65, 12, 0.3);
+    --sval-prot-err: #c8102e;
+    --sval-prot-err-bg: rgba(200, 16, 46, 0.06);
+    --sval-prot-err-bd: rgba(200, 16, 46, 0.3);
+    --sval-prot-breach: #8a6d00;
+    --sval-prot-breach-title: #5c4800;
+    --sval-prot-breach-bg: #fff6cc;
+    --sval-prot-breach-bd: rgba(160, 125, 0, 0.38);
+    --sval-prot-danger: #d93a45;
+    --sval-prot-danger-text: var(--sval-palette-red);
+  }
+
+  :root[privatebrowsingmode="temporary"] {
+    --sval-prot-well: rgba(166, 140, 255, 0.08);
+    --sval-prot-well-border: rgba(166, 140, 255, 0.14);
+    --sval-prot-icon: #e2dcff;
+    --sval-prot-body: #c6bfea;
+    --sval-prot-secondary: rgba(166, 140, 255, 0.14);
+    --sval-prot-secondary-hover: rgba(166, 140, 255, 0.2);
+  }
+}
+
+/* Increased contrast, which is the only contrast setting macOS chrome
+ * matches, draws the wells' edges solid. The selectors repeat the palettes'
+ * so they win in every window. */
+@media (prefers-contrast) and (not (forced-colors)) {
+  :root,
+  :root:not([privatebrowsingmode="temporary"], [data-sval-agent]),
+  :root[privatebrowsingmode="temporary"] {
+    --sval-prot-well-border: var(--sval-muted);
+  }
+}
+
+@media (forced-colors) {
+  :root {
+    --sval-prot-accent: LinkText;
+    --sval-prot-wash: transparent;
+    --sval-prot-well: Canvas;
+    --sval-prot-well-border: CanvasText;
+    --sval-prot-icon: CanvasText;
+    --sval-prot-body: CanvasText;
+    --sval-prot-popup: Canvas;
+    --sval-prot-secondary: ButtonFace;
+    --sval-prot-secondary-hover: SelectedItemText;
+    --sval-prot-secondary-ink: ButtonText;
+    /* `--sval-action` is ButtonText here (`sval-header.css`), so what sits on
+     * it is ButtonFace. */
+    --sval-prot-on-action: ButtonFace;
+    --sval-prot-knob-on: ButtonFace;
+    --sval-prot-knob-shadow: none;
+    /* With no colour, the shield's "!", the word beside it and the card's
+     * border carry the meaning. */
+    --sval-prot-http: CanvasText;
+    --sval-prot-exc: CanvasText;
+    --sval-prot-err: CanvasText;
+    --sval-prot-http-bg: Canvas;
+    --sval-prot-exc-bg: Canvas;
+    --sval-prot-err-bg: Canvas;
+    --sval-prot-http-bd: CanvasText;
+    --sval-prot-exc-bd: CanvasText;
+    --sval-prot-err-bd: CanvasText;
+    --sval-prot-breach: Highlight;
+    --sval-prot-breach-title: CanvasText;
+    --sval-prot-breach-bg: Canvas;
+    --sval-prot-breach-bd: CanvasText;
+    --sval-prot-danger: Highlight;
+    --sval-prot-danger-ink: HighlightText;
+    --sval-prot-danger-text: CanvasText;
+  }
+}
+
+/* Firefox's shield: Sval's button replaces it (decision 0131). Its element
+   stays in the field, because `gProtectionsHandler` writes it on every load. */
+#tracking-protection-icon-container {
+  display: none !important;
+}
+
+/* Firefox's permission icons in the address field: the site menu lists a
+   site's permissions and the site controls show a device in use
+   (`SvalSiteControls`, decision 0132). */
+#identity-permission-box,
+#blocked-permissions-container {
+  display: none !important;
+}
+
+/* The anchors of the prompts the site controls open from and show, open or
+   closed (`PROMPT_ANCHORS` in `SvalSiteControls`). `PopupNotifications`
+   marks each notification's anchor `showing` while the tab holds it, closed
+   or not (`_showIcons`). Every other prompt's anchor stays. */
+#notification-popup-box
+  > :is(
+    #geo-notification-icon,
+    #web-notifications-notification-icon,
+    #webRTC-shareDevices-notification-icon,
+    #webRTC-shareMicrophone-notification-icon,
+    #webRTC-shareScreen-notification-icon,
+    #persistent-storage-notification-icon,
+    #storage-access-notification-icon
+  ) {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------- glyphs */
+
+.sval-prot-glyph {
+  display: block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background-color: currentColor;
+  mask-image: var(--sval-glyph);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: 18px;
+}
+
+.sval-prot-glyph[data-icon="pr-shield"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-shield.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-shield-fill"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-shield-fill.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-shield-off"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-shield-off.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-media-off"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-media-off.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-info"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-info.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-tracker"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-tracker.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-fingerprint"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-fingerprint.svg");
+}
+
+.sval-prot-glyph[data-icon="pr-ads"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-ads.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-alert"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-alert.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-back"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-back.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-cert"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-cert.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-cookie"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-cookie.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-external"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-external.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-key"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-key.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-next"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-next.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-shield-alert"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-shield-alert.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-shield-plain"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-shield-plain.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-x"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-x.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-bell"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-bell.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-camera"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-camera.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-chevron-down"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg");
+}
+
+.sval-prot-glyph[data-icon="ep-scissors"] {
+  --sval-glyph: url("chrome://browser/content/sval/icons/scissors.svg");
+}
+
+.sval-prot-glyph[data-icon="ep-eraser"] {
+  --sval-glyph: url("chrome://browser/content/sval/icons/eraser.svg");
+}
+
+.sval-prot-glyph[data-icon="ep-palette"] {
+  --sval-glyph: url("chrome://browser/content/sval/icons/palette.svg");
+}
+
+.sval-prot-glyph[data-icon="ep-pin"] {
+  --sval-glyph: url("chrome://browser/content/sval/icons/pin.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-location"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-location.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-mic"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-mic.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-popup"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-popup.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-screen"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-screen.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-camera-off"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-camera-off.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-mic-off"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-mic-off.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-screen-off"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-screen-off.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-storage"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-storage.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-network"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-network.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-laptop"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-laptop.svg");
+}
+
+.sval-prot-glyph[data-icon="sc-glasses"] {
+  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-glasses.svg");
+}
+
+/* ---------------------------------------------------------------- button */
+
+#sval-protection-button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  margin-inline-end: 6px;
+  border-radius: 999px;
+  color: var(--sval-prot-icon);
+  cursor: default;
+  outline: none;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 1px;
+  }
+
+  /* A wrong connection outranks the protection state in the button; the
+   * panel shows both. */
+  &[data-tone="http"] {
+    color: var(--sval-prot-http);
+  }
+
+  &[data-tone="exc"] {
+    color: var(--sval-prot-exc);
+  }
+
+  &[data-tone="err"] {
+    color: var(--sval-prot-err);
+  }
+
+  /* Open, it takes the pressed look over any tone, which the open panel
+   * names, wherever the panel draws no stem (below); each other look is its
+   * glyph alone (header signals spec §1). */
+  &[open] {
+    background-color: var(--sval-on-bg);
+    color: var(--sval-on-ink);
+
+    &:hover {
+      background-color: var(--sval-on-hover);
+    }
+  }
+
+  &[sval-label] {
+    gap: 4px;
+    padding-inline-end: 9px;
+  }
+
+  &:not([sval-label]) > .sval-prot-label-word,
+  &:not([sval-breach]) > .sval-prot-dot,
+  &:not([sval-count]) > .sval-prot-count {
+    display: none;
+  }
+}
+
+#sval-protection-button {
+  position: relative;
+}
+
+.sval-prot-prompt-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sval-prot-label-word {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* A breach of the site: the header's one dot (`sval-header.css`) at the
+   shield's top right, as on a 28px cell around it, cutting its gap in the
+   shield. */
+.sval-prot-dot {
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background-color: var(--sval-dot, var(--sval-accent));
+}
+
+#sval-protection-button[sval-breach] > .sval-prot-shield {
+  mask-image: var(--sval-glyph), radial-gradient(circle at calc(100% - 1px) 1px, transparent 6px, #000 6.5px);
+  mask-size:
+    18px,
+    100% 100%;
+  mask-position:
+    center,
+    0 0;
+  mask-composite: intersect;
+}
+
+#sval-protection-button[sval-breach]:dir(rtl) > .sval-prot-shield {
+  mask-image: var(--sval-glyph), radial-gradient(circle at 1px 1px, transparent 6px, #000 6.5px);
+}
+
+/* What Sval blocked on the page: the header's count (`sval-header.css`) at
+   the shield's top right, as on a 28px cell around it, over the filled
+   shield. It cuts a 2px gap of its own shape in the shield: the cut is the
+   chip grown by 2px, `--sval-count-cut-w` wide and 17px tall, its start
+   8px into the 18px glyph and 7px above it. */
+#sval-protection-button > .sval-prot-count {
+  position: absolute;
+  top: 0;
+  inset-inline-start: 15px;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background-color: var(--sval-on-bg);
+  color: var(--sval-on-ink);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+#sval-protection-button[sval-count] {
+  --sval-count-cut: radial-gradient(circle closest-side, #000 calc(100% - 0.5px), transparent 100%);
+  --sval-count-cut-w: 17px;
+
+  &[sval-count-wide] {
+    --sval-count-cut: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='25' height='17'%3E%3Crect width='25' height='17' rx='8.5'/%3E%3C/svg%3E");
+    --sval-count-cut-w: 25px;
+
+    > .sval-prot-count {
+      width: 21px;
+    }
+  }
+
+  > .sval-prot-shield {
+    mask-image: var(--sval-glyph), linear-gradient(#000, #000), var(--sval-count-cut);
+    mask-size:
+      18px,
+      100% 100%,
+      var(--sval-count-cut-w) 17px;
+    mask-position:
+      center,
+      0 0,
+      8px -7px;
+    mask-repeat: no-repeat;
+    mask-composite: intersect, exclude;
+  }
+
+  &:dir(rtl) > .sval-prot-shield {
+    mask-position:
+      center,
+      0 0,
+      calc(10px - var(--sval-count-cut-w)) -7px;
+  }
+}
+
+@media (forced-colors) {
+  #sval-protection-button > .sval-prot-count {
+    background-color: ButtonText;
+    color: ButtonFace;
+  }
+}
+
+/* The button belongs to the page shown, not to what is being typed. A
+   results page's search words leave the proxy state invalid, and
+   UrlbarInput drops persistsearchterms once the value differs from them. */
+#urlbar:is([pageproxystate="invalid"]:not([persistsearchterms]), [breakout-extend]) #sval-protection-button {
+  display: none;
+}
+
+/* Under its open panel's stem the button is the face the stem grows from
+   (`sval-header.css`, panels), in the panel's fill. The stem's edge runs
+   over the face's top corner, where the count and the breach dot stand, so
+   they give way while the panel that names them is open, and the shield
+   is whole. The `:dir` outranks the count's and the dot's cuts in either
+   direction. */
+@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
+  #sval-protection-button[sval-stem] {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+
+    &,
+    &:hover {
+      background-color: var(--sval-stem-fill);
+      color: var(--sval-text);
+    }
+
+    > :is(.sval-prot-count, .sval-prot-dot) {
+      display: none;
+    }
+
+    &:is(:dir(ltr), :dir(rtl)) > .sval-prot-shield {
+      mask-image: var(--sval-glyph);
+      mask-size: 18px;
+      mask-position: center;
+      mask-composite: add;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- panel */
+
+#sval-protection-panel {
+  --panel-background-color: var(--sval-prot-popup);
+  --panel-text-color: var(--sval-text);
+  --panel-border-color: var(--sval-cluster-border);
+  --panel-border-radius: 20px;
+  --panel-padding: 6px;
+  --panel-width: 360px;
+  font-family: var(--sval-font);
+}
+
+.sval-prot-body {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: var(--sval-text);
+
+  & button {
+    font: inherit;
+    border: 0;
+    margin: 0;
+    appearance: none;
+  }
+}
+
+.sval-prot-muted {
+  color: var(--sval-muted);
+}
+
+.sval-prot-accent {
+  color: var(--sval-prot-accent);
+}
+
+.sval-prot-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.sval-prot-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background-color: var(--sval-wash);
+  color: var(--sval-prot-icon);
+
+  & > .sval-prot-glyph {
+    width: 20px;
+    height: 20px;
+    mask-size: 20px;
+  }
+}
+
+.sval-prot-body[data-look="off"] .sval-prot-tile {
+  color: var(--sval-muted);
+}
+
+.sval-prot-body[data-look="active"] .sval-prot-tile {
+  color: var(--sval-prot-accent);
+}
+
+.sval-prot-head-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-prot-domain {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.sval-prot-status {
+  font-size: 13px;
+  color: var(--sval-muted);
+}
+
+.sval-prot-well {
+  border-radius: 16px;
+  background-color: var(--sval-prot-well);
+}
+
+.sval-prot-media-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+
+  & > .sval-prot-glyph {
+    margin-top: 1px;
+    background-color: var(--sval-prot-accent);
+  }
+}
+
+.sval-prot-media-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.sval-prot-media-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sval-prot-media-body {
+  line-height: 1.45;
+  color: var(--sval-prot-body);
+}
+
+.sval-prot-pill {
+  flex: 1;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.sval-prot-primary {
+  background-color: var(--sval-action);
+  color: var(--sval-prot-on-action);
+}
+
+.sval-prot-secondary {
+  background-color: var(--sval-prot-secondary);
+  color: var(--sval-prot-secondary-ink);
+
+  &:hover {
+    background-color: var(--sval-prot-secondary-hover);
+  }
+}
+
+.sval-prot-hint {
+  font-size: 12px;
+  color: var(--sval-muted);
+  text-align: center;
+}
+
+.sval-prot-chosen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 12px 12px;
+}
+
+/* The chosen segment takes the pressed look in the popup's colours, so it
+ * reads by its contrast with the others (header signals spec §1). */
+.sval-prot-segments {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--sval-muted);
+}
+
+.sval-prot-segment {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-text);
+  font-size: 13px;
+  font-weight: 500;
+
+  &:has(> .sval-prot-radio:checked) {
+    background-color: var(--sval-text);
+    color: var(--sval-prot-popup);
+    font-weight: 600;
+  }
+
+  &:has(> .sval-prot-radio:focus-visible) {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* The segment draws the radio; the radio keeps the focus and the keys. */
+.sval-prot-radio {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+}
+
+.sval-prot-pill:focus-visible,
+.sval-prot-link:focus-visible {
+  outline: 2px solid var(--sval-focus);
+  outline-offset: 2px;
+}
+
+.sval-prot-section {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--sval-cluster-border);
+  margin-inline: 12px;
+}
+
+.sval-prot-heading {
+  margin: 0;
+  font: inherit;
+}
+
+.sval-prot-rows {
+  padding: 10px 0 8px;
+}
+
+.sval-prot-label {
+  padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sval-muted);
+}
+
+.sval-prot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 0;
+  box-sizing: border-box;
+}
+
+.sval-prot-row-icon {
+  width: 16px;
+  height: 16px;
+  mask-size: 16px;
+  color: var(--sval-muted);
+}
+
+.sval-prot-row-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sval-prot-sub {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--sval-muted);
+}
+
+.sval-prot-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sval-prot-compat {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sval-prot-body);
+}
+
+.sval-prot-info {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  mask-size: 16px;
+  color: var(--sval-muted);
+}
+
+.sval-prot-link {
+  color: var(--sval-prot-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* A link inside a sentence is told from it by more than its colour. */
+.sval-prot-compat .sval-prot-link {
+  text-decoration: underline;
+}
+
+.sval-prot-site {
+  margin-inline: 0;
+  border-top: 0;
+
+  & > .sval-prot-label-row {
+    display: flex;
+    justify-content: space-between;
+    margin-inline: 12px;
+    padding: 10px 0 2px;
+    border-top: 1px solid var(--sval-cluster-border);
+  }
+}
+
+.sval-prot-label-note {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sval-prot-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+
+  /* The line under a switch that can't be used may say why, so it keeps
+   * its contrast. */
+  &[data-disabled="true"] :is(.sval-prot-switch, .sval-prot-switch-label) {
+    opacity: 0.45;
+  }
+}
+
+.sval-prot-switch-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sval-prot-switch-label {
+  font-weight: 500;
+}
+
+.sval-prot-switch {
+  display: flex;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 2px !important;
+  border-radius: 999px;
+  /* Off is an outline with a small knob, so on and off differ by the
+   * track's fill against the popup and by the knob's place and size. */
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--sval-muted);
+  align-items: center;
+  justify-content: flex-start;
+
+  &::after {
+    content: "";
+    width: 14px;
+    height: 14px;
+    margin-inline-start: 2px;
+    border-radius: 50%;
+    background-color: var(--sval-muted);
+  }
+
+  &[aria-checked="true"] {
+    background-color: var(--sval-action);
+    box-shadow: none;
+    justify-content: flex-end;
+
+    &::after {
+      width: 18px;
+      height: 18px;
+      margin-inline-start: 0;
+      background-color: var(--sval-prot-knob-on);
+      box-shadow: var(--sval-prot-knob-shadow);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-prot-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 10px 12px 6px;
+  border-top: 1px solid var(--sval-cluster-border);
+  font-size: 12.5px;
+  color: var(--sval-muted);
+
+  & > .sval-prot-link {
+    flex: none;
+  }
+}
+
+/* ---------------------------------------------------------------- connection */
+
+.sval-prot-body[data-tone="http"] {
+  --sval-prot-tone: var(--sval-prot-http);
+  --sval-prot-tone-bg: var(--sval-prot-http-bg);
+  --sval-prot-tone-bd: var(--sval-prot-http-bd);
+}
+
+.sval-prot-body[data-tone="exc"] {
+  --sval-prot-tone: var(--sval-prot-exc);
+  --sval-prot-tone-bg: var(--sval-prot-exc-bg);
+  --sval-prot-tone-bd: var(--sval-prot-exc-bd);
+}
+
+.sval-prot-body[data-tone="err"] {
+  --sval-prot-tone: var(--sval-prot-err);
+  --sval-prot-tone-bg: var(--sval-prot-err-bg);
+  --sval-prot-tone-bd: var(--sval-prot-err-bd);
+}
+
+.sval-prot-body:not([data-tone=""]) .sval-prot-tile {
+  background-color: var(--sval-prot-tone-bg);
+  color: var(--sval-prot-tone);
+}
+
+.sval-prot-body[data-look="internal"] .sval-prot-tile {
+  color: var(--sval-prot-icon);
+}
+
+.sval-prot-head {
+  padding-bottom: 8px;
+}
+
+.sval-prot-conn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  box-sizing: border-box;
+  margin: 0 0 4px;
+  padding: 0 10px 0 12px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--sval-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: start;
+
+  &:is(button):hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -2px;
+  }
+}
+
+.sval-prot-body:not([data-tone=""]) .sval-prot-conn {
+  color: var(--sval-prot-tone);
+}
+
+.sval-prot-conn-icon,
+.sval-prot-next {
+  width: 16px;
+  height: 16px;
+  mask-size: 16px;
+}
+
+.sval-prot-conn-text {
+  flex: 1;
+}
+
+.sval-prot-next {
+  color: var(--sval-muted);
+}
+
+.sval-prot-card,
+.sval-prot-breach {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+.sval-prot-card {
+  background-color: var(--sval-prot-tone-bg);
+  border: 1px solid var(--sval-prot-tone-bd);
+}
+
+.sval-prot-card-icon {
+  margin-top: 1px;
+  color: var(--sval-prot-tone);
+}
+
+.sval-prot-card-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sval-prot-card-title {
+  font-weight: 600;
+}
+
+.sval-prot-card-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sval-prot-body);
+}
+
+.sval-prot-breach {
+  padding-inline-end: 8px;
+  background-color: var(--sval-prot-breach-bg);
+  border: 1px solid var(--sval-prot-breach-bd);
+}
+
+.sval-prot-breach-icon {
+  margin-top: 1px;
+  color: var(--sval-prot-breach);
+}
+
+.sval-prot-breach-title {
+  font-weight: 600;
+  color: var(--sval-prot-breach-title);
+}
+
+.sval-prot-breach-meta {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--sval-muted);
+}
+
+.sval-prot-breach-source {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--sval-muted);
+}
+
+.sval-prot-dismiss {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-prot-icon);
+
+  & > .sval-prot-glyph {
+    width: 14px;
+    height: 14px;
+    mask-size: 14px;
+  }
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 1px;
+  }
+}
+
+.sval-prot-internal {
+  margin: 0 0 2px;
+  border: 1px solid var(--sval-prot-well-border);
+}
+
+/* ---------------------------------------------------------------- clear data */
+
+.sval-prot-clear {
+  display: flex;
+  flex-direction: column;
+  margin-inline: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--sval-cluster-border);
+}
+
+.sval-prot-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  box-sizing: border-box;
+  margin-inline: -12px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--sval-text);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -2px;
+  }
+}
+
+.sval-prot-action-label {
+  flex: 1;
+}
+
+.sval-prot-external {
+  width: 14px;
+  height: 14px;
+  mask-size: 14px;
+  color: var(--sval-muted);
+}
+
+.sval-prot-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-inline: -6px;
+  padding: 12px 14px;
+  border: 1px solid var(--sval-prot-well-border);
+}
+
+.sval-prot-confirm-icon {
+  width: 16px;
+  height: 16px;
+  mask-size: 16px;
+  color: var(--sval-prot-icon) !important;
+  background-color: currentColor !important;
+}
+
+.sval-prot-confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sval-prot-small {
+  flex: none;
+  height: 32px;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+}
+
+.sval-prot-danger {
+  background-color: var(--sval-prot-danger);
+  color: var(--sval-prot-danger-ink);
+}
+
+/* ---------------------------------------------------------------- certificate view */
+
+/* The certificate view slides in over the main view inside the same panel. */
+.sval-prot-subview {
+  animation: sval-prot-subview-in 150ms var(--sval-ease);
+}
+
+@keyframes sval-prot-subview-in {
+  from {
+    opacity: 0;
+    translate: 16px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sval-prot-subview {
+    animation: none;
+  }
+}
+
+.sval-prot-subhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 6px 0 2px;
+}
+
+.sval-prot-back {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-prot-icon);
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -2px;
+  }
+}
+
+.sval-prot-subhead-domain {
+  font-weight: 600;
+  color: var(--sval-muted);
+}
+
+.sval-prot-cert-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 6px 12px 14px;
+}
+
+.sval-prot-details {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  row-gap: 9px;
+  column-gap: 12px;
+  margin: 0 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background-color: var(--sval-prot-well);
+  border: 1px solid var(--sval-prot-well-border);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sval-prot-detail-key {
+  color: var(--sval-muted);
+}
+
+.sval-prot-detail-value {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.sval-prot-tone {
+  color: var(--sval-prot-tone);
+}
+
+.sval-prot-remove-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 6px 4px;
+}
+
+.sval-prot-remove {
+  flex: none;
+  color: var(--sval-prot-danger-text);
+}
+
+.sval-prot-subview .sval-prot-clear {
+  margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------- site menu */
+
+#sval-site-menu,
+#sval-style-panel {
+  --panel-background-color: var(--sval-prot-popup);
+  --panel-text-color: var(--sval-text);
+  --panel-border-color: var(--sval-cluster-border);
+  --panel-border-radius: 20px;
+  --panel-padding: 6px;
+  --panel-width: 360px;
+  --panel-box-shadow: var(--sval-popup-shadow);
+  font-family: var(--sval-font);
+}
+
+/* Colorshift floats on its own, as the element picker's card does, and wears
+   the card's edge and shadow (`--overlay-border` and `--overlay-shadow`,
+   `sval-element-picker.css`). The margin is the popup window's room for that
+   shadow: its 48px blur below its 16px drop. */
+#sval-style-panel {
+  --panel-border-color: light-dark(rgba(19, 50, 143, 0.28), rgba(166, 232, 255, 0.34));
+  --panel-box-shadow: 0 0 0 1px light-dark(rgba(255, 255, 255, 0.8), rgba(3, 5, 26, 0.7)), 0 16px 48px light-dark(rgba(6, 10, 46, 0.28), rgba(3, 5, 26, 0.6));
+  --panel-box-shadow-margin: 64px;
+  -moz-window-shadow: none;
+
+  @media (forced-colors) {
+    --panel-border-color: CanvasText;
+    --panel-box-shadow: none;
+  }
+}
+
+.sval-site-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 12px 10px;
+}
+
+.sval-site-section {
+  display: flex;
+  flex-direction: column;
+  margin-inline: 12px;
+  border-top: 1px solid var(--sval-cluster-border);
+
+  & > .sval-prot-switch-row {
+    padding-inline: 0;
+  }
+}
+
+.sval-site-label {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0 6px;
+}
+
+.sval-site-segments {
+  padding-bottom: 12px;
+}
+
+.sval-site-note {
+  padding: 2px 0 10px;
+}
+
+/* The zoom slider: a 4px track in the menu's ink, a 16px knob, and a tick
+   under the track at each step. The ticks run between the knob's centres
+   at the two ends, 8px in from each side, where the knob stands on each
+   step. */
+.sval-site-zoom-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.sval-site-zoom-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 22px;
+}
+
+.sval-site-zoom-slider {
+  display: block;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+
+  &::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--sval-wash-strong);
+  }
+
+  &::-moz-range-progress {
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--sval-action);
+  }
+
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 50%;
+    background-color: var(--sval-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+    border-radius: 999px;
+  }
+}
+
+.sval-site-zoom-ticks {
+  position: absolute;
+  inset-inline: 8px;
+  top: 20px;
+  height: 0;
+}
+
+.sval-site-zoom-tick {
+  position: absolute;
+  inset-inline-start: calc(var(--sval-at) * 100%);
+  top: 0;
+  width: 1px;
+  height: 4px;
+  translate: -50% 0;
+  background-color: var(--sval-muted);
+
+  &:-moz-locale-dir(rtl) {
+    translate: 50% 0;
+  }
+
+  &.named {
+    height: 7px;
+    background-color: var(--sval-text);
+  }
+}
+
+.sval-site-zoom-tick-label {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  translate: -50% 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sval-muted);
+  white-space: nowrap;
+}
+
+.sval-site-zoom-value {
+  flex: none;
+  min-width: 40px;
+  line-height: 20px;
+  text-align: end;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sval-site-perm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 4px 0;
+}
+
+.sval-site-perm-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+/* The In use now section (header signals spec §5): a 52px row for each
+   live device, its tile in the live colours, and its Mute or Stop. */
+.sval-site-live {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  box-sizing: border-box;
+}
+
+.sval-site-live-tile {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background-color: var(--sval-live-bg);
+  color: var(--sval-live-ink);
+
+  & > .sval-prot-glyph {
+    width: 16px;
+    height: 16px;
+    mask-size: 16px;
+  }
+}
+
+.sval-site-live-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-site-stop,
+.sval-site-mute,
+.sval-site-zoom-reset {
+  flex: none;
+  height: 32px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Centred on the slider's 20px line. */
+.sval-site-zoom-reset {
+  margin-top: -6px;
+
+  &:disabled {
+    opacity: 0.45;
+  }
+}
+
+.sval-site-in-use {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 18px;
+  white-space: nowrap;
+  padding: 0 7px;
+  border-radius: 999px;
+  background-color: var(--sval-live-bg);
+  color: var(--sval-live-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sval-site-value {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 6px 0 12px !important;
+  font-size: 13px !important;
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-site-chevron {
+  width: 14px;
+  height: 14px;
+  mask-size: 14px;
+}
+
+.sval-site-clear {
+  width: 28px;
+  height: 28px;
+
+  &[sval-unset] {
+    opacity: 0;
+  }
+}
+
+.sval-site-menu > .sval-prot-footer {
+  margin-top: 0;
+}
+
+/* The Elements section: a row per mode, whose name is the button that starts
+   it. The button's ::after covers the row, so the pin and the Turn on link
+   above it stay separate controls. */
+.sval-site-element {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  box-sizing: border-box;
+  margin-inline: -12px;
+  padding: 6px 12px;
+  border-radius: 14px;
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:has(> .sval-prot-row-words > [aria-disabled="true"]) {
+    & > .sval-prot-row-icon,
+    & .sval-site-element-main {
+      opacity: 0.45;
+    }
+
+    &:hover {
+      background-color: transparent;
+    }
+
+    & .sval-prot-sub {
+      color: var(--sval-prot-body);
+    }
+  }
+}
+
+.sval-site-element-main {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible::after {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -2px;
+  }
+
+  &[aria-disabled="true"]::after {
+    cursor: default;
+  }
+}
+
+.sval-site-pin {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-text);
+
+  & > .sval-prot-glyph {
+    width: 16px;
+    height: 16px;
+    mask-size: 16px;
+  }
+
+  &:hover {
+    background-color: var(--sval-wash-strong);
+  }
+
+  /* Pinned: the pressed look in the popup's colours, with the pin filled
+   * (header signals spec §3). */
+  &[aria-pressed="true"] {
+    background-color: var(--sval-text);
+    color: var(--sval-prot-popup);
+
+    & > .sval-prot-glyph {
+      --sval-glyph: url("chrome://browser/content/sval/icons/pin-fill.svg");
+    }
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--sval-text) 86%, var(--sval-prot-popup));
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* The JavaScript section's pin sits 10px after its switch, in the column the
+   Elements rows' pins make. */
+.sval-prot-switch-row > .sval-site-pin {
+  margin-inline-start: -2px;
+}
+
+/* Removal rules for this site: a disclosure that opens by animating its row height
+   (a grid track from 0fr to 1fr), and none of it in reduced motion. */
+.sval-site-hidden-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The section's width and its 12px margins either side, so the hover
+     fill reaches the menu's edges. A button is otherwise as wide as its
+     content. */
+  width: -moz-available;
+  min-height: 44px;
+  box-sizing: border-box;
+  margin-inline: -12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+
+  &:hover {
+    background-color: var(--sval-wash);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -2px;
+  }
+}
+
+.sval-site-hidden-label {
+  flex: none;
+}
+
+.sval-site-hidden-count {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  min-width: 20px;
+  box-sizing: border-box;
+  padding: 0 7px;
+  border: 1px solid var(--sval-prot-well-border);
+  border-radius: 999px;
+  background-color: var(--sval-prot-well);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sval-site-hidden-chevron {
+  width: 16px;
+  height: 16px;
+  margin-inline-start: auto;
+  mask-size: 16px;
+  color: var(--sval-muted);
+}
+
+.sval-site-hidden-toggle[aria-expanded="true"] .sval-site-hidden-chevron {
+  mask-image: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg");
+}
+
+.sval-site-hidden-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 160ms var(--sval-ease);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.sval-site-hidden-toggle[aria-expanded="true"] + .sval-site-hidden-body {
+  grid-template-rows: 1fr;
+}
+
+.sval-site-hidden-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sval-site-hidden-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding-inline-start: 26px;
+}
+
+.sval-site-hidden-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sval-site-hidden-rule {
+  overflow: hidden;
+  font-family: var(--sval-mono);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-site-hidden-show {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sval-muted);
+
+  & > .sval-prot-glyph {
+    width: 14px;
+    height: 14px;
+    mask-size: 14px;
+  }
+
+  &:hover {
+    background-color: var(--sval-wash-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-site-hidden-manage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding-inline-start: 26px;
+  font-size: 13px;
+}
+
+.sval-site-hidden-external {
+  width: 13px;
+  height: 13px;
+  mask-size: 13px;
+}
+
+/* The pressed look under forced colours, as the header's (`sval-header.css`). */
+@media (forced-colors) {
+  .sval-site-pin[aria-pressed="true"],
+  .sval-prot-segment:has(> .sval-prot-radio:checked) {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+}
+
+/* ---------------------------------------------------------------- permission prompt */
+
+/* Firefox's permission prompt, in Sval's look: the site controls open it
+   (`SvalSiteControls`), so it is drawn as the site menu is. */
+#notification-popup {
+  --panel-background-color: var(--sval-prot-popup);
+  --panel-text-color: var(--sval-text);
+  --panel-border-color: var(--sval-cluster-border);
+  --panel-border-radius: 20px;
+  --panel-box-shadow: var(--sval-popup-shadow);
+  --button-border-radius: 999px;
+  --button-background-color-primary: var(--sval-action);
+  --button-background-color-primary-hover: var(--sval-action);
+  --button-background-color-primary-active: var(--sval-action);
+  --button-text-color-primary: var(--sval-prot-on-action);
+  --button-background-color: var(--sval-prot-secondary);
+  --button-background-color-hover: var(--sval-prot-secondary-hover);
+  --button-text-color: var(--sval-prot-secondary-ink);
+  --focus-outline-color: var(--sval-focus);
+  font-family: var(--sval-font);
+}
+
+#notification-popup popupnotification {
+  padding: 12px;
+}
+
+#notification-popup .popup-notification-icon {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  border-radius: 12px;
+  background-color: var(--sval-wash);
+  fill: var(--sval-accent);
+  -moz-context-properties: fill;
+}
+
+#notification-popup .popup-notification-description {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+#notification-popup .popup-notification-hint-text,
+#notification-popup .popup-notification-warning {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sval-prot-body);
+}
+
+#notification-popup .popup-notification-checkbox {
+  font-size: 14px;
+  accent-color: var(--sval-action);
+}
+
+#notification-popup .panel-footer {
+  padding-inline: 12px;
+  padding-bottom: 12px;
+}
+
+/* ---------------------------------------------------------------- style editor */
+
+/* The title and its Close button, on one line. */
+.sval-style-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-inline-end: 8px;
+
+  & > .sval-site-head {
+    flex: 1;
+    min-width: 0;
+  }
+
+  & > .sval-style-close {
+    margin-top: 12px;
+  }
+}
+
+/* The font: its name, then its menu at the row's end. */
+.sval-style-color {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+
+.sval-style-color-label {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* The tint's wheel: every hue around the edge at the accent's own
+   saturation and lightness, fading to the menu's surface in the middle,
+   where there is no tint. It is a picture of directions, so it reads the
+   same in a right-to-left window. */
+.sval-style-wheel-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+/* The editor moves by its title row and the bare surface around its
+   sections, as the element picker's card does (`sval-element-picker.css`). */
+.sval-style,
+.sval-style-head {
+  cursor: grab;
+}
+
+.sval-style > :not(.sval-style-head),
+.sval-style-head :is(button, .sval-scope) {
+  cursor: default;
+}
+
+#sval-style-panel[moving] {
+  cursor: grabbing;
+
+  * {
+    cursor: grabbing;
+  }
+}
+
+.sval-style-wheel {
+  position: relative;
+  direction: ltr;
+  width: 176px;
+  aspect-ratio: 1;
+  border: 1px solid var(--sval-cluster-border);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle closest-side, var(--sval-prot-popup), transparent),
+    conic-gradient(hsl(0 50% 55%), hsl(60 50% 55%), hsl(120 50% 55%), hsl(180 50% 55%), hsl(240 50% 55%), hsl(300 50% 55%), hsl(360 50% 55%));
+  /* The gradients are sized to the padding box and repeat, so painted under
+     the border they show the opposite edge's hue at the rim. */
+  background-clip: padding-box;
+  /* A dot at the rim stands half past the wheel's edge. */
+  margin: 10px;
+  touch-action: none;
+  cursor: grab;
+
+  &[moving] {
+    cursor: grabbing;
+
+    * {
+      cursor: grabbing;
+    }
+  }
+}
+
+/* The circle both dots stand on: one distance, one strength. */
+.sval-style-ring {
+  position: absolute;
+  inset: calc(50% - var(--sval-reach) * 50%);
+  border: 1.5px dashed var(--sval-text);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* A dot sits at --sval-x and --sval-y, each from -1 to 1 of the wheel's
+   radius, and is filled with the hue it picks. */
+.sval-style-dot {
+  position: absolute;
+  left: calc(50% + var(--sval-x, 0) * 50%);
+  top: calc(50% + var(--sval-y, 0) * 50%);
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  translate: -50% -50%;
+  border: 2px solid var(--sval-text);
+  border-radius: 50%;
+  background-color: var(--sval-prot-popup);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  cursor: grab;
+
+  &[data-tinted] {
+    background-color: var(--sval-style-hue);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-style-dot-second {
+  width: 14px;
+  height: 14px;
+
+  &:not([data-tinted]) {
+    visibility: hidden;
+  }
+}
+
+.sval-style-wheel-line {
+  text-align: center;
+}
+
+/* Contrast, brightness and saturation: each label, a slider on the zoom
+   slider's track and ticks, centred on no change, and its value. */
+.sval-style-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+}
+
+.sval-style-slider-row {
+  display: grid;
+  grid-template-columns: 84px 1fr 36px;
+  align-items: start;
+  gap: 10px;
+}
+
+.sval-style-slider-label,
+.sval-style-slider-value {
+  line-height: 20px;
+}
+
+.sval-style-slider-label {
+  font-weight: 500;
+}
+
+/* Its ticks carry no labels, so the track keeps room for the ticks alone. */
+.sval-style-slider-row > .sval-site-zoom-track {
+  padding-bottom: 10px;
+}
+
+.sval-style-slider {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &::-moz-range-progress {
+    background-color: transparent;
+  }
+}
+
+.sval-style-slider-value {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--sval-muted);
+}
+
+/* The theme's choices, drawn as Settings › Appearance › Theme draws them
+   (`.setting-chooser-item`, `preferences.css`, which only Settings loads). */
+#sval-style-panel .setting-chooser-item {
+  flex: 1;
+
+  &::part(image) {
+    width: 54px;
+    box-shadow: var(--card-box-shadow);
+    margin-block-start: var(--space-medium);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius-small);
+  }
+
+  &:dir(rtl)::part(image) {
+    transform: scaleX(-1);
+  }
+}
+
+/* Under forced colours the wheel keeps its hues, which are what it picks,
+   and its dots their fills; the dots' edges and the ring take the system's
+   text colour from their tokens. The sliders' tracks, which forced colours
+   leave transparent, are outlined so the knob shows where it stands. */
+@media (forced-colors) {
+  .sval-style-wheel {
+    forced-color-adjust: none;
+  }
+
+  .sval-site-zoom-slider::-moz-range-track {
+    box-sizing: border-box;
+    border: 1px solid CanvasText;
+  }
+}
+
+/* The site menu's Colorshift row carries the site controls' button's dot
+   while the site has a saved Colorshift (`sval-header.css`): a 6px dot in
+   the same colour at the icon's top end corner, past its edge as the
+   button's sits past its icon. */
+.sval-site-style-icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.sval-site-style-dot {
+  position: absolute;
+  top: -2px;
+  inset-inline-end: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--sval-on-bg);
+  pointer-events: none;
+
+  @media (forced-colors) {
+    background-color: ButtonText;
+  }
+}
+
+/* Colorshift is as tall as the screen allows, and scrolls what it holds
+   inside its rounded content, its buttons kept in view at the foot. */
+#sval-style-panel > .sval-style {
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: max(0px, calc(var(--panel-border-radius) - var(--panel-padding)));
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+/* Reset style at the start, then Cancel and Save at the end, as the
+   element picker's card orders its buttons. */
+.sval-style-footer {
+  position: sticky;
+  bottom: 0;
+  background-color: var(--panel-background-color);
+  justify-content: flex-end;
+
+  > .sval-style-reset {
+    margin-inline-end: auto;
+  }
+}
+
+.sval-style-footer > .sval-prot-pill {
+  flex: none;
+  padding: 0 18px;
+  border: 0;
+}
+
+#sval-style-theme-section {
+  padding-bottom: 12px;
+}
+
+.sval-style .sval-prot-switch-row {
+  padding-inline: 0;
+}
+
+/* Under forced colours a secondary button's fill is the window's own, so it
+   takes an edge in the button text colour to read as a button. `:root`
+   outranks the panels' borderless button rules. */
+@media (forced-colors) {
+  :root .sval-prot-secondary {
+    border: 1px solid ButtonText;
+  }
+}

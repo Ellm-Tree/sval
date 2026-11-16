@@ -1,0 +1,89 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- about:privatebrowsing: the home page in the private palette, always dark. -->
+<html lang="en" class="private">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; img-src chrome: moz-extension: blob: page-icon:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title>New private tab</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="chrome://browser/skin/privatebrowsing/favicon.svg"
+    />
+    <link rel="stylesheet" href="chrome://browser/content/sval/home/home.css" />
+    <script defer src="chrome://browser/content/sval/home/home.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1 class="brand" aria-label="Sval, private window">
+        <span class="mark">
+          <img
+            class="on-dark"
+            src="chrome://browser/content/sval/home/mark-private.svg"
+            alt=""
+          />
+        </span>
+      </h1>
+      <form class="search" role="search">
+        <!-- The address bar's search-mode switcher: its menu is
+             SvalHomeSearchParent's. -->
+        <button
+          type="button"
+          class="engine-button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          hidden
+        >
+          <img class="engine" alt="" />
+          <span class="engine-title"></span>
+          <span class="engine-close" hidden></span>
+        </button>
+        <input
+          type="search"
+          name="q"
+          autofocus
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="256"
+          aria-label="Search"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="suggestions"
+          aria-expanded="false"
+        />
+        <!-- The key that opens the Launcher from any page, from the
+             SvalHomeSearch actor. -->
+        <span class="sval-keycap launcher-key" aria-hidden="true" hidden></span>
+        <button type="submit" aria-label="Go">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </svg>
+        </button>
+        <div class="suggestions-card">
+          <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
+          <div class="sval-launcher-foot" aria-hidden="true"></div>
+        </div>
+      </form>
+      <p class="private-note">
+        Private window. Sval keeps no history, and doesn't remember or sync any
+        of its tabs. Cookies and site data last until you close the private
+        window.
+      </p>
+    </main>
+  </body>
+</html>

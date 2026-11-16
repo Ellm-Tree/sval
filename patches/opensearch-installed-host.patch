@@ -1,0 +1,86 @@
+Sval: don't offer an OpenSearch engine whose site already has one installed
+
+OpenSearchManager.addEngine hides an offer only when its <link> title is an
+installed engine's name. kagi.com titles its description "Kagi Search" and
+installs it as "Kagi", so the address bar offers Sval's own Kagi engine back
+and adding it fails as a duplicate. The offer list is private to the module
+and its consumers read it synchronously, so no added file can filter it.
+
+diff --git a/browser/components/search/OpenSearchManager.sys.mjs b/browser/components/search/OpenSearchManager.sys.mjs
+index 275fae31d5..55b59f1670 100644
+--- a/browser/components/search/OpenSearchManager.sys.mjs
++++ b/browser/components/search/OpenSearchManager.sys.mjs
+@@ -106,13 +106,14 @@ class _OpenSearchManager {
+         ? this.#hiddenEngines.get(browser)
+         : this.#offeredEngines.get(browser)) || [];
+ 
+-    engines.push({
++    let offer = {
+       uri: engine.href,
+       title: engine.title,
+       get icon() {
+         return browser.mIconURL;
+       },
+-    });
++    };
++    engines.push(offer);
+ 
+     if (shouldBeHidden) {
+       this.#hiddenEngines.set(browser, engines);
+@@ -122,6 +123,56 @@ class _OpenSearchManager {
+       if (browser == win.gBrowser.selectedBrowser) {
+         this.updateOpenSearchBadge(win);
+       }
++      this.#hideIfHostInstalled(browser, offer);
++    }
++  }
++
++  /**
++   * Sval: a page's OpenSearch title need not be the name its description
++   * installs under (kagi.com offers "Kagi Search" and installs "Kagi"), so
++   * the name check above lets an installed engine be offered again, and
++   * adding it fails as a duplicate. A description served from the site an
++   * installed engine searches on, www. or not, is taken to describe that
++   * engine.
++   *
++   * @param {MozBrowser} browser
++   * @param {OpenSearchData} offer
++   */
++  async #hideIfHostInstalled(browser, offer) {
++    let siteOf = host => {
++      try {
++        return Services.eTLD.getBaseDomainFromHost(host);
++      } catch {
++        // An IP address or a single-label name is its own site.
++        return host;
++      }
++    };
++    let site;
++    try {
++      site = siteOf(Services.io.newURI(offer.uri).host);
++    } catch {
++      return;
++    }
++    let installed = await lazy.SearchService.getEngines();
++    if (
++      !installed.some(
++        e => e.searchUrlDomain && siteOf(e.searchUrlDomain) == site
++      )
++    ) {
++      return;
++    }
++    let offered = this.#offeredEngines.get(browser) || [];
++    let i = offered.indexOf(offer);
++    if (i == -1) {
++      return;
++    }
++    offered.splice(i, 1);
++    let hidden = this.#hiddenEngines.get(browser) || [];
++    hidden.push(offer);
++    this.#hiddenEngines.set(browser, hidden);
++    let win = browser.documentGlobal;
++    if (win && browser == win.gBrowser.selectedBrowser) {
++      this.updateOpenSearchBadge(win);
+     }
+   }
+ 

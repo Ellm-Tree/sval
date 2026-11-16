@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# First run opened with the panel's own actions, whose import of a fake Arc
+# writes Favorites, pins and the card into the profile, so it runs in a
+# browser of its own. The prefs are every browser manifest's baseline, which
+# browser.toml gives the reasons for.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+]
+support-files = ["head.js"]
+
+["browser_sval_first_run_import.js"]

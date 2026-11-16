@@ -1,0 +1,48 @@
+Sval: the sharing indicator opens Sval's site menu
+
+Firefox's webrtcUI.showSharingDoorhanger, which the global sharing indicator
+and the macOS sharing menu call, opens gPermissionPanel at
+#identity-permission-box, which Sval hides. Sval shows a site's permissions
+and what it captures in its site menu (SvalSiteControls, decision 0132),
+so the doorhanger is that menu.
+
+diff --git a/browser/modules/webrtcUI.sys.mjs b/browser/modules/webrtcUI.sys.mjs
+index 9da26e0224..68d2b79e81 100644
+--- a/browser/modules/webrtcUI.sys.mjs
++++ b/browser/modules/webrtcUI.sys.mjs
+@@ -10,6 +10,8 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   SitePermissions: "resource:///modules/SitePermissions.sys.mjs",
++  SvalSiteControls:
++    "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs",
+ });
+ ChromeUtils.defineLazyGetter(
+   lazy,
+@@ -709,7 +711,7 @@ export var webrtcUI = {
+    * @param aEvent - The user input event that is invoking the panel. This can be
+    *        undefined / null if no such event exists.
+    */
+-  showSharingDoorhanger(aActiveStream, aEvent) {
++  showSharingDoorhanger(aActiveStream) {
+     let browserWindow = aActiveStream.browser.documentGlobal;
+     if (aActiveStream.tab) {
+       browserWindow.gBrowser.selectedTab = aActiveStream.tab;
+@@ -723,7 +725,7 @@ export var webrtcUI = {
+         "activate",
+         function () {
+           Services.tm.dispatchToMainThread(function () {
+-            browserWindow.gPermissionPanel.openPopup(aEvent);
++            lazy.SvalSiteControls.openMenu(browserWindow);
+           });
+         },
+         { once: true }
+@@ -733,7 +735,7 @@ export var webrtcUI = {
+         .activateApplication(true);
+       return;
+     }
+-    browserWindow.gPermissionPanel.openPopup(aEvent);
++    lazy.SvalSiteControls.openMenu(browserWindow);
+   },
+ 
+   updateWarningLabel(aMenuList) {

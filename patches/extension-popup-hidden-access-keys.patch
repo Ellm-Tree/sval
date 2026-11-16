@@ -1,0 +1,36 @@
+Sval: an answered extension prompt gives up its buttons' access keys
+
+The tab-hide, home page and new tab prompts stay in the document once shown,
+hidden. Their moz-buttons' inner HTML buttons keep their access keys, and
+EventStateManager checks rendering only for XUL access-key targets, so Alt+D
+off macOS pressed the hidden Disable Extension button in place of opening the
+address bar. No chrome API reaches the inner buttons' registration, so the
+prompt that owns them clears and restores the keys.
+
+diff --git a/browser/components/extensions/ExtensionControlledPopup.sys.mjs b/browser/components/extensions/ExtensionControlledPopup.sys.mjs
+index 13f2bb2fb5..65d5edf974 100644
+--- a/browser/components/extensions/ExtensionControlledPopup.sys.mjs
++++ b/browser/components/extensions/ExtensionControlledPopup.sys.mjs
+@@ -313,6 +313,13 @@ export class ExtensionControlledPopup {
+       "popuphidden",
+       () => {
+         popupnotification.hidden = true;
++        // The buttons are moz-buttons, whose access key sits on an HTML
++        // button, and EventStateManager's IsAccessKeyTarget checks only a
++        // XUL element for a frame. A hidden button keeps taking its key:
++        // off macOS, Alt+D would press Disable Extension in place of
++        // focusing the address bar.
++        popupnotification.button.accessKey = null;
++        popupnotification.secondaryButton.accessKey = null;
+         panel.removeEventListener("buttoncommand", handleButtonCommand);
+         panel.removeEventListener(
+           "secondarybuttoncommand",
+@@ -350,6 +357,8 @@ export class ExtensionControlledPopup {
+       popupnotification.removeAttribute("learnmoreurl");
+     }
+     popupnotification.show();
++    // Gives back the access keys the popuphidden listener above takes away.
++    popupnotification.initializeAttributeInheritance();
+     if (anchor?.id == "unified-extensions-button") {
+       const { gUnifiedExtensions } = anchor.documentGlobal;
+       gUnifiedExtensions.recordButtonTelemetry("extension_controlled_setting");

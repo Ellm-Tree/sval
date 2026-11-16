@@ -1,0 +1,270 @@
+Sval: send only the primary language
+
+A new RFPTarget, LanguagesPrimaryOnly, reduces the language list a site sees
+to its first language and that language's base, so "de-CH, fr, en" reads as
+["de-CH", "de"]: in navigator.languages for windows
+(Navigator::GetLanguages) and workers (WorkerNavigator::GetLanguages), in
+the Accept-Language header, and as the default locale of window, worker and
+worklet realms, which then matches navigator.language. A DevTools or
+WebDriver language override still wins. SvalRFPService::SpoofLanguages is
+the one reduction all of them use.
+
+It is Doc-gated, so granularOverrides lifts it per site. The header follows
+the same decision: nsHttpChannel::AsyncOpen composes the channel check with
+the load's granular overrides, as Document::ShouldResistFingerprinting
+does, once AntiTrackingUtils::UpdateAntiTrackingInfoForChannel has put
+them on the load info. It sets Accept-Language wherever the header is still
+one of nsHttpHandler's two forms, so a redirect, which copies the header,
+carries the final site's.
+
+No chrome API can change what these report per site: intl.accept_languages
+is one global pref.
+
+diff --git a/dom/base/Navigator.cpp b/dom/base/Navigator.cpp
+index 079746f779..52ed486937 100644
+--- a/dom/base/Navigator.cpp
++++ b/dom/base/Navigator.cpp
+@@ -427,6 +427,10 @@ void Navigator::GetLanguages(nsTArray<nsString>& aLanguages) {
+   }
+ 
+   GetAcceptLanguages(aLanguages, nullptr);
++  if (mWindow && mWindow->AsGlobal()->ShouldResistFingerprinting(
++                     RFPTarget::LanguagesPrimaryOnly)) {
++    SvalRFPService::SpoofLanguages(aLanguages);
++  }
+ 
+   // The returned value is cached by the binding code. The window listens to the
+   // accept languages change and will clear the cache when needed. It has to
+diff --git a/dom/base/nsGlobalWindowOuter.cpp b/dom/base/nsGlobalWindowOuter.cpp
+index 1e9618ec65..f6d0873833 100644
+--- a/dom/base/nsGlobalWindowOuter.cpp
++++ b/dom/base/nsGlobalWindowOuter.cpp
+@@ -2063,12 +2063,20 @@ static nsresult CreateNativeGlobalForInner(
+   creationOptions.setDefineSharedArrayBufferConstructor(
+       aDefineSharedArrayBufferConstructor);
+ 
++  // The default locale matches the primary language navigator.languages
++  // reports.
++  nsAutoCString locale(
++      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride());
++  if (locale.IsEmpty() &&
++      aDocument->ShouldResistFingerprinting(RFPTarget::LanguagesPrimaryOnly)) {
++    SvalRFPService::PrimaryLanguage(locale);
++  }
++
+   xpc::InitGlobalObjectOptions(
+       options, principal->IsSystemPrincipal(), aIsSecureContext,
+       aDocument->ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),
+       aDocument->ShouldResistFingerprinting(RFPTarget::JSMathFdlibm),
+-      aDocument->ShouldResistFingerprinting(RFPTarget::JSLocale),
+-      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),
++      aDocument->ShouldResistFingerprinting(RFPTarget::JSLocale), locale,
+       aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());
+ 
+   // Determine if we need the Components object.
+diff --git a/dom/workers/WorkerNavigator.cpp b/dom/workers/WorkerNavigator.cpp
+index 519668019e..0fc6d93f90 100644
+--- a/dom/workers/WorkerNavigator.cpp
++++ b/dom/workers/WorkerNavigator.cpp
+@@ -125,6 +125,16 @@ bool WorkerNavigator::GlobalPrivacyControl() const {
+          gpcStatus;
+ }
+ 
++void WorkerNavigator::GetLanguages(nsTArray<nsString>& aLanguages) const {
++  aLanguages = mProperties.mLanguages.Clone();
++  WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
++  if (workerPrivate && workerPrivate->GetLanguageOverride().IsEmpty() &&
++      workerPrivate->ShouldResistFingerprinting(
++          RFPTarget::LanguagesPrimaryOnly)) {
++    SvalRFPService::SpoofLanguages(aLanguages);
++  }
++}
++
+ void WorkerNavigator::SetLanguages(const nsTArray<nsString>& aLanguages) {
+   WorkerNavigator_Binding::ClearCachedLanguageValue(this);
+   WorkerNavigator_Binding::ClearCachedLanguagesValue(this);
+diff --git a/dom/workers/WorkerNavigator.h b/dom/workers/WorkerNavigator.h
+index 2f9e06bcb0..b9e58c2c6c 100644
+--- a/dom/workers/WorkerNavigator.h
++++ b/dom/workers/WorkerNavigator.h
+@@ -91,9 +91,7 @@ class WorkerNavigator final : public nsWrapperCache {
+     aLanguage.Assign(mProperties.mLanguages[0]);
+   }
+ 
+-  void GetLanguages(nsTArray<nsString>& aLanguages) const {
+-    aLanguages = mProperties.mLanguages.Clone();
+-  }
++  void GetLanguages(nsTArray<nsString>& aLanguages) const;
+ 
+   void GetUserAgent(nsString& aUserAgent, CallerType aCallerType,
+                     ErrorResult& aRv) const;
+diff --git a/dom/workers/WorkerPrivate.cpp b/dom/workers/WorkerPrivate.cpp
+index 3780f5747c..fd2e25d7ff 100644
+--- a/dom/workers/WorkerPrivate.cpp
++++ b/dom/workers/WorkerPrivate.cpp
+@@ -2921,7 +2921,13 @@ WorkerPrivate::WorkerPrivate(
+       JS::RealmOptions& chromeRealmOptions = mJSSettings.chromeRealmOptions;
+       JS::RealmOptions& contentRealmOptions = mJSSettings.contentRealmOptions;
+ 
+-      const nsCString& languageOverride = mLoadInfo.mLanguageOverrideLocale;
++      // The default locale matches the primary language navigator.languages
++      // reports.
++      nsAutoCString languageOverride(mLoadInfo.mLanguageOverrideLocale);
++      if (languageOverride.IsEmpty() &&
++          ShouldResistFingerprinting(RFPTarget::LanguagesPrimaryOnly)) {
++        SvalRFPService::PrimaryLanguage(languageOverride);
++      }
+       const nsAString& timezoneOverride = mLoadInfo.mTimezoneOverride;
+ 
+       xpc::InitGlobalObjectOptions(
+diff --git a/dom/worklet/WorkletGlobalScope.cpp b/dom/worklet/WorkletGlobalScope.cpp
+index c40353f140..02969db1c6 100644
+--- a/dom/worklet/WorkletGlobalScope.cpp
++++ b/dom/worklet/WorkletGlobalScope.cpp
+@@ -139,6 +139,8 @@ JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {
+   if (ShouldResistFingerprinting(RFPTarget::JSLocale)) {
+     nsCString locale = nsRFPService::GetSpoofedJSLocale();
+     options.behaviors().setLocaleOverride(locale.get());
++  } else if (!mImpl->PrimaryLanguage().IsEmpty()) {
++    options.behaviors().setLocaleOverride(mImpl->PrimaryLanguage().get());
+   }
+ 
+   // The SharedArrayBuffer global constructor property should not be present in
+diff --git a/dom/worklet/WorkletImpl.cpp b/dom/worklet/WorkletImpl.cpp
+index 51181d25c4..6dd82e1451 100644
+--- a/dom/worklet/WorkletImpl.cpp
++++ b/dom/worklet/WorkletImpl.cpp
+@@ -65,6 +65,10 @@ WorkletImpl::WorkletImpl(nsPIDOMWindowInner* aWindow, nsIPrincipal* aPrincipal)
+     mOverriddenFingerprintingSettings =
+         doc->GetOverriddenFingerprintingSettings();
+ 
++    if (ShouldResistFingerprinting(RFPTarget::LanguagesPrimaryOnly)) {
++      SvalRFPService::PrimaryLanguage(mPrimaryLanguage);
++    }
++
+     if (auto* policy = PolicyContainer::Cast(doc->GetPolicyContainer())) {
+       ipc::PolicyContainerArgs policyContainer;
+       PolicyContainer::ToArgs(policy, policyContainer);
+diff --git a/dom/worklet/WorkletImpl.h b/dom/worklet/WorkletImpl.h
+index 76ef098144..f28ee7b8cb 100644
+--- a/dom/worklet/WorkletImpl.h
++++ b/dom/worklet/WorkletImpl.h
+@@ -92,6 +92,8 @@ class WorkletImpl {
+                                          mOverriddenFingerprintingSettings);
+   }
+ 
++  const nsCString& PrimaryLanguage() const { return mPrimaryLanguage; }
++
+   virtual void OnAddModuleStarted() const {
+     MOZ_ASSERT(NS_IsMainThread());
+     // empty base impl
+@@ -136,6 +138,10 @@ class WorkletImpl {
+   // indicates no granular overrides are present for this workerlet.
+   Maybe<RFPTargetSet> mOverriddenFingerprintingSettings;
+ 
++  // The primary language, read on the main thread for the realm's default
++  // locale under RFPTarget::LanguagesPrimaryOnly; empty when it is off.
++  nsCString mPrimaryLanguage;
++
+   const OriginTrials mTrials;
+ };
+ 
+diff --git a/netwerk/protocol/http/nsHttpChannel.cpp b/netwerk/protocol/http/nsHttpChannel.cpp
+index eb246d8104..6523cce53a 100644
+--- a/netwerk/protocol/http/nsHttpChannel.cpp
++++ b/netwerk/protocol/http/nsHttpChannel.cpp
+@@ -59,6 +59,7 @@
+ #include "nsError.h"
+ #include "nsPrintfCString.h"
+ #include "nsQueryObject.h"
++#include "nsRFPService.h"
+ #include "nsThreadUtils.h"
+ #include "nsIConsoleService.h"
+ #include "nsINetworkErrorLogging.h"
+@@ -7634,6 +7635,30 @@ nsHttpChannel::AsyncOpen(nsIStreamListener* aListener) {
+     MOZ_ASSERT(NS_SUCCEEDED(rv));
+   }
+ 
++  // Accept-Language takes the decision the loaded document makes for
++  // navigator.languages, Document::ShouldResistFingerprinting's: the channel
++  // check together with the granular overrides the anti-tracking info just
++  // put on the load. A header still in either of nsHttpHandler's forms is set
++  // to this load's, so a redirect, which copies the header, carries the final
++  // site's. A header someone set is kept.
++  nsAutoCString acceptLanguage;
++  if (NS_SUCCEEDED(
++          mRequestHead.GetHeader(nsHttp::Accept_Language, acceptLanguage)) &&
++      (acceptLanguage.Equals(gHttpHandler->AcceptLanguages(false)) ||
++       acceptLanguage.Equals(gHttpHandler->AcceptLanguages(true)))) {
++    bool primaryOnly =
++        nsContentUtils::ShouldResistFingerprinting(
++            this, RFPTarget::IsAlwaysEnabledForPrecompute) &&
++        nsRFPService::IsRFPEnabledFor(
++            NS_UsePrivateBrowsing(this), RFPTarget::LanguagesPrimaryOnly,
++            mLoadInfo->GetOverriddenFingerprintingSettings());
++    rv = mRequestHead.SetHeader(nsHttp::Accept_Language,
++                                gHttpHandler->AcceptLanguages(primaryOnly),
++                                false,
++                                nsHttpHeaderArray::eVarietyRequestOverride);
++    MOZ_ASSERT(NS_SUCCEEDED(rv));
++  }
++
+   if (WaitingForTailUnblock()) {
+     // This channel is marked as Tail and is part of a request context
+     // that has positive number of non-tailed requestst, hence this channel
+diff --git a/netwerk/protocol/http/nsHttpHandler.cpp b/netwerk/protocol/http/nsHttpHandler.cpp
+index d7c4ee4d66..d82223d208 100644
+--- a/netwerk/protocol/http/nsHttpHandler.cpp
++++ b/netwerk/protocol/http/nsHttpHandler.cpp
+@@ -2122,9 +2122,29 @@ nsresult nsHttpHandler::SetAcceptLanguages() {
+   if (NS_SUCCEEDED(rv)) {
+     mAcceptLanguages.Assign(buf);
+   }
++
++  nsTArray<nsCString> languages;
++  for (const auto& language :
++       nsCCharSeparatedTokenizer(acceptLanguages, ',').ToRange()) {
++    languages.AppendElement(language);
++  }
++  SvalRFPService::SpoofLanguages(languages);
++  nsAutoCString primaryOnly;
++  StringJoinAppend(primaryOnly, ","_ns, languages);
++  buf.Truncate();
++  if (NS_SUCCEEDED(PrepareAcceptLanguages(primaryOnly.get(), buf))) {
++    mAcceptLanguagesPrimaryOnly.Assign(buf);
++  }
+   return rv;
+ }
+ 
++const nsCString& nsHttpHandler::AcceptLanguages(bool aPrimaryOnly) {
++  if (mAcceptLanguagesIsDirty) {
++    (void)SetAcceptLanguages();
++  }
++  return aPrimaryOnly ? mAcceptLanguagesPrimaryOnly : mAcceptLanguages;
++}
++
+ nsresult nsHttpHandler::SetAcceptEncodings(const char* aAcceptEncodings,
+                                            bool isSecure, bool isDictionary) {
+   if (isDictionary) {
+diff --git a/netwerk/protocol/http/nsHttpHandler.h b/netwerk/protocol/http/nsHttpHandler.h
+index 93d4734c93..c55defd66d 100644
+--- a/netwerk/protocol/http/nsHttpHandler.h
++++ b/netwerk/protocol/http/nsHttpHandler.h
+@@ -133,6 +133,9 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
+   bool IsAcceptableEncoding(const char* encoding, bool isSecure);
+ 
+   const nsCString& UserAgent(bool aShouldResistFingerprinting);
++  // The Accept-Language header, or with aPrimaryOnly its form under
++  // RFPTarget::LanguagesPrimaryOnly.
++  const nsCString& AcceptLanguages(bool aPrimaryOnly);
+ 
+   enum HttpVersion HttpVersion() { return mHttpVersion; }
+   enum HttpVersion ProxyHttpVersion() { return mProxyHttpVersion; }
+@@ -626,6 +629,7 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
+   nsCString mDocumentAcceptHeader;
+ 
+   nsCString mAcceptLanguages;
++  nsCString mAcceptLanguagesPrimaryOnly;
+   nsCString mHttpAcceptEncodings;
+   nsCString mHttpsAcceptEncodings;
+   nsCString mDictionaryAcceptEncodings;

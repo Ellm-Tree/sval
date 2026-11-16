@@ -1,0 +1,101 @@
+Sval: SitePermissions reads a cleared tab's id from its notification
+
+Backport of Mozilla's Bug 2064716 (mozilla-central 4f46b1144708, Firefox
+156), unchanged. ESR 153 does not carry it.
+Clearing a tab's permissions (removeAllForBrowser, removeByActionForBrowser)
+notifies "browser-perm-changed" with "cleared" and the browser id in an
+nsISupportsPRUint64, where every other change sends an nsIPermission.
+SitePermissions' observer asked every subject for nsIPermission, threw
+NS_NOINTERFACE on each clear, which every reload's
+clearTemporaryBlockPermissions makes, and never told the tab its
+permissions had changed. Its test is browser_SitePermissions.js'
+testTemporaryBulkClearChangeEvent.
+Drop this patch when the upstream pin reaches Firefox 156.
+
+diff --git a/browser/modules/SitePermissions.sys.mjs b/browser/modules/SitePermissions.sys.mjs
+index 3cf23c809c..d8be7e7644 100644
+--- a/browser/modules/SitePermissions.sys.mjs
++++ b/browser/modules/SitePermissions.sys.mjs
+@@ -13,9 +13,13 @@ var gStringBundle = Services.strings.createBundle(
+ // UI consumers (identity panel, etc.) update.
+ Services.obs.addObserver(
+   {
+-    observe(subject, _topic, _data) {
+-      let permission = subject.QueryInterface(Ci.nsIPermission);
+-      let browserId = permission.browserId;
++    observe(subject, _topic, data) {
++      // A bulk clear reports the affected tab as a bare browserId rather than
++      // as an nsIPermission, since no single permission describes it.
++      let browserId =
++        data == "cleared"
++          ? subject?.QueryInterface(Ci.nsISupportsPRUint64).data
++          : subject.QueryInterface(Ci.nsIPermission).browserId;
+       if (!browserId) {
+         return;
+       }
+diff --git a/browser/modules/test/browser/browser_SitePermissions.js b/browser/modules/test/browser/browser_SitePermissions.js
+index 6cc8838ad8..a8bedbbbfa 100644
+--- a/browser/modules/test/browser/browser_SitePermissions.js
++++ b/browser/modules/test/browser/browser_SitePermissions.js
+@@ -239,6 +239,61 @@ add_task(async function testTemporaryChangeEvent() {
+   BrowserTestUtils.removeTab(tab);
+ });
+ 
++// Bulk clears of browser-scoped permissions report the affected tab as a bare
++// browserId instead of an nsIPermission, so they need separate coverage from
++// testTemporaryChangeEvent above.
++add_task(async function testTemporaryBulkClearChangeEvent() {
++  let principal =
++    Services.scriptSecurityManager.createContentPrincipalFromOrigin(
++      "https://example.com"
++    );
++
++  let tab = await BrowserTestUtils.openNewForegroundTab(
++    gBrowser,
++    principal.spec
++  );
++
++  let browser = tab.linkedBrowser;
++  let browserId = browser.browserId;
++
++  let changeEventCount = 0;
++  function listener() {
++    changeEventCount++;
++  }
++
++  browser.addEventListener("PermissionStateChange", listener);
++
++  let setTemporaryBlock = () =>
++    SitePermissions.setForPrincipal(
++      browser.contentPrincipal,
++      "geo",
++      SitePermissions.BLOCK,
++      SitePermissions.SCOPE_TEMPORARY,
++      browser
++    );
++
++  setTemporaryBlock();
++  is(changeEventCount, 1, "Should've changed on set");
++
++  // Goes through removeByActionForBrowser.
++  SitePermissions.clearTemporaryBlockPermissions(browser);
++  is(
++    changeEventCount,
++    2,
++    "Should've changed on clearTemporaryBlockPermissions"
++  );
++
++  setTemporaryBlock();
++  is(changeEventCount, 3, "Should've changed on set");
++
++  Services.perms.removeAllForBrowser(browserId);
++  is(changeEventCount, 4, "Should've changed on removeAllForBrowser");
++
++  browser.removeEventListener("PermissionStateChange", listener);
++
++  BrowserTestUtils.removeTab(tab);
++});
++
+ add_task(async function testInvalidPrincipal() {
+   // Check that an error is thrown when an invalid principal argument is passed.
+   try {

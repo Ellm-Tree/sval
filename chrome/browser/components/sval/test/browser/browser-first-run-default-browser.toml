@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# The one first run that answers Yes on the default-browser step, so Sval
+# asks the system to make it the default. It runs only on Linux, where GIO
+# records the default browser in mimeapps.list under XDG_CONFIG_HOME, which
+# the environment points at a folder of this browser's own, so no other
+# manifest's first run finds Sval already the default. On macOS and Windows
+# the system answers with a prompt of its own, on whatever desktop runs the
+# file. The prefs after the first are every browser manifest's baseline,
+# which browser.toml gives the reasons for.
+[DEFAULT]
+run-if = ["os == 'linux'"]
+environment = "XDG_CONFIG_HOME=/tmp/sval-first-run-default-browser/config XDG_DATA_HOME=/tmp/sval-first-run-default-browser/data"
+prefs = [
+  "browser.sval.firstRun.enabled=true",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+]
+support-files = ["head.js", "sval_first_run_helpers.js"]
+
+["browser_sval_first_run_default_browser.js"]

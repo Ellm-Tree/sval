@@ -1,0 +1,27 @@
+Sval: GTK commits the toplevel's new opaque region on Wayland
+
+nsWindow::UpdateOpaqueRegionInternal sets the toplevel GdkWindow's opaque
+region, which GDK sends with the toplevel surface's next commit. GTK
+commits that surface only when it repaints it, and a window that draws
+its own titlebar has nothing of GTK's to repaint. So a region that
+shrinks, as when the chrome turns translucent, never reaches the
+compositor, which keeps drawing the toplevel's clear pixels as opaque
+black under the translucent parts. Invalidating the toplevel makes GTK
+commit it.
+
+diff --git a/widget/gtk/nsWindow.cpp b/widget/gtk/nsWindow.cpp
+index 6230e46d0d..eedc4b8b83 100644
+--- a/widget/gtk/nsWindow.cpp
++++ b/widget/gtk/nsWindow.cpp
+@@ -5107,6 +5107,11 @@ void nsWindow::UpdateOpaqueRegionInternal() {
+ #ifdef MOZ_WAYLAND
+     if (GdkIsWaylandDisplay()) {
+       mSurface->SetOpaqueRegion(mOpaqueRegion.ToUnknownRegion());
++      // GDK sends the toplevel's opaque region with the toplevel's next
++      // commit, and GTK commits it only when it repaints it. Until then the
++      // compositor draws the toplevel's clear pixels as opaque black under
++      // every part of the window that turned translucent.
++      gdk_window_invalidate_rect(window, nullptr, false);
+     }
+ #endif
+   }

@@ -1,0 +1,91 @@
+Sval: certificate exceptions keep every jar's userContextId
+
+Each workspace jar and each private window is a jar of its own, told apart
+by its userContextId. nsCertOverrideService::GetKeyString keeps only
+privateBrowsingId, so an exception the user accepts in one private window or
+workspace is taken in every other. The key keeps userContextId too, and the
+service removes a jar's exceptions on clear-origin-attributes-data, as
+ClearDataService's cert cleaner has no per-attributes delete. That cleaner's
+site delete clears each exception under its own origin attributes, which the
+key holds. An exception added with no origin attributes, as the certificate
+manager's dialog adds one, is still taken in every jar
+(HasMatchingOverride's fallback). No chrome API reaches the key.
+
+diff --git a/security/manager/ssl/nsCertOverrideService.cpp b/security/manager/ssl/nsCertOverrideService.cpp
+index 068d9702fd..de37ba8478 100644
+--- a/security/manager/ssl/nsCertOverrideService.cpp
++++ b/security/manager/ssl/nsCertOverrideService.cpp
+@@ -169,6 +169,7 @@ nsresult nsCertOverrideService::Init() {
+   // reading/writing the wrong settings file after a profile change.
+   if (observerService) {
+     observerService->AddObserver(this, "last-pb-context-exited", false);
++    observerService->AddObserver(this, "clear-origin-attributes-data", false);
+     observerService->AddObserver(this, "profile-do-change", true);
+     // simulate a profile change so we read the current profile's settings file
+     Observe(nullptr, "profile-do-change", nullptr);
+@@ -199,6 +200,36 @@ nsCertOverrideService::Observe(nsISupports*, const char* aTopic,
+   } else if (!nsCRT::strcmp(aTopic, "last-pb-context-exited")) {
+     ClearValidityOverride("all:temporary-certificates"_ns, 0,
+                           OriginAttributes());
++  } else if (!nsCRT::strcmp(aTopic, "clear-origin-attributes-data")) {
++    // Sval: a jar's overrides go when its data is cleared, while the other
++    // jars keep theirs.
++    OriginAttributesPattern pattern;
++    if (!aData || !pattern.Init(nsDependentString(aData))) {
++      return NS_OK;
++    }
++    bool removedAny = false;
++    {
++      MutexAutoLock lock(mMutex);
++      for (auto iter = mSettingsTable.Iter(); !iter.Done(); iter.Next()) {
++        if (pattern.Matches(iter.Get()->mSettings->mOriginAttributes)) {
++          iter.Remove();
++          removedAny = true;
++        }
++      }
++      if (removedAny) {
++        Write(lock);
++      }
++    }
++    if (removedAny) {
++      nsCOMPtr<nsINSSComponent> nss(do_GetService(PSM_COMPONENT_CONTRACTID));
++      if (nss) {
++        nss->ClearSSLExternalAndInternalSessionCache();
++      }
++      nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
++      if (os) {
++        os->NotifyObservers(nullptr, "net:cancel-all-connections", nullptr);
++      }
++    }
+   }
+ 
+   return NS_OK;
+@@ -751,8 +782,11 @@ void nsCertOverrideService::GetKeyString(
+   GetHostWithPort(aHostName, aPort, keyString);
+   keyString.Append(':');
+   OriginAttributes strippedAttributes(aOriginAttributes);
++  // Sval: keyed by userContextId as well, so an override accepted in one jar
++  // is not taken in another.
+   strippedAttributes.StripAttributes(
+-      ~OriginAttributes::STRIP_PRIVATE_BROWSING_ID);
++      ~(OriginAttributes::STRIP_PRIVATE_BROWSING_ID |
++        OriginAttributes::STRIP_USER_CONTEXT_ID));
+   nsAutoCString attributeSuffix;
+   strippedAttributes.CreateSuffix(attributeSuffix);
+   keyString.Append(attributeSuffix);
+diff --git a/toolkit/components/cleardata/ClearDataService.sys.mjs b/toolkit/components/cleardata/ClearDataService.sys.mjs
+index 4305e3275d..f229ede675 100644
+--- a/toolkit/components/cleardata/ClearDataService.sys.mjs
++++ b/toolkit/components/cleardata/ClearDataService.sys.mjs
+@@ -601,8 +601,9 @@ const CertCleaner = {
+           aOriginAttributesPattern
+         )
+       )
+-      .forEach(({ asciiHost, port }) =>
+-        overrideService.clearValidityOverride(asciiHost, port, {})
++      // Sval: each override is keyed by its own jar.
++      .forEach(({ asciiHost, port, originAttributes }) =>
++        overrideService.clearValidityOverride(asciiHost, port, originAttributes)
+       );
+   },
+ 

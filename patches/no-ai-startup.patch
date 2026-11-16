@@ -1,0 +1,42 @@
+Sval: Firefox's AI features never start
+
+Smart Window, the sidebar chatbot and link previews each start from a
+startup category. Sval ships none of them (spec §2, principle 6), so
+their registrations go, and AIWindow.init never moves #PanelUI-button
+beside the tab strip. Their modules stay, because code across the
+browser asks them, through lazy getters, whether a feature is on, and
+the locked prefs answer that it is off.
+
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 8edb9fe210..58f2157562 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -59,7 +59,6 @@ category browser-window-load moz-src:///browser/components/customkeys/CustomKeys
+ 
+ category browser-window-delayed-startup moz-src:///browser/components/contentanalysis/content/ContentAnalysis.sys.mjs ContentAnalysis.initialize
+ category browser-window-delayed-startup resource:///modules/HomePage.sys.mjs HomePage.delayedStartup
+-category browser-window-delayed-startup moz-src:///browser/components/genai/LinkPreview.sys.mjs LinkPreview.init
+ category browser-window-delayed-startup moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs ReportBrokenSite.init
+ category browser-window-delayed-startup moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.init
+ category browser-window-delayed-startup resource:///modules/taskbartabs/TaskbarTabsPageAction.sys.mjs TaskbarTabsPageAction.init
+@@ -128,7 +127,6 @@ category browser-idle-startup resource://gre/modules/RFPHelper.sys.mjs RFPHelper
+ category browser-idle-startup resource://gre/modules/Blocklist.sys.mjs Blocklist.loadBlocklistAsync
+ category browser-idle-startup resource://gre/modules/psm/RemoteSecuritySettings.sys.mjs RemoteSecuritySettings.init
+ category browser-idle-startup moz-src:///browser/components/tabbrowser/TabUnloader.sys.mjs TabUnloader.init
+-category browser-idle-startup resource:///modules/GenAI.sys.mjs GenAI.init
+ category browser-idle-startup moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs QuickSuggest.init
+ category browser-idle-startup moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.init
+ category browser-idle-startup moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.init
+diff --git a/browser/components/aiwindow/ui/moz.build b/browser/components/aiwindow/ui/moz.build
+index a8f1756a48..336cdb8297 100644
+--- a/browser/components/aiwindow/ui/moz.build
++++ b/browser/components/aiwindow/ui/moz.build
+@@ -40,8 +40,4 @@ TESTING_JS_MODULES += [
+     "test/AIWindowTestUtils.sys.mjs",
+ ]
+ 
+-EXTRA_COMPONENTS += [
+-    "aiwindow.manifest",
+-]
+-
+ JAR_MANIFESTS += ["jar.mn"]

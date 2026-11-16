@@ -1,0 +1,332 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The Ctrl+Tab switcher (`SvalTabSwitcher`): a card of previews centred over
+ * the page, under a scrim. The card is the Launcher's float, its surface,
+ * edge, shadow and roles (`sval-launcher.css`, `sval-launcher-rows.css`), so
+ * it takes the window's scheme and its workspace's tint as the Launcher does.
+ * Loaded after `sval-header.css` and `sval-launcher.css`.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* Over the content area only, as the Launcher's scrim, and above
+   `#tabbrowser-tabbox` for the same reason. `SvalTabSwitcher` sets the
+   place. It centres the card and takes a press outside it; the scrim is the
+   frames' own, below. */
+#sval-tab-switcher {
+  position: fixed;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  font-family: var(--sval-font);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* The scrim, drawn by each frame a page shows in, one per pane of a Split,
+   so it takes the frame's rounded corners (`sval-header.css`, the frame)
+   and leaves the chrome around the frames as it is. Under the frame's edge,
+   which is drawn over the page the same way. */
+:root[sval-tab-switcher-open] #tabbrowser-tabpanels > :is(.browserSidebarContainer.deck-selected, .split-view-panel.split-view-panel-active)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background-color: var(--sval-launcher-scrim);
+  pointer-events: none;
+  animation: sval-switcher-fade 120ms linear;
+}
+
+.sval-switcher-card {
+  /* The card's padding, which the footer's keys also keep from the tiles
+     above them. `CARD_PADDING` in `SvalTabSwitcher`. */
+  --sval-switcher-card-padding: 16px;
+  box-sizing: border-box;
+  padding: var(--sval-switcher-card-padding);
+  border: 1px solid var(--sval-launcher-card-border);
+  border-radius: 24px;
+  background-color: var(--sval-launcher-card-bg);
+  box-shadow: var(--sval-launcher-card-shadow);
+  color: var(--sval-launcher-text);
+  animation: sval-switcher-in 160ms var(--sval-launcher-ease);
+}
+
+/* The card's top edge: which Workspace the tabs are in, on one line, cut
+   short when the grid is narrower. Its own width never widens the card,
+   which the grid sets. The text clips inside it, which leaves the edge's
+   shadow (`sval-edge-above`) free to fall below it. */
+.sval-switcher-heading {
+  contain: inline-size;
+  padding: 0 4px;
+  color: var(--sval-launcher-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.sval-switcher-heading-text {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The card's bottom edge: the switcher's keys, a key cap and what it does
+   for each, each pair kept on one line. Where the grid is narrower than
+   them, the pairs wrap onto another line; their width never widens the
+   card. */
+.sval-switcher-footer {
+  contain: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  /* As much room above the keys as the card leaves below them, on one line
+     or two. */
+  padding: var(--sval-switcher-card-padding) 4px 0;
+  color: var(--sval-launcher-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.sval-switcher-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Between the heading and the footer, the grid scrolls, and only it. Its
+   padding is the selected item's ring's room at the scroller's sides and
+   the space between the grid and the two edges. */
+.sval-switcher-scroller {
+  box-sizing: border-box;
+  width: var(--sval-switcher-width);
+  max-height: var(--sval-switcher-room);
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+  padding: 12px 4px;
+  /* The selected tile scrolls clear of the edges' shadows. */
+  scroll-padding-block: 12px;
+  margin-inline: -4px;
+}
+
+/* Zero height: what lies past one when it is out of view is past that
+   edge (`SvalDom.shadeScrollEdges`). */
+.sval-switcher-edge {
+  height: 0;
+}
+
+/* `--sval-switcher-columns`, `-item-width`, `-width` and `-room` are the
+   window's, set on the card (`SvalTabSwitcher`): as many columns as fit,
+   the width they and the scrollbar take, and the height the page leaves
+   the scroller. */
+#sval-tab-switcher-list {
+  --sval-switcher-item-height: calc(var(--sval-switcher-item-width) * 10 / 16 + 40px);
+  display: grid;
+  grid-template-columns: repeat(var(--sval-switcher-columns), var(--sval-switcher-item-width));
+  grid-auto-rows: var(--sval-switcher-item-height);
+  gap: 12px;
+  outline: none;
+}
+
+.sval-switcher-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 16px;
+  transition: background-color var(--sval-launcher-dur) var(--sval-launcher-ease);
+
+  /* The option is what the pointer presses, for its whole box. */
+  > * {
+    pointer-events: none;
+  }
+
+  &:hover {
+    background-color: var(--sval-launcher-hover);
+  }
+
+  &[aria-selected="true"] {
+    background-color: var(--sval-launcher-selected);
+    box-shadow: inset 0 0 0 2px var(--sval-launcher-accent);
+    transition: none;
+  }
+}
+
+/* The list has focus while the switcher shows, so its selected item carries
+   the focus ring. */
+#sval-tab-switcher-list:focus-visible > .sval-switcher-item[aria-selected="true"] {
+  box-shadow:
+    inset 0 0 0 2px var(--sval-launcher-accent),
+    0 0 0 2px var(--sval-focus);
+}
+
+.sval-switcher-preview {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--sval-launcher-divider);
+
+  /* A page draws on white unless it says otherwise. */
+  &[data-preview="snapshot"] {
+    background-color: #ffffff;
+  }
+
+  &[data-preview="placeholder"] {
+    background-color: var(--sval-launcher-cap-fill);
+  }
+
+  > :is(canvas, .sval-switcher-picture) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* A tab with no page to draw: its favicon and site, centred. */
+.sval-switcher-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0 12px;
+  box-sizing: border-box;
+
+  > .sval-switcher-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+.sval-switcher-site {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--sval-launcher-muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sval-switcher-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 4px;
+
+  > .sval-switcher-icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* A pin's glyph and a group's chip (`sval-launcher-rows.css`) end the
+   caption, and the title gives way to them. */
+.sval-switcher-caption {
+  > .sval-mark {
+    width: 16px;
+    height: 16px;
+  }
+
+  > .sval-chip {
+    min-width: 0;
+    max-width: 55%;
+
+    > .sval-chip-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+}
+
+/* An icon not found yet takes its room without drawing a broken image. */
+.sval-switcher-icon:not([src]) {
+  visibility: hidden;
+}
+
+.sval-switcher-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@keyframes sval-switcher-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sval-switcher-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sval-switcher-card {
+    animation-name: sval-switcher-fade;
+  }
+}
+
+/* ---------------------------------------------------------------- access */
+
+@media (forced-colors) {
+  .sval-switcher-item {
+    &:hover {
+      background-color: transparent;
+      box-shadow: inset 0 0 0 1px CanvasText;
+    }
+
+    &[aria-selected="true"] {
+      background-color: Highlight;
+      box-shadow: none;
+      color: HighlightText;
+
+      .sval-switcher-site {
+        color: HighlightText;
+      }
+    }
+  }
+
+  .sval-switcher-preview {
+    box-shadow: inset 0 0 0 1px CanvasText;
+  }
+}
+
+/* ---------------------------------------------------------------- hover */
+
+/* A Workspace panel row's preview (`SvalTabHoverPreview`) shows the picture
+   this switcher keeps, as an image, drawn as Firefox's preview draws its
+   own canvas (`tab-hover-preview.css`). */
+#tab-preview-panel .tab-preview-thumbnail-container > .sval-hover-picture {
+  display: block;
+  width: 100%;
+  animation: tab-hover-preview-fadein 0.2s ease;
+  border: 1px solid var(--border-color-deemphasized);
+  border-radius: var(--border-radius-medium);
+  box-sizing: border-box;
+}

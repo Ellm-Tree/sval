@@ -1,0 +1,109 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Screenshots' overlay (`ScreenshotsOverlayChild`), drawn in the page's
+ * anonymous content, which links this sheet after `overlay.css` (patch
+ * `screenshots-overlay-sval-sheet`). Nothing of Sval's chrome reaches a page,
+ * so the overlay takes the element picker's overlay tokens
+ * (`sval-element-picker.css`), dark in both themes: the overlay darkens
+ * the page whatever its scheme. The type is the system's, as the picker's
+ * is: font visibility keeps a page's anonymous content from Sval's font.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+#screenshots-component {
+  --sval-shot-surface: #0a1140;
+  --sval-shot-border: rgba(166, 232, 255, 0.34);
+  --sval-shot-shadow: 0 0 0 1px rgba(3, 5, 26, 0.7), 0 16px 48px rgba(3, 5, 26, 0.6);
+  --sval-shot-ink: #ffffff;
+  --sval-shot-secondary: rgba(166, 232, 255, 0.1);
+  --sval-shot-secondary-hover: rgba(166, 232, 255, 0.16);
+  --sval-shot-primary: #1f6bff;
+  --sval-shot-primary-hover: #3a7dff;
+  --sval-shot-focus: #5cf2ff;
+
+  font-family: system-ui, sans-serif;
+}
+
+@media not (forced-colors) {
+  .preview-instructions {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  #selection-size,
+  #buttons-container {
+    border: 1px solid var(--sval-shot-border);
+    background-color: var(--sval-shot-surface);
+    box-shadow: var(--sval-shot-shadow);
+    color: var(--sval-shot-ink);
+  }
+
+  #selection-size {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  #buttons-container {
+    padding: 5px;
+    border-radius: 24px;
+  }
+
+  .screenshots-button {
+    min-height: 36px;
+    min-width: 36px;
+    margin: 0;
+    padding: 0 16px;
+    border: none;
+    border-radius: 999px;
+    background-color: var(--sval-shot-secondary);
+    color: var(--sval-shot-ink);
+    font:
+      600 14px system-ui,
+      sans-serif;
+
+    &:hover {
+      background-color: var(--sval-shot-secondary-hover);
+      color: var(--sval-shot-ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--sval-shot-focus);
+      outline-offset: 2px;
+    }
+
+    &.primary {
+      background-color: var(--sval-shot-primary);
+
+      &:hover {
+        background-color: var(--sval-shot-primary-hover);
+      }
+    }
+  }
+
+  #cancel {
+    padding: 0;
+  }
+
+  .buttons-wrapper {
+    gap: 6px;
+  }
+
+  #screenshots-cancel-button {
+    margin-top: 12px;
+    border: 1px solid var(--sval-shot-border);
+    background-color: var(--sval-shot-surface);
+    box-shadow: var(--sval-shot-shadow);
+
+    /* `overlay.css` turns the button white with black ink on hover. */
+    &:hover {
+      background-color: var(--sval-shot-surface);
+      border-color: var(--sval-shot-ink);
+      color: var(--sval-shot-ink);
+    }
+  }
+}

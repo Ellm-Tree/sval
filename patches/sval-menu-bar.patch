@@ -1,0 +1,541 @@
+Sval: the menu bar's Workspaces, Favorites and Tab menus, without Work Offline, Page Style, Search History or the developer restart
+
+The three menus start hidden in the markup, which every macOS window
+includes, the hidden window among them: it shows its menu bar when no other
+window is open, is created before Sval's startup code runs, and has no
+workspace, favorite or tab to act on. macOS reads only `hidden` when it draws
+the menu bar (`nsMenuUtilsX::NodeIsHiddenOrCollapsed`). `SvalMenuBar` shows
+and fills them in each browser window.
+
+Work Offline and Page Style go with everything that serves only them: the
+`BrowserOffline` object and its command, `gPageStyleMenu` and its script, the
+`PageStyle` actor, their strings and their tests. Gecko keeps
+`Services.io.offline`, which it sets when the system loses the network and
+which `navigator.onLine` reads, and the document viewer's
+`authorStyleDisabled`. Search History and the History menu's other way into
+the History sidebar, renamed Show History, open the same sidebar.
+
+File's Restart (Developer) and its Accel+Alt+R key go with
+`DevelopmentHelpers` and its script. Firefox adds them to any build
+without MOZILLA_OFFICIAL, which Sval never sets (decision 0063), so every
+Sval would otherwise ship a local build's restart shortcut.
+
+diff --git a/browser/actors/moz.build b/browser/actors/moz.build
+index 90365893ac..2e0b31de0a 100644
+--- a/browser/actors/moz.build
++++ b/browser/actors/moz.build
+@@ -56,9 +56,6 @@ with Files("LinkHandler*.sys.mjs"):
+ with Files("PageInfo*.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Page Info Window")
+ 
+-with Files("PageStyle*.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Menus")
+-
+ with Files("Plugin*.sys.mjs"):
+     BUG_COMPONENT = ("Core", "Audio/Video: GMP")
+ 
+@@ -123,8 +120,6 @@ FINAL_TARGET_FILES.actors += [
+     "LinkHandlerParent.sys.mjs",
+     "PageInfoChild.sys.mjs",
+     "PageInfoPreviewChild.sys.mjs",
+-    "PageStyleChild.sys.mjs",
+-    "PageStyleParent.sys.mjs",
+     "PluginChild.sys.mjs",
+     "PluginParent.sys.mjs",
+     "PointerLockChild.sys.mjs",
+diff --git a/browser/base/content/browser-development-helpers.js b/browser/base/content/browser-development-helpers.js
+deleted file mode 100644
+index 5155b280b8..0000000000
+--- a/browser/base/content/browser-development-helpers.js
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/* This Source Code Form is subject to the terms of the Mozilla Public
+- * License, v. 2.0. If a copy of the MPL was not distributed with this
+- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+-
+-/**
+- * Extra features for local development. This file isn't loaded in
+- * non-local builds.
+- */
+-
+-var DevelopmentHelpers = {
+-  init() {
+-    this.quickRestart = this.quickRestart.bind(this);
+-    this.addRestartShortcut();
+-  },
+-
+-  quickRestart() {
+-    Services.obs.notifyObservers(null, "startupcache-invalidate");
+-    Services.env.set("MOZ_DISABLE_SAFE_MODE_KEY", "1");
+-
+-    Services.startup.quit(
+-      Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart
+-    );
+-  },
+-
+-  addRestartShortcut() {
+-    let command = document.createXULElement("command");
+-    command.setAttribute("id", "cmd_quickRestart");
+-    command.addEventListener("command", this.quickRestart, true);
+-    document.getElementById("mainCommandSet").prepend(command);
+-
+-    let key = document.createXULElement("key");
+-    key.setAttribute("id", "key_quickRestart");
+-    key.setAttribute("key", "r");
+-    key.setAttribute("modifiers", "accel,alt");
+-    key.setAttribute("command", "cmd_quickRestart");
+-    document.getElementById("mainKeyset").prepend(key);
+-
+-    let menuitem = document.createXULElement("menuitem");
+-    menuitem.setAttribute("id", "menu_FileRestartItem");
+-    menuitem.setAttribute("key", "key_quickRestart");
+-    menuitem.setAttribute("label", "Restart (Developer)");
+-    menuitem.addEventListener("command", this.quickRestart, true);
+-    document.getElementById("menu_FilePopup").appendChild(menuitem);
+-  },
+-};
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+index 19d901d2c9..3c286d0173 100644
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -536,8 +536,6 @@ var gBrowserInit = {
+       "serial-device-state-changed"
+     );
+ 
+-    BrowserOffline.init();
+-
+     BrowserUtils.callModulesFromCategory(
+       {
+         categoryName: "browser-window-delayed-startup",
+@@ -631,10 +629,6 @@ var gBrowserInit = {
+       gDataNotificationInfoBar.init();
+     }
+ 
+-    if (!AppConstants.MOZILLA_OFFICIAL) {
+-      DevelopmentHelpers.init();
+-    }
+-
+     gExtensionsNotifications.init();
+ 
+     let wasMinimized = window.windowState == window.STATE_MINIMIZED;
+@@ -1311,7 +1305,6 @@ var gBrowserInit = {
+         "serial-device-state-changed"
+       );
+ 
+-      BrowserOffline.uninit();
+       PanelUI.uninit();
+     }
+ 
+diff --git a/browser/base/content/browser-main.js b/browser/base/content/browser-main.js
+index 1af1dd9d56..f3fd55631b 100644
+--- a/browser/base/content/browser-main.js
++++ b/browser/base/content/browser-main.js
+@@ -11,9 +11,6 @@
+   if (AppConstants.MOZ_DATA_REPORTING) {
+     Services.scriptloader.loadSubScript("chrome://browser/content/browser-data-submission-info-bar.js", this);
+   }
+-  if (!AppConstants.MOZILLA_OFFICIAL) {
+-    Services.scriptloader.loadSubScript("chrome://browser/content/browser-development-helpers.js", this);
+-  }
+   Services.scriptloader.loadSubScript("chrome://browser/content/browser-pageActions.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/sidebar/browser-sidebar.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/browser-customtitlebar.js", this);
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index d8ba0664ca..f19a6850ec 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -61,11 +61,6 @@
+                 <menuitem id="menu_importFromAnotherBrowser"
+                           command="cmd_file_importFromAnotherBrowser" data-l10n-id="menu-file-import-from-another-browser"/>
+                 <menuseparator/>
+-                <menuitem id="goOfflineMenuitem"
+-                          type="checkbox"
+-                          command="cmd_toggleOfflineStatus"
+-                          observes="cmd_toggleOfflineStatus"
+-                          data-l10n-id="menu-file-go-offline"/>
+                 <menuitem id="menu_FileQuitItem"
+ #ifdef XP_MACOSX
+                           data-l10n-id="menu-quit-mac"
+@@ -159,16 +154,6 @@
+                               data-l10n-id="menu-view-full-zoom-toggle"/>
+                   </menupopup>
+                 </menu>
+-                <menu id="pageStyleMenu" data-l10n-id="menu-view-page-style-menu">
+-                  <menupopup id="pageStyleMenuPopup">
+-                    <menuitem id="menu_pageStyleNoStyle"
+-                              type="radio" data-l10n-id="menu-view-page-style-no-style"/>
+-                    <menuitem id="menu_pageStylePersistentOnly"
+-                              type="radio"
+-                              checked="true" data-l10n-id="menu-view-page-basic-style"/>
+-                    <menuseparator/>
+-                  </menupopup>
+-                </menu>
+                 <menuitem id="repair-text-encoding"
+                           disabled="true"
+                           data-l10n-id="menu-view-repair-text-encoding"/>
+@@ -204,6 +189,13 @@
+               </menupopup>
+             </menu>
+ 
++            <menu id="sval-workspaces-menu" label="Workspaces" accesskey="W" hidden="true">
++              <menupopup id="sval-workspaces-menu-popup"/>
++            </menu>
++            <menu id="sval-favorites-menubar" label="Favorites" accesskey="a" hidden="true">
++              <menupopup id="sval-favorites-menubar-popup"/>
++            </menu>
++
+             <menu id="history-menu" data-l10n-id="menu-history">
+               <menupopup id="historyMenuPopup"
+ #ifndef XP_MACOSX
+@@ -232,9 +224,6 @@
+                           command="Browser:RestoreLastSession" data-l10n-id="menu-history-restore-last-session"/>
+                 <menuitem id="hiddenTabsMenu"
+                           hidden="true" data-l10n-id="menu-history-hidden-tabs"/>
+-                <menuitem id="menu_searchHistory"
+-                          command="History:SearchHistory"
+-                          data-l10n-id="menu-history-search"/>
+                 <menu id="historyUndoMenu"
+                       disabled="true" data-l10n-id="menu-history-undo-menu">
+                   <menupopup id="historyUndoPopup"
+@@ -276,6 +265,9 @@
+               </menupopup>
+             </menu>
+ 
++            <menu id="sval-tab-menu" label="Tab" accesskey="b" hidden="true">
++              <menupopup id="sval-tab-menu-popup"/>
++            </menu>
+   <menu id="bookmarksMenu"
+         data-l10n-id="menu-bookmarks-menu">
+     <menupopup id="bookmarksMenuPopup"
+diff --git a/browser/base/content/browser-menubar.js b/browser/base/content/browser-menubar.js
+index 30a957f085..3c6f767d5b 100644
+--- a/browser/base/content/browser-menubar.js
++++ b/browser/base/content/browser-menubar.js
+@@ -16,12 +16,6 @@ document.addEventListener(
+           break;
+ 
+         // == view-menu ==
+-        case "menu_pageStyleNoStyle":
+-          gPageStyleMenu.disableStyle();
+-          break;
+-        case "menu_pageStylePersistentOnly":
+-          gPageStyleMenu.switchStyleSheet(null);
+-          break;
+         case "repair-text-encoding":
+           BrowserCommands.forceEncodingDetection();
+           break;
+@@ -185,9 +179,6 @@ document.addEventListener(
+         case "view-menu-popup":
+           ToolbarContextMenu.onViewToolbarsPopupShowing(event);
+           break;
+-        case "pageStyleMenuPopup":
+-          gPageStyleMenu.fillPopup(event.target);
+-          break;
+         case "historyMenuPopup":
+           if (!event.target.parentNode._placesView) {
+             new HistoryMenu(event);
+diff --git a/browser/base/content/browser-sets.inc.xhtml b/browser/base/content/browser-sets.inc.xhtml
+index af26cba085..76e902749e 100644
+--- a/browser/base/content/browser-sets.inc.xhtml
++++ b/browser/base/content/browser-sets.inc.xhtml
+@@ -38,7 +38,6 @@
+     <command id="cmd_restoreWindow" />
+     <command id="cmd_toggleMute" />
+     <command id="cmd_CustomizeToolbars" />
+-    <command id="cmd_toggleOfflineStatus" />
+     <command id="cmd_quitApplication" />
+ 
+     <command id="View:AboutProcesses" />
+diff --git a/browser/base/content/browser-sets.js b/browser/base/content/browser-sets.js
+index b3615d038a..2a750318b2 100644
+--- a/browser/base/content/browser-sets.js
++++ b/browser/base/content/browser-sets.js
+@@ -97,9 +97,6 @@ document.addEventListener(
+           case "cmd_CustomizeToolbars":
+             gCustomizeMode.enter();
+             break;
+-          case "cmd_toggleOfflineStatus":
+-            BrowserOffline.toggleOfflineStatus();
+-            break;
+           case "cmd_quitApplication":
+             goQuitApplication(event);
+             break;
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 04f0050157..42267fa51b 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -293,11 +293,6 @@ XPCOMUtils.defineLazyScriptGetter(
+   "gSharedTabWarning",
+   "chrome://browser/content/browser-webrtc.js"
+ );
+-XPCOMUtils.defineLazyScriptGetter(
+-  this,
+-  "gPageStyleMenu",
+-  "chrome://browser/content/browser-pagestyle.js"
+-);
+ XPCOMUtils.defineLazyScriptGetter(
+   this,
+   "gProfiles",
+@@ -1939,7 +1934,6 @@ var XULBrowserWindow = {
+   get _elementsForTextBasedTypes() {
+     delete this._elementsForTextBasedTypes;
+     return (this._elementsForTextBasedTypes = [
+-      document.getElementById("pageStyleMenu"),
+       document.getElementById("context-viewpartialsource-selection"),
+       document.getElementById("context-print-selection"),
+     ]);
+@@ -3574,77 +3568,6 @@ function middleMousePaste(event) {
+   }
+ }
+ 
+-// Note that this is also called from non-browser windows on OSX, which do
+-// share menu items but not much else. See nonbrowser-mac.js.
+-var BrowserOffline = {
+-  _inited: false,
+-
+-  // BrowserOffline Public Methods
+-  init() {
+-    if (!this._uiElement) {
+-      this._uiElement = document.getElementById("cmd_toggleOfflineStatus");
+-    }
+-
+-    Services.obs.addObserver(this, "network:offline-status-changed");
+-
+-    this._updateOfflineUI(Services.io.offline);
+-
+-    this._inited = true;
+-  },
+-
+-  uninit() {
+-    if (this._inited) {
+-      Services.obs.removeObserver(this, "network:offline-status-changed");
+-    }
+-  },
+-
+-  toggleOfflineStatus() {
+-    var ioService = Services.io;
+-
+-    if (!ioService.offline && !this._canGoOffline()) {
+-      this._updateOfflineUI(false);
+-      return;
+-    }
+-
+-    ioService.offline = !ioService.offline;
+-  },
+-
+-  // nsIObserver
+-  observe(aSubject, aTopic) {
+-    if (aTopic != "network:offline-status-changed") {
+-      return;
+-    }
+-
+-    // This notification is also received because of a loss in connectivity,
+-    // which we ignore by updating the UI to the current value of io.offline
+-    this._updateOfflineUI(Services.io.offline);
+-  },
+-
+-  // BrowserOffline Implementation Methods
+-  _canGoOffline() {
+-    try {
+-      var cancelGoOffline = Cc["@mozilla.org/supports-PRBool;1"].createInstance(
+-        Ci.nsISupportsPRBool
+-      );
+-      Services.obs.notifyObservers(cancelGoOffline, "offline-requested");
+-
+-      // Something aborted the quit process.
+-      if (cancelGoOffline.data) {
+-        return false;
+-      }
+-    } catch (ex) {}
+-
+-    return true;
+-  },
+-
+-  _uiElement: null,
+-  _updateOfflineUI(aOffline) {
+-    var offlineLocked = Services.prefs.prefIsLocked("network.online");
+-    this._uiElement.toggleAttribute("disabled", !!offlineLocked);
+-    this._uiElement.toggleAttribute("checked", aOffline);
+-  },
+-};
+-
+ function CanCloseWindow() {
+   // Avoid redundant calls to canClose from showing multiple
+   // PermitUnload dialogs.
+diff --git a/browser/base/content/nonbrowser-mac.js b/browser/base/content/nonbrowser-mac.js
+index 191e4de77c..694fa05e8f 100644
+--- a/browser/base/content/nonbrowser-mac.js
++++ b/browser/base/content/nonbrowser-mac.js
+@@ -32,7 +32,6 @@ var NonBrowserWindow = {
+       "viewSidebarMenuMenu",
+       "Browser:Reload",
+       "viewFullZoomMenu",
+-      "pageStyleMenu",
+       "repair-text-encoding",
+       "View:PageSource",
+       "View:FullScreen",
+@@ -116,9 +115,6 @@ var NonBrowserWindow = {
+   delayedStartup() {
+     this.delayedStartupTimeoutId = null;
+ 
+-    // initialise the offline listener
+-    BrowserOffline.init();
+-
+     // Initialize the private browsing UI only if window is private
+     if (PrivateBrowsingUtils.isWindowPrivate(window)) {
+       PrivateBrowsingUI.init(window);
+@@ -138,8 +134,6 @@ var NonBrowserWindow = {
+       clearTimeout(this.delayedStartupTimeoutId);
+       return;
+     }
+-
+-    BrowserOffline.uninit();
+   },
+ 
+   handleEvent(event) {
+diff --git a/browser/base/content/test/menubar/browser.toml b/browser/base/content/test/menubar/browser.toml
+index f02df3f938..35fdcd42e1 100644
+--- a/browser/base/content/test/menubar/browser.toml
++++ b/browser/base/content/test/menubar/browser.toml
+@@ -13,8 +13,6 @@ support-files = ["file_shareurl.html"]
+ 
+ ["browser_file_menu_import_wizard.js"]
+ 
+-["browser_file_offline.js"]
+-
+ ["browser_file_share_linux.js"]
+ https_first_disabled = true
+ run-if = ["os == 'linux'"]
+@@ -38,5 +36,3 @@ run-if = [
+   "os == 'mac'", # Mac only feature
+ ]
+ ["browser_search_bookmarks.js"]
+-
+-["browser_search_history.js"]
+diff --git a/browser/base/jar.mn b/browser/base/jar.mn
+index 85ec4dc421..cd1b8c18c8 100644
+--- a/browser/base/jar.mn
++++ b/browser/base/jar.mn
+@@ -39,16 +39,12 @@ browser.jar:
+         content/browser/browser-context.js            (content/browser-context.js)
+         content/browser/browser-customization.js      (content/browser-customization.js)
+         content/browser/browser-data-submission-info-bar.js (content/browser-data-submission-info-bar.js)
+-#ifndef MOZILLA_OFFICIAL
+-        content/browser/browser-development-helpers.js (content/browser-development-helpers.js)
+-#endif
+         content/browser/browser-fullScreenAndPointerLock.js (content/browser-fullScreenAndPointerLock.js)
+         content/browser/browser-gestureSupport.js           (content/browser-gestureSupport.js)
+         content/browser/browser-init.js                     (content/browser-init.js)
+         content/browser/browser-main.js                     (content/browser-main.js)
+         content/browser/browser-menubar.js                  (content/browser-menubar.js)
+         content/browser/browser-pageActions.js              (content/browser-pageActions.js)
+-        content/browser/browser-pagestyle.js                (content/browser-pagestyle.js)
+         content/browser/browser-places.js                   (content/browser-places.js)
+         content/browser/browser-profiles.js                 (content/browser-profiles.js)
+         content/browser/browser-safebrowsing.js             (content/browser-safebrowsing.js)
+diff --git a/browser/base/moz.build b/browser/base/moz.build
+index 33b90b64e2..f843e34326 100644
+--- a/browser/base/moz.build
++++ b/browser/base/moz.build
+@@ -40,7 +40,6 @@ BROWSER_CHROME_MANIFESTS += [
+     "content/test/outOfProcess/browser.toml",
+     "content/test/pageActions/browser.toml",
+     "content/test/pageinfo/browser.toml",
+-    "content/test/pageStyle/browser.toml",
+     "content/test/permissions/browser.toml",
+     "content/test/plugins/browser.toml",
+     "content/test/popupNotifications/browser.toml",
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index b0a58dce69..bf3ae17728 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -646,21 +646,6 @@ let JSWINDOWACTORS = {
+     },
+   },
+ 
+-  PageStyle: {
+-    parent: {
+-      esModuleURI: "resource:///actors/PageStyleParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/PageStyleChild.sys.mjs",
+-      events: {
+-        pageshow: { createActor: false },
+-      },
+-    },
+-
+-    messageManagerGroups: ["browsers"],
+-    allFrames: true,
+-  },
+-
+   Pdfjs: {
+     parent: {
+       esModuleURI: "resource://pdf.js/PdfjsParent.sys.mjs",
+diff --git a/browser/components/places/tests/browser/browser_bookmark_titles.js b/browser/components/places/tests/browser/browser_bookmark_titles.js
+index 96024ecc8e..f8e7152cda 100644
+--- a/browser/components/places/tests/browser/browser_bookmark_titles.js
++++ b/browser/components/places/tests/browser/browser_bookmark_titles.js
+@@ -61,11 +61,11 @@ add_task(async function check_default_bookmark_title() {
+ 
+   // Simulate a network outage with offline mode. (Localhost is still
+   // accessible in offline mode, so disable the test proxy as well.)
+-  BrowserOffline.toggleOfflineStatus();
++  Services.io.offline = !Services.io.offline;
+   let proxy = Services.prefs.getIntPref("network.proxy.type");
+   Services.prefs.setIntPref("network.proxy.type", 0);
+   registerCleanupFunction(function () {
+-    BrowserOffline.toggleOfflineStatus();
++    Services.io.offline = !Services.io.offline;
+     Services.prefs.setIntPref("network.proxy.type", proxy);
+   });
+ 
+diff --git a/browser/locales/en-US/browser/menubar.ftl b/browser/locales/en-US/browser/menubar.ftl
+index 04830a9c98..ec721372fb 100644
+--- a/browser/locales/en-US/browser/menubar.ftl
++++ b/browser/locales/en-US/browser/menubar.ftl
+@@ -111,10 +111,6 @@ menu-file-print =
+ menu-file-import-from-another-browser =
+     .label = Import From Another Browser…
+     .accesskey = I
+-menu-file-go-offline =
+-    .label = Work Offline
+-    .accesskey = k
+-
+ ## Edit Menu
+ 
+ menu-edit =
+@@ -165,15 +161,6 @@ menu-view-full-zoom-actual-size =
+ menu-view-full-zoom-toggle =
+     .label = Zoom Text Only
+     .accesskey = T
+-menu-view-page-style-menu =
+-    .label = Page Style
+-    .accesskey = y
+-menu-view-page-style-no-style =
+-    .label = No Style
+-    .accesskey = n
+-menu-view-page-basic-style =
+-    .label = Basic Page Style
+-    .accesskey = B
+ menu-view-repair-text-encoding =
+     .label = Repair Text Encoding
+     .accesskey = c
+@@ -217,7 +204,7 @@ menu-history =
+     .label = History
+     .accesskey = s
+ menu-history-show-all-history =
+-    .label = Show All History
++    .label = Show History
+ menu-history-clear-recent-history =
+     .label = Clear Recent History…
+ menu-history-synced-tabs =
+@@ -230,9 +217,6 @@ menu-history-undo-menu =
+     .label = Recently Closed Tabs
+ menu-history-undo-window-menu =
+     .label = Recently Closed Windows
+-# "Search" is a verb, as in "Search in History"
+-menu-history-search =
+-    .label = Search History
+ 
+ ## Bookmarks Menu
+ 

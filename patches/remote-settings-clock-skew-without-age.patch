@@ -1,0 +1,54 @@
+Sval: Remote Settings measures clock skew from the Date header alone
+
+The CDN in front of firefox.settings.services.mozilla.com stamps Date when
+it delivers a cached response and sends the cache's age in Age, so adding
+Age to Date put the measured server time up to max-age (60 seconds) ahead.
+Every client's clock_skew_seconds came out between 0 and -60 at random.
+
+diff --git a/services/settings/Utils.sys.mjs b/services/settings/Utils.sys.mjs
+index 34a7f9ca42..bdf944d1ef 100644
+--- a/services/settings/Utils.sys.mjs
++++ b/services/settings/Utils.sys.mjs
+@@ -498,12 +498,10 @@ export var Utils = {
+ 
+     const { changes = [], timestamp } = payload;
+ 
+-    let serverTimeMillis = Date.parse(response.headers.get("Date"));
+-    // Since the response is served via a CDN, the Date header value could have been cached.
+-    const cacheAgeSeconds = response.headers.has("Age")
+-      ? parseInt(response.headers.get("Age"), 10)
+-      : 0;
+-    serverTimeMillis += cacheAgeSeconds * 1000;
++    // The CDN in front of the server stamps Date when it delivers a cached
++    // response, so Date is the time already and adding Age would count the
++    // cache's age twice.
++    const serverTimeMillis = Date.parse(response.headers.get("Date"));
+ 
+     // Age of data (time between publication and now).
+     const ageSeconds = (serverTimeMillis - timestamp) / 1000;
+diff --git a/services/settings/test/unit/test_remote_settings_poll.js b/services/settings/test/unit/test_remote_settings_poll.js
+index 3f7fae2863..38eda2654c 100644
+--- a/services/settings/test/unit/test_remote_settings_poll.js
++++ b/services/settings/test/unit/test_remote_settings_poll.js
+@@ -938,11 +938,11 @@ add_task(async function test_check_clockskew_is_updated() {
+ });
+ add_task(clear_state);
+ 
+-add_task(async function test_check_clockskew_takes_age_into_account() {
++add_task(async function test_check_clockskew_ignores_age() {
+   const currentTime = Date.now();
+   const skewSeconds = 5;
+   const ageCDNSeconds = 3600;
+-  const serverTime = currentTime - skewSeconds * 1000 - ageCDNSeconds * 1000;
++  const serverTime = currentTime - skewSeconds * 1000;
+ 
+   function serverResponse(request, response) {
+     response.setHeader("Content-Type", "application/json; charset=UTF-8");
+@@ -957,6 +957,7 @@ add_task(async function test_check_clockskew_takes_age_into_account() {
+ 
+   const clockSkew = Services.prefs.getIntPref(PREF_CLOCK_SKEW_SECONDS);
+   Assert.greaterOrEqual(clockSkew, skewSeconds, `clockSkew is ${clockSkew}`);
++  Assert.less(clockSkew, skewSeconds + 10, `clockSkew is ${clockSkew}`);
+ });
+ add_task(clear_state);
+ 

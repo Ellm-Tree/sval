@@ -1,0 +1,132 @@
+Sval: ask for devices and location in an agent's tab whatever is saved
+
+A site's saved Allow for the camera, the microphone or the location is
+the user's answer for their own tabs. Used in a tab an agent drives, it
+lets a prompt-injected agent join a call or read the location with no
+prompt at all. There WebRTCParent's checkRequestAllowed and
+PermissionUI's geolocation prompt skip a saved Allow and ask, as they do
+for a site with nothing saved, and the prompt offers no answer to save:
+no Always allow, no remember checkbox, and no Always block for a screen.
+A saved Block still refuses, and a grant the user gave in the tab itself
+still counts. Screen sharing always asks already.
+
+diff --git a/browser/actors/WebRTCParent.sys.mjs b/browser/actors/WebRTCParent.sys.mjs
+index a4f6d9ff9f..16d02a05e6 100644
+--- a/browser/actors/WebRTCParent.sys.mjs
++++ b/browser/actors/WebRTCParent.sys.mjs
+@@ -405,6 +405,11 @@ export class WebRTCParent extends JSWindowActorParent {
+     // if we're handling a potentially insecure third party
+     // through a wildcard ("*") allow attribute.
+     let limited = aRequest.secondOrigin;
++    // Sval: a tab an agent drives never uses a saved Allow, which the user
++    // gave for their own tabs, so a prompt-injected agent cannot take the
++    // device unasked. A device the tab uses, or used within its grace
++    // period, was allowed in that tab and still counts.
++    const savedCounts = !this.browsingContext.top.svalAgentTab;
+ 
+     let map = lazy.webrtcUI.activePerms.get(this.manager.outerWindowId);
+     // We consider a camera or mic active if it is active or was active within a
+@@ -412,8 +417,9 @@ export class WebRTCParent extends JSWindowActorParent {
+     const isAllowed = ({ mediaSource, rawId }, permissionID) =>
+       map?.get(windowID + mediaSource + rawId) ||
+       (!limited &&
+-        (lazy.SitePermissions.getForPrincipal(aPrincipal, permissionID).state ==
+-          lazy.SitePermissions.ALLOW ||
++        ((savedCounts &&
++          lazy.SitePermissions.getForPrincipal(aPrincipal, permissionID)
++            .state == lazy.SitePermissions.ALLOW) ||
+           lazy.SitePermissions.getForPrincipal(
+             aPrincipal,
+             [mediaSource, rawId].join("^"),
+@@ -720,6 +726,15 @@ function prompt(aActor, aBrowser, aRequest) {
+     ];
+   }
+ 
++  // Sval: a tab an agent drives never uses a saved Allow (checkRequestAllowed),
++  // so its prompt offers no answer to save, Always block for a screen
++  // included.
++  const agentTab = !!aBrowser.browsingContext?.svalAgentTab;
++  if (agentTab && !reqAudioOutput) {
++    actionL10nIds.splice(2);
++    secondaryActions.splice(1);
++  }
++
+   // Sval: a camera or microphone request offers Always allow as a button of
+   // its own (SvalPromptButtons), in place of the remember checkbox.
+   const offerAlwaysAllow =
+@@ -1278,7 +1293,7 @@ function prompt(aActor, aBrowser, aRequest) {
+ 
+   function shouldShowAlwaysRemember() {
+     // Don't offer "always remember" action in PB mode
+-    if (lazy.PrivateBrowsingUtils.isBrowserPrivate(aBrowser)) {
++    if (lazy.PrivateBrowsingUtils.isBrowserPrivate(aBrowser) || agentTab) {
+       return false;
+     }
+ 
+diff --git a/browser/modules/PermissionUI.sys.mjs b/browser/modules/PermissionUI.sys.mjs
+index 1af134fd99..8fe6524573 100644
+--- a/browser/modules/PermissionUI.sys.mjs
++++ b/browser/modules/PermissionUI.sys.mjs
+@@ -265,6 +265,14 @@ class PermissionPrompt {
+     return undefined;
+   }
+ 
++  /**
++   * Sval: whether the request asks even where the site has a saved Allow,
++   * using only an Allow given in this tab.
++   */
++  get svalIgnoresSavedAllow() {
++    return false;
++  }
++
+   /**
+    * These are the options that will be passed to the PopupNotification when it
+    * is shown. See the documentation of `PopupNotifications_show` in
+@@ -483,7 +491,7 @@ class PermissionPrompt {
+       // If we're reading and setting permissions, then we need
+       // to check to see if we already have a permission setting
+       // for this particular principal.
+-      let { state } = lazy.SitePermissions.getForPrincipal(
++      let { state, scope } = lazy.SitePermissions.getForPrincipal(
+         this.principal,
+         this.permissionKey,
+         this.browser,
+@@ -499,7 +507,9 @@ class PermissionPrompt {
+       if (
+         state == lazy.SitePermissions.ALLOW &&
+         !this.request.isRequestDelegatedToUnsafeThirdParty &&
+-        !this.request.ignoreAllowSitePermission
++        !this.request.ignoreAllowSitePermission &&
++        (scope == lazy.SitePermissions.SCOPE_TEMPORARY ||
++          !this.svalIgnoresSavedAllow)
+       ) {
+         this.allow();
+         return;
+@@ -899,9 +909,10 @@ class GeolocationPermissionPrompt extends PermissionPromptForRequest {
+ 
+     // Don't offer "always remember" action in PB mode
+     options.checkbox = {
+-      show: !lazy.PrivateBrowsingUtils.isWindowPrivate(
+-        this.browser.documentGlobal
+-      ),
++      show:
++        !lazy.PrivateBrowsingUtils.isWindowPrivate(
++          this.browser.documentGlobal
++        ) && !this.svalIgnoresSavedAllow,
+     };
+ 
+     if (this.request.isRequestDelegatedToUnsafeThirdParty) {
+@@ -923,6 +934,13 @@ class GeolocationPermissionPrompt extends PermissionPromptForRequest {
+     return "geolocation";
+   }
+ 
++  // Sval: a tab an agent drives never uses a saved Allow, which the user
++  // gave for their own tabs, so a prompt-injected agent cannot read the
++  // location unasked. Its prompt offers no answer to save.
++  get svalIgnoresSavedAllow() {
++    return !!this.browser.browsingContext?.svalAgentTab;
++  }
++
+   get anchorID() {
+     return "geo-notification-icon";
+   }

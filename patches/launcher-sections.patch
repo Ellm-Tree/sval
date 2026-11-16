@@ -1,0 +1,118 @@
+Sval: The address bar lists its rows in fixed sections
+
+The Launcher's rows come in sections after the row Enter takes: open tabs,
+pins and Favorites, commands, history, then search suggestions, each under
+a heading, with no more rows than its limit, in an order the user sets.
+The muxer places rows by the layout `makeDefaultResultGroups` makes, and no
+pref sets that layout, so `getResultGroups` hands Firefox's layout to
+`SvalLauncherSections.resultGroups`, which builds the sections around it,
+and adds the settings to its cache key. Sval's own rows name their groups
+through `UrlbarUtils.getResultGroup`'s `result.group` branch, which its
+comment gives as there for `test_suggestedIndexRelativeToGroup.js`; a rebase
+that drops it sends those rows to the general group, which the layout
+places in History.
+
+Firefox draws a heading from a row's type and provider, so a history row
+would read "Your History" and a suggestion's would name the engine.
+`#rowLabel` asks `SvalLauncherSections` first: a row's own heading, as
+Sval's rows carry one, else that of the section its group is in.
+
+The muxer keeps one heuristic, so when Sval's open-tab match is the row
+Enter takes, the autofilled site and the web search it displaced would not
+show; it keeps one row per address, the one it reads first, so a history
+row could stand for a Favorite or a page picked before; and Firefox's
+open-tab row for a pin's page would drop the pin's row. The muxer sorts the
+results `SvalLauncherSections.unsorted` hands it, which lists the displaced
+heuristics as rows of the top area, puts input history before the rest, and
+leaves those rows out.
+
+diff --git a/browser/components/urlbar/UrlbarMuxerStandard.sys.mjs b/browser/components/urlbar/UrlbarMuxerStandard.sys.mjs
+index 9d93c76328..7a7ecb7875 100644
+--- a/browser/components/urlbar/UrlbarMuxerStandard.sys.mjs
++++ b/browser/components/urlbar/UrlbarMuxerStandard.sys.mjs
+@@ -16,6 +16,8 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
++  SvalLauncherSections:
++    "moz-src:///browser/components/sval/SvalLauncherSections.sys.mjs",
+   SvalLauncherTabs:
+     "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+@@ -91,6 +93,10 @@ class MuxerUnifiedComplete extends UrlbarMuxer {
+    *   The array of UrlbarResult that is not sorted yet.
+    */
+   sort(context, unsortedResults) {
++    unsortedResults = lazy.SvalLauncherSections.unsorted(
++      context,
++      unsortedResults
++    );
+     // This method is called multiple times per keystroke, so it should be as
+     // fast and efficient as possible.  We do two passes through the results:
+     // one to collect state for the second pass, and then a second to build the
+diff --git a/browser/components/urlbar/UrlbarPrefs.sys.mjs b/browser/components/urlbar/UrlbarPrefs.sys.mjs
+index 51b33db779..424adb218c 100644
+--- a/browser/components/urlbar/UrlbarPrefs.sys.mjs
++++ b/browser/components/urlbar/UrlbarPrefs.sys.mjs
+@@ -16,6 +16,8 @@ const lazy = XPCOMUtils.declareLazy({
+   CustomizableUI:
+     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
++  SvalLauncherSections:
++    "moz-src:///browser/components/sval/SvalLauncherSections.sys.mjs",
+   UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
+ });
+ 
+@@ -1227,16 +1229,20 @@ class Preferences {
+       "suggest.semanticHistory.separateGroup"
+     );
+     key += separateSemanticGroup;
++    key += lazy.SvalLauncherSections.cacheKey(context);
+     switch (context.sapName) {
+       case "urlbar": {
+         let showSearchSuggestionsFirst =
+           this.#getShowSearchSuggestionsFirst(context);
+         key += showSearchSuggestionsFirst;
+         return this.#getOrCacheResultGroups(key, () =>
+-          makeDefaultResultGroups({
+-            showSearchSuggestionsFirst,
+-            separateSemanticGroup,
+-          })
++          lazy.SvalLauncherSections.resultGroups(
++            makeDefaultResultGroups({
++              showSearchSuggestionsFirst,
++              separateSemanticGroup,
++            }),
++            context
++          )
+         );
+       }
+       case "searchbar": {
+diff --git a/browser/components/urlbar/content/UrlbarView.mjs b/browser/components/urlbar/content/UrlbarView.mjs
+index f92c43a2ca..a6b975817e 100644
+--- a/browser/components/urlbar/content/UrlbarView.mjs
++++ b/browser/components/urlbar/content/UrlbarView.mjs
+@@ -18,6 +18,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+   SvalFavoritesProvider:
+     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
++  SvalLauncherSections:
++    "moz-src:///browser/components/sval/SvalLauncherSections.sys.mjs",
+   UrlbarProviderOpenTabs:
+     "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+@@ -2868,6 +2870,14 @@ export class UrlbarView {
+       return null;
+     }
+ 
++    let svalLabel = lazy.SvalLauncherSections.rowLabel(
++      row.result,
++      this.#queryContext
++    );
++    if (svalLabel !== undefined) {
++      return svalLabel;
++    }
++
+     if (row.result.rowLabel) {
+       return row.result.rowLabel;
+     }

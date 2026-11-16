@@ -1,0 +1,65 @@
+---
+title: Isolate a Workspace
+description: Give a Workspace its own cookies and sign-ins, so you can be signed in to two accounts on one site.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+An isolated Workspace keeps its own cookies and sign-ins. Sites in an
+isolated Workspace can't see that you're signed in from your other
+Workspaces.
+
+You use Fastmail for work and for home. You isolate your Work Workspace, sign
+in to your work account there, and stay signed in to your home account
+everywhere else.
+
+## Isolate a new Workspace
+
+1. Above your tabs, select the current Workspace's name.
+2. At the bottom of the list, choose **New Workspace…**.
+3. In **Name**, type a name for the Workspace.
+4. Check **Isolate this Workspace**.
+5. Select **Create**.
+
+<Screenshot name="docs-isolate-a-workspace" frame="rounded" maxWidth={560} alt="The New Workspace dialog for Trip Planning with Isolate this Workspace checked" />
+
+## Isolate a Workspace you already have
+
+1. Above your tabs, right-click the Workspace's name.
+2. Choose **Isolate Workspace…**.
+3. In the dialog, select **Isolate Workspace**.
+
+Every tab in the Workspace reloads. The Workspace starts with no sign-ins, so
+sign in again on the sites you use there. **Isolated** shows next to the
+Workspace's name.
+
+To isolate a Workspace the window isn't showing, open the Workspaces list and
+right-click that Workspace there.
+
+## Stop isolating a Workspace
+
+1. Above your tabs, right-click the Workspace's name.
+2. Choose **Stop isolating Workspace…**.
+3. In the dialog, select **Stop isolating**.
+
+Every tab in the Workspace reloads with the sign-ins of your other
+Workspaces. Sval deletes the sign-ins and site data that were kept only in
+the isolated Workspace.
+
+## Details
+
+- Whether a Workspace is isolated syncs to your other devices. The
+  sign-ins don't, so you sign in once on each device. When you isolate a
+  Workspace, your other devices reload the Workspace's tabs without
+  asking.
+- In the Workspaces list, an isolated Workspace has a box next to its
+  name.
+- When you move a tab into or out of an isolated Workspace, Sval asks
+  first, then reloads the tab.
+- Deleting an isolated Workspace deletes its sign-ins and site data too.
+
+## Related pages
+
+- [What an isolated Workspace keeps apart](/docs/explanation/isolated-workspaces/)
+- [Move a tab to another Workspace](/docs/how-to/workspaces/move-a-tab-to-another-workspace/)
+- [Workspace settings and controls](/docs/reference/workspaces/)

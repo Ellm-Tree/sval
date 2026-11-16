@@ -1,0 +1,65 @@
+---
+title: Change a keyboard shortcut
+description: Give a command a new shortcut, give one to a command that has none, or put back Sval's default.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Sval lists every shortcut in Settings › Keyboard shortcuts. You can change
+most shortcuts. You can also give a shortcut to a command that starts with
+none, like New Workspace.
+
+You make Workspaces often and want a key for New Workspace.
+
+<Screenshot name="docs-keyboard-shortcuts" alt="Settings › Keyboard shortcuts, with Change and Clear next to each shortcut you can change" />
+
+## Steps
+
+1. Open Settings › Keyboard shortcuts.
+2. Find the command, then select **Change** next to it.
+3. Press the keys you want, all at once.
+
+The row shows the new shortcut, and **Reset** shows next to it.
+
+If another command already has that shortcut, Sval asks whether to move
+the shortcut to this command. Select OK to take the shortcut from the other
+command.
+
+## Remove a shortcut
+
+1. Open Settings › Keyboard shortcuts.
+2. Next to the command, select **Clear**.
+
+The row reads None.
+
+## Put back the default
+
+- To put back one shortcut, select **Reset** next to that shortcut.
+- To put back every shortcut, select **Reset all shortcuts** at the bottom
+  of the list, then confirm.
+
+## Details
+
+- A row with no **Change** button has a fixed shortcut, like the keys that
+  move through the Workspace's rows.
+- To stop without a change, press Escape or Tab, or select **Cancel**.
+- A letter, number, or punctuation mark needs <kbd>⌘</kbd>, <kbd>⌥</kbd>, or <kbd>⌃</kbd> (Ctrl or Alt) with
+  it. Shift alone isn't enough. Backspace can't be a shortcut.
+- Websites can't take the shortcuts listed in
+  [Keys a website can't take](/docs/reference/shortcuts/#keys-a-website-cant-take),
+  even after you change them.
+- Menus and button tooltips show the shortcut as you set it.
+- Shortcuts you change apply on this device only.
+- Shortcuts for extensions are at the end of the list. To change one,
+  select **Change in the extensions page**.
+
+## If something goes wrong
+
+- **Not a shortcut key.** This shows in the field when Sval can't use the
+  keys you pressed, like a letter on its own. Press the key again with <kbd>⌘</kbd>, <kbd>⌥</kbd>, or <kbd>⌃</kbd>
+  (Ctrl or Alt).
+
+## Related pages
+
+- [Turn off recently used order for Ctrl+Tab](/docs/how-to/shortcuts/turn-off-recently-used-order-for-ctrl-tab/)
+- [Keyboard shortcuts](/docs/reference/shortcuts/)

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# adblock-rust's css-validation feature asks for cssparser 0.34, and the
+# selectors crate it pairs with is servo/components/selectors, which is built
+# on cssparser 0.37. This crate answers the 0.34 requirement with 0.37, so
+# both sides share one cssparser and its types line up.
+
+[package]
+name = "cssparser"
+version = "0.34.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+cssparser = "0.37"

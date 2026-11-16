@@ -1,0 +1,36 @@
+#!/bin/sh -e
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+if [ "$$1" = "configure" ] || [ "$$1" = "abort-upgrade" ] || [ "$$1" = "abort-remove" ] ; then
+    # Below the 100 of Mozilla's own package
+    # (browser/installer/linux/app/debian/postinst.in), so installing Sval
+    # never takes the system's browser links from an installed Firefox while
+    # they follow priority. The user chooses Sval with update-alternatives or
+    # Sval's own default-browser setting.
+    update-alternatives --install /usr/bin/gnome-www-browser \
+        gnome-www-browser /usr/bin/${PKG_NAME} 40 \
+        --slave /usr/share/man/man1/gnome-www-browser.1.gz \
+        gnome-www-browser.1.gz /usr/share/man/man1/${PKG_NAME}.1.gz
+
+    update-alternatives --install /usr/bin/x-www-browser \
+        x-www-browser /usr/bin/${PKG_NAME} 40 \
+        --slave /usr/share/man/man1/x-www-browser.1.gz \
+        x-www-browser.1.gz /usr/share/man/man1/${PKG_NAME}.1.gz
+
+    # The profile gives Gecko's sandbox user namespaces on Ubuntu 24.04 and
+    # later. AppArmor before 4.0, as on Ubuntu 22.04 and Debian 12, cannot
+    # parse it and does not restrict user namespaces, so it is installed only
+    # where it parses, as electron-builder's packages do. It is copied rather
+    # than shipped in /etc/apparmor.d, where an unparsable profile would fail
+    # every boot's profile load.
+    profile=/etc/apparmor.d/${PKG_NAME}
+    if aa-enabled --quiet 2>/dev/null &&
+        apparmor_parser --skip-kernel-load --skip-cache /usr/share/${PKG_NAME}/apparmor-profile > /dev/null 2>&1 ; then
+        cp -f /usr/share/${PKG_NAME}/apparmor-profile "$$profile"
+        if ! { [ -x /usr/bin/ischroot ] && /usr/bin/ischroot; } ; then
+            apparmor_parser --replace --write-cache --skip-read-cache "$$profile" || true
+        fi
+    fi
+fi

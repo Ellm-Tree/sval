@@ -1,0 +1,21 @@
+Sval: an update of the same version must have a newer build ID
+
+Sval releases built on one ESR share its application version, which updates
+and extensions compare, and differ only by build ID. Upstream treats any
+other build ID of the same version as newer, so a feed replaying an older
+signed release would roll users back. Build IDs are timestamps of one fixed
+width, so comparing them as strings orders them.
+
+diff --git a/toolkit/mozapps/update/UpdateService.sys.mjs b/toolkit/mozapps/update/UpdateService.sys.mjs
+index db167b7..0d31e68 100644
+--- a/toolkit/mozapps/update/UpdateService.sys.mjs
++++ b/toolkit/mozapps/update/UpdateService.sys.mjs
+@@ -1958,7 +1958,7 @@ function updateIsAtLeastAsOldAs(update, version, buildID) {
+   let versionComparison = Services.vc.compare(update.appVersion, version);
+   return (
+     versionComparison < 0 ||
+-    (versionComparison == 0 && update.buildID == buildID)
++    (versionComparison == 0 && update.buildID <= buildID)
+   );
+ }
+ 

@@ -1,0 +1,100 @@
+Sval: keep ticking a background tab's refresh driver every 10 minutes
+
+The inactive refresh driver timer doubled its interval and, past 10
+minutes, stopped scheduling until another driver joined it. A driver
+with work still pending stayed attached to the stopped timer, and
+EnsureTimerStarted returns early for a driver that has a timer, so it
+never ticked again. Animation events are dispatched only in a tick, so
+a background page that kept cancelling Web Animations queued events
+without bound, each holding its animation, target and listeners. An
+8-hour soak saw a YouTube tab grow about 55 MB an hour this way. This
+caps the interval at 10 minutes instead, and a driver with nothing to do
+still leaves the timer on its next tick.
+
+diff --git a/layout/base/nsRefreshDriver.cpp b/layout/base/nsRefreshDriver.cpp
+index 2e624b2f71..fddbfa32a6 100644
+--- a/layout/base/nsRefreshDriver.cpp
++++ b/layout/base/nsRefreshDriver.cpp
+@@ -111,8 +111,8 @@ static mozilla::LazyLogModule sRefreshDriverLog("nsRefreshDriver");
+ #define LOG(...) \
+   MOZ_LOG(sRefreshDriverLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
+ 
+-// after 10 minutes, stop firing off inactive timers
+-#define DEFAULT_INACTIVE_TIMER_DISABLE_SECONDS 600
++// the longest an inactive timer waits between ticks
++#define DEFAULT_INACTIVE_TIMER_MAX_TICK_SECONDS 600
+ 
+ // The number of seconds spent skipping frames because we are waiting for the
+ // compositor before logging.
+@@ -1028,9 +1028,11 @@ class StartupRefreshDriverTimer : public SimpleTimerBasedRefreshDriverTimer {
+  * A RefreshDriverTimer for inactive documents.  When a new refresh driver is
+  * added, the rate is reset to the base (normally 1s/1fps).  Every time
+  * it ticks, a single refresh driver is poked.  Once they have all been poked,
+- * the duration between ticks doubles, up to mDisableAfterMilliseconds.  At that
+- * point, the timer is quiet and doesn't tick (until something is added to it
+- * again).
++ * the duration between ticks doubles, up to mMaxTickDurationMilliseconds, and
++ * stays there.  A driver with nothing left to do removes itself on its next
++ * tick, and the timer stops once it holds no drivers, so a driver still in the
++ * timer has work waiting: queued animation events, for one, are only dispatched
++ * in a tick (AnimationEventDispatcher::ScheduleDispatch).
+  *
+  * When a timer is removed, there is a possibility of another timer
+  * being skipped for one cycle.  We could avoid this by adjusting
+@@ -1044,13 +1046,13 @@ class InactiveRefreshDriverTimer final
+   explicit InactiveRefreshDriverTimer(double aRate)
+       : SimpleTimerBasedRefreshDriverTimer(aRate),
+         mNextTickDuration(aRate),
+-        mDisableAfterMilliseconds(-1.0),
++        mMaxTickDurationMilliseconds(-1.0),
+         mNextDriverIndex(0) {}
+ 
+-  InactiveRefreshDriverTimer(double aRate, double aDisableAfterMilliseconds)
++  InactiveRefreshDriverTimer(double aRate, double aMaxTickDurationMilliseconds)
+       : SimpleTimerBasedRefreshDriverTimer(aRate),
+         mNextTickDuration(aRate),
+-        mDisableAfterMilliseconds(aDisableAfterMilliseconds),
++        mMaxTickDurationMilliseconds(aMaxTickDurationMilliseconds),
+         mNextDriverIndex(0) {}
+ 
+   void AddRefreshDriver(nsRefreshDriver* aDriver) override {
+@@ -1098,17 +1100,13 @@ class InactiveRefreshDriverTimer final
+   }
+ 
+   void ScheduleNextTick(TimeStamp aNowTime) override {
+-    if (mDisableAfterMilliseconds > 0.0 &&
+-        mNextTickDuration > mDisableAfterMilliseconds) {
+-      // We hit the time after which we should disable
+-      // inactive window refreshes; don't schedule anything
+-      // until we get kicked by an AddRefreshDriver call.
+-      return;
+-    }
+-
+     // double the next tick time if we've already gone through all of them once
+     if (mNextDriverIndex >= GetRefreshDriverCount()) {
+       mNextTickDuration *= 2.0;
++      if (mMaxTickDurationMilliseconds > 0.0) {
++        mNextTickDuration =
++            std::min(mNextTickDuration, mMaxTickDurationMilliseconds);
++      }
+       mNextDriverIndex = 0;
+     }
+ 
+@@ -1154,7 +1152,7 @@ class InactiveRefreshDriverTimer final
+   }
+ 
+   double mNextTickDuration;
+-  double mDisableAfterMilliseconds;
++  double mMaxTickDurationMilliseconds;
+   uint32_t mNextDriverIndex;
+   bool mIsTicking = false;
+ };
+@@ -1381,7 +1379,7 @@ RefreshDriverTimer* nsRefreshDriver::ChooseTimer() {
+     if (!sThrottledRateTimer) {
+       sThrottledRateTimer = MakeRefPtr<InactiveRefreshDriverTimer>(
+           GetThrottledTimerInterval(),
+-          DEFAULT_INACTIVE_TIMER_DISABLE_SECONDS * 1000.0);
++          DEFAULT_INACTIVE_TIMER_MAX_TICK_SECONDS * 1000.0);
+     }
+     return sThrottledRateTimer;
+   }

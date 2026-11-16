@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: existence
+message: "Split the sentence at the semicolon."
+level: error
+nonword: true
+raw:
+  - ';'

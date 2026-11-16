@@ -1,0 +1,57 @@
+---
+title: When Sval puts tabs to sleep
+description: Why switching Workspaces doesn't reload your pages, and when Sval frees the memory of tabs you've left.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+
+A sleeping tab has given back the memory its page used. The tab keeps its
+place in the Workspace and its history. When you select the tab, the page loads
+again. Sval decides when tabs sleep so that the Workspaces you come back to are
+as you left them, and the ones you've abandoned stop using memory.
+
+<Screenshot name="docs-sleeping-tabs" frame="rounded" maxWidth={300} alt="The Engineering group with tokio and Pull requests dimmed as sleeping tabs, and the other tabs awake" />
+
+## Switching Workspaces keeps pages running
+
+When you switch a window to another Workspace, the Workspace you left keeps
+running out of sight. Sval doesn't reload its pages when you come back. A
+half-written Fastmail reply, a video's place, or a scrolled Codeberg diff is
+where you left it.
+
+Once a Workspace has been out of sight for three hours, Sval puts its tabs
+to sleep. Three hours is long enough to come back from a meeting and find
+the Workspace as it was. It's also short enough that the Workspaces you
+left during the day give their memory back. If your computer runs low on
+memory, Sval can put those tabs to sleep sooner.
+
+## What stays awake
+
+Some tabs stay awake when the three hours pass, because putting them to
+sleep would lose something:
+
+- A tab playing sound, because you can hear it.
+- A tab holding text you typed and haven't sent.
+- A tab in a call, or showing a picture-in-picture video.
+- A tab you set to Keep Awake.
+
+A Split sleeps as one. If one tab in a Split has to stay awake, the whole
+Split stays awake, so the Split comes back whole.
+
+## Pins
+
+A pin's page sleeps along with the other tabs in the Workspace, and keeps
+its place. When you come back, the pin shows the page it was on. When you
+close a pin, or your computer runs low on memory, the pin starts again at
+its saved page.
+
+## Putting tabs to sleep yourself
+
+You can put a tab or a group to sleep at any time, and keep a tab from ever
+sleeping.
+
+## Related pages
+
+- [Put tabs to sleep](/docs/how-to/tabs/put-tabs-to-sleep/)
+- [Keep a tab awake](/docs/how-to/tabs/keep-a-tab-awake/)
+- [Switch a window to another Workspace](/docs/how-to/workspaces/switch-a-window-to-another-workspace/)

@@ -1,0 +1,24 @@
+Sval: LightweightThemeConsumer leaves a window that has unloaded alone
+
+Backport of Mozilla's Bug 2083168 (mozilla-central 316632883ed2, Firefox
+161), unchanged. ESR 153 does not carry it.
+LightweightThemeConsumer's pref observers could still call _update after its
+window unloaded, when the consumer has dropped its document, and _update
+threw on the missing document. _update returns once the document is gone.
+Drop this patch when the upstream pin reaches Firefox 161.
+
+diff --git a/toolkit/modules/LightweightThemeConsumer.sys.mjs b/toolkit/modules/LightweightThemeConsumer.sys.mjs
+index 2bef680f15..9d3a08e659 100644
+--- a/toolkit/modules/LightweightThemeConsumer.sys.mjs
++++ b/toolkit/modules/LightweightThemeConsumer.sys.mjs
+@@ -328,6 +328,10 @@ LightweightThemeConsumer.prototype = {
+   },
+ 
+   _update(themeData) {
++    // The pref observers can still call this after the window unloaded.
++    if (!this._doc) {
++      return;
++    }
+     const manager = lazy.LightweightThemeManager;
+ 
+     // Store user's theme before replacing with aiThemeData or privateThemeData.

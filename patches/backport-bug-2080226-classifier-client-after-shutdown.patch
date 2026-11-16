@@ -1,0 +1,165 @@
+Sval: the content classifier's Remote Settings client stops notifying a shut-down service
+
+Backport of Mozilla's Bug 2080226 (mozilla-central f3693da86126, Firefox
+161), unchanged. ESR 153 does not carry it.
+ContentClassifierRemoteSettingsClient's importAllLists and onSync captured
+the service before their awaits, so a shutdown() during rs.get() or
+deleteDownloaded() still called onListsChanged on it, which rejects with
+NS_ERROR_NOT_INITIALIZED once ContentClassifierService::BlockShutdown has
+run, and the rejection went uncaught. Both re-read the service after their
+awaits. Its test is test_rs_client_shutdown.js.
+Drop this patch when the upstream pin reaches Firefox 161.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs b/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs
+index acee03492b..49aa1654fc 100644
+--- a/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs
++++ b/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs
+@@ -95,8 +95,7 @@ export class ContentClassifierRemoteSettingsClient {
+    * @param {Array} event.data.deleted  Removed records.
+    */
+   async onSync({ data: { created = [], updated = [], deleted = [] } }) {
+-    let service = this.#service;
+-    if (!service) {
++    if (!this.#service) {
+       return;
+     }
+ 
+@@ -117,15 +116,14 @@ export class ContentClassifierRemoteSettingsClient {
+       ...created.map(r => r.Name),
+     ];
+     let removedNames = deleted.map(r => r.Name);
+-    service.onListsChanged(updatedNames, removedNames);
++    this.#service?.onListsChanged(updatedNames, removedNames);
+   }
+ 
+   /**
+    * Fetch all records from the collection and notify the service.
+    */
+   async importAllLists() {
+-    let service = this.#service;
+-    if (!service) {
++    if (!this.#service) {
+       return;
+     }
+ 
+@@ -137,7 +135,7 @@ export class ContentClassifierRemoteSettingsClient {
+       lazy.log.error(`Error importing lists:`, error);
+     }
+ 
+-    service.onListsChanged(
++    this.#service?.onListsChanged(
+       records.map(r => r.Name),
+       []
+     );
+diff --git a/toolkit/components/content-classifier/test/unit/test_rs_client_shutdown.js b/toolkit/components/content-classifier/test/unit/test_rs_client_shutdown.js
+new file mode 100644
+index 0000000000..2f1872695c
+--- /dev/null
++++ b/toolkit/components/content-classifier/test/unit/test_rs_client_shutdown.js
+@@ -0,0 +1,96 @@
++/* Any copyright is dedicated to the Public Domain.
++   http://creativecommons.org/publicdomain/zero/1.0/ */
++
++"use strict";
++
++const { ContentClassifierRemoteSettingsClient } = ChromeUtils.importESModule(
++  "resource://gre/modules/ContentClassifierRemoteSettingsClient.sys.mjs"
++);
++const { RemoteSettings } = ChromeUtils.importESModule(
++  "resource://services-settings/remote-settings.sys.mjs"
++);
++const { sinon } = ChromeUtils.importESModule(
++  "resource://testing-common/Sinon.sys.mjs"
++);
++
++const rs = RemoteSettings("content-classifier-lists");
++
++function makeFakeService() {
++  return {
++    calls: [],
++    onListsChanged(updated, removed) {
++      this.calls.push({ updated, removed });
++    },
++  };
++}
++
++add_setup(() => {
++  do_get_profile();
++  registerCleanupFunction(() => sinon.restore());
++});
++
++add_task(async function test_import_notifies_service() {
++  sinon.stub(rs, "get").resolves([{ Name: "list-a" }]);
++
++  const client = new ContentClassifierRemoteSettingsClient();
++  const service = makeFakeService();
++  await client.init(service);
++
++  Assert.deepEqual(
++    service.calls,
++    [{ updated: ["list-a"], removed: [] }],
++    "the initial import notifies the service"
++  );
++
++  client.shutdown();
++  sinon.restore();
++});
++
++add_task(async function test_import_pending_across_shutdown() {
++  const { promise, resolve } = Promise.withResolvers();
++  sinon.stub(rs, "get").returns(promise);
++
++  const client = new ContentClassifierRemoteSettingsClient();
++  const service = makeFakeService();
++  const initPromise = client.init(service);
++
++  client.shutdown();
++  resolve([{ Name: "list-a" }]);
++  await initPromise;
++
++  Assert.deepEqual(
++    service.calls,
++    [],
++    "an import finishing after shutdown() does not notify the service"
++  );
++
++  sinon.restore();
++});
++
++add_task(async function test_sync_pending_across_shutdown() {
++  sinon.stub(rs, "get").resolves([]);
++
++  const client = new ContentClassifierRemoteSettingsClient();
++  const service = makeFakeService();
++  await client.init(service);
++  service.calls = [];
++
++  const { promise, resolve } = Promise.withResolvers();
++  sinon.stub(rs.attachments, "deleteDownloaded").returns(promise);
++
++  const syncPromise = client.onSync({
++    data: { deleted: [{ Name: "list-b" }] },
++  });
++
++  client.shutdown();
++  resolve();
++  await syncPromise;
++
++  Assert.deepEqual(
++    service.calls,
++    [],
++    "a sync finishing after shutdown() does not notify the service"
++  );
++
++  sinon.restore();
++});
+diff --git a/toolkit/components/content-classifier/test/unit/xpcshell.toml b/toolkit/components/content-classifier/test/unit/xpcshell.toml
+index 56c8be421c..f29564be89 100644
+--- a/toolkit/components/content-classifier/test/unit/xpcshell.toml
++++ b/toolkit/components/content-classifier/test/unit/xpcshell.toml
+@@ -1,3 +1,5 @@
+ [DEFAULT]
+ 
++["test_rs_client_shutdown.js"]
++
+ ["test_shutdown_blocker.js"]

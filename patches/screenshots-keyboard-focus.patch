@@ -1,0 +1,48 @@
+Sval: keep Screenshots' keyboard focus in its buttons and overlay
+
+Left or Right on the Save visible / Save full page buttons moved the
+crosshair and took focus off the buttons, so no key moved between them.
+From there Tab found nothing: the overlay prevents every key's default,
+and its focus lock only knew the face and Cancel. Left and Right move
+between the buttons, and Tab with nothing in the overlay focused enters
+it as the buttons' Tab does.
+
+diff --git a/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs b/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs
+index d6d73b4c85..c1a52cb96a 100644
+--- a/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs
++++ b/browser/components/screenshots/ScreenshotsOverlayChild.sys.mjs
+@@ -1099,6 +1099,8 @@ export class ScreenshotsOverlay {
+           } else {
+             this.previewCancelButton.focus({ focusVisible: true });
+           }
++        } else {
++          this.focus(event.shiftKey ? "backward" : "forward");
+         }
+         break;
+       case STATES.SELECTED:
+diff --git a/browser/components/screenshots/ScreenshotsUtils.sys.mjs b/browser/components/screenshots/ScreenshotsUtils.sys.mjs
+index 042f795c9c..5948c4a4f0 100644
+--- a/browser/components/screenshots/ScreenshotsUtils.sys.mjs
++++ b/browser/components/screenshots/ScreenshotsUtils.sys.mjs
+@@ -399,6 +399,21 @@ export var ScreenshotsUtils = {
+    * @returns
+    */
+   handleArrowKeyDown(event, browser) {
++    let group = event.composedTarget?.closest?.("moz-button-group");
++    if (group && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
++      let buttons = [...group.children];
++      let step = event.key === "ArrowRight" ? 1 : -1;
++      if (group.matches(":dir(rtl)")) {
++        step = -step;
++      }
++      let index = buttons.indexOf(event.composedTarget);
++      buttons[(index + step + buttons.length) % buttons.length].focus({
++        focusVisible: true,
++      });
++      event.preventDefault();
++      return;
++    }
++
+     // Wayland doesn't support `sendNativeMouseEvent` so just return
+     if (Services.appinfo.isWayland) {
+       return;

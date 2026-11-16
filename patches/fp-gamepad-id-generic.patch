@@ -1,0 +1,57 @@
+Sval: a generic id for standard-mapped gamepads
+
+A new RFPTarget, GamepadIdGeneric, makes Gamepad.id read "Standard Gamepad"
+for a gamepad whose mapping is "standard", in place of the vendor and
+product ids and device name. The standard mapping already gives every button
+its meaning, so games keep working; a gamepad without one keeps its id,
+which a page needs to map its buttons. RFPTarget::Gamepad, which hides
+gamepads entirely, stays a strict choice.
+
+No chrome API can change what Gamepad.id reports.
+
+diff --git a/dom/gamepad/Gamepad.cpp b/dom/gamepad/Gamepad.cpp
+index 3848684ea8..ff05102ef2 100644
+--- a/dom/gamepad/Gamepad.cpp
++++ b/dom/gamepad/Gamepad.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "mozilla/StaticPrefs_dom.h"
+ #include "mozilla/dom/GamepadBinding.h"
++#include "nsIGlobalObject.h"
+ #include "nsPIDOMWindow.h"
+ #include "nsTArray.h"
+ #include "nsVariant.h"
+@@ -188,6 +189,20 @@ void Gamepad::SyncState(Gamepad* aOther) {
+   UpdateTimestamp();
+ }
+ 
++void Gamepad::GetId(nsAString& aID) const {
++  // A standard mapping already tells a page every button's meaning, so the
++  // device name adds nothing a game needs.
++  if (mMapping == GamepadMappingType::Standard) {
++    nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
++    if (global &&
++        global->ShouldResistFingerprinting(RFPTarget::GamepadIdGeneric)) {
++      aID.AssignLiteral("Standard Gamepad");
++      return;
++    }
++  }
++  aID = mID;
++}
++
+ already_AddRefed<Gamepad> Gamepad::Clone(nsISupports* aParent) {
+   RefPtr<Gamepad> out =
+       new Gamepad(aParent, mID, mIndex, mHandle, mMapping, mHand,
+diff --git a/dom/gamepad/Gamepad.h b/dom/gamepad/Gamepad.h
+index 625c70cda8..df20ea6bfe 100644
+--- a/dom/gamepad/Gamepad.h
++++ b/dom/gamepad/Gamepad.h
+@@ -70,7 +70,7 @@ class Gamepad final : public nsISupports, public nsWrapperCache {
+   virtual JSObject* WrapObject(JSContext* aCx,
+                                JS::Handle<JSObject*> aGivenProto) override;
+ 
+-  void GetId(nsAString& aID) const { aID = mID; }
++  void GetId(nsAString& aID) const;
+ 
+   DOMHighResTimeStamp Timestamp() const { return mTimestamp; }
+ 

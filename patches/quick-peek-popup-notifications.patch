@@ -1,0 +1,84 @@
+Sval: show a Quick Peek's prompts while it is open
+
+A Quick Peek's page shows over the selected tab, which stays selected, and
+PopupNotifications shows only the selected browser's notifications. A
+prompt the Quick Peek's page raised, such as an extension install's, waited
+unseen and went when the Quick Peek closed.
+
+diff --git a/toolkit/modules/PopupNotifications.sys.mjs b/toolkit/modules/PopupNotifications.sys.mjs
+index 181ce91118..439eb001b8 100644
+--- a/toolkit/modules/PopupNotifications.sys.mjs
++++ b/toolkit/modules/PopupNotifications.sys.mjs
+@@ -40,6 +40,9 @@ const TELEMETRY_STAT_REOPENED_OFFSET = 20;
+ const lazy = {};
+ 
+ XPCOMUtils.defineLazyPreferenceGetter(lazy, "buttonDelay", PREF_SECURITY_DELAY);
++ChromeUtils.defineESModuleGetters(lazy, {
++  SvalQuickPeek: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
++});
+ 
+ var popupNotificationsMap = new WeakMap();
+ var gNotificationParents = new WeakMap();
+@@ -827,14 +830,12 @@ PopupNotifications.prototype = {
+     if (!suppress) {
+       // If notifications are not suppressed, always update the visibility.
+       this._suppress = false;
+-      let notifications = this.getNotificationsForBrowser(
+-        this.tabbrowser.selectedBrowser
+-      );
++      let notifications = this.getNotificationsForBrowser(this._activeBrowser);
+       this._update(
+         notifications,
+         this._getAnchorsForNotifications(
+           notifications,
+-          getAnchorFromBrowser(this.tabbrowser.selectedBrowser)
++          getAnchorFromBrowser(this._activeBrowser)
+         )
+       );
+       return;
+@@ -936,8 +937,8 @@ PopupNotifications.prototype = {
+    * Gets notifications for the currently selected browser.
+    */
+   get _currentNotifications() {
+-    return this.tabbrowser.selectedBrowser
+-      ? this.getNotificationsForBrowser(this.tabbrowser.selectedBrowser)
++    return this._activeBrowser
++      ? this.getNotificationsForBrowser(this._activeBrowser)
+       : [];
+   },
+ 
+@@ -996,7 +997,7 @@ PopupNotifications.prototype = {
+       this.panel.firstElementChild.notification.browser;
+     this.panel.hidePopup();
+     // Focus the browser if it's still selected by the time we dismiss.
+-    if (browser && this.tabbrowser.selectedBrowser === browser) {
++    if (browser && this._activeBrowser === browser) {
+       browser.focus();
+     }
+   },
+@@ -1649,7 +1650,15 @@ PopupNotifications.prototype = {
+     // actually being within the selected tab. We workaround this by
+     // comparing frameLoader instead, which is proxied from the outer
+     // <xul:browser> to the inner mozbrowser <iframe>.
+-    return this.tabbrowser.selectedBrowser.frameLoader == browser.frameLoader;
++    return this._activeBrowser.frameLoader == browser.frameLoader;
++  },
++
++  // A Quick Peek's page is shown over the selected tab, which stays selected.
++  get _activeBrowser() {
++    return (
++      lazy.SvalQuickPeek.tabOf(this.window)?.linkedBrowser ??
++      this.tabbrowser.selectedBrowser
++    );
+   },
+ 
+   _onIconBoxCommand: function PopupNotifications_onIconBoxCommand(event) {
+@@ -1717,7 +1726,7 @@ PopupNotifications.prototype = {
+     browser
+   ) {
+     // Mark notifications anchored to this anchor as un-dismissed
+-    browser = browser || this.tabbrowser.selectedBrowser;
++    browser = browser || this._activeBrowser;
+     let notifications = this.getNotificationsForBrowser(browser);
+     notifications.forEach(function (n) {
+       if (n.anchorElement == anchor) {

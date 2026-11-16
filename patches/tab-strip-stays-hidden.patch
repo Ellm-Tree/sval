@@ -1,0 +1,49 @@
+Sval: the tab strip stays collapsed in a window Sval shows the tabs of
+
+Sval's panel is where a window's tabs show (decision 0049).
+TabBarVisibility.update assigns TabsToolbar.collapsed on every tab open and
+close, and decides an ordinary window's strip shows. A window whose root
+has svaltabstriphidden (SvalFirefox.hideTabStrip) keeps the strip
+collapsed, with the tabs-hidden and browser-titlebar state Firefox gives a
+window whose strip it hides, so a custom titlebar keeps its window buttons.
+The File menu keeps Firefox's items for a window of tabs. No chrome API
+changes what update decides.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 783cda01a6..52c6ef5bd8 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -10251,15 +10251,21 @@ var TabBarVisibility = {
+     let tabsToolbar = document.getElementById("TabsToolbar");
+     let navbar = document.getElementById("nav-bar");
+ 
+-    gNavToolbox.toggleAttribute("tabs-hidden", hideTabsToolbar);
++    // Sval: a window whose tabs Sval's panel shows keeps its strip collapsed
++    // (SvalFirefox.hideTabStrip), with its menus as Firefox sets them.
++    let stripHidden =
++      hideTabsToolbar ||
++      document.documentElement.hasAttribute("svaltabstriphidden");
++
++    gNavToolbox.toggleAttribute("tabs-hidden", stripHidden);
+     // Should the nav-bar look and function like a titlebar?
+     navbar.classList.toggle(
+       "browser-titlebar",
+-      CustomTitlebar.enabled && hideTabsToolbar
++      CustomTitlebar.enabled && stripHidden
+     );
+ 
+     if (
+-      hideTabsToolbar == tabsToolbar.collapsed &&
++      stripHidden == tabsToolbar.collapsed &&
+       !force &&
+       this._initialUpdateDone
+     ) {
+@@ -10269,7 +10275,7 @@ var TabBarVisibility = {
+     }
+     this._initialUpdateDone = true;
+ 
+-    tabsToolbar.collapsed = hideTabsToolbar;
++    tabsToolbar.collapsed = stripHidden;
+ 
+     // Stylize close menu items based on tab visibility. When a window will only
+     // ever have a single tab, only show the option to close the tab, and

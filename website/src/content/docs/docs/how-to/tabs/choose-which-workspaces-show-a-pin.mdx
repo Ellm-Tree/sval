@@ -1,0 +1,55 @@
+---
+title: Choose which Workspaces show a pin
+description: Show a pin in every Workspace, or only in the ones you pick.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+A pin shows in every Workspace until you pick the Workspaces it should show
+in.
+
+Your Roon pin belongs in Home, and you don't want it in Work.
+
+<Screenshot name="docs-pin-menu" frame="rounded" maxWidth={400} alt="The Roon pin's menu with Show in open. Work, Home, and Ceramics Shop are checked." />
+
+## Steps
+
+1. In the pins row, right-click the pin, then point to **Show in**.
+2. Check each Workspace the pin should show in, and uncheck the others.
+3. Close the menu.
+
+The pin leaves the pins row in every Workspace you unchecked.
+
+## Details
+
+- To check every Workspace, select **Select all**. To uncheck every
+  Workspace, select **Deselect all**. The menu stays open while you check.
+- With every Workspace checked, the pin also shows in Workspaces you make
+  later.
+- If you close the menu with nothing checked, the pin stays where it was.
+<Until v="0.1.0-rc.10">
+
+- What you choose for a pinned folder applies to every pin inside the
+  folder. A pin inside a pinned folder has no Show in of its own.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- What you choose for a pin folder applies to every pin inside the pin
+  folder. A pin inside a pin folder has no Show in of its own.
+
+</Since>
+- To pin a tab only in the Workspace you're in, right-click the tab and
+  choose **Pin to This Workspace**.
+- Your choice of Workspaces for a pin syncs to your other devices.
+- When you delete a Workspace, Sval takes that Workspace out of every pin's
+  list. A pin left with no Workspaces shows in every Workspace.
+- Show in never lists agent Workspaces.
+- In a Workspace that doesn't show the pin, <kbd>⌘1</kbd> to <kbd>⌘9</kbd> skip that pin.
+
+## Related pages
+
+- [Pin a site](/docs/how-to/tabs/pin-a-site/)
+- [Tabs in a Workspace](/docs/reference/tabs/)

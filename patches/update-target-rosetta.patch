@@ -1,0 +1,30 @@
+Sval: name the CPU an Intel Mac build runs on in its update target
+
+Sval ships separate Apple silicon and Intel Mac builds. An Intel copy
+carried to an Apple silicon Mac, by Migration Assistant or a wrong
+download, runs under Rosetta and would take Intel updates for good. Its
+BUILD_TARGET gains "-aarch64" under Rosetta, as a Windows build's names
+the CPU it runs on, and the update feed answers that target with the
+Apple silicon build, whose complete update replaces the whole app.
+
+diff --git a/toolkit/modules/UpdateUtils.sys.mjs b/toolkit/modules/UpdateUtils.sys.mjs
+index 0d57bc90eb..ea9c2434d9 100644
+--- a/toolkit/modules/UpdateUtils.sys.mjs
++++ b/toolkit/modules/UpdateUtils.sys.mjs
+@@ -88,6 +88,16 @@ export var UpdateUtils = {
+           break;
+         case "BUILD_TARGET":
+           replacement = Services.appinfo.OS + "_" + this.ABI;
++          // An Intel build under Rosetta names the CPU it runs on, as a
++          // Windows build does in ABI, so the update feed can move it to the
++          // Apple silicon build. ABI itself stays the build's own: GMPUtils
++          // checks an installed media plugin's ABI against it.
++          if (
++            AppConstants.platform == "macosx" &&
++            Services.sysinfo.getProperty("rosettaStatus")
++          ) {
++            replacement += "-aarch64";
++          }
+           break;
+         case "OS_VERSION":
+           replacement = this.OSVersion;

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# A feature's name is capitalized as a noun. Split is also a verb, which
+# stays lowercase, so only its noun uses after a determiner match.
+extends: existence
+message: "Capitalize the feature name in '%s'."
+level: error
+ignorecase: false
+tokens:
+  - workspaces?
+  - launchers?
+  - (?:a|an|the|this|that|each|every|your|new) (?:peek|split)s?
+  - (?:Quick peek|quick Peek|quick peek)s?

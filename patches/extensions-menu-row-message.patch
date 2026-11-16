@@ -1,0 +1,67 @@
+Sval: an extension row keeps its message while its buttons are hovered
+
+Firefox swaps the message in a row of the extensions menu while the row's
+buttons are hovered or focused: what a click would do for the extension's
+own button, and "Manage extension" for its menu button. In Sval the row's
+message says what the extension can do on the site (SvalExtensionsMenu),
+and it stays.
+
+diff --git a/browser/base/content/browser-unified-extensions.js b/browser/base/content/browser-unified-extensions.js
+index 49d6166666..6b9ad28f82 100644
+--- a/browser/base/content/browser-unified-extensions.js
++++ b/browser/base/content/browser-unified-extensions.js
+@@ -104,16 +104,8 @@ customElements.define(
+             gUnifiedExtensions.MESSAGE_DECK_INDEX_DEFAULT;
+           break;
+ 
+-        case "focus":
+-        case "mouseover":
+-          if (target === this._menuButton) {
+-            this._messageDeck.selectedIndex =
+-              gUnifiedExtensions.MESSAGE_DECK_INDEX_MENU_HOVER;
+-          } else if (target === this._actionButton) {
+-            this._messageDeck.selectedIndex =
+-              gUnifiedExtensions.MESSAGE_DECK_INDEX_HOVER;
+-          }
+-          break;
++        // Sval: the row keeps its message while its buttons are hovered or
++        // focused.
+       }
+     }
+ 
+diff --git a/browser/components/extensions/parent/ext-browserAction.js b/browser/components/extensions/parent/ext-browserAction.js
+index 45ce82b3ef..b8cd2c219d 100644
+--- a/browser/components/extensions/parent/ext-browserAction.js
++++ b/browser/components/extensions/parent/ext-browserAction.js
+@@ -583,14 +583,8 @@ this.browserAction = class extends ExtensionAPIPersistent {
+     );
+ 
+     switch (event.type) {
+-      case "focus":
+-      case "mouseover": {
+-        if (messageDeck) {
+-          messageDeck.selectedIndex =
+-            window.gUnifiedExtensions.MESSAGE_DECK_INDEX_MENU_HOVER;
+-        }
+-        break;
+-      }
++      // Sval: the row keeps its message while its menu button is hovered or
++      // focused.
+ 
+       case "blur":
+       case "mouseout": {
+@@ -655,12 +649,8 @@ this.browserAction = class extends ExtensionAPIPersistent {
+         let tab = window.gBrowser.selectedTab;
+         let popupURL = this.action.getPopupUrl(tab);
+ 
+-        let { node } = window.gBrowser && this.widget.forWindow(window);
+-        if (node) {
+-          node.querySelector(
+-            ".unified-extensions-item-message-deck"
+-          ).selectedIndex = window.gUnifiedExtensions.MESSAGE_DECK_INDEX_HOVER;
+-        }
++        // Sval: the row keeps its message while its button is hovered or
++        // focused.
+ 
+         // We don't want to preload the popup on focus (for now).
+         if (event.type === "focus") {

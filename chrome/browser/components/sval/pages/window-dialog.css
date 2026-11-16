@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Firefox's dialogs that open as windows of their own (`WINDOW_DIALOGS` in
+   `SvalPageStyle`), in the palette and type of Sval's dialog frame. The
+   system draws the window's edge and corners, so the root drops the card's
+   border and radius that `dialog.css` gives a dialog in a modal box. No
+   browser window holds them, so they take the palette of the system's
+   theme. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-dialog.css");
+@import url("chrome://browser/content/sval/pages/dialog.css");
+
+/* The root's native window appearance paints the system's window grey over
+   the card on macOS. */
+:root {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+}
+
+/* The card's type and padding, and a clear `<dialog>`, which `dialog.css`
+   gives a dialog through `[dialogroot]`, an attribute only `SubDialog`
+   sets. An opaque `<dialog>` paints the system's dialog grey over the
+   card. */
+:root:not([dialogroot]) > dialog {
+  padding: 20px 24px 24px;
+  background: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* The browser's menu bar, which `macWindow.inc.xhtml` puts in a window.
+   `dialog.js` sizes the window to its content on load, while the bar still
+   takes its 22px; the native menu bar code hides it after (`menubar[native]`
+   in `xul.css`), leaving that height empty below the buttons. The native
+   menu bar is built from the element, displayed or not. */
+#main-menubar {
+  display: none;
+}

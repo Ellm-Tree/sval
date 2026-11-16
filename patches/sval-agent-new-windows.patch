@@ -1,0 +1,53 @@
+Sval: offer an agent tab's featureless new window to the chrome as a tab
+
+A page in an agent's tab that opens a link under browser.link.open_newwindow
+2, or with Shift held, gets a new window that Firefox opens in native code
+with no chrome JS on the way (nsWindowWatcher::GetWindowOpenLocation, then
+OpenWindowWithRemoteTab), so the window opens and takes focus before Sval can
+put its content in the agent's own window. This offers such an open from a
+tab Sval marks as an agent's (the SvalAgentTab field) to the chrome's
+createContentWindowInFrame first, still as OPEN_NEWWINDOW. Sval's chrome opens
+it as a background tab in the agent's window, or returns no element, and the
+window opens as it would have. A window asked for with window features is a
+popup and is left to Firefox. No chrome API is consulted for where a window
+opens.
+
+diff --git a/dom/ipc/ContentParent.cpp b/dom/ipc/ContentParent.cpp
+index 4cc1d62808..ef29eb4b82 100644
+--- a/dom/ipc/ContentParent.cpp
++++ b/dom/ipc/ContentParent.cpp
+@@ -5472,10 +5472,23 @@ mozilla::ipc::IPCResult ContentParent::CommonCreateWindow(
+ #endif
+   }
+ 
++  // Sval: a page in an agent's tab that asks for a window without window
++  // features, as a link does under browser.link.open_newwindow 2 or with
++  // Shift held, is offered to the chrome first, still as OPEN_NEWWINDOW.
++  // Sval's chrome opens it as a background tab in the agent's own window, or
++  // returns no element, and then the window opens as it would have.
++  const bool svalOfferNewWindow =
++      aOpenLocation == nsIBrowserDOMWindow::OPEN_NEWWINDOW && browserDOMWin &&
++      topBC && topBC->GetSvalAgentTab() &&
++      (aChromeFlags & ~(nsIWebBrowserChrome::CHROME_REMOTE_WINDOW |
++                        nsIWebBrowserChrome::CHROME_FISSION_WINDOW)) ==
++          nsIWebBrowserChrome::CHROME_ALL;
++
+   if (aOpenLocation == nsIBrowserDOMWindow::OPEN_NEWTAB ||
+       aOpenLocation == nsIBrowserDOMWindow::OPEN_NEWTAB_BACKGROUND ||
+       aOpenLocation == nsIBrowserDOMWindow::OPEN_NEWTAB_FOREGROUND ||
+-      aOpenLocation == nsIBrowserDOMWindow::OPEN_PRINT_BROWSER) {
++      aOpenLocation == nsIBrowserDOMWindow::OPEN_PRINT_BROWSER ||
++      svalOfferNewWindow) {
+     RefPtr<Element> openerElement = do_QueryObject(frame);
+ 
+     nsCOMPtr<nsIOpenURIInFrameParams> params =
+@@ -5492,6 +5505,9 @@ mozilla::ipc::IPCResult ContentParent::CommonCreateWindow(
+         VoidString(), getter_AddRefs(el));
+     RefPtr<nsFrameLoaderOwner> frameLoaderOwner = do_QueryObject(el);
+     if (NS_SUCCEEDED(aResult) && frameLoaderOwner) {
++      if (svalOfferNewWindow) {
++        aOpenLocation = nsIBrowserDOMWindow::OPEN_NEWTAB_BACKGROUND;
++      }
+       RefPtr<nsFrameLoader> frameLoader = frameLoaderOwner->GetFrameLoader();
+       if (frameLoader) {
+         aNewRemoteTab = frameLoader->GetRemoteTab();

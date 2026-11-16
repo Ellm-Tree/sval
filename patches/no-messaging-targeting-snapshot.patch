@@ -1,0 +1,29 @@
+Sval: no Firefox Messaging System targeting snapshot at startup
+
+BrowserGlue's BackgroundUpdate idle task writes targeting.snapshot.json for
+the background update task, which reads it to run Nimbus, the Firefox
+Messaging System and its telemetry ping. Sval runs none of them. Taking the
+snapshot evaluates every ASRouter targeting attribute, and two of those act:
+`needsUpdate` makes a foreground update check, and `crashData` lists the
+crash-reports folder. No pref turns the snapshot off, so the call goes;
+scheduling the background update task itself is left as it is.
+
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 97dee13c12..70457a35af 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -1226,14 +1226,6 @@ BrowserGlue.prototype = {
+             let { BackgroundUpdate } = ChromeUtils.importESModule(
+               "resource://gre/modules/BackgroundUpdate.sys.mjs"
+             );
+-            try {
+-              await BackgroundUpdate.scheduleFirefoxMessagingSystemTargetingSnapshotting();
+-            } catch (e) {
+-              console.error(
+-                "There was an error scheduling Firefox Messaging System targeting snapshotting: ",
+-                e
+-              );
+-            }
+             await BackgroundUpdate.maybeScheduleBackgroundUpdateTask();
+           }
+         },

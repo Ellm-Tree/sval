@@ -1,0 +1,124 @@
+Sval: Linux desktop integration names Sval by its own application id
+
+Gecko registers with the desktop portal as org.mozilla.firefox whatever the
+application's identity (DoRegisterHostApp), and the portal's permission
+store keys its grants by that id, so Sval and an installed Firefox shared
+their notification, location, camera, screen sharing and background grants.
+Sval registers app.sval.sval, the distribution id followed by the remoting
+name, which is also the name of its desktop entry. Notifications and MPRIS
+name the same desktop entry, so the desktop finds Sval's name and icon for
+them.
+
+The remoting name stays sval: it is the program name the windows carry,
+and the desktop entry's StartupWMClass ties those windows to the entry.
+
+diff --git a/toolkit/system/gnome/nsAlertsIconListener.cpp b/toolkit/system/gnome/nsAlertsIconListener.cpp
+index 8bcd426..9dc0da2 100644
+--- a/toolkit/system/gnome/nsAlertsIconListener.cpp
++++ b/toolkit/system/gnome/nsAlertsIconListener.cpp
+@@ -3,6 +3,7 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ #include "nsAlertsIconListener.h"
++#include "mozilla/WidgetUtilsGtk.h"
+ #include "imgIContainer.h"
+ #include "imgIRequest.h"
+ #include "nsServiceManagerUtils.h"
+@@ -233,7 +234,7 @@ nsresult nsAlertsIconListener::ShowAlert(imgIContainer* aImage) {
+     } else {
+       notify_notification_set_hint(
+           mNotification, "desktop-entry",
+-          g_variant_new("s", (const char*)gAppData->remotingName));
++          g_variant_new("s", mozilla::widget::GetDesktopEntryId().get()));
+     }
+   }
+ 
+diff --git a/widget/gtk/MPRISServiceHandler.cpp b/widget/gtk/MPRISServiceHandler.cpp
+index ca18fa5..9a19ffa 100644
+--- a/widget/gtk/MPRISServiceHandler.cpp
++++ b/widget/gtk/MPRISServiceHandler.cpp
+@@ -484,15 +484,18 @@ void MPRISServiceHandler::InitIdentity() {
+   rv = appInfo->GetVendor(mIdentity);
+   MOZ_ASSERT(NS_SUCCEEDED(rv));
+ 
++  nsAutoCString name;
+   if (gAppData) {
+-    mDesktopEntry = gAppData->remotingName;
++    name = gAppData->remotingName;
++    mDesktopEntry = GetDesktopEntryId();
+   } else {
+-    rv = appInfo->GetName(mDesktopEntry);
++    rv = appInfo->GetName(name);
+     MOZ_ASSERT(NS_SUCCEEDED(rv));
++    mDesktopEntry = name;
+   }
+ 
+   mIdentity.Append(' ');
+-  mIdentity.Append(mDesktopEntry);
++  mIdentity.Append(name);
+ 
+   LOGMPRIS("InitIdentity() MPRIS desktop ID %s", mDesktopEntry.get());
+ }
+diff --git a/widget/gtk/WidgetUtilsGtk.cpp b/widget/gtk/WidgetUtilsGtk.cpp
+index ef75a76..f7aac32 100644
+--- a/widget/gtk/WidgetUtilsGtk.cpp
++++ b/widget/gtk/WidgetUtilsGtk.cpp
+@@ -22,6 +22,8 @@
+ #include "nsString.h"
+ #include "nsGtkKeyUtils.h"
+ #include "nsGtkUtils.h"
++#include "nsAppRunner.h"
++#include "mozilla/XREAppData.h"
+ 
+ #include <gtk/gtk.h>
+ #include <dlfcn.h>
+@@ -184,6 +186,12 @@ bool IsRunningUnderFlatpak() {
+   return sRunning;
+ }
+ 
++nsCString GetDesktopEntryId() {
++  nsCString id(MOZ_DISTRIBUTION_ID ".");
++  id.Append(gAppData ? gAppData->remotingName : MOZ_APP_NAME);
++  return id;
++}
++
+ #ifdef MOZ_ENABLE_DBUS
+ static void DoRegisterHostApp() {
+   GUniquePtr<GError> error;
+@@ -202,7 +210,7 @@ static void DoRegisterHostApp() {
+ 
+   GVariantBuilder builder;
+   g_variant_builder_init(&builder, G_VARIANT_TYPE("(sa{sv})"));
+-  g_variant_builder_add(&builder, "s", "org.mozilla.firefox");
++  g_variant_builder_add(&builder, "s", GetDesktopEntryId().get());
+   GVariantBuilder dict_builder;
+   g_variant_builder_init(&dict_builder, G_VARIANT_TYPE("a{sv}"));
+   g_variant_builder_add_value(&builder, g_variant_builder_end(&dict_builder));
+diff --git a/widget/gtk/WidgetUtilsGtk.h b/widget/gtk/WidgetUtilsGtk.h
+index 1da1d2b..4f8ee1e 100644
+--- a/widget/gtk/WidgetUtilsGtk.h
++++ b/widget/gtk/WidgetUtilsGtk.h
+@@ -56,6 +56,11 @@ inline bool IsRunningUnderFlatpakOrSnap() {
+ void RegisterHostApp();
+ #endif
+ 
++// Sval: the application id the desktop knows the browser by, which names
++// its desktop entry: the distribution id followed by the remoting name. The
++// desktop portal, notifications and MPRIS identify the application by it.
++nsCString GetDesktopEntryId();
++
+ enum class PortalKind {
+   FilePicker,
+   MimeHandler,
+diff --git a/widget/gtk/moz.build b/widget/gtk/moz.build
+index e40a75b..80ef223 100644
+--- a/widget/gtk/moz.build
++++ b/widget/gtk/moz.build
+@@ -199,6 +199,7 @@ if not CONFIG["MOZ_SYSTEM_LIBDRM"]:
+ DEFINES["CAIRO_GFX"] = True
+ 
+ DEFINES["MOZ_APP_NAME"] = '"%s"' % CONFIG["MOZ_APP_NAME"]
++DEFINES["MOZ_DISTRIBUTION_ID"] = '"%s"' % CONFIG["MOZ_DISTRIBUTION_ID"]
+ 
+ CFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
+ CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]

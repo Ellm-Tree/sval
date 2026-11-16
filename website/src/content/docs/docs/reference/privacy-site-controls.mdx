@@ -1,0 +1,215 @@
+---
+title: Address bar site controls
+description: What the Privacy and Security button, the site controls, and the site settings menu show and do for the site you're on.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+For the site you're on, the address bar has two kinds of controls. The
+Privacy and Security button shows how Sval protects you on the site. The
+site controls at the end of the address bar show what the site is allowed
+to do.
+
+## The Privacy and Security button
+
+The button sits next to the site's address.
+
+- The number on the button counts the trackers and ads Sval blocked on the
+  page. It also counts the fingerprinters Sval foiled. Over 99, the number
+  reads 99+.
+- When the site had a data breach in the last year, a dot shows in place
+  of the number.
+- When the connection isn't secure, the button shows **Not secure**. When
+  Sval blocked the site as harmful, the button shows **Dangerous site**.
+- Selecting the button opens the Privacy and Security panel.
+
+## The Privacy and Security panel
+
+<Screenshot name="home-privacy" frame="rounded" maxWidth={520} alt="The Privacy and Security panel for cnn.com, showing trackers and ads blocked and per-site protection switches" />
+
+- The header names the site and says **Protections on** or **Protections
+  off for this site**. On an address like `nas.example.com`, the site's
+  name is a menu that picks that address alone or All of example.com.
+- **The connection line.** The line reads, for example, **Connection
+  secure**. Selecting it opens the certificate view, which shows **Verified as**, **Issued by**, **Valid**, and
+  **Encryption**, then **More information**, which opens Page Info.
+  **HTTPS-Only on this site** shows for a site you made an HTTPS-Only
+  exception for. **Remove certificate exception** shows for a certificate
+  you chose to trust.
+- A warning shows first when the connection isn't secure, when parts of the
+  page aren't secure, or when Sval didn't load the page.
+- **This site had a data breach.** The notice shows the month, how many
+  accounts were affected, and what was exposed. It names Have I Been Pwned
+  as the source. Its × dismisses the notice.
+- **On this page.** This counts **Trackers blocked**, **Ads blocked**, and
+  **Fingerprinting foiled**. With protections off, **Allowed on this page**
+  counts **Trackers loaded**.
+- Under This site, both switches reload the tab:
+  - **Protections for this site.** Sval blocks trackers and ads on the
+    site and resists fingerprinting.
+  - **Fingerprinting protection.** Turning this off lets the site read
+    your device's real values. While Protections is off, this switch is off and
+    you can't change it. Mozilla's compatibility fixes cover some sites.
+    When those fixes are on and cover the site, this switch shows off.
+    Turning the switch on keeps full protection on the site, without
+    Mozilla's fix.
+- At the bottom, **Manage sites** opens Settings › Sites. In a private
+  window, a note says the choices you make there last until you close the
+  window. They never sync.
+
+On Sval's own pages, local files, and extension pages, the
+Privacy and Security panel says that blocking and site controls don't apply.
+
+## The site controls
+
+From the start of the row:
+
+- **Camera, microphone, and screen sharing.** These buttons show while the
+  page uses them. The camera or microphone button mutes or unmutes that
+  device. The screen sharing button opens the site settings menu, where
+  **Stop** ends the sharing.
+- **Location.** This button shows while the site asks for your location,
+  and while the site uses your location. When the button is lit, selecting
+  it blocks location on the site. When the button is crossed out, selecting
+  it allows location on the site. Either way, the page reloads.
+- **Video and audio.** This media button plays or stops the page's video
+  and audio for this visit. When a page tries to play on a site set to Ask
+  first, Sval asks whether the page can play, under this button. The button
+  lights up until you answer.
+- **JavaScript.** This button turns JavaScript on or off for the site and
+  reloads the tab. The tooltip says whether your rule set it.
+- **Scissors and eraser.** The scissors button starts Snip. The eraser
+  button starts Remove from this site, and shows only once you pin it.
+  Each button shows how much it removed on the page.
+
+<Until v="0.1.0-rc.10">
+
+- **Site settings.** This button opens the site settings menu. When the
+  scissors or eraser button isn't pinned, its count shows on the Site
+  settings button. When the button shows no count, a dot on it shows that
+  the site has a saved [Colorshift](#colorshift).
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Colorshift.** This palette button opens [Colorshift](#colorshift),
+  and shows only once you pin it. A dot on it shows that the site has a
+  saved Colorshift.
+- **Site settings.** This button opens the site settings menu. When the
+  scissors or eraser button isn't pinned, its count shows on the Site
+  settings button. When the Site settings button shows no count and the
+  Colorshift button isn't pinned, a dot on the Site settings button shows
+  that the site has a saved Colorshift.
+
+</Since>
+
+The page's own buttons follow, after a divider:
+
+- **Translate.** This button shows while Sval can translate the page into
+  your language. While the page is translated, the button shows your
+  language's code.
+- **Reader View.** This button shows on an article and opens it in Reader
+  View.
+- **Favorite.** This button adds the page to your Favorites, or removes it.
+
+## The site settings menu
+
+<Screenshot name="home-site-controls-v2" alt="Site settings for bonappetit.com: zoom, element removal, Colorshift, video and audio, JavaScript, and per-site permissions" />
+
+The header names the site and says **Site settings**. On an address like
+`nas.example.com`, the site's name is a menu that picks that address alone
+or All of example.com.
+
+- **In use now.** This lists the camera, microphone, or screen the page
+  uses, with **Mute**, **Unmute**, or **Stop**.
+- **Zoom.** A slider shows the page's zoom and moves one step at a time.
+  **Reset** puts the zoom back.
+
+<Until v="0.1.0-rc.10">
+
+- **Colorshift.** **Colorshift This Site…** opens
+  [Colorshift](#colorshift), where you change how the site looks. With
+  nothing saved, the line under **Colorshift This Site…** reads "Change
+  this site's colors, theme, and font". When the site has a saved
+  Colorshift, the row has the same dot as the Site settings arrow. The line
+  then lists what the Colorshift changes, such as "Blue tint, dark theme,
+  serif font".
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Colorshift.** **Colorshift This Site…** opens
+  [Colorshift](#colorshift), where you change how the site looks. With
+  nothing saved, the line under **Colorshift This Site…** reads "Change
+  this site's colors, theme, and font". When the site has a saved
+  Colorshift, the row has the same dot as the Site settings button, or as
+  the Colorshift button once you pin it. The line then lists what the
+  Colorshift changes, such as "Blue tint, dark theme, serif font". The pin
+  next to **Colorshift This Site…** puts the Colorshift button in
+  the address bar.
+
+</Since>
+
+- **Elements.** **Remove from this site…** saves a rule that applies on
+  every visit. **Snip…** removes something until you reload. The pin next
+  to each one puts its button in the address bar. Below them, Removed from
+  this site lists what you removed, with **Show again** on each item. Then
+  comes **Manage in Settings**.
+- **Video and audio.** This offers **Always allow**, **Ask first**, and
+  **Always deny** for the site.
+- **JavaScript.** There's a switch for the site, and a pin for the
+  JavaScript button. Changing it reloads the tab. Turning JavaScript off
+  breaks some sites.
+- **Permissions.** This always lists Use the camera, Use the microphone,
+  Access your location, Send notifications, and pop-ups. Then come any
+  other permissions the site holds. Each permission has a menu of answers,
+  and an × that clears your answer. Pop-ups show how many Sval blocked on
+  the page. When you change a permission here, the tab reloads as the menu
+  closes.
+- **Clear cookies and site data.** Sval asks first. Then Sval clears the
+  site's data from where the tab keeps it, and reloads the tab. You're
+  signed out of the site.
+- At the bottom, **Manage sites** opens Settings › Sites.
+
+In private windows, Colorshift, Remove from this site, and the JavaScript
+switch are off, because each of them saves a choice.
+
+## Colorshift
+
+Colorshift changes how a site looks for you, on every visit. It opens from
+the site settings menu, from the menu you get when you right-click the page
+or a tab, from the Launcher, or from a key you give it. Colorshift opens over
+the page. The site settings menu can be open at the same time. The page shows each change as you make it. Your saved
+changes sync to all your devices. See
+[Colorshift a site](/docs/how-to/privacy/colorshift-a-site/) for the steps.
+
+- **Title.** The title names the site. Under the site's name, a line says you can
+  change the site's look and feel, and that your changes sync to all your
+  devices. On an address like `nas.example.com`, the site's name is a menu
+  that picks that address alone or All of `example.com`. **Close** works
+  as **Cancel** does. Dragging the title moves Colorshift.
+- **Color wheel.** The big dot's direction picks a color, and its distance
+  from the middle sets how strong the tint is. Light colors, like the page's
+  background, take the big dot's color. The small dot picks the color dark
+  colors take, like the page's text, and stays as far from the middle as the
+  big dot. With the big dot in the middle, the page has no tint.
+- **Contrast.** This moves the page's light and dark colors apart, or
+  closer together.
+- **Brightness.** This makes every color on the page lighter or darker.
+- **Saturation.** This makes the page's colors more vivid, or grayer.
+- **Theme.** This picks **Automatic**, **Light**, or **Dark**, under
+  **Prefers the site's own light or dark theme**. Automatic lets the site
+  follow Sval's own light or dark theme. Light and Dark ask the site for
+  that theme. When the site has none, Sval turns the page's colors light or
+  dark and leaves pictures and videos as they are.
+- **Font.** This picks Original, System, Serif, Monospace, or Readable.
+  Original keeps the site's own font.
+- **Reset style.** This shows only when the site has a saved Colorshift.
+  It sets every control to leave the site as it is, and the page shows the
+  site's own look at once.
+  **Save** then removes the saved Colorshift, and **Cancel** keeps it.
+- **Cancel.** The page goes back to how it looked when Colorshift opened,
+  and Colorshift closes. Escape does the same, and so does switching tabs.
+- **Save.** Sval keeps the changes for the site and closes Colorshift.

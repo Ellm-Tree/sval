@@ -1,0 +1,54 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Focus test page</title>
+  </head>
+  <body>
+    <form>
+      <label>Name <input id="name" /></label>
+      <p id="name-error" hidden>Name is required</p>
+      <label>Email <input id="email" /></label>
+      <button id="send" type="button">Send</button>
+    </form>
+    <script>
+      // What the page hears of focus and visibility, in order: an event's
+      // type and what it reached, an element by its id.
+      const heard = [];
+      window.heard = heard;
+      const where = target => {
+        if (target === window) {
+          return "window";
+        }
+        return target === document ? "document" : target.id;
+      };
+      for (const type of ["focus", "blur", "focusin", "focusout"]) {
+        window.addEventListener(
+          type,
+          event => {
+            if (
+              event.target !== window ||
+              event.eventPhase === Event.AT_TARGET
+            ) {
+              heard.push(`${type} ${where(event.target)}`);
+            }
+          },
+          true
+        );
+      }
+      document.addEventListener("visibilitychange", () =>
+        heard.push(`visibilitychange ${document.visibilityState}`)
+      );
+
+      // Validation on blur, as form libraries do it (Formik's validateOnBlur):
+      // a required field left empty shows its error once it loses focus.
+      const name = document.getElementById("name");
+      name.addEventListener("blur", () => {
+        document.getElementById("name-error").hidden = name.value !== "";
+      });
+    </script>
+  </body>
+</html>

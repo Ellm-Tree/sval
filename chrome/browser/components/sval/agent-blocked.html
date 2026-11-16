@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- about:agentblocked: the error page a top-level load in an agent's tab
+   - shows when Sval's agent gate refuses it. Its text is all Sval's own: the
+   - refused page sent nothing, and the address's host is the one thing the
+   - page takes from its URL. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Blocked by the user</title>
+    <link
+      rel="stylesheet"
+      href="chrome://global/skin/error-pages.css"
+      type="text/css"
+    />
+    <link rel="icon" href="chrome://global/skin/icons/blocked.svg" />
+  </head>
+  <body>
+    <div class="container">
+      <div id="text-container">
+        <div class="title">
+          <h1 class="title-text" id="sval-agent-blocked-title">
+            Blocked by the user
+          </h1>
+        </div>
+        <p id="sval-agent-blocked-reason">
+          The user has blocked this agent from opening this page.
+        </p>
+      </div>
+    </div>
+    <script
+      type="module"
+      src="chrome://browser/content/sval/agent-blocked.mjs"
+    ></script>
+  </body>
+</html>

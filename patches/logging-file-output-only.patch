@@ -1,0 +1,89 @@
+Sval: about:logging logs to a file only
+
+Its other output records into Firefox's profiler and then opens the result
+on profiler.firefox.com or uploads it to api.profiler.firefox.com, a host
+Sval does not contact (spec 10.9). The profiler choice is hidden, the page
+always takes the file output, an address asking for the profiler is refused
+as an invalid output, and the page's CSP no longer allows the upload host.
+
+diff --git a/toolkit/content/aboutLogging/aboutLogging.html b/toolkit/content/aboutLogging/aboutLogging.html
+index bed33cd14d..9be1491b85 100644
+--- a/toolkit/content/aboutLogging/aboutLogging.html
++++ b/toolkit/content/aboutLogging/aboutLogging.html
+@@ -9,7 +9,7 @@
+     <meta name="viewport" content="initial-scale=1" />
+     <meta
+       http-equiv="Content-Security-Policy"
+-      content="default-src chrome:; object-src 'none'; connect-src https://api.profiler.firefox.com"
++      content="default-src chrome:; object-src 'none'"
+     />
+     <meta name="color-scheme" content="light dark" />
+     <title data-l10n-id="about-logging-title"></title>
+@@ -171,20 +171,19 @@
+           ></span>
+         </div>
+         <h2 data-l10n-id="about-logging-logging-output-selection"></h2>
+-        <div id="logging-output-profiler" class="form-entry">
++        <div id="logging-output-profiler" class="form-entry" hidden>
+           <input
+             type="radio"
+             id="radio-logging-profiler"
+             name="logging-output"
+             value="profiler"
+-            checked
+           />
+           <label
+             for="radio-logging-profiler"
+             data-l10n-id="about-logging-logging-to-profiler"
+           ></label>
+         </div>
+-        <div id="profiler-configuration" class="form-entry">
++        <div id="profiler-configuration" class="form-entry" hidden>
+           <input type="checkbox" id="with-profiler-stacks-checkbox" /><label
+             for="with-profiler-stacks-checkbox"
+             data-l10n-id="about-logging-with-profiler-stacks-checkbox"
+@@ -200,6 +199,7 @@
+             id="radio-logging-file"
+             name="logging-output"
+             value="file"
++            checked
+           />
+           <label
+             for="radio-logging-file"
+diff --git a/toolkit/content/aboutLogging/aboutLogging.mjs b/toolkit/content/aboutLogging/aboutLogging.mjs
+index 8940d997f0..7ac1d138e9 100644
+--- a/toolkit/content/aboutLogging/aboutLogging.mjs
++++ b/toolkit/content/aboutLogging/aboutLogging.mjs
+@@ -199,7 +199,7 @@ const gLoggingPresets = {
+ 
+ const gLoggingSettings = {
+   // Possible values: "profiler" and "file".
+-  loggingOutputType: "profiler",
++  loggingOutputType: "file",
+   running: false,
+   // If non-null, the profiler preset to use. If null, the preset selected in
+   // the dropdown is going to be used. It is also possible to use a "custom"
+@@ -391,7 +391,7 @@ function parseURL() {
+           break;
+         case "output":
+         case "output-type":
+-          if (v !== "profiler" && v !== "file") {
++          if (v !== "file") {
+             throw new ParseError("about-logging-invalid-output", k, v);
+           }
+           outputTypeOverriden = v;
+@@ -554,13 +554,7 @@ function init() {
+     );
+   });
+ 
+-  let loggingOutputType = Services.prefs.getCharPref(
+-    "logging.config.output_type",
+-    "profiler"
+-  );
+-  if (loggingOutputType.length) {
+-    updateLoggingOutputType(loggingOutputType);
+-  }
++  updateLoggingOutputType("file");
+ 
+   $("#with-profiler-stacks-checkbox").checked = Services.prefs.getBoolPref(
+     "logging.config.profilerstacks",

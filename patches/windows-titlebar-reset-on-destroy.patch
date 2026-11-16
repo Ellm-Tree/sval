@@ -1,0 +1,29 @@
+Sval: restore a window's default title bar before destroying it
+
+On Windows 11, nsWindow::SetCustomTitlebar has the Windows App SDK collapse
+the title bar (WindowsUIUtils::SetIsTitlebarCollapsed, which sets
+ExtendsContentIntoTitleBar). The SDK keeps that title bar's GDI objects
+after the window is destroyed: about twenty per window, in every Firefox
+channel. A process that opens and closes a few hundred windows reaches
+Windows' limit of 10,000 GDI objects, and the next window's title bar fails
+inside the SDK, which fail-fasts (e0464645 in
+Microsoft.UI.Windowing.Core.dll). Restoring the default title bar
+(ResetToDefault) before DestroyWindow frees them.
+
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+index 65e81fef82..11b54d3cc7 100644
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -1320,6 +1320,12 @@ void nsWindow::Destroy() {
+    */
+   DestroyLayerManager();
+ 
++  // The Windows App SDK keeps a collapsed title bar's resources past the
++  // window's destruction; restoring the default title bar first frees them.
++  if (mCustomNonClient && ShouldAssociateWithWinAppSDK()) {
++    WindowsUIUtils::SetIsTitlebarCollapsed(mWnd, false);
++  }
++
+   // The DestroyWindow function destroys the specified window. The function
+   // sends WM_DESTROY and WM_NCDESTROY messages to the window to deactivate it
+   // and remove the keyboard focus from it. The function also destroys the

@@ -1,0 +1,26 @@
+Sval: the crash dialog can be reached from the Dock and Cmd-Tab
+
+The crash reporter's Info.plist sets LSUIElement, because the same binary
+also runs without a window (--ping-cleanup, --send-ping), and those runs
+must not put an icon in the Dock. It applies to the dialog too, so once
+another window covers it, neither the Dock nor Cmd-Tab can bring it back,
+and it waits there for the user. The run that shows a window switches to
+the regular activation policy before it activates.
+
+diff --git a/toolkit/crashreporter/client/app/src/ui/macos/mod.rs b/toolkit/crashreporter/client/app/src/ui/macos/mod.rs
+index e7503bcde8..dc1adc55c1 100644
+--- a/toolkit/crashreporter/client/app/src/ui/macos/mod.rs
++++ b/toolkit/crashreporter/client/app/src/ui/macos/mod.rs
+@@ -259,6 +259,12 @@ objc_class! {
+     impl AppDelegate: NSObject /*<NSApplicationDelegate>*/ {
+         #[sel(applicationDidFinishLaunching:)]
+         fn application_did_finish_launching(&mut self, _notification: Ptr<cocoa::NSNotification>) {
++            // Info.plist's LSUIElement keeps the windowless runs out of the Dock. The run that shows
++            // a window takes the regular policy, so the Dock and Cmd-Tab can bring its window back.
++            unsafe {
++                cocoa::NSApplication::sharedApplication()
++                    .setActivationPolicy_(cocoa::NSApplicationActivationPolicyRegular)
++            };
+             // Activate the application (bringing windows to the active foreground later)
+             unsafe { cocoa::NSApplication::sharedApplication().activateIgnoringOtherApps_(runtime::YES) };
+ 

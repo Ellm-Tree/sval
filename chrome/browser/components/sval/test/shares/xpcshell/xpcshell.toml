@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+[DEFAULT]
+firefox-appdir = "browser"
+# Every xpcshell manifest's baseline, which test/xpcshell/xpcshell.toml gives
+# the reason for. Without it no step writes to the share.
+prefs = ["services.settings.clock_skew_seconds=0"]
+# Real helper processes against a real network share: slower than the 30 s a
+# file gets by default, and a hang test waits out a step on purpose. The
+# restore file's SMB task takes about 75 s on Windows, where the share needs 30 s
+# to answer again after each restore.
+requesttimeoutfactor = 8
+run-sequentially = ["true"] # the tasks fault one shared NAS from one runner
+
+["test_sval_shares_hang.js"]
+
+["test_sval_shares_infra.js"]
+
+["test_sval_shares_quit.js"]
+
+["test_sval_shares_restore.js"]
+
+["test_sval_shares_reuse.js"]

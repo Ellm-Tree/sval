@@ -1,0 +1,35 @@
+Sval: test profiles start without Sval's first run or list downloads
+
+Every harness profile starts from testing/profiles/base, so a pref set there
+covers every mochitest and xpcshell profile, Mozilla's own tests included.
+
+- First run opens its dialog over the first window of a fresh profile, which
+  every harness profile is. A browser-chrome run whose manifest does not turn
+  it off then stops at its start: `Tester.nextTest` throws on the selected
+  browser and no test begins. Sval's first-run test turns it on for itself.
+- The harness crashes on a connection to a real host
+  (MOZ_DISABLE_NONLOCAL_CONNECTIONS), and a blocking level would otherwise
+  fetch its lists from their publishers. A test that needs a list serves it
+  itself.
+
+The harness reads these files from the source tree; no test manifest or
+chrome API reaches every profile.
+
+diff --git a/testing/profiles/base/user.js b/testing/profiles/base/user.js
+index eb09e84d30..bc43450bea 100644
+--- a/testing/profiles/base/user.js
++++ b/testing/profiles/base/user.js
+@@ -26,3 +26,13 @@ user_pref("browser.startup.couldRestoreSession.count", -1);
+ // This is used to disable address autofill telemetry since we cannot download
+ // the model within tests.
+ user_pref("extensions.formautofill.useml", false);
++
++// Sval: first run opens a window-modal dialog on a fresh profile, which every
++// harness profile is, and the harness cannot start a test behind it. Sval's
++// first-run test turns it on for itself.
++user_pref("browser.sval.firstRun.enabled", false);
++
++// Sval: blocking lists download from their publishers on a schedule, which
++// the harness forbids (MOZ_DISABLE_NONLOCAL_CONNECTIONS). A test that needs a
++// download serves the list itself.
++user_pref("browser.sval.adblock.updates.enabled", false);

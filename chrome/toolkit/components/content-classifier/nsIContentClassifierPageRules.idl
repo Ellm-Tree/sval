@@ -1,0 +1,24 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+#include "nsISupports.idl"
+
+/**
+ * A document's page rules, adblock-rust's UrlSpecificResources merged across
+ * the engines that block in its window's kind, in the engines pref's order.
+ * nsIContentClassifierService.pageRules builds one per address, and every
+ * frame at that address reads it.
+ */
+[scriptable, builtinclass, uuid(40c300ec-5ca5-41ac-8809-9e235a3d6738)]
+interface nsIContentClassifierPageRules : nsISupports {
+    /** The hiding selectors, each once. */
+    readonly attribute Array<ACString> selectors;
+    /** The procedural filters, each JSON-encoded as adblock-rust gives it. */
+    readonly attribute Array<ACString> proceduralActions;
+    /** The class and id selectors generic lookups leave out. */
+    readonly attribute Array<ACString> exceptions;
+    /** The scriptlets' code, each engine's in turn. */
+    readonly attribute ACString script;
+    /** Whether any engine excepts the address from generic rules. */
+    readonly attribute boolean generichide;
+};

@@ -1,0 +1,66 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's workspace and group dialog, on `sval-dialog.css`'s frame, with the
+ * colour section's look in `sval-color-picker.css`. The card's colour while
+ * a workspace's colour is chosen is set inline (`sval-dialog-frame.js`),
+ * because none is a value a stylesheet can name.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* As wide as the colours in one row, and never narrower than the frame's
+ * usual width. The name field takes whatever the row leaves it. */
+.sval-nw {
+  width: max-content;
+  min-width: max(400px, 100%);
+  max-width: none;
+}
+
+.sval-nw-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.sval-nw-name-field {
+  flex: 1;
+}
+
+/* Under the name field it belongs to, closer than the gap between fields. */
+#sval-nw-name-error {
+  margin-top: -12px;
+}
+
+/* An error result line (messages spec §9.6): a 16px glyph, a 10px gap, the
+ * sentence at 14px/20px in text ink. The glyph takes the dialog's error ink,
+ * which `sval-dialog.css` sets for each scheme and tint. */
+.sval-nw-look-error {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--sval-dialog-text);
+
+  &:empty {
+    display: none;
+  }
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-block-start: 2px;
+    background: center / contain no-repeat url("chrome://browser/content/sval/icons/circle-alert.svg");
+    -moz-context-properties: fill;
+    fill: var(--sval-dialog-error);
+  }
+}
+
+/* A secondary button like the dialog's others. It sits 2px above the row's
+ * bottom so it centres on the 44px name field beside it. */
+.sval-nw-emoji {
+  margin-bottom: 2px;
+}

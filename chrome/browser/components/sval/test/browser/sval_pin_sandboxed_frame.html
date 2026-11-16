@@ -1,0 +1,20 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>A page with a sandboxed frame</title>
+  </head>
+  <body>
+    <h1>Sandboxed</h1>
+    <!-- Scripts run, but the frame may neither navigate the page nor open
+         a popup. -->
+    <iframe
+      id="frame"
+      sandbox="allow-scripts"
+      srcdoc='<a id="out" target="_top" href="https://example.org/browser/browser/components/sval/test/browser/sval_agent_page2.html">Away</a>'
+    ></iframe>
+  </body>
+</html>

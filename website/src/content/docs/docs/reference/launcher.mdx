@@ -1,0 +1,200 @@
+---
+title: Address bar and Launcher
+description: What the address bar and the Launcher show, the keys they answer, and the settings that change them.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+The Launcher is the address bar, opened over the page. What you type in
+the Launcher can go to a page, search the web, switch to an open tab in
+any Workspace, or run one of Sval's commands. The search field on the home
+page lists the same rows and answers the same keys.
+
+<Screenshot name="features-launcher" alt="The Launcher searching lisbon, with open tabs from other Workspaces, a Favorite, and history" />
+
+## The address bar
+
+The address bar sits in the toolbar. While you're not typing, the address
+bar shows the page's address the way you chose in Settings › Appearance › Address bar.
+
+- The site name is shown without "www.". The rest of the address is
+  dimmed.
+- When the address doesn't fit, Sval drops whole parts from the left, so
+  the end of the address stays in view.
+- When there's room, the address bar shows the Launcher's shortcut at its
+  right end.
+- When you click the address bar, or reach it with <kbd>F6</kbd>, the list opens right
+  there in the toolbar.
+
+## Opening the Launcher
+
+<kbd>⌘L</kbd> (<kbd>Ctrl+L</kbd> on Windows and Linux) opens the Launcher in the middle of the
+window, over the page, with the address selected. <kbd>Alt+D</kbd> does the same on
+Windows and Linux. In the menu bar, **File › Launcher…** opens it too.
+
+- Escape, or a click outside the Launcher, closes the Launcher and takes
+  you back to the page.
+- With nothing typed, the Launcher lists your most recently used tabs
+  under Recent tabs.
+- The field reads "Search, go to a tab, or run a command" until you type.
+
+## Sections
+
+<Until v="0.1.0-rc.10">
+
+As you type, the Launcher lists what matches, in sections. The first row
+is what Enter opens. It's the best match among your open tabs, an address
+Sval completes for you, or a search. The sections come after that first
+row. Until you change it, the order is:
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+As you type, the Launcher lists what matches, in sections. The first row
+is what Enter opens: a search for what you typed, or the site when you
+type an address or Sval completes one. An open tab is never the first row.
+When what you typed starts a word in an open tab's title, or starts the
+tab's domain, Open tabs comes right after the first row. Otherwise the
+sections come in this order until you change it:
+
+</Since>
+
+- **Open tabs.** This section lists up to 4 open tabs from every
+  Workspace. A tab in another Workspace shows that Workspace's emoji and
+  name, in the Workspace's color. Enter on that tab switches to its
+  Workspace.
+- **Pins and Favorites.** This section lists up to 3 of your pins and
+  Favorites.
+- **Commands.** This section lists up to 3 of Sval's commands whose names
+  match.
+- **History.** This section lists up to 5 pages you've visited.
+- **Search suggestions.** This section lists up to 3 suggestions from your
+  search engine.
+
+Each page shows once, in the first section it fits. Typing % and a
+space lists every open tab.
+
+## What Enter does
+
+The selected row names what Enter does there: **Open**, **Search**,
+**Switch to tab**, Switch to and a Workspace's name, **Go to pin**, **Go to
+Favorite**, **Run**, or **Choose**.
+
+The line under the list names the other keys that work on the selected
+row. It also says what each key does there.
+
+- **New tab:** <kbd>Shift+Enter</kbd> opens the page in a new tab.
+- **New window:** <kbd>⇧⌘Enter</kbd> (<kbd>Ctrl+Shift+Enter</kbd>) opens the page in a new
+  window.
+- **Split:** <kbd>⌥Enter</kbd> (<kbd>Alt+Enter</kbd>) opens the page next to this tab in a
+  Split. On an open tab, it reads **Split with this tab**.
+- **Remove:** <kbd>⇧⌫</kbd> (<kbd>Shift+Delete</kbd> on Windows and
+  Linux) removes a History or Search suggestions row, so the row stops
+  showing.
+- **Runs it from anywhere** names the command's own shortcut. **No
+  shortcut** means the command has none.
+- **Opens a list** marks a command that asks you to choose something next.
+- **Close:** Escape.
+
+On an open tab, every Enter key except <kbd>⌥Enter</kbd> switches to that tab. A
+modifier never opens a second copy of the tab. A Split never mixes an
+agent's tabs with yours, so on an agent's tab, <kbd>⌥Enter</kbd> switches to the tab
+too. When you're in a pin, a page from another site opens in a new tab. A
+pin or Favorite row has no Split choice.
+
+## Commands
+
+Typing a few letters of a command's name finds the command. Commands that don't
+apply to the tab you're on are left out. The commands are:
+
+- **Workspaces:** Go to a Workspace by name, New Workspace, Rename
+  Workspace, and Move this tab to….
+
+<Until v="0.1.0-rc.10">
+
+- **Tabs:** Pin this tab, Pin this tab to this Workspace, Unpin this tab,
+  Add to Favorites, Copy address, Copy Markdown link, and Put this tab to
+  sleep. This group also has Keep this tab awake, Let this tab sleep,
+  Duplicate tab, Archive this tab, Reopen closed tab, Mute tab, Unmute tab,
+  and Reader view.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Tabs:** Pin this tab, Pin this tab to this Workspace, Move this pin to
+  Favorites, Add to Favorites, Copy address, Copy Markdown link, and Put
+  this tab to sleep. This group also has Keep this tab awake, Let this tab sleep,
+  Duplicate tab, Archive this tab, Reopen closed tab, Mute tab, Unmute tab,
+  and Reader view.
+
+</Since>
+
+- **Splits:** Split with…, Close Split, and Swap panes.
+- **The window:** Show or hide the Workspace panel.
+- **The site:** Privacy and Security, Site settings, Colorshift this site,
+  Clear site data, and Block JavaScript or Allow JavaScript.
+- **Agents:** Give Workspace back and Agent access settings.
+- **Settings:** General, Workspaces, Links, Sync and devices, Appearance,
+  Search and Launcher, Privacy and protection, Sites, and Keyboard
+  shortcuts settings.
+- **More:** Downloads, Extensions, Passwords, New Peek Window, New private
+  window, Print, Save as PDF, and Take a screenshot. This group also has
+  Translate page, Refresh Sval, Clear history, Restart Sval, Inspect page,
+  View page source, Color picker, and History.
+
+A command also matches other words for it. "Bookmark" finds Add to
+Favorites, and "unload" finds Put this tab to sleep.
+
+### Commands that ask you to choose
+
+**Move this tab to…** and **Split with…** keep the Launcher open and list
+your choices. Move this tab to… lists Workspaces, and Split with… lists
+tabs. The command shows at the start of the field.
+
+- Typing narrows the list.
+- **Current.** This marks the Workspace the tab is already in.
+- **New Workspace…** This row is last. When you've typed a name, the row
+  reads New Workspace "name"… and makes a Workspace with that name.
+- Backspace in the empty field, Escape, or the **Back** button takes you
+  back to the first list.
+
+## Settings › Search and Launcher › Launcher sections
+
+Launcher sections lists the sections in the order the Launcher shows
+them. The sections the Launcher doesn't show come last.
+
+- The menu next to a section sets how many rows the section lists, from
+  **None** to 10.
+- **Move up** and **Move down.** The section moves up or down one place.
+- **Hide.** The Launcher stops showing the section. The section moves to
+  the end of the list, marked **Not shown**. Its **Show** button puts it
+  back.
+
+These limits apply while you type. When you've typed nothing, or typed %,
+or you're in a command's list of choices, the Launcher lists every row
+that fits. These settings sync to your other devices.
+
+## Settings › Appearance › Address bar
+
+- **Site name.** You see the site alone. This is the default.
+- **Site and path.** You also see the path, without anything after a ? or
+  #.
+- **Full address.** You see the whole address after the site name.
+
+An example under the choices shows how each one looks.
+
+## Reader View
+
+On a page that can be read as an article, the Reader View button shows
+next to the address bar. Selecting the button, or pressing <kbd>⌥⌘R</kbd>, opens the
+page in Reader View. On Windows the key is <kbd>F9</kbd>, and on Linux it's <kbd>Ctrl+Alt+R</kbd>.
+
+## Narrow windows
+
+As you make a window narrower, the toolbar moves its buttons into the »
+menu one at a time. They go in this order: Split View, History, Downloads, Reader View,
+Favorite, the site controls, Home, Reload, and Forward. The buttons work the
+same from the » menu. The Workspace panel button, Back, and the address bar always stay
+in the toolbar.

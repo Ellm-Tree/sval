@@ -1,0 +1,32 @@
+Sval: tab previews stop counting popups that are no longer open
+
+TabHoverPanelSet counts a panel or menupopup as open from its
+popupshowing to its popuphiding, seeds the count with panels marked
+panelopen or animating, and shows no tab preview while any is counted. A
+popup can close with no popuphiding: its popupshowing was cancelled, it
+was removed from the document while open, or it was seeded closed but
+still marked animating, which panel.js clears only on popupshown. Any of
+these kept the window from showing a tab preview again. A counted popup
+that is closed or out of the document is dropped before the check.
+
+diff --git a/browser/components/tabbrowser/content/tab-hover-preview.mjs b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+index 2407a8a97f..bef6388ac3 100644
+--- a/browser/components/tabbrowser/content/tab-hover-preview.mjs
++++ b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+@@ -213,6 +213,16 @@ export default class TabHoverPanelSet {
+   }
+ 
+   shouldActivate() {
++    // Sval: a popup counted open can close without a popuphiding: its
++    // popupshowing was cancelled, it was removed from the document while
++    // open, or it was seeded closed but still marked animating, which
++    // panel.js clears only on popupshown. Each would keep every preview
++    // closed for the window's life.
++    for (const popup of this.#openPopups) {
++      if (!popup.isConnected || popup.state == "closed") {
++        this.#openPopups.delete(popup);
++      }
++    }
+     return (
+       // All other popups are closed.
+       !this.#openPopups.size &&

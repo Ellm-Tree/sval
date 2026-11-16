@@ -1,0 +1,151 @@
+Sval: a press of play plays the video on a site that asks first
+
+Under media.autoplay.site-permission-only a click or key press on a page
+allows nothing, because a page can call play() from any input. On a site
+that asks first, a play() made inside the handler of the user's press is
+allowed: the test media.autoplay.blocking_policy's user-input-depth policy
+makes (UserActivation::IsHandlingUserInput). A player's play button calls
+play() there, Gecko's own controls included, and a play() the page makes
+later, from a timer or after a load the press started, does not. Always
+deny and a tab's DENY refuse the press.
+
+A play() the press allowed sends SvalMediaPressPlayed, chrome-only, which
+the Autoplay actor forwards to the tab, so the front end can allow media
+for the rest of the visit. With the pref off nothing changes.
+
+diff --git a/dom/media/autoplay/AutoplayPolicy.cpp b/dom/media/autoplay/AutoplayPolicy.cpp
+index 8783bad41e..65e7be7297 100644
+--- a/dom/media/autoplay/AutoplayPolicy.cpp
++++ b/dom/media/autoplay/AutoplayPolicy.cpp
+@@ -145,6 +145,31 @@ static bool IsWindowAllowedToPlayBySitePermission(nsPIDOMWindowInner* aWindow) {
+   return IsWindowAllowedToPlayByTraits(aWindow);
+ }
+ 
++// Under media.autoplay.site-permission-only, whether the site's answer is ask
++// first: BLOCKED_ALL, its own or, for a site with none, the default's. Always
++// deny, the site's DENY or the default's, and a tab's DENY for a visit the
++// user stopped, refuse every press.
++static bool SiteAsksFirst(nsPIDOMWindowInner* aWindow) {
++  const uint32_t perm = SiteAutoplayPerm(aWindow);
++  return perm == nsIAutoplay::BLOCKED_ALL ||
++         (perm == nsIPermissionManager::UNKNOWN_ACTION &&
++          StaticPrefs::media_autoplay_site_permission_only_default() == 0);
++}
++
++// On a site that asks first, a media element plays when play() runs inside
++// the handler of the user's press, the test media.autoplay.blocking_policy's
++// user-input-depth policy makes. A player's own play button calls play()
++// there, and a play() the page makes later, from a timer or after a load the
++// press started, does not.
++static bool IsAllowedToPlayByPress(const HTMLMediaElement& aElement) {
++  if (UserActivation::IsHandlingUserInput() &&
++      SiteAsksFirst(aElement.OwnerDoc()->GetInnerWindow())) {
++    AUTOPLAY_LOG("Allow autoplay as play() is called inside user input.");
++    return true;
++  }
++  return false;
++}
++
+ static uint32_t DefaultAutoplayBehaviour() {
+   int32_t prefValue = StaticPrefs::media_autoplay_default();
+   if (prefValue == nsIAutoplay::ALLOWED) {
+@@ -248,7 +273,8 @@ static bool IsAllowedToPlayInternal(const HTMLMediaElement& aElement) {
+ #endif
+   if (StaticPrefs::media_autoplay_site_permission_only()) {
+     return IsWindowAllowedToPlayBySitePermission(
+-        aElement.OwnerDoc()->GetInnerWindow());
++               aElement.OwnerDoc()->GetInnerWindow()) ||
++           IsAllowedToPlayByPress(aElement);
+   }
+ 
+   bool isInaudible = IsMediaElementInaudible(aElement);
+@@ -409,6 +435,15 @@ DocumentAutoplayPolicy IsDocAllowedToPlay(const Document& aDocument) {
+   return DocumentAutoplayPolicy::Disallowed;
+ }
+ 
++/* static */
++bool AutoplayPolicy::IsAllowedToPlayOnlyByPress(
++    const HTMLMediaElement& aElement) {
++  return StaticPrefs::media_autoplay_site_permission_only() &&
++         !IsWindowAllowedToPlayBySitePermission(
++             aElement.OwnerDoc()->GetInnerWindow()) &&
++         IsAllowedToPlayByPress(aElement);
++}
++
+ /* static */
+ uint32_t AutoplayPolicy::GetSiteAutoplayPermission(nsIPrincipal* aPrincipal,
+                                                    uint64_t aBrowserId) {
+diff --git a/dom/media/autoplay/AutoplayPolicy.h b/dom/media/autoplay/AutoplayPolicy.h
+index 2765ca4b44..d5d4e44048 100644
+--- a/dom/media/autoplay/AutoplayPolicy.h
++++ b/dom/media/autoplay/AutoplayPolicy.h
+@@ -40,6 +40,10 @@ class AutoplayPolicy {
+   // Returns whether a given AudioContext is allowed to play.
+   static bool IsAllowedToPlay(const dom::AudioContext& aContext);
+ 
++  // Whether aElement may play only because the user input being handled
++  // calls play(), on a site set to ask first.
++  static bool IsAllowedToPlayOnlyByPress(const dom::HTMLMediaElement& aElement);
++
+   // Return the value of the autoplay permission for given principal. The return
+   // value can be 0=unknown, 1=allow, 2=block audio, 5=block audio and video.
+   // A permission scoped to the tab aBrowserId takes precedence over the
+diff --git a/dom/media/mediaelement/HTMLMediaElement.cpp b/dom/media/mediaelement/HTMLMediaElement.cpp
+index 6a5e332fd7..abcfcf6742 100644
+--- a/dom/media/mediaelement/HTMLMediaElement.cpp
++++ b/dom/media/mediaelement/HTMLMediaElement.cpp
+@@ -5043,6 +5043,13 @@ already_AddRefed<Promise> HTMLMediaElement::Play(ErrorResult& aRv) {
+ 
+   if (AllowedToPlay()) {
+     AUTOPLAY_LOG("allow MediaElement {} to play", fmt::ptr(this));
++    if (media::AutoplayPolicy::IsAllowedToPlayOnlyByPress(*this)) {
++      // Sval: the front end allows media for the visit the press started.
++      RefPtr<AsyncEventDispatcher> asyncDispatcher = new AsyncEventDispatcher(
++          this, u"SvalMediaPressPlayed"_ns, CanBubble::eYes,
++          ChromeOnlyDispatch::eYes);
++      asyncDispatcher->PostDOMEvent();
++    }
+     mAllowedToPlayPromise.ResolveIfExists(true, __func__);
+     PlayInternal(handlingUserInput);
+     UpdateCustomPolicyAfterPlayed();
+diff --git a/toolkit/actors/AutoplayChild.sys.mjs b/toolkit/actors/AutoplayChild.sys.mjs
+index e103a524a8..12ae8f6692 100644
+--- a/toolkit/actors/AutoplayChild.sys.mjs
++++ b/toolkit/actors/AutoplayChild.sys.mjs
+@@ -4,6 +4,11 @@
+ 
+ export class AutoplayChild extends JSWindowActorChild {
+   handleEvent(event) {
++    // Sval: a press played a video, on a site that asks first.
++    if (event.type == "SvalMediaPressPlayed") {
++      this.sendAsyncMessage("SvalMediaPressPlayed", {});
++      return;
++    }
+     // Sval: whether the user had just interacted with the page, so the front
+     // end can tell a press of play from autoplay, and what tried to play: a
+     // video or an audio element, or, from the document, Web Audio or an
+diff --git a/toolkit/actors/AutoplayParent.sys.mjs b/toolkit/actors/AutoplayParent.sys.mjs
+index 77166c067c..6032f09bd9 100644
+--- a/toolkit/actors/AutoplayParent.sys.mjs
++++ b/toolkit/actors/AutoplayParent.sys.mjs
+@@ -8,7 +8,7 @@ export class AutoplayParent extends JSWindowActorParent {
+     let browser = topBrowsingContext.embedderElement;
+     let document = browser.ownerDocument;
+     let event = document.createEvent("CustomEvent");
+-    event.initCustomEvent("GloballyAutoplayBlocked", true, false, {
++    event.initCustomEvent(message.name, true, false, {
+       url: this.documentURI,
+       userGesture: !!message.data?.userGesture,
+       kind: message.data?.kind ?? "media",
+diff --git a/toolkit/modules/ActorManagerParent.sys.mjs b/toolkit/modules/ActorManagerParent.sys.mjs
+index 8cab331f21..fbaea5e9bf 100644
+--- a/toolkit/modules/ActorManagerParent.sys.mjs
++++ b/toolkit/modules/ActorManagerParent.sys.mjs
+@@ -178,6 +178,7 @@ let JSWINDOWACTORS = {
+       esModuleURI: "resource://gre/actors/AutoplayChild.sys.mjs",
+       events: {
+         GloballyAutoplayBlocked: {},
++        SvalMediaPressPlayed: {},
+       },
+     },
+ 

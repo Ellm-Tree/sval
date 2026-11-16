@@ -1,0 +1,18 @@
+Sval: the installer's welcome page says what Sval is
+
+NSIS's stock welcome text asks the user to close every other application
+before installing. Sval's welcome page describes the browser in its place.
+
+diff --git a/browser/locales/en-US/installer/mui.properties b/browser/locales/en-US/installer/mui.properties
+index a4ebb900f4..78b0b08b10 100644
+--- a/browser/locales/en-US/installer/mui.properties
++++ b/browser/locales/en-US/installer/mui.properties
+@@ -22,7 +22,7 @@
+ # from en-US contains a \n.
+ 
+ MUI_TEXT_WELCOME_INFO_TITLE=Welcome to the $BrandFullNameDA Setup Wizard
+-MUI_TEXT_WELCOME_INFO_TEXT=This wizard will guide you through the installation of $BrandFullNameDA.\n\nIt is recommended that you close all other applications before starting Setup. This will make it possible to update relevant system files without having to reboot your computer.\n\n$_CLICK
++MUI_TEXT_WELCOME_INFO_TEXT=$BrandFullNameDA is a web browser that lets you organize your tabs into Workspaces and encrypts and syncs them to your other devices through storage you choose - no account necessary.\n\n$BrandFullNameDA puts you back in control over what information websites can collect about you, and blocks common tracking and fingerprinting techniques.\n\n$_CLICK
+ MUI_TEXT_COMPONENTS_TITLE=Choose Components
+ MUI_TEXT_COMPONENTS_SUBTITLE=Choose which features of $BrandFullNameDA you want to install.
+ MUI_INNERTEXT_COMPONENTS_DESCRIPTION_TITLE=Description

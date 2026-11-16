@@ -1,0 +1,31 @@
+Sval: a release build reads the beta feed when the user takes release candidates
+
+Every Sval release build is on the release channel, which the build fixes in
+its default prefs and UpdateUtils reads from them alone. The beta feed
+carries every release candidate and every release, so a user who turns on
+browser.sval.update.releaseCandidates (Settings, About) gets both, and one
+who turns it off again waits on the release feed for a newer build; the
+updater never offers an older one. Only the feed's URL changes: the channel
+the build reports, and every check that compares a downloaded update's
+channel against it, stay release.
+
+diff --git a/toolkit/modules/UpdateUtils.sys.mjs b/toolkit/modules/UpdateUtils.sys.mjs
+index 11ef622a5b..e3a9000a0d 100644
+--- a/toolkit/modules/UpdateUtils.sys.mjs
++++ b/toolkit/modules/UpdateUtils.sys.mjs
+@@ -97,6 +97,15 @@ export var UpdateUtils = {
+           break;
+         case "CHANNEL":
+           replacement = this.UpdateChannel;
++          if (
++            replacement == "release" &&
++            Services.prefs.getBoolPref(
++              "browser.sval.update.releaseCandidates",
++              false
++            )
++          ) {
++            replacement = "beta";
++          }
+           break;
+         case "PLATFORM_VERSION":
+           replacement = Services.appinfo.platformVersion;

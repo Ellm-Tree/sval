@@ -1,0 +1,79 @@
+Sval: macOS windows can be ordered behind another app's
+
+A link from another app opens over that app, but
+LaunchServices activates Sval before delivering the link, and AppKit queues
+Sval's key and main windows in front of every other app's as it handles the
+activation. SvalMacWindowOrder reads the activation as nsAppShell's
+applicationDidBecomeActive: runs, before AppKit commits the window
+transaction, and orders those windows behind the app the user was in. It
+also gives the chrome nsISvalMacWindowOrder, to bring a window kept behind
+forward and to hand activation to the app behind a closing window. Gecko's
+widgets only ever order a window in front (nsCocoaWindow::Show, SetFocus),
+so no chrome API does this.
+
+diff --git a/widget/cocoa/components.conf b/widget/cocoa/components.conf
+index 0ca2fba502..22b140d90a 100644
+--- a/widget/cocoa/components.conf
++++ b/widget/cocoa/components.conf
+@@ -139,6 +139,14 @@ Classes = [
+         'type': 'nsMacUserActivityUpdater',
+         'processes': ProcessSelector.ALLOW_IN_GPU_RDD_VR_SOCKET_AND_UTILITY_PROCESS,
+     },
++    {
++        # Sval: ordering windows among other apps'.
++        'cid': '{d8e203d4-75ce-4a49-a75b-a58bdf5af8b6}',
++        'contract_ids': ['@sval/mac-window-order;1'],
++        'type': 'SvalMacWindowOrder',
++        'headers': ['/widget/cocoa/SvalMacWindowOrder.h'],
++        'processes': ProcessSelector.MAIN_PROCESS_ONLY,
++    },
+     {
+         'cid': '{e9096367-ddd9-45e4-b762-49c0c18b7119}',
+         'contract_ids': ['@mozilla.org/widget/mac-web-app-utils;1'],
+diff --git a/widget/cocoa/moz.build b/widget/cocoa/moz.build
+index a6d143819e..bc69f80531 100644
+--- a/widget/cocoa/moz.build
++++ b/widget/cocoa/moz.build
+@@ -92,6 +92,7 @@ SOURCES += [
+     "nsClipboard.mm",
+     "nsDragService.mm",
+     "nsNativeThemeCocoa.mm",
++    "SvalMacWindowOrder.mm",  # Sval
+ ]
+ 
+ if not CONFIG["RELEASE_OR_BETA"] or CONFIG["MOZ_DEBUG"]:
+diff --git a/widget/cocoa/nsAppShell.mm b/widget/cocoa/nsAppShell.mm
+index babd2d0d4b..9ac9b645b5 100644
+--- a/widget/cocoa/nsAppShell.mm
++++ b/widget/cocoa/nsAppShell.mm
+@@ -38,6 +38,7 @@
+ #include "mozilla/widget/ScreenManager.h"
+ #include "HeadlessScreenHelper.h"
+ #include "MOZMenuOpeningCoordinator.h"
++#include "SvalMacWindowOrder.h"  // Sval
+ #include "pratom.h"
+ #if !defined(RELEASE_OR_BETA) || defined(DEBUG)
+ #  include "nsSandboxViolationSink.h"
+@@ -1113,6 +1114,9 @@ void nsAppShell::OnMemoryPressureChanged(
+         NSEventModifierFlagDeviceIndependentFlagsMask;
+   }
+ 
++  // Sval: before AppKit commits the activation's window transaction.
++  SvalMacWindowOrder::ActivationStarted();
++
+   nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
+   if (observerService) {
+     observerService->NotifyObservers(
+diff --git a/widget/moz.build b/widget/moz.build
+index 813b1d5351..95e3d75ab3 100644
+--- a/widget/moz.build
++++ b/widget/moz.build
+@@ -64,6 +64,8 @@ if toolkit == "cocoa":
+         "nsIMacUserActivityUpdater.idl",
+         "nsIMacWebAppUtils.idl",
+         "nsIStandaloneNativeMenu.idl",
++        # Sval: ordering windows among other apps' (SvalMacWindowOrder.mm).
++        "nsISvalMacWindowOrder.idl",
+         "nsITaskbarProgress.idl",
+         "nsITouchBarHelper.idl",
+         "nsITouchBarInput.idl",

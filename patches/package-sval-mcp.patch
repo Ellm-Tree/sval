@@ -1,0 +1,22 @@
+Sval: package sval-mcp beside the browser binary
+
+sval-mcp is the stdio program local agents launch to reach Sval. It ships in
+every package so Sval's installer and updater keep it at the browser's build.
+scripts/stage-sval-mcp.sh builds it into dist/bin before packaging, and the
+manifest copies only the files it names, so naming it is the only way in.
+
+diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
+index 525b87e86d..1a4fc28204 100644
+--- a/browser/installer/package-manifest.in
++++ b/browser/installer/package-manifest.in
+@@ -419,6 +419,10 @@ bin/libfreebl_64int_3.so
+ ;
+ @BINPATH@/pingsender@BIN_SUFFIX@
+ 
++; [ sval-mcp, the shim local agents launch to reach Sval ]
++;
++@BINPATH@/sval-mcp@BIN_SUFFIX@
++
+ ; [ Native Messaging Host Proxy ]
+ ;
+ #if defined(XP_WIN) || defined(XP_MACOSX)

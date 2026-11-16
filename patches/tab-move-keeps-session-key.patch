@@ -1,0 +1,96 @@
+Sval: a tab moved to another window keeps its session state
+
+tabbrowser's _swapBrowserDocShells swapped the browsers' permanentKey
+properties after swapping their docshells. The swap sets each browsing
+context's embedder, and CanonicalBrowsingContext::MaybeSetPermanentKey gives
+the context the key its new element holds at that moment: the other tab's.
+SessionStore files every update by the context's key, so whatever a moved
+tab reported afterwards (form data, scroll, history) went under a key no tab
+holds. SessionStore's onMoveToNewWindow copied the state across once, after
+a flush, and threw when the update it needed had not been processed yet
+(Mozilla bug 1938594, open, no fix upstream).
+
+Swapping the keys first makes each context's key its element's. The moved
+tab's state stays under its own key, so the copy, and its race, go.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index c710de0b07..c05c99d948 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -1967,10 +1967,6 @@ var SessionStoreInternal = {
+         // moved to a new window.
+         if (aEvent.detail.adoptedBy) {
+           this.moveCustomTabValue(target, aEvent.detail.adoptedBy);
+-          this.onMoveToNewWindow(
+-            target.linkedBrowser,
+-            aEvent.detail.adoptedBy.linkedBrowser
+-          );
+         } else if (!aEvent.detail.skipSessionStore) {
+           // `skipSessionStore` is set by tab close callers to indicate that we
+           // shouldn't record the closed tab.
+@@ -3465,26 +3461,6 @@ var SessionStoreInternal = {
+     return Array.from(splitViewData.values());
+   },
+ 
+-  /**
+-   * Flush and copy tab state when moving a tab to a new window.
+-   *
+-   * @param aFromBrowser
+-   *        Browser reference.
+-   * @param aToBrowser
+-   *        Browser reference.
+-   */
+-  onMoveToNewWindow(aFromBrowser, aToBrowser) {
+-    lazy.TabStateFlusher.flush(aFromBrowser).then(() => {
+-      let tabState = lazy.TabStateCache.get(aFromBrowser.permanentKey);
+-      if (!tabState) {
+-        throw new Error(
+-          "Unexpected undefined tabState for onMoveToNewWindow aFromBrowser"
+-        );
+-      }
+-      lazy.TabStateCache.update(aToBrowser.permanentKey, tabState);
+-    });
+-  },
+-
+   /**
+    * Save a closed tab if needed.
+    *
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index e512377f26..19812924f2 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -6638,16 +6638,27 @@
+       // so we need to toggle 'hidden' to make swapping work in this case.
+       ourBrowserContainer.hidden = otherBrowserContainer.hidden = false;
+ 
+-      // Swap the docshells
+-      ourBrowser.swapDocShells(aOtherBrowser);
+-
+-      ourBrowserContainer.hidden = ourBrowserContainerWasHidden;
+-      otherBrowserContainer.hidden = otherBrowserContainerWasHidden;
+-
+-      // Swap permanentKey properties.
++      // Swap permanentKey properties before the docshells. Each browsing
++      // context takes the key of the element it moves into
++      // (CanonicalBrowsingContext::MaybeSetPermanentKey), and SessionStore
++      // files the context's updates under that key, so the element must
++      // already hold the key the content keeps.
+       let ourPermanentKey = ourBrowser.permanentKey;
+       ourBrowser.permanentKey = aOtherBrowser.permanentKey;
+       aOtherBrowser.permanentKey = ourPermanentKey;
++
++      // Swap the docshells
++      try {
++        ourBrowser.swapDocShells(aOtherBrowser);
++      } catch (e) {
++        aOtherBrowser.permanentKey = ourBrowser.permanentKey;
++        ourBrowser.permanentKey = ourPermanentKey;
++        throw e;
++      } finally {
++        ourBrowserContainer.hidden = ourBrowserContainerWasHidden;
++        otherBrowserContainer.hidden = otherBrowserContainerWasHidden;
++      }
++
+       aOurTab.permanentKey = ourBrowser.permanentKey;
+       if (remoteBrowser) {
+         let otherTab = remoteBrowser.getTabForBrowser(aOtherBrowser);

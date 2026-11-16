@@ -1,0 +1,42 @@
+Sval: the DoH provider select reads a resolver's other URLs as it
+
+SvalSecureDns knows URLs that name a listed resolver another way, such as
+Mozilla's Cloudflare URL, and the dohProviderSelect setting matches the
+current URL against DoHConfigController's list exactly, so such a URL reads
+as "Custom". The setting reads the URL through
+SvalSecureDns.canonicalURL before it looks it up. The setting's matching
+is private to privacy.mjs, so no chrome API reaches it.
+
+diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
+index 8f9073fd87..68d618a798 100644
+--- a/browser/components/preferences/config/privacy.mjs
++++ b/browser/components/preferences/config/privacy.mjs
+@@ -28,6 +28,7 @@ const lazy = XPCOMUtils.declareLazy({
+   Management: "resource://gre/modules/Extension.sys.mjs",
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+   SiteDataManager: "resource:///modules/SiteDataManager.sys.mjs",
++  SvalSecureDns: "moz-src:///browser/components/sval/SvalSecureDns.sys.mjs",
+   IPProtection:
+     "moz-src:///browser/components/ipprotection/IPProtection.sys.mjs",
+   BANDWIDTH: "chrome://browser/content/ipprotection/ipprotection-constants.mjs",
+@@ -3477,7 +3478,8 @@ Preferences.addSetting({
+       // so we'll make a stub for it. Without an id, we'll have to use the url as the label
+       resolvers.unshift({ uri: defaultURI });
+     }
+-    let currentURI = deps.dohURL.value;
++    // Sval: a URL that names a listed resolver another way reads as it.
++    let currentURI = lazy.SvalSecureDns.canonicalURL(deps.dohURL.value);
+     if (currentURI && !resolvers.some(p => p.uri == currentURI)) {
+       this._custom = true;
+     }
+@@ -3510,7 +3512,9 @@ Preferences.addSetting({
+     if (this._custom) {
+       return "custom";
+     }
+-    let currentURI = deps.dohURL.value || deps.dohDefaultURL.value;
++    let currentURI = lazy.SvalSecureDns.canonicalURL(
++      deps.dohURL.value || deps.dohDefaultURL.value
++    );
+     let resolvers = lazy.DoHConfigController.currentConfig.providerList;
+     if (!resolvers.some(p => p.uri == currentURI)) {
+       this._custom = true;

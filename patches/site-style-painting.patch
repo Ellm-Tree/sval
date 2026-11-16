@@ -1,0 +1,481 @@
+Sval: pass the painted frame to the colors that skip nsIFrame
+
+Borders, outlines, backgrounds, gradient stops, SVG fill and stroke and
+collapsed table borders resolve their colors from a ComputedStyle, which
+knows no frame, so they would keep the page's colors under a site style.
+Each passes the frame it paints. A text field's background is a theme
+color no style resolves, and a background-color animation runs on the
+compositor, so both take the style where their color is made, as do a
+button's and a select's themed faces. A link's border is resolved
+without its frame, since it is styled where it is drawn.
+
+diff --git a/gfx/layers/AnimationInfo.cpp b/gfx/layers/AnimationInfo.cpp
+index 3c87298768..825092c7fe 100644
+--- a/gfx/layers/AnimationInfo.cpp
++++ b/gfx/layers/AnimationInfo.cpp
+@@ -16,6 +16,7 @@
+ #include "mozilla/MotionPathUtils.h"
+ #include "mozilla/PresShell.h"
+ #include "mozilla/ScrollContainerFrame.h"
++#include "mozilla/SvalSiteStyleColors.h"
+ #include "nsIContent.h"
+ #include "nsLayoutUtils.h"
+ #include "nsRefreshDriver.h"
+@@ -368,7 +369,10 @@ static void SetAnimatable(NonCustomCSSPropertyId aProperty,
+       // resolve currentColor at this moment.
+       nscolor foreground =
+           aFrame->Style()->GetVisitedDependentColor(&nsStyleText::mColor);
+-      aAnimatable = aAnimationValue.GetColor(foreground);
++      // The compositor paints the color as given, so it takes the site style
++      // here, as a color the main thread paints does.
++      aAnimatable = SvalSiteStyleColors::Resolve(
++          aAnimationValue.GetColor(foreground), aFrame);
+       break;
+     }
+     case eCSSProperty_opacity:
+diff --git a/layout/painting/nsCSSRendering.cpp b/layout/painting/nsCSSRendering.cpp
+index 3c824193ed..78c9d6b6b1 100644
+--- a/layout/painting/nsCSSRendering.cpp
++++ b/layout/painting/nsCSSRendering.cpp
+@@ -787,7 +787,7 @@ static nsCSSBorderRenderer ConstructBorderRenderer(
+   // pull out styles, colors
+   for (const auto i : mozilla::AllPhysicalSides()) {
+     borderStyles[i] = aStyleBorder.GetBorderStyle(i);
+-    borderColors[i] = aStyleBorder.BorderColorFor(i).CalcColor(*aStyle);
++    borderColors[i] = aStyleBorder.BorderColorFor(i).CalcColor(*aStyle, aForFrame);
+   }
+ 
+   PrintAsFormatString(
+@@ -1007,7 +1007,7 @@ nsCSSRendering::CreateBorderRendererForNonThemedOutline(
+   // This handles treating the initial color as 'currentColor'; if we
+   // ever want 'invert' back we'll need to do a bit of work here too.
+   nscolor outlineColor =
+-      aStyle->GetVisitedDependentColor(&nsStyleOutline::mOutlineColor);
++      aStyle->GetVisitedDependentColor(&nsStyleOutline::mOutlineColor, aForFrame);
+   nscolor outlineColors[4] = {outlineColor, outlineColor, outlineColor,
+                               outlineColor};
+ 
+@@ -2345,7 +2345,7 @@ static Maybe<nscolor> CalcScrollbarColor(nsIFrame* aFrame,
+   const auto& color = aKind == ScrollbarColorKind::Thumb
+                           ? colors.AsColors().thumb
+                           : colors.AsColors().track;
+-  return Some(color.CalcColor(*scrollbarStyle));
++  return Some(color.CalcColor(*scrollbarStyle, aFrame));
+ }
+ 
+ static nscolor GetBackgroundColor(nsIFrame* aFrame,
+@@ -2371,7 +2371,8 @@ static nscolor GetBackgroundColor(nsIFrame* aFrame,
+     default:
+       break;
+   }
+-  return aStyle->GetVisitedDependentColor(&nsStyleBackground::mBackgroundColor);
++  return aStyle->GetVisitedDependentColor(&nsStyleBackground::mBackgroundColor,
++                                          aFrame);
+ }
+ 
+ nscolor nsCSSRendering::DetermineBackgroundColor(nsPresContext* aPresContext,
+diff --git a/layout/painting/nsCSSRenderingBorders.cpp b/layout/painting/nsCSSRenderingBorders.cpp
+index fd2524fd78..c5b90bc789 100644
+--- a/layout/painting/nsCSSRenderingBorders.cpp
++++ b/layout/painting/nsCSSRenderingBorders.cpp
+@@ -3624,7 +3624,8 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
+     case StyleImage::Tag::Gradient: {
+       const StyleGradient& gradient = *mImageRenderer.GetGradientData();
+       nsCSSGradientRenderer renderer = nsCSSGradientRenderer::Create(
+-          aForFrame->PresContext(), aForFrame->Style(), gradient, mImageSize);
++          aForFrame->PresContext(), aForFrame->Style(), aForFrame, gradient,
++          mImageSize);
+ 
+       wr::ExtendMode extendMode;
+       nsTArray<wr::GradientStop> stops;
+diff --git a/layout/painting/nsCSSRenderingGradients.cpp b/layout/painting/nsCSSRenderingGradients.cpp
+index 80a9d36ca8..2b1e0a70ed 100644
+--- a/layout/painting/nsCSSRenderingGradients.cpp
++++ b/layout/painting/nsCSSRenderingGradients.cpp
+@@ -667,7 +667,8 @@ static nsTArray<ColorStop> ComputeColorStops(ComputedStyle* aComputedStyle,
+ 
+ nsCSSGradientRenderer nsCSSGradientRenderer::Create(
+     nsPresContext* aPresContext, ComputedStyle* aComputedStyle,
+-    const StyleGradient& aGradient, const nsSize& aIntrinsicSize) {
++    const nsIFrame* aFrame, const StyleGradient& aGradient,
++    const nsSize& aIntrinsicSize) {
+   auto srcSize = CSSSize::FromAppUnits(aIntrinsicSize);
+ 
+   // Compute "gradient line" start and end relative to the intrinsic size of
+@@ -704,6 +705,7 @@ nsCSSGradientRenderer nsCSSGradientRenderer::Create(
+ 
+   nsCSSGradientRenderer renderer;
+   renderer.mPresContext = aPresContext;
++  renderer.mFrame = aFrame;
+   renderer.mGradient = &aGradient;
+   renderer.mStops = std::move(stops);
+   renderer.mLineStart = {
+@@ -992,9 +994,10 @@ void nsCSSGradientRenderer::Paint(gfxContext& aContext, const nsRect& aDest,
+       GradientStopInterpolator(
+           const nsTArray<ColorStop>& aStops,
+           const StyleColorInterpolationMethod& aStyleColorInterpolationMethod,
+-          bool aExtend, nsTArray<gfx::GradientStop>& aResult)
++          bool aExtend, nsTArray<gfx::GradientStop>& aResult,
++          const nsIFrame* aFrame)
+           : ColorStopInterpolator(aStops, aStyleColorInterpolationMethod,
+-                                  aExtend),
++                                  aExtend, aFrame),
+             mStops(aResult) {}
+       void CreateStop(float aPosition, gfx::DeviceColor aColor) {
+         mStops.AppendElement(gfx::GradientStop{aPosition, aColor});
+@@ -1007,12 +1010,12 @@ void nsCSSGradientRenderer::Paint(gfxContext& aContext, const nsRect& aDest,
+     bool extend = !isRepeat && styleColorInterpolationMethod.hue ==
+                                    StyleHueInterpolationMethod::Longer;
+     GradientStopInterpolator interpolator(mStops, styleColorInterpolationMethod,
+-                                          extend, rawStops);
++                                          extend, rawStops, mFrame);
+     interpolator.CreateStops();
+   } else {
+     rawStops.SetLength(mStops.Length());
+     for (uint32_t i = 0; i < mStops.Length(); i++) {
+-      rawStops[i].color = ToDeviceColor(mStops[i].mColor);
++      rawStops[i].color = ToDeviceColor(mStops[i].mColor, mFrame);
+       rawStops[i].color.a *= aOpacity;
+       rawStops[i].offset = stopScale * (mStops[i].mPosition - stopOrigin);
+     }
+@@ -1203,8 +1206,10 @@ class MOZ_STACK_CLASS WrColorStopInterpolator
+   WrColorStopInterpolator(
+       const nsTArray<ColorStop>& aStops,
+       const StyleColorInterpolationMethod& aStyleColorInterpolationMethod,
+-      float aOpacity, nsTArray<wr::GradientStop>& aResult, bool aExtend)
+-      : ColorStopInterpolator(aStops, aStyleColorInterpolationMethod, aExtend),
++      float aOpacity, nsTArray<wr::GradientStop>& aResult, bool aExtend,
++      const nsIFrame* aFrame)
++      : ColorStopInterpolator(aStops, aStyleColorInterpolationMethod, aExtend,
++                              aFrame),
+         mResult(aResult),
+         mOpacity(aOpacity),
+         mOutputStop(0) {}
+@@ -1284,12 +1289,12 @@ void nsCSSGradientRenderer::BuildWebRenderParameters(
+                   styleColorInterpolationMethod.hue ==
+                       StyleHueInterpolationMethod::Longer;
+     WrColorStopInterpolator interpolator(mStops, styleColorInterpolationMethod,
+-                                         aOpacity, aStops, extend);
++                                         aOpacity, aStops, extend, mFrame);
+     interpolator.CreateStops();
+   } else {
+     aStops.SetLength(mStops.Length());
+     for (uint32_t i = 0; i < mStops.Length(); i++) {
+-      aStops[i].color = wr::ToColorF(ToDeviceColor(mStops[i].mColor));
++      aStops[i].color = wr::ToColorF(ToDeviceColor(mStops[i].mColor, mFrame));
+       aStops[i].color.a *= aOpacity;
+       aStops[i].offset = (float)mStops[i].mPosition;
+     }
+diff --git a/layout/painting/nsCSSRenderingGradients.h b/layout/painting/nsCSSRenderingGradients.h
+index 30f665f7ca..2d423423b7 100644
+--- a/layout/painting/nsCSSRenderingGradients.h
++++ b/layout/painting/nsCSSRenderingGradients.h
+@@ -42,10 +42,13 @@ class MOZ_STACK_CLASS ColorStopInterpolator {
+   ColorStopInterpolator(
+       const nsTArray<ColorStop>& aStops,
+       const StyleColorInterpolationMethod& aStyleColorInterpolationMethod,
+-      bool aExtend)
++      // The frame painted, whose site style the stops take. SVG's stops are
++      // styled already, through their own frames.
++      bool aExtend, const nsIFrame* aFrame = nullptr)
+       : mStyleColorInterpolationMethod(aStyleColorInterpolationMethod),
+         mStops(aStops),
+-        mExtend(aExtend) {}
++        mExtend(aExtend),
++        mFrame(aFrame) {}
+ 
+   void CreateStops() {
+     // This loop intentionally iterates extra stops at the beginning and end
+@@ -96,7 +99,7 @@ class MOZ_STACK_CLASS ColorStopInterpolator {
+             Servo_InterpolateColor(mStyleColorInterpolationMethod,
+                                    &start.mColor, &end.mColor, progress);
+         static_cast<T*>(this)->CreateStop(float(position),
+-                                          gfx::ToDeviceColor(color));
++                                          gfx::ToDeviceColor(color, mFrame));
+       }
+     }
+   }
+@@ -108,6 +111,7 @@ class MOZ_STACK_CLASS ColorStopInterpolator {
+   // which only matters if this is a CSS non-repeating gradient with
+   // StyleHueInterpolationMethod::Longer (only valid for hsl/hwb/lch/oklch).
+   bool mExtend;
++  const nsIFrame* mFrame;
+ 
+   // This could be made tunable, but at 1.0/128 the error is largely
+   // irrelevant, as WebRender re-encodes it to 128 pairs of stops.
+@@ -126,6 +130,7 @@ class nsCSSGradientRenderer final {
+    */
+   static nsCSSGradientRenderer Create(nsPresContext* aPresContext,
+                                       ComputedStyle* aComputedStyle,
++                                      const nsIFrame* aFrame,
+                                       const StyleGradient& aGradient,
+                                       const nsSize& aIntrinsiceSize);
+ 
+@@ -173,6 +178,7 @@ class nsCSSGradientRenderer final {
+  private:
+   nsCSSGradientRenderer()
+       : mPresContext(nullptr),
++        mFrame(nullptr),
+         mGradient(nullptr),
+         mRadiusX(0.0),
+         mRadiusY(0.0),
+@@ -192,6 +198,7 @@ class nsCSSGradientRenderer final {
+       const nsSize& aRepeatSize, bool aForceRepeatToCoverTiles);
+ 
+   nsPresContext* mPresContext;
++  const nsIFrame* mFrame;
+   const StyleGradient* mGradient;
+   nsTArray<ColorStop> mStops;
+   gfxPoint mLineStart, mLineEnd;  // only for linear/radial gradients
+diff --git a/layout/painting/nsImageRenderer.cpp b/layout/painting/nsImageRenderer.cpp
+index 6e464b48c9..0496eddab3 100644
+--- a/layout/painting/nsImageRenderer.cpp
++++ b/layout/painting/nsImageRenderer.cpp
+@@ -575,7 +575,7 @@ ImgDrawResult nsImageRenderer::Draw(nsPresContext* aPresContext,
+     }
+     case StyleImage::Tag::Gradient: {
+       nsCSSGradientRenderer renderer = nsCSSGradientRenderer::Create(
+-          aPresContext, mForFrame->Style(), *mGradientData, mSize);
++          aPresContext, mForFrame->Style(), mForFrame, *mGradientData, mSize);
+ 
+       renderer.Paint(*ctx, aDest, aFill, aRepeatSize, aSrc, aDirtyRect,
+                      aOpacity);
+@@ -652,7 +652,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
+   switch (mType) {
+     case StyleImage::Tag::Gradient: {
+       nsCSSGradientRenderer renderer = nsCSSGradientRenderer::Create(
+-          aPresContext, mForFrame->Style(), *mGradientData, mSize);
++          aPresContext, mForFrame->Style(), mForFrame, *mGradientData, mSize);
+ 
+       renderer.BuildWebRenderDisplayItems(aBuilder, aSc, aDest, aFill,
+                                           aRepeatSize, aSrc,
+@@ -1092,7 +1092,7 @@ ImgDrawResult nsImageRenderer::DrawShapeImage(nsPresContext* aPresContext,
+ 
+   if (mImage->IsGradient()) {
+     nsCSSGradientRenderer renderer = nsCSSGradientRenderer::Create(
+-        aPresContext, mForFrame->Style(), *mGradientData, mSize);
++        aPresContext, mForFrame->Style(), mForFrame, *mGradientData, mSize);
+     nsRect dest(nsPoint(0, 0), mSize);
+     renderer.Paint(aRenderingContext, dest, dest, mSize,
+                    CSSIntRect::FromAppUnitsRounded(dest), dest, 1.0);
+diff --git a/layout/svg/SVGUtils.cpp b/layout/svg/SVGUtils.cpp
+index c46bbc6ff9..989e74da77 100644
+--- a/layout/svg/SVGUtils.cpp
++++ b/layout/svg/SVGUtils.cpp
+@@ -1176,23 +1176,23 @@ gfxRect SVGUtils::PathExtentsToMaxStrokeExtents(const gfxRect& aPathExtents,
+ /* static */
+ nscolor SVGUtils::GetFallbackOrPaintColor(
+     const ComputedStyle& aStyle, StyleSVGPaint nsStyleSVG::* aFillOrStroke,
+-    nscolor aDefaultContextFallbackColor) {
++    nscolor aDefaultContextFallbackColor, const nsIFrame* aFrame) {
+   const auto& paint = aStyle.StyleSVG()->*aFillOrStroke;
+   nscolor color;
+   switch (paint.kind.tag) {
+     case StyleSVGPaintKind::Tag::PaintServer:
+       color = paint.fallback.IsColor()
+-                  ? paint.fallback.AsColor().CalcColor(aStyle)
++                  ? paint.fallback.AsColor().CalcColor(aStyle, aFrame)
+                   : NS_RGBA(0, 0, 0, 0);
+       break;
+     case StyleSVGPaintKind::Tag::ContextStroke:
+     case StyleSVGPaintKind::Tag::ContextFill:
+       color = paint.fallback.IsColor()
+-                  ? paint.fallback.AsColor().CalcColor(aStyle)
++                  ? paint.fallback.AsColor().CalcColor(aStyle, aFrame)
+                   : aDefaultContextFallbackColor;
+       break;
+     default:
+-      color = paint.kind.AsColor().CalcColor(aStyle);
++      color = paint.kind.AsColor().CalcColor(aStyle, aFrame);
+       break;
+   }
+   if (const auto* styleIfVisited = aStyle.GetStyleIfVisited()) {
+@@ -1206,7 +1206,8 @@ nscolor SVGUtils::GetFallbackOrPaintColor(
+     // another simple color.
+     if (paintIfVisited.kind.IsColor() && paint.kind.IsColor()) {
+       nscolor colors[2] = {
+-          color, paintIfVisited.kind.AsColor().CalcColor(*styleIfVisited)};
++          color,
++          paintIfVisited.kind.AsColor().CalcColor(*styleIfVisited, aFrame)};
+       return ComputedStyle::CombineVisitedColors(colors,
+                                                  aStyle.RelevantLinkVisited());
+     }
+@@ -1276,7 +1277,7 @@ void SVGUtils::MakeFillPatternFor(nsIFrame* aFrame, gfxContext* aContext,
+   // objectBoundingBox where the width or height of the object is zero.
+   // See http://www.w3.org/TR/SVG11/coords.html#ObjectBoundingBox
+   sRGBColor color(sRGBColor::FromABGR(GetFallbackOrPaintColor(
+-      *aFrame->Style(), &nsStyleSVG::mFill, NS_RGB(0, 0, 0))));
++      *aFrame->Style(), &nsStyleSVG::mFill, NS_RGB(0, 0, 0), aFrame)));
+   color.a *= fillOpacity;
+   aOutPattern->InitColorPattern(ToDeviceColor(color));
+ }
+@@ -1343,7 +1344,7 @@ void SVGUtils::MakeStrokePatternFor(nsIFrame* aFrame, gfxContext* aContext,
+   // objectBoundingBox where the width or height of the object is zero.
+   // See http://www.w3.org/TR/SVG11/coords.html#ObjectBoundingBox
+   sRGBColor color(sRGBColor::FromABGR(GetFallbackOrPaintColor(
+-      *aFrame->Style(), &nsStyleSVG::mStroke, NS_RGBA(0, 0, 0, 0))));
++      *aFrame->Style(), &nsStyleSVG::mStroke, NS_RGBA(0, 0, 0, 0), aFrame)));
+   color.a *= strokeOpacity;
+   aOutPattern->InitColorPattern(ToDeviceColor(color));
+ }
+diff --git a/layout/svg/SVGUtils.h b/layout/svg/SVGUtils.h
+index a4367a69d4..2ad32c3d01 100644
+--- a/layout/svg/SVGUtils.h
++++ b/layout/svg/SVGUtils.h
+@@ -429,7 +429,8 @@ class SVGUtils final {
+ 
+   static nscolor GetFallbackOrPaintColor(
+       const ComputedStyle&, StyleSVGPaint nsStyleSVG::* aFillOrStroke,
+-      nscolor aDefaultContextFallbackColor);
++      nscolor aDefaultContextFallbackColor,
++      const nsIFrame* aFrame = nullptr);
+ 
+   static void MakeFillPatternFor(nsIFrame* aFrame, gfxContext* aContext,
+                                  GeneralPattern* aOutPattern,
+diff --git a/layout/tables/nsTableFrame.cpp b/layout/tables/nsTableFrame.cpp
+index 7c6c774a93..6c194476ea 100644
+--- a/layout/tables/nsTableFrame.cpp
++++ b/layout/tables/nsTableFrame.cpp
+@@ -4090,7 +4090,7 @@ static void GetColorAndStyle(const nsIFrame* aFrame, WritingMode aTableWM,
+     return;
+   }
+   *aColor = aFrame->Style()->GetVisitedDependentColor(
+-      nsStyleBorder::BorderColorFieldFor(physicalSide));
++      nsStyleBorder::BorderColorFieldFor(physicalSide), aFrame);
+ 
+   if (aWidth) {
+     *aWidth = styleData->GetComputedBorderWidth(physicalSide);
+diff --git a/widget/Theme.cpp b/widget/Theme.cpp
+index 6ea267d340..d955e60d2f 100644
+--- a/widget/Theme.cpp
++++ b/widget/Theme.cpp
+@@ -18,6 +18,7 @@
+ #include "mozilla/RelativeLuminanceUtils.h"
+ #include "mozilla/ScrollContainerFrame.h"
+ #include "mozilla/StaticPrefs_widget.h"
++#include "mozilla/SvalSiteStyleColors.h"
+ #include "mozilla/webrender/WebRenderAPI.h"
+ #include "nsCSSColorUtils.h"
+ #include "nsCSSRendering.h"
+@@ -670,10 +671,15 @@ template <typename PaintBackendData>
+ void Theme::PaintTextField(PaintBackendData& aPaintData,
+                            const LayoutDeviceRect& aRect,
+                            const ElementState& aState, const Colors& aColors,
+-                           DPIRatio aDpiRatio) {
++                           DPIRatio aDpiRatio, const nsIFrame* aFrame) {
+   auto [backgroundColor, borderColor] =
+       ComputeTextfieldColors(aState, aColors, OutlineCoversBorder::Yes);
+ 
++  // The field's background is a theme color no style resolved, so it takes
++  // the page's site style here, as the field's text does.
++  backgroundColor = sRGBColor::FromABGR(
++      SvalSiteStyleColors::Resolve(backgroundColor.ToABGR(), aFrame));
++
+   const CSSCoord radius = 2.0f;
+ 
+   ThemeDrawing::PaintRoundedRectWithRadius(aPaintData, aRect, backgroundColor,
+@@ -690,19 +696,19 @@ template <typename PaintBackendData>
+ void Theme::PaintListbox(PaintBackendData& aPaintData,
+                          const LayoutDeviceRect& aRect,
+                          const ElementState& aState, const Colors& aColors,
+-                         DPIRatio aDpiRatio) {
++                         DPIRatio aDpiRatio, const nsIFrame* aFrame) {
+   // We happen to share style between text fields and list boxes.
+-  return PaintTextField(aPaintData, aRect, aState, aColors, aDpiRatio);
++  return PaintTextField(aPaintData, aRect, aState, aColors, aDpiRatio, aFrame);
+ }
+ 
+ template <typename PaintBackendData>
+ void Theme::PaintMenulist(PaintBackendData& aPaintData,
+                           const LayoutDeviceRect& aRect,
+                           const ElementState& aState, const Colors& aColors,
+-                          DPIRatio aDpiRatio) {
++                          DPIRatio aDpiRatio, const nsIFrame* aFrame) {
+   // We share styles between menulists and buttons.
+   return PaintButton(aPaintData, aRect, StyleAppearance::Menulist, aState,
+-                     aColors, aDpiRatio);
++                     aColors, aDpiRatio, aFrame);
+ }
+ 
+ enum class PhysicalArrowDirection {
+@@ -1018,10 +1024,16 @@ template <typename PaintBackendData>
+ void Theme::PaintButton(PaintBackendData& aPaintData,
+                         const LayoutDeviceRect& aRect,
+                         StyleAppearance aAppearance, const ElementState& aState,
+-                        const Colors& aColors, DPIRatio aDpiRatio) {
++                        const Colors& aColors, DPIRatio aDpiRatio,
++                        const nsIFrame* aFrame) {
+   const CSSCoord radius = 4.0f;
+   auto [backgroundColor, borderColor] = ComputeButtonColors(aState, aColors);
+ 
++  // The button's face is a theme color no style resolved, so it takes the
++  // page's site style here, as the button's text does.
++  backgroundColor = sRGBColor::FromABGR(
++      SvalSiteStyleColors::Resolve(backgroundColor.ToABGR(), aFrame));
++
+   if (aAppearance == StyleAppearance::Toolbarbutton &&
+       (!aState.HasState(ElementState::HOVER) ||
+        aState.HasState(ElementState::DISABLED))) {
+@@ -1158,13 +1170,16 @@ bool Theme::DoDrawWidgetBackground(PaintBackendData& aPaintData,
+     case StyleAppearance::Textfield:
+     case StyleAppearance::NumberInput:
+     case StyleAppearance::PasswordInput:
+-      PaintTextField(aPaintData, devPxRect, elementState, colors, dpiRatio);
++      PaintTextField(aPaintData, devPxRect, elementState, colors, dpiRatio,
++                     aFrame);
+       break;
+     case StyleAppearance::Listbox:
+-      PaintListbox(aPaintData, devPxRect, elementState, colors, dpiRatio);
++      PaintListbox(aPaintData, devPxRect, elementState, colors, dpiRatio,
++                   aFrame);
+       break;
+     case StyleAppearance::Menulist:
+-      PaintMenulist(aPaintData, devPxRect, elementState, colors, dpiRatio);
++      PaintMenulist(aPaintData, devPxRect, elementState, colors, dpiRatio,
++                    aFrame);
+       break;
+     case StyleAppearance::MozMenulistArrowButton:
+       if constexpr (std::is_same_v<PaintBackendData, WebRenderBackendData>) {
+@@ -1255,7 +1270,7 @@ bool Theme::DoDrawWidgetBackground(PaintBackendData& aPaintData,
+     case StyleAppearance::Button:
+     case StyleAppearance::Toolbarbutton:
+       PaintButton(aPaintData, devPxRect, aAppearance, elementState, colors,
+-                  dpiRatio);
++                  dpiRatio, aFrame);
+       break;
+     case StyleAppearance::FocusOutline:
+       PaintAutoStyleOutline(aFrame, aPaintData, devPxRect, colors, dpiRatio);
+diff --git a/widget/Theme.h b/widget/Theme.h
+index 4e0acbb25b..02f08c018e 100644
+--- a/widget/Theme.h
++++ b/widget/Theme.h
+@@ -161,13 +161,16 @@ class Theme : protected nsNativeTheme, public nsITheme {
+                            const ElementState&, DPIRatio);
+   template <typename PaintBackendData>
+   void PaintTextField(PaintBackendData&, const LayoutDeviceRect&,
+-                      const ElementState&, const Colors&, DPIRatio);
++                      const ElementState&, const Colors&, DPIRatio,
++                      const nsIFrame*);
+   template <typename PaintBackendData>
+   void PaintListbox(PaintBackendData&, const LayoutDeviceRect&,
+-                    const ElementState&, const Colors&, DPIRatio);
++                    const ElementState&, const Colors&, DPIRatio,
++                    const nsIFrame*);
+   template <typename PaintBackendData>
+   void PaintMenulist(PaintBackendData&, const LayoutDeviceRect&,
+-                     const ElementState&, const Colors&, DPIRatio);
++                     const ElementState&, const Colors&, DPIRatio,
++                     const nsIFrame*);
+   void PaintMenulistArrow(nsIFrame*, DrawTarget&, const LayoutDeviceRect&);
+   void PaintSpinnerButton(nsIFrame*, DrawTarget&, const LayoutDeviceRect&,
+                           const ElementState&, StyleAppearance, const Colors&,
+@@ -182,7 +185,8 @@ class Theme : protected nsNativeTheme, public nsITheme {
+                      bool aIsMeter);
+   template <typename PaintBackendData>
+   void PaintButton(PaintBackendData&, const LayoutDeviceRect&, StyleAppearance,
+-                   const ElementState&, const Colors&, DPIRatio);
++                   const ElementState&, const Colors&, DPIRatio,
++                   const nsIFrame*);
+ 
+   static void PrefChangedCallback(const char*, void*) {
+     LookAndFeel::NotifyChangedAllWindows(ThemeChangeKind::Layout);

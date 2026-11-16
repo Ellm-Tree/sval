@@ -1,0 +1,67 @@
+---
+title: Change fingerprinting protection
+description: Turn on Strict fingerprinting protection, change single protections, or go back to Sval's defaults.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Fingerprinting protection limits what sites can learn about your browser and
+device. Sval's defaults make you look like other Sval users and rarely break
+sites. In Settings, you can protect more, or less.
+
+You want sites to learn as little as possible about your computer, and you
+accept that some sites might break.
+
+<Screenshot name="docs-fingerprinting" frame="rounded" maxWidth={600} alt="Settings › Privacy and protection › Fingerprinting, with protection on in every window and Strict fingerprinting protection off" />
+
+## Turn on Strict fingerprinting protection
+
+1. Open Settings › Privacy and protection.
+2. Under Fingerprinting, turn on **Strict fingerprinting protection**.
+
+The line under the switch says how many strict items are on. The change
+takes effect the next time a page loads.
+
+## Change one protection
+
+1. Open Settings › Privacy and protection.
+2. Under Fingerprinting, open **Advanced**.
+3. Select a group, such as **Graphics**.
+4. Turn the protection you want on or off.
+
+Each protection says what it hides and what it can break.
+
+## Go back to Sval's defaults
+
+1. Open Settings › Privacy and protection.
+2. Under Fingerprinting, select **Restore Sval's defaults**.
+
+Sval shows the message **Restored Sval's defaults.**, with **Undo**.
+
+## Details
+
+- **Fingerprinting protection.** Choose where protection applies: **In
+  every window**, **Only in private windows**, or **Off**. It starts on In
+  every window.
+- **Strict fingerprinting protection.** This switch is off at first.
+  Turning it on turns on the strict items, which protect you more and break
+  more sites. When only some strict items are on, the switch reads Partly
+  on. Turning the switch on then turns on the rest.
+- **Tell sites all your languages.** The switch is off at first, so sites see
+  only your first language.
+- **Report the real CPU core count.** The switch is off at first, so each site
+  sees a count of its own, between half your cores and all of them.
+- **WebRTC (calls in the browser).** Choose **Allow calls**, **Only through
+  your proxy**, or **Block**. It starts on Allow calls, and sites don't see
+  your local network address.
+- **Mozilla's compatibility fixes.** You'll find this switch in Advanced,
+  under Compatibility. See
+  [Turn on Mozilla's compatibility fixes](/docs/how-to/privacy/turn-on-mozillas-compatibility-fixes/).
+- To turn protection off for one site, use the Privacy and Security button.
+  See [Turn off protections for a site](/docs/how-to/privacy/turn-off-protections-for-a-site/).
+
+## Related pages
+
+- [Give a site a fingerprinting exception](/docs/how-to/privacy/give-a-site-a-fingerprinting-exception/)
+- [Privacy and protection settings](/docs/reference/privacy/)
+- [What Sval keeps private](/docs/explanation/what-sval-keeps-private/)

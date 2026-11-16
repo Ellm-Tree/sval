@@ -1,0 +1,77 @@
+---
+title: Updates
+description: What each update control does, from the Notices button to the update settings in About Sval.
+---
+
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+Sval checks for updates and downloads them on its own. The controls below
+tell you when an update is ready. They also choose how Sval installs
+updates.
+
+## The Notices button
+
+While an update needs you, the Notices button shows in the header, with a
+dot. Selecting the button opens the update messages.
+
+A new message opens by itself once, in the window you're using. The message
+stays open until you select the Notices button or one of the message's
+buttons.
+
+- **Update available, restart.** "Get the latest version of Sval. Open tabs
+  and windows will be restored." **Update and restart** restarts Sval on
+  the new version. **Dismiss** closes the message.
+- **Update available, download.** "Download the latest version of Sval."
+  **Download** downloads the new version. **Dismiss** closes the message.
+- **Couldn't update.** "Sval couldn't update automatically." **Download**
+  opens the page to download the new version. **Dismiss** closes the
+  message.
+- **Unable to update.** Your operating system isn't compatible with the
+  latest version. **Learn more** opens a page about the problem.
+<Until v="0.1.0-rc.10">
+
+- **Another copy running.** "Close the other copy of Sval to finish
+  updating." **Update Anyway** updates now, and **Not Now** waits.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Another copy running.** "Close the other copy of Sval to finish
+  updating." **Update and Restart Anyway** restarts Sval on the new
+  version now, and **Not Now** waits. Once the other copy quits, the
+  message changes to the **Update available, restart** message.
+
+</Since>
+
+Some messages also have a **Learn more** link to the release notes.
+
+After you dismiss a message, a row stays until you restart. The row says an
+update is available. When you select the row, it does what the message's
+main button does. While an update downloads, a row reads **Downloading Sval
+update**.
+
+## About Sval in Settings
+
+### Sval updates
+
+- **The update status.** This shows the version you have, and whether Sval
+  is checking, downloading, or up to date. **Check for updates** checks
+  straight away. When an update is ready, the button restarts Sval to
+  finish the update.
+- **Show update history.** You see the updates Sval has installed.
+- **Automatically install updates (recommended).** Sval downloads and
+  installs updates on its own. This is the default.
+- **Check for updates, but choose when to install.** Sval asks you before
+  it downloads an update. If an update is downloading when you switch to
+  this, Sval asks whether to finish that update. **Finish Update** keeps
+  the update, and **Discard Update** drops it.
+- **When Sval is not running.** This shows on Windows, under Automatically
+  install updates. Sval can update while it's closed.
+
+### Release candidates
+
+- **Receive release candidate updates.** Sval updates to each release
+  candidate as well as each regular release. This is off unless this copy
+  of Sval started as a release candidate. The setting shows only on a copy
+  of Sval that updates itself.

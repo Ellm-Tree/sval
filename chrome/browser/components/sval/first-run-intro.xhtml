@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  One scene of first run's introduction, which `first-run-intro.js` fills.
+  The scenes draw Sval's own components, which are styled for the browser
+  window: by its stylesheets, by the tint on its root and in its dark
+  scheme. So each scene is a document of its own, which takes those sheets
+  and that root without restyling first run, and whose frame gives it the
+  dark scheme whatever the system's.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; img-src chrome: blob: data:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title></title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link rel="stylesheet" href="chrome://browser/skin/" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-header.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-panel.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-launcher.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-protection.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/first-run-intro.css"
+    />
+    <link rel="localization" href="branding/brand.ftl" />
+    <link rel="localization" href="browser/browser.ftl" />
+    <link rel="localization" href="sval/launcher.ftl" />
+    <script src="chrome://browser/content/sval/first-run-intro-scene.js"></script>
+  </head>
+
+  <body class="sval-fr-scene"></body>
+</html>

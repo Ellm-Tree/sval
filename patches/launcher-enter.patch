@@ -1,0 +1,180 @@
+Sval: Enter on an open-tab, pin or command row goes through Sval
+
+A row of Sval's open tabs (`SvalLauncherTabs`) may be a tab of a workspace
+no window shows, which has no Firefox tab for `switchToTabHavingURI` to
+find. Picking it calls the panel's own select, which changes workspace in
+the one place a window does and materialises the tab as a click on its row
+does (`SvalPanel.goToTab`). Firefox turns a modified Enter on a switch-to-tab
+row into a load; on Sval's row every Enter switches, so a modifier never
+duplicates an open tab. The empty tab the row was picked in closes once the
+switch has happened, as Firefox closes it after a switch to a tab. Alt+Enter
+on it splits this tab with it instead. So the address bar sets no
+`action-override` while a modifier is held: Firefox sets it so the next
+Enter loads a switch-to-tab row's page in place, and its row reads as a
+page to visit, while in the address bar every Enter on such a row switches
+or splits.
+
+Enter on a pin's row (`SvalFavoritesProvider`) shows the pin's page through
+the pins row's own select, as a click on the pin does, where Firefox would
+load the pin's address in the tab the field was typed in; Enter on a
+Favorite's row opens it as the Favorites menu does (`SvalFavorites.open`).
+
+Where Enter opens a page is Sval's mapping (`SvalLauncherEnter.whereFor`):
+Shift for a new tab, Accel+Shift for a new window and Alt for a split, where
+Firefox uses Shift for a window and Alt for a tab. `_whereToOpen` is where
+every pick and every Enter asks, and it is told the row picked, which
+Firefox does not pass. Firefox turns a keyed new tab back into this tab when
+this tab is empty; Sval's Shift+Enter always opens a new tab, so Home stays
+where it was. A split is no place `openTrustedLinkIn` knows, and a
+pin is no tab Firefox restricts (`allowPinnedTabHostChange` reads
+`tab.pinned`), so `_loadURL`, which every page load from the field goes
+through, asks Sval for both.
+
+The address bar lists its rows in sections, each with a limit of its own
+after Firefox's own count of rows (`SvalLauncherSections.maxResults`), so a
+query asks for that many rows; the view shows no more rows than the query
+asked for.
+
+A command that picks something (`SvalLauncherCommands`) keeps the view open
+on its choices, so its row is picked before `pickResult` closes the view,
+and while the choices show, a query asks only Sval's commands provider,
+through the query context's `providers`, which no input caller sets.
+
+diff --git a/browser/components/urlbar/content/UrlbarInput.mjs b/browser/components/urlbar/content/UrlbarInput.mjs
+index c5469e0cfc..24c08fc37a 100644
+--- a/browser/components/urlbar/content/UrlbarInput.mjs
++++ b/browser/components/urlbar/content/UrlbarInput.mjs
+@@ -70,6 +70,12 @@ const lazy = XPCOMUtils.declareLazy({
+   SharingUtils: "resource:///modules/SharingUtils.sys.mjs",
+   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
++  SvalLauncherCommands:
++    "moz-src:///browser/components/sval/SvalLauncherCommands.sys.mjs",
++  SvalLauncherEnter:
++    "moz-src:///browser/components/sval/SvalLauncherEnter.sys.mjs",
++  SvalLauncherSections:
++    "moz-src:///browser/components/sval/SvalLauncherSections.sys.mjs",
+   UrlbarController:
+     "moz-src:///browser/components/urlbar/UrlbarController.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+@@ -1513,6 +1519,10 @@ ${
+       return;
+     }
+ 
++    if (lazy.SvalLauncherCommands.pickInPlace(this, result)) {
++      return;
++    }
++
+     if (
+       lazy.UrlbarPrefs.get("autoFill.adaptiveHistory.enabled") &&
+       result.autofill &&
+@@ -1619,7 +1629,7 @@ ${
+ 
+       openParams.forceForeground = false;
+     } else {
+-      where = this._whereToOpen(event);
++      where = this._whereToOpen(event, result);
+       if (resultUrl && where == "current") {
+         // Open help links in a new tab.
+         where = "tab";
+@@ -1658,6 +1668,9 @@ ${
+ 
+     switch (result.type) {
+       case lazy.UrlbarUtils.RESULT_TYPE.URL: {
++        if (lazy.SvalLauncherEnter.pickFavorite(this, result, where, event)) {
++          return;
++        }
+         if (result.heuristic) {
+           // Bug 1578856: both the provider and the docshell run heuristics to
+           // decide how to handle a non-url string, either fixing it to a url, or
+@@ -1698,6 +1711,12 @@ ${
+         break;
+       }
+       case lazy.UrlbarUtils.RESULT_TYPE.TAB_SWITCH: {
++        if (result.payload.svalNodeId) {
++          let fromTab = this.window.gBrowser.selectedTab;
++          this.handleRevert();
++          lazy.SvalLauncherEnter.pickTab(this.window, result, fromTab, where);
++          return;
++        }
+         // Behaviour is reversed with SecondaryActions, default behaviour is to navigate
+         // and button is provided to switch to tab.
+         if (
+@@ -3923,6 +3942,9 @@ ${
+   }
+ 
+   _toggleActionOverride(event) {
++    if (this.#isAddressbar) {
++      return;
++    }
+     if (
+       event.keyCode == KeyEvent.DOM_VK_SHIFT ||
+       event.keyCode == KeyEvent.DOM_VK_ALT ||
+@@ -4338,6 +4360,12 @@ ${
+     browser = this.window.gBrowser.selectedBrowser,
+     keepViewOpen = false
+   ) {
++    openUILinkWhere = lazy.SvalLauncherEnter.whereToLoad(
++      this.window,
++      url,
++      openUILinkWhere,
++      browser
++    );
+     if (this.#isAddressbar) {
+       this.#prepareAddressbarLoad(
+         url,
+@@ -4399,7 +4427,7 @@ ${
+     this.#notifyStartNavigation(resultDetails);
+ 
+     try {
+-      this.window.openTrustedLinkIn(url, openUILinkWhere, params);
++      lazy.SvalLauncherEnter.open(this.window, url, openUILinkWhere, params);
+     } catch (ex) {
+       // This load can throw an exception in certain cases, which means
+       // we'll want to replace the URL with the loaded URL:
+@@ -4419,13 +4447,22 @@ ${
+    * Determines where a URL/page should be opened.
+    *
+    * @param {Event} event the event triggering the opening.
+-   * @returns {"current" | "tabshifted" | "tab" | "save" | "window"}
++   * @param {UrlbarResult} [result] the result being picked, if any.
++   * @returns {"current" | "tabshifted" | "tab" | "save" | "window" | "split" | "switch"}
+    */
+-  _whereToOpen(event) {
++  _whereToOpen(event, result = null) {
+     let isKeyboardEvent = KeyboardEvent.isInstance(event);
+     let reuseEmpty = isKeyboardEvent;
+     let where = undefined;
+-    if (
++    if (isKeyboardEvent && this.#isAddressbar) {
++      where = lazy.SvalLauncherEnter.whereFor({
++        event,
++        result,
++        win: this.window,
++      });
++      // Shift+Enter opens a new tab from an empty one too (launcher spec §3).
++      reuseEmpty = false;
++    } else if (
+       isKeyboardEvent &&
+       (event.altKey || event.getModifierState("AltGraph"))
+     ) {
+@@ -5791,7 +5828,7 @@ ${
+     // increase the limit.
+     let maxResults =
+       this.searchMode?.source != lazy.UrlbarUtils.RESULT_SOURCE.ACTIONS
+-        ? lazy.UrlbarPrefs.get("maxRichResults")
++        ? lazy.SvalLauncherSections.maxResults(this.sapName)
+         : UNLIMITED_MAX_RESULTS;
+     let options = {
+       allowAutofill,
+@@ -5817,6 +5854,10 @@ ${
+         options.sources = [this.searchMode.source];
+       }
+     }
++    let svalProviders = lazy.SvalLauncherCommands.providersFor(this);
++    if (svalProviders) {
++      options.providers = svalProviders;
++    }
+ 
+     return new lazy.UrlbarQueryContext(options);
+   }

@@ -1,0 +1,20 @@
+Sval: load Sval's lint rules for its component directory
+
+The tree's flat configuration reads a directory's own .eslintrc.mjs only
+when eslint-subdirs.config.mjs lists it. Listing browser/components/sval lets
+Sval's added .eslintrc.mjs apply eslint-plugin-sval (tools/lint/eslint), so
+mach lint runs Sval's test-hygiene rules with the rest; there is no other
+hook into the configuration.
+
+diff --git a/eslint-subdirs.config.mjs b/eslint-subdirs.config.mjs
+index 299b578769..69244699d7 100644
+--- a/eslint-subdirs.config.mjs
++++ b/eslint-subdirs.config.mjs
+@@ -52,6 +52,7 @@ export default [
+   )),
+   ...(await convertConfigurationFile("browser/components/aboutwelcome")),
+   ...(await convertConfigurationFile("browser/components/asrouter")),
++  ...(await convertConfigurationFile("browser/components/sval")),
+   ...(await convertConfigurationFile("browser/components/customizableui")),
+   ...(await convertConfigurationFile(
+     "browser/components/customizableui/content"

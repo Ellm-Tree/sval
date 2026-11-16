@@ -1,0 +1,83 @@
+---
+title: How pins differ from tabs and Favorites
+description: Why a pin has a page of its own, and why a pin goes back to its saved page only when you ask.
+---
+
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+Sval has three ways to keep a site, each for a different kind of use.
+
+- **Tabs.** Tabs hold what you're doing now. A tab belongs to one
+  Workspace and lasts until you close it.
+- **Favorites.** Favorites are links you keep, in folders in the Favorites
+  menu. Opening a Favorite opens a new tab.
+- **Pins.** Pins are for the few sites you live in, such as your mail and
+  your calendar. Each pin is its own page, one click away in every
+  Workspace.
+
+## Pins and Favorites
+
+<Until v="0.1.0-rc.10">
+
+Pinning doesn't make a new kind of thing. A pin is a Favorite marked to show
+in the pins row. That's why pins sync, rename, sit in folders, and export
+the same way Favorites do. When you unpin a site, the Favorite stays where
+it was.
+
+While a Favorite is pinned, it's not in the Favorites menu, so each site
+shows in one place.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+Your pins and your Favorites are two separate lists. A site can be a pin, a
+Favorite, both, or neither. Changing a pin never changes a Favorite, and
+changing a Favorite never changes a pin. So on a pin's page, the
+**Favorite** button shows only whether the page is in Favorites. Taking
+the page out of Favorites leaves the pin where it is.
+
+Pins sync, and you can rename them and keep them in pin folders. When you
+export your Favorites, your pins go in a folder named "Pins" at the end.
+
+</Since>
+
+## Its icon is its page
+
+When you click a pin, you see the pin's own page. Sval doesn't open a new
+tab each time. The pin's page never shows in the list of tabs, so the pin
+always has a page to come back to.
+
+## It goes back only when you ask
+
+Sval never reloads a pin when you come back to it, because a reload would
+throw away a half-written email. To send a pin back to its saved page, use
+the refresh button on the pin's tile, or choose Back to saved page in the
+pin's menu. The pin goes back by itself only when you close the pin, or
+when Sval puts the pin to sleep because your computer runs low on memory.
+
+The saved page never changes on its own either. It changes only when you
+choose Edit address… or Save current page as this pin, so a pin can't end
+up saving a sign-out page.
+
+## It stays on its own site
+
+When you follow a link in a pin to another site, the link opens in a Quick Peek
+over the pin. A link to another address on the same site stays in the pin,
+such as a link from app.fastmail.com to www.fastmail.com. The pin keeps
+showing its own site, so the pin's icon always tells you what's behind it.
+You can keep the page from the Quick Peek as a tab.
+
+## Each Workspace has its own page
+
+A pin shows in every Workspace unless you limit where it shows. Each
+Workspace has its own page for the pin, signed in with that Workspace's
+sign-ins. In an
+isolated Workspace, the same Fastmail pin can show your work account while
+your other Workspaces show your personal one.
+
+## Related pages
+
+- [Pin a site](/docs/how-to/tabs/pin-a-site/)
+- [Choose which Workspaces show a pin](/docs/how-to/tabs/choose-which-workspaces-show-a-pin/)
+- [What an isolated Workspace keeps apart](/docs/explanation/isolated-workspaces/)

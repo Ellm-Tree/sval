@@ -1,0 +1,51 @@
+Sval: swap the other-copy update notice once the other copy quits
+
+UpdateListener picks the "Other Instance" notification once, when the
+update is ready, and never looks again. Quitting the other copy left the
+notice asking for it to be closed until a restart. The listener polls at
+app.update.checkOnlyInstance.interval and shows the restart notification
+once no other copy runs.
+
+diff --git a/toolkit/mozapps/update/UpdateListener.sys.mjs b/toolkit/mozapps/update/UpdateListener.sys.mjs
+index b689833c27..9f88d94dba 100644
+--- a/toolkit/mozapps/update/UpdateListener.sys.mjs
++++ b/toolkit/mozapps/update/UpdateListener.sys.mjs
+@@ -264,6 +264,7 @@ export var UpdateListener = {
+       // It doesn't make sense to show the "Other Instance" notification in the
+       // dismissed (badge only) form because it has no menu component.
+       dismissed = false;
++      this.recheckOtherInstance(update);
+     }
+     if (!dismissed) {
+       this.restartDoorhangerShown = true;
+@@ -276,6 +277,30 @@ export var UpdateListener = {
+     );
+   },
+ 
++  // Swaps the "Other Instance" notification for the restart one once the
++  // other copy has quit, polling as waitForOtherInstances does. A dismissed
++  // notification is replaced by a dismissed one.
++  recheckOtherInstance(update) {
++    let interval = Services.prefs.getIntPref(
++      "app.update.checkOnlyInstance.interval",
++      5 * 60 * 1000
++    );
++    this.addTimeout(interval, () => {
++      if (lazy.AppUpdateService.isOtherInstanceHandlingUpdates) {
++        this.recheckOtherInstance(update);
++        return;
++      }
++      let otherInstance = lazy.AppMenuNotifications.notifications.find(
++        n => n.id == "update-other-instance"
++      );
++      if (!otherInstance) {
++        return;
++      }
++      lazy.AppMenuNotifications.removeNotification("update-other-instance");
++      this.showRestartNotification(update, otherInstance.dismissed);
++    });
++  },
++
+   showUpdateAvailableNotification(update, dismissed) {
+     let learnMoreURL = this.getReleaseNotesUrl(update);
+     this.showUpdateNotification(

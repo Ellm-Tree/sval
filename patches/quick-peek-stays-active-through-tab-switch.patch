@@ -1,0 +1,52 @@
+Sval: the tab switcher leaves a Quick Peek's page active
+
+A Quick Peek (SvalQuickPeek) is a hidden background tab whose panel shows over the
+selected tab, and SvalQuickPeek keeps its browser active while it shows, as
+`showSplitViewPanels` keeps a split's panes. A tab switch still in flight
+when the Quick Peek opens takes the Quick Peek's tab into its own record once the
+page's layers arrive (`getTabState`), then unloads it as a tab nobody
+asked to see (`unloadNonRequiredTabs`): the page stops rendering and reads
+as hidden. The switcher spares print preview, split view and
+Picture-in-Picture pages through `shouldDeactivateDocShell`; no chrome
+API adds another, so it asks Tabbrowser.showsOverTab, which names the
+tab SvalQuickPeekTab marks.
+
+diff --git a/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs b/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+index 483cda4507..4fc53903ac 100644
+--- a/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
++++ b/browser/components/tabbrowser/AsyncTabSwitcher.sys.mjs
+@@ -944,7 +944,9 @@ export class AsyncTabSwitcher {
+     return !(
+       this.tabbrowser._printPreviewBrowsers.has(browser) ||
+       this.tabbrowser.splitViewBrowsers.includes(browser) ||
+-      lazy.PictureInPicture.isOriginatingBrowser(browser)
++      lazy.PictureInPicture.isOriginatingBrowser(browser) ||
++      // Sval: a page shown over the selected one (`Tabbrowser.showsOverTab`).
++      this.tabbrowser.showsOverTab(browser)
+     );
+   }
+ 
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 9e9057797f..757cfa8430 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -8345,6 +8345,19 @@
+       return !!aBrowser?.hasAttribute("sval-agent-layer");
+     }
+ 
++    /**
++     * Sval: whether `aBrowser`'s page shows over the selected tab, as a
++     * Quick Peek's does (SvalQuickPeekTab marks its tab). Its own code keeps it active
++     * while it shows, as `showSplitViewPanels` keeps a split's panes, so the
++     * tab switcher leaves it alone.
++     *
++     * @param {MozBrowser} aBrowser
++     * @returns {boolean}
++     */
++    showsOverTab(aBrowser) {
++      return !!this.getTabForBrowser(aBrowser)?.hasAttribute("sval-quick-peek");
++    }
++
+     /**
+      * Sval: applies the window's visibility to its pages again, as a
+      * visibilitychange does, once `keepsPageShown` changes for one of them

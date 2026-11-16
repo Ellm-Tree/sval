@@ -1,0 +1,36 @@
+Sval: browser-chrome test windows keep their own console
+
+The mochitest harness replaced every browser window's console with a
+Console.sys.mjs ConsoleAPI. DevTools' DocumentEventsListener.hasNativeConsoleAPI
+then finds a non-native console on the window the Browser Console targets,
+and WebConsoleUI.handleNavigated logs "The Web Console logging API ... has
+been disabled by a script on this page" each time the Browser Console opens
+in a test. The replacement is the harness's own, so only the harness can
+stop it. The test profile sets devtools.console.stdout.chrome, which prints
+the native console's calls to the log as the replacement did.
+
+diff --git a/testing/mochitest/api.js b/testing/mochitest/api.js
+index eafa0ee93a..46cb18d901 100644
+--- a/testing/mochitest/api.js
++++ b/testing/mochitest/api.js
+@@ -74,16 +74,11 @@ var WindowListener = {
+   // browser-test.js is only loaded into the first window. Setup that
+   // needs to happen in all navigator:browser windows should go here.
+   setupWindow(win) {
++    // The window keeps its own console: DevTools reports any other object
++    // there as a page script disabling the logging API
++    // (DocumentEventsListener.hasNativeConsoleAPI), and the test profile's
++    // devtools.console.stdout.chrome already prints its calls to the log.
+     win.nativeConsole = win.console;
+-    let { ConsoleAPI } = ChromeUtils.importESModule(
+-      "resource://gre/modules/Console.sys.mjs"
+-    );
+-    win.console = new ConsoleAPI();
+-    // Add createInstance to the native wrapper so that it can be called from
+-    // within windows.
+-    win.console.createInstance = win.nativeConsole.createInstance.bind(
+-      win.nativeConsole
+-    );
+   },
+ 
+   tearDownWindow(win) {

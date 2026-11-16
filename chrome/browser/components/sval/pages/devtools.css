@@ -1,0 +1,51 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* about:debugging in Settings' look. It draws with colours of its own that
+   `aboutdebugging`'s `base.css` declares on the root, beside Firefox's
+   tokens, so those take Sval's values here. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/pages/info.css");
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  :root {
+    --in-content-background-color: var(--sval-page);
+    --bg-color: var(--sval-page);
+    --text-color: var(--sval-ink-body);
+    --secondary-text-color: var(--sval-ink-muted);
+    --box-background: var(--sval-card);
+    --box-border-color: var(--sval-border);
+    --card-background-color: var(--sval-card);
+    --card-separator-color: var(--sval-border-subtle);
+    --button-background-color: transparent;
+    --button-color: var(--sval-ink);
+    --button-hover-background-color: var(--sval-tint);
+    --category-text-selected: var(--sval-accent);
+    --sidebar-background-hover: var(--sval-tint);
+    --primary-button-background-color: var(--sval-action);
+    --primary-button-color: var(--sval-action-text);
+    --primary-button-hover-background-color: var(--sval-action-hover);
+    --primary-button-active-background-color: var(--sval-action-press);
+    --theme-body-background: var(--sval-page);
+    --theme-body-color: var(--sval-ink-body);
+    --theme-highlight-blue: var(--sval-accent);
+  }
+}
+
+/* Photon's buttons, as about:debugging draws them, take Settings' pill;
+   the default button keeps an edge on Sval's clear button background. */
+@media not ((forced-colors) or (prefers-contrast)) {
+  :is(.default-button, .primary-button) {
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .default-button {
+    border: 1px solid var(--sval-border-strong);
+  }
+
+  .default-button:enabled:hover {
+    border-color: var(--sval-accent);
+  }
+}

@@ -1,0 +1,59 @@
+Sval: Settings' certificate file errors say what went wrong in plain words
+
+Importing or backing up a certificate file that fails names the file
+format, "PKCS #12", and "unknown reasons". The errors say what could not
+be done, and for a file that would not open, the likely causes, under a
+title naming the manager in place of the prompt service's "Alert". The
+manager links the brand's strings, which the errors name.
+
+diff --git a/security/manager/locales/en-US/security/certificates/certManager.ftl b/security/manager/locales/en-US/security/certificates/certManager.ftl
+index 4e8d372291..e7eebb2921 100644
+--- a/security/manager/locales/en-US/security/certificates/certManager.ftl
++++ b/security/manager/locales/en-US/security/certificates/certManager.ftl
+@@ -130,10 +130,11 @@ exception-mgr-permanent =
+     .accesskey = P
+ 
+ pk11-bad-password = The password entered was incorrect.
+-pkcs12-decode-err = Failed to decode the file. Either it is not in PKCS #12 format, has been corrupted, or the password you entered was incorrect.
+-pkcs12-unknown-err-restore = Failed to restore the PKCS #12 file for unknown reasons.
+-pkcs12-unknown-err-backup = Failed to create the PKCS #12 backup file for unknown reasons.
+-pkcs12-unknown-err = The PKCS #12 operation failed for unknown reasons.
++certmgr-alert-title = Certificates
++pkcs12-decode-err = { -brand-short-name } couldn’t open this certificate file. The password may be wrong, or the file may be damaged or of another kind.
++pkcs12-unknown-err-restore = { -brand-short-name } couldn’t import this certificate file.
++pkcs12-unknown-err-backup = { -brand-short-name } couldn’t save the certificate backup.
++pkcs12-unknown-err = { -brand-short-name } couldn’t finish with this certificate file.
+ pkcs12-info-no-smartcard-backup = It is not possible to back up certificates from a hardware security device such as a smart card.
+ pkcs12-dup-data = The certificate and private key already exist on the security device.
+ 
+diff --git a/security/manager/pki/resources/content/certManager.js b/security/manager/pki/resources/content/certManager.js
+index 8ca1f9b551..52fd11479f 100644
+--- a/security/manager/pki/resources/content/certManager.js
++++ b/security/manager/pki/resources/content/certManager.js
+@@ -598,9 +598,12 @@ async function promptError(aErrorCode) {
+       default:
+         break;
+     }
+-    let [message] = await document.l10n.formatValues([{ id: msgName }]);
++    let [title, message] = await document.l10n.formatValues([
++      { id: "certmgr-alert-title" },
++      { id: msgName },
++    ]);
+     let prompter = Services.ww.getNewPrompter(window);
+-    prompter.alert(null, message);
++    prompter.alert(title, message);
+   }
+ }
+ 
+diff --git a/security/manager/pki/resources/content/certManager.xhtml b/security/manager/pki/resources/content/certManager.xhtml
+index 5f8081a56f..ffe376be5c 100644
+--- a/security/manager/pki/resources/content/certManager.xhtml
++++ b/security/manager/pki/resources/content/certManager.xhtml
+@@ -22,6 +22,7 @@
+         href="chrome://pippki/content/certManager.css"
+       />
+ 
++      <html:link rel="localization" href="branding/brand.ftl" />
+       <html:link
+         rel="localization"
+         href="security/certificates/certManager.ftl"

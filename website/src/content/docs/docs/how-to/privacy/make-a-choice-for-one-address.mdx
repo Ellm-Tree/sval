@@ -1,0 +1,59 @@
+---
+title: Make a choice for one address on a site
+description: Give an address like nas.example.com its own protections, video and audio, or JavaScript choice, apart from the rest of the site.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+A choice you make for a site can cover one address, like `nas.example.com`,
+or all of `example.com`. For any choice you haven't made for the address
+itself, the address follows the site.
+
+Your home server is at `nas.example.com`. You want JavaScript on for that
+address, while the rest of `example.com` keeps it off.
+
+## From the address bar
+
+1. Go to a page on the address, such as `nas.example.com`.
+2. Select the Privacy and Security button or the **Site settings** button.
+3. In the title, choose the address or All of example.com.
+4. Make the choice.
+
+The site settings menu, the Privacy and Security panel, the extensions menu,
+and the Remove from this site card all start on the address you're on.
+
+<Screenshot name="docs-site-scope" frame="rounded" maxWidth={360} alt="The site settings menu on news.ycombinator.com, with its title open to choose between news.ycombinator.com alone and all of ycombinator.com" />
+
+## In Settings
+
+1. Open Settings › Sites.
+2. In Your sites, select the site's row.
+3. Next to the site's name, select **More**, then choose **Add an address…**.
+4. In the field that opens, type the address.
+5. Select **Add**.
+6. Make the choice in the cards that follow.
+
+Your choices cover that address and every address under it. Once the site
+has an address with its own choices, the site's page shows **Choices for**
+in place of More. **Add an address…** is then the last item in Choices for.
+
+## Details
+
+- In Settings › Sites, an address with its own choices is listed under its
+  site. Selecting **Reset** on that address removes only the address's own
+  choices.
+- On a site's page, use **Choices for** to pick which address you're
+  changing. The cards under For all of example.com, such as Permissions and
+  Cookies and site data, always cover the whole site.
+- While the menu is set to the whole site, a line names the choices the
+  address you're on keeps for itself. For example, the line can say
+  "app.example.com keeps its own JavaScript choice." The site's choice doesn't reach that address.
+- The JavaScript button changes the choice for the address you're on.
+- `www.example.com` and `example.com` count as the same address.
+- Site permissions such as camera and location always belong to the exact
+  address that asked.
+
+## Related pages
+
+- [Reset a site's choices](/docs/how-to/privacy/reset-a-sites-choices/)
+- [Settings › Sites](/docs/reference/privacy-sites/)

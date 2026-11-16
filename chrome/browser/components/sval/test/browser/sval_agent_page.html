@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent test page</title>
+  </head>
+  <body>
+    <h1>Sign in</h1>
+    <form id="f" action="https://example.com/sval-form" method="post">
+      <label>Email <input id="email" type="email" /></label>
+      <label>Password <input id="pw" type="password" value="hunter2" /></label>
+      <label><input id="keep" type="checkbox" /> Keep me signed in</label>
+      <select id="plan">
+        <option value="a">Basic</option>
+        <option value="b">Pro</option>
+      </select>
+      <button id="submit" type="submit">Sign in</button>
+    </form>
+    <button
+      id="fetch"
+      onclick="
+        fetch('https://example.com/sval-fetch', { method: 'POST', body: 'x' })
+      "
+    >
+      Send by fetch
+    </button>
+    <button
+      id="late"
+      onclick="
+        window.addEventListener(
+          'message',
+          e =>
+            e.data === 'late' &&
+            fetch('https://example.com/sval-late', {
+              method: 'POST',
+              body: 'x',
+            }),
+          { once: true }
+        )
+      "
+    >
+      Send later
+    </button>
+    <button id="alert" onclick="alert('hello')">Alert</button>
+    <a id="next" href="sval_agent_page2.html">Next page</a>
+    <div aria-hidden="true">Hidden text</div>
+    <div style="display: none">Invisible</div>
+    <p>Plain words here.</p>
+  </body>
+</html>

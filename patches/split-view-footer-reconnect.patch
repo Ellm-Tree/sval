@@ -1,0 +1,44 @@
+Sval: a split view pane's footer follows its tab again once put back
+
+MozSplitViewFooter.disconnectedCallback forgets its tab and stops listening,
+and connectedCallback returns at once for a footer already set up, so a
+footer taken out of the document and put back kept the address it last
+showed, through every later load. The footer keeps the tab it had when taken
+out, and follows it again from the tab's state when put back.
+
+diff --git a/browser/components/tabbrowser/content/split-view-footer.js b/browser/components/tabbrowser/content/split-view-footer.js
+index 08007ff89d..41b60d1f62 100644
+--- a/browser/components/tabbrowser/content/split-view-footer.js
++++ b/browser/components/tabbrowser/content/split-view-footer.js
+@@ -54,6 +54,9 @@
+     /** @type {XULElement} */
+     #tab = null;
+ 
++    /** @type {XULElement} */
++    #detachedTab = null;
++
+     static markup = `
+       <hbox class="split-view-security-warning" hidden="">
+         <html:img role="presentation" src="chrome://global/skin/icons/security-broken.svg" />
+@@ -67,6 +70,12 @@
+ 
+     connectedCallback() {
+       if (this.#initialized) {
++        // Put back after a move: follow its tab again, from where it is now.
++        if (this.#detachedTab) {
++          const tab = this.#detachedTab;
++          this.#detachedTab = null;
++          this.setTab(tab);
++        }
+         return;
+       }
+       this.appendChild(this.constructor.fragment);
+@@ -89,6 +98,8 @@
+     }
+ 
+     disconnectedCallback() {
++      // Kept, so a footer put back follows its tab again.
++      this.#detachedTab = this.#tab;
+       this.#resetTab();
+     }
+ 

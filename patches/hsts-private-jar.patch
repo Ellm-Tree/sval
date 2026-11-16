@@ -1,0 +1,255 @@
+Sval: HSTS and site integrity keep every jar's userContextId
+
+Each workspace jar and each private window is a jar of its own, told apart
+by its userContextId. The site security and site integrity stores drop
+userContextId from their keys, so an HSTS header one jar saw would upgrade
+loads in every other, which a site can read back as an identifier that
+links the jars. Every entry keeps it. The site security service follows
+clear-origin-attributes-data, so a jar's HSTS entries go when its data is
+cleared while the others stay; ClearDataService's HSTS cleaner has no
+per-attributes delete, and nothing outside the service can list its
+entries. The site integrity service clears its own the same way. No chrome
+API reaches the storage keys.
+
+diff --git a/security/manager/ssl/SiteIntegrityService.cpp b/security/manager/ssl/SiteIntegrityService.cpp
+index 3410603084..dd75e820de 100644
+--- a/security/manager/ssl/SiteIntegrityService.cpp
++++ b/security/manager/ssl/SiteIntegrityService.cpp
+@@ -5,6 +5,10 @@
+ #include "SiteIntegrityService.h"
+ 
+ #include "mozilla/Logging.h"
++#include "mozilla/Services.h"
++#include "nsIObserverService.h"
++#include "nsSiteSecurityService.h"
++#include "nsXULAppAPI.h"
+ #include "nsComponentManagerUtils.h"
+ #include "nsIDataStorage.h"
+ #include "PublicKeyPinningService.h"
+@@ -16,7 +20,7 @@ using namespace mozilla;
+ 
+ static LazyLogModule gSiteIntegrityLog("SiteIntegrity");
+ 
+-NS_IMPL_ISUPPORTS(SiteIntegrityService, nsISiteIntegrityService)
++NS_IMPL_ISUPPORTS(SiteIntegrityService, nsISiteIntegrityService, nsIObserver)
+ 
+ SiteIntegrityService::~SiteIntegrityService() = default;
+ 
+@@ -42,11 +46,36 @@ nsresult SiteIntegrityService::Init() {
+     return NS_ERROR_FAILURE;
+   }
+ 
++  // Sval: a jar's entries go when its data is cleared, while the other jars
++  // keep theirs.
++  if (XRE_IsParentProcess() && NS_IsMainThread()) {
++    nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
++    if (obs) {
++      obs->AddObserver(this, "clear-origin-attributes-data", false);
++      obs->AddObserver(this, "xpcom-shutdown", false);
++    }
++  }
++
+   MOZ_LOG_FMT(gSiteIntegrityLog, LogLevel::Debug,
+               "SiteIntegrityService initialized successfully");
+   return NS_OK;
+ }
+ 
++NS_IMETHODIMP
++SiteIntegrityService::Observe(nsISupports* aSubject, const char* aTopic,
++                              const char16_t* aData) {
++  if (!strcmp(aTopic, "xpcom-shutdown")) {
++    nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
++    if (obs) {
++      obs->RemoveObserver(this, "clear-origin-attributes-data");
++      obs->RemoveObserver(this, "xpcom-shutdown");
++    }
++  } else if (!strcmp(aTopic, "clear-origin-attributes-data")) {
++    nsSiteSecurityService::RemoveEntriesMatching(mDataStorage, aData);
++  }
++  return NS_OK;
++}
++
+ NS_IMETHODIMP
+ SiteIntegrityService::SetProtected(nsIURI* aSourceURI,
+                                    const OriginAttributes& aOriginAttributes,
+@@ -104,13 +133,10 @@ static void GetStorageKey(const nsACString& aHostname,
+                           nsAutoCString& outStorageKey) {
+   outStorageKey = aHostname;
+ 
+-  // Don't isolate by userContextId.
+-  OriginAttributes originAttributesNoUserContext = aOriginAttributes;
+-  originAttributesNoUserContext.mUserContextId =
+-      nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID;
+-
++  // Sval: isolated by userContextId, so the state a site sets in one jar is
++  // not seen in another.
+   nsAutoCString originAttributesSuffix;
+-  originAttributesNoUserContext.CreateSuffix(originAttributesSuffix);
++  aOriginAttributes.CreateSuffix(originAttributesSuffix);
+ 
+   outStorageKey.Append(originAttributesSuffix);
+ }
+diff --git a/security/manager/ssl/SiteIntegrityService.h b/security/manager/ssl/SiteIntegrityService.h
+index 88d3ec92f6..96eb16cc42 100644
+--- a/security/manager/ssl/SiteIntegrityService.h
++++ b/security/manager/ssl/SiteIntegrityService.h
+@@ -9,13 +9,16 @@
+ #include "nsISiteIntegrityService.h"
+ #include "nsCOMPtr.h"
+ #include "nsIDataStorage.h"
++#include "nsIObserver.h"
+ 
+ namespace mozilla {
+ 
+-class SiteIntegrityService : public nsISiteIntegrityService {
++class SiteIntegrityService : public nsISiteIntegrityService,
++                             public nsIObserver {
+  public:
+   NS_DECL_THREADSAFE_ISUPPORTS
+   NS_DECL_NSISITEINTEGRITYSERVICE
++  NS_DECL_NSIOBSERVER
+ 
+   SiteIntegrityService() = default;
+   nsresult Init();
+diff --git a/security/manager/ssl/nsSiteSecurityService.cpp b/security/manager/ssl/nsSiteSecurityService.cpp
+index 9b259fd3ed..36c1dc45b9 100644
+--- a/security/manager/ssl/nsSiteSecurityService.cpp
++++ b/security/manager/ssl/nsSiteSecurityService.cpp
+@@ -14,7 +14,9 @@
+ #include "mozilla/Tokenizer.h"
+ #include "mozilla/dom/PContent.h"
+ #include "mozilla/dom/ToJSValue.h"
++#include "mozilla/Services.h"
+ #include "nsCOMArray.h"
++#include "nsIObserverService.h"
+ #include "nsIScriptSecurityManager.h"
+ #include "nsISocketProvider.h"
+ #include "nsIURI.h"
+@@ -172,7 +174,7 @@ nsSiteSecurityService::nsSiteSecurityService() : mDafsa(kDafsa) {}
+ 
+ nsSiteSecurityService::~nsSiteSecurityService() = default;
+ 
+-NS_IMPL_ISUPPORTS(nsSiteSecurityService, nsISiteSecurityService)
++NS_IMPL_ISUPPORTS(nsSiteSecurityService, nsISiteSecurityService, nsIObserver)
+ 
+ nsresult nsSiteSecurityService::Init() {
+   nsCOMPtr<nsIDataStorageManager> dataStorageManager(
+@@ -190,9 +192,63 @@ nsresult nsSiteSecurityService::Init() {
+     return NS_ERROR_FAILURE;
+   }
+ 
++  // Sval: a jar's entries go when its data is cleared, while the other jars
++  // keep theirs.
++  if (XRE_IsParentProcess() && NS_IsMainThread()) {
++    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
++    if (obs) {
++      obs->AddObserver(this, "clear-origin-attributes-data", false);
++      obs->AddObserver(this, "xpcom-shutdown", false);
++    }
++  }
++
+   return NS_OK;
+ }
+ 
++// Sval: removes the entries whose origin attributes match the pattern
++// "clear-origin-attributes-data" carries.
++NS_IMETHODIMP
++nsSiteSecurityService::Observe(nsISupports* aSubject, const char* aTopic,
++                               const char16_t* aData) {
++  if (!strcmp(aTopic, "xpcom-shutdown")) {
++    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
++    if (obs) {
++      obs->RemoveObserver(this, "clear-origin-attributes-data");
++      obs->RemoveObserver(this, "xpcom-shutdown");
++    }
++    return NS_OK;
++  }
++  if (!strcmp(aTopic, "clear-origin-attributes-data")) {
++    RemoveEntriesMatching(mSiteStateStorage, aData);
++  }
++  return NS_OK;
++}
++
++// static
++void nsSiteSecurityService::RemoveEntriesMatching(
++    nsIDataStorage* aStorage, const char16_t* aPatternJSON) {
++  OriginAttributesPattern pattern;
++  if (!pattern.Init(nsDependentString(aPatternJSON))) {
++    return;
++  }
++  nsTArray<RefPtr<nsIDataStorageItem>> items;
++  if (NS_FAILED(aStorage->GetAll(items))) {
++    return;
++  }
++  for (const auto& item : items) {
++    nsIDataStorage::DataType type;
++    nsAutoCString key;
++    if (NS_FAILED(item->GetType(&type)) || NS_FAILED(item->GetKey(key))) {
++      continue;
++    }
++    nsAutoCString hostname;
++    OriginAttributes attrs;
++    if (attrs.PopulateFromOrigin(key, hostname) && pattern.Matches(attrs)) {
++      (void)aStorage->Remove(key, type);
++    }
++  }
++}
++
+ nsresult nsSiteSecurityService::GetHost(nsIURI* aURI, nsACString& aResult) {
+   nsCOMPtr<nsIURI> innerURI = NS_GetInnermostURI(aURI);
+   if (!innerURI) {
+@@ -261,13 +317,12 @@ static void GetNormalizedStorageKey(const nsACString& hostname,
+                                     /*out*/ nsAutoCString& storageKey) {
+   storageKey = hostname;
+ 
+-  // Don't isolate by userContextId.
+-  OriginAttributes originAttributesNoUserContext = aOriginAttributes;
+-  originAttributesNoUserContext.mUserContextId =
+-      nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID;
+-  NormalizePartitionKey(originAttributesNoUserContext.mPartitionKey);
++  // Sval: isolated by userContextId, so the state a site sets in one jar is
++  // not seen in another.
++  OriginAttributes keyAttributes = aOriginAttributes;
++  NormalizePartitionKey(keyAttributes.mPartitionKey);
+   nsAutoCString originAttributesSuffix;
+-  originAttributesNoUserContext.CreateSuffix(originAttributesSuffix);
++  keyAttributes.CreateSuffix(originAttributesSuffix);
+   storageKey.Append(originAttributesSuffix);
+ }
+ 
+diff --git a/security/manager/ssl/nsSiteSecurityService.h b/security/manager/ssl/nsSiteSecurityService.h
+index 5ac5c16bb8..a6d90837f5 100644
+--- a/security/manager/ssl/nsSiteSecurityService.h
++++ b/security/manager/ssl/nsSiteSecurityService.h
+@@ -9,6 +9,7 @@
+ #include "mozilla/Dafsa.h"
+ #include "nsCOMPtr.h"
+ #include "nsIDataStorage.h"
++#include "nsIObserver.h"
+ #include "nsISiteSecurityService.h"
+ #include "nsString.h"
+ #include "nsTArray.h"
+@@ -84,15 +85,22 @@ class SiteHSTSState {
+ 
+ struct nsSTSPreload;
+ 
+-class nsSiteSecurityService : public nsISiteSecurityService {
++class nsSiteSecurityService : public nsISiteSecurityService,
++                              public nsIObserver {
+  public:
+   NS_DECL_THREADSAFE_ISUPPORTS
+   NS_DECL_NSISITESECURITYSERVICE
++  NS_DECL_NSIOBSERVER
+ 
+   nsSiteSecurityService();
+   nsresult Init();
+ 
+   static nsresult GetHost(nsIURI* aURI, nsACString& aResult);
++
++  // Sval: removes the entries of aStorage whose origin attributes match the
++  // pattern a "clear-origin-attributes-data" notification carries.
++  static void RemoveEntriesMatching(nsIDataStorage* aStorage,
++                                    const char16_t* aPatternJSON);
+   static bool HostIsIPAddress(const nsCString& hostname);
+ 
+  protected:

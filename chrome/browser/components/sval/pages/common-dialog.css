@@ -1,0 +1,73 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Firefox's common dialog (`commonDialog.xhtml`), which every
+   `Services.prompt` question and a page's `alert`, `confirm` and sign-in
+   take, laid out as Sval's dialog frame (`sval-dialog.css`): its width,
+   padding and gaps, its title and body type, and its checkbox. Toolkit's
+   `commonDialog.css` gives each of the dialog's items a 4px inline margin
+   in a modal box, so the padding here is the frame's less that margin.
+   `adjustableTitle.js` replaces the title with `#titleContainer`, which
+   names the site that asks. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:root[subdialog] {
+  width: 400px;
+  min-width: 0;
+  font: 400 14px/1.5 var(--sval-font);
+
+  dialog {
+    --grid-padding: 20px;
+    padding: 24px 20px;
+
+    &::part(dialog-button) {
+      margin: 0 0 0 10px;
+      min-height: 40px;
+      font: 600 14px var(--sval-font);
+    }
+  }
+
+  .dialogRow {
+    margin-block: 0 20px;
+  }
+}
+
+#infoTitle,
+#titleText {
+  font: 600 17px/1.3 var(--sval-font);
+  color: var(--sval-dialog-text);
+}
+
+#infoTitle {
+  margin-bottom: 4px;
+}
+
+#titleContainer .titleIcon {
+  fill: var(--sval-dialog-body);
+}
+
+#infoBody {
+  color: var(--sval-dialog-body);
+  text-wrap: pretty;
+}
+
+.checkbox-label {
+  color: var(--sval-dialog-text);
+}
+
+#loginLabel,
+#password1Label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sval-dialog-muted);
+}
+
+#loginTextbox,
+#password1Textbox {
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 18px;
+  font: 400 15px var(--sval-font);
+}

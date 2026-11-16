@@ -1,0 +1,20 @@
+Sval: the distribution add-ons scan logs at debug
+
+`installDistributionAddons` runs whenever the application changes, which is
+every update, and logged each folder it looks in as a warning. Looking in
+a folder that holds nothing is the ordinary case. The scan's own findings,
+a file that is not an XPI and an add-on that fails to install, still warn.
+
+diff --git a/toolkit/mozapps/extensions/internal/XPIProvider.sys.mjs b/toolkit/mozapps/extensions/internal/XPIProvider.sys.mjs
+index 74d738e46f..5f712bca69 100644
+--- a/toolkit/mozapps/extensions/internal/XPIProvider.sys.mjs
++++ b/toolkit/mozapps/extensions/internal/XPIProvider.sys.mjs
+@@ -3227,7 +3227,7 @@ export var XPIProvider = {
+ 
+     let changed = false;
+     for (let distroDir of distroDirs) {
+-      logger.warn(`Checking ${distroDir.path} for addons`);
++      logger.debug(`Checking ${distroDir.path} for addons`);
+       for (let file of iterDirectory(distroDir)) {
+         if (!isXPI(file.leafName, true)) {
+           // Only warn for files, not directories

@@ -1,0 +1,51 @@
+Sval: getUserMedia:muteVideo and muteAudio can mute one window
+
+The mute topics mute every camera or microphone in the content process, as
+the global mute toggles ask. Sval's live cells and site menu mute the
+selected tab's camera or microphone, and a content process can hold other
+tabs of the same site, so a window id in the topic's data mutes that
+window's captures alone. The toggles send no data and keep muting every
+window.
+
+diff --git a/dom/media/MediaManager.cpp b/dom/media/MediaManager.cpp
+index db85e87e1a..276bacf11b 100644
+--- a/dom/media/MediaManager.cpp
++++ b/dom/media/MediaManager.cpp
+@@ -4134,11 +4134,35 @@ nsresult MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
+     return NS_OK;
+   } else if (!strcmp(aTopic, "getUserMedia:muteVideo") ||
+              !strcmp(aTopic, "getUserMedia:unmuteVideo")) {
+-    OnCameraMute(!strcmp(aTopic, "getUserMedia:muteVideo"));
++    const bool mute = !strcmp(aTopic, "getUserMedia:muteVideo");
++    // A window id mutes that window's captures alone; with none, every
++    // window's, as the global mute toggles ask.
++    if (aData && *aData) {
++      nsresult rv;
++      const uint64_t windowID = nsDependentString(aData).ToInteger64(&rv);
++      MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
++      if (RefPtr<GetUserMediaWindowListener> listener =
++              GetWindowListener(windowID)) {
++        listener->MuteOrUnmuteCameras(mute);
++      }
++      return NS_OK;
++    }
++    OnCameraMute(mute);
+     return NS_OK;
+   } else if (!strcmp(aTopic, "getUserMedia:muteAudio") ||
+              !strcmp(aTopic, "getUserMedia:unmuteAudio")) {
+-    OnMicrophoneMute(!strcmp(aTopic, "getUserMedia:muteAudio"));
++    const bool mute = !strcmp(aTopic, "getUserMedia:muteAudio");
++    if (aData && *aData) {
++      nsresult rv;
++      const uint64_t windowID = nsDependentString(aData).ToInteger64(&rv);
++      MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
++      if (RefPtr<GetUserMediaWindowListener> listener =
++              GetWindowListener(windowID)) {
++        listener->MuteOrUnmuteMicrophones(mute);
++      }
++      return NS_OK;
++    }
++    OnMicrophoneMute(mute);
+     return NS_OK;
+   } else if ((!strcmp(aTopic, "application-background") ||
+               !strcmp(aTopic, "application-foreground")) &&

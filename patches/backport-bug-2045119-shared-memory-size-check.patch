@@ -1,0 +1,544 @@
+Sval: a received shared memory handle must be as large as it claims
+
+Backport of Mozilla's Bug 2045119 (mozilla-central 0112087d1a12 and its
+gtests 1485e9ce0da0, Firefox 155), unchanged. ESR 153 does not carry it.
+A shared memory handle read from IPC was mapped at the size the sender
+claimed. On Linux a child could shrink the memfd behind a handle it had
+sent, as with the idle scheduler's counter, and the parent crashed with
+SIGBUS on its next read. Platform::IsSafeToMap takes the claimed size:
+on Linux a memfd is sealed against shrinking and growing where the
+kernel allows it, and the reader checks the seal, and the size, before
+mapping; Android checks the size, and macOS and Windows leave the check
+to the kernel. The Linux sandbox lets every process read seals and add
+those two. TestSharedMemory.cpp's new cases are Mozilla's gtests for it.
+Drop this patch when the upstream pin reaches Firefox 155.
+
+diff --git a/ipc/glue/SharedMemoryHandle.cpp b/ipc/glue/SharedMemoryHandle.cpp
+index 8410eb8395..3bbb9046fc 100644
+--- a/ipc/glue/SharedMemoryHandle.cpp
++++ b/ipc/glue/SharedMemoryHandle.cpp
+@@ -90,10 +90,6 @@ bool HandleBase::FromMessageReader(IPC::MessageReader* aReader) {
+     aReader->FatalError("Failed to read shared memory PlatformHandle");
+     return false;
+   }
+-  if (handle && !Platform::IsSafeToMap(handle)) {
+-    aReader->FatalError("Shared memory PlatformHandle is not safe to map");
+-    return false;
+-  }
+   uint64_t size = 0;
+   if (!ReadParam(aReader, &size)) {
+     aReader->FatalError("Failed to read shared memory handle size");
+@@ -104,6 +100,10 @@ bool HandleBase::FromMessageReader(IPC::MessageReader* aReader) {
+         "Unexpected PlatformHandle for zero-sized shared memory handle");
+     return false;
+   }
++  if (handle && !Platform::IsSafeToMap(handle, size)) {
++    aReader->FatalError("Shared memory PlatformHandle is not safe to map");
++    return false;
++  }
+   mHandle = std::move(handle);
+   SetSize(size);
+   return true;
+diff --git a/ipc/glue/SharedMemoryHandle.h b/ipc/glue/SharedMemoryHandle.h
+index b414041b0d..51d8f4fbbd 100644
+--- a/ipc/glue/SharedMemoryHandle.h
++++ b/ipc/glue/SharedMemoryHandle.h
+@@ -23,6 +23,8 @@ struct CommandLineArg;
+ 
+ namespace mozilla::ipc {
+ 
++struct SharedMemoryInternalTest;  // For gtests.
++
+ namespace shared_memory {
+ 
+ enum class Type {
+@@ -129,6 +131,8 @@ class HandleBase {
+ 
+   PlatformHandle mHandle = nullptr;
+   uint64_t mSize = 0;
++
++  friend SharedMemoryInternalTest;
+ };
+ 
+ /**
+diff --git a/ipc/glue/SharedMemoryPlatform.h b/ipc/glue/SharedMemoryPlatform.h
+index 5c63fa83e6..2f1d54e0f3 100644
+--- a/ipc/glue/SharedMemoryPlatform.h
++++ b/ipc/glue/SharedMemoryPlatform.h
+@@ -50,10 +50,12 @@ class Platform {
+    * This is used when handles are read from IPC.
+    *
+    * @param aHandle The handle to check.
++   * @param aSize The claimed size of the handle, as read from IPC.  Mappings
++   * that extend past this point could misbehave or fail.
+    *
+    * @returns Whether the handle is safe to map.
+    */
+-  static bool IsSafeToMap(const PlatformHandle& aHandle);
++  static bool IsSafeToMap(const PlatformHandle& aHandle, uint64_t aSize);
+ 
+   /**
+    * Clone a handle.
+diff --git a/ipc/glue/SharedMemoryPlatform_android.cpp b/ipc/glue/SharedMemoryPlatform_android.cpp
+index 646f96375c..7a0cd79db9 100644
+--- a/ipc/glue/SharedMemoryPlatform_android.cpp
++++ b/ipc/glue/SharedMemoryPlatform_android.cpp
+@@ -19,8 +19,8 @@
+ #  include <valgrind/valgrind.h>
+ #endif
+ 
+-#include "mozilla/Maybe.h"
+ #include "mozilla/DebugOnly.h"
++#include "mozilla/Maybe.h"
+ #include "mozilla/UniquePtrExtensions.h"
+ #include "prenv.h"
+ 
+@@ -126,6 +126,15 @@ size_t Platform::PageSize() { return sysconf(_SC_PAGESIZE); }
+ 
+ size_t Platform::AllocationGranularity() { return PageSize(); }
+ 
+-bool Platform::IsSafeToMap(const PlatformHandle&) { return true; }
++bool Platform::IsSafeToMap(const PlatformHandle& aHandle, uint64_t aSize) {
++  size_t memSize = ASharedMemory_getSize(aHandle.get());
++  // errors return 0, which will fail this check
++  if (memSize < aSize) {
++    MOZ_LOG_FMT(gSharedMemoryLog, LogLevel::Warning,
++                "shm is too short ({} < {})", memSize, aSize);
++    return false;
++  }
++  return true;
++}
+ 
+ }  // namespace mozilla::ipc::shared_memory
+diff --git a/ipc/glue/SharedMemoryPlatform_mach.cpp b/ipc/glue/SharedMemoryPlatform_mach.cpp
+index 808339aac6..3ff2a543b0 100644
+--- a/ipc/glue/SharedMemoryPlatform_mach.cpp
++++ b/ipc/glue/SharedMemoryPlatform_mach.cpp
+@@ -223,6 +223,10 @@ size_t Platform::PageSize() {
+ 
+ size_t Platform::AllocationGranularity() { return PageSize(); }
+ 
+-bool Platform::IsSafeToMap(const PlatformHandle&) { return true; }
++bool Platform::IsSafeToMap(const PlatformHandle&, uint64_t) {
++  // mach_vm_map is not well documented but it appears to check for the usual
++  // kinds of invalid input (out-of-range size, wrong object type, etc.)
++  return true;
++}
+ 
+ }  // namespace mozilla::ipc::shared_memory
+diff --git a/ipc/glue/SharedMemoryPlatform_posix.cpp b/ipc/glue/SharedMemoryPlatform_posix.cpp
+index 3f13592cbc..ab1cc9f97a 100644
+--- a/ipc/glue/SharedMemoryPlatform_posix.cpp
++++ b/ipc/glue/SharedMemoryPlatform_posix.cpp
+@@ -31,6 +31,7 @@
+ #include "base/eintr_wrapper.h"
+ #include "base/string_util.h"
+ #include "mozilla/Atomics.h"
++#include "mozilla/CheckedInt.h"
+ #include "mozilla/Maybe.h"
+ #include "mozilla/ProfilerThreadSleep.h"
+ #include "mozilla/UniquePtrExtensions.h"
+@@ -121,6 +122,20 @@ static Maybe<unsigned> HaveMemfd() {
+ #ifdef USE_MEMFD_CREATE
+   static const Maybe<unsigned> kHave = []() -> Maybe<unsigned> {
+     unsigned flags = MFD_CLOEXEC | MFD_ALLOW_SEALING;
++
++#  ifdef MOZ_VALGRIND
++    // Valgrind allows memfd_create but doesn't understand F_ADD_SEALS.
++    if (RUNNING_ON_VALGRIND) {
++      flags &= ~MFD_ALLOW_SEALING;
++    }
++#  endif
++    // Also allow opting out of seals for testing.
++    if (PR_GetEnv("MOZ_SHM_NO_SEALS")) {
++      flags &= ~MFD_ALLOW_SEALING;
++    }
++
++    // MFD_NOEXEC_SEAL seems to imply MFD_ALLOW_SEALING, but clearing the
++    // MFD_ALLOW_SEALING bit is mostly a signal to callers to not use seals.
+ #  ifdef MFD_NOEXEC_SEAL
+     flags |= MFD_NOEXEC_SEAL;
+ #  endif
+@@ -173,6 +188,10 @@ static Maybe<unsigned> HaveMemfd() {
+ #endif  // USE_MEMFD_CREATE
+ }
+ 
++static bool MemfdCanSeal(Maybe<unsigned> aMaybeFlags) {
++  return aMaybeFlags && (*aMaybeFlags & MFD_ALLOW_SEALING);
++}
++
+ bool AppendPosixShmPrefix(std::string* aStr, pid_t aPid) {
+   if (HaveMemfd()) {
+     return false;
+@@ -207,8 +226,9 @@ static Maybe<PlatformHandle> CreateImpl(size_t aSize,
+   mozilla::UniqueFileHandle frozen_fd;
+ 
+ #ifdef USE_MEMFD_CREATE
+-  if (auto flags = HaveMemfd()) {
+-    fd.reset(memfd_create("mozilla-ipc", *flags));
++  auto memfdStatus = HaveMemfd();
++  if (memfdStatus) {
++    fd.reset(memfd_create("mozilla-ipc", *memfdStatus));
+     if (!fd) {
+       // In general it's too late to fall back here -- in a sandboxed
+       // child process, shm_open is already blocked.  And it shouldn't
+@@ -272,7 +292,7 @@ static Maybe<PlatformHandle> CreateImpl(size_t aSize,
+   // Using posix_fallocate will ensure that there's actually space for this
+   // file. Otherwise we end up with a sparse file that can give SIGBUS if we
+   // run out of space while writing to it.  (This doesn't apply to memfd.)
+-  if (!HaveMemfd()) {
++  if (!memfdStatus) {
+     int rv;
+     // Avoid repeated interruptions of posix_fallocate by the profiler's
+     // SIGPROF sampling signal. Indicating "thread sleep" here means we'll
+@@ -311,7 +331,7 @@ static Maybe<PlatformHandle> CreateImpl(size_t aSize,
+                     strerror(*fallocateError));
+       }
+       MOZ_LOG_FMT(gSharedMemoryLog, LogLevel::Warning,
+-                  "fallocate failed to set shm size: {}",
++                  "ftruncate failed to set shm size: {}",
+                   strerror(ftruncate_errno));
+       return Nothing();
+     }
+@@ -320,6 +340,15 @@ static Maybe<PlatformHandle> CreateImpl(size_t aSize,
+   if (aFreezable) {
+     *aFreezable = std::move(frozen_fd);
+   }
++#ifdef USE_MEMFD_CREATE
++  // Freeze the size if possible; see IsSafeToMap below for more details.
++  if (MemfdCanSeal(memfdStatus) &&
++      fcntl(fd.get(), F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW) != 0) {
++    MOZ_LOG_FMT(gSharedMemoryLog, LogLevel::Warning,
++                "failed to seal size of shm: {}", strerror(errno));
++  }
++#endif
++
+   return Some(std::move(fd));
+ }
+ 
+@@ -354,14 +383,7 @@ PlatformHandle Platform::CloneHandle(const PlatformHandle& aHandle) {
+ 
+ bool Platform::Freeze(FreezableHandle& aHandle) {
+ #ifdef USE_MEMFD_CREATE
+-#  ifdef MOZ_VALGRIND
+-  // Valgrind allows memfd_create but doesn't understand F_ADD_SEALS.
+-  static const bool haveSeals = RUNNING_ON_VALGRIND == 0;
+-#  else
+-  static const bool haveSeals = true;
+-#  endif
+-  static const bool useSeals = !PR_GetEnv("MOZ_SHM_NO_SEALS");
+-  if (HaveMemfd() && haveSeals && useSeals) {
++  if (MemfdCanSeal(HaveMemfd())) {
+     // Seals are added to the file as defense-in-depth.  The primary
+     // method of access control is creating a read-only fd (using
+     // procfs in this case) and requiring that sandboxes processes not
+@@ -380,6 +402,9 @@ bool Platform::Freeze(FreezableHandle& aHandle) {
+     // However, Linux 5.1 added F_SEAL_FUTURE_WRITE, which prevents
+     // write operations afterwards, but existing writeable mappings
+     // are unaffected (similar to ashmem protection semantics).
++    //
++    // The size should have already been sealed in CreateImpl, but
++    // trying to add an already-set seal is harmless.
+ 
+     const int seals = F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
+     int sealError = EINVAL;
+@@ -463,6 +488,42 @@ size_t Platform::PageSize() { return sysconf(_SC_PAGESIZE); }
+ 
+ size_t Platform::AllocationGranularity() { return PageSize(); }
+ 
+-bool Platform::IsSafeToMap(const PlatformHandle&) { return true; }
++bool Platform::IsSafeToMap(const PlatformHandle& aHandle, uint64_t aSize) {
++  // In general, mappings can extend beyond the end of the file; accessing that
++  // part of the mapping raises SIGBUS (explicitly specified in POSIX).  This is
++  // a safe crash and doesn't allow exploitation, but it can waste time for
++  // bug-finding efforts, and checking should be relatively cheap.
++  //
++  // If we have memfd and seal support, and it's available at runtime, then
++  // validate that the file size can't decrease.  Since we still support
++  // versions of Linux which don't have memfd (RHEL 7, scheduled for EoL in
++  // 2028-06, uses kernel 3.10), as well as Tier 3 OSes without memfd, those
++  // will simply do a best-effort check of the size.
++#ifdef USE_MEMFD_CREATE
++  if (MemfdCanSeal(HaveMemfd())) {
++    static constexpr int kReqSeals = F_SEAL_SHRINK;
++    int seals = fcntl(aHandle.get(), F_GET_SEALS);
++    if (seals == -1 || (~seals & kReqSeals)) {
++      MOZ_ASSERT(seals != -1 || errno == EINVAL);
++      MOZ_LOG_FMT(gSharedMemoryLog, LogLevel::Warning, "shm is shrinkable??");
++      return false;
++    }
++  }
++#endif
++
++  struct stat st;
++  if (fstat(aHandle.get(), &st) != 0) {
++    MOZ_LOG_FMT(gSharedMemoryLog, LogLevel::Warning, "failed to fstat shm: {}",
++                strerror(errno));
++    return false;
++  }
++  CheckedInt<uint64_t> fileSize(st.st_size);
++  if (!fileSize.isValid() || fileSize.value() < aSize) {
++    MOZ_LOG_FMT(gSharedMemoryLog, LogLevel::Warning,
++                "shm is too short ({} < {})", st.st_size, aSize);
++    return false;
++  }
++  return true;
++}
+ 
+ }  // namespace mozilla::ipc::shared_memory
+diff --git a/ipc/glue/SharedMemoryPlatform_windows.cpp b/ipc/glue/SharedMemoryPlatform_windows.cpp
+index 3eb3c9da58..f485592a97 100644
+--- a/ipc/glue/SharedMemoryPlatform_windows.cpp
++++ b/ipc/glue/SharedMemoryPlatform_windows.cpp
+@@ -246,7 +246,11 @@ size_t Platform::AllocationGranularity() {
+   return si.dwAllocationGranularity;
+ }
+ 
+-bool Platform::IsSafeToMap(const PlatformHandle& aHandle) {
++bool Platform::IsSafeToMap(const PlatformHandle& aHandle, uint64_t) {
++  // On Windows the kernel enforces that a mapping (a.k.a. view) cannot exceed
++  // the size of the file mapping object (a.k.a. section object), which in turn
++  // cannot exceed the size of the underlying file if any.  Thus, we don't need
++  // to check the provided size here, because it will be checked by the OS.
+   return IsSectionSafeToMap(aHandle.get());
+ }
+ 
+diff --git a/ipc/gtest/IPCTestUtils.h b/ipc/gtest/IPCTestUtils.h
+new file mode 100644
+index 0000000000..92a92e9d21
+--- /dev/null
++++ b/ipc/gtest/IPCTestUtils.h
+@@ -0,0 +1,55 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
++ * You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef mozilla_ipc_gtest_IPCTestUtils_h
++#define mozilla_ipc_gtest_IPCTestUtils_h
++
++#include "mozilla/ipc/ProtocolUtils.h"
++
++#include "chrome/common/ipc_message.h"
++#include "chrome/common/ipc_message_utils.h"
++
++#include <stdio.h>
++
++namespace mozilla::ipc {
++
++class MockActor : public IProtocol {
++ public:
++  // LastMsgIndex is within the defined range of the enum (so UBSan won't
++  // complain) but outside the range accepted by the ParamTraits instance
++  // (just in case this is accidentally treated like a real actor somehow).
++  MockActor() : IProtocol(LastMsgIndex, UnknownSide) {}
++  ~MockActor() = default;
++
++#define STUB_OUT(Decl) \
++  Decl override { MOZ_CRASH("stub"); }
++  STUB_OUT(void DeallocManagee(ProtocolId, IProtocol*))
++  STUB_OUT(Result OnMessageReceived(const Message&))
++  STUB_OUT(Result OnMessageReceived(const Message&, UniquePtr<Message>&))
++  STUB_OUT(Span<const ProtocolId> ManagedProtocolIds() const)
++  STUB_OUT(UntypedManagedContainer* GetManagedActors(ProtocolId))
++  STUB_OUT(void ActorAlloc())
++  STUB_OUT(void ActorDealloc())
++#undef STUB_OUT
++
++  void HandleFatalError(const char* aMsg) override {
++    fprintf(stderr, "Continuing past IPC Error: %s\n", aMsg);
++  }
++};
++
++template <typename T>
++static bool SerializeAndDeserialize(T&& aIn, T* aOut) {
++  IPC::Message msg(MSG_ROUTING_NONE, 0);
++  {
++    IPC::MessageWriter writer(msg);
++    IPC::WriteParam(&writer, std::move(aIn));
++  }
++  MockActor actor;
++  IPC::MessageReader reader(msg, &actor);
++  return IPC::ReadParam(&reader, aOut);
++}
++
++}  // namespace mozilla::ipc
++
++#endif  // mozilla_ipc_gtest_IPCTestUtils_h
+diff --git a/ipc/gtest/TestBigBuffer.cpp b/ipc/gtest/TestBigBuffer.cpp
+index acf9057b14..2949fcaa52 100644
+--- a/ipc/gtest/TestBigBuffer.cpp
++++ b/ipc/gtest/TestBigBuffer.cpp
+@@ -2,6 +2,8 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#include "IPCTestUtils.h"
++
+ #include "chrome/common/ipc_message.h"
+ #include "chrome/common/ipc_message_utils.h"
+ #include "gtest/gtest.h"
+@@ -11,18 +13,6 @@
+ 
+ namespace mozilla::ipc {
+ 
+-static bool SerializeAndDeserialize(BigBuffer&& aIn, BigBuffer* aOut) {
+-  IPC::Message msg(MSG_ROUTING_NONE, 0);
+-  {
+-    IPC::MessageWriter writer(msg);
+-    IPC::WriteParam(&writer, std::move(aIn));
+-  }
+-  EXPECT_EQ(aIn.Size(), 0u);
+-
+-  IPC::MessageReader reader(msg);
+-  return IPC::ReadParam(&reader, aOut);
+-}
+-
+ TEST(BigBuffer, Empty)
+ {
+   BigBuffer in(0);
+diff --git a/ipc/gtest/TestSharedMemory.cpp b/ipc/gtest/TestSharedMemory.cpp
+index 5fde03bb48..b9e0ed76c7 100644
+--- a/ipc/gtest/TestSharedMemory.cpp
++++ b/ipc/gtest/TestSharedMemory.cpp
+@@ -2,6 +2,10 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++#include "IPCTestUtils.h"
++
++#include "chrome/common/ipc_message.h"
++#include "chrome/common/ipc_message_utils.h"
+ #include "gtest/gtest.h"
+ 
+ #include "mozilla/ipc/SharedMemoryCursor.h"
+@@ -25,6 +29,14 @@
+ 
+ namespace mozilla::ipc {
+ 
++struct SharedMemoryInternalTest : public testing::Test {
++  // Changes our idea of the size without changing the size of the OS object;
++  // mappings could fail, or could succeed but crash on access.
++  void UnsafeSetSize(shared_memory::HandleBase& aHandle, uint64_t aSize) {
++    aHandle.SetSize(aSize);
++  }
++};
++
+ #define ASSERT_SHMEM(handle, size)            \
+   do {                                        \
+     ASSERT_EQ((handle).Size(), size_t(size)); \
+@@ -588,4 +600,54 @@ TEST(IPCSharedMemory, CursorWriteRead)
+   ASSERT_FALSE(cursor.Write(data, std::size(data)));
+ }
+ 
++// A baseline for the SizeChangeMsg test below
++TEST_F(SharedMemoryInternalTest, PlainRoundTrip) {
++  auto handle = shared_memory::Create(65537);
++  ASSERT_TRUE(SerializeAndDeserialize(std::move(handle), &handle));
++  ASSERT_SHMEM(handle, 65537);
++  auto mapping = handle.Map();
++  EXPECT_TRUE(mapping.IsValid());
++}
++
++// Check that a handle where the stated size is higher than the OS object size
++// results in an error at or before mapping time.
++TEST_F(SharedMemoryInternalTest, SizeChangeMsg) {
++  // Windows and Mach only care about the number of pages, so the change has to
++  // roll over a page boundary.  This should be enough.
++  static constexpr size_t kRealSize = 65536;
++  static constexpr size_t kFakeSize = 65537;
++
++  auto handle = shared_memory::Create(kRealSize);
++
++  // We already know that our Handle class accepts and preserves unaligned
++  // sizes, so this is valid.
++  UnsafeSetSize(handle, kFakeSize);
++  ASSERT_SHMEM(handle, kFakeSize);
++
++#if defined(XP_UNIX) && !defined(XP_DARWIN)
++  EXPECT_FALSE(SerializeAndDeserialize(std::move(handle), &handle));
++#else  // Win/Mac
++  ASSERT_TRUE(SerializeAndDeserialize(std::move(handle), &handle));
++  auto mapping = handle.Map();
++  EXPECT_FALSE(mapping.IsValid());
++#endif
++}
++
++// If the claimed size is lower than the real size, that's fine; it doesn't
++// break anything, and some OSes round up the size anyway.  It also can't be
++// done accidentally though our SharedMemory API, since SetSize is private.
++TEST_F(SharedMemoryInternalTest, SizeChangeMsgDown) {
++  static constexpr size_t kRealSize = 65536;
++  static constexpr size_t kFakeSize = 12288;
++
++  auto handle = shared_memory::Create(kRealSize);
++  UnsafeSetSize(handle, kFakeSize);
++  ASSERT_SHMEM(handle, kFakeSize);
++
++  ASSERT_TRUE(SerializeAndDeserialize(std::move(handle), &handle));
++  auto mapping = handle.Map();
++  ASSERT_TRUE(mapping.IsValid());
++  EXPECT_EQ(kFakeSize, mapping.Size());
++}
++
+ }  // namespace mozilla::ipc
+diff --git a/security/sandbox/linux/SandboxFilter.cpp b/security/sandbox/linux/SandboxFilter.cpp
+index 24a9486194..b175f93c27 100644
+--- a/security/sandbox/linux/SandboxFilter.cpp
++++ b/security/sandbox/linux/SandboxFilter.cpp
+@@ -103,6 +103,10 @@ static_assert(F_LINUX_SPECIFIC_BASE == 1024);
+ #ifndef F_ADD_SEALS
+ #  define F_ADD_SEALS (F_LINUX_SPECIFIC_BASE + 9)
+ #  define F_GET_SEALS (F_LINUX_SPECIFIC_BASE + 10)
++#  define F_SEAL_SEAL 0x0001
++#  define F_SEAL_SHRINK 0x0002
++#  define F_SEAL_GROW 0x0004
++#  define F_SEAL_WRITE 0x0008
+ #else
+ static_assert(F_ADD_SEALS == (F_LINUX_SPECIFIC_BASE + 9));
+ static_assert(F_GET_SEALS == (F_LINUX_SPECIFIC_BASE + 10));
+@@ -1070,14 +1074,23 @@ class SandboxPolicyCommon : public SandboxPolicyBase {
+       CASES_FOR_fcntl: {
+         Arg<int> cmd(1);
+         Arg<int> flags(2);
++
+         // Typical use of F_SETFL is to modify the flags returned by
+         // F_GETFL and write them back, including some flags that
+         // F_SETFL ignores.  This is a default-deny policy in case any
+         // new SETFL-able flags are added.  (In particular we want to
+         // forbid O_ASYNC; see bug 1328896, but also see bug 1408438.)
+-        static const int ignored_flags =
++        static constexpr int kIgnoredFlags =
+             O_ACCMODE | O_LARGEFILE_REAL | O_CLOEXEC | FMODE_NONOTIFY;
+-        static const int allowed_flags = ignored_flags | O_APPEND | O_NONBLOCK;
++        static constexpr int kAllowedFlags =
++            kIgnoredFlags | O_APPEND | O_NONBLOCK;
++
++        // Limiting file seals may be an excess of caution; more can be added if
++        // needed. (E.g., F_SEAL_WRITE would be useful so that child-to-parent
++        // IPC can prevent races, but we don't have a cross-platform solution
++        // for that use case.)
++        static constexpr int kAllowedSeals = F_SEAL_SHRINK | F_SEAL_GROW;
++
+         return Switch(cmd)
+             // Close-on-exec is meaningless when execve isn't allowed, but
+             // NSPR reads the bit and asserts that it has the expected value.
+@@ -1087,7 +1100,7 @@ class SandboxPolicyCommon : public SandboxPolicyBase {
+                 If((flags & ~FD_CLOEXEC) == 0, Allow()).Else(InvalidSyscall()))
+             // F_GETFL is also used by fdopen
+             .Case(F_GETFL, Allow())
+-            .Case(F_SETFL, If((flags & ~allowed_flags) == 0, Allow())
++            .Case(F_SETFL, If((flags & ~kAllowedFlags) == 0, Allow())
+                                .Else(InvalidSyscall()))
+ #if defined(MOZ_PROFILE_GENERATE)
+             .Case(F_SETLKW, Allow())
+@@ -1097,6 +1110,10 @@ class SandboxPolicyCommon : public SandboxPolicyBase {
+             // Used by Mesa, generally useful, and harmless: tests if
+             // two file descriptors refer to the same file description.
+             .Case(F_DUPFD_QUERY, Allow())
++            // Allow sealing size for shared memory; see above.
++            .Case(F_GET_SEALS, Allow())
++            .Case(F_ADD_SEALS, If((flags & ~kAllowedSeals) == 0, Allow())
++                                   .Else(InvalidSyscall()))
+             .Default(SandboxPolicyBase::EvaluateSyscall(sysno));
+       }
+ 

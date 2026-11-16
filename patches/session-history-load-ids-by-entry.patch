@@ -1,0 +1,67 @@
+Sval: a session history entry removes its own load ids by key
+
+SessionHistoryEntry's destructor scanned the whole of sLoadIdToEntry for
+the ids that point at it. Only SessionHistoryCommit removes an id, so every
+load that never commits (superseded, a 204, a download, a cancel) leaves its
+id in the map until its entry dies. Freeing a tab whose context held many
+such loads scanned the map once per entry, and the parent process's main
+thread spent minutes in PLDHashTable::Iterator::Next under
+AsyncFreeSnowWhite, with every window unresponsive. Each entry keeps the
+ids that map to it and removes those, so freeing an entry costs its own
+loads.
+
+diff --git a/docshell/shistory/SessionHistoryEntry.cpp b/docshell/shistory/SessionHistoryEntry.cpp
+index 64b4ae9d03..a73bee17b5 100644
+--- a/docshell/shistory/SessionHistoryEntry.cpp
++++ b/docshell/shistory/SessionHistoryEntry.cpp
+@@ -485,6 +485,10 @@ void SessionHistoryEntry::SetByLoadId(uint64_t aLoadId,
+   MOZ_LOG(
+       gSHLog, LogLevel::Verbose,
+       ("SessionHistoryEntry::SetByLoadId(%" PRIu64 " - %p)", aLoadId, aEntry));
++  if (auto previous = sLoadIdToEntry->Lookup(aLoadId)) {
++    previous->mEntry->mLoadIds.RemoveElement(aLoadId);
++  }
++  aEntry->mLoadIds.AppendElement(aLoadId);
+   sLoadIdToEntry->InsertOrUpdate(
+       aLoadId, LoadingEntry{
+                    .mEntry = aEntry,
+@@ -501,7 +505,9 @@ void SessionHistoryEntry::RemoveLoadId(uint64_t aLoadId) {
+ 
+   MOZ_LOG(gSHLog, LogLevel::Verbose,
+           ("SHEntry::RemoveLoadId(%" PRIu64 ")", aLoadId));
+-  sLoadIdToEntry->Remove(aLoadId);
++  if (auto entry = sLoadIdToEntry->Extract(aLoadId)) {
++    entry->mEntry->mLoadIds.RemoveElement(aLoadId);
++  }
+ }
+ 
+ SessionHistoryEntry::SessionHistoryEntry()
+@@ -530,8 +536,9 @@ SessionHistoryEntry::~SessionHistoryEntry() {
+   }
+ 
+   if (sLoadIdToEntry) {
+-    sLoadIdToEntry->RemoveIf(
+-        [this](auto& aIter) { return aIter.Data().mEntry == this; });
++    for (uint64_t loadId : mLoadIds) {
++      sLoadIdToEntry->Remove(loadId);
++    }
+     if (sLoadIdToEntry->IsEmpty()) {
+       delete sLoadIdToEntry;
+       sLoadIdToEntry = nullptr;
+diff --git a/docshell/shistory/SessionHistoryEntry.h b/docshell/shistory/SessionHistoryEntry.h
+index 0c99cb14b2..61a7f2805a 100644
+--- a/docshell/shistory/SessionHistoryEntry.h
++++ b/docshell/shistory/SessionHistoryEntry.h
+@@ -544,6 +544,12 @@ class SessionHistoryEntry : public nsISHEntry, public nsSupportsWeakReference {
+ 
+   HistoryEntryCounterForBrowsingContext mBCHistoryLength;
+ 
++  // The load ids sLoadIdToEntry maps to this entry, which the destructor
++  // removes by key. A load that never commits keeps its id in the map until
++  // its entry dies, so the map holds such ids from every tab, and a scan of
++  // it per destroyed entry is quadratic in them.
++  nsTArray<uint64_t> mLoadIds;
++
+   static nsTHashMap<nsUint64HashKey, LoadingEntry>* sLoadIdToEntry;
+ };
+ 

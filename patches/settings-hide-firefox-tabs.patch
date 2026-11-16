@@ -1,0 +1,53 @@
+Sval: hide Firefox's tab-strip settings and its session restore
+
+about:preferences' Tabs interaction fieldset acts only on Firefox's tab strip,
+which Sval's workspace panel replaces; Sval locks each pref, which hides the
+controls but not the fieldset heading. "Open previous windows and tabs" is
+always on in Sval, which reopens every window of the last session with its
+workspace (Sval spec §10.4). Appearance's "Customize browser layout"
+link opens the browser layout group, which Sval's locks hide. None of these
+has a pref of its own that hides it, so the setting config is the only lever.
+
+diff --git a/browser/components/preferences/config/appearance.mjs b/browser/components/preferences/config/appearance.mjs
+index 6a2a200d7f..d06f6ee6f4 100644
+--- a/browser/components/preferences/config/appearance.mjs
++++ b/browser/components/preferences/config/appearance.mjs
+@@ -86,6 +86,9 @@ Preferences.addSetting({
+ 
+ Preferences.addSetting({
+   id: "related-settings-tabs-browsing-link",
++  // Sval: the link opens Firefox's browser layout (horizontal or vertical
++  // tabs), which Sval locks off for its workspace panel.
++  visible: () => false,
+   onUserClick: e => {
+     e.preventDefault();
+     window.gotoPref("paneTabsBrowsing-layout");
+diff --git a/browser/components/preferences/config/tabs-browsing.mjs b/browser/components/preferences/config/tabs-browsing.mjs
+index 7dd5937b32..00d0495546 100644
+--- a/browser/components/preferences/config/tabs-browsing.mjs
++++ b/browser/components/preferences/config/tabs-browsing.mjs
+@@ -225,6 +225,10 @@ Preferences.addSetting({
+ // "Interaction" tabs settings
+ Preferences.addSetting({
+   id: "tabsInteraction",
++  // Sval: every control here acts on Firefox's tab strip, which Sval's
++  // workspace panel replaces. Sval locks their prefs, which hides each
++  // control but not this heading.
++  visible: () => false,
+ });
+ Preferences.addSetting({
+   id: "ctrlTabRecentlyUsedOrder",
+diff --git a/browser/components/preferences/main.js b/browser/components/preferences/main.js
+index b66ff919d9..0583448509 100644
+--- a/browser/components/preferences/main.js
++++ b/browser/components/preferences/main.js
+@@ -288,6 +288,9 @@ Preferences.addSetting({
+   id: "browserRestoreSession",
+   pref: "browser.startup.page",
+   deps: ["privateBrowsingAutoStart"],
++  // Sval: every launch reopens the last session's windows (Sval spec §10.4),
++  // and any other choice would open one window on one workspace.
++  visible: () => false,
+   get:
+     /**
+      * Returns the value of the "Open previous windows and tabs" option based

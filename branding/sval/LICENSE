@@ -1,0 +1,52 @@
+Sval brand art
+
+Copyright 2026 Ellm Tree, Inc. (https://sval.app)
+
+The files listed below are Sval's brand art: its icons, wordmarks, glyph, tile
+and installer art, and the masters they are generated from. Ellm Tree, Inc.
+reserves all rights in them except the ones granted here.
+
+Unmodified copies. You may copy and redistribute an unmodified Sval build, or
+Sval's unmodified source, with this art in it. You do so under the licenses
+that cover Sval's code: the GNU Affero General Public License 3.0 with the Sval
+App Store Permission for Sval's own files, and the Mozilla Public License 2.0
+for the files derived from Mozilla's. A copy is
+unmodified when neither its code nor its art has been changed.
+
+Modified versions. If you change Sval, you may use and share your version
+under those same licenses, but it is not Sval. Before you distribute it,
+replace every file listed below with art of your own, and do not present it
+under Sval's name or marks. This is the same rule Mozilla's trademark policy
+applies to Sval as a modified version of Firefox.
+
+No other license to this art is granted. TRADEMARKS.md says how Sval's name
+and logo may be used.
+
+Paths are relative to the repository root. `*` matches any file name within
+one directory.
+
+- branding/sval/*.bmp
+- branding/sval/*.icns
+- branding/sval/*.ico
+- branding/sval/*.png
+- branding/sval/*.sfx, the icon in its resources
+- branding/sval/content/*.png
+- branding/sval/content/*.svg
+- branding/sval/msix/Assets/*.png
+- branding/sval/stubinstaller/bgstub.jpg
+- branding/sval/src/icon.svg
+- branding/sval/src/masters/*
+- chrome/browser/components/sval/sval-glyph.svg
+- chrome/browser/components/sval/home/starfield-stars-only-1920x1080.svg
+- website/public/favicon*
+- website/public/apple-touch-icon*
+- website/src/assets/art/bg/*
+- website/src/assets/art/brand/*
+- website/public/og/*
+- website/public/screenshots/*
+- website/screenshots/*
+
+Every other file in branding/sval/ is code, under the license named in its own
+header or in the repository's REUSE.toml. branding/sval/src/sval-art.js, the
+program that draws this art, is licensed under the GNU Affero General Public
+License 3.0 with the Sval App Store Permission; the art it draws is reserved.

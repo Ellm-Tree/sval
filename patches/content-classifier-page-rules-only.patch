@@ -1,0 +1,140 @@
+Sval: a content-classifier feature that serves page rules only
+
+Sval's `my-filters` feature holds the user's own rules alone, so their
+hiding rules reach a page whose site has protections off, or where the
+blocking level runs no list, while the lists' rules do not. Its engine
+must not block: a site's protection exception covers every request, the
+user's own network rules included, and those rules block through the
+`ads` feature's engine with the level's lists. A feature marked
+mPageRulesOnly is skipped by ClassifyWithEngines, and pageRules and
+hiddenClassIdSelectors take aPageRulesOnly to answer from those engines
+or from the others, so a page never gets the user's rules twice.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index 35fee5427e..36bd77af96 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -64,6 +64,8 @@ constexpr nsLiteralCString kMinorExceptionListIds[] = {
+ // their own.
+ constexpr nsLiteralCString kAllowedDomainsListIds[] = {
+     "sval-allowed-domains"_ns};
++// Sval: the user's own rules, as a list of their own.
++constexpr nsLiteralCString kMyFiltersListIds[] = {"sval-my-filters"_ns};
+ // Sval: backs the empty span of a feature whose ids come from its pref; an
+ // empty Span's own constructor is not constexpr.
+ constexpr nsLiteralCString kPrefListIds[] = {""_ns};
+@@ -142,6 +144,11 @@ constexpr ContentClassifierFeature kFeatures[] = {
+      NS_ERROR_TRACKING_URI, false,
+      "privacy.trackingprotection.content.ads.list_ids"},
+     // Sval: listed last in the engines prefs, so it excepts every list above.
++    // Sval: the user's own rules alone, for a page that takes none of the
++    // blocking features' page rules.
++    {"my-filters"_ns, Span<const nsLiteralCString>(kMyFiltersListIds),
++     nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING, 0, 0, 0,
++     NS_OK, false, nullptr, false, true},
+     {"allowed-domains"_ns,
+      Span<const nsLiteralCString>(kAllowedDomainsListIds),
+      nsIClassifiedChannel::ClassificationFlags::CLASSIFIED_TRACKING, 0, 0, 0,
+@@ -842,6 +849,10 @@ ContentClassifierResult ContentClassifierService::ClassifyWithEngines(
+   bool matchedSoFar = false;
+   for (const auto& engine : aEngines) {
+     const ContentClassifierFeature& feature = engine->Feature();
++    // Sval: a page-rules-only feature has no say in a channel.
++    if (feature.mPageRulesOnly) {
++      continue;
++    }
+     // Sval: after an important block only a feature that overrides it runs.
+     if (!aIndependentEngines &&
+         result.GetStatus() == ContentClassifierResult::Status::ImportantHit &&
+@@ -1058,7 +1069,7 @@ NS_IMETHODIMP ContentClassifierService::GetFeatureNames(
+ // pages.
+ 
+ NS_IMETHODIMP ContentClassifierService::PageRules(
+-    const nsACString& aUrl, bool aPrivateBrowsing,
++    const nsACString& aUrl, bool aPrivateBrowsing, bool aPageRulesOnly,
+     nsIContentClassifierPageRules** aRules) {
+   // adblock-rust's answer depends on the whole URL: its host's rules, and
+   // whether a $generichide or $elemhide exception matches the URL
+@@ -1072,6 +1083,7 @@ NS_IMETHODIMP ContentClassifierService::PageRules(
+   }
+   nsAutoCString key(spec);
+   key.Append(aPrivateBrowsing ? " p" : " n");
++  key.Append(aPageRulesOnly ? "o" : "a");
+   MutexAutoLock lock(mLock);
+   if (auto cached = mCosmeticCache.Lookup(key)) {
+     NS_ADDREF(*aRules = cached.Data());
+@@ -1080,7 +1092,9 @@ NS_IMETHODIMP ContentClassifierService::PageRules(
+   RefPtr<SvalClassifierPageRules> rules = new SvalClassifierPageRules();
+   for (const auto& engine :
+        aPrivateBrowsing ? mCancelEnginesPBM : mCancelEngines) {
+-    rules->Add(*engine, spec);
++    if (engine->Feature().mPageRulesOnly == aPageRulesOnly) {
++      rules->Add(*engine, spec);
++    }
+   }
+   constexpr uint32_t kMaxCachedUrls = 256;
+   if (mCosmeticCache.Count() >= kMaxCachedUrls) {
+@@ -1094,11 +1108,14 @@ NS_IMETHODIMP ContentClassifierService::PageRules(
+ NS_IMETHODIMP ContentClassifierService::HiddenClassIdSelectors(
+     const nsTArray<nsCString>& aClasses, const nsTArray<nsCString>& aIds,
+     const nsTArray<nsCString>& aExceptions, bool aPrivateBrowsing,
+-    nsTArray<nsCString>& aSelectors) {
++    bool aPageRulesOnly, nsTArray<nsCString>& aSelectors) {
+   aSelectors.Clear();
+   MutexAutoLock lock(mLock);
+   for (const auto& engine :
+        aPrivateBrowsing ? mCancelEnginesPBM : mCancelEngines) {
++    if (engine->Feature().mPageRulesOnly != aPageRulesOnly) {
++      continue;
++    }
+     (void)SvalClassifierEngine::HiddenClassIdSelectors(
+         *engine, aClasses, aIds, aExceptions, aSelectors);
+   }
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index 6b4311209b..7ebbc23811 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -88,6 +88,11 @@ struct ContentClassifierFeature {
+   // `$important`. adblock-rust files such an exception with the others, so
+   // the service applies it.
+   bool mOverridesImportant = false;
++
++  // Sval: when true, the feature's engine never classifies a channel and
++  // answers pageRules and hiddenClassIdSelectors only when asked for the
++  // page-rules-only engines.
++  bool mPageRulesOnly = false;
+ };
+ 
+ enum class InitPhase {
+diff --git a/toolkit/components/content-classifier/nsIContentClassifierService.idl b/toolkit/components/content-classifier/nsIContentClassifierService.idl
+index b9f2279e49..ff7e677af7 100644
+--- a/toolkit/components/content-classifier/nsIContentClassifierService.idl
++++ b/toolkit/components/content-classifier/nsIContentClassifierService.idl
+@@ -36,20 +36,23 @@ interface nsIContentClassifierService : nsISupports {
+     Array<ACString> getFeatureNames();
+ 
+     /**
+-     * Sval: the page rules for a document at aUrl.
++     * Sval: the page rules for a document at aUrl, from the page-rules-only
++     * engines when aPageRulesOnly is true and from the others when false.
+      */
+     nsIContentClassifierPageRules pageRules(in ACString aUrl,
+-                                            in boolean aPrivateBrowsing);
++                                            in boolean aPrivateBrowsing,
++                                            in boolean aPageRulesOnly);
+ 
+     /**
+      * Sval: the generic hiding selectors for class and id names seen on a
+      * page, leaving out aExceptions, the union of the page's
+-     * UrlSpecificResources exceptions.
++     * UrlSpecificResources exceptions, from the engines pageRules names.
+      */
+     Array<ACString> hiddenClassIdSelectors(in Array<ACString> aClasses,
+                                            in Array<ACString> aIds,
+                                            in Array<ACString> aExceptions,
+-                                           in boolean aPrivateBrowsing);
++                                           in boolean aPrivateBrowsing,
++                                           in boolean aPageRulesOnly);
+ 
+     /**
+      * Sval: the scriptlet library, a JSON array of adblock-rust resources.

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  Sval's general dialog, opened by `SvalDialog.sys.mjs`. `sval-dialog.js` fills
+  it from what the opener passes in.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title></title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script src="chrome://browser/content/sval/sval-dialog.js"></script>
+  </head>
+  <body>
+    <form
+      class="sval-dialog"
+      role="dialog"
+      aria-labelledby="sval-dialog-title"
+      aria-describedby="sval-dialog-body"
+    >
+      <div class="sval-dialog-head">
+        <span
+          class="sval-dialog-icon"
+          aria-hidden="true"
+          hidden="hidden"
+        ></span>
+        <div class="sval-dialog-copy">
+          <h1 class="sval-dialog-title" id="sval-dialog-title"></h1>
+          <p class="sval-dialog-body" id="sval-dialog-body" hidden="hidden"></p>
+          <p
+            class="sval-dialog-warning"
+            id="sval-dialog-warning"
+            hidden="hidden"
+          ></p>
+        </div>
+        <button
+          class="sval-dialog-close"
+          type="button"
+          aria-label="Close"
+          title="Close"
+          hidden="hidden"
+        ></button>
+      </div>
+      <div class="sval-dialog-field" hidden="hidden">
+        <label class="sval-dialog-label" for="sval-dialog-input"></label>
+        <input
+          class="sval-dialog-input"
+          id="sval-dialog-input"
+          type="text"
+          autocomplete="off"
+        />
+        <span
+          class="sval-dialog-error"
+          id="sval-dialog-error"
+          aria-live="polite"
+        ></span>
+      </div>
+      <dl class="sval-dialog-details" hidden="hidden"></dl>
+      <label class="sval-dialog-check" hidden="hidden">
+        <input type="checkbox" />
+        <span class="sval-dialog-check-label"></span>
+      </label>
+      <div class="sval-dialog-actions"></div>
+    </form>
+  </body>
+</html>

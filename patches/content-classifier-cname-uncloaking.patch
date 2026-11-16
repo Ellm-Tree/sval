@@ -1,0 +1,109 @@
+Sval: the content classifier matches a cloaked host by its canonical name
+
+A request no rule matched is held before it connects while its host is
+resolved, and classified again under the host's CNAME when that is on
+another site, so a tracker behind a subdomain of the page's own site is
+blocked by the rules for the tracker. The logic is in SvalCnameUncloaking,
+an added file. The hook wraps the callback that lets the channel go on and
+records whether the first classification missed, both inside
+AntiTrackingChannelClassifierUtils::CheckChannelHelper, which no chrome API
+reaches. The uncloaked request is built from ContentClassifierRequest's
+private fields, hence the friend declaration. An exception for the request's
+own address keeps it unblocked; HasCancelException, defined in the added
+file, reads the service's engines, which only its members reach.
+
+diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+index f38dfb4623..1f6aeb5216 100644
+--- a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
++++ b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+@@ -19,6 +19,7 @@
+ #include "mozilla/glean/UrlClassifierMetrics.h"
+ #include "mozilla/net/AsyncUrlChannelClassifier.h"
+ #include "mozilla/StaticPrefs_privacy.h"
++#include "mozilla/SvalCnameUncloaking.h"
+ #include "mozilla/dom/BrowsingContext.h"
+ #include "mozilla/dom/CanonicalBrowsingContext.h"
+ #include "mozilla/net/UrlClassifierCommon.h"
+@@ -945,6 +946,16 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+   RefPtr<ContentClassifierService> contentClassifier =
+       ContentClassifierService::GetInstance();
+ 
++  // Sval: a request no rule matched waits for its host's canonical name to be
++  // classified (SvalCnameUncloaking.h).
++  RefPtr<SvalCnameUncloaking> uncloaking = SvalCnameUncloaking::ForChannel(
++      aChannel, contentClassifier, aPerformBlocking);
++  if (uncloaking) {
++    aCallback = uncloaking->Wrap(std::move(aCallback));
++    callbackFromFeature = aCallback;
++    onUndispatched = aCallback;
++  }
++
+   const bool skipURLClassifier =
+       StaticPrefs::
+           privacy_trackingprotection_urlclassifier_disable_for_channel_classifier() &&
+@@ -1064,6 +1075,7 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+        eventPriority, outerStartTime,
+        contentClassifierRequest = std::move(contentClassifierRequest),
+        contentClassifier, callbackFromFeature = std::move(callbackFromFeature),
++       uncloaking,  // Sval
+        channel = nsCOMPtr<nsIChannel>(aChannel)]() mutable -> void {
+         MOZ_ASSERT(!NS_IsMainThread());
+ 
+@@ -1084,6 +1096,9 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+           if (aPerformBlocking) {
+             cancelResult =
+                 contentClassifier->ClassifyForCancel(*contentClassifierRequest);
++            if (uncloaking) {  // Sval
++              uncloaking->FirstClassified(cancelResult);
++            }
+           }
+           if (aPerformAnnotations) {
+             annotateResult = contentClassifier->ClassifyForAnnotate(
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index 4660264c8f..6b4311209b 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -232,6 +232,10 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   ContentClassifierResult ClassifyForAnnotate(
+       const ContentClassifierRequest& aRequest);
+ 
++  // Sval: whether an exception in the cancel engines matches aRequest, as it
++  // would once a rule had matched. Defined in SvalCnameUncloaking.cpp.
++  bool HasCancelException(const ContentClassifierRequest& aRequest);
++
+   [[nodiscard]] net::ChannelBlockDecision MaybeCancelChannel(
+       nsIChannel* aChannel, const ContentClassifierResult& aResult);
+   void MaybeAnnotateChannel(nsIChannel* aChannel,
+diff --git a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+index ff9cc0a631..516b6428e0 100644
+--- a/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
++++ b/toolkit/components/content-classifier/content_classifier_engine/ContentClassifierEngine.h
+@@ -50,6 +50,9 @@ class ContentClassifierEngineResult {
+ 
+ class ContentClassifierRequest {
+   friend class ContentClassifierEngine;
++  // Sval: uncloaking classifies a request again under its host's canonical
++  // name.
++  friend class SvalCnameUncloaking;
+   nsCString mUrl;
+   nsCString mHost;
+   nsCString mSourceHost;
+diff --git a/toolkit/components/content-classifier/moz.build b/toolkit/components/content-classifier/moz.build
+index 6200150833..3cca37557c 100644
+--- a/toolkit/components/content-classifier/moz.build
++++ b/toolkit/components/content-classifier/moz.build
+@@ -24,6 +24,14 @@ UNIFIED_SOURCES += [
+     "SvalClassifierPageRules.cpp",
+ ]
+ 
++# Sval's CNAME uncloaking.
++UNIFIED_SOURCES += [
++    "SvalCnameUncloaking.cpp",
++]
++EXPORTS.mozilla += [
++    "SvalCnameUncloaking.h",
++]
++
+ EXPORTS.mozilla += [
+     "ContentClassifierService.h",
+ ]

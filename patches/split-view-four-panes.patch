@@ -1,0 +1,407 @@
+Sval: a split view shows up to four tabs side by side
+
+Sval's split view holds two to four tabs (split-view spec §4.3).
+addTabSplitView and the wrapper's addTabs already take any number of tabs;
+what assumed two is the layout around them. tabpanels made one splitter and
+ordered the first two panels; the wrapper reset only panels[1]'s width and
+reversed only its first two tabs, and kept the list its panels are drawn
+from as it was made, so a tab closing in a split of three left its panel in
+the list. content-area.css ordered and spaced only columns 0 and 1.
+
+Each panel but the last gets a splitter after it, which resizes that panel
+as Firefox's one splitter resizes the first; the last panel fills the rest.
+Reverse reverses every tab. The wrapper's list follows its children, and a
+change in them redraws its panels. addTabSplitView, the wrapper's addTabs and
+moveTabToSplitView pass a TabMetricsContext through to the TabMove each
+tab raises, as tab moves elsewhere in tabbrowser do, so a split Sval rebuilds
+from its tree is told from one the user makes. No chrome API reaches the
+private fields involved, which is why this is a patch.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index e543eef46c..cfeee66c22 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -3608,10 +3608,12 @@
+      * @param {string} [options.trigger]
+      *   The trigger method for creating the split view. Used for telemetry.
+      *   Valid values: "menu_add", "menu_open".
++     * @param {TabMetricsContext} [options.metricsContext]
++     *   Carried by the TabMove each tab raises as it moves in.
+      */
+     addTabSplitView(
+       tabs,
+-      { id = null, insertBefore = null, trigger = null } = {}
++      { id = null, insertBefore = null, trigger = null, metricsContext } = {}
+     ) {
+       if (!tabs?.length) {
+         throw new Error("Cannot create split view with zero tabs");
+@@ -3630,7 +3632,7 @@
+         splitview,
+         insertBefore?.splitview ?? insertBefore
+       );
+-      splitview.addTabs(tabs);
++      splitview.addTabs(tabs, { metricsContext });
+ 
+       // Bail out if the split view is empty at this point. This can happen if all
+       // provided tabs are pinned and therefore cannot be grouped.
+@@ -7272,8 +7274,14 @@
+      * @param {MozTabbrowserTab} aTab
+      * @param {MozTabSplitViewWrapper} aSplitViewWrapper
+      * @param {int} [insertAtIndex=-1] An optional index for a tab to insert into the split view
++     * @param {TabMetricsContext} [metricsContext] Carried by the TabMove
+      */
+-    moveTabToSplitView(aTab, aSplitViewWrapper, insertAtIndex = -1) {
++    moveTabToSplitView(
++      aTab,
++      aSplitViewWrapper,
++      insertAtIndex = -1,
++      metricsContext = null
++    ) {
+       if (!this.isTab(aTab)) {
+         throw new Error("Can only move a tab into a split view wrapper");
+       }
+@@ -7287,13 +7295,16 @@
+         return;
+       }
+ 
+-      this.#handleTabMove(aTab, () =>
+-        insertAtIndex > -1
+-          ? aSplitViewWrapper.insertBefore(
+-              aTab,
+-              aSplitViewWrapper.tabs[insertAtIndex]
+-            )
+-          : aSplitViewWrapper.appendChild(aTab)
++      this.#handleTabMove(
++        aTab,
++        () =>
++          insertAtIndex > -1
++            ? aSplitViewWrapper.insertBefore(
++                aTab,
++                aSplitViewWrapper.tabs[insertAtIndex]
++              )
++            : aSplitViewWrapper.appendChild(aTab),
++        metricsContext
+       );
+       this.removeFromMultiSelectedTabs(aTab);
+       this.tabContainer._notifyBackgroundTab(aTab);
+diff --git a/browser/components/tabbrowser/content/tabsplitview.js b/browser/components/tabbrowser/content/tabsplitview.js
+index 6e86e5690d..38fae61733 100644
+--- a/browser/components/tabbrowser/content/tabsplitview.js
++++ b/browser/components/tabbrowser/content/tabsplitview.js
+@@ -153,6 +153,11 @@
+       if (!this.#tabChangeObserver) {
+         this.#tabChangeObserver = new window.MutationObserver(mutations => {
+           if (this.tabs.length) {
++            // A split can hold more than two tabs, so one can leave while two
++            // or more stay. Those are the ones its panels show.
++            const departed = this.#tabs.filter(tab => !tab.splitview);
++            gBrowser.tabpanels.removeTabsFromSplitview(departed);
++            this.#tabs = this.tabs;
+             this.hasActiveTab = this.tabs.some(tab => tab.selected);
+             this.tabs.forEach((tab, index) => {
+               // Renumber tabs so that a11y tools can tell users that a given
+@@ -161,6 +166,9 @@
+               tab.setAttribute("aria-setsize", this.tabs.length);
+               tab.updateSplitViewAriaLabel(index);
+             });
++            if (this.hasActiveTab && this.tabs.length > 1) {
++              this.#activate();
++            }
+             this.dispatchEvent(
+               new CustomEvent("SplitViewTabChange", {
+                 bubbles: true,
+@@ -304,11 +312,11 @@
+     }
+ 
+     /**
+-     * Reset custom width on the right panel, allowing it to fill the rest of
+-     * the available space.
++     * Reset custom width on the rightmost panel, allowing it to fill the rest
++     * of the available space.
+      */
+     resetRightPanelWidth() {
+-      const panel = this.panels[1];
++      const panel = this.panels.at(-1);
+       this.#storedPanelWidths.delete(panel);
+       panel.removeAttribute("width");
+       panel.style.removeProperty("width");
+@@ -321,8 +329,16 @@
+      * @param {object} [options]
+      * @param {boolean} [options.isSessionRestore]
+      * @param {int} [options.indexOfReplacedTab] [optional] Used if replacing a tab in the split view
++     * @param {TabMetricsContext} [options.metricsContext] Carried by each tab's TabMove
+      */
+-    addTabs(tabs, { isSessionRestore = false, indexOfReplacedTab = -1 } = {}) {
++    addTabs(
++      tabs,
++      {
++        isSessionRestore = false,
++        indexOfReplacedTab = -1,
++        metricsContext = null,
++      } = {}
++    ) {
+       for (let tab of tabs) {
+         if (tab.pinned) {
+           return;
+@@ -341,7 +357,12 @@
+         }
+         isSessionRestore
+           ? this.appendChild(tab)
+-          : gBrowser.moveTabToSplitView(tabToMove, this, indexOfReplacedTab);
++          : gBrowser.moveTabToSplitView(
++            tabToMove,
++            this,
++            indexOfReplacedTab,
++            metricsContext
++          );
+         if (tab === gBrowser.selectedTab) {
+           this.hasActiveTab = true;
+         }
+@@ -432,11 +453,13 @@
+      *   The trigger method for reversing tabs. Used for telemetry.
+      */
+     reverseTabs(trigger = null) {
+-      const [firstTab, secondTab] = this.#tabs;
++      const tabs = this.#tabs;
+       this.#shouldMoveAllTabsAtOnce = false;
+-      gBrowser.moveTabBefore(secondTab, firstTab);
++      for (let i = tabs.length - 1; i > 0; i--) {
++        gBrowser.moveTabBefore(tabs[i], tabs[0]);
++      }
+       this.#shouldMoveAllTabsAtOnce = true;
+-      this.#tabs = [secondTab, firstTab];
++      this.#tabs = tabs.toReversed();
+       if (this.hasActiveTab) {
+         gBrowser.showSplitViewPanels(this.#tabs);
+         updateUrlbarButton.arm();
+diff --git a/browser/themes/shared/tabbrowser/content-area.css b/browser/themes/shared/tabbrowser/content-area.css
+index d3a4641bfb..0c2ebd5116 100644
+--- a/browser/themes/shared/tabbrowser/content-area.css
++++ b/browser/themes/shared/tabbrowser/content-area.css
+@@ -83,15 +83,18 @@
+     }
+   }
+ 
+-  /* When column-0 is selected, its right outline extends into the splitter's
+-   * inline-start margin: widen that side to 3px (2px outline + 1px clear). */
+-  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="0"].deck-selected) .split-view-splitter {
++  /* When a column is selected, its outline extends into the margin of the
++   * splitter on each side of it: widen that side to 3px (2px outline + 1px
++   * clear). The splitter after column N carries column="N". */
++  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="0"].deck-selected) .split-view-splitter[column="0"],
++  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="1"].deck-selected) .split-view-splitter[column="1"],
++  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="2"].deck-selected) .split-view-splitter[column="2"] {
+     margin-inline-start: 3px;
+   }
+ 
+-  /* When column-1 is selected, its left outline extends into the splitter's
+-   * inline-end margin: widen that side to 3px (2px outline + 1px clear). */
+-  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="1"].deck-selected) .split-view-splitter {
++  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="1"].deck-selected) .split-view-splitter[column="0"],
++  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="2"].deck-selected) .split-view-splitter[column="1"],
++  #tabbrowser-tabpanels[splitview]:has(.split-view-panel[column="3"].deck-selected) .split-view-splitter[column="2"] {
+     margin-inline-end: 3px;
+   }
+ }
+@@ -314,6 +317,14 @@
+     .split-view-splitter {
+       order: 1;
+       flex: none;
++
++      &[column="1"] {
++        order: 3;
++      }
++
++      &[column="2"] {
++        order: 5;
++      }
+       -moz-user-focus: normal;
+       border-color: transparent;
+ 
+@@ -327,6 +338,21 @@
+       margin-inline-start: 0;
+     }
+ 
++    .split-view-panel[column="2"] {
++      order: 4;
++      margin-inline-start: 0;
++    }
++
++    .split-view-panel[column="3"] {
++      order: 6;
++      margin-inline-start: 0;
++    }
++
++    /* A column with another after it meets that column's splitter. */
++    .split-view-panel:has(+ .split-view-splitter:not([hidden])) {
++      margin-inline-end: 0;
++    }
++
+     /* Panels with a custom width shouldn't grow. */
+     .split-view-panel[width] {
+       flex: none;
+diff --git a/toolkit/content/widgets/tabbox.js b/toolkit/content/widgets/tabbox.js
+index b906bbf3c9..96c2ac7f46 100644
+--- a/toolkit/content/widgets/tabbox.js
++++ b/toolkit/content/widgets/tabbox.js
+@@ -276,27 +276,30 @@
+     #splitViewPanels = [];
+ 
+     /**
+-     * The splitter placed in between Split View panels.
++     * The splitters placed in between Split View panels, one after each
++     * panel but the last.
+      *
+-     * @type {XULElement}
++     * @type {XULElement[]}
+      */
+-    #splitViewSplitter = null;
++    #splitViewSplitters = [];
+     #splitterWasDragging = false;
+     #splitterAriaUpdateTask = null;
+-    #splitViewSplitterObserver = new MutationObserver(() => {
+-      const splitterState = this.#splitViewSplitter.getAttribute("state");
+-      if (splitterState === "dragging") {
+-        this.#splitterWasDragging = true;
+-        gBrowser.activeSplitView.resetRightPanelWidth();
+-      } else {
+-        const wasDragging = this.#splitterWasDragging;
+-        this.#splitterWasDragging = false;
+-        if (wasDragging) {
+-          window.promiseDocumentFlushed(() =>
+-            this.#recordSplitViewResizeTelemetry()
+-          );
++    #splitViewSplitterObserver = new MutationObserver(records => {
++      for (const { target } of records) {
++        const splitterState = target.getAttribute("state");
++        if (splitterState === "dragging") {
++          this.#splitterWasDragging = true;
++          gBrowser.activeSplitView.resetRightPanelWidth();
++        } else {
++          const wasDragging = this.#splitterWasDragging;
++          this.#splitterWasDragging = false;
++          if (wasDragging) {
++            window.promiseDocumentFlushed(() =>
++              this.#recordSplitViewResizeTelemetry()
++            );
++          }
++          this.#splitterAriaUpdateTask.arm();
+         }
+-        this.#splitterAriaUpdateTask.arm();
+       }
+     });
+ 
+@@ -382,15 +385,29 @@
+     }
+ 
+     get splitViewSplitter() {
+-      if (!this.#splitViewSplitter) {
+-        this.#splitViewSplitter = this.#createSplitViewSplitter();
++      return this.#splitViewSplitterAt(0);
++    }
++
++    /**
++     * The splitter after the panel in column `index`, made the first time
++     * it is asked for.
++     *
++     * @param {number} index
++     * @returns {XULElement}
++     */
++    #splitViewSplitterAt(index) {
++      while (this.#splitViewSplitters.length <= index) {
++        this.#splitViewSplitters.push(
++          this.#createSplitViewSplitter(this.#splitViewSplitters.length)
++        );
+       }
+-      return this.#splitViewSplitter;
++      return this.#splitViewSplitters[index];
+     }
+ 
+-    #createSplitViewSplitter() {
++    #createSplitViewSplitter(index) {
+       const splitter = document.createXULElement("splitter");
+       splitter.className = "split-view-splitter";
++      splitter.setAttribute("column", index);
+       splitter.setAttribute("resizebefore", "sibling");
+       splitter.setAttribute("resizeafter", "none");
+       splitter.setAttribute("tabindex", "0");
+@@ -411,15 +428,19 @@
+     }
+ 
+     async updateSplitterAriaAttributes() {
+-      // avoid triggering the splitter's creation here if it doesnt already exist
+-      const splitter = this.#splitViewSplitter;
+-      if (!splitter) {
+-        return;
+-      }
+-      // The splitter is actively controlling the size of the left/first panel
++      // avoid triggering a splitter's creation here if it doesnt already exist
++      await Promise.all(
++        this.#splitViewSplitters.map((splitter, index) =>
++          this.#updateSplitterAriaAttributes(splitter, index)
++        )
++      );
++    }
++
++    async #updateSplitterAriaAttributes(splitter, index) {
++      // The splitter is actively controlling the size of the panel before it
+       const controlledPanel =
+-        this.#splitViewPanels.length &&
+-        document.getElementById(this.splitViewPanels[0]);
++        this.#splitViewPanels.length > index + 1 &&
++        document.getElementById(this.splitViewPanels[index]);
+       if (controlledPanel) {
+         splitter.setAttribute("aria-controls", controlledPanel.id);
+ 
+@@ -573,31 +594,38 @@
+       const splitViewTabSelected =
+         gBrowser.selectedTab.splitview && updatedValue;
+       this.toggleAttribute("splitview", updatedValue);
+-      this.splitViewSplitter.hidden = !splitViewTabSelected;
++      const panels = this.splitViewPanels
++        .map(id => document.getElementById(id))
++        .filter(Boolean);
++      const splitters = splitViewTabSelected ? panels.length - 1 : 0;
++      for (let i = 0; i < Math.max(splitters, 1); i++) {
++        this.#splitViewSplitterAt(i);
++      }
++      this.#splitViewSplitters.forEach((splitter, index) => {
++        splitter.hidden = index >= splitters;
++      });
+       const selectedPanel = this.selectedPanel;
+ 
+       if (splitViewTabSelected) {
+         // Ensure panels are in the correct DOM order so that focus moves
+         // as expected when tabbing across a splitview
+-        const firstPanel = document.getElementById(this.splitViewPanels[0]);
+-        const secondPanel = document.getElementById(this.splitViewPanels[1]);
+-        if (firstPanel && secondPanel) {
+-          // Does secondPanel follow firstPanel? Move firstPanel before secondPanel if necessary
++        for (let i = panels.length - 2; i >= 0; i--) {
++          // Does the next panel follow this one? Move this one before it if necessary
+           if (
+             !(
+-              firstPanel.compareDocumentPosition(secondPanel) &
++              panels[i].compareDocumentPosition(panels[i + 1]) &
+               Node.DOCUMENT_POSITION_FOLLOWING
+             )
+           ) {
+-            firstPanel.parentElement.moveBefore(firstPanel, secondPanel);
++            panels[i].parentElement.moveBefore(panels[i], panels[i + 1]);
+           }
+         }
+-        // Ensure the splitter is in-between the panels
+-        if (
+-          firstPanel &&
+-          firstPanel.nextElementSibling !== this.#splitViewSplitter
+-        ) {
+-          firstPanel.after(this.#splitViewSplitter);
++        // Ensure a splitter is in-between each two panels
++        for (let i = 0; i < splitters; i++) {
++          const splitter = this.#splitViewSplitters[i];
++          if (panels[i].nextElementSibling !== splitter) {
++            panels[i].after(splitter);
++          }
+         }
+       }
+       // Ensure that selected index stays up to date, in case the splitter

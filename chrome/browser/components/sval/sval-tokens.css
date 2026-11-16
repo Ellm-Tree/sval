@@ -1,0 +1,140 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The Sval browser design system's palette and its typeface, defined once.
+ * Every Sval sheet imports this and names its own roles (an action, a border,
+ * a page) from these values, so a palette change is made here. The names are
+ * the palette's, because a sheet's light and dark themes pick different ones
+ * for the same role.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@font-face {
+  font-family: "Outfit";
+  src: url("chrome://browser/content/sval/home/Outfit.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+:root {
+  /* Sval Blue, the one action colour, and its hover and press shades. */
+  --sval-palette-blue: #1f6bff;
+  --sval-palette-blue-400: #3a7dff;
+  --sval-palette-blue-600: #1557e0;
+  --sval-palette-blue-700: #1446c8;
+  /* Neon, for focus and accents on dark. */
+  --sval-palette-neon: #5cf2ff;
+  /* The ink scale, from the night sheet to the pale page. */
+  --sval-palette-ink-950: #060a2e;
+  --sval-palette-ink-850: #0a1140;
+  --sval-palette-ink-700: #1c2a6b;
+  --sval-palette-ink-600: #34437f;
+  --sval-palette-ink-500: #5a6699;
+  --sval-palette-ink-400: #8f9bc7;
+  --sval-palette-ink-300: #b3bcdb;
+  --sval-palette-ink-200: #d6ddf0;
+  --sval-palette-ink-50: #f5f9ff;
+  /* The light window's frame, a step off the pale page. */
+  --sval-palette-frame-light: #eef2fc;
+  /* Danger and errors: the red on a light surface, and its invert on a dark
+     one. */
+  --sval-palette-red: #c42f3a;
+  --sval-palette-red-invert: #ff8a90;
+  /* The washes borders, hovers and tracks are drawn in, as channels for an
+     alpha: `rgb(var(--sval-palette-wash-light) / 0.1)` on a light surface,
+     `-wash-dark` on a dark one. */
+  --sval-palette-wash-light: 19 50 143;
+  --sval-palette-wash-dark: 166 232 255;
+  /* Outfit sets every word Sval draws; the system's faces stand in only for
+     a glyph Outfit lacks. */
+  --sval-font: "Outfit", system-ui, sans-serif;
+  /* For text read a character at a time: codes, keys and fingerprints. */
+  --sval-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Words only a screen reader needs: in the accessibility tree, out of sight
+ * and out of the layout. */
+.sval-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The surface of every dialog, menu and popover: a step off the background
+ * it opens over, lighter on a dark one and darker on a light one, so it
+ * stands apart from that background in every palette and a shadow is not
+ * all that lifts it. A sheet that draws such a surface sets the background
+ * as `--sval-surface-ground` and whether it is dark as `--sval-surface-dark`
+ * (1 or 0). */
+:root {
+  --sval-surface-step: 0.04;
+  --sval-surface: oklch(from var(--sval-surface-ground) calc(l + (2 * var(--sval-surface-dark) - 1) * var(--sval-surface-step)) c h);
+}
+
+/* The thumb of every Sval scroller's thin scrollbar, on a clear track
+ * (`scrollbar-color: var(--sval-scrollbar-thumb) transparent`). Windows 11's
+ * overlay scrollbar draws its thumb a sixth of its strip's width until the
+ * pointer is over the strip, and darkens it on hover
+ * (`ScrollbarDrawingWin11::DoPaintScrollbarThumb`,
+ * `ThemeColors::AdjustUnthemedScrollbarThumbColor`). macOS draws its thumb
+ * several times wider (`ScrollbarDrawingCocoa`'s `GetThumbRect`), and the
+ * ink that shows it there leaves the Windows line unseen. */
+:root {
+  --sval-scrollbar-thumb: color-mix(in srgb, currentColor 30%, transparent);
+}
+
+@media (-moz-platform: windows) and (-moz-overlay-scrollbars) {
+  :root {
+    --sval-scrollbar-thumb: color-mix(in srgb, currentColor 60%, transparent);
+  }
+}
+
+/* While content lies past a scroller's edge, the part fixed across that edge
+ * casts a shadow over it: `sval-edge-above` on the part above the scroller,
+ * `sval-edge-below` on the part below (`SvalDom.shadeScrollEdges`, which
+ * sets `sval-over-rows`). The scroller is positioned in both its hosts, so
+ * these are too, to paint above it. */
+.sval-edge-above,
+.sval-edge-below {
+  position: relative;
+  z-index: 1;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    height: 14px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 150ms;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+
+    @media (forced-colors) {
+      display: none;
+    }
+  }
+
+  &[sval-over-rows]::after {
+    opacity: 1;
+  }
+}
+
+.sval-edge-above::after {
+  top: 100%;
+  background: linear-gradient(rgb(0 0 0 / 0.6), rgb(0 0 0 / 0.25) 35%, transparent);
+}
+
+.sval-edge-below::after {
+  bottom: 100%;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0.25) 35%, transparent);
+}

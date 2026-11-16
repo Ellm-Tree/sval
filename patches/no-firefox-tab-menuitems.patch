@@ -1,0 +1,32 @@
+Sval: no Firefox View or Restore Previous Session in the menu bar
+
+Sval's workspaces replace Firefox's tab notions: Firefox View is closed,
+and Sval restores from its tree (spec §10.4). The menu bar markup is
+included in every macOS window, the hidden window among them, which shows
+its menu bar when no other window is open. The hidden window is created
+before `final-ui-startup` (`XREMain::XRE_mainRun`), earlier than Sval's
+startup code and outside the browser-window hooks, so the items start
+hidden in the markup. macOS reads only `hidden` when it draws the menu bar
+(`nsMenuUtilsX::NodeIsHiddenOrCollapsed`), and nothing in Firefox shows
+either item again.
+
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index 76c06da443..d8ba0664ca 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -228,6 +228,7 @@
+                 <menuitem id="sync-tabs-menuitem"
+                           hidden="true" data-l10n-id="menu-history-synced-tabs"/>
+                 <menuitem id="historyRestoreLastSession"
++                          hidden="true"
+                           command="Browser:RestoreLastSession" data-l10n-id="menu-history-restore-last-session"/>
+                 <menuitem id="hiddenTabsMenu"
+                           hidden="true" data-l10n-id="menu-history-hidden-tabs"/>
+@@ -384,6 +385,7 @@
+                         data-l10n-id="menu-tools-fxa-re-auth"/>
+ 
+               <menuitem id="menu_openFirefoxView"
++                        hidden="true"
+                         data-l10n-id="menu-tools-firefox-view"/>
+               <menuseparator id="devToolsSeparator"/>
+               <menu id="browserToolsMenu" data-l10n-id="menu-tools-browser-tools">

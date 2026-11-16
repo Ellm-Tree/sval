@@ -1,0 +1,22 @@
+Sval: a host's fingerprinting overrides beat its site's
+
+nsRFPService keys first-party overrides by the base domain alone, so a
+choice made for one host could not be told from its site's. A first-party
+lookup takes the key of the page's host, or the nearest name above it, that
+has an entry, before the base domain's (SvalRFPService.cpp).
+
+diff --git a/toolkit/components/resistfingerprinting/nsRFPService.cpp b/toolkit/components/resistfingerprinting/nsRFPService.cpp
+index 994e1cb4c6..fa6686da50 100644
+--- a/toolkit/components/resistfingerprinting/nsRFPService.cpp
++++ b/toolkit/components/resistfingerprinting/nsRFPService.cpp
+@@ -3024,6 +3024,10 @@ Maybe<RFPTargetSet> nsRFPService::GetOverriddenFingerprintingSettingsForURI(
+   //   2. {first-party domain}: First-party contexts that load the given
+   //   first-party domain.
+   if (!aThirdPartyURI) {
++    // Sval: a host's own entry, a choice made for that host, beats its site's.
++    SvalRFPService::NarrowFirstPartyDomain(overrides, aFirstPartyURI,
++                                           isBaseline, firstPartyDomain);
++
+     // Test the {first-party domain, *} scope.
+     key.Assign(firstPartyDomain);
+     key.Append(FP_OVERRIDES_DOMAIN_KEY_DELIMITER);

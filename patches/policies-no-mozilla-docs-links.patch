@@ -1,0 +1,37 @@
+Sval: about:policies names each policy without linking Mozilla's docs
+
+The Documentation tab linked each policy's name to
+firefox-admin-docs.mozilla.org, which documents Firefox. The name is shown
+as plain text, as on the Active tab.
+
+diff --git a/browser/components/enterprisepolicies/content/aboutPolicies.js b/browser/components/enterprisepolicies/content/aboutPolicies.js
+index 19c0b3dd6d..686e9303c9 100644
+--- a/browser/components/enterprisepolicies/content/aboutPolicies.js
++++ b/browser/components/enterprisepolicies/content/aboutPolicies.js
+@@ -23,17 +23,6 @@ function col(text, className) {
+   return column;
+ }
+ 
+-function link(text) {
+-  let column = document.createElement("td");
+-  let a = document.createElement("a");
+-  a.href = `https://firefox-admin-docs.mozilla.org/reference/policies/${text.toLowerCase()}/`;
+-  a.target = "_blank";
+-  let content = document.createTextNode(text);
+-  a.appendChild(content);
+-  column.appendChild(a);
+-  return column;
+-}
+-
+ /*
+  * Builds the policy name column, flagging the policy when one of its
+  * operations failed to apply.
+@@ -429,7 +418,7 @@ function generateDocumentation() {
+       content.classList.toggle("content");
+     });
+     let row = document.createElement("tr");
+-    row.appendChild(link(policyName));
++    row.appendChild(col(policyName));
+     let descriptionColumn = col("");
+     let stringID = string_mapping[policyName] || policyName;
+     document.l10n.setAttributes(descriptionColumn, `policy-${stringID}`);

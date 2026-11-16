@@ -1,0 +1,34 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Media press</title>
+<style>
+  #player { position: relative; width: 320px; height: 180px; }
+  #player video { width: 100%; height: 100%; }
+  #overlay { position: absolute; inset: 0; margin: auto; width: 80px; height: 40px; }
+</style>
+</head>
+<body>
+<p id="text">Text that is no player.</p>
+<div id="player"><video id="custom" muted></video><button id="overlay">Play</button></div>
+<video id="native" controls muted width="320" height="180"></video>
+<script>
+  // Each video shows a canvas's stream. The overlay button plays the custom
+  // player's video inside its click, as a player's play button does. A click
+  // on the text plays it a moment later, as a page does after a load the
+  // click started.
+  for (const id of ["custom", "native"]) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 180;
+    canvas.getContext("2d").fillRect(0, 0, 320, 180);
+    document.getElementById(id).srcObject = canvas.captureStream();
+  }
+  const play = id => document.getElementById(id).play().catch(() => {});
+  document.getElementById("overlay").addEventListener("click", () => play("custom"));
+  document.getElementById("text").addEventListener("click", () => {
+    setTimeout(() => play("custom"), 100);
+  });
+</script>
+</body></html>

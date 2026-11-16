@@ -1,0 +1,26 @@
+Sval: accessibility skips an empty relation id
+
+`DocAccessible::AddDependentIDsFor` reads each relation attribute's ids and
+looks every one up with GetElementById. An empty value parses to the empty
+atom, which names no element, and the lookup logs "Empty string passed to
+getElementById()". Element reflection writes that empty value: setting
+`popoverTargetElement` sets `popovertarget` to "", as moz-button does for
+the address bar's search-mode menu. With accessibility on, every tab switch
+would log the warning, in the browser window and in pages doing the same.
+
+diff --git a/accessible/generic/DocAccessible.cpp b/accessible/generic/DocAccessible.cpp
+index cc9ab175f2..368f58bbb1 100644
+--- a/accessible/generic/DocAccessible.cpp
++++ b/accessible/generic/DocAccessible.cpp
+@@ -1944,6 +1944,11 @@ void DocAccessible::AddDependentIDsFor(LocalAccessible* aRelProvider,
+           "Attribute used for adding accessible relations must be parsed.");
+       for (uint32_t i = 0; i < parsedAttrValue->GetAtomCount(); i++) {
+         auto id = parsedAttrValue->AtomAt(static_cast<int32_t>(i));
++        // An empty value names no element. Element reflection writes one:
++        // setting popoverTargetElement sets popovertarget to "".
++        if (id == nsGkAtoms::_empty) {
++          continue;
++        }
+         AttrRelProviders* providers =
+             GetOrCreateRelProviders(relProviderEl, id);
+         if (!providers) {

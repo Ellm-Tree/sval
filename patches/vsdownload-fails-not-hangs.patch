@@ -1,0 +1,38 @@
+Sval: a Visual Studio package that fails to download fails configure
+
+vsdownload.py downloads Visual Studio's packages in a multiprocessing.Pool,
+five attempts a file. Pool returns a worker's exception to the parent by
+pickling it, and urllib's ContentTooShortError does not unpickle (its
+__init__ takes a content argument its args lack), so a file whose fifth
+attempt comes back short kills the pool's result thread and task.get() waits
+forever: configure hangs until the job's timeout. The last failure is raised
+as a plain Exception naming the file, and the attempts back off, so a short
+outage of the download host is ridden out.
+
+diff --git a/third_party/python/vsdownload/vsdownload.py b/third_party/python/vsdownload/vsdownload.py
+index 28f2c660cf..d2534a735e 100755
+--- a/third_party/python/vsdownload/vsdownload.py
++++ b/third_party/python/vsdownload/vsdownload.py
+@@ -28,6 +28,7 @@ import socket
+ import subprocess
+ import sys
+ import tempfile
++import time
+ import urllib.request
+ import xml.etree.ElementTree as ET
+ import zipfile
+@@ -644,8 +645,13 @@ def _downloadPayload(payload, destname, fileid, allowHashMismatch):
+             return size
+         except Exception as e:
+             if attempt == attempts - 1:
+-                raise
++                # Pool hands a worker's exception to the parent by pickling
++                # it, and one that does not unpickle, such as urllib's
++                # ContentTooShortError, kills the pool's result thread and
++                # leaves task.get() waiting forever.
++                raise Exception("%s: %s: %s" % (fileid, type(e).__name__, e)) from None
+             print("%s: %s" % (type(e).__name__, e), flush=True)
++            time.sleep(2 ** attempt)
+ 
+ def mergeTrees(src, dest):
+     if not os.path.isdir(src):

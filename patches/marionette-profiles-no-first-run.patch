@@ -1,0 +1,36 @@
+Sval: Marionette profiles start without Sval's first run or list downloads
+
+Every Marionette profile takes its prefs from `DesktopInstance.desktop_prefs`
+and none from testing/profiles/base, where test-profiles-sval-defaults.patch
+turns these off for the other harnesses.
+
+- First run opens its dialog on a fresh profile, which every Marionette
+  profile is, and a test that restarts the browser loses its session behind
+  it. Sval's first-run test turns it on for itself.
+- Blocking lists download from their publishers on a schedule, and the
+  harness crashes on a connection to a real host
+  (MOZ_DISABLE_NONLOCAL_CONNECTIONS), so a test that runs long enough
+  crashes on the download.
+
+This is a patch of its own because it touches Python, which
+scripts/gecko-key.sh counts as native: kept apart, a change to the pref list
+in user.js does not move the Gecko key.
+
+diff --git a/testing/marionette/client/marionette_driver/geckoinstance.py b/testing/marionette/client/marionette_driver/geckoinstance.py
+index c2d0a75cf9..2c56784c2a 100644
+--- a/testing/marionette/client/marionette_driver/geckoinstance.py
++++ b/testing/marionette/client/marionette_driver/geckoinstance.py
+@@ -624,6 +624,13 @@ class FennecInstance(GeckoInstance):
+ 
+ class DesktopInstance(GeckoInstance):
+     desktop_prefs = {
++        # Sval: first run opens its dialog on a fresh profile, which every
++        # Marionette profile is, and a test cannot drive the window behind it.
++        "browser.sval.firstRun.enabled": False,
++        # Sval: blocking lists download from their publishers on a schedule,
++        # and the harness crashes on a connection to a real host
++        # (MOZ_DISABLE_NONLOCAL_CONNECTIONS).
++        "browser.sval.adblock.updates.enabled": False,
+         # Disable Firefox old build background check
+         "app.update.checkInstallTime": False,
+         # Disable automatically upgrading Firefox

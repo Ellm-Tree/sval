@@ -1,0 +1,45 @@
+---
+title: Undo closing tabs or deleting a group
+description: Put back tabs you closed together, or a group, pin, or Workspace you deleted, from the message at the bottom of the Workspace panel.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+When you close several tabs at once, or delete a group, a pin, or a
+Workspace, a message at the bottom of the Workspace panel offers
+**Undo** for 8 seconds. Undo puts everything back where it was.
+
+You closed four Codeberg tabs together, and one of them still had a review
+you hadn't sent.
+
+<Screenshot name="docs-undo-message" frame="rounded" maxWidth={280} alt="Closed 2 tabs, with an Undo button, at the bottom of the Workspace panel" />
+
+## Steps
+
+1. At the bottom of the Workspace panel, in the message such as "Closed 4 tabs",
+   select **Undo** before the message goes.
+
+The tabs, group, pin, or Workspace come back where they were.
+
+## Details
+
+- <kbd>⌘Z</kbd> (<kbd>Ctrl+Z</kbd> on Windows and Linux) also undoes while the message shows,
+  unless the page or a text field has the focus. The page and text fields
+  keep <kbd>⌘Z</kbd> for their own undo.
+- The message stays while the pointer is on the message, or while the
+  message has the focus.
+- To close the message and make the change for good, select **Dismiss**
+  next to Undo.
+- You can undo only the latest change. A new close or delete replaces the
+  message, and the change before it is made for good.
+- If you close the window or quit Sval while the message shows, the change
+  is made for good.
+- Your other devices hear about the change only once the message goes.
+- Closing a single tab shows no message. <kbd>⇧⌘T</kbd> (<kbd>Ctrl+Shift+T</kbd> on Windows and
+  Linux) reopens the tab you closed last.
+
+## Related pages
+
+- [Delete a group](/docs/how-to/tabs/delete-a-group/)
+- [Act on several tabs at once](/docs/how-to/tabs/act-on-several-tabs-at-once/)
+- [Delete a Workspace](/docs/how-to/workspaces/delete-a-workspace/)

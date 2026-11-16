@@ -1,0 +1,32 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Media gate loop</title></head>
+<body>
+<p id="text">Text that is no player.</p>
+<button id="play">Play</button>
+<video id="video" muted></video>
+<script>
+  // A mini-player that calls play() every 250 ms while its video is paused,
+  // noting whether the page had the user's activation as it called.
+  const canvas = document.createElement("canvas");
+  canvas.getContext("2d").fillRect(0, 0, 1, 1);
+  const video = document.getElementById("video");
+  video.srcObject = canvas.captureStream();
+  window.attempts = [];
+  setInterval(() => {
+    if (!video.paused) {
+      return;
+    }
+    const active = navigator.userActivation.isActive;
+    video.play().then(
+      () => window.attempts.push({ active, result: "resolved" }),
+      e => window.attempts.push({ active, result: e.name })
+    );
+  }, 250);
+  document
+    .getElementById("play")
+    .addEventListener("click", () => video.play().catch(() => {}));
+</script>
+</body></html>

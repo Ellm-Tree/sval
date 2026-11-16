@@ -1,0 +1,51 @@
+Sval: let Sval decide an external protocol launch from an agent's tab
+
+Every page-started launch of another application reaches
+nsContentDispatchChooser.handleURI in the parent, with the context and the
+principal that asked: a link click to a scheme Gecko does not expose
+(nsDocShell::OnLinkClickSync), a document or frame load
+(nsExtProtocolChannel::OpenURL) and a content process's request
+(ContentParent::RecvLoadURIExternal) all end in
+nsExternalHelperAppService::LoadURI, which hands the address on there.
+Sval's agent policy decides first (SvalAgentGate.mayOpenApp), and Firefox's
+own permission and handler checks run after it as in any tab. No chrome API
+sees a launch before it happens, and registering a second component under
+the dispatcher's contract would depend on which registration wins.
+
+diff --git a/toolkit/mozapps/handling/ContentDispatchChooser.sys.mjs b/toolkit/mozapps/handling/ContentDispatchChooser.sys.mjs
+index 8d89744fc8..96bb146575 100644
+--- a/toolkit/mozapps/handling/ContentDispatchChooser.sys.mjs
++++ b/toolkit/mozapps/handling/ContentDispatchChooser.sys.mjs
+@@ -8,6 +8,13 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+ import { E10SUtils } from "resource://gre/modules/E10SUtils.sys.mjs";
+ 
++const lazy = {};
++ChromeUtils.defineESModuleGetters(lazy, {
++  // Sval ships only the desktop browser, so toolkit may reach into it here.
++  // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++  mayOpenApp: "moz-src:///browser/components/sval/SvalAgentGate.sys.mjs",
++});
++
+ const DIALOG_URL_APP_CHOOSER =
+   "chrome://mozapps/content/handling/appChooser.xhtml";
+ const DIALOG_URL_PERMISSION =
+@@ -46,6 +53,18 @@ export class nsContentDispatchChooser {
+     aBrowsingContext,
+     aTriggeredExternally = false
+   ) {
++    // Sval: an agent's tab opens an app only as its policy says.
++    if (
++      !(await lazy.mayOpenApp(
++        aURI,
++        aPrincipal,
++        aBrowsingContext,
++        this._getHandlerName(aHandler)
++      ))
++    ) {
++      return;
++    }
++
+     const isStandardProtocol = E10SUtils.STANDARD_SAFE_PROTOCOLS.includes(
+       aURI.scheme
+     );

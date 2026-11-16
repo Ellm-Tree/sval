@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>An agent is asking</title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script src="chrome://browser/content/sval/agent-alert.js"></script>
+  </head>
+  <body>
+    <form
+      class="sval-dialog sval-aa"
+      role="alertdialog"
+      aria-labelledby="sval-aa-question"
+    >
+      <div class="sval-dialog-head">
+        <span
+          class="sval-dialog-icon"
+          data-icon="agent"
+          aria-hidden="true"
+        ></span>
+        <div class="sval-dialog-copy">
+          <h1 class="sval-dialog-title" id="sval-aa-question"></h1>
+          <p class="sval-dialog-body" id="sval-aa-detail" hidden="hidden"></p>
+        </div>
+      </div>
+      <ul class="sval-dialog-list" id="sval-aa-items" hidden="hidden"></ul>
+      <fieldset
+        class="sval-dialog-well sval-aa-options"
+        id="sval-aa-options"
+        hidden="hidden"
+      >
+        <legend
+          class="sval-dialog-check-title"
+          id="sval-aa-options-label"
+        ></legend>
+      </fieldset>
+      <div class="sval-dialog-scope" id="sval-aa-scope" hidden="hidden">
+        <span class="sval-dialog-scope-label" id="sval-aa-scope-label"
+          >Remember for</span
+        >
+        <button
+          type="button"
+          class="sval-dialog-scope-button"
+          id="sval-aa-scope-button"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="sval-aa-scope-menu"
+        >
+          <span class="sval-dialog-scope-value" id="sval-aa-scope-value"></span>
+          <span class="sval-dialog-scope-chevron" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div
+        class="sval-dialog-scope-menu"
+        id="sval-aa-scope-menu"
+        role="listbox"
+        tabindex="0"
+        aria-labelledby="sval-aa-scope-label"
+        hidden="hidden"
+      ></div>
+      <div class="sval-dialog-actions sval-aa-actions"></div>
+      <p class="sval-dialog-note" id="sval-aa-delay"></p>
+    </form>
+  </body>
+</html>

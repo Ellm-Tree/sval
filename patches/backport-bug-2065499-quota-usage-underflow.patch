@@ -1,0 +1,107 @@
+Sval: the quota manager keeps its global usage and limit signed
+
+Backport of Mozilla's Bug 2065499 (mozilla-central 61ed14bf240e, Firefox
+155), with one hunk's context moved to ESR 153's MutexAutoUnlock in
+CanonicalQuotaObject::LockedMaybeUpdateSize. ESR 153 does not carry it.
+QuotaManager held mTemporaryStorageUsage and mTemporaryStorageLimit as
+uint64_t. Usage can drop below zero for a moment while quota operations
+finish out of order, and it wrapped to a value above every limit, so each
+later write failed as over quota and storage stayed unusable for every
+site. Both fields become int64_t and the sums beside them follow.
+Mozilla landed it without a test.
+Drop this patch when the upstream pin reaches Firefox 155.
+
+diff --git a/dom/quota/ActorsParent.cpp b/dom/quota/ActorsParent.cpp
+index eb66f69b12..64c05b9220 100644
+--- a/dom/quota/ActorsParent.cpp
++++ b/dom/quota/ActorsParent.cpp
+@@ -7682,7 +7682,7 @@ std::pair<uint64_t, uint64_t> QuotaManager::GetUsageAndLimitForEstimate(
+             // reports its own origin usage against that limit.
+             if (originInfo && originInfo->LockedPersisted()) {
+               return std::pair(originInfo->LockedUsage(),
+-                               mTemporaryStorageLimit);
++                               static_cast<uint64_t>(mTemporaryStorageLimit));
+             }
+           }
+ 
+@@ -8058,7 +8058,7 @@ QuotaManager::GetOriginInfosExceedingGlobalLimit() const {
+       },
+       [temporaryStorageUsage = mTemporaryStorageUsage,
+        temporaryStorageLimit = mTemporaryStorageLimit,
+-       doomedUsage = uint64_t{0}](const auto& originInfo) mutable {
++       doomedUsage = int64_t{0}](const auto& originInfo) mutable {
+         if (temporaryStorageUsage - doomedUsage <= temporaryStorageLimit) {
+           return true;
+         }
+diff --git a/dom/quota/CanonicalQuotaObject.cpp b/dom/quota/CanonicalQuotaObject.cpp
+index ca37938081..8de69373e4 100644
+--- a/dom/quota/CanonicalQuotaObject.cpp
++++ b/dom/quota/CanonicalQuotaObject.cpp
+@@ -186,7 +186,7 @@ bool CanonicalQuotaObject::LockedMaybeUpdateSize(int64_t aSize, bool aTruncate)
+   }
+ 
+   if (!sizeToBeFreed) {
+-    uint64_t usage = quotaManager->mTemporaryStorageUsage;
++    int64_t usage = quotaManager->mTemporaryStorageUsage;
+ 
+     MutexAutoUnlock autoUnlock(quotaManager->mQuotaMutex);
+ 
+diff --git a/dom/quota/OriginInfo.cpp b/dom/quota/OriginInfo.cpp
+index b744837efe..888de08b3a 100644
+--- a/dom/quota/OriginInfo.cpp
++++ b/dom/quota/OriginInfo.cpp
+@@ -251,8 +251,8 @@ Maybe<bool> OriginInfo::LockedUpdateUsages(Client::Type aClientType,
+   }
+ 
+   AssertNoOverflow(quotaManager->mTemporaryStorageUsage, aDelta);
+-  uint64_t newTemporaryStorageUsage =
+-      quotaManager->mTemporaryStorageUsage + aDelta;
++  int64_t newTemporaryStorageUsage =
++      quotaManager->mTemporaryStorageUsage + AssertedCast<int64_t>(aDelta);
+ 
+   if (newTemporaryStorageUsage <= quotaManager->mTemporaryStorageLimit) {
+     mClientUsages[aClientType] = Some(newClientUsage);
+@@ -283,8 +283,8 @@ bool OriginInfo::LockedUpdateUsagesForEviction(Client::Type aClientType,
+   uint64_t newClientUsage = mClientUsages[aClientType].valueOr(0) + aDelta;
+ 
+   AssertNoOverflow(quotaManager->mTemporaryStorageUsage, aDelta);
+-  uint64_t newTemporaryStorageUsage =
+-      quotaManager->mTemporaryStorageUsage + aDelta;
++  int64_t newTemporaryStorageUsage =
++      quotaManager->mTemporaryStorageUsage + AssertedCast<int64_t>(aDelta);
+ 
+   uint64_t newGroupUsage = mGroupInfo->mUsage;
+   if (!LockedPersisted()) {
+@@ -316,7 +316,8 @@ bool OriginInfo::LockedUpdateUsagesForEviction(Client::Type aClientType,
+   }
+ 
+   AssertNoOverflow(quotaManager->mTemporaryStorageUsage, aDelta);
+-  newTemporaryStorageUsage = quotaManager->mTemporaryStorageUsage + aDelta;
++  newTemporaryStorageUsage =
++      quotaManager->mTemporaryStorageUsage + AssertedCast<int64_t>(aDelta);
+ 
+   NS_ASSERTION(newTemporaryStorageUsage <= quotaManager->mTemporaryStorageLimit,
+                "How come?!");
+diff --git a/dom/quota/QuotaManager.h b/dom/quota/QuotaManager.h
+index 6a6dfa26e5..a8ba830647 100644
+--- a/dom/quota/QuotaManager.h
++++ b/dom/quota/QuotaManager.h
+@@ -1218,8 +1218,16 @@ class QuotaManager final : public BackgroundThreadObject {
+ 
+   MozPromiseHolder<BoolPromise> mInitializeAllTemporaryOriginsPromiseHolder;
+ 
+-  uint64_t mTemporaryStorageLimit;
+-  uint64_t mTemporaryStorageUsage;
++  // Technically the limits should be unsigned, but mTemporaryStorageUsage can
++  // go below zero sometimes. We suppose this could either be of because a race
++  // condition in the order of completion of the quota operations, leading a
++  // temporary negative value until everything completes; or because of bugs
++  // elsewhere in our implementation leading to underflow in our usage values.
++  // In any case having signed integers ensures comparisons between numbers make
++  // sense. See bug 1585978 for details.
++  int64_t mTemporaryStorageLimit;
++  int64_t mTemporaryStorageUsage;
++
+   int64_t mNextDirectoryLockId;
+   bool mStorageInitialized;
+   bool mPersistentStorageInitialized;

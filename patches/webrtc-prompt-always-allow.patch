@@ -1,0 +1,168 @@
+Sval: offer Always allow as its own button in the camera prompt
+
+The camera and microphone prompt answered with Allow or Block, and made
+either one permanent through a "Remember for all cameras and microphones"
+checkbox, so Always allow was a checkbox plus a button and easy to miss.
+Where the prompt can grant for good (a secure page, outside private
+browsing, a camera or microphone), WebRTCParent's prompt offers Always
+allow as a third answer in place of the checkbox. It runs the main
+action as the checked checkbox did.
+
+PopupNotifications lists every secondary action past the first in the
+secondary button's chevron menu. options.actionButtons shows each of them
+as a button of its own (SvalPromptButtons), and their clicks take the same
+focus and security-delay checks as the other two buttons.
+
+diff --git a/browser/actors/WebRTCParent.sys.mjs b/browser/actors/WebRTCParent.sys.mjs
+index aa20c63635..a4f6d9ff9f 100644
+--- a/browser/actors/WebRTCParent.sys.mjs
++++ b/browser/actors/WebRTCParent.sys.mjs
+@@ -720,6 +720,23 @@ function prompt(aActor, aBrowser, aRequest) {
+     ];
+   }
+ 
++  // Sval: a camera or microphone request offers Always allow as a button of
++  // its own (SvalPromptButtons), in place of the remember checkbox.
++  const offerAlwaysAllow =
++    !reqAudioOutput &&
++    !sharingScreen &&
++    !sharingAudio &&
++    aRequest.secure &&
++    shouldShowAlwaysRemember();
++  if (offerAlwaysAllow) {
++    actionL10nIds.push({ id: "webrtc-action-always-allow" });
++    secondaryActions.push({
++      callback() {
++        notification.mainAction.callback({ checkboxChecked: true });
++      },
++    });
++  }
++
+   // The formatMessagesSync method returns an array of results
+   // for each message that was requested, and for the ones with
+   // attributes, returns an attributes array with objects like:
+@@ -751,6 +768,7 @@ function prompt(aActor, aBrowser, aRequest) {
+     name: originToShow,
+     persistent: true,
+     hideClose: true,
++    actionButtons: offerAlwaysAllow,
+     eventCallback(aTopic, aNewBrowser, withoutUserResponse) {
+       if (aTopic == "swapping") {
+         return true;
+@@ -1293,7 +1311,7 @@ function prompt(aActor, aBrowser, aRequest) {
+     return "webrtc-remember-allow-checkbox";
+   }
+ 
+-  if (shouldShowAlwaysRemember()) {
++  if (shouldShowAlwaysRemember() && !offerAlwaysAllow) {
+     // Disable the permanent 'Allow' action if the connection isn't secure, or for
+     // screen/audio sharing (because we can't guess which window the user wants to
+     // share without prompting). Note that we never enter this block for private
+diff --git a/browser/locales/en-US/browser/webrtcIndicator.ftl b/browser/locales/en-US/browser/webrtcIndicator.ftl
+index 6d735e2499..16e5462fd8 100644
+--- a/browser/locales/en-US/browser/webrtcIndicator.ftl
++++ b/browser/locales/en-US/browser/webrtcIndicator.ftl
+@@ -197,6 +197,9 @@ webrtc-action-allow =
+ webrtc-action-block =
+     .label = Block
+     .accesskey = B
++webrtc-action-always-allow =
++    .label = Always allow
++    .accesskey = l
+ webrtc-action-always-block =
+     .label = Always block
+     .accesskey = w
+diff --git a/toolkit/modules/PopupNotifications.sys.mjs b/toolkit/modules/PopupNotifications.sys.mjs
+index 439eb001b8..70e0346655 100644
+--- a/toolkit/modules/PopupNotifications.sys.mjs
++++ b/toolkit/modules/PopupNotifications.sys.mjs
+@@ -42,6 +42,8 @@ const lazy = {};
+ XPCOMUtils.defineLazyPreferenceGetter(lazy, "buttonDelay", PREF_SECURITY_DELAY);
+ ChromeUtils.defineESModuleGetters(lazy, {
+   SvalQuickPeek: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
++  SvalPromptButtons:
++    "moz-src:///browser/components/sval/SvalPromptButtons.sys.mjs",
+ });
+ 
+ var popupNotificationsMap = new WeakMap();
+@@ -1215,6 +1217,12 @@ PopupNotifications.prototype = {
+ 
+         for (let i = 1; i < n.secondaryActions.length; i++) {
+           let action = n.secondaryActions[i];
++          // Sval: options.actionButtons shows each further action as a
++          // button of its own, between the secondary and the primary one.
++          if (n.options.actionButtons) {
++            action.telemetryStatId = telemetryStatId;
++            continue;
++          }
+           let item = doc.createXULElement("menuitem");
+           item.setAttribute("label", action.label);
+           item.setAttribute("accesskey", action.accessKey);
+@@ -1237,7 +1245,7 @@ PopupNotifications.prototype = {
+       );
+       popupnotification.toggleAttribute(
+         "dropmarkerhidden",
+-        n.secondaryActions.length < 2
++        n.secondaryActions.length < 2 || !!n.options.actionButtons
+       );
+ 
+       let checkbox = n.options.checkbox;
+@@ -1274,6 +1282,20 @@ PopupNotifications.prototype = {
+ 
+       popupnotification.menupopup.textContent = "";
+       popupnotification.menupopup.append(...menuitems);
++      lazy.SvalPromptButtons.draw(
++        popupnotification,
++        hasSecondaryActions && n.options.actionButtons
++          ? n.secondaryActions.slice(1)
++          : [],
++        (event, action) =>
++          this._onButtonEvent(
++            event,
++            "actionbuttoncommand",
++            "button",
++            popupnotification,
++            action
++          )
++      );
+     }, this);
+   },
+ 
+@@ -1938,7 +1960,13 @@ PopupNotifications.prototype = {
+     }
+   },
+ 
+-  _onButtonEvent(event, type, source = "button", notificationEl = null) {
++  _onButtonEvent(
++    event,
++    type,
++    source = "button",
++    notificationEl = null,
++    actionButtonAction = null
++  ) {
+     if (!notificationEl) {
+       notificationEl = getNotificationFromElement(event.originalTarget);
+     }
+@@ -1964,6 +1992,9 @@ PopupNotifications.prototype = {
+     if (type == "secondarybuttoncommand") {
+       action = notification.secondaryActions?.[0];
+       telemetryStatId = TELEMETRY_STAT_ACTION_2;
++    } else if (type == "actionbuttoncommand") {
++      action = actionButtonAction;
++      telemetryStatId = action.telemetryStatId;
+     }
+ 
+     // Receiving a button event means the notification should have been shown.
+@@ -1998,7 +2029,11 @@ PopupNotifications.prototype = {
+       }
+     }
+ 
+-    if (type == "buttoncommand" || type == "secondarybuttoncommand") {
++    if (
++      type == "buttoncommand" ||
++      type == "secondarybuttoncommand" ||
++      type == "actionbuttoncommand"
++    ) {
+       // TODO: Bug 1892756.
+       if (
+         Services.focus.activeWindow != this.window ||

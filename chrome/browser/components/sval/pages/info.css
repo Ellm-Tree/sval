@@ -1,0 +1,130 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Firefox's information and tool pages in Settings' look, over
+ * `sval-page.css`'s tokens. These pages draw with toolkit's in-content
+ * `common.css` and `info-pages.css`, so one sheet covers their shared
+ * parts: headings in Sval's sizes and ink, tables and boxes as Settings'
+ * cards, and Sval's type in place of the system font `info-pages.css` sets
+ * on a table. A page with parts of its own takes a sheet that imports this
+ * one.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:root {
+  --sval-info-radius: 12px;
+  /* A page whose root is narrower than the window, such as about:crashes,
+     shows the canvas around it. */
+  background-color: var(--background-color-canvas);
+}
+
+body,
+table,
+button,
+input,
+select,
+textarea {
+  font-family: var(--sval-font);
+}
+
+h1,
+.title,
+.title-text {
+  color: var(--sval-ink);
+  font-size: var(--sval-heading-size);
+  font-weight: var(--sval-heading-weight);
+  letter-spacing: var(--sval-heading-tracking);
+}
+
+h2,
+.major-section {
+  color: var(--sval-ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  color: var(--sval-ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Code, paths and values stay monospace, in the page's ink. */
+code,
+pre,
+kbd,
+samp,
+.monospace,
+td.integer {
+  font-family: var(--sval-mono);
+}
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  table {
+    border: 1px solid var(--sval-border);
+    border-radius: var(--sval-info-radius);
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: var(--sval-card);
+    box-shadow: var(--sval-shadow);
+    font-size: 14px;
+  }
+
+  th,
+  td {
+    padding: 8px 12px;
+    border: 0;
+    border-top: 1px solid var(--sval-border-subtle);
+    vertical-align: top;
+  }
+
+  tr:first-child > :is(th, td),
+  thead + tbody > tr:first-child > :is(th, td) {
+    border-top: 0;
+  }
+
+  thead + tbody > tr:first-child > :is(th, td) {
+    border-top: 1px solid var(--sval-border);
+  }
+
+  th {
+    background-color: var(--sval-sunken);
+    color: var(--sval-ink);
+    font-weight: 600;
+  }
+
+  table button {
+    padding-inline: 12px;
+  }
+
+  /* The section lists of about:networking, about:webauthn and the like:
+     `common.css` draws each as a button with the primary button's border,
+     which Sval's tokens make the action colour. They take the look of
+     Settings' own nav instead. */
+  #categories > .category {
+    border-color: transparent;
+    border-radius: 999px;
+  }
+
+  #categories > :is(.category[selected], .category.selected) {
+    background-color: var(--sval-tint);
+    color: var(--sval-accent);
+  }
+
+  .action-box {
+    border: 1px solid var(--sval-border);
+    border-radius: 20px;
+    background-color: var(--sval-card);
+    box-shadow: var(--sval-shadow);
+  }
+
+  hr {
+    border-color: var(--sval-border);
+  }
+
+  a {
+    color: var(--sval-accent);
+  }
+}

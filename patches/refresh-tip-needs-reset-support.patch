@@ -1,0 +1,34 @@
+Sval: the address bar offers a refresh only where a reset is supported
+
+UrlbarProviderInterventions shows its refresh tip whenever the
+profileRefresh policy allows it, and its up-to-date tip offers a refresh
+unconditionally, but picking either calls resetBrowser, which does nothing
+when ResetProfile.resetSupported is false: a profile the profile service does
+not know, or a build without the self-migrator. Both tips ask
+resetSupported, which checks the policy too.
+
+diff --git a/browser/components/urlbar/UrlbarProviderInterventions.sys.mjs b/browser/components/urlbar/UrlbarProviderInterventions.sys.mjs
+index dfdc81f530..74de806aa0 100644
+--- a/browser/components/urlbar/UrlbarProviderInterventions.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderInterventions.sys.mjs
+@@ -530,8 +530,7 @@ export class UrlbarProviderInterventions extends UrlbarProvider {
+ 
+     return (
+       this.currentTip != TIPS.NONE &&
+-      (this.currentTip != TIPS.REFRESH ||
+-        Services.policies.isAllowed("profileRefresh"))
++      (this.currentTip != TIPS.REFRESH || lazy.ResetProfile.resetSupported())
+     );
+   }
+ 
+@@ -563,7 +562,9 @@ export class UrlbarProviderInterventions extends UrlbarProvider {
+         break;
+       case lazy.AppUpdater.STATUS.NO_UPDATES_FOUND:
+         // We show a special refresh tip when the browser is up to date.
+-        this.currentTip = TIPS.UPDATE_REFRESH;
++        this.currentTip = lazy.ResetProfile.resetSupported()
++          ? TIPS.UPDATE_REFRESH
++          : TIPS.NONE;
+         break;
+       case lazy.AppUpdater.STATUS.CHECKING:
+         // This will be the case the first time we check.  See startQuery for

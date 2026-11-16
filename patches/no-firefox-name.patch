@@ -1,0 +1,295 @@
+Sval: name the browser by its brand where upstream says Firefox
+
+Strings that hardcode "Firefox" use the brand name instead, and headings
+named for features Sval removes are renamed.
+
+diff --git a/browser/locales/en-US/browser/appExtensionFields.ftl b/browser/locales/en-US/browser/appExtensionFields.ftl
+index 06f56085fb..0f6f260fb3 100644
+--- a/browser/locales/en-US/browser/appExtensionFields.ftl
++++ b/browser/locales/en-US/browser/appExtensionFields.ftl
+@@ -14,5 +14,5 @@ extension-firefox-compact-light-description=A theme with a light color scheme.
+ extension-firefox-compact-dark-name=Dark
+ extension-firefox-compact-dark-description=A theme with a dark color scheme.
+ 
+-extension-firefox-alpenglow-name=Firefox Alpenglow
++extension-firefox-alpenglow-name=Alpenglow
+ extension-firefox-alpenglow-description=Use a colorful appearance for buttons, menus, and windows.
+diff --git a/browser/locales/en-US/browser/policies/policies-descriptions.ftl b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+index 356a3680c7..536cedb627 100644
+--- a/browser/locales/en-US/browser/policies/policies-descriptions.ftl
++++ b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+@@ -84,7 +84,7 @@ policy-DisableFeedbackCommands = Disable commands to send feedback from the Help
+ policy-DisableFirefoxAccounts1 = Disable account-based services, including sync.
+ 
+ # Firefox Screenshots is the name of the feature, and should not be translated.
+-policy-DisableFirefoxScreenshots = Disable the Firefox Screenshots feature.
++policy-DisableFirefoxScreenshots = Disable the { -screenshots-brand-name } feature.
+ 
+ policy-DisableFirefoxStudies = Prevent { -brand-short-name } from running studies.
+ 
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index a890aeb558..1516c920c4 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -1261,10 +1261,10 @@ containers-remove-button2 =
+ ## Account and sync
+ 
+ account-sync-section =
+-    .heading = Account and sync
++    .heading = General
+ 
+-pane-account-sync-title2 = Account and sync
+-    .title = Account and sync
++pane-account-sync-title2 = General
++    .title = General
+ 
+ sync-group-label =
+     .label = Sync
+@@ -1306,7 +1306,7 @@ sync-signedout-account-short =
+ #
+ # They can be moved within the sentence as needed to adapt
+ # to your language, but should not be changed or translated.
+-sync-mobile-promo = Download Firefox for <img data-l10n-name="android-icon"/> <a data-l10n-name="android-link">Android</a> or <img data-l10n-name="ios-icon"/> <a data-l10n-name="ios-link">iOS</a> to sync with your mobile device.
++sync-mobile-promo = Download { -brand-short-name } for <img data-l10n-name="android-icon"/> <a data-l10n-name="android-link">Android</a> or <img data-l10n-name="ios-icon"/> <a data-l10n-name="ios-link">iOS</a> to sync with your mobile device.
+ 
+ ## Firefox account - Signed in
+ 
+@@ -1480,7 +1480,7 @@ sync-engine-payment-methods2 =
+ 
+ sync-engine-addons =
+     .label = Add-ons
+-    .tooltiptext = Extensions and themes for Firefox desktop
++    .tooltiptext = Extensions and themes for { -brand-short-name }
+     .accesskey = A
+ 
+ sync-engine-settings =
+diff --git a/browser/locales/en-US/chrome/overrides/appstrings.properties b/browser/locales/en-US/chrome/overrides/appstrings.properties
+index 13464a72e8..d61234893d 100644
+--- a/browser/locales/en-US/chrome/overrides/appstrings.properties
++++ b/browser/locales/en-US/chrome/overrides/appstrings.properties
+@@ -3,29 +3,29 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ malformedURI2=Please check that the URL is correct and try again.
+-fileNotFound=Firefox can’t find the file at %S.
++fileNotFound=Sval can’t find the file at %S.
+ fileAccessDenied=The file at %S is not readable.
+ # %S is replaced by the uri host
+ httpErrorPage=%S sent back an error.
+ serverError=%S might have a temporary problem or it could have moved.
+ dnsNotFound2=We can’t connect to the server at %S.
+ basicHttpAuthDisabled=Someone pretending to be the site could try to steal things like your username, password, or email.
+-unknownProtocolFound=Firefox doesn’t know how to open this address, because one of the following protocols (%S) isn’t associated with any program or is not allowed in this context.
+-connectionFailure=Firefox can’t establish a connection to the server at %S.
++unknownProtocolFound=Sval doesn’t know how to open this address, because one of the following protocols (%S) isn’t associated with any program or is not allowed in this context.
++connectionFailure=Sval can’t establish a connection to the server at %S.
+ netInterrupt=The connection to %S was interrupted while the page was loading.
+ netTimeout=The server at %S is taking too long to respond.
+-redirectLoop=Firefox has detected that the server is redirecting the request for this address in a way that will never complete.
++redirectLoop=Sval has detected that the server is redirecting the request for this address in a way that will never complete.
+ ## LOCALIZATION NOTE (confirmRepostPrompt): In this item, don’t translate "%S"
+ confirmRepostPrompt=To display this page, %S must send information that will repeat any action (such as a search or order confirmation) that was performed earlier.
+ resendButton.label=Resend
+-clientSocketMisconfiguration=Firefox doesn’t know how to communicate with the server.
++clientSocketMisconfiguration=Sval doesn’t know how to communicate with the server.
+ netReset=The connection to the server was reset while the page was loading.
+ notCached=This document is no longer available.
+-netOffline=Firefox is currently in offline mode and can’t browse the Web.
++netOffline=Sval is currently in offline mode and can’t browse the Web.
+ isprinting=The document cannot change while Printing or in Print Preview.
+-deniedPortAccess=This address uses a network port which is normally used for purposes other than Web browsing. Firefox has canceled the request for your protection.
+-proxyResolveFailure=Firefox is configured to use a proxy server that can’t be found.
+-proxyConnectFailure=Firefox is configured to use a proxy server that is refusing connections.
++deniedPortAccess=This address uses a network port which is normally used for purposes other than Web browsing. Sval has canceled the request for your protection.
++proxyResolveFailure=Sval is configured to use a proxy server that can’t be found.
++proxyConnectFailure=Sval is configured to use a proxy server that is refusing connections.
+ contentEncodingError=The page you are trying to view cannot be shown because it uses an invalid or unsupported form of compression.
+ unsafeContentType=The page you are trying to view cannot be shown because it is contained in a file type that may not be safe to open. Please contact the website owners to inform them of this problem.
+ externalProtocolTitle=External Protocol Request
+@@ -43,9 +43,9 @@ cspBlocked=This page has a content security policy that prevents it from being l
+ xfoBlocked=This page has an X-Frame-Options policy that prevents it from being loaded in this context.
+ corruptedContentErrorv2=The site at %S has experienced a network protocol violation that cannot be repaired.
+ ## LOCALIZATION NOTE (sslv3Used) - Do not translate "%S".
+-sslv3Used=Firefox cannot guarantee the safety of your data on %S because it uses SSLv3, a broken security protocol.
++sslv3Used=Sval cannot guarantee the safety of your data on %S because it uses SSLv3, a broken security protocol.
+ inadequateSecurityError=The website tried to negotiate an inadequate level of security.
+ blockedByPolicy=Your organization has blocked access to this page or website.
+-blockedByCORP=Firefox didn’t load this page because it looks like the security configuration doesn’t match the previous page.
++blockedByCORP=Sval didn’t load this page because it looks like the security configuration doesn’t match the previous page.
+ invalidHeaderValue=%S sent back a header with empty characters not allowed by web security standards.
+-networkProtocolError=Firefox has experienced a network protocol violation that cannot be repaired.
++networkProtocolError=Sval has experienced a network protocol violation that cannot be repaired.
+diff --git a/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl b/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl
+index acd6e92b39..e2417ad4db 100644
+--- a/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl
++++ b/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl
+@@ -328,7 +328,7 @@ discopane-intro3 =
+     Extensions and themes let you customize { -brand-product-name }. They can boost privacy,
+     enhance productivity, improve media, change the way { -brand-product-name } looks, and
+     so much more. These small software programs are often developed by a third party. Here’s
+-    a selection Firefox <a data-l10n-name="learn-more-trigger">recommends</a> for
++    a selection Mozilla <a data-l10n-name="learn-more-trigger">recommends</a> for
+     exceptional security, performance, and functionality.
+ 
+ # Notice to make user aware that the recommendations are personalized.
+@@ -497,7 +497,7 @@ addon-detail-group-label-quarantined-domains =
+ # recommendation. As such, we hard code "Firefox" and avoid personalising
+ # language like the words "our" or "we".
+ addon-badge-recommended4 =
+-  .title = Firefox only recommends extensions that meet standards for security and performance
++  .title = Mozilla only recommends extensions that meet standards for security and performance
+ # We hard code "Mozilla" in the string below because the extensions are built
+ # by Mozilla and we don't want forks to display "by Fork".
+ addon-badge-line4 =
+@@ -537,7 +537,7 @@ addon-sitepermissions-required = Grants the following capabilities to <span data
+ 
+ # A recommendation for the Firefox Color theme shown at the bottom of the theme
+ # list view. The "Firefox Color" name itself should not be translated.
+-recommended-theme-1 = Feeling creative? <a data-l10n-name="link">Build your own theme with Firefox Color.</a>
++recommended-theme-1 = Feeling creative? <a data-l10n-name="link">Build your own theme.</a>
+ 
+ ## Page headings
+ 
+diff --git a/toolkit/locales/en-US/toolkit/about/aboutTelemetry.ftl b/toolkit/locales/en-US/toolkit/about/aboutTelemetry.ftl
+index 4749a04551..380381507d 100644
+--- a/toolkit/locales/en-US/toolkit/about/aboutTelemetry.ftl
++++ b/toolkit/locales/en-US/toolkit/about/aboutTelemetry.ftl
+@@ -17,8 +17,8 @@ about-telemetry-next-ping = >>
+ about-telemetry-page-title = Telemetry Data
+ about-telemetry-current-store = Current Store:
+ about-telemetry-more-information = Looking for more information?
+-about-telemetry-firefox-data-doc = The <a data-l10n-name="data-doc-link">Firefox Data Documentation</a> contains guides about how to work with our data tools.
+-about-telemetry-telemetry-client-doc = The <a data-l10n-name="client-doc-link">Firefox Telemetry client documentation</a> includes definitions for concepts, API documentation and data references.
++about-telemetry-firefox-data-doc = The <a data-l10n-name="data-doc-link">Mozilla Data Documentation</a> contains guides about how to work with our data tools.
++about-telemetry-telemetry-client-doc = The <a data-l10n-name="client-doc-link">Telemetry client documentation</a> includes definitions for concepts, API documentation and data references.
+ about-telemetry-telemetry-dashboard = The <a data-l10n-name="dashboard-link">Telemetry dashboards</a> allow you to visualize the data Mozilla receives via Telemetry.
+ about-telemetry-telemetry-probe-dictionary = The <a data-l10n-name="probe-dictionary-link">Probe Dictionary</a> provides details and descriptions for the probes collected by Telemetry.
+ about-telemetry-show-in-Firefox-json-viewer = Open in the JSON viewer
+diff --git a/toolkit/locales/en-US/toolkit/branding/brandings.ftl b/toolkit/locales/en-US/toolkit/branding/brandings.ftl
+index 97f695334a..1fd39fa14e 100644
+--- a/toolkit/locales/en-US/toolkit/branding/brandings.ftl
++++ b/toolkit/locales/en-US/toolkit/branding/brandings.ftl
+@@ -15,17 +15,17 @@
+ ## https://mozilla-l10n.github.io/styleguides/mozilla_general/#brands-copyright-and-trademark
+ 
+ -facebook-container-brand-name = Facebook Container
+--monitor-brand-name = Firefox Monitor
++-monitor-brand-name = Mozilla Monitor
+ -monitor-brand-short-name = Monitor
+ -mozmonitor-brand-name = Mozilla Monitor
+ -pocket-brand-name = Pocket
+--send-brand-name = Firefox Send
+--screenshots-brand-name = Firefox Screenshots
++-send-brand-name = Send
++-screenshots-brand-name = Screenshots
+ -mozilla-vpn-brand-name = Mozilla VPN
+--profiler-brand-name = Firefox Profiler
+--translations-brand-name = Firefox Translations
+--focus-brand-name = Firefox Focus
+--relay-brand-name = Firefox Relay
++-profiler-brand-name = Profiler
++-translations-brand-name = Translations
++-focus-brand-name = Focus
++-relay-brand-name = Relay
+ -relay-brand-short-name = Relay
+ -fakespot-brand-name = Fakespot
+ -solo-ai-brand-name = Solo
+@@ -42,18 +42,18 @@
+ 
+ # “Suggest” can be localized, “Firefox” must be treated as a brand
+ # and kept in English.
+--firefox-suggest-brand-name = Firefox Suggest
++-firefox-suggest-brand-name = Suggest
+ 
+ # ”Home" can be localized, “Firefox” must be treated as a brand
+ # and kept in English.
+--firefox-home-brand-name = Firefox Home
++-firefox-home-brand-name = Sval Home
+ 
+ # View" can be localized, “Firefox” must be treated as a brand
+ # and kept in English.
+--firefoxview-brand-name = Firefox View
++-firefoxview-brand-name = Sval View
+ 
+ # Firefox Labs is the name for a page in Settings to allow users to learn about
+ # experimental and in-development features, and turn those features on and off.
+ # The "Labs" portion can be localized, “Firefox” must be treated as a brand
+ # and kept in English.
+--firefoxlabs-brand-name = Firefox Labs
++-firefoxlabs-brand-name = Labs
+diff --git a/devtools/client/locales/en-US/aboutdebugging.ftl b/devtools/client/locales/en-US/aboutdebugging.ftl
+index a22ee7dc7a..542e54e88b 100644
+--- a/devtools/client/locales/en-US/aboutdebugging.ftl
++++ b/devtools/client/locales/en-US/aboutdebugging.ftl
+@@ -233,7 +233,7 @@ about-debugging-browser-version-too-old = The connected browser has an old versi
+ 
+ # Dedicated message for a backward compatibility issue that occurs when connecting:
+ # from Fx 70+ to the old Firefox for Android (aka Fennec) which uses Fx 68.
+-about-debugging-browser-version-too-old-fennec = This version of Firefox cannot debug Firefox for Android (68). We recommend installing Firefox for Android Nightly on your phone for testing. <a>More details</a>
++about-debugging-browser-version-too-old-fennec = This version of { -brand-shorter-name } cannot debug Firefox for Android (68). We recommend installing Firefox for Android Nightly on your phone for testing. <a>More details</a>
+ 
+ # This string is displayed in the runtime page if the remote browser version is too recent.
+ # "Troubleshooting" link points to https://firefox-source-docs.mozilla.org/devtools-user/about_colon_debugging/
+@@ -241,7 +241,7 @@ about-debugging-browser-version-too-old-fennec = This version of Firefox cannot
+ # { $localID } is the build ID of the current Firefox instance (same format)
+ # { $runtimeVersion } is the version of the remote browser (for instance "67.0a1")
+ # { $localVersion } is the version of your current browser (same format)
+-about-debugging-browser-version-too-recent = The connected browser is more recent ({ $runtimeVersion }, buildID { $runtimeID }) than your { -brand-shorter-name } ({ $localVersion }, buildID { $localID }). This is an unsupported setup and may cause DevTools to fail. Please update Firefox. <a>Troubleshooting</a>
++about-debugging-browser-version-too-recent = The connected browser is more recent ({ $runtimeVersion }, buildID { $runtimeID }) than your { -brand-shorter-name } ({ $localVersion }, buildID { $localID }). This is an unsupported setup and may cause DevTools to fail. Please update { -brand-shorter-name }. <a>Troubleshooting</a>
+ 
+ # Displayed for runtime info in runtime pages.
+ # { $name } is brand name such as "Firefox Nightly"
+diff --git a/devtools/client/locales/en-US/application.ftl b/devtools/client/locales/en-US/application.ftl
+index 68949a283b..8be0f2aa59 100644
+--- a/devtools/client/locales/en-US/application.ftl
++++ b/devtools/client/locales/en-US/application.ftl
+@@ -92,7 +92,7 @@ manifest-loaded-error = There was an error while loading the manifest:
+ 
+ # Text displayed as an error when there has been a Firefox DevTools error while
+ # trying to load the manifest
+-manifest-loaded-devtools-error = Firefox DevTools error
++manifest-loaded-devtools-error = DevTools error
+ 
+ # Text displayed when the page has no manifest available
+ manifest-non-existing = No manifest found to inspect.
+diff --git a/devtools/client/locales/en-US/jsonview.properties b/devtools/client/locales/en-US/jsonview.properties
+index a50abb88a1..282f599173 100644
+--- a/devtools/client/locales/en-US/jsonview.properties
++++ b/devtools/client/locales/en-US/jsonview.properties
+@@ -47,8 +47,8 @@ jsonViewer.filterJSON=Filter JSON
+ # LOCALIZATION NOTE (jsonViewer.sizeProfilerButton): Tooltip for the toolbar
+ # button that opens the Firefox Profiler with a profile showing how much space
+ # each part of the JSON document uses.
+-jsonViewer.sizeProfilerButton=Investigate JSON size in the Firefox Profiler
++jsonViewer.sizeProfilerButton=Investigate JSON size in the Profiler
+ 
+ # LOCALIZATION NOTE (jsonViewer.sizeProfilerButtonDisabled): Tooltip for the
+ # toolbar button when it is disabled because the JSON document is invalid.
+-jsonViewer.sizeProfilerButtonDisabled=Investigate JSON size in the Firefox Profiler (disabled for invalid JSON)
++jsonViewer.sizeProfilerButtonDisabled=Investigate JSON size in the Profiler (disabled for invalid JSON)
+diff --git a/devtools/client/locales/en-US/memory.properties b/devtools/client/locales/en-US/memory.properties
+index 47097101ea..b71ea811be 100644
+--- a/devtools/client/locales/en-US/memory.properties
++++ b/devtools/client/locales/en-US/memory.properties
+@@ -28,7 +28,7 @@ snapshot.io.import.window=Import Snapshot
+ 
+ # LOCALIZATION NOTE (snapshot.io.filter): The title for the filter used to
+ # filter file types (*.fxsnapshot)
+-snapshot.io.filter=Firefox Snapshots
++snapshot.io.filter=Memory snapshots
+ 
+ # LOCALIZATION NOTE (aggregate.mb): The label annotating the number of bytes (in
+ # megabytes) in a snapshot. %S represents the value, rounded to 2 decimal
+diff --git a/devtools/client/locales/en-US/responsive.properties b/devtools/client/locales/en-US/responsive.properties
+index 9c9876fe79..3bb52da7c1 100644
+--- a/devtools/client/locales/en-US/responsive.properties
++++ b/devtools/client/locales/en-US/responsive.properties
+@@ -45,7 +45,7 @@ responsive.screenshotGeneratedFilename=Screen Shot %1$S at %2$S
+ # LOCALIZATION NOTE (responsive.remoteOnly): Message displayed in the tab's
+ # notification box if a user tries to open Responsive Design Mode in a
+ # non-remote tab.
+-responsive.remoteOnly=Responsive Design Mode is only available for remote browser tabs, such as those used for web content in multi-process Firefox.
++responsive.remoteOnly=Responsive Design Mode is only available for remote browser tabs, such as those used for web content in multi-process Sval.
+ 
+ # LOCALIZATION NOTE (responsive.changeDevicePixelRatio): Tooltip for the
+ # device pixel ratio dropdown when is enabled.

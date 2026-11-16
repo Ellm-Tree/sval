@@ -1,0 +1,40 @@
+---
+title: Choose what the address bar shows
+description: Show the site name alone, the site with its path, or the full address.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+When you're not typing in the address bar, it shows a short form of the
+page's address. You choose how much of the address you see.
+
+You work in a web app whose page names are in the path, and want to see
+which page you're on.
+
+<Screenshot name="docs-address-bar" frame="rounded" maxWidth={600} alt="Settings › Appearance › Address bar, set to Site name, with allrecipes.com as the example" />
+
+## Steps
+
+1. Open Settings › Appearance.
+2. Under Address bar, select **Site name**, **Site and path**, or **Full
+   address**.
+
+The example under the choices shows how an address looks with each one.
+
+## Details
+
+- **Site name.** You see the site without "www.". This is the default.
+- **Site and path.** You also see the path, without anything after a ? or
+  #.
+- **Full address.** You also see everything after the site name.
+- The part after the site name is dimmed.
+- When the address doesn't fit, Sval drops whole parts from the left. That
+  keeps the end of the address, like a page number, in view.
+- The Launcher's key shows at the right end of the address bar when
+  there's room. It's the first thing to go when there isn't.
+- When you open the Launcher, the page's address is already in the field
+  and selected, so whatever you type replaces the address.
+
+## Related pages
+
+- [Address bar and Launcher](/docs/reference/launcher/)

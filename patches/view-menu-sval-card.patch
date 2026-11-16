@@ -1,0 +1,33 @@
+Sval: open the user's card from the View menu
+
+View › Your Sval Card shows the card in its dialog, on every platform.
+
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index f19a6850ec..0ee46612bd 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -186,6 +186,8 @@
+                 <menuitem id="documentDirection-swap"
+                           hidden="true"
+                           data-l10n-id="menu-view-bidi-switch-page-direction"/>
++                <menuseparator/>
++                <menuitem id="svalCardMenu" label="Your Sval Card"/>
+               </menupopup>
+             </menu>
+ 
+diff --git a/browser/base/content/browser-menubar.js b/browser/base/content/browser-menubar.js
+index 3c6f767d5b..51669f9296 100644
+--- a/browser/base/content/browser-menubar.js
++++ b/browser/base/content/browser-menubar.js
+@@ -23,6 +23,11 @@ document.addEventListener(
+         case "exitFullScreenItem":
+           BrowserCommands.fullScreen();
+           break;
++        case "svalCardMenu":
++          ChromeUtils.importESModule(
++            "moz-src:///browser/components/sval/SvalCardArt.sys.mjs"
++          ).openCardDialog(window);
++          break;
+         case "documentDirection-swap":
+           gBrowser.selectedBrowser.sendMessageToActor(
+             "SwitchDocumentDirection",

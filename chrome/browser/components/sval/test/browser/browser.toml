@@ -1,0 +1,907 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# First run opens a window-modal dialog on a fresh profile, which every
+# harness profile is; the file that tests it turns it on for itself. Search
+# suggestions would reach the network from the home page's field as a test
+# types into it, which the harness forbids. Firefox's crash-file cleanup runs
+# five minutes into a session and records the day it ran
+# (`CrashFileCleaner`), a pref change that would fail whichever file was
+# running then. Sval runs no sync pass of its own (`_passOnItsOwn`), so the
+# document moves only when a test acts; a task about those passes turns them
+# on for itself. Allow and Pair stay disabled for the dialog delay; the tasks
+# about that delay set it back for themselves. A device publishes nothing
+# before its first time reading (decision 1714), and the harness reaches no
+# Remote Settings server, so every profile starts with a reading of no
+# difference.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+]
+support-files = [
+  "sval_agent_analytics.html",
+  "sval_agent_broken_frame.html",
+  "sval_agent_challenge.sjs",
+  "sval_agent_console.html",
+  "sval_agent_coop.sjs",
+  "sval_agent_doc.pdf",
+  "sval_agent_download.sjs",
+  "sval_agent_focus.html",
+  "sval_agent_hop.html",
+  "sval_agent_input.html",
+  "sval_agent_links.html",
+  "sval_agent_on_helpers.js",
+  "sval_agent_page.html",
+  "sval_agent_page_helpers.js",
+  "sval_agent_session_helpers.js",
+  "sval_agent_page2.html",
+  "sval_agent_popup.html",
+  "sval_agent_post.sjs",
+  "sval_agent_red.html",
+  "sval_agent_redirect.sjs",
+  "sval_agent_settings_helpers.js",
+  "sval_agent_sites_helpers.js",
+  "sval_agent_slow.sjs",
+  "sval_agent_status.sjs",
+  "sval_agent_stream.sjs",
+  "sval_agent_tools.html",
+  "sval_agent_upload_helpers.js",
+  "sval_background_helpers.js",
+  "sval_answer_dialog_helpers.js",
+  "sval_blocking_helpers.js",
+  "sval_capture_page.html",
+  "sval_call_page.html",
+  "sval_ctrl_tab_helpers.js",
+  "sval_pip_video_page.html",
+  "sval_reload_cacheable.sjs",
+  "sval_restore_counter.sjs",
+  "sval_switcher_page.sjs",
+  "sval_launcher_home_helpers.js",
+  "sval_launcher_suggestions.sjs",
+  "sval_accept_language.sjs",
+  "sval_element_picker.html",
+  "sval_key_taker.html",
+  "sval_element_picker_shadow.html",
+  "sval_element_picker_helpers.js",
+  "sval_blocking_list.sjs",
+  "sval_element_picker_image.sjs",
+  "sval_element_snip.html",
+  "sval_favorite_icon.html",
+  "sval_favorites_menu_helpers.js",
+  "sval_form_post.sjs",
+  "sval_feedback_helpers.js",
+  "sval_extension_notices_helpers.js",
+  "sval_first_run_helpers.js",
+  "sval_header_toggle_helpers.js",
+  "sval_fp_cores_worker.js",
+  "sval_javascript_frame.html",
+  "sval_javascript_page.html",
+  "sval_javascript_sandbox.html",
+  "sval_javascript_sw.html",
+  "sval_javascript_sw.js",
+  "sval_media_gate_frame.html",
+  "sval_media_gate_loop.html",
+  "sval_media_gate_page.html",
+  "sval_media_press_page.html",
+  "sval_page_dialog_helpers.js",
+  "sval_page_rules.html",
+  "sval_page_rules_beacon.sjs",
+  "sval_page_tools_helpers.js",
+  "sval_pairing_helpers.js",
+  "sval_panel_helpers.js",
+  "sval_panel_startup_helpers.js",
+  "sval_quick_peek_links.html",
+  "sval_pin_frame.html",
+  "sval_pin_sandboxed_frame.html",
+  "sval_pins_helpers.js",
+  "sval_pip_helpers.js",
+  "sval_preferences_helpers.js",
+  "sval_private_helpers.js",
+  "sval_private_hsts.sjs",
+  "sval_private_isolation.html",
+  "sval_protection_embeds.html",
+  "sval_reader_article.html",
+  "sval_scriptlets.html",
+  "sval_site_page_helpers.js",
+  "sval_site_styles.html",
+  "sval_site_styles_helpers.js",
+  "sval_switcher_helpers.js",
+  "sval_take_control_helpers.js",
+  "sval_user_agent.sjs",
+  "sval_workspace_windows_helpers.js",
+  "head.js",
+]
+
+["browser_sval_a11y_shadow_insertion.js"]
+
+["browser_sval_about_license.js"]
+
+["browser_sval_accessibility_console.js"]
+
+["browser_sval_addons_page.js"]
+
+["browser_sval_agent_alert_waits.js"]
+
+["browser_sval_agent_alerts.js"]
+
+["browser_sval_agent_answers_dialogs.js"]
+
+["browser_sval_agent_apps.js"]
+
+["browser_sval_agent_challenge.js"]
+
+["browser_sval_agent_clients.js"]
+
+["browser_sval_agent_clipboard.js"]
+
+["browser_sval_agent_close_window.js"]
+
+["browser_sval_agent_connection.js"]
+
+["browser_sval_agent_console.js"]
+
+["browser_sval_agent_device_prompts.js"]
+
+["browser_sval_agent_dialog_holds_the_tab.js"]
+
+["browser_sval_agent_dialog_words.js"]
+
+["browser_sval_agent_download_permission.js"]
+
+["browser_sval_agent_download_start.js"]
+
+["browser_sval_agent_download_traces.js"]
+
+["browser_sval_agent_download_unasked.js"]
+
+["browser_sval_agent_focus.js"]
+
+["browser_sval_agent_hand_over.js"]
+
+["browser_sval_agent_handoff.js"]
+
+["browser_sval_agent_late_write_answer.js"]
+
+["browser_sval_agent_late_write_release.js"]
+
+["browser_sval_agent_local_sites.js"]
+
+["browser_sval_agent_marking.js"]
+
+["browser_sval_agent_model_context.js"]
+
+["browser_sval_agent_navigate_frames.js"]
+
+["browser_sval_agent_on_groups.js"]
+
+["browser_sval_agent_on_pages.js"]
+
+["browser_sval_agent_on_peeks_and_quick_peeks.js"]
+
+["browser_sval_agent_on_workspaces.js"]
+
+["browser_sval_agent_overlay.js"]
+
+["browser_sval_agent_overlay_devices.js"]
+support-files = ["!/toolkit/components/pictureinpicture/tests/test-video-long.mp4"]
+
+["browser_sval_agent_overlay_fullscreen.js"]
+
+["browser_sval_agent_overlay_popups.js"]
+
+["browser_sval_agent_page_actions.js"]
+
+["browser_sval_agent_page_click_targets.js"]
+
+["browser_sval_agent_page_dialogs.js"]
+
+["browser_sval_agent_page_focus.js"]
+
+["browser_sval_agent_page_input.js"]
+
+["browser_sval_agent_page_scroll.js"]
+
+["browser_sval_agent_page_snapshot.js"]
+
+["browser_sval_agent_page_tool_guard_lifetime.js"]
+
+["browser_sval_agent_page_tool_guards.js"]
+
+["browser_sval_agent_page_tools.js"]
+
+["browser_sval_agent_pairing.js"]
+
+["browser_sval_agent_pdf_save.js"]
+
+["browser_sval_agent_polite_actions.js"]
+
+["browser_sval_agent_protocol.js"]
+
+["browser_sval_agent_quick_peek.js"]
+
+["browser_sval_agent_reads.js"]
+
+["browser_sval_agent_screenshots.js"]
+
+["browser_sval_agent_session_pairing.js"]
+
+["browser_sval_agent_settings.js"]
+
+["browser_sval_agent_settings_hosts.js"]
+
+["browser_sval_agent_settings_tools.js"]
+
+# LSFileQuarantineEnabled and the quarantine attribute are macOS's.
+
+["browser_sval_agent_shim_unquarantined.js"]
+run-if = ["os == 'mac'"]
+
+["browser_sval_agent_site_alert.js"]
+
+["browser_sval_agent_site_gate.js"]
+
+["browser_sval_agent_site_hooks.js"]
+
+["browser_sval_agent_site_scope.js"]
+
+["browser_sval_agent_snapshot_deadline.js"]
+
+["browser_sval_agent_stop.js"]
+
+["browser_sval_agent_tab_copies.js"]
+
+["browser_sval_agent_tab_filing.js"]
+
+["browser_sval_agent_tab_owner.js"]
+
+["browser_sval_agent_tabs.js"]
+
+["browser_sval_agent_take_control_crash.js"]
+
+["browser_sval_agent_take_control_hands_over.js"]
+
+["browser_sval_agent_take_control_kept.js"]
+
+["browser_sval_agent_tool_loads.js"]
+
+["browser_sval_agent_tools.js"]
+
+["browser_sval_agent_upload_grants.js"]
+
+["browser_sval_agent_upload_refusals.js"]
+
+["browser_sval_agent_upload_waits.js"]
+
+["browser_sval_agent_uploads.js"]
+
+["browser_sval_agent_watched_tabs.js"]
+
+["browser_sval_agent_window_nodes.js"]
+
+["browser_sval_agent_writes.js"]
+
+["browser_sval_agent_writes_held.js"]
+
+["browser_sval_agent_writes_own.js"]
+
+["browser_sval_agent_writes_waiting.js"]
+
+["browser_sval_app_notices.js"]
+
+["browser_sval_appearance.js"]
+
+["browser_sval_archive.js"]
+
+["browser_sval_back_after_address_bar_load.js"]
+
+["browser_sval_background_both_ways.js"]
+
+["browser_sval_background_peer_workspace.js"]
+
+["browser_sval_backup_key.js"]
+
+["browser_sval_blocking_engine.js"]
+
+["browser_sval_blocking_off_and_on.js"]
+
+["browser_sval_blocking_query_stripping.js"]
+
+["browser_sval_blocking_settings.js"]
+
+["browser_sval_blocking_url_classifier.js"]
+
+["browser_sval_camera_prompt.js"]
+
+["browser_sval_card.js"]
+
+["browser_sval_certificate_alerts.js"]
+
+["browser_sval_chrome_deprecations.js"]
+
+["browser_sval_coexistence.js"]
+
+["browser_sval_color_picker.js"]
+
+["browser_sval_console_api_warning.js"]
+
+["browser_sval_console_origin.js"]
+
+["browser_sval_content_scrollbars.js"]
+
+["browser_sval_context_menu_keys.js"]
+
+["browser_sval_context_menu_separators.js"]
+
+["browser_sval_credentials.js"]
+
+["browser_sval_critical.js"]
+
+["browser_sval_ctrl_tab.js"]
+
+["browser_sval_ctrl_tab_keys.js"]
+
+["browser_sval_ctrl_tab_list.js"]
+
+["browser_sval_ctrl_tab_marks.js"]
+
+["browser_sval_default_browser_prompt.js"]
+
+["browser_sval_devtools_close.js"]
+
+["browser_sval_devtools_defaults.js"]
+
+["browser_sval_dialog_accessible_tree.js"]
+
+["browser_sval_downloads_workspaces.js"]
+
+["browser_sval_element_picker.js"]
+
+["browser_sval_element_picker_keys.js"]
+
+["browser_sval_element_picker_scope.js"]
+
+["browser_sval_element_picker_shadow.js"]
+
+["browser_sval_element_snip.js"]
+
+["browser_sval_email_menu.js"]
+
+["browser_sval_emoji_picker.js"]
+
+["browser_sval_error_pages.js"]
+
+["browser_sval_export.js"]
+
+["browser_sval_extension_blocked_site_data.js"]
+
+["browser_sval_extension_blocked_sites.js"]
+
+["browser_sval_extension_compat.js"]
+
+["browser_sval_extension_notices.js"]
+
+["browser_sval_extension_sites_settings.js"]
+
+["browser_sval_extension_update_wait.js"]
+
+["browser_sval_extensions_menu_page_action.js"]
+
+["browser_sval_extensions_menu_pinned.js"]
+
+["browser_sval_extensions_menu_site_switch.js"]
+
+["browser_sval_extensions_settings.js"]
+
+["browser_sval_favicon.js"]
+
+["browser_sval_favorite_icons.js"]
+
+["browser_sval_favorites.js"]
+
+["browser_sval_favorites_extensions.js"]
+
+["browser_sval_favorites_menu.js"]
+
+["browser_sval_favorites_menu_pins.js"]
+
+["browser_sval_favorites_urlbar.js"]
+
+["browser_sval_feedback_collector.js"]
+
+["browser_sval_feedback_form.js"]
+
+["browser_sval_feedback_private.js"]
+
+["browser_sval_feedback_report.js"]
+
+["browser_sval_find_bar.js"]
+
+["browser_sval_fingerprinting.js"]
+
+["browser_sval_firefox.js"]
+
+["browser_sval_firefox_dialogs.js"]
+
+["browser_sval_firefox_questions.js"]
+
+["browser_sval_forget_site.js"]
+
+["browser_sval_fp_audio.js"]
+
+["browser_sval_fp_audio_noise.js"]
+
+["browser_sval_fp_emoji.js"]
+
+["browser_sval_fp_gamepad.js"]
+
+["browser_sval_fp_hardware_concurrency.js"]
+
+["browser_sval_fp_languages.js"]
+
+["browser_sval_fp_media_devices.js"]
+
+["browser_sval_fp_outer_size.js"]
+
+["browser_sval_fp_permissions.js"]
+
+["browser_sval_fp_screen.js"]
+
+["browser_sval_fp_speech_voices.js"]
+
+["browser_sval_header.js"]
+
+["browser_sval_header_overflow.js"]
+
+["browser_sval_header_popovers.js"]
+
+["browser_sval_header_stem_screen_top.js"]
+
+["browser_sval_header_toggle_cool_colours.js"]
+
+["browser_sval_header_toggle_warm_colours.js"]
+
+["browser_sval_header_toggles.js"]
+
+["browser_sval_headless.js"]
+
+["browser_sval_history_scope.js"]
+
+["browser_sval_history_sidebar.js"]
+
+["browser_sval_history_unstored_visits.js"]
+
+["browser_sval_history_workspaces.js"]
+
+["browser_sval_home_favorites.js"]
+
+["browser_sval_home_page.js"]
+
+["browser_sval_home_workspace.js"]
+
+["browser_sval_identity_moved.js"]
+
+["browser_sval_import.js"]
+
+["browser_sval_import_a11y.js"]
+
+["browser_sval_info_pages.js"]
+
+["browser_sval_isolated_workspaces.js"]
+
+["browser_sval_javascript.js"]
+
+["browser_sval_kagi.js"]
+
+["browser_sval_kagi_engine_watch.js"]
+
+["browser_sval_kagi_response.js"]
+
+["browser_sval_keep_loaded.js"]
+
+# Native key events need a widget that synthesizes them: Windows, and macOS
+# when headed, which the file checks itself. GTK implements none
+# (`nsIWidget::SynthesizeNativeKeyEvent`'s default).
+
+["browser_sval_keyboard_layouts.js"]
+run-if = ["os == 'win'", "os == 'mac'"]
+
+["browser_sval_keyboard_shortcuts.js"]
+
+["browser_sval_launch.js"]
+
+["browser_sval_launcher_across_workspaces.js"]
+
+["browser_sval_launcher_agent_commands.js"]
+
+["browser_sval_launcher_colours.js"]
+
+["browser_sval_launcher_commands.js"]
+
+["browser_sval_launcher_enter.js"]
+
+["browser_sval_launcher_float.js"]
+
+["browser_sval_launcher_home.js"]
+
+["browser_sval_launcher_home_keys.js"]
+
+["browser_sval_launcher_new_window.js"]
+
+["browser_sval_launcher_rows.js"]
+
+["browser_sval_launcher_sections.js"]
+
+["browser_sval_launcher_tabs.js"]
+
+["browser_sval_letterboxing.js"]
+
+["browser_sval_link_routing.js"]
+
+["browser_sval_live_fill.js"]
+
+["browser_sval_load_line.js"]
+
+["browser_sval_local_addresses.js"]
+
+["browser_sval_location_button.js"]
+
+["browser_sval_long_host.js"]
+
+["browser_sval_mcp_end_to_end.js"]
+
+["browser_sval_media_button.js"]
+
+["browser_sval_media_gate.js"]
+
+["browser_sval_media_gate_tab.js"]
+
+["browser_sval_media_press.js"]
+
+["browser_sval_media_prompt.js"]
+
+["browser_sval_menu_bar.js"]
+
+["browser_sval_my_filters.js"]
+
+["browser_sval_my_filters_synced.js"]
+
+["browser_sval_new_peek.js"]
+
+["browser_sval_new_workspace.js"]
+
+["browser_sval_no_ai.js"]
+
+["browser_sval_no_mozilla_links.js"]
+
+["browser_sval_no_profile_reset.js"]
+
+["browser_sval_notification_bar.js"]
+
+["browser_sval_on_states.js"]
+
+["browser_sval_page_font.js"]
+
+["browser_sval_page_rules.js"]
+
+["browser_sval_panel.js"]
+
+["browser_sval_panel_accessible.js"]
+
+["browser_sval_panel_context_menu.js"]
+
+["browser_sval_panel_drag.js"]
+
+["browser_sval_panel_edge_reveal.js"]
+
+["browser_sval_panel_edge_shadows.js"]
+
+["browser_sval_panel_footer.js"]
+
+["browser_sval_panel_menus.js"]
+
+["browser_sval_panel_multiselect.js"]
+
+["browser_sval_panel_resize.js"]
+
+["browser_sval_panel_selection.js"]
+
+["browser_sval_panel_undo.js"]
+
+["browser_sval_peek.js"]
+
+["browser_sval_peek_downloads.js"]
+
+["browser_sval_peek_launcher.js"]
+
+["browser_sval_peek_new_window.js"]
+
+["browser_sval_peek_reopen.js"]
+
+["browser_sval_peek_shown.js"]
+
+["browser_sval_peek_sidebar.js"]
+
+["browser_sval_peek_undo_close.js"]
+
+["browser_sval_peer_delete_spares_tab_in_front.js"]
+
+["browser_sval_pins.js"]
+
+["browser_sval_pins_absence.js"]
+
+["browser_sval_pins_draw.js"]
+
+["browser_sval_pins_folders.js"]
+
+["browser_sval_pins_launch.js"]
+
+["browser_sval_pins_links.js"]
+
+["browser_sval_pins_menus.js"]
+
+["browser_sval_pins_numbers.js"]
+
+["browser_sval_pins_session.js"]
+
+["browser_sval_pip_on_tab_switch.js"]
+
+["browser_sval_pip_toggle_size.js"]
+
+["browser_sval_preferences_in_firefox_categories.js"]
+
+["browser_sval_preferences_layout.js"]
+
+["browser_sval_preferences_placement.js"]
+
+["browser_sval_preferences_session_restore.js"]
+
+["browser_sval_preferences_sync_and_agents.js"]
+
+["browser_sval_private_page_window.js"]
+
+["browser_sval_private_sessions.js"]
+
+["browser_sval_private_site_records.js"]
+
+["browser_sval_private_site_state.js"]
+
+["browser_sval_private_tabs_downloads.js"]
+
+["browser_sval_private_tree.js"]
+
+["browser_sval_private_window.js"]
+
+["browser_sval_private_writes_nothing.js"]
+
+["browser_sval_protection_access.js"]
+
+["browser_sval_protection_button.js"]
+
+["browser_sval_protection_compat_fix.js"]
+
+["browser_sval_protection_connection.js"]
+
+["browser_sval_protection_private.js"]
+
+["browser_sval_protection_search_terms.js"]
+
+["browser_sval_protection_sites.js"]
+
+["browser_sval_protections_settings.js"]
+
+["browser_sval_protections_tracking.js"]
+
+["browser_sval_quick_peek.js"]
+
+["browser_sval_quick_peek_click.js"]
+
+["browser_sval_quick_peek_menu.js"]
+
+["browser_sval_quick_peek_prompts.js"]
+
+["browser_sval_reader_button.js"]
+
+["browser_sval_reader_page.js"]
+
+["browser_sval_reload_menu.js"]
+
+["browser_sval_removed_pages.js"]
+
+["browser_sval_reserved_keys.js"]
+
+["browser_sval_resize_reach.js"]
+
+["browser_sval_restore.js"]
+
+["browser_sval_row_activation.js"]
+
+["browser_sval_screenshots_keyboard.js"]
+
+["browser_sval_scriptlets.js"]
+
+["browser_sval_search_keywords.js"]
+
+["browser_sval_search_opens_alike.js"]
+
+["browser_sval_secure_dns.js"]
+
+["browser_sval_selection_windows.js"]
+
+["browser_sval_settings.js"]
+
+["browser_sval_settings_closed_while_loading.js"]
+
+["browser_sval_settings_element_picker.js"]
+
+["browser_sval_settings_folder.js"]
+
+["browser_sval_settings_kagi.js"]
+
+["browser_sval_settings_page_stays_put.js"]
+
+["browser_sval_settings_sval_folder.js"]
+
+["browser_sval_settings_sync.js"]
+
+["browser_sval_settings_sync_key.js"]
+
+["browser_sval_settings_sync_now.js"]
+
+["browser_sval_shortcut_hints.js"]
+
+["browser_sval_site_controls.js"]
+
+["browser_sval_site_controls_elements.js"]
+
+["browser_sval_site_data.js"]
+
+["browser_sval_site_data_clear_scope.js"]
+
+["browser_sval_site_menu_scope.js"]
+
+["browser_sval_site_mute.js"]
+
+["browser_sval_site_page.js"]
+
+["browser_sval_site_page_data.js"]
+
+["browser_sval_site_page_forget.js"]
+
+["browser_sval_site_page_hidden.js"]
+
+["browser_sval_site_page_permissions.js"]
+
+["browser_sval_site_permission_list.js"]
+
+["browser_sval_site_permissions_cleared.js"]
+
+["browser_sval_site_search.js"]
+
+["browser_sval_site_style_colors.js"]
+
+["browser_sval_site_styles.js"]
+
+["browser_sval_site_styles_dark.js"]
+
+["browser_sval_site_styles_editor.js"]
+
+["browser_sval_site_styles_pin.js"]
+
+["browser_sval_site_zoom.js"]
+
+["browser_sval_sites_category.js"]
+
+["browser_sval_sites_extension_switches.js"]
+
+["browser_sval_sites_hosts.js"]
+
+["browser_sval_split_row.js"]
+
+["browser_sval_split_view.js"]
+
+["browser_sval_startup_publish.js"]
+
+["browser_sval_startup_when_sync_fails.js"]
+
+["browser_sval_startup_workspace.js"]
+
+["browser_sval_surrogate_pair_keys.js"]
+
+["browser_sval_switcher.js"]
+
+["browser_sval_switcher_agent_work.js"]
+
+["browser_sval_switcher_idle_unload.js"]
+
+["browser_sval_switcher_kept_tab_shown.js"]
+
+["browser_sval_switcher_kept_tabs.js"]
+
+["browser_sval_switcher_live_media.js"]
+
+["browser_sval_switcher_menu.js"]
+
+["browser_sval_switcher_peers.js"]
+
+["browser_sval_switcher_reorder.js"]
+
+["browser_sval_switcher_setting.js"]
+
+["browser_sval_switcher_strip.js"]
+
+["browser_sval_switcher_swipe.js"]
+
+["browser_sval_switcher_tabs.js"]
+
+["browser_sval_switcher_unsaved_work.js"]
+
+["browser_sval_tab_actions.js"]
+
+["browser_sval_tab_closed_behind_dialog.js"]
+
+["browser_sval_tab_closed_in_workspace.js"]
+
+["browser_sval_tab_copies.js"]
+
+["browser_sval_tab_hover_preview.js"]
+
+["browser_sval_tab_icons.js"]
+
+["browser_sval_tab_menu_favorite.js"]
+
+["browser_sval_tab_move_state.js"]
+
+["browser_sval_tabs.js"]
+
+["browser_sval_tabs_cancelled_load.js"]
+
+["browser_sval_theme_setting.js"]
+
+["browser_sval_tls_alert_error.js"]
+
+["browser_sval_translate_cell.js"]
+
+["browser_sval_trusted_scriptlets.js"]
+
+["browser_sval_two_devices.js"]
+
+["browser_sval_typeface.js"]
+
+["browser_sval_undo_close_window.js"]
+
+["browser_sval_update_feed.js"]
+
+["browser_sval_upstream_ui.js"]
+
+["browser_sval_user_agent.js"]
+
+["browser_sval_video_visibility.js"]
+support-files = ["!/toolkit/components/pictureinpicture/tests/test-video-long.mp4"]
+
+["browser_sval_webdriver_window.js"]
+
+["browser_sval_webgl_manual_loss.js"]
+
+["browser_sval_window_keys.js"]
+
+["browser_sval_windows_gdi.js"]
+run-if = ["os == 'win'"]
+
+["browser_sval_workspace_windows_closing.js"]
+
+["browser_sval_workspace_windows_leaving.js"]
+
+["browser_sval_workspace_windows_moving.js"]
+
+["browser_sval_workspace_windows_taking.js"]
+
+# Alphabetical, and nothing here depends on the order. Every file that touches
+# the window's panel builds its own fixture over it. `browser_sval_launch.js`,
+# the one file that asserts what the harness's own startup left behind, reads
+# Firefox's tab strip and a settings file of its own, neither of which any other
+# file writes. Each file is also run on its own, the only run that proves it.

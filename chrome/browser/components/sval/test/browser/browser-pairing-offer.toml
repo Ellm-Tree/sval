@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# Offering this device's key from the settings page. Sharing makes the
+# profile a sync key for good, so these run on a fresh profile of their
+# own.
+# The prefs after the first are every browser manifest's baseline, which
+# browser.toml gives the reasons for.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+]
+support-files = ["head.js", "sval_pairing_helpers.js"]
+
+["browser_sval_pairing_offer.js"]
+
+["browser_sval_pairing_withdrawal.js"]

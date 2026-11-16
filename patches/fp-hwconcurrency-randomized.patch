@@ -1,0 +1,127 @@
+Sval: per-site, per-session navigator.hardwareConcurrency
+
+A new RFPTarget, NavigatorHWConcurrencyRandomized, makes
+navigator.hardwareConcurrency a count in [max(2, ceil(real / 2)), real]. A
+fixed count is the same on every site and across restarts, so it is a stable
+identifier; a drawn one links no two sites, and a web app sizing a worker
+pool to it keeps at least half its parallelism.
+
+SvalRFPService::RandomizedHardwareConcurrency draws the count from the
+fingerprinting randomization key canvas and audio noise use: the key
+cookieJarSettings carries, derived from the browsing session key and the
+top-level site, so it is fixed for a site within a session, and private
+browsing has its own. RuntimeService::ClampedHardwareConcurrency answers
+documents and workers alike, each from its own global's key. A dedicated
+worker shares its document's cookieJarSettings, a shared worker's is
+serialized from it, and a service worker's comes from
+GenerateKeyForServiceWorker's derivation of the same key, so every realm of
+a site reads one count. RFP's fixed NavigatorHWConcurrency takes precedence
+over it, and it over the tiers. The key is made when any randomization
+target is on, so this one joins kRandomizationTargets, which
+GetBrowsingSessionKey and GenerateKey check. RandomizationDigest is the HMAC
+both this and AudioOutputNoiseKey draw from, each under its own target's
+name. The target is Doc-gated, so a site's -AllTargets granular entry gives
+it the real count.
+
+No chrome API can change what navigator.hardwareConcurrency returns.
+
+diff --git a/dom/base/Navigator.cpp b/dom/base/Navigator.cpp
+index 52ed486937..cc5a8545cf 100644
+--- a/dom/base/Navigator.cpp
++++ b/dom/base/Navigator.cpp
+@@ -714,7 +714,8 @@ uint64_t Navigator::HardwareConcurrency() {
+       nsGlobalWindowInner::Cast(mWindow)->ShouldResistFingerprinting(
+           RFPTarget::NavigatorHWConcurrency),
+       nsGlobalWindowInner::Cast(mWindow)->ShouldResistFingerprinting(
+-          RFPTarget::NavigatorHWConcurrencyTiered));
++          RFPTarget::NavigatorHWConcurrencyTiered),
++      nsGlobalWindowInner::Cast(mWindow));
+ }
+ 
+ namespace {
+diff --git a/dom/workers/RuntimeService.cpp b/dom/workers/RuntimeService.cpp
+index c58a8f8261..38c8ad9de2 100644
+--- a/dom/workers/RuntimeService.cpp
++++ b/dom/workers/RuntimeService.cpp
+@@ -66,6 +66,7 @@
+ #include "nsLayoutStatics.h"
+ #include "nsNetUtil.h"
+ #include "nsPIDOMWindow.h"
++#include "nsRFPService.h"
+ #include "nsServiceManagerUtils.h"
+ #include "nsThreadUtils.h"
+ #include "nsXPCOM.h"
+@@ -2100,8 +2101,8 @@ void RuntimeService::MemoryPressureAllWorkers() {
+   BroadcastAllWorkers([](auto& worker) { worker.MemoryPressure(); });
+ }
+ 
+-uint32_t RuntimeService::ClampedHardwareConcurrency(bool aRFPHardcoded,
+-                                                    bool aRFPTiered) const {
++uint32_t RuntimeService::ClampedHardwareConcurrency(
++    bool aRFPHardcoded, bool aRFPTiered, nsIGlobalObject* aGlobal) const {
+   // The Firefox Hardware Report says 34% of Firefox users have exactly 4 cores.
+   // When the resistFingerprinting pref is set, we want to blend into the crowd
+   // so spoof navigator.hardwareConcurrency = 4 to reduce user uniqueness. On
+@@ -2138,6 +2139,15 @@ uint32_t RuntimeService::ClampedHardwareConcurrency(bool aRFPHardcoded,
+     (void)unclampedHardwareConcurrency.compareExchange(0, numberOfProcessors);
+   }
+ 
++  const uint32_t count = std::min(uint32_t(unclampedHardwareConcurrency),
++                                  StaticPrefs::dom_maxHardwareConcurrency());
++  // A document and its workers draw from the same randomization key, so
++  // every realm of a site reads one count.
++  if (const auto randomized =
++          SvalRFPService::RandomizedHardwareConcurrency(aGlobal, count)) {
++    return *randomized;
++  }
++
+   if (MOZ_UNLIKELY(aRFPTiered)) {
+     if (unclampedHardwareConcurrency >= 8) {
+       return 8;
+@@ -2145,8 +2155,7 @@ uint32_t RuntimeService::ClampedHardwareConcurrency(bool aRFPHardcoded,
+     return 4;
+   }
+ 
+-  return std::min(uint32_t(unclampedHardwareConcurrency),
+-                  StaticPrefs::dom_maxHardwareConcurrency());
++  return count;
+ }
+ 
+ // nsISupports
+diff --git a/dom/workers/RuntimeService.h b/dom/workers/RuntimeService.h
+index 777352c728..b3d7ccceb4 100644
+--- a/dom/workers/RuntimeService.h
++++ b/dom/workers/RuntimeService.h
+@@ -18,6 +18,7 @@
+ #include "nsIObserver.h"
+ #include "nsTArray.h"
+ 
++class nsIGlobalObject;
+ class nsPIDOMWindowInner;
+ 
+ namespace mozilla::dom {
+@@ -176,8 +177,8 @@ class RuntimeService final : public nsIObserver {
+ 
+   void MemoryPressureAllWorkers();
+ 
+-  uint32_t ClampedHardwareConcurrency(bool aRFPHardcoded,
+-                                      bool aRFPTiered) const;
++  uint32_t ClampedHardwareConcurrency(bool aRFPHardcoded, bool aRFPTiered,
++                                      nsIGlobalObject* aGlobal) const;
+ 
+   void CrashIfHanging();
+ 
+diff --git a/dom/workers/WorkerNavigator.cpp b/dom/workers/WorkerNavigator.cpp
+index 0fc6d93f90..1c22b7ddac 100644
+--- a/dom/workers/WorkerNavigator.cpp
++++ b/dom/workers/WorkerNavigator.cpp
+@@ -246,7 +246,8 @@ uint64_t WorkerNavigator::HardwareConcurrency() const {
+       aWorkerPrivate->ShouldResistFingerprinting(
+           RFPTarget::NavigatorHWConcurrency),
+       aWorkerPrivate->ShouldResistFingerprinting(
+-          RFPTarget::NavigatorHWConcurrencyTiered));
++          RFPTarget::NavigatorHWConcurrencyTiered),
++      aWorkerPrivate->GlobalScope());
+ }
+ 
+ StorageManager* WorkerNavigator::Storage() {

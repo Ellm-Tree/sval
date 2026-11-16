@@ -1,0 +1,28 @@
+Sval: about:buildconfig names a key file option without its path
+
+about:buildconfig prints every configure option given (all_configure_options),
+and a --with-*-keyfile option carries the path where the builder keeps the
+key, such as Sval's Safe Browsing key under the builder's home directory. The
+page names the option alone. The list is made in configure, so no chrome API
+reaches it.
+
+diff --git a/toolkit/moz.configure b/toolkit/moz.configure
+index 593f8b9b9c..cf555564a8 100644
+--- a/toolkit/moz.configure
++++ b/toolkit/moz.configure
+@@ -134,9 +134,12 @@ def all_configure_options():
+             and value.origin not in ("default", "implied", "confvars")
+             and value != option.default
+         ):
+-            result.append(
+-                ensure_unicode(__sandbox__._raw_options[option], system_encoding)
+-            )
++            raw = ensure_unicode(__sandbox__._raw_options[option], system_encoding)
++            # A key file's path is where the builder keeps it, so
++            # about:buildconfig names the option alone.
++            if option.name and option.name.endswith("-keyfile"):
++                raw = raw.split("=", 1)[0]
++            result.append(raw)
+         # We however always include options that are sent to old configure
+         # because we don't know their actual defaults. (Keep the conditions
+         # separate for ease of understanding and ease of removal)

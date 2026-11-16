@@ -1,0 +1,295 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# Sval's own component directory. A file added under here costs no patch
+# against Mozilla's build files beyond the line in browser/components/moz.build
+# that names this directory. Files Sval adds elsewhere in Gecko are wired in by
+# their own patches.
+MOZ_SRC_FILES += [
+    "SvalAddons.sys.mjs",
+    "SvalAddonsNav.sys.mjs",
+    "SvalAgentAlerts.sys.mjs",
+    "SvalAgentArgs.sys.mjs",
+    "SvalAgentAsk.sys.mjs",
+    "SvalAgentBrands.sys.mjs",
+    "SvalAgentChallenge.sys.mjs",
+    "SvalAgentClients.sys.mjs",
+    "SvalAgentConsole.sys.mjs",
+    "SvalAgentControl.sys.mjs",
+    "SvalAgentDownloads.sys.mjs",
+    "SvalAgentFiles.sys.mjs",
+    "SvalAgentGate.sys.mjs",
+    "SvalAgentMarking.sys.mjs",
+    "SvalAgentPageChild.sys.mjs",
+    "SvalAgentPageDialogs.sys.mjs",
+    "SvalAgentPageParent.sys.mjs",
+    "SvalAgentPageTools.sys.mjs",
+    "SvalAgentPolicy.sys.mjs",
+    "SvalAgentPolite.sys.mjs",
+    "SvalAgentRouting.sys.mjs",
+    "SvalAgents.sys.mjs",
+    "SvalAgentSession.sys.mjs",
+    "SvalAgentSnapshot.sys.mjs",
+    "SvalAgentStore.sys.mjs",
+    "SvalAgentTabRegistry.sys.mjs",
+    "SvalAgentTabs.sys.mjs",
+    "SvalAgentTools.sys.mjs",
+    "SvalAgentWire.sys.mjs",
+    "SvalAgentWrites.sys.mjs",
+    "SvalAppNotices.sys.mjs",
+    "SvalArchive.sys.mjs",
+    "SvalBackupKey.sys.mjs",
+    "SvalBlocking.sys.mjs",
+    "SvalBlockingLists.sys.mjs",
+    "SvalBytes.sys.mjs",
+    "SvalCard.sys.mjs",
+    "SvalCardArt.sys.mjs",
+    "SvalCardMotion.sys.mjs",
+    "SvalCardStats.sys.mjs",
+    "SvalChromePages.sys.mjs",
+    "SvalClock.sys.mjs",
+    "SvalColor.sys.mjs",
+    "SvalColorPicker.sys.mjs",
+    "SvalCritical.sys.mjs",
+    "SvalDeviceNames.sys.mjs",
+    "SvalDialog.sys.mjs",
+    "SvalDialogBox.sys.mjs",
+    "SvalDom.sys.mjs",
+    "SvalDownloadsPanel.sys.mjs",
+    "SvalDownloadWorkspaces.sys.mjs",
+    "SvalElementCandidates.sys.mjs",
+    "SvalElementPicker.sys.mjs",
+    "SvalElementPickerChild.sys.mjs",
+    "SvalElementPickerParent.sys.mjs",
+    "SvalElementPointing.sys.mjs",
+    "SvalElementRules.sys.mjs",
+    "SvalEmailMenu.sys.mjs",
+    "SvalEmojiData.sys.mjs",
+    "SvalEmojiPicker.sys.mjs",
+    "SvalEngine.sys.mjs",
+    "SvalExport.sys.mjs",
+    "SvalExportModel.sys.mjs",
+    "SvalExtensionCompat.sys.mjs",
+    "SvalExtensionNotices.sys.mjs",
+    "SvalExtensionSites.sys.mjs",
+    "SvalExtensionsMenu.sys.mjs",
+    "SvalExternalLinks.sys.mjs",
+    "SvalFavoriteIcons.sys.mjs",
+    "SvalFavorites.sys.mjs",
+    "SvalFavoritesMenu.sys.mjs",
+    "SvalFavoritesProvider.sys.mjs",
+    "SvalFavoritesStore.sys.mjs",
+    "SvalFavoritesView.sys.mjs",
+    "SvalFeedback.sys.mjs",
+    "SvalFeedbackForm.sys.mjs",
+    "SvalFingerprinting.sys.mjs",
+    "SvalFirefox.sys.mjs",
+    "SvalFirstRun.sys.mjs",
+    "SvalFirstRunModel.sys.mjs",
+    "SvalForgetSite.sys.mjs",
+    "SvalHeader.sys.mjs",
+    "SvalHeadless.sys.mjs",
+    "SvalHistorySidebar.sys.mjs",
+    "SvalHistorySync.sys.mjs",
+    "SvalHomeFavoritesChild.sys.mjs",
+    "SvalHomeFavoritesParent.sys.mjs",
+    "SvalHomePage.sys.mjs",
+    "SvalHomeSearchChild.sys.mjs",
+    "SvalHomeSearchParent.sys.mjs",
+    "SvalHomeWorkspaceChild.sys.mjs",
+    "SvalHomeWorkspaceParent.sys.mjs",
+    "SvalICloudKeychain.sys.mjs",
+    "SvalIdentity.sys.mjs",
+    "SvalImport.sys.mjs",
+    "SvalImportArc.sys.mjs",
+    "SvalImportArcExport.sys.mjs",
+    "SvalImportChromium.sys.mjs",
+    "SvalImportFiles.sys.mjs",
+    "SvalImportFirefox.sys.mjs",
+    "SvalImportHtml.sys.mjs",
+    "SvalImportLevelDB.sys.mjs",
+    "SvalImportModel.sys.mjs",
+    "SvalImportOrion.sys.mjs",
+    "SvalImportSafari.sys.mjs",
+    "SvalImportSources.sys.mjs",
+    "SvalImportZen.sys.mjs",
+    "SvalJavascript.sys.mjs",
+    "SvalJSONFile.sys.mjs",
+    "SvalKagi.sys.mjs",
+    "SvalKagiPrivacyPass.sys.mjs",
+    "SvalKeyJoin.sys.mjs",
+    "SvalLauncher.sys.mjs",
+    "SvalLauncherCommands.sys.mjs",
+    "SvalLauncherEnter.sys.mjs",
+    "SvalLauncherPrefs.sys.mjs",
+    "SvalLauncherRows.sys.mjs",
+    "SvalLauncherSections.sys.mjs",
+    "SvalLauncherTabs.sys.mjs",
+    "SvalLinkClick.sys.mjs",
+    "SvalLinkDownloads.sys.mjs",
+    "SvalLinkRules.sys.mjs",
+    "SvalLoadLine.sys.mjs",
+    "SvalLocalSettings.sys.mjs",
+    "SvalLog.sys.mjs",
+    "SvalMacWindowOrder.sys.mjs",
+    "SvalMenuBar.sys.mjs",
+    "SvalMirror.sys.mjs",
+    "SvalNewWorkspace.sys.mjs",
+    "SvalNoticesButton.sys.mjs",
+    "SvalPageRules.sys.mjs",
+    "SvalPageRulesChild.sys.mjs",
+    "SvalPageRulesParent.sys.mjs",
+    "SvalPageStyle.sys.mjs",
+    "SvalPageStyleChild.sys.mjs",
+    "SvalPairing.sys.mjs",
+    "SvalPanelModel.sys.mjs",
+    "SvalPanelReveal.sys.mjs",
+    "SvalPasswordManager.sys.mjs",
+    "SvalPeek.sys.mjs",
+    "SvalPinChild.sys.mjs",
+    "SvalPinPages.sys.mjs",
+    "SvalPinParent.sys.mjs",
+    "SvalPins.sys.mjs",
+    "SvalPinsModel.sys.mjs",
+    "SvalPinsRow.sys.mjs",
+    "SvalPinTab.sys.mjs",
+    "SvalPreferences.sys.mjs",
+    "SvalPrivateFile.sys.mjs",
+    "SvalPrivateJars.sys.mjs",
+    "SvalPrivateSession.sys.mjs",
+    "SvalPrivateZoom.sys.mjs",
+    "SvalPromptButtons.sys.mjs",
+    "SvalProtectionButton.sys.mjs",
+    "SvalPush.sys.mjs",
+    "SvalQuickPeek.sys.mjs",
+    "SvalQuickPeekTab.sys.mjs",
+    "SvalRegion.sys.mjs",
+    "SvalReleaseCandidates.sys.mjs",
+    "SvalReloadMenu.sys.mjs",
+    "SvalReport.sys.mjs",
+    "SvalRestore.sys.mjs",
+    "SvalScopeMenu.sys.mjs",
+    "SvalScriptlets.sys.mjs",
+    "SvalSearchConfig.sys.mjs",
+    "SvalSearchKeywords.sys.mjs",
+    "SvalSecretStore.sys.mjs",
+    "SvalSecureDns.sys.mjs",
+    "SvalSerialQueue.sys.mjs",
+    "SvalSettingsRegistry.sys.mjs",
+    "SvalSettingsSync.sys.mjs",
+    "SvalSharedFolder.sys.mjs",
+    "SvalShortcuts.sys.mjs",
+    "SvalSiteControls.sys.mjs",
+    "SvalSiteData.sys.mjs",
+    "SvalSitePermissionList.sys.mjs",
+    "SvalSiteProtections.sys.mjs",
+    "SvalSiteStylePanel.sys.mjs",
+    "SvalSiteStyles.sys.mjs",
+    "SvalSplits.sys.mjs",
+    "SvalStartup.sys.mjs",
+    "SvalSyncableAddress.sys.mjs",
+    "SvalTabActions.sys.mjs",
+    "SvalTabHoverPreview.sys.mjs",
+    "SvalTabs.sys.mjs",
+    "SvalTabSwitcher.sys.mjs",
+    "SvalThemes.sys.mjs",
+    "SvalTimeout.sys.mjs",
+    "SvalTitleHold.sys.mjs",
+    "SvalTrackerOwners.sys.mjs",
+    "SvalTrackingSettings.sys.mjs",
+    "SvalTreeSnapshot.sys.mjs",
+    "SvalUpdateDelay.sys.mjs",
+    "SvalVisitWorkspaces.sys.mjs",
+    "SvalWebDriver.sys.mjs",
+    "SvalWindow.sys.mjs",
+    "SvalWindowsAcl.sys.mjs",
+    "SvalWorkerClient.sys.mjs",
+    "SvalWorkspaceJar.sys.mjs",
+]
+
+EXTRA_COMPONENTS += [
+    "sval.manifest",
+]
+
+# Where Gecko asks Sval about a page's file pickers, downloads and clipboard
+# writes in an agent's tab (SvalAgentFiles.h), and Places a visit's workspace.
+XPIDL_SOURCES += ["nsISvalAgentFiles.idl", "nsISvalVisitWorkspaces.idl"]
+XPIDL_MODULE = "browser_sval"
+EXPORTS.mozilla += ["SvalAgentFiles.h"]
+XPCOM_MANIFESTS += ["components.conf"]
+
+JAR_MANIFESTS += ["jar.mn"]
+
+# Sval's own Fluent strings.
+DIRS += ["locales"]
+
+BROWSER_CHROME_MANIFESTS += [
+    "test/browser/browser-agent-screenshot-video.toml",
+    "test/browser/browser-first-run-closed.toml",
+    "test/browser/browser-first-run-default-answer.toml",
+    "test/browser/browser-first-run-default-browser.toml",
+    "test/browser/browser-first-run-emptied.toml",
+    "test/browser/browser-first-run-escape.toml",
+    "test/browser/browser-first-run-existing.toml",
+    "test/browser/browser-first-run-import.toml",
+    "test/browser/browser-first-run-join-backup.toml",
+    "test/browser/browser-first-run-join-cancel.toml",
+    "test/browser/browser-first-run-join-code.toml",
+    "test/browser/browser-first-run-join-lands.toml",
+    "test/browser/browser-first-run-join-later.toml",
+    "test/browser/browser-first-run-join-waiting.toml",
+    "test/browser/browser-first-run-kagi-later.toml",
+    "test/browser/browser-first-run-kagi.toml",
+    "test/browser/browser-first-run-later.toml",
+    "test/browser/browser-first-run-new-path.toml",
+    "test/browser/browser-first-run-replaced.toml",
+    "test/browser/browser-first-run-second-window.toml",
+    "test/browser/browser-first-run-shared-new.toml",
+    "test/browser/browser-first-run-tour.toml",
+    "test/browser/browser-pairing-code.toml",
+    "test/browser/browser-pairing-join-first.toml",
+    "test/browser/browser-pairing-join.toml",
+    "test/browser/browser-pairing-offer.toml",
+    "test/browser/browser-private-only.toml",
+    "test/browser/browser-sync-key.toml",
+    "test/browser/browser-webgpu.toml",
+    "test/browser/browser.toml",
+]
+
+XPCSHELL_TESTS_MANIFESTS += ["test/xpcshell/xpcshell.toml"]
+
+# The real-share suite. Every task skips unless the nightly job sets
+# SVAL_CI_SHARES=1.
+XPCSHELL_TESTS_MANIFESTS += ["test/shares/xpcshell/xpcshell.toml"]
+BROWSER_CHROME_MANIFESTS += ["test/shares/browser/browser.toml"]
+TESTING_JS_MODULES += ["test/shares/SvalSharesTestUtils.sys.mjs"]
+
+# The suite against the platform's own key store. Every task skips unless the
+# daily CI run sets SVAL_CI_OS_KEYSTORE=1.
+XPCSHELL_TESTS_MANIFESTS += ["test/os-keystore/xpcshell.toml"]
+
+# Temporary files and directories every Sval suite makes, each removed with its
+# test file.
+TESTING_JS_MODULES += ["test/SvalTestTemp.sys.mjs"]
+
+# A clock a test moves by hand, in both suites.
+TESTING_JS_MODULES += ["test/SvalTestClock.sys.mjs"]
+
+# The bound every Sval suite puts on a wait for an event.
+TESTING_JS_MODULES += ["test/SvalTestWait.sys.mjs"]
+
+# A refused read or write, provoked on every platform.
+TESTING_JS_MODULES += ["test/SvalTestDeny.sys.mjs"]
+
+# A failed engine call, which fails its test when it never happened.
+TESTING_JS_MODULES += ["test/SvalTestFault.sys.mjs"]
+
+# The loopback agent client the listener's tests connect with, in both suites.
+TESTING_JS_MODULES += ["test/SvalTestAgentClient.sys.mjs"]
+
+# The state every browser-chrome file starts from, kept for the whole run.
+TESTING_JS_MODULES += ["test/SvalTestSlate.sys.mjs"]
+
+# What the browser-chrome harness removes before every file, Mozilla's
+# included: the workspaces earlier files left.
+TESTING_JS_MODULES += ["test/SvalTestLeftovers.sys.mjs"]

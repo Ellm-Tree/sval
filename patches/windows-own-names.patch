@@ -1,0 +1,212 @@
+Sval: the Windows installer keeps to Sval's own registry keys and files
+
+Firefox and Sval run side by side without touching each other's state.
+Mozilla's installer writes several names that are Firefox's whatever the
+application's identity:
+
+- AppName was "Firefox", so the installer kept the taskbar ids, the
+  32-to-64-bit migration flag, the installer's prefs and the default
+  agent's shortcut under Software\Mozilla\Firefox, where Firefox's
+  WindowsInstallsInfo counts installs and where Sval itself reads
+  Software\Mozilla\Sval (WinTaskbar, UpdateService). AppName is the
+  application's name, as application.ini has it.
+- The uninstaller left Uninstalled-<channel> in Software\Mozilla\Firefox,
+  which BrowserGlue reads and deletes at startup, so uninstalling one app
+  offered the other a reset. Both use the application's own key.
+- The launcher process's key is SOFTWARE\<vendor>\<name>\Launcher
+  (LauncherRegistryInfo::kLauncherSubKeyPath); the installer wrote and
+  cleaned Software\Mozilla\Firefox\Launcher.
+- The installer and every update wrote the legacy
+  Software\mozilla.org\Mozilla CurrentVersion that Firefox also writes, and
+  moved or deleted %LOCALAPPDATA%\Mozilla\Firefox\postSigningData, which is
+  Firefox's.
+- App Paths is keyed by the executable's name, firefox.exe, so installing
+  Sval made "firefox" in Run start Sval, and uninstalling it with no other
+  Sval left removed the key whoever held it. Sval takes the key only when
+  no other install holds it, and removes it only when it is its own.
+
+browser/installer/windows/moz.build passes the application's name and
+vendor to defines.nsi.in.
+
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index d73aed7..6729104 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -837,12 +837,12 @@ BrowserGlue.prototype = {
+       if (updateChannel) {
+         let uninstalledValue = lazy.WindowsRegistry.readRegKey(
+           Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER,
+-          "Software\\Mozilla\\Firefox",
++          `Software\\Mozilla\\${Services.appinfo.name}`,
+           `Uninstalled-${updateChannel}`
+         );
+         let removalSuccessful = lazy.WindowsRegistry.removeRegKey(
+           Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER,
+-          "Software\\Mozilla\\Firefox",
++          `Software\\Mozilla\\${Services.appinfo.name}`,
+           `Uninstalled-${updateChannel}`
+         );
+         if (removalSuccessful && uninstalledValue == "True") {
+diff --git a/browser/installer/windows/moz.build b/browser/installer/windows/moz.build
+index b8a4e8a..0c0bc60 100644
+--- a/browser/installer/windows/moz.build
++++ b/browser/installer/windows/moz.build
+@@ -5,6 +5,8 @@
+ DEFINES["APP_VERSION"] = CONFIG["MOZ_APP_VERSION"]
+ 
+ DEFINES["MOZ_APP_NAME"] = CONFIG["MOZ_APP_NAME"]
++DEFINES["MOZ_APP_BASENAME"] = CONFIG["MOZ_APP_BASENAME"]
++DEFINES["MOZ_APP_VENDOR"] = CONFIG["MOZ_APP_VENDOR"]
+ DEFINES["MOZ_APP_DISPLAYNAME"] = CONFIG["MOZ_APP_DISPLAYNAME"]
+ DEFINES["MOZILLA_VERSION"] = CONFIG["MOZILLA_VERSION"]
+ 
+diff --git a/browser/installer/windows/nsis/defines.nsi.in b/browser/installer/windows/nsis/defines.nsi.in
+index 81a3df5..648640e 100644
+--- a/browser/installer/windows/nsis/defines.nsi.in
++++ b/browser/installer/windows/nsis/defines.nsi.in
+@@ -20,7 +20,7 @@
+ !endif
+ 
+ # These defines should match application.ini settings
+-!define AppName               "Firefox"
++!define AppName               "@MOZ_APP_BASENAME@"
+ !define AppVersion            "@APP_VERSION@"
+ !define GREVersion            @MOZILLA_VERSION@
+ !define AB_CD                 "@AB_CD@"
+@@ -97,7 +97,7 @@
+ 
+ #ifdef MOZ_LAUNCHER_PROCESS
+ !define MOZ_LAUNCHER_PROCESS
+-!define MOZ_LAUNCHER_SUBKEY "Software\Mozilla\${AppName}\Launcher"
++!define MOZ_LAUNCHER_SUBKEY "Software\@MOZ_APP_VENDOR@\${AppName}\Launcher"
+ #endif
+ 
+ #ifdef RELEASE_OR_BETA
+diff --git a/browser/installer/windows/nsis/installer.nsi b/browser/installer/windows/nsis/installer.nsi
+index 5f449be..12b64f7 100755
+--- a/browser/installer/windows/nsis/installer.nsi
++++ b/browser/installer/windows/nsis/installer.nsi
+@@ -313,7 +313,7 @@ Section "-InstallStartCleanup"
+   ${InitHashAppModelId} "$INSTDIR" "Software\Mozilla\${AppName}\TaskBarIDs"
+ 
+   ; Clean up old maintenance service logs
+-  ${CleanMaintenanceServiceLogs} "Mozilla\Firefox"
++  ${CleanMaintenanceServiceLogs} "Mozilla\${AppName}"
+ 
+   ${RemoveDeprecatedFiles}
+   ${RemovePrecompleteEntries} "false"
+@@ -436,11 +436,6 @@ Section "-Application" APP_IDX
+     ${RegCleanMain} "Software\Mozilla"
+     ${RegCleanUninstall}
+     ${UpdateProtocolHandlers}
+-
+-    ReadRegStr $0 HKLM "Software\mozilla.org\Mozilla" "CurrentVersion"
+-    ${If} "$0" != "${GREVersion}"
+-      WriteRegStr HKLM "Software\mozilla.org\Mozilla" "CurrentVersion" "${GREVersion}"
+-    ${EndIf}
+   ${EndIf}
+ 
+   ${RemoveDeprecatedKeys}
+@@ -519,9 +514,23 @@ Section "-Application" APP_IDX
+ 
+   ; These need special handling on uninstall since they may be overwritten by
+   ; an install into a different location.
++  ; App Paths is keyed by the executable's name, which an installed Firefox
++  ; shares, so Sval takes the key only when no other install holds it.
+   StrCpy $0 "Software\Microsoft\Windows\CurrentVersion\App Paths\${FileMainEXE}"
+-  ${WriteRegStr2} $RegHive "$0" "" "$INSTDIR\${FileMainEXE}" 0
+-  ${WriteRegStr2} $RegHive "$0" "Path" "$INSTDIR" 0
++  Push $1
++  Push $2
++  ReadRegStr $1 HKLM "$0" "Path"
++  ReadRegStr $2 HKCU "$0" "Path"
++  ${If} $1 == ""
++  ${OrIf} $1 == "$INSTDIR"
++    ${If} $2 == ""
++    ${OrIf} $2 == "$INSTDIR"
++      ${WriteRegStr2} $RegHive "$0" "" "$INSTDIR\${FileMainEXE}" 0
++      ${WriteRegStr2} $RegHive "$0" "Path" "$INSTDIR" 0
++    ${EndIf}
++  ${EndIf}
++  Pop $2
++  Pop $1
+ 
+   StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\$R9"
+   ${CreateRegKey} "$RegHive" "$0" 0
+diff --git a/browser/installer/windows/nsis/uninstaller.nsi b/browser/installer/windows/nsis/uninstaller.nsi
+index 437138d..9fa7e8c 100755
+--- a/browser/installer/windows/nsis/uninstaller.nsi
++++ b/browser/installer/windows/nsis/uninstaller.nsi
+@@ -474,7 +474,7 @@ Section "Uninstall"
+   ${EndIf}
+ 
+   ; Clean up old maintenance service logs
+-  ${un.CleanMaintenanceServiceLogs} "Mozilla\Firefox"
++  ${un.CleanMaintenanceServiceLogs} "Mozilla\${AppName}"
+ 
+   ; Remove any app model id's stored in the registry for this install path
+   DeleteRegValue HKCU "Software\Mozilla\${AppName}\TaskBarIDs" "$INSTDIR"
+@@ -565,8 +565,15 @@ Section "Uninstall"
+ 
+   StrCpy $0 "Software\Microsoft\Windows\CurrentVersion\App Paths\${FileMainEXE}"
+   ${If} $R9 == "false"
+-    DeleteRegKey HKLM "$0"
+-    DeleteRegKey HKCU "$0"
++    ; An installed Firefox may hold App Paths under the same name.
++    ReadRegStr $R1 HKLM "$0" "Path"
++    ${If} "$R1" == "$INSTDIR"
++      DeleteRegKey HKLM "$0"
++    ${EndIf}
++    ReadRegStr $R1 HKCU "$0" "Path"
++    ${If} "$R1" == "$INSTDIR"
++      DeleteRegKey HKCU "$0"
++    ${EndIf}
+     StrCpy $0 "Software\Microsoft\MediaPlayer\ShimInclusionList\${FileMainEXE}"
+     DeleteRegKey HKLM "$0"
+     DeleteRegKey HKCU "$0"
+@@ -732,7 +739,7 @@ Section "Uninstall"
+   ; subsequently deleted after checking. If the value is found during startup
+   ; the browser will offer to Reset Firefox. We use the UpdateChannel to match
+   ; uninstalls of Firefox-release with reinstalls of Firefox-release, for example.
+-  WriteRegStr HKCU "Software\Mozilla\Firefox" "Uninstalled-${UpdateChannel}" "True"
++  WriteRegStr HKCU "Software\Mozilla\${AppName}" "Uninstalled-${UpdateChannel}" "True"
+ 
+ !ifdef MOZ_MAINTENANCE_SERVICE
+   ; Get the path the allowed cert is at and remove it
+diff --git a/browser/installer/windows/nsis/uninstaller_helpers.nsh b/browser/installer/windows/nsis/uninstaller_helpers.nsh
+index 2a59a3f..c98e5a3 100644
+--- a/browser/installer/windows/nsis/uninstaller_helpers.nsh
++++ b/browser/installer/windows/nsis/uninstaller_helpers.nsh
+@@ -333,11 +333,6 @@
+ 
+     ; Add the Firewall entries after an update
+     Call AddFirewallEntries
+-
+-    ReadRegStr $0 HKLM "Software\mozilla.org\Mozilla" "CurrentVersion"
+-    ${If} "$0" != "${GREVersion}"
+-      WriteRegStr HKLM "Software\mozilla.org\Mozilla" "CurrentVersion" "${GREVersion}"
+-    ${EndIf}
+   ${EndIf}
+ 
+   ${RemoveDeprecatedKeys}
+@@ -383,20 +378,6 @@
+   ; Fix the distribution.ini file if applicable
+   ${FixDistributionsINI}
+ 
+-  ; https://bugzilla.mozilla.org/show_bug.cgi?id=1616355
+-  ; Migrate postSigningData file if present, and if it doesn't already exist.
+-  ${GetLocalAppDataFolder} $0
+-  ${If} ${FileExists} "$INSTDIR\postSigningData"
+-    ; If it already exists, just delete the appdata one.
+-    ; It's possible this was for a different install, but it's impossible to
+-    ; know for sure, so we may as well just get rid of it.
+-    Delete /REBOOTOK "$0\Mozilla\Firefox\postSigningData"
+-  ${Else}
+-    ${If} ${FileExists} "$0\Mozilla\Firefox\postSigningData"
+-      Rename "$0\Mozilla\Firefox\postSigningData" "$INSTDIR\postSigningData"
+-    ${EndIf}
+-  ${EndIf}
+-
+   RmDir /r /REBOOTOK "$INSTDIR\${TO_BE_DELETED}"
+ 
+   ; Register AccessibleMarshal.dll with COM (this requires write access to HKLM)

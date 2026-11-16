@@ -1,0 +1,133 @@
+Sval: each embed shim keeps its own placeholders and observer
+
+Every embed shim in a frame shares one copy of smartblock_embeds_helper.js:
+the shims run in one content script sandbox, and executing the file again
+for the next shim throws on the redeclared const, which lib/shims.js
+swallows. Its placeholders and observer were that copy's globals, so
+unblocking one shim disconnected another's observer and restored every
+shim's embeds while its own observer kept watching, and that observer gave
+its embed its placeholder back.
+
+diff --git a/browser/extensions/webcompat/lib/smartblock_embeds_helper.js b/browser/extensions/webcompat/lib/smartblock_embeds_helper.js
+index f561c1da04..75e7ea0c19 100644
+--- a/browser/extensions/webcompat/lib/smartblock_embeds_helper.js
++++ b/browser/extensions/webcompat/lib/smartblock_embeds_helper.js
+@@ -14,11 +14,11 @@ const SMARTBLOCK_EMBED_OBSERVER_TIMEOUT_MS = 10000;
+  */
+ const embedHelperLib = (() => {
+   let prevRanShims = new Set();
+-  let originalEmbedContainers = [];
+-  let embedPlaceholders = [];
+-  let modifiedContainers = [];
+-  let observerTimeout;
+-  let newEmbedObserver;
++  // Every embed shim in a frame runs in this one library: the shims share a
++  // content script sandbox, and running this file again for the next shim
++  // throws on the redeclared const. Each shim's placeholders and observer are
++  // its own, so that unblocking one shim restores and stops only its embeds.
++  const shimStates = new Map();
+ 
+   function sendMessageToAddon(message, shimId) {
+     return browser.runtime.sendMessage({ message, shimId });
+@@ -34,29 +34,30 @@ const embedHelperLib = (() => {
+     }
+ 
+     if (topic === "smartblock:unblock-embed") {
+-      if (newEmbedObserver) {
+-        newEmbedObserver.disconnect();
+-        newEmbedObserver = null;
++      const state = shimStates.get(handlingShimId);
++      if (state.newEmbedObserver) {
++        state.newEmbedObserver.disconnect();
++        state.newEmbedObserver = null;
+       }
+ 
+-      if (observerTimeout) {
+-        clearTimeout(observerTimeout);
+-        observerTimeout = null;
++      if (state.observerTimeout) {
++        clearTimeout(state.observerTimeout);
++        state.observerTimeout = null;
+       }
+ 
+       // Remove placeholder and restore original containers
+-      embedPlaceholders.forEach((placeholder, idx) => {
+-        const modifiedContainer = modifiedContainers[idx];
+-        const originalContainer = originalEmbedContainers[idx];
++      state.embedPlaceholders.forEach((placeholder, idx) => {
++        const modifiedContainer = state.modifiedContainers[idx];
++        const originalContainer = state.originalEmbedContainers[idx];
+ 
+         // Replace the modified container with the original
+         modifiedContainer.replaceWith(originalContainer);
+       });
+ 
+       // Clear the arrays
+-      embedPlaceholders = [];
+-      modifiedContainers = [];
+-      originalEmbedContainers = [];
++      state.embedPlaceholders = [];
++      state.modifiedContainers = [];
++      state.originalEmbedContainers = [];
+ 
+       // recreate scripts
+       let scriptElement = document.createElement("script");
+@@ -365,9 +366,10 @@ const embedHelperLib = (() => {
+       }
+ 
+       // Save references for later restoration
+-      embedPlaceholders.push(replacementElement);
+-      modifiedContainers.push(replacementElement);
+-      originalEmbedContainers.push(originalContainer);
++      const state = shimStates.get(shimId);
++      state.embedPlaceholders.push(replacementElement);
++      state.modifiedContainers.push(replacementElement);
++      state.originalEmbedContainers.push(originalContainer);
+ 
+       // Replace the original container with our replacement element
+       originalContainer.replaceWith(replacementElement);
+@@ -392,11 +394,12 @@ const embedHelperLib = (() => {
+    * @param {object} SHIM_INFO - Information about the shim wrapped in an object.
+    */
+   function createEmbedMutationObserver(SHIM_INFO) {
+-    const { embedSelector } = SHIM_INFO;
++    const { embedSelector, shimId } = SHIM_INFO;
++    const state = shimStates.get(shimId);
+ 
+     // Monitor for new embeds being added after page load so we can replace them
+     // with placeholders.
+-    newEmbedObserver = new MutationObserver(mutations => {
++    const newEmbedObserver = new MutationObserver(mutations => {
+       for (let { addedNodes, target, type } of mutations) {
+         const nodes = type === "attributes" ? [target] : addedNodes;
+         for (const node of nodes) {
+@@ -426,11 +429,11 @@ const embedHelperLib = (() => {
+       attributeFilter: ["id", "class"],
+     });
+ 
++    state.newEmbedObserver = newEmbedObserver;
++
+     // Disconnect the mutation observer after a fixed (long) timeout to conserve resources.
+-    observerTimeout = setTimeout(() => {
+-      if (newEmbedObserver) {
+-        newEmbedObserver.disconnect();
+-      }
++    state.observerTimeout = setTimeout(() => {
++      newEmbedObserver.disconnect();
+     }, SMARTBLOCK_EMBED_OBSERVER_TIMEOUT_MS);
+   }
+ 
+@@ -473,6 +476,13 @@ const embedHelperLib = (() => {
+     }
+ 
+     prevRanShims.add(shimId);
++    shimStates.set(shimId, {
++      originalEmbedContainers: [],
++      embedPlaceholders: [],
++      modifiedContainers: [],
++      observerTimeout: null,
++      newEmbedObserver: null,
++    });
+ 
+     // Listen for messages from the background script.
+     browser.runtime.onMessage.addListener(request => {

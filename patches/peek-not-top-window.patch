@@ -1,0 +1,112 @@
+Sval: a Peek is neither the frontmost window nor a restored one
+
+A Peek is a full browser window that holds one page from another
+app, in no workspace (SvalPeek). BrowserWindowTracker.getTopWindow
+answers "the window to open this in" for Firefox's callers, a link from
+another app with the Peek turned off among them, and it skips a
+popup for the same reason unless asked. No chrome API takes a window out of
+its answer: a popup's toolbar.visible, the only other way, makes the
+address bar read-only and the titlebar native, and the Peek carries
+the main window's address bar and titlebar.
+
+For the same reason SessionStore's restore of the last closed window, which
+macOS runs for the next window after every one is closed, skips a Peek
+as it skips a popup: the Peek would take that window's tabs.
+
+Firefox's quick actions and search terms persistence ask getTopWindow for
+the window whose address bar is in use, which a Peek's can be: they
+take it with allowPopups, or with only a Peek open they get null and
+throw, and the throw drops every quick action from the address bar.
+
+openPreferences opens Settings in the most recent browser window, a Peek
+among them, whose new tab opens another Peek, or an agent's
+window, whose overlay holds the user's input and whose tabs are the agent's.
+It asks SvalPeek.settingsWindow for the user's own window instead.
+
+diff --git a/browser/modules/BrowserWindowTracker.sys.mjs b/browser/modules/BrowserWindowTracker.sys.mjs
+index d40299f846..f96814ef19 100644
+--- a/browser/modules/BrowserWindowTracker.sys.mjs
++++ b/browser/modules/BrowserWindowTracker.sys.mjs
+@@ -220,7 +220,10 @@ export const BrowserWindowTracker = {
+     for (let win of _trackedWindows) {
+       if (
+         !win.closed &&
+-        (options.allowPopups || win.toolbar.visible) &&
++        // Sval: a Peek holds one page, as a popup does.
++        (options.allowPopups ||
++          (win.toolbar.visible &&
++            !win.document.documentElement.hasAttribute("svalpeek"))) &&
+         (options.allowTaskbarTabs ||
+           !win.document.documentElement.hasAttribute("taskbartab")) &&
+         (!("private" in options) ||
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index 6253d6590a..561ef9644c 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -2218,6 +2218,8 @@ var SessionStoreInternal = {
+     } else if (
+       this._restoreLastWindow &&
+       aWindow.toolbar.visible &&
++      // Sval: a Peek holds one page, as a popup does.
++      !aWindow.document.documentElement.hasAttribute("svalpeek") &&
+       this._closedWindows.length &&
+       !isPrivateWindow
+     ) {
+@@ -2315,7 +2317,11 @@ var SessionStoreInternal = {
+       this._shouldRestoreLastSession = false;
+     }
+ 
+-    if (this._restoreLastWindow && aWindow.toolbar.visible) {
++    if (
++      this._restoreLastWindow &&
++      aWindow.toolbar.visible &&
++      !aWindow.document.documentElement.hasAttribute("svalpeek")
++    ) {
+       // always reset (if not a popup window)
+       // we don't want to restore a window directly after, for example,
+       // undoCloseWindow was executed.
+diff --git a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+index 255d4672fa..21d5bffb39 100644
+--- a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
++++ b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+@@ -52,7 +52,9 @@ let openAddonsUrl = url => {
+   };
+ };
+ 
+-let currentWindow = () => lazy.BrowserWindowTracker.getTopWindow();
++// Sval: the window whose address bar asks, a Peek among them.
++let currentWindow = () =>
++  lazy.BrowserWindowTracker.getTopWindow({ allowPopups: true });
+ let currentBrowser = () => currentWindow().gBrowser.selectedBrowser;
+ 
+ let unmutedAudioTabs = () =>
+diff --git a/browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs b/browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs
+index 2cc6593cdb..db378365dd 100644
+--- a/browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs
++++ b/browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs
+@@ -379,7 +379,8 @@ class _UrlbarSearchTermsPersistence {
+   }
+ 
+   onSearchModeChanged() {
+-    let window = lazy.BrowserWindowTracker.getTopWindow();
++    // Sval: the window whose address bar changed, a Peek among them.
++    let window = lazy.BrowserWindowTracker.getTopWindow({ allowPopups: true });
+     let urlbar = window.gURLBar;
+     if (!urlbar) {
+       return;
+diff --git a/browser/base/content/utilityOverlay.js b/browser/base/content/utilityOverlay.js
+index bdfabc3f75..be11cc9d57 100644
+--- a/browser/base/content/utilityOverlay.js
++++ b/browser/base/content/utilityOverlay.js
+@@ -386,7 +386,10 @@ async function openPreferences(paneID, extraArgs) {
+     });
+   }
+ 
+-  let win = Services.wm.getMostRecentWindow("navigator:browser");
++  // Sval: the user's own window, never a Peek or an agent's.
++  let win = ChromeUtils.importESModule(
++    "moz-src:///browser/components/sval/SvalPeek.sys.mjs"
++  ).SvalPeek.settingsWindow();
+   let friendlyCategoryName = internalPrefCategoryNameToFriendlyName(paneID);
+   let params;
+   if (extraArgs && extraArgs.urlParams) {

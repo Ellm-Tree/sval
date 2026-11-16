@@ -1,0 +1,649 @@
+Sval: Firefox's pages Sval has no use for are not built
+
+Each page is removed from the about: redirect tables and the components.conf
+beside them, and its document from its jar.mn, so the name opens as any
+unknown about: address does (`nsAboutProtocolHandler::NewChannel` answers a
+missing module with NS_ERROR_MALFORMED_URI) and the document is not shipped.
+A name is registered by a contract compiled into libxul, so no chrome API
+removes it. The pages: about:logins and its import report, about:protections,
+about:keyboard, about:welcomeback and the onboarding's document,
+about:studies, about:asrouter, about:messagepreview, about:aichatcontent,
+about:inference, about:mozilla, about:logo, about:unloads, about:telemetry,
+about:glean, about:profiling, about:firefoxview, about:robots, about:sync-log,
+about:profiles, the selectable profiles' pages, about:pdf,
+about:sessionrestore, about:fingerprintingprotection and about:checkerboard.
+Sval replaces each, or has no use for it.
+
+diff --git a/browser/base/jar.mn b/browser/base/jar.mn
+index 416391b3ec..85ec4dc421 100644
+--- a/browser/base/jar.mn
++++ b/browser/base/jar.mn
+@@ -10,7 +10,6 @@ browser.jar:
+         content/browser/aboutDialog.css               (content/aboutDialog.css)
+         content/browser/aboutRestartRequired.js       (content/aboutRestartRequired.js)
+         content/browser/aboutRestartRequired.xhtml    (content/aboutRestartRequired.xhtml)
+-        content/browser/aboutRobots.xhtml             (content/aboutRobots.xhtml)
+         content/browser/aboutRobots.js                (content/aboutRobots.js)
+         content/browser/aboutRobots.css               (content/aboutRobots.css)
+         content/browser/logos/etp-mobile.svg          (content/logos/etp-mobile.svg)
+diff --git a/browser/components/about/AboutRedirector.cpp b/browser/components/about/AboutRedirector.cpp
+index 55ad36042c..77be8eb2cb 100644
+--- a/browser/components/about/AboutRedirector.cpp
++++ b/browser/components/about/AboutRedirector.cpp
+@@ -6,7 +6,6 @@
+ 
+ #include "AboutRedirector.h"
+ #include "nsNetUtil.h"
+-#include "nsIAppStartup.h"
+ #include "nsIChannel.h"
+ #include "nsIURI.h"
+ #include "nsIProtocolHandler.h"
+@@ -16,7 +15,6 @@
+ #include "mozilla/dom/ContentChild.h"
+ #include "mozilla/browser/NimbusFeatures.h"
+ 
+-#define PROFILES_ENABLED_PREF "browser.profiles.enabled"
+ #define ABOUT_WELCOME_CHROME_URL \
+   "chrome://browser/content/aboutwelcome/aboutwelcome.html"
+ #define ABOUT_HOME_URL "about:home"
+@@ -44,16 +42,6 @@ struct RedirEntry {
+     browser/components/about/components.conf
+ */
+ static const RedirEntry kRedirMap[] = {
+-    {"aichatcontent", "chrome://browser/content/aiwindow/aiChatContent.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"asrouter", "chrome://browser/content/asrouter/asrouter-admin.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+     {"blocked", "chrome://browser/content/blockedSite.xhtml",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::URI_CAN_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+@@ -62,25 +50,10 @@ static const RedirEntry kRedirMap[] = {
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::URI_CAN_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"unloads", "chrome://browser/content/tabunloader/aboutUnloads.html",
+-     nsIAboutModule::ALLOW_SCRIPT},
+     {"framecrashed", "chrome://browser/content/aboutFrameCrashed.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::URI_CAN_LOAD_IN_CHILD |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"logins", "chrome://browser/content/aboutlogins/aboutLogins.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI},
+-    {"loginsimportreport",
+-     "chrome://browser/content/aboutlogins/aboutLoginsImportReport.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI},
+-    {"firefoxview", "chrome://browser/content/firefoxview/firefoxview.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+     {"opentabs", "chrome://browser/content/tabbrowser/opentabs.html",
+      nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+@@ -90,32 +63,14 @@ static const RedirEntry kRedirMap[] = {
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::URI_MUST_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+          nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS},
+-    {"profiling",
+-     "chrome://devtools/content/performance-new/aboutprofiling/index.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+-    {"robots", "chrome://browser/content/aboutRobots.xhtml",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::ALLOW_SCRIPT},
+-    {"sessionrestore", "chrome://browser/content/aboutSessionRestore.xhtml",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::HIDE_FROM_ABOUTABOUT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI},
+     {"tabcrashed", "chrome://browser/content/aboutTabCrashed.xhtml",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"welcomeback", "chrome://browser/content/aboutWelcomeBack.xhtml",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::HIDE_FROM_ABOUTABOUT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI},
+     {"welcome", "about:blank",
+      nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+          nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+          nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::ALLOW_SCRIPT},
+-    {"messagepreview",
+-     "chrome://browser/content/messagepreview/messagepreview.html",
+-     nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+     {"settings", "chrome://browser/content/preferences/preferences.xhtml",
+      nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+@@ -130,46 +85,6 @@ static const RedirEntry kRedirMap[] = {
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+     {"restartrequired", "chrome://browser/content/aboutRestartRequired.xhtml",
+      nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"protections", "chrome://browser/content/protections.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::IS_SECURE_CHROME_UI},
+-#ifdef MOZ_NORMANDY
+-    {"studies", "resource://normandy-content/about-studies/about-studies.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT},
+-#endif
+-#ifdef MOZ_SELECTABLE_PROFILES
+-    {"profilemanager", "chrome://browser/content/profiles/profiles.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"editprofile", "chrome://browser/content/profiles/edit-profile.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"deleteprofile", "chrome://browser/content/profiles/delete-profile.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-    {"newprofile", "chrome://browser/content/profiles/new-profile.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-#endif
+-    {"keyboard", "chrome://browser/content/customkeys/customkeys.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::IS_SECURE_CHROME_UI | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS},
+ };
+ 
+ static nsAutoCString GetAboutModuleName(nsIURI* aURI) {
+@@ -196,22 +111,6 @@ AboutRedirector::NewChannel(nsIURI* aURI, nsILoadInfo* aLoadInfo,
+ 
+   nsAutoCString path = GetAboutModuleName(aURI);
+ 
+-  if ((path.EqualsASCII("editprofile") || path.EqualsASCII("deleteprofile") ||
+-       path.EqualsASCII("newprofile")) &&
+-      !mozilla::Preferences::GetBool(PROFILES_ENABLED_PREF, false)) {
+-    return NS_ERROR_NOT_AVAILABLE;
+-  }
+-
+-  if (path.EqualsASCII("profilemanager") &&
+-      !mozilla::Preferences::GetBool(PROFILES_ENABLED_PREF, false)) {
+-    bool startingUp;
+-    nsCOMPtr<nsIAppStartup> appStartup(
+-        mozilla::components::AppStartup::Service());
+-    if (NS_FAILED(appStartup->GetStartingUp(&startingUp)) || !startingUp) {
+-      return NS_ERROR_NOT_AVAILABLE;
+-    }
+-  }
+-
+   for (auto& redir : kRedirMap) {
+     if (!strcmp(path.get(), redir.id)) {
+       nsAutoCString url;
+diff --git a/browser/components/about/components.conf b/browser/components/about/components.conf
+index 2ffc0b624f..9b7e6c64af 100644
+--- a/browser/components/about/components.conf
++++ b/browser/components/about/components.conf
+@@ -3,45 +3,21 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ pages = [
+-    'aichatcontent',
+-    'asrouter',
+     'blocked',
+     'certerror',
+     'downloads',
+     'framecrashed',
+-    'keyboard',
+-    'logins',
+-    'loginsimportreport',
+-    'firefoxview',
+-    'messagepreview',
+     'opentabs',
+     'policies',
+     'preferences',
+     'privatebrowsing',
+-    'protections',
+-    'profiling',
+     'reader',
+     'restartrequired',
+-    'robots',
+-    'sessionrestore',
+     'settings',
+     'tabcrashed',
+-    'unloads',
+     'welcome',
+-    'welcomeback',
+ ]
+ 
+-if buildconfig.substs.get('MOZ_NORMANDY'):
+-    pages += ['studies']
+-
+-if buildconfig.substs.get('MOZ_SELECTABLE_PROFILES'):
+-    pages += [
+-        'deleteprofile',
+-        'editprofile',
+-        'profilemanager',
+-        'newprofile',
+-    ]
+-
+ Classes = [
+     {
+         'cid': '{7e4bb6ad-2fc4-4dc6-89ef-23e8e5ccf980}',
+diff --git a/browser/components/aboutlogins/jar.mn b/browser/components/aboutlogins/jar.mn
+index f0847671ac..f40441e589 100644
+--- a/browser/components/aboutlogins/jar.mn
++++ b/browser/components/aboutlogins/jar.mn
+@@ -48,9 +48,7 @@ browser.jar:
+   content/browser/aboutlogins/icons/intro-illustration.svg               (content/icons/intro-illustration.svg)
+   content/browser/aboutlogins/aboutLogins.css                            (content/aboutLogins.css)
+   content/browser/aboutlogins/aboutLogins.mjs                             (content/aboutLogins.mjs)
+-  content/browser/aboutlogins/aboutLogins.html                           (content/aboutLogins.html)
+   content/browser/aboutlogins/aboutLoginsImportReport.css                (content/aboutLoginsImportReport.css)
+   content/browser/aboutlogins/aboutLoginsImportReport.mjs                 (content/aboutLoginsImportReport.mjs)
+-  content/browser/aboutlogins/aboutLoginsImportReport.html               (content/aboutLoginsImportReport.html)
+   content/browser/aboutlogins/aboutLoginsUtils.mjs                        (content/aboutLoginsUtils.mjs)
+   content/browser/aboutlogins/common.css                                 (content/common.css)
+diff --git a/browser/components/aboutwelcome/jar.mn b/browser/components/aboutwelcome/jar.mn
+index 14365db169..ad5a1002d0 100644
+--- a/browser/components/aboutwelcome/jar.mn
++++ b/browser/components/aboutwelcome/jar.mn
+@@ -5,7 +5,6 @@
+ browser.jar:
+   content/browser/aboutwelcome/aboutwelcome.bundle.js (./content/aboutwelcome.bundle.js)
+   content/browser/aboutwelcome/aboutwelcome.css (./content/aboutwelcome.css)
+-  content/browser/aboutwelcome/aboutwelcome.html (./content/aboutwelcome.html)
+ 
+ # This section is for image assets for about:welcome. These are currently
+ # placed in the chrome://activity-stream/ path to provide backwards compability
+diff --git a/browser/components/aiwindow/ui/jar.mn b/browser/components/aiwindow/ui/jar.mn
+index 7066a99721..12e75c7fcd 100644
+--- a/browser/components/aiwindow/ui/jar.mn
++++ b/browser/components/aiwindow/ui/jar.mn
+@@ -3,7 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ browser.jar:
+-  content/browser/aiwindow/aiChatContent.html                       (content/aiChatContent.html)
+   content/browser/aiwindow/aiWindow.html                            (content/aiWindow.html)
+   content/browser/aiwindow/assets/ai-chat-grid-loading.svg          (assets/ai-chat-grid-loading.svg)
+   content/browser/aiwindow/assets/ask-icon.svg                      (assets/ask-icon.svg)
+diff --git a/browser/components/asrouter/jar.mn b/browser/components/asrouter/jar.mn
+index 9ffcbe424c..44b99875df 100644
+--- a/browser/components/asrouter/jar.mn
++++ b/browser/components/asrouter/jar.mn
+@@ -6,7 +6,6 @@ browser.jar:
+ % resource activity-stream %res/activity-stream/ contentaccessible=yes
+ % content activity-stream %content/activity-stream/ contentaccessible=yes
+   content/activity-stream/data/content/assets/glyph-webextension-16.svg  (content/assets/glyph-webextension-16.svg)
+-  content/browser/asrouter/asrouter-admin.html                           (content/asrouter-admin.html)
+   content/browser/asrouter/asrouter-admin.bundle.js                      (content/asrouter-admin.bundle.js)
+   content/browser/asrouter/components/ASRouterAdmin/ASRouterAdmin.css    (content/components/ASRouterAdmin/ASRouterAdmin.css)
+   content/browser/asrouter/components/menu-message.mjs               (content/components/menu-message/menu-message.mjs)
+diff --git a/browser/components/customkeys/content/jar.mn b/browser/components/customkeys/content/jar.mn
+index 4b841dcfe9..243b5c23a5 100644
+--- a/browser/components/customkeys/content/jar.mn
++++ b/browser/components/customkeys/content/jar.mn
+@@ -4,5 +4,4 @@
+ 
+ browser.jar:
+   content/browser/customkeys/customkeys.css
+-  content/browser/customkeys/customkeys.html
+   content/browser/customkeys/customkeys.js
+diff --git a/browser/components/firefoxview/jar.mn b/browser/components/firefoxview/jar.mn
+index 939cb9185f..e7bb57e166 100644
+--- a/browser/components/firefoxview/jar.mn
++++ b/browser/components/firefoxview/jar.mn
+@@ -8,7 +8,6 @@ browser.jar:
+     content/browser/firefoxview/chats.mjs
+     content/browser/firefoxview/chats-tab-list.css
+     content/browser/firefoxview/chats-tab-list.mjs
+-    content/browser/firefoxview/firefoxview.html
+     content/browser/firefoxview/firefoxview.mjs
+     content/browser/firefoxview/history.css
+     content/browser/firefoxview/history.mjs
+diff --git a/browser/components/messagepreview/jar.mn b/browser/components/messagepreview/jar.mn
+index 592a782d76..296e7313b9 100644
+--- a/browser/components/messagepreview/jar.mn
++++ b/browser/components/messagepreview/jar.mn
+@@ -3,7 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ browser.jar:
+-    content/browser/messagepreview/messagepreview.html
+     content/browser/messagepreview/messagepreview.js
+     content/browser/messagepreview/limelight.svg
+     content/browser/messagepreview/switch.svg
+diff --git a/browser/components/migration/jar.mn b/browser/components/migration/jar.mn
+index bf1d7516ed..f56c6db1bc 100644
+--- a/browser/components/migration/jar.mn
++++ b/browser/components/migration/jar.mn
+@@ -3,7 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ browser.jar:
+-   content/browser/aboutWelcomeBack.xhtml                     (content/aboutWelcomeBack.xhtml)
+    content/browser/migration/migration-dialog-window.html     (content/migration-dialog-window.html)
+    content/browser/migration/migration-dialog-window.js       (content/migration-dialog-window.js)
+    content/browser/migration/migration-wizard.mjs             (content/migration-wizard.mjs)
+diff --git a/browser/components/profiles/jar.mn b/browser/components/profiles/jar.mn
+index b76fe67065..c261ce00aa 100644
+--- a/browser/components/profiles/jar.mn
++++ b/browser/components/profiles/jar.mn
+@@ -8,12 +8,9 @@ browser.jar:
+     content/browser/profiles/avatarSelectionHelpers.mjs (content/avatarSelectionHelpers.mjs)
+     content/browser/profiles/delete-profile-card.css (content/delete-profile-card.css)
+     content/browser/profiles/delete-profile-card.mjs (content/delete-profile-card.mjs)
+-    content/browser/profiles/delete-profile.html    (content/delete-profile.html)
+     content/browser/profiles/edit-profile-card.css (content/edit-profile-card.css)
+     content/browser/profiles/edit-profile-card.mjs (content/edit-profile-card.mjs)
+-    content/browser/profiles/edit-profile.html    (content/edit-profile.html)
+     content/browser/profiles/new-profile-card.mjs (content/new-profile-card.mjs)
+-    content/browser/profiles/new-profile.html     (content/new-profile.html)
+     content/browser/profiles/profile-avatar-selector.css (content/profile-avatar-selector.css)
+     content/browser/profiles/profile-avatar-selector.mjs (content/profile-avatar-selector.mjs)
+     content/browser/profiles/profile-card.css     (content/profile-card.css)
+@@ -23,5 +20,4 @@ browser.jar:
+     content/browser/profiles/profiles-pages.css   (content/profiles-pages.css)
+     content/browser/profiles/profiles-theme-card.css (content/profiles-theme-card.css)
+     content/browser/profiles/profiles-theme-card.mjs (content/profiles-theme-card.mjs)
+-    content/browser/profiles/profiles.html        (content/profiles.html)
+     content/browser/profiles/assets/              (content/assets/*)
+diff --git a/browser/components/protections/jar.mn b/browser/components/protections/jar.mn
+index b3454b70e9..84d38921d4 100644
+--- a/browser/components/protections/jar.mn
++++ b/browser/components/protections/jar.mn
+@@ -8,6 +8,5 @@ browser.jar:
+     content/browser/privacy-metrics-card.mjs               (content/privacy-metrics-card.mjs)
+     content/browser/privacy-metrics-card.css               (content/privacy-metrics-card.css)
+     content/browser/protections.css                       (content/protections.css)
+-    content/browser/protections.html                      (content/protections.html)
+     content/browser/protections.mjs                        (content/protections.mjs)
+     content/browser/vpn-card.mjs                           (content/vpn-card.mjs)
+diff --git a/browser/components/sessionstore/jar.mn b/browser/components/sessionstore/jar.mn
+index b31a4fb351..78c0b0e324 100644
+--- a/browser/components/sessionstore/jar.mn
++++ b/browser/components/sessionstore/jar.mn
+@@ -3,5 +3,4 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ browser.jar:
+-*   content/browser/aboutSessionRestore.xhtml             (content/aboutSessionRestore.xhtml)
+     content/browser/aboutSessionRestore.js                (content/aboutSessionRestore.js)
+diff --git a/browser/components/tabunloader/jar.mn b/browser/components/tabunloader/jar.mn
+index f2b6effcd8..bd9899497b 100644
+--- a/browser/components/tabunloader/jar.mn
++++ b/browser/components/tabunloader/jar.mn
+@@ -4,5 +4,4 @@
+ 
+ browser.jar:
+   content/browser/tabunloader/aboutUnloads.css  (content/aboutUnloads.css)
+-  content/browser/tabunloader/aboutUnloads.html (content/aboutUnloads.html)
+   content/browser/tabunloader/aboutUnloads.js   (content/aboutUnloads.js)
+diff --git a/docshell/base/nsAboutRedirector.cpp b/docshell/base/nsAboutRedirector.cpp
+index 9ae7cf5c1d..b8a95fa365 100644
+--- a/docshell/base/nsAboutRedirector.cpp
++++ b/docshell/base/nsAboutRedirector.cpp
+@@ -100,9 +100,6 @@ static const RedirEntry kRedirMap[] = {
+     {"buildconfig", "chrome://global/content/buildconfig.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::IS_SECURE_CHROME_UI},
+-    {"checkerboard", "chrome://global/content/aboutCheckerboard.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::ALLOW_SCRIPT},
+ #ifndef MOZ_WIDGET_ANDROID
+     {"config", "chrome://global/content/aboutconfig/aboutconfig.html",
+      nsIAboutModule::IS_SECURE_CHROME_UI},
+@@ -115,12 +112,6 @@ static const RedirEntry kRedirMap[] = {
+     {"crashes", "chrome://global/content/crashes.html",
+      nsIAboutModule::IS_SECURE_CHROME_UI},
+ #endif
+-    {"fingerprintingprotection",
+-     "chrome://global/content/usercharacteristics/usercharacteristics.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::HIDE_FROM_ABOUTABOUT | nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS},
+ #ifdef MOZ_WIDGET_ANDROID
+     {"home", "about:blank",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+@@ -131,17 +122,11 @@ static const RedirEntry kRedirMap[] = {
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::URI_CAN_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+-#if defined(NIGHTLY_BUILD)
+-    {"inference", "chrome://global/content/aboutInference.html",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+-#endif
+     {"license", "chrome://global/content/license.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::IS_SECURE_CHROME_UI},
+     {"logging", "chrome://global/content/aboutLogging/aboutLogging.html",
+      nsIAboutModule::ALLOW_SCRIPT},
+-    {"logo", "chrome://branding/content/about.png",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT},
+     {"memory", "chrome://global/content/aboutMemory.xhtml",
+      nsIAboutModule::ALLOW_SCRIPT},
+     {"certificate", "chrome://global/content/certviewer/certviewer.html",
+@@ -150,8 +135,6 @@ static const RedirEntry kRedirMap[] = {
+          nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+          nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+          nsIAboutModule::IS_SECURE_CHROME_UI},
+-    {"mozilla", "chrome://global/content/mozilla.html",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT},
+ #if !defined(ANDROID) && !defined(XP_WIN)
+     {"webauthn", "chrome://global/content/aboutWebauthn.html",
+      nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+@@ -162,14 +145,6 @@ static const RedirEntry kRedirMap[] = {
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+     {"networking", "chrome://global/content/aboutNetworking.html",
+      nsIAboutModule::ALLOW_SCRIPT},
+-#ifndef MOZ_WIDGET_ANDROID
+-    {"pdf", "chrome://global/content/aboutPDF.html",
+-     nsIAboutModule::ALLOW_SCRIPT |
+-         nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
+-         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
+-         nsIAboutModule::IS_SECURE_CHROME_UI},
+-#endif
+     {"performance", "about:processes",
+      nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+@@ -190,10 +165,6 @@ static const RedirEntry kRedirMap[] = {
+     // having to connect the device to a desktop machine and all that entails.
+     {"serviceworkers", "chrome://global/content/aboutServiceWorkers.xhtml",
+      nsIAboutModule::ALLOW_SCRIPT},
+-#ifndef ANDROID
+-    {"profiles", "chrome://global/content/aboutProfiles.xhtml",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+-#endif
+     // about:srcdoc is unresolvable by specification.  It is included here
+     // because the security manager would disallow srcdoc iframes otherwise.
+     {"srcdoc", "about:blank",
+@@ -209,15 +180,6 @@ static const RedirEntry kRedirMap[] = {
+     {"windows-messages", "chrome://global/content/aboutWindowsMessages.html",
+      nsIAboutModule::ALLOW_SCRIPT},
+ #endif
+-#ifndef MOZ_GLEAN_ANDROID
+-    {"glean", "chrome://global/content/aboutGlean.html",
+-#  if !defined(NIGHTLY_BUILD) && defined(MOZILLA_OFFICIAL)
+-     nsIAboutModule::HIDE_FROM_ABOUTABOUT |
+-#  endif
+-         nsIAboutModule::ALLOW_SCRIPT},
+-#endif
+-    {"telemetry", "chrome://global/content/aboutTelemetry.xhtml",
+-     nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+ #ifndef MOZ_WIDGET_ANDROID
+     {"translations",
+      "chrome://global/content/translations/about-translations.html",
+diff --git a/docshell/build/components.conf b/docshell/build/components.conf
+index 9f69506e15..b91e673059 100644
+--- a/docshell/build/components.conf
++++ b/docshell/build/components.conf
+@@ -6,19 +6,15 @@ about_pages = [
+     'about',
+     'buildconfig',
+     'certificate',
+-    'checkerboard',
+     'config',
+     'crashcontent',
+     'crashparent',
+     'crashgpu',
+     'crashextensions',
+-    'fingerprintingprotection',
+     'httpsonlyerror',
+     'license',
+     'logging',
+-    'logo',
+     'memory',
+-    'mozilla',
+     'neterror',
+     'networking',
+     'performance',
+@@ -27,7 +23,6 @@ about_pages = [
+     'serviceworkers',
+     'srcdoc',
+     'support',
+-    'telemetry',
+     'url-classifier',
+     'webrtc',
+ ]
+@@ -37,9 +32,6 @@ if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] != 'android':
+ if defined('MOZ_CRASHREPORTER'):
+     about_pages.append('crashes')
+ if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] != 'android':
+-    about_pages.append('profiles')
+-if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] != 'android':
+-    about_pages.append('pdf')
+     about_pages.append('translations')
+ if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] == 'android':
+     about_pages.append('crashcontentjava')
+@@ -47,12 +39,8 @@ if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] == 'android':
+ if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] == 'windows':
+     about_pages.append('third-party')
+     about_pages.append('windows-messages')
+-if not defined('MOZ_GLEAN_ANDROID'):
+-    about_pages.append('glean')
+ if buildconfig.substs['MOZ_WIDGET_TOOLKIT'] != 'android' and buildconfig.substs['MOZ_WIDGET_TOOLKIT'] != 'windows':
+     about_pages.append('webauthn')
+-if defined('NIGHTLY_BUILD'):
+-    about_pages.append('inference')
+ 
+ Headers = ['/docshell/build/nsDocShellModule.h']
+ 
+diff --git a/services/sync/components.conf b/services/sync/components.conf
+index a750487481..592d6e4f4f 100644
+--- a/services/sync/components.conf
++++ b/services/sync/components.conf
+@@ -9,10 +9,4 @@ Classes = [
+         'esModule': 'resource://services-sync/Weave.sys.mjs',
+         'constructor': 'WeaveService',
+     },
+-    {
+-        'cid': '{d28f8a0b-95da-48f4-b712-caf37097be41}',
+-        'contract_ids': ['@mozilla.org/network/protocol/about;1?what=sync-log'],
+-        'esModule': 'resource://services-sync/Weave.sys.mjs',
+-        'constructor': 'AboutWeaveLog',
+-    },
+ ]
+diff --git a/toolkit/components/aboutcheckerboard/jar.mn b/toolkit/components/aboutcheckerboard/jar.mn
+index 5d8cd6729d..5acdcda8c5 100644
+--- a/toolkit/components/aboutcheckerboard/jar.mn
++++ b/toolkit/components/aboutcheckerboard/jar.mn
+@@ -4,5 +4,4 @@
+ 
+ toolkit.jar:
+   content/global/aboutCheckerboard.js           (content/aboutCheckerboard.js)
+-  content/global/aboutCheckerboard.html        (content/aboutCheckerboard.html)
+   content/global/aboutCheckerboard.css          (content/aboutCheckerboard.css)
+diff --git a/toolkit/components/aboutinference/jar.mn b/toolkit/components/aboutinference/jar.mn
+index 5259e95638..f32c3e3188 100644
+--- a/toolkit/components/aboutinference/jar.mn
++++ b/toolkit/components/aboutinference/jar.mn
+@@ -3,7 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ toolkit.jar:
+-  content/global/aboutInference.html                (content/aboutInference.html)
+   content/global/aboutInference.js                  (content/aboutInference.js)
+   content/global/aboutInference.css                 (content/aboutInference.css)
+   content/global/model-files-view.mjs               (content/model-files-view.mjs)
+diff --git a/toolkit/components/aboutpdf/jar.mn b/toolkit/components/aboutpdf/jar.mn
+index 1ffcf86a8e..aa1e347380 100644
+--- a/toolkit/components/aboutpdf/jar.mn
++++ b/toolkit/components/aboutpdf/jar.mn
+@@ -3,6 +3,5 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ toolkit.jar:
+-  content/global/aboutPDF.html    (content/aboutPDF.html)
+   content/global/aboutPDF.mjs     (content/aboutPDF.mjs)
+   content/global/aboutPDF.css     (content/aboutPDF.css)
+diff --git a/toolkit/components/normandy/jar.mn b/toolkit/components/normandy/jar.mn
+index ff3dbfb319..c918a81d71 100644
+--- a/toolkit/components/normandy/jar.mn
++++ b/toolkit/components/normandy/jar.mn
+@@ -13,7 +13,7 @@ toolkit.jar:
+   res/normandy/schemas/ (./schemas/*.schema.json)
+ 
+ % resource normandy-content %res/normandy/content/ contentaccessible=yes
+-  res/normandy/content/ (./content/*)
++  res/normandy/content/ (./content/*.sys.mjs)
+ 
+ % resource normandy-vendor %res/normandy/vendor/ contentaccessible=yes
+   res/normandy/vendor/ (./vendor/*)
+diff --git a/toolkit/components/resistfingerprinting/jar.mn b/toolkit/components/resistfingerprinting/jar.mn
+index 3d71f08c19..f0560bab14 100644
+--- a/toolkit/components/resistfingerprinting/jar.mn
++++ b/toolkit/components/resistfingerprinting/jar.mn
+@@ -7,6 +7,5 @@ toolkit.jar:
+   content/global/usercharacteristics/gl-matrix.js (content/gl-matrix.js)
+   content/global/usercharacteristics/ssdeep.js (content/ssdeep.js)
+   content/global/usercharacteristics/usercharacteristics.css (content/usercharacteristics.css)
+-  content/global/usercharacteristics/usercharacteristics.html (content/usercharacteristics.html)
+   content/global/usercharacteristics/usercharacteristics.js (content/usercharacteristics.js)
+   content/global/usercharacteristics/usercharacteristics.woff (content/usercharacteristics.woff)
+diff --git a/toolkit/content/jar.mn b/toolkit/content/jar.mn
+index 27c97a5166..92bc1d8697 100644
+--- a/toolkit/content/jar.mn
++++ b/toolkit/content/jar.mn
+@@ -20,7 +20,6 @@ toolkit.jar:
+    content/global/aboutNetworking.html
+ #ifndef ANDROID
+    content/global/aboutProfiles.js
+-   content/global/aboutProfiles.xhtml
+ #endif
+    content/global/aboutServiceWorkers.js
+    content/global/aboutServiceWorkers.xhtml
+@@ -39,11 +38,9 @@ toolkit.jar:
+ *  content/global/aboutSupport.xhtml
+ #ifndef MOZ_GLEAN_ANDROID
+    content/global/aboutGlean.js
+-   content/global/aboutGlean.html
+    content/global/aboutGlean.css
+ #endif
+    content/global/aboutTelemetry.js
+-   content/global/aboutTelemetry.xhtml
+    content/global/aboutTelemetry.css
+    content/global/aboutUrlClassifier.js
+    content/global/aboutUrlClassifier.xhtml
+@@ -58,7 +55,6 @@ toolkit.jar:
+    content/global/filepicker.properties
+    content/global/customElements.js
+    content/global/globalOverlay.js
+-   content/global/mozilla.html
+    content/global/aboutMozilla.css
+    content/global/preferencesBindings.js
+    content/global/preferences/AsyncSetting.mjs  (preferences/AsyncSetting.mjs)

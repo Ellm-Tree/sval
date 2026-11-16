@@ -1,0 +1,85 @@
+Sval: Gecko's tooling takes the executable's name from MOZ_APP_NAME
+
+Sval's executable is sval (MOZ_APP_NAME), so that its process name and the
+Windows registrations keyed by the executable are not an installed
+Firefox's. Mozilla's tooling assumed the name is "firefox" in four places:
+
+- The artifact code looked for firefox/ in every package it unpacks. A
+  package's top directory and its binaries are MOZ_APP_NAME
+  (package-name.mk, browser/app/moz.build), so it reads that from the
+  build. The taskcluster index keeps its own product.
+- mozinfo's appname is what the test harnesses and manifests key a
+  browser build on: xpcshell's firefox-appdir, mozrunner's FirefoxRunner
+  and FirefoxProfile, and appname conditions. A browser build is "firefox"
+  to them whatever its executable is called.
+- The mochitest harness on Windows treated a live process as the browser
+  only when its image was firefox.exe, so it could not find a sval.exe
+  left running after a test.
+- Extension.sys.mjs took normandyAddonStudy off the privileged
+  permissions in any application not called firefox, so any extension
+  could have asked Sval for the API browser/components/extensions
+  provides. It keys on the build app, browser, as Firefox's is.
+
+diff --git a/python/mozbuild/mozbuild/artifacts.py b/python/mozbuild/mozbuild/artifacts.py
+index 5bb72e9392..c543ed5215 100644
+--- a/python/mozbuild/mozbuild/artifacts.py
++++ b/python/mozbuild/mozbuild/artifacts.py
+@@ -533,6 +533,11 @@ class ArtifactJob:
+ 
+     @property
+     def product(self):
++        # A package's top directory and its binaries take the executable's
++        # name (package-name.mk, browser/app/moz.build), which a build can set
++        # apart from the product in the index namespace.
++        if self._substs and "MOZ_APP_NAME" in self._substs:
++            return self._substs["MOZ_APP_NAME"]
+         return self.job_configuration.product
+ 
+     @property
+diff --git a/python/mozbuild/mozbuild/mozinfo.py b/python/mozbuild/mozbuild/mozinfo.py
+index 08e9ca8068..0e5817e977 100644
+--- a/python/mozbuild/mozbuild/mozinfo.py
++++ b/python/mozbuild/mozbuild/mozinfo.py
+@@ -44,8 +44,12 @@ def build_dict(config, env=os.environ):
+     # Widget toolkit, just pass the value directly through.
+     d["toolkit"] = substs.get("MOZ_WIDGET_TOOLKIT")
+ 
+-    # Application name
+-    if "MOZ_APP_NAME" in substs:
++    # Application name. The harnesses and manifests know a browser build as
++    # "firefox" (xpcshell's firefox-appdir, mozrunner's FirefoxRunner,
++    # appname conditions), whatever executable name MOZ_APP_NAME gives it.
++    if substs.get("MOZ_BUILD_APP") == "browser":
++        d["appname"] = "firefox"
++    elif "MOZ_APP_NAME" in substs:
+         d["appname"] = substs["MOZ_APP_NAME"]
+ 
+     # Build app name
+diff --git a/testing/mochitest/runtests.py b/testing/mochitest/runtests.py
+index e18b27abf1..5d0070e5c6 100644
+--- a/testing/mochitest/runtests.py
++++ b/testing/mochitest/runtests.py
+@@ -511,7 +511,9 @@ if mozinfo.isWin:
+                 # Still an active process, so conservatively assume it's Firefox.
+                 return True
+ 
+-            return pName.value.endswith((b"firefox.exe", b"plugin-container.exe"))
++            return pName.value.endswith(
++                (b"firefox.exe", b"sval.exe", b"plugin-container.exe")
++            )
+         finally:
+             ctypes.windll.kernel32.CloseHandle(pHandle)
+ 
+diff --git a/toolkit/components/extensions/Extension.sys.mjs b/toolkit/components/extensions/Extension.sys.mjs
+index a4d103eefa..cfa1d58010 100644
+--- a/toolkit/components/extensions/Extension.sys.mjs
++++ b/toolkit/components/extensions/Extension.sys.mjs
+@@ -212,7 +212,7 @@ if (AppConstants.platform == "android") {
+ }
+ 
+ if (
+-  AppConstants.MOZ_APP_NAME != "firefox" ||
++  AppConstants.MOZ_BUILD_APP != "browser" ||
+   AppConstants.platform == "android"
+ ) {
+   for (const perm of PRIVILEGED_PERMS_DESKTOP_ONLY) {

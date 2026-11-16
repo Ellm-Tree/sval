@@ -1,0 +1,63 @@
+Sval: Space after an @ word picks the engine Tab would
+
+Tab completes an @ word to the first engine with a keyword the word
+begins (UrlbarProviderTokenAliasEngines), while Space searched only an
+engine whose whole keyword the word is (UrlbarProviderAliasEngines), so
+"@k" and Space searched the default engine for "@k" where Tab picked
+Kagi. Both keys take their engine from SvalSearchKeywords, which also
+lets a whole keyword win over a longer one it begins, so "@b" picks
+Bing ahead of Brave Search's "@br".
+
+diff --git a/browser/components/urlbar/UrlbarProviderAliasEngines.sys.mjs b/browser/components/urlbar/UrlbarProviderAliasEngines.sys.mjs
+index 7971d11082..fd81fdf19f 100644
+--- a/browser/components/urlbar/UrlbarProviderAliasEngines.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderAliasEngines.sys.mjs
+@@ -15,6 +15,8 @@ import {
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
++  SvalSearchKeywords:
++    "moz-src:///browser/components/sval/SvalSearchKeywords.sys.mjs",
+   UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
+   UrlbarSearchUtils:
+     "moz-src:///browser/components/urlbar/UrlbarSearchUtils.sys.mjs",
+@@ -61,6 +63,12 @@ export class UrlbarProviderAliasEngines extends UrlbarProvider {
+       alias,
+       queryContext.searchString
+     );
++    // Sval: an `@` word picks the engine Tab would complete it to
++    // (SvalSearchKeywords), so `@k ` searches Kagi.
++    engine ??= await lazy.SvalSearchKeywords.engineBegun(
++      alias,
++      queryContext.searchString
++    );
+     let icon = await engine?.getIconURL();
+     if (!engine || instance != this.queryInstance) {
+       return;
+diff --git a/browser/components/urlbar/UrlbarProviderTokenAliasEngines.sys.mjs b/browser/components/urlbar/UrlbarProviderTokenAliasEngines.sys.mjs
+index f74e9cb6eb..f855bf497e 100644
+--- a/browser/components/urlbar/UrlbarProviderTokenAliasEngines.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderTokenAliasEngines.sys.mjs
+@@ -14,6 +14,8 @@ import {
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
++  SvalSearchKeywords:
++    "moz-src:///browser/components/sval/SvalSearchKeywords.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+   UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
+   UrlbarSearchUtils:
+@@ -171,7 +173,12 @@ export class UrlbarProviderTokenAliasEngines extends UrlbarProvider {
+     let { lowerCaseSearchString } = queryContext;
+ 
+     // The user is typing a specific engine. We should show a heuristic result.
+-    for (let { engine, tokenAliases } of this._engines) {
++    // Sval: an engine's whole keyword picks it ahead of a longer keyword the
++    // word begins, as Space does (SvalSearchKeywords).
++    for (let { engine, tokenAliases } of lazy.SvalSearchKeywords.ordered(
++      this._engines,
++      lowerCaseSearchString
++    )) {
+       for (let alias of tokenAliases) {
+         if (alias.startsWith(lowerCaseSearchString)) {
+           // We found the engine.

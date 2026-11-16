@@ -1,0 +1,77 @@
+Sval: list only the OS's own speech voices for the UI language
+
+A new RFPTarget, SpeechVoicesDefault, limits speechSynthesis.getVoices to
+the OS's default voice and the voices for the UI language the user did not
+download, so neither installed voices nor the OS's full voice set reaches a
+page while speech keeps working. It is Doc-gated, so granularOverrides gives
+a site the full list.
+
+Gecko's backends cannot all tell a shipped voice from a downloaded one.
+macOS can, by identifier: voices downloaded in Settings are
+com.apple.voice.enhanced.* and com.apple.voice.premium.*, and
+SvalRFPService::IsDefaultSpeechVoice hides them. SapiService (Windows) and
+SpeechDispatcherService (Linux) register only a name, language and URI with
+no such mark, so there the list is limited by language alone. The macOS
+identifier scheme is Apple's, read from AVSpeechSynthesisVoice identifiers;
+it was not checked against a downloaded voice.
+
+No chrome API can change what SpeechSynthesis::GetVoices lists.
+
+diff --git a/dom/media/webspeech/synth/SpeechSynthesis.cpp b/dom/media/webspeech/synth/SpeechSynthesis.cpp
+index d432253d4b..7e95ab3f38 100644
+--- a/dom/media/webspeech/synth/SpeechSynthesis.cpp
++++ b/dom/media/webspeech/synth/SpeechSynthesis.cpp
+@@ -9,11 +9,13 @@
+ #include "mozilla/dom/Element.h"
+ #include "mozilla/dom/SpeechSynthesisBinding.h"
+ #include "mozilla/dom/WindowGlobalChild.h"
++#include "mozilla/intl/LocaleService.h"
+ #include "nsContentUtils.h"
+ #include "nsGlobalWindowInner.h"
+ #include "nsIDocShell.h"
+ #include "nsISupportsPrimitives.h"
+ #include "nsPIDOMWindowInlines.h"
++#include "nsRFPService.h"
+ #include "nsSpeechTask.h"
+ #include "nsSynthVoiceRegistry.h"
+ 
+@@ -236,6 +238,20 @@ void SpeechSynthesis::GetVoices(
+     return;
+   }
+ 
++  bool defaultVoicesOnly =
++      window && window->AsGlobal()->ShouldResistFingerprinting(
++                    RFPTarget::SpeechVoicesDefault);
++  nsAutoString uiLanguage;
++  if (defaultVoicesOnly) {
++    nsAutoCString appLocale;
++    intl::LocaleService::GetInstance()->GetAppLocaleAsBCP47(appLocale);
++    int32_t separator = appLocale.FindChar('-');
++    if (separator >= 0) {
++      appLocale.Truncate(separator);
++    }
++    CopyASCIItoUTF16(appLocale, uiLanguage);
++  }
++
+   nsISupports* voiceParent = NS_ISUPPORTS_CAST(nsIObserver*, this);
+ 
+   for (uint32_t i = 0; i < voiceCount; i++) {
+@@ -247,6 +263,18 @@ void SpeechSynthesis::GetVoices(
+       continue;
+     }
+ 
++    if (defaultVoicesOnly) {
++      nsAutoString lang;
++      bool isDefault = false;
++      (void)nsSynthVoiceRegistry::GetInstance()->GetVoiceLang(uri, lang);
++      (void)nsSynthVoiceRegistry::GetInstance()->IsDefaultVoice(uri,
++                                                               &isDefault);
++      if (!SvalRFPService::IsDefaultSpeechVoice(uri, lang, isDefault,
++                                               uiLanguage)) {
++        continue;
++      }
++    }
++
+     SpeechSynthesisVoice* voice = mVoiceCache.GetWeak(uri);
+ 
+     if (!voice) {

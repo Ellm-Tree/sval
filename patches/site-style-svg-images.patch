@@ -1,0 +1,126 @@
+Sval: draw an SVG image with the site style of the page showing it
+
+An SVG image is a document of its own with no BrowsingContext, so it would
+keep its colors while the page around it is tinted or dark. The page's
+style travels in the SVGImageContext, which keys the image's cached
+renderings, and the image's pres context paints with it.
+
+diff --git a/image/AutoRestoreSVGState.h b/image/AutoRestoreSVGState.h
+index 984cfaa782..e35d03af41 100644
+--- a/image/AutoRestoreSVGState.h
++++ b/image/AutoRestoreSVGState.h
+@@ -52,6 +52,7 @@ class MOZ_STACK_CLASS AutoRestoreSVGState final {
+         }
+         return dom::PrefersColorSchemeOverride::None;
+       }());
++      pc->SetSvalSiteStyleOverride(aSVGContext.GetSvalSiteStyle());
+     }
+ 
+     // Set context paint (if specified) on the document:
+diff --git a/layout/base/nsPresContext.h b/layout/base/nsPresContext.h
+index 68726c6802..bcd6344716 100644
+--- a/layout/base/nsPresContext.h
++++ b/layout/base/nsPresContext.h
+@@ -21,6 +21,7 @@
+ #include "mozilla/PreferenceSheet.h"
+ #include "mozilla/PresShellForwards.h"
+ #include "mozilla/ScrollStyles.h"
++#include "mozilla/SvalSiteStyleColors.h"
+ #include "mozilla/TimeStamp.h"
+ #include "mozilla/UniquePtr.h"
+ #include "mozilla/WeakPtr.h"
+@@ -593,6 +594,16 @@ class nsPresContext : public nsISupports,
+    */
+   void SetColorSchemeOverride(mozilla::dom::PrefersColorSchemeOverride);
+ 
++  // An SVG image's document has no BrowsingContext to carry the site style
++  // of the page drawing it, so the page hands its style to the image here.
++  void SetSvalSiteStyleOverride(const mozilla::SvalSiteStyle& aStyle) {
++    mSvalSiteStyleOverride = aStyle;
++    mHasSvalSiteStyleOverride = true;
++  }
++  const mozilla::SvalSiteStyle* GetSvalSiteStyleOverride() const {
++    return mHasSvalSiteStyleOverride ? &mSvalSiteStyleOverride : nullptr;
++  }
++
+   /**
+    * Sets the effective link parameters overrides, and invalidate stuff as
+    * needed.
+@@ -1438,6 +1449,8 @@ class nsPresContext : public nsISupports,
+   mozilla::dom::PrefersColorSchemeOverride mOverriddenOrEmbedderColorScheme;
+   mozilla::StyleForcedColors mForcedColors;
+   mozilla::StyleLinkParameters mLinkParameters;
++  mozilla::SvalSiteStyle mSvalSiteStyleOverride;
++  bool mHasSvalSiteStyleOverride = false;
+ 
+  protected:
+   virtual ~nsPresContext();
+diff --git a/layout/svg/SVGImageContext.cpp b/layout/svg/SVGImageContext.cpp
+index 384401ae2c..ff1829ea98 100644
+--- a/layout/svg/SVGImageContext.cpp
++++ b/layout/svg/SVGImageContext.cpp
+@@ -50,6 +50,9 @@ void SVGImageContext::MaybeStoreContextPaint(SVGImageContext& aContext,
+     }
+   }
+ 
++  aContext.SetSvalSiteStyle(
++      SvalSiteStyle::Of(aPresContext.Document()->GetBrowsingContext()));
++
+   const nsStyleSVG* style = aStyle.StyleSVG();
+   if (!style->ExposesContextProperties()) {
+     // Content must have '-moz-context-properties' set to the names of the
+diff --git a/layout/svg/SVGImageContext.h b/layout/svg/SVGImageContext.h
+index b1f8119896..707d041649 100644
+--- a/layout/svg/SVGImageContext.h
++++ b/layout/svg/SVGImageContext.h
+@@ -9,6 +9,7 @@
+ #include "mozilla/Maybe.h"
+ #include "mozilla/SVGContextPaint.h"
+ #include "mozilla/SVGPreserveAspectRatio.h"
++#include "mozilla/SvalSiteStyleColors.h"
+ 
+ class nsIFrame;
+ class nsISVGPaintContext;
+@@ -75,6 +76,14 @@ class SVGImageContext {
+     mColorScheme = aScheme;
+   }
+ 
++  // The site style of the page drawing the image, which the image's own
++  // document paints with.
++  const SvalSiteStyle& GetSvalSiteStyle() const { return mSvalSiteStyle; }
++
++  void SetSvalSiteStyle(const SvalSiteStyle& aStyle) {
++    mSvalSiteStyle = aStyle;
++  }
++
+   const Maybe<SVGPreserveAspectRatio>& GetPreserveAspectRatio() const {
+     return mPreserveAspectRatio;
+   }
+@@ -116,7 +125,8 @@ class SVGImageContext {
+     return contextPaintIsEqual && mViewportSize == aOther.mViewportSize &&
+            mPreserveAspectRatio == aOther.mPreserveAspectRatio &&
+            mColorScheme == aOther.mColorScheme &&
+-           mLinkParameters == aOther.mLinkParameters;
++           mLinkParameters == aOther.mLinkParameters &&
++           mSvalSiteStyle == aOther.mSvalSiteStyle;
+   }
+ 
+   bool operator!=(const SVGImageContext&) const = default;
+@@ -129,7 +139,8 @@ class SVGImageContext {
+     return HashGeneric(hash, mViewportSize.map(HashSize).valueOr(0),
+                        mPreserveAspectRatio.map(HashPAR).valueOr(0),
+                        mColorScheme.map(HashColorScheme).valueOr(0),
+-                       HashLinkParameters(mLinkParameters));
++                       HashLinkParameters(mLinkParameters),
++                       mSvalSiteStyle.Hash());
+   }
+ 
+  private:
+@@ -167,6 +178,7 @@ class SVGImageContext {
+   Maybe<SVGPreserveAspectRatio> mPreserveAspectRatio;
+   Maybe<ColorScheme> mColorScheme;
+   StyleLinkParameters mLinkParameters;
++  SvalSiteStyle mSvalSiteStyle;
+ };
+ 
+ }  // namespace mozilla

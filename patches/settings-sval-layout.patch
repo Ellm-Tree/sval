@@ -1,0 +1,354 @@
+Sval: Settings' categories are Sval's
+
+Sval's settings are its own categories (Sval spec §10.8), and several of
+Firefox's setting groups belong to a different category in Sval than in
+Firefox. A category's groups are its `groupIds` in `CONFIG_PANES`, and that
+list is what the page renders and what settings search reports each group
+under, so the groups move there and nowhere else. A sub-page's `parent`
+follows its groups. Enhanced Tracking Protection's pages are not panes, and its
+status card is not in Privacy and protection: Sval's cards there replace them,
+and its advanced settings hold the prefs they reached (protections spec §3.3).
+Home and startup becomes Workspaces, Privacy and security becomes Privacy and
+protection, and Search becomes Search and Launcher, in the messages that name
+them in the nav, the heading and breadcrumbs. Permissions and data shows
+nothing: Sites, a category of Sval's, holds the permission defaults and each
+site's permissions, and Extensions the add-on install warning (Sval decision
+1484).
+
+An address naming a category whose groups moved (from a bookmark, a restored
+tab, or Firefox's own code) lands on the category that holds them:
+`resolveLegacyCategory` is how `gotoPref` already resolves a moved category,
+and its map is the one place that names destinations.
+
+Firefox's import and export group is in Workspaces alone, so General's list
+drops it. DNS over HTTPS is Privacy and protection's Secure DNS card, Sval's
+own file built from Firefox's DoH settings, so the category does not list
+Firefox's DoH group, its sub-page holds nothing, and an address naming either
+lands on the card. Cookies and site data is a card of Sval's too, built from
+Firefox's own site data settings with Sval's cookie choice, so Firefox's group
+is not listed. Certificates and the proxy are in no category's list: Privacy
+and protection's Advanced, a section of Sval's, draws them.
+
+diff --git a/browser/components/preferences/config/LegacyPaneMappings.mjs b/browser/components/preferences/config/LegacyPaneMappings.mjs
+index 689281d..60cdd89 100644
+--- a/browser/components/preferences/config/LegacyPaneMappings.mjs
++++ b/browser/components/preferences/config/LegacyPaneMappings.mjs
+@@ -90,6 +90,57 @@ export const LEGACY_PANE_MAPPINGS = new Map([
+     { category: "passwordsAutofill", subcategory: "address-autofill" },
+   ],
+   ["privacy-logins", { category: "passwordsAutofill", subcategory: "logins" }],
++
++  // Sval: categories whose topics moved to another. Sval turns off Firefox's
++  // password manager and autofill, and Sval's password setting is in Privacy.
++  // A key given twice takes its last entry.
++  ["passwordsAutofill", { category: "privacy" }],
++  ["privacy-logins", { category: "privacy" }],
++  ["privacy-payment-methods-autofill", { category: "privacy" }],
++  ["privacy-credit-card-autofill", { category: "privacy" }],
++  ["privacy-addresses-autofill", { category: "privacy" }],
++  ["privacy-address-autofill", { category: "privacy" }],
++  ["svalDevices", { category: "svalSync" }],
++  ["svalDevices-offer", { category: "svalSync", subcategory: "offer" }],
++  ["svalDevices-claim", { category: "svalSync", subcategory: "claim" }],
++  ["svalAds", { category: "privacy" }],
++  ["svalWorkspaces", { category: "home" }],
++  ["tabsBrowsing", { category: "home" }],
++  ["downloads", { category: "sync" }],
++  ["languages", { category: "sync" }],
++  ["accessibility", { category: "appearance" }],
++  ["general-drm", { category: "sync", subcategory: "drm" }],
++  ["general-link-preview", { category: "sync", subcategory: "link-preview" }],
++  ["general-fxtranslations", { category: "sync", subcategory: "translations" }],
++  ["general-translations", { category: "sync", subcategory: "translations" }],
++  // Sval's cards in Privacy and protection replace Enhanced Tracking
++  // Protection's pages, and its advanced tracking settings hold the prefs
++  // they reached.
++  [
++    "privacy-trackingprotection",
++    { category: "privacy", subcategory: "tracking" },
++  ],
++  ["etp", { category: "privacy", subcategory: "tracking" }],
++  ["etpCustomize", { category: "privacy", subcategory: "tracking" }],
++  ["privacy-doh", { category: "privacy", subcategory: "secureDns" }],
++  ["dnsOverHttps", { category: "privacy", subcategory: "secureDns" }],
++  // Sval's Protections category is part of Privacy and protection, but for
++  // its list of sites, which is Sites (Sval decision 1484).
++  ["svalProtections", { category: "privacy" }],
++  [
++    "svalProtections-tracking",
++    { category: "privacy", subcategory: "tracking" },
++  ],
++  [
++    "svalProtections-secureDns",
++    { category: "privacy", subcategory: "secureDns" },
++  ],
++  ["svalProtections-sites", { category: "svalSites", subcategory: "sites" }],
++  // Sites holds the permission defaults, and each site's page its
++  // permissions (Sval decision 1484).
++  ["permissionsData", { category: "svalSites" }],
++  ["privacy-permissions", { category: "svalSites" }],
++  ["privacy-permissions-block-popups", { category: "svalSites" }],
+ ]);
+ 
+ /**
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index e6f6cdc..725a251 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -231,20 +231,25 @@ const CONFIG_PANES = Object.freeze({
+   },
+   accessibility: {
+     l10nId: "preferences-accessibility-header",
++    // Sval: Appearance shows these groups (Sval spec §10.8).
++    groupIds: [],
++    module: "chrome://browser/content/preferences/config/accessibility.mjs",
++    iconSrc: "chrome://browser/skin/preferences/category-accessibility.svg",
++    visible: () => srdSectionPrefs.all,
++  },
++  appearance: {
++    l10nId: "preferences-appearance-header",
++    // Sval: with the accessibility groups, whose category Sval folds in here,
++    // and without the links to other categories (Sval spec §10.8).
+     groupIds: [
++      "appearance",
++      "browserTheme",
+       "zoom",
+       "fonts",
+       "contrast",
+       "keyboardAndScrolling",
+       "motionAndLink",
+     ],
+-    module: "chrome://browser/content/preferences/config/accessibility.mjs",
+-    iconSrc: "chrome://browser/skin/preferences/category-accessibility.svg",
+-    visible: () => srdSectionPrefs.all,
+-  },
+-  appearance: {
+-    l10nId: "preferences-appearance-header",
+-    groupIds: ["appearance", "browserTheme", "relatedSettings"],
+     module: "chrome://browser/content/preferences/config/appearance.mjs",
+     iconSrc: "chrome://global/skin/icons/eye.svg",
+     visible: () => srdSectionPrefs.all,
+@@ -260,7 +265,8 @@ const CONFIG_PANES = Object.freeze({
+   downloads: {
+     l10nId: "pane-downloads3",
+     iconSrc: "chrome://browser/skin/downloads/downloads.svg",
+-    groupIds: ["downloads", "applications"],
++    // Sval: General shows these groups (Sval spec §10.8).
++    groupIds: [],
+     module: "chrome://browser/content/preferences/config/downloads.mjs",
+     visible: () =>
+       Services.prefs.getBoolPref("browser.settings-redesign.enabled", false),
+@@ -268,31 +274,16 @@ const CONFIG_PANES = Object.freeze({
+   connectionSecurity: {
+     parent: "privacy",
+     l10nId: "preferences-connection-header",
+-    groupIds: [
+-      "httpsOnly",
+-      "networkProxy",
+-      "privacyPanel",
+-      "browsingProtection",
+-      "certificates",
+-    ],
++    // Sval: Privacy and security shows the rest (Sval spec §10.8).
++    groupIds: ["privacyPanel"],
+     replaces: "privacy",
+   },
+   dnsOverHttps: {
+     parent: "privacy",
+     l10nId: "preferences-doh-header2",
+-    groupIds: ["dnsOverHttpsAdvanced"],
+-    replaces: "privacy",
+-  },
+-  etp: {
+-    parent: "privacy",
+-    l10nId: "preferences-etp-header",
+-    groupIds: ["etpBanner", "etpAdvanced"],
+-    replaces: "privacy",
+-  },
+-  etpCustomize: {
+-    parent: "etp",
+-    l10nId: "preferences-etp-customize-header",
+-    groupIds: ["etpCustomize", "etpReset"],
++    // Sval: Protections' Secure DNS card holds DNS over HTTPS, and
++    // `LegacyPaneMappings` sends this page's address there (Sval spec §10.8).
++    groupIds: [],
+     replaces: "privacy",
+   },
+   experimental: {
+@@ -314,21 +305,20 @@ const CONFIG_PANES = Object.freeze({
+   },
+   home: {
+     l10nId: "home-section",
+-    iconSrc: "chrome://browser/skin/home.svg",
+-    // Sval: General offers the default browser (favorites-native spec §15.5).
+-    groupIds: ["startupHome", "homepage", "home"],
++    // Sval: this category is Sval's Workspaces (Sval spec §10.8): the home
++    // page and new windows, and import and export. General offers the
++    // default browser (favorites-native spec §15.5), and Sval's home page
++    // reads none of Firefox Home's switches.
++    groupIds: ["homepage", "importBrowserData"],
++    iconSrc: "chrome://browser/content/sval/icons/panel-left.svg",
+     module: "chrome://browser/content/preferences/config/home-startup.mjs",
+     replaces: "home",
+   },
+   languages: {
+     l10nId: "preferences-languages-header3",
+     iconSrc: "chrome://browser/skin/translations.svg",
+-    groupIds: [
+-      "browserLanguage",
+-      "websiteLanguage",
+-      "translations",
+-      "spellCheck",
+-    ],
++    // Sval: General shows these groups (Sval spec §10.8).
++    groupIds: [],
+     module: "chrome://browser/content/preferences/config/languages.mjs",
+     visible: () => srdSectionEnabled("languages"),
+   },
+@@ -363,7 +353,10 @@ const CONFIG_PANES = Object.freeze({
+   permissionsData: {
+     l10nId: "permissions-data-section",
+     iconSrc: "chrome://browser/skin/permissions.svg",
+-    groupIds: ["permissions", "dataCollection"],
++    // Sval: Sites holds the permission defaults, each site's page its
++    // permissions, and Extensions the add-on install warning (Sval decision
++    // 1484). Sval sends no data to choose about (Sval spec §10.9).
++    groupIds: [],
+     module: "chrome://browser/content/preferences/config/permissions-data.mjs",
+     visible: () => srdSectionEnabled("permissionsData"),
+   },
+@@ -386,16 +379,18 @@ const CONFIG_PANES = Object.freeze({
+   privacy: {
+     l10nId: "pane-privacy-section",
+     iconSrc: "chrome://browser/skin/preferences/category-privacy-security.svg",
++    // Sval: this category is Sval's Privacy and protection (Sval spec §10.8),
++    // whose own cards Sval puts between these groups. The connection settings
++    // are here, not a page of their own, and certificates and the proxy are
++    // in the category's Advanced, which Sval draws. Sval's cards replace
++    // Enhanced Tracking Protection and hold Global Privacy Control, DNS over
++    // HTTPS, and cookies and site data.
+     groupIds: [
+-      "securityPrivacyStatus",
+       "securityPrivacyWarnings",
+-      "etpStatus",
++      "httpsOnly",
++      "browsingProtection",
+       "ipprotection",
+-      "cookiesAndSiteData2",
+       "history2",
+-      "nonTechnicalPrivacy2",
+-      "dnsOverHttps",
+-      "connectionLink",
+     ],
+     module: "chrome://browser/content/preferences/config/privacy.mjs",
+     replaces: "privacy",
+@@ -417,10 +412,19 @@ const CONFIG_PANES = Object.freeze({
+     iconSrc: "chrome://browser/skin/fxa/avatar-empty.svg",
+     groupIds: [
+       "defaultBrowserSync",
+-      "accountDisabled",
+-      "account",
+-      "sync",
+-      "importBrowserData",
++      // Sval: General holds what had categories of its own (Sval spec §10.8).
++      // Firefox Accounts and their sync are not part of Sval (Sval spec §10.9),
++      // so their groups are not here.
++      "startupHome",
++      "browserLanguage",
++      "websiteLanguage",
++      "translations",
++      "spellCheck",
++      "downloads",
++      "applications",
++      "pageNavigation",
++      "media",
++      "performance",
+       "profiles",
+       "backup",
+     ],
+@@ -437,20 +441,18 @@ const CONFIG_PANES = Object.freeze({
+   },
+   tabsBrowsing: {
+     l10nId: "tabs-browsing-section",
+-    groupIds: [
+-      "browserLayout",
+-      "tabs",
+-      "pageNavigation",
+-      "media",
+-      "performance",
+-      "recommendations",
+-    ],
++    // Sval: General shows page navigation, media and performance (Sval spec
++    // §10.8), and no category the rest. General and Links show the settings
++    // of the tabs group Sval keeps, the workspace panel is Sval's browser
++    // layout, and Sval shows no recommendations as the user browses.
++    groupIds: [],
+     iconSrc: "chrome://global/skin/icons/cursor-arrow.svg",
+     module: "chrome://browser/content/preferences/config/tabs-browsing.mjs",
+     visible: () => srdSectionEnabled("tabsBrowsing"),
+   },
+   translations: {
+-    parent: srdSectionEnabled("languages") ? "languages" : "general",
++    // Sval: the languages groups are in General (Sval spec §10.8).
++    parent: "sync",
+     l10nId: "settings-translations-subpage-header",
+     groupIds: [
+       "translationsAutomaticTranslation",
+@@ -461,7 +463,9 @@ const CONFIG_PANES = Object.freeze({
+     visible: () => srdSectionEnabled("translations"),
+   },
+   containers: {
+-    parent: srdSectionEnabled("tabsBrowsing") ? "tabsBrowsing" : "general",
++    // Sval: the category of Sval's isolated workspaces (Sval spec §10.1).
++    // Sval locks Firefox's containers off, so no setting links here.
++    parent: "home",
+     l10nId: "containers-section-header2",
+     groupIds: ["containers"],
+     module: "chrome://browser/content/preferences/config/containers.mjs",
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index f16b1e8..a40e5d6 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -59,17 +59,17 @@ pane-general-title = General
+ 
+ pane-home-title = Home
+ 
+-pane-home-startup-title2 = Home and startup
+-  .title = Home and startup
++pane-home-startup-title2 = Workspaces
++  .title = Workspaces
+ 
+-pane-search-title2 = Search
+-  .title = Search
++pane-search-title2 = Search and Launcher
++  .title = Search and Launcher
+ 
+-pane-privacy-title3 = Privacy and security
+-  .title = Privacy and security
++pane-privacy-title3 = Privacy and protection
++  .title = Privacy and protection
+ 
+ pane-privacy-section =
+-    .heading = Privacy and security
++    .heading = Privacy and protection
+ 
+ pane-sync-title3 = Sync
+ 
+@@ -930,7 +930,7 @@ network-proxy-connection-settings2 =
+ ## Home Section
+ 
+ home-section =
+-    .heading = Home and startup
++    .heading = Workspaces
+ 
+ home-new-windows-tabs-header = New Windows and Tabs
+ 
+@@ -1066,7 +1066,7 @@ home-prefs-choose-wallpaper-link = Choose a wallpaper
+ 
+ # Header for the search section ("search" is a noun).
+ search-section =
+-    .heading = Search
++    .heading = Search and Launcher
+ 
+ search-engine-group =
+     .label = Default search engine

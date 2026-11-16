@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: existence
+message: "Cut '%s'. It adds nothing."
+level: error
+ignorecase: true
+tokens:
+  - simply
+  - just
+  - actually
+  - really
+  - in order to
+  - please note that

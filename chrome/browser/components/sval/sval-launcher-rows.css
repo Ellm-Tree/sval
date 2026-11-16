@@ -1,0 +1,237 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The Launcher's rows as its three hosts draw them alike: the float and the
+ * address bar in place (`sval-launcher.css`) and Home's field (`home.css`).
+ * The parts are `SvalLauncherRows`' and the page's: a workspace's or an
+ * agent's chip, a pin's or Favorite's mark, key caps, the selected row's
+ * Enter hint and the line under the list. The values are the Launcher's
+ * design's, from the palette in `sval-tokens.css`; each host imports this
+ * after that palette and Sval's tab-group palette (`sval-palette.css`).
+ *
+ * Every colour is the dark value on a dark surface and the light value on a
+ * light one, by the host's `--sval-surface-dark` (1 or 0, `sval-tokens.css`):
+ * the window's in the browser, which its workspace's tint sets
+ * (`sval-panel.css`, window tint), and the page's on Home (`home.css`). So
+ * the rows take the scheme of the surface the card is drawn on, as the
+ * header's popups do.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:root {
+  --sval-launcher-dark: calc(var(--sval-surface-dark) * 100%);
+  --sval-launcher-text: color-mix(in srgb, #ffffff var(--sval-launcher-dark), var(--sval-palette-ink-950));
+  --sval-launcher-icon: color-mix(in srgb, var(--sval-palette-ink-200) var(--sval-launcher-dark), var(--sval-palette-ink-700));
+  --sval-launcher-muted: color-mix(in srgb, var(--sval-palette-ink-400) var(--sval-launcher-dark), var(--sval-palette-ink-500));
+  --sval-launcher-accent: color-mix(in srgb, var(--sval-palette-neon) var(--sval-launcher-dark), var(--sval-palette-blue-700));
+  --sval-launcher-hover: color-mix(in srgb, rgb(var(--sval-palette-wash-dark) / 0.07) var(--sval-launcher-dark), rgb(var(--sval-palette-wash-light) / 0.05));
+  --sval-launcher-selected: color-mix(in srgb, rgba(92, 242, 255, 0.14) var(--sval-launcher-dark), rgba(31, 107, 255, 0.1));
+  --sval-launcher-divider: color-mix(in srgb, rgb(var(--sval-palette-wash-dark) / 0.1) var(--sval-launcher-dark), rgb(var(--sval-palette-wash-light) / 0.1));
+  --sval-launcher-cap-fill: color-mix(in srgb, rgb(var(--sval-palette-wash-dark) / 0.08) var(--sval-launcher-dark), rgb(var(--sval-palette-wash-light) / 0.05));
+  --sval-launcher-cap-ring: color-mix(in srgb, rgb(var(--sval-palette-wash-dark) / 0.2) var(--sval-launcher-dark), rgb(var(--sval-palette-wash-light) / 0.2));
+  --sval-launcher-cap-ink: color-mix(in srgb, var(--sval-palette-ink-200) var(--sval-launcher-dark), var(--sval-palette-ink-700));
+  --sval-launcher-foot-bg: color-mix(in srgb, rgb(var(--sval-palette-wash-dark) / 0.03) var(--sval-launcher-dark), rgb(var(--sval-palette-wash-light) / 0.025));
+  --sval-launcher-agent-fill: color-mix(in srgb, #18171d var(--sval-launcher-dark), #ecebf0);
+  --sval-launcher-agent-ring: color-mix(in srgb, rgba(255, 255, 255, 0.16) var(--sval-launcher-dark), rgba(24, 23, 29, 0.16));
+  --sval-launcher-agent-ink: color-mix(in srgb, var(--sval-palette-ink-200) var(--sval-launcher-dark), #18171d);
+  --sval-launcher-picked-fill: color-mix(in srgb, rgba(92, 242, 255, 0.1) var(--sval-launcher-dark), rgba(31, 107, 255, 0.08));
+  --sval-launcher-dur: 160ms;
+  --sval-launcher-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+/* ---------------------------------------------------------------- key caps */
+
+/* One cap per combination ("⌘⇧↵", "Ctrl+Shift+Enter"). A command row's key
+   is the provider's own element (`SvalLauncherCommands`); Home's is `.key`. */
+.sval-keycap,
+.urlbarView-dynamic-svalCommand-shortcut:not([hidden]),
+.suggestions .key {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background-color: var(--sval-launcher-cap-fill);
+  box-shadow: inset 0 0 0 1px var(--sval-launcher-cap-ring);
+  color: var(--sval-launcher-cap-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- chips */
+
+/* A tab in another workspace: a dot in the workspace's colour, its emoji and
+   its name, on its tint. */
+.sval-chip {
+  --sval-chip-fill: var(--sval-launcher-tint, var(--sval-launcher-cap-fill));
+  --sval-chip-ink: var(--sval-launcher-ink, var(--sval-launcher-text));
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: 999px;
+  background-color: var(--sval-chip-fill);
+  color: var(--sval-chip-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.sval-chip-glyph {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.sval-chip-emoji {
+  flex: none;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.sval-chip[data-agent] {
+  --sval-chip-fill: var(--sval-launcher-agent-fill);
+  --sval-chip-ink: var(--sval-launcher-agent-ink);
+  box-shadow: inset 0 0 0 1px var(--sval-launcher-agent-ring);
+
+  > .sval-chip-glyph {
+    width: 13px;
+    height: 13px;
+    border-radius: 0;
+    mask: url("chrome://browser/content/sval/agent-robot.svg") center / contain no-repeat;
+  }
+}
+
+/* A workspace's colour, for its chip and its swatch among a command's
+   choices: its fill and its ink on that fill, which `SvalLauncherRows`
+   sets from `SvalColor` beside `data-color`. */
+
+/* ---------------------------------------------------------------- marks */
+
+.sval-mark {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background-color: var(--sval-launcher-muted);
+  mask: center / contain no-repeat;
+
+  &[data-mark="pin"] {
+    mask-image: url("chrome://browser/content/sval/icons/pin.svg");
+  }
+
+  &[data-mark="favorite"] {
+    mask: none;
+    background: url("chrome://browser/content/sval/header-icons/star-filled.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: var(--sval-launcher-accent);
+  }
+}
+
+/* ---------------------------------------------------------------- hint */
+
+/* What Enter does, on the selected row only: its host shows it there. */
+.sval-launcher-hint {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--sval-launcher-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- foot */
+
+/* The line under the list: the selected row's keys, Escape's at the end.
+   Outside the part that scrolls; a screen reader reads the same keys from
+   the rows. */
+.sval-launcher-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 18px;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 8px 12px 8px 16px;
+  border-top: 1px solid var(--sval-launcher-divider);
+  background-color: var(--sval-launcher-foot-bg);
+  color: var(--sval-launcher-muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.sval-launcher-foot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &[end] {
+    margin-inline-start: auto;
+  }
+}
+
+.sval-launcher-foot-note {
+  color: var(--sval-launcher-text);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- access */
+
+@media (forced-colors) {
+  :root {
+    --sval-launcher-text: CanvasText;
+    --sval-launcher-icon: CanvasText;
+    --sval-launcher-muted: CanvasText;
+    --sval-launcher-accent: CanvasText;
+    --sval-launcher-hover: transparent;
+    --sval-launcher-selected: Highlight;
+    --sval-launcher-divider: CanvasText;
+    --sval-launcher-foot-bg: Canvas;
+  }
+
+  .sval-keycap,
+  .urlbarView-dynamic-svalCommand-shortcut,
+  .suggestions .key,
+  .sval-chip,
+  .sval-chip[data-agent] {
+    --sval-chip-fill: Canvas;
+    --sval-chip-ink: CanvasText;
+    background-color: Canvas;
+    box-shadow: inset 0 0 0 1px CanvasText;
+    color: CanvasText;
+  }
+
+  /* On the selected row every ink is the highlight's. */
+  :is(.urlbarView-row[selected], .suggestions .result[aria-selected="true"]) {
+    :is(.sval-keycap, .urlbarView-dynamic-svalCommand-shortcut, .key, .sval-chip) {
+      background-color: Highlight;
+      box-shadow: inset 0 0 0 1px HighlightText;
+      color: HighlightText;
+    }
+
+    :is(.sval-mark, .sval-chip-glyph) {
+      background-color: HighlightText;
+    }
+
+    .sval-launcher-hint {
+      color: HighlightText;
+    }
+  }
+}

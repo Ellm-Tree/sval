@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Embeds</title>
+  </head>
+  <body>
+    <!-- The query names the embeds the page holds, comma-separated. Each is
+       - the markup and script its webcompat shim matches. -->
+    <script>
+      const EMBEDS = {
+        instagram: ["instagram-media", "https://www.instagram.com/embed.js"],
+        tiktok: ["tiktok-embed", "https://www.tiktok.com/embed.js"],
+        twitter: ["twitter-tweet", "https://platform.twitter.com/widgets.js"],
+      };
+      const names = location.search.slice(1).split(",");
+      for (const name of names) {
+        const quote = document.createElement("blockquote");
+        quote.className = EMBEDS[name][0];
+        quote.textContent = name;
+        document.body.append(quote);
+      }
+      // An allowed embed's script goes to a host the test resolves to this
+      // machine, where nothing answers. Windows takes seconds to refuse that
+      // connection, and a script added before the load holds the load event
+      // until it is refused, so the scripts are added once the page has
+      // loaded, as a lazily loaded embed is.
+      addEventListener("load", () => {
+        for (const name of names) {
+          const script = document.createElement("script");
+          script.src = EMBEDS[name][1];
+          document.body.append(script);
+        }
+      });
+    </script>
+  </body>
+</html>

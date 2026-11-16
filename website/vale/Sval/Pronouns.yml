@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: occurrence
+message: "Three or more 'it' or 'its' in one sentence. Name the thing again."
+level: error
+scope: sentence
+max: 2
+token: '\b(?:[Ii]t|[Ii]ts)\b'

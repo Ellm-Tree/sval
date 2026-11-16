@@ -1,0 +1,171 @@
+Sval: mark the entry a chrome-initiated load leaves in the triggering process
+
+Backport of Mozilla's D314488 (Bug 2058297, diff 2 of 2026-07-29, r+ smaug,
+not landed). The ESR 153.5.0 pin does not carry it. Its hunk in
+browser_new_tab_in_privilegedabout_process_pref.js is left out, because the
+workaround it removes is not in the pin; the rest applies unchanged.
+A load with a system triggering principal, such as one from the address bar,
+counts as user interaction with the entry it leaves, so that
+browser.navigation.requireUserInteraction lets Back return to it.
+nsDocShell::LoadURI set that flag in the content process. When the old page's
+process was running a script, the flag arrived after the new entry was
+active, or never, because ContentChild::RecvLoadURI drops a load whose
+BrowsingContext has left the process, and Back was disabled.
+BrowsingContext::MaybeSetSHEntryHasUserInteraction sets it in the process
+that triggers the load, from BrowsingContext::LoadURI and
+BrowserParent::LoadURL, and nsDocShell::LoadURI skips it once set. Drop this
+patch when Bug 2058297 lands and reaches the upstream pin's ESR.
+
+diff --git a/docshell/base/BrowsingContext.cpp b/docshell/base/BrowsingContext.cpp
+index e7b3a6c80f..c55cbbd997 100644
+--- a/docshell/base/BrowsingContext.cpp
++++ b/docshell/base/BrowsingContext.cpp
+@@ -2383,6 +2383,8 @@ nsresult BrowsingContext::LoadURI(nsDocShellLoadState* aLoadState,
+     }
+   } else if (XRE_IsParentProcess()) {
+     if (ContentParent* cp = Canonical()->GetContentParent()) {
++      MaybeSetSHEntryHasUserInteraction(aLoadState);
++
+       // Attempt to initiate this load immediately in the parent, if it
+       // succeeds, aLoadState will have a reference to the pending
+       // DocumentLoadListener, which will be recovered when the DocumentChannel
+@@ -2446,6 +2448,32 @@ nsresult BrowsingContext::LoadURI(nsDocShellLoadState* aLoadState,
+   return NS_OK;
+ }
+ 
++void BrowsingContext::MaybeSetSHEntryHasUserInteraction(
++    const nsDocShellLoadState* aLoadState) {
++  // A system triggering principal means the load comes from browser chrome, so
++  // count it as user interaction for the entry we are leaving, to let the user
++  // navigate back to it.
++  nsIPrincipal* triggeringPrincipal = aLoadState->TriggeringPrincipal();
++  if (!triggeringPrincipal || !triggeringPrincipal->IsSystemPrincipal()) {
++    return;
++  }
++
++  WindowContext* topWc = GetTopWindowContext();
++  if (!topWc || topWc->IsDiscarded()) {
++    return;
++  }
++
++  // The parent process applies this to whichever session history entry is
++  // active when it arrives, so a content process setting it again for a load
++  // the parent already handled would race with the entry for the new load
++  // becoming the active one, and mark that entry instead.
++  if (topWc->GetSHEntryHasUserInteraction()) {
++    return;
++  }
++
++  MOZ_ALWAYS_SUCCEEDS(topWc->SetSHEntryHasUserInteraction(true));
++}
++
+ nsresult BrowsingContext::InternalLoad(nsDocShellLoadState* aLoadState) {
+   if (IsDiscarded()) {
+     return NS_OK;
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+index 96a1d895d4..be124f7d55 100644
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -483,6 +483,11 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+ 
+   nsresult InternalLoad(nsDocShellLoadState* aLoadState);
+ 
++  // Marks the active session history entry as having been interacted with if
++  // aLoadState comes from the browser chrome. Call as early as possible, from
++  // the process triggering the load.
++  void MaybeSetSHEntryHasUserInteraction(const nsDocShellLoadState* aLoadState);
++
+   void Navigate(
+       nsIURI* aURI, Document* aSourceDocument, nsIPrincipal& aSubjectPrincipal,
+       ErrorResult& aRv,
+diff --git a/docshell/base/nsDocShell.cpp b/docshell/base/nsDocShell.cpp
+index f6750087c7..cb4f9eeb0c 100644
+--- a/docshell/base/nsDocShell.cpp
++++ b/docshell/base/nsDocShell.cpp
+@@ -857,19 +857,7 @@ nsresult nsDocShell::LoadURI(nsDocShellLoadState* aLoadState,
+              "Shouldn't be loading from an entry when calling InternalLoad "
+              "from LoadURI");
+ 
+-  // If we have a system triggering principal, we can assume that this load was
+-  // triggered by some UI in the browser chrome, such as the URL bar or
+-  // bookmark bar. This should count as a user interaction for the current sh
+-  // entry, so that the user may navigate back to the current entry, from the
+-  // entry that is going to be added as part of this load.
+-  nsCOMPtr<nsIPrincipal> triggeringPrincipal =
+-      aLoadState->TriggeringPrincipal();
+-  if (triggeringPrincipal && triggeringPrincipal->IsSystemPrincipal()) {
+-    WindowContext* topWc = mBrowsingContext->GetTopWindowContext();
+-    if (topWc && !topWc->IsDiscarded()) {
+-      MOZ_ALWAYS_SUCCEEDS(topWc->SetSHEntryHasUserInteraction(true));
+-    }
+-  }
++  mBrowsingContext->MaybeSetSHEntryHasUserInteraction(aLoadState);
+ 
+   rv = InternalLoad(aLoadState);
+   NS_ENSURE_SUCCESS(rv, rv);
+diff --git a/docshell/test/browser/browser_backforward_userinteraction_systemprincipal.js b/docshell/test/browser/browser_backforward_userinteraction_systemprincipal.js
+index 496c4b7a5c..d6aad704e9 100644
+--- a/docshell/test/browser/browser_backforward_userinteraction_systemprincipal.js
++++ b/docshell/test/browser/browser_backforward_userinteraction_systemprincipal.js
+@@ -105,3 +105,48 @@ add_task(async function test_urlBar() {
+     await loaded;
+   });
+ });
++
++// Same thing for a load that switches process, where the entry being left and
++// the entry being created belong to different content processes.
++add_task(async function test_process_switch() {
++  await SpecialPowers.pushPrefEnv({
++    set: [
++      ["browser.navigation.requireUserInteraction", true],
++      ["browser.newtab.preload", false],
++      ["browser.tabs.remote.separatePrivilegedContentProcess", true],
++    ],
++  });
++
++  let tab = await BrowserTestUtils.openNewForegroundTab(
++    gBrowser,
++    "about:newtab"
++  );
++  let browser = tab.linkedBrowser;
++  assertBackForwardState(false, false);
++  let privilegedPid = browser.frameLoader.remoteTab.osPid;
++
++  info(`Loading ${TEST_PAGE} from the browser chrome.`);
++  let loaded = BrowserTestUtils.browserLoaded(browser, false, TEST_PAGE);
++  BrowserTestUtils.startLoadingURIString(browser, TEST_PAGE);
++  await loaded;
++
++  isnot(
++    browser.frameLoader.remoteTab.osPid,
++    privilegedPid,
++    "The load should have switched process, otherwise this is a duplicate of " +
++      "the test above."
++  );
++
++  let sh = browser.browsingContext.sessionHistory;
++  ok(
++    sh.getEntryAtIndex(sh.index - 1).hasUserInteraction,
++    "The entry we navigated away from should have user interaction."
++  );
++  ok(
++    !sh.getEntryAtIndex(sh.index).hasUserInteraction,
++    "The entry this load created should not have user interaction."
++  );
++  assertBackForwardState(true, false);
++
++  BrowserTestUtils.removeTab(tab);
++});
+diff --git a/dom/ipc/BrowserParent.cpp b/dom/ipc/BrowserParent.cpp
+index ed6b784a83..d228f5dd77 100644
+--- a/dom/ipc/BrowserParent.cpp
++++ b/dom/ipc/BrowserParent.cpp
+@@ -1001,6 +1001,8 @@ void BrowserParent::LoadURL(nsDocShellLoadState* aLoadState) {
+     return;
+   }
+ 
++  mBrowsingContext->MaybeSetSHEntryHasUserInteraction(aLoadState);
++
+   (void)SendLoadURL(WrapNotNull(aLoadState), GetShowInfo());
+ }
+ 

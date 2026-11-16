@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Screenshots' preview in its tab dialog, after `dialog.css`. The card is
+   the document, sized to the box (`sizeTo: "available"`); the preview
+   (`screenshots-preview`) fills it. Firefox sizes the preview to the
+   viewport's units, with the body's margin around it, which overflows the
+   card both ways. A document's rule beats the component's `:host` rule. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+screenshots-preview {
+  width: auto;
+  height: 100%;
+}

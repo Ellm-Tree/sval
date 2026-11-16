@@ -1,0 +1,60 @@
+Sval: SessionStore saves no pin's page
+
+A pin's page is a hidden tab marked by its "sval-pin" attribute
+(SvalPinTab.sys.mjs), and after a restart each pin starts at its saved
+address. SessionStore saves no attribute it was not asked to persist, so a
+page it brought back, from a restart, a closed window or the recently closed
+tabs, came back as a hidden tab of no pin, which Sval's tab observer filed as
+a tab of the window's workspace. A marked tab is left out of the window state
+SessionStore collects, which a restart, a crash and a closed window restore
+from, and out of the recently closed tabs, as Firefox leaves out its Firefox
+View tab. The selected index counts only the tabs saved.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index af971063bb..6b9691b1ea 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -3506,6 +3506,10 @@ var SessionStoreInternal = {
+     if (aTab == aWindow.FirefoxViewHandler.tab) {
+       return;
+     }
++    // Sval: a pin's page is no closed tab to reopen (SvalPinTab).
++    if (aTab.hasAttribute("sval-pin")) {
++      return;
++    }
+ 
+     let permanentKey = aTab.linkedBrowser.permanentKey;
+ 
+@@ -5812,10 +5816,19 @@ var SessionStoreInternal = {
+     let tabsData = (winData.tabs = []);
+ 
+     // update the internal state data for this window
++    // Sval: a pin's page is in no saved session (SvalPinTab), and the
++    // selected index counts only the tabs saved.
++    let pinsBeforeSelected = 0;
+     for (let tab of tabs) {
+       if (tab == aWindow.FirefoxViewHandler.tab) {
+         continue;
+       }
++      if (tab.hasAttribute("sval-pin")) {
++        if (tab._tPos < tabbrowser.selectedTab._tPos) {
++          pinsBeforeSelected++;
++        }
++        continue;
++      }
+       let tabData = lazy.TabState.collect(tab, TAB_CUSTOM_VALUES.get(tab));
+       tabMap.set(tab, tabData);
+       tabsData.push(tabData);
+@@ -5832,7 +5845,11 @@ var SessionStoreInternal = {
+       let splitViewData = splitView.state;
+       winData.splitViews.push(splitViewData);
+     }
+-    let selectedIndex = tabbrowser.tabbox.selectedIndex + 1;
++    let selectedIndex =
++      tabbrowser.tabbox.selectedIndex + 1 - pinsBeforeSelected;
++    if (tabbrowser.selectedTab.hasAttribute("sval-pin")) {
++      selectedIndex = 1;
++    }
+     // We don't store the Firefox View tab in Session Store, so if it was the last selected "tab" when
+     // a window is closed, point to the first item in the tab strip instead (it will never be the Firefox View tab,
+     // since it's only inserted into the tab strip after it's selected).

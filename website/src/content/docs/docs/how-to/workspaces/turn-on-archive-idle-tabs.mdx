@@ -1,0 +1,58 @@
+---
+title: Turn on Archive idle tabs
+description: Have Sval put away tabs you haven't used in a while, for every Workspace or for one.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+When Archive idle tabs is on, Sval moves tabs you haven't used for a set
+time out of their Workspace and into History, under Archived tabs. You can
+get any archived tab back from there.
+
+Your Work Workspace fills up with tabs you opened once and never went back
+to. You want the old ones gone without closing each one yourself.
+
+<Screenshot name="docs-idle-tabs" frame="rounded" maxWidth={600} alt="Settings › Workspaces › Idle tabs, with Archive idle tabs unchecked, After set to 7 Days, and Keep archived tabs for set to 30 days" />
+
+## Turn it on for every Workspace
+
+1. Open Settings › Workspaces.
+2. Under Idle tabs, check **Archive idle tabs**.
+3. In **After**, choose how long a tab can go unused.
+
+## Choose a different time for one Workspace
+
+1. Above your tabs, right-click the Workspace's name.
+2. Choose **Edit…**.
+3. In **Archive idle tabs**, choose a time, or **Never**.
+4. Select **Save**.
+
+Each Workspace starts on Use Default, which follows your choice in
+Settings. If you choose something other than Use Default for one Workspace, that
+choice applies even when Archive idle tabs is off in Settings.
+
+## Details
+
+- Archive idle tabs is off until you turn it on. When you turn it on, Sval
+  picks 7 Days. The other times are 12 Hours, 24 Hours, and 30 Days.
+- A tab counts as used when you stay on the tab for a few seconds after
+  going to it, clicking in the page, or typing there. A use on any of your
+  devices counts.
+- Sval never archives these tabs:
+  - A tab in a group.
+  - A tab you're looking at in any window.
+  - A tab that's playing sound.
+  - A tab kept awake with Keep Awake.
+  - A tab in picture-in-picture or a call.
+  - A tab holding text you typed.
+- Sval archives a Split only when every tab in the Split is idle. The Split
+  comes back whole.
+- **Keep archived tabs for.** This setting decides how long History keeps
+  an archived tab: 7, 30, or 90 days. The setting starts at 30 days.
+- Both settings sync to your other devices.
+- Tabs in a private window are never archived.
+
+## Related pages
+
+- [Get an archived tab back](/docs/how-to/workspaces/get-an-archived-tab-back/)
+- [Workspace settings and controls](/docs/reference/workspaces/)

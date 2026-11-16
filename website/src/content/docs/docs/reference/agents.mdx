@@ -1,0 +1,196 @@
+---
+title: Agents
+description: What each agent control does, from Settings › Agents to the card over an agent's window and the questions Sval asks.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+An agent is an AI app on your computer that browses in Sval. Each session
+of the app works in a Workspace of its own. The session follows the rules
+you set for that app.
+
+<Screenshot name="features-agent-workspaces" frame="rounded" alt="The Workspace switcher showing an agent’s Workspaces, one for each task, like Find Lisbon restaurants" />
+
+## Settings › Agents › Agent access
+
+- **Let AI agents on this computer use Sval.** This switch turns agent
+  access on or off. Agent access stays off until you turn it on, here or
+  when you first set up Sval. While agent access is off, no app can
+  connect. Each device has its own setting.
+- The line under the switch says whether access is on and how many agents
+  are paired. If access couldn't start, the line says why.
+- **Let sites offer tools to agents.** A website can offer agents actions
+  of its own, like searching a store or adding to a cart. This setting is
+  off by default. You can change it only while agent access is on.
+- **Speed limit for polite agents.** This sets how many actions a second
+  an agent takes on one site while **Be polite** is checked on the agent's
+  card. The setting takes a whole number from 1 to 100, and starts at 1.
+- **How long agents wait for your answer.** This sets how long an agent
+  waits when Sval asks you about one of its requests. The choices are 5
+  minutes, 15 minutes, 30 minutes, 1 hour, 4 hours, and 12 hours. It starts
+  at 1 hour.
+- **Delete unused agent Workspaces.** Sval deletes an agent's Workspace and
+  its tabs once no session has used the Workspace for the time you choose.
+  The choices are **After 7 days**, **After 30 days**, **After 90 days**,
+  and **Never**. It starts at After 30 days.
+
+## Settings › Agents › Connect an AI app
+
+Sval can set up some apps itself. Each of these apps gets a row:
+Claude Code, Claude Desktop, the ChatGPT desktop app and Codex, Cursor, and
+Mistral Vibe. Each row says one of these:
+
+- **Not connected.** The row has a **Connect** button, which adds Sval to
+  the app's settings.
+- **Connected.** The row has a **Disconnect** button, which takes Sval out
+  of the app's settings.
+- **This app points to a Sval that has moved. Connect updates it.**
+- **This app has a Sval entry you changed. Connect replaces it.**
+- **This app points to a Sval that isn't on this computer. Fix points it to
+  this Sval.**
+- **Not found on this computer.** The app isn't installed.
+- **Sval can't read this app's settings, so it leaves them as they are.**
+
+After a change, the line under the heading says how to restart the app.
+
+**Other apps** is for any other app that runs local MCP servers. This
+section shows the path of the file to run, with a **Copy** button. It also
+shows the JSON to paste into the app's configuration, with a **Copy JSON**
+button.
+
+## Settings › Agents › Paired agents
+
+Each app you've paired gets a row. The row shows the app's name and how
+many Workspaces the app has. It also shows the app's default for other
+sites and how many site rules the app has.
+
+- **Permissions.** The app's page opens.
+- **Unpair.** After you confirm, Sval disconnects the app and deletes its
+  permissions.
+
+While agent access is off, the list is hidden. Sval keeps the pairings and
+permissions.
+
+## An agent's page
+
+- **Default for sites with no rule.** This is the access the agent gets
+  on a site that has no rule of its own.
+  - **Ask on first visit:** Sval asks you the first time the agent opens a
+    site. Your answer becomes a site rule. This is the default.
+  - **Blocked:** the agent can't open the site.
+  - **Read only:** the agent reads pages. It never clicks, types, or
+    submits.
+  - **Ask before writes:** the agent reads freely. Sval asks you before
+    the agent clicks, types, or submits.
+  - **Full:** the agent clicks, types, and submits on its own, without
+    asking.
+
+  Sval asks before the agent opens a service on this computer or a device
+  on your local network. That holds for every default except Blocked.
+- **Site tools.** This shows while sites are allowed to offer tools.
+  **Off** hides every site's tools from this agent. With **Ask**, Sval asks
+  you before every tool call. **On** follows the site's access level. With
+  On, tools you've already allowed run without asking.
+- **Site rules.** The list has a rule for each site, with a search box and
+  a filter. **Add site** adds a rule. Each row has these columns:
+  - **Access:** Default, or one of the levels above.
+  - **Downloads**, **Uploads**, and **Console:** Ask, Allow, or Deny. An
+    upload rule names the folders the agent can upload files from.
+  - **Apps:** Ask, Deny, or a list of the apps the site has asked to open.
+    Each app in the list has its own answer.
+  - **Site tools:** this column shows while the agent's Site tools setting
+    is On or Ask.
+  - **Remove rule:** Sval removes the row's rule. **Undo** puts the rule
+    back.
+- **Unpair.** Sval disconnects the agent and deletes its permissions.
+
+## Settings › Agents › Advanced › WebDriver
+
+- **Let WebDriver use your Workspaces' cookies.** Tabs that WebDriver
+  scripts open get your sign-ins. When this is off, those tabs get a
+  Workspace and cookies of their own. This setting is off by default. Each
+  device has its own setting.
+
+## The pairing alert
+
+The first time an app asks to use Sval, Sval shows
+**Pair “…” with Sval?**. The alert lists the app's task, the app, the
+folder the app started in, and when.
+
+- The line in the box says which kind of Workspace the app asked for. A
+  shared Workspace has your sign-ins. An isolated Workspace is signed out
+  of every site.
+- The check box picks the other kind.
+- **Pair.** Sval approves the app for every session from then on. The
+  button works a moment after the alert comes to the front.
+- **Deny.** Sval refuses the app.
+
+## The agent's window
+
+<Until v="0.1.0-rc.10">
+
+Each session's Workspace shows in a window of its own. The window opens
+behind the window you're using. The Workspace's name is the app's
+name, with a robot in place of an emoji. The window's title is the
+same.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+Each session's Workspace shows in a window of its own. The window opens
+behind the window you're using. The Workspace's name is the app's
+name, with the app's icon in place of an emoji. An app Sval doesn't know
+gets a robot. The window's title is the Workspace's name.
+
+In the switcher, the Workspaces menu, Move to Workspace, and the strip's
+list of an app's Workspaces, each Workspace shows the icon of the model its
+agent named. The icons include Claude, GPT, Qwen, DeepSeek, and Llama. A
+Workspace whose agent named no model Sval knows shows no model icon.
+
+</Since>
+
+While the agent works, the window is dimmed. A card in the middle names the
+agent and says what it's doing.
+
+- **Take control.** The agent pauses and you get the Workspace.
+- **Stop agent.** Sval ends what the agent is doing, and the agent stays
+  stopped until you select **Resume**. Resume takes the place of Stop agent.
+- **Be polite.** On each site, the agent keeps to the speed limit you set
+  in Settings. The box starts checked.
+
+While you have control, a bar above each page says **You control this
+Workspace.**, with **Give Workspace back to** and the agent's name.
+
+## Questions Sval asks about an agent
+
+Sval asks in the agent's window and brings that window forward. When the
+address is part of a larger site, **Remember for** chooses whether your
+answer covers that address or the whole site.
+
+- **A new site:** **Allow**, **Allow all sites, read only**, or **Deny**.
+  For a service on this computer or a device on your local network, only
+  Allow or Deny.
+- **What a page is about to send:** **Allow** or **Deny** answers once.
+  **Always allow writes** sets the site to Full. **Always deny writes**
+  sets the site to Read only.
+- **A download or an upload:** Allow or Deny answers once. **Always allow**
+  and **Always deny** set a rule. For an upload, **Always allow covers**
+  chooses **This folder only** or **This folder and the folders inside
+  it**.
+- **The developer console:** Allow or Deny. Sval remembers your answer
+  for the site.
+- **An app a page wants to open:** Allow or Deny, once or always for that
+  kind of link.
+- **A site's tools:** Sval asks whether the agent can see the site's
+  tools. Then, for each call, Sval asks whether the tool can run.
+
+## The Workspace panel and the Launcher
+
+- **Agent Workspaces.** In the Workspaces list, this heading lists
+   the agents' Workspaces after your own. In a tab's
+  **Move to Workspace** menu, the same heading lists agent Workspaces you
+  can hand the tab to.
+- In the Launcher, **Give Workspace back** returns a Workspace you took
+  control of. **Agent access settings** opens Settings › Agents.

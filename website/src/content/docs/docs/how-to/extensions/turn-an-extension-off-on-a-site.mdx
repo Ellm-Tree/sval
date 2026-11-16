@@ -1,0 +1,60 @@
+---
+title: Turn an extension off on a site
+description: Stop an extension from reading or changing anything on one site, and keep it working everywhere else.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Each extension has a switch for each site. When you turn an extension off
+on a site, the extension can't read or change anything in tabs showing
+that site. Everywhere else, the extension works as before.
+
+A page-styling extension breaks the layout of your Roon dashboard, and you
+want it to leave that one site alone.
+
+<Screenshot name="features-extensions" frame="rounded" maxWidth={480} alt="The extensions menu on theverge.com. Each extension shows what it can do on the site, with a Run on theverge.com switch." />
+
+## From the extensions menu
+
+1. Go to a page on the site.
+2. In the toolbar, select **Extensions**.
+3. On the extension's row, turn off the **Run on** switch.
+
+Sval reloads the site's tabs. The extension's row then says the extension can't
+see or change anything on the site.
+
+## From Settings
+
+1. Open Settings › Extensions.
+2. Under Installed, select the extension's name.
+3. Under Sites where this extension is off, type the site in **Turn it off on a site**.
+4. Select **Turn off**.
+
+## Details
+
+- Each row in the extensions menu says what that extension can do on the
+  site you're on. A row can list reading and changing the site's pages,
+  seeing the site's connections, or reading and changing the site's
+  cookies.
+- When an extension is off on a site, it can't read or change the site's
+  pages or cookies. The extension can't see the site's connections, or see
+  you open the site's pages.
+- Some addresses have a part before the site's name, such as
+  app.fastmail.com. On a page like that, the switch starts out covering
+  that address alone. To switch the whole site, choose
+  **All of fastmail.com** in the Run on line at the top of the menu.
+- To turn the extension back on, turn its switch back on in the menu, or
+  next to the site in Settings.
+- In Settings › Sites, each site's page lists the extensions that can
+  reach that site, with a switch for each one.
+- Your switches sync to your other devices.
+- In a private window, the extensions menu doesn't show the switches. If
+  you open Settings in a private window, you'll see the switches but can't
+  change them, because your switches are saved and synced.
+- On pages without a site, such as Settings, the menu doesn't show the
+  switches either.
+- The menu shows a switch only for an extension that can reach the site.
+
+## Related pages
+
+- [Extension settings and controls](/docs/reference/extensions/)

@@ -1,0 +1,274 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The browser's own pages in the Sval browser design system's visual
+ * language: Outfit, Sval Blue as the one action colour, Neon for focus and
+ * accents in the dark theme, pill buttons and fields, panels with a 20px
+ * radius. Settings imports this sheet, and `SvalPageStyle` loads it into
+ * Firefox's own pages, so a page drawn with Firefox's design system and
+ * components takes Sval's look through Firefox's design tokens, which are set
+ * here to Sval's values. The Sval values are the system's tokens under their
+ * system names, as in home/home.css, because they are Sval's brand rather
+ * than Firefox's design tokens; each colour role has a light and a dark
+ * value, so the page follows the system theme.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+
+:root {
+  --sval-blue: var(--sval-palette-blue);
+  --sval-neon: var(--sval-palette-neon);
+  --sval-action: var(--sval-blue);
+  --sval-action-hover: var(--sval-palette-blue-600);
+  --sval-action-press: var(--sval-palette-blue-700);
+  --sval-action-text: #ffffff;
+  --sval-accent: var(--sval-blue);
+  --sval-focus: var(--sval-blue);
+  --sval-page: var(--sval-palette-ink-50);
+  --sval-ink: var(--sval-palette-ink-950);
+  --sval-ink-body: var(--sval-palette-ink-700);
+  --sval-ink-muted: var(--sval-palette-ink-500);
+  --sval-card: #ffffff;
+  --sval-sunken: var(--sval-palette-ink-50);
+  --sval-border: rgb(var(--sval-palette-wash-light) / 0.14);
+  --sval-border-strong: rgb(var(--sval-palette-wash-light) / 0.28);
+  /* A control's edge, and an off switch's track: 3:1 or more against the
+     card and the page, as a control's boundary must be (WCAG 1.4.11). The
+     faint borders are for cards, which are not controls. */
+  --sval-control-edge: var(--sval-palette-ink-500);
+  --sval-switch-knob-off: #ffffff;
+  --sval-shadow: 0 8px 24px rgb(var(--sval-palette-wash-light) / 0.1);
+  --sval-tint: rgba(31, 107, 255, 0.1);
+  --sval-problem: #c8321f;
+  --sval-problem-tint: rgba(200, 50, 31, 0.1);
+  /* A result line's glyph (messages spec §9.6). */
+  --sval-result-success: #1a7f3c;
+  --sval-result-error: var(--sval-palette-red);
+  --sval-result-error-tint: rgba(196, 47, 58, 0.08);
+  --sval-border-subtle: rgb(var(--sval-palette-wash-light) / 0.08);
+  --sval-card-hover: #ffffff;
+  --sval-raised: #ffffff;
+  --sval-glass: rgba(245, 249, 255, 0.82);
+  --sval-fixed: #1e8c3a;
+  --sval-security: #c2410a;
+  --sval-inverse: #ffffff;
+  --sval-modal-dim: rgba(6, 10, 46, 0.28);
+  --sval-modal-shadow: 0 40px 100px rgb(var(--sval-palette-wash-light) / 0.28), 0 12px 32px rgb(var(--sval-palette-wash-light) / 0.14);
+  --sval-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --sval-dur: 240ms;
+  /* One button for the whole page: a pill, as the Agents pane draws it. */
+  --sval-button-height: 34px;
+  --sval-button-font-size: 14px;
+  --sval-button-font-weight: 600;
+  /* A page's title: Settings' panes, the info and error pages. */
+  --sval-heading-size: 28px;
+  --sval-heading-weight: 600;
+  --sval-heading-tracking: -0.02em;
+
+  font-family: var(--sval-font);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sval-action-hover: var(--sval-palette-blue-400);
+    --sval-action-press: var(--sval-palette-blue-600);
+    --sval-accent: var(--sval-neon);
+    --sval-focus: var(--sval-neon);
+    --sval-page: var(--sval-palette-ink-850);
+    --sval-ink: #ffffff;
+    --sval-ink-body: var(--sval-palette-ink-200);
+    --sval-ink-muted: var(--sval-palette-ink-400);
+    --sval-card: rgb(var(--sval-palette-wash-light) / 0.28);
+    --sval-sunken: rgba(6, 10, 46, 0.55);
+    --sval-border: rgb(var(--sval-palette-wash-dark) / 0.18);
+    --sval-border-strong: rgb(var(--sval-palette-wash-dark) / 0.34);
+    --sval-control-edge: var(--sval-palette-ink-400);
+    /* A white knob is under 3:1 on the light track. */
+    --sval-switch-knob-off: var(--sval-palette-ink-850);
+    --sval-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --sval-tint: rgba(92, 242, 255, 0.12);
+    --sval-problem: #ff7a6b;
+    --sval-problem-tint: rgba(255, 122, 107, 0.14);
+    --sval-result-success: #5ee08a;
+    --sval-result-error: var(--sval-palette-red-invert);
+    --sval-result-error-tint: rgba(255, 138, 144, 0.12);
+    --sval-border-subtle: rgb(var(--sval-palette-wash-dark) / 0.1);
+    --sval-card-hover: rgb(var(--sval-palette-wash-light) / 0.44);
+    --sval-raised: var(--sval-palette-ink-850);
+    --sval-glass: rgba(6, 10, 46, 0.72);
+    --sval-fixed: #4fcf6a;
+    --sval-security: #ffc22a;
+    --sval-inverse: var(--sval-palette-ink-950);
+    --sval-modal-dim: rgba(3, 5, 26, 0.62);
+    --sval-modal-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), 0 12px 32px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/*
+ * Firefox's design tokens (toolkit/themes/shared/design-system), set to Sval's
+ * values. Firefox declares them in cascade layers, so these unlayered values
+ * win, and its components, light DOM and shadow DOM alike, follow without a
+ * rule of their own. High contrast and forced colours keep Firefox's values,
+ * which are built for them.
+ */
+@media not ((forced-colors) or (prefers-contrast)) {
+  :root {
+    --background-color-canvas: var(--sval-page);
+    --background-color-box: var(--sval-card);
+    /* What floats over the page, every panel-list among it, is opaque: the
+       card is translucent in the dark theme. */
+    --panel-background-color: var(--sval-raised);
+    --text-color: var(--sval-ink-body);
+    --text-color-deemphasized: var(--sval-ink-muted);
+    --icon-color: var(--sval-ink-body);
+    --color-accent-primary: var(--sval-action);
+    --color-accent-primary-hover: var(--sval-action-hover);
+    --color-accent-primary-active: var(--sval-action-press);
+    --color-accent-primary-selected: var(--sval-action);
+    --text-color-accent-primary-selected: var(--sval-action-text);
+    --link-color: var(--sval-accent);
+    --link-color-hover: var(--sval-accent);
+    --link-color-active: var(--sval-accent);
+    --link-color-visited: var(--sval-accent);
+    --focus-outline-color: var(--sval-focus);
+    --border-color: var(--sval-border);
+    --border-color-deemphasized: var(--sval-border-subtle);
+    --border-color-interactive: var(--sval-border-strong);
+    --border-color-interactive-hover: var(--sval-accent);
+    --border-color-interactive-active: var(--sval-accent);
+    --border-color-selected: var(--sval-accent);
+
+    --button-border-radius: 999px;
+    --button-font-size: var(--sval-button-font-size);
+    --button-font-weight: var(--sval-button-font-weight);
+    --button-min-height: var(--sval-button-height);
+    --button-padding: 0 16px;
+    --button-background-color: transparent;
+    --button-background-color-hover: var(--sval-tint);
+    --button-background-color-active: var(--sval-tint);
+    --button-background-color-disabled: transparent;
+    --button-border-color: var(--sval-border-strong);
+    --button-border-color-hover: var(--sval-accent);
+    --button-border-color-active: var(--sval-accent);
+    --button-border-color-disabled: var(--sval-border-strong);
+    --button-text-color: var(--sval-ink);
+    --button-background-color-primary: var(--sval-action);
+    --button-background-color-primary-hover: var(--sval-action-hover);
+    --button-background-color-primary-active: var(--sval-action-press);
+    --button-background-color-primary-disabled: var(--sval-action);
+    --button-border-color-primary: var(--sval-action);
+    --button-border-color-primary-hover: var(--sval-action-hover);
+    --button-border-color-primary-active: var(--sval-action-press);
+    --button-text-color-primary: var(--sval-action-text);
+    --button-background-color-destructive: var(--sval-problem);
+    --button-background-color-destructive-hover: color-mix(in srgb, var(--sval-problem) 86%, var(--sval-ink));
+    --button-background-color-destructive-active: color-mix(in srgb, var(--sval-problem) 86%, var(--sval-ink));
+    --button-border-color-destructive: transparent;
+    --button-text-color-destructive: var(--sval-inverse);
+    --button-background-color-ghost-hover: var(--sval-tint);
+    --button-background-color-ghost-active: var(--sval-tint);
+
+    --card-background-color: var(--sval-card);
+    --card-border-color: var(--sval-border);
+    --card-border-radius: 20px;
+    --card-box-shadow: var(--sval-shadow);
+
+    --checkbox-background-color: var(--sval-sunken);
+    --checkbox-border-color: var(--sval-control-edge);
+    --checkbox-border-radius: 6px;
+
+    --input-border-color: var(--sval-control-edge);
+    --input-text-border-color: var(--sval-control-edge);
+    --input-text-border-radius: 999px;
+    --input-text-background-color: var(--sval-sunken);
+    --input-text-color: var(--sval-ink);
+
+    --table-background-color: var(--sval-card);
+    --table-border-color: var(--sval-border);
+    --table-header-background-color: var(--sval-sunken);
+    --table-header-text-color: var(--sval-ink);
+    --table-row-background-color: var(--sval-card);
+    --table-row-background-color-alternate: var(--sval-sunken);
+  }
+}
+
+/* What Firefox's tokens do not reach: its headings, which take Sval's sizes
+   and ink. */
+
+moz-page-header {
+  --font-size-heading-large: var(--sval-heading-size);
+  --font-size-heading-medium: var(--sval-heading-size);
+  color: var(--sval-ink);
+  letter-spacing: var(--sval-heading-tracking);
+}
+
+:root {
+  --font-size-heading-medium: 18px;
+}
+
+moz-fieldset::part(label) {
+  color: var(--sval-ink);
+}
+
+/* Components that declare tokens of their own on their host, where only a
+   rule on the element itself reaches them. Switches are Sval's switch, boxes
+   and menus the Agents pane's rows and selects, and the nav and promo boxes
+   take Sval's accent and surfaces. */
+@media not ((forced-colors) or (prefers-contrast)) {
+  moz-toggle {
+    --toggle-width: 44px;
+    --toggle-height: 26px;
+    /* Centres the taller track on the label's first line. */
+    --input-height: var(--toggle-height);
+    --toggle-dot-margin: 4px;
+    --toggle-dot-transform-x: calc(var(--toggle-width) - 2 * var(--toggle-dot-margin) - var(--toggle-dot-width));
+    --toggle-border-width: 0px;
+    --toggle-background-color: var(--sval-control-edge);
+    --toggle-background-color-hover: var(--sval-control-edge);
+    --toggle-background-color-active: var(--sval-control-edge);
+    --toggle-dot-background-color: var(--sval-switch-knob-off);
+    --toggle-dot-background-color-on-pressed: #ffffff;
+  }
+
+  /* The controls nested under a switch keep Firefox's own input height. */
+  moz-toggle > * {
+    --input-height: var(--size-item-small);
+  }
+
+  moz-box-item,
+  moz-box-button,
+  moz-box-link,
+  moz-box-group {
+    --box-border-color: var(--sval-border);
+    --box-border-radius: 12px;
+  }
+
+  moz-page-nav-button {
+    --page-nav-button-indicator-color: var(--sval-accent);
+    --page-nav-button-background-color-selected: var(--sval-tint);
+  }
+
+  moz-promo {
+    --promo-background-color: var(--sval-sunken);
+    --promo-border-color: var(--sval-border);
+    --promo-message-text-color: var(--sval-ink-body);
+    --promo-heading-text-color: var(--sval-ink);
+  }
+
+  moz-select {
+    --select-border-radius: 8px;
+    --select-background-color: var(--sval-glass);
+  }
+
+  /* `common-shared.css` paints a menulist's popup and an autocomplete
+     popup in the box colour, which is the translucent card here. */
+  menulist > menupopup {
+    --panel-background-color: var(--sval-raised);
+  }
+
+  panel[type="autocomplete-richlistbox"] {
+    background-color: var(--sval-raised);
+  }
+}

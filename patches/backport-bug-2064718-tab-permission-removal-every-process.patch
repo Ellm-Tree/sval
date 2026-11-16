@@ -1,0 +1,347 @@
+Sval: a removed tab-scoped permission reaches every process holding a copy
+
+Backport of Mozilla's Bug 2064718 (mozilla-central a845ae2cf750, Firefox
+156), unchanged. ESR 153 does not carry it.
+PermissionManager::ForwardBrowserPermissionToChild sent a change to a
+tab-scoped permission only to the process showing the tab. A page the tab
+left keeps its process's copy, in the bfcache and in a later load there,
+which TransmitBrowserPermissionsForPrincipal seeded, so a grant removed
+after the tab moved to another process applied again on going back. A
+removal reaches every process that NeedsPermissionsUpdate for the
+permission's key. A clear of a tab's permissions reaches every process: it
+names no origin, and on a tab's close GetCurrentTopByBrowserId no longer
+finds the tab. Its test is browser_temporary_permissions_child_clear.js.
+Drop this patch when the upstream pin reaches Firefox 156.
+
+diff --git a/browser/base/content/test/permissions/browser.toml b/browser/base/content/test/permissions/browser.toml
+index 2ddd84d27c..daf71ea8d2 100644
+--- a/browser/base/content/test/permissions/browser.toml
++++ b/browser/base/content/test/permissions/browser.toml
+@@ -57,6 +57,8 @@ support-files = ["../webrtc/get_user_media.html"]
+ 
+ ["browser_temporary_permissions_api_e2e.js"]
+ 
++["browser_temporary_permissions_child_clear.js"]
++
+ ["browser_temporary_permissions_cross_origin_navigation.js"]
+ 
+ ["browser_temporary_permissions_expiry.js"]
+diff --git a/browser/base/content/test/permissions/browser_temporary_permissions_child_clear.js b/browser/base/content/test/permissions/browser_temporary_permissions_child_clear.js
+new file mode 100644
+index 0000000000..7a31c4f281
+--- /dev/null
++++ b/browser/base/content/test/permissions/browser_temporary_permissions_child_clear.js
+@@ -0,0 +1,231 @@
++/* Any copyright is dedicated to the Public Domain.
++ * http://creativecommons.org/publicdomain/zero/1.0/ */
++
++"use strict";
++
++// Browser-scoped permission removals must reach the content process. The
++// parent's own table is cleared synchronously, so these tests deliberately
++// assert the *child's* view, read from a tab that shares the content process
++// and outlives the tab (or the document) the permission belonged to.
++
++const ORIGIN = "https://example.com/";
++const OTHER_ORIGIN = "https://example.org/";
++
++let gTabs = new Set();
++
++function getPrincipal(origin) {
++  return Services.scriptSecurityManager.createContentPrincipalFromOrigin(
++    origin
++  );
++}
++
++// Reads the content process' copy of a browser-scoped permission. `browser`
++// only selects which process to ask; `browserId` is the tab being asked about
++// and need not belong to `browser`.
++async function testForBrowserInChild(browser, origin, type, browserId) {
++  return SpecialPowers.spawn(browser, [origin, type, browserId], (o, t, id) => {
++    let principal =
++      Services.scriptSecurityManager.createContentPrincipalFromOrigin(o);
++    return Services.perms.testForBrowser(principal, t, id);
++  });
++}
++
++function getContentProcessID(browser) {
++  return browser.browsingContext.currentWindowGlobal.domProcess.childID;
++}
++
++async function openTab(url = ORIGIN) {
++  let tab = await BrowserTestUtils.openNewForegroundTab(gBrowser, url);
++  gTabs.add(tab);
++  return tab;
++}
++
++function closeTab(tab) {
++  gTabs.delete(tab);
++  return BrowserTestUtils.removeTab(tab);
++}
++
++// Opens two same-origin tabs pinned to a single content process. The first is
++// returned as the observer: it stays open so its process survives whatever
++// happens to the second tab, letting us inspect what that process still
++// believes.
++async function openObserverAndSubjectTabs() {
++  let observerTab = await openTab();
++  let subjectTab = await openTab();
++
++  Assert.equal(
++    getContentProcessID(observerTab.linkedBrowser),
++    getContentProcessID(subjectTab.linkedBrowser),
++    "Both tabs should share one content process"
++  );
++
++  return { observerTab, subjectTab };
++}
++
++add_setup(async function () {
++  // Force same-origin tabs to share a process so one can outlive the other.
++  await SpecialPowers.pushPrefEnv({
++    set: [["dom.ipc.processCount.webIsolated", 1]],
++  });
++});
++
++registerCleanupFunction(() => {
++  for (let tab of gTabs) {
++    BrowserTestUtils.removeTab(tab);
++  }
++  gTabs.clear();
++});
++
++// Bug 2064718: on tab close the BrowserId is unregistered from the
++// BrowsingContext map before "browsing-context-discarded" fires, so the clear
++// could not be routed to the tab's content process and the entry leaked there.
++add_task(async function testTabCloseClearsPermissionInChild() {
++  let { observerTab, subjectTab } = await openObserverAndSubjectTabs();
++  let browser = subjectTab.linkedBrowser;
++  let principal = getPrincipal(ORIGIN);
++  let browserId = browser.browserId;
++
++  Services.perms.addFromPrincipalForBrowser(
++    principal,
++    "geo",
++    Services.perms.ALLOW_ACTION,
++    browserId,
++    0
++  );
++
++  await waitForPermissionState(browser, "geolocation", "granted");
++  Assert.equal(
++    await testForBrowserInChild(browser, ORIGIN, "geo", browserId),
++    Services.perms.ALLOW_ACTION,
++    "Content process should see the permission before tab close"
++  );
++
++  await closeTab(subjectTab);
++
++  Assert.equal(
++    Services.perms.testForBrowser(principal, "geo", browserId),
++    Services.perms.UNKNOWN_ACTION,
++    "Parent should have dropped the permission on tab close"
++  );
++
++  await TestUtils.waitForCondition(
++    async () =>
++      (await testForBrowserInChild(
++        observerTab.linkedBrowser,
++        ORIGIN,
++        "geo",
++        browserId
++      )) == Services.perms.UNKNOWN_ACTION,
++    "Waiting for the content process to drop the closed tab's permission"
++  );
++
++  await closeTab(observerTab);
++});
++
++// Bug 2064718: a removal was only routed to the tab's *current* content
++// process, so a process left behind by a process switch kept serving the
++// permission after it had been revoked.
++add_task(async function testRemovalReachesProcessLeftBehindByProcessSwitch() {
++  let { observerTab, subjectTab } = await openObserverAndSubjectTabs();
++  let browser = subjectTab.linkedBrowser;
++  let principal = getPrincipal(ORIGIN);
++  let browserId = browser.browserId;
++
++  Services.perms.addFromPrincipalForBrowser(
++    principal,
++    "geo",
++    Services.perms.ALLOW_ACTION,
++    browserId,
++    0
++  );
++  await waitForPermissionState(browser, "geolocation", "granted");
++
++  // Navigate cross-site so the tab switches process. The original process stays
++  // alive because observerTab is still in it, still holding the entry.
++  let loaded = BrowserTestUtils.browserLoaded(browser, false, OTHER_ORIGIN);
++  BrowserTestUtils.startLoadingURIString(browser, OTHER_ORIGIN);
++  await loaded;
++
++  Assert.notEqual(
++    getContentProcessID(browser),
++    getContentProcessID(observerTab.linkedBrowser),
++    "Tab should have switched away from the original process"
++  );
++  Assert.equal(
++    await testForBrowserInChild(
++      observerTab.linkedBrowser,
++      ORIGIN,
++      "geo",
++      browserId
++    ),
++    Services.perms.ALLOW_ACTION,
++    "Original process should still hold the entry after the process switch"
++  );
++
++  Services.perms.removeFromPrincipalForBrowser(principal, "geo", browserId);
++
++  await TestUtils.waitForCondition(
++    async () =>
++      (await testForBrowserInChild(
++        observerTab.linkedBrowser,
++        ORIGIN,
++        "geo",
++        browserId
++      )) == Services.perms.UNKNOWN_ACTION,
++    "Waiting for the process left behind to drop the revoked permission"
++  );
++
++  await closeTab(subjectTab);
++  await closeTab(observerTab);
++});
++
++// The same delivery path is used for a single removal and for a bulk clear on
++// a live tab. Both are covered here because they take different IPC messages.
++add_task(async function testExplicitRemovalClearsPermissionInChild() {
++  let { observerTab, subjectTab } = await openObserverAndSubjectTabs();
++  let browser = subjectTab.linkedBrowser;
++  let principal = getPrincipal(ORIGIN);
++  let browserId = browser.browserId;
++
++  for (let removal of [
++    () =>
++      Services.perms.removeFromPrincipalForBrowser(principal, "geo", browserId),
++    () => Services.perms.removeAllForBrowser(browserId),
++    () =>
++      Services.perms.removeByActionForBrowser(
++        browserId,
++        Services.perms.ALLOW_ACTION
++      ),
++  ]) {
++    Services.perms.addFromPrincipalForBrowser(
++      principal,
++      "geo",
++      Services.perms.ALLOW_ACTION,
++      browserId,
++      0
++    );
++    await waitForPermissionState(browser, "geolocation", "granted");
++
++    removal();
++
++    await TestUtils.waitForCondition(
++      async () =>
++        (await testForBrowserInChild(browser, ORIGIN, "geo", browserId)) ==
++        Services.perms.UNKNOWN_ACTION,
++      "Waiting for the content process to drop the removed permission"
++    );
++    Assert.equal(
++      await testForBrowserInChild(
++        observerTab.linkedBrowser,
++        ORIGIN,
++        "geo",
++        browserId
++      ),
++      Services.perms.UNKNOWN_ACTION,
++      "Permission should be gone from the shared content process"
++    );
++  }
++
++  await closeTab(subjectTab);
++  await closeTab(observerTab);
++});
+diff --git a/extensions/permissions/PermissionManager.cpp b/extensions/permissions/PermissionManager.cpp
+index cbf4f0892f..5fd93baae8 100644
+--- a/extensions/permissions/PermissionManager.cpp
++++ b/extensions/permissions/PermissionManager.cpp
+@@ -4459,6 +4459,34 @@ void PermissionManager::ForwardBrowserPermissionToChild(
+     uint64_t aBrowserId, bool aIsRemoval) {
+   MOZ_ASSERT(XRE_IsParentProcess());
+ 
++  nsAutoCString origin;
++  nsresult rv = aPrincipal->GetOrigin(origin);
++  if (NS_FAILED(rv)) {
++    return;
++  }
++
++  // A removal has to reach every process that may still hold a copy, not only
++  // the tab's current one: out-of-process iframes, and processes left behind by
++  // a process switch, are seeded by TransmitBrowserPermissionsForPrincipal.
++  // Select them by permission key, as regular permission updates do, so the
++  // origin only reaches processes that were already given it. The key has no
++  // tab dimension, so a process holding this origin for a different tab is
++  // notified too, where the removal is a no-op.
++  if (aIsRemoval) {
++    nsAutoCString permissionKey;
++    GetKeyForPermission(aPrincipal, aType, permissionKey);
++
++    nsTArray<dom::ContentParent*> cplist;
++    dom::ContentParent::GetAll(cplist);
++    for (dom::ContentParent* cp : cplist) {
++      if (cp->NeedsPermissionsUpdate(permissionKey)) {
++        (void)cp->SendSetBrowserPermission(origin, nsCString(aType), aAction,
++                                           aBrowserId, aIsRemoval);
++      }
++    }
++    return;
++  }
++
+   RefPtr<dom::BrowsingContext> bc =
+       dom::BrowsingContext::GetCurrentTopByBrowserId(aBrowserId);
+   if (!bc) {
+@@ -4470,12 +4498,6 @@ void PermissionManager::ForwardBrowserPermissionToChild(
+     return;
+   }
+ 
+-  nsAutoCString origin;
+-  nsresult rv = aPrincipal->GetOrigin(origin);
+-  if (NS_FAILED(rv)) {
+-    return;
+-  }
+-
+   if (!cp->SendSetBrowserPermission(origin, nsCString(aType), aAction,
+                                     aBrowserId, aIsRemoval)) {
+     NS_WARNING("Failed to send SetBrowserPermission to child");
+@@ -4716,19 +4738,16 @@ void PermissionManager::ForwardClearBrowserPermissionsToChild(
+     uint64_t aBrowserId, uint32_t aActionFilter) {
+   MOZ_ASSERT(XRE_IsParentProcess());
+ 
+-  RefPtr<dom::BrowsingContext> bc =
+-      dom::BrowsingContext::GetCurrentTopByBrowserId(aBrowserId);
+-  if (!bc) {
+-    return;
+-  }
+-
+-  dom::ContentParent* cp = bc->Canonical()->GetContentParent();
+-  if (!cp) {
+-    return;
+-  }
+-
+-  if (!cp->SendClearBrowserPermissions(aBrowserId, aActionFilter)) {
+-    NS_WARNING("Failed to send ClearBrowserPermissions to child");
++  // The BrowserId cannot be resolved back to a BrowsingContext here: the main
++  // caller is tab teardown, and BrowsingContext::Detach unregisters the
++  // BrowserId before it fires "browsing-context-discarded". Broadcast instead.
++  // Unlike SetBrowserPermission this message names no origin, so it discloses
++  // nothing to processes that never held the entry, and clearing a browserId a
++  // process knows nothing about is a no-op.
++  nsTArray<dom::ContentParent*> cplist;
++  dom::ContentParent::GetAll(cplist);
++  for (dom::ContentParent* cp : cplist) {
++    (void)cp->SendClearBrowserPermissions(aBrowserId, aActionFilter);
+   }
+ }
+ 

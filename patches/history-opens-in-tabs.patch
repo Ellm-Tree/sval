@@ -1,0 +1,38 @@
+Sval: a plain click on a history page opens it in a new tab
+
+PlacesUIUtils.openNodeWithEvent opens a bookmark in a new tab under
+browser.tabs.loadBookmarksInTabs, reusing the selected tab when it is empty,
+and has no such rule for history. Sval applies the same rule to history under
+browser.sval.loadHistoryInTabs. No API decides where a Places view opens a
+node: the History sidebar and the history menus call this function directly.
+
+diff --git a/browser/components/places/PlacesUIUtils.sys.mjs b/browser/components/places/PlacesUIUtils.sys.mjs
+index 7c11a2004c..ace96ef9f7 100644
+--- a/browser/components/places/PlacesUIUtils.sys.mjs
++++ b/browser/components/places/PlacesUIUtils.sys.mjs
+@@ -880,7 +880,11 @@ export var PlacesUIUtils = {
+     let window = aEvent.target.documentGlobal;
+ 
+     let where = lazy.BrowserUtils.whereToOpenLink(aEvent, false, true);
+-    if (this.loadBookmarksInTabs && lazy.PlacesUtils.nodeIsBookmark(aNode)) {
++    let isBookmark = lazy.PlacesUtils.nodeIsBookmark(aNode);
++    if (
++      (this.loadBookmarksInTabs && isBookmark) ||
++      (this.svalLoadHistoryInTabs && !isBookmark)
++    ) {
+       if (where == "current" && !aNode.uri.startsWith("javascript:")) {
+         where = "tab";
+       }
+@@ -1859,6 +1863,12 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   "browser.tabs.loadBookmarksInTabs",
+   false
+ );
++XPCOMUtils.defineLazyPreferenceGetter(
++  PlacesUIUtils,
++  "svalLoadHistoryInTabs",
++  "browser.sval.loadHistoryInTabs",
++  false
++);
+ XPCOMUtils.defineLazyPreferenceGetter(
+   PlacesUIUtils,
+   "openInTabClosesMenu",

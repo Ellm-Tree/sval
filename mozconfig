@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Sval's identity: the configuration every build of Sval shares. scripts/build.sh
+# writes the tree's mozconfig as this file followed by one mode's fragment:
+# mozconfig.artifact for development and CI, mozconfig.gecko to compile Gecko.
+#
+# An artifact build must use the same identity as the Gecko build whose
+# packages it consumes, because packaging reads these options. Keeping them in
+# one file is what keeps the two in step.
+#
+# Most of what follows is compiled into libxul. Against Mozilla's prebuilt
+# libxul it changes only application.ini, which the compiled-in Firefox
+# identity overrides for a bare launch; that is why scripts/run.sh passes
+# --profile. It takes full effect in Sval's own Gecko, and in artifact builds
+# made from it.
+
+# Firefox is the default project; state it anyway so the file is self-documenting.
+ac_add_options --enable-project=browser
+
+# Sval branding. The directory is copied in by scripts/sync-files.sh.
+# Mozilla's trademark policy forbids Firefox branding.
+ac_add_options --with-branding=browser/branding/sval
+
+# The application's name: application.ini's "Name", the Unix remoting name and
+# the Windows MessageWindow name. Upstream documents varying it for full
+# rebrandings, which Sval is. The vendor and profile directory are project
+# flags that no mozconfig can set; patches/sval-app-vendor.patch sets them.
+ac_add_options --with-app-basename=Sval
+
+# MOZ_APP_NAME is the executable's name on every platform: sval.exe, sval and
+# Sval.app/Contents/MacOS/sval (browser/app/moz.build, Info.plist.in). It also
+# names a package's top directory (toolkit/mozapps/installer/package-name.mk),
+# the Windows installer's FileMainEXE and the registrations keyed by it (App
+# Paths, Applications), the toast notification pipe, and the Linux sval.desktop
+# that nsGNOMEShellService looks for. The artifact tooling reads it from the build to find the binaries
+# in a package it unpacks (python/mozbuild/mozbuild/artifacts.py). Left
+# unset, it would follow --with-app-basename lowercased; it is stated so that
+# the name is chosen here.
+ac_add_options --with-app-name=sval
+
+# The prefix of every Apple bundle id: macOS builds app.sval.sval from it and
+# the display name. Sval ships under sval.app.
+ac_add_options --with-distribution-id=app.sval
+
+# Sval loads no add-on from the directories that Firefox-family apps share:
+# ~/Library/Application Support/Mozilla/Extensions and its system twin on
+# macOS, %APPDATA%\Mozilla\Extensions on Windows, and ~/.mozilla/extensions,
+# /usr/lib/mozilla/extensions and /usr/share/mozilla/extensions on Linux.
+# XPIProvider looks in each under the application id, which Sval shares with
+# Firefox for add-on compatibility, so it would read Firefox's add-ons. The
+# profile's add-ons and the application's own are unaffected
+# (nsXREDirProvider::GetFile, ENABLE_SYSTEM_EXTENSION_DIRS).
+ac_add_options --disable-system-extension-dirs
+
+# The crash reporter stays compiled in, and a crash report goes to Sval's
+# feedback collector only when the user chooses to send it. Gecko posts a
+# report to this URL with /submit appended (build/application.ini.in,
+# ServerURL).
+ac_add_options --with-crashreporter-url=https://feedback.sval.app
+
+# Load the fonts the application ships, such as Twemoji Mozilla, on every
+# platform. Upstream turns this on for Windows and Linux only; macOS needs it
+# too for the bundled emoji font (RFPTarget::EmojiFontBundled).
+ac_add_options --enable-bundled-fonts
+
+# Google Safe Browsing, under Sval's own key. The key is never
+# committed: it is read from a file outside the repository, and a build without
+# that file simply has no Safe Browsing. CI writes the file from a secret.
+# The key reaches the front-end through AppConstants, so artifact builds take
+# it too.
+SVAL_SAFEBROWSING_KEYFILE="${SVAL_SAFEBROWSING_KEYFILE:-$HOME/.config/sval/safebrowsing-api.key}"
+if test -f "$SVAL_SAFEBROWSING_KEYFILE"; then
+  ac_add_options --with-google-safebrowsing-api-keyfile="$SVAL_SAFEBROWSING_KEYFILE"
+fi
+
+# A release build is on the release update channel: it checks Sval's update
+# feed, its updater trusts only Sval's MAR certificates (release_primary.der
+# and release_secondary.der, which chrome/ puts in the tree) and MARs made
+# for sval-release, and it shows Sval's own version. The application version
+# Gecko compares, for updates and for extensions' minimum Firefox version,
+# stays the ESR version. scripts/build.sh writes both version files when
+# SVAL_RELEASE_VERSION names the release. Every other build is on the default
+# channel, whose feed is never published, so a development build never
+# updates itself.
+if test -n "$SVAL_RELEASE_VERSION"; then
+  ac_add_options --enable-update-channel=release
+  ac_add_options --with-version-file-path=sval-version
+  ac_add_options MAR_CHANNEL_ID=sval-release
+  ac_add_options ACCEPTED_MAR_CHANNEL_IDS=sval-release
+fi

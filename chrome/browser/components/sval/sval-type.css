@@ -1,0 +1,38 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Outfit for a whole chrome document: its root, which everything without a
+ * font of its own inherits, and each element Mozilla's sheets give a system
+ * font of its own. Those sheets set it with the `font` shorthand (`menu`,
+ * `message-box`, `caption`, `icon`, `-moz-pull-down-menu`), under selectors
+ * up to an id (`#protections-popup`, `#editBookmarkPanel`), so the family
+ * here is important to win them all. The shorthand's size and weight stay
+ * the platform's.
+ *
+ * A menu Gecko hands to the platform (`nsXULPopupManager::ShowNativeMenuInternal`)
+ * is drawn by the platform in its own font, whatever this sheet says.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+
+:root,
+menubar,
+menupopup,
+menulist,
+panel,
+tooltip,
+popupnotification,
+button[type="default"],
+.ac-title,
+.tab-note-preview-container {
+  font-family: var(--sval-font) !important;
+}
+
+/* Form controls take `-moz-field` and `-moz-button` from the user agent's
+   `forms.css`, which any author rule outranks, so a class that sets its own
+   family, a monospace one included, keeps it. */
+:where(button, input, select, textarea) {
+  font-family: var(--sval-font);
+}

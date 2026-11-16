@@ -1,0 +1,297 @@
+Sval: paint every color a frame resolves through its site style
+
+A site style tints and inverts a page's colors as they are painted
+(chrome/layout/style/SvalSiteStyleColors.cpp, ported from Zen Browser's
+boosts backend). A user sheet can only replace colors, and a filter on the
+page inverts its pictures with it. StyleAbsoluteColor::ToColor is where
+every computed color becomes an nscolor, so it takes the frame the color is
+painted for and applies the frame's document's style there. The frame
+argument defaults to null, which leaves a color as it is, so only the
+callers that paint a frame's colors pass one: nsIFrame's and
+ComputedStyle's GetVisitedDependentColor, CalcColor, ToDeviceColor for
+gradient stops, and the canvas's default background.
+
+diff --git a/gfx/thebes/gfxUtils.cpp b/gfx/thebes/gfxUtils.cpp
+index 6c19c572f0..d11cbad2ee 100644
+--- a/gfx/thebes/gfxUtils.cpp
++++ b/gfx/thebes/gfxUtils.cpp
+@@ -1743,8 +1743,9 @@ DeviceColor ToDeviceColor(nscolor aColor) {
+   return ToDeviceColor(sRGBColor::FromABGR(aColor));
+ }
+ 
+-DeviceColor ToDeviceColor(const StyleAbsoluteColor& aColor) {
+-  return ToDeviceColor(aColor.ToColor());
++DeviceColor ToDeviceColor(const StyleAbsoluteColor& aColor,
++                          const nsIFrame* aFrame) {
++  return ToDeviceColor(aColor.ToColor(aFrame));
+ }
+ 
+ sRGBColor ToSRGBColor(const StyleAbsoluteColor& aColor) {
+diff --git a/gfx/thebes/gfxUtils.h b/gfx/thebes/gfxUtils.h
+index 55f874429f..350144c83d 100644
+--- a/gfx/thebes/gfxUtils.h
++++ b/gfx/thebes/gfxUtils.h
+@@ -29,6 +29,7 @@ struct gfxQuad;
+ class nsICookieJarSettings;
+ class nsIInputStream;
+ class nsIGfxInfo;
++class nsIFrame;
+ 
+ namespace mozilla {
+ namespace dom {
+@@ -609,7 +610,9 @@ namespace gfx {
+  * applicable).
+  */
+ DeviceColor ToDeviceColor(const sRGBColor&);
+-DeviceColor ToDeviceColor(const StyleAbsoluteColor&);
++// A frame, when given, has its document's site style applied to the color.
++DeviceColor ToDeviceColor(const StyleAbsoluteColor&,
++                          const nsIFrame* aFrame = nullptr);
+ DeviceColor ToDeviceColor(nscolor);
+ 
+ sRGBColor ToSRGBColor(const StyleAbsoluteColor&);
+diff --git a/layout/base/PresShell.cpp b/layout/base/PresShell.cpp
+index d6d77b6105..8785ada557 100644
+--- a/layout/base/PresShell.cpp
++++ b/layout/base/PresShell.cpp
+@@ -136,6 +136,7 @@
+ #include "mozilla/layers/WebRenderLayerManager.h"
+ #include "mozilla/layers/WebRenderUserData.h"
+ #include "mozilla/layout/ScrollAnchorContainer.h"
++#include "mozilla/SvalSiteStyleColors.h"
+ #include "nsAnimationManager.h"
+ #include "nsAutoLayoutPhase.h"
+ #include "nsCOMArray.h"
+@@ -5656,7 +5657,8 @@ nscolor PresShell::GetDefaultBackgroundColorToDraw() const {
+   if (!mPresContext) {
+     return NS_RGB(255, 255, 255);
+   }
+-  return mPresContext->DefaultBackgroundColor();
++  return SvalSiteStyleColors::Resolve(mPresContext->DefaultBackgroundColor(),
++                                      GetRootFrame());
+ }
+ 
+ void PresShell::UpdateCanvasBackground() {
+diff --git a/layout/generic/nsIFrame.h b/layout/generic/nsIFrame.h
+index 257cc037ea..3af30803cf 100644
+--- a/layout/generic/nsIFrame.h
++++ b/layout/generic/nsIFrame.h
+@@ -1010,7 +1010,7 @@ class nsIFrame : public nsQueryFrame {
+   /** Also forward GetVisitedDependentColor to the style */
+   template <typename T, typename S>
+   nscolor GetVisitedDependentColor(T S::* aField) {
+-    return mComputedStyle->GetVisitedDependentColor(aField);
++    return mComputedStyle->GetVisitedDependentColor(aField, this);
+   }
+ 
+   /**
+diff --git a/layout/style/ComputedStyle.cpp b/layout/style/ComputedStyle.cpp
+index 18308d7891..453da8ffa1 100644
+--- a/layout/style/ComputedStyle.cpp
++++ b/layout/style/ComputedStyle.cpp
+@@ -285,29 +285,32 @@ static nscolor GetVisitedDependentColorInternal(const ComputedStyle& aStyle,
+ }
+ 
+ static nscolor ExtractColor(const ComputedStyle& aStyle,
+-                            const StyleAbsoluteColor& aColor) {
+-  return aColor.ToColor();
++                            const StyleAbsoluteColor& aColor,
++                            const nsIFrame* aFrame) {
++  return aColor.ToColor(aFrame);
+ }
+ 
+ static nscolor ExtractColor(const ComputedStyle& aStyle,
+-                            const StyleColor& aColor) {
+-  return aColor.CalcColor(aStyle);
++                            const StyleColor& aColor, const nsIFrame* aFrame) {
++  return aColor.CalcColor(aStyle, aFrame);
+ }
+ 
+ // Currently caret-color, the only property in the list which is a ColorOrAuto,
+ // always maps auto to currentcolor.
+ static nscolor ExtractColor(const ComputedStyle& aStyle,
+-                            const StyleColorOrAuto& aColor) {
++                            const StyleColorOrAuto& aColor,
++                            const nsIFrame* aFrame) {
+   if (aColor.IsAuto()) {
+-    return ExtractColor(aStyle, StyleColor::CurrentColor());
++    return ExtractColor(aStyle, StyleColor::CurrentColor(), aFrame);
+   }
+-  return ExtractColor(aStyle, aColor.AsColor());
++  return ExtractColor(aStyle, aColor.AsColor(), aFrame);
+ }
+ 
+ static nscolor ExtractColor(const ComputedStyle& aStyle,
+-                            const StyleSVGPaint& aPaintServer) {
++                            const StyleSVGPaint& aPaintServer,
++                            const nsIFrame* aFrame) {
+   return aPaintServer.kind.IsColor()
+-             ? ExtractColor(aStyle, aPaintServer.kind.AsColor())
++             ? ExtractColor(aStyle, aPaintServer.kind.AsColor(), aFrame)
+              : NS_RGBA(0, 0, 0, 0);
+ }
+ 
+@@ -315,14 +318,14 @@ static nscolor ExtractColor(const ComputedStyle& aStyle,
+ #define GENERATE_VISITED_COLOR_TEMPLATE(name_, fields_)                        \
+   template <>                                                                  \
+   nscolor ComputedStyle::GetVisitedDependentColor(                             \
+-      decltype(nsStyle##name_::MOZ_ARG_1 fields_) nsStyle##name_::* aField)    \
+-      const {                                                                  \
++      decltype(nsStyle##name_::MOZ_ARG_1 fields_) nsStyle##name_::* aField,    \
++      const nsIFrame* aFrame) const {                                          \
+     MOZ_ASSERT(MOZ_FOR_EACH(STYLE_FIELD, (nsStyle##name_, ), fields_) false,   \
+                "Getting visited-dependent color for a field in nsStyle" #name_ \
+                " which is not listed in nsCSSVisitedDependentPropList.h");     \
+     return GetVisitedDependentColorInternal(                                   \
+-        *this, [aField](const ComputedStyle& aStyle) {                         \
+-          return ExtractColor(aStyle, aStyle.Style##name_()->*aField);         \
++        *this, [aField, aFrame](const ComputedStyle& aStyle) {                 \
++          return ExtractColor(aStyle, aStyle.Style##name_()->*aField, aFrame); \
+         });                                                                    \
+   }
+ FOR_EACH_VISITED_DEPENDENT_STYLE_STRUCT(GENERATE_VISITED_COLOR_TEMPLATE)
+diff --git a/layout/style/ComputedStyle.h b/layout/style/ComputedStyle.h
+index 7d7071cbab..f5704a7c6c 100644
+--- a/layout/style/ComputedStyle.h
++++ b/layout/style/ComputedStyle.h
+@@ -18,6 +18,7 @@
+ 
+ enum nsChangeHint : uint32_t;
+ class nsWindowSizes;
++class nsIFrame;
+ 
+ #define FORWARD_STRUCT(name_) struct nsStyle##name_;
+ FOR_EACH_STYLE_STRUCT(FORWARD_STRUCT, FORWARD_STRUCT)
+@@ -342,7 +343,8 @@ class ComputedStyle {
+    *               been listed in nsCSSVisitedDependentPropList.h.
+    */
+   template <typename T, typename S>
+-  nscolor GetVisitedDependentColor(T S::* aField) const;
++  nscolor GetVisitedDependentColor(T S::* aField,
++                                   const nsIFrame* aFrame = nullptr) const;
+ 
+   /**
+    * aColors should be a two element array of nscolor in which the first
+diff --git a/layout/style/StyleColor.cpp b/layout/style/StyleColor.cpp
+index bbee32af30..2901059053 100644
+--- a/layout/style/StyleColor.cpp
++++ b/layout/style/StyleColor.cpp
+@@ -6,6 +6,7 @@
+ #include "mozilla/ComputedStyleInlines.h"
+ #include "mozilla/StaticPrefs_layout.h"
+ #include "mozilla/StyleColorInlines.h"
++#include "mozilla/SvalSiteStyleColors.h"
+ #include "mozilla/dom/BindingDeclarations.h"
+ #include "nsIFrame.h"
+ #include "nsStyleStruct.h"
+@@ -106,13 +107,14 @@ nscolor StyleColor::CalcColor(
+ }
+ 
+ template <>
+-nscolor StyleColor::CalcColor(const ComputedStyle& aStyle) const {
+-  return ResolveColor(aStyle.StyleText()->mColor).ToColor();
++nscolor StyleColor::CalcColor(const ComputedStyle& aStyle,
++                              const nsIFrame* aFrame) const {
++  return ResolveColor(aStyle.StyleText()->mColor).ToColor(aFrame);
+ }
+ 
+ template <>
+ nscolor StyleColor::CalcColor(const nsIFrame* aFrame) const {
+-  return ResolveColor(aFrame->StyleText()->mColor).ToColor();
++  return ResolveColor(aFrame->StyleText()->mColor).ToColor(aFrame);
+ }
+ 
+ StyleAbsoluteColor StyleAbsoluteColor::ToColorSpace(
+@@ -120,7 +122,7 @@ StyleAbsoluteColor StyleAbsoluteColor::ToColorSpace(
+   return Servo_ConvertColorSpace(this, aColorSpace);
+ }
+ 
+-nscolor StyleAbsoluteColor::ToColor() const {
++nscolor StyleAbsoluteColor::ToColor(const nsIFrame* aFrame) const {
+   constexpr StyleColorSpace DEST_COLOR_SPACE = StyleColorSpace::Srgb;
+ 
+   constexpr float MIN = 0.0f;
+@@ -162,11 +164,13 @@ nscolor StyleAbsoluteColor::ToColor() const {
+     }
+   }
+ 
+-  return NS_RGBA(
+-      nsStyleUtil::FloatToColorComponent(translatedColor.components._0),
+-      nsStyleUtil::FloatToColorComponent(translatedColor.components._1),
+-      nsStyleUtil::FloatToColorComponent(translatedColor.components._2),
+-      nsStyleUtil::FloatToColorComponent(translatedColor.alpha));
++  return SvalSiteStyleColors::Resolve(
++      NS_RGBA(
++          nsStyleUtil::FloatToColorComponent(translatedColor.components._0),
++          nsStyleUtil::FloatToColorComponent(translatedColor.components._1),
++          nsStyleUtil::FloatToColorComponent(translatedColor.components._2),
++          nsStyleUtil::FloatToColorComponent(translatedColor.alpha)),
++      aFrame);
+ }
+ 
+ }  // namespace mozilla
+diff --git a/layout/style/StyleColorInlines.h b/layout/style/StyleColorInlines.h
+index 332f715ca2..a5bddde671 100644
+--- a/layout/style/StyleColorInlines.h
++++ b/layout/style/StyleColorInlines.h
+@@ -66,7 +66,7 @@ template <>
+ nscolor StyleColor::CalcColor(nscolor) const;
+ 
+ template <>
+-nscolor StyleColor::CalcColor(const ComputedStyle&) const;
++nscolor StyleColor::CalcColor(const ComputedStyle&, const nsIFrame*) const;
+ 
+ template <>
+ nscolor StyleColor::CalcColor(const nsIFrame*) const;
+diff --git a/layout/style/moz.build b/layout/style/moz.build
+index 4b89cbf319..67c03a92fc 100644
+--- a/layout/style/moz.build
++++ b/layout/style/moz.build
+@@ -130,6 +130,7 @@ EXPORTS.mozilla += [
+     "StyleSheet.h",
+     "StyleSheetInfo.h",
+     "StyleSheetInlines.h",
++    "SvalSiteStyleColors.h",
+     "TimelineCollection.h",
+     "TimelineManager.h",
+     "URLExtraData.h",
+@@ -188,6 +189,9 @@ EXPORTS.mozilla.css += [
+     "StylePreloadKind.h",
+ ]
+ 
++# Its helpers are file-local with short names a unified build could clash on.
++SOURCES += ["SvalSiteStyleColors.cpp"]
++
+ UNIFIED_SOURCES += [
+     "AnimationCollection.cpp",
+     "AttributeStyles.cpp",
+diff --git a/servo/ports/geckolib/cbindgen.toml b/servo/ports/geckolib/cbindgen.toml
+index 10c0c702db..683849b58c 100644
+--- a/servo/ports/geckolib/cbindgen.toml
++++ b/servo/ports/geckolib/cbindgen.toml
+@@ -673,9 +673,10 @@ renaming_overrides_prefixing = true
+   nscolor CalcColor(const nsIFrame*) const;
+   /**
+    * Compute the final color, taking into account the foreground color from the
+-   * style.
++   * style. The frame, when supplied, has the site style of its document
++   * applied to the color.
+    */
+-  nscolor CalcColor(const ComputedStyle&) const;
++  nscolor CalcColor(const ComputedStyle&, const nsIFrame* = nullptr) const;
+   /**
+    * Compute the final color, making the argument the foreground color.
+    */
+@@ -698,9 +699,10 @@ renaming_overrides_prefixing = true
+ 
+   /**
+    * Convert this color to an nscolor. The color will be converted to sRGB first
+-   * if required.
++   * if required. The frame, when supplied, is the one the color is painted
++   * for, and the site style of its document is applied to the color.
+    */
+-  nscolor ToColor() const;
++  nscolor ToColor(const nsIFrame* = nullptr) const;
+ """
+ 
+ "ColorFunction" = """

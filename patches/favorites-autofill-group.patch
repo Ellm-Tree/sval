@@ -1,0 +1,22 @@
+Sval: Favorites' autofill is grouped as the address bar's own autofill
+
+Sval's Favorites live in the engine's document, not in Places, so
+`UrlbarProviderAutofill` finds none of them. `SvalFavoritesAutofill` fills
+a favorite's origin or address in its place, as Firefox fills a bookmarked
+one, and its result has to rank where Firefox's does. No API assigns a
+heuristic result's group: `UrlbarUtils.getResultGroup` names each heuristic
+provider it knows, and sends any other to the fallback group with a console
+error. One case label puts it beside Firefox's own autofill.
+
+diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/urlbar/UrlbarUtils.sys.mjs
+index e4ef360762..663f068056 100644
+--- a/browser/components/urlbar/UrlbarUtils.sys.mjs
++++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
+@@ -607,6 +607,7 @@ export var UrlbarUtils = {
+         case "UrlbarProviderAliasEngines":
+           return this.RESULT_GROUP.HEURISTIC_ENGINE_ALIAS;
+         case "UrlbarProviderAutofill":
++        case "SvalFavoritesAutofill":
+           return this.RESULT_GROUP.HEURISTIC_AUTOFILL;
+         case "UrlbarProviderBookmarkKeywords":
+           return this.RESULT_GROUP.HEURISTIC_BOOKMARK_KEYWORD;

@@ -1,0 +1,26 @@
+Sval: open Sval's feedback form from openFeedbackPage
+
+Upstream opens app.feedback.baseURL, which Sval leaves empty, so the
+About dialog's feedback link did nothing. Sval's feedback is its own
+form, which SvalFeedbackForm opens in the newest browser window.
+
+diff --git a/browser/base/content/utilityOverlay.js b/browser/base/content/utilityOverlay.js
+index be11cc9d57..cd5cd0c596 100644
+--- a/browser/base/content/utilityOverlay.js
++++ b/browser/base/content/utilityOverlay.js
+@@ -472,11 +472,12 @@ function openTroubleshootingPage() {
+ }
+ 
+ /**
+- * Opens the feedback page for this version of the application.
++ * Opens Sval's Send Feedback form.
+  */
+ function openFeedbackPage() {
+-  var url = Services.urlFormatter.formatURLPref("app.feedback.baseURL");
+-  openTrustedLinkIn(url, "tab");
++  ChromeUtils.importESModule(
++    "moz-src:///browser/components/sval/SvalFeedbackForm.sys.mjs"
++  ).SvalFeedbackForm.open(window);
+ }
+ 
+ /**

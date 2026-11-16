@@ -1,0 +1,7 @@
+#filter substitution
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# Sval's own Fluent strings, as `sval/<file>.ftl`. Sval ships en-US only.
+[localization] @AB_CD@.jar:
+  sval                                              (en-US/*.ftl)

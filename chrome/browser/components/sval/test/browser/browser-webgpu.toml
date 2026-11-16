@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# WebGPU, with the prefs Mozilla's own WebGPU mochitests run under
+# (dom/webgpu/tests/mochitest/mochitest.toml). dom.webgpu.enabled is off by
+# default on Linux, and gfxPlatform::InitWebGPUConfig refuses the Mesa that
+# Linux CI's software Vulkan driver comes with unless
+# gfx.webgpu.ignore-blocklist is set at startup, so these run in a browser of
+# their own.
+# The first five prefs are every browser manifest's baseline, which
+# browser.toml gives the reasons for.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+  "dom.webgpu.enabled=true",
+  "gfx.webgpu.ignore-blocklist=true",
+]
+support-files = ["sval_agent_page2.html"]
+
+["browser_sval_fp_webgpu_timestamps.js"]

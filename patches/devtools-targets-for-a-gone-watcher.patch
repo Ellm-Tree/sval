@@ -1,0 +1,51 @@
+Sval: DevTools ignores a target reported for a watcher that has gone
+
+ParentProcessWatcherRegistry.unregisterWatcher dropped the watcher from its
+map without writing the map back to sharedData. A content process that
+starts while the JS Process Actors are still registered reads the stale
+watcher there, and DevToolsProcessChild.instantiate creates targets for it;
+a process that read it just before the destruction reached it does the
+same. DevToolsProcessParent.#onTargetAvailable then threw "Watcher Actor
+with ID ... can't be found" for each, which the Multiprocess Browser
+Console shows on a close while processes start. The registry writes the
+map back when a watcher goes, and #onTargetAvailable ignores a gone
+watcher as #onTargetDestroyed does; destroyWatcher destroys those targets
+when it reaches the process. The watcher registry and the process actors
+are Mozilla's, so no chrome API reaches them.
+
+diff --git a/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs b/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
+index ec695abd54..d75d3f32ed 100644
+--- a/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
++++ b/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
+@@ -241,6 +241,10 @@ export const ParentProcessWatcherRegistry = {
+   async unregisterWatcher(watcherActorID, processesDone) {
+     sessionDataByWatcherActor.delete(watcherActorID);
+     watcherActors.delete(watcherActorID);
++    // The JS Actors stay registered until processesDone settles, and a
++    // process that starts meanwhile creates targets for every watcher it
++    // reads from sharedData; the parent no longer knows this one.
++    persistMapToSharedData();
+     await processesDone;
+     // Past XPCOM shutdown the in-process actors are gone, and
+     // JSActorService::UnregisterProcessActor dereferences them.
+diff --git a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+index 80e288bf21..981bfa5a26 100644
+--- a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
++++ b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+@@ -139,11 +139,11 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+    */
+   #onTargetAvailable({ watcherActorID, forwardingPrefix, targetActorForm }) {
+     const watcher = ParentProcessWatcherRegistry.getWatcher(watcherActorID);
+-
+-    if (!watcher) {
+-      throw new Error(
+-        `Watcher Actor with ID '${watcherActorID}' can't be found.`
+-      );
++    // A process that read the watcher from sharedData before taking in its
++    // destruction creates its targets, and destroys them once destroyWatcher
++    // reaches it, as #onTargetDestroyed expects.
++    if (!watcher || watcher.isDestroyed()) {
++      return;
+     }
+     const connection = watcher.conn;
+ 

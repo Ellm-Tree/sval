@@ -1,0 +1,10 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Firefox's update history (Settings › About), in Sval's dialog frame.
+   Toolkit's `updates.css` insets the list from the dialog's text by a
+   margin of its own; the frame's text and its wells share one edge. */
+
+#historyItems {
+  margin-inline: 0;
+}

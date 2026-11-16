@@ -1,0 +1,39 @@
+---
+title: Open a new Peek window
+description: Open an empty Peek for something you won't keep, like a video call.
+---
+
+A new Peek window is a small window that isn't part of any Workspace. It's
+signed in as the Workspace you opened it from. When you close it, nothing is
+added to your Workspaces.
+
+You're about to join a video call and don't want the call's tab left in your Work
+Workspace afterward.
+
+## Steps
+
+1. Press <kbd>⌥⌘N</kbd> (<kbd>Ctrl+Alt+N</kbd> on Windows and Linux).
+2. Type an address or a search in the address bar.
+
+You can also choose **File › New Peek Window** in the menu bar.
+
+## Details
+
+- The Peek uses the sign-ins of the Workspace whose window you opened it
+  from. If you open the Peek from a private window, it uses the sign-ins
+  of your shared Workspaces.
+- A new Peek opens where you last closed one, at the same size.
+- After you close a Peek, its page stays in History.
+- To keep the page, open it in a Workspace. See
+  [Keep a page from a Peek in a Workspace](/docs/how-to/links/open-a-peek-in-a-workspace/).
+- If a link in the Peek would open a new tab, the link opens in a Peek of
+  its own instead.
+- You'll find New Peek Window in the Launcher too.
+- On Windows, some keyboard layouts type a character with <kbd>Ctrl+Alt+N</kbd>.
+  With a layout like that, the keys type the character and don't open a
+  Peek. Use the Launcher instead.
+
+## Related pages
+
+- [Keep a page from a Peek in a Workspace](/docs/how-to/links/open-a-peek-in-a-workspace/)
+- [Links settings and controls](/docs/reference/links/)

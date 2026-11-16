@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# The Rust every build under this checkout compiles with, Gecko's included:
+# rustup applies this file to any rustc or cargo run below it, so mach in
+# build/firefox picks it up on the gecko runner's image, the Mac runner's VMs
+# and a developer's Mac alike, and installs it where it is missing.
+#
+# It is the release Mozilla builds the upstream pin with: the channel of
+# linux64-rust in build/firefox/taskcluster/kinds/toolchain/rust.yml. A pin
+# bump moves it to match. Mozilla's clang and this rustc then share an LLVM
+# generation, which cross-language LTO needs, and scripts/gecko-key.sh hashes
+# this file, so a new compiler is a new Gecko.
+
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
+targets = ["x86_64-pc-windows-msvc", "x86_64-apple-darwin"]

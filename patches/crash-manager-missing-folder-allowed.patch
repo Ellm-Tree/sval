@@ -1,0 +1,22 @@
+Sval: CrashManager does not log a crash folder that is not there
+
+`_getDirectoryEntries` calls a missing folder allowed and logs it as an
+error anyway. A profile that has never crashed has no `submitted` folder,
+so every reader of `submittedDumps` would log a NotFoundError. Other errors
+are logged.
+
+diff --git a/toolkit/components/crashes/CrashManager.in.sys.mjs b/toolkit/components/crashes/CrashManager.in.sys.mjs
+index a7c96ca782..fb88aea56a 100644
+--- a/toolkit/components/crashes/CrashManager.in.sys.mjs
++++ b/toolkit/components/crashes/CrashManager.in.sys.mjs
+@@ -931,7 +931,9 @@ CrashManager.prototype = Object.freeze({
+         });
+       } catch (ex) {
+         // Missing events folders are allowed
+-        console.error(ex);
++        if (!DOMException.isInstance(ex) || ex.name != "NotFoundError") {
++          console.error(ex);
++        }
+       }
+ 
+       return entries;

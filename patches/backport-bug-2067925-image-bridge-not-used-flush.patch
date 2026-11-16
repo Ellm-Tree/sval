@@ -1,0 +1,37 @@
+Sval: ImageBridgeParent clears its about-to-send flag after a flush
+
+Backport of Mozilla's Bug 2067925 (mozilla-central e1a1356c1fdd, Firefox
+161), unchanged. ESR 153 does not carry it.
+ImageBridgeParent set mAboutToSendAsyncMessages for its first
+transaction and never cleared it, so every later NotifyNotUsed sent
+outside a transaction, as ReleaseCompositable sends, waited for a next
+transaction on that bridge. With none, the content process kept the
+textures and the decoded frames behind them alive, and on macOS the RDD
+process grew by gigabytes over days of video. Mozilla landed it without
+a test.
+Drop this patch when the upstream pin reaches Firefox 161.
+
+diff --git a/gfx/layers/ipc/ISurfaceAllocator.h b/gfx/layers/ipc/ISurfaceAllocator.h
+index 6dde6b6fc3..16c0eabeee 100644
+--- a/gfx/layers/ipc/ISurfaceAllocator.h
++++ b/gfx/layers/ipc/ISurfaceAllocator.h
+@@ -131,6 +131,7 @@ class HostIPCAllocator : public ISurfaceAllocator {
+   }
+ 
+   bool IsAboutToSendAsyncMessages() { return mAboutToSendAsyncMessages; }
++  void ClearAboutToSendAsyncMessages() { mAboutToSendAsyncMessages = false; }
+ 
+  protected:
+   nsTArray<AsyncParentMessageData> mPendingAsyncMessage;
+diff --git a/gfx/layers/ipc/ImageBridgeParent.cpp b/gfx/layers/ipc/ImageBridgeParent.cpp
+index 92a3e8629e..3d7c726ff4 100644
+--- a/gfx/layers/ipc/ImageBridgeParent.cpp
++++ b/gfx/layers/ipc/ImageBridgeParent.cpp
+@@ -179,6 +179,7 @@ class MOZ_STACK_CLASS AutoImageBridgeParentAsyncMessageSender final {
+ 
+   ~AutoImageBridgeParentAsyncMessageSender() {
+     mImageBridge->SendPendingAsyncMessages();
++    mImageBridge->ClearAboutToSendAsyncMessages();
+     if (mToDestroy) {
+       mImageBridge->DestroyActors(*mToDestroy);
+     }

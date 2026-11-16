@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: occurrence
+message: "A sentence over 30 words. Split it."
+level: error
+scope: sentence
+max: 30
+token: '\b[\w''’-]+\b'

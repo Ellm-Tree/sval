@@ -1,0 +1,20 @@
+Sval: the address bar's history group is labelled "Your History"
+
+Firefox labels the group of rows from the user's own data, history and
+bookmarks and open tabs, with its Suggest brand, which Sval's no-firefox-name
+patch reduces to a bare "Suggest". The label is a Fluent string the address
+bar and the home page both read, so only a patch renames it.
+
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index 3fc288109c..fb562f6b88 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -955,7 +955,7 @@ urlbar-view-context-menu-open-in-private-window =
+ # A label shown above the "Firefox Suggest" (bookmarks/history) group in the
+ # urlbar results.
+ urlbar-group-firefox-suggest =
+-  .label = { -firefox-suggest-brand-name }
++  .label = Your History
+ 
+ # A label shown above the search suggestions group in the urlbar results. It
+ # should use sentence case.

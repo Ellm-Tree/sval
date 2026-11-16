@@ -1,0 +1,150 @@
+---
+title: Extensions
+description: What each extension control does, from the extensions menu to an extension's page in Settings.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+
+Sval runs Manifest V2 and Manifest V3 extensions from addons.mozilla.org.
+With the controls below, you install extensions, turn them on and off, and
+limit where they run.
+
+## The extensions menu
+
+<Screenshot name="features-extensions" maxWidth={480} frame="rounded" alt="The extensions menu on theverge.com: each extension shows what it can do on this site, with a Run on theverge.com switch" />
+
+The **Extensions** button on the toolbar opens the extensions menu. The
+button shows a dot when an extension offers a button for the page you're
+on. It also shows a dot when the menu has a notice.
+
+Each extension has a row with its name. When the page you're on belongs to
+a site, each extension that can reach the site also shows these:
+
+- **What it can do on the site.** For example, the row says "Can read and
+  change pages on" the site. It can also say the extension can see the site's
+  connections, read and change the site's cookies, or see which pages of
+  the site you open. When the extension is off for the site, the row says
+  "Can't see or change anything".
+- **Run on.** This switch turns the extension on or off for the site. When
+  you turn the extension off, the site's tabs reload.
+
+A row can also show these:
+
+- **The extension's page button.** This shows when the extension offers a
+  button for this page, such as a feed reader on a page with a feed. The
+  button does what the extension's own button does.
+- **Pin to the toolbar.** The extension's button goes on the toolbar. While
+  the button is there, this reads **Unpin from the toolbar**. A pinned
+  extension stays in the menu.
+
+Some addresses, such as app.fastmail.com, have a part before the site's
+name. On those pages, a Run on line at the top of the menu
+chooses what the switches cover: that address alone, or
+**All of fastmail.com**.
+
+In private windows, the menu doesn't show what an extension can do or the
+Run on switch.
+
+### Notices in the extensions menu
+
+Notices show at the top of the menu. The extensions button shows a dot
+until you've seen the notices.
+
+- **An extension was added.** **OK** closes the notice. **Pin to toolbar**
+  pins the extension's button.
+- **An extension sees only one Workspace.** An extension that hides tabs
+  might not work as expected, because it only sees the tabs in the current
+  Workspace. **Remove** removes the extension, and **Keep** keeps it.
+- **An extension was turned off.** Sval turns off an extension that uses
+  containers. **Remove** removes the extension, and **OK** keeps it turned
+  off.
+- **A password manager couldn't be installed.** **Try Again** tries to
+  install the password manager again.
+
+## Settings › Extensions
+
+### Extension updates
+
+- **Days to wait before installing extension updates.** When Sval finds an
+  update, Sval waits this many days before installing the update. The
+  setting starts at 7. With 0, Sval installs updates right away. The
+  longest wait is 365 days. Your other devices use the same number.
+
+### Installed
+
+The list shows every extension by name, with its description.
+
+- **A name.** The extension's page opens.
+- **The switch.** The extension turns on or off. When another program
+  installed the extension, the extension asks for its permissions the first
+  time you turn it on.
+- **Install from file…** Sval installs an extension from a file on your
+  computer.
+- **Open the full extensions page.** The add-ons page opens in the same
+  tab.
+
+### Installing from websites
+
+- **Show warning when websites try to install extensions.** Sval asks you
+  before a website installs an extension.
+- **Choose which websites can install extensions.** You see the list of
+  sites that can install extensions without the warning.
+
+## An extension's page
+
+Selecting an extension's name in Settings › Extensions opens its page.
+
+### Extension
+
+- **On.** This switch turns the extension on or off. It also shows the
+  extension's version.
+- **Run in private windows.** The extension runs in private windows, where
+  it can see what you do. For an extension that can't run in private
+  windows, this shows **Never**. For an extension that has to run there,
+  it shows **Always**.
+- **Update waiting.** This shows when Sval is holding an update. It gives
+  the update's version and the date Sval will install the update.
+  **Update now** installs the update straight away.
+- **Its own settings.** This shows while the extension is on, if the
+  extension has settings of its own. **Options** opens those settings in a
+  new tab.
+
+### Permissions
+
+The list says what the extension can do. It uses the words of the prompt
+you saw when you installed the extension. Each optional permission has a
+switch, marked **Optional**. When an extension asks for no permissions, the
+list says **It asks for no permissions**.
+
+### Sites where this extension is off
+
+- **A site.** Each site shows with its switch off. Turning the switch on
+  lets the extension run on that site again.
+- **Turn it off on a site.** This field takes a site's address. **Turn
+  off** turns the extension off on that site.
+
+Your switches sync to your other devices.
+
+### Remove
+
+- **Remove.** A dialog asks you to confirm. Then Sval deletes the
+  extension and its data from this device. When Sval can't remove an
+  extension, this card doesn't show.
+
+## Settings › Sites
+
+A site's page has an Extensions card. The card lists every extension that
+can reach the site, each with a switch for that site.
+
+## Settings › Keyboard shortcuts
+
+Each extension with shortcuts has its own group that lists its shortcuts.
+**Change in the extensions page** opens the page where you change those
+shortcuts.
+
+## Extensions Sval doesn't install
+
+- **Themes.** Sval draws its own colors. When you try to install a theme,
+  Sval says "Sval doesn't support themes."
+- **Extensions that use containers.** Sval cancels the install and suggests
+  isolated Workspaces instead.

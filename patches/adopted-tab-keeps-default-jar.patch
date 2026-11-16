@@ -1,0 +1,24 @@
+Sval: a tab moved to another window keeps the default jar
+
+adoptTab gives the new tab the moving tab's usercontextid attribute, and a
+tab in the default jar has none, so addTab gives the new tab
+gBrowser.defaultUserContextId, which Sval sets to the jar of the workspace
+the window shows (workspace-jar-for-new-tabs.patch). A tab dragged into an
+isolated workspace's window would take that workspace's jar before the user
+has agreed to the move. Asking for jar 0 keeps the tab in its own jar, and
+SvalTabs reopens it in the workspace's jar once its node moves there.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index bbd319efa9..5d4fb4f492 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -7608,6 +7608,9 @@
+         // new tab must have the same usercontextid as the old one
+         params.userContextId = aTab.getAttribute("usercontextid");
+       }
++      // Sval: and one in the default jar stays in it, where addTab would
++      // give the window's workspace jar.
++      params.userContextId ??= 0;
+       params.skipLoad = true;
+       let newTab = this.addWebTab("about:blank", params);
+ 

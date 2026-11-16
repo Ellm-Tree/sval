@@ -1,0 +1,29 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+#include "nsISupports.idl"
+
+interface nsIBaseWindow;
+
+/**
+ * Orders Sval's windows among other apps' windows on macOS, which no chrome
+ * API does: Gecko's widgets only ever order a window in front
+ * (nsCocoaWindow::Show, SetFocus). SvalMacWindowOrder.mm describes when Sval
+ * keeps its windows behind another app's.
+ */
+[scriptable, uuid(5b0d6f3e-2a51-4c8e-9a7d-3f1e8c2b4d61)]
+interface nsISvalMacWindowOrder : nsISupports
+{
+  /**
+   * Brings `window` in front of the other apps' windows when Sval is the
+   * active app and another app's window covers it. Does nothing for a window
+   * already in front.
+   */
+  void bringForward(in nsIBaseWindow window);
+
+  /**
+   * Hands activation to the app whose window is just behind Sval's key
+   * window, when that window is not Sval's. Called as the key window closes.
+   */
+  void passActivationBehind();
+};

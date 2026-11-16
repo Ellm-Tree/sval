@@ -1,0 +1,20 @@
+Sval: hide File's last line with Quit on macOS
+
+Sval's menu bar takes out Work Offline, which stood between File's last
+line and Quit. macOS takes Quit out of File and hides the line above it
+only by this id (`nsMenuBarX::AquifyMenuBar`), so without it File ends
+on a line there.
+
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index 0ee46612bd..d8c4a5c727 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -60,7 +60,7 @@
+                 <menuseparator/>
+                 <menuitem id="menu_importFromAnotherBrowser"
+                           command="cmd_file_importFromAnotherBrowser" data-l10n-id="menu-file-import-from-another-browser"/>
+-                <menuseparator/>
++                <menuseparator id="menu_FileQuitSeparator"/>
+                 <menuitem id="menu_FileQuitItem"
+ #ifdef XP_MACOSX
+                           data-l10n-id="menu-quit-mac"

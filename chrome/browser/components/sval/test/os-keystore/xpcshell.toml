@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# The suite against the platform's own key store. Every task skips unless the
+# daily CI run sets SVAL_CI_OS_KEYSTORE=1.
+[DEFAULT]
+firefox-appdir = "browser"
+head = "head_os_keystore.js"
+# Every file uses the one store the job set up, and some stop it, so no two
+# files may run at once.
+run-sequentially = ["true"]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+]
+
+["test_sval_os_keystore.js"]
+
+["test_sval_os_keystore_earlier_refusal.js"]
+
+["test_sval_os_keystore_installing_again.js"]
+
+["test_sval_os_keystore_no_secret_service.js"]
+
+["test_sval_os_keystore_read_once.js"]
+
+["test_sval_os_keystore_refused_first_write.js"]
+
+["test_sval_os_keystore_unreadable.js"]

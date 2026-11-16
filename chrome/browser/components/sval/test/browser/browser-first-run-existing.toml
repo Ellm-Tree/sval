@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# A profile whose first launch ran without first run, so it has a workspace,
+# on which the file turns first run on before another window opens. A
+# profile's first launch happens once, so it runs in a browser of its own. The
+# prefs after the first are every browser manifest's baseline, which
+# browser.toml gives the reasons for.
+[DEFAULT]
+prefs = [
+  "browser.sval.firstRun.enabled=false",
+  "browser.sval.sync.background.enabled=false",
+  "services.settings.clock_skew_seconds=0",
+  "browser.crashReports.cleanupCheck.enabled=false",
+  "browser.search.suggest.enabled=false",
+  "security.dialog_enable_delay=0",
+]
+support-files = [
+  "head.js",
+  "sval_first_run_helpers.js",
+  "sval_first_run_scenario_helpers.js",
+]
+
+["browser_sval_first_run_existing.js"]

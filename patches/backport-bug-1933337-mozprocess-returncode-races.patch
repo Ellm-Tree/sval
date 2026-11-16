@@ -1,0 +1,146 @@
+Sval: mozprocess reads a process's exit code without racing its reader
+
+Backport of Mozilla's Bug 1933337 (mozilla-central 678211a7551d,
+1bf2f8e2dd37 and 093301928869, Firefox 161), with the one-line change of
+Bug 1916979 (mozilla-central e79b49bd6181, Firefox 160) the first of them
+builds on, unchanged. ESR 153 carries none of them.
+ProcessReader treats a deadline already passed as a timeout (Bug 1916979).
+On Windows the exit code is read under the cleanup lock, so it never reads a
+handle _cleanup is closing on another thread; Process.returncode is set in
+one place only; and poll() no longer returns the None a timed-out wait()
+stored once the reader thread has finished, which reported a process that
+had exited as still running. Its test is mozprocess's test_poll.py.
+Drop this patch when the upstream pin reaches Firefox 161.
+
+diff --git a/testing/mozbase/mozprocess/mozprocess/processhandler.py b/testing/mozbase/mozprocess/mozprocess/processhandler.py
+index 60967649ae..d18f95fd5a 100644
+--- a/testing/mozbase/mozprocess/mozprocess/processhandler.py
++++ b/testing/mozbase/mozprocess/mozprocess/processhandler.py
+@@ -249,7 +249,7 @@ class ProcessHandlerMixin:
+ 
+         def kill(self, sig=None, timeout=None):
+             self.send_signal(sig)
+-            self.returncode = self.wait(timeout)
++            self.wait(timeout)
+             self._cleanup()
+             return self.returncode
+ 
+@@ -272,7 +272,7 @@ class ProcessHandlerMixin:
+             Returns the main process's exit code
+             """
+             # This call will be different for each OS
+-            self.returncode = self._custom_wait(timeout=timeout)
++            self._custom_wait(timeout=timeout)
+             if self.returncode is not None:
+                 self._cleanup()
+             return self.returncode
+@@ -596,6 +596,22 @@ falling back to not using job objects for managing child processes""",
+                             self.debug("We got a message %s" % msgid.value)
+                             pass
+ 
++            def _update_returncode(self, exited=False):
++                """Set returncode if the process has exited. Returns False if
++                its handle has already been closed by _cleanup (possibly on
++                another thread).
++
++                - exited: the caller knows the process has exited, so an exit
++                  code equal to STILL_ACTIVE is the real exit code.
++                """
++                with self._cleanup_lock:
++                    if not self._handle:
++                        return False
++                    returncode = winprocess.GetExitCodeProcess(self._handle)
++                    if exited or returncode != winprocess.STILL_ACTIVE:
++                        self.returncode = returncode
++                    return True
++
+             def _custom_wait(self, timeout=None):
+                 """Custom implementation of wait.
+ 
+@@ -603,11 +619,7 @@ falling back to not using job objects for managing child processes""",
+                   will wait indefinitely.
+                 """
+                 # First, check to see if the process is still running
+-                if self._handle:
+-                    returncode = winprocess.GetExitCodeProcess(self._handle)
+-                    if returncode != winprocess.STILL_ACTIVE:
+-                        self.returncode = returncode
+-                else:
++                if not self._update_returncode():
+                     # Dude, the process is like totally dead!
+                     return self.returncode
+ 
+@@ -650,10 +662,7 @@ falling back to not using job objects for managing child processes""",
+                             "IO Completion Port failed to signal process shutdown"
+                         )
+                     finally:
+-                        if self._handle:
+-                            returncode = winprocess.GetExitCodeProcess(self._handle)
+-                            if returncode != winprocess.STILL_ACTIVE:
+-                                self.returncode = returncode
++                        self._update_returncode()
+ 
+                 else:
+                     # Not managing with job objects, so all we can reasonably do
+@@ -686,7 +695,7 @@ falling back to not using job objects for managing child processes""",
+                     elif rc == winprocess.WAIT_OBJECT_0:
+                         # We caught WAIT_OBJECT_0, which indicates all is well
+                         self.debug("Single process terminated successfully")
+-                        self.returncode = winprocess.GetExitCodeProcess(self._handle)
++                        self._update_returncode(exited=True)
+                     else:
+                         # An error occured we should probably throw
+                         rc = winprocess.GetLastError()
+@@ -950,7 +959,7 @@ falling back to not using job objects for managing child processes""",
+         # processed.
+         elif not self._ignore_children and self.reader.is_alive():
+             return None
+-        elif hasattr(self, "returncode"):
++        elif getattr(self, "returncode", None) is not None:
+             return self.returncode
+         else:
+             return self.proc.poll()
+@@ -1179,8 +1188,10 @@ class ProcessReader:
+             queue_timeout = None
+             if timeout:
+                 queue_timeout = timeout - time.time()
++                if queue_timeout <= 0:
++                    raise Empty
+             if output_timeout:
+-                if queue_timeout:
++                if queue_timeout is not None:
+                     queue_timeout = min(queue_timeout, output_timeout)
+                 else:
+                     queue_timeout = output_timeout
+diff --git a/testing/mozbase/mozprocess/tests/test_poll.py b/testing/mozbase/mozprocess/tests/test_poll.py
+index 475c61576c..362c83d9af 100644
+--- a/testing/mozbase/mozprocess/tests/test_poll.py
++++ b/testing/mozbase/mozprocess/tests/test_poll.py
+@@ -37,6 +37,27 @@ class ProcTestPoll(proctest.ProcTest):
+         self.determine_status(p, True)
+         p.kill()
+ 
++    def test_poll_after_wait_timeout(self):
++        """wait() times out while the process is running, and poll() is
++        called after the process has finished on its own."""
++        p = processhandler.ProcessHandler([
++            self.python,
++            "-c",
++            "import time; time.sleep(1)",
++        ])
++        p.run()
++        self.assertIsNone(p.wait(timeout=0.1))
++
++        for _ in range(0, 500):
++            time.sleep(processhandler.INTERVAL_PROCESS_ALIVE_CHECK)
++            returncode = p.poll()
++            if returncode is not None:
++                break
++
++        self.assertEqual(returncode, 0)
++
++        self.determine_status(p)
++
+     def test_poll_after_kill(self):
+         """Process is killed, and poll() is called."""
+         p = processhandler.ProcessHandler(

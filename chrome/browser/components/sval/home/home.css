@@ -1,0 +1,1349 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Sval's home page and private page: the brand lockup and one search field on
+   the brand field. The page is Sval's brand surface, so its values are the
+   Sval browser design system's tokens, carried here under their system names,
+   because the page loads nothing from outside the browser (spec §10.9). */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-palette.css");
+@import url("chrome://browser/content/sval/sval-launcher-rows.css");
+
+:root {
+  --sval-blue: var(--sval-palette-blue);
+  --sval-neon: var(--sval-palette-neon);
+  --ink-950: var(--sval-palette-ink-950);
+  --ink-850: var(--sval-palette-ink-850);
+  --ink-500: var(--sval-palette-ink-500);
+
+  --surface-glass: rgba(6, 10, 46, 0.72);
+  --border-strong: rgb(var(--sval-palette-wash-dark) / 0.34);
+  --text-strong: #ffffff;
+  --text-muted: var(--sval-palette-ink-400);
+  --action-primary: var(--sval-blue);
+  --action-primary-hover: var(--sval-palette-blue-400);
+  --action-primary-press: var(--sval-palette-blue-600);
+  --action-primary-text: #ffffff;
+  --focus-ring: var(--sval-neon);
+
+  /* Each field's outer stop is its frame's colour, so the page meets the
+     frame without an edge (pins spec §12.5): an untinted dark window's
+     frame is ink-850 (`sval-header.css`). */
+  --grad-night: radial-gradient(80% 80% at 50% 38%, #13328f 0%, var(--sval-palette-ink-850) 100%);
+  --grad-private: radial-gradient(80% 80% at 50% 38%, #2a1660 0%, #06031a 100%);
+  --bg-stars: url("chrome://browser/content/sval/home/starfield-stars-only-1920x1080.svg");
+
+  --shadow-md: 0 8px 24px rgba(3, 5, 26, 0.45);
+  --shadow-light-md: 0 8px 24px rgb(var(--sval-palette-wash-light) / 0.1);
+  --shadow-light-lg: 0 24px 60px rgb(var(--sval-palette-wash-light) / 0.14);
+  --glow-blue: 0 0 0 1px rgba(92, 242, 255, 0.25), 0 10px 36px rgba(31, 107, 255, 0.55);
+  --inset-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --blur-glass: 16px;
+  --ease-orbit: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --dur-fast: 160ms;
+
+  --space-5: 20px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --page-gutter: 32px;
+  --container-narrow: 760px;
+  --radius-icon: 22.5%;
+  --radius-pill: 999px;
+
+  --weight-regular: 400;
+  --text-body-l: 18px;
+
+  /* The page's own roles, which the light scheme, a workspace's colour and
+     the private palette reassign. The starfield is drawn over the field at
+     `--home-stars`'s opacity. */
+  --home-field: var(--grad-night);
+  --home-stars: 0.7;
+  --home-ink: var(--text-strong);
+  --home-ink-muted: var(--text-muted);
+  --home-input-bg: #070c30;
+  --home-input-border: var(--border-strong);
+  --home-input-shadow: var(--inset-hairline), var(--shadow-md);
+  --home-caret: var(--sval-neon);
+  --home-switch-on: var(--action-primary);
+  --home-wash: rgb(var(--sval-palette-wash-dark) / 0.1);
+
+  /* The Favorites row (home-favorites spec §11). The system's values as
+     first-run.css carries them, and the row's own tokens from the design.
+     On the night field a small surface carries the hairline alone, as the
+     header's cluster does, and a raised panel the header popup's shadow
+     (`--sval-cluster-shadow`, `--sval-popup-shadow` in sval-header.css). */
+  --text-body: var(--sval-palette-ink-200);
+  --ink-100: var(--sval-palette-frame-light);
+  --surface-card: rgba(255, 255, 255, 0.07);
+  --surface-card-hover: rgba(255, 255, 255, 0.13);
+  --surface-raised: var(--sval-palette-ink-850);
+  --border-subtle: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --border-default: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --shadow-lg: 0 24px 64px rgba(3, 5, 26, 0.55);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --space-8: 32px;
+  --fav-tile: 96px;
+  --fav-well: 64px;
+  --fav-icon: 32px;
+  --fav-mini: 16px;
+  --fav-gap: 8px;
+  --fav-panel-tile: 80px;
+  --fav-panel-well: 48px;
+  --fav-panel-icon: 24px;
+  --shadow-drag: 0 0 0 1px rgba(92, 242, 255, 0.35), 0 16px 40px rgba(3, 5, 26, 0.6);
+  --glow-tile-hover: 0 0 24px rgba(31, 107, 255, 0.35);
+  --focus-backing: var(--surface-glass);
+  --surface-press: rgb(var(--sval-palette-wash-light) / 0.56);
+  --home-tile-bg: var(--surface-card);
+  --home-tile-shadow: var(--inset-hairline);
+  --home-panel-shadow: var(--inset-hairline), var(--shadow-lg);
+  --home-letter: var(--sval-neon);
+  --home-label-shadow: 0 1px 2px rgba(3, 5, 26, 0.85);
+  --z-fav-panel: 10;
+  --z-suggest: 20;
+  color-scheme: dark;
+}
+
+/* The light scheme, which `workspace.js` sets from the theme, as the
+   window's is. A workspace's colour changes the glow, the coloured stars and
+   the daylight field's edge, never the scheme. The private page is always dark. */
+:root.light:not(.private) {
+  --text-body: var(--sval-palette-ink-700);
+  --surface-card: #ffffff;
+  --surface-raised: #ffffff;
+  --border-subtle: rgb(var(--sval-palette-wash-light) / 0.08);
+  --border-default: rgb(var(--sval-palette-wash-light) / 0.14);
+  --shadow-drag: 0 0 0 1px rgba(31, 107, 255, 0.35), 0 16px 40px rgb(var(--sval-palette-wash-light) / 0.25);
+  --glow-tile-hover: 0 0 0 transparent;
+  --focus-backing: rgba(255, 255, 255, 0.55);
+  --surface-press: var(--ink-100);
+  --home-tile-bg: rgba(255, 255, 255, 0.6);
+  --surface-card-hover: rgba(255, 255, 255, 0.88);
+  --home-tile-shadow: var(--shadow-light-md);
+  --home-panel-shadow: var(--shadow-light-lg);
+  --home-letter: var(--sval-blue);
+  --home-label-shadow: none;
+  /* --text-muted is about 3.5:1 on the light field. */
+  --home-ink-muted: var(--text-body);
+  --border-strong: rgb(var(--sval-palette-wash-light) / 0.28);
+  --text-strong: var(--ink-950);
+  --text-muted: var(--ink-500);
+  --action-primary-hover: var(--sval-palette-blue-600);
+  --action-primary-press: var(--sval-palette-blue-700);
+  /* The field's edge is the window's tint, where the Sval blue can fall
+     under 3:1; blue-700 keeps the ring and the switch's on state at 3:1 or
+     more across the field. */
+  --focus-ring: var(--sval-palette-blue-700);
+  --home-switch-on: var(--sval-palette-blue-700);
+  /* The field's own border, 3:1 or more on the light field. */
+  --home-input-border: var(--ink-500);
+
+  /* Daylight: near-white at the centre, fading at the edge into the
+     window's own tint, so the page meets its frame in its colour. */
+  --home-field: radial-gradient(75% 70% at 50% 36%, #ffffff 0%, oklch(0.98 0.012 var(--g-nh)) 40%, var(--g-tint) 100%);
+  --home-stars: 0;
+  --home-input-bg: #ffffff;
+  --home-input-shadow: var(--shadow-light-md);
+  --home-caret: var(--sval-blue);
+  --home-wash: rgb(var(--sval-palette-wash-light) / 0.08);
+  color-scheme: light;
+}
+
+/* The sky's colours, which the moon's glow and the coloured stars
+   (`glow.js`) and the daylight field read: `--g-nh` their hue, `--g-c` the
+   stars' chroma, `--g-bc` the chroma the daylight sky's tiled stars are
+   scaled from, and `--g-tint` the window's colour, where the daylight field
+   meets the frame, Sval's light frame for a window with no colour. */
+:root {
+  --g-nh: 250;
+  --g-bc: 0.085;
+  --g-c: 0.11;
+  --g-tint: var(--sval-palette-frame-light);
+}
+
+/* A Workspace's colour (`data-sval-tint`, written by
+   `SvalHomeWorkspaceChild`) is a wash over the night sky, whatever the
+   theme (`workspace.js`): the colour the window shows, rising from the
+   bottom of the page like a glow on the horizon, with a faint band along
+   the top where the page meets the frame, and clear round the mark and the
+   search field, so the sky shows through. `SvalColor` sets how strong the
+   wash is, weaker for a light colour, so the page's light text reads on it,
+   and solves that text (the `--h-` members). */
+:root[data-sval-tint]:not(.private) {
+  --home-field:
+    linear-gradient(180deg, var(--h-wash-mid) 0%, transparent 20%),
+    radial-gradient(150% 90% at 50% 100%, var(--h-wash-edge) 0%, var(--h-wash-mid) 55%, transparent 100%), var(--grad-night);
+  --text-body: var(--h-body);
+  --text-muted: var(--h-muted);
+  --home-ink-muted: var(--h-muted);
+}
+
+/* The suggestions' card (search, below) is on the surface the Launcher's
+   card takes in the window (`sval-launcher.css`): a step off the window's
+   frame (`sval-tokens.css`), which is the workspace's colour where it has
+   one. A colour's card takes the scheme of the text its window takes
+   (`data-sval-ink`), whatever the system's, as the window's popups do
+   (`sval-header.css`). The rows take the card's scheme from
+   `--sval-surface-dark` (`sval-launcher-rows.css`). */
+:root {
+  --sval-surface-dark: 1;
+  --sval-surface-ground: var(--sval-palette-ink-850);
+}
+
+:root:is(.light, [data-sval-tint]):not(.private) {
+  --sval-surface-ground: var(--g-tint);
+}
+
+:root:is(.light:not([data-sval-tint]), [data-sval-ink="dark"]):not(.private) {
+  --sval-surface-dark: 0;
+}
+
+:root[data-sval-ink="dark"]:not(.light, .private) .suggestions-card {
+  color-scheme: light;
+}
+
+:root.light[data-sval-ink="light"]:not(.private) .suggestions-card {
+  color-scheme: dark;
+}
+
+.private {
+  --home-field: var(--grad-private);
+  --home-input-bg: rgba(6, 3, 26, 0.72);
+  --home-input-border: rgba(166, 140, 255, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--home-field);
+  background-attachment: fixed;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The starfield, on a layer of its own so it can be dimmed. Fixed, as the
+   field is, and behind everything on the page. */
+html::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-stars) center / cover no-repeat;
+  opacity: var(--home-stars);
+  pointer-events: none;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--space-10) var(--page-gutter);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--home-ink);
+  font-family: var(--sval-font);
+  font-size: 16px;
+}
+
+main {
+  width: 100%;
+  max-width: var(--container-narrow);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 10vh;
+}
+
+.brand {
+  margin: 0 0 var(--space-12);
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+/* The mark is the unplated icon, its moon drawn straight on the page. The
+   moon spans 78% of the image, so a 120px box draws it 94px across. */
+.mark {
+  width: 120px;
+  height: 120px;
+  flex: none;
+}
+
+.mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mark .on-light {
+  display: none;
+}
+
+:root.light:not(.private) .mark .on-dark {
+  display: none;
+}
+:root.light:not(.private) .mark .on-light {
+  display: block;
+}
+
+.search {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+}
+
+.search input {
+  width: 100%;
+  height: 56px;
+  padding: 0 60px 0 56px;
+  border: 1px solid var(--home-input-border);
+  border-radius: var(--radius-pill);
+  background: var(--home-input-bg);
+  backdrop-filter: blur(var(--blur-glass));
+  color: var(--home-ink);
+  font: var(--weight-regular) var(--text-body-l) / 1 var(--sval-font);
+  caret-color: var(--home-caret);
+  box-shadow: var(--home-input-shadow);
+  transition:
+    border-color var(--dur-fast) var(--ease-orbit),
+    box-shadow var(--dur-fast) var(--ease-orbit);
+}
+
+.search input::placeholder {
+  color: var(--home-ink-muted);
+  opacity: 1;
+}
+
+.search input::-moz-search-clear-button {
+  display: none;
+}
+
+.search input:hover {
+  border-color: var(--focus-ring);
+}
+
+.search input:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* The Launcher's key, while the field is empty (launcher spec §8). */
+.search .launcher-key {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 56px;
+  margin-block: auto;
+  pointer-events: none;
+}
+
+/* Room for the cap, which a long placeholder would run under. */
+.search:not(.choosing):has(.launcher-key:not([hidden])) input:placeholder-shown {
+  padding-inline-end: 128px;
+  text-overflow: ellipsis;
+}
+
+.search :is(.launcher-key[hidden], input:not(:placeholder-shown) ~ .launcher-key),
+.search.choosing .launcher-key {
+  display: none;
+}
+
+/* The default engine's own icon, set once the page knows the engine, on the
+   button that opens the engine menu, as the address bar's switcher does. */
+.search .engine-button {
+  inset-block: 0;
+  inset-inline: 12px auto;
+  width: 36px;
+  height: 36px;
+  margin-block: auto;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  z-index: 1;
+}
+
+.search .engine-button:is(:hover, [aria-expanded="true"]) {
+  background: var(--home-wash);
+}
+
+.search .engine-button:active {
+  background: var(--home-wash);
+}
+
+.search .engine {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* In a search mode the button shows the mode's name and a Close button, as
+   the address bar's switcher does, and the field's text starts after it
+   (`--engine-width`, which the page sets). */
+.search .engine-title,
+.search .engine-close {
+  display: none;
+}
+
+.search.in-mode .engine-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  padding-inline: 8px;
+  background: var(--home-wash);
+  color: var(--home-ink);
+  font: 600 14px / 1 var(--sval-font);
+}
+
+.search.in-mode .engine-title {
+  display: block;
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search.in-mode .engine-close:not([hidden]) {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+  opacity: 0.6;
+  mask: url("chrome://global/skin/icons/close.svg") center / 10px no-repeat;
+}
+
+.search.in-mode .engine-close:hover {
+  opacity: 1;
+}
+
+.search.in-mode input {
+  padding-inline-start: calc(12px + var(--engine-width, 36px) + 12px);
+}
+
+.search button {
+  position: absolute;
+  inset-block: 8px;
+  inset-inline-end: 8px;
+  width: 40px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-orbit);
+}
+
+.search button:hover {
+  background: var(--action-primary-hover);
+}
+
+.search button:active {
+  background: var(--action-primary-press);
+}
+
+.search button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.search button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* The results, on a card under the field in the field's own glass, drawn as
+   the address bar's rows are (`sval-launcher.css`, `sval-launcher-rows.css`):
+   40px rows, the title and its address or action, the row's own parts at
+   its end, uppercase section headings, and the selected row a wash, a bar,
+   a semibold title and what Enter does. The list scrolls inside the card;
+   the line under it stays. */
+.suggestions-card {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 8px);
+  z-index: var(--z-suggest);
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+  border: 1px solid var(--home-input-border);
+  border-radius: 24px;
+  background: var(--sval-surface);
+  box-shadow: var(--home-input-shadow);
+  font: var(--weight-regular) 14px / 1.25 var(--sval-font);
+  text-align: start;
+  animation: home-suggestions-in 120ms linear;
+}
+
+/* The private page's card stays the glass of its field: a private window
+   has no workspace. */
+.private .suggestions-card {
+  background: var(--home-input-bg);
+  backdrop-filter: blur(var(--blur-glass));
+}
+
+.suggestions-card:has(> .suggestions[hidden]) {
+  display: none;
+}
+
+@keyframes home-suggestions-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.suggestions,
+.suggestions .section-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--sval-launcher-muted);
+}
+
+.suggestions {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.suggestions[hidden] {
+  display: none;
+}
+
+.suggestions .group {
+  display: block;
+  padding: 12px 14px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.suggestions .result {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 10px 0 14px;
+  border-radius: 14px;
+  cursor: default;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease-orbit);
+}
+
+.suggestions .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--sval-launcher-icon);
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+/* The left slot of a row with no favicon of its own. */
+.suggestions .result[data-glyph="command"] .icon {
+  content: url("chrome://browser/content/sval/icons/square-terminal.svg");
+}
+
+.suggestions .result[data-glyph="plus"] .icon {
+  content: url("chrome://browser/content/sval/icons/plus.svg");
+}
+
+.suggestions .result[data-glyph="check"] .icon {
+  content: url("chrome://browser/content/sval/icons/check.svg");
+}
+
+/* A workspace among a command's choices: its tint, ringed in its ink. */
+.suggestions .result[data-swatch]:not([data-glyph]) .icon {
+  content: linear-gradient(transparent, transparent);
+  border-radius: 4px;
+  background-color: var(--sval-launcher-tint, var(--sval-launcher-cap-fill));
+  box-shadow: inset 0 0 0 1.5px var(--sval-launcher-ink, var(--sval-launcher-cap-ring));
+}
+
+.suggestions .title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 20px;
+  color: var(--sval-launcher-text);
+}
+
+/* The secondary text follows the title and gives way first. */
+.suggestions :is(.url, .action) {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.suggestions .end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  padding-inline-start: 12px;
+}
+
+.suggestions strong {
+  font-weight: 600;
+}
+
+/* A search shows its engine only while selected. */
+.suggestions .result[data-kind="search"]:not([aria-selected="true"]) .action {
+  display: none;
+}
+
+.suggestions .result[data-kind="tab"] .action {
+  color: var(--sval-launcher-accent);
+}
+
+.suggestions .result:hover {
+  background: var(--sval-launcher-hover);
+}
+
+.suggestions .result[aria-selected="true"] {
+  background: var(--sval-launcher-selected);
+  transition: none;
+
+  .sval-launcher-hint {
+    display: inline-flex;
+  }
+}
+
+.suggestions .tag {
+  font-size: 12px;
+}
+
+/* A tip's button, which the row stands for. */
+.suggestions .tip-button {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--sval-launcher-cap-fill);
+  box-shadow: inset 0 0 0 1px var(--sval-launcher-cap-ring);
+  color: var(--sval-launcher-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* A row's menu, as the address bar's view draws its menu button. */
+.suggestions .menu-button {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background-color: var(--sval-launcher-icon);
+  mask: url("chrome://global/skin/icons/more.svg") center / 16px no-repeat;
+
+  &:hover,
+  &[open] {
+    background-color: var(--sval-launcher-text);
+  }
+
+  /* The mask clips an outline, so Tab's selection is the accent's ink. */
+  &[selected] {
+    background-color: var(--sval-launcher-accent);
+  }
+}
+
+/* The workspace the tab is in, among a command's choices: listed, but not
+   for choosing. */
+.suggestions .result[aria-disabled="true"] {
+  opacity: 0.55;
+}
+
+.suggestions .result[aria-disabled="true"]:hover {
+  background: none;
+}
+
+/* A command whose choices the list shows, at the field's start in place of
+   the engine button, with its Back button. The field's text starts after it
+   (`--chip-width`, which the page sets). */
+.search.choosing .engine-button {
+  visibility: hidden;
+}
+
+.search.choosing input {
+  padding-inline-start: calc(16px + var(--chip-width, 0px) + 12px);
+}
+
+.search .chip {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 16px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  margin-block: auto;
+  padding: 0 12px 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--home-wash);
+  box-shadow: inset 0 0 0 1px var(--home-input-border);
+  color: var(--home-ink);
+  font: 600 14px / 1 var(--sval-font);
+  white-space: nowrap;
+}
+
+.search .chip .chip-back {
+  position: static;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  color: inherit;
+}
+
+.search .chip .chip-back:hover {
+  background: var(--home-wash);
+}
+
+.search .chip .chip-back svg {
+  width: 14px;
+  height: 14px;
+}
+
+.suggestions .result[aria-selected="true"] {
+  .title {
+    font-weight: 600;
+  }
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 8px;
+    inset-inline-start: 0;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--sval-launcher-accent);
+  }
+}
+
+/* The Favorites row (home-favorites spec §11). With the row on, the lockup
+   is anchored where the centred page, with no row, puts it, so the field
+   never moves as pins change. That is half of what `main` leaves once the
+   body's padding (`--space-10` each side), its own 10vh and the lockup
+   (the 120px mark, its 48px margin and the 56px field) are taken away:
+   45vh − (80px + 224px) / 2. */
+:root.has-favorites main {
+  justify-content: flex-start;
+  padding-block: max(0px, calc(45vh - 152px)) 0;
+}
+
+.favorites {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin-block-start: var(--space-8);
+}
+
+.favorites[hidden],
+.fav-empty[hidden],
+.fav-drop[hidden],
+.fav-panel[hidden],
+.fav-panel-empty[hidden],
+.fav-back[hidden] {
+  display: none;
+}
+
+.fav-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--fav-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fav-empty {
+  margin: 0;
+  color: var(--text-body);
+  font: 400 14px / 20px var(--sval-font);
+  text-align: center;
+}
+
+.fav-tile {
+  position: relative;
+  width: var(--fav-tile);
+  min-height: 106px;
+  padding: 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.fav-well {
+  width: var(--fav-well);
+  height: var(--fav-well);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--home-tile-bg);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--home-tile-shadow);
+  transition:
+    transform var(--dur-fast) var(--ease-orbit),
+    background-color var(--dur-fast) var(--ease-orbit),
+    box-shadow var(--dur-fast) var(--ease-orbit);
+}
+
+.fav-icon {
+  width: var(--fav-icon);
+  height: var(--fav-icon);
+}
+
+.fav-letter {
+  color: var(--home-letter);
+  font: 600 26px / 1 var(--sval-font);
+}
+
+.fav-grid {
+  grid-template-columns: repeat(2, var(--fav-mini));
+  grid-template-rows: repeat(2, var(--fav-mini));
+  gap: 6px;
+  place-content: center;
+}
+
+.fav-mini {
+  width: var(--fav-mini);
+  height: var(--fav-mini);
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.fav-mini:empty {
+  border: 1px solid var(--border-subtle);
+}
+
+.fav-mini-icon {
+  width: var(--fav-mini);
+  height: var(--fav-mini);
+}
+
+.fav-mini .fav-letter {
+  font-size: 11px;
+}
+
+.fav-label {
+  max-width: 80px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font: 500 14px / 18px var(--sval-font);
+  text-shadow: var(--home-label-shadow);
+}
+
+.fav-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fav-chevron {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--dur-fast) var(--ease-orbit);
+}
+
+.fav-tile:hover .fav-well,
+.fav-tile.open .fav-well {
+  background: var(--surface-card-hover);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md), var(--glow-tile-hover);
+}
+
+.fav-tile:hover .fav-well {
+  transform: translateY(-2px);
+}
+
+.fav-tile:hover,
+.fav-tile.open {
+  color: var(--text-strong);
+}
+
+.fav-tile.open .fav-chevron {
+  transform: rotate(180deg);
+}
+
+.fav-tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  background: var(--focus-backing);
+}
+
+.fav-tile:active .fav-well {
+  transform: scale(0.96);
+  background: var(--surface-press);
+  transition-duration: 90ms;
+}
+
+.fav-tile.dragging .fav-well {
+  border: 1.5px dashed var(--border-strong);
+  background: transparent;
+  box-shadow: none;
+}
+
+.fav-tile.dragging .fav-well > * {
+  opacity: 0.35;
+}
+
+.fav-tile.drop-into .fav-well {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.fav-drop {
+  position: absolute;
+  width: 2px;
+  height: var(--fav-well);
+  border-radius: 1px;
+  background: var(--focus-ring);
+  box-shadow: 0 0 8px rgba(31, 107, 255, 0.5);
+  pointer-events: none;
+}
+
+.fav-panel {
+  position: absolute;
+  inset-inline: 0;
+  z-index: var(--z-fav-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--home-panel-shadow);
+  color: var(--text-body);
+}
+
+.fav-caret {
+  position: absolute;
+  top: -8px;
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  border-block-start: 1px solid var(--border-strong);
+  border-inline-start: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.fav-panel-header {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 12px;
+  border-block-end: 1px solid var(--border-subtle);
+}
+
+.fav-back {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fav-back svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fav-back:hover {
+  background: var(--home-wash);
+}
+
+.fav-panel-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font: 600 16px / 20px var(--sval-font);
+}
+
+.fav-open-all {
+  height: 32px;
+  padding-inline: 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-strong);
+  font: 500 14px / 1 var(--sval-font);
+  cursor: pointer;
+}
+
+.fav-open-all:hover {
+  background: var(--home-wash);
+}
+
+.fav-open-all:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+:is(.fav-back, .fav-open-all):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.fav-panel-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 12px 16px;
+  list-style: none;
+}
+
+.fav-panel-body .fav-tile {
+  width: var(--fav-panel-tile);
+  height: auto;
+}
+
+.fav-panel-body .fav-well {
+  width: var(--fav-panel-well);
+  height: var(--fav-panel-well);
+  border-radius: var(--radius-sm);
+}
+
+.fav-panel-body .fav-icon {
+  width: var(--fav-panel-icon);
+  height: var(--fav-panel-icon);
+}
+
+.fav-panel-body .fav-grid {
+  gap: 4px;
+}
+
+.fav-panel-body .fav-label {
+  max-width: 72px;
+  font: 500 12px / 16px var(--sval-font);
+}
+
+.fav-panel-body .fav-chevron {
+  display: none;
+}
+
+.fav-panel-empty {
+  margin: 0;
+  padding: 32px 16px 36px;
+  color: var(--text-muted);
+  font: 400 14px / 20px var(--sval-font);
+  text-align: center;
+}
+
+.private-note {
+  max-width: 480px;
+  margin: var(--space-8) 0 0;
+  color: var(--text-body);
+  font: 400 14px / 20px var(--sval-font);
+  text-align: center;
+}
+
+.fav-switch {
+  position: fixed;
+  inset-block-end: 20px;
+  inset-inline-end: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--home-ink-muted);
+  font: 500 14px / 1 var(--sval-font);
+}
+
+.fav-switch label {
+  cursor: pointer;
+}
+
+.fav-switch-track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  /* The off track's edge is the thumb's colour, so the control's bounds
+     show as clearly as its thumb. */
+  border: 1px solid var(--home-ink-muted);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-orbit);
+}
+
+.fav-switch-track::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--home-ink-muted);
+  transition: transform var(--dur-fast) var(--ease-orbit);
+}
+
+.fav-switch-track[aria-checked="true"] {
+  border-color: transparent;
+  background: var(--home-switch-on);
+}
+
+.fav-switch-track[aria-checked="true"]::after {
+  background: #ffffff;
+  transform: translateX(14px);
+}
+
+.fav-switch-track:dir(rtl)[aria-checked="true"]::after {
+  transform: translateX(-14px);
+}
+
+.fav-switch-track:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search input,
+  .search button,
+  .suggestions .result,
+  .fav-well,
+  .fav-chevron,
+  .fav-switch-track,
+  .fav-switch-track::after {
+    transition: none;
+  }
+  .fav-tile:hover .fav-well {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .search input {
+    border-color: ButtonText;
+    background: Field;
+    color: FieldText;
+    backdrop-filter: none;
+  }
+  .search input:focus,
+  .search button:focus-visible {
+    outline-color: Highlight;
+  }
+  .search button {
+    border: 1px solid ButtonText;
+  }
+  .suggestions-card {
+    border-color: ButtonText;
+    background: Field;
+    color: FieldText;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .suggestions .result:hover {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px CanvasText;
+  }
+  .suggestions .result[aria-selected="true"] {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .suggestions .result[aria-selected="true"] :is(.title, .url, .action, .tag) {
+    color: HighlightText;
+  }
+  .suggestions .result[aria-selected="true"]::before {
+    background: HighlightText;
+  }
+  .fav-well {
+    border: 1px solid ButtonText;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .fav-tile:focus-visible,
+  :is(.fav-back, .fav-open-all, .fav-switch-track):focus-visible {
+    outline-color: Highlight;
+  }
+  .fav-drop {
+    background: Highlight;
+    box-shadow: none;
+  }
+  .fav-panel {
+    box-shadow: none;
+  }
+  /* The thumb and the on track are backgrounds, which forced colours
+     would paint as Canvas; the switch draws itself in system colours so on
+     and off stay apart. */
+  .fav-switch-track,
+  .fav-switch-track::after {
+    forced-color-adjust: none;
+  }
+  .fav-switch-track {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .fav-switch-track::after {
+    background: ButtonText;
+  }
+  .fav-switch-track[aria-checked="true"] {
+    border-color: SelectedItem;
+    background: SelectedItem;
+  }
+  .fav-switch-track[aria-checked="true"]::after {
+    background: SelectedItemText;
+  }
+}
+
+/* ------------------------------------------------- moon glow and stars */
+
+/* The workspace's colour has area where it doesn't sit behind the search
+   field: a twilight horizon across the bottom of the sky, a glow hugging the
+   moon, and seven coloured stars in a fixed, uneven scatter, clear of the
+   search field and the pins (`glow.js` paints all three). The glow and the
+   mark's shadows are the design's, drawn for its 64px mark, at the scale of
+   the page's 120px mark (×1.875). The glow is light under `screen` on the
+   night field and a pastel under `multiply` on the daylight one, and sits
+   straight in the page's stacking context, because a blend reaches no
+   further than the stacking context it is in. A private page has no colour
+   of its own; its mark takes the dark page's shadow. */
+.mark {
+  position: relative;
+}
+
+.mark img {
+  filter: drop-shadow(0 3.75px 5.625px rgba(2, 4, 20, 0.95)) drop-shadow(0 11.25px 30px rgba(2, 4, 20, 0.95));
+}
+
+:root.light:not(.private) .mark img {
+  filter: drop-shadow(0 3.75px 5.625px rgba(6, 10, 46, 0.85)) drop-shadow(0 13.125px 30px rgba(6, 10, 46, 0.95));
+}
+
+.moon-glow {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  z-index: -1;
+  width: 328px;
+  height: 328px;
+  margin: -164px 0 0 -164px;
+  border-radius: 50%;
+  filter: blur(6px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+:root.light:not(.private) .moon-glow {
+  mix-blend-mode: multiply;
+}
+
+/* A Workspace's colour glows round the mark, the colour the window shows
+   fading out into the sky. No text lies under the glow, which ends before
+   the hint below the search field, so it can be stronger than the wash the
+   text is solved on, and a light colour shows. */
+:root[data-sval-tint]:not(.private) .moon-glow {
+  background: radial-gradient(closest-side, rgb(from var(--h-glow) r g b / 0.6) 0%, rgb(from var(--h-glow) r g b / 0.28) 45%, transparent 100%);
+  mix-blend-mode: normal;
+}
+
+/* The stars are placed on the field, as a share of the window, and drawn at
+   90% opacity. */
+.sky-stars {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.sky-star {
+  position: absolute;
+  border-radius: 50%;
+}
+
+/* Daylight: the stars are crisp points in the tint's ink, tiled across the
+   sky and fading out below its upper half. */
+:root.light:not(.private) {
+  --g-ink: oklch(0.55 min(0.15, max(0.05, calc(var(--g-bc) * 2.6))) var(--g-nh));
+}
+
+:root.light:not(.private) .galaxy-glow {
+  opacity: 0.9;
+  mix-blend-mode: multiply;
+}
+
+:root.light:not(.private) .galaxy-dust {
+  opacity: 0.9;
+}
+
+:root.light:not(.private) .galaxy-field {
+  mix-blend-mode: multiply;
+}
+
+:root.light:not(.private) body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  --g-a: oklch(from var(--g-ink) l c h / 0.45);
+  --g-b: oklch(from var(--g-ink) l c h / 0.32);
+  --g-c: oklch(from var(--g-ink) l c h / 0.24);
+  background:
+    radial-gradient(circle at 23px 41px, var(--g-a) 0 0.8px, transparent 1.4px) 0 0 / 240px 240px,
+    radial-gradient(circle at 131px 87px, var(--g-b) 0 0.7px, transparent 1.3px) 0 0 / 240px 240px,
+    radial-gradient(circle at 77px 203px, var(--g-b) 0 0.9px, transparent 1.5px) 0 0 / 240px 240px,
+    radial-gradient(circle at 211px 151px, var(--g-c) 0 0.7px, transparent 1.3px) 0 0 / 240px 240px,
+    radial-gradient(circle at 61px 300px, var(--g-a) 0 1.1px, transparent 1.7px) 0 0 / 377px 377px,
+    radial-gradient(circle at 290px 120px, var(--g-b) 0 0.8px, transparent 1.4px) 0 0 / 377px 377px,
+    radial-gradient(circle at 180px 30px, var(--g-c) 0 0.7px, transparent 1.3px) 0 0 / 377px 377px,
+    radial-gradient(circle at 340px 260px, var(--g-b) 0 1px, transparent 1.6px) 0 0 / 377px 377px,
+    radial-gradient(circle at 400px 90px, var(--g-a) 0 1.3px, transparent 1.9px) 0 0 / 613px 613px,
+    radial-gradient(circle at 120px 480px, var(--g-b) 0 1.2px, transparent 1.8px) 0 0 / 613px 613px,
+    radial-gradient(circle at 530px 410px, var(--g-b) 0 1px, transparent 1.6px) 0 0 / 613px 613px;
+  mask-image: linear-gradient(180deg, #000 0%, #000 40%, transparent 80%);
+}
+
+@media (forced-colors) {
+  .moon-glow,
+  .sky-stars,
+  body::before {
+    display: none;
+  }
+}

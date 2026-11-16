@@ -1,0 +1,176 @@
+Sval: the crash dialog sends no Glean crash ping
+
+Mozilla's crash reporter client starts Glean when the dialog opens and
+queues a crash ping, with a client id, for incoming.telemetry.mozilla.org.
+It decides whether that ping may upload by reading
+datareporting.healthreport.uploadEnabled from the profile's prefs.js, and
+treats an absent pref as true. Sval locks the pref false in its default
+prefs, which never reach prefs.js, so that check cannot see Sval's choice.
+The dialog starts no Glean and sends no ping. The report itself leaves only
+when the user ticks the send box.
+
+Starting Glean also takes the exclusive lock on Crash Reports/glean/
+crashping.pid. In Sval's release build the dialog holds that lock until
+the user closes it, and every later crash's dialog and every --ping-cleanup
+run waits on it with no window.
+
+Gecko's CrashManager runs the client with --ping-cleanup on each
+maintenance pass, whatever the upload pref says. Glean started that way on
+a store that once had upload on queues a deletion-request ping for the same
+server, so the CrashManager starts the client for no ping at all.
+
+Mozilla's glean_ping test becomes sval_no_glean_ping, which checks that no
+ping is sent, and test_sval_no_crash_ping.js checks the maintenance pass.
+
+diff --git a/toolkit/components/crashes/CrashManager.in.sys.mjs b/toolkit/components/crashes/CrashManager.in.sys.mjs
+index fb88aea56a..e87de01c80 100644
+--- a/toolkit/components/crashes/CrashManager.in.sys.mjs
++++ b/toolkit/components/crashes/CrashManager.in.sys.mjs
+@@ -175,7 +175,10 @@ export var CrashManager = function (options) {
+ 
+   // Tests may disable the Glean ping to avoid unnecessary overhead of invoking
+   // the crash reporter client.
+-  this._disableGleanPing = false;
++  // Sval: no crash ping is sent and no ping cleanup runs. Glean started by
++  // --ping-cleanup with upload off on a store that had a client id queues a
++  // deletion-request ping for Mozilla's telemetry.
++  this._disableGleanPing = true;
+ 
+   // The CrashStore currently attached to this object.
+   this._store = null;
+diff --git a/toolkit/crashreporter/client/app/src/logic.rs b/toolkit/crashreporter/client/app/src/logic.rs
+index 26a9fa3f8c..8f3cfa84e0 100644
+--- a/toolkit/crashreporter/client/app/src/logic.rs
++++ b/toolkit/crashreporter/client/app/src/logic.rs
+@@ -34,7 +34,6 @@ pub struct ReportCrash {
+     attempted_to_send: AtomicBool,
+     ui: Option<AsyncTask<ReportCrashUIState>>,
+     memtest: RefCell<Option<Memtest>>,
+-    glean_handle: Option<crashping::GleanHandle>,
+ }
+ 
+ fn modify_extra_for_report(extra: &mut serde_json::Value) {
+@@ -98,25 +97,15 @@ impl ReportCrash {
+             attempted_to_send: Default::default(),
+             ui: None,
+             memtest: None.into(),
+-            glean_handle: None,
+         })
+     }
+ 
+-    /// Take ownership of the Glean store, to release it once the crash ping has been sent.
+-    #[cfg(not(test))]
+-    pub fn with_glean_handle(mut self, handle: crashping::GleanHandle) -> Self {
+-        self.glean_handle = Some(handle);
+-        self
+-    }
+-
+     /// Returns whether an attempt was made to send the report.
+     pub fn run(mut self) -> anyhow::Result<bool> {
+         self.memtest_according_to_settings();
+         self.set_log_file();
+         self.set_extra_context();
+         let hash = self.compute_minidump_hash();
+-        self.send_crash_ping();
+-        self.release_glean_store();
+         if let Err(e) = self.update_events_file(hash.as_deref()) {
+             log::warn!("failed to update events file: {e:#}");
+         }
+@@ -178,26 +167,6 @@ impl ReportCrash {
+         }
+     }
+ 
+-    /// Send crash pings to legacy telemetry and Glean.
+-    fn send_crash_ping(&self) {
+-        net::ping::CrashPing {
+-            extra: &self.extra,
+-            reason: Some("crash"),
+-        }
+-        .send()
+-    }
+-
+-    /// Shut down Glean and release the Glean store, so that other processes sending crash pings
+-    /// (like a restarted Firefox) do not wait for the UI to close or the report to be sent.
+-    fn release_glean_store(&mut self) {
+-        if let Some(handle) = self.glean_handle.take() {
+-            ::std::thread::spawn(move || {
+-                ::glean::shutdown();
+-                drop(handle);
+-            });
+-        }
+-    }
+-
+     /// Update the events file with information about the crash ping, minidump hash, and
+     /// stacktraces.
+     fn update_events_file(&self, minidump_hash: Option<&str>) -> anyhow::Result<()> {
+diff --git a/toolkit/crashreporter/client/app/src/main.rs b/toolkit/crashreporter/client/app/src/main.rs
+index cd1571b106..b74663b055 100644
+--- a/toolkit/crashreporter/client/app/src/main.rs
++++ b/toolkit/crashreporter/client/app/src/main.rs
+@@ -33,8 +33,6 @@
+ #![cfg_attr(windows, windows_subsystem = "windows")]
+ 
+ use crate::std::sync::Arc;
+-#[cfg(not(test))]
+-use anyhow::Context;
+ use config::Config;
+ 
+ // A few macros are defined here to allow use in all submodules via textual scope lookup.
+@@ -63,6 +61,9 @@ mod analyze;
+ mod async_task;
+ mod config;
+ mod data;
++// Sval: the crash dialog never initializes Glean, so InitOptions::from_config and the pref
++// reading behind it run only in Mozilla's tests.
++#[cfg_attr(not(test), allow(dead_code))]
+ mod glean;
+ mod lang;
+ mod logging;
+@@ -258,20 +259,10 @@ fn try_run(config: &mut Arc<Config>) -> anyhow::Result<bool> {
+             extra
+         };
+ 
+-        // Initialize glean here since it relies on the data directory (which will not change after
+-        // this point). We could potentially initialize it even later (only just before we need
+-        // it), however we may use it for more than just the crash ping in the future, in which
+-        // case it makes more sense to do it as early as possible.
+-        //
+-        // When we are testing, glean will already be initialized (if needed).
+-        #[cfg(not(test))]
+-        let glean_handle = glean::InitOptions::from_config(&config)
+-            .init()
+-            .context("failed to acquire Glean store")?;
+-
++        // Sval: the crash dialog starts no Glean. Its one use here is the crash ping to Mozilla's
++        // telemetry, which Sval never sends, and the Glean store's lock would block every other
++        // crash reporter process until this one exits.
+         let report_crash = logic::ReportCrash::new(config.clone(), extra)?;
+-        #[cfg(not(test))]
+-        let report_crash = report_crash.with_glean_handle(glean_handle);
+         report_crash.run()
+     }
+ }
+diff --git a/toolkit/crashreporter/client/app/src/test.rs b/toolkit/crashreporter/client/app/src/test.rs
+index 5e389bd4ff..b117611efd 100644
+--- a/toolkit/crashreporter/client/app/src/test.rs
++++ b/toolkit/crashreporter/client/app/src/test.rs
+@@ -864,8 +864,9 @@ fn pingsender_failure() {
+         );
+ }
+ 
++// Sval: the crash dialog sends no Glean crash ping.
+ #[test]
+-fn glean_ping() {
++fn sval_no_glean_ping() {
+     let mut test = GuiTest::new();
+     test.enable_glean_pings();
+     let submitted_glean_ping = Counter::new();
+@@ -879,7 +880,7 @@ fn glean_ping() {
+     test.run(|interact| {
+         interact.element("quit", |_style, b: &model::Button| b.click.fire(&()));
+     });
+-    submitted_glean_ping.assert_one();
++    assert_eq!(submitted_glean_ping.count(), 0);
+ }
+ 
+ #[test]

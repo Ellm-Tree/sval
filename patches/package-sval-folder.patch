@@ -1,0 +1,22 @@
+Sval: package sval-folder beside the browser binary
+
+sval-folder is the program the browser starts to read and write the shared
+folder, so a read stuck on a hung network mount stalls it and never the
+browser. The browser runs it from beside its own binary and cannot sync a
+shared folder without it, and the manifest copies only the files it names.
+
+diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
+index 17436e67ca..afbf46ed1a 100644
+--- a/browser/installer/package-manifest.in
++++ b/browser/installer/package-manifest.in
+@@ -423,6 +423,10 @@ bin/libfreebl_64int_3.so
+ ;
+ @BINPATH@/sval-mcp@BIN_SUFFIX@
+ 
++; [ sval-folder, the helper that reads and writes Sval's shared folder ]
++;
++@BINPATH@/sval-folder@BIN_SUFFIX@
++
+ ; [ Native Messaging Host Proxy ]
+ ;
+ #if defined(XP_WIN) || defined(XP_MACOSX)

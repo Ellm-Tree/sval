@@ -1,0 +1,367 @@
+Sval: the content classifier holds a channel until its engines are built
+
+content-classifier-skips-url-classifier.patch skips the URL classifier
+whenever the content classifier service exists, which it does before any
+engine is built, so a request at startup could pass with no rule to match
+it. The service holds each channel's lookup until the engines from what is on
+this device are built: the passes begun before then, the Remote Settings
+client's initial import among them, read Sval's lists and Remote Settings'
+local copy and never the network, and a pass that fails still ends the wait.
+The wait sits inside AntiTrackingChannelClassifierUtils::CheckChannelHelper;
+no chrome API can hold a channel there.
+
+diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+index fbfe1aa85e..f38dfb4623 100644
+--- a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
++++ b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+@@ -937,6 +937,7 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+   }
+ 
+   std::function<void()> callbackFromFeature = aCallback;
++  std::function<void()> onUndispatched = aCallback;  // Sval
+ 
+   // Acquire the ContentClassifier service. We check if it's initialized and
+   // enabled before returning the instance. If it's returning a nullptr, the
+@@ -1158,6 +1159,22 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+             eventPriority);
+       });
+ 
++  // Sval: a channel waits for the content classifier's engines from what is
++  // on this device, so a request made at startup is not let through before
++  // any rule can match it. The callback is called here if the lookup can no
++  // longer be dispatched, as the caller expects once this returns success.
++  if (contentClassifier && !contentClassifier->EnginesReady()) {
++    contentClassifier->CallWhenEnginesReady(NS_NewRunnableFunction(
++        "AntiTrackingChannelClassifierUtils::CheckChannelHelper - engines",
++        [r, onUndispatched = std::move(onUndispatched)]() {
++          nsIThread* thread = nsUrlClassifierDBService::BackgroundThread();
++          if (!thread || NS_FAILED(thread->Dispatch(r, NS_DISPATCH_NORMAL))) {
++            onUndispatched();
++          }
++        }));
++    return NS_OK;
++  }
++
+   // no need to prioritize the dispatch to the URLClassifier thread
+   // since overriding prioritization is ignored if we aren't on the MainThread
+   return nsUrlClassifierDBService::BackgroundThread()->Dispatch(
+diff --git a/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs b/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs
+index 76114bedcd..75e61aaeda 100644
+--- a/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs
++++ b/toolkit/components/content-classifier/ContentClassifierRemoteSettingsClient.sys.mjs
+@@ -139,7 +139,9 @@ export class ContentClassifierRemoteSettingsClient {
+ 
+     let records = [];
+     try {
+-      records = await this.#rs.get();
++      // Sval: the service holds classification until the engines from this
++      // import are built, so it reads only what is on this device.
++      records = await this.#rs.get({ syncIfEmpty: false });
+       lazy.log.debug(`importAllLists: got ${records.length} records`);
+     } catch (error) {
+       lazy.log.error(`Error importing lists:`, error);
+@@ -157,13 +159,14 @@ export class ContentClassifierRemoteSettingsClient {
+    * attachment cannot be obtained.
+    *
+    * @param {string} name  The Name field of the RemoteSettings record.
++   * @param {boolean} [localOnly] Sval: read only what is on this device.
+    * @returns {Promise<Uint8Array>}
+    */
+-  async getListBytes(name) {
++  async getListBytes(name, localOnly = false) {
+     if (name.startsWith(SVAL_LIST_PREFIX)) {
+       return lazy.SvalBlockingLists.getListBytes(name);
+     }
+-    let records = await this.#rs.get();
++    let records = await this.#rs.get(localOnly ? { syncIfEmpty: false } : {});
+     let record = records.find(r => r.Name === name);
+     if (!record) {
+       throw new Error(`No record with name "${name}"`);
+@@ -176,6 +179,7 @@ export class ContentClassifierRemoteSettingsClient {
+       result = await this.#rs.attachments.download(record, {
+         fallbackToCache: true,
+         fallbackToDump: true,
++        avoidDownload: localOnly,
+       });
+     } catch (e) {
+       lazy.log.error(`Failed to download attachment for "${name}":`, e);
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index 7c6a039e88..900c3a7178 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -199,6 +199,26 @@ void NotifyListsLoadedForTesting(const nsACString& aInstalled = ""_ns) {
+   }
+ }
+ 
++// Sval: held by an UpdateFeatures pass's closures. The last reference goes
++// once the pass has installed its engines, or when its closures are dropped
++// unrun, and tells the service on the main thread.
++class EnginesPassToken final {
++ public:
++  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(EnginesPassToken)
++
++  explicit EnginesPassToken(ContentClassifierService* aService)
++      : mService(aService) {}
++
++ private:
++  ~EnginesPassToken() {
++    NS_DispatchToMainThread(NS_NewRunnableFunction(
++        "ContentClassifierService::EnginesPassEnded",
++        [service = std::move(mService)]() { service->EnginesPassEnded(); }));
++  }
++
++  RefPtr<ContentClassifierService> mService;
++};
++
+ }  // namespace
+ 
+ NS_IMPL_ISUPPORTS(ContentClassifierService, nsIAsyncShutdownBlocker,
+@@ -551,6 +571,10 @@ void ContentClassifierService::Init() {
+   if (sEnabled && HasAnyActiveRemoteSettingsFeatures()) {
+     InitRSClient();
+   }
++  // Sval: with no import to wait for, nothing holds classification.
++  if (!mRSClient) {
++    SetEnginesReady();
++  }
+ }
+ 
+ void ContentClassifierService::InitRSClient() {
+@@ -563,6 +587,10 @@ void ContentClassifierService::InitRSClient() {
+   MOZ_LOG_FMT(gContentClassifierLog, LogLevel::Info,
+               "InitRSClient - creating RS client");
+ 
++  // Sval: classification waits for the engines this client's import builds.
++  mEnginesReady = false;
++  mInitialImportIssued = false;
++
+   nsresult rv;
+   mRSClient =
+       do_GetService(NS_CONTENTCLASSIFIERREMOTESETTINGSCLIENT_CONTRACTID, &rv);
+@@ -570,21 +598,71 @@ void ContentClassifierService::InitRSClient() {
+     MOZ_LOG_FMT(gContentClassifierLog, LogLevel::Error,
+                 "InitRSClient - failed to get RS client service: {:#x}",
+                 static_cast<uint32_t>(rv));
++    SetEnginesReady();  // Sval
+     return;
+   }
+ 
+-  // The returned Promise is ignored: C++ doesn't need to await the
+-  // initial import. Callers that do (such as tests) observe the
+-  // NS_CONTENT_CLASSIFIER_FILTER_LISTS_LOADED_TOPIC notification.
+-  RefPtr<dom::Promise> unused;
+-  rv = mRSClient->Init(this, getter_AddRefs(unused));
++  // Sval: the returned Promise settles once the initial import has called
++  // OnListsChanged, so the pass it began is counted by then.
++  RefPtr<dom::Promise> imported;
++  rv = mRSClient->Init(this, getter_AddRefs(imported));
+   if (NS_WARN_IF(NS_FAILED(rv))) {
+     MOZ_LOG_FMT(gContentClassifierLog, LogLevel::Error,
+                 "InitRSClient - failed to init RS client: {:#x}",
+                 static_cast<uint32_t>(rv));
+     mRSClient = nullptr;
++    SetEnginesReady();  // Sval
++    return;
++  }
++  RefPtr<ContentClassifierService> self = this;
++  auto onImported = [self](JSContext*, JS::Handle<JS::Value>, ErrorResult&) {
++    self->mInitialImportIssued = true;
++    self->MaybeSetEnginesReady();
++  };
++  if (imported) {
++    imported->AddCallbacksWithCycleCollectedArgs(onImported, onImported);
++  } else {
++    mInitialImportIssued = true;
++    MaybeSetEnginesReady();
++  }
++}
++
++// Sval
++void ContentClassifierService::CallWhenEnginesReady(
++    already_AddRefed<nsIRunnable> aRunnable) {
++  MOZ_ASSERT(NS_IsMainThread());
++  nsCOMPtr<nsIRunnable> runnable = aRunnable;
++  if (mEnginesReady) {
++    runnable->Run();
+     return;
+   }
++  mWaitingForEngines.AppendElement(std::move(runnable));
++}
++
++// Sval
++void ContentClassifierService::EnginesPassEnded() {
++  MOZ_ASSERT(NS_IsMainThread());
++  MOZ_ASSERT(mEnginesPassesInFlight > 0);
++  --mEnginesPassesInFlight;
++  MaybeSetEnginesReady();
++}
++
++// Sval
++void ContentClassifierService::MaybeSetEnginesReady() {
++  MOZ_ASSERT(NS_IsMainThread());
++  if (!mEnginesReady && mInitialImportIssued && !mEnginesPassesInFlight) {
++    SetEnginesReady();
++  }
++}
++
++// Sval
++void ContentClassifierService::SetEnginesReady() {
++  MOZ_ASSERT(NS_IsMainThread());
++  mEnginesReady = true;
++  nsTArray<nsCOMPtr<nsIRunnable>> waiting = std::move(mWaitingForEngines);
++  for (const auto& runnable : waiting) {
++    runnable->Run();
++  }
+ }
+ 
+ void ContentClassifierService::ShutdownRSClient() {
+@@ -601,13 +679,17 @@ void ContentClassifierService::ShutdownRSClient() {
+     client->Shutdown();
+   }
+ 
+-  MutexAutoLock lock(mLock);
+-  mEngines.Clear();
+-  mCancelEngines.Clear();
+-  mCancelEnginesPBM.Clear();
+-  mAnnotateEngines.Clear();
+-  mAnnotateEnginesPBM.Clear();
+-  mCosmeticCache.Clear();  // Sval
++  {
++    MutexAutoLock lock(mLock);
++    mEngines.Clear();
++    mCancelEngines.Clear();
++    mCancelEnginesPBM.Clear();
++    mAnnotateEngines.Clear();
++    mAnnotateEnginesPBM.Clear();
++    mCosmeticCache.Clear();  // Sval
++  }
++  // Sval: with no client, no engine is coming to wait for.
++  SetEnginesReady();
+ }
+ 
+ // static
+@@ -1070,12 +1152,13 @@ using ListBytesPromise = MozPromise<nsTArray<uint8_t>, nsresult,
+ // Convert the JS Promise returned by getListBytes into a MozPromise
+ // resolved with the raw bytes (Uint8Array contents).
+ static RefPtr<ListBytesPromise> FetchListBytesFromRemoteSettings(
+-    nsIContentClassifierRemoteSettingsClient* aClient,
+-    const nsACString& aName) {
++    nsIContentClassifierRemoteSettingsClient* aClient, const nsACString& aName,
++    bool aLocalOnly) {
+   MOZ_ASSERT(NS_IsMainThread());
+ 
+   RefPtr<dom::Promise> jsPromise;
+-  nsresult rv = aClient->GetListBytes(aName, getter_AddRefs(jsPromise));
++  nsresult rv =
++      aClient->GetListBytes(aName, aLocalOnly, getter_AddRefs(jsPromise));
+   if (NS_FAILED(rv) || !jsPromise) {
+     return ListBytesPromise::CreateAndReject(
+         NS_FAILED(rv) ? rv : NS_ERROR_FAILURE, __func__);
+@@ -1310,6 +1393,10 @@ void ContentClassifierService::UpdateFeatures(
+     return;
+   }
+ 
++  // Sval: counted until the last closure holding it goes.
++  ++mEnginesPassesInFlight;
++  RefPtr<EnginesPassToken> pass = new EnginesPassToken(this);
++
+   RefPtr<ContentClassifierService> self = this;
+ 
+   if (aFeatures.IsEmpty()) {
+@@ -1321,7 +1408,7 @@ void ContentClassifierService::UpdateFeatures(
+     buildThread->Dispatch(NS_NewRunnableFunction(
+         "ContentClassifierService::UpdateFeaturesNoFetch",
+         [self, snapshot = std::move(aPreferenceSnapshot),
+-         generation = aGeneration]() {
++         generation = aGeneration, pass = std::move(pass)]() {
+           {
+             MutexAutoLock lock(self->mLock);
+             if (self->mInitPhase != InitPhase::InitSucceeded) {
+@@ -1346,7 +1433,8 @@ void ContentClassifierService::UpdateFeatures(
+           [self, features = std::move(aFeatures),
+            featureVersions = std::move(aFeatureVersions),
+            snapshot = std::move(aPreferenceSnapshot),
+-           buildThread = std::move(buildThread), generation = aGeneration](
++           buildThread = std::move(buildThread), generation = aGeneration,
++           pass = std::move(pass)](
+               EngineRulesPromise::AllSettledPromiseType::ResolveOrRejectValue&&
+                   aValue) mutable {
+             MOZ_ASSERT(NS_IsMainThread());
+@@ -1375,7 +1463,8 @@ void ContentClassifierService::UpdateFeatures(
+                 [self, features = std::move(features),
+                  featureVersions = std::move(featureVersions),
+                  perFeatureRules = std::move(perFeatureRules),
+-                 snapshot = std::move(snapshot), generation]() mutable {
++                 snapshot = std::move(snapshot), generation,
++                 pass = std::move(pass)]() mutable {
+                   MOZ_ASSERT(!NS_IsMainThread());
+ 
+                   // Build engines outside the lock; InitFromRules can be
+@@ -1556,7 +1645,10 @@ ContentClassifierService::FetchEngineDataForFeature(
+     listIdsInOrder.AppendElement(listId);
+     permissionsInOrder.AppendElement(
+         mTrustedListIds.Contains(listId) ? kTrustedPermission : 0);
+-    fetches.AppendElement(FetchListBytesFromRemoteSettings(mRSClient, listId));
++    // Sval: a pass begun before the engines are ready never waits on the
++    // network, as classification waits for it.
++    fetches.AppendElement(
++        FetchListBytesFromRemoteSettings(mRSClient, listId, !mEnginesReady));
+   }
+ 
+   if (fetches.IsEmpty()) {
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index ad3f3a6fcc..4660264c8f 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -217,6 +217,16 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   static nsTArray<nsCString> ListIdsFor(
+       const ContentClassifierFeature& aFeature);
+ 
++  // Sval: whether the engines built from what is on this device are in use.
++  // Until they are, CallWhenEnginesReady holds what it is given, so a request
++  // made before them is classified by them. Main thread only.
++  bool EnginesReady() const { return mEnginesReady; }
++  void CallWhenEnginesReady(already_AddRefed<nsIRunnable> aRunnable);
++
++  // Sval: an UpdateFeatures pass has ended, whether it installed engines or
++  // was dropped. Main thread only.
++  void EnginesPassEnded();
++
+   ContentClassifierResult ClassifyForCancel(
+       const ContentClassifierRequest& aRequest);
+   ContentClassifierResult ClassifyForAnnotate(
+@@ -261,6 +271,16 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   void ProcessListChangesSoon();
+   bool mListChangesPending = false;
+ 
++  // Sval: mEnginesReady is set once the RS client's initial import has
++  // issued its pass and every pass begun before ready has ended, and when
++  // the RS client is shut down or there is none. Main thread only.
++  void MaybeSetEnginesReady();
++  void SetEnginesReady();
++  bool mEnginesReady = false;
++  bool mInitialImportIssued = false;
++  uint32_t mEnginesPassesInFlight = 0;
++  nsTArray<nsCOMPtr<nsIRunnable>> mWaitingForEngines;
++
+   // This rebuilds the given features,
+   // according to that preference snapshot. This also means that features that
+   // aren't referenced by the current pref snapshot are going to have their
+diff --git a/toolkit/components/content-classifier/nsIContentClassifierRemoteSettingsClient.idl b/toolkit/components/content-classifier/nsIContentClassifierRemoteSettingsClient.idl
+index 14a23b5645..923f2b3058 100644
+--- a/toolkit/components/content-classifier/nsIContentClassifierRemoteSettingsClient.idl
++++ b/toolkit/components/content-classifier/nsIContentClassifierRemoteSettingsClient.idl
+@@ -31,8 +31,12 @@ interface nsIContentClassifierRemoteSettingsClient : nsISupports {
+      * raw attachment bytes for the named list, sourced from the RS
+      * attachments cache. Rejects if no record with that name exists
+      * or its attachment cannot be obtained.
++     *
++     * Sval: with aLocalOnly, only what is on this device is read, Remote
++     * Settings' local copy and its packaged dump among it, and nothing is
++     * fetched.
+      */
+-    Promise getListBytes(in ACString aName);
++    Promise getListBytes(in ACString aName, [optional] in boolean aLocalOnly);
+ };
+ 
+ %{C++

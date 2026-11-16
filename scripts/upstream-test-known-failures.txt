@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Mozilla's own tests that fail in Sval because Sval removes, locks or replaces
+# what they test on purpose, or because the display CI gives them cannot do
+# what they test: test file, the patch or file that changes it, and why. A
+# test that fails only on a default a user can change is no line here: it
+# runs with the user's other choice (upstream-tests.txt). A failure caused by
+# a defect in Sval is an issue, never a line here. A test that passes again
+# loses its line in the same pull request.
+browser/base/content/test/about/browser_aboutCertError_clockSkew.js no-undocumented-support-links.patch the time error page has no Learn more link, since Sval's site has no page for time errors
+browser/base/content/test/about/browser_aboutCertError_notYetValid.js no-undocumented-support-links.patch the time error page has no Learn more link, since Sval's site has no page for time errors
+browser/base/content/test/about/browser_aboutCertError_offlineSupport.js no-undocumented-support-links.patch Sval packages no offline copy of the time errors article, which no Learn more link opens
+browser/base/content/test/about/browser_aboutCertError_offlineSupport_feltPrivacyV1.js no-undocumented-support-links.patch Sval packages no offline copy of the time errors article, which no Learn more link opens
+browser/base/content/test/about/browser_aboutNetError.js no-undocumented-support-links.patch the site-not-found error page has no Learn more link, since Sval's site has no page for it
+browser/base/content/test/permissions/browser_temporary_permissions.js sval-protection.css Firefox's permission icons leave the address bar, and the site menu lists a site's permissions, a temporary block among them (decision 0132)
+browser/base/content/test/permissions/browser_temporary_permissions_navigation.js sval-panel.js Sval collapses the tab strip, so the tab context menu it opens on the selected tab never shows
+browser/base/content/test/permissions/browser_temporary_permissions_tabs.js sval-protection.css Firefox's permission icons leave the address bar, and the site menu lists a site's permissions, a temporary block among them (decision 0132)
+browser/base/content/test/webextensions/browser_extension_update_background.js app-menu-notices-need-the-button.patch Sval draws no app menu button, so the update's badge and permission doorhanger the test opens from it are not shown
+browser/base/content/test/webextensions/browser_extension_update_background_noprompt.js app-menu-notices-need-the-button.patch Sval draws no app menu button, so the update's badge and permission doorhanger the test opens from it are not shown
+browser/base/content/test/webrtc/browser_devices_get_user_media_tear_off_tab.js webrtc-indicator-opens-site-menu.patch the sharing doorhanger is Sval's site menu, so Firefox's permission panel the test waits on never opens (decision 0132)
+browser/base/content/test/webrtc/browser_tab_switch_warning.js ctrl-tab-switcher.patch Sval draws the Ctrl+Tab switcher itself, so the panel the test waits on to show and hide is not in the window
+browser/components/customizableui/test/browser_panelUINotifications.js app-menu-notices-need-the-button.patch Sval draws no app menu button, so its doorhangers and badges are not shown
+browser/components/downloads/test/browser/browser_downloads_keynav.js downloads-per-workspace.patch the panel's workspace view switch sits before the list, so Tab from the footer reaches the switch before the list
+browser/components/downloads/test/browser/browser_pdfjs_preview.js sval-panel.js a window opened for the preview shows the workspace the test's previous new window left when it closed, with that window's PDF tab restored lazily after the preview (spec §10.7), so the preview is not the window's last tab, which the test takes as the preview
+browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_reset.js no-profile-reset.patch Sval supports no profile reset, which would leave Sval's own files in the old profile
+browser/components/enterprisepolicies/tests/browser/browser_policy_mv3_force_installed_host_permissions.js no-undocumented-support-links.patch the add-on permissions policy banner has no Learn more link, since Sval's site has no page for managed browsers
+browser/components/places/tests/browser/browser_click_bookmarks_on_toolbar.js SvalWindow.sys.mjs Sval locks the bookmarks toolbar to never shown, so the bookmark it clicks has no size
+browser/components/places/tests/browser/browser_sidebar_open_bookmarks.js SvalHistorySidebar.sys.mjs Sval slides the sidebar out before it hides, and a show asked for mid-slide reverses the slide and keeps the page, so the sidebar loads nothing for the test to wait on
+browser/components/privatebrowsing/test/browser/browser_privatebrowsing_permissions.js permissions-private-jar.patch each private window keeps its own permissions, so a grant is stored under the window's userContextId, which the test's principal lacks
+browser/components/profiles/tests/unit/test_reset_profile_supported.js no-profile-reset.patch Sval supports no profile reset, which would leave Sval's own files in the old profile
+browser/components/sessionstore/test/browser_354894_perwindowpb.js sval-panel.js the test changes its own window's windowtype so it is no browser window, so a window it opens shows the workspace that window shows, and once a pass runs the test's window closes with the test in it, as a window does when every workspace has a window of its own (spec §10.7)
+browser/components/sessionstore/test/browser_590563.js no-closed-about-pages.patch Sval does not build about:sessionrestore, and the test drives that page's tab list
+browser/components/sessionstore/test/browser_615394-SSWindowState_events_undoCloseWindow.js sval-panel.js a reopened window restores every tab its workspace holds (spec §10.7), and each restore marks the window busy, so the busy states the test counts are not its own window's alone
+browser/components/sessionstore/test/browser_background_tab_crash.js app-sval-prefs.js Sval locks crash report submission off (browser.crashReports.unsubmittedCheck.autoSubmit2), so a crashed background tab waits on its crashed page instead of restoring itself
+browser/components/sessionstore/test/browser_closed_objects_changed_notifications_windows.js sval-panel-start.js the window the test opens before setBrowserState shows the workspace an earlier closed window left and restores its tab (spec §10.7), so closing it saves the window again once that tab flushes, after setBrowserState, one notification more than the test counts
+browser/components/sessionstore/test/browser_firefoxView_restore.js no-closed-about-pages.patch Sval does not build about:firefoxview and hides the Firefox View button the test clicks
+browser/components/sessionstore/test/browser_newtab_userTypedValue.js SvalHomeSearchParent.sys.mjs about:privatebrowsing in a normal window opens in a new private window and the tab goes back or closes, so the window the test closes holds no tab of that page to restore
+browser/components/sessionstore/test/browser_reopen_all_windows.js SvalRestore.sys.mjs Sval files no bare blank tab, and closes the blank tabs a window held once its workspace's tabs are back in it (spec §10.4)
+browser/components/sessionstore/test/browser_restoreLastClosedTabOrWindowOrSession.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/sessionstore/test/browser_restoreTabContainer.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+browser/components/sessionstore/test/browser_restore_container_tabs_oa.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+browser/components/sessionstore/test/browser_restore_verticalPinnedTabs.js app-sval-firefox-ui.js Sval locks vertical tabs off (sidebar.verticalTabs), so the test's pref changes nothing
+browser/components/sessionstore/test/browser_restored_window_features.js sval-panel.js Sval collapses the tab strip, so a restored window's tab bar is collapsed
+browser/components/sessionstore/test/browser_sessionStoreContainer.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+browser/components/sessionstore/test/browser_splitview_restore_in_closed_window.js SvalTabs.sys.mjs a window shows the splits Sval's tree holds, and a split Firefox's session restores is not one (decision 0050)
+browser/components/sessionstore/test/browser_splitview_string_migration.js SvalTabs.sys.mjs a window shows the splits Sval's tree holds, and a split Firefox's session restores is not one (decision 0050)
+browser/components/sessionstore/test/browser_tab_groups_save_on_window_close.js SvalRestore.sys.mjs Sval files no bare blank tab, and closes the blank tabs a window held once its workspace's tabs are back in it (spec §10.4)
+browser/components/sessionstore/test/browser_tab_label_during_restore.js sval-panel.js the window title starts with the workspace's name, not the page's
+browser/components/sessionstore/test/browser_urlbarSearchMode.js remove-unused-firefox-chrome.patch the address bar has no one-off search buttons, so the click meant for one lands outside the results and closes them
+browser/components/sessionstore/test/browser_windowStateContainer.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+browser/components/sessionstore/test/marionette/test_new_tab_on_restore.py SvalRestore.sys.mjs Sval files no bare blank tab, and closes the blank tabs a window held once its workspace's tabs are back in it (spec §10.4), the new tab browser.sessionstore.newTabOnRestore adds among them
+browser/components/tabbrowser/test/browser/dragdrop/browser_drag_multiselected_splitview.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/dragdrop/browser_drag_splitview.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabMediaIndicator/browser_mute_webAudio.js sval-panel.js Sval collapses the tab strip, so the pointer never reaches the tab's sound button the test hovers and clicks
+browser/components/tabbrowser/test/browser/tabs/browser_adoptTab_failure.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_audioTabIcon.js sval-panel.js Sval collapses the tab strip, so the pointer never reaches the tab's sound button the test hovers and clicks
+browser/components/tabbrowser/test/browser/tabs/browser_ctrlTab.js ctrl-tab-switcher.patch Sval draws the Ctrl+Tab switcher itself, so the panel, previews and List all tabs button the test reads are not in the window
+browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_close_duplicate_tabs.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_move_to_another_window_drag.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_move_to_new_window_contextmenu.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_origin_attrs_rel.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+browser/components/tabbrowser/test/browser/tabs/browser_tab_a11y_description.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+browser/components/tabbrowser/test/browser/tabs/browser_tab_drag_drop_perwindow.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview.js sval-header.css Sval draws the address bar's page actions only while it is hovered or focused, so the split view button the test waits to see stays hidden
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_about_opentabs.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_alt_click.js sval-panel.js Sval collapses the tab strip, so a click or drag on a tab lands nowhere
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_contextmenu.js sval-panel.js Sval collapses the tab strip, so the tab context menu it opens on a tab never shows
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_footer.js SvalWindow.sys.mjs a pane's footer menu closes that pane alone and leaves the others split (split-view spec §6.4), where the test expects it to close the whole split
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_keyboard_focus.js sval-panel.js Sval collapses the tab strip, so focus never reaches a tab in it
+browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_telemetry.js sval-panel.js Sval collapses the tab strip, so the tab context menu it opens on a tab never shows
+browser/components/uitour/test/browser_UITour_resetProfile.js no-profile-reset.patch Sval supports no profile reset, which would leave Sval's own files in the old profile
+dom/ipc/tests/browser_domainPolicy.js SvalJavascript.sys.mjs Sval holds the script security manager's one domain policy for its per-site JavaScript rules, so the test cannot activate its own
+dom/media/autoplay/test/browser/browser_autoplay_policy_web_audio.js media-autoplay-site-permission.patch Sval's media gate, which no setting turns off, lets only a site's choice or the default for sites with no choice decide Web Audio, and a click never lets an AudioContext start, where the test expects Firefox's block-until-a-click model
+dom/media/autoplay/test/mochitest/test_autoplay_policy.html media-autoplay-site-permission.patch Sval's media gate, which no setting turns off, lets only a site's choice or the default for sites with no choice decide autoplay, muted and audible alike, where the test expects Firefox's block-audible model
+dom/media/doctor/test/browser/browser_decoderDoctor.js no-undocumented-support-links.patch the decoder notices on Windows and Linux have no Learn more button, since Sval's site has no page for them
+dom/modelcontext/tests/browser/browser_modelContext_xpcom.js sval-agent-model-context.patch navigator.modelContext exists only in an agent tab, so the ordinary tab the test opens has none
+dom/tests/browser/browser_test_new_window_from_content.js app-sval-firefox-ui.js Sval locks browser.link.open_newwindow at 3, since a new window takes another workspace, so the test's other values of it never apply
+remote/shared/test/browser/browser_TabManager.js webdriver-jar-of-its-own.patch Sval opens a WebDriver tab in a window of WebDriver's own, so a tab the test adds to its window lands in another one
+toolkit/components/content-classifier/test/browser/browser_content_classifier_engines_pref.js content-classifier-sval-tracker-lists.patch the trackers features take Sval's own lists from a pref, never Disconnect's disconnect-tracker-base and disconnect-tracker-content, which the test hands them (decision 1051)
+toolkit/components/content-classifier/test/browser/browser_content_classifier_remote_settings.js content-classifier-sval-tracker-lists.patch the trackers features take Sval's own lists from a pref, never Disconnect's disconnect-tracker-base and disconnect-tracker-content, which the test hands them (decision 1051)
+toolkit/components/content-classifier/test/unit/test_rs_client_shutdown.js content-classifier-sval-lists.patch the client hands Sval's own lists to SvalBlockingLists, a browser module, and this toolkit xpcshell suite runs without the browser's chrome, so the client cannot load it
+toolkit/components/contextualidentity/tests/browser/browser_closeContainerTabs.js SvalTabs.sys.mjs a tab outside its workspace's jar is reopened in that jar (isolated workspaces spec §2)
+toolkit/components/windowwatcher/test/browser_popup_condition_window.js app-sval-firefox-ui.js Sval locks browser.link.open_newwindow at 3, since a new window takes another workspace, so the test's other values of it never apply
+toolkit/content/tests/browser/browser_error_registry.js server-alert-error-pages.patch Sval registers its own entries for the TLS alerts a server sends, so the registry holds more errors than the test counts in Firefox's own lists
+toolkit/mozapps/extensions/test/browser/browser_html_detail_permissions_policy_blocked.js no-undocumented-support-links.patch the add-on permissions policy banner has no Learn more link, since Sval's site has no page for managed browsers

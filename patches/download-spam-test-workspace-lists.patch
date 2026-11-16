@@ -1,0 +1,27 @@
+Sval: browser_download_spam_protection.js expects each window's own list
+
+downloads-per-workspace has the panel list the downloads of the workspace
+its window shows, and a second window shows a workspace of its own, so
+the first window's download is not in the second's list. That one check
+expects Sval's count, and the rest of the task runs as upstream's.
+
+diff --git a/browser/components/downloads/test/browser/browser_download_spam_protection.js b/browser/components/downloads/test/browser/browser_download_spam_protection.js
+index b9ec6801c1..20cb2fcd8f 100644
+--- a/browser/components/downloads/test/browser/browser_download_spam_protection.js
++++ b/browser/components/downloads/test/browser/browser_download_spam_protection.js
+@@ -199,11 +199,13 @@ add_task(async function check_download_spam_ui() {
+   let listbox2 = browserWin2.document.getElementById("downloadsListBox");
+   ok(listbox2, "Download list box present");
+ 
++  // Sval: the second window shows a workspace of its own, and its panel lists
++  // that workspace's downloads, so the first window's download is not in it.
+   await TestUtils.waitForCondition(() => {
+     return (
+-      listbox2.childElementCount == 2 && !listbox2.getAttribute("disabled")
++      listbox2.childElementCount == 1 && !listbox2.getAttribute("disabled")
+     );
+-  }, "2 downloads = 1 allowed download from first window, and 1 for 100 downloads blocked in second window");
++  }, "1 download for 100 downloads blocked in second window");
+ 
+   is(
+     listbox.childElementCount,

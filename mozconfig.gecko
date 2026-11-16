@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Compiling Sval's own Gecko, appended to mozconfig by scripts/build.sh with
+# SVAL_MODE=gecko. Its packages are what artifact builds consume through
+# MOZ_ARTIFACT_FILE.
+
+# Sval's data directory on Linux is ~/.sval. A dotted name keeps Gecko there
+# from the first launch (MOZ_LEGACY_HOME in toolkit/moz.configure). Left at
+# Mozilla's "mozilla", it also names the product directory that
+# nsAppFileLocationProvider falls back to on every platform. Both are defines
+# compiled into libxul, so an artifact build takes them with the binaries,
+# and configure offers the option only with a compile environment.
+ac_add_options --with-user-appdir=.sval
+
+# configure fetches the compilers, Rust and the sysroot it needs.
+ac_add_options --enable-bootstrap
+
+# Every compile keeps line tables, so `mach buildsymbols` can write the
+# symbols a crash's stack is read with: function names, files and lines.
+# Full debug symbols multiply rustc's memory: with them, one crate took
+# 3.8 GB. --enable-debug-symbols sets the C and C++ flags, and gives rustc
+# -Cdebuginfo=2 (rust_compile_flags). rust.mk puts RUSTFLAGS after that, and
+# rustc takes the last -Cdebuginfo. Packaging strips the binaries
+# (mozpack.executables.strip).
+ac_add_options --enable-debug-symbols=-gline-tables-only
+ac_add_options RUSTFLAGS=-Cdebuginfo=line-tables-only
+
+# The tests package stages jsapi-tests, which only a JS shell build produces.
+# Mozilla's own CI builds the shell for the same reason (build/mozconfig.common).
+ac_add_options --enable-js-shell
+
+# Thin LTO made Speedometer 3 6% faster on linux64 at no measurable cost in
+# compile time or memory.
+ac_add_options --enable-lto=thin
+
+# Compiles go through sccache, which configure bootstraps. gecko.yml gives
+# the gecko runner and each Mac runner slot a cache of its own that lasts
+# between runs.
+ac_add_options --with-ccache=sccache
+
+# Memory grows with parallel jobs, and cargo shares make's job count, so the
+# heaviest Rust crates can land at once. 10 jobs peak at 10.6 to 11.7 GB when
+# the compiler cache misses; 12 run out of memory in 14 GB.
+mk_add_options MOZ_PARALLEL_BUILD=${SVAL_GECKO_JOBS:-10}
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/objdir-gecko

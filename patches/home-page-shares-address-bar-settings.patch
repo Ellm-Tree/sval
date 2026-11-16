@@ -1,0 +1,30 @@
+Sval: Settings name the home page beside the address bar
+
+The home page's field answers from the address bar's engine
+(SvalHomeSearchParent), so the address bar's suggestion settings govern it too.
+Their labels say so. Fluent strings have no override short of a patch.
+
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 1516c920c4..2bf96d0790 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -1096,7 +1096,7 @@ search-show-suggestions-url-bar-option =
+ # "before" refers to location (appearing most proximate to), not time
+ # (appearing before).
+ search-show-suggestions-above-history-option-2 =
+-    .label = Show search suggestions before browsing history in address bar results
++    .label = Show search suggestions before browsing history in address bar and home page results
+ 
+ search-show-suggestions-private-windows-2 =
+     .label = Search suggestions in private windows
+@@ -1105,8 +1105,8 @@ search-suggestions-cant-show-2 =
+     .message = Search suggestions will not be shown in location bar results because you have configured { -brand-short-name } to never remember history.
+ 
+ addressbar-header-1 =
+-    .label = Address Bar
+-    .description = Choose which suggestions display in your address bar
++    .label = Address Bar and Home Page
++    .description = Choose which suggestions display in your address bar and on your home page
+ 
+ # When Firefox Suggest is enabled, this replaces `addressbar-header-1`.
+ addressbar-header-firefox-suggest-2 =

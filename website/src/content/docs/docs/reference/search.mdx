@@ -1,0 +1,162 @@
+---
+title: Search
+description: The search engines Sval offers, their keywords, the Kagi card, and each search setting in Settings › Search and Launcher.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+
+Sval searches with the engine you choose when you first set up Sval. You
+can change your search engine at any time in Settings › Search and Launcher.
+The address bar, the Launcher, and the search field on the home page all
+use that engine.
+
+## The search engines
+
+<Screenshot name="features-search" maxWidth={520} alt="Settings › Additional search engines: Kagi, DuckDuckGo, Startpage, Brave Search, and Ecosia turned on, Google and Bing off, each with its own @ shortcut" />
+
+When you first set up Sval, the **Choose a search engine** step lists these
+engines, each with a line about the engine:
+
+- **DuckDuckGo.** This is the default.
+- **Startpage**
+- **Brave Search**
+- **Kagi.** You need a Kagi account. When you choose Kagi, a
+  **Sign in to Kagi** button shows under it.
+- **Google**
+- **Bing**
+- **Ecosia**
+- **Qwant**
+- **Perplexity**
+- **Wikipedia.** This engine searches only Wikipedia, in your language.
+
+On a device you add to sync, the step reads **Your search engine**. It
+starts on the engine your other device uses.
+
+Sval also comes with three engines that each search one site: **YouTube**,
+**GitHub**, and **OpenStreetMap**. Settings › Search and Launcher lists
+them. The **Choose a search engine** step leaves them out.
+
+<Since v="0.1.0-rc.10">
+## Search with another engine once
+
+Your default engine's icon is at the start of the address bar, the
+Launcher, and the home page's search field. The icon opens a list of your
+engines, and the engine you pick searches what you type this time. That
+engine's name shows at the start of the field, the same as when you type a
+keyword. The list also has Favorites, Tabs, History, and Actions, which
+each search only that kind of item. The list ends with Search Settings.
+<kbd>⌥↓</kbd> (<kbd>Alt+Down</kbd>) in the field also opens the list.
+</Since>
+
+## Keywords
+
+Each engine Sval comes with has a short keyword that starts with `@`. When
+you type a keyword and a space in the Launcher, the address bar, or the home
+page's search field, your search goes to that engine. The engine's name
+shows at the start of the field until you press <kbd>⌫</kbd>
+(<kbd>Backspace</kbd>) in the empty field.
+
+| Keyword | Searches |
+|---|---|
+| `@yt` | YouTube |
+| `@gh` | GitHub |
+| `@w` | Wikipedia, in your language |
+| `@maps` | OpenStreetMap |
+| `@ddg` | DuckDuckGo |
+| `@sp` | Startpage |
+| `@br` | Brave Search |
+| `@kagi` | Kagi |
+| `@g` | Google |
+| `@b` | Bing |
+| `@eco` | Ecosia |
+| `@qw` | Qwant |
+| `@pplx` | Perplexity |
+
+Every engine except Kagi also has a longer keyword, like `@youtube` or
+`@duckduckgo`. Typing `@` alone lists every engine, and each row starts with
+the engine's short keyword. A keyword you set yourself in Settings needs no `@`.
+
+## Settings › Search and Launcher
+
+### Default search engine
+
+- The menu sets the engine Sval searches with when you type something
+  that isn't an address. The menu lists the engines above and any you've
+  added.
+
+Your default search engine syncs to your other devices.
+
+### Kagi
+
+The Kagi card shows while Kagi is your default search engine, or while a
+Session Link is saved.
+
+- **Sign in to Kagi.** Kagi's sign-in page opens in a new window. This
+  button shows while you're signed out.
+- **Signed in to Kagi.** This shows once you've signed in.
+- The line under that says whether private windows sign in to Kagi with
+  Privacy Pass, with your Session Link, or not yet. With Privacy Pass, the
+  line also says how many searches are left.
+- **Check again.** Sval asks Kagi again whether your plan includes Privacy
+  Pass. This button shows when Kagi said your plan doesn't.
+- **Kagi Session Link.** This field takes the Session Link you copy from
+  Kagi.
+  **Save** keeps the link on this device, and **Clear** removes it. The
+  line under the field reads **Saved.** or **Not set.** The field shows
+  only when your plan has no Privacy Pass, or when a link is saved.
+
+Your Kagi sign-in, Privacy Pass searches, and Session Link stay on each
+device. Each device signs in to Kagi on its own.
+
+### Additional search engines
+
+- **Add search engine.** The Add Search Engine dialog opens.
+- The list shows your search engines, each with its keywords under its
+  name. A keyword picks that engine for one search, as
+  [Keywords](#keywords) describes.
+- **Edit search engine.** The pencil button opens a dialog. Its **Keyword
+  (optional)** field sets a keyword of your own, and clearing the field
+  removes yours. The engine's `@` keywords stay. For an engine you added,
+  the dialog also has fields for the engine's name and address.
+
+### The Add Search Engine dialog
+
+- **Search engine name.** This field is required.
+- **URL with %s in place of search term.** This field takes the address of
+  a search, with %s where your words go. It's required.
+- **Keyword (optional).** This field takes a short word that picks this
+  engine in the address bar.
+- **Advanced.** Two more fields show: **POST data with %s in place of
+  search term (leave empty for GET)** and **Suggestions URL with %s in
+  place of search term (optional)**.
+- **Add Engine.** Sval adds the engine.
+
+### Search engine suggestions
+
+- **Show search suggestions.** Your search engine suggests searches as
+  you type. Under this setting:
+  - **Show search suggestions in address bar results.** Suggestions show
+    in the Launcher's Search suggestions section.
+  - **Show search suggestions before browsing history in address bar and
+    home page results.** Suggestions show above History.
+  - **Search suggestions in private windows.** Suggestions show in private
+    windows too.
+
+### Launcher sections
+
+See [Address bar and Launcher](/docs/reference/launcher/#settings--search-and-launcher--launcher-sections).
+
+### Address Bar and Home Page
+
+These checkboxes choose which kinds of results show in the address bar,
+the Launcher, and the search field on the home page. **Open tabs** turns
+the Launcher's Open tabs section on or off.
+
+## Private windows
+
+A private window searches with your default search engine. When that
+engine is Kagi, a private window never uses your Kagi sign-in. If your plan
+includes Privacy Pass, the window signs in with Privacy Pass. Kagi then
+knows you're a subscriber and never learns which subscriber you are. Each
+search uses up one Privacy Pass search.

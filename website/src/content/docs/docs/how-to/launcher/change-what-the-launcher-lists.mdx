@@ -1,0 +1,45 @@
+---
+title: Change what the Launcher lists
+description: Reorder the Launcher's sections, change how many rows each one shows, or hide one.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+As you type, the Launcher lists what matches in sections: Open tabs, Pins
+and Favorites, Commands, History, and Search suggestions. You choose the
+order of the sections, how many rows each one shows, and which ones show at
+all.
+
+You switch between tabs far more often than you search, so you want more
+open tabs and no search suggestions.
+
+<Screenshot name="docs-launcher-sections" frame="rounded" maxWidth={600} alt="Settings › Search and Launcher › Launcher sections. Each section has a row count and buttons to move or hide it." />
+
+## Steps
+
+1. Open Settings › Search and Launcher.
+2. Under Launcher sections, find the section you want to change.
+3. In the menu next to the section's name, choose how many rows it shows.
+4. To move the section, select **Move up** or **Move down**.
+5. To take the section out of the Launcher, select **Hide**.
+
+The Launcher uses the new order and limits the next time you type in it.
+
+## Details
+
+- A hidden section moves to the end of the list, marked **Not shown**.
+  Select **Show** to put it back, last in the order.
+- Choosing **None** keeps a section in its place with no rows.
+- To start with, Open tabs shows 4 rows and History shows 5. Pins and
+  Favorites, Commands, and Search suggestions show 3 rows each.
+- The limits apply while you type. With nothing typed, or in a command's
+  list of choices, the Launcher lists every row that fits.
+- The first row is the one Enter opens. It always shows, whatever you
+  hide.
+- These settings sync to your other devices.
+- The home page's search field follows the same settings.
+
+## Related pages
+
+- [Address bar and Launcher](/docs/reference/launcher/)
+- [Search](/docs/reference/search/)

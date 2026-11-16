@@ -1,0 +1,1166 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The import picker (`import-picker.js`) and Sval's import page, in the Sval
+ * browser design system's visual language, as `first-run.css` is. The picker
+ * is drawn in the system's semantic tokens, defined here for light and dark,
+ * so the page follows the browser's theme and first run's always-dark sheet
+ * gets the dark values. The values are the system's own, under its names,
+ * because they are Sval's brand rather than Firefox's design tokens.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-type.css");
+
+:root {
+  --surface-raised: light-dark(#ffffff, var(--sval-palette-ink-850));
+  --surface-sunken: light-dark(var(--sval-palette-frame-light), #03051a);
+  --surface-card: light-dark(#ffffff, rgb(var(--sval-palette-wash-light) / 0.28));
+  --surface-card-hover: light-dark(#ffffff, rgb(var(--sval-palette-wash-light) / 0.44));
+  --surface-glass: light-dark(rgba(245, 249, 255, 0.82), rgba(6, 10, 46, 0.72));
+  --border-subtle: light-dark(rgb(var(--sval-palette-wash-light) / 0.08), rgb(var(--sval-palette-wash-dark) / 0.1));
+  --border-default: light-dark(rgb(var(--sval-palette-wash-light) / 0.14), rgb(var(--sval-palette-wash-dark) / 0.18));
+  --border-strong: light-dark(rgb(var(--sval-palette-wash-light) / 0.28), rgb(var(--sval-palette-wash-dark) / 0.34));
+  /* A text field's edge, at least 3:1 against the surface in both schemes. */
+  --border-field: var(--sval-palette-ink-500);
+  --text-strong: light-dark(var(--sval-palette-ink-950), #ffffff);
+  --text-body: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  --text-muted: light-dark(var(--sval-palette-ink-500), var(--sval-palette-ink-400));
+  --text-accent: light-dark(var(--sval-palette-blue), var(--sval-palette-neon));
+  --action-primary: var(--sval-palette-blue);
+  --action-primary-hover: light-dark(var(--sval-palette-blue-600), var(--sval-palette-blue-400));
+  --action-primary-press: light-dark(var(--sval-palette-blue-700), var(--sval-palette-blue-600));
+  --action-primary-text: #ffffff;
+  --focus-ring: light-dark(var(--sval-palette-blue), var(--sval-palette-neon));
+  --status-security: light-dark(#c2410a, #ffc22a);
+  /* Messages spec §9.6's result colours. */
+  --result-success: light-dark(#1a7f3c, #5ee08a);
+  --result-error: light-dark(var(--sval-palette-red), var(--sval-palette-red-invert));
+  --result-error-tint: light-dark(rgba(196, 47, 58, 0.08), rgba(255, 138, 144, 0.12));
+}
+
+/* ---------------------------------------------------------------- page */
+
+html,
+body {
+  margin: 0;
+  background: var(--surface-raised);
+}
+
+/* Once the dialog is sized (`import.js`), the page fills it, and a window
+ * too short for it shortens the page rather than cutting it off. */
+html[data-sized] {
+  max-height: 100vh;
+
+  > body,
+  .sval-im {
+    height: 100%;
+  }
+}
+
+.sval-im {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 600px;
+  max-height: 700px;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  background: var(--surface-raised);
+  color: var(--text-body);
+  font: 400 15px/1.4 var(--sval-font);
+  -moz-osx-font-smoothing: grayscale;
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* The picker's cap would leave the Arc card and its welcome scrolling in
+     a dialog with room for them; with the card the page takes the height
+     it needs, as far as `SubDialog` lets the window hold. */
+  &:has(.sval-im-card:not([hidden])) {
+    max-height: none;
+  }
+}
+
+.sval-im-title {
+  flex: none;
+  margin: 0;
+  padding: 22px 24px 0;
+  color: var(--text-strong);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sval-im-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+}
+
+.sval-im-actions > button {
+  appearance: none;
+  height: 36px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-strong);
+  font: 700 14px var(--sval-font);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--surface-card-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+
+  &.primary {
+    padding: 0 20px;
+    border-color: transparent;
+    background: var(--action-primary);
+    color: var(--action-primary-text);
+
+    &:hover:not(:disabled) {
+      background: var(--action-primary-hover);
+    }
+
+    &:hover:active:not(:disabled) {
+      background: var(--action-primary-press);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- picker */
+
+.sval-im-picker {
+  --sval-im-pad: 24px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+
+  &[hidden] {
+    display: none;
+  }
+
+  p,
+  ul,
+  ol,
+  dl,
+  dd,
+  fieldset {
+    margin: 0;
+  }
+
+  [hidden] {
+    display: none;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--action-primary);
+  }
+
+  button {
+    appearance: none;
+    min-height: 0;
+    margin: 0;
+    font-family: var(--sval-font);
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Each glyph is a Lucide file drawn in its element's `fill`. */
+.sval-im-picker img[src$=".svg"],
+.sval-im-progress img[src$=".svg"],
+.sval-im-handoff img[src$=".svg"] {
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+.sval-im-defs {
+  display: grid;
+  flex: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  padding: 12px var(--sval-im-pad) 0;
+  font-size: 14px;
+  line-height: 1.4;
+
+  > dt {
+    color: var(--text-strong);
+    font-weight: 700;
+  }
+
+  > dd {
+    color: var(--text-muted);
+  }
+}
+
+/* The one region of the picker that scrolls. */
+.sval-im-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-block-start: 14px;
+  padding: 12px var(--sval-im-pad);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+  border-block: 1px solid var(--border-subtle);
+}
+
+/* A bookmarks file, offered below the browsers the scan found. */
+.sval-im-file {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-block-start: 20px;
+}
+
+.sval-im-file-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Looking, and nothing found: first run's status row. */
+.sval-im-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-card);
+  color: var(--text-body);
+  font-size: 15px;
+}
+
+.sval-im-status-glyph {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--text-muted);
+}
+
+.sval-im-looking > .sval-im-status-glyph {
+  color: var(--text-accent);
+  animation: sval-im-spin 1s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes sval-im-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.sval-im-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.sval-im-source {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+
+  &[data-ticked] {
+    border-color: var(--border-strong);
+    background: color-mix(in srgb, var(--action-primary) 9%, transparent);
+  }
+}
+
+.sval-im-source-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px 12px 14px;
+}
+
+.sval-im-source-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  cursor: pointer;
+
+  [data-problem] > .sval-im-source-head > & {
+    cursor: default;
+  }
+}
+
+.sval-im-logo {
+  flex: none;
+  width: 28px;
+  height: 28px;
+
+  [data-problem] & {
+    opacity: 0.45;
+  }
+
+  &[data-fallback] {
+    color: var(--text-muted);
+  }
+}
+
+.sval-im-source-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sval-im-source-name {
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sval-im-source-summary {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+
+  [data-problem] & {
+    color: var(--text-body);
+  }
+}
+
+.sval-im-chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+
+  [aria-expanded="true"] > & {
+    transform: rotate(180deg);
+  }
+}
+
+.sval-im-picker .sval-im-fold {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+
+  &:hover {
+    background: var(--surface-card-hover);
+  }
+}
+
+/* A pill: Open System Settings, Show steps. */
+.sval-im-picker .sval-im-pill,
+.sval-im-handoff .sval-im-pill {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-strong);
+  font: 700 13px var(--sval-font);
+
+  &:hover {
+    background: var(--surface-card-hover);
+  }
+}
+
+/* Under the name: 14px padding, 16px checkbox, 12px gap, 28px logo, 12px
+ * gap. */
+.sval-im-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px 14px 82px;
+}
+
+/* Indented to the logo. */
+.sval-im-details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 14px 14px 42px;
+}
+
+.sval-im-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--text-accent) 26%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-accent) 7%, transparent);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sval-im-note-glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-block-start: 2px;
+  color: var(--text-accent);
+}
+
+.sval-im-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sval-im-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sval-im-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sval-im-windows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.sval-im-window {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sval-im-window-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sval-im-emoji {
+  flex: none;
+  width: 20px;
+  font-size: 15px;
+  text-align: center;
+}
+
+.sval-im-window-name,
+.sval-im-bookmarks-name {
+  appearance: none;
+  height: 32px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-field);
+  border-radius: 8px;
+  background: var(--surface-glass);
+  color: var(--text-strong);
+  font: 500 14px var(--sval-font);
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.sval-im-window-name {
+  flex: 1;
+}
+
+.sval-im-picker .sval-im-disclose {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 13px var(--sval-font);
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--surface-card-hover);
+    color: var(--text-strong);
+  }
+
+  > .sval-im-chevron {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* A window's isolated switch, drawn as the panel's Isolated mark: outlined
+ * while off, filled while on. */
+.sval-im-picker .sval-im-isolate {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 12px var(--sval-font);
+
+  &::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    background: currentColor;
+    mask: url("chrome://browser/content/sval/workspace-isolated.svg") center / contain no-repeat;
+  }
+
+  &:hover:not(:disabled) {
+    color: var(--text-strong);
+  }
+
+  &[aria-pressed="true"] {
+    border-color: var(--text-accent);
+    background: var(--surface-card-hover);
+    color: var(--text-strong);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+/* A window's preview: read-only, and never a scroll region of its own. */
+.sval-im-contents {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 2px 0 6px 24px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+}
+
+.sval-im-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sval-im-picker .sval-im-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-body);
+  font: 600 12px var(--sval-font);
+
+  &[aria-pressed="true"] {
+    border-color: var(--text-accent);
+    background: var(--surface-card-hover);
+  }
+}
+
+.sval-im-group-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.sval-im-group-folder {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--text-muted);
+}
+
+.sval-im-group-count {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.sval-im-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sval-im-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.5;
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--border-strong);
+  }
+
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.sval-im-more {
+  padding-inline-start: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.sval-im-bookmarks {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+
+  > legend {
+    margin-block-end: 6px;
+    padding: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.sval-im-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.sval-im-bookmarks-name {
+  width: 100%;
+  margin-block-start: 8px;
+}
+
+.sval-im-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-body);
+  font-size: 14px;
+  cursor: pointer;
+
+  .sval-im-details > & {
+    gap: 8px;
+  }
+}
+
+/* "Archive idle tabs, like Arc did", with the time beside it. */
+.sval-im-archive-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------- logins */
+
+/* At the picker's foot, on the import page: folded until Show steps. */
+.sval-im-logins {
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: 12px var(--sval-im-pad) 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+}
+
+.sval-im-handoff {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-card);
+  color: var(--text-body);
+  font-family: var(--sval-font);
+
+  ol {
+    margin: 0;
+  }
+
+  .sval-im-pill {
+    flex: none;
+    height: 30px;
+    padding: 0 12px;
+  }
+}
+
+.sval-im-handoff-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sval-im-handoff-glyph {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-block-start: 1px;
+  color: var(--text-accent);
+}
+
+.sval-im-handoff-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-im-handoff-title {
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sval-im-handoff-sub,
+.sval-im-step-detail {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sval-im-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+
+  > li {
+    display: flex;
+    gap: 10px;
+  }
+}
+
+.sval-im-step-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 700;
+
+  [data-tone="warn"] > & {
+    border-color: var(--status-security);
+    color: var(--status-security);
+  }
+}
+
+.sval-im-step-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.sval-im-export {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+
+  strong {
+    color: var(--text-strong);
+    font-weight: 600;
+  }
+}
+
+.sval-im-export-logo {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-block-start: 2px;
+}
+
+/* ---------------------------------------------------------------- running */
+
+/* The import under way and its result (messages spec §7), in the picker's
+ * place: a row per browser, the bar, then the result lines. */
+.sval-im-run {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 220px;
+  margin-block-start: 14px;
+  padding: 12px 24px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+  border-block: 1px solid var(--border-subtle);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-im-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sval-im-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.sval-im-progress-glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: center / contain no-repeat;
+  -moz-context-properties: fill;
+  fill: currentColor;
+
+  [data-state="running"] > & {
+    background-image: url("chrome://browser/content/sval/icons/loader-circle.svg");
+    color: var(--text-accent);
+    animation: sval-im-spin 1s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  [data-state="done"] > & {
+    background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+    color: var(--result-success);
+  }
+
+  [data-state="failed"] > & {
+    background-image: url("chrome://browser/content/sval/icons/circle-alert.svg");
+    color: var(--result-error);
+  }
+}
+
+.sval-im-progress-logo {
+  flex: none;
+  width: 20px;
+  height: 20px;
+
+  &[data-fallback] {
+    color: var(--text-muted);
+  }
+}
+
+.sval-im-bar {
+  appearance: none;
+  flex: none;
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+
+  &::-moz-progress-bar {
+    border-radius: 3px;
+    background: var(--action-primary);
+  }
+}
+
+.sval-im-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &:empty {
+    display: none;
+  }
+}
+
+/* The card Arc gave its user (`card.css`), centred under the result. */
+.sval-im-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* The card's drawing reaches 30px below it for its shadow (`card.css`),
+     which the gap to the note holds, so the run never scrolls for it. */
+  gap: 40px;
+  padding-block: 12px 8px;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-im-card-note {
+  max-width: 400px;
+  margin: 0;
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* A result line (messages spec §9.6): a 16px glyph, a 10px gap, the
+ * sentence, and its buttons on a row beneath, under the sentence. An error
+ * with buttons sits in a tinted well. */
+.sval-im-result-line {
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 20px;
+
+  &:has(> .sval-im-result-actions) {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  &[data-status="error"]:has(> .sval-im-result-actions) {
+    background: var(--result-error-tint);
+  }
+}
+
+.sval-im-result-text {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-block-start: 2px;
+    background: center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  [data-status="success"] > &::before {
+    background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+    color: var(--result-success);
+  }
+
+  [data-status="error"] > &::before {
+    background-image: url("chrome://browser/content/sval/icons/circle-alert.svg");
+    color: var(--result-error);
+  }
+}
+
+.sval-im-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-block-start: 8px;
+  padding-inline-start: 26px;
+
+  > button {
+    appearance: none;
+    height: 32px;
+    min-height: 0;
+    margin: 0;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-strong);
+    font: 600 13px var(--sval-font);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-card-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.45;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- forced colours */
+
+/* A high-contrast theme matches `(forced-colors)` in chrome without forcing
+ * its colours on it, so the page and the picker take them themselves, as
+ * `first-run.css` does. A theme replaces the light system colours
+ * (`PreferenceSheet::Prefs::Load`), so they take the light scheme. */
+@media (forced-colors) {
+  :root {
+    color-scheme: light;
+    --surface-raised: Canvas;
+    --surface-sunken: Canvas;
+    --surface-card: Canvas;
+    --surface-card-hover: Canvas;
+    --surface-glass: Field;
+    --border-subtle: CanvasText;
+    --border-default: ButtonText;
+    --border-strong: ButtonText;
+    --border-field: ButtonText;
+    --text-strong: CanvasText;
+    --text-body: CanvasText;
+    --text-muted: CanvasText;
+    --text-accent: CanvasText;
+    --action-primary: ButtonText;
+    --action-primary-hover: SelectedItem;
+    --action-primary-press: SelectedItem;
+    --action-primary-text: ButtonFace;
+    --focus-ring: CanvasText;
+    --status-security: CanvasText;
+    --result-success: CanvasText;
+    --result-error: CanvasText;
+    --result-error-tint: Canvas;
+  }
+
+  .sval-im-source[data-ticked] {
+    border-color: Highlight;
+    background: Canvas;
+  }
+
+  .sval-im-picker input[type="checkbox"],
+  .sval-im-picker input[type="radio"] {
+    accent-color: auto;
+  }
+
+  .sval-im-window-name,
+  .sval-im-bookmarks-name {
+    color: FieldText;
+
+    &:disabled {
+      opacity: 1;
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+
+  .sval-im-picker .sval-im-group[aria-pressed="true"],
+  .sval-im-picker .sval-im-isolate[aria-pressed="true"] {
+    border-color: Highlight;
+    outline: 1px solid Highlight;
+  }
+
+  .sval-im-actions > button,
+  .sval-im-result-actions > button,
+  .sval-im-picker button,
+  .sval-im-handoff button {
+    color: ButtonText;
+
+    &:hover:not(:disabled) {
+      border-color: SelectedItem;
+      color: SelectedItem;
+    }
+
+    &:disabled {
+      opacity: 1;
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+
+  .sval-im-actions > button.primary {
+    border-color: ButtonText;
+    color: ButtonFace;
+
+    &:hover:not(:disabled) {
+      color: SelectedItemText;
+    }
+
+    &:disabled {
+      border-color: GrayText;
+      background: ButtonFace;
+      color: GrayText;
+    }
+  }
+
+  .sval-im-tab::before {
+    background: CanvasText;
+  }
+
+  .sval-im-bar {
+    border: 1px solid CanvasText;
+
+    &::-moz-progress-bar {
+      background: Highlight;
+    }
+  }
+
+  [data-problem] .sval-im-logo {
+    opacity: 1;
+  }
+}

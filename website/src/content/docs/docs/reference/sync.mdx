@@ -1,0 +1,145 @@
+---
+title: Sync
+description: What each control in Settings › Sync and devices does, and what the sync indicator at the bottom of the Workspace panel says.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+
+Sval syncs through a folder you choose, and encrypts everything it puts
+there with a key only your devices have. Settings › Sync and devices holds
+the folder, this device's name, adding a device, and the sync key.
+
+<Screenshot name="features-sync" alt="Settings › Sync and devices, with the sync folder, sync status and this device’s name" />
+
+## Sync
+
+When no folder is chosen, the card reads "Sval saves your Workspaces on this
+device only. To sync them, choose a folder your devices share."
+
+- **Choose folder…** A folder picker opens. The folder you choose becomes
+  this device's sync folder. Once you've chosen a folder, the button reads
+  **Change…**. When Sval can't find its files in the folder, the button
+  reads **Choose another…**.
+- Once you've chosen a folder, its name and full path show. When the
+  folder is in a cloud service Sval recognizes, like iCloud Drive, Dropbox,
+  or OneDrive, Sval shows the service's name and the folder's name.
+- **Show in Finder** (**Show in File Explorer** on Windows, **Show in Files**
+  on Linux). The folder opens.
+- **Use this folder again.** This shows while Sval can't reach the folder
+  you chose. Once you've reconnected the folder, selecting this
+  button tries the folder again.
+- **Stop syncing.** This device stops syncing through the folder. Every
+  Workspace stays on the device.
+- On a Mac, a note says Sval keeps what unlocks your sync key in your Mac's
+  Keychain, as "Sval secrets".
+- On a computer with no keyring, a note says Sval keeps your sync key in
+  your Sval profile.
+
+Under the buttons, the sync readout says how sync is going, with the same
+words as the sync indicator.
+
+- **Sync now.** Sval syncs straight away. While Sval syncs, the readout
+  says **Syncing…**. If the sync fails, the readout says
+  **Couldn't sync**.
+- The readout has the same buttons as the sync indicator, listed below.
+
+## Your devices
+
+- **This device's name.** Your other devices show this name next to
+  agent Workspaces from this device. The name doesn't sync.
+- **Sync with another device.** The steps for adding a device open. This
+  button shows once you've chosen a sync folder. Until then, the card says
+  **Choose a sync folder first.** and offers **Go to Sync**.
+
+## Sync with another device
+
+- **This device shows a code.** This device gives its key to another
+  device.
+- **The other device shows a code.** This device takes the key from
+  another device.
+- **Back.** You go to the step before. The button is hidden while a code
+  shows or Sval is looking for a code.
+
+### This device shows a code
+
+- The first step names the sync folder, which the other device needs too.
+- **Show code.** Sval makes a one-time code of 12 characters in three
+  groups. The code works for an hour. A countdown shows the time left.
+- **Copy.** Sval copies the code.
+- **Cancel code.** The code stops working.
+- When the other device joins, the page reads **Code used. Your devices are
+  syncing.**
+
+### The other device shows a code
+
+- The first step names the sync folder, which both devices need.
+- **Next.** You go to the code step. If Sval finds your sync key in the
+  folder, left from an earlier install on this computer, Sval joins with
+  that key and asks for no code.
+- **Type the code it shows.** This field takes the code in upper or lower
+  case, with or without dashes.
+- **Join.** Sval looks for the code in the sync folder, and keeps looking
+  until the code arrives.
+- **Stop.** Sval stops looking.
+
+## Advanced › Sync key
+
+Advanced shows once a sync folder is chosen.
+
+- **Save a backup.** The Back up your sync key dialog opens. It shows the
+  key, with **Copy**, **Print…**, and **Save to a file…**. Sval offers the
+  same dialog when it makes a new key. Until you copy, print, or save the
+  key, the page says **You haven't saved a backup.**
+- **Set up sync again.** After you confirm, Sval makes a new sync key. Your
+  other devices stop syncing until you give each one a new code. The old
+  key can't read the folder anymore.
+- **Restore from a backup.** This field takes a key you backed up. **Restore** checks
+  the key against the Workspaces in the sync folder, then uses it.
+
+**Save a backup** and **Set up sync again** show only on a device that
+syncs.
+
+## The sync indicator
+
+Once you've chosen a sync folder, the sync indicator sits at the bottom of
+the Workspace panel. Selecting the indicator opens Settings › Sync and devices. The
+indicator says one of these:
+
+- How long ago Sval last synced, in minutes, hours, or days.
+- **Syncing…** Sval is syncing for the first time since it started.
+- **Not synced yet**, or **Last synced** with a time. Sval can't reach your
+  sync folder.
+- **Sync folder not found.** The folder is gone. **Choose Folder…** chooses
+  another one.
+- **Can't access sync folder.** Sval isn't allowed to change files in the
+  folder. **Choose Folder…** chooses another one.
+- **Sync stopped.** The files in the folder are too large to sync.
+- **Sync is off.** This device's sync key is missing or doesn't match the
+  folder's key. **Reconnect…** asks for a code from another device.
+- **Pair your other device.** The folder has Workspaces from a device that
+  isn't syncing with this one. **Enter Code…** asks for that device's code.
+- **Sync needs access.** The system won't give Sval the sync key.
+  **Allow Access** (**Try Again** on Windows) asks the system again.
+- **Update Sval.** Another device runs a newer Sval. **Update** looks for
+  the update.
+- In a private window, the indicator says the window's tabs aren't saved or
+  synced.
+
+## When you first set up Sval
+
+- **I'm new to Sval.** Sval sets up this device, and saves your Workspaces
+  on this device only. On the last step, **Set up sync** opens
+  Settings › Sync and devices, where you choose a folder to sync through.
+- **I use Sval on another device.** This device joins a device that already
+  syncs. Sval asks for the folder that device uses. Then Sval asks for the
+  code that device shows.
+- **Restore with your backup key.** This shows on the code step. It takes
+  your backed-up key in place of a code. Sval checks the key against the
+  Workspaces in the folder, then uses it.
+
+## Related pages
+
+- [How sync works](/docs/explanation/sync/)
+- [Choose a sync folder](/docs/how-to/sync/choose-a-sync-folder/)
+- [Sync another device with this one](/docs/how-to/sync/sync-another-device/)
+- [Back up your sync key](/docs/how-to/sync/back-up-your-sync-key/)

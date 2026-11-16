@@ -1,0 +1,55 @@
+Sval: ContentSearch answers only pages still there
+
+A page's `GetEngine` waits on the search service before it reads the
+actor's browsing context, and a page closed in that time has a destroyed
+actor, whose `browsingContext` throws InvalidStateError. Sval closes the
+startup tab's home page as soon as a restored workspace has tabs of its
+own, so this would happen on most launches. The reply checks the actor is
+still registered (`didDestroy` removes it), in `_reply` for every message.
+
+A page navigated to another process keeps its child actor until its old
+process tears the page down, so a reply the parent sent before the page left
+can arrive when `contentWindow` is null, and `Cu.cloneInto` throws on it.
+The child drops a message that finds no window.
+
+diff --git a/browser/actors/ContentSearchParent.sys.mjs b/browser/actors/ContentSearchParent.sys.mjs
+index 08a2ded30d..eede200506 100644
+--- a/browser/actors/ContentSearchParent.sys.mjs
++++ b/browser/actors/ContentSearchParent.sys.mjs
+@@ -427,6 +427,9 @@ export let ContentSearch = {
+ 
+   async _onMessageGetEngine({ actor }) {
+     let state = await this.currentStateObj();
++    if (!gContentSearchActors.has(actor)) {
++      return undefined;
++    }
+     let { usePrivateBrowsing } = actor.browsingContext;
+     return this._reply(actor, "Engine", {
+       isPrivateEngine: usePrivateBrowsing,
+@@ -626,7 +629,9 @@ export let ContentSearch = {
+   },
+ 
+   _reply(actor, type, data) {
+-    actor.sendAsyncMessage(type, data);
++    if (gContentSearchActors.has(actor)) {
++      actor.sendAsyncMessage(type, data);
++    }
+   },
+ 
+   _broadcast(type, data) {
+diff --git a/browser/actors/ContentSearchChild.sys.mjs b/browser/actors/ContentSearchChild.sys.mjs
+index 3012a16173..8cbf940c99 100644
+--- a/browser/actors/ContentSearchChild.sys.mjs
++++ b/browser/actors/ContentSearchChild.sys.mjs
+@@ -18,6 +18,11 @@ export class ContentSearchChild extends JSWindowActorChild {
+   }
+ 
+   _fireEvent(type, data = null) {
++    // A page navigated away from keeps its actor until its process tears the
++    // page down, and a message arriving meanwhile has no window to go to.
++    if (!this.contentWindow) {
++      return;
++    }
+     let event = Cu.cloneInto(
+       {
+         detail: {

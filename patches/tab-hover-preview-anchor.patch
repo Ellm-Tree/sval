@@ -1,0 +1,140 @@
+Sval: a tab hover preview anchored to the Workspace panel's row
+
+Firefox's tab hover preview opens against the tab element and draws its
+own picture, for loaded tabs only. Sval hides the tab strip and shows the
+preview from the Workspace panel's rows, so TabPanel.activate takes an
+optional source naming the element to anchor to, the popup position and
+the picture to show, an element or none. A tab in the strip passes none
+and is drawn as before. No chrome API sets the anchor or the picture of
+the panel set Firefox owns.
+
+diff --git a/browser/components/tabbrowser/content/tab-hover-preview.mjs b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+index 6123b16c7c..2407a8a97f 100644
+--- a/browser/components/tabbrowser/content/tab-hover-preview.mjs
++++ b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+@@ -97,8 +97,10 @@ export default class TabHoverPanelSet {
+    * type.
+    *
+    * @param {MozTabbrowserTab|MozTabbrowserTabGroup} tabOrGroup - The tab or group to activate the panel on.
++   * @param {object} [source] Sval: where a tab's preview anchors and what
++   *   picture it shows, for a tab drawn outside the tab strip (`TabPanel`).
+    */
+-  activate(tabOrGroup) {
++  activate(tabOrGroup, source = null) {
+     if (!this.shouldActivate()) {
+       return;
+     }
+@@ -109,7 +111,7 @@ export default class TabHoverPanelSet {
+         return;
+       }
+       this.#setActivePanel(this.tabPanel);
+-      this.tabPanel.activate(tabOrGroup);
++      this.tabPanel.activate(tabOrGroup, source);
+     } else if (this.#win.gBrowser.isTabGroup(tabOrGroup)) {
+       if (!tabOrGroup.collapsed) {
+         return;
+@@ -296,6 +298,15 @@ class TabPanel extends HoverPanel {
+   /** @type {DOMElement|null} */
+   #addNoteButton;
+ 
++  /**
++   * Sval: the tab's row in the Workspace panel draws it, since the tab strip
++   * is hidden: `{ anchor, position, x, y, thumbnail }`, the picture an
++   * element or null. Null for a tab in the strip.
++   *
++   * @type {object|null}
++   */
++  #source = null;
++
+   constructor(panel, panelSet) {
+     super(panel, panelSet);
+ 
+@@ -368,12 +379,13 @@ class TabPanel extends HoverPanel {
+     }
+   }
+ 
+-  activate(tab) {
++  activate(tab, source = null) {
+     if (this.#tab === tab && this.panelElement.state == "open") {
+       return;
+     }
+     let originalTab = this.#tab;
+     this.#tab = tab;
++    this.#source = source;
+ 
+     // Calling `moveToAnchor` in advance of the call to `openPopup` ensures
+     // that race conditions can be avoided in cases where the user hovers
+@@ -403,7 +415,10 @@ class TabPanel extends HoverPanel {
+         if (!this.panelSet.shouldActivate()) {
+           return;
+         }
+-        this.panelElement.openPopup(this.#tab, this.popupOptions);
++        this.panelElement.openPopup(
++          this.#source?.anchor ?? this.#tab,
++          this.popupOptions
++        );
+       }, this);
+       this.win.addEventListener("TabSelect", this);
+       this.panelElement.addEventListener("popupshowing", this);
+@@ -439,6 +454,7 @@ class TabPanel extends HoverPanel {
+     this.win.removeEventListener("TabSelect", this);
+     this.#tab?.removeEventListener("TabAttrModified", this);
+     this.#tab = null;
++    this.#source = null;
+     this.#thumbnailElement = null;
+   }
+ 
+@@ -448,7 +464,7 @@ class TabPanel extends HoverPanel {
+       targets.push(this.#interactiveArea);
+     }
+     if (this.#tab) {
+-      targets.push(this.#tab);
++      targets.push(this.#source?.anchor ?? this.#tab);
+     }
+     return targets;
+   }
+@@ -503,6 +519,11 @@ class TabPanel extends HoverPanel {
+   #maybeRequestThumbnail() {
+     let tab = this.#tab;
+ 
++    if (this.#source) {
++      this.#thumbnailElement = this.#source.thumbnail;
++      return;
++    }
++
+     if (!this.#hasValidThumbnailState(tab)) {
+       let wireframeElement = lazy.PageWireframes.getWireframeElementForTab(tab);
+       if (wireframeElement) {
+@@ -626,8 +647,10 @@ class TabPanel extends HoverPanel {
+     );
+     thumbnailContainer.classList.toggle(
+       "hide-thumbnail",
+-      !this.#hasValidThumbnailState(this.#tab) &&
+-        !this.#hasValidWireframeState(this.#tab)
++      this.#source
++        ? !this.#thumbnailElement
++        : !this.#hasValidThumbnailState(this.#tab) &&
++            !this.#hasValidWireframeState(this.#tab)
+     );
+     if (thumbnailContainer.firstChild != this.#thumbnailElement) {
+       thumbnailContainer.replaceChildren();
+@@ -649,7 +672,7 @@ class TabPanel extends HoverPanel {
+   #movePanel() {
+     if (this.#tab) {
+       this.panelElement.moveToAnchor(
+-        this.#tab,
++        this.#source?.anchor ?? this.#tab,
+         this.popupOptions.position,
+         this.popupOptions.x,
+         this.popupOptions.y
+@@ -658,6 +681,10 @@ class TabPanel extends HoverPanel {
+   }
+ 
+   get popupOptions() {
++    if (this.#source) {
++      const { position, x, y } = this.#source;
++      return { position, x, y };
++    }
+     let tabContainer = this.win.gBrowser.tabContainer;
+     // Popup anchors to the bottom edge of the tab in horizontal tabs mode
+     if (!tabContainer.verticalMode) {

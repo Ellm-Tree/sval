@@ -1,0 +1,407 @@
+version = 1
+
+# Licensing for every file that does not state its own, in the REUSE
+# specification's format (https://reuse.software/spec-3.3/). A file this does
+# not name is Sval's own work and carries Sval's notice in its first lines.
+# scripts/check-licenses.py enforces both, and scripts/lint.sh runs it.
+#
+# When paths overlap, the last annotation that matches a file wins.
+
+# The website at sval.app, which no license covers. Later annotations give
+# its art, its docs and its prose-check config their own licenses.
+[[annotations]]
+path = "website/**"
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "LicenseRef-sval-website"
+
+# Sval's own files that cannot carry a comment, or whose readers would show one.
+[[annotations]]
+path = [
+  "*.md",
+  "**/*.md",
+  "renovate.json",
+  "chrome/.gitkeep",
+  "chrome/browser/components/sval/test/browser/sval_agent_doc.pdf",
+  "tools/sval-mcp/Cargo.lock",
+  "tools/sval-folder/Cargo.lock",
+  "engine/Cargo.lock",
+  "chrome/toolkit/mozapps/update/updater/*.der",
+]
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+
+# Files other browsers wrote from Sval's own test browsing, for the import
+# tests. They are data in each browser's format and carry no comment.
+[[annotations]]
+path = "chrome/browser/components/sval/test/xpcshell/data/import/**"
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+
+# Sval's brand art. branding/sval/LICENSE lists the same paths and says what
+# may be done with them.
+[[annotations]]
+path = [
+  "branding/sval/*.bmp",
+  "branding/sval/*.icns",
+  "branding/sval/*.ico",
+  "branding/sval/*.png",
+  "branding/sval/content/*.png",
+  "branding/sval/content/*.svg",
+  "branding/sval/msix/Assets/*.png",
+  "branding/sval/stubinstaller/bgstub.jpg",
+  "branding/sval/src/icon.svg",
+  "branding/sval/src/masters/*",
+  "chrome/browser/components/sval/sval-glyph.svg",
+  "chrome/browser/components/sval/home/starfield-stars-only-1920x1080.svg",
+  "website/public/favicon*",
+  "website/public/apple-touch-icon*",
+  "website/src/assets/art/bg/*",
+  "website/src/assets/art/brand/*",
+  "website/public/og/*",
+  "website/public/screenshots/*",
+  "website/screenshots/*",
+]
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "LicenseRef-sval-brand-art"
+
+# Outfit, the brand typeface, shipped with the home page so the page loads no
+# font from the network. Taken unmodified from google/fonts (ofl/outfit).
+[[annotations]]
+path = "chrome/browser/components/sval/home/Outfit.ttf"
+SPDX-FileCopyrightText = "2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)"
+SPDX-License-Identifier = "OFL-1.1"
+
+# Audiowide, the user's card's display face, shipped so the card loads no
+# font from the network. Taken unmodified from google/fonts (ofl/audiowide).
+[[annotations]]
+path = "chrome/browser/components/sval/card/Audiowide-Regular.ttf"
+SPDX-FileCopyrightText = "2012 Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with Reserved Font Name \"Audiowide\""
+SPDX-License-Identifier = "OFL-1.1"
+
+# Lucide icons (lucide.dev), with each stroke set to `context-fill` so the
+# page's colour reaches it. Those the element picker draws as masks, where no
+# context paint reaches them, fall back to black. Lucide's LICENSE names the
+# icons it derives from Feather, by their Feather names; those are annotated
+# below under Feather's MIT license.
+[[annotations]]
+path = "chrome/browser/components/sval/icons/*.svg"
+SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
+SPDX-License-Identifier = "ISC"
+
+# Lucide icons for the header's buttons and address bar, with each stroke set
+# to `context-fill`.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/header-icons/book-open.svg",
+  "chrome/browser/components/sval/header-icons/extensions.svg",
+  "chrome/browser/components/sval/header-icons/history.svg",
+  "chrome/browser/components/sval/header-icons/bell.svg",
+  "chrome/browser/components/sval/header-icons/camera-off.svg",
+  "chrome/browser/components/sval/header-icons/camera.svg",
+  "chrome/browser/components/sval/header-icons/home.svg",
+  "chrome/browser/components/sval/header-icons/languages.svg",
+  "chrome/browser/components/sval/header-icons/location-off.svg",
+  "chrome/browser/components/sval/header-icons/location.svg",
+  "chrome/browser/components/sval/header-icons/mic.svg",
+  "chrome/browser/components/sval/header-icons/private.svg",
+  "chrome/browser/components/sval/header-icons/reload.svg",
+  "chrome/browser/components/sval/header-icons/screen-off.svg",
+  "chrome/browser/components/sval/header-icons/sliders-horizontal.svg",
+  "chrome/browser/components/sval/header-icons/split.svg",
+]
+SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
+SPDX-License-Identifier = "ISC"
+
+# The header's Lucide icons that Lucide derives from Feather (arrow-left,
+# arrow-right, x, search, arrow-up-right, mic-off, monitor,
+# database), which Lucide's license puts under Feather's MIT license.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/header-icons/back.svg",
+  "chrome/browser/components/sval/header-icons/forward.svg",
+  "chrome/browser/components/sval/header-icons/mic-off.svg",
+  "chrome/browser/components/sval/header-icons/screen.svg",
+  "chrome/browser/components/sval/header-icons/search.svg",
+  "chrome/browser/components/sval/header-icons/star-filled.svg",
+  "chrome/browser/components/sval/header-icons/star.svg",
+  "chrome/browser/components/sval/header-icons/stop.svg",
+  "chrome/browser/components/sval/header-icons/storage.svg",
+  "chrome/browser/components/sval/header-icons/switch-tab.svg",
+]
+SPDX-FileCopyrightText = [
+  "2013 Cole Bemis",
+  "2026 Lucide Icons and Contributors",
+]
+SPDX-License-Identifier = "MIT"
+
+# The Privacy and Security panel's and the site controls' Lucide icons,
+# drawn as masks. Shield, shield-alert, badge-check, cookie, key-round,
+# camera, camera-off, mic, map-pin, bell, app-window and
+# screen-share-off are Lucide's own; the others Lucide derives from Feather
+# (alert-triangle, chevron-left, chevron-right, chevron-down, x,
+# external-link, database, monitor, mic-off), which its license puts under
+# Feather's MIT license.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/protection-icons/sc-bell.svg",
+  "chrome/browser/components/sval/protection-icons/sc-camera-off.svg",
+  "chrome/browser/components/sval/protection-icons/sc-camera.svg",
+  "chrome/browser/components/sval/protection-icons/sc-cert.svg",
+  "chrome/browser/components/sval/protection-icons/sc-cookie.svg",
+  "chrome/browser/components/sval/protection-icons/sc-glasses.svg",
+  "chrome/browser/components/sval/protection-icons/sc-key.svg",
+  "chrome/browser/components/sval/protection-icons/sc-laptop.svg",
+  "chrome/browser/components/sval/protection-icons/sc-location.svg",
+  "chrome/browser/components/sval/protection-icons/sc-mic.svg",
+  "chrome/browser/components/sval/protection-icons/sc-network.svg",
+  "chrome/browser/components/sval/protection-icons/sc-popup.svg",
+  "chrome/browser/components/sval/protection-icons/sc-screen-off.svg",
+  "chrome/browser/components/sval/protection-icons/sc-shield-alert.svg",
+  "chrome/browser/components/sval/protection-icons/sc-shield-plain.svg",
+]
+SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
+SPDX-License-Identifier = "ISC"
+
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/protection-icons/sc-alert.svg",
+  "chrome/browser/components/sval/protection-icons/sc-back.svg",
+  "chrome/browser/components/sval/protection-icons/sc-chevron-down.svg",
+  "chrome/browser/components/sval/protection-icons/sc-external.svg",
+  "chrome/browser/components/sval/protection-icons/sc-mic-off.svg",
+  "chrome/browser/components/sval/protection-icons/sc-next.svg",
+  "chrome/browser/components/sval/protection-icons/sc-screen.svg",
+  "chrome/browser/components/sval/protection-icons/sc-storage.svg",
+  "chrome/browser/components/sval/protection-icons/sc-x.svg",
+]
+SPDX-FileCopyrightText = [
+  "2013 Cole Bemis",
+  "2026 Lucide Icons and Contributors",
+]
+SPDX-License-Identifier = "MIT"
+
+# The dialog's Lucide icons, with each stroke set to `context-fill`. Pencil is
+# Lucide's own; check and trash-2 Lucide derives from Feather, and its license
+# puts them under Feather's MIT license.
+[[annotations]]
+path = "chrome/browser/components/sval/dialog-icons/pencil.svg"
+SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
+SPDX-License-Identifier = "ISC"
+
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/dialog-icons/check.svg",
+  "chrome/browser/components/sval/dialog-icons/trash-2.svg",
+]
+SPDX-FileCopyrightText = [
+  "2013 Cole Bemis",
+  "2026 Lucide Icons and Contributors",
+]
+SPDX-License-Identifier = "MIT"
+
+# The icons that Lucide derives from Feather (arrow-left, check,
+# chevron-down, alert-circle, message-circle, sidebar, plus, search and x, as
+# Feather names them), which Lucide's license puts under Feather's MIT
+# license. Each stroke is set to `context-fill`.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/icons/arrow-left.svg",
+  "chrome/browser/components/sval/icons/check.svg",
+  "chrome/browser/components/sval/icons/chevron-down.svg",
+  "chrome/browser/components/sval/icons/circle-alert.svg",
+  "chrome/browser/components/sval/icons/message-circle.svg",
+  "chrome/browser/components/sval/icons/panel-left.svg",
+  "chrome/browser/components/sval/icons/plus.svg",
+  "chrome/browser/components/sval/icons/search.svg",
+  "chrome/browser/components/sval/icons/x.svg",
+  "chrome/browser/components/sval/notification-icons/chevron-down.svg",
+]
+SPDX-FileCopyrightText = [
+  "2013 Cole Bemis",
+  "2026 Lucide Icons and Contributors",
+]
+SPDX-License-Identifier = "MIT"
+
+# Lucide icons standing in for Mozilla's illustrations (docs/firefox-assets.md),
+# drawn at illustration size: the stroke is thinner, and is Sval blue, or
+# `context-fill` where Firefox's stylesheet sets a fill. None is one of the
+# icons Lucide's license names as derived from Feather.
+[[annotations]]
+path = "chrome/browser/components/sval/illustrations/*.svg"
+SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
+SPDX-License-Identifier = "ISC"
+
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/search-icons/brave.png",
+  "chrome/browser/components/sval/search-icons/kagi.png",
+  "chrome/browser/components/sval/search-icons/github.png",
+  "chrome/browser/components/sval/search-icons/openstreetmap.png",
+]
+SPDX-FileCopyrightText = ["Brave Software, Inc.", "Kagi Inc.", "GitHub, Inc.", "OpenStreetMap Foundation"]
+SPDX-License-Identifier = "LicenseRef-third-party-logos"
+
+# The logos of browsers import reads from, shown beside each one's name so
+# the user knows which browser a row is (nominative use). Firefox ships
+# Chrome's, Edge's and Safari's itself, under
+# chrome://browser/content/migration/brands/.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/import-brands/arc.png",
+  "chrome/browser/components/sval/import-brands/brave.png",
+  "chrome/browser/components/sval/import-brands/dia.png",
+  "chrome/browser/components/sval/import-brands/firefox.png",
+  "chrome/browser/components/sval/import-brands/orion.png",
+  "chrome/browser/components/sval/import-brands/vivaldi.png",
+  "chrome/browser/components/sval/import-brands/zen.png",
+]
+SPDX-FileCopyrightText = ["The Browser Company of New York, Inc.", "Brave Software, Inc.", "Kagi Inc.", "Mozilla Foundation", "Vivaldi Technologies AS", "Zen OSS Team"]
+SPDX-License-Identifier = "LicenseRef-third-party-logos"
+
+# The logos of the password managers first run offers, beside each one's name
+# so the user knows which is which (nominative use), as each manager's Firefox
+# add-on carries it on addons.mozilla.org.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/password-managers/1password.png",
+  "chrome/browser/components/sval/password-managers/bitwarden.png",
+  "chrome/browser/components/sval/password-managers/dashlane.png",
+  "chrome/browser/components/sval/password-managers/icloud.png",
+  "chrome/browser/components/sval/password-managers/keepassxc.png",
+  "chrome/browser/components/sval/password-managers/lastpass.png",
+  "chrome/browser/components/sval/password-managers/nordpass.png",
+  "chrome/browser/components/sval/password-managers/protonpass.png",
+]
+SPDX-FileCopyrightText = ["AgileBits Inc.", "Bitwarden Inc.", "Dashlane SAS", "Apple Inc.", "KeePassXC Team", "LastPass US LP", "Nord Security", "Proton AG"]
+SPDX-License-Identifier = "LicenseRef-third-party-logos"
+
+# The marks of agent apps and model makers, on an agent's Workspace so the
+# user knows which app works there and on which model (nominative use).
+# LobeHub's drawings of them (scripts/generate-agent-brands.py) are MIT; the
+# marks themselves are their makers' trademarks.
+[[annotations]]
+path = "chrome/browser/components/sval/agent-brands/*.svg"
+SPDX-FileCopyrightText = "2023 LobeHub"
+SPDX-License-Identifier = "MIT AND LicenseRef-third-party-logos"
+
+# Mozilla's prebuilt 7-Zip installer stubs (other-licenses/7zstub/firefox),
+# with Sval's icon and names in their resources (scripts/generate-branding.sh).
+# The icon is Sval's brand art. The stub's code is the LZMA SDK, which is in
+# the public domain, built with Mozilla's resources
+# (other-licenses/7zstub/README.mozilla).
+[[annotations]]
+path = "branding/sval/*.sfx"
+SPDX-FileCopyrightText = ["Mozilla contributors", "2026 Ellm Tree, Inc."]
+SPDX-License-Identifier = "MPL-2.0 AND LicenseRef-sval-brand-art"
+
+# Mozilla's code, or Sval's modification of it. MPL 2.0 is per-file copyleft,
+# so each of these stays MPL 2.0 and keeps Mozilla's header.
+#
+# Mozilla's files, copied unchanged.
+[[annotations]]
+path = [
+  "branding/sval/dsstore",
+  "branding/sval/content/jar.mn",
+  "branding/sval/content/moz.build",
+  "branding/sval/locales/moz.build",
+  "branding/sval/stubinstaller/profile_cleanup_page.css",
+]
+SPDX-FileCopyrightText = "Mozilla contributors"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Mozilla's files as Sval modified them: the patch series, the branding files
+# copied from browser/branding/unofficial and changed, the search
+# configuration, which carries Mozilla's Wikipedia engine records, the Linux
+# package templates, from browser/installer/linux/app, Mozilla's extensions
+# bookmarks test, run against Sval's Favorites, the installer's
+# ServicesHelper plugin, built from Mozilla's source as patched
+# (scripts/build-serviceshelper.sh), and the executables' manifests, each
+# from Mozilla's manifest of the executable it renames.
+[[annotations]]
+path = [
+  "patches/*.patch",
+  "chrome/browser/app/sval.exe.manifest",
+  "chrome/ipc/app/sval-child.exe.manifest",
+  "chrome/toolkit/components/maintenanceservice/sval-update-service.exe.manifest",
+  "chrome/toolkit/mozapps/defaultagent/proxy/sval-default-agent.exe.manifest",
+  "branding/sval/branding.nsi",
+  "branding/sval/configure.sh",
+  "branding/sval/content/aboutDialog.css",
+  "branding/sval/locales/jar.mn",
+  "branding/sval/locales/en-US/brand.ftl",
+  "branding/sval/locales/en-US/brand.properties",
+  "branding/sval/moz.build",
+  "branding/sval/stubinstaller/installing_page.css",
+  "branding/sval/sval-private-browsing.VisualElementsManifest.xml",
+  "branding/sval/sval.VisualElementsManifest.xml",
+  "chrome/browser/components/sval/SvalSearchConfig.sys.mjs",
+  "chrome/browser/components/sval/test/xpcshell/test_sval_ext_bookmarks.js",
+  "chrome/other-licenses/nsis/Plugins/ServicesHelper.dll",
+  "packaging/linux/debian/*",
+  "packaging/linux/rpm/*",
+]
+SPDX-FileCopyrightText = ["Mozilla contributors", "2026 Ellm Tree, Inc."]
+SPDX-License-Identifier = "MPL-2.0"
+
+# Zen Browser's site color engine and its tests, ported from Zen's
+# boosts (src/zen/boosts, src/zen/tests/boosts) and changed. MPL 2.0, as Zen
+# licenses them, each keeping its header.
+[[annotations]]
+path = [
+  "chrome/docshell/base/SvalSiteStyleFields.cpp",
+  "chrome/layout/style/SvalSiteStyleColors.cpp",
+  "chrome/layout/style/SvalSiteStyleColors.h",
+  "chrome/browser/components/sval/test/browser/browser_sval_site_style_colors.js",
+]
+SPDX-FileCopyrightText = ["The Zen OSS Team", "2026 Ellm Tree, Inc."]
+SPDX-License-Identifier = "MPL-2.0"
+
+# The hosts that hold a public suffix, from the Public Suffix List, as data
+# (scripts/update-tracker-owners.py, decision 1051).
+[[annotations]]
+path = "chrome/browser/components/sval/tracker-owners/shared-hosting.mjs"
+SPDX-FileCopyrightText = "The Public Suffix List's contributors"
+SPDX-License-Identifier = "MPL-2.0"
+
+# AdGuard's companiesdb, each company's domains, from
+# AdguardTeam/companiesdb's dist/trackers.json, as data
+# (scripts/update-tracker-owners.py, decision 1051).
+[[annotations]]
+path = "chrome/browser/components/sval/tracker-owners/adguard-companiesdb.mjs"
+SPDX-FileCopyrightText = "AdGuard Software Ltd and the WhoTracks.me contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# Sval's own files that cannot carry a comment.
+[[annotations]]
+path = ".claude/settings.json"
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+
+# The prose check's config, which scripts/check-prose.sh reads.
+[[annotations]]
+path = ["website/.vale.ini", "website/vale/**"]
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+
+# The docs' text and the release notes, which anyone may share or adapt,
+# commercially too, with credit and under the same license (decision 2023).
+[[annotations]]
+path = ["website/src/content/docs/**", "website/src/content/releases/**"]
+SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# The ext-background-effect-v1 Wayland protocol's client bindings, in the form
+# wayland-scanner generates from the protocol's XML in wayland-protocols,
+# under the protocol's MIT license.
+[[annotations]]
+path = [
+  "chrome/widget/gtk/wayland/ext-background-effect-v1-client-protocol.h",
+  "chrome/widget/gtk/wayland/ext-background-effect-v1-protocol.c",
+]
+SPDX-FileCopyrightText = [
+  "2015 Martin Gräßlin",
+  "2015 Marco Martin",
+  "2020 Vlad Zahorodnii",
+  "2024 Xaver Hugl",
+]
+SPDX-License-Identifier = "MIT"

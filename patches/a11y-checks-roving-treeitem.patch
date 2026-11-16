@@ -1,0 +1,27 @@
+Sval: the accessibility checks accept a treeitem reached by a roving tabindex
+
+`isKeyboardFocusable` takes an element with a negative tabindex as one a
+keyboard user cannot reach, apart from the roving-tabindex widgets it
+names: toolbars, moz-radio and moz-visual-picker. WAI-ARIA's tree view
+pattern keeps one treeitem in the tab order and moves among the rest with
+the arrow keys, so a click on any other treeitem of a valid tree (Sval's
+panel rows) failed as "Node is not focusable via the accessibility API".
+A treeitem whose tree has a treeitem at tabindex 0 is now accepted.
+
+diff --git a/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js b/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js
+index 0774e48e0c..96f0ff31e8 100644
+--- a/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js
++++ b/testing/mochitest/tests/SimpleTest/AccessibilityUtils.js
+@@ -789,6 +789,12 @@ this.AccessibilityUtils = (function () {
+           node.getRootNode().host?.localName === "moz-radio") ||
+         (role === Ci.nsIAccessibleRole.ROLE_RADIOBUTTON &&
+           node.getRootNode().host?.localName === "moz-visual-picker-item") ||
++        // An ARIA tree keeps one treeitem in the tab order and reaches the
++        // rest with the arrow keys (https://www.w3.org/WAI/ARIA/apg/patterns/treeview/).
++        (role === Ci.nsIAccessibleRole.ROLE_OUTLINEITEM &&
++          node
++            .closest('[role="tree"]')
++            ?.querySelector('[role="treeitem"][tabindex="0"]')) ||
+         shouldIgnoreTabIndex(node))
+     );
+   }

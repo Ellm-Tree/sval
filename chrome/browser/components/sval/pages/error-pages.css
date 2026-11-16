@@ -1,0 +1,132 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The pages a failed load or a crash puts in a tab, over `sval-page.css`'s
+ * tokens: network and certificate errors, HTTPS-Only's, a blocked site, a
+ * site rated for adults (about:restricted), a load the agent gate refused
+ * (about:agentblocked), a crashed tab or frame and the restart an update
+ * asks for. Each page's text
+ * sits on one card, as a Settings pane's does, and its title takes Settings'
+ * heading. Every page here draws its text in a `.container` or
+ * `#errorPageContainer` on `info-pages.css`; a certificate or network error
+ * Firefox's newer card handles draws it in `net-error-card`'s shadow tree,
+ * which only the host's box and inherited values reach.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  body > .container,
+  body > #errorPageContainer,
+  net-error-card,
+  #badCertAdvancedPanel,
+  .error-description {
+    box-sizing: border-box;
+    padding: 32px 40px;
+    background-color: var(--sval-card);
+    border: 1px solid var(--sval-border);
+    border-radius: 20px;
+    box-shadow: var(--sval-shadow);
+  }
+
+  net-error-card {
+    margin-top: calc(96px - var(--error-page-padding, 0px));
+  }
+
+  /* `info-pages.css` hangs a title's icon in the margin left of the text,
+     which would put it outside the card; it stands above the title. */
+  body > :is(.container, #errorPageContainer) .title {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    background-position: left top;
+    background-size: 32px;
+  }
+
+  body.certerror .title,
+  body.captiveportal .title,
+  body.blocked .title,
+  main.container .title {
+    padding-top: 48px;
+  }
+
+  body > :is(.container, #errorPageContainer) .title:dir(rtl) {
+    background-position: right top;
+  }
+
+  /* Sval's glyphs for the titles' Firefox icons. */
+  body.certerror .title {
+    background-image: url("chrome://browser/content/sval/icons/triangle-alert.svg") !important;
+  }
+
+  body.blocked .title {
+    background-image: url("chrome://browser/content/sval/icons/shield-ban.svg");
+  }
+
+  main.container .title {
+    background-image: url("chrome://browser/content/sval/icons/shield-off.svg");
+  }
+
+  /* about:restricted's title takes Sval's warning glyph, in the page's own
+     warning colour (`aboutRestricted.css`). */
+  :root:has(> head > link[href$="aboutRestricted.css"]) .title {
+    padding-top: 48px;
+    background-image: url("chrome://browser/content/sval/icons/triangle-alert.svg");
+  }
+
+  .title-text {
+    padding-bottom: 0;
+    margin-block: 0 16px;
+    color: var(--sval-ink);
+    font-size: var(--sval-heading-size);
+    font-weight: var(--sval-heading-weight);
+    letter-spacing: var(--sval-heading-tracking);
+  }
+
+  .container h2,
+  .container h3 {
+    color: var(--sval-ink);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  #errorShortDesc {
+    color: var(--sval-ink-body);
+  }
+
+  /* The crashed tab's report choices, the advanced panel's technical
+     details and the DNS-over-HTTPS notice are boxes within the card, as a
+     Settings card's grouped rows are. */
+  #reportBox,
+  .trr-message-container,
+  #certificateErrorDebugInformation,
+  #advancedPanelButtonContainer {
+    background-color: var(--sval-sunken);
+    border: 1px solid var(--sval-border);
+    border-radius: 12px;
+  }
+
+  #reportBox {
+    padding: 16px 20px;
+  }
+
+  #advancedPanelButtonContainer {
+    padding: 8px;
+  }
+
+  textarea {
+    border: 1px solid var(--sval-control-edge);
+    border-radius: 12px;
+    background-color: var(--sval-sunken);
+    color: var(--sval-ink);
+    padding: 8px 12px;
+  }
+
+  /* A crashed frame shows a glyph alone, centred in the frame. */
+  :root:has(> head > link[href$="aboutFrameCrashed.css"]) body {
+    background-color: var(--sval-page);
+    background-image: url("chrome://browser/content/sval/icons/circle-alert.svg");
+    background-size: 24px;
+    -moz-context-properties: fill;
+    fill: var(--sval-ink-muted);
+  }
+}

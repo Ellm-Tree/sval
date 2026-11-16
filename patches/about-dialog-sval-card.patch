@@ -1,0 +1,34 @@
+Sval: show the user's card in About, in Sval's design
+
+The dialog loads Sval's own sheet, which draws it with Sval's tokens
+and type, and a script that puts the user's card in place of the
+globe. The help link reads Documentation, from sval/about.ftl.
+
+diff --git a/browser/base/content/aboutDialog.xhtml b/browser/base/content/aboutDialog.xhtml
+index e8503fb4f..57c749422 100644
+--- a/browser/base/content/aboutDialog.xhtml
++++ b/browser/base/content/aboutDialog.xhtml
+@@ -32,6 +32,8 @@
+       rel="stylesheet"
+       href="chrome://branding/content/aboutDialog.css"
+     />
++    <html:link rel="stylesheet" href="chrome://browser/content/sval/card/card.css"/>
++    <html:link rel="stylesheet" href="chrome://browser/content/sval/about-dialog.css"/>
+ 
+     <html:link rel="localization" href="branding/brand.ftl"/>
+     <html:link rel="localization" href="browser/aboutDialog.ftl"/>
+@@ -107,7 +109,7 @@
+                 <label id="releasenotes" is="text-link" hidden="true" data-l10n-id="releaseNotes-link"/>
+               </hbox>
+               <description class="text-blurb">
+-                <label id="aboutDialogHelpLink" is="text-link" data-l10n-id="aboutdialog-help-user"/>
++                <label id="aboutDialogHelpLink" is="text-link" data-l10n-id="about-sval-documentation"/>
+                 <label id="submit-feedback" is="text-link" data-l10n-id="about-sval-send-feedback"/>
+               </description>
+             </vbox>
+@@ -141,4 +143,5 @@
+   </keyset>
+ 
+   <script src="chrome://browser/content/aboutDialog.js"/>
++  <script src="chrome://browser/content/sval/about-dialog.js"/>
+ </window>

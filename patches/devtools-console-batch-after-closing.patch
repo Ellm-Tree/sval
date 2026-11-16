@@ -1,0 +1,39 @@
+Sval: the Web Console drops a queued batch once it has started closing
+
+WebConsoleWrapper.setTimeoutIfNeeded dispatches its queued messages 50 ms
+later. When the console closes in between, WebConsoleUI.destroy has
+dispatched START_IGNORE_ACTION, the ignore middleware throws on that
+dispatch, and the timer's async callback rejects with nothing to catch it
+("Dispatching 'MESSAGES_ADD' action after panel's closing"). The timer
+returns early when the store ignores actions. The wrapper is Mozilla's
+DevTools front end, so no chrome API reaches it.
+
+diff --git a/devtools/client/webconsole/webconsole-wrapper.js b/devtools/client/webconsole/webconsole-wrapper.js
+index 43f0208e69..191def4ee0 100644
+--- a/devtools/client/webconsole/webconsole-wrapper.js
++++ b/devtools/client/webconsole/webconsole-wrapper.js
+@@ -28,6 +28,9 @@ const {
+ } = require("resource://devtools/client/webconsole/selectors/messages.js");
+ 
+ const EventEmitter = require("resource://devtools/shared/event-emitter.js");
++const {
++  isIgnoringActions,
++} = require("resource://devtools/client/shared/redux/middleware/ignore.js");
+ const App = createFactory(
+   require("resource://devtools/client/webconsole/components/App.js")
+ );
+@@ -412,6 +415,14 @@ class WebConsoleWrapper extends EventEmitter {
+           return;
+         }
+ 
++        // A batch queued before the console started closing is dropped: from
++        // then on the ignore middleware throws on every action, and this
++        // timer's promise has no caller to catch it.
++        if (isIgnoringActions(store.getState())) {
++          done();
++          return;
++        }
++
+         const { ui } = store.getState();
+         store.dispatch(
+           actions.messagesAdd(this.queuedMessageAdds, null, ui.persistLogs)

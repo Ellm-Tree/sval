@@ -1,0 +1,878 @@
+Sval: each private window is a browsing session of its own
+
+A private window's first tab opens in a cookie jar of its own
+(SvalPrivateJars), and its new tabs follow it through
+gBrowser.defaultUserContextId; a window a page opened keeps its opener's,
+as Gecko gives it. Any other tab opened in a private window is given the
+window's jar, whatever was asked for, and a private popup's links open in
+the window whose session it shares, or in a window of their own. Switch to
+tab offers a private window only its own session's tabs, and the content
+pref service, the last download folder, and the tab group menus keep each
+private session apart too. The jar has to be chosen as the first browser is
+made, in _setupInitialBrowserAndTab, which every private window reaches, the
+first one under permanent private browsing included; nothing earlier sees
+them all. Tabs never move into or out of a private window: the swap refuses
+it, the moves to a new window do nothing, and the tab menu leaves "Move to
+New Window" out. Each private window lists only the tabs closed in it, and
+only its own downloads, in the panel, the toolbar button and
+about:downloads. A private window's site zoom is held on the window
+(SvalPrivateZoom), and no favicon a private page shows is written to the
+profile. No chrome API reaches these: each is decided inside the function
+patched, before any event fires.
+
+diff --git a/browser/actors/LinkHandlerParent.sys.mjs b/browser/actors/LinkHandlerParent.sys.mjs
+index 31922042e9..bf476819bf 100644
+--- a/browser/actors/LinkHandlerParent.sys.mjs
++++ b/browser/actors/LinkHandlerParent.sys.mjs
+@@ -13,6 +13,7 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
++  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   OpenSearchManager:
+     "moz-src:///browser/components/search/OpenSearchManager.sys.mjs",
+ });
+@@ -243,7 +244,8 @@ export class LinkHandlerParent extends JSWindowActorParent {
+         return;
+       }
+     }
+-    if (canStoreIcon) {
++    // Sval: nothing a private window shows is written to the profile.
++    if (canStoreIcon && !lazy.PrivateBrowsingUtils.isBrowserPrivate(browser)) {
+       try {
+         lazy.PlacesUtils.favicons
+           .setFaviconForPage(
+diff --git a/browser/base/content/browser-commands.js b/browser/base/content/browser-commands.js
+index a9a7ab4495..8684b60db3 100644
+--- a/browser/base/content/browser-commands.js
++++ b/browser/base/content/browser-commands.js
+@@ -496,7 +496,11 @@ var BrowserCommands = {
+ 
+     if (inNewWindow) {
+       tabBrowser.hideTab(tab);
+-      tabBrowser.replaceTabWithWindow(tab);
++      // Sval: a private window keeps its tabs (replaceTabWithWindow), so the
++      // source shows in this one.
++      if (!tabBrowser.replaceTabWithWindow(tab)) {
++        tabBrowser.showTab(tab);
++      }
+     }
+   },
+ 
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+index 28e8d41f6e..c48b6accd6 100644
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -876,7 +876,11 @@ var gBrowserInit = {
+             inBackground: false,
+             replace: true,
+             // See below for the semantics of window.arguments. Only the minimum is supported.
+-            userContextId: window.arguments[5],
++            // Sval: a private window's pages load in its session's jar, which
++            // its first tab took (SvalPrivateJars).
++            userContextId: PrivateBrowsingUtils.isWindowPrivate(window)
++              ? gBrowser.defaultUserContextId
++              : window.arguments[5],
+             triggeringPrincipal:
+               window.arguments[8] ||
+               Services.scriptSecurityManager.getSystemPrincipal(),
+@@ -901,6 +905,11 @@ var gBrowserInit = {
+           window.arguments[5] != undefined
+             ? window.arguments[5]
+             : Ci.nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID;
++        // Sval: a private window's pages load in its session's jar, which its
++        // first tab took (SvalPrivateJars).
++        if (PrivateBrowsingUtils.isWindowPrivate(window)) {
++          userContextId = gBrowser.defaultUserContextId;
++        }
+ 
+         let hasValidUserGestureActivation = undefined;
+         let textDirectiveUserActivation = undefined;
+diff --git a/browser/base/content/main-popupset.js b/browser/base/content/main-popupset.js
+index b920e15708..970958f64c 100644
+--- a/browser/base/content/main-popupset.js
++++ b/browser/base/content/main-popupset.js
+@@ -624,6 +624,13 @@ document.addEventListener(
+           event.target.querySelector(
+             "#open-tab-group-context-menu_moveToNewWindow"
+           ).disabled = groupAloneInWindow;
++          // Sval: a private window's tabs stay in its session, and no tab
++          // moves into one.
++          for (let id of ["moveToNewWindow", "moveToThisWindow"]) {
++            event.target.querySelector(
++              `#open-tab-group-context-menu_${id}`
++            ).hidden = PrivateBrowsingUtils.isWindowPrivate(window);
++          }
+         }
+       });
+ 
+diff --git a/browser/base/content/nsContextMenu.sys.mjs b/browser/base/content/nsContextMenu.sys.mjs
+index 5bab8ffea8..dfe1dd4d86 100644
+--- a/browser/base/content/nsContextMenu.sys.mjs
++++ b/browser/base/content/nsContextMenu.sys.mjs
+@@ -1648,7 +1648,11 @@ export class nsContextMenu {
+       const viewSourceBrowser = tabBrowser.getBrowserForTab(tab);
+       if (inNewWindow) {
+         tabBrowser.hideTab(tab);
+-        tabBrowser.replaceTabsWithWindow(tab);
++        // Sval: a private window keeps its tabs (replaceTabsWithWindow), so
++        // the source shows in this one.
++        if (!tabBrowser.replaceTabsWithWindow(tab)) {
++          tabBrowser.showTab(tab);
++        }
+       }
+       return viewSourceBrowser;
+     };
+diff --git a/browser/components/downloads/DownloadsCommon.sys.mjs b/browser/components/downloads/DownloadsCommon.sys.mjs
+index bc0f50e87c..0290cf68a4 100644
+--- a/browser/components/downloads/DownloadsCommon.sys.mjs
++++ b/browser/components/downloads/DownloadsCommon.sys.mjs
+@@ -250,12 +250,11 @@ export var DownloadsCommon = {
+    * the window in question.
+    */
+   getIndicatorData(aWindow) {
+-    if (lazy.PrivateBrowsingUtils.isContentWindowPrivate(aWindow)) {
+-      return lazy.PrivateDownloadsIndicatorData;
+-    }
++    const isPrivate =
++      lazy.PrivateBrowsingUtils.isContentWindowPrivate(aWindow);
+     return lazy.SvalDownloadWorkspaces.indicatorDataFor(
+       aWindow,
+-      filter => new DownloadsIndicatorDataCtor(false, filter)
++      filter => new DownloadsIndicatorDataCtor(isPrivate, filter)
+     );
+   },
+ 
+@@ -1360,7 +1359,10 @@ DownloadsIndicatorDataCtor.prototype = {
+     this._oldDownloadStates = new WeakMap();
+     this._itemCount = 0;
+     if (this._views.length) {
+-      for (let download of lazy.DownloadsData._downloads) {
++      let data = this._isPrivate
++        ? lazy.PrivateDownloadsData
++        : lazy.DownloadsData;
++      for (let download of data._downloads) {
+         if (this._svalFilter(download)) {
+           DownloadsViewPrototype.onDownloadAdded.call(this, download);
+           this._itemCount++;
+diff --git a/browser/components/downloads/content/allDownloadsView.js b/browser/components/downloads/content/allDownloadsView.js
+index 786d0089bc..dd4e666334 100644
+--- a/browser/components/downloads/content/allDownloadsView.js
++++ b/browser/components/downloads/content/allDownloadsView.js
+@@ -11,6 +11,8 @@ var { XPCOMUtils } = ChromeUtils.importESModule(
+ );
+ 
+ ChromeUtils.defineESModuleGetters(this, {
++  SvalDownloadWorkspaces:
++    "moz-src:///browser/components/sval/SvalDownloadWorkspaces.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   Downloads: "resource://gre/modules/Downloads.sys.mjs",
+   DownloadsCommon:
+@@ -518,6 +520,10 @@ DownloadsPlacesView.prototype = {
+   },
+ 
+   onDownloadAdded(download, { insertBefore } = {}) {
++    // Sval: a private window lists the downloads started in it alone.
++    if (!SvalDownloadWorkspaces.listedInPage(window, download)) {
++      return;
++    }
+     let shell = new HistoryDownloadElementShell(download);
+     this._viewItemsForDownloads.set(download, shell);
+ 
+@@ -543,10 +549,13 @@ DownloadsPlacesView.prototype = {
+   },
+ 
+   onDownloadChanged(download) {
+-    this._viewItemsForDownloads.get(download).onChanged();
++    this._viewItemsForDownloads.get(download)?.onChanged();
+   },
+ 
+   onDownloadRemoved(download) {
++    if (!this._viewItemsForDownloads.has(download)) {
++      return;
++    }
+     let element = this._viewItemsForDownloads.get(download).element;
+ 
+     // If the element was selected exclusively, select its next
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index a69619ad5c..6253d6590a 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -4347,6 +4347,11 @@ var SessionStoreInternal = {
+         sourceOptions.sourceWindow
+       );
+     }
++    // Sval: each private window is a session of its own, and lists only the
++    // tabs closed in it.
++    if (sourceOptions.private) {
++      sourceOptions.closedTabsFromAllWindows = false;
++    }
+     return sourceOptions;
+   },
+ 
+diff --git a/browser/components/tabbrowser/content/browser-fullZoom.js b/browser/components/tabbrowser/content/browser-fullZoom.js
+index 34864261b0..a90dece080 100644
+--- a/browser/components/tabbrowser/content/browser-fullZoom.js
++++ b/browser/components/tabbrowser/content/browser-fullZoom.js
+@@ -49,9 +49,15 @@ var FullZoom = {
+     window.addEventListener("MozScaleGestureComplete", this);
+ 
+     // Register ourselves with the service so we know when our pref changes.
+-    this._cps2 = Cc["@mozilla.org/content-pref/service;1"].getService(
+-      Ci.nsIContentPrefService2
+-    );
++    // Sval: a private window's site zoom is its own, in memory
++    // (SvalPrivateZoom).
++    this._cps2 =
++      ChromeUtils.importESModule(
++        "moz-src:///browser/components/sval/SvalPrivateZoom.sys.mjs"
++      ).SvalPrivateZoom.storeFor(window) ??
++      Cc["@mozilla.org/content-pref/service;1"].getService(
++        Ci.nsIContentPrefService2
++      );
+     this._cps2.addObserverForName(this.name, this);
+ 
+     this.updateBackgroundTabs = Services.prefs.getBoolPref(
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index cfeee66c22..ae9982565b 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -202,6 +202,11 @@
+           "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs",
+         SponsorProtection:
+           "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
++        // Sval: a private window's session (SvalPrivateJars).
++        SvalPrivateJars:
++          "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
++        SvalWebDriver:
++          "moz-src:///browser/components/sval/SvalWebDriver.sys.mjs",
+         TabMetrics:
+           "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
+         TabStateFlusher:
+@@ -666,6 +671,17 @@
+         userContextId = openWindowInfo.originAttributes.userContextId;
+       }
+ 
++      // Sval: a private window is a session of its own, and its tabs open in
++      // its jar (SvalPrivateJars). One a page opened shares its opener's.
++      if (PrivateBrowsingUtils.isWindowPrivate(window)) {
++        const keep =
++          !!(openWindowInfo || tabArgument) ||
++          (!!userContextId &&
++            this.SvalWebDriver.isClientsJar(userContextId));
++        userContextId = this.defaultUserContextId =
++          this.SvalPrivateJars.jarForWindow(window, userContextId, { keep });
++      }
++
+       let remoteTypeOptions = { window, userContextId };
+       if (triggeringRemoteType) {
+         // NOTE: We intentionally don't allow setting preferredRemoteType to
+@@ -4167,6 +4183,19 @@
+       if (userContextId == null) {
+         userContextId = this.defaultUserContextId;
+       }
++      // Sval: a private window's tabs use its own session's jar alone
++      // (SvalPrivateJars), save a WebDriver client's own user context.
++      if (
++        PrivateBrowsingUtils.isWindowPrivate(window) &&
++        this.defaultUserContextId != null &&
++        userContextId != this.defaultUserContextId &&
++        !(
++          userContextId &&
++          this.SvalWebDriver.isClientsJar(userContextId)
++        )
++      ) {
++        userContextId = this.defaultUserContextId;
++      }
+ 
+       if (!noInitialLabel) {
+         if (isBlankPageURL(uriString)) {
+@@ -6353,6 +6382,14 @@
+         return false;
+       }
+ 
++      // Sval: nor between two private windows, each a session of its own.
++      if (
++        aOtherTab.documentGlobal != window &&
++        PrivateBrowsingUtils.isWindowPrivate(window)
++      ) {
++        return false;
++      }
++
+       // Do not allow transfering a useRemoteSubframes tab to a
+       // non-useRemoteSubframes window and vice versa.
+       if (gFissionBrowser != aOtherTab.documentGlobal.gFissionBrowser) {
+@@ -6841,7 +6878,8 @@
+      *   Key-value pairs that will be serialized into the features string.
+      */
+     replaceTabWithWindow(aTab, aOptions = {}) {
+-      if (this.tabs.length == 1) {
++      // Sval: a private window's tabs stay in its session.
++      if (this.tabs.length == 1 || PrivateBrowsingUtils.isWindowPrivate(window)) {
+         return null;
+       }
+       // TODO bug 1967925: Consider handling the case where aTab is a tab group
+@@ -6873,6 +6911,10 @@
+      * in the current window, in which case this will do nothing.
+      */
+     replaceTabsWithWindow(contextTab, aOptions = {}) {
++      // Sval: a private window's tabs stay in its session.
++      if (PrivateBrowsingUtils.isWindowPrivate(window)) {
++        return null;
++      }
+       if (this.isTabGroupLabel(contextTab)) {
+         // TODO bug 1967937: Pass contextTab.group instead.
+         return this.replaceTabWithWindow(contextTab, aOptions);
+@@ -10623,6 +10665,9 @@ var TabContextMenu = {
+ 
+     document.getElementById("context_openTabInWindow").disabled =
+       this.contextTab.hasAttribute("customizemode");
++    // Sval: a private window's tabs stay in its session.
++    document.getElementById("context_openTabInWindow").hidden =
++      PrivateBrowsingUtils.isWindowPrivate(window);
+ 
+     // Only one of "Duplicate Tab"/"Duplicate Tabs" should be visible.
+     document.getElementById("context_duplicateTab").hidden = this.multiselected;
+diff --git a/browser/components/tabbrowser/content/tabgroup-menu.js b/browser/components/tabbrowser/content/tabgroup-menu.js
+index cf93f332a1..07f767780f 100644
+--- a/browser/components/tabbrowser/content/tabgroup-menu.js
++++ b/browser/components/tabbrowser/content/tabgroup-menu.js
+@@ -928,6 +928,9 @@
+       });
+       document.getElementById("tabGroupEditor_moveGroupToNewWindow").disabled =
+         gBrowser.openTabs.length == this.activeGroup?.tabs.length;
++      // Sval: a private window's tabs stay in its session.
++      document.getElementById("tabGroupEditor_moveGroupToNewWindow").hidden =
++        PrivateBrowsingUtils.isWindowPrivate(window);
+       let linkCount = this.#getGroupLinks(this.activeGroup).length;
+       document.l10n.setAttributes(
+         this.#commandButtons.copyAllLinks,
+diff --git a/browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs b/browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs
+index 32d13667fc..e2d2237e6f 100644
+--- a/browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs
+@@ -107,11 +107,11 @@ export class UrlbarProviderOpenTabs extends UrlbarProvider {
+    * @param {boolean} [isInPrivateWindow] Whether it's for a private browsing window
+    * @returns {Map} { url => Set([userContextId, groupId]) }
+    */
+-  static getOpenTabUrls(isInPrivateWindow = false) {
++  static getOpenTabUrls(isInPrivateWindow = false, userContextId = 0) {
+     let uniqueUrls = new Map();
+     if (isInPrivateWindow) {
+       let urlInfo = UrlbarProviderOpenTabs.getOpenTabUrlsForUserContextId(
+-        PRIVATE_USER_CONTEXT_ID,
++        userContextId,
+         true
+       );
+       for (let [url, contextId, groupId] of urlInfo) {
+@@ -119,7 +119,7 @@ export class UrlbarProviderOpenTabs extends UrlbarProvider {
+       }
+     } else {
+       gOpenTabUrls.forEach((groups, userContextId) => {
+-        if (userContextId == PRIVATE_USER_CONTEXT_ID) {
++        if (!UrlbarProviderOpenTabs.isNonPrivateUserContextId(userContextId)) {
+           return;
+         }
+ 
+@@ -167,7 +167,12 @@ export class UrlbarProviderOpenTabs extends UrlbarProvider {
+    * @returns {number} userContextId
+    */
+   static getUserContextIdForOpenPagesTable(userContextId, isInPrivateWindow) {
+-    return isInPrivateWindow ? PRIVATE_USER_CONTEXT_ID : userContextId;
++    // Sval: each private window is a session of its own (SvalPrivateJars), so
++    // its tabs are kept apart from every other's, under -1 less its jar.
++    if (!isInPrivateWindow || userContextId < 0) {
++      return userContextId;
++    }
++    return PRIVATE_USER_CONTEXT_ID - (userContextId || 0);
+   }
+ 
+   /**
+@@ -177,7 +182,7 @@ export class UrlbarProviderOpenTabs extends UrlbarProvider {
+    * @returns {boolean}
+    */
+   static isNonPrivateUserContextId(userContextId) {
+-    return userContextId != PRIVATE_USER_CONTEXT_ID;
++    return userContextId > PRIVATE_USER_CONTEXT_ID;
+   }
+ 
+   /**
+diff --git a/browser/components/urlbar/UrlbarProviderSemanticHistorySearch.sys.mjs b/browser/components/urlbar/UrlbarProviderSemanticHistorySearch.sys.mjs
+index 12e45de1d4..2fd9092de5 100644
+--- a/browser/components/urlbar/UrlbarProviderSemanticHistorySearch.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderSemanticHistorySearch.sys.mjs
+@@ -135,7 +135,8 @@ export class UrlbarProviderSemanticHistorySearch extends UrlbarProvider {
+     }
+ 
+     let openTabs = lazy.UrlbarProviderOpenTabs.getOpenTabUrls(
+-      queryContext.isPrivate
++      queryContext.isPrivate,
++      queryContext.userContextId
+     );
+     for (let res of results) {
+       if (
+diff --git a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+index 1250439774..a50a65d843 100644
+--- a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+@@ -187,7 +187,8 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+     let tabUrlsToContextIds = new Map();
+     if (lazy.UrlbarPrefs.get("suggest.openpage")) {
+       lazy.UrlbarProviderOpenTabs.getOpenTabUrls(
+-        queryContext.isPrivate
++        queryContext.isPrivate,
++        queryContext.userContextId
+       ).forEach((userContextAndGroupIds, url) => {
+         let userContextIds = new Set();
+         for (let [userContextId] of userContextAndGroupIds) {
+diff --git a/browser/modules/BrowserDOMWindow.sys.mjs b/browser/modules/BrowserDOMWindow.sys.mjs
+index 7006931164..f31e9f4cca 100644
+--- a/browser/modules/BrowserDOMWindow.sys.mjs
++++ b/browser/modules/BrowserDOMWindow.sys.mjs
+@@ -10,6 +10,7 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ let lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
++  SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   TaskbarTabsUtils: "resource:///modules/taskbartabs/TaskbarTabsUtils.sys.mjs",
+   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+@@ -107,6 +108,11 @@ export class BrowserDOMWindow {
+       !lazy.TaskbarTabsUtils.isTaskbarTabWindow(this.win)
+     ) {
+       win = this.win;
++    } else if (aIsPrivate) {
++      // Sval: a private popup's links open in the window whose session it
++      // shares, or in a window of their own (SvalPrivateJars).
++      win = lazy.SvalPrivateJars.windowOf(aUserContextId);
++      needToFocusWin = true;
+     } else {
+       win = BrowserWindowTracker.getTopWindow({ private: aIsPrivate });
+       needToFocusWin = true;
+diff --git a/browser/modules/URILoadingHelper.sys.mjs b/browser/modules/URILoadingHelper.sys.mjs
+index b0f17c20bc..9670928736 100644
+--- a/browser/modules/URILoadingHelper.sys.mjs
++++ b/browser/modules/URILoadingHelper.sys.mjs
+@@ -10,6 +10,7 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
++  SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+ });
+ 
+@@ -734,6 +735,17 @@ export const URILoadingHelper = {
+       return top;
+     }
+ 
++    // Sval: a private popup's links open in the window whose session it
++    // shares, when that is open (SvalPrivateJars).
++    if (!forceNonPrivate && PrivateBrowsingUtils.isWindowPrivate(top)) {
++      let owner = lazy.SvalPrivateJars.windowOf(
++        top.gBrowser?.selectedTab.userContextId
++      );
++      if (owner) {
++        return owner;
++      }
++    }
++
+     return lazy.BrowserWindowTracker.getTopWindow({
+       private: !forceNonPrivate && PrivateBrowsingUtils.isWindowPrivate(window),
+       allowPopups: !skipPopups,
+@@ -948,6 +960,15 @@ export const URILoadingHelper = {
+       ) {
+         return false;
+       }
++      // Sval: nor between private windows of different sessions
++      // (SvalPrivateJars).
++      if (
++        PrivateBrowsingUtils.isWindowPrivate(aWindow) &&
++        aWindow.gBrowser.defaultUserContextId !=
++          window.gBrowser?.defaultUserContextId
++      ) {
++        return false;
++      }
+ 
+       // Remove the query string, fragment, both, or neither from a given url.
+       function cleanURL(url, removeQuery, removeFragment) {
+diff --git a/toolkit/components/contentprefs/ContentPrefService2.sys.mjs b/toolkit/components/contentprefs/ContentPrefService2.sys.mjs
+index 83acc2c57b..37c5dfb8d0 100644
+--- a/toolkit/components/contentprefs/ContentPrefService2.sys.mjs
++++ b/toolkit/components/contentprefs/ContentPrefService2.sys.mjs
+@@ -33,6 +33,8 @@ export function ContentPrefService2() {
+   }
+ 
+   Services.obs.addObserver(this, "last-pb-context-exited");
++  // Sval: a private session's prefs go when its data is cleared.
++  Services.obs.addObserver(this, "clear-origin-attributes-data");
+ 
+   // Observe shutdown so we can shut down the database connection.
+   Services.obs.addObserver(this, "profile-before-change");
+@@ -135,6 +137,7 @@ ContentPrefService2.prototype = {
+   _destroy() {
+     Services.obs.removeObserver(this, "profile-before-change");
+     Services.obs.removeObserver(this, "last-pb-context-exited");
++    Services.obs.removeObserver(this, "clear-origin-attributes-data");
+ 
+     // Delete references to XPCOM components to make sure we don't leak them
+     // (although we haven't observed leakage in tests).  Also delete references
+@@ -149,6 +152,27 @@ ContentPrefService2.prototype = {
+   _cache: cache,
+   _pbStore: privModeStorage,
+ 
++  // Sval: each private window is a browsing session of its own, told apart by
++  // its userContextId (SvalPrivateJars), and keeps its prefs apart from every
++  // other's. A context without origin attributes has the first store.
++  _pbStores: new Map([[0, privModeStorage]]),
++
++  _pbStoreFor(context) {
++    let jar = context?.originAttributes?.userContextId ?? 0;
++    let store = this._pbStores.get(jar);
++    if (!store) {
++      store = new ContentPrefStore();
++      this._pbStores.set(jar, store);
++    }
++    return store;
++  },
++
++  // The stores a removal for `context` reaches: its own, or every one for no
++  // context.
++  _pbStoresFor(context) {
++    return context ? [this._pbStoreFor(context)] : [...this._pbStores.values()];
++  },
++
+   _connPromise: null,
+ 
+   get conn() {
+@@ -179,7 +203,7 @@ ContentPrefService2.prototype = {
+     // browsing.
+     let pbPrefs = new ContentPrefStore();
+     if (context && context.usePrivateBrowsing) {
+-      for (let [sgroup, sname, val] of this._pbStore) {
++      for (let [sgroup, sname, val] of this._pbStoreFor(context)) {
+         if (sname == name) {
+           pbPrefs.set(sgroup, sname, val);
+         }
+@@ -260,7 +284,7 @@ ContentPrefService2.prototype = {
+     // browsing.
+     let pbPrefs = new ContentPrefStore();
+     if (context && context.usePrivateBrowsing) {
+-      for (let [sgroup, val] of this._pbStore.match(
++      for (let [sgroup, val] of this._pbStoreFor(context).match(
+         group,
+         name,
+         includeSubdomains
+@@ -366,7 +390,7 @@ ContentPrefService2.prototype = {
+ 
+     let storesToCheck = [this._cache];
+     if (context && context.usePrivateBrowsing) {
+-      storesToCheck.push(this._pbStore);
++      storesToCheck.push(this._pbStoreFor(context));
+     }
+ 
+     let outStore = new ContentPrefStore();
+@@ -399,7 +423,7 @@ ContentPrefService2.prototype = {
+     checkCallbackArg(callback, false);
+ 
+     if (context && context.usePrivateBrowsing) {
+-      this._pbStore.set(group, name, value);
++      this._pbStoreFor(context).set(group, name, value);
+       this._schedule(function () {
+         cbHandleCompletion(callback, Ci.nsIContentPrefCallback2.COMPLETE_OK);
+         this._notifyPrefSet(group, name, value, context.usePrivateBrowsing);
+@@ -587,13 +611,11 @@ ContentPrefService2.prototype = {
+     let prefsPrivateBrowsing = new ContentPrefStore();
+ 
+     if (isPrivate || context == null) {
+-      for (let [sgroup] of this._pbStore.match(
+-        group,
+-        name,
+-        includeSubdomains
+-      )) {
+-        prefsPrivateBrowsing.set(sgroup, name, undefined);
+-        this._pbStore.remove(sgroup, name);
++      for (let pbStore of this._pbStoresFor(context)) {
++        for (let [sgroup] of pbStore.match(group, name, includeSubdomains)) {
++          prefsPrivateBrowsing.set(sgroup, name, undefined);
++          pbStore.remove(sgroup, name);
++        }
+       }
+     }
+ 
+@@ -747,16 +769,18 @@ ContentPrefService2.prototype = {
+     let prefsPrivateBrowsing = new ContentPrefStore();
+ 
+     if (isPrivate || context == null) {
+-      for (let [sgroup, sname] of this._pbStore) {
+-        if (
+-          !group ||
+-          (!includeSubdomains && group == sgroup) ||
+-          (includeSubdomains &&
+-            sgroup &&
+-            this._pbStore.groupsMatchIncludingSubdomains(group, sgroup))
+-        ) {
+-          prefsPrivateBrowsing.set(sgroup, sname, undefined);
+-          this._pbStore.remove(sgroup, sname);
++      for (let pbStore of this._pbStoresFor(context)) {
++        for (let [sgroup, sname] of pbStore) {
++          if (
++            !group ||
++            (!includeSubdomains && group == sgroup) ||
++            (includeSubdomains &&
++              sgroup &&
++              pbStore.groupsMatchIncludingSubdomains(group, sgroup))
++          ) {
++            prefsPrivateBrowsing.set(sgroup, sname, undefined);
++            pbStore.remove(sgroup, sname);
++          }
+         }
+       }
+     }
+@@ -858,12 +882,14 @@ ContentPrefService2.prototype = {
+     // This nukes all the groups in _pbStore since we don't have their timestamp
+     // information.
+     if (isPrivate || context == null) {
+-      for (let [sgroup, sname] of this._pbStore) {
+-        if (sgroup) {
+-          prefsPrivateBrowsing.set(sgroup, sname, undefined);
++      for (let pbStore of this._pbStoresFor(context)) {
++        for (let [sgroup, sname] of pbStore) {
++          if (sgroup) {
++            prefsPrivateBrowsing.set(sgroup, sname, undefined);
++          }
+         }
++        pbStore.removeAllGroups();
+       }
+-      this._pbStore.removeAllGroups();
+     }
+ 
+     queryPromise
+@@ -988,10 +1014,12 @@ ContentPrefService2.prototype = {
+     let prefsPrivateBrowsing = new ContentPrefStore();
+ 
+     if (isPrivate || context == null) {
+-      for (let [sgroup, sname] of this._pbStore) {
+-        if (sname === name) {
+-          prefsPrivateBrowsing.set(sgroup, name, undefined);
+-          this._pbStore.remove(sgroup, name);
++      for (let pbStore of this._pbStoresFor(context)) {
++        for (let [sgroup, sname] of pbStore) {
++          if (sname === name) {
++            prefsPrivateBrowsing.set(sgroup, name, undefined);
++            pbStore.remove(sgroup, name);
++          }
+         }
+       }
+     }
+@@ -1235,14 +1263,24 @@ ContentPrefService2.prototype = {
+    * @param subj   This value depends on topic.
+    * @param topic  The backchannel "method" name.
+    */
+-  observe: function CPS2_observe(subj, topic) {
++  observe: function CPS2_observe(subj, topic, data) {
+     switch (topic) {
+       case "profile-before-change":
+         this._destroy();
+         break;
+       case "last-pb-context-exited":
+-        this._pbStore.removeAll();
++        for (let pbStore of this._pbStores.values()) {
++          pbStore.removeAll();
++        }
++        break;
++      case "clear-origin-attributes-data": {
++        let pattern = JSON.parse(data);
++        if (pattern.privateBrowsingId && pattern.userContextId) {
++          this._pbStores.get(pattern.userContextId)?.removeAll();
++          this._pbStores.delete(pattern.userContextId);
++        }
+         break;
++      }
+       case "test:reset": {
+         let fn = subj.QueryInterface(Ci.xpcIJSWeakReference).get();
+         this._reset(fn);
+@@ -1262,7 +1300,9 @@ ContentPrefService2.prototype = {
+    * @param callback  A function that will be called when done.
+    */
+   async _reset(callback) {
+-    this._pbStore.removeAll();
++    for (let pbStore of this._pbStores.values()) {
++      pbStore.removeAll();
++    }
+     this._cache.removeAll();
+ 
+     this._observers = new Map();
+diff --git a/toolkit/components/contentprefs/ContentPrefServiceChild.sys.mjs b/toolkit/components/contentprefs/ContentPrefServiceChild.sys.mjs
+index e9fa293cfd..de412b6bbb 100644
+--- a/toolkit/components/contentprefs/ContentPrefServiceChild.sys.mjs
++++ b/toolkit/components/contentprefs/ContentPrefServiceChild.sys.mjs
+@@ -11,10 +11,14 @@ import {
+   safeCallback,
+ } from "resource://gre/modules/ContentPrefUtils.sys.mjs";
+ 
+-// We only need one bit of information out of the context.
++// We only need whether the context is private and, Sval, which private
++// session it is.
+ function contextArg(context) {
+   return context && context.usePrivateBrowsing
+-    ? { usePrivateBrowsing: true }
++    ? {
++        usePrivateBrowsing: true,
++        userContextId: context.originAttributes?.userContextId ?? 0,
++      }
+     : null;
+ }
+ 
+diff --git a/toolkit/components/contentprefs/ContentPrefServiceParent.sys.mjs b/toolkit/components/contentprefs/ContentPrefServiceParent.sys.mjs
+index 09aada0245..e2e6c0de77 100644
+--- a/toolkit/components/contentprefs/ContentPrefServiceParent.sys.mjs
++++ b/toolkit/components/contentprefs/ContentPrefServiceParent.sys.mjs
+@@ -8,12 +8,23 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   _methodsCallableFromChild: "resource://gre/modules/ContentPrefUtils.sys.mjs",
++  // Sval ships only the desktop browser, so toolkit may reach into it here.
++  // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++  SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
+ });
+ 
+ let loadContext = Cu.createLoadContext();
+ let privateLoadContext = Cu.createPrivateLoadContext();
+ 
+ function contextArg(context) {
++  // Sval: a private session's prefs are its own (SvalPrivateJars), so they
++  // are looked up with a load context of that session.
++  if (context?.usePrivateBrowsing && context.userContextId) {
++    return (
++      lazy.SvalPrivateJars.loadContextOf(context.userContextId) ??
++      privateLoadContext
++    );
++  }
+   return context && context.usePrivateBrowsing
+     ? privateLoadContext
+     : loadContext;
+diff --git a/toolkit/mozapps/downloads/DownloadLastDir.sys.mjs b/toolkit/mozapps/downloads/DownloadLastDir.sys.mjs
+index f43dc627e4..744f7919a9 100644
+--- a/toolkit/mozapps/downloads/DownloadLastDir.sys.mjs
++++ b/toolkit/mozapps/downloads/DownloadLastDir.sys.mjs
+@@ -31,6 +31,11 @@ import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtil
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+ const lazy = {};
++ChromeUtils.defineESModuleGetters(lazy, {
++  // Sval ships only the desktop browser, so toolkit may reach into it here.
++  // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
++  SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
++});
+ XPCOMUtils.defineLazyServiceGetter(
+   lazy,
+   "cps2",
+@@ -44,13 +49,22 @@ let privateLoadContext = Cu.createPrivateLoadContext();
+ var observer = {
+   QueryInterface: ChromeUtils.generateQI(["nsIObserver"]),
+ 
+-  observe(aSubject, aTopic) {
++  observe(aSubject, aTopic, aData) {
+     switch (aTopic) {
+       case "last-pb-context-exited":
+         gDownloadLastDirFile = null;
++        gPrivateLastDirFiles.clear();
+         break;
++      case "clear-origin-attributes-data": {
++        let pattern = JSON.parse(aData);
++        if (pattern.privateBrowsingId) {
++          gPrivateLastDirFiles.delete(pattern.userContextId);
++        }
++        break;
++      }
+       case "browser:purge-session-history": {
+         gDownloadLastDirFile = null;
++        gPrivateLastDirFiles.clear();
+         if (Services.prefs.prefHasUserValue(LAST_DIR_PREF)) {
+           Services.prefs.clearUserPref(LAST_DIR_PREF);
+         }
+@@ -73,6 +87,7 @@ var observer = {
+ };
+ 
+ Services.obs.addObserver(observer, "last-pb-context-exited");
++Services.obs.addObserver(observer, "clear-origin-attributes-data");
+ Services.obs.addObserver(observer, "browser:purge-session-history");
+ 
+ function readLastDirPref() {
+@@ -92,6 +107,24 @@ XPCOMUtils.defineLazyPreferenceGetter(
+ 
+ var gDownloadLastDirFile = readLastDirPref();
+ 
++// Sval: each private window is a browsing session of its own, told apart by
++// its userContextId (SvalPrivateJars), and remembers its own last folder.
++var gPrivateLastDirFiles = new Map();
++
++/**
++ * @param {Window} aWindow A browser window, a dialog it opened, or a page.
++ * @returns {number} the userContextId of the session it belongs to.
++ */
++function sessionOf(aWindow) {
++  return (
++    aWindow.gBrowser?.defaultUserContextId ??
++    aWindow.opener?.gBrowser?.defaultUserContextId ??
++    aWindow.docShell.QueryInterface(Ci.nsILoadContext).originAttributes
++      .userContextId ??
++    0
++  );
++}
++
+ export class DownloadLastDir {
+   // aForcePrivate is only used when aWindow is null.
+   constructor(aWindow, aForcePrivate) {
+@@ -110,6 +143,13 @@ export class DownloadLastDir {
+     // safe because we only care about the private browsing state. All the
+     // rest of the load context isn't of interest to the content pref service.
+     this.fakeContext = isPrivate ? privateLoadContext : nonPrivateLoadContext;
++    this.session = 0;
++    if (isPrivate && aWindow) {
++      this.session = sessionOf(aWindow);
++      this.fakeContext =
++        (this.session && lazy.SvalPrivateJars.loadContextOf(this.session)) ||
++        privateLoadContext;
++    }
+   }
+ 
+   isPrivate() {
+@@ -126,6 +166,7 @@ export class DownloadLastDir {
+ 
+   cleanupPrivateFile() {
+     gDownloadLastDirFile = null;
++    gPrivateLastDirFiles.clear();
+   }
+ 
+   #getLastFile() {
+@@ -133,6 +174,14 @@ export class DownloadLastDir {
+       gDownloadLastDirFile = null;
+     }
+ 
++    if (this.isPrivate() && this.session) {
++      let file = gPrivateLastDirFiles.get(this.session);
++      if (!file?.exists()) {
++        file = readLastDirPref();
++        gPrivateLastDirFiles.set(this.session, file);
++      }
++      return file;
++    }
+     if (this.isPrivate()) {
+       if (!gDownloadLastDirFile) {
+         gDownloadLastDirFile = readLastDirPref();
+@@ -197,7 +246,13 @@ export class DownloadLastDir {
+         );
+       }
+     }
+-    if (this.isPrivate()) {
++    if (this.isPrivate() && this.session) {
++      if (aFile instanceof Ci.nsIFile) {
++        gPrivateLastDirFiles.set(this.session, aFile.clone());
++      } else {
++        gPrivateLastDirFiles.delete(this.session);
++      }
++    } else if (this.isPrivate()) {
+       if (aFile instanceof Ci.nsIFile) {
+         gDownloadLastDirFile = aFile.clone();
+       } else {

@@ -1,0 +1,83 @@
+Sval: a server socket can hold its address and port for exclusive use
+
+nsServerSocket binds with SO_REUSEADDR, with which Windows lets a socket of
+another account bind the same address and port and take connections meant
+for the first. Sval's agent listener must not share its port with another
+OS user. nsIServerSocket.ExclusiveAddress binds with SO_EXCLUSIVEADDRUSE in
+place of SO_REUSEADDR on Windows. No chrome API reaches the socket's
+options.
+
+diff --git a/netwerk/base/nsIServerSocket.idl b/netwerk/base/nsIServerSocket.idl
+index 07137f4155..aa93191dc3 100644
+--- a/netwerk/base/nsIServerSocket.idl
++++ b/netwerk/base/nsIServerSocket.idl
+@@ -34,6 +34,10 @@ interface nsIServerSocket : nsISupports
+     /// The server socket will not be closed when Gecko is set
+     /// offline.
+     const nsServerSocketFlag KeepWhenOffline = 0x00000002;
++    /// Sval: on Windows, the socket is bound with SO_EXCLUSIVEADDRUSE in
++    /// place of SO_REUSEADDR, so no other socket, another account's
++    /// included, can bind its address and port. Other platforms ignore it.
++    const nsServerSocketFlag ExclusiveAddress = 0x00000004;
+     /** @} */
+ 
+     /**
+diff --git a/netwerk/base/nsServerSocket.cpp b/netwerk/base/nsServerSocket.cpp
+index a56f0973f6..58a574bf09 100644
+--- a/netwerk/base/nsServerSocket.cpp
++++ b/netwerk/base/nsServerSocket.cpp
+@@ -342,6 +342,7 @@ nsServerSocket::InitSpecialConnection(int32_t aPort, nsServerSocketFlag aFlags,
+   PR_SetNetAddr(val, PR_AF_INET, aPort, &addr);
+ 
+   mKeepWhenOffline = ((aFlags & nsIServerSocket::KeepWhenOffline) != 0);
++  mExclusiveAddress = ((aFlags & nsIServerSocket::ExclusiveAddress) != 0);
+   return InitWithAddress(&addr, aBackLog);
+ }
+ 
+@@ -384,10 +385,30 @@ nsresult nsServerSocket::InitWithAddressInternal(const PRNetAddr* aAddr,
+   PR_SetFDInheritable(mFD, false);
+ 
+   PRSocketOptionData opt;
++  bool reuseAddress = true;
+ 
+-  opt.option = PR_SockOpt_Reuseaddr;
+-  opt.value.reuse_addr = true;
+-  PR_SetSocketOption(mFD, &opt);
++#if defined(XP_WIN)
++  // Sval: with SO_REUSEADDR, Windows lets a socket of another account bind
++  // the same address and port; SO_EXCLUSIVEADDRUSE in its place lets none.
++  if (mExclusiveAddress) {
++    PROsfd osfd = PR_FileDesc2NativeHandle(mFD);
++    BOOL exclusive = TRUE;
++    if (osfd == -1 || setsockopt(osfd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
++                                 reinterpret_cast<const char*>(&exclusive),
++                                 sizeof(exclusive)) != 0) {
++      NS_WARNING("cannot bind the server socket for exclusive use");
++      Close();
++      return NS_ERROR_FAILURE;
++    }
++    reuseAddress = false;
++  }
++#endif
++
++  if (reuseAddress) {
++    opt.option = PR_SockOpt_Reuseaddr;
++    opt.value.reuse_addr = true;
++    PR_SetSocketOption(mFD, &opt);
++  }
+ 
+   opt.option = PR_SockOpt_Nonblocking;
+   opt.value.non_blocking = true;
+diff --git a/netwerk/base/nsServerSocket.h b/netwerk/base/nsServerSocket.h
+index b99c842925..4cfab91b82 100644
+--- a/netwerk/base/nsServerSocket.h
++++ b/netwerk/base/nsServerSocket.h
+@@ -75,6 +75,8 @@ class nsServerSocket : public nsASocketHandler, public nsIServerSocket {
+   nsCOMPtr<nsIEventTarget> mListenerTarget;
+   bool mAttached{false};
+   bool mKeepWhenOffline{false};
++  // Sval: nsIServerSocket::ExclusiveAddress.
++  bool mExclusiveAddress{false};
+ };
+ 
+ }  // namespace net

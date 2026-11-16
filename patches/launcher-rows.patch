@@ -1,0 +1,40 @@
+Sval: The address bar's rows teach their keys, and its sections are groups
+
+Each row of the Launcher shows what Enter does on it and the line under the
+list what its modifiers do, an open tab of another workspace shows that
+workspace as a chip, and a screen reader hears each section as a group
+named by its heading, and each open tab with its workspace (launcher spec
+§7, §8). The view draws its rows itself and offers no hook for either, so
+it hands its rows to `SvalLauncherRows` once it has laid them out and
+labelled them (`#updateIndices`), and again when the selection moves
+(`#selectElement`).
+
+diff --git a/browser/components/urlbar/content/UrlbarView.mjs b/browser/components/urlbar/content/UrlbarView.mjs
+index a6b975817e..029765cb52 100644
+--- a/browser/components/urlbar/content/UrlbarView.mjs
++++ b/browser/components/urlbar/content/UrlbarView.mjs
+@@ -18,6 +18,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+   SvalFavoritesProvider:
+     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
++  SvalLauncherRows:
++    "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
+   SvalLauncherSections:
+     "moz-src:///browser/components/sval/SvalLauncherSections.sys.mjs",
+   UrlbarProviderOpenTabs:
+@@ -2769,6 +2771,7 @@ export class UrlbarView {
+     }
+ 
+     this.input.toggleAttribute("noresults", !this.visibleResults.length);
++    lazy.SvalLauncherRows.updateRows(this.input, this.#rows);
+   }
+ 
+   /**
+@@ -3083,6 +3086,7 @@ export class UrlbarView {
+     if (provider) {
+       provider.tryMethod("onSelection", result, element);
+     }
++    lazy.SvalLauncherRows.updateSelection(this.input, this.#rows);
+   }
+ 
+   /**

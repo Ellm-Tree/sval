@@ -1,0 +1,54 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Input test page</title>
+    <style>
+      body {
+        margin: 0;
+        height: 5000px;
+      }
+      #field {
+        position: fixed;
+        top: 30%;
+        left: 10%;
+        width: 80%;
+      }
+      #press {
+        position: fixed;
+        top: 60%;
+        left: 10%;
+      }
+    </style>
+  </head>
+  <body>
+    <input id="field" aria-label="Field" />
+    <button id="press" onclick="document.title = 'Pressed'">Press</button>
+    <script>
+      // Every input event the page receives, in order.
+      window.seen = [];
+      for (const type of [
+        "mousedown",
+        "mouseup",
+        "click",
+        "contextmenu",
+        "wheel",
+        "keydown",
+        "keyup",
+        "input",
+        "pointerdown",
+        "touchstart",
+        "dragenter",
+        "dragover",
+        "drop",
+        "compositionstart",
+        "compositionend",
+      ]) {
+        addEventListener(type, () => window.seen.push(type), true);
+      }
+    </script>
+  </body>
+</html>

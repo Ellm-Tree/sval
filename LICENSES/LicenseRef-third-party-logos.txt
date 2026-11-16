@@ -1,0 +1,71 @@
+Third-party logos
+
+These files are the logos of the products they are named after, used only
+to name those products:
+
+- chrome/browser/components/sval/search-icons/brave.png: Brave Search, by
+  Brave Software, Inc., as its own site serves it.
+- chrome/browser/components/sval/search-icons/kagi.png: Kagi Search, by
+  Kagi Inc., as its own site serves it.
+- chrome/browser/components/sval/search-icons/github.png: GitHub, by
+  GitHub, Inc., as its own site serves it.
+- chrome/browser/components/sval/search-icons/openstreetmap.png:
+  OpenStreetMap, by the OpenStreetMap Foundation, as its own site serves it.
+- chrome/browser/components/sval/import-brands/arc.png: the Arc browser, by
+  The Browser Company of New York, Inc., from the icon Arc's application
+  bundle carries.
+- chrome/browser/components/sval/import-brands/brave.png: the Brave
+  browser, by Brave Software, Inc., from the icon Brave's application
+  bundle carries.
+- chrome/browser/components/sval/import-brands/dia.png: the Dia browser,
+  by The Browser Company of New York, Inc., from the icon Dia's application
+  bundle carries.
+- chrome/browser/components/sval/import-brands/firefox.png: the Firefox
+  browser, by the Mozilla Foundation, as Firefox's official branding
+  carries it.
+- chrome/browser/components/sval/import-brands/orion.png: the Orion
+  browser, by Kagi Inc., from the icon Orion's application bundle carries.
+- chrome/browser/components/sval/import-brands/vivaldi.png: the Vivaldi
+  browser, by Vivaldi Technologies AS, from the icon Vivaldi's application
+  bundle carries.
+- chrome/browser/components/sval/import-brands/zen.png: the Zen browser, by
+  the Zen OSS Team, as Zen's release branding carries it.
+- chrome/browser/components/sval/password-managers/1password.png: 1Password,
+  by AgileBits Inc., from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/bitwarden.png: Bitwarden,
+  by Bitwarden Inc., from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/dashlane.png: Dashlane,
+  by Dashlane SAS, from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/icloud.png: iCloud
+  Passwords, by Apple Inc., from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/keepassxc.png: KeePassXC,
+  by the KeePassXC Team, from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/lastpass.png: LastPass,
+  by LastPass US LP, from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/nordpass.png: NordPass,
+  by Nord Security, from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/password-managers/protonpass.png: Proton
+  Pass, by Proton AG, from the icon its Firefox add-on carries on
+  addons.mozilla.org.
+- chrome/browser/components/sval/agent-brands/*.svg: the marks of AI
+  agent apps and model makers, among them Anthropic's Claude, OpenAI's
+  ChatGPT and Codex, xAI's Grok, Mistral AI, Google's Gemini and Gemma,
+  Meta's Llama, Alibaba's Qwen, DeepSeek, Microsoft, NVIDIA, Cursor and
+  GitHub Copilot, each file named for its product, as LobeHub's icon set
+  draws them in one colour.
+
+Sval ships the search engines' logos only to show which search engine is
+which, the browsers' logos only to show which browser it imports from, the
+password managers' logos only to show which password manager is which, and
+the agents' marks only to show which app or model an agent's Workspace
+belongs to.
+Ellm Tree, Inc. claims no rights in them and grants no license to them. They
+are other companies' trademarks. Their owners' rights in them are
+unaffected by any license in this repository.

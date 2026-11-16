@@ -1,0 +1,17 @@
+Sval: build Sval's component directory
+
+browser/components/sval holds every file Sval adds. Listing it in DIRS is the
+one change to Mozilla's build files it needs.
+
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index d1d769ab09..c38c273885 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -68,6 +68,7 @@ DIRS += [
+     "sessionstore",
+     "shell",
+     "sidebar",
++    "sval",
+     "syncedtabs",
+     "tabbrowser",
+     "tabnotes",

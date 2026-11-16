@@ -1,0 +1,32 @@
+Sval: unregistering a JS process actor survives a process past its in-process actors
+
+Backport of Mozilla's Bug 2056174 (mozilla-central 7a8efbffdb7e, Firefox
+154), unchanged. ESR 153 does not carry it.
+JSActorService::UnregisterProcessActor appended InProcessChild::Singleton()
+and InProcessParent::Singleton() to the managers it walks without checking
+them, and both are null once XPCOM shutdown has torn the in-process actors
+down, so unregistering a process actor then crashed on a null dereference.
+DevTools unregisters its process actors when its last watcher goes.
+Drop this patch when the upstream pin reaches Firefox 154.
+
+diff --git a/dom/ipc/jsactor/JSActorService.cpp b/dom/ipc/jsactor/JSActorService.cpp
+index bea1d44d9f..6068090bfd 100644
+--- a/dom/ipc/jsactor/JSActorService.cpp
++++ b/dom/ipc/jsactor/JSActorService.cpp
+@@ -321,8 +321,14 @@ void JSActorService::UnregisterProcessActor(const nsACString& aName) {
+         }
+         managers.AppendElement(cp);
+       }
+-      managers.AppendElement(InProcessChild::Singleton());
+-      managers.AppendElement(InProcessParent::Singleton());
++      InProcessChild* ipChild = InProcessChild::Singleton();
++      if (ipChild) {
++        managers.AppendElement(ipChild);
++      }
++      InProcessParent* ipParent = InProcessParent::Singleton();
++      if (ipParent) {
++        managers.AppendElement(ipParent);
++      }
+     } else {
+       managers.AppendElement(ContentChild::GetSingleton());
+     }

@@ -1,0 +1,22 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Element picker shadow root test page</title>
+  </head>
+  <body>
+    <p>Some article text.</p>
+    <div id="host"></div>
+    <script>
+      const root = document
+        .getElementById("host")
+        .attachShadow({ mode: "open" });
+      root.innerHTML =
+        "<style>.sval-test-inner { display: block; width: 200px; height: 100px; background: #ccc; }</style>" +
+        '<div class="sval-test-inner" id="inner">Inside</div>';
+    </script>
+  </body>
+</html>

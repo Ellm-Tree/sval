@@ -1,0 +1,384 @@
+Sval: an autoplay mode where the site's permission decides what plays
+
+media.autoplay.site-permission-only (default false) makes
+AutoplayPolicy::IsAllowedToPlay answer, for media elements and for realtime
+AudioContexts, from the top-level site's autoplay-media permission: ALLOW
+plays, and anything else blocks media, muted media too, whatever the user
+pressed. A click or key press on a page says nothing about which media the
+user wants: a page can call play() from any input it gets, and Gecko's
+default blocking model, which blesses an element and counts sticky
+activation, would let a player play for the rest of the page's life after
+one unrelated click. The user allows media in the front end, which grants
+ALLOW. An OfflineAudioContext keeps Gecko's exemption: it renders to a
+buffer and cannot make a sound, and a page that waits on a render that
+never finishes stands out.
+
+media.autoplay.site-permission-only.default gives a site with no
+permission the answer one of the stored permissions gets: 0 that of
+BLOCKED_ALL, 1 that of ALLOW, 2 that of DENY. It is the user's choice for
+every site without one of its own, so a default and a site's own choice
+of the same name mean the same thing, and the gate stays on under each.
+Gecko blocks under 0 and 2 alike; the front end tells them apart.
+
+It is a separate bool rather than a new media.autoplay.default value
+because the front end reads that pref as a three-state default
+(SitePermissions' autoplay-media getDefault and setDefault, the site
+permissions dialog) and would rewrite an unknown value to "block audible"
+the first time the user touched the setting.
+
+The traits IsWindowAllowedToPlayByTraits checks still allow: an active or
+granted camera, microphone or screen capture, which is stronger consent
+than an autoplay grant; a top-level video document, which the user opened
+directly and which runs no page script; extension pages, which the user
+installed; and Gecko's fingerprinting-protection principal, which is not a
+site. navigator.getAutoplayPolicy reports the same answer, so a blocked
+site reads "disallowed" and players show a play button.
+
+GetSiteAutoplayPermission reads a permission scoped to the tab (the
+permission manager's ForBrowser permissions, which SitePermissions'
+SCOPE_TEMPORARY writes) ahead of the site's own, the precedence the
+permission manager documents for them (browser-scoped.rst), so "allow now"
+also works on a site stored as DENY. That is how "allow now" reaches Gecko.
+The tab's grant survives reloads: it lasts until the front end removes it,
+the tab closes, or privacy.temporary_permission_expire_time_ms passes. A
+grant for one page load is the front end's to give, by clearing it on the
+next load. nsGlobalWindowInner already updates the WindowContext's autoplay
+permission on browser-perm-changed, so a grant reaches the open page at
+once.
+
+The front end learns what was blocked from GloballyAutoplayBlocked, the
+chrome-only event the Autoplay actor forwards to the tab, and tells a press
+of play from autoplay by whether the page had transient user activation.
+So, under the mode:
+- AutoplayChild reports whether the document had transient user
+  activation, which only the content process can tell.
+- HTMLMediaElement sends the event once per element
+  (mHasEverBeenBlockedForAutoplay). On a typical page the video tries to
+  autoplay first, with no gesture, and the user's press of play is blocked
+  too, so a blocked play() made with transient user activation is reported
+  again.
+- An element in a document sends it from itself, so the actor can say
+  whether a video or audio element tried to play, for the media button's
+  words; the parent forwards it as the event's `kind`. An element in no
+  document, and Web Audio, report from the document, as "media".
+- A blocked AudioContext sends it once per context, and again for each
+  blocked start made with transient user activation, because a page usually
+  makes its context on load and resumes it when the user presses play.
+With the pref off nothing changes.
+
+No chrome API can change what AutoplayPolicy answers, or what the Autoplay
+actor reports.
+
+diff --git a/dom/base/nsGlobalWindowInner.cpp b/dom/base/nsGlobalWindowInner.cpp
+index 851763a32..d977f4b67 100644
+--- a/dom/base/nsGlobalWindowInner.cpp
++++ b/dom/base/nsGlobalWindowInner.cpp
+@@ -1778,8 +1778,8 @@ void nsGlobalWindowInner::UpdateAutoplayPermission() {
+   if (!GetWindowContext()) {
+     return;
+   }
+-  uint32_t perm =
+-      media::AutoplayPolicy::GetSiteAutoplayPermission(GetPrincipal());
++  uint32_t perm = media::AutoplayPolicy::GetSiteAutoplayPermission(
++      GetPrincipal(), GetBrowsingContext()->Top()->BrowserId());
+   if (GetWindowContext()->GetAutoplayPermission() == perm) {
+     return;
+   }
+@@ -1841,8 +1841,8 @@ void nsGlobalWindowInner::UpdatePermissions() {
+   RefPtr<WindowContext> windowContext = GetWindowContext();
+ 
+   WindowContext::Transaction txn;
+-  txn.SetAutoplayPermission(
+-      media::AutoplayPolicy::GetSiteAutoplayPermission(principal));
++  txn.SetAutoplayPermission(media::AutoplayPolicy::GetSiteAutoplayPermission(
++      principal, GetBrowsingContext()->Top()->BrowserId()));
+   txn.SetPopupPermission(PopupBlocker::GetPopupPermission(principal));
+ 
+   if (windowContext->IsTop()) {
+diff --git a/dom/ipc/WindowGlobalActor.cpp b/dom/ipc/WindowGlobalActor.cpp
+index 3282bd9c2..cd33e0dec 100644
+--- a/dom/ipc/WindowGlobalActor.cpp
++++ b/dom/ipc/WindowGlobalActor.cpp
+@@ -130,7 +130,8 @@ WindowGlobalInit WindowGlobalActor::WindowInitializer(
+ 
+   // Initialze permission fields
+   fields.Get<Indexes::IDX_AutoplayPermission>() =
+-      media::AutoplayPolicy::GetSiteAutoplayPermission(init.principal());
++      media::AutoplayPolicy::GetSiteAutoplayPermission(
++          init.principal(), aWindow->GetBrowsingContext()->Top()->BrowserId());
+   fields.Get<Indexes::IDX_PopupPermission>() =
+       PopupBlocker::GetPopupPermission(init.principal());
+ 
+diff --git a/dom/media/autoplay/AutoplayPolicy.cpp b/dom/media/autoplay/AutoplayPolicy.cpp
+index 7fd2ed858..8783bad41 100644
+--- a/dom/media/autoplay/AutoplayPolicy.cpp
++++ b/dom/media/autoplay/AutoplayPolicy.cpp
+@@ -130,6 +130,21 @@ static bool IsWindowAllowedToPlayOverall(nsPIDOMWindowInner* aWindow) {
+          IsWindowAllowedToPlayByTraits(aWindow);
+ }
+ 
++// Under media.autoplay.site-permission-only, only ALLOW or a trait lets media
++// play, whatever the user pressed: the top-level site's own permission, or for
++// a site with none the one media.autoplay.site-permission-only.default gives
++// every such site.
++static bool IsWindowAllowedToPlayBySitePermission(nsPIDOMWindowInner* aWindow) {
++  const uint32_t perm = SiteAutoplayPerm(aWindow);
++  if (perm == nsIPermissionManager::ALLOW_ACTION ||
++      (perm == nsIPermissionManager::UNKNOWN_ACTION &&
++       StaticPrefs::media_autoplay_site_permission_only_default() == 1)) {
++    AUTOPLAY_LOG("Allow autoplay as the site has autoplay permission.");
++    return true;
++  }
++  return IsWindowAllowedToPlayByTraits(aWindow);
++}
++
+ static uint32_t DefaultAutoplayBehaviour() {
+   int32_t prefValue = StaticPrefs::media_autoplay_default();
+   if (prefValue == nsIAutoplay::ALLOWED) {
+@@ -231,6 +246,11 @@ static bool IsAllowedToPlayInternal(const HTMLMediaElement& aElement) {
+                                                     : RType::eAUDIBLE);
+   }
+ #endif
++  if (StaticPrefs::media_autoplay_site_permission_only()) {
++    return IsWindowAllowedToPlayBySitePermission(
++        aElement.OwnerDoc()->GetInnerWindow());
++  }
++
+   bool isInaudible = IsMediaElementInaudible(aElement);
+   bool isUsingAutoplayModel = IsAllowedToPlayByBlockingModel(aElement);
+ 
+@@ -295,6 +315,10 @@ bool AutoplayPolicy::IsAllowedToPlay(const AudioContext& aContext) {
+     return true;
+   }
+ 
++  if (StaticPrefs::media_autoplay_site_permission_only()) {
++    return IsWindowAllowedToPlayBySitePermission(aContext.GetOwnerWindow());
++  }
++
+   if (!IsEnableBlockingWebAudioByUserGesturePolicy()) {
+     return true;
+   }
+@@ -346,6 +370,12 @@ DocumentAutoplayPolicy IsDocAllowedToPlay(const Document& aDocument) {
+                                  : DocumentAutoplayPolicy::Disallowed;
+   }
+ #endif
++  if (StaticPrefs::media_autoplay_site_permission_only()) {
++    return IsWindowAllowedToPlayBySitePermission(window)
++               ? DocumentAutoplayPolicy::Allowed
++               : DocumentAutoplayPolicy::Disallowed;
++  }
++
+   const uint32_t sitePermission = SiteAutoplayPerm(window);
+   const uint32_t globalPermission = DefaultAutoplayBehaviour();
+   const uint32_t policy = StaticPrefs::media_autoplay_blocking_policy();
+@@ -380,7 +410,8 @@ DocumentAutoplayPolicy IsDocAllowedToPlay(const Document& aDocument) {
+ }
+ 
+ /* static */
+-uint32_t AutoplayPolicy::GetSiteAutoplayPermission(nsIPrincipal* aPrincipal) {
++uint32_t AutoplayPolicy::GetSiteAutoplayPermission(nsIPrincipal* aPrincipal,
++                                                   uint64_t aBrowserId) {
+   if (!aPrincipal) {
+     return nsIPermissionManager::DENY_ACTION;
+   }
+@@ -391,7 +422,15 @@ uint32_t AutoplayPolicy::GetSiteAutoplayPermission(nsIPrincipal* aPrincipal) {
+     return nsIPermissionManager::DENY_ACTION;
+   }
+ 
+-  uint32_t perm = nsIPermissionManager::DENY_ACTION;
++  uint32_t perm = nsIPermissionManager::UNKNOWN_ACTION;
++  if (aBrowserId) {
++    permMgr->TestForBrowser(aPrincipal, "autoplay-media"_ns, aBrowserId,
++                            &perm);
++    if (perm != nsIPermissionManager::UNKNOWN_ACTION) {
++      return perm;
++    }
++  }
++  perm = nsIPermissionManager::DENY_ACTION;
+   permMgr->TestExactPermissionFromPrincipal(aPrincipal, "autoplay-media"_ns,
+                                             &perm);
+   return perm;
+@@ -400,6 +439,11 @@ uint32_t AutoplayPolicy::GetSiteAutoplayPermission(nsIPrincipal* aPrincipal) {
+ /* static */
+ dom::AutoplayPolicy AutoplayPolicy::GetAutoplayPolicy(
+     const dom::HTMLMediaElement& aElement) {
++  if (StaticPrefs::media_autoplay_site_permission_only()) {
++    return IsAllowedToPlayInternal(aElement) ? dom::AutoplayPolicy::Allowed
++                                             : dom::AutoplayPolicy::Disallowed;
++  }
++
+   // Note, the site permission can contain following values :
+   // - UNKNOWN_ACTION : no permission set for this site
+   // - ALLOW_ACTION : allowed to autoplay
+diff --git a/dom/media/autoplay/AutoplayPolicy.h b/dom/media/autoplay/AutoplayPolicy.h
+index 490463877..2765ca4b4 100644
+--- a/dom/media/autoplay/AutoplayPolicy.h
++++ b/dom/media/autoplay/AutoplayPolicy.h
+@@ -42,7 +42,11 @@ class AutoplayPolicy {
+ 
+   // Return the value of the autoplay permission for given principal. The return
+   // value can be 0=unknown, 1=allow, 2=block audio, 5=block audio and video.
+-  static uint32_t GetSiteAutoplayPermission(nsIPrincipal* aPrincipal);
++  // A permission scoped to the tab aBrowserId takes precedence over the
++  // principal's own, as the permission manager's browser-scoped permissions
++  // are documented to.
++  static uint32_t GetSiteAutoplayPermission(nsIPrincipal* aPrincipal,
++                                            uint64_t aBrowserId);
+ 
+   // Following methods are used for the internal implementation for the Autoplay
+   // Policy Detection API, the public JS interfaces are in exposed on Navigator.
+diff --git a/dom/media/mediaelement/HTMLMediaElement.cpp b/dom/media/mediaelement/HTMLMediaElement.cpp
+index 6cd37c384..6a5e332fd 100644
+--- a/dom/media/mediaelement/HTMLMediaElement.cpp
++++ b/dom/media/mediaelement/HTMLMediaElement.cpp
+@@ -5064,14 +5064,24 @@ void HTMLMediaElement::DispatchEventsWhenPlayWasNotAllowed() {
+     MaybeNotifyAutoplayBlocked();
+     ReportToConsole(nsIScriptError::warningFlag, "BlockAutoplayError");
+     mHasEverBeenBlockedForAutoplay = true;
++  } else if (StaticPrefs::media_autoplay_site_permission_only() &&
++             OwnerDoc()->HasValidTransientUserGestureActivation()) {
++    // Sval: under the media gate a press of play is blocked as autoplay is,
++    // so a press on an element whose autoplay was blocked is reported too.
++    MaybeNotifyAutoplayBlocked();
+   }
+ }
+ 
+ void HTMLMediaElement::MaybeNotifyAutoplayBlocked() {
+   // This event is used to notify front-end side that we've blocked autoplay,
+   // so front-end side should show blocking icon as well.
++  // Sval: sent from the element itself where it is in a document, so the
++  // front end can tell a video from audio; one out of every document, such
++  // as `new Audio()`, reaches the window only through its owner document.
++  nsINode* target = IsInComposedDoc() ? static_cast<nsINode*>(this)
++                                      : static_cast<nsINode*>(OwnerDoc());
+   RefPtr<AsyncEventDispatcher> asyncDispatcher =
+-      new AsyncEventDispatcher(OwnerDoc(), u"GloballyAutoplayBlocked"_ns,
++      new AsyncEventDispatcher(target, u"GloballyAutoplayBlocked"_ns,
+                                CanBubble::eYes, ChromeOnlyDispatch::eYes);
+   asyncDispatcher->PostDOMEvent();
+ }
+diff --git a/dom/media/webaudio/AudioContext.cpp b/dom/media/webaudio/AudioContext.cpp
+index d96780b5a..64e2a674d 100644
+--- a/dom/media/webaudio/AudioContext.cpp
++++ b/dom/media/webaudio/AudioContext.cpp
+@@ -1127,10 +1127,6 @@ void AudioContext::ReportBlocked() {
+                   "BlockAutoplayWebAudioStartError");
+   mWasAllowedToStart = false;
+ 
+-  if (!StaticPrefs::media_autoplay_block_event_enabled()) {
+-    return;
+-  }
+-
+   RefPtr<nsIRunnable> r = NS_NewRunnableFunction(
+       "AudioContext::AutoplayBlocked", [self = RefPtr{this}]() {
+         nsGlobalWindowInner* win = self->GetOwnerWindow();
+@@ -1143,6 +1139,24 @@ void AudioContext::ReportBlocked() {
+           return;
+         }
+ 
++        // Under the media gate the front end shows blocked media from this
++        // event, sent once per context as
++        // HTMLMediaElement::MaybeNotifyAutoplayBlocked sends it per element,
++        // and again for each blocked start made with a gesture, which the
++        // front end reads as a press of play.
++        if (StaticPrefs::media_autoplay_site_permission_only() &&
++            (!self->mHasNotifiedAutoplayBlocked ||
++             doc->HasValidTransientUserGestureActivation())) {
++          self->mHasNotifiedAutoplayBlocked = true;
++          nsContentUtils::DispatchEventOnlyToChrome(
++              doc, doc, u"GloballyAutoplayBlocked"_ns, CanBubble::eYes,
++              Cancelable::eNo);
++        }
++
++        if (!StaticPrefs::media_autoplay_block_event_enabled()) {
++          return;
++        }
++
+         AUTOPLAY_LOG("Dispatch `blocked` event for AudioContext {}",
+                      fmt::ptr(self.get()));
+         nsContentUtils::DispatchTrustedEvent(doc, self, u"blocked"_ns,
+diff --git a/dom/media/webaudio/AudioContext.h b/dom/media/webaudio/AudioContext.h
+index 3ff3c1f0f..506845460 100644
+--- a/dom/media/webaudio/AudioContext.h
++++ b/dom/media/webaudio/AudioContext.h
+@@ -441,6 +441,9 @@ class AudioContext final : public DOMEventTargetHelper,
+   // is running. That will keep the audio context being able to continue running
+   // even if the window is inactive.
+   bool mSetPageAwakeRequest = false;
++
++  // Whether GloballyAutoplayBlocked has been sent for this context.
++  bool mHasNotifiedAutoplayBlocked = false;
+ };
+ 
+ static const dom::AudioContext::AudioContextId NO_AUDIO_CONTEXT = 0;
+diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
+index ce7b15fbe..6e931f7a2 100644
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -11922,6 +11922,23 @@
+   value: 1
+   mirror: always
+ 
++# Media plays only where the top-level site's autoplay-media permission is
++# ALLOW, whatever media.autoplay.default and media.autoplay.blocking_policy say
++# and whatever the user pressed. Offline AudioContexts are exempt: they render
++# to a buffer and make no sound.
++- name: media.autoplay.site-permission-only
++  type: bool
++  value: false
++  mirror: always
++
++# Under media.autoplay.site-permission-only, the answer for a top-level site
++# with no autoplay-media permission: 0 is BLOCKED_ALL's, 1 is ALLOW's and 2 is
++# DENY's. Only 1 lets media play.
++- name: media.autoplay.site-permission-only.default
++  type: int32_t
++  value: 0
++  mirror: always
++
+ # File-backed MediaCache size.
+ - name: media.cache_size
+   type: RelaxedAtomicUint32
+diff --git a/toolkit/actors/AutoplayChild.sys.mjs b/toolkit/actors/AutoplayChild.sys.mjs
+index 2bbfd22f0..e103a524a 100644
+--- a/toolkit/actors/AutoplayChild.sys.mjs
++++ b/toolkit/actors/AutoplayChild.sys.mjs
+@@ -3,7 +3,15 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ export class AutoplayChild extends JSWindowActorChild {
+-  handleEvent() {
+-    this.sendAsyncMessage("GloballyAutoplayBlocked", {});
++  handleEvent(event) {
++    // Sval: whether the user had just interacted with the page, so the front
++    // end can tell a press of play from autoplay, and what tried to play: a
++    // video or an audio element, or, from the document, Web Audio or an
++    // element in no document.
++    const kind = { video: "video", audio: "audio" }[event.target?.localName];
++    this.sendAsyncMessage("GloballyAutoplayBlocked", {
++      userGesture: !!this.document?.hasValidTransientUserGestureActivation,
++      kind: kind ?? "media",
++    });
+   }
+ }
+diff --git a/toolkit/actors/AutoplayParent.sys.mjs b/toolkit/actors/AutoplayParent.sys.mjs
+index 667df53e7..77166c067 100644
+--- a/toolkit/actors/AutoplayParent.sys.mjs
++++ b/toolkit/actors/AutoplayParent.sys.mjs
+@@ -3,13 +3,15 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ export class AutoplayParent extends JSWindowActorParent {
+-  receiveMessage() {
++  receiveMessage(message) {
+     let topBrowsingContext = this.manager.browsingContext.top;
+     let browser = topBrowsingContext.embedderElement;
+     let document = browser.ownerDocument;
+     let event = document.createEvent("CustomEvent");
+     event.initCustomEvent("GloballyAutoplayBlocked", true, false, {
+       url: this.documentURI,
++      userGesture: !!message.data?.userGesture,
++      kind: message.data?.kind ?? "media",
+     });
+     browser.dispatchEvent(event);
+   }

@@ -1,0 +1,84 @@
+---
+title: Add a page to Favorites
+description: Keep a page in the Favorites menu, take it out again, and pin a Favorite.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+Favorites are the pages you keep. You'll find them in the Favorites menu at
+the top of the Workspace panel. Favorites don't belong to any Workspace, so you can
+open one from any Workspace.
+
+You found a Codeberg page on release notes you'll come back to, but you
+don't need it open.
+
+<Screenshot name="docs-favorites-menu" frame="rounded" maxWidth={360} alt="The Favorites menu at the top of the Workspace panel, with the Reading and Tools folders and two Favorites" />
+
+## Steps
+
+1. In the Workspace, right-click the tab, then choose **Add to Favorites**.
+
+Sval says "Added to Favorites". The page is now in the Favorites menu.
+
+To take a page out of Favorites, right-click its tab and choose
+**Remove from Favorites**.
+
+## Pin a Favorite
+
+1. At the top of the Workspace panel, select **Favorites**.
+2. Right-click the Favorite, then choose **Pin**.
+
+<Until v="0.1.0-rc.10">
+
+The Favorite moves from the Favorites menu to the pins row. When you unpin
+the Favorite, Sval puts it back where it was in your Favorites.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+A copy of the Favorite shows at the end of the pins row. The Favorite stays
+in the Favorites menu. Pin works on a folder too, and the folder's copy
+shows in the pins row as one tile. If a pin already has the Favorite's
+address, the menu doesn't offer Pin.
+
+</Since>
+
+## Details
+
+- <kbd>⌘D</kbd> (<kbd>Ctrl+D</kbd> on Windows and Linux) adds the page you're viewing. It never
+  removes one. On a page that's already a Favorite, Sval says "Already in
+  Favorites".
+- The **Favorite** button in the toolbar adds the page you're viewing. If
+  the page is already a Favorite, the button removes it.
+
+<Since v="0.1.0-rc.10">
+
+- On a pin's page, the **Favorite** button shows whether the page is in
+  Favorites. Adding or removing the Favorite leaves the pin as it is.
+
+</Since>
+
+- <kbd>⇧⌘O</kbd> (<kbd>Ctrl+Shift+O</kbd> on Windows and Linux) shows the Favorites menu.
+- In the Favorites menu, right-click a Favorite or a folder to find
+  **Rename…**, **Edit Address…**, **Delete**, **Move to**, and
+  **New Folder…**, among others. **Pin to This Workspace** pins the Favorite
+  or folder only in the Workspace you're in.
+
+<Until v="0.1.0-rc.10">
+
+- Pinned Favorites also show as tiles on the home page.
+
+</Until>
+
+- Favorites sync to your other devices, along with your Workspaces and
+  groups.
+- A private window has no Favorites menu, and you can't add to Favorites
+  from one.
+
+## Related pages
+
+- [Pin a site](/docs/how-to/tabs/pin-a-site/)
+- [How pins differ from tabs and Favorites](/docs/explanation/pins/)
+- [Tabs in a Workspace](/docs/reference/tabs/)

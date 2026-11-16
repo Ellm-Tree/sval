@@ -1,0 +1,26 @@
+Sval: size the Picture-in-Picture toggle from the video's real size
+
+A <video> without controls gets a new NoControlsPictureInPictureImpl
+widget when it comes back from Picture-in-Picture. The widget starts from
+its default reflowedDimensions, 300 by 150, and sizes the toggle from
+those in init. resizevideocontrols, which would correct them, comes only
+when the video's size changes, and a video back from Picture-in-Picture
+keeps its size, so the toggle stays marked small-video. init measures the
+video first (updateReflowedDimensions), as the reflow handler does.
+
+diff --git a/toolkit/content/widgets/videocontrols.js b/toolkit/content/widgets/videocontrols.js
+index cec4a857c6..51f175297d 100644
+--- a/toolkit/content/widgets/videocontrols.js
++++ b/toolkit/content/widgets/videocontrols.js
+@@ -3194,6 +3194,11 @@ this.NoControlsDesktopImplWidget = class {
+           // not to show the Picture-in-Picture toggle now.
+           //
+           // [1]: https://www.w3.org/TR/html50/embedded-content-0.html#dom-media-have_metadata
++          //
++          // Sval: a widget made for a video already laid out, as one back
++          // from Picture-in-Picture, gets no resizevideocontrols until its
++          // size changes, so it measures the video before sizing the toggle.
++          this.updateReflowedDimensions();
+           this.updatePictureInPictureToggleDisplay();
+         }
+ 

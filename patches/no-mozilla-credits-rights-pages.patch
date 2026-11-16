@@ -1,0 +1,60 @@
+Sval: no about:credits or about:rights
+
+Each name was an about: module that handed back a channel to mozilla.org:
+Mozilla's credits, and Firefox's terms of use. Neither page is Sval's, and
+a content policy sees only the https address, so the entries are removed
+from the redirect tables and their contracts from components.conf, and
+neither name resolves.
+
+diff --git a/browser/components/about/AboutRedirector.cpp b/browser/components/about/AboutRedirector.cpp
+index 48bbf4038d..55ad36042c 100644
+--- a/browser/components/about/AboutRedirector.cpp
++++ b/browser/components/about/AboutRedirector.cpp
+@@ -93,9 +93,6 @@ static const RedirEntry kRedirMap[] = {
+     {"profiling",
+      "chrome://devtools/content/performance-new/aboutprofiling/index.html",
+      nsIAboutModule::ALLOW_SCRIPT | nsIAboutModule::IS_SECURE_CHROME_UI},
+-    {"rights", "https://www.mozilla.org/about/legal/terms/firefox/",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD},
+     {"robots", "chrome://browser/content/aboutRobots.xhtml",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::ALLOW_SCRIPT},
+diff --git a/browser/components/about/components.conf b/browser/components/about/components.conf
+index 6d439f1746..2ffc0b624f 100644
+--- a/browser/components/about/components.conf
++++ b/browser/components/about/components.conf
+@@ -22,7 +22,6 @@ pages = [
+     'profiling',
+     'reader',
+     'restartrequired',
+-    'rights',
+     'robots',
+     'sessionrestore',
+     'settings',
+diff --git a/docshell/base/nsAboutRedirector.cpp b/docshell/base/nsAboutRedirector.cpp
+index 22bef400fd..9ae7cf5c1d 100644
+--- a/docshell/base/nsAboutRedirector.cpp
++++ b/docshell/base/nsAboutRedirector.cpp
+@@ -115,9 +115,6 @@ static const RedirEntry kRedirMap[] = {
+     {"crashes", "chrome://global/content/crashes.html",
+      nsIAboutModule::IS_SECURE_CHROME_UI},
+ #endif
+-    {"credits", "https://www.mozilla.org/credits/",
+-     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+-         nsIAboutModule::URI_MUST_LOAD_IN_CHILD},
+     {"fingerprintingprotection",
+      "chrome://global/content/usercharacteristics/usercharacteristics.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+diff --git a/docshell/build/components.conf b/docshell/build/components.conf
+index 8173a460fd..9f69506e15 100644
+--- a/docshell/build/components.conf
++++ b/docshell/build/components.conf
+@@ -12,7 +12,6 @@ about_pages = [
+     'crashparent',
+     'crashgpu',
+     'crashextensions',
+-    'credits',
+     'fingerprintingprotection',
+     'httpsonlyerror',
+     'license',

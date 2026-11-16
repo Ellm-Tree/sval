@@ -1,0 +1,313 @@
+Sval: an extension the user turned off on a site or host reaches nothing in its tabs
+
+Each policy holds the sites and hosts the user turned the extension off on,
+and the hosts they turned it back on at under them (blockedSites).
+Content-script matching and ChannelWrapper refuse the extension in a
+tab whose top-level host is off by the most specific of them: no content
+script in any frame, no request the tab makes in webRequest or
+filterResponseData. A frame's process need not hold the tab's top-level
+document, so its host comes from the parent's window tree, or the frame
+load's top-level principal, which the parent sets (SvalBlockedSites.cpp).
+
+diff --git a/dom/chrome-webidl/ChannelWrapper.webidl b/dom/chrome-webidl/ChannelWrapper.webidl
+index a0572403bd..9d4e5689e3 100644
+--- a/dom/chrome-webidl/ChannelWrapper.webidl
++++ b/dom/chrome-webidl/ChannelWrapper.webidl
+@@ -197,6 +197,12 @@ interface ChannelWrapper : EventTarget {
+                   optional WebExtensionPolicy? extension = null,
+                   optional MozRequestMatchOptions options = {});
+ 
++  /**
++   * True if the request belongs to a tab whose top-level document is on one
++   * of the extension's blockedSites.
++   */
++  boolean blockedFor(WebExtensionPolicy extension);
++
+ 
+   /**
+    * Register's this channel as traceable by the given add-on. This is a
+diff --git a/dom/chrome-webidl/WebExtensionPolicy.webidl b/dom/chrome-webidl/WebExtensionPolicy.webidl
+index eb11b95d5d..cb401b3834 100644
+--- a/dom/chrome-webidl/WebExtensionPolicy.webidl
++++ b/dom/chrome-webidl/WebExtensionPolicy.webidl
+@@ -152,6 +152,21 @@ interface WebExtensionPolicy {
+   [Cached, Pure]
+   attribute boolean ignoreQuarantine;
+ 
++  /**
++   * The sites and hosts on which the extension reaches nothing in a tab
++   * whose top-level document is on one of them, each covering the names
++   * under it. A host written "~host" is one it runs on under such a name.
++   * The entry of the most specific name decides.
++   */
++  [Cached, Frozen, Pure]
++  attribute sequence<DOMString> blockedSites;
++
++  /**
++   * True if a tab whose top-level document's host is `host` is on one of
++   * blockedSites.
++   */
++  boolean blockedOnTopSite(UTF8String host);
++
+   /**
+    * True if this extension has recommended state.
+    */
+@@ -359,6 +374,8 @@ dictionary WebExtensionInit {
+ 
+   boolean ignoreQuarantine = false;
+ 
++  sequence<DOMString> blockedSites = [];
++
+   boolean hasRecommendedState = false;
+ 
+   boolean temporarilyInstalled = false;
+diff --git a/toolkit/components/extensions/WebExtensionContentScript.h b/toolkit/components/extensions/WebExtensionContentScript.h
+index 6e0b767e86..5df337efa6 100644
+--- a/toolkit/components/extensions/WebExtensionContentScript.h
++++ b/toolkit/components/extensions/WebExtensionContentScript.h
+@@ -63,6 +63,11 @@ class MOZ_STACK_CLASS DocInfo final {
+ 
+   bool IsTopLevel() const;
+   bool IsTopLevelOpaqueAboutBlank() const;
++
++  // The site of the tab's top-level document: its host where this is the
++  // top-level document, otherwise its partition key's site. Empty where there
++  // is none.
++  void TopLevelHost(nsACString& aHost) const;
+   bool IsSameOriginWithTop() const;
+   bool ShouldMatchActiveTabPermission() const;
+ 
+diff --git a/toolkit/components/extensions/WebExtensionPolicy.cpp b/toolkit/components/extensions/WebExtensionPolicy.cpp
+index 6f34de1dc8..0ae3e0ba52 100644
+--- a/toolkit/components/extensions/WebExtensionPolicy.cpp
++++ b/toolkit/components/extensions/WebExtensionPolicy.cpp
+@@ -5,6 +5,10 @@
+ #include "MainThreadUtils.h"
+ #include "mozilla/ExtensionPolicyService.h"
+ #include "mozilla/extensions/DocumentObserver.h"
++#include "mozilla/extensions/SvalBlockedSites.h"
++#include "mozilla/dom/Document.h"
++#include "nsICookieJarSettings.h"
++#include "nsILoadInfo.h"
+ #include "mozilla/extensions/WebExtensionContentScript.h"
+ #include "mozilla/extensions/WebExtensionPolicy.h"
+ 
+@@ -217,6 +221,8 @@ WebExtensionPolicyCore::WebExtensionPolicyCore(GlobalObject& aGlobal,
+       mTemporarilyInstalled(aInit.mTemporarilyInstalled),
+       mBackgroundWorkerScript(aInit.mBackgroundWorkerScript),
+       mIgnoreQuarantine(aInit.mIsPrivileged || aInit.mIgnoreQuarantine),
++      mBlockedSites(new AtomSet(aInit.mBlockedSites)),
++      mHasBlockedSites(!aInit.mBlockedSites.IsEmpty()),
+       mHasRecommendedState(aInit.mHasRecommendedState),
+       mPermissions(new AtomSet(aInit.mPermissions)) {
+   // In practice this is not necessary, but in tests where the uuid
+@@ -333,6 +339,17 @@ bool WebExtensionPolicyCore::QuarantinedFromURI(const URLInfo& aURI) const {
+   return !IgnoreQuarantine() && WebExtensionPolicy::IsQuarantinedURI(aURI);
+ }
+ 
++bool WebExtensionPolicyCore::BlockedOnTopSite(const nsACString& aHost) const {
++  AutoReadLock lock(mLock);
++  return mHasBlockedSites && SvalHostInSites(*mBlockedSites, aHost);
++}
++
++bool WebExtensionPolicyCore::BlockedOnDoc(const DocInfo& aDoc) const {
++  nsAutoCString host;
++  aDoc.TopLevelHost(host);
++  return BlockedOnTopSite(host);
++}
++
+ bool WebExtensionPolicyCore::PrivateBrowsingAllowed() const {
+   return HasPermission(nsGkAtoms::privateBrowsingAllowedPermission);
+ }
+@@ -511,6 +528,11 @@ Result<nsString, nsresult> WebExtensionPolicy::GetURL(
+   return NS_ConvertUTF8toUTF16(spec);
+ }
+ 
++void WebExtensionPolicy::SetBlockedSites(const nsTArray<nsString>& aSites) {
++  WebExtensionPolicy_Binding::ClearCachedBlockedSitesValue(this);
++  mCore->SetBlockedSites(aSites);
++}
++
+ void WebExtensionPolicy::SetIgnoreQuarantine(bool aIgnore) {
+   WebExtensionPolicy_Binding::ClearCachedIgnoreQuarantineValue(this);
+   mCore->SetIgnoreQuarantine(aIgnore);
+@@ -956,6 +978,10 @@ bool MozDocumentMatcher::Matches(const DocInfo& aDoc,
+     return false;
+   }
+ 
++  if (mExtension && mExtension->BlockedOnDoc(aDoc)) {
++    return false;
++  }
++
+   auto& urlinfo = aDoc.PrincipalURL();
+   if (mExtension && mExtension->ManifestVersion() >= 3) {
+     // In MV3, activeTab only allows access to same-origin iframes.
+@@ -1216,6 +1242,25 @@ bool DocInfo::IsTopLevel() const {
+   return mIsTopLevel.ref();
+ }
+ 
++void DocInfo::TopLevelHost(nsACString& aHost) const {
++  if (IsTopLevel()) {
++    // A document's principal names its host where its URL has none, as for
++    // an about:blank or blob: document a page made.
++    aHost = GetWindow() ? PrincipalURL().Host() : URL().Host();
++    return;
++  }
++  struct Matcher {
++    nsACString& mHost;
++    void operator()(Window aWin) { SvalTopLevelHostOfWindow(aWin, mHost); }
++    void operator()(LoadInfo aLoadInfo) {
++      nsCOMPtr<nsICookieJarSettings> settings;
++      (void)aLoadInfo->GetCookieJarSettings(getter_AddRefs(settings));
++      SvalTopLevelHost(aLoadInfo, settings, mHost);
++    }
++  };
++  mObj.match(Matcher{aHost});
++}
++
+ bool DocInfo::IsTopLevelOpaqueAboutBlank() const {
+   if (mIsTopLevelOpaqueAboutBlank.isNothing()) {
+     struct Matcher {
+diff --git a/toolkit/components/extensions/WebExtensionPolicy.h b/toolkit/components/extensions/WebExtensionPolicy.h
+index 5faa09e45e..1644dfc603 100644
+--- a/toolkit/components/extensions/WebExtensionPolicy.h
++++ b/toolkit/components/extensions/WebExtensionPolicy.h
+@@ -144,6 +144,19 @@ class WebExtensionPolicyCore final {
+   bool QuarantinedFromDoc(const DocInfo& aDoc) const;
+   bool QuarantinedFromURI(const URLInfo& aURI) const MOZ_EXCLUDES(mLock);
+ 
++  void GetBlockedSites(nsTArray<nsString>& aResult) const MOZ_EXCLUDES(mLock) {
++    AutoReadLock lock(mLock);
++    mBlockedSites->Get(aResult);
++  }
++  void SetBlockedSites(const nsTArray<nsString>& aSites) MOZ_EXCLUDES(mLock) {
++    RefPtr<AtomSet> sites = new AtomSet(aSites);
++    AutoWriteLock lock(mLock);
++    mBlockedSites = std::move(sites);
++    mHasBlockedSites = !aSites.IsEmpty();
++  }
++  bool BlockedOnTopSite(const nsACString& aHost) const MOZ_EXCLUDES(mLock);
++  bool BlockedOnDoc(const DocInfo& aDoc) const;
++
+   Maybe<dom::ExtensionGuardSource> CheckGuarded(const URLInfo& aURI) const
+       MOZ_EXCLUDES(mLock);
+ 
+@@ -208,6 +221,8 @@ class WebExtensionPolicyCore final {
+   mutable RWLock mLock{"WebExtensionPolicyCore"};
+ 
+   bool mIgnoreQuarantine MOZ_GUARDED_BY(mLock);
++  RefPtr<AtomSet> mBlockedSites MOZ_GUARDED_BY(mLock);
++  bool mHasBlockedSites MOZ_GUARDED_BY(mLock);
+   bool mHasRecommendedState MOZ_GUARDED_BY(mLock);
+   RefPtr<AtomSet> mPermissions MOZ_GUARDED_BY(mLock);
+   RefPtr<MatchPatternSetCore> mHostPermissions MOZ_GUARDED_BY(mLock);
+@@ -348,6 +363,17 @@ class WebExtensionPolicy final : public nsISupports, public nsWrapperCache {
+   bool IgnoreQuarantine() const { return mCore->IgnoreQuarantine(); }
+   void SetIgnoreQuarantine(bool aIgnore);
+ 
++  void GetBlockedSites(nsTArray<nsString>& aResult) const {
++    mCore->GetBlockedSites(aResult);
++  }
++  void SetBlockedSites(const nsTArray<nsString>& aSites);
++  bool BlockedOnTopSite(const nsACString& aHost) const {
++    return mCore->BlockedOnTopSite(aHost);
++  }
++  bool BlockedOnDoc(const DocInfo& aDoc) const {
++    return mCore->BlockedOnDoc(aDoc);
++  }
++
+   bool HasRecommendedState() const { return mCore->HasRecommendedState(); }
+   void SetHasRecommendedState(bool aHasRecommendedState);
+ 
+diff --git a/toolkit/components/extensions/moz.build b/toolkit/components/extensions/moz.build
+index 5afb1e1e59..532de7b686 100644
+--- a/toolkit/components/extensions/moz.build
++++ b/toolkit/components/extensions/moz.build
+@@ -96,6 +96,7 @@ EXPORTS.mozilla.extensions = [
+     "ExtensionsParent.h",
+     "MatchGlob.h",
+     "MatchPattern.h",
++    "SvalBlockedSites.h",
+     "WebExtensionContentScript.h",
+     "WebExtensionPolicy.h",
+ ]
+@@ -105,6 +106,7 @@ UNIFIED_SOURCES += [
+     "ExtensionsChild.cpp",
+     "ExtensionsParent.cpp",
+     "MatchPattern.cpp",
++    "SvalBlockedSites.cpp",
+     "WebExtensionPolicy.cpp",
+ ]
+ 
+diff --git a/toolkit/components/extensions/webrequest/ChannelWrapper.cpp b/toolkit/components/extensions/webrequest/ChannelWrapper.cpp
+index 649d0d808f..ac1df07005 100644
+--- a/toolkit/components/extensions/webrequest/ChannelWrapper.cpp
++++ b/toolkit/components/extensions/webrequest/ChannelWrapper.cpp
+@@ -18,6 +18,7 @@
+ #include "mozilla/Components.h"
+ #include "mozilla/ErrorNames.h"
+ #include "mozilla/ExtensionPolicyService.h"
++#include "mozilla/extensions/SvalBlockedSites.h"
+ #include "mozilla/Try.h"
+ #include "mozilla/dom/ContentParent.h"
+ #include "mozilla/dom/RemoteType.h"
+@@ -29,6 +30,7 @@
+ #include "nsContentUtils.h"
+ #include "nsIContentPolicy.h"
+ #include "nsIClassifiedChannel.h"
++#include "nsICookieJarSettings.h"
+ #include "nsIHttpChannelInternal.h"
+ #include "nsIHttpHeaderVisitor.h"
+ #include "nsIInterfaceRequestor.h"
+@@ -656,6 +658,10 @@ bool ChannelWrapper::Matches(
+       return false;
+     }
+ 
++    if (BlockedFor(*aExtension)) {
++      return false;
++    }
++
+     // The third parameter (aCheckRestricted) is false because we already check
+     // restricted URLs below as part of CanModify().
+     // The fourth parameter (aAllowFilePermission, default false) does not
+@@ -689,6 +695,18 @@ bool ChannelWrapper::Matches(
+   return true;
+ }
+ 
++bool ChannelWrapper::BlockedFor(const WebExtensionPolicy& aExtension) const {
++  nsAutoCString host;
++  if (Type() == MozContentPolicyType::Main_frame) {
++    host = FinalURLInfo().Host();
++  } else if (nsCOMPtr<nsILoadInfo> loadInfo = GetLoadInfo()) {
++    nsCOMPtr<nsICookieJarSettings> settings;
++    (void)loadInfo->GetCookieJarSettings(getter_AddRefs(settings));
++    SvalTopLevelHost(loadInfo, settings, host);
++  }
++  return aExtension.BlockedOnTopSite(host);
++}
++
+ int64_t NormalizeFrameID(nsILoadInfo* aLoadInfo, uint64_t bcID) {
+   RefPtr<BrowsingContext> bc = aLoadInfo->GetAssociatedBrowsingContext();
+   if (!bc) {
+@@ -883,7 +901,7 @@ already_AddRefed<nsITraceableChannel> ChannelWrapper::GetTraceableChannel(
+     if (!HaveChannel() ||
+         // The fourth parameter (aAllowFilePermission, default false) does not
+         // matter because file:-channels are never wrapped by ChannelWrapper.
+-        !aAddon.CanAccessURI(FinalURLInfo())) {
++        !aAddon.CanAccessURI(FinalURLInfo()) || BlockedFor(aAddon)) {
+       return nullptr;
+     }
+ 
+diff --git a/toolkit/components/extensions/webrequest/ChannelWrapper.h b/toolkit/components/extensions/webrequest/ChannelWrapper.h
+index 8a9ca85f5a..9261d5cd04 100644
+--- a/toolkit/components/extensions/webrequest/ChannelWrapper.h
++++ b/toolkit/components/extensions/webrequest/ChannelWrapper.h
+@@ -178,6 +178,8 @@ class ChannelWrapper final : public DOMEventTargetHelper,
+                const WebExtensionPolicy* aExtension,
+                const dom::MozRequestMatchOptions& aOptions) const;
+ 
++  bool BlockedFor(const WebExtensionPolicy& aExtension) const;
++
+   already_AddRefed<nsILoadInfo> GetLoadInfo() const {
+     nsCOMPtr<nsIChannel> chan = MaybeChannel();
+     if (chan) {

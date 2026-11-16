@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's notification bar, inside the bar's shadow root: what
+ * `notification-bar.css` cannot reach from the window. `NotificationMessage`
+ * links this sheet after `infobar.css` (patch `notification-bar-sval-sheet`),
+ * so a rule here wins a tie with that file. `moz-message-bar.css` comes after
+ * both, so every rule here starts with `:host(.infobar)` to outrank it.
+ *
+ * The colours come from the tokens `notification-bar.css` sets on the host,
+ * with Firefox's own as the fallback in a document that does not load it.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* The type is carried by the tint, the rule and the icon tile, so Firefox's
+ * gradient stripe goes. */
+:host(.infobar)::before {
+  display: none;
+}
+
+/* Everything top-aligned, so a message that wraps leaves the tile, the
+ * buttons and the close on its first line. */
+:host(.infobar) .container {
+  align-items: flex-start;
+  gap: 12px;
+  /* 48px with the bar's 1px rule. */
+  box-sizing: border-box;
+  min-height: 47px;
+  padding: 8px 8px 8px 12px;
+}
+
+:host(.infobar) .icon-container {
+  flex: none;
+}
+
+/* Message and actions share one wrapping row: below about 520px of bar the
+ * actions drop under the message. */
+:host(.infobar) .content {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  align-items: flex-start;
+  gap: 2px 12px;
+}
+
+/* One line of message is 32px tall, the height of a button. */
+:host(.infobar) .text-container {
+  flex: 1 1 280px;
+  min-width: 0;
+  padding-block: 6px;
+}
+
+:host(.infobar) .text-content {
+  padding-block: 0;
+}
+
+:host(.infobar) .actions.active {
+  flex: none;
+}
+
+/* Sval's glyph for each type, in the tile's ink, counting the bars
+ * `notification-bar.css` gives another type than Firefox does. A system bar
+ * has no icon in Firefox (`messageTypeToIconData`), so its tile is drawn
+ * before the content. */
+:host(.infobar[type="info"]) .icon {
+  content: url("chrome://browser/content/sval/notification-icons/info.svg");
+}
+
+:host(.infobar:is([type="warning"], [value="process-hang"])) .icon {
+  content: url("chrome://browser/content/sval/notification-icons/warning.svg");
+}
+
+:host(.infobar:is([type="critical"], [value="subframe-crashed"])) .icon {
+  content: url("chrome://browser/content/sval/notification-icons/critical.svg");
+}
+
+:host(.infobar[type="system"]) .container::before {
+  content: "";
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-block-start: 2px;
+  border-radius: 8px;
+  background: url("chrome://browser/content/sval/notification-icons/info.svg") center / 16px no-repeat var(--message-bar-icon-background-color);
+  -moz-context-properties: fill;
+  fill: var(--message-bar-icon-color);
+}
+
+/* The close: a 32px circle with a 16px cross, last on the first line. */
+:host(.infobar) .close {
+  --message-bar-icon-close-url: url("chrome://browser/content/sval/notification-icons/close.svg");
+  --button-size-icon-small: 32px;
+  --button-border-radius: 999px;
+  --button-icon-fill: var(--sval-bar-close-ink, currentColor);
+  --button-background-color-ghost-hover: var(--sval-bar-close-hover, var(--button-background-color-hover));
+  --button-background-color-ghost-active: var(--sval-bar-close-hover, var(--button-background-color-active));
+  --focus-outline: 2px solid var(--sval-bar-focus, var(--focus-outline-color));
+  --focus-outline-offset: 2px;
+  --icon-size: 16px;
+  flex: none;
+  margin: 0;
+  align-self: flex-start;
+}

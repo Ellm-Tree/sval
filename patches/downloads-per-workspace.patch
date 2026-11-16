@@ -1,0 +1,277 @@
+Sval: downloads belong to the workspace that started them
+
+The Downloads panel, the toolbar button and the panel opening on its own
+follow the workspace the window shows (SvalDownloadWorkspaces): the session
+data records each download's workspace as it joins the list, the panel lists
+the window's view of them (SvalDownloadsPanel), each window's indicator data
+filters by its workspace, and a download is announced only in a window
+showing its workspace, never for an agent's. No chrome API reaches these: the
+indicator data is one object shared by every window, and the panel's list
+and the announcement have no filter or hook.
+
+diff --git a/browser/components/downloads/DownloadsCommon.sys.mjs b/browser/components/downloads/DownloadsCommon.sys.mjs
+index b14c60d52e..4a838f77e1 100644
+--- a/browser/components/downloads/DownloadsCommon.sys.mjs
++++ b/browser/components/downloads/DownloadsCommon.sys.mjs
+@@ -29,6 +29,8 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
++  SvalDownloadWorkspaces:
++    "moz-src:///browser/components/sval/SvalDownloadWorkspaces.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   DownloadHistory: "resource://gre/modules/DownloadHistory.sys.mjs",
+   DownloadUtils: "resource://gre/modules/DownloadUtils.sys.mjs",
+@@ -249,7 +251,10 @@ export var DownloadsCommon = {
+     if (lazy.PrivateBrowsingUtils.isContentWindowPrivate(aWindow)) {
+       return lazy.PrivateDownloadsIndicatorData;
+     }
+-    return lazy.DownloadsIndicatorData;
++    return lazy.SvalDownloadWorkspaces.indicatorDataFor(
++      aWindow,
++      filter => new DownloadsIndicatorDataCtor(false, filter)
++    );
+   },
+ 
+   /**
+@@ -877,6 +882,8 @@ DownloadsDataCtor.prototype = {
+   // Integration with the asynchronous Downloads back-end
+ 
+   onDownloadAdded(download) {
++    lazy.SvalDownloadWorkspaces.record(download);
++
+     // Download objects do not store the end time of downloads, as the Downloads
+     // API does not need to persist this information for all platforms. Once a
+     // download terminates on a Desktop browser, it becomes a history download,
+@@ -891,7 +898,7 @@ DownloadsDataCtor.prototype = {
+       download.error?.becauseBlockedByReputationCheck ||
+       download.error?.becauseBlockedByContentAnalysis
+     ) {
+-      this._notifyDownloadEvent("error");
++      this._notifyDownloadEvent("error", {}, download);
+     }
+   },
+ 
+@@ -918,15 +925,17 @@ DownloadsDataCtor.prototype = {
+         download.succeeded ||
+         (download.error && download.error.becauseBlocked)
+       ) {
+-        this._notifyDownloadEvent("finish");
++        this._notifyDownloadEvent("finish", {}, download);
+       }
+     }
+ 
+     if (!download.newDownloadNotified) {
+       download.newDownloadNotified = true;
+-      this._notifyDownloadEvent("start", {
+-        openDownloadsListOnStart: download.openDownloadsListOnStart,
+-      });
++      this._notifyDownloadEvent(
++        "start",
++        { openDownloadsListOnStart: download.openDownloadsListOnStart },
++        download
++      );
+     }
+   },
+ 
+@@ -987,16 +996,21 @@ DownloadsDataCtor.prototype = {
+    *        true (default) - open the downloads panel.
+    *        false - only show an indicator notification.
+    */
+-  _notifyDownloadEvent(aType, { openDownloadsListOnStart = true } = {}) {
++  _notifyDownloadEvent(
++    aType,
++    { openDownloadsListOnStart = true } = {},
++    aDownload = null
++  ) {
+     DownloadsCommon.log(
+       "Attempting to notify that a new download has started or finished."
+     );
+ 
+-    // Show the panel in the most recent browser window, if present.
+-    let browserWin = lazy.BrowserWindowTracker.getTopWindow({
+-      private: this._isPrivate,
+-      allowFromInactiveWorkspace: true,
+-    });
++    // Show the panel in the most recent browser window showing the download's
++    // workspace, if present.
++    let browserWin = lazy.SvalDownloadWorkspaces.windowToTell(
++      aDownload,
++      this._isPrivate
++    );
+     if (!browserWin) {
+       return;
+     }
+@@ -1276,10 +1290,11 @@ const DownloadsViewPrototype = {
+  * actually started.  This is useful to display a neutral progress indicator in
+  * the main browser window until the autostart timeout elapses.
+  */
+-function DownloadsIndicatorDataCtor(aPrivate) {
++function DownloadsIndicatorDataCtor(aPrivate, aFilter = null) {
+   this._oldDownloadStates = new WeakMap();
+   this._isPrivate = aPrivate;
+   this._views = [];
++  this._svalFilter = aFilter;
+ }
+ DownloadsIndicatorDataCtor.prototype = {
+   /**
+@@ -1318,11 +1333,33 @@ DownloadsIndicatorDataCtor.prototype = {
+   },
+ 
+   onDownloadAdded(download) {
++    if (this._svalFilter && !this._svalFilter(download)) {
++      return;
++    }
+     DownloadsViewPrototype.onDownloadAdded.call(this, download);
+     this._itemCount++;
+     this._updateViews();
+   },
+ 
++  /**
++   * Takes the downloads the filter passes now, for a window that came to
++   * show another workspace.
++   */
++  svalRefilter() {
++    this._oldDownloadStates = new WeakMap();
++    this._itemCount = 0;
++    if (this._views.length) {
++      for (let download of lazy.DownloadsData._downloads) {
++        if (this._svalFilter(download)) {
++          DownloadsViewPrototype.onDownloadAdded.call(this, download);
++          this._itemCount++;
++        }
++      }
++    }
++    this.updateAttention();
++    this._updateViews();
++  },
++
+   onDownloadStateChanged(download) {
+     if (this._attentionSuppressed !== DownloadsCommon.SUPPRESS_NONE) {
+       return;
+@@ -1362,11 +1399,17 @@ DownloadsIndicatorDataCtor.prototype = {
+   },
+ 
+   onDownloadChanged(download) {
++    if (!this._oldDownloadStates.has(download)) {
++      return;
++    }
+     DownloadsViewPrototype.onDownloadChanged.call(this, download);
+     this._updateViews();
+   },
+ 
+   onDownloadRemoved(download) {
++    if (!this._oldDownloadStates.has(download)) {
++      return;
++    }
+     DownloadsViewPrototype.onDownloadRemoved.call(this, download);
+     this._itemCount--;
+     this.updateAttention();
+@@ -1458,6 +1501,9 @@ DownloadsIndicatorDataCtor.prototype = {
+       ? lazy.PrivateDownloadsData._downloads
+       : lazy.DownloadsData._downloads;
+     for (let download of downloads) {
++      if (this._svalFilter && !this._svalFilter(download)) {
++        continue;
++      }
+       if (
+         download.isInCurrentBatch ||
+         (download.canceled && download.hasPartialData)
+diff --git a/browser/components/downloads/content/downloads.js b/browser/components/downloads/content/downloads.js
+index 450fb19a2f..96cda8b625 100644
+--- a/browser/components/downloads/content/downloads.js
++++ b/browser/components/downloads/content/downloads.js
+@@ -33,6 +33,7 @@ var { XPCOMUtils } = ChromeUtils.importESModule(
+ );
+ 
+ ChromeUtils.defineESModuleGetters(this, {
++  SvalDownloadsPanel: "moz-src:///browser/components/sval/SvalDownloadsPanel.sys.mjs",
+   DownloadsViewUI:
+     "moz-src:///browser/components/downloads/DownloadsViewUI.sys.mjs",
+   FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
+@@ -111,6 +112,7 @@ var DownloadsPanel = {
+     // elements and initialize our views.
+ 
+     this.panel.hidden = false;
++    SvalDownloadsPanel.mount(window);
+     DownloadsViewController.initialize();
+     DownloadsCommon.log("Attaching DownloadsView...");
+     DownloadsCommon.getData(window).addView(DownloadsView);
+@@ -779,7 +781,7 @@ var DownloadsView = {
+       this._downloads.length,
+       "downloads in total."
+     );
+-    let count = this._downloads.length;
++    let count = SvalDownloadsPanel.listedCount(window, this._downloads);
+     let hiddenCount = count - this.kItemCountLimit;
+ 
+     if (count > 0) {
+@@ -833,9 +835,9 @@ var DownloadsView = {
+ 
+     this.loading = false;
+ 
+-    // We suppressed item count change notifications during the batch load, at
+-    // this point we should just call the function once.
+-    this._itemCountChanged();
++    // We suppressed list and item count changes during the batch load, at
++    // this point we should just make them once.
++    this.svalRelist();
+ 
+     // Notify the panel that all the initially available downloads have been
+     // loaded.  This ensures that the interface is visible, if still required.
+@@ -854,18 +856,11 @@ var DownloadsView = {
+ 
+     this._downloads.unshift(download);
+ 
+-    // The newly added item is visible in the panel and we must add the
+-    // corresponding element. If the list overflows, remove the last item from
+-    // the panel to make room for the new one that we just added at the top.
+-    this._addViewItem(download, true);
+-    if (this._downloads.length > this.kItemCountLimit) {
+-      this._removeViewItem(this._downloads[this.kItemCountLimit]);
+-    }
+-
+-    // For better performance during batch loads, don't update the count for
+-    // every item, because the interface won't be visible until load finishes.
++    // For better performance during batch loads, don't update the list or the
++    // count for every item, because the interface won't be visible until load
++    // finishes.
+     if (!this.loading) {
+-      this._itemCountChanged();
++      this.svalRelist();
+     }
+   },
+ 
+@@ -888,16 +883,15 @@ var DownloadsView = {
+ 
+     let itemIndex = this._downloads.indexOf(download);
+     this._downloads.splice(itemIndex, 1);
++    this.svalRelist();
++  },
+ 
+-    if (itemIndex < this.kItemCountLimit) {
+-      // The item to remove is visible in the panel.
+-      this._removeViewItem(download);
+-      if (this._downloads.length >= this.kItemCountLimit) {
+-        // Reinsert the next item into the panel.
+-        this._addViewItem(this._downloads[this.kItemCountLimit - 1], false);
+-      }
+-    }
+-
++  /**
++   * Shows the newest downloads the window's workspace view lists, up to
++   * kItemCountLimit, in order, and updates the count (SvalDownloadsPanel).
++   */
++  svalRelist() {
++    SvalDownloadsPanel.relist(window, this);
+     this._itemCountChanged();
+   },
+ 
+@@ -937,6 +931,7 @@ var DownloadsView = {
+       this.richListBox.appendChild(element);
+     }
+     viewItem.ensureActive();
++    SvalDownloadsPanel.decorate(window, viewItem);
+   },
+ 
+   /**

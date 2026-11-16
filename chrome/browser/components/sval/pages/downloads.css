@@ -1,0 +1,75 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* about:downloads in Settings' look: the list is a card, and each row is
+   drawn as the Downloads panel draws it (`sval-downloads.css`). */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/pages/info.css");
+
+#contentAreaDownloadsView {
+  padding: 32px 48px;
+  font-family: var(--sval-font);
+}
+
+#downloadsListEmptyDescription {
+  color: var(--sval-ink-muted);
+  font-size: 15px;
+}
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  #downloadsListBox:not(:empty) {
+    padding: 6px;
+    border: 1px solid var(--sval-border);
+    border-radius: 20px;
+    background-color: var(--sval-card);
+    box-shadow: var(--sval-shadow);
+  }
+
+  #downloadsListBox > richlistitem {
+    min-height: 56px;
+    padding-inline: 10px 6px;
+    border-radius: 14px;
+    color: var(--sval-ink-body);
+
+    &:hover {
+      background-color: var(--sval-tint);
+    }
+
+    &[selected] {
+      background-color: var(--sval-tint);
+      color: var(--sval-ink);
+    }
+
+    & .downloadTypeIcon {
+      margin-block: 12px;
+      margin-inline: 0 12px;
+    }
+
+    & .downloadTarget {
+      color: var(--sval-ink);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    & .downloadDetails {
+      color: var(--sval-ink-muted);
+      font-size: 12px;
+      opacity: 1;
+    }
+
+    & .downloadProgress {
+      height: 3px;
+      border-radius: 2px;
+
+      &::-moz-progress-bar {
+        border-radius: 2px;
+        background-color: var(--sval-accent);
+      }
+    }
+
+    & .downloadButton > .button-box {
+      border-radius: 50%;
+    }
+  }
+}

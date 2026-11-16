@@ -1,0 +1,27 @@
+Sval: move Firefox's translations button out of the address field
+
+Sval's site controls draw the button under its id and its parts' ids
+(SvalHeader), so FullPageTranslationsPanel shows, marks and anchors on
+that copy, and the toolbox's click and keypress handlers open the panel
+from it.
+
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 5a473a0a63..760f9e4f50 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -363,15 +363,6 @@
+                   hidden="true">
+               <image class="urlbar-icon"/>
+             </hbox>
+-            <hbox id="translations-button"
+-                  class="urlbar-page-action"
+-                  role="button"
+-                  data-l10n-id="urlbar-translations-button2"
+-                  hidden="true">
+-              <image class="urlbar-icon" id="translations-button-icon" />
+-              <image class="urlbar-icon" id="translations-button-circle-arrows" />
+-              <html:span id="translations-button-locale" aria-hidden="true" />
+-            </hbox>
+             <hbox id="pageActionButton"
+                   class="urlbar-page-action"
+                   role="button"

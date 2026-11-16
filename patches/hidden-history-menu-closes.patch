@@ -1,0 +1,28 @@
+Sval: the hidden window's History menu closes after session store fakes its opening
+
+On macOS, SessionStoreInternal.maybeSaveClosedWindow dispatches a synthetic
+popupshowing on the hidden window's History menu when the first window
+closes, so its key shortcuts are set up. HistoryMenu opens its Places result
+on popupshowing and closes it only on popuphidden, which never came, so the
+view kept observing history with no popup built. Once the result was
+invalidated (history cleared), every later visit's title change or move threw
+"No DOM node set for aPlacesNode" from PlacesViewBase. A matching popuphidden
+closes the result, as a real open and close would.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index 14218bec44..ee556f32c3 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -2732,6 +2732,12 @@ var SessionStoreInternal = {
+           let historyMenu = window.document.getElementById("history-menu");
+           let evt = new window.CustomEvent("popupshowing", { bubbles: true });
+           historyMenu.menupopup.dispatchEvent(evt);
++          // The menu never opened, so close what popupshowing opened: the
++          // history view would otherwise keep following a result whose
++          // popup it never builds.
++          historyMenu.menupopup.dispatchEvent(
++            new window.CustomEvent("popuphidden", { bubbles: true })
++          );
+         }
+       } else if (!shouldStore) {
+         if (

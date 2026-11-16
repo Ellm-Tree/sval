@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  Sval's first run (first-run spec §3), shown in the browser window's modal
+  dialog by `SvalFirstRun.sys.mjs`. `first-run.js` builds one section per step
+  into `main`, because every string lives in its one `STRINGS` object.
+
+  Search engine icons are blob: URLs made by the search service in the parent
+  process (`ConfigSearchEngine.getIconURL`), so images may come from there.
+  The Workspace step's fields are the New Workspace dialog's
+  (`workspace-form.js`, on `sval-dialog.css`), and its emoji picker is
+  `emoji-picker.xhtml` in a frame of the sheet.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; img-src chrome: blob: moz-icon:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title></title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-color-picker.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/new-workspace.css"
+    />
+    <link rel="stylesheet" href="chrome://browser/content/sval/import.css" />
+    <link rel="stylesheet" href="chrome://browser/content/sval/card/card.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/first-run-intro.css"
+    />
+    <link rel="stylesheet" href="chrome://browser/content/sval/first-run.css" />
+    <script src="chrome://browser/content/sval/import-picker.js"></script>
+    <script src="chrome://browser/content/sval/workspace-form.js"></script>
+    <script src="chrome://browser/content/sval/first-run-intro.js"></script>
+    <script src="chrome://browser/content/sval/first-run.js"></script>
+  </head>
+
+  <body>
+    <main class="sval-fr"></main>
+  </body>
+</html>

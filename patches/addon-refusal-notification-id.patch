@@ -1,0 +1,21 @@
+Sval: the extension refusal doorhanger is one of the add-on notifications
+
+SvalExtensionCompat says why an install was refused in a doorhanger on the
+extensions button. gUnifiedExtensions.getPopupAnchorID logs an error for a
+doorhanger there whose id gXPInstallObserver.NOTIFICATION_IDS does not
+list, and the list is what removeAllNotifications takes down when a page
+enters full screen. The list is a literal in browser-addons.js.
+
+diff --git a/browser/base/content/browser-addons.js b/browser/base/content/browser-addons.js
+index 9e0aed5c95..efe5cc2113 100644
+--- a/browser/base/content/browser-addons.js
++++ b/browser/base/content/browser-addons.js
+@@ -1222,6 +1222,8 @@ var gXPInstallObserver = {
+     "addon-progress",
+     "addon-webext-permissions",
+     "xpinstall-disabled",
++    // Sval: SvalExtensionCompat's refusal of an extension Sval cannot run.
++    "sval-install-refused",
+   ],
+ 
+   /**

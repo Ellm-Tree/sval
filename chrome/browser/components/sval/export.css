@@ -1,0 +1,64 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The export page (`export.xhtml`), on the import page's sheet
+ * (`import.css`): only what export lays out differently is here, in the
+ * same system's values as that sheet.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+.sval-ex-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 12px 24px 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-ex-lede,
+.sval-ex-complete {
+  margin: 0;
+  color: var(--text-body);
+  font-size: 14px;
+}
+
+.sval-ex-targets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+}
+
+.sval-ex-choices[hidden],
+.sval-ex-history-row[hidden] {
+  display: none;
+}
+
+.sval-ex-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 24px 0;
+  font-size: 14px;
+
+  > p {
+    margin: 0;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-ex-saved {
+  color: var(--text-strong);
+  font-weight: 700;
+}

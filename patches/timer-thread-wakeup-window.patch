@@ -1,0 +1,78 @@
+Sval: wake the timer thread for a timer due inside its wakeup window
+
+Backport of Mozilla's Bug 2074584 (mozilla-central 79b9a558d4f6, Firefox 159),
+unchanged. ESR 153 does not carry it. On Windows the timer thread hands
+SetWaitableTimerEx a tolerance of up to timer.maximum_firing_delay_tolerance_ms
+(10 s) when the earliest timer is a long one, and Windows uses all of it on an
+idle machine. AddTimer compared a new timer only against the start of that
+window, so a short timer due inside it did not wake the thread and fired up to
+10 s late. Drop this patch when the upstream pin reaches Firefox 159.
+
+diff --git a/xpcom/threads/TimerThread.cpp b/xpcom/threads/TimerThread.cpp
+index 7735d32645..4bb66ffb64 100644
+--- a/xpcom/threads/TimerThread.cpp
++++ b/xpcom/threads/TimerThread.cpp
+@@ -820,7 +820,8 @@ TimerThread::Run() {
+ 
+       // Determine when we should wake up.
+       const auto [wakeupTime, wakeupTolerance] = ComputeWakeupTimeFromTimers();
+-      mIntendedWakeupTime = wakeupTime;
++      mLatestIntendedWakeupTime =
++          wakeupTime.IsNull() ? TimeStamp{} : wakeupTime + wakeupTolerance;
+       waitTolerance = wakeupTolerance;
+ 
+       // About to sleep - let's make note of how many timers we processed and
+@@ -829,6 +830,7 @@ TimerThread::Run() {
+ 
+ #if TIMER_THREAD_STATISTICS
+       CollectTimersFiredStatistics(timersFiredThisWakeup);
++      mIntendedWakeupTime = wakeupTime;
+ #endif
+ 
+       // Determine how long to sleep for. Grab TimeStamp::Now() at the last
+@@ -847,7 +849,10 @@ TimerThread::Run() {
+                   ("waiting for %f\n", waitFor.ToMilliseconds()));
+       }
+     } else {
++      mLatestIntendedWakeupTime = TimeStamp{};
++#if TIMER_THREAD_STATISTICS
+       mIntendedWakeupTime = TimeStamp{};
++#endif
+       // Sleep for 0.1 seconds while not firing timers.
+       // NOTE: Re-evaluate this behavior. Why do we wake up ten times a second
+       // to do nothing?
+@@ -906,9 +911,10 @@ nsresult TimerThread::AddTimer(nsTimerImpl* aTimer,
+       StaticPrefs::timer_maximum_firing_delay_tolerance_ms());
+   const TimeDuration firingDelay = ComputeAcceptableFiringDelay(
+       aTimer->mDelay, minTimerDelay, maxTimerDelay);
++  // The thread may sleep until the end of the window it handed to the monitor.
+   const bool firingBeforeNextWakeup =
+-      mIntendedWakeupTime.IsNull() ||
+-      (aTimer->mTimeout + firingDelay < mIntendedWakeupTime);
++      mLatestIntendedWakeupTime.IsNull() ||
++      (aTimer->mTimeout + firingDelay < mLatestIntendedWakeupTime);
+   const bool wakeUpTimerThread =
+       mWaiting && (firingBeforeNextWakeup || aTimer->mDelay.IsZero());
+ 
+diff --git a/xpcom/threads/TimerThread.h b/xpcom/threads/TimerThread.h
+index 1b800be823..2a0f8708aa 100644
+--- a/xpcom/threads/TimerThread.h
++++ b/xpcom/threads/TimerThread.h
+@@ -356,11 +356,14 @@ class TimerThread final : public mozilla::Runnable, public nsIObserver {
+ 
+   ProfilerThreadId mProfilerThreadId MOZ_GUARDED_BY(mMonitor);
+ 
+-  // Time at which we were intending to wake up the last time that we slept.
+-  // Is "null" if we have never slept or if our last sleep was "forever".
+-  TimeStamp mIntendedWakeupTime;
++  // End of the wakeup window handed to the monitor the last time that we
++  // slept. Is "null" if we have never slept or if our last sleep was "forever".
++  TimeStamp mLatestIntendedWakeupTime;
+ 
+ #if TIMER_THREAD_STATISTICS
++  // Start of that window, with the same "null" cases.
++  TimeStamp mIntendedWakeupTime;
++
+   static constexpr size_t sTimersFiredPerWakeupBucketCount = 16;
+   static inline constexpr std::array<size_t, sTimersFiredPerWakeupBucketCount>
+       sTimersFiredPerWakeupThresholds = {

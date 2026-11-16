@@ -1,0 +1,68 @@
+Sval: popups Firefox anchors to the app menu button open in Sval's header
+
+Sval's header draws no app menu button, so its panel toggle
+(sval-panel-button) takes the confirmation hints and the full-page
+translations panel Firefox anchors there. A permission prompt can anchor to
+the site controls' cell for the permission it asks for
+(SvalSiteControls.promptAnchor), which browser.js's getVisibleAnchorElement
+asks after its own answer. ConfirmationHint.show, the translations panel's
+element lookup and the options browser.js gives PopupNotifications take no
+anchor from chrome.
+
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index cb1e577..79bfd49 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -480,11 +480,23 @@ ChromeUtils.defineLazyGetter(this, "PopupNotifications", () => {
+       return fallback.find(element => element?.checkVisibility()) ?? null;
+     };
+ 
++    // Sval: a permission prompt can anchor to the site controls.
++    const { SvalSiteControls } = ChromeUtils.importESModule(
++      "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs"
++    );
+     return new PopupNotifications(
+       gBrowser,
+       document.getElementById("notification-popup"),
+       document.getElementById("notification-popup-box"),
+-      { shouldSuppress, getVisibleAnchorElement }
++      {
++        shouldSuppress,
++        getVisibleAnchorElement: anchorElement =>
++          SvalSiteControls.promptAnchor(
++            window,
++            anchorElement,
++            getVisibleAnchorElement(anchorElement)
++          ),
++      }
+     );
+   } catch (ex) {
+     console.error(ex);
+@@ -4717,6 +4729,12 @@ var ConfirmationHint = {
+       event,
+     } = {}
+   ) {
++    // Sval: the header draws no app menu button, so its panel toggle takes
++    // the hints Firefox anchors there.
++    if (anchor?.id == "PanelUI-menu-button") {
++      anchor = document.getElementById("sval-panel-button") ?? anchor;
++    }
++
+     this._reset();
+ 
+     MozXULElement.insertFTLIfNeeded("toolkit/branding/brandings.ftl");
+diff --git a/browser/components/translations/content/fullPageTranslationsPanel.js b/browser/components/translations/content/fullPageTranslationsPanel.js
+index 5541340..f1fd465 100644
+--- a/browser/components/translations/content/fullPageTranslationsPanel.js
++++ b/browser/components/translations/content/fullPageTranslationsPanel.js
+@@ -288,7 +288,9 @@ var FullPageTranslationsPanel = new (class {
+ 
+       TranslationsPanelShared.defineLazyElements(document, this.#lazyElements, {
+         alwaysTranslateLanguageMenuItem: ".always-translate-language-menuitem",
+-        appMenuButton: "PanelUI-menu-button",
++        // Sval: the header draws no app menu button, so its panel toggle
++        // takes the panel in its place.
++        appMenuButton: "sval-panel-button",
+         cancelButton: "full-page-translations-panel-cancel",
+         changeSourceLanguageButton:
+           "full-page-translations-panel-change-source-language",

@@ -1,0 +1,38 @@
+Sval: browser-chrome parks the pointer whenever a run starts
+
+Tester parks the pointer only under MOZ_AUTOMATION, which Sval's CI does
+not set. A CI job's Xvfb display keeps its pointer from one harness run
+to the next, so a run started after a test that moved the native pointer
+hovered whatever page lay under it: browser_show_statuspanel_splitview.js
+then read a link's address in place of its own. Mozilla's spot, screen
+(1000, 10), lies on Sval's address field, which changes its look under
+the pointer, so the pointer goes to the top-left corner.
+
+diff --git a/testing/mochitest/browser-test.js b/testing/mochitest/browser-test.js
+index cdafa8d9f0..e862ff93c3 100644
+--- a/testing/mochitest/browser-test.js
++++ b/testing/mochitest/browser-test.js
+@@ -343,14 +343,15 @@ function Tester(aTests, structuredLogger, aCallback) {
+     ),
+   });
+ 
+-  // ensure the mouse is reset before each test run
+-  if (Services.env.exists("MOZ_AUTOMATION")) {
+-    this.EventUtils.synthesizeNativeMouseEvent({
+-      type: "mousemove",
+-      screenX: 1000,
+-      screenY: 10,
+-    });
+-  }
++  // The display outlives each harness run, and so does its pointer: a run
++  // starts with it wherever an earlier run's native events left it, where it
++  // can hover a page. The screen's top-left corner is clear of Sval's address
++  // field, whose look follows the pointer.
++  this.EventUtils.synthesizeNativeMouseEvent({
++    type: "mousemove",
++    screenX: 5,
++    screenY: 5,
++  });
+ }
+ Tester.prototype = {
+   EventUtils: {},

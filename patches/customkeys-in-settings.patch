@@ -1,0 +1,28 @@
+Sval: Firefox's shortcut editor's actor serves Settings
+
+Settings' Keyboard shortcuts pane (Sval's `settings-keyboard.js`) lists and
+changes keys through Firefox's own `CustomKeys` actor, which lists the
+window's keys, remaps them in `CustomKeys` and captures the new keystroke on
+the page's `<browser>`. about:preferences loads in the parent process, so the
+actor matches it there. Sval does not build about:keyboard
+(`no-closed-about-pages.patch`), so the actor needs no page of its own. Registering the actor afresh from
+Sval's code would have to unregister Mozilla's after DesktopActorRegistry
+has made it, a second declaration of the same actor.
+
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 0c863af656..9856351023 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -438,8 +438,10 @@ let JSWINDOWACTORS = {
+         DOMDocElementInserted: { wantUntrusted: true },
+       },
+     },
+-    matches: ["about:keyboard"],
+-    remoteTypes: ["privilegedabout"],
++    // Sval: Settings' Keyboard shortcuts pane takes about:keyboard's place.
++    includeChrome: true,
++    matches: ["about:preferences*", "about:settings*"],
++    remoteTypes: ["parent"],
+   },
+ 
+   DecoderDoctor: {

@@ -1,0 +1,87 @@
+Sval: The address bar floats as the Launcher, and its placeholder is Sval's
+
+⌘L floats the address bar over the page, and a pick returns it to the
+toolbar (`SvalLauncher`). The view tells its listeners it has closed, but
+not whether a row was picked, which is what tells a pick from a query that
+found no rows; `close` passes its `elementPicked` along.
+
+The address bar's placeholder says what the Launcher finds (launcher spec
+§8), where Firefox's names the search engine. Firefox writes
+the placeholder in `_setPlaceholder` whenever the engine changes, so Sval's
+is written there. The field first writes it while the window parses, before
+Sval adds its strings to the window, and a message missing from the
+window's first translation stops its later ones (`docs/upstream-candidates.md`),
+so until then the placeholder is Firefox's, which `SvalLauncher` replaces
+once the window is translated.
+`UrlbarTestUtils.assertSearchMode` checks the placeholder a search mode
+leaves behind, so it expects Sval's.
+
+diff --git a/browser/components/urlbar/content/UrlbarInput.mjs b/browser/components/urlbar/content/UrlbarInput.mjs
+index 29c3f6e9f6..ee3b8d737b 100644
+--- a/browser/components/urlbar/content/UrlbarInput.mjs
++++ b/browser/components/urlbar/content/UrlbarInput.mjs
+@@ -70,6 +70,7 @@ const lazy = XPCOMUtils.declareLazy({
+   SharingUtils: "resource:///modules/SharingUtils.sys.mjs",
+   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
++  SvalLauncher: "moz-src:///browser/components/sval/SvalLauncher.sys.mjs",
+   SvalLauncherCommands:
+     "moz-src:///browser/components/sval/SvalLauncherCommands.sys.mjs",
+   SvalLauncherEnter:
+@@ -5225,6 +5226,17 @@ ${
+       return;
+     }
+ 
++    // Sval's placeholder says what the Launcher finds (launcher spec §8).
++    let svalPlaceholder = lazy.SvalLauncher.placeholder(this.window);
++    if (svalPlaceholder && lazy.UrlbarPrefs.get("keyword.enabled")) {
++      this.document.l10n.setAttributes(
++        this.inputField,
++        svalPlaceholder.id,
++        svalPlaceholder.args
++      );
++      return;
++    }
++
+     let l10nId;
+     if (lazy.UrlbarPrefs.get("keyword.enabled")) {
+       l10nId = engineName
+diff --git a/browser/components/urlbar/content/UrlbarView.mjs b/browser/components/urlbar/content/UrlbarView.mjs
+index 029765cb52..e7104f69ee 100644
+--- a/browser/components/urlbar/content/UrlbarView.mjs
++++ b/browser/components/urlbar/content/UrlbarView.mjs
+@@ -573,7 +573,9 @@ export class UrlbarView {
+     this.window.removeEventListener("resize", this);
+     this.window.removeEventListener("blur", this);
+ 
+-    this.controller.notify(this.controller.NOTIFICATIONS.VIEW_CLOSE);
++    this.controller.notify(this.controller.NOTIFICATIONS.VIEW_CLOSE, {
++      elementPicked,
++    });
+ 
+     // Revoke icon blob URLs that were created while the view was open.
+     if (this.#blobUrlsByResultUrl) {
+diff --git a/browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs b/browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs
+index cdc47fea1a..e067f795a6 100644
+--- a/browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs
++++ b/browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs
+@@ -27,6 +27,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   NimbusTestUtils: "resource://testing-common/NimbusTestUtils.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
++  SvalLauncher: "moz-src:///browser/components/sval/SvalLauncher.sys.mjs",
+   TestUtils: "resource://testing-common/TestUtils.sys.mjs",
+   UrlbarController:
+     "moz-src:///browser/components/urlbar/UrlbarController.sys.mjs",
+@@ -994,8 +995,11 @@ class UrlbarInputTestUtils {
+       let keywordEnabled = Services.prefs.getBoolPref("keyword.enabled");
+ 
+       let expectedPlaceholder;
++      let svalPlaceholder = lazy.SvalLauncher.placeholder(window);
+       if (this.#urlbar(window).sapName == "searchbar") {
+         expectedPlaceholder = { id: "searchbar-input" };
++      } else if (keywordEnabled && svalPlaceholder) {
++        expectedPlaceholder = { id: svalPlaceholder.id };
+       } else if (keywordEnabled && engineName) {
+         expectedPlaceholder = {
+           id: "urlbar-placeholder-with-name",

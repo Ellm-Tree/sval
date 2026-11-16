@@ -1,0 +1,79 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Site styles test page</title>
+    <style>
+      html {
+        background-color: rgb(255, 255, 255);
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background-color: rgb(255, 255, 255);
+        color: rgb(0, 0, 0);
+        font-family: monospace;
+      }
+      a {
+        color: rgb(0, 0, 238);
+      }
+      /* Blocks drawn in the text's color and in a mid gray, to read the
+         colors the page is painted with. */
+      .block {
+        width: 48px;
+        height: 24px;
+      }
+      #ink {
+        background-color: currentColor;
+      }
+      #gray {
+        background-color: rgb(120, 120, 120);
+      }
+      #photo {
+        width: 48px;
+        height: 24px;
+        display: block;
+      }
+      /* A page that leaves its background to the browser's default. */
+      .plain,
+      .plain body {
+        background: none;
+      }
+      /* A page with a dark theme of its own. */
+      @media (prefers-color-scheme: dark) {
+        .theme,
+        .theme body {
+          background-color: rgb(17, 17, 17);
+          color: rgb(238, 238, 238);
+        }
+      }
+      /* A page that is only ever dark. */
+      .dark-only,
+      .dark-only body {
+        background-color: rgb(18, 18, 18);
+        color: rgb(230, 230, 230);
+      }
+    </style>
+    <script>
+      // ?plain, ?theme or ?dark-only picks which page this is.
+      const kind = location.search.slice(1);
+      if (["plain", "theme", "dark-only"].includes(kind)) {
+        document.documentElement.classList.add(kind);
+      }
+    </script>
+  </head>
+  <body>
+    <p id="text">A page to style.</p>
+    <a id="link" href="#text">A link</a>
+    <div id="ink" class="block"></div>
+    <div id="gray" class="block"></div>
+    <img
+      id="photo"
+      alt="A red picture"
+      src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC"
+    />
+  </body>
+</html>

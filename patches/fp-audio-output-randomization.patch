@@ -1,0 +1,337 @@
+Sval: per-site, per-session noise on audio output a page reads
+
+A new RFPTarget, AudioOutputRandomization, scales each sample of the audio
+output a page reads by its own gain between 0.999 and 0.9999: an
+OfflineAudioContext's rendered buffer, once, before getChannelData or
+copyFromChannel can read it; the samples an AnalyserNode's time-domain and
+frequency data are computed from; the input a ScriptProcessorNode hands its
+audioprocess event; the input and connected param values an
+AudioWorkletProcessor's process() reads; and a DynamicsCompressorNode's
+reduction. Brave farbles audio with one gain per site in [0.999, 1). No gain
+moves a sample by more than 0.01 dB, so nothing audible changes, yet every
+float32 sample, and so a render hash, differs between sites.
+
+SvalRFPService::AudioOutputNoiseKey draws a key from the fingerprinting
+randomization key canvas noise uses: the key cookieJarSettings carries,
+derived from the browsing session key and the top-level site, so it is
+fixed for a site within a session, and private browsing has its own.
+SvalRFPService::RandomizeAudioOutput draws each gain from that key, the
+channel, the sample's index and a hash of the samples, as canvas noise
+hashes the image: a base the key alone fixes plus a jitter, so even the
+largest gain a page can learn from many renders differs between sites. A
+reference signal rendered beside a fingerprint, such as a ConstantSourceNode
+on another channel or in another context, draws unrelated gains and cannot
+divide them out. The key is made when any randomization target is on:
+GetBrowsingSessionKey and GenerateKey check one list of them,
+kRandomizationTargets. Each node computes its context's noise key once, when
+it is made, so no audio callback or getter pays for the HMAC. The target is
+Doc-gated, so a site's -AllTargets granular entry gives it the raw output.
+
+No chrome API can change what Web Audio renders.
+
+diff --git a/dom/media/webaudio/AnalyserNode.cpp b/dom/media/webaudio/AnalyserNode.cpp
+index 3c80514a1d..2304f68837 100644
+--- a/dom/media/webaudio/AnalyserNode.cpp
++++ b/dom/media/webaudio/AnalyserNode.cpp
+@@ -124,7 +124,9 @@ AnalyserNode::AnalyserNode(AudioContext* aContext)
+       mAnalysisBlock(2048),
+       mMinDecibels(-100.),
+       mMaxDecibels(-30.),
+-      mSmoothingTimeConstant(.8) {
++      mSmoothingTimeConstant(.8),
++      mNoiseKey(
++          SvalRFPService::AudioOutputNoiseKey(aContext->GetParentObject())) {
+   mTrack =
+       AudioNodeTrack::Create(aContext, new AnalyserNodeEngine(this),
+                              AudioNodeTrack::NO_TRACK_FLAGS, aContext->Graph());
+@@ -381,6 +383,12 @@ void AnalyserNode::GetTimeDomainData(float* aData, size_t aLength) {
+     readChunk++;
+     writeIndex += copyLength;
+   }
++
++  // RFPTarget::AudioOutputRandomization. The frequency data is computed from
++  // these samples, so it carries the noise too.
++  if (mNoiseKey) {
++    SvalRFPService::RandomizeAudioOutput(*mNoiseKey, 0, aData, aLength);
++  }
+ }
+ 
+ }  // namespace dom
+diff --git a/dom/media/webaudio/AnalyserNode.h b/dom/media/webaudio/AnalyserNode.h
+index 93aef9ba18..3b99a34dbb 100644
+--- a/dom/media/webaudio/AnalyserNode.h
++++ b/dom/media/webaudio/AnalyserNode.h
+@@ -8,6 +8,7 @@
+ #include "AlignedTArray.h"
+ #include "AudioNode.h"
+ #include "FFTBlock.h"
++#include "nsRFPService.h"
+ 
+ namespace mozilla::dom {
+ 
+@@ -71,6 +72,7 @@ class AnalyserNode final : public AudioNode {
+   double mMinDecibels;
+   double mMaxDecibels;
+   double mSmoothingTimeConstant;
++  const Maybe<SvalRFPService::AudioNoiseKey> mNoiseKey;
+   size_t mCurrentChunk = 0;
+   AlignedTArray<float> mOutputBuffer;
+ };
+diff --git a/dom/media/webaudio/AudioDestinationNode.cpp b/dom/media/webaudio/AudioDestinationNode.cpp
+index 94596f869a..9b2494d91d 100644
+--- a/dom/media/webaudio/AudioDestinationNode.cpp
++++ b/dom/media/webaudio/AudioDestinationNode.cpp
+@@ -27,6 +27,7 @@
+ #include "nsContentUtils.h"
+ #include "nsGlobalWindowInner.h"
+ #include "nsPIDOMWindowInlines.h"
++#include "nsRFPService.h"
+ 
+ extern mozilla::LazyLogModule gAudioChannelLog;
+ 
+@@ -150,6 +151,16 @@ class OfflineDestinationNodeEngine final : public AudioNodeEngine {
+ 
+   already_AddRefed<AudioBuffer> CreateAudioBuffer(AudioContext* aContext) {
+     MOZ_ASSERT(NS_IsMainThread());
++    // RFPTarget::AudioOutputRandomization's noise goes into the rendered data
++    // once, so getChannelData and copyFromChannel read the same samples.
++    if (const auto key =
++            SvalRFPService::AudioOutputNoiseKey(aContext->GetParentObject());
++        key && mBuffer) {
++      for (uint32_t i = 0; i < mNumberOfChannels; ++i) {
++        SvalRFPService::RandomizeAudioOutput(
++            *key, i, mBuffer->GetDataForWrite(i), mLength);
++      }
++    }
+     // Create the input buffer
+     ErrorResult rv;
+     RefPtr<AudioBuffer> renderedBuffer =
+diff --git a/dom/media/webaudio/AudioWorkletNode.cpp b/dom/media/webaudio/AudioWorkletNode.cpp
+index 2ce03b433c..68fd5ef522 100644
+--- a/dom/media/webaudio/AudioWorkletNode.cpp
++++ b/dom/media/webaudio/AudioWorkletNode.cpp
+@@ -29,6 +29,7 @@
+ #include "mozilla/dom/Worklet.h"
+ #include "nsIScriptGlobalObject.h"
+ #include "nsPrintfCString.h"
++#include "nsRFPService.h"
+ #include "nsReadableUtils.h"
+ 
+ namespace mozilla::dom {
+@@ -63,7 +64,9 @@ class WorkletNodeEngine final : public AudioNodeEngine {
+                     const Optional<Sequence<uint32_t>>& aOutputChannelCount)
+       : AudioNodeEngine(aNode),
+         mDestination(aDestinationNode->Track()),
+-        mParamTimelines(std::move(aParamTimelines)) {
++        mParamTimelines(std::move(aParamTimelines)),
++        mNoiseKey(SvalRFPService::AudioOutputNoiseKey(
++            aNode->Context()->GetParentObject())) {
+     if (aOutputChannelCount.WasPassed()) {
+       mOutputChannelCount = aOutputChannelCount.Value();
+     }
+@@ -170,6 +173,10 @@ class WorkletNodeEngine final : public AudioNodeEngine {
+   Ports mInputs;
+   Ports mOutputs;
+   ParameterValues mParameters;
++  // Read on the rendering thread, so drawn once on the main thread.
++  const Maybe<SvalRFPService::AudioNoiseKey> mNoiseKey;
++  // Keeps params' noise apart from the input channels'.
++  static constexpr uint32_t kParamChannelBase = 1 << 16;
+ 
+   RefPtr<AudioWorkletGlobalScope> mGlobal;
+   JS::PersistentRooted<JSObject*> mProcessor;
+@@ -539,6 +546,12 @@ void WorkletNodeEngine::ProcessBlocksOnPorts(AudioNodeTrack* aTrack,
+       float* dest = JS_GetFloat32ArrayData(float32Arrays[c], &isShared, nogc);
+       MOZ_ASSERT(!isShared);  // Was created as unshared
+       AudioBlockCopyChannelWithScale(channelData[c], volume, dest);
++      // RFPTarget::AudioOutputRandomization noises the samples process()
++      // reads as it does an offline render's.
++      if (mNoiseKey) {
++        SvalRFPService::RandomizeAudioOutput(*mNoiseKey, c, dest,
++                                            WEBAUDIO_BLOCK_SIZE);
++      }
+     }
+   }
+ 
+@@ -566,6 +579,10 @@ void WorkletNodeEngine::ProcessBlocksOnPorts(AudioNodeTrack* aTrack,
+     // https://bugzilla.mozilla.org/show_bug.cgi?id=1616599
+     if (frames == 1) {
+       std::fill_n(dest + 1, WEBAUDIO_BLOCK_SIZE - 1, dest[0]);
++    } else if (mNoiseKey) {
++      // A node connected to the param sums its output into these values.
++      SvalRFPService::RandomizeAudioOutput(*mNoiseKey, kParamChannelBase + i,
++                                          dest, WEBAUDIO_BLOCK_SIZE);
+     }
+   }
+ 
+diff --git a/dom/media/webaudio/DynamicsCompressorNode.cpp b/dom/media/webaudio/DynamicsCompressorNode.cpp
+index 5c99477d89..efc6b36bff 100644
+--- a/dom/media/webaudio/DynamicsCompressorNode.cpp
++++ b/dom/media/webaudio/DynamicsCompressorNode.cpp
+@@ -160,10 +160,22 @@ class DynamicsCompressorNodeEngine final : public AudioNodeEngine {
+   UniquePtr<DynamicsCompressor> mCompressor;
+ };
+ 
++float DynamicsCompressorNode::Reduction() const {
++  float reduction = mReduction;
++  // RFPTarget::AudioOutputRandomization noises this DSP output as it does
++  // the samples.
++  if (mNoiseKey) {
++    SvalRFPService::RandomizeAudioOutput(*mNoiseKey, 0, &reduction, 1);
++  }
++  return reduction;
++}
++
+ DynamicsCompressorNode::DynamicsCompressorNode(AudioContext* aContext)
+     : AudioNode(aContext, 2, ChannelCountMode::Clamped_max,
+                 ChannelInterpretation::Speakers),
+-      mReduction(0) {
++      mReduction(0),
++      mNoiseKey(
++          SvalRFPService::AudioOutputNoiseKey(aContext->GetParentObject())) {
+   mThreshold = CreateAudioParam(DynamicsCompressorNodeEngine::THRESHOLD,
+                                 u"threshold"_ns, -24.f, -100.f, 0.f);
+   mKnee = CreateAudioParam(DynamicsCompressorNodeEngine::KNEE, u"knee"_ns, 30.f,
+diff --git a/dom/media/webaudio/DynamicsCompressorNode.h b/dom/media/webaudio/DynamicsCompressorNode.h
+index 3fb9120f92..76422910cb 100644
+--- a/dom/media/webaudio/DynamicsCompressorNode.h
++++ b/dom/media/webaudio/DynamicsCompressorNode.h
+@@ -7,6 +7,7 @@
+ 
+ #include "AudioNode.h"
+ #include "AudioParam.h"
++#include "nsRFPService.h"
+ 
+ namespace mozilla::dom {
+ 
+@@ -42,7 +43,7 @@ class DynamicsCompressorNode final : public AudioNode {
+   // Called GetRelease to prevent clashing with the nsISupports::Release name
+   AudioParam* GetRelease() const { return mRelease; }
+ 
+-  float Reduction() const { return mReduction; }
++  float Reduction() const;
+ 
+   const char* NodeType() const override { return "DynamicsCompressorNode"; }
+ 
+@@ -80,6 +81,7 @@ class DynamicsCompressorNode final : public AudioNode {
+   RefPtr<AudioParam> mKnee;
+   RefPtr<AudioParam> mRatio;
+   float mReduction;
++  const Maybe<SvalRFPService::AudioNoiseKey> mNoiseKey;
+   RefPtr<AudioParam> mAttack;
+   RefPtr<AudioParam> mRelease;
+ };
+diff --git a/dom/media/webaudio/ScriptProcessorNode.cpp b/dom/media/webaudio/ScriptProcessorNode.cpp
+index 1332670aed..beaf4b7f95 100644
+--- a/dom/media/webaudio/ScriptProcessorNode.cpp
++++ b/dom/media/webaudio/ScriptProcessorNode.cpp
+@@ -409,6 +409,15 @@ class ScriptProcessorNodeEngine final : public AudioNodeEngine {
+         // Create the input buffer
+         RefPtr<AudioBuffer> inputBuffer;
+         if (mInputBuffer) {
++          // RFPTarget::AudioOutputRandomization noises the samples a script
++          // reads here as it does an offline render's.
++          if (const auto& key = aNode->NoiseKey()) {
++            for (uint32_t i = 0; i < mInputBuffer->GetChannels(); ++i) {
++              SvalRFPService::RandomizeAudioOutput(
++                  *key, i, mInputBuffer->GetDataForWrite(i),
++                  aNode->BufferSize());
++            }
++          }
+           ErrorResult rv;
+           inputBuffer = AudioBuffer::Create(
+               context->GetOwnerWindow(), inputChannelCount, aNode->BufferSize(),
+@@ -481,7 +490,9 @@ ScriptProcessorNode::ScriptProcessorNode(AudioContext* aContext,
+                               :  // respect what the web developer requested
+                       4096)      // choose our own buffer size -- 4KB for now
+       ,
+-      mNumberOfOutputChannels(aNumberOfOutputChannels) {
++      mNumberOfOutputChannels(aNumberOfOutputChannels),
++      mNoiseKey(
++          SvalRFPService::AudioOutputNoiseKey(aContext->GetParentObject())) {
+   MOZ_ASSERT(BufferSize() % WEBAUDIO_BLOCK_SIZE == 0, "Invalid buffer size");
+   ScriptProcessorNodeEngine* engine = new ScriptProcessorNodeEngine(
+       this, aContext->Destination(), BufferSize(), aNumberOfInputChannels);
+diff --git a/dom/media/webaudio/ScriptProcessorNode.h b/dom/media/webaudio/ScriptProcessorNode.h
+index dc406440e4..b5878c760d 100644
+--- a/dom/media/webaudio/ScriptProcessorNode.h
++++ b/dom/media/webaudio/ScriptProcessorNode.h
+@@ -7,6 +7,7 @@
+ 
+ #include "AudioNode.h"
+ #include "mozilla/ErrorResult.h"
++#include "nsRFPService.h"
+ 
+ namespace mozilla::dom {
+ 
+@@ -107,6 +108,11 @@ class ScriptProcessorNode final : public AudioNode {
+ 
+   uint32_t NumberOfOutputChannels() const { return mNumberOfOutputChannels; }
+ 
++  // Sval: RFPTarget::AudioOutputRandomization's key for the context, or none.
++  const Maybe<SvalRFPService::AudioNoiseKey>& NoiseKey() const {
++    return mNoiseKey;
++  }
++
+   using DOMEventTargetHelper::DispatchTrustedEvent;
+ 
+   const char* NodeType() const override { return "ScriptProcessorNode"; }
+@@ -121,6 +127,7 @@ class ScriptProcessorNode final : public AudioNode {
+ 
+   const uint32_t mBufferSize;
+   const uint32_t mNumberOfOutputChannels;
++  const Maybe<SvalRFPService::AudioNoiseKey> mNoiseKey;
+   bool mHasPhantomInput = false;
+ };
+ 
+diff --git a/toolkit/components/resistfingerprinting/nsRFPService.cpp b/toolkit/components/resistfingerprinting/nsRFPService.cpp
+index 16b56e52ef..8eb25298a4 100644
+--- a/toolkit/components/resistfingerprinting/nsRFPService.cpp
++++ b/toolkit/components/resistfingerprinting/nsRFPService.cpp
+@@ -1333,16 +1333,14 @@ nsresult nsRFPService::GetBrowsingSessionKey(
+ 
+   // If any fingerprinting randomization protection is enabled, we generate the
+   // browsing session key.
+-  // Note that there is only canvas randomization protection currently.
+-  if (!nsContentUtils::ShouldResistFingerprinting(
+-          "Checking the target activation globally without local context",
+-          RFPTarget::CanvasRandomization) &&
+-      !nsContentUtils::ShouldResistFingerprinting(
+-          "Checking the target activation globally without local context",
+-          RFPTarget::WebGLRandomization) &&
+-      !nsContentUtils::ShouldResistFingerprinting(
+-          "Checking the target activation globally without local context",
+-          RFPTarget::EfficientCanvasRandomization)) {
++  if (std::none_of(std::begin(SvalRFPService::kRandomizationTargets),
++                   std::end(SvalRFPService::kRandomizationTargets),
++                   [](RFPTarget aTarget) {
++                     return nsContentUtils::ShouldResistFingerprinting(
++                         "Checking the target activation globally without "
++                         "local context",
++                         aTarget);
++                   })) {
+     return NS_ERROR_NOT_AVAILABLE;
+   }
+ 
+@@ -1438,15 +1436,12 @@ Maybe<nsTArray<uint8_t>> nsRFPService::GenerateKey(nsIChannel* aChannel) {
+ 
+   // Return nothing if fingerprinting randomization is disabled for the given
+   // channel.
+-  //
+-  // Note that canvas randomization is the only fingerprinting randomization
+-  // protection currently.
+-  if (!nsContentUtils::ShouldResistFingerprinting(
+-          aChannel, RFPTarget::CanvasRandomization) &&
+-      !nsContentUtils::ShouldResistFingerprinting(
+-          aChannel, RFPTarget::WebGLRandomization) &&
+-      !nsContentUtils::ShouldResistFingerprinting(
+-          aChannel, RFPTarget::EfficientCanvasRandomization)) {
++  if (std::none_of(std::begin(SvalRFPService::kRandomizationTargets),
++                   std::end(SvalRFPService::kRandomizationTargets),
++                   [aChannel](RFPTarget aTarget) {
++                     return nsContentUtils::ShouldResistFingerprinting(aChannel,
++                                                                       aTarget);
++                   })) {
+     return Nothing();
+   }
+   auto sessionKeyStr = sessionKey.ToString();

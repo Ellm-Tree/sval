@@ -1,0 +1,27 @@
+Sval: SessionStore says when a restore has set a tab's custom values
+
+restoreTab sets a tab's custom values from the state it restores, so a tab
+duplicateTab or setTabState copies arrives carrying its original's values,
+Sval's node id among them. Nothing tells a listener at that moment:
+SSTabRestoring fires only once restoreDocShellState resolves, by which time
+other code can have read the copied id. Sval gives the copy its own node from
+this event. It is dispatched at the end of restoreTab, after the method's
+other events, as the method's own comment asks of anything external.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index c05c99d948..301c379fc1 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -6667,6 +6667,12 @@ var SessionStoreInternal = {
+     // while we wait for the messages to be processed.
+     this.updateTabLabelAndIcon(tab, tabData);
+ 
++    // Tell listeners the tab's custom values are now tabData's, while
++    // nothing else has run since they were set.
++    let valuesEvent = window.document.createEvent("Events");
++    valuesEvent.initEvent("SSTabCustomValuesRestored", true, false);
++    tab.dispatchEvent(valuesEvent);
++
+     // Decrease the busy state counter after we're done.
+     this._setWindowStateReady(window);
+   },

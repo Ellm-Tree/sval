@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Development and CI builds, appended to mozconfig by scripts/build.sh.
+#
+# Artifact builds download prebuilt Gecko binaries and compile only the
+# front-end (JS/XHTML/CSS) into omni.ja. This is what keeps the edit-run loop
+# at seconds instead of hours. The binaries are Mozilla's, or Sval's own when
+# MOZ_ARTIFACT_FILE names packages from a mozconfig.gecko build.
+#
+# An artifact build compiles no C, C++ or Rust. A native change reaches it only
+# through a Gecko compiled with mozconfig.gecko and fetched by its key
+# (scripts/gecko-key.sh).
+ac_add_options --enable-artifact-builds
+
+# The Gecko's symbol archive goes to dist/crashreporter-symbols, the symbols
+# path the test harnesses read a crash's stack with by default
+# (mochitest_options.py). Mozilla's Gecko brings Mozilla's archive, and
+# Sval's the one its compile wrote with `mach buildsymbols`.
+ac_add_options --enable-artifact-build-symbols
+
+# Keep the object directory inside the gitignored upstream checkout.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/objdir-frontend
+
+# A CLOBBER change upstream makes mach refuse to build an existing object
+# directory (CLOBBER in the tree root). Runners and worktrees keep theirs
+# between builds, and an artifact objdir holds nothing a rebuild cannot
+# remake, so mach removes it and builds (Clobberer.maybe_do_clobber).
+mk_add_options AUTOCLOBBER=1

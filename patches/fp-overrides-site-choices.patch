@@ -1,0 +1,102 @@
+Sval: read Sval's per-site fingerprinting choices from their own prefs
+
+A site's fingerprinting choices (fingerprinting protection off, or one of
+its exceptions) live in a pref per site under browser.sval.protection.site.,
+which settings sync carries. SvalSiteProtections derives the entries they
+need and keeps them on the default branch of two Sval prefs, so the entries
+are never saved beside the synced store and none can outlive the choice it
+came from.
+
+FingerprintingWebCompatService reads them after the granular-overrides
+prefs and follows them as it follows those, so a person's own granular
+entries stay theirs and a site's choice takes the place of one for the
+same site. No chrome API reaches the service's entries: nsIRFPService only
+replaces them wholesale, and this service rewrites them whenever its own
+prefs or the remote ones change. The granular prefs themselves cannot hold
+them unsaved: a default-branch value is hidden by any user value, and a
+change to it notifies no observer while one exists (Pref::SetDefaultValue).
+
+diff --git a/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs b/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
+index 16b15102d9..8353db5199 100644
+--- a/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
++++ b/toolkit/components/resistfingerprinting/FingerprintingWebCompatService.sys.mjs
+@@ -52,6 +52,13 @@ const PREF_GRANULAR_OVERRIDES_BASELINE =
+   "privacy.baselineFingerprintingProtection.granularOverrides";
+ const PREF_REMOTE_OVERRIDES_ENABLED =
+   "privacy.fingerprintingProtection.remoteOverrides.enabled";
++// Sval's per-site choices, which SvalSiteProtections derives from its synced
++// store and keeps on the default branch, so they are never saved beside it.
++// They are read after the granular prefs, so a site's choice takes the place
++// of an entry for the same site there.
++const PREF_SITE_OVERRIDES = "browser.sval.protection.fingerprintingOverrides";
++const PREF_SITE_OVERRIDES_BASELINE =
++  "browser.sval.protection.baselineFingerprintingOverrides";
+ // nsRFPService::SetFingerprintingOverrides resolves every entry against the
+ // global target sets as they are when it runs, so the entries are resolved
+ // again whenever either set changes.
+@@ -78,6 +85,18 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   PREF_REMOTE_OVERRIDES_ENABLED
+ );
+ 
++XPCOMUtils.defineLazyPreferenceGetter(
++  lazy,
++  "siteOverridesPref",
++  PREF_SITE_OVERRIDES
++);
++
++XPCOMUtils.defineLazyPreferenceGetter(
++  lazy,
++  "baselineSiteOverridesPref",
++  PREF_SITE_OVERRIDES_BASELINE
++);
++
+ /**
+  * The object represents a fingerprinting override.
+  */
+@@ -148,6 +167,8 @@ export class FingerprintingWebCompatService {
+     Services.prefs.addObserver(PREF_GRANULAR_OVERRIDES, this);
+     Services.prefs.addObserver(PREF_GRANULAR_OVERRIDES_BASELINE, this);
+     Services.prefs.addObserver(PREF_REMOTE_OVERRIDES_ENABLED, this);
++    Services.prefs.addObserver(PREF_SITE_OVERRIDES, this);
++    Services.prefs.addObserver(PREF_SITE_OVERRIDES_BASELINE, this);
+     for (const pref of PREFS_GLOBAL_OVERRIDES) {
+       Services.prefs.addObserver(pref, this);
+     }
+@@ -185,6 +206,8 @@ export class FingerprintingWebCompatService {
+     for (const [pref, isBaseline] of [
+       [lazy.baselineGranularOverridesPref, true],
+       [lazy.granularOverridesPref, false],
++      [lazy.baselineSiteOverridesPref, true],
++      [lazy.siteOverridesPref, false],
+     ]) {
+       let overrides;
+       try {
+@@ -220,8 +243,8 @@ export class FingerprintingWebCompatService {
+           continue;
+         }
+ 
+-        // The granular prefs persist and sync, so they hold choices made in
+-        // normal windows, which a private window does not take.
++        // These prefs hold choices made in normal windows, which a private
++        // window does not take.
+         this.#granularOverrides.add(
+           this.#createFingerprintingOverrideFrom(override, isBaseline, false)
+         );
+@@ -301,6 +324,8 @@ export class FingerprintingWebCompatService {
+     if (
+       prefName != PREF_GRANULAR_OVERRIDES &&
+       prefName != PREF_GRANULAR_OVERRIDES_BASELINE &&
++      prefName != PREF_SITE_OVERRIDES &&
++      prefName != PREF_SITE_OVERRIDES_BASELINE &&
+       prefName != PREF_REMOTE_OVERRIDES_ENABLED
+     ) {
+       return;
+@@ -328,6 +353,8 @@ export class FingerprintingWebCompatService {
+     Services.prefs.removeObserver(PREF_GRANULAR_OVERRIDES, this);
+     Services.prefs.removeObserver(PREF_GRANULAR_OVERRIDES_BASELINE, this);
+     Services.prefs.removeObserver(PREF_REMOTE_OVERRIDES_ENABLED, this);
++    Services.prefs.removeObserver(PREF_SITE_OVERRIDES, this);
++    Services.prefs.removeObserver(PREF_SITE_OVERRIDES_BASELINE, this);
+     for (const pref of PREFS_GLOBAL_OVERRIDES) {
+       Services.prefs.removeObserver(pref, this);
+     }

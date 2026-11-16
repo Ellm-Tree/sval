@@ -1,0 +1,21 @@
+Sval: Settings' exception lists say what a usable address looks like
+
+An address Settings' exception lists cannot use is answered with "Invalid
+Hostname Entered", a word the user never typed. The answer says the text
+is not a website address and gives one as an example.
+
+diff --git a/browser/locales/en-US/browser/preferences/permissions.ftl b/browser/locales/en-US/browser/preferences/permissions.ftl
+index a3b604a7b0..d43821b3db 100644
+--- a/browser/locales/en-US/browser/preferences/permissions.ftl
++++ b/browser/locales/en-US/browser/preferences/permissions.ftl
+@@ -91,8 +91,8 @@ permissions-capabilities-listitem-off-temporarily =
+ 
+ ## Invalid Hostname Dialog
+ 
+-permissions-invalid-uri-title = Invalid Hostname Entered
+-permissions-invalid-uri-label = Please enter a valid hostname
++permissions-invalid-uri-title = That isn’t a website address
++permissions-invalid-uri-label = Enter an address like example.com.
+ 
+ ## Exceptions - Tracking Protection
+ 

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# Sval's upstream Firefox base. Both values are read by scripts/fetch-upstream.sh.
+#
+# UPSTREAM_REF is a pinned commit SHA, not a branch. Firefox ESR 153 is the
+# current ESR line as of 2026-09-15; the pinned commit below is the release
+# tag its renovate line names. A branch name (e.g. "esr153") moves
+# underneath us — git apply has no fuzz, so an upstream respin can break the
+# build on a day nobody chose to rebase, and MPL compliance needs to record
+# which exact revision a binary was built from.
+#
+# Point releases on the pinned ESR line are security fixes. Renovate opens a
+# pull request for each one as soon as its FIREFOX_*esr_RELEASE tag appears,
+# moving the tag in the comment below and UPSTREAM_REF together. CI decides
+# whether patches/series still applies.
+#
+# Moving to a new ESR line is the annual rebase, and Renovate leaves it alone.
+# It is a deliberate act: expect patches in patches/series to need rework, and
+# read the ESR release notes first. Move rust-toolchain.toml, and the
+# Dockerfile's default toolchain, to the Rust the new pin builds with.
+#
+# values must not contain spaces — this file is sourced as shell.
+UPSTREAM_REMOTE=https://github.com/mozilla-firefox/firefox.git
+# renovate: datasource=github-tags depName=mozilla-firefox/firefox tag=FIREFOX_153_7_0esr_RELEASE
+UPSTREAM_REF=9aecd40e03ebf6e866e32a0a3001488ed751228d

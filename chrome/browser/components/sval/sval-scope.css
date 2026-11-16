@@ -1,0 +1,218 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The scope dropdown (`SvalScopeMenu`), at host-scoped rules spec §4's
+ * metrics. Its colours are the chrome's popup tokens (`sval-header.css`,
+ * `sval-protection.css`); a surface with tokens of its own, as the element
+ * picker's overlay, sets the `--sval-scope-*` ones.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+.sval-scope {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sval-scope-button {
+  appearance: none;
+  box-sizing: border-box;
+  max-width: calc(100% + 8px);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sval-scope-text, var(--sval-text));
+  cursor: pointer;
+  text-align: start;
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-scope-focus, var(--sval-focus));
+    outline-offset: 2px;
+  }
+}
+
+/* A surface's title: the chevron follows the title's last line, which wraps
+ * at any character. */
+.sval-scope[data-look="title"] > .sval-scope-button {
+  display: inline-block;
+  min-height: 32px;
+  margin-inline-start: -8px;
+  padding: 3px 6px 3px 8px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  & > .sval-scope-chevron {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-inline-start: 6px;
+    vertical-align: -3px;
+    mask-size: 16px;
+  }
+
+  &:hover {
+    background: var(--sval-scope-hover, var(--sval-wash));
+  }
+
+  &[aria-expanded="true"] {
+    background: var(--sval-scope-hover, var(--sval-wash));
+    box-shadow: inset 0 0 0 1px var(--sval-scope-muted, var(--sval-muted));
+  }
+}
+
+/* A pill that finishes a line's words. */
+.sval-scope[data-look="pill"] > .sval-scope-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 6px 0 11px;
+  border-radius: 999px;
+  background: var(--sval-scope-pill, var(--sval-prot-secondary));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+
+  & > .sval-scope-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  & > .sval-scope-chevron {
+    width: 14px;
+    height: 14px;
+    mask-size: 14px;
+  }
+
+  &:hover,
+  &[aria-expanded="true"] {
+    background: var(--sval-scope-pill-hover, var(--sval-prot-secondary-hover));
+  }
+
+  &[aria-expanded="true"] {
+    box-shadow: inset 0 0 0 1px var(--sval-scope-muted, var(--sval-muted));
+  }
+}
+
+.sval-scope-chevron {
+  flex: none;
+  background-color: currentColor;
+  mask-image: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg");
+  mask-position: center;
+  mask-repeat: no-repeat;
+}
+
+.sval-scope-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  width: var(--sval-scope-menu-width, 290px);
+  max-width: calc(100vw - 16px);
+  padding: 6px;
+  border: 1px solid var(--sval-scope-border, var(--sval-wash-strong));
+  border-radius: 16px;
+  background: var(--sval-scope-popup, var(--sval-prot-popup));
+  box-shadow: var(--sval-scope-shadow, var(--sval-popup-shadow));
+  color: var(--sval-scope-text, var(--sval-text));
+  outline: none;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+
+  &[hidden] {
+    display: none;
+  }
+
+  .sval-scope[data-flow="over"] > & {
+    position: absolute;
+    inset-inline-start: 0;
+    top: calc(100% + 4px);
+    z-index: 10;
+  }
+
+  .sval-scope[data-flow="inline"] > & {
+    margin-top: 4px;
+    box-shadow: none;
+  }
+}
+
+.sval-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  &:hover,
+  &[aria-selected="true"],
+  &[data-active] {
+    background: var(--sval-scope-hover, var(--sval-wash));
+  }
+
+  .sval-scope-menu:focus-visible > &[data-active] {
+    outline: 2px solid var(--sval-scope-focus, var(--sval-focus));
+    outline-offset: -2px;
+  }
+}
+
+.sval-scope-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask: url("chrome://browser/content/sval/icons/check.svg") center / 16px no-repeat;
+  visibility: hidden;
+
+  [aria-selected="true"] > & {
+    visibility: visible;
+  }
+}
+
+.sval-scope-words {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sval-scope-name {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.sval-scope-sub {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--sval-scope-muted, var(--sval-muted));
+}
+
+/* The one line naming what the host keeps at the site's scope. */
+.sval-scope-keeps {
+  padding: 0 12px 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--sval-scope-muted, var(--sval-muted));
+}
+
+@media (forced-colors) {
+  .sval-scope-button,
+  .sval-scope-option {
+    forced-color-adjust: auto;
+  }
+
+  .sval-scope-option[aria-selected="true"] {
+    outline: 1px solid CanvasText;
+  }
+}

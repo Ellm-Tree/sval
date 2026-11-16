@@ -1,0 +1,39 @@
+Sval: report WebGPU timestamp-query as unsupported
+
+A new RFPTarget, WebGPUTimestampQueryHidden, leaves timestamp-query out of
+GPUAdapter.features, so a page cannot time GPU work precisely. requestDevice
+then refuses it with the TypeError an adapter that lacks the feature gives,
+which is what a page sees on hardware without it; the not-implemented path
+would name the browser and a Bugzilla URL. Quantising the timings instead
+needs a patch to vendored wgpu-core. The target is Doc-gated, so
+granularOverrides gives a site the feature back.
+
+No chrome API can change what Adapter lists.
+
+diff --git a/dom/webgpu/Adapter.cpp b/dom/webgpu/Adapter.cpp
+index 568509ad2b..1bebedff23 100644
+--- a/dom/webgpu/Adapter.cpp
++++ b/dom/webgpu/Adapter.cpp
+@@ -289,6 +289,11 @@ Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,
+     return ret;
+   }();
+ 
++  // Under WebGPUTimestampQueryHidden the adapter reports timestamp-query as
++  // one that lacks it would, so requestDevice refuses it the same way.
++  const bool hideTimestampQuery = GetParentObject()->ShouldResistFingerprinting(
++      RFPTarget::WebGPUTimestampQueryHidden);
++
+   auto remainingFeatureBits = aInfo->features;
+   auto bitMask = decltype(remainingFeatureBits){0};
+   while (remainingFeatureBits) {
+@@ -305,6 +310,10 @@ Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,
+ 
+     const auto featureForBit = FEATURE_BY_BIT.find(bit);
+     if (featureForBit != FEATURE_BY_BIT.end()) {
++      if (hideTimestampQuery &&
++          featureForBit->second == dom::GPUFeatureName::Timestamp_query) {
++        continue;
++      }
+       mFeatures->Add(featureForBit->second, ignoredRv);
+     } else {
+       // One of two cases:

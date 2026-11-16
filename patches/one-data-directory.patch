@@ -1,0 +1,169 @@
+Sval: one data directory, with no profile database or profile manager
+
+Sval keeps its data in one directory, `Data` in the application's data
+directory (toolkit/profile/SvalDataDirectory.cpp). The profile service knows
+it as its only profile and the default of every install, and never reads or
+writes profiles.ini or installs.ini. That database gives each install
+location a profile of its own, which would start Sval with none of its data
+whenever it runs from another path, and holds the ShowSelector flag that
+opens the profile group selector on every launch.
+
+ShowProfileManager refuses to open, so `-P`, `-ProfileManager` and
+`XRE_RESTART_TO_PROFILE_MANAGER` exit with a message. `--profile <path>`
+still starts Sval on another directory.
+
+A background task that keeps its own profile keeps it in the tasks'
+directory under its install-and-task prefix, with no salt and no record in
+the database.
+
+Selecting the default profile creates its directory, which Firefox's
+database otherwise guarantees exists.
+
+diff --git a/toolkit/profile/moz.build b/toolkit/profile/moz.build
+index 1fcfb6f690..84643fe7d8 100644
+--- a/toolkit/profile/moz.build
++++ b/toolkit/profile/moz.build
+@@ -28,6 +28,7 @@ EXPORTS += ["nsProfileLock.h"]
+ UNIFIED_SOURCES += [
+     "nsProfileLock.cpp",
+     "nsToolkitProfileService.cpp",
++    "SvalDataDirectory.cpp",
+ ]
+ 
+ if CONFIG["OS_ARCH"] == "Darwin" and CONFIG["NIGHTLY_BUILD"]:
+diff --git a/toolkit/profile/nsToolkitProfileService.cpp b/toolkit/profile/nsToolkitProfileService.cpp
+index f624b97e48..10edb1f717 100644
+--- a/toolkit/profile/nsToolkitProfileService.cpp
++++ b/toolkit/profile/nsToolkitProfileService.cpp
+@@ -1058,6 +1058,9 @@ nsresult nsToolkitProfileService::Init() {
+   rv = mInstallDBFile->AppendNative("installs.ini"_ns);
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
++  // Sval reads no profile database: its one profile is its data directory.
++  return InitSvalDataDirectory();
++
+   nsAutoCString buffer;
+ 
+   rv = UpdateFileStats(mProfileDBFile, &mProfileDBExists,
+@@ -1850,54 +1853,14 @@ nsresult nsToolkitProfileService::SelectStartupProfile(
+           getter_AddRefs(rootDir));
+       NS_ENSURE_SUCCESS(rv, rv);
+ 
+-      nsAutoCString buffer;
+-      rv = mProfileDB.GetString("BackgroundTasksProfiles", profilePrefix.get(),
+-                                buffer);
+-      bool exists = false;
+-
+-      if (NS_SUCCEEDED(rv)) {
+-        // We have a record of one!  Use it.
+-        rv = rootDir->Clone(getter_AddRefs(file));
+-        NS_ENSURE_SUCCESS(rv, rv);
+-
+-        rv = file->AppendNative(buffer);
+-        NS_ENSURE_SUCCESS(rv, rv);
+-
+-        rv = file->Exists(&exists);
+-        NS_ENSURE_SUCCESS(rv, rv);
+-
+-        if (!exists) {
+-          printf_stderr(
+-              "Profile directory does not exist, create a new directory");
+-        }
+-      }
+-
+-      if (!exists) {
+-        nsCString saltedProfilePrefix = profilePrefix;
+-        SaltProfileName(saltedProfilePrefix);
+-
+-        nsresult rv = BackgroundTasks::CreateNonEphemeralProfileDirectory(
+-            rootDir, saltedProfilePrefix, getter_AddRefs(file));
+-        if (NS_WARN_IF(NS_FAILED(rv))) {
+-          // In background task mode, NS_ERROR_UNEXPECTED is handled specially
+-          // to exit with a non-zero exit code.
+-          return NS_ERROR_UNEXPECTED;
+-        }
+-        *aDidCreate = true;
+-
+-        // Keep a record of the salted name.  It's okay if this doesn't succeed:
+-        // not great, but it's better for tasks (particularly,
+-        // `backgroundupdate`) to run and not persist state correctly than to
+-        // not run at all.
+-        rv =
+-            mProfileDB.SetString("BackgroundTasksProfiles", profilePrefix.get(),
+-                                 saltedProfilePrefix.get());
+-        (void)NS_WARN_IF(NS_FAILED(rv));
+-
+-        if (NS_SUCCEEDED(rv)) {
+-          rv = Flush();
+-          (void)NS_WARN_IF(NS_FAILED(rv));
+-        }
++      // Each task keeps one directory per install, named for both, with no
++      // record in a profile database.
++      rv = BackgroundTasks::CreateNonEphemeralProfileDirectory(
++          rootDir, profilePrefix, getter_AddRefs(file));
++      if (NS_WARN_IF(NS_FAILED(rv))) {
++        // In background task mode, NS_ERROR_UNEXPECTED is handled specially
++        // to exit with a non-zero exit code.
++        return NS_ERROR_UNEXPECTED;
+       }
+     }
+ 
+@@ -2061,6 +2024,9 @@ nsresult nsToolkitProfileService::SelectStartupProfile(
+   *aWasDefaultSelection = true;
+   mStartupReason = "default"_ns;
+ 
++  rv = EnsureDirExists(mCurrent->mRootDir);
++  NS_ENSURE_SUCCESS(rv, rv);
++
+   // Use the selected profile.
+   mCurrent->GetRootDir(aRootDir);
+   mCurrent->GetLocalDir(aLocalDir);
+@@ -2539,6 +2505,9 @@ static nsCString FindSectionByPath(nsINIParser& aParser,
+ nsresult WriteProfileInfo(nsIFile* profilesDBFile, nsIFile* installDBFile,
+                           const nsCString& installSection,
+                           const CurrentProfileData* profileInfo) {
++  // Sval writes no profile database.
++  return NS_OK;
++
+   nsINIParser profilesIni;
+   nsresult rv = profilesIni.Init(profilesDBFile);
+   NS_ENSURE_SUCCESS(rv, rv);
+@@ -2792,6 +2761,9 @@ nsToolkitProfileService::AsyncFlush(JSContext* aCx, dom::Promise** aPromise) {
+ 
+ nsresult nsToolkitProfileService::FlushData(const nsCString& aProfilesIniData,
+                                             const nsCString& aInstallsIniData) {
++  // Sval writes no profile database.
++  return NS_OK;
++
+   if (GetIsListOutdated()) {
+     return NS_ERROR_DATABASE_CHANGED;
+   }
+diff --git a/toolkit/profile/nsToolkitProfileService.h b/toolkit/profile/nsToolkitProfileService.h
+index 1479a43221..5bab866bdd 100644
+--- a/toolkit/profile/nsToolkitProfileService.h
++++ b/toolkit/profile/nsToolkitProfileService.h
+@@ -111,6 +111,7 @@ class nsToolkitProfileService final : public nsIToolkitProfileService,
+   ~nsToolkitProfileService();
+ 
+   nsresult Init();
++  nsresult InitSvalDataDirectory();
+ 
+   nsresult CreateTimesInternal(nsIFile* profileDir, const nsACString& aSource);
+   void GetProfileByDir(nsIFile* aRootDir, nsIFile* aLocalDir,
+diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
+index 07c7961053..390aae3196 100644
+--- a/toolkit/xre/nsAppRunner.cpp
++++ b/toolkit/xre/nsAppRunner.cpp
+@@ -3147,6 +3147,12 @@ static ReturnAbortOnError ShowProfileDialog(
+ 
+ static ReturnAbortOnError ShowProfileManager(
+     nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative) {
++  // Sval has one profile, its data directory, and no profile manager.
++  PR_fprintf(PR_STDERR,
++             "Error: Sval has no profile manager. Use --profile <path> to "
++             "start on another directory.\n");
++  return NS_ERROR_ABORT;
++
+   static const char kProfileManagerURL[] =
+       "chrome://mozapps/content/profile/profileSelection.xhtml";
+   static const char kTelemetryEnv[] = "XRE_RESTARTED_BY_PROFILE_MANAGER=1";

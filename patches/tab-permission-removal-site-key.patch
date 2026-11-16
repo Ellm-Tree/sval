@@ -1,0 +1,41 @@
+Sval: a removed tab-scoped DENY reaches the processes holding its site
+
+backport-bug-2064718-tab-permission-removal-every-process.patch sends a
+removal to every process that NeedsPermissionsUpdate for the permission's
+key, which is the origin's. A DENY is stored for the whole site
+(PermissionManager::AddBrowserPermissionInternal), and
+TransmitBrowserPermissionsForPrincipal hands it to a process showing any
+origin of the site, under that origin. A process that showed only another
+origin of the site holds the site's key and not the removed permission's
+origin key, so upstream's fix leaves its copy of the DENY in place, and it
+applies again on going back there. The removal also goes to the processes
+that hold the site's key.
+
+The selection sits inside ForwardBrowserPermissionToChild; no chrome API can
+send a permission change to a content process.
+
+diff --git a/extensions/permissions/PermissionManager.cpp b/extensions/permissions/PermissionManager.cpp
+index d55e9a7da4..91024de98a 100644
+--- a/extensions/permissions/PermissionManager.cpp
++++ b/extensions/permissions/PermissionManager.cpp
+@@ -4585,11 +4585,19 @@ void PermissionManager::ForwardBrowserPermissionToChild(
+   if (aIsRemoval) {
+     nsAutoCString permissionKey;
+     GetKeyForPermission(aPrincipal, aType, permissionKey);
++    // Sval: a DENY is stored for the whole site (AddBrowserPermissionInternal),
++    // so TransmitBrowserPermissionsForPrincipal hands it to a process showing
++    // any origin of the site. Such a process holds the site's key and not
++    // this origin's.
++    nsAutoCString siteKey;
++    GetKeyForPrincipal(aPrincipal, IsOAForceStripPermission(aType), true,
++                       siteKey);
+ 
+     nsTArray<dom::ContentParent*> cplist;
+     dom::ContentParent::GetAll(cplist);
+     for (dom::ContentParent* cp : cplist) {
+-      if (cp->NeedsPermissionsUpdate(permissionKey)) {
++      if (cp->NeedsPermissionsUpdate(permissionKey) ||
++          cp->NeedsPermissionsUpdate(siteKey)) {
+         (void)cp->SendSetBrowserPermission(origin, nsCString(aType), aAction,
+                                            aBrowserId, aIsRemoval);
+       }

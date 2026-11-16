@@ -1,0 +1,140 @@
+Sval: DevTools keeps its process actors registered until every process has answered a watcher's destruction
+
+Closing a page's toolbox, or the Browser Console, destroys its watcher. The
+watcher sends destroyWatcher to every process's DevTools actor and, as the
+last watcher, unregisters those actors at once. Each process keeps sending
+while it tears the watcher's targets down (targetDestroyed, resource packets,
+the page's own console messages), and every message that arrives after the
+unregistering logs "NotFoundError: No such JSProcessActor 'DevToolsProcess'"
+(or 'BrowserToolboxDevToolsProcess') from JSActorManager::ReceiveRawMessage.
+
+destroyWatcher becomes a query, which each process answers after the
+messages it sent while destroying, and the registry unregisters the actors
+once every answer is in, if no watcher registered meanwhile. A process that
+exits answers by rejecting the query; a frozen one keeps the actors
+registered until it answers, which costs nothing, where a timeout would
+bring the error back. Each parent-side actor forgets the watcher when it
+sends the query, while the watcher's connection is still open, since the
+actor now outlives it, and a watcher that takes the actor up meanwhile
+clears its destroyed state so didDestroy still cleans that watcher up. Past
+XPCOM shutdown the registry leaves the actors registered, because
+JSActorService::UnregisterProcessActor dereferences the in-process actors,
+which are gone by then. The watcher, its registry and the process actors are
+Mozilla's, so no chrome API reaches them.
+
+diff --git a/devtools/server/actors/watcher.js b/devtools/server/actors/watcher.js
+index 694515e94e..c041f8b07d 100644
+--- a/devtools/server/actors/watcher.js
++++ b/devtools/server/actors/watcher.js
+@@ -191,13 +191,20 @@ exports.WatcherActor = class WatcherActor extends Actor {
+     // Only try to notify content processes if the watcher was in the registry.
+     // Otherwise it means that it wasn't connected to any process and the JS Process Actor
+     // wouldn't be registered.
++    // Each process answers once it has destroyed this watcher's targets, after
++    // every message it sent while doing so, and the JS Process Actors stay
++    // registered until then: a message reaching an unregistered actor logs
++    // NotFoundError (JSActorManager::ReceiveRawMessage).
++    const destroyed = [];
+     if (ParentProcessWatcherRegistry.getWatcher(this.actorID)) {
+       // Emit one IPC message on destroy to all the processes
+       const domProcesses = ChromeUtils.getAllDOMProcesses();
+       for (const domProcess of domProcesses) {
+-        domProcess.getActor(this._jsActorName).destroyWatcher({
+-          watcherActorID: this.actorID,
+-        });
++        destroyed.push(
++          domProcess.getActor(this._jsActorName).destroyWatcher({
++            watcherActorID: this.actorID,
++          })
++        );
+       }
+     }
+ 
+@@ -207,7 +214,10 @@ exports.WatcherActor = class WatcherActor extends Actor {
+       Resources.getParentProcessResourceTypes(Object.values(Resources.TYPES))
+     );
+ 
+-    ParentProcessWatcherRegistry.unregisterWatcher(this.actorID);
++    ParentProcessWatcherRegistry.unregisterWatcher(
++      this.actorID,
++      Promise.allSettled(destroyed)
++    );
+ 
+     // In case the watcher actor is leaked, prevent leaking the browser window
+     this._browserElement = null;
+diff --git a/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs b/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
+index 8229bea142..ec695abd54 100644
+--- a/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
++++ b/devtools/server/actors/watcher/ParentProcessWatcherRegistry.sys.mjs
+@@ -231,10 +231,26 @@ export const ParentProcessWatcherRegistry = {
+    * The watcher would be automatically unregistered from removeWatcherEntry,
+    * if we remove all entries. But we aren't removing all breakpoints.
+    * So here, we force clearing any reference to the watcher actor when it destroys.
++   *
++   * @param String watcherActorID
++   * @param Promise processesDone
++   *        Settles once every process has answered the watcher's destruction.
++   *        The JS Actors are unregistered after it, as messages sent before
++   *        those answers still have to reach them.
+    */
+-  unregisterWatcher(watcherActorID) {
++  async unregisterWatcher(watcherActorID, processesDone) {
+     sessionDataByWatcherActor.delete(watcherActorID);
+     watcherActors.delete(watcherActorID);
++    await processesDone;
++    // Past XPCOM shutdown the in-process actors are gone, and
++    // JSActorService::UnregisterProcessActor dereferences them.
++    if (
++      Services.startup.isInOrBeyondShutdownPhase(
++        Ci.nsIAppStartup.SHUTDOWN_PHASE_XPCOMSHUTDOWN
++      )
++    ) {
++      return;
++    }
+     this.maybeUnregisterJSActors();
+   },
+ 
+diff --git a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+index a57ff614ea..80e288bf21 100644
+--- a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
++++ b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+@@ -113,10 +113,25 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+     });
+   }
+ 
++  /**
++   * Request the content process to destroy all the targets of a watcher.
++   * Resolves once it has, so every message it sent meanwhile has arrived,
++   * or once the process is gone, when nothing more can arrive from it.
++   * The JS Process Actor stays registered until then, so a frozen process
++   * holds it, at no cost, rather than have its late messages log
++   * NotFoundError; this skips sendQuery's frozen-process timeout.
++   * The watcher is forgotten here at once, while its connection is still
++   * open, as this actor may outlive it until the JS Process Actor is
++   * unregistered.
++   */
+   destroyWatcher({ watcherActorID }) {
+-    return this.sendAsyncMessage("DevToolsProcessParent:destroyWatcher", {
+-      watcherActorID,
+-    });
++    const watcher = ParentProcessWatcherRegistry.getWatcher(watcherActorID);
++    if (watcher) {
++      this.#unregisterWatcher(watcher);
++    }
++    return super
++      .sendQuery("DevToolsProcessParent:destroyWatcher", { watcherActorID })
++      .catch(() => {});
+   }
+ 
+   /**
+@@ -137,6 +152,10 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+     // communication between the parent process DevToolsServer
+     // and the content process.
+     if (!this.#watchers.get(watcher.watcherConnectionPrefix)) {
++      // This actor outlives its last watcher until the JS Process Actor is
++      // unregistered, and a new watcher may take it up meanwhile; didDestroy
++      // has to clean that watcher up.
++      this.#destroyed = false;
+       connection.on("closed", this.#onConnectionClosed);
+ 
+       // Create a js-window-actor based transport.

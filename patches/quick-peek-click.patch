@@ -1,0 +1,49 @@
+Sval: a Quick Peek takes the click the user chose for it, in Firefox's place
+
+Every click on a link with a modifier reaches ClickHandlerParent, which
+opens it where BrowserUtils.whereToOpenLink says. The click that opens a
+link in a Quick Peek can be one Firefox opens a tab or a window for, such as
+Command-Option-click, so this asks SvalQuickPeek first and opens the link as
+Firefox would only when no Quick Peek opened. A listener of Sval's own on
+chromelinkclick cannot stop Firefox's: both listen to the same event, in
+no order either can rely on. ClickHandlerChild also sends a page's own
+scripted click while the page has the user's activation, so it says
+whether the click is the user's, which a Quick Peek requires.
+
+diff --git a/browser/actors/ClickHandlerChild.sys.mjs b/browser/actors/ClickHandlerChild.sys.mjs
+index 3d8c409c7e..4469eeee80 100644
+--- a/browser/actors/ClickHandlerChild.sys.mjs
++++ b/browser/actors/ClickHandlerChild.sys.mjs
+@@ -112,6 +112,8 @@ export class ClickHandlerChild extends JSWindowActorChild {
+       ctrlKey: event.ctrlKey,
+       metaKey: event.metaKey,
+       altKey: event.altKey,
++      // Sval opens a Quick Peek for the user's own click alone.
++      isTrusted: event.isTrusted,
+       href: null,
+       title: null,
+       policyContainer,
+diff --git a/browser/actors/ClickHandlerParent.sys.mjs b/browser/actors/ClickHandlerParent.sys.mjs
+index c06993a8f5..3b4ca1ad56 100644
+--- a/browser/actors/ClickHandlerParent.sys.mjs
++++ b/browser/actors/ClickHandlerParent.sys.mjs
+@@ -9,6 +9,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
+   PlacesUIUtils: "moz-src:///browser/components/places/PlacesUIUtils.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
++  SvalQuickPeek: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
+   WebNavigationFrames: "resource://gre/modules/WebNavigationFrames.sys.mjs",
+ });
+ 
+@@ -98,6 +99,11 @@ export class ClickHandlerParent extends JSWindowActorParent {
+       /* Skip invalid URIs. */
+     }
+ 
++    // The click the user chose for a Quick Peek opens one where it can.
++    if (lazy.SvalQuickPeek.openClick(this.manager, data)) {
++      return;
++    }
++
+     // This part is based on handleLinkClick.
+     var where = lazy.BrowserUtils.whereToOpenLink(data);
+     if (where == "current") {

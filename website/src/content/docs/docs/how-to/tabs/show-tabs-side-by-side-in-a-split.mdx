@@ -1,0 +1,82 @@
+---
+title: Show tabs side by side in a Split
+description: Put two to four tabs next to each other in one window, then resize, reorder, or separate them.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+A Split shows up to four tabs side by side in one window. In the Workspace, a
+Split is one row with a tile for each tab.
+
+You're comparing two laptops on two shop pages and want both in view.
+
+<Screenshot name="docs-split" alt="Linear's pricing page and Vercel's pricing page side by side in a Split, with the Split's row in the Pricing pages group" />
+
+## Split two tabs you have open
+
+1. In the Workspace, select the first tab.
+2. Option-click (Alt-click on Windows and Linux) the second tab's row.
+
+The two tabs show side by side, with the one you were viewing on the left.
+
+## Split a tab with one you pick
+
+1. In the Workspace, right-click the tab, then choose **Create Split**.
+2. In the new pane, choose the tab to show next to the first one.
+
+<kbd>⌃+</kbd> (<kbd>Ctrl+Shift+Plus</kbd> on Windows and Linux) does the same for the tab you're
+viewing. On a US keyboard, <kbd>⌃+</kbd> is <kbd>⌃⇧=</kbd>.
+
+## Open a link in a Split
+
+1. On the page, right-click the link, then choose **Open Link in Split View**.
+
+The link opens next to the page you're on.
+
+## Details
+
+- A Split holds up to four tabs. While you view a Split that has room,
+  Option-click another tab to add it as the rightmost pane. <kbd>⌃+</kbd>
+  also adds a pane, and you pick the tab to show in it.
+<Until v="0.1.0-rc.10">
+
+- You can also drag one tab's row onto the right end of another tab's row.
+  While you're over that spot, the row reads **Create Split**. Over a
+  Split's row, it reads **Join Split**. When you drag a Split, it reads
+  **Merge Splits**. A narrow Workspace panel has no such spot.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- You can also drag one tab's row onto the right half of another tab's row.
+  While you're over that half, it fills with color and reads **Create
+  Split**. Over a Split's row, the half reads **Join Split**. When you
+  drag a Split, the half reads **Merge Splits**. In a narrow Workspace
+  panel, the row shows only the **New group** half.
+
+</Since>
+
+- The new pane lists the tabs of this Workspace that aren't in a Split.
+- To add a tab to a Split in this Workspace that has room, choose
+  **Add to Split** in the tab's menu.
+- Drag the divider between two panes to resize them. Sval keeps the sizes
+  after a restart. The sizes sync to your other devices along with the
+  Split.
+- Right-click a pane's tile in the Workspace to find **Move Pane Left**,
+  **Move Pane Right**, **Rename Split…**, **Separate**, and **Close All**.
+  In a Split of two tabs, Close All reads **Close Both**. <kbd>Alt+←</kbd>
+  and <kbd>Alt+→</kbd> also move the focused pane.
+- **Separate.** The Split turns back into ordinary tabs, in the same place.
+- When you close one tab in a Split of two, the other tab is separated.
+- A Split without a name shows the titles of its pages. To name a Split,
+  use **Rename Split…**. An empty name brings back the titles.
+- In a Quick Peek, **Open in Split** shows the page next to the tab it came from.
+- Panes only sit side by side. Sval has no top-and-bottom or grid layout.
+- You can't pin a tab in a Split.
+
+## Related pages
+
+- [Open a link in a Quick Peek](/docs/how-to/tabs/open-a-link-in-a-quick-peek/)
+- [Tabs in a Workspace](/docs/reference/tabs/)

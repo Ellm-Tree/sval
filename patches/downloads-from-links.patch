@@ -1,0 +1,52 @@
+Sval: a link from another app that is a download leaves no peek or tab
+
+A link from another app opens in a peek, or in a tab Sval opens for it, and
+when Gecko hands its first load to the external helper app service that
+window or tab is left empty: Gecko closes one only when it has an opener to
+fall back to (MaybeCloseWindowHelper), which such a link never has. The
+download's start is where Sval learns of it with the browsing context it
+came from (SvalLinkDownloads.handOver), and the announcement waits for the
+peek to close and an ordinary window to be in front, since the panel opens
+only in the active window. No chrome API reaches this: the announcement is
+made inside DownloadsDataCtor, as the download's first change arrives, with
+no hook before it.
+
+diff --git a/browser/components/downloads/DownloadsCommon.sys.mjs b/browser/components/downloads/DownloadsCommon.sys.mjs
+index 1584b53142..0290cf68a4 100644
+--- a/browser/components/downloads/DownloadsCommon.sys.mjs
++++ b/browser/components/downloads/DownloadsCommon.sys.mjs
+@@ -31,6 +31,8 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   SvalDownloadWorkspaces:
+     "moz-src:///browser/components/sval/SvalDownloadWorkspaces.sys.mjs",
++  SvalLinkDownloads:
++    "moz-src:///browser/components/sval/SvalLinkDownloads.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   DownloadHistory: "resource://gre/modules/DownloadHistory.sys.mjs",
+   DownloadUtils: "resource://gre/modules/DownloadUtils.sys.mjs",
+@@ -930,11 +932,20 @@ DownloadsDataCtor.prototype = {
+ 
+     if (!download.newDownloadNotified) {
+       download.newDownloadNotified = true;
+-      this._notifyDownloadEvent(
+-        "start",
+-        { openDownloadsListOnStart: download.openDownloadsListOnStart },
+-        download
+-      );
++      const announce = () =>
++        this._notifyDownloadEvent(
++          "start",
++          { openDownloadsListOnStart: download.openDownloadsListOnStart },
++          download
++        );
++      // Sval: a peek or tab a link from another app opened, whose first load
++      // became this download, closes before it is announced.
++      const handedOver = lazy.SvalLinkDownloads.handOver(download);
++      if (handedOver) {
++        handedOver.catch(console.error).then(announce);
++      } else {
++        announce();
++      }
+     }
+   },
+ 

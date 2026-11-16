@@ -1,0 +1,291 @@
+Sval: the RFP window-rounding tests read the content area as it settles
+
+Backport of Mozilla's Bug 2054792 (mozilla-central a2152ea74bfb, Firefox
+155), tests only, unchanged. It includes the change Bug 1710902
+(mozilla-central 524bf09b055a, Firefox 154) made to the same two files,
+which replaces BrowserTestUtils.waitForCondition with
+TestUtils.waitForCondition and which Bug 2054792's hunks build on. ESR 153
+carries neither.
+browser_dynamical_window_rounding.js compared the content read after a
+resize with a rounding of the browser container's size read once before it,
+and on Linux resized again until the container matched the requested outer
+width, which it never does when the chrome beside the page takes part of the
+window's width, as Sval's workspace panel does. The test re-reads the
+container in its wait and waits for the rounding to settle, on every
+platform. browser_roundedWindow_newWindow.js asserts that RFP's spoofed
+screen, available screen and inner sizes are one positive size, where it
+re-derived a pixel size that holds only for small chrome.
+Drop this patch when the upstream pin reaches Firefox 155.
+
+diff --git a/browser/components/resistfingerprinting/test/browser/browser_dynamical_window_rounding.js b/browser/components/resistfingerprinting/test/browser/browser_dynamical_window_rounding.js
+index f4665379de..c19d83d518 100644
+--- a/browser/components/resistfingerprinting/test/browser/browser_dynamical_window_rounding.js
++++ b/browser/components/resistfingerprinting/test/browser/browser_dynamical_window_rounding.js
+@@ -71,26 +71,20 @@ function checkForDefaultSetting(
+   let targetWidth = RFPHelper.steppedSize(aRealWidth, true);
+   let targetHeight = RFPHelper.steppedSize(aRealHeight);
+ 
+-  // This platform-specific code is explained in the large comment below.
+-  if (getPlatform() != "linux") {
+-    ok(
+-      handleOSFuzziness(aContentWidth, targetWidth),
+-      `Default Dimensions: The content window width is correctly rounded into. ${aRealWidth}px -> ${aContentWidth}px should equal ${targetWidth}px`
+-    );
+-
+-    ok(
+-      handleOSFuzziness(aContentHeight, targetHeight),
+-      `Default Dimensions: The content window height is correctly rounded into. ${aRealHeight}px -> ${aContentHeight}px should equal ${targetHeight}px`
+-    );
+-
+-    // Using ok() above will cause Win/Mac to fail on even the first test, we don't need to repeat it, return true so waitForCondition ends
+-    return true;
+-  }
+-  // Returning true or false depending on if the test succeeded will cause Linux to repeat until it succeeds.
+-  return (
+-    handleOSFuzziness(aContentWidth, targetWidth) &&
+-    handleOSFuzziness(aContentHeight, targetHeight)
+-  );
++  return {
++    widthMatches: handleOSFuzziness(aContentWidth, targetWidth),
++    heightMatches: handleOSFuzziness(aContentHeight, targetHeight),
++    assert() {
++      ok(
++        this.widthMatches,
++        `Default Dimensions: The content window width is correctly rounded into. ${aRealWidth}px -> ${aContentWidth}px should equal ${targetWidth}px`
++      );
++      ok(
++        this.heightMatches,
++        `Default Dimensions: The content window height is correctly rounded into. ${aRealHeight}px -> ${aContentHeight}px should equal ${targetHeight}px`
++      );
++    },
++  };
+ }
+ 
+ function test_letterboxing_css_rule() {
+@@ -139,37 +133,21 @@ async function test_dynamical_window_rounding(aWindow, aURL, aCheckFunc) {
+         `${caseString} Resizing (currently ${containerWidth}x${containerHeight})`
+       );
+ 
++      // Resizing is asynchronous. On Linux an onresize can fire reporting an
++      // earlier requested dimension (see 1407366#53); previously the test tried
++      // to redo the resize when the browser container didn't match the
++      // requested width, but under browser.nova.enabled the container can never
++      // equal the requested outer width (the chrome consumes a different amount
++      // of space), so that redo looped forever with no size change and timed
++      // out (bug 2054792). We instead resolve on the first onresize and let the
++      // waitForCondition below cope with stale/intermediate sizes by re-reading
++      // both the container and the content until the rounding settles.
+       aWindow.onresize = () => {
+         ({ containerWidth, containerHeight } = getContainerSize(tab));
+         info(
+           `${caseString} Resized (currently ${containerWidth}x${containerHeight})`
+         );
+-        if (getPlatform() == "linux" && containerWidth != width) {
+-          /*
+-           * We observed frequent test failures that resulted from receiving an onresize
+-           * event where the browser was resized to an earlier requested dimension. This
+-           * resize event happens on Linux only, and is an artifact of the asynchronous
+-           * resizing. (See more discussion on 1407366#53)
+-           *
+-           * We cope with this problem in two ways.
+-           *
+-           * 1: If we detect that the browser was resized to the wrong value; we
+-           *    redo the resize. (This is the lines of code immediately following this
+-           *    comment)
+-           * 2: We repeat the test until it works using waitForCondition(). But we still
+-           *    test Win/Mac more thoroughly: they do not loop in waitForCondition more
+-           *    than once, and can fail the test on the first attempt (because their
+-           *    check() functions use ok() while on Linux, we do not all ok() and instead
+-           *    rely on waitForCondition to fail).
+-           *
+-           * The logging statements in this test, and RFPHelper.sys.mjs, help narrow down and
+-           * illustrate the issue.
+-           */
+-          info(`${caseString} We hit the weird resize bug. Resize it again.`);
+-          aWindow.resizeTo(width, height);
+-        } else {
+-          resolve();
+-        }
++        resolve();
+       };
+       aWindow.resizeTo(width, height);
+     });
+@@ -180,8 +158,17 @@ async function test_dynamical_window_rounding(aWindow, aURL, aCheckFunc) {
+     );
+     await promiseRounding;
+ 
++    // The container and the content viewport can settle over more than one
++    // layout pass (e.g. under browser.nova.enabled the content area sits in a
++    // flex container whose size lags the window resize by a frame, so
++    // letterboxing rounds more than once before reaching its final size; see
++    // bug 2054792). Re-read the container on every iteration and compare it
++    // against a freshly-read content size so both come from the same settled
++    // layout generation, then wait for the rounding to reach its fixed point.
+     info(`${caseString} Get innerWidth/Height from the content.`);
+-    await BrowserTestUtils.waitForCondition(async () => {
++    let result;
++    await TestUtils.waitForCondition(async () => {
++      ({ containerWidth, containerHeight } = getContainerSize(tab));
+       let { contentWidth, contentHeight } = await SpecialPowers.spawn(
+         tab.linkedBrowser,
+         [],
+@@ -193,14 +180,21 @@ async function test_dynamical_window_rounding(aWindow, aURL, aCheckFunc) {
+         }
+       );
+ 
+-      info(`${caseString} Check the result.`);
+-      return aCheckFunc(
++      info(
++        `${caseString} Check the result (container ${containerWidth}x${containerHeight}, content ${contentWidth}x${contentHeight}).`
++      );
++      result = aCheckFunc(
+         contentWidth,
+         contentHeight,
+         containerWidth,
+         containerHeight
+       );
+-    }, "Default Dimensions: The content window width is correctly rounded into.");
++      return result.widthMatches && result.heightMatches;
++    }, "The content window is correctly rounded into.").catch(() => {});
++
++    // Assert the final result once, so a case that never settles reports a
++    // meaningful width/height mismatch rather than a bare timeout.
++    result.assert();
+   }
+ 
+   BrowserTestUtils.removeTab(tab);
+@@ -249,26 +243,20 @@ async function test_customize_width_and_height(aWindow, aURL) {
+       }
+     }
+ 
+-    // This platform-specific code is explained in the large comment above.
+-    if (getPlatform() != "linux") {
+-      ok(
+-        handleOSFuzziness(aContentWidth, targetDimensions.width),
+-        `Custom Dimension: The content window width is correctly rounded into. ${aRealWidth}px -> ${aContentWidth}px should equal ${targetDimensions.width}`
+-      );
+-
+-      ok(
+-        handleOSFuzziness(aContentHeight, targetDimensions.height),
+-        `Custom Dimension: The content window height is correctly rounded into. ${aRealHeight}px -> ${aContentHeight}px should equal ${targetDimensions.height}`
+-      );
+-
+-      // Using ok() above will cause Win/Mac to fail on even the first test, we don't need to repeat it, return true so waitForCondition ends
+-      return true;
+-    }
+-    // Returning true or false depending on if the test succeeded will cause Linux to repeat until it succeeds.
+-    return (
+-      handleOSFuzziness(aContentWidth, targetDimensions.width) &&
+-      handleOSFuzziness(aContentHeight, targetDimensions.height)
+-    );
++    return {
++      widthMatches: handleOSFuzziness(aContentWidth, targetDimensions.width),
++      heightMatches: handleOSFuzziness(aContentHeight, targetDimensions.height),
++      assert() {
++        ok(
++          this.widthMatches,
++          `Custom Dimension: The content window width is correctly rounded into. ${aRealWidth}px -> ${aContentWidth}px should equal ${targetDimensions.width}`
++        );
++        ok(
++          this.heightMatches,
++          `Custom Dimension: The content window height is correctly rounded into. ${aRealHeight}px -> ${aContentHeight}px should equal ${targetDimensions.height}`
++        );
++      },
++    };
+   };
+ 
+   await test_dynamical_window_rounding(aWindow, aURL, checkDimension);
+diff --git a/browser/components/resistfingerprinting/test/browser/browser_roundedWindow_newWindow.js b/browser/components/resistfingerprinting/test/browser/browser_roundedWindow_newWindow.js
+index 80676e549d..fc13f69559 100644
+--- a/browser/components/resistfingerprinting/test/browser/browser_roundedWindow_newWindow.js
++++ b/browser/components/resistfingerprinting/test/browser/browser_roundedWindow_newWindow.js
+@@ -5,9 +5,6 @@
+ 
+ const CC = Components.Constructor;
+ 
+-let gMaxAvailWidth;
+-let gMaxAvailHeight;
+-
+ add_setup(async function () {
+   await SpecialPowers.pushPrefEnv({
+     set: [
+@@ -15,12 +12,6 @@ add_setup(async function () {
+       ["privacy.resistFingerprinting", true],
+     ],
+   });
+-
+-  // Calculate the maximum available size.
+-  let maxAvailSize = await calcMaximumAvailSize();
+-
+-  gMaxAvailWidth = maxAvailSize.maxAvailWidth;
+-  gMaxAvailHeight = maxAvailSize.maxAvailHeight;
+ });
+ 
+ add_task(async function test_new_window() {
+@@ -33,32 +24,40 @@ add_task(async function test_new_window() {
+     TEST_PATH + "file_dummy.html"
+   );
+ 
+-  await SpecialPowers.spawn(
+-    tab.linkedBrowser,
+-    [{ gMaxAvailWidth, gMaxAvailHeight }],
+-    async function (input) {
+-      is(
+-        content.screen.width,
+-        input.gMaxAvailWidth,
+-        "The screen.width has a correct rounded value"
+-      );
+-      is(
+-        content.screen.height,
+-        input.gMaxAvailHeight,
+-        "The screen.height has a correct rounded value"
+-      );
+-      is(
+-        content.innerWidth,
+-        input.gMaxAvailWidth,
+-        "The window.innerWidth has a correct rounded value"
+-      );
+-      is(
+-        content.innerHeight,
+-        input.gMaxAvailHeight,
+-        "The window.innerHeight has a correct rounded value"
+-      );
+-    }
+-  );
++  // When resisting fingerprinting, the content window can't observe the real
++  // screen: screen and screen.avail are collapsed onto the content viewport, so
++  // screen.width/height, screen.availWidth/Height and innerWidth/Height all
++  // report the same value. We assert that invariant instead of an exact pixel
++  // size, because the actual size depends on how much space the chrome leaves
++  // for the content area, which varies by platform and by chrome configuration
++  // (e.g. browser.nova.enabled), see bug 2054792.
++  await SpecialPowers.spawn(tab.linkedBrowser, [], async function () {
++    let { screen } = content;
++
++    is(
++      screen.width,
++      content.innerWidth,
++      "screen.width is spoofed to the content viewport width"
++    );
++    is(
++      screen.height,
++      content.innerHeight,
++      "screen.height is spoofed to the content viewport height"
++    );
++    is(
++      screen.availWidth,
++      screen.width,
++      "screen.availWidth is spoofed to screen.width"
++    );
++    is(
++      screen.availHeight,
++      screen.height,
++      "screen.availHeight is spoofed to screen.height"
++    );
++
++    Assert.greater(screen.width, 0, "The spoofed width is positive");
++    Assert.greater(screen.height, 0, "The spoofed height is positive");
++  });
+ 
+   BrowserTestUtils.removeTab(tab);
+   await BrowserTestUtils.closeWindow(win);

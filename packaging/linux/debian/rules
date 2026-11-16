@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+%:
+	dh $@
+
+override_dh_strip_nondeterminism:
+	dh_strip_nondeterminism -Xxpi
+
+override_dh_strip:
+	:
+
+# The repackager names the desktop entry after the package. Its file name is
+# the application id the browser gives the desktop portal, notifications and
+# MPRIS: the distribution id followed by the remoting name.
+override_dh_install:
+	dh_install
+	mv debian/sval/usr/share/applications/sval.desktop \
+		debian/sval/usr/share/applications/app.sval.sval.desktop

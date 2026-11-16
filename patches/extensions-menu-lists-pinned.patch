@@ -1,0 +1,86 @@
+Sval: the extensions menu lists pinned extensions
+
+Firefox lists an extension with a toolbar button only while its button sits
+in the menu, so a pinned extension leaves the menu and its controls, Pin to
+Toolbar among them. SvalExtensionsMenu gives it a row in the menu's list
+that names its button, and the row's menu pins and unpins by that name.
+The button opens the menu even when every extension is pinned, where
+Firefox would open the extensions list in its add-ons page instead.
+
+diff --git a/browser/base/content/browser-addons.js b/browser/base/content/browser-addons.js
+index efe5cc2113..48ae281502 100644
+--- a/browser/base/content/browser-addons.js
++++ b/browser/base/content/browser-addons.js
+@@ -19,6 +19,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   PERMISSION_L10N: "resource://gre/modules/ExtensionPermissionMessages.sys.mjs",
+   SITEPERMS_ADDON_TYPE:
+     "resource://gre/modules/addons/siteperms-addon-utils.sys.mjs",
++  SvalExtensionsMenu:
++    "moz-src:///browser/components/sval/SvalExtensionsMenu.sys.mjs",
+   getSitePermsInstallPromptStringIds:
+     "resource://gre/modules/addons/siteperms-addon-utils.sys.mjs",
+ });
+@@ -2440,11 +2442,13 @@ var gUnifiedExtensions = {
+       item.setExtension(policy.extension);
+       list.appendChild(item);
+     }
++    // Sval: pinned extensions stay listed.
++    lazy.SvalExtensionsMenu.listPinned(window, list);
+ 
+     const emptyStateBox = panelview.querySelector(
+       "#unified-extensions-empty-state"
+     );
+-    if (this.hasExtensionsInPanel(policies)) {
++    if (this.hasExtensionsInPanel(policies) || list.childElementCount) {
+       // Any of the extension lists are non-empty.
+       emptyStateBox.hidden = true;
+     } else if (this.isPrivateWindowMissingExtensionsWithoutPBMAccess()) {
+@@ -2736,21 +2740,8 @@ var gUnifiedExtensions = {
+           return;
+         }
+ 
+-        // The button should directly open `about:addons` when the user does not
+-        // have any active extensions listed in the unified extensions panel,
+-        // and no alternative content is available for display in the panel.
+-        const policies = this.getActivePolicies();
+-        if (
+-          policies.length &&
+-          !this.hasExtensionsInPanel(policies) &&
+-          !this.isPrivateWindowMissingExtensionsWithoutPBMAccess() &&
+-          !(await this.getDisabledExtensionsInfo()).isAnyDisabled
+-        ) {
+-          // This may happen if the user has pinned all of their extensions.
+-          // In that case, the extensions panel is empty.
+-          await BrowserAddonUI.openAddonsMgr("addons://list/extension");
+-          return;
+-        }
++        // Sval: the panel lists pinned extensions too (SvalExtensionsMenu), so
++        // it is never empty while an extension is active.
+       }
+ 
+       this.blocklistAttentionInfo =
+@@ -2948,7 +2939,9 @@ var gUnifiedExtensions = {
+ 
+   _getWidgetId(menu) {
+     const { triggerNode } = menu;
+-    return triggerNode.closest(".unified-extensions-item")?.id;
++    const item = triggerNode.closest(".unified-extensions-item");
++    // Sval: a pinned extension's row names its button.
++    return item?.dataset.widgetId || item?.id;
+   },
+ 
+   async onPinToToolbarChange(menu, event) {
+@@ -2977,6 +2970,13 @@ var gUnifiedExtensions = {
+     }
+ 
+     this.pinToToolbar(widgetId, shouldPinToToolbar);
++    // Sval: the open menu lists the extension where its button went.
++    const list = document.querySelector(
++      "#unified-extensions-view .unified-extensions-list"
++    );
++    if (list && this._panel?.state === "open") {
++      lazy.SvalExtensionsMenu.listPinned(window, list);
++    }
+   },
+ 
+   pinToToolbar(widgetId, shouldPinToToolbar) {

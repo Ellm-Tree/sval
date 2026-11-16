@@ -1,0 +1,69 @@
+---
+title: Run a command from the Launcher
+description: Type part of a command's name to make a Workspace, move a tab, split, change site settings, or open a Settings page.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+Besides opening pages, the Launcher runs Sval's commands. Type a few
+letters of what you want to do, then pick the command from the list.
+
+You're reading an article in Home and want it in Work instead, without
+reaching for the mouse.
+
+<Screenshot name="docs-launcher-command" alt="The Launcher over an article, with move typed and Move this tab to… listed under Commands" />
+
+## Steps
+
+1. Press <kbd>⌘L</kbd> (<kbd>Ctrl+L</kbd> on Windows and Linux).
+2. Type part of the command's name, like "move" or "new wor".
+3. Under Commands, select the command.
+
+The command runs on the tab you're on.
+
+## Commands that ask you to choose
+
+Some commands need one more choice. **Move this tab to…** asks for a
+Workspace, and **Split with…** asks for a tab.
+
+1. Select **Move this tab to…**.
+2. In the list, select the Workspace.
+
+To make a Workspace while you move the tab, type the new Workspace's
+name, then select
+**New Workspace…** at the end of the list.
+
+## Details
+
+- You can find a command by other words for it too. "Bookmark" finds Add to
+  Favorites, "unload" finds Put this tab to sleep, and "preferences" finds
+  the Settings pages.
+
+<Until v="0.1.0-rc.10">
+
+- A command shows only when it applies. For example, Unpin this tab shows
+  only for a pin. Close Split shows only for a tab in a Split.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- A command shows only when it applies. For example, Move this pin to
+  Favorites shows only for a pin. Close Split shows only for a tab in a
+  Split.
+
+</Since>
+
+- A command with its own shortcut shows the shortcut in the line under the
+  list, next to **Runs it from anywhere**.
+- The Commands section lists up to 3 commands. The full list of commands
+  is in [Address bar and Launcher](/docs/reference/launcher/#commands).
+- To leave a command's list, press Escape, or press Backspace in the
+  empty field.
+
+## Related pages
+
+- [Go to an open tab from the Launcher](/docs/how-to/launcher/go-to-an-open-tab-from-the-launcher/)
+- [Change what the Launcher lists](/docs/how-to/launcher/change-what-the-launcher-lists/)
+- [Address bar and Launcher](/docs/reference/launcher/)

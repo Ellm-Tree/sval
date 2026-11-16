@@ -1,0 +1,93 @@
+Sval: carry a tab's site style on its top BrowsingContext
+
+The parent process decides which site style a tab's page takes, and the
+content process paints with it. Fields on the top BrowsingContext reach
+every process that renders the tab, before the page's first paint when the
+parent sets them as the document starts, and setting one repaints the tab's
+documents (chrome/docshell/base/SvalSiteStyleFields.cpp).
+
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -326,6 +326,20 @@ struct EmbedderColorSchemes {
+         {.mTopOnly = true, .mCanSet = CanSet::Unrestricted})                   \
+   FIELD(SessionStoreEpoch, uint32_t,                                           \
+         {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  /* The site style every color of the tab's documents is painted with       \
++   * (SvalSiteStyleColors.h). */                                               \
++  FIELD(SvalSiteStyleAccent, uint32_t,                                         \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  FIELD(SvalSiteStyleRotation, float,                                          \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  FIELD(SvalSiteStyleContrast, float,                                          \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  FIELD(SvalSiteStyleBrightness, float,                                        \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  FIELD(SvalSiteStyleSaturation, float,                                        \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  FIELD(SvalSiteStyleDark, bool,                                               \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
+   /* Whether we can execute scripts in this BrowsingContext. Has no effect     \
+    * unless scripts are also allowed in the parent WindowContext. */           \
+   FIELD(AllowJavascript, bool,                                                 \
+@@ -747,6 +761,17 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+   float FullZoom() const { return GetFullZoom(); }
+   float TextZoom() const { return GetTextZoom(); }
+ 
++  uint32_t SvalSiteStyleAccent() const { return GetSvalSiteStyleAccent(); }
++  float SvalSiteStyleRotation() const { return GetSvalSiteStyleRotation(); }
++  float SvalSiteStyleContrast() const { return GetSvalSiteStyleContrast(); }
++  float SvalSiteStyleBrightness() const {
++    return GetSvalSiteStyleBrightness();
++  }
++  float SvalSiteStyleSaturation() const {
++    return GetSvalSiteStyleSaturation();
++  }
++  bool SvalSiteStyleDark() const { return GetSvalSiteStyleDark(); }
++
+   float OverrideDPPX() const { return Top()->GetOverrideDPPX(); }
+ 
+   bool SuspendMediaWhenInactive() const {
+@@ -1371,6 +1396,12 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+   void DidSet(FieldIndex<I>, T&& aOldValue) {}
+ 
+   void DidSet(FieldIndex<IDX_SessionStoreEpoch>, uint32_t aOldValue);
++  void DidSet(FieldIndex<IDX_SvalSiteStyleAccent>, uint32_t aOldValue);
++  void DidSet(FieldIndex<IDX_SvalSiteStyleRotation>, float aOldValue);
++  void DidSet(FieldIndex<IDX_SvalSiteStyleContrast>, float aOldValue);
++  void DidSet(FieldIndex<IDX_SvalSiteStyleBrightness>, float aOldValue);
++  void DidSet(FieldIndex<IDX_SvalSiteStyleSaturation>, float aOldValue);
++  void DidSet(FieldIndex<IDX_SvalSiteStyleDark>, bool aOldValue);
+ 
+   // Ensure that opener is in the same BrowsingContextGroup.
+   bool CanSet(FieldIndex<IDX_OpenerId>, const uint64_t& aValue,
+diff --git a/dom/chrome-webidl/BrowsingContext.webidl b/dom/chrome-webidl/BrowsingContext.webidl
+--- a/dom/chrome-webidl/BrowsingContext.webidl
++++ b/dom/chrome-webidl/BrowsingContext.webidl
+@@ -191,6 +191,15 @@ interface BrowsingContext {
+ 
+   [SetterThrows] attribute float textZoom;
+ 
++  // The site style the tab's documents are painted with. May only be set on
++  // the top BC, from the parent process.
++  [SetterThrows] attribute unsigned long svalSiteStyleAccent;
++  [SetterThrows] attribute float svalSiteStyleRotation;
++  [SetterThrows] attribute float svalSiteStyleContrast;
++  [SetterThrows] attribute float svalSiteStyleBrightness;
++  [SetterThrows] attribute float svalSiteStyleSaturation;
++  [SetterThrows] attribute boolean svalSiteStyleDark;
++
+   // Override the dots-per-CSS-pixel scaling factor in this BrowsingContext
+   // and all of its descendants. May only be set on the top BC, and should
+   // only be set from the parent process.
+diff --git a/docshell/base/moz.build b/docshell/base/moz.build
+--- a/docshell/base/moz.build
++++ b/docshell/base/moz.build
+@@ -97,6 +97,7 @@ UNIFIED_SOURCES += [
+     "nsRefreshTimer.cpp",
+     "nsWebNavigationInfo.cpp",
+     "SerializedLoadContext.cpp",
++    "SvalSiteStyleFields.cpp",
+     "WindowContext.cpp",
+ ]
+ 

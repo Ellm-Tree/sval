@@ -1,0 +1,3661 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's panel: "fill + bar".
+ *
+ * One rule of thumb across every state: a *place* is a surface, *you are here*
+ * is a line. A coloured group is one tinted block that holds its tabs; every
+ * group's children hang from a rail at the parent's twisty; the selected tab
+ * is where that rail thickens into a bar. Hover is a wash. An unloaded tab
+ * loses ink and its favicon goes grey, with no outline, so it never fights a
+ * fill.
+ *
+ * DOM this file expects from the panel's scripts (sval-panel*.js):
+ * - .sval-switcher-bar > button.sval-switcher > span.sval-switcher-emoji + span.sval-switcher-name
+ *   (its name is its own element so it can elide inside a flex row).
+ * - .sval-favorites-bar > button.sval-favorites > span.sval-label, then the
+ *   XUL box.sval-favorites-host holding the Favorites menu; hidden in a
+ *   private window.
+ * - .sval-panel-header > button.sval-newtab > span.sval-label, then
+ *   button.sval-newtab.is-folder > span.sval-label ("New group").
+ * - Every row carries aria-level (rails key off it) and, for groups,
+ *   an optional span.sval-row-count after the name (shown when collapsed).
+ * - A tab's or group's row has button.sval-row-audio before its close
+ *   button, shown while the row carries data-media ("pause", "mute", "play"
+ *   or "unmute", what a press does); a switcher entry,
+ *   menu[data-workspace-id], has button.sval-switcher-audio the same way.
+ * - The last visible row of a coloured group's block carries
+ *   data-sval-group-end, so the block's bottom corners round.
+ */
+
+/* ---------------------------------------------------------------- mount */
+
+@import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-palette.css");
+@import url("chrome://browser/content/sval/sval-color-picker.css");
+@import url("chrome://browser/content/sval/sval-iso-pill.css");
+@import url("chrome://browser/content/sval/sval-feedback.css");
+
+#sval-panel-container {
+  /* `SvalPanel._applyPanelWidth` sets this device's width inline; the
+     bounds are Firefox's sidebar's at most. */
+  width: var(--size-sidebar);
+  min-width: var(--size-item-xlarge);
+  max-width: 75vw;
+  position: relative;
+  /* A clip, which makes no scroll frame: the open menus' rule below
+     changes only its margin, which reframes nothing under their buttons. */
+  overflow: clip;
+  /* The edge's reach past the panel (below). */
+  overflow-clip-margin: calc(6px + var(--space-xsmall));
+  /* The 48px layout below is a container query against this box. */
+  container: sval-panel / inline-size;
+}
+
+/* Beside the page's frame (`sval-header.css`, page frame) the panel needs no
+   edge. A full-screen window shows the page unframed, so there the panel
+   takes an edge of its own. */
+:root[inFullscreen] #sval-panel-container {
+  border-inline-end: var(--border-width) solid var(--sval-cluster-border, var(--border-color));
+
+  &[sval-placement="right"] {
+    border-inline-end: none;
+    border-inline-start: var(--border-width) solid var(--sval-cluster-border, var(--border-color));
+  }
+}
+
+/* The edge a drag resizes the panel by (`SvalPanel._buildResizer`), on the
+ * side that faces the page. A press takes it from the panel's edge, across
+ * the 6px gap the page's frame leaves (`sval-header.css`, page frame), to a
+ * little inside the page. It stops at the panel's edge because the tree's
+ * scrollbar runs along it there. A full-screen window leaves no gap, so
+ * there the edge takes a strip of the page alone. */
+.sval-panel-resizer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 100% calc(-6px - var(--space-xsmall));
+  cursor: ew-resize;
+  /* Over `#tabbrowser-tabbox`, which browser.css lifts to 2. */
+  z-index: 3;
+
+  #sval-panel-container[sval-placement="right"] > & {
+    inset-inline: calc(-6px - var(--space-xsmall)) 100%;
+  }
+
+  :root[inFullscreen] & {
+    inset-inline: 100% calc(-2 * var(--space-xsmall));
+  }
+
+  :root[inFullscreen] #sval-panel-container[sval-placement="right"] > & {
+    inset-inline: calc(-2 * var(--space-xsmall)) 100%;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
+}
+
+/* A drag keeps the resize cursor and selects nothing on its way. */
+#sval-panel-container[sval-resizing] {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+/* A popup shows the one page that opened it, such as a sign-in, and is
+ * marked as Firefox marks it for its own toolbar rules. */
+:root[chromehidden~="toolbar"] #sval-panel-container {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- panel */
+
+/* The line that closes a section of the panel: under New tab and New group,
+ * and under the pinned tabs (`sval-pins.css`), which a private window does
+ * not load. */
+:root {
+  /* The media button's glyphs, here because the switcher's popup is outside
+   * the panel. */
+  --sval-i-pause: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3.5' y='2.5' width='3' height='11' rx='1' fill='black'/%3E%3Crect x='9.5' y='2.5' width='3' height='11' rx='1' fill='black'/%3E%3C/svg%3E");
+  --sval-i-skip-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2.5' y='3' width='2' height='10' rx='1' fill='black'/%3E%3Cpath d='M13.5 3.8v8.4a.8.8 0 0 1-1.2.7L5.6 8.7a.8.8 0 0 1 0-1.4l6.7-4.2a.8.8 0 0 1 1.2.7z' fill='black'/%3E%3C/svg%3E");
+  --sval-i-seek-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 4.2v7.6a.7.7 0 0 1-1.1.6L1.6 8.6a.7.7 0 0 1 0-1.2l5.3-3.8A.7.7 0 0 1 8 4.2zM15 4.2v7.6a.7.7 0 0 1-1.1.6L8.6 8.6a.7.7 0 0 1 0-1.2l5.3-3.8a.7.7 0 0 1 1.1.6z' fill='black'/%3E%3C/svg%3E");
+  --sval-i-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 2.8v10.4a.8.8 0 0 0 1.2.7l8.4-5.2a.8.8 0 0 0 0-1.4L5.7 2.1a.8.8 0 0 0-1.2.7z' fill='black'/%3E%3C/svg%3E");
+  --sval-i-speaker: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4.7 6 9H2v6h4l5 4.3z'/%3E%3Cpath d='M16 9a5 5 0 0 1 0 6M19.4 5.6a9 9 0 0 1 0 12.8'/%3E%3C/svg%3E"); /* = sval-pins.css's speaker */
+  --sval-i-speaker-muted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4.7 6 9H2v6h4l5 4.3z'/%3E%3Cpath d='m22 9-6 6M16 9l6 6'/%3E%3C/svg%3E");
+  --sval-section-hairline: rgb(var(--sval-palette-wash-dark) / 0.12);
+  /* The strip's outline and divider, and the well a Workspace on it shows
+     under the pointer, as the pins row's (`sval-pins.css`). */
+  --sval-strip-frame: rgb(var(--sval-palette-wash-dark) / 0.14);
+  --sval-strip-well: rgb(var(--sval-palette-wash-dark) / 0.07);
+  /* The fill that marks the Workspace you're in, in the switcher's menu and
+     on the strip, beside the selected tab's bar. */
+  --sval-current-fill: color-mix(in srgb, var(--color-accent-primary) 22%, transparent);
+  --sval-current-fill-hover: color-mix(in srgb, var(--color-accent-primary) 30%, transparent);
+  /* The strip's slide. */
+  --ease-orbit: cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-sval-tint], [privatebrowsingmode="temporary"], [data-sval-agent]) {
+    --sval-section-hairline: rgb(var(--sval-palette-wash-light) / 0.12);
+    --sval-strip-frame: rgb(var(--sval-palette-wash-light) / 0.18);
+    --sval-strip-well: rgb(var(--sval-palette-wash-light) / 0.05);
+  }
+}
+
+:root[data-sval-ink="dark"] {
+  --sval-section-hairline: rgb(var(--sval-palette-wash-light) / 0.12);
+  --sval-strip-frame: rgb(var(--sval-palette-wash-light) / 0.16);
+  --sval-strip-well: rgb(var(--sval-palette-wash-light) / 0.06);
+}
+
+.sval-panel {
+  /* Firefox's space tokens are rem, and a chrome rem is the menu font's size,
+     which is rarely a whole number of pixels. The rows stack these spaces, so
+     unrounded they put each row on a fraction and the gaps between coloured
+     groups snap to unequal pixels. */
+  --space-xxsmall: round(var(--dimension-relative-0125), 1px);
+  --space-xsmall: round(var(--dimension-relative-025), 1px);
+  --space-small: round(var(--dimension-relative-050), 1px);
+  /* Accent slots, set per row/switcher by _applyAccent. */
+  --sval-border: var(--border-color, color-mix(in srgb, currentColor 30%, transparent));
+  --sval-hairline: var(--border-color-deemphasized, color-mix(in srgb, currentColor 16%, transparent));
+  --sval-accent: var(--sval-border);
+  --sval-accent-invert: var(--sval-border);
+  --sval-accent-pale: var(--background-color-dimmed);
+  --sval-accent-label: var(--color-gray-100);
+  --sval-indent: calc(var(--size-item-small) + var(--space-small));
+  --sval-row-h: var(--size-item-large);
+  --sval-hover: var(--background-color-dimmed);
+  /* Never under 12px, the smallest chrome text should be: 0.9em of the
+   * menu font is less on macOS and Windows. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  --sval-small: max(12px, var(--font-size-small, 0.9em));
+  /* Icons are masks over currentColor, so they follow theme and HC. */
+  --sval-i-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --sval-i-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 3v10M3 8h10' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  --sval-i-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4l8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  --sval-i-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E"); /* = header-icons/star.svg (Lucide) */
+  --sval-i-ws: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='5' width='9' height='9' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Cpath d='M5 2.5h6.5a2 2 0 0 1 2 2V11' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  --sval-i-page: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='1.5' width='10' height='13' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E");
+  --sval-i-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m13.995 14-10.99 0A2.007 2.007 0 0 1 1 11.995l0-8.99C1 1.899 1.899 1 3.005 1l2.958 0a2.01 2.01 0 0 1 1.47.641L8.693 3l5.302 0C15.101 3 16 3.899 16 5.005l0 6.99A2.007 2.007 0 0 1 13.995 14zM2.85 2.25l-.6.6 0 9.3.6.6 11.3 0 .6-.6 0-7.3-.6-.6-5.73 0-.458-.2-1.445-1.559a.758.758 0 0 0-.554-.241l-3.113 0z'/%3E%3C/svg%3E"); /* = icons/folder.svg (proton); the file's context-fill doesn't resolve outside chrome */
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  font: menu;
+  font-family: var(--sval-font);
+  color: var(--sidebar-text-color);
+  background: var(--sidebar-background-color);
+}
+
+/* `hidden` must be restated against every part that sets its own display. */
+.sval-panel-header[hidden],
+.sval-panel-footer[hidden],
+.sval-tree[hidden],
+.sval-row[hidden] {
+  display: none;
+}
+
+:where(.sval-panel button) {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.sval-action {
+  padding: var(--space-xsmall) var(--space-small);
+  border-radius: var(--border-radius-small);
+  background: var(--button-background-color);
+}
+
+.sval-action:hover {
+  background: var(--button-background-color-hover);
+}
+
+.sval-action:disabled {
+  opacity: var(--opacity-deemphasized-strong);
+}
+
+.sval-newtab::before,
+.sval-favorites::before {
+  content: "";
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  mask: var(--sval-ico) center / contain no-repeat;
+}
+
+.sval-switcher:focus-visible,
+.sval-favorites:focus-visible,
+.sval-newtab:focus-visible,
+.sval-row:focus-visible {
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: calc(-1 * var(--focus-outline-width));
+}
+
+/* ------------------------------------------------------------- switcher */
+
+/* The switcher and Favorites buttons start on a whole CSS pixel. macOS
+ * places a popup's window on whole points (`nsCocoaWindow::
+ * RoundsWidgetCoordinatesTo`, `nsIWidget::MaybeRoundToDisplayPixels`), so a
+ * menu under a button that starts between two would sit off it by the
+ * difference, and the edge they share would break. The spacing tokens scale
+ * with the menu font, which can leave them fractional. */
+.sval-switcher-bar,
+.sval-favorites-bar {
+  --sval-bar-inline: round(var(--space-small), 1px);
+}
+
+.sval-switcher-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxsmall);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding: var(--space-small) var(--sval-bar-inline) var(--space-xsmall);
+}
+
+.sval-switcher-bar[hidden],
+.sval-switcher[hidden] {
+  display: none;
+}
+
+.sval-switcher {
+  --sval-ink: light-dark(var(--sval-accent), var(--sval-accent-invert));
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  height: calc(var(--size-item-large) + var(--space-small));
+  /* The Favorites button's inline padding, so the chevrons line up. */
+  padding-inline: var(--space-xsmall);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--border-radius-medium);
+  text-align: start;
+}
+
+.sval-switcher:hover {
+  background: var(--sval-hover);
+}
+
+/* The workspace's emoji sits on a tile; a coloured workspace fills it. */
+.sval-switcher-emoji {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--size-item-large);
+  height: var(--size-item-large);
+  border-radius: var(--border-radius-small);
+  line-height: 1;
+  background: var(--background-color-dimmed);
+}
+
+/* A coloured workspace's tile is the window it gets
+   (`sval-panel-switcher.js` sets `--sval-switcher-fill`), on that window, so
+   the window's line is what edges it (`SvalColor`). */
+.sval-switcher[data-sval-color] .sval-switcher-emoji {
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  background: var(--sval-switcher-fill);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  box-shadow: inset 0 0 0 1.5px var(--sval-tint-line);
+}
+
+.sval-switcher-emoji:empty::before {
+  content: "";
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  mask: var(--sval-i-ws) center / contain no-repeat;
+}
+
+.sval-switcher-name,
+.sval-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
+}
+
+.sval-switcher::after {
+  content: "";
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  opacity: var(--opacity-deemphasized);
+  mask: var(--sval-i-chev) center / 12px no-repeat;
+  rotate: 90deg;
+}
+
+/* ---------------------------------------------------------------- strip */
+
+/*
+ * The strip of Workspaces (`sval-panel-strip.js`), in the switcher's place
+ * when Settings › Workspaces picks it: an outlined track, a hairline under it
+ * so its framed tiles never read as the pins under the line, and dots while
+ * it overflows. `sval-panel-strip.js` sizes each item and slides the row
+ * from the sizes below, so the two change together.
+ *
+ * DOM: .sval-strip > .sval-strip-track > .sval-strip-view > .sval-strip-row >
+ * (.sval-strip-tabs[role=tablist] > .sval-strip-item[role=tab] >
+ * .sval-strip-tile > .sval-strip-face + .sval-strip-isolated +
+ * button.sval-strip-audio, then .sval-strip-name; .sval-strip-divider before
+ * the agents' items) + button.sval-strip-add; then .sval-strip-dots and
+ * .sval-strip-hairline.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+.sval-strip {
+  --sval-strip-tile: 28px;
+  --sval-strip-gap: 4px;
+  /* The column's view: three items and the gaps between them. */
+  --sval-strip-column: 108px;
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:not([data-names="all"]) {
+    --sval-strip-gap: 3px;
+  }
+}
+
+.sval-strip-track {
+  padding: 2px;
+  border: 1px solid var(--sval-strip-frame);
+  border-radius: 11px;
+}
+
+.sval-strip-view {
+  position: relative;
+  height: 36px;
+  overflow: hidden;
+
+  .sval-strip[data-overflow] & {
+    mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+  }
+
+  .sval-strip[data-layout="column"] & {
+    height: var(--sval-strip-column);
+  }
+
+  .sval-strip[data-layout="column"][data-overflow] & {
+    mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  }
+}
+
+.sval-strip-row,
+.sval-strip-tabs {
+  display: flex;
+  gap: var(--sval-strip-gap);
+}
+
+.sval-strip-row {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  transition: transform 280ms var(--ease-orbit);
+
+  /* Back to the current Workspace once the pointer has left: slower than a
+     switch, so it reads as the strip settling on its own. */
+  .sval-strip[data-returning] & {
+    transition-duration: 750ms;
+  }
+
+  .sval-strip[data-sliding] & {
+    transition: transform 90ms linear;
+  }
+}
+
+.sval-strip-item {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  color: var(--text-color-deemphasized);
+  font-size: 13px;
+  transition:
+    width 280ms var(--ease-orbit),
+    background-color 200ms,
+    color 200ms;
+
+  &[data-shows-name] {
+    justify-content: flex-start;
+    padding: 0 10px 0 3px;
+  }
+
+  .sval-strip[data-names="all"] & {
+    padding: 0 10px;
+  }
+
+  &:hover {
+    background: var(--sval-strip-well);
+    color: var(--sidebar-text-color);
+  }
+
+  &[data-current] {
+    background: var(--sval-current-fill);
+    color: var(--sidebar-text-color);
+    font-weight: var(--font-weight-semibold);
+
+    &:hover {
+      background: var(--sval-current-fill-hover);
+    }
+
+    /* The selected tab's bar (tree, below), at the item's start. */
+    .sval-strip &::before {
+      inset-inline-start: 0;
+      margin-inline-start: 0;
+    }
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
+
+  /* Where a dragged Workspace will drop: a line at the item's side, as the
+     menu draws one between its entries. */
+  &:is([data-drop="before"], [data-drop="after"]) {
+    background-image: linear-gradient(var(--focus-outline-color), var(--focus-outline-color));
+    background-repeat: no-repeat;
+    background-size: 2px 100%;
+  }
+
+  &[data-drop="before"] {
+    background-position: left;
+  }
+
+  &[data-drop="after"] {
+    background-position: right;
+  }
+
+  /* Down the column, the line runs across. */
+  .sval-strip[data-layout="column"] &:is([data-drop="before"], [data-drop="after"]) {
+    background-size: 100% 2px;
+  }
+
+  .sval-strip[data-layout="column"] &[data-drop="before"] {
+    background-position: top;
+  }
+
+  .sval-strip[data-layout="column"] &[data-drop="after"] {
+    background-position: bottom;
+  }
+}
+
+/* At 72px and below the strip stands up into a column of icons, each item
+   the column's width and an icon's height. */
+.sval-strip[data-layout="column"] {
+  .sval-strip-row {
+    inset-inline: 0;
+  }
+
+  .sval-strip-row,
+  .sval-strip-tabs {
+    flex-direction: column;
+  }
+
+  .sval-strip-item,
+  .sval-strip-add {
+    width: auto;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .sval-strip-divider {
+    width: auto;
+    height: 1px;
+    margin-inline: 8px;
+    background: var(--sval-strip-frame);
+
+    &::before {
+      display: none;
+    }
+  }
+}
+
+/* The current Workspace's name under the track, where the items show none. */
+.sval-strip-caption {
+  height: 16px;
+  padding: 0 4px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 16px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* Where the current Workspace stands among them all, where dots don't fit:
+   a line under the track with a thumb along it. */
+.sval-strip-line {
+  --sval-strip-at: 0;
+  position: relative;
+  height: 6px;
+  margin-inline: 8px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 2px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--sval-section-hairline);
+  }
+
+  > span {
+    position: absolute;
+    top: 2px;
+    inset-inline-start: calc((100% - 12px) * var(--sval-strip-at));
+    width: 12px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-accent-primary);
+    transition: inset-inline-start 280ms var(--ease-orbit);
+  }
+}
+
+.sval-strip-tile {
+  position: relative;
+  flex: none;
+  width: var(--sval-strip-tile);
+  height: var(--sval-strip-tile);
+}
+
+.sval-strip-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--sval-strip-fill, var(--background-color-dimmed));
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.85;
+
+  .sval-strip[data-names="all"] & {
+    opacity: 0.6;
+  }
+
+  [data-current] > .sval-strip-tile > & {
+    opacity: 1;
+  }
+
+  /* No emoji: the Workspace glyph, as the switcher draws it, or an agent's
+     mark. */
+  &:empty::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    background: currentColor;
+    mask: var(--sval-i-ws) center / contain no-repeat;
+  }
+
+  &.sval-strip-agent::before {
+    mask-image: var(--sval-agent-mark);
+  }
+}
+
+/* An isolated Workspace's box (isolated workspaces spec §10), at the tile's
+   foot, in `sval-iso-pill.css`'s ink. */
+.sval-strip-isolated {
+  display: none;
+  position: absolute;
+  inset-inline-end: -5px;
+  bottom: -2px;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: 50%;
+  background: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  color: light-dark(#ffffff, var(--sval-palette-ink-950));
+  box-shadow: 0 0 0 2px var(--sidebar-background-color);
+
+  [data-isolated] > .sval-strip-tile > & {
+    display: grid;
+  }
+
+  &::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: currentColor;
+    mask: url("chrome://browser/content/sval/workspace-isolated.svg") center / contain no-repeat;
+  }
+}
+
+/* How many Workspaces an agent app's item holds, at the tile's foot, where
+   an isolated Workspace's box would be: an app's item is never one
+   Workspace's, so the two never meet. */
+.sval-strip-count {
+  display: none;
+  position: absolute;
+  inset-inline-end: -6px;
+  bottom: -2px;
+  min-width: 15px;
+  height: 15px;
+  box-sizing: border-box;
+  padding-inline: 3px;
+  place-items: center;
+  border-radius: 999px;
+  background: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
+  color: light-dark(#ffffff, var(--sval-palette-ink-950));
+  box-shadow: 0 0 0 2px var(--sidebar-background-color);
+  font: 600 9.5px/1 var(--sval-font);
+  font-variant-numeric: tabular-nums;
+
+  [data-agent-app] > .sval-strip-tile > & {
+    display: grid;
+  }
+
+  /* The list's window covers the tile's foot while it is open, and the list
+     shows each Workspace the count counts. */
+  [data-agent-app] > .sval-strip-tile > .sval-strip-face[sval-stem] ~ & {
+    display: none;
+  }
+
+  @media (forced-colors) {
+    background: CanvasText;
+    color: Canvas;
+  }
+}
+
+/* What the Workspace plays, at the tile's top; a press acts on it as the
+   menu's media button does. */
+.sval-strip-audio {
+  display: none;
+  position: absolute;
+  inset-inline-end: -5px;
+  top: -2px;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-background-color);
+  color: var(--sidebar-text-color);
+  box-shadow:
+    0 0 0 1px var(--sval-strip-frame),
+    0 0 0 2px var(--sidebar-background-color);
+
+  [data-media] > .sval-strip-tile > & {
+    display: grid;
+  }
+
+  &::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: currentColor;
+    mask: var(--sval-i-pause) center / contain no-repeat;
+  }
+
+  [data-media="play"] > .sval-strip-tile > &::before {
+    mask-image: var(--sval-i-play);
+  }
+
+  [data-media="mute"] > .sval-strip-tile > &::before {
+    mask-image: var(--sval-i-speaker);
+  }
+
+  [data-media="unmute"] > .sval-strip-tile > &::before {
+    mask-image: var(--sval-i-speaker-muted);
+  }
+}
+
+.sval-strip-name {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  [data-shows-name] > & {
+    display: block;
+  }
+}
+
+.sval-strip-divider {
+  flex: none;
+  width: 1px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+
+  &::before {
+    content: "";
+    width: 1px;
+    height: 20px;
+    background: var(--sval-strip-frame);
+  }
+}
+
+/* New Workspace…: a dashed tile the size of the others, with a plus. */
+.sval-strip-add {
+  flex: none;
+  width: 34px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--text-color-deemphasized);
+
+  &::before,
+  &::after {
+    content: "";
+    grid-area: 1 / 1;
+  }
+
+  &::before {
+    box-sizing: border-box;
+    width: var(--sval-strip-tile);
+    height: var(--sval-strip-tile);
+    border: 1.5px dashed var(--sval-strip-frame);
+    border-radius: 4px;
+  }
+
+  &::after {
+    width: 12px;
+    height: 12px;
+    background: currentColor;
+    mask: var(--sval-i-plus) center / contain no-repeat;
+  }
+
+  &:hover {
+    background: var(--sval-strip-well);
+    color: var(--sidebar-text-color);
+  }
+}
+
+.sval-strip-dots {
+  height: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  > span {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--text-color-deemphasized);
+    opacity: 0.45;
+    transition:
+      width 280ms var(--ease-orbit),
+      background-color 280ms;
+  }
+
+  > span[data-current] {
+    width: 14px;
+    background: var(--color-accent-primary);
+    opacity: 1;
+  }
+}
+
+.sval-strip-hairline {
+  height: 1px;
+  background: var(--sval-section-hairline);
+}
+
+/* Under reduced motion the strip moves without sliding, and the wheel's
+   slide back is instant. */
+@media (prefers-reduced-motion) {
+  .sval-strip-row,
+  .sval-strip-item,
+  .sval-strip-dots > span,
+  .sval-strip-line > span {
+    transition: none;
+  }
+
+  .sval-strip[data-sliding] .sval-strip-row {
+    transition: none;
+  }
+}
+
+@media (forced-colors) {
+  .sval-strip-item[data-current] {
+    outline: 2px solid SelectedItem;
+    outline-offset: -2px;
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ------------------------------------------------------------ favorites */
+
+.sval-favorites-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding: 0 var(--sval-bar-inline) var(--space-xsmall);
+}
+
+.sval-favorites-bar[hidden] {
+  display: none;
+}
+
+.sval-favorites {
+  --sval-ico: var(--sval-i-star);
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  height: var(--size-item-large);
+  padding-inline: var(--space-xsmall);
+  border-radius: var(--border-radius-medium);
+  text-align: start;
+}
+
+.sval-favorites:hover {
+  background: var(--sval-hover);
+}
+
+/* The switcher's chevron: the menu opens below, as the switcher's does. */
+.sval-favorites::after {
+  content: "";
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  opacity: var(--opacity-deemphasized);
+  mask: var(--sval-i-chev) center / 12px no-repeat;
+  rotate: 90deg;
+}
+
+/* Each chevron points up while its menu is open, which `aria-expanded`
+   carries. */
+:is(.sval-switcher, .sval-favorites)[aria-expanded="true"]::after {
+  rotate: -90deg;
+}
+
+/* Holds the Favorites menu, which takes no room of its own. */
+.sval-favorites-host {
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- menus */
+
+/*
+ * The Workspace and Favorites menus are drawn alike on every platform: by
+ * Gecko (`nonnative`) and as Firefox's own bookmarks menus are
+ * (`toolbar-menupopup`, `panelUI-shared.css`), which takes the window's popup
+ * colours (`sval-header.css`). These rules are what Sval adds to that.
+ */
+
+/* Every menu has a drawn shadow, on macOS too, where `popup.css` leaves menus
+ * the window server's faint one. The margin is the popup window's room for
+ * `--sval-menu-shadow`: three deviations of its far layer and its drop. A menu attached to
+ * its button by the stem (`[sval-stem]`) takes the stem's margin, edge and
+ * shadow instead (`sval-header.css`, spec §9.4). */
+menupopup:not([sval-stem]) {
+  --panel-box-shadow: var(--sval-menu-shadow);
+  --panel-box-shadow-margin: 14px;
+  -moz-window-shadow: none;
+}
+
+/* The active item is where the arrow keys are, so it wears the panel's focus
+ * ring (`.sval-row:focus-visible`) over the hover wash. A `menu` whose submenu
+ * is open stays active, so the ring moves into the submenu with the keys.
+ * The pointer makes an item active too, so the Workspace menu rings it only
+ * once a key is pressed in the menu (`sval-keys`, which the pointer's next
+ * move clears). */
+:is(#sval-workspace-menu[sval-keys], #sval-favorites-menu) :is(menu, menuitem)[_moz-menuactive]:not([open]) {
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: calc(-1 * var(--focus-outline-width));
+}
+
+/* The window's own workspace, in its place in the switcher's list or an
+   agent app's list under the strip. */
+:is(#sval-workspace-menu menu, .sval-agent-app-popup > menuitem)[aria-current="true"] {
+  font-weight: var(--font-weight-semibold);
+  /* The selected tab's marks: an accent bar at the start edge and a tinted
+     fill, so the row reads as "you are here" at a glance. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  box-shadow: inset 4px 0 0 var(--color-accent-primary);
+  background-color: var(--sval-current-fill);
+
+  &:-moz-locale-dir(rtl) {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    box-shadow: inset -4px 0 0 var(--color-accent-primary);
+  }
+}
+
+/* The Workspace menu opens over the switcher (`SvalPanel._openSwitcher`), at
+ * least as wide as it, and shows at most twelve rows
+ * (`SvalPanel._scrollSwitcherMenu`). */
+#sval-workspace-menu {
+  &::part(content) {
+    min-width: var(--sval-switcher-width, 0);
+  }
+
+  &::part(arrowscrollbox-scrollbox) {
+    max-height: var(--sval-menu-rows-max, none);
+  }
+}
+
+/* Where a drag will drop in the Favorites menu or the switcher: a line before
+ * or after the item, as Firefox's bookmarks menus draw one between items
+ * (`places-popup`'s drop indicator). `SvalFavoritesView` and
+ * `SvalPanel._showWorkspaceDrop` set `data-drop`. */
+#sval-favorites-menu :is(menu, menuitem, menuseparator),
+#sval-workspace-menu > menu {
+  /* Painted, so the item keeps its size while the line moves. */
+  &:is([data-drop="before"], [data-drop="after"]) {
+    background-image: linear-gradient(var(--focus-outline-color), var(--focus-outline-color));
+    background-repeat: no-repeat;
+    background-size: 100% var(--space-xxsmall);
+  }
+
+  &[data-drop="before"] {
+    background-position: top;
+  }
+
+  &[data-drop="after"] {
+    background-position: bottom;
+  }
+}
+
+/* High contrast. The window's popup colours are Sval's own (`sval-header.css`),
+ * so the menus restate what Firefox's tokens would give them: an edge that
+ * shows under increased contrast, and under forced colours the system's menu
+ * colours, as `popup.css` gives every menu, with the active item in the
+ * selection's pair and a disabled one in GrayText. `(forced-colors)` for the
+ * reason the panel's own block gives (below). */
+@media (prefers-contrast) {
+  :is(#sval-workspace-menu, #sval-favorites-menu) {
+    &,
+    menupopup {
+      --panel-border-color: currentColor;
+    }
+  }
+}
+
+@media (forced-colors) {
+  :is(#sval-workspace-menu, #sval-favorites-menu) {
+    &,
+    menupopup {
+      --panel-background-color: Menu;
+      --panel-text-color: MenuText;
+      --panel-border-color: MenuText;
+      --panel-box-shadow: none;
+      --button-background-color-ghost-hover: SelectedItem;
+      --button-background-color-ghost-active: SelectedItem;
+      --button-text-color-ghost-hover: SelectedItemText;
+      --button-text-color-ghost-active: SelectedItemText;
+      --button-text-color-ghost-disabled: GrayText;
+      --focus-outline-color: SelectedItemText;
+    }
+
+    /* A disabled item is not filled when active, so its ring is on Menu. */
+    :is(menu, menuitem)[disabled] {
+      --focus-outline-color: MenuText;
+    }
+  }
+}
+
+/* The Favorites menu grows from its button as the header's popovers do
+ * (`sval-header.css`, panels, where the menu's window draws the edge and
+ * shadow of both, and the conditions they are drawn under): while it is
+ * open, the button wears the menu's fill and nothing else. */
+@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
+  /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+  .sval-favorites[sval-stem] {
+    background: var(--sval-stem-fill);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  /* The strip's list of an agent app's Workspaces grows from the app's tile
+     the same way. */
+  .sval-strip-face[sval-stem] {
+    background: var(--sval-stem-fill);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+  /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+}
+
+/* -------------------------------------------------------------- header */
+
+/* A hairline under New tab and New group sets them apart from the tree. */
+.sval-panel-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxsmall);
+  margin-inline: var(--space-small);
+  /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+  padding-block-end: calc(var(--space-xsmall) + 5px);
+  /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  border-block-end: 1px solid var(--sval-section-hairline);
+}
+
+/* Zero height: the tree's padding stays the space past its first and last
+ * rows. */
+.sval-tree-edge {
+  height: 0;
+}
+
+/* New tab and New group share the row equally. */
+.sval-newtab {
+  --sval-ico: var(--sval-i-plus);
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  height: var(--size-item-large);
+  /* Lines the + up with the rows' twisty column. */
+  padding-inline: var(--space-xsmall);
+  border-radius: var(--border-radius-medium);
+  white-space: nowrap;
+  text-align: start;
+}
+
+.sval-newtab:hover {
+  background: var(--sval-hover);
+}
+
+.is-folder {
+  --sval-ico: var(--sval-i-folder);
+}
+
+/* ---------------------------------------------------------------- tree */
+
+.sval-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* A sideways scroll over the panel switches workspaces
+     (`SvalPanel._onPanelWheel`), so the tree never takes it. */
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+  /* The space under the hairline is the tree's own, so rows scroll up to
+   * the hairline and under its shadow. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding: calc(var(--space-xsmall) + 5px) 0 var(--space-small);
+  position: relative;
+}
+
+.sval-row {
+  --sval-ink: light-dark(var(--sval-accent), var(--sval-accent-invert));
+  /* Where this row's rail runs: under its parent's twisty. */
+  --sval-rail-x: max(0px, calc(var(--space-xsmall) + (var(--sval-row-depth, 0) - 1) * var(--sval-indent) + var(--size-item-small) / 2 - 1px));
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  box-sizing: border-box;
+  /* Fixed height: arrow keys step row by row. */
+  height: var(--sval-row-h);
+  margin-inline: var(--space-small);
+  padding-inline: calc(var(--space-xsmall) + var(--sval-row-depth, 0) * var(--sval-indent)) var(--space-xxsmall);
+  border-radius: var(--border-radius-medium);
+  outline: none;
+  cursor: default;
+  user-select: none;
+}
+
+.sval-row:hover {
+  background: var(--sval-hover);
+}
+
+/* You are here, as a surface: the panel's own colour, tinted or not, a step
+ * toward its ink on a light window and away from it on a dark one, with a
+ * little more of its hue. Hover is a neutral wash of the ink, so the two
+ * never match, and hovering the selected row deepens its fill. A coloured
+ * group's rows step their block instead (below). */
+@media not ((prefers-contrast) or (forced-colors)) {
+  .sval-row:is([aria-selected="true"], [data-sval-viewed]):not([data-sval-fill], [data-sval-nested]) {
+    --sval-selected-step: 1;
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    background: oklch(from var(--sidebar-background-color) calc(l + var(--sval-selected-step) * (-0.12 + 0.29 * var(--sval-surface-dark))) calc(c + 0.02) h);
+
+    &:hover {
+      --sval-selected-step: 1.2;
+    }
+  }
+}
+
+.sval-row[data-kind="group"] > .sval-row-name,
+.sval-row[aria-selected="true"] {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The rail every child hangs from: a hairline, or 2px of the group's colour. */
+.sval-row:not([aria-level="1"])::after {
+  content: "";
+  position: absolute;
+  inset-block: 0 var(--sval-rail-end, calc(var(--space-small) * 0));
+  inset-inline-start: var(--sval-rail-x);
+  /* A hairline centred on the twisty: half a pixel has no token. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  margin-inline-start: 0.5px;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  width: var(--border-width);
+  background: var(--sval-border);
+}
+
+.sval-row[data-sval-fill="inherited"]::after {
+  margin: 0;
+  /* The coloured rail is a fixed 2px; the bar below is 4px. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  width: 2px;
+  background: var(--sval-ink);
+}
+
+/* The last row of a coloured block stops its rail short of the block's edge,
+ * so the line ends inside the colour and not on its border. */
+.sval-row[data-sval-group-end] {
+  --sval-rail-end: var(--space-small);
+}
+
+/* ...and rounds off where it stops. */
+.sval-row[data-sval-group-end]::after,
+.sval-row[data-sval-group-end] > .sval-row-base-rail {
+  border-end-start-radius: var(--border-radius-xsmall);
+  border-end-end-radius: var(--border-radius-xsmall);
+}
+
+/* The first child's rail rounds off where it starts, too. */
+.sval-row:not([aria-level="1"])[aria-posinset="1"]::after,
+.sval-row-base-rail[data-start] {
+  border-start-start-radius: var(--border-radius-xsmall);
+  border-start-end-radius: var(--border-radius-xsmall);
+}
+
+/* You are here: the rail thickens. At top level there is no rail, so the bar
+ * sits at the row's start in the accent colour. A split's row wears it while
+ * one of its panes is viewed, and the strip's item the Workspace you're in. */
+.sval-row:is([aria-selected="true"], [data-sval-viewed])::before,
+.sval-strip-item[data-current]::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset-block: var(--space-xsmall);
+  inset-inline-start: var(--sval-rail-x);
+  margin-inline-start: -1px;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  width: 4px;
+  border-radius: var(--border-radius-xsmall);
+  background: var(--color-accent-primary);
+}
+
+.sval-row[data-sval-fill="inherited"]:is([aria-selected="true"], [data-sval-viewed])::before {
+  background: var(--sval-ink);
+}
+
+/*
+ * A group's block lets through half of what its window does
+ * (`--sval-tint-alpha`, 1 on a solid window): its lightness comes from the surface it sits on
+ * and its hue and chroma from the group (palette). Two hues are never mixed,
+ * so no pairing of group and window turns muddy, and every block sits the
+ * same step off its surface, light or dark, so none vibrates against its
+ * window. `--sval-step` scales that step: 1 at rest, more for a selected or
+ * hovered row. The step stops where the block's text would miss its target
+ * (`--sval-k-lmin` and `--sval-k-lmax`, `SvalColor.groupBounds`).
+ *
+ * `--sval-k-*` names the group whose block an element draws and `--sval-on-l`
+ * the lightness under it, so a nested group's card can be measured from its
+ * parent's block. A custom property substitutes its `var()`s where it is
+ * declared, so `--sval-block` is declared on every element that draws one.
+ */
+.sval-row[data-sval-fill],
+.sval-row[data-sval-nested],
+.sval-row-surface {
+  --sval-step: 1;
+  --sval-selected-block-step: calc(2.3 - 0.8 * var(--sval-surface-dark));
+  --sval-on-l: var(--sval-tint-l);
+  --sval-k-h: var(--sval-accent-h);
+  --sval-k-bh: var(--sval-accent-bh, var(--sval-accent-h));
+  --sval-k-bc: var(--sval-accent-bc);
+  --sval-k-bd: var(--sval-accent-bd);
+  --sval-k-bdd: var(--sval-accent-bdd);
+  --sval-k-bdir: var(--sval-accent-bdir);
+  --sval-k-lmin: var(--sval-accent-lmin);
+  --sval-k-lmax: var(--sval-accent-lmax);
+  /* A light surface's blocks step darker. A dark surface's step the way the
+   * window says, or always darker for a token that says so; such a token
+   * steps darker by its light-surface nudge again on a window whose every
+   * block already steps darker, so it stays apart from them. */
+  --sval-k-dir: calc(var(--sval-k-bdir) + (1 + var(--sval-k-bdir)) * var(--sval-block-dir));
+  --sval-block: oklch(
+    clamp(
+        var(--sval-k-lmin),
+        var(--sval-on-l) + var(--sval-step) *
+          (
+            (1 - var(--sval-surface-dark)) * (-0.075 + 0.6 * var(--sval-k-bd)) + var(--sval-surface-dark) * var(--sval-k-dir) *
+              (0.085 + var(--sval-k-bdd) + max(0, -1 * var(--sval-k-bdir)) * max(0, -1 * var(--sval-block-dir)) * (-1 * var(--sval-k-bd) - var(--sval-k-bdd)))
+          ),
+        var(--sval-k-lmax)
+      )
+      calc(var(--sval-k-bc) * (0.85 + 0.15 * var(--sval-surface-dark)))
+      calc(var(--sval-k-h) + var(--sval-surface-dark) * (var(--sval-k-bh) - var(--sval-k-h))) / var(--sval-tint-alpha, 1)
+  );
+}
+
+/* A coloured group is one block: header and tabs share it, and only the
+ * block's outer corners round. Its text is solved on the block
+ * (`SvalPanel.applyAccent`). */
+.sval-row[data-sval-fill] {
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  color: var(--sval-accent-text);
+  --text-color-deemphasized: var(--sval-accent-muted);
+  border-radius: 0;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  background: var(--sval-block);
+}
+
+/* Hover lifts a block a little; the selected row lifts it further and
+ * deepens its colour, so it reads as selected with or without the pointer.
+ * On a dark surface the panel's light ink caps how far a block may lift and
+ * keep AA contrast, so there the selected row's extra colour carries more of
+ * the difference. */
+.sval-row[data-sval-fill]:hover {
+  --sval-step: calc(1.45 - 0.2 * var(--sval-surface-dark));
+}
+
+.sval-row[data-sval-fill="inherited"]:is([aria-selected="true"], [data-sval-viewed]) {
+  --sval-step: var(--sval-selected-block-step);
+  --sval-k-bc: calc(var(--sval-accent-bc) * 1.3);
+}
+
+/* A group's name is in the panel's text colour, and its colour is in the
+ * block, the rail and the folder: several palette colours fall below 4.5:1
+ * as text on their own block, light or dark, tinted window or not. */
+.sval-row[data-sval-fill="own"] {
+  margin-top: var(--space-xsmall);
+  border-start-start-radius: var(--border-radius-medium);
+  border-start-end-radius: var(--border-radius-medium);
+}
+
+.sval-row:is([data-sval-fill="own"][aria-expanded="false"]:not([data-sval-shows-selection]), [data-sval-group-end]) {
+  margin-bottom: var(--space-xsmall);
+  border-end-start-radius: var(--border-radius-medium);
+  border-end-end-radius: var(--border-radius-medium);
+}
+
+.sval-row[data-sval-fill="own"] > :is(.sval-row-count, .sval-row-folder) {
+  color: inherit;
+  opacity: 1;
+}
+
+.sval-row[data-sval-fill="own"] > .sval-row-folder {
+  background: var(--sval-ink);
+}
+
+/*
+ * A coloured group inside a coloured group is a surface inside a surface. The
+ * outermost colour keeps the whole width of every row it holds, so it never
+ * breaks; each nested colour is a rounded card drawn on top of it by the row's
+ * `.sval-row-surface` span, inset from the start by one level and from the end
+ * by a step per level. Header and last row of a card carry a little padding so
+ * their content centres in the card and not in the row.
+ */
+.sval-row[data-sval-nested],
+.sval-row[data-sval-nested]:hover,
+.sval-row[data-sval-nested]:is([aria-selected="true"], [data-sval-viewed]) {
+  --sval-base-ink: light-dark(var(--sval-base), var(--sval-base-invert));
+  --sval-step: 1;
+  --sval-k-h: var(--sval-base-h);
+  --sval-k-bh: var(--sval-base-bh, var(--sval-base-h));
+  --sval-k-bc: var(--sval-base-bc);
+  --sval-k-bd: var(--sval-base-bd);
+  --sval-k-bdd: var(--sval-base-bdd);
+  --sval-k-bdir: var(--sval-base-bdir);
+  --sval-k-lmin: var(--sval-base-lmin);
+  --sval-k-lmax: var(--sval-base-lmax);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  background: var(--sval-block);
+}
+
+.sval-row[data-sval-nested][data-sval-fill="own"]::after {
+  display: none;
+}
+
+/* The outer group's rail keeps running down the gutter beside the card. */
+.sval-row-base-rail {
+  position: absolute;
+  inset-block: 0 var(--sval-rail-end, calc(var(--space-small) * 0));
+  inset-inline-start: calc(var(--space-xsmall) + var(--sval-base-depth) * var(--sval-indent) + var(--size-item-small) / 2 - 1px);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  width: 2px;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  background: var(--sval-base-ink);
+  pointer-events: none;
+}
+
+.sval-row[data-sval-nested][data-sval-fill="own"] {
+  margin-top: 0;
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+.sval-row[data-sval-nested]:not([data-sval-group-end]) {
+  margin-bottom: 0;
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.sval-row[data-sval-nested-start] {
+  padding-block-start: var(--space-xsmall);
+}
+
+.sval-row[data-sval-nested-end] {
+  padding-block-end: var(--space-xsmall);
+}
+
+.sval-row-surface {
+  --sval-s-ink: light-dark(var(--sval-accent), var(--sval-accent-invert));
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  inset-inline-start: calc(var(--space-xsmall) + (var(--sval-s-depth) - 1) * var(--sval-indent) + var(--size-item-small));
+  inset-inline-end: calc(var(--sval-s-level) * var(--space-xsmall));
+  /* The outer group's block at rest, then one plain step per card between. */
+  --sval-s-dir: calc(var(--sval-base-bdir) + (1 + var(--sval-base-bdir)) * var(--sval-block-dir));
+  --sval-on-l: calc(
+    var(--sval-tint-l) + (1 - var(--sval-surface-dark)) * (-0.075 * var(--sval-s-level) + 0.6 * var(--sval-base-bd)) + var(--sval-surface-dark) *
+      var(--sval-s-dir) * (0.085 * var(--sval-s-level) + var(--sval-base-bdd))
+  );
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  background: var(--sval-block);
+  pointer-events: none;
+}
+
+.sval-row-surface[data-start] {
+  inset-block-start: var(--space-xsmall);
+  border-start-start-radius: var(--border-radius-medium);
+  border-start-end-radius: var(--border-radius-medium);
+}
+
+.sval-row-surface[data-end] {
+  inset-block-end: var(--space-xsmall);
+  border-end-start-radius: var(--border-radius-medium);
+  border-end-end-radius: var(--border-radius-medium);
+}
+
+.sval-row:hover > .sval-row-surface[data-inner] {
+  --sval-step: calc(1.45 - 0.2 * var(--sval-surface-dark));
+}
+
+.sval-row:is([aria-selected="true"], [data-sval-viewed]) > .sval-row-surface[data-inner] {
+  --sval-step: var(--sval-selected-block-step);
+  --sval-k-bc: calc(var(--sval-accent-bc) * 1.3);
+}
+
+/* Not loaded here: less ink, grey favicon. */
+.sval-row[data-loaded="false"] {
+  color: var(--text-color-deemphasized);
+}
+
+.sval-row[data-loaded="false"] > .sval-row-icon {
+  opacity: var(--opacity-deemphasized-strong);
+  filter: grayscale(1);
+}
+
+/* A tab Sval will not open on this device: going to it does nothing. */
+.sval-row[data-unopenable] {
+  cursor: not-allowed;
+}
+
+.sval-row[data-unopenable] > .sval-row-name {
+  text-decoration: line-through;
+}
+
+/* ---------------------------------------------------------- row parts */
+
+.sval-twisty {
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  opacity: var(--opacity-deemphasized);
+  mask: var(--sval-i-chev) center / 12px no-repeat;
+}
+
+.sval-twisty:dir(rtl) {
+  scale: -1 1;
+}
+
+/* A leaf keeps its twisty slot so names line up with their siblings'. */
+.sval-twisty[hidden] {
+  display: block;
+  visibility: hidden;
+}
+
+.sval-row[aria-expanded="true"] > .sval-twisty {
+  rotate: 90deg;
+}
+
+/* Mirrored, the chevron points left, and `scale` applies before `rotate`, so
+ * it turns the other way to point down. */
+.sval-row[aria-expanded="true"] > .sval-twisty:dir(rtl) {
+  rotate: -90deg;
+}
+
+.sval-row-icon,
+.sval-row-folder,
+.sval-row-emoji {
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+}
+
+.sval-row-icon {
+  display: block;
+  box-sizing: border-box;
+}
+
+/* No favicon yet: a page outline holds the icon's place. */
+.sval-row-icon:not([src]) {
+  background: currentColor;
+  opacity: var(--opacity-deemphasized-strong);
+  mask: var(--sval-i-page) center / contain no-repeat;
+}
+
+/* Loading a page: the header's reload mark turns in the favicon's place. With
+ * reduced motion the favicon stays, as the header's stop button says it. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-busy] > .sval-row-icon {
+    content: url("chrome://browser/content/sval/header-icons/reload.svg");
+    background: none;
+    mask: none;
+    opacity: 1;
+    -moz-context-properties: fill;
+    fill: currentColor;
+    animation: sval-busy-turn 1s linear infinite;
+  }
+}
+
+@keyframes sval-busy-turn {
+  to {
+    rotate: 1turn;
+  }
+}
+
+.sval-row-emoji {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.sval-row-folder {
+  background: currentColor;
+  opacity: var(--opacity-deemphasized);
+  mask: var(--sval-i-folder) center / contain no-repeat;
+}
+
+.sval-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-row-count {
+  display: none;
+  flex: none;
+  padding-inline: var(--space-xxsmall) var(--space-small);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  font-size: var(--sval-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color-deemphasized);
+}
+
+.sval-row[aria-expanded="false"] > .sval-row-count {
+  display: block;
+}
+
+.sval-row-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--size-item-medium);
+  height: var(--size-item-medium);
+  border-radius: var(--border-radius-small);
+  /* Delete/Backspace close from the keyboard, so hiding costs no reach. */
+  visibility: hidden;
+}
+
+.sval-row-close::before {
+  content: "";
+  width: var(--size-item-xsmall);
+  height: var(--size-item-xsmall);
+  background: currentColor;
+  mask: var(--sval-i-close) center / contain no-repeat;
+}
+
+.sval-row:is(:hover, :focus-visible) > .sval-row-close {
+  visibility: visible;
+}
+
+.sval-row-close:hover {
+  background: var(--background-color-dimmed);
+}
+
+.sval-row-audio,
+.sval-switcher-audio {
+  display: none;
+  flex: none;
+  place-items: center;
+  width: var(--size-item-medium);
+  height: var(--size-item-medium);
+  padding: 0;
+  border: 0;
+  border-radius: var(--border-radius-small);
+  background: none;
+  color: inherit;
+}
+
+:is(.sval-row, menu)[data-media] > :is(.sval-row-audio, .sval-switcher-audio) {
+  display: grid;
+}
+
+:is(.sval-row-audio, .sval-switcher-audio)::before {
+  content: "";
+  width: var(--size-item-xsmall);
+  height: var(--size-item-xsmall);
+  background: currentColor;
+  mask: var(--sval-i-pause) center / contain no-repeat;
+}
+
+[data-media="play"] > :is(.sval-row-audio, .sval-switcher-audio)::before {
+  mask-image: var(--sval-i-play);
+}
+
+[data-media="mute"] > :is(.sval-row-audio, .sval-switcher-audio)::before {
+  mask-image: var(--sval-i-speaker);
+}
+
+[data-media="unmute"] > :is(.sval-row-audio, .sval-switcher-audio)::before {
+  mask-image: var(--sval-i-speaker-muted);
+}
+
+:is(.sval-row-audio, .sval-switcher-audio):hover {
+  background: var(--background-color-dimmed);
+}
+
+/* -------------------------------------------------------------- split */
+
+/*
+ * A split is one row (split-view spec §6.3): the split glyph in the twisty's
+ * slot, then a tray holding each pane as a tile, in pane order. Every pane
+ * shows its title when each tile would be at least 96px wide; otherwise only
+ * the active pane, the one viewed last, does, and the rest are their
+ * favicons. The tray's own width decides, through the container queries
+ * below: (tray content width - 2px gaps) / panes >= 96px.
+ *
+ * DOM: .sval-row[data-kind="split"] > span.sval-split-glyph +
+ * div.sval-split-body > (span.sval-split-name)? + div.sval-split-tray[data-panes]
+ * > div.sval-split-pane[data-sval-active]? > (img.sval-row-icon | span.sval-split-pick)
+ * + span.sval-split-title.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+.sval-row[data-kind="split"] {
+  --sval-split-border: light-dark(rgb(var(--sval-palette-wash-light) / 0.4), rgb(var(--sval-palette-wash-dark) / 0.42));
+  --sval-split-tray: light-dark(rgb(var(--sval-palette-wash-light) / 0.14), rgba(3, 5, 26, 0.62));
+  --sval-split-cell: light-dark(#ffffff, rgb(var(--sval-palette-wash-dark) / 0.16));
+  --sval-split-cell-hover: light-dark(#dce5fa, rgb(var(--sval-palette-wash-dark) / 0.28));
+  --sval-split-mark: var(--color-accent-primary);
+  height: auto;
+  min-height: var(--sval-row-h);
+  gap: 2px;
+  padding: 2px 4px 2px calc(4px + var(--sval-row-depth, 0) * var(--sval-indent));
+}
+
+/* Inside a group, the split's tray and tiles are the group's colour. */
+.sval-row[data-kind="split"][data-sval-fill] {
+  --sval-split-border: color-mix(in srgb, var(--sval-ink) 62%, transparent);
+  --sval-split-tray: light-dark(rgba(255, 255, 255, 0.65), rgba(3, 5, 26, 0.5));
+  --sval-split-cell: color-mix(in srgb, var(--sval-ink) 26%, transparent);
+  --sval-split-cell-hover: color-mix(in srgb, var(--sval-ink) 42%, transparent);
+  --sval-split-mark: var(--sval-ink);
+}
+
+/* The tile under the pointer washes, never the row. A viewed split keeps
+ * its selected fill (tree). */
+.sval-row[data-kind="split"]:not([aria-selected="true"], [data-sval-viewed]):hover {
+  background: transparent;
+}
+
+.sval-row[data-kind="split"][data-sval-fill]:hover {
+  --sval-step: 1;
+  background: var(--sval-block);
+}
+
+.sval-row[data-kind="split"][data-sval-fill][data-sval-viewed]:hover {
+  --sval-step: var(--sval-selected-block-step);
+}
+
+.sval-row[data-kind="split"].sval-row-dragging {
+  opacity: 0.35;
+}
+
+.sval-row[data-kind="split"][data-sval-named] {
+  align-items: end;
+}
+
+.sval-split-glyph {
+  flex: none;
+  align-self: center;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  opacity: 0.6;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1.75' y='2.75' width='12.5' height='10.5' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Cpath d='M8 3v10' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.sval-row[data-kind="split"][data-sval-named] > .sval-split-glyph {
+  align-self: end;
+  margin-block-end: 6px;
+}
+
+.sval-split-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A named split's caption, over the panes, starting where the first
+ * favicon does: the tray's 1px edge, its 2px inset and the tile's 5px. */
+.sval-split-name {
+  height: 20px;
+  line-height: 20px;
+  padding-inline-start: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-color-deemphasized);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-row[data-kind="split"][data-sval-fill] .sval-split-name {
+  color: var(--sval-ink);
+}
+
+.sval-split-tray {
+  container: sval-split / inline-size;
+  display: flex;
+  gap: 2px;
+  box-sizing: border-box;
+  height: 28px;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid var(--sval-split-border);
+  border-radius: var(--border-radius-medium);
+  background: var(--sval-split-tray);
+}
+
+.sval-split-pane {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 28px;
+  min-width: 0;
+  border-radius: 5px;
+  background: var(--sval-split-cell);
+  outline: none;
+
+  &:hover {
+    background: var(--sval-split-cell-hover);
+  }
+
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--focus-outline-color);
+  }
+}
+
+/* An expanded tile: the active one always, and every one when they fit. */
+.sval-split-pane[data-sval-active] {
+  flex: 1 1 0;
+  justify-content: start;
+  width: auto;
+  padding: 0 8px 0 5px;
+}
+
+@container sval-split (min-width: 194px) {
+  .sval-split-tray[data-panes="2"] > .sval-split-pane {
+    flex: 1 1 0;
+    justify-content: start;
+    width: auto;
+    padding: 0 8px 0 5px;
+  }
+}
+
+@container sval-split (min-width: 292px) {
+  .sval-split-tray[data-panes="3"] > .sval-split-pane {
+    flex: 1 1 0;
+    justify-content: start;
+    width: auto;
+    padding: 0 8px 0 5px;
+  }
+}
+
+@container sval-split (min-width: 390px) {
+  .sval-split-tray[data-panes="4"] > .sval-split-pane {
+    flex: 1 1 0;
+    justify-content: start;
+    width: auto;
+    padding: 0 8px 0 5px;
+  }
+}
+
+.sval-split-title {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-split-pane[data-sval-active] > .sval-split-title {
+  display: block;
+}
+
+@container sval-split (min-width: 194px) {
+  .sval-split-tray[data-panes="2"] > .sval-split-pane > .sval-split-title {
+    display: block;
+  }
+}
+
+@container sval-split (min-width: 292px) {
+  .sval-split-tray[data-panes="3"] > .sval-split-pane > .sval-split-title {
+    display: block;
+  }
+}
+
+@container sval-split (min-width: 390px) {
+  .sval-split-tray[data-panes="4"] > .sval-split-pane > .sval-split-title {
+    display: block;
+  }
+}
+
+/* The viewed pane: an underline flush with the tile's foot, and its title
+ * in the selected row's weight. */
+.sval-split-pane[aria-selected="true"] {
+  &::after {
+    content: "";
+    position: absolute;
+    inset-inline: 8px;
+    bottom: 0;
+    height: 1.5px;
+    border-radius: 1px;
+    background: var(--sval-split-mark);
+  }
+
+  > .sval-split-title {
+    font-weight: var(--font-weight-semibold);
+  }
+}
+
+/* Not loaded here: a muted title and a grey favicon. */
+.sval-split-pane[data-loaded="false"] {
+  > .sval-split-title {
+    color: var(--text-color-deemphasized);
+  }
+
+  > .sval-row-icon {
+    opacity: 0.7;
+    filter: grayscale(1);
+  }
+}
+
+/* A pane waiting for a pick: a dashed slot holding a plus. */
+.sval-split-pick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  border: 1px dashed var(--text-color-deemphasized);
+  border-radius: 4px;
+
+  &::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: var(--text-color-deemphasized);
+    mask: var(--sval-i-plus) center / contain no-repeat;
+  }
+}
+
+.sval-split-pane[data-sval-picker] > .sval-split-title {
+  color: var(--text-color-deemphasized);
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ------------------------------------------------------ window tint */
+
+/*
+ * The surface a group's block is measured from (tree): the window's oklch
+ * lightness, whether it is dark, and which way blocks step off it. Sval's
+ * navy and the light window's blue white when untinted; a tinted window's
+ * are set on the root with its colours (`SvalPanel._applyWindowTint`).
+ * Private and agent windows are dark in both schemes.
+ */
+:root {
+  --sval-tint-l: 0.215;
+  --sval-surface-dark: 1;
+  --sval-block-dir: 1;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([privatebrowsingmode="temporary"], [data-sval-agent]) {
+    --sval-tint-l: 0.962;
+    --sval-surface-dark: 0;
+  }
+}
+
+/* A framed document's `prefers-color-scheme` is its frame's used
+ * `color-scheme` (`nsSubDocumentFrame::MaybeUpdateEmbedderColorScheme`).
+ * Both schemes on the frame give it the OS's, which Sval's dialogs pick
+ * their palette from, whichever scheme the window below takes. */
+.dialogFrame {
+  color-scheme: light dark;
+}
+
+/* Under forced colours the window takes the system's colours, as an
+ * untinted one does (`sval-header.css`, tokens).
+ *
+ * A tinted window's colours are `SvalColor`'s, solved for the window in the
+ * system's appearance and contrast (decision 0057), and its text is light or
+ * dark as the colour needs (`data-sval-ink`), whatever the system's
+ * appearance: its native widgets take the scheme of that text. */
+@media not (forced-colors) {
+  :root[data-sval-tint] {
+    --toolbox-background-color: var(--sval-tint);
+    --toolbox-background-color-inactive: var(--sval-tint);
+    --toolbar-background-color: var(--sval-tint);
+    --toolbox-text-color: var(--sval-tint-strong);
+    --toolbox-text-color-inactive: var(--sval-tint-strong);
+    --toolbar-text-color: var(--sval-tint-strong);
+    --toolbar-field-text-color: var(--sval-tint-field-ink);
+    --toolbar-field-text-color-focus: var(--sval-tint-field-ink);
+  }
+
+  :root[data-sval-ink="light"] {
+    color-scheme: dark;
+  }
+
+  :root[data-sval-ink="dark"] {
+    color-scheme: light;
+    --focus-outline-color: var(--toolbar-text-color);
+  }
+
+  /*
+   * A window that can see through (`SvalColor.seeThroughMaterial`): the
+   * root alone carries the window's colour, at the share of it the
+   * transparency leaves (`--sval-tint-accent`), and the chrome around the
+   * page is transparent over it. While that share is whole the window is
+   * opaque. Below it Gecko makes the window transparent and lays the
+   * system's material behind the whole of it, in the appearance of the
+   * root's color-scheme: the HUD window material on macOS
+   * (`nsCocoaWindow::SetTransparencyMode`), on Windows the Acrylic
+   * backdrop `windowsmica` asks for (`nsWindow::UpdateMicaBackdrop`), and on
+   * Linux the compositor's blur it asks for (`nsWindow::SetMicaBackdrop`),
+   * under a layer the root's colour carries (`SvalColor.accentOf`). The page
+   * and every popup stay opaque. The selector names both attributes to outweigh
+   * the tinted window's own colours in `sval-header.css`.
+   *
+   * macOS gives the root the system window's look, which Gecko draws in
+   * place of the root's background and always takes as opaque
+   * (`-moz-mac-window` in `global.css`, `ComputeSingleCanvasBackground`), so
+   * the root drops that look here. Linux gives a root that draws its own
+   * titlebar the window decorations' look (`-moz-window-decorations` in
+   * Linux's `browser.css`), which draws nothing on Wayland and outweighs
+   * this rule, so the root drops it under a selector that weighs more.
+   */
+  :root[data-sval-tint][data-sval-see-through] {
+    appearance: none;
+    &[customtitlebar][sizemode] {
+      appearance: none;
+    }
+    --toolbox-background-color: transparent;
+    --toolbox-background-color-inactive: transparent;
+    --toolbar-background-color: transparent;
+    --sidebar-background-color: transparent;
+    --sval-on-ink: var(--sval-tint);
+    /* A pin's number and ring are cut in the panel's colour, which is clear
+       here: they take the colour the window shows. */
+    --sval-pin-panel: var(--sval-tint);
+    --sval-surface-ground: var(--sval-tint);
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    background: var(--sval-tint-accent);
+
+    /* Clear at once: these fade their colour as the window turns inactive
+       (`--inactive-window-transition`), and a fade from an opaque colour
+       would hold it over the window's own until it ends. */
+    & :is(body, #browser, #tabbrowser-tabbox, #tabbrowser-tabpanels, #navigator-toolbox, #sval-panel-container, #sidebar-box) {
+      background: transparent;
+      transition: none;
+    }
+  }
+}
+
+/* ------------------------------------------------------ agent marking */
+
+/*
+ * An agent's workspace wears its app's mark, or Sval's robot face for an app
+ * Sval does not know, wherever a workspace is named: the switcher, its list
+ * and every tab row (agent-control spec §6). `--sval-agent-mark` is the mark,
+ * set on the window and on each strip item. Masks
+ * over currentColor, like every icon here, so it follows the theme and
+ * high-contrast mode.
+ */
+.sval-switcher-emoji.sval-agent-glyph::before,
+.sval-row-agent,
+.sval-agent-robot {
+  content: "";
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  background: currentColor;
+  mask: var(--sval-agent-mark, url("chrome://browser/content/sval/agent-robot.svg")) center / contain no-repeat;
+}
+
+.sval-agent-menuitem,
+.sval-isolated-menuitem {
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+/*
+ * An agent's window: a frame tinted in the agent hue (spec §6). The window is
+ * charcoal and grey,
+ * stark and drained of colour, so it reads as somewhere the user does not
+ * work, and Take control is the one bright thing in it. Its frame is darker
+ * than any preset's window (`SvalColor.PRESETS`, gray included), so
+ * no workspace colour the user picks can pass for it.
+ * The robot on its switcher tile and rows says "agent" without colour at
+ * all, so the mark never relies on colour alone.
+ *
+ * Firefox's own remote-control cue (`:root[remotecontrol]`, striped address
+ * bar and robot) is not reused: `gRemoteControl` (browser.js) writes that
+ * attribute on every window whenever Marionette, the remote agent or a
+ * DevTools socket is listening, and takes it away whenever none is, so it
+ * cannot say which windows an agent works in.
+ *
+ * The frame keeps the dark scheme in the light and dark themes, so the
+ * toolbar reads the same in both.
+ */
+:root[data-sval-agent] {
+  --sval-agent-hue: var(--color-gray-55);
+  --sval-agent-on-hue: var(--color-gray-0);
+  --sval-agent-veil: color-mix(in srgb, var(--color-gray-100) 55%, transparent);
+
+  @media not ((prefers-contrast) or (forced-colors)) {
+    --sval-agent-tint: color-mix(in srgb, var(--color-gray-90) 40%, var(--color-gray-100));
+
+    color-scheme: dark;
+    --toolbox-background-color: var(--sval-agent-tint);
+    --toolbox-background-color-inactive: var(--sval-agent-tint);
+    --toolbar-background-color: var(--sval-agent-tint);
+    --sidebar-background-color: var(--sval-agent-tint);
+    --toolbox-text-color: var(--color-gray-0);
+    --toolbox-text-color-inactive: var(--color-gray-0);
+    --toolbar-text-color: var(--color-gray-0);
+  }
+
+  /*
+   * High contrast: the chrome is not colour-forced (Firefox's own themes key
+   * on `prefers-contrast` and `forced-colors` and pick system colours), so
+   * the frame keeps the theme's colours. The robot still says "agent".
+   */
+  @media (prefers-contrast) or (forced-colors) {
+    --sval-agent-hue: var(--border-color);
+    --sval-agent-on-hue: var(--text-color);
+    --sval-agent-veil: color-mix(in srgb, var(--background-color-canvas) 60%, transparent);
+  }
+}
+
+:root[data-sval-agent] #sval-panel-container {
+  border-inline-color: var(--sval-agent-hue);
+}
+
+:root[data-sval-agent] .sval-switcher-emoji.sval-agent-glyph {
+  background: var(--sval-agent-hue);
+  color: var(--sval-agent-on-hue);
+
+  @media (prefers-contrast) or (forced-colors) {
+    background: var(--background-color-canvas);
+    outline: var(--border-width) solid var(--border-color);
+  }
+}
+
+/*
+ * The overlay over an agent's window (`SvalAgentMarking`), drawn over
+ * everything in it, so the user's pointer lands on it and nothing beneath.
+ * The page under it cannot take focus, as under Firefox's own tab-modal
+ * dialogs (`browser[tabDialogShowing]`). The strip over the toolbar is the window's
+ * drag region, so the window still moves; the hole over the window's own
+ * buttons is cut by a clip path the module sets.
+ *
+ * It is Sval's night sky in light and dark chrome alike: the contrast is what
+ * says the window is not the user's right now. The window shows through it
+ * drained of colour, and the sky's stars are tiled gradients at three
+ * co-prime sizes (240, 377 and 613px), so no image is loaded and the pattern
+ * never visibly repeats. The values are the Sval browser design system's, as
+ * in `settings.css` and `home/home.css`: Sval's brand rather than Firefox's
+ * design tokens.
+ */
+browser[sval-agent-layer] {
+  -moz-user-focus: none !important;
+}
+
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+.sval-agent-overlay {
+  --sval-agent-sky: rgb(var(--sval-palette-wash-light) / 0.55);
+  --sval-agent-scrim: rgba(3, 5, 26, 0.9);
+  --sval-agent-star: #ffffff;
+  --sval-agent-star-blue: #a6e8ff;
+  --sval-agent-star-cyan: var(--sval-palette-neon);
+  --sval-agent-star-opacity: 1;
+  --sval-agent-card: rgba(10, 17, 64, 0.94);
+  --sval-agent-card-border: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --sval-agent-text: #ffffff;
+  --sval-agent-sub: #a9b3d6;
+  --sval-agent-avatar: rgb(var(--sval-palette-wash-dark) / 0.12);
+  --sval-agent-avatar-ink: var(--sval-palette-ink-200);
+  --sval-agent-ring: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --sval-agent-cta: var(--sval-palette-blue);
+  --sval-agent-cta-hover: var(--sval-palette-blue-400);
+  --sval-agent-cta-press: var(--sval-palette-blue-600);
+  --sval-agent-focus: var(--sval-palette-neon);
+
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, var(--sval-agent-sky), var(--sval-agent-scrim));
+  backdrop-filter: grayscale(1);
+  cursor: not-allowed;
+  -moz-window-dragging: no-drag;
+  animation: sval-agent-in 240ms ease-out;
+
+  @media (prefers-color-scheme: dark) {
+    --sval-agent-star-opacity: 0.6;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: var(--sval-agent-star-opacity);
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 23px 41px, var(--sval-agent-star) 0 1px, transparent 1.5px) 0 0 / 240px 240px,
+      radial-gradient(circle at 131px 87px, rgba(255, 255, 255, 0.75) 0 1px, transparent 1.5px) 0 0 / 240px 240px,
+      radial-gradient(circle at 77px 203px, rgba(255, 255, 255, 0.6) 0 1px, transparent 1.5px) 0 0 / 240px 240px,
+      radial-gradient(circle at 211px 151px, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.5px) 0 0 / 240px 240px,
+      radial-gradient(circle at 61px 300px, var(--sval-agent-star-blue) 0 1.2px, transparent 1.8px) 0 0 / 377px 377px,
+      radial-gradient(circle at 290px 120px, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.5px) 0 0 / 377px 377px,
+      radial-gradient(circle at 180px 30px, rgb(var(--sval-palette-wash-dark) / 0.7) 0 1px, transparent 1.5px) 0 0 / 377px 377px,
+      radial-gradient(circle at 340px 260px, var(--sval-agent-star) 0 1.2px, transparent 1.8px) 0 0 / 377px 377px,
+      radial-gradient(circle at 400px 90px, var(--sval-agent-star) 0 1.6px, rgb(var(--sval-palette-wash-dark) / 0.25) 2px, transparent 4px) 0 0 / 613px 613px,
+      radial-gradient(circle at 120px 480px, var(--sval-agent-star-cyan) 0 1.5px, rgba(92, 242, 255, 0.2) 2px, transparent 4px) 0 0 / 613px 613px,
+      radial-gradient(circle at 530px 410px, var(--sval-agent-star) 0 1.4px, transparent 2px) 0 0 / 613px 613px;
+  }
+}
+
+@keyframes sval-agent-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.sval-agent-overlay[hidden],
+.sval-agent-bar[hidden] {
+  display: none;
+}
+
+.sval-agent-titlebar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: var(--sval-agent-titlebar-height, 0);
+  -moz-window-dragging: drag;
+}
+
+/* The capsule at the window's centre: who, what they are doing, and the way
+   back in. */
+/* Two blocks, apart: who is acting and what it is doing, then the user's
+   controls. The card itself draws nothing. It takes focus only so a screen
+   reader announces it, and each control in it shows its own focus. */
+.sval-agent-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 92vw;
+  color: var(--sval-agent-text);
+  font: 400 13px/1.3 var(--sval-font);
+  white-space: nowrap;
+  cursor: default;
+  outline: none;
+}
+
+.sval-agent-card > .sval-agent-label,
+.sval-agent-controls {
+  border: 2px solid var(--sval-agent-focus);
+  background: var(--sval-agent-card);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.75),
+    0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.sval-agent-card > .sval-agent-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 10px 28px 10px 10px;
+  border-radius: 999px;
+}
+
+.sval-agent-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 16px;
+  border-radius: 28px;
+}
+
+.sval-agent-actions {
+  display: flex;
+  gap: 10px;
+
+  > .sval-agent-take {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* The robot in a ring that pulses as the agent acts, twice for each action
+ * (`#pulseRing` in SvalAgentMarking.sys.mjs). An endless ring would keep the
+ * window busy while the agent is idle: a box-shadow animation is painted
+ * again on the main thread and redrawn by the GPU process every frame. */
+.sval-agent-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--sval-agent-avatar);
+  color: var(--sval-agent-avatar-ink);
+  animation: sval-agent-ring 2s ease-in-out 2;
+
+  > .sval-agent-robot {
+    width: 20px;
+    height: 20px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    box-shadow: 0 0 0 4px var(--sval-agent-ring);
+  }
+}
+
+@keyframes sval-agent-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--sval-agent-ring);
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--sval-agent-ring);
+  }
+}
+
+.sval-agent-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-agent-card .sval-agent-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.sval-agent-status,
+.sval-agent-challenge {
+  max-width: 420px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--sval-agent-sub);
+}
+
+.sval-agent-status:empty {
+  display: none;
+}
+
+/* The user's way to lift the rate limit on this agent. */
+.sval-agent-polite {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 6px;
+  color: var(--sval-agent-sub);
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--sval-agent-text);
+  }
+
+  > input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--sval-agent-cta);
+  }
+
+  > input:focus-visible {
+    outline: 2px solid var(--sval-agent-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* The one bright thing in an agent's window: the way back in. */
+.sval-agent-take {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  height: 48px;
+  padding: 0 22px 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--sval-agent-cta);
+  box-shadow: 0 10px 32px color-mix(in srgb, var(--sval-agent-cta) 60%, transparent);
+  color: #ffffff;
+  font: 600 15px/1 var(--sval-font);
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  &::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    background: currentColor;
+    mask: url("chrome://browser/content/sval/icons/mouse-pointer-2.svg") center / contain no-repeat;
+  }
+
+  &:hover {
+    background: var(--sval-agent-cta-hover);
+  }
+
+  &:hover:active {
+    background: var(--sval-agent-cta-press);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-agent-cta-hover);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* Stop, and Resume in its place: as large as Take control, in the card's own
+   surface, so Take control stays the one bright thing. */
+.sval-agent-stop,
+.sval-agent-resume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  height: 48px;
+  padding: 0 22px 0 18px;
+  border: 1px solid var(--sval-agent-card-border);
+  border-radius: 999px;
+  background: var(--sval-agent-avatar);
+  color: var(--sval-agent-text);
+  font: 600 15px/1 var(--sval-font);
+  cursor: pointer;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    background: url("chrome://browser/content/sval/agent-stop.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  &:hover {
+    background: var(--sval-agent-ring);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-agent-focus);
+    outline-offset: 3px;
+  }
+}
+
+.sval-agent-resume::before {
+  background-image: url("chrome://global/skin/media/play-fill.svg");
+}
+
+/* Navigation the window asked of the tab was refused: the capsule says so. */
+.sval-agent-card[data-pulse] {
+  animation: sval-agent-pulse 600ms ease-out;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation-duration: 1ms;
+    outline: 2px solid var(--sval-agent-focus);
+  }
+}
+
+@keyframes sval-agent-pulse {
+  40% {
+    transform: scale(1.03);
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+/*
+ * High contrast: the sky and the capsule take the theme's system colours,
+ * like the rest of the chrome; the robot and the words still say "agent".
+ */
+@media (prefers-contrast) or (forced-colors) {
+  .sval-agent-overlay {
+    background: var(--sval-agent-veil);
+
+    &::before {
+      display: none;
+    }
+  }
+
+  .sval-agent-card > .sval-agent-label,
+  .sval-agent-controls {
+    border-color: var(--border-color);
+    background: var(--background-color-box);
+    backdrop-filter: none;
+    box-shadow: none;
+    color: var(--text-color);
+  }
+
+  .sval-agent-status,
+  .sval-agent-challenge,
+  .sval-agent-polite {
+    color: var(--text-color);
+  }
+
+  .sval-agent-stop,
+  .sval-agent-resume {
+    border: var(--border-width) solid var(--button-border-color);
+    background: var(--button-background-color);
+    color: var(--button-text-color);
+
+    &:hover {
+      background: var(--button-background-color-hover);
+    }
+  }
+
+  .sval-agent-take {
+    border: var(--border-width) solid var(--button-border-color-primary);
+    background: var(--button-background-color-primary);
+    box-shadow: none;
+    color: var(--button-text-color-primary);
+
+    &:hover {
+      background: var(--button-background-color-primary-hover);
+    }
+
+    &:hover:active {
+      background: var(--button-background-color-primary-active);
+    }
+  }
+}
+
+/*
+ * Above a tab the user has taken: the header's surface and pills, so it reads
+ * as part of Sval's chrome, with the robot in its ring and the way to hand the
+ * tab back.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+/* The bar sits above the page as the find bar does (`sval-header.css`), in
+   the chrome's colour, with the page's rounded frame starting under it. Its
+   height is its 32px button and 6px either side. */
+#tabbrowser-tabpanels {
+  --sval-agent-bar-h: calc(32px + 2 * 6px);
+}
+
+:root:not([inDOMFullscreen]) #tabbrowser-tabpanels > :is(.browserSidebarContainer, .split-view-panel):has(> .browserContainer > .sval-agent-bar:not([hidden])) {
+  &::after {
+    top: var(--sval-agent-bar-h);
+  }
+
+  &:has(> .browserContainer > findbar:not([hidden]))::after {
+    top: calc(var(--sval-agent-bar-h) + var(--sval-findbar-h));
+  }
+
+  > .browserContainer {
+    background: var(--toolbar-background-color);
+  }
+
+  > .browserContainer > .browserStack {
+    border-start-start-radius: 8px;
+    border-start-end-radius: 8px;
+    overflow: clip;
+  }
+}
+
+.sval-agent-bar {
+  order: -2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  height: var(--sval-agent-bar-h);
+  padding: 6px 8px 6px 12px;
+  background: var(--toolbar-background-color);
+  color: var(--toolbar-text-color);
+  font: 500 13px/1.3 var(--sval-font);
+
+  > .sval-agent-robot {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.sval-agent-bar .sval-agent-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sval-agent-give {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 32px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--sval-palette-blue);
+  box-shadow: 0 6px 20px rgba(31, 107, 255, 0.45);
+  color: #ffffff;
+  font: 600 13px/1 var(--sval-font);
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  &:hover {
+    background: var(--sval-palette-blue-400);
+  }
+
+  &:hover:active {
+    background: var(--sval-palette-blue-600);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-palette-blue-400);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+@media (prefers-contrast) or (forced-colors) {
+  .sval-agent-bar {
+    background: var(--background-color-box);
+    color: var(--text-color);
+  }
+
+  .sval-agent-give {
+    border: var(--border-width) solid var(--button-border-color-primary);
+    background: var(--button-background-color-primary);
+    box-shadow: none;
+    color: var(--button-text-color-primary);
+  }
+}
+
+/* Read by screen readers, and drawn nowhere. */
+.sval-agent-announcer {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------ drag and drop */
+
+.sval-row.sval-row-dragging {
+  opacity: var(--opacity-deemphasized-strong);
+}
+
+/* A row's drop target outlined, in the row under its content
+   (`_outlineDropTarget`): solid with a wash for a group the drop goes into,
+   dashed for a row of a new group waiting on its name. */
+.sval-drop-outline {
+  --sval-drop-c: var(--color-accent-primary);
+  position: absolute;
+  z-index: -1;
+  box-sizing: border-box;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  border: 1.5px solid var(--sval-drop-c);
+  border-radius: var(--border-radius-medium);
+  pointer-events: none;
+
+  .sval-drop-into > & {
+    background: color-mix(in srgb, var(--sval-drop-c) 30%, transparent);
+  }
+
+  .sval-drop-merge > & {
+    border-style: dashed;
+  }
+}
+
+/* The drop marks' sizes are the panel-drag handoff's own, in px. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+/* A middle drop's mark: the row faded under the panel's colour, and its two
+   halves, New group and the split. `_showDropMark` sets its box to the
+   row's drop target.
+   The panel's colour is `--sval-pin-panel`, which holds the tint where a
+   see-through window clears `--sidebar-background-color`. */
+.sval-drop-mark {
+  --sval-drop-c: var(--color-accent-primary);
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--border-radius-medium);
+  background: color-mix(in srgb, var(--sval-pin-panel) 85%, transparent);
+  pointer-events: none;
+}
+
+.sval-drop-mark[hidden],
+.sval-drop-half[hidden] {
+  display: none;
+}
+
+/* Equal halves, so each covers the zone it names (`dropIntent`). */
+.sval-drop-half {
+  flex: 1 1 0;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1.5px solid var(--sval-drop-c);
+  border-radius: 10px;
+  color: var(--sval-drop-c);
+  font-size: 12px;
+  font-weight: 600;
+
+  &[data-active]:not([data-faint]) {
+    background: var(--sval-drop-c);
+    color: var(--button-text-color-primary);
+  }
+
+  &[data-faint] {
+    border-style: dashed;
+    border-color: var(--text-color-deemphasized);
+    color: var(--text-color-deemphasized);
+    opacity: 0.6;
+  }
+}
+
+.sval-drop-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: var(--sval-i-folder) center / contain no-repeat;
+
+  [data-half="split"] > & {
+    background: url("chrome://browser/content/sval/header-icons/split.svg") center / contain no-repeat;
+    mask: none;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+}
+
+.sval-drop-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Where an Alt-dragged page lands among its split's tiles. */
+.sval-drop-bar {
+  position: absolute;
+  width: 2px;
+  translate: -50% 0;
+  border-radius: 1px;
+  background: var(--sval-drop-c, var(--color-accent-primary));
+  pointer-events: none;
+
+  &[data-stacked="true"] {
+    height: 2px;
+    translate: 0 -50%;
+  }
+}
+
+.sval-drop-bar[hidden] {
+  display: none;
+}
+
+/* What a drag shows when it is not the row it started on: a page leaving
+   its split as the tab row it becomes, or a group's header alone. */
+.sval-drag-image {
+  position: fixed;
+  top: -1000px;
+  inset-inline-start: 0;
+  width: 220px;
+  border-radius: var(--border-radius-medium);
+  background: var(--sval-popup-bg);
+  box-shadow: var(--sval-popup-shadow);
+}
+
+.sval-drag-count {
+  margin-inline-start: 6px;
+  color: var(--text-color-deemphasized);
+  font-size: 12px;
+  font-weight: 500;
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+.sval-drop-line {
+  position: absolute;
+  inset-inline-start: calc(var(--space-small) + var(--space-xsmall) + var(--sval-drop-depth, 0) * var(--sval-indent));
+  inset-inline-end: var(--space-small);
+  border-top: var(--focus-outline-width) solid var(--color-accent-primary);
+  translate: 0 -50%;
+  pointer-events: none;
+}
+
+.sval-drop-line::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(-1 * var(--space-small));
+  top: -1px;
+  /* The ring at the drop line's start: 6px so its 2px border leaves a dot. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  width: 6px;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  height: 6px;
+  translate: 0 -50%;
+  border: var(--focus-outline-width) solid var(--color-accent-primary);
+  border-radius: var(--border-radius-circle);
+  background: var(--sidebar-background-color);
+}
+
+.sval-drop-line[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A landing holds its colour 150ms, then eases back over 450ms. */
+  .sval-row.sval-row-landed,
+  .sval-split-pane.sval-row-landed-split,
+  .sval-row.sval-row-landed-into {
+    animation: sval-row-landed 600ms ease-out;
+  }
+
+  /* Two soft beats on the design system's orbit easing, so a group just made
+     is found without taking the selected row's bar. */
+  .sval-row.sval-row-new {
+    animation: sval-row-new 450ms cubic-bezier(0.22, 0.8, 0.24, 1) 2;
+  }
+
+  /* A tab opening and closing. The durations are `ROW_FADE_MS` in
+     sval-panel-rows.js, which keeps a closed row only that long. */
+  .sval-row.sval-row-opening {
+    animation: sval-row-opening 150ms cubic-bezier(0.22, 0.8, 0.24, 1);
+  }
+
+  .sval-row.sval-row-leaving {
+    animation: sval-row-leaving 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+}
+
+/* A closed tab's row while it fades: it folds away as it goes, so the rows
+   below close the gap instead of jumping into it. */
+.sval-row.sval-row-leaving {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@keyframes sval-row-opening {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sval-row-leaving {
+  to {
+    opacity: 0;
+    height: 0;
+  }
+}
+
+@keyframes sval-row-new {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  40% {
+    background-color: color-mix(in srgb, var(--color-accent-primary) 25%, transparent);
+  }
+}
+
+@keyframes sval-row-landed {
+  0%,
+  25% {
+    background-color: var(--sval-landed);
+  }
+}
+
+/* Under reduced motion a landing holds its colour 300ms and does not fade. */
+@media (prefers-reduced-motion: reduce) {
+  .sval-row.sval-row-landed,
+  .sval-split-pane.sval-row-landed-split,
+  .sval-row.sval-row-landed-into {
+    animation: sval-row-landed-held 300ms step-end;
+  }
+}
+
+@keyframes sval-row-landed-held {
+  0% {
+    background-color: var(--sval-landed);
+  }
+}
+
+.sval-row.sval-row-landed {
+  --sval-landed: color-mix(in srgb, var(--color-accent-primary) 24%, transparent);
+}
+
+.sval-split-pane.sval-row-landed-split {
+  --sval-landed: color-mix(in srgb, var(--color-accent-primary) 45%, transparent);
+}
+
+.sval-row.sval-row-landed-into {
+  --sval-landed: color-mix(in srgb, var(--color-accent-primary) 40%, transparent);
+}
+
+.sval-row[data-sval-fill]:is(.sval-row-landed, .sval-row-landed-into),
+.sval-row[data-sval-fill] .sval-split-pane.sval-row-landed-split {
+  --sval-landed: color-mix(in srgb, var(--sval-ink) 40%, transparent);
+}
+
+/* ------------------------------------------------------------ footer */
+
+/* The feedback button keeps to the indicator's line when the row under it
+ * holds more lines. */
+.sval-panel-footer {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-small);
+  padding: var(--space-small);
+  border-top: var(--border-width) solid var(--sval-hairline);
+}
+
+/* While media plays, the footer is three columns, so the media controls sit
+ * in its middle whatever the sync row beside them holds, shown or hidden. */
+.sval-panel-footer:has(> .sval-media-bar:not([hidden])) {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+
+  > .sval-sync-row {
+    grid-column: 1;
+  }
+
+  > .sval-media-bar {
+    grid-column: 2;
+  }
+
+  > .sval-feedback-button {
+    grid-column: 3;
+    justify-self: end;
+  }
+}
+
+/* Back, Play/Pause and Forward: a cluster drawn as the header's are
+ * (sval-header.css), an outlined pill of round buttons with the toolbar's
+ * washes. */
+.sval-media-bar {
+  display: flex;
+  align-items: center;
+  padding: var(--space-xxsmall);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  border: var(--border-width) solid var(--sval-cluster-border);
+  border-radius: var(--border-radius-circle);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-media-control {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  width: 28px;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius-circle);
+  background: transparent;
+  color: var(--toolbar-text-color, inherit);
+
+  /* The header's washes (sval-header.css), which no design token carries. */
+  &:hover {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    background-color: var(--sval-wash);
+  }
+
+  &:hover:active {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    background-color: var(--sval-wash-strong);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
+
+  &::before {
+    content: "";
+    width: var(--size-item-xsmall);
+    height: var(--size-item-xsmall);
+    background: currentColor;
+  }
+
+  &[data-command="mediaToggle"]::before {
+    mask: var(--sval-i-pause) center / contain no-repeat;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+
+  &[data-command="mediaPrevious"]::before {
+    mask: var(--sval-i-skip-back) center / contain no-repeat;
+  }
+
+  &[data-command="mediaNext"]::before {
+    mask: var(--sval-i-skip-back) center / contain no-repeat;
+    transform: scaleX(-1);
+  }
+
+  &[data-command="mediaBack"]::before {
+    mask: var(--sval-i-seek-back) center / contain no-repeat;
+  }
+
+  &[data-command="mediaForward"]::before {
+    mask: var(--sval-i-seek-back) center / contain no-repeat;
+    transform: scaleX(-1);
+  }
+}
+
+.sval-media-bar[data-media="play"] > [data-command="mediaToggle"]::before {
+  mask-image: var(--sval-i-play);
+}
+
+/* Send Feedback (`SvalFeedbackForm`): Lucide's message-circle in the panel's
+ * icon ink, at the row's end whether or not the indicator shows. The sizes
+ * are the indicator's. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+.sval-feedback-button {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius-circle);
+  background: transparent;
+  color: inherit;
+
+  &::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    background: url("chrome://browser/content/sval/icons/message-circle.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  &:hover {
+    background: var(--button-background-color-ghost-hover);
+  }
+
+  &:hover:active {
+    background: var(--button-background-color-ghost-active);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+/*
+ * The sync indicator (messages spec §3, §9.1, §9.2): a pill holding the
+ * moon in a 24px slot and, when the state has one, its label, then the
+ * buttons the state asks for at the row's end, wrapping to a row of their
+ * own when the label's row is full. A state whose detail the footer shows
+ * (spec §3) puts the detail and then its buttons on lines of their own,
+ * each starting under the label. The icons use `context-fill`, which
+ * resolves only in an image painted with `-moz-context-properties`, so the
+ * moon and badges are background images filled with the ink.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+.sval-sync-row {
+  --sval-sync-warning: #ffb224;
+  --sval-sync-warning-mark: #241600;
+  --sval-sync-error: #ff6b70;
+  --sval-sync-error-mark: #2a0008;
+  --sval-sync-ring: var(--sidebar-background-color);
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* Under forced colours the badges take the system's colours below, whatever
+ * the scheme or tint. */
+@media not (forced-colors) {
+  @media (prefers-color-scheme: light) {
+    :root:not([privatebrowsingmode="temporary"], [data-sval-agent], [data-sval-tint]) .sval-sync-row {
+      --sval-sync-warning: #b86e00;
+      --sval-sync-warning-mark: #ffffff;
+      --sval-sync-error: var(--sval-palette-red);
+      --sval-sync-error-mark: #ffffff;
+    }
+  }
+
+  :root[data-sval-ink="dark"]:not([privatebrowsingmode="temporary"], [data-sval-agent]) .sval-sync-row {
+    --sval-sync-warning: #b86e00;
+    --sval-sync-warning-mark: #ffffff;
+    --sval-sync-error: var(--sval-palette-red);
+    --sval-sync-error-mark: #ffffff;
+  }
+}
+
+@media (forced-colors) {
+  .sval-sync-row {
+    --sval-sync-warning: CanvasText;
+    --sval-sync-warning-mark: Canvas;
+    --sval-sync-error: CanvasText;
+    --sval-sync-error-mark: Canvas;
+    --sval-sync-ring: Canvas;
+  }
+}
+
+.sval-sync-indicator {
+  appearance: none;
+  flex: none;
+  min-width: 28px;
+  max-width: 100%;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:has(> .sval-sync-label:not(:empty)) {
+    padding: 0 10px 0 3px;
+  }
+
+  &:hover {
+    background: var(--button-background-color-ghost-hover);
+  }
+
+  &:hover:active {
+    background: var(--button-background-color-ghost-active);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
+}
+
+.sval-sync-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  [data-severity="offline"] > & {
+    font-weight: 400;
+    color: color-mix(in srgb, currentColor 72%, transparent);
+  }
+
+  /* An empty label stays in the tree, because it is the live region that
+   * announces the next one, and takes no room. */
+  &:not(:empty) {
+    margin-inline-start: 7px;
+  }
+}
+
+.sval-sync-icon {
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 24px;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    -moz-context-properties: fill;
+    background: center / contain no-repeat;
+  }
+
+  &::before {
+    inset: 0;
+    fill: currentColor;
+    background-image: url("chrome://browser/content/sval/sync-icons/moon.svg");
+  }
+
+  [data-icon="moon-off"] > &::before {
+    background-image: url("chrome://browser/content/sval/sync-icons/moon-off.svg");
+  }
+
+  [data-icon="moon-offline"] > &::before {
+    opacity: 0.5;
+  }
+
+  /* Syncing: the satellite circles the moon once per 2.4s. */
+  [data-icon="moon-syncing"] > &::after {
+    inset: 0;
+    fill: currentColor;
+    background-image: url("chrome://browser/content/sval/sync-icons/satellite.svg");
+    animation: sval-sync-orbit 2.4s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation-play-state: paused;
+    }
+  }
+
+  /* A badge: a 14.4px disc off the slot's corner, ringed in the footer's
+   * colour so it stands apart from the moon, holding a 12px mark. */
+  :is([data-icon="moon-offline"], [data-icon="moon-warning"], [data-icon="moon-error"]) > &::after {
+    inset-block-end: -3.6px;
+    inset-inline-end: -3.6px;
+    width: 14.4px;
+    height: 14.4px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.8px var(--sval-sync-ring);
+    background-size: 12px;
+  }
+
+  [data-icon="moon-offline"] > &::after {
+    background-color: var(--text-color-deemphasized);
+    background-image: url("chrome://browser/content/sval/sync-icons/badge-pause.svg");
+    fill: var(--sval-sync-ring);
+  }
+
+  [data-icon="moon-warning"] > &::after {
+    background-color: var(--sval-sync-warning);
+    background-image: url("chrome://browser/content/sval/sync-icons/badge-bang.svg");
+    fill: var(--sval-sync-warning-mark);
+  }
+
+  [data-icon="moon-error"] > &::after {
+    background-color: var(--sval-sync-error);
+    background-image: url("chrome://browser/content/sval/sync-icons/badge-x.svg");
+    fill: var(--sval-sync-error-mark);
+  }
+}
+
+@keyframes sval-sync-orbit {
+  to {
+    rotate: 1turn;
+  }
+}
+
+.sval-sync-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-inline-start: auto;
+
+  &:empty {
+    display: none;
+  }
+}
+
+/* The label's offset in the pill: its start padding, the moon's slot and
+ * the label's margin. */
+.sval-sync-detail,
+.sval-sync-row:has(> .sval-sync-detail:not([hidden])) > .sval-sync-actions {
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding-inline-start: calc(3px + 24px + 7px);
+}
+
+.sval-sync-detail {
+  font-size: 12px;
+  line-height: 16px;
+  color: color-mix(in srgb, currentColor 80%, transparent);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-sync-action,
+.sval-sync-dismiss {
+  appearance: none;
+  height: 28px;
+  margin: 0;
+  border: var(--border-width) solid var(--border-color-interactive);
+  border-radius: 14px;
+  background: var(--button-background-color);
+  color: var(--button-text-color);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover {
+    background: var(--button-background-color-hover);
+  }
+
+  &:hover:active {
+    background: var(--button-background-color-active);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: var(--focus-outline-offset);
+  }
+}
+
+.sval-sync-action {
+  padding: 0 12px;
+}
+
+.sval-sync-dismiss {
+  width: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    mask: var(--sval-i-close) center / contain no-repeat;
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ------------------------------------------------------------ undo */
+
+/* The Undo message (`sval-panel-undo.js`): the element picker's toast
+ * (`sval-element-picker.css`, Toast) drawn on the chrome's tokens, which the
+ * picker's overlay copies. It sits above the footer in the panel's column,
+ * so it covers no row, and wraps where one line does not fit. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+.sval-undo-region {
+  flex: none;
+
+  &:empty {
+    display: none;
+  }
+}
+
+.sval-undo {
+  --sval-undo-done: #4fcf6a;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  min-height: 48px;
+  margin: var(--space-small);
+  padding: 5px 6px 5px 16px;
+  border: 1px solid var(--sval-popup-edge, var(--sval-cluster-border));
+  border-radius: 24px;
+  background: var(--sval-popup-bg, var(--sval-surface));
+  box-shadow: var(--sval-popup-shadow);
+  color: var(--sval-text);
+  font-family: var(--sval-font);
+  font-size: 14px;
+  font-weight: 600;
+  animation: sval-undo-rise 160ms cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes sval-undo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.sval-undo-icon,
+.sval-undo-glyph,
+.sval-undo-dismiss::before {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.sval-undo-icon {
+  color: var(--sval-undo-done);
+  mask-image: url("chrome://browser/content/sval/icons/check.svg");
+}
+
+.sval-undo-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-undo-button,
+.sval-undo-dismiss {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--sval-prot-secondary);
+  color: var(--sval-prot-secondary-ink);
+  font: inherit;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--sval-prot-secondary-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: 2px;
+  }
+}
+
+.sval-undo-button {
+  padding: 0 14px 0 11px;
+}
+
+.sval-undo-glyph {
+  mask-image: url("chrome://browser/content/sval/icons/undo-2.svg");
+}
+
+.sval-undo-dismiss {
+  width: 36px;
+  padding: 0;
+
+  &::before {
+    content: "";
+    mask-image: url("chrome://browser/content/sval/icons/x.svg");
+  }
+}
+
+@media not (forced-colors) {
+  @media (prefers-color-scheme: light) {
+    :root:not([privatebrowsingmode="temporary"], [data-sval-agent], [data-sval-tint]) .sval-undo {
+      --sval-undo-done: #1e8c3a;
+    }
+  }
+
+  :root[data-sval-ink="dark"]:not([privatebrowsingmode="temporary"], [data-sval-agent]) .sval-undo {
+    --sval-undo-done: #1e8c3a;
+  }
+}
+
+@media (forced-colors) {
+  .sval-undo {
+    --sval-undo-done: CanvasText;
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .sval-undo-button,
+  .sval-undo-dismiss {
+    border-color: ButtonText;
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ------------------------------------------------------------- 48px */
+
+@container sval-panel (max-width: 72px) {
+  .sval-switcher-bar {
+    flex-direction: column;
+    padding-inline: var(--space-xsmall);
+  }
+
+  .sval-switcher {
+    flex: none;
+    width: 100%;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sval-undo-icon,
+  .sval-undo-button > span:not(.sval-undo-glyph),
+  .sval-undo-dismiss,
+  .sval-switcher::after,
+  .sval-favorites::after,
+  .sval-sync-label,
+  .sval-sync-detail,
+  .sval-sync-actions {
+    display: none;
+  }
+
+  /* The Undo message keeps its button, and its text for a screen reader. */
+  /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+  .sval-undo {
+    padding: 5px;
+    margin-inline: var(--space-xsmall);
+  }
+
+  .sval-undo-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .sval-undo-button {
+    width: 36px;
+    padding: 0;
+  }
+  /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+  /* Only the icon is left, in a circle; its tooltip and accessible name
+   * still say the state. The feedback button stacks under it. */
+  .sval-sync-row {
+    justify-content: center;
+  }
+
+  .sval-panel-footer {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sval-feedback-button {
+    width: var(--size-item-large);
+    height: var(--size-item-large);
+    margin: 0;
+  }
+
+  .sval-sync-indicator.sval-sync-indicator {
+    width: var(--size-item-large);
+    min-width: var(--size-item-large);
+    height: var(--size-item-large);
+    padding: 0;
+    border-radius: var(--border-radius-circle);
+  }
+
+  /* New tab and New group stack, each its icon, as the buttons above them
+   * do. */
+  .sval-panel-header {
+    flex-direction: column;
+    margin-inline: var(--space-xsmall);
+    justify-content: center;
+  }
+
+  .sval-newtab,
+  .sval-favorites {
+    flex: none;
+    width: 100%;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sval-favorites-bar {
+    padding-inline: var(--space-xsmall);
+  }
+
+  .sval-row {
+    margin-inline: var(--space-xsmall);
+    padding-inline: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .sval-row > :is(.sval-twisty, .sval-row-close, .sval-row-count),
+  .sval-row[data-media] > .sval-row-audio,
+  .sval-row[aria-expanded] > .sval-row-count {
+    display: none;
+  }
+
+  /* Out of sight but still the accessible names of their rows and buttons,
+   * which `display: none` would take with them. */
+  .sval-switcher-name,
+  .sval-label,
+  .sval-row > .sval-row-name {
+    position: absolute;
+    flex: none;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sval-row:not([aria-level="1"])::after {
+    display: none;
+  }
+
+  .sval-row[aria-selected="true"]::before {
+    inset-inline-start: 0;
+    margin: 0;
+  }
+
+  /* A split's panes stack in its one box, first on top, and the underline
+   * alone marks the viewed one. Its name is its tooltip and its accessible
+   * name. */
+  /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+  .sval-row[data-kind="split"] {
+    padding: 2px 0;
+  }
+
+  .sval-row[data-kind="split"][data-sval-viewed]::before,
+  .sval-split-glyph,
+  .sval-split-name {
+    display: none;
+  }
+
+  .sval-split-tray {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .sval-split-pane,
+  .sval-split-pane[data-sval-active] {
+    flex: none;
+    width: auto;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .sval-split-pane > .sval-split-title,
+  .sval-split-pane[data-sval-active] > .sval-split-title {
+    display: none;
+  }
+  /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+}
+
+/* `(forced-colors)`, not `(forced-colors: active)`: a chrome window in a
+ * high-contrast theme is only ever `requested` (`nsPresContext::
+ * UpdateForcedColors`), so `active` never matches here, as upstream's own
+ * chrome stylesheets assume.
+ *
+ * Under increased contrast and forced colours the selected row, in a
+ * coloured group or not, is the system's selection: its fill, its text and
+ * the bar in that text's colour. Firefox's selection tokens name those
+ * colours under forced colours only, so the rule names them itself. Its
+ * selector outranks a coloured group's block, a nested card's row and a
+ * split's hover. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+@media (prefers-contrast) or (forced-colors) {
+  .sval-panel .sval-row.sval-row:is([aria-selected="true"], [data-sval-viewed]) {
+    background: SelectedItem;
+    color: SelectedItemText;
+
+    &::before {
+      background: SelectedItemText;
+    }
+
+    > .sval-row-surface[data-inner] {
+      background: transparent;
+    }
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+
+@media (forced-colors) {
+  /* The rails and hover are painted in Sval's own colours, which a
+   * high-contrast theme does not reach and forced colours repaint as Canvas.
+   * No background-color token is CanvasText, so the rails name the system
+   * colour itself. */
+  .sval-row:not([aria-level="1"])::after,
+  .sval-row-base-rail {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    background: CanvasText;
+  }
+
+  :is(.sval-row, .sval-switcher, .sval-newtab):hover:not([aria-selected="true"]) {
+    outline: var(--border-width) solid var(--color-accent-primary-selected);
+    outline-offset: calc(-1 * var(--border-width));
+  }
+}
+
+/* A workspace switch blends the window from one workspace's tint to the
+   next (`_switchToOnce`). Registered as a colour so it interpolates; nothing
+   reads it with a fallback. */
+@property --sval-tint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+:root[data-sval-switching] {
+  transition: --sval-tint 150ms ease-out;
+}

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  Sval's workspace and group dialog, for creating and editing, shown in the
+  browser window's modal dialog by `SvalNewWorkspace.sys.mjs`.
+  `new-workspace.js` puts the fields `workspace-form.js` draws under the
+  title, since first run's Workspace step draws the same fields.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>New Workspace</title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-color-picker.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/new-workspace.css"
+    />
+    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script src="chrome://browser/content/sval/workspace-form.js"></script>
+    <script src="chrome://browser/content/sval/new-workspace.js"></script>
+  </head>
+
+  <body>
+    <form class="sval-dialog sval-nw" aria-labelledby="sval-nw-title">
+      <h1 class="sval-dialog-title" id="sval-nw-title">New Workspace</h1>
+      <p class="sval-nw-look-error" id="sval-nw-look-error" role="alert"></p>
+      <label
+        class="sval-dialog-check sval-dialog-well-check sval-nw-isolated"
+        hidden="hidden"
+      >
+        <input
+          type="checkbox"
+          aria-labelledby="sval-nw-isolated-title"
+          aria-describedby="sval-nw-isolated-note"
+        />
+        <span class="sval-dialog-check-words">
+          <span class="sval-dialog-check-title" id="sval-nw-isolated-title"
+            >Isolate this Workspace<span
+              class="sval-dialog-iso-glyph"
+              aria-hidden="true"
+            ></span
+          ></span>
+          <span class="sval-dialog-check-note" id="sval-nw-isolated-note"
+            >Sites in this Workspace get their own sign-ins and can’t see yours
+            from other Workspaces.</span
+          >
+        </span>
+      </label>
+      <div class="sval-dialog-field sval-nw-archive" hidden="hidden">
+        <label class="sval-dialog-label" for="sval-nw-archive-choice"
+          >Archive idle tabs</label
+        >
+        <select
+          class="sval-dialog-input sval-nw-archive-choice"
+          id="sval-nw-archive-choice"
+        ></select>
+      </div>
+      <div class="sval-dialog-actions">
+        <button class="sval-dialog-btn sval-nw-cancel" type="button">
+          Cancel
+        </button>
+        <button class="sval-dialog-btn sval-nw-create primary" type="submit">
+          Create
+        </button>
+      </div>
+    </form>
+  </body>
+</html>

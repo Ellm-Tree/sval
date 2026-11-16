@@ -1,0 +1,236 @@
+Sval: the URL classifier steps aside for the features the content classifier replaces
+
+A backport of mozilla-central's
+privacy.trackingprotection.urlclassifier.disable_for_channel_classifier pref
+and its check in AntiTrackingChannelClassifierUtils::CheckChannelHelper,
+narrowed: with it on, the URL classifier's tracking features stay off, so
+the two engines never match the same tracking lists, while the
+consent-manager and anti-fraud annotations and the harmful add-on protection
+keep running, as in Firefox. Safe Browsing does not run through this path.
+
+The URL classifier's features complete before the content classifier
+decides, so a channel they stopped is left alone and the content classifier
+sees their annotations, and it skips a channel
+UrlClassifierCommon::ShouldProcessWithProtectionFeature says protection
+skips, as Firefox's own protection features do.
+
+The check sits inside a C++ function; no chrome API can skip it.
+
+diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
+index 9027a79530..8f197fc3b5 100644
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -17564,6 +17564,13 @@
+   value: false
+   mirror: always
+ 
++# When true, disable the URLClassifier while the ContentClassifier (channel
++# classifier) engine is active.
++- name: privacy.trackingprotection.urlclassifier.disable_for_channel_classifier
++  type: bool
++  value: false
++  mirror: always
++
+ # Log level for the content classifier remote settings client.
+ # Set to "Debug" for verbose output, or one of "Info", "Warn", "Error", "Off".
+ - name: privacy.trackingprotection.content.remote_settings.loglevel
+diff --git a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+index 654ecffedd..48499d4a13 100644
+--- a/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
++++ b/netwerk/url-classifier/AsyncUrlChannelClassifier.cpp
+@@ -4,6 +4,9 @@
+ 
+ #include "ChannelClassifierService.h"
+ #include "Classifier.h"
++#include "UrlClassifierFeatureAntiFraudAnnotation.h"
++#include "UrlClassifierFeatureConsentManagerAnnotation.h"
++#include "UrlClassifierFeatureHarmfulAddonProtection.h"
+ #include "ContentClassifierService.h"
+ #include "HttpBaseChannel.h"
+ #include "mozilla/Components.h"
+@@ -15,6 +18,7 @@
+ #include "mozilla/TimeStamp.h"
+ #include "mozilla/glean/UrlClassifierMetrics.h"
+ #include "mozilla/net/AsyncUrlChannelClassifier.h"
++#include "mozilla/StaticPrefs_privacy.h"
+ #include "mozilla/dom/BrowsingContext.h"
+ #include "mozilla/dom/CanonicalBrowsingContext.h"
+ #include "mozilla/net/UrlClassifierCommon.h"
+@@ -576,8 +580,11 @@ class FeatureTask {
+   // Called on the classifier thread.
+   void DoLookup(nsUrlClassifierDBServiceWorker* aWorkerClassifier);
+ 
+-  // Called on the main-thread to process the channel.
+-  void CompleteClassification();
++  // Sval: called on the main-thread to process the channel, in two halves, so
++  // the content classifier can decide between them. ProcessFeatures returns
++  // false when a feature stopped the channel.
++  bool ProcessFeatures();
++  void FinishClassification();
+ 
+   nsresult GetOrCreateURIData(nsIURI* aURI, nsIURI* aInnermostURI,
+                               nsIUrlClassifierFeature::URIType aURIType,
+@@ -769,24 +776,18 @@ void FeatureTask::DoLookup(nsUrlClassifierDBServiceWorker* aWorkerClassifier) {
+        this));
+ }
+ 
+-void FeatureTask::CompleteClassification() {
++bool FeatureTask::ProcessFeatures() {
+   MOZ_ASSERT(NS_IsMainThread());
+-
+   for (FeatureData& feature : mFeatures) {
+     if (!feature.MaybeCompleteClassification(mChannel)) {
+-      break;
++      return false;
+     }
+   }
+-
+-  UC_LOG(
+-      ("AsyncChannelClassifier::FeatureTask::CompleteClassification - complete "
+-       "classification for "
+-       "channel %p [this=%p]",
+-       mChannel.get(), this));
+-
+-  mCallbackHolder->Exec();
++  return true;
+ }
+ 
++void FeatureTask::FinishClassification() { mCallbackHolder->Exec(); }
++
+ nsresult FeatureData::InitializeList(
+     FeatureTask* aTask, nsIChannel* aChannel,
+     nsIUrlClassifierFeature::listType aListType,
+@@ -937,39 +938,79 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+ 
+   std::function<void()> callbackFromFeature = aCallback;
+ 
++  // Acquire the ContentClassifier service. We check if it's initialized and
++  // enabled before returning the instance. If it's returning a nullptr, the
++  // service is either not initialized or disabled.
++  RefPtr<ContentClassifierService> contentClassifier =
++      ContentClassifierService::GetInstance();
++
++  const bool skipURLClassifier =
++      StaticPrefs::
++          privacy_trackingprotection_urlclassifier_disable_for_channel_classifier() &&
++      contentClassifier;
++
+   RefPtr<FeatureTask> task = nullptr;
+ 
+-  if (aPerformAnnotations && aPerformBlocking) {
+-    nsresult rv = FeatureTask::Create(aChannel, std::move(aCallback),
+-                                      getter_AddRefs(task));
+-    if (NS_FAILED(rv)) {
+-      return rv;
++  if (!aPerformAnnotations && !aPerformBlocking) {
++    return NS_ERROR_FAILURE;
++  }
++
++  if (!skipURLClassifier) {
++    if (aPerformAnnotations && aPerformBlocking) {
++      nsresult rv = FeatureTask::Create(aChannel, std::move(aCallback),
++                                        getter_AddRefs(task));
++      if (NS_FAILED(rv)) {
++        return rv;
++      }
++    } else if (aPerformAnnotations) {
++      nsTArray<nsCOMPtr<nsIUrlClassifierFeature>> features;
++      UrlClassifierFeatureFactory::GetNonCancelingFeaturesFromChannel(aChannel,
++                                                                      features);
++      nsresult rv = FeatureTask::CreateWithFeatures(
++          aChannel, features, std::move(aCallback), getter_AddRefs(task));
++      if (NS_FAILED(rv)) {
++        return rv;
++      }
++    } else if (aPerformBlocking) {
++      nsTArray<nsCOMPtr<nsIUrlClassifierFeature>> features;
++      UrlClassifierFeatureFactory::GetCancelingFeaturesFromChannel(aChannel,
++                                                                   features);
++      nsresult rv = FeatureTask::CreateWithFeatures(
++          aChannel, features, std::move(aCallback), getter_AddRefs(task));
++      if (NS_FAILED(rv)) {
++        return rv;
++      }
+     }
+-  } else if (aPerformAnnotations) {
++  } else {
++    // Sval: the content classifier replaces the URL classifier's tracking
++    // features only. The consent-manager and anti-fraud annotations, which
++    // let a protection skip a channel, and the harmful add-on protection keep
++    // running here, as in Firefox.
+     nsTArray<nsCOMPtr<nsIUrlClassifierFeature>> features;
+-    UrlClassifierFeatureFactory::GetNonCancelingFeaturesFromChannel(aChannel,
+-                                                                    features);
+-    nsresult rv = FeatureTask::CreateWithFeatures(
+-        aChannel, features, std::move(aCallback), getter_AddRefs(task));
+-    if (NS_FAILED(rv)) {
+-      return rv;
++    if (aPerformBlocking) {
++      UrlClassifierFeatureFactory::GetCancelingFeaturesFromChannel(aChannel,
++                                                                   features);
+     }
+-  } else if (aPerformBlocking) {
+-    nsTArray<nsCOMPtr<nsIUrlClassifierFeature>> features;
+-    UrlClassifierFeatureFactory::GetCancelingFeaturesFromChannel(aChannel,
+-                                                                 features);
++    if (aPerformAnnotations) {
++      UrlClassifierFeatureFactory::GetNonCancelingFeaturesFromChannel(
++          aChannel, features);
++    }
++    features.RemoveElementsBy([](const nsCOMPtr<nsIUrlClassifierFeature>& f) {
++      nsAutoCString name;
++      f->GetName(name);
++      return !name.Equals(
++                 UrlClassifierFeatureConsentManagerAnnotation::Name()) &&
++             !name.Equals(UrlClassifierFeatureAntiFraudAnnotation::Name()) &&
++             !name.Equals(UrlClassifierFeatureHarmfulAddonProtection::Name());
++    });
+     nsresult rv = FeatureTask::CreateWithFeatures(
+         aChannel, features, std::move(aCallback), getter_AddRefs(task));
+     if (NS_FAILED(rv)) {
+       return rv;
+     }
+-  } else {
+-    return NS_ERROR_FAILURE;
+   }
+ 
+   Maybe<ContentClassifierRequest> contentClassifierRequest;
+-  RefPtr<ContentClassifierService> contentClassifier =
+-      ContentClassifierService::GetInstance();
+   if (contentClassifier) {
+     contentClassifierRequest.emplace(aChannel);
+   }
+@@ -1071,10 +1112,21 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+                  annotateResult = std::move(annotateResult),
+                  callbackFromFeature = std::move(callbackFromFeature),
+                  contentClassifier]() -> void {
+-                  if (contentClassifier) {
++                  // Sval: the URL classifier's features go first, so a channel
++                  // they stopped is left alone and the content classifier
++                  // sees their consent-manager and anti-fraud annotations,
++                  // which skip protection as they do for Firefox's
++                  // features (UrlClassifierCommon::
++                  // ShouldProcessWithProtectionFeature).
++                  const bool stopped = task && !task->ProcessFeatures();
++                  if (contentClassifier && !stopped) {
+                     ChannelBlockDecision cancelAction =
+-                        contentClassifier->MaybeCancelChannel(channel,
+-                                                              cancelResult);
++                        ChannelBlockDecision::Allowed;
++                    if (UrlClassifierCommon::ShouldProcessWithProtectionFeature(
++                            channel)) {
++                      cancelAction = contentClassifier->MaybeCancelChannel(
++                          channel, cancelResult);
++                    }
+                     // Only provide annotations if we didn't block the channel.
+                     if (cancelAction != ChannelBlockDecision::Blocked) {
+                       contentClassifier->MaybeAnnotateChannel(channel,
+@@ -1098,7 +1150,7 @@ nsresult AntiTrackingChannelClassifierUtils::CheckChannelHelper(
+                   // We must always call the callback. Either via the task or
+                   // explicitly.
+                   if (task) {
+-                    task->CompleteClassification();
++                    task->FinishClassification();
+                   } else {
+                     callbackFromFeature();
+                   }

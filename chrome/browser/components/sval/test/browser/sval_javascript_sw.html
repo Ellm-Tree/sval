@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>sval javascript sw</title>
+  </head>
+  <body>
+    <script>
+      // The page is outside the worker's scope, so it waits on the worker
+      // itself: `navigator.serviceWorker.ready` waits for a controller.
+      navigator.serviceWorker
+        .register("sval_javascript_sw.js", {
+          scope: "sval_javascript_sw_scope/",
+        })
+        .then(registration => {
+          const worker =
+            registration.installing ||
+            registration.waiting ||
+            registration.active;
+          const done = () => {
+            if (worker.state === "activated") {
+              document.title = "registered";
+            }
+          };
+          worker.addEventListener("statechange", done);
+          done();
+        })
+        .catch(e => {
+          document.title = `failed: ${e.name}`;
+        });
+    </script>
+  </body>
+</html>

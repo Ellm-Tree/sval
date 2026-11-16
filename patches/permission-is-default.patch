@@ -1,0 +1,155 @@
+Sval: a permission says whether the defaults file grants it
+
+The permission manager keeps the entries it imports from
+permissions.manager.defaultsUrl apart from the profile's own
+(cIDPermissionIsDefault): it never removes or expires them, and restores one
+when the profile's entry that replaced it is removed. nsIPermission does not
+carry that, so the Sites settings could not tell a grant Sval ships from one
+the user made. isDefault carries it on the permissions getPermissionObject,
+getAll and getAllForPrincipal return.
+
+diff --git a/extensions/permissions/Permission.cpp b/extensions/permissions/Permission.cpp
+index a3ccaed3fd..ad98642573 100644
+--- a/extensions/permissions/Permission.cpp
++++ b/extensions/permissions/Permission.cpp
+@@ -21,14 +21,15 @@ NS_IMPL_ISUPPORTS_CI(Permission, nsIPermission)
+ Permission::Permission(nsIPrincipal* aPrincipal, const nsACString& aType,
+                        uint32_t aCapability, uint32_t aExpireType,
+                        int64_t aExpireTime, int64_t aModificationTime,
+-                       uint64_t aBrowserId)
++                       uint64_t aBrowserId, bool aIsDefault)
+     : mPrincipal(aPrincipal),
+       mType(aType),
+       mCapability(aCapability),
+       mExpireType(aExpireType),
+       mExpireTime(aExpireTime),
+       mModificationTime(aModificationTime),
+-      mBrowserId(aBrowserId) {}
++      mBrowserId(aBrowserId),
++      mIsDefault(aIsDefault) {}
+ 
+ already_AddRefed<nsIPrincipal> Permission::ClonePrincipalForPermission(
+     nsIPrincipal* aPrincipal) {
+@@ -51,7 +52,7 @@ already_AddRefed<nsIPrincipal> Permission::ClonePrincipalForPermission(
+ already_AddRefed<Permission> Permission::Create(
+     nsIPrincipal* aPrincipal, const nsACString& aType, uint32_t aCapability,
+     uint32_t aExpireType, int64_t aExpireTime, int64_t aModificationTime,
+-    uint64_t aBrowserId) {
++    uint64_t aBrowserId, bool aIsDefault) {
+   NS_ENSURE_TRUE(aPrincipal, nullptr);
+ 
+   nsCOMPtr<nsIPrincipal> principal =
+@@ -60,7 +61,7 @@ already_AddRefed<Permission> Permission::Create(
+ 
+   RefPtr<Permission> permission =
+       new Permission(principal, aType, aCapability, aExpireType, aExpireTime,
+-                     aModificationTime, aBrowserId);
++                     aModificationTime, aBrowserId, aIsDefault);
+   return permission.forget();
+ }
+ 
+@@ -107,6 +108,12 @@ Permission::GetBrowserId(uint64_t* aBrowserId) {
+   return NS_OK;
+ }
+ 
++NS_IMETHODIMP
++Permission::GetIsDefault(bool* aIsDefault) {
++  *aIsDefault = mIsDefault;
++  return NS_OK;
++}
++
+ NS_IMETHODIMP
+ Permission::Matches(nsIPrincipal* aPrincipal, bool aExactHost, bool* aMatches) {
+   NS_ENSURE_ARG_POINTER(aPrincipal);
+diff --git a/extensions/permissions/Permission.h b/extensions/permissions/Permission.h
+index 859dfabc0b..f456feed79 100644
+--- a/extensions/permissions/Permission.h
++++ b/extensions/permissions/Permission.h
+@@ -22,7 +22,7 @@ class Permission : public nsIPermission {
+   static already_AddRefed<Permission> Create(
+       nsIPrincipal* aPrincipal, const nsACString& aType, uint32_t aCapability,
+       uint32_t aExpireType, int64_t aExpireTime, int64_t aModificationTime,
+-      uint64_t aBrowserId = 0);
++      uint64_t aBrowserId = 0, bool aIsDefault = false);
+ 
+   // This method creates a new nsIPrincipal with a stripped OriginAttributes (no
+   // userContextId) and a content principal equal to the origin of 'aPrincipal'.
+@@ -32,7 +32,8 @@ class Permission : public nsIPermission {
+  protected:
+   Permission(nsIPrincipal* aPrincipal, const nsACString& aType,
+              uint32_t aCapability, uint32_t aExpireType, int64_t aExpireTime,
+-             int64_t aModificationTime, uint64_t aBrowserId = 0);
++             int64_t aModificationTime, uint64_t aBrowserId = 0,
++             bool aIsDefault = false);
+ 
+   virtual ~Permission() = default;
+ 
+@@ -43,6 +44,7 @@ class Permission : public nsIPermission {
+   int64_t mExpireTime;
+   int64_t mModificationTime;
+   uint64_t mBrowserId;
++  bool mIsDefault;
+ };
+ 
+ }  // namespace mozilla
+diff --git a/extensions/permissions/PermissionManager.cpp b/extensions/permissions/PermissionManager.cpp
+index ceab787f2c..59ca835afe 100644
+--- a/extensions/permissions/PermissionManager.cpp
++++ b/extensions/permissions/PermissionManager.cpp
+@@ -2767,7 +2767,8 @@ PermissionManager::GetPermissionObject(nsIPrincipal* aPrincipal,
+   PermissionEntry& perm = entry->GetPermissions()[idx];
+   nsCOMPtr<nsIPermission> r = Permission::Create(
+       principal, mTypeArray[perm.mType], perm.mPermission, perm.mExpireType,
+-      perm.mExpireTime, perm.mModificationTime);
++      perm.mExpireTime, perm.mModificationTime, 0,
++      perm.mID == cIDPermissionIsDefault);
+   if (NS_WARN_IF(!r)) {
+     return NS_ERROR_FAILURE;
+   }
+@@ -2886,7 +2887,8 @@ nsresult PermissionManager::GetPermissionEntries(
+       RefPtr<nsIPermission> permission = Permission::Create(
+           principal, mTypeArray[permEntry.mType], permEntry.mPermission,
+           permEntry.mExpireType, permEntry.mExpireTime,
+-          permEntry.mModificationTime);
++          permEntry.mModificationTime, 0,
++          permEntry.mID == cIDPermissionIsDefault);
+       if (NS_WARN_IF(!permission)) {
+         continue;
+       }
+@@ -3030,7 +3032,8 @@ nsresult PermissionManager::GetAllForPrincipalHelper(
+ 
+       RefPtr<nsIPermission> permission = Permission::Create(
+           aPrincipal, mTypeArray[perm.mType], perm.mPermission,
+-          perm.mExpireType, perm.mExpireTime, perm.mModificationTime);
++          perm.mExpireType, perm.mExpireTime, perm.mModificationTime, 0,
++          perm.mID == cIDPermissionIsDefault);
+       if (NS_WARN_IF(!permission)) {
+         continue;
+       }
+@@ -3041,7 +3044,8 @@ nsresult PermissionManager::GetAllForPrincipalHelper(
+   for (const auto& perm : strippedPerms) {
+     RefPtr<nsIPermission> permission = Permission::Create(
+         aPrincipal, mTypeArray[perm.mType], perm.mPermission, perm.mExpireType,
+-        perm.mExpireTime, perm.mModificationTime);
++        perm.mExpireTime, perm.mModificationTime, 0,
++        perm.mID == cIDPermissionIsDefault);
+     if (NS_WARN_IF(!permission)) {
+       continue;
+     }
+diff --git a/netwerk/base/nsIPermission.idl b/netwerk/base/nsIPermission.idl
+index 8f6e46d88c..564d54afae 100644
+--- a/netwerk/base/nsIPermission.idl
++++ b/netwerk/base/nsIPermission.idl
+@@ -60,6 +60,12 @@ interface nsIPermission : nsISupports
+      */
+     readonly attribute uint64_t browserId;
+ 
++    /**
++     * Whether this permission is one the defaults file grants
++     * (permissions.manager.defaultsUrl), rather than one the profile stores.
++     */
++    readonly attribute boolean isDefault;
++
+     /**
+      * Test whether a principal would be affected by this permission.
+      *

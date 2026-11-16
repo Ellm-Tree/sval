@@ -1,0 +1,61 @@
+Sval: unsigned add-on warnings that only automation can hide
+
+`ExtensionsUI` and about:addons let `extensions.ui.disableUnsignedWarnings`
+hide the unsigned add-on warnings in automation and in any build without
+MOZILLA_OFFICIAL. Sval never sets MOZILLA_OFFICIAL (decision 0063), and on
+ESR a user can turn off `xpinstall.signatures.required`
+(`AddonSettings.REQUIRE_SIGNING`), so one about:config pref would have
+hidden that an installed add-on is unsigned. Tests keep the pref, through
+`Cu.isInAutomation`.
+
+diff --git a/browser/modules/ExtensionsUI.sys.mjs b/browser/modules/ExtensionsUI.sys.mjs
+index 95a4b6e40b..29f7b40369 100644
+--- a/browser/modules/ExtensionsUI.sys.mjs
++++ b/browser/modules/ExtensionsUI.sys.mjs
+@@ -2,7 +2,6 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ import { EventEmitter } from "resource://gre/modules/EventEmitter.sys.mjs";
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+@@ -227,12 +226,12 @@ export var ExtensionsUI = {
+ 
+       info.unsigned =
+         info.addon.signedState <= lazy.AddonManager.SIGNEDSTATE_MISSING;
+-      // In local builds (or automation), when this pref is set, pretend the
+-      // file is correctly signed even if it isn't so that the UI looks like
+-      // what users would normally see.
++      // In automation, when this pref is set, pretend the file is correctly
++      // signed even if it isn't so that the UI looks like what users would
++      // normally see.
+       if (
+         info.unsigned &&
+-        (Cu.isInAutomation || !AppConstants.MOZILLA_OFFICIAL) &&
++        Cu.isInAutomation &&
+         Services.prefs.getBoolPref(
+           "extensions.ui.disableUnsignedWarnings",
+           false
+diff --git a/toolkit/mozapps/extensions/content/aboutaddons-utils.mjs b/toolkit/mozapps/extensions/content/aboutaddons-utils.mjs
+index a63c980f24..9048f72866 100644
+--- a/toolkit/mozapps/extensions/content/aboutaddons-utils.mjs
++++ b/toolkit/mozapps/extensions/content/aboutaddons-utils.mjs
+@@ -296,13 +296,11 @@ export function isCorrectlySigned(addon) {
+ }
+ 
+ export function isUnsignedWarningMessageDisabled() {
+-  // While running in automation, in a local build or in a Thunderbird
+-  // application instance, allow to hide the unsigned add-on message bars
+-  // through the related about:config preference.
++  // While running in automation or in a Thunderbird application instance,
++  // allow to hide the unsigned add-on message bars through the related
++  // about:config preference.
+   return (
+-    (Cu.isInAutomation ||
+-      !lazy.AppConstants.MOZILLA_OFFICIAL ||
+-      lazy.AppConstants.MOZ_APP_NAME === "thunderbird") &&
++    (Cu.isInAutomation || lazy.AppConstants.MOZ_APP_NAME === "thunderbird") &&
+     Services.prefs.getBoolPref("extensions.ui.disableUnsignedWarnings", false)
+   );
+ }

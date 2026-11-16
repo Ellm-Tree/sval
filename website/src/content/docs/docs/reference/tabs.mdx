@@ -1,0 +1,371 @@
+---
+title: Tabs in a Workspace
+description: What each part of the Workspace panel does, from the Favorites button to the media controls, with the tab, group, Split, and pin menus and the settings for them.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+Each Workspace keeps your tabs, groups, Splits, and pins. The Workspace
+panel shows them down one side of the window. This page goes through the
+Workspace from top to bottom, then its menus and settings. The switcher at
+the top, which changes the Workspace, is described on
+[Workspaces](/docs/reference/workspaces/).
+
+<Screenshot name="features-panel" alt="Three Wikipedia articles in a Split, next to a Workspace of nested, color-coded tab groups" />
+
+## Favorites
+
+<Until v="0.1.0-rc.10">
+
+The **Favorites** button opens the Favorites menu. The menu holds your
+Favorites and their folders, and it's the same in every Workspace. Pinned
+Favorites aren't in the menu. A private window has no Favorites button.
+
+When you right-click a Favorite or a folder in the menu, you get **Undo**,
+**Open**, **Open in New Window**, **Open in Private Window**, and
+**Open All** for a folder. The menu also has **Pin** or **Unpin**,
+**Pin to This Workspace**, **Show in** for a pinned Favorite,
+**Rename…**, **Edit Address…**, and **Delete**. The rest are **Move to**,
+**Move Up**, **Move Down**, **New Folder…**, **New Separator**, and
+**Export…**.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+The **Favorites** button opens the Favorites menu. The menu holds all your
+Favorites and their folders, and it's the same in every Workspace. A
+private window has no Favorites button.
+
+When you right-click a Favorite or a folder in the menu, you get **Undo**,
+**Open**, **Open in New Window**, **Open in Private Window**, and
+**Open All** for a folder. The menu also has **Pin**,
+**Pin to This Workspace**, **Rename…**, **Edit Address…**, and **Delete**.
+The rest are **Move to**, **Move Up**, **Move Down**, **New Folder…**,
+**New Separator**, and **Export…**.
+
+- **Pin.** A copy of the Favorite or folder goes at the end of the pins
+  row. The Favorite stays in the menu. Pin doesn't show for a Favorite
+  whose address a pin already has.
+- **Pin to This Workspace.** The copy shows in this Workspace and no other.
+
+</Since>
+
+## The pins row
+
+The pins row shows a tile for each pin in this Workspace, in an order you
+set by dragging. The row shows only when there are pins.
+
+- Selecting a tile shows the pin's page. The selected tile widens to show
+  the pin's name. When you've moved away from the pin's saved page, the
+  tile also shows the title of the page you're on.
+- When you've moved away from a pin's saved page, the pin shows a dot
+  while it isn't selected.
+- The refresh button at the end of the selected tile takes the pin back to
+  its saved page. The button is named "Back to" and the pin's name. It
+  shows when you've moved away from the saved page and you point to the
+  tile or focus it.
+<Until v="0.1.0-rc.10">
+
+- A pinned folder is one tile that shows its first few icons. Selecting the
+  tile opens the folder's pins.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- A pin folder is one tile that shows its first few icons. Selecting the
+  tile opens the pin folder's pins.
+- Dropping a pin on the middle of another pin opens the Create Pin Folder
+  dialog. Dropping a pin on the edge of another pin moves the pin there.
+  - **Create.** Sval makes a pin folder that holds both pins. The pin
+    folder is named "Untitled pin folder" unless you type a name.
+  - **Cancel.** Sval makes no pin folder, and both pins stay where they
+    were.
+- Dropping a pin on the middle of a pin folder's tile moves the pin into
+  the pin folder. Dragging a pin from the open pin folder onto the row
+  takes the pin out of the pin folder.
+- Right-clicking the row next to the pins shows **New Pin Folder…**. It
+  asks for a name, then adds an empty pin folder at the end of the row.
+
+</Since>
+
+- Settings › Workspaces › Pins sets how many lines of tiles show. When
+  there are more pins than fit, the last tile reads "+" and the number of
+  pins left over. Selecting that tile opens those pins.
+- While you drag a tab and the row has no pins, the empty space reads
+  **Drop to pin**.
+
+## New tab and New group
+
+- **New tab.** A tab opens at the top of the Workspace.
+- **New group.** The New group dialog opens. The group goes in the
+  Workspace or group you're working in.
+
+## The New group and Edit group dialogs
+
+- **Name.** This field is required.
+- **Emoji.** The emoji picker opens.
+- **Color.** This offers the same colors as a Workspace has. A group with a
+  color shows as a tinted block.
+- **Create**, or **Save** in Edit group. Sval saves the group.
+
+## Rows
+
+Each tab, group, and Split is a row.
+
+- Clicking a tab's row shows its page. Clicking a group's row folds or
+  unfolds the group.
+- Double-clicking a row's name renames the row.
+- A sleeping tab's row is dimmed, with a gray icon.
+- A folded group shows how many tabs it holds. It also shows the tab you're
+  viewing in that group.
+- A Split's row has a tile for each tab in the Split, left to right. Clicking
+  a tile shows that Split.
+- A tab, or a folded group, shows a pause button while it plays sound. The
+  button pauses what's playing and plays it again. When the sound can't be
+  paused, you get a mute button instead.
+- <kbd>⌘</kbd>-click (Ctrl-click on Windows and Linux) adds a row to the selection.
+  Shift-click selects every row in between.
+- Option-clicking (Alt-clicking on Windows and Linux) a tab splits it with
+  the tab you're viewing.
+- Pointing at a tab's row, or moving to it with the keyboard, shows a preview
+  next to the Workspace panel. The preview shows the tab's title, the site,
+  and a picture of the page. A tab whose page hasn't loaded since Sval started
+  has no picture. The preview goes away when you move away, click, scroll, or
+  press <kbd>Esc</kbd>.
+
+## Dragging rows
+
+<Until v="0.1.0-rc.10">
+
+What happens depends on where you drop a row on another row. While a drop
+would do more than move the row, a label shows.
+
+- **Near the top or bottom edge.** The row you drag goes before or after
+  that row.
+- **The middle of a tab's row.** Sval makes a new group of the two tabs.
+  The label reads **New group**.
+- **The right end of a tab's row.** Sval makes a Split, and the label
+  reads **Create Split**. On a Split's row, the label reads **Join Split**.
+  When you drag a Split, it reads **Merge Splits**. A full Split reads
+  "4 pages max". A narrow Workspace panel has no spot for making a Split.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+What happens depends on where you drop a row on another row.
+
+- **Near the top or bottom edge.** The row you drag goes before or after
+  that row.
+- **The middle of a tab's or Split's row.** The row fades and shows two
+  halves. The half under the pointer fills with color. A drop on a half
+  does what the half reads.
+  - **New group**, the left half, makes a new group of the two tabs.
+  - **Create Split**, the right half, makes a Split of the two. On a
+    Split's row, this half reads **Join Split**. When you drag a Split,
+    this half reads **Merge Splits**. On a full Split, this half reads
+    "4 pages max" and is drawn faint. A drop on it does nothing.
+  - A narrow Workspace panel shows only **New group**.
+
+</Since>
+
+- **A folded group's row.** The row you drag goes inside the group, last.
+  On an open group's row, the top half puts your row before the group. The
+  bottom half puts your row first inside the group.
+- **A dragged group or selection.** It goes before or after the row,
+  depending on which half you drop it on. It never makes a group or a
+  Split.
+
+## The Undo message
+
+After you close several tabs, or delete a group, a pin, or a Workspace, a
+message at the bottom says what you removed.
+
+- **Undo.** Sval puts back what you removed.
+- **Dismiss.** The message closes.
+
+The message stays for 8 seconds, and longer while the pointer is on it or
+it has focus.
+
+## The media controls
+
+While a tab in the window has media, controls show at the bottom of the
+Workspace panel for whatever played last, in any of the window's Workspaces. They are
+**Previous Track**, **Back 10 Seconds**, play and pause,
+**Forward 10 Seconds**, and **Next Track**. The track buttons show only on
+sites that have tracks.
+
+## The Workspace panel's edge
+
+Dragging the edge next to the page makes the Workspace panel wider or
+narrower. Double-clicking the edge puts back the default width.
+
+## A tab's menu
+
+<Screenshot name="docs-tab-menu" frame="rounded" maxWidth={260} alt="A tab’s menu in the Workspace panel: New tab, Rename, Move up and down, Move to group, Move to Workspace, Pin, Add to Favorites, Copy Markdown Link, Create Split, Add to Split, Put to Sleep, Keep Awake, and Close, with their shortcuts" />
+
+- **New tab.** A new tab opens.
+- **Rename.** A dialog asks for the tab's new name.
+- **Move up** and **Move down**. The tab moves one row.
+- **Move to group.** The submenu lists the groups the tab can go into.
+- **Move to Workspace.** The submenu lists your other Workspaces.
+- **Pin.** The tab becomes a pin at the end of the pins row.
+  **Pin to This Workspace** pins the tab in this Workspace and no other.
+- **Add to Favorites.** Sval adds the page to Favorites. For a Favorite,
+  this reads **Remove from Favorites**.
+- **Copy Markdown Link.** Sval copies the page's title and address as a
+  Markdown link.
+- **Colorshift This Site….** Sval selects the tab and opens Colorshift for
+  the tab's site.
+  See [Colorshift a site](/docs/how-to/privacy/colorshift-a-site/).
+- **Create Split.** A new pane opens next to the tab, where you pick a tab
+  for it.
+- **Add to Split.** The submenu lists the Splits in this Workspace that
+  have room for the tab.
+- **Put to Sleep.** Sval frees the memory the page uses. The tab stays in
+  the Workspace.
+- **Keep Awake.** Sval stops putting the tab to sleep. The entry is checked
+  while it's on.
+- **Pause Media.** This shows while the tab has media or sound. It reads
+  **Play Media**, **Mute**, or **Unmute** when that's what it does.
+- **Close.** The tab closes.
+
+When you've selected several rows, only **Close**, **Move to group**,
+**New group with selection**, and **Move to Workspace** work. The others
+are dimmed.
+
+## A group's menu
+
+- **New tab.** A tab opens inside the group.
+- **Edit…** The Edit group dialog opens.
+- **New group.** Sval makes a group inside this group.
+- **Move up**, **Move down**, **Move to group**, and **Move to Workspace**.
+  The group moves with everything in it.
+- **Put to Sleep.** Every tab in the group goes to sleep.
+- **Pause Media.** This acts on every tab in the group.
+- **Delete group…** Sval asks what happens to the group's tabs.
+  **Move out of group** moves them out, and **Delete all** deletes them
+  with the group. An empty group is deleted without asking.
+
+## A Split pane's menu
+
+<Screenshot name="docs-split-pane-menu" frame="rounded" maxWidth={280} alt="A Split pane’s menu: the tab’s items, then Add Tab to Split, Separate, Move Pane Left, Move Pane Right, Rename Split…, and Close Both" />
+
+When you right-click a tile in a Split's row, you get the tab's menu
+without Pin. You also get these:
+
+- **Add Tab to Split.** A new pane opens in the Split. This is dimmed when
+  the Split already has four panes.
+- **Separate.** The Split turns back into ordinary tabs, in the same place.
+- **Move Pane Left** and **Move Pane Right**. The pane moves one place.
+  Each is dimmed when the pane is already at that end.
+- **Rename Split…** This names the Split. A Split without a name
+  shows the titles of its pages.
+- **Close All.** Every tab in the Split closes. For a Split of two, this
+  reads **Close Both**.
+
+When you move a pane up, down, or to a group or Workspace, its whole Split
+moves with it.
+
+## A pin's menu
+
+- **Back to saved page.** The pin goes back to its saved page.
+- **Save current page as this pin.** From now on, the pin goes back to this
+  page. Both entries are dimmed when you're on the saved page.
+- **Show in.** This picks the Workspaces that show the pin. **Select all** and
+  **Deselect all** are there too.
+
+<Until v="0.1.0-rc.10">
+
+- **Rename…** This changes the pin's name.
+- **Edit address…** This changes the address the pin goes back to.
+- **Unpin.** The pin leaves the pins row. Its Favorite stays.
+- **Delete.** Sval deletes the pin and its Favorite. You can undo this from
+  the Undo message.
+
+A pin inside a pinned folder has no Show in or Unpin.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Move to Folder.** The submenu lists the folders in the pins row. Move to
+  Folder shows only when the row has a folder.
+- **Rename…** This changes the pin's name.
+- **Edit address…** This changes the address the pin goes back to.
+- **Move to Favorites.** The pin leaves the pins row and goes to the end of
+  your Favorites. Sval forgets the pin's Show in choice. If the pin's page is
+  open, the page becomes a tab at the top of the list of tabs. You can undo
+  this from the Undo message.
+- **Delete.** Sval deletes the pin. You can undo this from the Undo
+  message.
+
+A pin inside a pinned folder has no Show in or Move to Favorites.
+
+When you right-click a pinned folder's tile, you get these:
+
+- **Show in.** This picks the Workspaces that show the folder and its pins.
+- **Rename…** This changes the folder's name.
+- **Move Contents to Row.** The folder's pins go in the pins row where the
+  folder was, and Sval deletes the folder.
+- **Move to Favorites.** The folder and its pins go to the end of your
+  Favorites.
+- **Delete.** Sval deletes the folder and its pins. You can undo this from
+  the Undo message.
+
+</Since>
+
+## The Quick Peek bar
+
+The bar at the top of a Quick Peek shows the page's address. It also shows these:
+
+- "From" and a pin's name, when the Quick Peek came from a pin.
+- **Open in Split.** The page shows in a Split, next to the tab it came
+  from.
+- **Open as tab.** The page stays as a tab, next to the tab it came from.
+- The close button closes the Quick Peek, as Escape does.
+
+## Settings › Appearance › Workspace panel side
+
+- **Left** and **Right**. The Workspace panel goes on that side of every window. Each
+  device keeps its own choice.
+
+## Settings › Appearance
+
+- **Show a preview when you point at a tab.** While this is on, a tab's
+  preview shows next to the Workspace panel. It's on at first.
+
+## Settings › Appearance › Hidden Workspace panel
+
+- **Show the Workspace panel when you hold the pointer at the edge of the
+  window.** While the Workspace panel is hidden, it slides in over the page
+  when you hold the pointer at the edge of the window on the Workspace
+  panel's side. This is on by default. Each device keeps its own choice.
+
+## Settings › Workspaces › Pins
+
+- **Rows of pins to show.** This sets how many lines of pins show: 1, 2, 3,
+  4, 6, or 8. It starts at 4.
+
+## Settings › Links › Links in pages
+
+- **Open a link in a Quick Peek with Option-click** (Alt-click on Windows and Linux).
+  Option-click on a link opens it in a Quick Peek. This is on by default. When
+  it's off, Option-click does what the page expects, and the link's menu
+  has no Open Link in Quick Peek.
+- **Open links to other sites from a pin in a Quick Peek.** When you're in a pin
+  and select a link to another site, the link opens in a Quick Peek. When this is
+  off, the link opens in the pin.
+
+## History and Downloads
+
+
+- **This Workspace** and **All Workspaces.** These sit at the top of the
+  History sidebar and the Downloads list. They choose whether you see the
+  pages or files of this Workspace or of every Workspace.
+- Under All Workspaces, each row shows its Workspace.
+
+
+- **Remove from list.** This sits next to a download. The download leaves
+  the list.
+- **Clear list.** Every finished download the list shows leaves the list.

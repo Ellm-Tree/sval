@@ -1,0 +1,49 @@
+Sval: letterbox only the browsers that have a tab, and attach to a window once
+
+RFPHelper's _attachWindow watches every .browserStack in the window, and
+the preloaded new-tab browser sits in one with no tab until a new tab
+adopts it. _roundContentSize asks the browser's tab browser for its
+container, so while a preload is still on its initial about:blank (which
+_noLetterBoxingFor does not exempt), turning letterboxing on threw
+"aBrowser.getTabBrowser() is null" from the resize observer. A browser
+with no tab is skipped; TabOpen rounds the preload once a tab takes it.
+
+kPrefResistFingerprinting is a prefix of kPrefLetterboxing, and pref
+observers match by prefix, so one change to the letterboxing pref reaches
+_handleLetterboxingPrefChanged twice. Each call attached the window again,
+and _detachWindow disconnects only the last resize observer, so the
+others kept rounding browsers after letterboxing was off. _attachWindow
+skips a window it is already attached to.
+
+mozilla-central's RFPHelper is unchanged in both places; no Bugzilla bug
+covers either.
+
+diff --git a/toolkit/components/resistfingerprinting/RFPHelper.sys.mjs b/toolkit/components/resistfingerprinting/RFPHelper.sys.mjs
+index f82d7309e1..f04f555d13 100644
+--- a/toolkit/components/resistfingerprinting/RFPHelper.sys.mjs
++++ b/toolkit/components/resistfingerprinting/RFPHelper.sys.mjs
+@@ -373,8 +373,10 @@ class _RFPHelper {
+   }
+ 
+   _roundOrResetContentSize(aBrowser, isNewTab = false) {
+-    // We won't do anything for lazy browsers.
+-    if (!aBrowser?.isConnected) {
++    // We won't do anything for lazy browsers, nor for a browser with no tab:
++    // the preloaded new tab sits in a .browserStack of its own until a tab
++    // adopts it, and TabOpen rounds it then.
++    if (!aBrowser?.isConnected || !aBrowser.getTabBrowser()) {
+       return;
+     }
+     if (this._noLetterBoxingFor(aBrowser)) {
+@@ -612,6 +614,11 @@ class _RFPHelper {
+   }
+ 
+   _attachWindow(aWindow) {
++    // kPrefResistFingerprinting is a prefix of kPrefLetterboxing, so both
++    // pref observers report a letterboxing change.
++    if (this._resizeObservers.has(aWindow)) {
++      return;
++    }
+     aWindow.gBrowser.addTabsProgressListener(this);
+     aWindow.addEventListener("TabOpen", this);
+     let resizeObserver = new aWindow.ResizeObserver(entries => {

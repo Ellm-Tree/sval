@@ -1,0 +1,162 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * First run's introduction scenes (`first-run-intro.js`): the hero first run
+ * places above a frame's text, and the scene inside it, drawn in a document
+ * of its own (`first-run-intro.xhtml`) that loads this sheet too. Everything
+ * the scene shows past its sky and placement is the components' own
+ * stylesheets.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ---------------------------------------------------------------- hero */
+
+.sval-fr-hero {
+  position: relative;
+  flex: none;
+  height: 300px;
+  border-bottom: 1px solid rgb(166 232 255 / 0.1);
+  overflow: hidden;
+
+  &[data-scene="launcher"] {
+    height: 332px;
+  }
+}
+
+/* The frame's scheme is the scheme its document's media queries answer
+ * (`nsSubDocumentFrame::MaybeUpdateEmbedderColorScheme`), so the components
+ * take their dark palette whatever the system's. */
+.sval-fr-hero-scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- scene */
+
+/* Over the browser's own body background (`browser-shared.css`). */
+:root:not([theme-image-in-toolbox]) body.sval-fr-scene {
+  position: relative;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background:
+    url("chrome://browser/content/sval/home/starfield-stars-only-1920x1080.svg") center / 900px auto no-repeat,
+    radial-gradient(90% 110% at 50% 30%, #13328f 0%, #060a2e 100%);
+}
+
+/* The window the panel stands in: the panel on the window's tint, beside
+ * a page, drawn at real size and scaled to the scene. */
+.sval-fr-window {
+  --sval-fr-scale: 0.75;
+  position: absolute;
+  top: calc(48px / var(--sval-fr-scale));
+  left: 50%;
+  display: flex;
+  width: calc(464px / var(--sval-fr-scale));
+  height: calc(232px / var(--sval-fr-scale));
+  translate: -50% 0;
+  zoom: var(--sval-fr-scale);
+  border: 1px solid rgb(166 232 255 / 0.18);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--toolbar-background-color);
+  box-shadow: 0 18px 40px rgb(3 5 26 / 0.55);
+
+  > #sval-panel-container {
+    width: 280px;
+    flex: none;
+  }
+}
+
+.sval-fr-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 8px 8px 0;
+  padding: 18px;
+  border-radius: 10px;
+  background: var(--sval-palette-ink-850);
+
+  > span {
+    border-radius: 6px;
+    background: rgb(255 255 255 / 0.05);
+  }
+
+  > .sval-fr-page-title {
+    width: 66%;
+    height: 18px;
+    background: rgb(255 255 255 / 0.09);
+  }
+
+  > .sval-fr-page-line {
+    height: 12px;
+  }
+
+  > .sval-fr-page-line + .sval-fr-page-line {
+    width: 84%;
+  }
+
+  > .sval-fr-page-block {
+    flex: 1;
+    margin-top: 6px;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.04);
+  }
+}
+
+/* The Launcher floats where `SvalLauncher` would place it over a page. */
+.sval-fr-launcher {
+  --sval-fr-scale: 0.76;
+  --sval-launcher-list-max: none;
+  position: absolute;
+  inset: 0;
+  zoom: var(--sval-fr-scale);
+
+  > #urlbar {
+    --sval-launcher-top: 24px;
+    --sval-launcher-left: calc(50% - 300px);
+    --sval-launcher-width: 600px;
+  }
+}
+
+/* The address bar's row, and the protection panel open under its shield as
+ * an arrow panel draws its content (`popup.css`). */
+.sval-fr-protection {
+  --sval-fr-scale: 0.8;
+  position: absolute;
+  top: calc(16px / var(--sval-fr-scale));
+  left: 0;
+  width: calc(560px / var(--sval-fr-scale));
+  zoom: var(--sval-fr-scale);
+
+  > #nav-bar {
+    display: flex;
+    height: var(--sval-header-h);
+    align-items: center;
+    padding-inline: 60px;
+  }
+
+  #nav-bar-customization-target {
+    display: flex;
+    flex: 1;
+    align-items: center;
+  }
+
+  > #sval-protection-panel {
+    margin-top: 6px;
+    margin-inline-start: 92px;
+    box-sizing: border-box;
+    padding: var(--panel-padding);
+    color: var(--panel-text-color);
+    background: var(--panel-background-color);
+    border-radius: var(--panel-border-radius);
+    border: 1px solid var(--panel-border-color);
+    width: var(--panel-width);
+    box-shadow: var(--panel-box-shadow);
+  }
+}

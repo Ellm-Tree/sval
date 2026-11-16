@@ -1,0 +1,71 @@
+---
+title: Allow video and audio on a site
+description: Let a page play video and audio for one visit, or choose what a site always gets.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Out of the box, every site is on Ask first. Nothing plays, with sound or
+without, until you allow it. When a page tries to play, Sval asks whether
+it can. You can also allow a site for one visit with the media button in the
+address bar, and save a choice for the site in the site settings menu.
+
+You open a Roon support video and it doesn't start. Later, you want a music
+site you trust to always play.
+
+<Screenshot name="home-site-controls-v2" alt="Site settings for bonappetit.com: zoom, element removal, Colorshift, video and audio, JavaScript, and per-site permissions" />
+
+## Allow it for this visit
+
+When the page tries to play, Sval asks under the media button. Select
+**Allow for this visit**.
+
+If you closed the question:
+
+1. Look for the media button next to the address. The button lights up when
+   the page has tried to play.
+2. Select the media button.
+
+Either way, the tab reloads, and the page can play video and audio. To stop
+them again for the rest of the visit, select the media button.
+
+## Choose what a site always gets
+
+When Sval asks, select **Always allow**. The tab reloads, and the page plays.
+
+To choose any time:
+
+1. In the address bar, select the **Site settings** button.
+2. Under Video and audio, choose **Always allow**, **Ask first**, or
+   **Always deny**.
+3. Close the menu.
+
+When you choose Always allow, the tab reloads as the menu closes, so the
+page can play.
+
+## Change the default for every site
+
+1. Open Settings › Sites.
+2. Under Defaults, in **Video and audio**, choose **Always allow**,
+   **Ask first**, or **Always deny**.
+
+## Details
+
+- Sval asks once a visit. If you select **Don't allow for this visit**, or
+  close the question, Sval doesn't ask again until you leave the site.
+- On Ask first, clicking elsewhere on the page doesn't allow video and
+  audio.
+- The media button's tooltip tells you what the button will do, such as
+  "Click to allow for this visit".
+- While a page shares your screen or uses your camera or microphone, you
+  can't stop the page's video and audio.
+- Your choice for a site syncs to your other devices, and so does the
+  default.
+- On an address like `nas.example.com`, use the menu's title to pick whether
+  your choice covers that address alone or all of `example.com`.
+
+## Related pages
+
+- [Turn JavaScript on or off for a site](/docs/how-to/privacy/turn-javascript-on-or-off-for-a-site/)
+- [Address bar site controls](/docs/reference/privacy-site-controls/)
+- [Settings › Sites](/docs/reference/privacy-sites/)

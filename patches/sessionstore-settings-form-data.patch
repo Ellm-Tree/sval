@@ -1,0 +1,60 @@
+Sval: Settings' form fields are neither saved with a tab nor put back
+
+The session store saves the fields of a page with its tab and, when the
+tab is restored, sets each one back and fires `input` on it
+(SessionStoreUtils::RestoreFormData). Sval's switches and fields in
+about:preferences write their prefs on `input`, so a Settings tab
+restored at launch set every pref back to what its fields held when the
+tab was last saved, undoing changes made since. TabState.copyFromCache
+is where every saved state is read from the tab's cache, and
+_restoreTabEntry is where saved fields are handed to the page, so data
+already in a profile is never put back either. No chrome API decides
+which pages' fields the session store keeps. SvalPreferences decides
+which form data is Settings'.
+
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index a6820f09fa..6317417a0f 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -201,6 +201,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   TabStateCache: "resource:///modules/sessionstore/TabStateCache.sys.mjs",
+   TabStateFlusher: "resource:///modules/sessionstore/TabStateFlusher.sys.mjs",
+   setTimeout: "resource://gre/modules/Timer.sys.mjs",
++  SvalPreferences: "moz-src:///browser/components/sval/SvalPreferences.sys.mjs",
+ });
+ 
+ ChromeUtils.defineLazyGetter(lazy, "blankURI", () => {
+@@ -8438,7 +8439,8 @@ var SessionStoreInternal = {
+       return SessionStoreUtils.initializeRestore(
+         browser.browsingContext,
+         lazy.SessionStoreHelper.buildRestoreData(
+-          tabData.formdata,
++          // Sval: Settings' saved fields are never put back.
++          lazy.SvalPreferences.restorableFormData(tabData.formdata),
+           tabData.scroll
+         )
+       );
+diff --git a/browser/components/sessionstore/TabState.sys.mjs b/browser/components/sessionstore/TabState.sys.mjs
+index 4ba4dda363..43ccd14b23 100644
+--- a/browser/components/sessionstore/TabState.sys.mjs
++++ b/browser/components/sessionstore/TabState.sys.mjs
+@@ -9,6 +9,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   TabAttributes: "resource:///modules/sessionstore/TabAttributes.sys.mjs",
+   TabStateCache: "resource:///modules/sessionstore/TabStateCache.sys.mjs",
+   sessionStoreLogger: "resource:///modules/sessionstore/SessionLogger.sys.mjs",
++  SvalPreferences: "moz-src:///browser/components/sval/SvalPreferences.sys.mjs",
+ });
+ 
+ /**
+@@ -212,6 +213,11 @@ class _TabState {
+         }
+       }
+ 
++      // Sval: Settings' fields are never saved.
++      if (key === "formdata") {
++        value = lazy.SvalPreferences.restorableFormData(value);
++      }
++
+       if (key === "history") {
+         // Make a shallow copy of the entries array. We (currently) don't update
+         // entries in place, so we don't have to worry about performing a deep

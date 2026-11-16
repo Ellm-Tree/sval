@@ -1,0 +1,52 @@
+Sval: test_cert_overrides.js expects an exception to keep its jar
+
+cert-overrides-per-jar keeps userContextId in an exception's key, so one
+added under a userContextId is taken only in that jar. Upstream's test
+expects it taken in every jar, so those checks expect Sval's answer and the
+rest of the file runs as upstream's.
+
+diff --git a/security/manager/ssl/tests/unit/test_cert_overrides.js b/security/manager/ssl/tests/unit/test_cert_overrides.js
+index 33bdf43a6c..5a459a8927 100644
+--- a/security/manager/ssl/tests/unit/test_cert_overrides.js
++++ b/security/manager/ssl/tests/unit/test_cert_overrides.js
+@@ -582,25 +582,37 @@ function add_simple_tests() {
+       cert,
+       false
+     );
++    // Sval: each jar keeps its own exceptions, so one added under a
++    // userContextId is taken only in that jar, whatever its firstPartyDomain.
+     Assert.ok(
+-      certOverrideService.hasMatchingOverride(
++      !certOverrideService.hasMatchingOverride(
+         "test.example.org",
+         443,
+         {},
+         cert,
+         {}
+       ),
+-      "Should ignore firstPartyDomain and userContextId when adding overrides"
++      "Should keep userContextId when adding overrides"
+     );
+     Assert.ok(
+       certOverrideService.hasMatchingOverride(
++        "test.example.org",
++        443,
++        { firstPartyDomain: "example.com", userContextId: 1 },
++        cert,
++        {}
++      ),
++      "Should ignore firstPartyDomain when checking overrides"
++    );
++    Assert.ok(
++      !certOverrideService.hasMatchingOverride(
+         "test.example.org",
+         443,
+         { firstPartyDomain: "example.com", userContextId: 2 },
+         cert,
+         {}
+       ),
+-      "Should ignore firstPartyDomain and userContextId when checking overrides"
++      "Should not take an override from another userContextId"
+     );
+     certOverrideService.rememberValidityOverride(
+       "example.test",

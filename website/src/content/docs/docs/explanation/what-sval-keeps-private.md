@@ -1,0 +1,149 @@
+---
+title: What Sval keeps private
+description: What Sval keeps on your computer, every service it contacts and why, and what it does against tracking and fingerprinting.
+---
+
+Sval sends no usage data. It contacts only the services named on this
+page. A test launches a fresh install of Sval and records every connection
+Sval makes. The test fails on any host that isn't on Sval's list.
+
+## What stays on your computer
+
+Sval doesn't run a sync service. When you sync, your devices meet in a
+folder you choose, and everything Sval writes there is encrypted with your
+sync key. See [How sync works](/docs/explanation/sync/).
+
+Several protections need data from outside Sval. For each one, Sval
+downloads the whole list and does the checking on your device:
+
+- **Ad and tracker blocking.** Sval downloads each filter list from the
+  group that publishes it, and matches every request against the lists on
+  your device.
+- **Dangerous site warnings.** Sval downloads Google Safe Browsing's lists
+  of phishing and malware sites, and checks addresses on your device. When
+  an address matches, Sval confirms the match by sending Google a short
+  fragment of a hash. Sval never sends Google the address itself.
+- **Data breach warnings.** Sval downloads Have I Been Pwned's whole list of
+  breaches from Mozilla. Sval then checks the site you're on against the
+  list, on your device. When you turn breach warnings off, Sval doesn't
+  download the list.
+- **Translation.** Pages are translated on your device. Sval downloads the
+  translation models it needs.
+
+Cookies and site data stay on the device. Sval never syncs them.
+
+Choices you make in a private window last until you close the window.
+They never sync.
+
+## What Sval writes about itself
+
+- **The log.** Sval writes warnings and errors to `sval-log.txt` in its data
+  folder. The log never includes a Workspace, group, or tab name, a URL, or
+  a secret.
+- **Crash reports.** A crash report leaves your computer only when you check
+  the box to send it. It goes to Sval's feedback server, which stores no IP
+  address and no identifier.
+- **Feedback.** When you use Send Feedback, Sval sends the report only
+  once you select Send.
+
+## What Sval contacts
+
+Out of the box, Sval contacts these services, each for a reason:
+
+- **Sval's update server.** Sval checks for updates once a day. The
+  request reveals only your release channel and platform.
+- **The publishers of your filter lists.** Sval contacts them to keep
+  blocking up to date. Sval fetches a list you add the same way it loads a
+  page you open. When you add a list on another device, this device
+  downloads the list only once you allow it here.
+- **Mozilla's Remote Settings.** Sval checks every hour for data that
+  protects you. The checks cover revoked certificates, blocked extensions
+  and drivers, tracking protection data and the site fixes it needs, cookie
+  banner rules, password rules, translation models, and the breach list. Each request
+  carries your IP address and nothing about your browsing. Sval downloads
+  nothing else from Remote Settings.
+- **addons.mozilla.org.** Sval checks for updates to your extensions. The
+  check tells addons.mozilla.org which extensions you have installed.
+- **Google Safe Browsing.** Sval uses Safe Browsing for the lists of
+  dangerous sites, with its own key.
+- **Your search engine.** Your search engine suggests searches as you type,
+  so it sees what you type before you search. DuckDuckGo is the default.
+  You can turn suggestions off in Settings › Search. Private windows keep
+  suggestions off.
+- **Cisco's OpenH264 codec.** Sval downloads the codec once per release, so
+  video calls work on sites that use H.264. Cisco has to distribute the
+  codec for licensing reasons.
+- **Mozilla's Web Push service.** Sval contacts Web Push only while a site
+  you allowed can send you notifications.
+
+Sval contacts these only once you choose them:
+
+- **Kagi.** Sval contacts Kagi when you choose Kagi as your search engine.
+- **An encrypted DNS resolver.** When you turn on Secure DNS, Sval
+  contacts only the resolver you pick.
+- **Google's Widevine download.** Sval downloads Widevine the first time a
+  site needs it to play protected video, once you agree.
+- **addons.mozilla.org.** Sval contacts addons.mozilla.org when you install
+  an extension or choose a password manager.
+- **Sval's feedback server.** Sval contacts the feedback server when you
+  send feedback or a crash report.
+
+Sval turns off the contacts Firefox makes on its own. They include
+telemetry, studies, and experiments. They also include Mozilla's update and
+region checks, sponsored suggestions and weather, and connection checks.
+Sval also turns off the extension recommendations that send Mozilla your
+list of extensions, network location lookups, and Firefox accounts. Sval gets your location only from your
+operating system.
+
+## Against tracking
+
+Sval blocks ads and trackers with open-source filter lists. A new install
+uses Balanced Blocking, which blocks what uBlock Origin blocks out of the
+box. Strict Blocking also blocks trackers in links, social widgets, and
+scam sites. On top of that, Strict Blocking strips tracking parameters from
+the addresses you open.
+
+Some sites load a tracker from an address on their own domain that points
+to the tracker's servers. When blocking is on, Sval looks up where each of
+these addresses leads. If the address leads to a tracker, Sval blocks it.
+When you use a proxy, Sval skips this check, because the lookup would
+reveal the address outside the proxy.
+
+The cookie setting starts on Keep each site's cookies to that site, so a
+company's cookie on one site can't follow you to another.
+
+Global Privacy Control is on. It tells sites not to sell or share your
+data. In some places, the law requires sites to honor that request.
+
+## Against fingerprinting
+
+Sites can tell browsers apart by reading details of the device, such as
+the screen, fonts, and graphics card. Sval's fingerprinting protection
+gives sites values that make you look like other Sval users. The protection
+rarely breaks sites.
+
+- Protection runs in every window, so a private window doesn't stand out
+  from a normal one.
+- Sites see only your first language, unless you turn on Tell sites all
+  your languages.
+- Each site sees its own count of processor cores, somewhere between half
+  your cores and all of them.
+- Mozilla publishes a list that weakens protection on Google's and Bing's
+  sites. Sval doesn't use that list, but you can turn it on in Settings.
+
+Strict fingerprinting protection hides more, and it breaks more sites. If
+protection breaks a site, you can turn protection off for that site.
+
+## What this doesn't cover
+
+- Your network sees the sites you look up, unless you turn on Secure DNS.
+- Sites you sign in to know who you are. An isolated Workspace keeps a
+  sign-in apart from your other Workspaces. See
+  [What an isolated Workspace keeps apart](/docs/explanation/isolated-workspaces/).
+
+## Related pages
+
+- [Choose how much Sval blocks](/docs/how-to/privacy/choose-how-much-sval-blocks/)
+- [Change fingerprinting protection](/docs/how-to/privacy/change-fingerprinting-protection/)
+- [Turn on Secure DNS](/docs/how-to/privacy/turn-on-secure-dns/)
+- [Privacy and protection settings](/docs/reference/privacy/)

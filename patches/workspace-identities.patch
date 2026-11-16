@@ -1,0 +1,93 @@
+Sval: identities for isolated workspaces, safe from a locked containers pref
+
+An isolated workspace's tabs share a cookie jar of their own (isolated
+workspaces spec §4). A non-public identity is the kind Firefox uses for its
+own internal jars: no container menu lists it, no tab is coloured for it and
+no label names it in the address bar, which is what a workspace's jar needs,
+since Sval draws the workspace itself. ContextualIdentityService.create makes
+only public identities, remove refuses non-public ones and only a public
+identity can be found by id, and no other API does any of the three. So
+create takes an isPublic option, remove takes any identity except Firefox's
+own system identities, and getPrivateIdentityFromId mirrors
+getPublicIdentityFromId.
+
+Sval locks privacy.userContext.enabled off, and an add-on with the
+contextualIdentities permission still writes it at startup. The write
+notifies observers although the locked value never changes, and this
+service answers every notification that reads false by closing every tab
+outside the default jar and resetting its identities, which would close an
+isolated workspace's tabs and delete its jar. So a notification for a locked
+pref is ignored: its value cannot have changed.
+
+diff --git a/toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs b/toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs
+index ad94dece6e..e3707b7327 100644
+--- a/toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs
++++ b/toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs
+@@ -253,6 +253,12 @@ _ContextualIdentityService.prototype = {
+   },
+ 
+   async observe(aSubject, aTopic) {
++    if (
++      aTopic === "nsPref:changed" &&
++      Services.prefs.prefIsLocked(CONTEXTUAL_IDENTITY_ENABLED_PREF)
++    ) {
++      return;
++    }
+     if (aTopic === "nsPref:changed") {
+       const contextualIdentitiesEnabled = Services.prefs.getBoolPref(
+         CONTEXTUAL_IDENTITY_ENABLED_PREF
+@@ -373,7 +379,7 @@ _ContextualIdentityService.prototype = {
+     });
+   },
+ 
+-  create(name, icon, color) {
++  create(name, icon, color, { isPublic = true } = {}) {
+     this.ensureDataReady();
+ 
+     // Retrieve the next userContextId available.
+@@ -396,7 +402,7 @@ _ContextualIdentityService.prototype = {
+ 
+     let identity = {
+       userContextId,
+-      public: true,
++      public: isPublic,
+       icon,
+       color,
+       name,
+@@ -485,7 +491,9 @@ _ContextualIdentityService.prototype = {
+     this.ensureDataReady();
+ 
+     let index = this._identities.findIndex(
+-      i => i.userContextId == userContextId && i.public
++      i =>
++        i.userContextId == userContextId &&
++        !this._systemIdentities.some(system => system.name == i.name)
+     );
+     if (index == -1) {
+       return false;
+@@ -494,7 +502,7 @@ _ContextualIdentityService.prototype = {
+     Services.clearData.deleteDataFromOriginAttributesPattern({ userContextId });
+ 
+     let deletedOutput = this.getIdentityObserverOutput(
+-      this.getPublicIdentityFromId(userContextId)
++      this._identities[index]
+     );
+     this._identities.splice(index, 1);
+     this._openedIdentities.delete(userContextId);
+@@ -655,6 +663,16 @@ _ContextualIdentityService.prototype = {
+     );
+   },
+ 
++  getPrivateIdentityFromId(userContextId) {
++    this.ensureDataReady();
++    return Cu.cloneInto(
++      this._identities.find(
++        info => info.userContextId == userContextId && !info.public
++      ),
++      {}
++    );
++  },
++
+   formatContextLabel(l10nId) {
+     const [msg] = lazy.l10n.formatMessagesSync([l10nId]);
+     for (let attr of msg.attributes) {

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>Sval/renovate-config",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "packageRules": [
+    {
+      "description": "privacypass and voprf are built on rand_core 0.6, tls_codec 0.4 and blind-rsa-signatures 0.15, with getrandom 0.2 and 0.3 behind them. Moving one of these alone breaks the engine's build (see the comments in engine/Cargo.toml), so they move together with privacypass.",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchFileNames": [
+        "engine/Cargo.toml"
+      ],
+      "matchPackageNames": [
+        "rand_core",
+        "tls_codec",
+        "blind-rsa-signatures",
+        "getrandom",
+        "getrandom-02"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "build/rust/cssparser-0.34 answers adblock-rust's cssparser 0.34 requirement with the cssparser Gecko vendors in third_party/rust, so its requirement is that version and moves only when the ESR base does. Any other version has nothing to resolve to, and the Gecko compile fails.",
+      "matchFileNames": [
+        "chrome/build/rust/cssparser-0.34/Cargo.toml"
+      ],
+      "matchDepNames": [
+        "cssparser"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "ESR point releases are security fixes, so they skip the weekly window and the release-age wait. They run the full CI, because a Gecko change can break Windows or macOS alone. A new ESR line (a major) is the annual rebase, done by hand.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "mozilla-firefox/firefox"
+      ],
+      "schedule": [
+        "at any time"
+      ],
+      "minimumReleaseAge": "0 days",
+      "addLabels": [
+        "security",
+        "full-ci"
+      ]
+    },
+    {
+      "description": "A new ESR line is the annual rebase (upstream.txt). Listed after the rule above so it wins.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "mozilla-firefox/firefox"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "wasm-bindgen-cli writes the glue for the engine's wasm-bindgen crate and must match its version exactly, so it joins the rust crates group and both move in one pull request.",
+      "matchDepNames": [
+        "wasm-bindgen-cli"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "rust crates",
+      "addLabels": [
+        "rust"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "A 0.x minor bump of wasm-bindgen-cli is breaking, as the shared preset treats the crate's. Listed after the rule above so it wins.",
+      "matchDepNames": [
+        "wasm-bindgen-cli"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Firefox ESR commit in upstream.txt. The tag in the comment above UPSTREAM_REF is the version; UPSTREAM_REF is its commit.",
+      "managerFilePatterns": [
+        "/^upstream\\.txt$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+) tag=(?<currentValue>\\S+)\\nUPSTREAM_REF=(?<currentDigest>[0-9a-f]{40})"
+      ],
+      "versioningTemplate": "regex:^FIREFOX_(?<major>\\d+)_(?<minor>\\d+)(_(?<patch>\\d+))?esr_RELEASE$"
+    },
+    {
+      "customType": "regex",
+      "description": "The wasm-bindgen-cli the CI image installs.",
+      "managerFilePatterns": [
+        "/^\\.forgejo/docker/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "cargo install wasm-bindgen-cli --version (?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "crate",
+      "depNameTemplate": "wasm-bindgen-cli"
+    }
+  ]
+}

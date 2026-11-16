@@ -1,0 +1,159 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Reader view in Sval's look, over `sval-page.css`. Reader view draws itself
+ * in its own colour scheme, which the reader picks in its Colours menu and
+ * `AboutReader` sets as a class on the body, whatever the system's theme. So
+ * every colour here is set per scheme, from the palette, and none follows the
+ * `--sval-*` roles, which follow the system's theme. Light and dark take
+ * Sval's ink, canvas and accent; sepia and gray keep their own paper and take
+ * Sval's accent. Contrast, custom colours and high contrast (`hcm`) keep
+ * Firefox's values: the reader chose them, or they are built for forced
+ * colours.
+ *
+ * The article's text stays in the face the reader picks (sans-serif, serif or
+ * monospace, `reader.font_type`). Outfit, Sval's display face, sets the page's
+ * header and the controls.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:root {
+  /* The light and dark schemes' paper and ink. The Colours menu draws its
+     swatches from these too. */
+  --light-theme-background: #ffffff;
+  --light-theme-foreground: var(--sval-palette-ink-950);
+  --dark-theme-background: var(--sval-palette-ink-850);
+  --dark-theme-foreground: var(--sval-palette-ink-200);
+  --gray-theme-background: var(--sval-palette-ink-200);
+}
+
+body.light,
+body.sepia,
+body.gray {
+  --primary-color: var(--sval-palette-blue-600);
+  --toolbar-border: rgb(var(--sval-palette-wash-light) / 0.14);
+  --toolbar-button-background-hover: rgba(31, 107, 255, 0.1);
+  --toolbar-button-background-active: rgba(31, 107, 255, 0.16);
+  --tooltip-background: var(--sval-palette-ink-950);
+  --tooltip-foreground: #ffffff;
+  --popup-background: #ffffff;
+  --popup-foreground: var(--sval-palette-ink-950);
+  --popup-border: rgb(var(--sval-palette-wash-light) / 0.14);
+  --popup-line: rgb(var(--sval-palette-wash-light) / 0.08);
+  --popup-shadow: rgb(var(--sval-palette-wash-light) / 0.18);
+  --popup-button-background: var(--sval-palette-ink-50);
+  --popup-button-foreground: var(--sval-palette-ink-950);
+  --popup-button-foreground-hover: var(--sval-palette-ink-950);
+  --popup-button-selected-foreground: #ffffff;
+  --popup-button-border: rgb(var(--sval-palette-wash-light) / 0.28);
+  --selected-background: rgba(31, 107, 255, 0.22);
+  --link-color: var(--primary-color);
+  --link-color-hover: var(--sval-palette-blue-700);
+  --link-color-active: var(--sval-palette-blue-700);
+  --narrate-word-highlight-color: rgba(31, 107, 255, 0.45);
+  --narrating-paragraph-background-color: rgba(31, 107, 255, 0.08);
+}
+
+body.light {
+  --icon-fill: var(--sval-palette-ink-700);
+  --icon-disabled-fill: rgba(28, 42, 107, 0.4);
+}
+
+/* The paper's own ink on the toolbar, as Firefox draws these schemes, with
+   the darker blue, which keeps a link's 4.5:1 on the paper. */
+body.sepia {
+  --primary-color: var(--sval-palette-blue-700);
+  --link-color-hover: var(--sval-palette-ink-950);
+  --link-color-active: var(--sval-palette-ink-950);
+  --toolbar-border: var(--main-foreground);
+  --narrate-word-highlight-color: #bdb5a5;
+  --narrating-paragraph-background-color: #e0d7c5;
+}
+
+body.gray {
+  --primary-color: var(--sval-palette-blue-700);
+  --link-color-hover: var(--sval-palette-ink-950);
+  --link-color-active: var(--sval-palette-ink-950);
+  --toolbar-border: rgb(var(--sval-palette-wash-light) / 0.28);
+  --icon-fill: var(--sval-palette-ink-700);
+}
+
+body.dark {
+  --primary-color: var(--sval-palette-neon);
+  --toolbar-border: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --toolbar-button-background-hover: rgba(92, 242, 255, 0.12);
+  --toolbar-button-background-active: rgba(92, 242, 255, 0.2);
+  --tooltip-background: #ffffff;
+  --tooltip-foreground: var(--sval-palette-ink-950);
+  --popup-background: var(--sval-palette-ink-850);
+  --popup-foreground: #ffffff;
+  --popup-border: rgb(var(--sval-palette-wash-dark) / 0.18);
+  --popup-line: rgb(var(--sval-palette-wash-dark) / 0.1);
+  --popup-shadow: rgba(0, 0, 0, 0.5);
+  --popup-button-background: rgba(6, 10, 46, 0.55);
+  --popup-button-foreground: #ffffff;
+  --popup-button-foreground-hover: #ffffff;
+  --popup-button-selected-foreground: var(--sval-palette-ink-950);
+  --popup-button-border: rgb(var(--sval-palette-wash-dark) / 0.34);
+  --selected-background: rgba(92, 242, 255, 0.26);
+  --link-color: var(--primary-color);
+  --link-color-hover: #ffffff;
+  --link-color-active: #ffffff;
+  --icon-fill: var(--sval-palette-ink-200);
+  --icon-disabled-fill: rgba(214, 221, 240, 0.4);
+  --narrate-word-highlight-color: rgba(92, 242, 255, 0.5);
+  --narrating-paragraph-background-color: rgba(92, 242, 255, 0.08);
+}
+
+/* The header and the controls in Outfit. The article keeps the reader's
+   face. */
+.header,
+.domain,
+.toolbar,
+.dropdown-popup,
+.hover-label {
+  font-family: var(--sval-font);
+}
+
+.toolbar :is(button, select, input, label) {
+  font-family: inherit;
+}
+
+.header > h1 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.domain {
+  text-decoration: none !important;
+  font-weight: 600;
+}
+
+.domain:hover {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+}
+
+/* Shapes: the toolbar is a pill of round buttons, as Sval's header draws its
+   buttons, and its menus' buttons and fields are pills. Firefox draws each of
+   them with `--border-radius-small`, which every control under the toolbar
+   inherits; the menus themselves are panels with Settings' radius. */
+.toolbar {
+  --border-radius-small: 999px;
+  background-color: var(--main-background);
+  box-shadow: 0 8px 24px var(--popup-shadow);
+}
+
+.hover-label {
+  border-radius: 8px;
+}
+
+.dropdown .dropdown-popup {
+  border-radius: 20px;
+  box-shadow: 0 12px 32px var(--popup-shadow);
+}
+
+.color-scheme-buttons > label {
+  border-radius: 12px;
+}

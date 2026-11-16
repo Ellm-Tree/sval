@@ -1,0 +1,93 @@
+Sval: let Sval decide the file pickers and downloads of an agent's tab
+
+A page in a tab an agent controls may open no file picker, and its downloads
+are decided by a per-site permission, saved with no dialog and never opened.
+Gecko makes both in the parent with no chrome hook of its own: a picker from
+the @mozilla.org/filepicker;1 contract in FilePickerParent::RecvOpen, a
+download's dialog and transfer from @mozilla.org/helperapplauncherdialog;1
+and @mozilla.org/transfer;1 in nsExternalAppHandler. Standing a component in
+front of those contracts puts Sval in every picker and download, and fights
+whatever else registers over them, such as a test's mock. So these ask
+Sval's nsISvalAgentFiles first, through the helpers in Sval's SvalAgentFiles.h,
+which knows which tabs an agent controls: a refused picker is never made and
+comes back cancelled, and Sval may hand out its own dialog and transfer.
+Every other tab's pickers and downloads go to Firefox's components as
+before.
+
+diff --git a/dom/ipc/FilePickerParent.cpp b/dom/ipc/FilePickerParent.cpp
+index 97f8ee46a5..0c9401b3ab 100644
+--- a/dom/ipc/FilePickerParent.cpp
++++ b/dom/ipc/FilePickerParent.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include "FilePickerParent.h"
+ 
++#include "mozilla/SvalAgentFiles.h"
+ #include "mozilla/dom/BrowserParent.h"
+ #include "mozilla/dom/CanonicalBrowsingContext.h"
+ #include "mozilla/dom/ContentParent.h"
+@@ -276,7 +277,9 @@ mozilla::ipc::IPCResult FilePickerParent::RecvOpen(
+     nsTArray<nsString>&& aRawFilters, const nsString& aDisplayDirectory,
+     const nsString& aDisplaySpecialDirectory, const nsString& aOkButtonLabel,
+     const nsIFilePicker::CaptureTarget& aCapture) {
+-  if (!CreateFilePicker()) {
++  // Sval: no picker is made for a page in a tab an agent controls.
++  if (mozilla::sval::RefusesFilePicker(mBrowsingContext) ||
++      !CreateFilePicker()) {
+     (void)Send__delete__(this, void_t(), nsIFilePicker::returnCancel);
+     return IPC_OK();
+   }
+diff --git a/uriloader/exthandler/nsExternalHelperAppService.cpp b/uriloader/exthandler/nsExternalHelperAppService.cpp
+index 1eab401455..bef8c85ae3 100644
+--- a/uriloader/exthandler/nsExternalHelperAppService.cpp
++++ b/uriloader/exthandler/nsExternalHelperAppService.cpp
+@@ -6,6 +6,7 @@
+ 
+ /* This must occur *after* base/basictypes.h to avoid typedefs conflicts. */
+ #include "mozilla/Base64.h"
++#include "mozilla/SvalAgentFiles.h"
+ #include "mozilla/ResultExtensions.h"
+ 
+ #include "mozilla/dom/ContentChild.h"
+@@ -1913,7 +1914,8 @@ NS_IMETHODIMP nsExternalAppHandler::OnStartRequest(nsIRequest* request) {
+ 
+   if (alwaysAsk) {
+     // Display the dialog
+-    mDialog = do_CreateInstance(NS_HELPERAPPLAUNCHERDLG_CONTRACTID, &rv);
++    // Sval: a download in an agent's tab may get Sval's dialog.
++    mDialog = mozilla::sval::DownloadDialog(mBrowsingContext, &rv);
+     NS_ENSURE_SUCCESS(rv, rv);
+ 
+     // this will create a reference cycle (the dialog holds a reference to us as
+@@ -2354,8 +2356,9 @@ nsresult nsExternalAppHandler::CreateTransfer() {
+   // much that we can't launch the helper application or save to disk. Work on
+   // a local copy rather than mTransfer until we know we succeeded, to make it
+   // clearer that this function is re-entrant.
++  // Sval: a download in an agent's tab may get Sval's transfer.
+   nsCOMPtr<nsITransfer> transfer =
+-      do_CreateInstance(NS_TRANSFER_CONTRACTID, &rv);
++      mozilla::sval::DownloadTransfer(mBrowsingContext, &rv);
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   // Initialize the download
+@@ -2421,8 +2424,9 @@ nsresult nsExternalAppHandler::CreateTransfer() {
+ 
+ nsresult nsExternalAppHandler::CreateFailedTransfer() {
+   nsresult rv;
++  // Sval: a download in an agent's tab may get Sval's transfer.
+   nsCOMPtr<nsITransfer> transfer =
+-      do_CreateInstance(NS_TRANSFER_CONTRACTID, &rv);
++      mozilla::sval::DownloadTransfer(mBrowsingContext, &rv);
+   NS_ENSURE_SUCCESS(rv, rv);
+ 
+   // We won't pass the temp file to the transfer, so if we have one it needs to
+@@ -2506,7 +2510,8 @@ void nsExternalAppHandler::RequestSaveDestination(
+   nsresult rv = NS_OK;
+   if (!mDialog) {
+     // Get helper app launcher dialog.
+-    mDialog = do_CreateInstance(NS_HELPERAPPLAUNCHERDLG_CONTRACTID, &rv);
++    // Sval: a download in an agent's tab may get Sval's dialog.
++    mDialog = mozilla::sval::DownloadDialog(mBrowsingContext, &rv);
+     if (rv != NS_OK) {
+       Cancel(NS_BINDING_ABORTED);
+       return;

@@ -1,0 +1,203 @@
+---
+title: Workspaces
+description: What each Workspace control does, from the switcher above your tabs to the idle tab settings.
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
+Each Workspace keeps its own tabs and groups. A window shows one Workspace
+at a time. You make, change, and remove Workspaces with the controls below.
+
+## The switcher
+
+<Screenshot name="home-switcher-crop" frame="crop-tl" alt="The Workspace switcher open over the Workspace panel, listing Work, Ceramics Shop and Claude" />
+
+The switcher sits at the top of the Workspace panel. It shows the emoji, name, and
+color of the Workspace you're in. That color also tints the window. The
+window's title starts with the Workspace's emoji and name.
+
+- **Isolated.** This shows next to the name when the Workspace keeps its
+  own cookies and sign-ins.
+- When you select the switcher, the list of Workspaces opens.
+- When you right-click the switcher, the Workspace menu opens for the
+  Workspace you're in.
+- When you swipe sideways over the Workspace panel, the window goes to the
+  Workspace before or after the current one, in the list's order. A swipe
+  skips Agent Workspaces. Settings › Keyboard shortcuts has a switch that
+  turns swiping off.
+
+## The strip
+
+If you choose Strip in Settings › Workspaces › Workspace switcher, the strip
+takes the place of the switcher's button. It shows all your Workspaces in a
+row, in the list's order. The Workspace you're in is marked as the selected
+tab is, with a bar at its start.
+
+- **A Workspace.** Clicking a Workspace switches the window to it.
+  Shift-clicking it opens it in a new window.
+- **The Workspace you're in.** Clicking it opens the list of Workspaces over
+  the strip.
+- **The keys.** When the strip has focus, Left and Right switch the window
+  to the Workspace before or after the current one. Home and End switch to
+  the first and the last. Enter or Space opens the list of Workspaces.
+- **The mouse wheel.** The wheel slides the strip, or switches Workspaces,
+  as Settings › Workspaces › Workspace switcher says.
+- **The dots.** These show under the strip when your Workspaces don't fit
+  in it. The long dot is the Workspace you're in. When the dots don't fit, a line takes their place, with a mark where the Workspace you're in is.
+- **A box on a Workspace's icon.** The Workspace is isolated.
+- **A media button on a Workspace's icon.** This shows while a tab in that
+  Workspace has sound or media. Clicking it does what the media entry in
+  the Workspace menu says.
+<Until v="0.1.0-rc.10">
+
+- **Agent Workspaces.** After a line, the strip shows the Workspaces that
+  agents work in.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Agent Workspaces.** After a line, the strip shows the Workspaces that
+  agents work in, each with its app's icon. An app with more than one
+  Workspace has one icon, with a count of the app's Workspaces. Clicking
+  the icon opens a list of the app's Workspaces. Each Workspace in the list
+  shows the icon of the model its agent named, when Sval knows that model.
+  Choosing one switches to that Workspace.
+
+</Since>
+- **New Workspace…** The plus at the end of the strip opens the New
+  Workspace dialog.
+- **Dragging a Workspace.** A Workspace you drag along the strip moves to
+  where you drop it. Holding the drag near either end of the strip slides
+  the strip that way.
+
+When you right-click a Workspace on the strip, the Workspace menu opens for
+it. For a Workspace that no window shows, the menu starts with **Open in New
+Window**. Under the Workspace's commands, the menu has items that show or
+hide the strip's names. The menu leaves them out when the strip is a column.
+
+In a narrow Workspace panel, the strip shows icons only, and pointing at an
+icon shows its Workspace's name. If you chose to see names, the name of the
+Workspace you're in shows under the strip. When the Workspace panel is
+narrower still, the strip turns into a column three Workspaces tall, with no
+name, dots or line under it. Up and Down also switch Workspaces in the
+column.
+
+## The list of Workspaces
+
+The list shows every Workspace in the same order in every window. The
+Workspace you're in is in bold.
+
+- **A Workspace.** Selecting a Workspace switches the window to it.
+  Shift-clicking it, or pressing <kbd>Shift+Enter</kbd>, opens it in a new
+  window. If another window already shows that Workspace, Sval brings that
+  window to the front.
+- **A box next to a name.** The Workspace is isolated.
+- **A media button next to a name.** This shows while a tab in that
+  Workspace has sound or media. Clicking the button does what the media
+  entry in the Workspace menu says.
+- **Agent Workspaces.** After your own Workspaces, the list shows the
+  Workspaces that agents work in.
+- **New Workspace…** The New Workspace dialog opens.
+- **Dragging a Workspace.** A Workspace you drag up or down the list moves
+  to where you drop it. The new order syncs to your other devices. Swiping
+  and the Launcher follow the new order. You can't drag an Agent Workspace.
+
+When you point to a Workspace in the list, its submenu opens. When you
+right-click a Workspace, the Workspace menu opens for it.
+
+- **Open in New Window.** The Workspace opens in a window of its own. This
+  entry shows only for a Workspace that no window shows.
+- The rest of the submenu is the Workspace menu.
+
+## The Workspace menu
+
+<Screenshot name="docs-workspace-menu" frame="rounded" maxWidth={200} alt="The menu for the Work Workspace: Edit…, Isolate Workspace…, and Delete Workspace…" />
+
+- **Pause Media.** Sval pauses the media playing in the Workspace's tabs.
+  Sound that can't be paused is muted. This entry shows only while a tab
+  has media or sound. It reads **Play Media**, **Mute**, or **Unmute** when
+  that's what it does.
+- **Edit…** The Edit Workspace dialog opens.
+- **Isolate Workspace…** After you confirm, the Workspace gets its own
+  cookies and sign-ins. Every tab in the Workspace reloads.
+- **Stop isolating Workspace…** This shows in place of Isolate Workspace…
+  for an isolated Workspace. After you confirm, every tab reloads with the
+  sign-ins of your other Workspaces. Sval deletes the sign-ins and site data
+  that this Workspace kept.
+- **Delete Workspace…** After you confirm, Sval deletes the Workspace and
+  everything in it. This entry is dimmed when you have only one Workspace.
+
+In the menu bar, the **Workspaces** menu lists your Workspaces. Below them
+is the Workspace menu for the Workspace you're in.
+
+## The New Workspace dialog
+
+- **Name.** This field is required.
+- **Emoji.** The emoji picker opens. A new Workspace starts with a random
+  emoji. **No emoji** in the picker removes the emoji.
+- **Color.** This offers **Sval Default**, Red, Orange, Yellow, Green,
+  Cyan, Blue, Purple, Pink, Gray, and Black. The dialog takes on the color you
+  pick, as the window will.
+- **Isolate this Workspace.** The new Workspace gets its own cookies and
+  sign-ins. This box is unchecked unless you check it.
+- **Create.** Sval makes the Workspace and switches the window to it.
+
+## The Edit Workspace dialog
+
+The Edit Workspace dialog has the same **Name**, **Emoji**, and **Color** as
+the New Workspace dialog. They start with the Workspace's current name,
+emoji, and color.
+
+- **Archive idle tabs.** This sets how long this Workspace's tabs can go
+  unused before Sval archives them: **Use Default**, 12 Hours, 24 Hours,
+  7 Days, 30 Days, or **Never**. Use Default follows Settings and shows the time
+  you set there.
+- **Save.** Sval saves your changes.
+
+Agent Workspaces have no Archive idle tabs choice.
+
+## Settings › Workspaces › Workspace switcher
+
+- **Menu.** The switcher is a button that names the Workspace you're in.
+  Selecting it opens the list of Workspaces. Menu is the default.
+- **Strip.** The strip shows all your Workspaces in a row.
+- **The strip shows.** This sets what the strip shows: icons and names,
+  icons and the current Workspace's name, or icons only. Settings shows
+  this choice only while Strip is chosen.
+- **Scrolling over the strip.** This sets what the mouse wheel does over
+  the strip. With Slides the strip, the wheel moves the strip without
+  switching Workspaces. The strip slides back when you move the pointer
+  away. With Switches Workspaces, the wheel moves the window one Workspace
+  at a time and stops at your first and last Workspace. Settings shows this
+  choice only while Strip is chosen.
+
+## Settings › Workspaces › Idle tabs
+
+- **Archive idle tabs.** Sval moves tabs you haven't used for a while out
+  of their Workspace and into History, under Archived tabs. This setting is
+  off by default.
+- **After.** This sets how long a tab can go unused: 12 Hours, 24 Hours,
+  7 Days, or 30 Days. It starts at 7 Days.
+- **Keep archived tabs for.** This sets how long History keeps an archived
+  tab: 7, 30, or 90 days. It starts at 30 days.
+
+These settings sync to your other devices. If you choose something other
+than Use Default for a Workspace in the Edit Workspace dialog, that choice
+takes the place of After for that Workspace.
+
+## A tab's menu in the Workspace
+
+- **Move to Workspace.** The submenu lists your other Workspaces, then
+  **New Workspace…**, then any Agent Workspaces. Choosing one moves the tab,
+  group, or selected rows there. Sval asks before you move tabs into or
+  out of an isolated Workspace. Sval also asks before you move tabs into
+  an Agent Workspace.
+
+## History › Archived tabs
+
+In the History sidebar, **View › Archived tabs** lists the tabs Sval
+archived, newest first. Each row shows the page, the Workspace the tab came
+from, and when Sval archived the tab. Selecting a row puts the tab back in
+its Workspace. A tab you've put back stays in the list, dimmed.

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: existence
+message: "'%s' is an 'X, not Y' contrast. State the thing itself."
+level: error
+ignorecase: true
+nonword: true
+tokens:
+  - '\w+, not\b'

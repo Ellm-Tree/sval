@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# The checks a merge request on GitLab gets from GitLab's own runners: the
+# ones that need no Gecko build, no secret and nothing of Sval's
+# infrastructure. A fork's merge request runs them in the fork's project.
+# Sval's own CI runs these and the browser's suites once a change is taken in.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "api"
+
+default:
+  interruptible: true
+  timeout: 30 minutes
+
+# check-licenses.py reads tomllib, which needs Python 3.11 or newer.
+checks:
+  image: python:3.12-bookworm
+  variables:
+    GIT_DEPTH: 0
+  script:
+    # check-comments.py and check-commit-msg.py read the branch from its merge
+    # base with origin/main.
+    - git fetch --quiet origin "+refs/heads/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-main}:refs/remotes/origin/main"
+    - python3 scripts/check-licenses.py
+    - python3 scripts/check-comments.py
+    - python3 scripts/check-decisions.py
+    - python3 scripts/check-mask-icons.py
+    - python3 scripts/check-commit-msg.py
+    - |
+      if [ -n "${CI_MERGE_REQUEST_TITLE:-}" ]; then
+        python3 scripts/check-commit-msg.py --title "$CI_MERGE_REQUEST_TITLE"
+      fi
+    - python3 scripts/check-licenses-test.py
+    - python3 scripts/check-comments-test.py
+    - python3 scripts/check-decisions-test.py
+    - python3 scripts/check-commit-msg-test.py
+    - python3 scripts/check-mask-icons-test.py
+
+# Each crate's rust-toolchain.toml, or the repository's, pins the compiler,
+# and rustup installs it at the first cargo run. Tests that remove a file's
+# permissions run as an unprivileged user, because root ignores them
+# (scripts/as-test-user.sh).
+.rust:
+  image: rust:1-bookworm
+  variables:
+    SVAL_TEST_USER: sval
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libdbus-1-dev pkg-config python3 >/dev/null
+    - useradd --create-home "$SVAL_TEST_USER"
+    - (cd "$CRATE" && rustup toolchain install)
+    - chmod -R a+rwX "$RUSTUP_HOME" "$CARGO_HOME"
+    - chown -R "$SVAL_TEST_USER:$SVAL_TEST_USER" "$CI_PROJECT_DIR"
+
+engine:
+  extends: .rust
+  variables:
+    CRATE: engine
+  script:
+    - cd engine
+    - ../scripts/as-test-user.sh cargo test --locked --all-targets
+    - "../scripts/as-test-user.sh cargo test --locked --all-targets --features wasm wasm::"
+    - ../scripts/as-test-user.sh cargo clippy --locked --all-targets -- -D warnings
+    - ../scripts/as-test-user.sh cargo clippy --locked --all-targets --features wasm -- -D warnings
+    - ../scripts/as-test-user.sh cargo clippy --locked --target wasm32-unknown-unknown --features wasm -- -D warnings
+    - ../scripts/as-test-user.sh cargo fmt --check
+    - ../scripts/as-test-user.sh env RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --features wasm --target wasm32-unknown-unknown
+    - ../scripts/as-test-user.sh cargo build --locked --target wasm32-unknown-unknown
+    - cd .. && python3 scripts/generate-app-license.py --check
+
+sval-mcp:
+  extends: .rust
+  variables:
+    CRATE: tools/sval-mcp
+  script:
+    - cd tools/sval-mcp
+    - ../../scripts/as-test-user.sh cargo test --locked --all-targets
+    - ../../scripts/as-test-user.sh cargo clippy --locked --all-targets -- -D warnings
+    - ../../scripts/as-test-user.sh cargo fmt --check
+
+sval-folder:
+  extends: .rust
+  variables:
+    CRATE: tools/sval-folder
+  script:
+    - cd tools/sval-folder
+    - ../../scripts/as-test-user.sh cargo test --locked --all-targets
+    - ../../scripts/as-test-user.sh cargo clippy --locked --all-targets -- -D warnings
+    - ../../scripts/as-test-user.sh cargo fmt --check

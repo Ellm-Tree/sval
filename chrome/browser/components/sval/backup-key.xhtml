@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  The backup of the sync key, shown by `SvalBackupKey.sys.mjs` in the window's
+  dialog box, in Sval's dialog frame. The code is filled in by `backup-key.js`.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Back up your sync key</title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/backup-key.css"
+    />
+    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script src="chrome://browser/content/sval/backup-key.js"></script>
+  </head>
+
+  <body>
+    <div
+      class="sval-dialog sval-backup"
+      role="dialog"
+      aria-labelledby="sval-backup-title"
+      aria-describedby="sval-backup-body"
+    >
+      <div class="sval-dialog-head">
+        <span
+          class="sval-dialog-icon"
+          data-icon="key"
+          aria-hidden="true"
+        ></span>
+        <div class="sval-dialog-copy">
+          <h1 class="sval-dialog-title" id="sval-backup-title">
+            Back up your sync key
+          </h1>
+          <p class="sval-dialog-body" id="sval-backup-body">
+            This key unlocks your synced Workspaces. Nobody can recover it for
+            you, not even Sval, so keep a copy somewhere safe.
+          </p>
+        </div>
+      </div>
+
+      <div class="sval-dialog-well sval-backup-key">
+        <p class="sval-backup-code"></p>
+        <div class="sval-backup-key-foot">
+          <p class="sval-backup-fingerprint"></p>
+          <button class="sval-dialog-btn sval-backup-copy" type="button">
+            Copy
+          </button>
+        </div>
+      </div>
+
+      <section class="sval-backup-steps" aria-labelledby="sval-backup-how">
+        <h2 id="sval-backup-how">Keep it in your password manager</h2>
+        <ol>
+          <li>Press Copy.</li>
+          <li>
+            Make a secure note called “Sval sync key” in 1Password, Bitwarden,
+            Apple Passwords, or another password manager, and paste the code
+            into it.
+          </li>
+          <li>
+            If you lose every device, set up Sval on a new one. Choose your sync
+            folder, then “Restore with your backup key”.
+          </li>
+        </ol>
+        <p class="sval-backup-note">
+          You can also save it to a file or print it. Never keep it in your sync
+          folder.
+        </p>
+      </section>
+
+      <p class="sval-backup-status" role="status" aria-live="polite"></p>
+
+      <div class="sval-dialog-actions">
+        <button class="sval-dialog-btn sval-backup-print" type="button">
+          Print…
+        </button>
+        <button class="sval-dialog-btn sval-backup-save" type="button">
+          Save to a file…
+        </button>
+        <button
+          class="sval-dialog-btn sval-backup-done primary"
+          type="button"
+          autofocus="autofocus"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  </body>
+</html>

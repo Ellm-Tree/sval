@@ -1,0 +1,72 @@
+Sval: sync only the Remote Settings collections Sval names
+
+`browser.sval.remoteSettings.collections` lists them (spec §10.9). An entry
+written "collection@pref" syncs only while that boolean pref is true, for a
+collection serving one feature the user can turn off. Unset, every
+collection syncs as upstream does.
+
+diff --git a/services/settings/RemoteSettingsClient.sys.mjs b/services/settings/RemoteSettingsClient.sys.mjs
+index f84cdf9796..c81371450a 100644
+--- a/services/settings/RemoteSettingsClient.sys.mjs
++++ b/services/settings/RemoteSettingsClient.sys.mjs
+@@ -26,6 +26,37 @@ ChromeUtils.defineESModuleGetters(lazy, {
+ 
+ ChromeUtils.defineLazyGetter(lazy, "console", () => lazy.Utils.log);
+ 
++// Sval syncs only the collections it names (Sval spec §10.9), each one while
++// the boolean pref its entry may name ("collection@pref") is true. Unset,
++// everything syncs as upstream does.
++XPCOMUtils.defineLazyPreferenceGetter(
++  lazy,
++  "svalCollections",
++  "browser.sval.remoteSettings.collections",
++  "",
++  null,
++  value =>
++    value
++      ? new Map(
++          value.split(",").map(entry => {
++            const [name, pref] = entry.trim().split("@");
++            return [name, pref || null];
++          })
++        )
++      : null
++);
++
++function svalSkips(collectionName) {
++  if (!lazy.svalCollections) {
++    return false;
++  }
++  if (!lazy.svalCollections.has(collectionName)) {
++    return true;
++  }
++  const pref = lazy.svalCollections.get(collectionName);
++  return !!pref && !Services.prefs.getBoolPref(pref, false);
++}
++
+ /**
+  * Minimalist event emitter.
+  *
+@@ -651,7 +682,10 @@ export class RemoteSettingsClient extends EventEmitter {
+    * @param {object} options See #maybeSync() options.
+    */
+   async sync(options) {
+-    if (lazy.Utils.shouldSkipRemoteActivity) {
++    if (
++      lazy.Utils.shouldSkipRemoteActivity ||
++      svalSkips(this.collectionName)
++    ) {
+       lazy.console.debug(`${this.identifier} Skip remote sync.`);
+       return;
+     }
+@@ -703,6 +737,10 @@ export class RemoteSettingsClient extends EventEmitter {
+       sendEvents = true,
+     } = options;
+ 
++    if (svalSkips(this.collectionName)) {
++      return;
++    }
++
+     // Make sure we don't run several synchronizations in parallel, mainly
+     // in order to avoid race conditions in "sync" events listeners.
+     if (this._syncRunning) {

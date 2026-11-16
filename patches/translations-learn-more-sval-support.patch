@@ -1,0 +1,21 @@
+Sval: the Translations panel's gear-menu help goes to Sval's support
+
+The panel's second "Learn more" opens a hardcoded support.mozilla.org
+address, where its first one is a moz-support-link that formats
+app.support.baseURL. The gear menu's link formats the same pref with the
+same page, so both go where Sval's support is.
+
+diff --git a/browser/components/translations/content/fullPageTranslationsPanel.js b/browser/components/translations/content/fullPageTranslationsPanel.js
+index 37cbaf4737..554134000a 100644
+--- a/browser/components/translations/content/fullPageTranslationsPanel.js
++++ b/browser/components/translations/content/fullPageTranslationsPanel.js
+@@ -965,7 +965,8 @@ var FullPageTranslationsPanel = new (class {
+       gBrowser.selectedBrowser.browsingContext.top.embedderElement
+         .documentGlobal;
+     window.openTrustedLinkIn(
+-      "https://support.mozilla.org/kb/website-translation",
++      Services.urlFormatter.formatURLPref("app.support.baseURL") +
++        "website-translation",
+       "tab",
+       {
+         forceForeground: true,

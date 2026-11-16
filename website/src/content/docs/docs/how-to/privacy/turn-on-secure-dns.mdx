@@ -1,0 +1,43 @@
+---
+title: Turn on Secure DNS
+description: Look up the sites you visit through an encrypted resolver, such as Quad9 or Cloudflare.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Secure DNS controls how Sval looks up the sites you visit. Out of the box,
+Sval uses your network's DNS. You can have Sval use an encrypted resolver
+instead.
+
+You use public Wi-Fi at a café, and you don't want the network to see which
+sites you look up.
+
+<Screenshot name="docs-secure-dns" frame="rounded" maxWidth={600} alt="Settings › Privacy and protection › Secure DNS, set to Your network's DNS, with Encrypted, with fallback and Encrypted only below it" />
+
+## Steps
+
+1. Open Settings › Privacy and protection.
+2. Under Secure DNS, choose **Encrypted, with fallback**.
+3. In **Choose provider:**, choose a resolver.
+
+To use encrypted DNS with no fallback, choose **Encrypted only** in step 2.
+
+## Details
+
+- **Your network's DNS.** This option works with internal names, VPNs, and
+  router filters. Your network can see the sites you look up.
+- **Encrypted, with fallback.** Sval looks sites up through the resolver.
+  When that fails, Sval uses your network's DNS.
+- **Encrypted only.** Sval looks sites up only through the resolver. If the
+  resolver can't be reached, sites don't load.
+- The resolvers are Quad9, which is the default, and Cloudflare. To use
+  another resolver, choose **Custom** and enter its address.
+- **Internal names.** Domains in this list always use your network's DNS,
+  like names on a home or work network.
+- Secure DNS applies to every site. The setting syncs to your other devices.
+- Sval contacts only the resolver you choose.
+
+## Related pages
+
+- [Privacy and protection settings](/docs/reference/privacy/)
+- [What Sval keeps private](/docs/explanation/what-sval-keeps-private/)

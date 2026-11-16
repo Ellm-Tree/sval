@@ -1,0 +1,139 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- about:home and about:newtab in a normal window. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; img-src chrome: moz-extension: blob: data: page-icon:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="dark light" />
+    <title>New tab</title>
+    <link
+      rel="icon"
+      type="image/png"
+      href="chrome://branding/content/icon32.png"
+    />
+    <link rel="stylesheet" href="chrome://browser/content/sval/home/home.css" />
+    <!-- Not deferred: it sets the page's scheme before the first paint. -->
+    <script src="chrome://browser/content/sval/home/workspace.js"></script>
+    <script defer src="chrome://browser/content/sval/home/home.js"></script>
+    <script
+      defer
+      src="chrome://browser/content/sval/home/favorites.js"
+    ></script>
+    <script defer src="chrome://browser/content/sval/home/glow.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1 class="brand" aria-label="Sval">
+        <span class="mark">
+          <img
+            class="on-dark"
+            src="chrome://browser/content/sval/home/mark.svg"
+            alt=""
+          />
+          <img
+            class="on-light"
+            src="chrome://browser/content/sval/home/mark-light.svg"
+            alt=""
+          />
+        </span>
+      </h1>
+      <form class="search" role="search">
+        <!-- The address bar's search-mode switcher: its menu is
+             SvalHomeSearchParent's. -->
+        <button
+          type="button"
+          class="engine-button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          hidden
+        >
+          <img class="engine" alt="" />
+          <span class="engine-title"></span>
+          <span class="engine-close" hidden></span>
+        </button>
+        <input
+          type="search"
+          name="q"
+          autofocus
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="256"
+          aria-label="Search"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="suggestions"
+          aria-expanded="false"
+        />
+        <!-- The key that opens the Launcher from any page, from the
+             SvalHomeSearch actor. -->
+        <span class="sval-keycap launcher-key" aria-hidden="true" hidden></span>
+        <button type="submit" aria-label="Go">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </svg>
+        </button>
+        <div class="suggestions-card">
+          <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
+          <div class="sval-launcher-foot" aria-hidden="true"></div>
+        </div>
+      </form>
+      <!-- The row of pinned Favorites (home-favorites spec §3), drawn by
+           favorites.js from what the SvalHomeFavorites actor sends. -->
+      <section class="favorites" hidden>
+        <ul class="fav-row" aria-label="Favorites"></ul>
+        <p class="fav-empty" hidden>
+          Pinned tabs in this Workspace show up here.
+        </p>
+        <div class="fav-drop" hidden></div>
+        <div id="fav-panel" class="fav-panel" role="group" hidden>
+          <span class="fav-caret"></span>
+          <div class="fav-panel-header">
+            <button class="fav-back" type="button" hidden>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m12 19-7-7 7-7" />
+                <path d="M19 12H5" />
+              </svg>
+            </button>
+            <h2 class="fav-panel-title"></h2>
+            <button class="fav-open-all" type="button">Open all</button>
+          </div>
+          <ul class="fav-panel-body"></ul>
+          <p class="fav-panel-empty" hidden>This folder is empty.</p>
+        </div>
+        <p class="fav-status sval-visually-hidden" role="status"></p>
+      </section>
+    </main>
+    <footer class="fav-switch">
+      <label for="fav-switch">Show Pins</label>
+      <button
+        id="fav-switch"
+        class="fav-switch-track"
+        type="button"
+        role="switch"
+        aria-checked="true"
+      ></button>
+    </footer>
+  </body>
+</html>

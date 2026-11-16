@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Call page</title>
+<script>
+  window.state = "idle";
+  async function start() {
+    try {
+      window.call = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      window.state = "started";
+    } catch (e) {
+      window.state = e.name;
+    }
+  }
+  function hangUp() {
+    window.call?.getTracks().forEach(track => track.stop());
+  }
+</script>
+</head>
+<body><h1>Call</h1></body></html>

@@ -1,0 +1,68 @@
+---
+title: Dock a site's links in a Workspace
+description: With Link Docking, links to a site from other apps open straight in the Workspace you choose.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+With Link Docking, links from other apps that match a rule dock in the
+rule's Workspace as a new tab, without a Peek.
+
+Every Fastmail link you open from your calendar belongs in your Home
+Workspace. You add a Link Docking rule, and those links open there without a Peek.
+
+<Screenshot name="docs-link-rule-form" frame="rounded" maxWidth={600} alt="A new rule in Settings › Links › Link Docking that docks fastmail.com links in the Home Workspace, with the line that says what the rule will do" />
+
+## Steps
+
+1. Open Settings › Links.
+2. Under Link Docking, select **Add rule**.
+3. In **Match by**, choose **Site** or **Address contains**.
+4. Type the site, like fastmail.com, or part of an address, like
+   codeberg.org/acme.
+5. In **Workspace**, choose the Workspace.
+6. Select **Add**.
+
+The line under the form says what the rule will do before you add it, like
+"Links from other apps to fastmail.com and its subdomains dock in Home
+Workspace."
+
+## Change or remove a rule
+
+- To change a rule, select the pencil next to it, make your change, then
+  select **Save**.
+- To delete a rule, select the × next to it. To get the rule back, select
+  **Undo**.
+- To change the order, drag a rule up or down. With the keyboard, move
+  focus to the rule's grip, then press the Up or Down arrow key.
+
+## Details
+
+- **Site.** The rule matches the site and its subdomains. You can paste a
+  whole address, and Sval keeps the site and drops the rest.
+- **Address contains.** The rule matches any address with that text in it.
+  The text needs at least 3 characters and no spaces.
+- Sval tries the rules in order, and the first rule that matches wins. If a
+  rule above always matches first, the rule below it says
+  **This rule never applies.**
+- The link opens as a new tab in the window that shows the Workspace. If no
+  window shows the Workspace, your frontmost window switches to it.
+- Rules apply whether Peeks are on or off.
+- Rules apply only to links from other apps. Links you click in Sval aren't
+  changed.
+- Rules sync to all your devices. While sync is off, they stay on this
+  device.
+- Agent Workspaces aren't in the **Workspace** list.
+
+## If something goes wrong
+
+- **No Workspace.** The Workspace the rule sent links to was deleted. Edit
+  the rule and choose another Workspace. Until you do, links open as if the
+  rule weren't there.
+- **Rule 2 is already for fastmail.com.** A rule for that site already
+  exists. Edit that one instead.
+
+## Related pages
+
+- [Keep a page from a Peek in a Workspace](/docs/how-to/links/open-a-peek-in-a-workspace/)
+- [Links settings and controls](/docs/reference/links/)

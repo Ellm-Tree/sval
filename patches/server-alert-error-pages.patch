@@ -1,0 +1,26 @@
+Sval: give the TLS alerts a server sends their own error page
+
+A server that ends the handshake with an alert, such as internal_error,
+gets Firefox's catch-all nssFailure2 page, which says the authenticity of
+the received data could not be verified. No certificate came to verify
+and nothing can be overridden. The registry loads Sval's entries for
+these alerts from browser/components/sval/errors/server-alert-errors.mjs.
+
+diff --git a/toolkit/content/errors/error-registry.mjs b/toolkit/content/errors/error-registry.mjs
+index 75af020b75..72413761c9 100644
+--- a/toolkit/content/errors/error-registry.mjs
++++ b/toolkit/content/errors/error-registry.mjs
+@@ -14,6 +14,7 @@ import { CERT_ERRORS } from "chrome://global/content/errors/cert-errors.mjs";
+ import { PKIX_ERRORS } from "chrome://global/content/errors/pkix-errors.mjs";
+ import { SSL_ERRORS } from "chrome://global/content/errors/ssl-errors.mjs";
+ import { NET_ERRORS } from "chrome://global/content/errors/net-errors.mjs";
++import { SVAL_SERVER_ALERT_ERRORS } from "chrome://browser/content/sval/errors/server-alert-errors.mjs";
+ 
+ const ERROR_REGISTRY = new Map();
+ 
+@@ -112,4 +113,5 @@ export function initializeRegistry() {
+   registerErrors(PKIX_ERRORS);
+   registerErrors(SSL_ERRORS);
+   registerErrors(NET_ERRORS);
++  registerErrors(SVAL_SERVER_ALERT_ERRORS);
+ }

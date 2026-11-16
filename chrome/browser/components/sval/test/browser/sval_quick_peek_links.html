@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Quick Peek links</title>
+  </head>
+  <body>
+    <h1>Links</h1>
+    <p><a id="link" href="sval_agent_page2.html">A page</a></p>
+    <p>
+      <a id="blank" href="sval_agent_page2.html?blank" target="_blank"
+        >A page in a new tab</a
+      >
+    </p>
+    <p>
+      <a id="again" href="sval_quick_peek_links.html?again"
+        >These links again</a
+      >
+    </p>
+    <p>
+      <a id="popup" href="sval_quick_peek_links.html?popup">Links in a popup</a>
+    </p>
+    <p><a id="mail" href="mailto:someone@example.com">An email address</a></p>
+    <p>
+      <a
+        id="samesite"
+        href="https://test1.example.com/browser/browser/components/sval/test/browser/sval_agent_page2.html"
+        >A page on another host of this site</a
+      >
+    </p>
+    <p>
+      <a
+        id="elsewhere"
+        href="https://example.org/browser/browser/components/sval/test/browser/sval_agent_page2.html"
+        >A page on another site</a
+      >
+    </p>
+    <script>
+      // Every click the page sees, so a test knows one arrived.
+      window.clicks = 0;
+      addEventListener("click", () => window.clicks++, true);
+      document.getElementById("popup").onclick = event => {
+        event.preventDefault();
+        window.open(event.target.href, "_blank", "popup,width=400,height=400");
+      };
+    </script>
+  </body>
+</html>

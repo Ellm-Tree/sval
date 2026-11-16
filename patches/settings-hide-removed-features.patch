@@ -1,0 +1,78 @@
+Sval: hide settings for features Sval removes
+
+Mozilla's feedback link, data choices, wallpapers, the link
+to manage themes (decision 0093), and any setting whose pref Sval locks (spec
+§10.9).
+
+diff --git a/browser/components/preferences/config/about-firefox.mjs b/browser/components/preferences/config/about-firefox.mjs
+index 07ee0aefd2..2bdd4ab576 100644
+--- a/browser/components/preferences/config/about-firefox.mjs
++++ b/browser/components/preferences/config/about-firefox.mjs
+@@ -469,6 +469,8 @@ Preferences.addSetting({
+ });
+ Preferences.addSetting({
+   id: "supportShareIdeas",
++  // Sval: the link goes to Mozilla's feedback site (Sval spec §10.9).
++  visible: () => false,
+ });
+ 
+ SettingGroupManager.registerGroups({
+diff --git a/browser/components/preferences/config/permissions-data.mjs b/browser/components/preferences/config/permissions-data.mjs
+index dc5499aebf..e0b9d03f28 100644
+--- a/browser/components/preferences/config/permissions-data.mjs
++++ b/browser/components/preferences/config/permissions-data.mjs
+@@ -291,8 +291,9 @@ Preferences.addSetting({
+ Preferences.addSetting({
+   id: "dataCollectionCategory",
+   deps: ["privacySegmentation"],
+-  visible: ({ privacySegmentation }) =>
+-    lazy.AppConstants.MOZ_DATA_REPORTING || privacySegmentation.value,
++  // Sval: Sval sends Mozilla no data, so there is nothing here to choose (Sval
++  // spec §10.9).
++  visible: () => false,
+ });
+ Preferences.addSetting({
+   id: "dataCollectionLink",
+diff --git a/browser/extensions/newtab/lib/AboutPreferences.sys.mjs b/browser/extensions/newtab/lib/AboutPreferences.sys.mjs
+index 577431fbc9..f5968551c4 100644
+--- a/browser/extensions/newtab/lib/AboutPreferences.sys.mjs
++++ b/browser/extensions/newtab/lib/AboutPreferences.sys.mjs
+@@ -1484,7 +1484,8 @@ export class AboutPreferences {
+     Preferences.addSetting({
+       id: "chooseWallpaper",
+       deps: firefoxHomeDeps,
+-      visible: deps => firefoxHomeActive(deps),
++      // Sval: no wallpapers (Sval spec §10.9).
++      visible: () => false,
+       onUserClick: (e, deps) => {
+         e.preventDefault();
+         window.openTrustedLinkIn(HOME_CUSTOMIZE_URL, dispatchForHomeLink(deps));
+diff --git a/toolkit/content/preferences/Setting.mjs b/toolkit/content/preferences/Setting.mjs
+index 9fbde97de5..e18dc95f46 100644
+--- a/toolkit/content/preferences/Setting.mjs
++++ b/toolkit/content/preferences/Setting.mjs
+@@ -338,6 +338,11 @@ export class Setting extends EventEmitter {
+   }
+ 
+   get visible() {
++    // Sval: a pref Sval locks is a feature Sval removed (Sval spec §10.9), so its
++    // control is not shown greyed out.
++    if (this.locked) {
++      return false;
++    }
+     return this.config.visible ? this.config.visible(this.deps, this) : true;
+   }
+ 
+diff --git a/browser/components/preferences/config/appearance.mjs b/browser/components/preferences/config/appearance.mjs
+index d06f6ee6f4..1cf9f20adc 100644
+--- a/browser/components/preferences/config/appearance.mjs
++++ b/browser/components/preferences/config/appearance.mjs
+@@ -59,6 +59,8 @@ Preferences.addSetting(
+ 
+ Preferences.addSetting({
+   id: "web-appearance-manage-themes-link",
++  // Sval: Sval installs no themes (Sval decision 0093).
++  visible: () => false,
+   onUserClick: e => {
+     e.preventDefault();
+     // @ts-ignore topChromeWindow global

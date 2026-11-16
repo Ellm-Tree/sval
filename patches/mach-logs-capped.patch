@@ -1,0 +1,43 @@
+Sval: mach keeps its last five build and test profiles
+
+mach keeps a resource profile of every build and test run in its state
+directory's logs/build and logs/test, and a warnings file of every build.
+It trims its per-command logs with _cleanup_old_logs, but nothing trims
+these, and a test run's profile reaches tens of megabytes. An objdir kept
+across builds, as on a CI runner whose tree persists, fills its disk with
+them. Both writers call the same cleanup, which keeps the five newest of
+each kind.
+
+diff --git a/python/mozbuild/mozbuild/controller/building.py b/python/mozbuild/mozbuild/controller/building.py
+index b59258309e..846012e0f1 100644
+--- a/python/mozbuild/mozbuild/controller/building.py
++++ b/python/mozbuild/mozbuild/controller/building.py
+@@ -35,7 +35,7 @@ from rich.live import Live
+ from rich.text import Text
+ 
+ from ..backend import get_backend_class
+-from ..base import MozbuildObject
++from ..base import BUILD_LOG_SUBDIR, MozbuildObject
+ from ..compilation.warnings import (
+     RE_STRIP_COLORS,
+     WarningsCollector,
+@@ -1256,6 +1256,7 @@ class BuildDriver(MozbuildObject):
+     ):
+         self._ensure_build_log_dir_exists()
+         warnings_path = self._get_build_log_filename(construct_log_filename("warnings"))
++        self._cleanup_old_logs(BUILD_LOG_SUBDIR)
+         monitor = self._spawn(BuildMonitor)
+         monitor.init(warnings_path, self.log_manager.terminal, metrics)
+         status = self._build(
+diff --git a/testing/mozbase/mozlog/mozlog/handlers/resourcehandler.py b/testing/mozbase/mozlog/mozlog/handlers/resourcehandler.py
+index 4e13906477..baee544109 100644
+--- a/testing/mozbase/mozlog/mozlog/handlers/resourcehandler.py
++++ b/testing/mozbase/mozlog/mozlog/handlers/resourcehandler.py
+@@ -32,6 +32,7 @@ class ResourceHandler(LogHandler):
+         )
+         self.resources.start()
+         self.resources.start_streaming(self.build_resources_profile_path)
++        command_context._cleanup_old_logs(log_subdir)
+         print(
+             f"Streaming resource usage profile to: {self.build_resources_profile_path}"
+         )

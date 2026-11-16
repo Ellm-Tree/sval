@@ -1,0 +1,46 @@
+---
+title: Open a private window
+description: Browse in a window that keeps nothing once you close it.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+A private window keeps nothing after you close it. Each private window is a
+session of its own.
+
+<Screenshot name="features-private" alt="A Sval private window in violet, with a single New private tab and a note that nothing is kept or synced" />
+
+You want to check a Codeberg page signed out, without signing out of your
+own account.
+
+## Steps
+
+1. Press <kbd>⇧⌘N</kbd> (<kbd>Ctrl+Shift+N</kbd> on Windows and Linux).
+
+A private window opens. The top of its Workspace panel reads "Private window. Tabs
+here aren't saved or synced."
+
+In the menu bar, **File › New Private Window** does the same.
+
+## Details
+
+- A private window can't see the cookies or site data of another private
+  window, or of your Workspaces.
+- Nothing about a private window's tabs is saved to disk or synced.
+- Choices you make for a site in a private window last until you close the
+  window. Settings you open from a private window can't change anything
+  Sval keeps, such as an extension's switch for a site.
+- When you close a private window, Sval deletes the window's cookies and
+  site data.
+- When a page opens a sign-in window, the sign-in window shares the page's
+  session, so signing in works.
+- A private window has one Workspace of its own. It has no list of
+  Workspaces, no Favorites, and no pins.
+- Tabs and groups work as in any window.
+- You can't move a tab into or out of a private window.
+- Files you download stay on your computer.
+
+## Related pages
+
+- [What an isolated Workspace keeps apart](/docs/explanation/isolated-workspaces/)
+- [Tabs in a Workspace](/docs/reference/tabs/)

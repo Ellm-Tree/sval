@@ -1,0 +1,27 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* about:certificate's list rows each draw an Export button inside their own
+   shadow tree, without `common.css` (`list-item.css`), so it is the
+   platform's native button. Loaded as a user sheet (`SvalPageStyle`), so it
+   reaches the shadow tree and needs `!important` to win over the
+   component's rules. It takes Settings' pill button. */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@media not ((forced-colors) or (prefers-contrast)) {
+  .export {
+    appearance: none !important;
+    min-height: 28px !important;
+    padding: 0 14px !important;
+    border: 1px solid var(--sval-border-strong) !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--sval-ink) !important;
+    font: 600 13px var(--sval-font) !important;
+  }
+
+  .export:hover {
+    border-color: var(--sval-accent) !important;
+    background: var(--sval-tint) !important;
+  }
+}

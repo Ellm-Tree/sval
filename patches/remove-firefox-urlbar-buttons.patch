@@ -1,0 +1,101 @@
+Sval: remove Firefox's padlock, site button, and reader and split buttons
+
+Sval's protection button replaces the padlock and the site button (decision
+0131), and Sval locks browser.urlbar.trustPanel.featureGate off, so
+gTrustPanelHandler reads nothing. The site button's readers take a missing
+element: _refreshIdentityIcons stops before it writes the button's tooltip
+and label, and the padlock's dragstart listener is optional.
+PopupNotifications' anchor fallback in browser.js already skips a null
+element. Sval's header draws its own reader and split buttons under these
+ids, so AboutReaderParent.updateReaderButton, tabsplitview.js's
+updateUrlbarButton and the toolbox's click and keypress handlers drive
+them.
+
+diff --git a/browser/base/content/browser-siteIdentity.js b/browser/base/content/browser-siteIdentity.js
+index 3c6bba9a7a..b93220a8f2 100644
+--- a/browser/base/content/browser-siteIdentity.js
++++ b/browser/base/content/browser-siteIdentity.js
+@@ -945,6 +945,9 @@ var gIdentityHandler = {
+     }
+ 
+     // Push the appropriate strings out to the UI
++    if (!this._identityIcon) {
++      return;
++    }
+     this._identityIcon.setAttribute("tooltiptext", tooltip);
+ 
+     if (this._pageExtensionPolicy) {
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index f87796d500..1d1f8994e2 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -197,11 +197,6 @@
+             <image id="remote-control-icon"/>
+           </box>
+ 
+-          <box id="trust-icon-container" align="center" role="button" data-l10n-id="urlbar-identity-button" urlbar-slot="site-info">
+-            <image id="trust-icon"/>
+-            <label id="trust-label" crop="center" flex="1" data-l10n-id="urlbar-trust-icon-notsecure-label" />
+-          </box>
+-
+           <!-- Use onclick instead of normal popup= syntax since the popup
+                 code fires onmousedown, and hence eats our favicon drag events. -->
+           <box id="tracking-protection-icon-container" align="center"
+@@ -220,14 +215,6 @@
+                 class="identity-box"
+                 pageproxystate="invalid"
+                 urlbar-slot="site-info">
+-            <box id="identity-icon-box"
+-                  role="button"
+-                  align="center"
+-                  data-l10n-id="urlbar-identity-button"
+-                  class="identity-box-button">
+-              <image id="identity-icon"/>
+-              <label id="identity-icon-label" crop="center" flex="1"/>
+-            </box>
+             <box id="identity-permission-box"
+                   data-l10n-id="urlbar-permissions-granted"
+                   role="button"
+@@ -369,15 +356,6 @@
+               <label id="userContext-label"/>
+               <image id="userContext-indicator"/>
+             </hbox>
+-            <hbox id="reader-mode-button"
+-                  class="urlbar-page-action"
+-                  role="button"
+-                  data-l10n-id="reader-view-enter-button"
+-                  hidden="true"
+-                  tooltip="dynamic-shortcut-tooltip">
+-              <image id="reader-mode-button-icon"
+-                      class="urlbar-icon"/>
+-            </hbox>
+             <hbox id="picture-in-picture-button"
+                   class="urlbar-page-action"
+                   role="button"
+@@ -404,13 +382,6 @@
+             <toolbarbutton id="urlbar-zoom-button"
+                     tooltip="dynamic-shortcut-tooltip"
+                     hidden="true"/>
+-            <hbox id="split-view-button"
+-                  class="urlbar-page-action"
+-                  role="button"
+-                  data-l10n-id="urlbar-split-view-button"
+-                  hidden="true">
+-              <image class="urlbar-icon" id="split-view-button-icon" />
+-            </hbox>
+             <hbox id="pageActionButton"
+                   class="urlbar-page-action"
+                   role="button"
+diff --git a/browser/base/content/navigator-toolbox.js b/browser/base/content/navigator-toolbox.js
+index 715c677ec9..716f7fe46d 100644
+--- a/browser/base/content/navigator-toolbox.js
++++ b/browser/base/content/navigator-toolbox.js
+@@ -538,7 +538,7 @@ document.addEventListener(
+       });
+     document
+       .getElementById("trust-icon-container")
+-      .addEventListener("dragstart", event => {
++      ?.addEventListener("dragstart", event => {
+         gIdentityHandler.onDragStart(event);
+       });
+ 

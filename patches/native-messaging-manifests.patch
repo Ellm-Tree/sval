@@ -1,0 +1,123 @@
+Sval: native messaging, managed storage and PKCS#11 manifests are Sval's own
+
+Firefox and Sval run side by side without touching each other's state.
+Gecko reads extension host, managed storage and PKCS#11 manifests from
+folders every Firefox-family app shares: ~/Library/Application
+Support/Mozilla and /Library/Application Support/Mozilla on macOS,
+~/.mozilla and /usr/lib/mozilla on Linux, and Software\Mozilla in the
+Windows registry. Sval reads them from its own: the user's application
+data directory (~/Library/Application Support/Sval, ~/.sval), the system
+twin (/Library/Application Support/Sval, the system configuration
+directory /etc/sval), and Software\Sval.
+
+The Certificates policy looks for a bare file name in the same folders on
+macOS and Linux, and on Windows in the Mozilla directories in AppData,
+which it reached through the user extension directory that Sval turns
+off. On Windows it looks in the application data directory.
+
+Mozilla's native messaging tests write the registry key NativeManifests
+reads.
+
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index 316b3ff..6fcb642 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -539,15 +539,12 @@ export var Policies = {
+           let dirs = [];
+           let platform = AppConstants.platform;
+           if (platform == "win") {
+-            dirs = [
+-              // Ugly, but there is no official way to get %USERNAME\AppData\Roaming\Mozilla.
+-              Services.dirsvc.get("XREUSysExt", Ci.nsIFile).parent,
+-              // Even more ugly, but there is no official way to get %USERNAME\AppData\Local\Mozilla.
+-              Services.dirsvc.get("DefProfLRt", Ci.nsIFile).parent.parent,
+-            ];
++            // Sval: the application's own data directory, apart from the
++            // Mozilla directories in AppData that Firefox reads.
++            dirs = [Services.dirsvc.get("UAppData", Ci.nsIFile)];
+           } else if (platform == "macosx" || platform == "linux") {
+             dirs = [
+-              // These two keys are named wrong. They return the Mozilla directory.
++              // These two keys name the application's own directories.
+               Services.dirsvc.get("XREUserNativeManifests", Ci.nsIFile),
+               Services.dirsvc.get("XRESysNativeManifests", Ci.nsIFile),
+             ];
+diff --git a/toolkit/components/extensions/NativeManifests.sys.mjs b/toolkit/components/extensions/NativeManifests.sys.mjs
+index 48d7d50..a664840 100644
+--- a/toolkit/components/extensions/NativeManifests.sys.mjs
++++ b/toolkit/components/extensions/NativeManifests.sys.mjs
+@@ -22,7 +22,9 @@ const TYPES = {
+ const NATIVE_MANIFEST_SCHEMA =
+   "chrome://extensions/content/schemas/native_manifest.json";
+ 
+-const REGPATH = "Software\\Mozilla";
++// Sval: the application's own key, apart from Software\\Mozilla, which every
++// Firefox-family app reads.
++const REGPATH = `Software\\${AppConstants.MOZ_APP_BASENAME}`;
+ 
+ export var NativeManifests = {
+   _initializePromise: null,
+diff --git a/toolkit/components/extensions/test/xpcshell/head_native_messaging.js b/toolkit/components/extensions/test/xpcshell/head_native_messaging.js
+index 700624a..6f1e0f1 100644
+--- a/toolkit/components/extensions/test/xpcshell/head_native_messaging.js
++++ b/toolkit/components/extensions/test/xpcshell/head_native_messaging.js
+@@ -98,7 +98,7 @@ async function setupHosts(scripts) {
+     }
+ 
+     case "win": {
+-      const REGKEY = String.raw`Software\Mozilla\NativeMessagingHosts`;
++      const REGKEY = String.raw`Software\${AppConstants.MOZ_APP_BASENAME}\NativeMessagingHosts`;
+ 
+       let registry = new MockRegistry();
+       registerCleanupFunction(() => {
+diff --git a/toolkit/components/extensions/test/xpcshell/test_native_manifests.js b/toolkit/components/extensions/test/xpcshell/test_native_manifests.js
+index d0faa47..c8c9516 100644
+--- a/toolkit/components/extensions/test/xpcshell/test_native_manifests.js
++++ b/toolkit/components/extensions/test/xpcshell/test_native_manifests.js
+@@ -37,7 +37,7 @@ if (AppConstants.platform == "win") {
+   });
+ }
+ 
+-const REGPATH = "Software\\Mozilla\\NativeMessagingHosts";
++const REGPATH = `Software\\${AppConstants.MOZ_APP_BASENAME}\\NativeMessagingHosts`;
+ 
+ const BASE_SCHEMA = "chrome://extensions/content/schemas/manifest.json";
+ 
+diff --git a/toolkit/xre/nsXREDirProvider.cpp b/toolkit/xre/nsXREDirProvider.cpp
+index fea288a..ba10b95 100644
+--- a/toolkit/xre/nsXREDirProvider.cpp
++++ b/toolkit/xre/nsXREDirProvider.cpp
+@@ -414,18 +414,24 @@ nsXREDirProvider::GetFile(const char* aProperty, bool* aPersistent,
+     rv = GetUserAppDataDirectory(getter_AddRefs(file));
+   }
+ #if defined(XP_UNIX) || defined(XP_MACOSX)
++  // Sval: native messaging, managed storage and PKCS#11 manifests live in
++  // the application's own directories, apart from the Mozilla directories
++  // that every Firefox-family app shares: the user's application data
++  // directory, and /Library/Application Support/<profile> on macOS or the
++  // system configuration directory (/etc/<name>) on Linux.
+   else if (!strcmp(aProperty, XRE_SYS_NATIVE_MANIFESTS)) {
++#  if defined(XP_MACOSX)
++    rv = GetOSXFolderType(kOnSystemDisk, kApplicationSupportFolderType,
++                          getter_AddRefs(file));
++    NS_ENSURE_SUCCESS(rv, rv);
++    rv = AppendProfilePath(file, /* aLocal */ false);
++#  elif defined(MOZ_WIDGET_GTK)
++    rv = NS_GetSpecialDirectory(NS_OS_SYSTEM_CONFIG_DIR, getter_AddRefs(file));
++#  else
+     rv = ::GetSystemParentDirectory(getter_AddRefs(file));
++#  endif
+   } else if (!strcmp(aProperty, XRE_USER_NATIVE_MANIFESTS)) {
+-    // Keep forcing the legacy path for compatibility
+-    rv = GetUserDataDirectoryHome(getter_AddRefs(file), /* aLocal */ false,
+-                                  /* aForceLegacy */ true);
+-    NS_ENSURE_SUCCESS(rv, rv);
+-#  if defined(XP_MACOSX)
+-    rv = file->AppendNative("Mozilla"_ns);
+-#  else   // defined(XP_MACOSX)
+-    rv = file->AppendNative(".mozilla"_ns);
+-#  endif  // defined(XP_MACOSX)
++    rv = GetUserAppDataDirectory(getter_AddRefs(file));
+   }
+ #endif  // defined(XP_UNIX) || defined(XP_MACOSX)
+   else if (!strcmp(aProperty, XRE_UPDATE_ROOT_DIR)) {

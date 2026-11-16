@@ -1,0 +1,422 @@
+Sval: each visit records the workspace it was made in
+
+History::VisitURI asks Sval which workspace the browser is in, through
+nsISvalVisitWorkspaces, and writes the answer beside the visit in
+sval_visit_workspaces, a table outside Places' schema versions that a foreign
+key empties with its visits. A query's svalWorkspace lists the pages with a
+visit in that workspace or in none, and a date or site folder carries it to
+the queries it holds. No chrome API can do this: page-visited carries no
+browser, and a query cannot be narrowed by anything Places does not hold.
+
+diff --git a/toolkit/components/places/Database.cpp b/toolkit/components/places/Database.cpp
+index 413d9b8523..a51a55755f 100644
+--- a/toolkit/components/places/Database.cpp
++++ b/toolkit/components/places/Database.cpp
+@@ -724,6 +724,17 @@ nsresult Database::EnsureConnection() {
+       mDatabaseStatus = nsINavHistoryService::DATABASE_STATUS_UPGRADED;
+     }
+ 
++    // Sval: the workspace each visit was made in, kept outside Places'
++    // schema versions, so a migration of Mozilla's never meets it.
++    rv = mMainConn->ExecuteSimpleSQL(
++        "CREATE TABLE IF NOT EXISTS sval_visit_workspaces ("
++        "  visit_id INTEGER PRIMARY KEY NOT NULL"
++        ", workspace TEXT NOT NULL"
++        ", FOREIGN KEY (visit_id) REFERENCES moz_historyvisits(id) "
++        "  ON DELETE CASCADE"
++        ")"_ns);
++    NS_ENSURE_SUCCESS(rv, rv);
++
+     // Initialize here all the items that are not part of the on-disk database,
+     // like views, temp triggers or temp tables.  The database should not be
+     // considered corrupt if any of the following fails.
+diff --git a/toolkit/components/places/History.cpp b/toolkit/components/places/History.cpp
+index 6839700f05..09fe24aa10 100644
+--- a/toolkit/components/places/History.cpp
++++ b/toolkit/components/places/History.cpp
+@@ -46,7 +46,10 @@
+ #include "mozilla/StaticPrefs_layout.h"
+ #include "mozilla/StaticPrefs_places.h"
+ #include "mozilla/dom/ContentProcessMessageManager.h"
++#include "mozilla/dom/CanonicalBrowsingContext.h"
+ #include "mozilla/dom/Element.h"
++#include "nsISvalVisitWorkspaces.h"
++#include "nsServiceManagerUtils.h"
+ #include "mozilla/dom/PlacesObservers.h"
+ #include "mozilla/dom/PlacesVisit.h"
+ #include "mozilla/dom/PlacesVisitTitle.h"
+@@ -191,6 +194,9 @@ struct VisitData {
+   nsCString triggeringSponsoredURLBaseDomain;
+   int64_t triggeringSponsoredURLVisitTimeMS;
+   bool bookmarked;
++
++  // Sval: the workspace the visit was made in, void when it was made in none.
++  nsCString svalWorkspace = VoidCString();
+ };
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -1109,6 +1115,11 @@ class InsertVisitedURIs final : public Runnable {
+     rv = AddVisit(aPlace);
+     NS_ENSURE_SUCCESS(rv, rv);
+ 
++    if (!aPlace.svalWorkspace.IsVoid()) {
++      rv = AddSvalWorkspace(aPlace);
++      NS_ENSURE_SUCCESS(rv, rv);
++    }
++
+     // Adding a visit sets the recalculation flags through a trigger, but for
+     // error pages we don't want that, because recalculation considers this a
+     // normal successful visit. In the future we should store the error state
+@@ -1219,6 +1230,22 @@ class InsertVisitedURIs final : public Runnable {
+     return NS_OK;
+   }
+ 
++  /**
++   * Records the workspace _place's visit was made in, beside the visit.
++   */
++  nsresult AddSvalWorkspace(VisitData& _place) {
++    nsCOMPtr<mozIStorageStatement> stmt = mHistory->GetStatement(
++        "INSERT OR REPLACE INTO sval_visit_workspaces (visit_id, workspace) "
++        "VALUES (:visit_id, :workspace)");
++    NS_ENSURE_STATE(stmt);
++    mozStorageStatementScoper scoper(stmt);
++    nsresult rv = stmt->BindInt64ByName("visit_id"_ns, _place.visitId);
++    NS_ENSURE_SUCCESS(rv, rv);
++    rv = stmt->BindUTF8StringByName("workspace"_ns, _place.svalWorkspace);
++    NS_ENSURE_SUCCESS(rv, rv);
++    return stmt->Execute();
++  }
++
+   /**
+    * Updates the frecency, and possibly the hidden-ness of aPlace.
+    *
+@@ -1924,6 +1951,30 @@ void History::AppendToRecentlyVisitedURIs(nsIURI* aURI, bool aHidden) {
+ ////////////////////////////////////////////////////////////////////////////////
+ //// IHistory
+ 
++/**
++ * Sval: the workspace of the browser aBrowserId names, or void when it is in
++ * none, as nsISvalVisitWorkspaces answers it.
++ */
++static void SvalWorkspaceOf(uint64_t aBrowserId, nsCString& aWorkspace) {
++  aWorkspace.SetIsVoid(true);
++  if (!aBrowserId) {
++    return;
++  }
++  RefPtr<dom::BrowsingContext> top =
++      dom::BrowsingContext::GetCurrentTopByBrowserId(aBrowserId);
++  if (!top) {
++    return;
++  }
++  RefPtr<dom::Element> browser = top->Canonical()->GetEmbedderElement();
++  nsCOMPtr<nsISvalVisitWorkspaces> visits =
++      do_GetService("@sval/visit-workspaces;1");
++  if (!browser || !visits ||
++      NS_FAILED(visits->WorkspaceOfBrowser(browser, aWorkspace)) ||
++      aWorkspace.IsEmpty()) {
++    aWorkspace.SetIsVoid(true);
++  }
++}
++
+ NS_IMETHODIMP
+ History::VisitURI(nsIWidget* aWidget, nsIURI* aURI, nsIURI* aLastVisitedURI,
+                   uint32_t aFlags, uint64_t aBrowserId) {
+@@ -2127,6 +2178,8 @@ History::VisitURI(nsIWidget* aWidget, nsIURI* aURI, nsIURI* aLastVisitedURI,
+     }
+   }
+ 
++  SvalWorkspaceOf(aBrowserId, place.svalWorkspace);
++
+   mozIStorageConnection* dbConn = GetDBConn();
+   NS_ENSURE_STATE(dbConn);
+ 
+diff --git a/toolkit/components/places/nsINavHistoryService.idl b/toolkit/components/places/nsINavHistoryService.idl
+index 101a575dab..3b14366e68 100644
+--- a/toolkit/components/places/nsINavHistoryService.idl
++++ b/toolkit/components/places/nsINavHistoryService.idl
+@@ -704,6 +704,13 @@ interface nsINavHistoryQuery : nsISupports
+    */
+   void setParents(in Array<ACString> aGuids);
+ 
++  /**
++   * Sval: limits results to pages with a visit made in this workspace or in
++   * none, and with every other condition holding for that visit. Null, the
++   * default, matches every visit.
++   */
++  attribute AUTF8String svalWorkspace;
++
+   /**
+    * Creates a new query item with the same parameters of this one.
+    */
+diff --git a/toolkit/components/places/nsNavHistory.cpp b/toolkit/components/places/nsNavHistory.cpp
+index b441b54640..69ab1e5442 100644
+--- a/toolkit/components/places/nsNavHistory.cpp
++++ b/toolkit/components/places/nsNavHistory.cpp
+@@ -723,6 +723,8 @@ static bool IsOptimizableHistoryQuery(
+ 
+   if (aQuery->Transitions().Length() > 0) return false;
+ 
++  if (!aQuery->SvalWorkspace().IsVoid()) return false;
++
+   return true;
+ }
+ 
+@@ -765,6 +767,7 @@ class PlacesSQLQueryBuilder {
+   void OrderByTextColumnIndexDesc(int32_t aIndex);
+ 
+   const nsCString& mConditions;
++  RefPtr<nsNavHistoryQuery> mQuery;
+   bool mUseLimit;
+ 
+   uint16_t mResultType;
+@@ -787,6 +790,7 @@ PlacesSQLQueryBuilder::PlacesSQLQueryBuilder(
+     const RefPtr<nsNavHistoryQueryOptions>& aOptions, bool aUseLimit,
+     nsNavHistory::StringHash& aAddParams)
+     : mConditions(aConditions),
++      mQuery(aQuery),
+       mUseLimit(aUseLimit),
+       mResultType(aOptions->ResultType()),
+       mQueryType(aOptions->QueryType()),
+@@ -953,14 +957,32 @@ nsresult PlacesSQLQueryBuilder::SelectAsDay() {
+   // beginTime will become the node's time property, we don't use endTime
+   // because it could overlap, and we use time to sort containers and find
+   // insert position in a result.
++  // Sval: each day's query keeps the workspace, and a day shows only when
++  // one of its visits is in it.
++  nsAutoCString svalChild;
++  nsAutoCString svalVisit;
++  if (!mQuery->SvalWorkspace().IsVoid()) {
++    nsAutoCString escaped;
++    NS_ENSURE_TRUE(NS_Escape(mQuery->SvalWorkspace(), escaped, url_XAlphas),
++                   NS_ERROR_OUT_OF_MEMORY);
++    mAddParams.InsertOrUpdate("sval_child"_ns,
++                              "&svalWorkspace="_ns + escaped);
++    mAddParams.InsertOrUpdate("sval_workspace"_ns, mQuery->SvalWorkspace());
++    svalChild.AssignLiteral("||:sval_child");
++    svalVisit.AssignLiteral(
++        "AND COALESCE((SELECT workspace FROM sval_visit_workspaces "
++        "WHERE visit_id = moz_historyvisits.id), :sval_workspace) "
++        "= :sval_workspace ");
++  }
++
+   mQueryString = nsPrintfCString(
+       "SELECT null, "
+-      "'place:type=%d&sort=%d&beginTime='||beginTime||'&endTime='||endTime, "
++      "'place:type=%d&sort=%d&beginTime='||beginTime||'&endTime='||endTime%s, "
+       "dayTitle, null, null, beginTime, null, null, null, null, null, null, "
+       "null, null, null, null, null, null, null, null, null, null, "
+       "null, null, null "
+       "FROM (",  // TOUTER BEGIN
+-      resultType, sortingMode);
++      resultType, sortingMode, svalChild.get());
+ 
+   nsNavHistory* history = nsNavHistory::GetHistoryService();
+   NS_ENSURE_STATE(history);
+@@ -1112,13 +1134,14 @@ nsresult PlacesSQLQueryBuilder::SelectAsDay() {
+         "WHERE visit_date >= %s "
+         "AND visit_date < %s "
+         "AND visit_type NOT IN (0,%d,%d) "
++        "%s"
+         "{QUERY_OPTIONS_VISITS} "
+         "LIMIT 1 "
+         ") ",
+         dateParam.get(), sqlFragmentContainerBeginTime.get(),
+         sqlFragmentContainerEndTime.get(), sqlFragmentSearchBeginTime.get(),
+         sqlFragmentSearchEndTime.get(), nsINavHistoryService::TRANSITION_EMBED,
+-        nsINavHistoryService::TRANSITION_FRAMED_LINK);
++        nsINavHistoryService::TRANSITION_FRAMED_LINK, svalVisit.get());
+ 
+     mQueryString.Append(dayRange);
+ 
+@@ -1150,9 +1173,22 @@ nsresult PlacesSQLQueryBuilder::SelectAsSite() {
+         "{QUERY_OPTIONS_VISITS} "
+         "{QUERY_OPTIONS_PLACES} "
+         "{ADDITIONAL_CONDITIONS} ");
+-    timeConstraints.AssignLiteral(
+-        "||'&beginTime='||:begin_time||"
+-        "'&endTime='||:end_time");
++    // Sval: a workspace alone is a condition with no time.
++    bool hasTime = false;
++    if (NS_SUCCEEDED(mQuery->GetHasBeginTime(&hasTime)) && hasTime) {
++      timeConstraints.AssignLiteral(
++          "||'&beginTime='||:begin_time||"
++          "'&endTime='||:end_time");
++    }
++  }
++  // Sval: each site's query keeps the workspace.
++  if (!mQuery->SvalWorkspace().IsVoid()) {
++    nsAutoCString escaped;
++    NS_ENSURE_TRUE(NS_Escape(mQuery->SvalWorkspace(), escaped, url_XAlphas),
++                   NS_ERROR_OUT_OF_MEMORY);
++    mAddParams.InsertOrUpdate("sval_child"_ns,
++                              "&svalWorkspace="_ns + escaped);
++    timeConstraints.AppendLiteral("||:sval_child");
+   }
+ 
+   mQueryString = nsPrintfCString(
+@@ -2015,8 +2051,17 @@ nsresult nsNavHistory::QueryToSelectClause(
+ 
+   ConditionBuilder clause;
+ 
++  // Sval: a page is in a workspace's history through a visit made in that
++  // workspace or in none, and the time limits hold for that same visit. A
++  // date query has no page to limit: its days do (SelectAsDay).
++  uint16_t resultType = aOptions->ResultType();
++  bool svalWorkspace =
++      !aQuery->SvalWorkspace().IsVoid() &&
++      resultType != nsINavHistoryQueryOptions::RESULTS_AS_DATE_QUERY &&
++      resultType != nsINavHistoryQueryOptions::RESULTS_AS_DATE_SITE_QUERY;
+   if ((NS_SUCCEEDED(aQuery->GetHasBeginTime(&hasIt)) && hasIt) ||
+-      (NS_SUCCEEDED(aQuery->GetHasEndTime(&hasIt)) && hasIt)) {
++      (NS_SUCCEEDED(aQuery->GetHasEndTime(&hasIt)) && hasIt) ||
++      svalWorkspace) {
+     clause.Condition(
+         "EXISTS (SELECT 1 FROM moz_historyvisits "
+         "WHERE place_id = h.id");
+@@ -2026,6 +2071,15 @@ nsresult nsNavHistory::QueryToSelectClause(
+     // end time
+     if (NS_SUCCEEDED(aQuery->GetHasEndTime(&hasIt)) && hasIt)
+       clause.Condition("visit_date <=").Param(":end_time");
++    if (svalWorkspace) {
++      clause
++          .Condition(
++              "COALESCE((SELECT workspace FROM sval_visit_workspaces "
++              "WHERE visit_id = moz_historyvisits.id),")
++          .Param(":sval_workspace")
++          .Str(") =")
++          .Param(":sval_workspace");
++    }
+     clause.Str(" LIMIT 1)");
+   }
+ 
+@@ -2181,6 +2235,16 @@ nsresult nsNavHistory::BindQueryClauseParameters(
+     NS_ENSURE_SUCCESS(rv, rv);
+   }
+ 
++  // Sval: workspace, which a date query's days bind themselves.
++  uint16_t resultType = aOptions->ResultType();
++  if (!aQuery->SvalWorkspace().IsVoid() &&
++      resultType != nsINavHistoryQueryOptions::RESULTS_AS_DATE_QUERY &&
++      resultType != nsINavHistoryQueryOptions::RESULTS_AS_DATE_SITE_QUERY) {
++    rv = statement->BindUTF8StringByName("sval_workspace"_ns,
++                                         aQuery->SvalWorkspace());
++    NS_ENSURE_SUCCESS(rv, rv);
++  }
++
+   // search terms
+   if (!aQuery->SearchTerms().IsEmpty()) {
+     rv = statement->BindStringByName("search_string"_ns, aQuery->SearchTerms());
+diff --git a/toolkit/components/places/nsNavHistoryQuery.cpp b/toolkit/components/places/nsNavHistoryQuery.cpp
+index 26a6ded65d..da9d3f7478 100644
+--- a/toolkit/components/places/nsNavHistoryQuery.cpp
++++ b/toolkit/components/places/nsNavHistoryQuery.cpp
+@@ -99,6 +99,7 @@ static void SetOptionsKeyUint32(const nsCString& aValue,
+ #define QUERYKEY_QUERY_TYPE "queryType"
+ #define QUERYKEY_TAG "tag"
+ #define QUERYKEY_NOTTAGS "!tags"
++#define QUERYKEY_SVAL_WORKSPACE "svalWorkspace"
+ #define QUERYKEY_ASYNC_ENABLED "asyncEnabled"
+ #define QUERYKEY_TRANSITION "transition"
+ 
+@@ -249,6 +250,16 @@ nsNavHistory::QueryToQueryString(nsINavHistoryQuery* aQuery,
+   AppendBoolKeyValueIfTrue(queryString, nsLiteralCString(QUERYKEY_NOTTAGS),
+                            query, &nsINavHistoryQuery::GetTagsAreNot);
+ 
++  if (!query->SvalWorkspace().IsVoid()) {
++    nsAutoCString escaped;
++    if (!NS_Escape(query->SvalWorkspace(), escaped, url_XAlphas)) {
++      return NS_ERROR_OUT_OF_MEMORY;
++    }
++    AppendAmpersandIfNonempty(queryString);
++    queryString += nsLiteralCString(QUERYKEY_SVAL_WORKSPACE "=");
++    queryString += escaped;
++  }
++
+   // transitions
+   const nsTArray<uint32_t>& transitions = query->Transitions();
+   for (uint32_t i = 0; i < transitions.Length(); ++i) {
+@@ -417,6 +428,12 @@ nsresult nsNavHistory::TokensToQuery(const nsTArray<QueryKeyValuePair>& aTokens,
+     } else if (kvp.key.EqualsLiteral(QUERYKEY_NOTTAGS)) {
+       SetQueryKeyBool(kvp.value, aQuery, &nsINavHistoryQuery::SetTagsAreNot);
+ 
++    } else if (kvp.key.EqualsLiteral(QUERYKEY_SVAL_WORKSPACE)) {
++      nsAutoCString unescaped(kvp.value);
++      NS_UnescapeURL(unescaped);  // modifies input
++      rv = aQuery->SetSvalWorkspace(unescaped);
++      NS_ENSURE_SUCCESS(rv, rv);
++
+       // transition
+     } else if (kvp.key.EqualsLiteral(QUERYKEY_TRANSITION)) {
+       uint32_t transition = kvp.value.ToInteger(&rv);
+@@ -528,6 +545,7 @@ nsNavHistoryQuery::nsNavHistoryQuery()
+       mTagsAreNot(false) {
+   // differentiate not set (IsVoid) from empty string (local files)
+   mDomain.SetIsVoid(true);
++  mSvalWorkspace.SetIsVoid(true);
+ }
+ 
+ nsNavHistoryQuery::nsNavHistoryQuery(const nsNavHistoryQuery& aOther)
+@@ -544,7 +562,8 @@ nsNavHistoryQuery::nsNavHistoryQuery(const nsNavHistoryQuery& aOther)
+       mParents(aOther.mParents.Clone()),
+       mTags(aOther.mTags.Clone()),
+       mTagsAreNot(aOther.mTagsAreNot),
+-      mTransitions(aOther.mTransitions.Clone()) {}
++      mTransitions(aOther.mTransitions.Clone()),
++      mSvalWorkspace(aOther.mSvalWorkspace) {}
+ 
+ NS_IMETHODIMP nsNavHistoryQuery::GetBeginTime(PRTime* aBeginTime) {
+   *aBeginTime = mBeginTime;
+@@ -777,6 +796,16 @@ NS_IMETHODIMP nsNavHistoryQuery::SetTags(nsIVariant* aTags) {
+   return NS_OK;
+ }
+ 
++NS_IMETHODIMP nsNavHistoryQuery::GetSvalWorkspace(nsACString& aWorkspace) {
++  aWorkspace = mSvalWorkspace;
++  return NS_OK;
++}
++NS_IMETHODIMP nsNavHistoryQuery::SetSvalWorkspace(
++    const nsACString& aWorkspace) {
++  mSvalWorkspace = aWorkspace;
++  return NS_OK;
++}
++
+ NS_IMETHODIMP nsNavHistoryQuery::GetTagsAreNot(bool* aTagsAreNot) {
+   NS_ENSURE_ARG_POINTER(aTagsAreNot);
+   *aTagsAreNot = mTagsAreNot;
+diff --git a/toolkit/components/places/nsNavHistoryQuery.h b/toolkit/components/places/nsNavHistoryQuery.h
+index 579bfe487a..ef94e0c866 100644
+--- a/toolkit/components/places/nsNavHistoryQuery.h
++++ b/toolkit/components/places/nsNavHistoryQuery.h
+@@ -46,6 +46,8 @@ class nsNavHistoryQuery final : public nsINavHistoryQuery {
+ 
+   const nsTArray<uint32_t>& Transitions() const { return mTransitions; }
+ 
++  const nsCString& SvalWorkspace() { return mSvalWorkspace; }
++
+   nsresult Clone(nsNavHistoryQuery** _clone);
+ 
+   static nsresult QueryStringToQuery(const nsACString& aQueryString,
+@@ -72,6 +74,7 @@ class nsNavHistoryQuery final : public nsINavHistoryQuery {
+   nsTArray<nsString> mTags;
+   bool mTagsAreNot;
+   nsTArray<uint32_t> mTransitions;
++  nsCString mSvalWorkspace;  // Default is IsVoid
+ };
+ 
+ // nsNavHistoryQueryOptions
+diff --git a/toolkit/components/places/nsNavHistoryResult.cpp b/toolkit/components/places/nsNavHistoryResult.cpp
+index a5a09ac890..2cbdcbd9ad 100644
+--- a/toolkit/components/places/nsNavHistoryResult.cpp
++++ b/toolkit/components/places/nsNavHistoryResult.cpp
+@@ -142,6 +142,11 @@ uint32_t getUpdateRequirements(const RefPtr<nsNavHistoryQuery>& aQuery,
+     return QUERYUPDATE_NONE;
+   }
+ 
++  // Sval: whether a visit is in a workspace is known only to the database.
++  if (!aQuery->SvalWorkspace().IsVoid()) {
++    return QUERYUPDATE_COMPLEX;
++  }
++
+   // Whenever there is a maximum number of results,
+   // and we are not a bookmark query we must requery. This
+   // is because we can't generally know if any given addition/change causes

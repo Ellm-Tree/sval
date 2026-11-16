@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+extends: existence
+message: "'%s' sells. Say what the feature does."
+level: error
+ignorecase: true
+tokens:
+  - seamless(?:ly)?
+  - effortless(?:ly)?
+  - powerful
+  - robust
+  - elevate(?:s|d)?
+  - a testament to
+  - and (?:much )?more(?=[.,)]|$)

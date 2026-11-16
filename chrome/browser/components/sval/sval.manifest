@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+category browser-window-before-initial-xul-layout moz-src:///browser/components/sval/SvalWindow.sys.mjs SvalWindow.mount
+category browser-window-load moz-src:///browser/components/sval/SvalWindow.sys.mjs SvalWindow.load
+category browser-window-delayed-startup moz-src:///browser/components/sval/SvalWindow.sys.mjs SvalWindow.delayedStartup
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalExternalLinks.sys.mjs SvalExternalLinks.init
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalStartup.sys.mjs SvalStartup.init
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalHeadless.sys.mjs SvalHeadless.init
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalBlocking.sys.mjs SvalBlocking.init
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalPageRules.sys.mjs SvalPageRules.init
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalElementPicker.sys.mjs SvalElementPicker.init
+category browser-before-ui-startup moz-src:///browser/components/sval/SvalScriptlets.sys.mjs SvalScriptlets.start

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+[package]
+name = "sval-folder"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+publish = false
+description = "Reads and writes Sval's shared folder for the browser, in a process of its own."
+
+[lib]
+name = "sval_folder"
+path = "src/lib.rs"
+
+[dependencies]
+serde_json = "1"
+getrandom = "0.4"
+
+[target."cfg(unix)".dependencies]
+libc = "0.2"
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_Storage_FileSystem"] }

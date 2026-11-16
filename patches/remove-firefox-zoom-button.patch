@@ -1,0 +1,86 @@
+Sval: remove Firefox's zoom button from the address field
+
+Sval shows the page's zoom in the site menu, as a slider. updateZoomUI
+keeps the app menu's and the zoom widget's labels; the toolbox's click
+and keypress handlers and the tooltip maps find no element under the id
+and pass it by.
+
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 1390dabc5d..063b87ea5b 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -379,9 +379,6 @@
+               <image class="urlbar-icon" id="translations-button-circle-arrows" />
+               <html:span id="translations-button-locale" aria-hidden="true" />
+             </hbox>
+-            <toolbarbutton id="urlbar-zoom-button"
+-                    tooltip="dynamic-shortcut-tooltip"
+-                    hidden="true"/>
+             <hbox id="pageActionButton"
+                   class="urlbar-page-action"
+                   role="button"
+diff --git a/browser/modules/ZoomUI.sys.mjs b/browser/modules/ZoomUI.sys.mjs
+index 667ee95940..0c93cb4d9a 100644
+--- a/browser/modules/ZoomUI.sys.mjs
++++ b/browser/modules/ZoomUI.sys.mjs
+@@ -125,44 +125,12 @@ export async function updateZoomUI(aBrowser, aAnimate = false) {
+   let appMenuZoomReset = win.document.getElementById(
+     "appMenu-zoomReset-button2"
+   );
+-  let customizableZoomControls = win.document.getElementById("zoom-controls");
+   let customizableZoomReset = win.document.getElementById("zoom-reset-button");
+-  let urlbarZoomButton = win.document.getElementById("urlbar-zoom-button");
+   let zoomFactor = Math.round(win.ZoomManager.zoom * 100);
+ 
+-  let defaultZoom = Math.round((await ZoomUI.getGlobalValue()) * 100);
+-
+-  if (!win.gBrowser || win.gBrowser.selectedBrowser != aBrowser) {
+-    // Because the CPS call is async, at this point the selected browser
+-    // may have changed. We should re-check whether the browser for which we've
+-    // been notified is still the selected browser and bail out if not.
+-    // If the selected browser changed (again), we will have been called again
+-    // with the "right" browser, and that'll update the zoom level.
+-    return;
+-  }
+-
+-  // Hide urlbar zoom button if zoom is at the default zoom level,
+-  // if we're viewing an about:blank page with an empty/null
+-  // principal, if the PDF viewer is currently open,
+-  // or if the customizable control is in the toolbar.
+-
+-  urlbarZoomButton.hidden =
+-    defaultZoom == zoomFactor ||
+-    (aBrowser.currentURI.spec == "about:blank" &&
+-      (!aBrowser.contentPrincipal ||
+-        aBrowser.contentPrincipal.isNullPrincipal)) ||
+-    (aBrowser.contentPrincipal &&
+-      aBrowser.contentPrincipal.spec == "resource://pdf.js/web/viewer.html") ||
+-    (customizableZoomControls &&
+-      customizableZoomControls.getAttribute("cui-areatype") == "toolbar");
+-
+   let label = win.gNavigatorBundle.getFormattedString("zoom-button.label", [
+     zoomFactor,
+   ]);
+-  let accessibilityLabel = win.gNavigatorBundle.getFormattedString(
+-    "zoom-button.aria-label",
+-    [zoomFactor]
+-  );
+ 
+   if (appMenuZoomReset) {
+     appMenuZoomReset.setAttribute("label", label);
+@@ -170,15 +138,6 @@ export async function updateZoomUI(aBrowser, aAnimate = false) {
+   if (customizableZoomReset) {
+     customizableZoomReset.setAttribute("label", label);
+   }
+-  if (!urlbarZoomButton.hidden) {
+-    if (aAnimate && !win.gReduceMotion) {
+-      urlbarZoomButton.setAttribute("animate", "true");
+-    } else {
+-      urlbarZoomButton.removeAttribute("animate");
+-    }
+-    urlbarZoomButton.setAttribute("label", label);
+-    urlbarZoomButton.setAttribute("aria-label", accessibilityLabel);
+-  }
+ 
+   win.FullZoom.updateCommands();
+ }

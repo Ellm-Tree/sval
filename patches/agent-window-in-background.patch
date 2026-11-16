@@ -1,0 +1,242 @@
+Sval: open a window in the background, behind the window in front
+
+Sval opens an agent's workspace window when a page in that workspace opens a
+tab and no window shows the workspace, or when the agent acts and none is
+open. That window must not take the keyboard from the user or cover the window
+they are working in. Every platform's top-level Show activates and raises a
+window whenever the app is in the foreground (nsCocoaWindow::Show's
+makeKeyAndOrderFront, nsWindow::Show's SW_SHOWNORMAL under CanTakeFocus, GTK's
+focus-on-map), and the only exceptions, alwaysontop and alert windows, float
+above every other window, so no chrome API or window feature opens an ordinary
+window behind. This adds a system-only "background" window feature,
+CHROME_OPEN_IN_BACKGROUND, which the widget reads at its first show: macOS
+orders the window below the app's key or main window, or behind every window,
+without making it key; Windows shows it with SW_SHOWNOACTIVATE below the
+foreground window; GTK asks the window manager not to focus it on map; the
+headless widget does not activate it. BrowserWindowTracker files such a
+window behind the window in front, so it is not taken for the user's top
+window.
+
+diff --git a/browser/modules/BrowserWindowTracker.sys.mjs b/browser/modules/BrowserWindowTracker.sys.mjs
+index e1a8f6d8d2..3de804dc64 100644
+--- a/browser/modules/BrowserWindowTracker.sys.mjs
++++ b/browser/modules/BrowserWindowTracker.sys.mjs
+@@ -147,7 +147,17 @@ var WindowHelper = {
+       window.addEventListener(event, _handleEvent);
+     });
+ 
+-    _trackWindowOrder(window);
++    // Sval: a window opened in the background starts behind the one in front.
++    const background =
++      window.docShell.treeOwner
++        .QueryInterface(Ci.nsIInterfaceRequestor)
++        .getInterface(Ci.nsIAppWindow).chromeFlags &
++      Ci.nsIWebBrowserChrome.CHROME_OPEN_IN_BACKGROUND;
++    if (background && _trackedWindows.length) {
++      _trackedWindows.splice(1, 0, window);
++    } else {
++      _trackWindowOrder(window);
++    }
+ 
+     // Update the selected tab's content outer window ID.
+     _updateCurrentBrowserId(window.gBrowser.selectedBrowser);
+diff --git a/toolkit/components/browser/nsIWebBrowserChrome.idl b/toolkit/components/browser/nsIWebBrowserChrome.idl
+index a665bd039d..4a06b3470c 100644
+--- a/toolkit/components/browser/nsIWebBrowserChrome.idl
++++ b/toolkit/components/browser/nsIWebBrowserChrome.idl
+@@ -91,7 +91,11 @@ interface nsIWebBrowserChrome : nsISupports
+     // ignored for Linux.
+     const unsigned long CHROME_SUPPRESS_ANIMATION     = 1 << 24;
+ 
+-    // Two bits are free here.
++    // Sval: shows the new window behind the window in front, without
++    // activating it. Only system callers can ask for it.
++    const unsigned long CHROME_OPEN_IN_BACKGROUND     = 1 << 25;
++
++    // One bit is free here.
+ 
+     const unsigned long CHROME_CENTER_SCREEN          = 1 << 27;
+ 
+diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
+index dfa3fe9671..429302ce40 100644
+--- a/toolkit/components/windowwatcher/nsWindowWatcher.cpp
++++ b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
+@@ -2057,6 +2057,10 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForSystem(
+   if (aFeatures.GetBoolWithDefault("alwaysontop", false)) {
+     chromeFlags |= nsIWebBrowserChrome::CHROME_ALWAYS_ON_TOP;
+   }
++  // Sval: "background" opens the window behind the one in front, unfocused.
++  if (aFeatures.GetBoolWithDefault("background", false)) {
++    chromeFlags |= nsIWebBrowserChrome::CHROME_OPEN_IN_BACKGROUND;
++  }
+   if (aFeatures.GetBoolWithDefault("chrome", false)) {
+     chromeFlags |= nsIWebBrowserChrome::CHROME_OPENAS_CHROME;
+   }
+diff --git a/widget/InitData.h b/widget/InitData.h
+index 5b3480487c..ad6034d596 100644
+--- a/widget/InitData.h
++++ b/widget/InitData.h
+@@ -103,6 +103,9 @@ struct InitData {
+   bool mIsPrivate = false;
+   // True if the window is an alert / notification.
+   bool mIsAlert = false;
++  // Sval: true if the window's first show leaves it behind the window in
++  // front, and does not activate it.
++  bool mOpenInBackground = false;
+ };
+ 
+ }  // namespace mozilla::widget
+diff --git a/widget/cocoa/nsCocoaWindow.mm b/widget/cocoa/nsCocoaWindow.mm
+index 098b770057..41b6b6635a 100644
+--- a/widget/cocoa/nsCocoaWindow.mm
++++ b/widget/cocoa/nsCocoaWindow.mm
+@@ -5636,6 +5636,16 @@ void nsCocoaWindow::Show(bool aState) {
+       // displays.
+       if ((mAlwaysOnTop && mPiPType != PiPType::DocumentPiP) || mIsAlert) {
+         [mWindow orderFront:nil];
++      } else if (std::exchange(mOpenInBackground, false)) {
++        // Sval: behind the app's window in front, or behind every window when
++        // the app has none, neither key nor main, so the app's active window
++        // keeps the keyboard.
++        NSWindow* front = NSApp.keyWindow ?: NSApp.mainWindow;
++        if (front && front != mWindow) {
++          [mWindow orderWindow:NSWindowBelow relativeTo:front.windowNumber];
++        } else {
++          [mWindow orderBack:nil];
++        }
+       } else {
+         [mWindow makeKeyAndOrderFront:nil];
+       }
+diff --git a/widget/gtk/nsWindow.cpp b/widget/gtk/nsWindow.cpp
+index 9d11df1895..d650c1347e 100644
+--- a/widget/gtk/nsWindow.cpp
++++ b/widget/gtk/nsWindow.cpp
+@@ -941,6 +941,12 @@ void nsWindow::Show(bool aState) {
+ 
+   mIsShown = aState;
+ 
++  // Sval: a window opened in the background asks the window manager not to
++  // focus it when it maps (_NET_WM_USER_TIME 0 on X11).
++  if (aState && std::exchange(mOpenInBackground, false) && mShell) {
++    gtk_window_set_focus_on_map(GTK_WINDOW(mShell), FALSE);
++  }
++
+ #ifdef MOZ_LOGGING
+   LOG("nsWindow::Show state %d frame %s\n", aState, GetFrameTag().get());
+   if (!aState && mSourceDragContext && GdkIsWaylandDisplay()) {
+diff --git a/widget/headless/HeadlessWidget.cpp b/widget/headless/HeadlessWidget.cpp
+index 0841e299ea..f85cb6d300 100644
+--- a/widget/headless/HeadlessWidget.cpp
++++ b/widget/headless/HeadlessWidget.cpp
+@@ -165,11 +165,15 @@ void HeadlessWidget::Show(bool aState) {
+ 
+   LOG(("HeadlessWidget::Show [%p] state %d\n", (void*)this, aState));
+ 
++  // Sval: a window opened in the background is not activated.
++  const bool background = aState && std::exchange(mOpenInBackground, false);
++
+   // Top-level window and dialogs are activated/raised when shown.
+   // NB: alwaysontop windows are generally used for peripheral indicators.
+   //     So we don't focus them by default unless they are a Document
+   //     Picture-in-Picture.
+-  if (aState && (!mAlwaysOnTop || mPiPType == PiPType::DocumentPiP) &&
++  if (aState && !background &&
++      (!mAlwaysOnTop || mPiPType == PiPType::DocumentPiP) &&
+       (mWindowType == WindowType::TopLevel ||
+        mWindowType == WindowType::Dialog)) {
+     RaiseWindow();
+diff --git a/widget/nsIWidget.cpp b/widget/nsIWidget.cpp
+index 74fa56fa7c..eb7ebea3fc 100644
+--- a/widget/nsIWidget.cpp
++++ b/widget/nsIWidget.cpp
+@@ -450,6 +450,7 @@ void nsIWidget::BaseCreate(nsIWidget* aParent,
+   mPopupType = aInitData.mPopupHint;
+   mHasRemoteContent = aInitData.mHasRemoteContent;
+   mPiPType = aInitData.mPiPType;
++  mOpenInBackground = aInitData.mOpenInBackground;
+ 
+   mParent = aParent;
+   if (mParent) {
+diff --git a/widget/nsIWidget.h b/widget/nsIWidget.h
+index ca248338ae..7b004394b6 100644
+--- a/widget/nsIWidget.h
++++ b/widget/nsIWidget.h
+@@ -2444,6 +2444,10 @@ class nsIWidget : public nsSupportsWeakReference {
+ 
+   mozilla::widget::PiPType mPiPType;
+ 
++  // Sval: until the first show, whether that show leaves the window behind
++  // the window in front without activating it (InitData::mOpenInBackground).
++  bool mOpenInBackground = false;
++
+   struct InitialZoomConstraints {
+     InitialZoomConstraints(const uint32_t& aPresShellID,
+                            const ScrollableLayerGuid::ViewID& aViewID,
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+index 8a73e6fba9..2a47f745e9 100644
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -1761,29 +1761,43 @@ void nsWindow::Show(bool aState) {
+         // cursor.
+         SetCursor(Cursor{eCursor_standard});
+ 
++        // Sval: a window opened in the background shows without activating,
++        // at its normal size, since every maximized show activates.
++        const bool background = std::exchange(mOpenInBackground, false);
+         switch (mFrameState->GetSizeMode()) {
+           case nsSizeMode_Fullscreen:
+-            ::ShowWindow(mWnd, SW_SHOW);
++            ::ShowWindow(mWnd, background ? SW_SHOWNOACTIVATE : SW_SHOW);
+             break;
+           case nsSizeMode_Maximized:
+-            ::ShowWindow(mWnd, SW_SHOWMAXIMIZED);
++            ::ShowWindow(mWnd,
++                         background ? SW_SHOWNOACTIVATE : SW_SHOWMAXIMIZED);
+             break;
+           case nsSizeMode_Minimized:
+-            ::ShowWindow(mWnd, SW_SHOWMINIMIZED);
++            ::ShowWindow(mWnd,
++                         background ? SW_SHOWMINNOACTIVE : SW_SHOWMINIMIZED);
+             break;
+           default:
+-            if (CanTakeFocus() &&
++            if (!background && CanTakeFocus() &&
+                 (!mAlwaysOnTop || mPiPType == PiPType::DocumentPiP)) {
+               ::ShowWindow(mWnd, SW_SHOWNORMAL);
+             } else {
+               ::ShowWindow(mWnd, SW_SHOWNOACTIVATE);
+               // Don't flicker the window if we're restoring session
+-              if (!sIsRestoringSession) {
++              if (!sIsRestoringSession && !background) {
+                 (void)GetAttention(2);
+               }
+             }
+             break;
+         }
++        // Sval: and below the foreground window, unless that one is topmost,
++        // which a window placed after it would join.
++        HWND front = background ? ::GetForegroundWindow() : nullptr;
++        if (front && front != mWnd &&
++            !(::GetWindowLongPtrW(front, GWL_EXSTYLE) & WS_EX_TOPMOST)) {
++          ::SetWindowPos(mWnd, front, 0, 0, 0, 0,
++                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE |
++                             SWP_NOOWNERZORDER);
++        }
+ 
+         if (!mHasBeenShown) {
+           // Now that ::ShowWindow() has been called once, the window surface
+diff --git a/xpfe/appshell/nsAppShellService.cpp b/xpfe/appshell/nsAppShellService.cpp
+index 65215ba619..841a45c441 100644
+--- a/xpfe/appshell/nsAppShellService.cpp
++++ b/xpfe/appshell/nsAppShellService.cpp
+@@ -499,6 +499,10 @@ nsresult nsAppShellService::JustCreateTopWindow(
+     widgetInitData.mAlwaysOnTop = true;
+   }
+ 
++  if (aChromeMask & nsIWebBrowserChrome::CHROME_OPEN_IN_BACKGROUND) {
++    widgetInitData.mOpenInBackground = true;
++  }
++
+   if (aChromeMask & nsIWebBrowserChrome::CHROME_REMOTE_WINDOW) {
+     widgetInitData.mHasRemoteContent = true;
+   }

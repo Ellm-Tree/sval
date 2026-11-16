@@ -1,0 +1,19 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* The tab picker's header, inside `splitview-opentabs`'s shadow tree, which
+   fades from the picker's own tint (`opentabs-splitview.css`). Loaded as a
+   user sheet (`SvalPageStyle`), so it reaches the shadow tree and needs
+   `!important` to win over the component's rule. */
+
+.sticky-header {
+  background: linear-gradient(to bottom, var(--sval-page) 95%, transparent) !important;
+}
+
+h3 {
+  color: var(--sval-ink) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}

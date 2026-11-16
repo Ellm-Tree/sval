@@ -1,0 +1,281 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/* Firefox's History sidebar, as Sval shows it (SvalHistorySidebar.sys.mjs):
+ * its search field, View button and lists drawn as the panel draws its own
+ * (sval-panel.css), with rows as tall as the panel's in a slightly larger
+ * type. */
+
+@import url("chrome://browser/content/sval/sval-type.css");
+
+/* The header's accent and focus ring (sval-header.css), which this document,
+ * apart from the window's, does not inherit. Under high contrast and forced
+ * colours Firefox's own system colours stay. */
+@media not ((prefers-contrast) or (forced-colors)) {
+  :root {
+    --sval-accent: light-dark(var(--sval-palette-blue), var(--sval-palette-neon));
+    --focus-outline-color: var(--sval-accent);
+  }
+
+  /* A pill on a wash, as the address field and Settings' fields are. */
+  #search-box {
+    --input-text-min-height: var(--size-item-large, 32px);
+    --input-text-border-radius: var(--border-radius-circle);
+    --input-text-border-color: transparent;
+    --input-text-background-color: var(--background-color-dimmed);
+    --input-text-color: inherit;
+  }
+}
+
+#sidebar-search-container {
+  gap: var(--space-xsmall);
+  padding: var(--space-small);
+}
+
+/* The panel's icon buttons: a rounded wash on hover. */
+#viewButton {
+  min-height: var(--size-item-large, 32px);
+  margin: 0;
+  padding-inline: var(--space-small);
+  border-radius: var(--border-radius-medium);
+
+  &:hover,
+  &[open] {
+    background-color: var(--background-color-dimmed);
+  }
+}
+
+#historyTree,
+#sval-archived-tree {
+  margin: 0;
+}
+
+/* Each column keeps its label, which a screen reader gives each column's
+ * cells, and its width, which places its cells. `hideheader` only takes the
+ * header's native look (`tree.css`), so the header row is shut here, in a
+ * box with no height. */
+:is(#historyTree, #sval-archived-tree) > treecols {
+  height: 0;
+  min-height: 0;
+  overflow: clip;
+  border: 0;
+
+  > treecol {
+    min-height: 0;
+    padding-block: 0;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+#historyTree,
+#sval-archived-tree {
+  /* Two pixels above the sidebar's own size, on every platform's base: no
+   * design token is a step up from an inherited size. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  font-size: calc(1em + 2px);
+}
+
+#historyTree > treechildren::-moz-tree-row,
+#sval-archived-tree > treechildren::-moz-tree-row {
+  min-height: var(--size-item-large, 32px);
+  margin-inline: var(--space-small);
+}
+
+/* The panel's rows: hover is a neutral wash, the selected row a wash of the
+ * accent with the accent's bar at its start, and the text keeps its ink.
+ * High contrast and forced colours keep the tree's system colours. */
+@media not ((prefers-contrast) or (forced-colors)) {
+  :is(#historyTree, #sval-archived-tree) > treechildren {
+    /* Every row has room for the bar, so a selection moves no text. */
+    &::-moz-tree-row {
+      border: 0;
+      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+      border-inline-start: 4px solid transparent;
+      border-radius: var(--border-radius-medium);
+    }
+
+    /* The panel stripes no rows. */
+    &::-moz-tree-row(multicol, odd) {
+      background-color: transparent;
+    }
+
+    &::-moz-tree-row(hover) {
+      background-color: var(--background-color-dimmed);
+    }
+
+    &::-moz-tree-row(selected),
+    &::-moz-tree-row(selected, focus) {
+      /* Sval's accent, which no Firefox token carries. */
+      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+      border-inline-start-color: var(--sval-accent);
+      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+      background-color: color-mix(in srgb, var(--sval-accent) 18%, transparent);
+    }
+
+    &::-moz-tree-row(current, focus) {
+      outline: var(--focus-outline-width) solid var(--focus-outline-color);
+      outline-offset: calc(-1 * var(--focus-outline-width));
+    }
+
+    &::-moz-tree-image(selected),
+    &::-moz-tree-twisty(selected),
+    &::-moz-tree-cell-text(selected),
+    &::-moz-tree-image(selected, focus),
+    &::-moz-tree-twisty(selected, focus),
+    &::-moz-tree-cell-text(selected, focus) {
+      color: inherit;
+    }
+  }
+}
+
+/* A narrow sidebar takes its room from the workspace first, then the
+ * title, and never from the date. Each column's basis is what it wants in
+ * a wide one; the workspace's shrink factor makes it give way before the
+ * title does. */
+#historyTree > treecols > #title {
+  /* A share of the row's width, which no size token describes. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  flex: 1 1 10em;
+  min-width: 0;
+}
+
+/* The workspace of a page's latest visit, under All Workspaces
+ * (decision 1287). */
+#historyTree > treecols > #sval-workspace {
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  flex: 0 100 8em;
+  min-width: 0;
+}
+
+#historyTree > treechildren::-moz-tree-cell-text(sval-workspace) {
+  color: var(--text-color-deemphasized, GrayText);
+}
+
+/* A short date and time, "10/14/26, 11:59 PM", whole in the date's
+ * smaller type; a visit today shows its time alone. */
+#historyTree > treecols > #date {
+  flex: none;
+  width: 7.5em;
+}
+
+#historyTree > treechildren::-moz-tree-cell-text(date) {
+  color: var(--text-color-deemphasized, GrayText);
+  /* The sidebar's own size, two pixels under the list's (above): the
+   * platform tokens leave `--font-size-small` unset. */
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  font-size: calc(1em - 2px);
+}
+
+/* "This Workspace" and "All Workspaces": two segments on a track, the chosen
+ * one raised, as the Downloads panel's switch is (sval-downloads.css). */
+#sval-history-views {
+  display: grid;
+  /* Shares that shrink below their labels, so a narrow sidebar ends each
+     label in an ellipsis rather than widening the page past its edge. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xxsmall);
+  margin: 0 var(--space-small) var(--space-small);
+  padding: var(--space-xxsmall);
+  border-radius: var(--border-radius-circle);
+  background-color: var(--background-color-dimmed);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.sval-history-view {
+  appearance: none;
+  min-height: var(--size-item-medium);
+  margin: 0;
+  padding-inline: var(--space-small);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 0;
+  border-radius: var(--border-radius-circle);
+  background-color: transparent;
+  color: var(--text-color-deemphasized);
+  font: inherit;
+  cursor: pointer;
+
+  &[aria-checked="true"] {
+    background-color: var(--background-color-box);
+    box-shadow: var(--box-shadow-level-1);
+    color: inherit;
+    font-weight: var(--font-weight-bold);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
+}
+
+/* The system's own colours mark the chosen segment. */
+@media (prefers-contrast) or (forced-colors) {
+  .sval-history-view {
+    color: var(--button-text-color);
+
+    &[aria-checked="true"] {
+      background-color: var(--color-accent-primary-selected);
+      color: var(--text-color-accent-primary-selected);
+    }
+  }
+}
+
+/* The tabs Sval archived (idle-tab archive spec §7.3): the workspace each
+ * came from and when, beside its page, and a restored one dimmed. */
+#sval-archived-tree > treecols > #sval-archived-title {
+  flex: 1;
+}
+
+#sval-archived-tree > treecols > #sval-archived-workspace {
+  flex: none;
+  min-width: 5em;
+}
+
+#sval-archived-tree > treecols > #sval-archived-closed {
+  flex: none;
+  min-width: 7em;
+}
+
+#sval-archived-tree > treechildren::-moz-tree-cell-text(sval-archived-workspace),
+#sval-archived-tree > treechildren::-moz-tree-cell-text(sval-archived-closed),
+#sval-archived-tree > treechildren::-moz-tree-cell-text(restored) {
+  color: var(--text-color-deemphasized, GrayText);
+}
+
+#sval-history-footer {
+  padding: var(--space-small);
+  border-top: var(--border-width) solid var(--border-color-deemphasized, ThreeDShadow);
+}
+
+/* The panel's actions: a rounded button on Firefox's button colours. High
+ * contrast and forced colours keep the system's button, with its edge. */
+@media not ((prefers-contrast) or (forced-colors)) {
+  #sval-history-clear {
+    appearance: none;
+    min-height: var(--size-item-large, 32px);
+    margin: 0;
+    padding-inline: var(--space-medium);
+    border: 0;
+    border-radius: var(--border-radius-medium);
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+
+    &:hover {
+      background-color: var(--button-background-color-hover);
+    }
+
+    &:hover:active {
+      background-color: var(--button-background-color-active);
+    }
+
+    &:focus-visible {
+      outline: var(--focus-outline-width) solid var(--focus-outline-color);
+      outline-offset: var(--focus-outline-offset);
+    }
+  }
+}

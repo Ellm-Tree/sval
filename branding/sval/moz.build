@@ -1,0 +1,52 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+DIRS += ["content", "locales"]
+
+DIST_SUBDIR = "browser"
+export("DIST_SUBDIR")
+
+# Not using the shared FirefoxBranding() template from
+# ../branding-common.mozbuild here: it hardcodes "pref/firefox-branding.js",
+# and that file lives upstream, not in this ADDED branding directory. Doing
+# this inline keeps Sval's defaults in pref/app-sval-prefs.js without patching
+# the shared template.
+#
+# The filename app-sval-prefs.js is deliberate, not arbitrary: default pref files
+# load reverse-alphabetically and the alphabetically SMALLEST name is applied
+# LAST (wins). It must sort before firefox.js/debugger.js. See the comment at
+# the top of pref/app-sval-prefs.js.
+JS_PREFERENCE_FILES += [
+    "pref/app-sval-firefox-ui.js",
+    "pref/app-sval-prefs.js",
+]
+
+# Sval's default site permissions, read through permissions.manager.defaultsUrl
+# in app-sval-prefs.js, in place of Firefox's browser/app/permissions.
+FINAL_TARGET_FILES.defaults += [
+    "sval-permissions",
+]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+    # Windows reads an executable's tile from the file beside it named
+    # <executable>.VisualElementsManifest.xml.
+    FINAL_TARGET_FILES[".."] += [
+        "sval-private-browsing.VisualElementsManifest.xml",
+        "sval.VisualElementsManifest.xml",
+    ]
+    FINAL_TARGET_FILES.VisualElements += [
+        "PrivateBrowsing_150.png",
+        "PrivateBrowsing_70.png",
+        "VisualElements_150.png",
+        "VisualElements_70.png",
+    ]
+elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+    # GTK draws each window's icon from these.
+    FINAL_TARGET_FILES.chrome.icons.default += [
+        "default128.png",
+        "default16.png",
+        "default32.png",
+        "default48.png",
+        "default64.png",
+    ]

@@ -1,0 +1,73 @@
+---
+title: Choose a sync folder
+description: Turn on sync by choosing a folder your devices share, or move sync to another folder.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Sval syncs through a folder you choose. Your devices read and write the
+same folder. Sval encrypts everything it puts there.
+
+You set up Sval on this computer before you thought about syncing. Now you
+want your Workspaces on your laptop too, so you choose a folder in iCloud
+Drive that both computers can reach.
+
+<Screenshot name="features-sync" alt="Settings › Sync and devices, with the sync folder, the sync status, and this device's name" />
+
+## Steps
+
+1. Open Settings › Sync and devices.
+2. Under Sync, select **Choose folder…**.
+3. In the folder picker, choose a folder your other devices can reach, like
+   one in iCloud Drive, Dropbox, OneDrive, or on a network drive.
+4. On a Mac, if macOS asks whether Sval can use "Sval secrets", choose
+   **Always Allow**.
+
+The Sync card shows the folder's name and where the folder is. A line
+under that says when Sval last synced. Sval then offers to back up your sync key.
+See [Back up your sync key](/docs/how-to/sync/back-up-your-sync-key/).
+
+## Move sync to another folder
+
+1. Open Settings › Sync and devices.
+2. Under Sync, select **Change…**.
+3. Choose the new folder.
+
+Choose the same new folder on each of your other devices. Each device keeps
+syncing with the ones that use the same folder.
+
+## Details
+
+- Sval makes a folder called "sval" inside the folder you choose, and keeps
+  its files there. If you choose the "sval" folder itself, that works the
+  same as choosing the folder around it.
+- Your Workspaces stay on this device whether or not you sync. Sync adds the
+  folder as a place your devices meet.
+- To open the folder, select **Show in Finder** (**Show in File Explorer** on
+  Windows, **Show in Files** on Linux).
+- To sync straight away, select **Sync now**. Sval also syncs by itself.
+- Your choice of sync folder stays on this device and doesn't sync. You
+  choose the folder on each device.
+- These steps turn on sync on your first device. To add another device,
+  see [Sync another device with this one](/docs/how-to/sync/sync-another-device/).
+
+## If something goes wrong
+
+- **This folder already has Sval Workspaces.** Another of your devices
+  already syncs through this folder. To sync with that device, follow
+  [Sync another device with this one](/docs/how-to/sync/sync-another-device/)
+  instead of choosing the folder here.
+- **Sval couldn't save a sync key on this device, so the folder didn't
+  change.** On a Mac, choose the folder again and select **Always Allow**
+  when macOS asks.
+- **Can't reach this folder yet. Sval syncs when it's back.** Sval keeps
+  the folder you chose, and syncs once it can reach the folder. Reconnect the network
+  drive or USB drive, or check that the cloud service is running.
+- **Sval can't find its files in this folder.** The folder moved, or its
+  drive isn't connected. Reconnect the drive, then select **Use this folder
+  again**, or select **Choose another…**.
+
+## Related pages
+
+- [How sync works](/docs/explanation/sync/)
+- [Sync settings and controls](/docs/reference/sync/)

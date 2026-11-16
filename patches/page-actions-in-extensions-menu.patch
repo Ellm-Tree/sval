@@ -1,0 +1,228 @@
+Sval: show page actions in the extensions menu
+
+Sval's jar.mn overrides browser-pageActions.js with sval-page-actions.js,
+which draws an extension's page action on its row of the extensions menu
+and marks the extensions button while one shows for the selected tab.
+The address field's page action menu button, the panel it opened and the
+context menu of its buttons go, with the bookmark panel item's label
+update and their rules and strings. The extensions menu lists each row's
+page action wherever it lists the row's site switch.
+
+diff --git a/browser/base/content/browser-addons.js b/browser/base/content/browser-addons.js
+index c6096268bf..5ca49b0fa8 100644
+--- a/browser/base/content/browser-addons.js
++++ b/browser/base/content/browser-addons.js
+@@ -2446,6 +2446,7 @@ var gUnifiedExtensions = {
+     // the selected tab's site.
+     lazy.SvalExtensionsMenu.listPinned(window, list);
+     lazy.SvalExtensionsMenu.addSwitches(window, panelview);
++    lazy.SvalExtensionsMenu.addPageActions(window, panelview);
+ 
+     const emptyStateBox = panelview.querySelector(
+       "#unified-extensions-empty-state"
+@@ -2980,6 +2981,7 @@ var gUnifiedExtensions = {
+     if (list && this._panel?.state === "open") {
+       lazy.SvalExtensionsMenu.listPinned(window, list);
+       lazy.SvalExtensionsMenu.addSwitches(window, this._panel);
++      lazy.SvalExtensionsMenu.addPageActions(window, this._panel);
+     }
+   },
+ 
+diff --git a/browser/base/content/browser-places.js b/browser/base/content/browser-places.js
+index 80a7f50942..13c0e5283a 100644
+--- a/browser/base/content/browser-places.js
++++ b/browser/base/content/browser-places.js
+@@ -1960,34 +1960,6 @@ var BookmarkingUI = {
+         }
+       }
+     }
+-
+-    // Update Page Actions.
+-    if (document.getElementById("page-action-buttons")) {
+-      // Fetch the label attribute value of the message and
+-      // apply it on the star title.
+-      //
+-      // Note: This should be updated once bug 1608198 is fixed.
+-      this._latestMenuItemL10nId = menuItemL10nId;
+-      document.l10n.formatMessages([{ id: menuItemL10nId }]).then(l10n => {
+-        // It's possible for this promise to be scheduled multiple times.
+-        // In such a case, we'd like to avoid setting the title if there's
+-        // a newer l10n id pending to be set.
+-        if (this._latestMenuItemL10nId != menuItemL10nId) {
+-          return;
+-        }
+-
+-        // We assume that menuItemL10nId has a single attribute.
+-        let label = l10n[0].attributes[0].value;
+-
+-        // Update the label for the page action panel.
+-        let panelButton = BrowserPageActions.panelButtonNodeForActionID(
+-          PageActions.ACTION_ID_BOOKMARK
+-        );
+-        if (panelButton) {
+-          panelButton.setAttribute("label", label);
+-        }
+-      });
+-    }
+   },
+ 
+   onMainMenuPopupShowing: function BUI_onMainMenuPopupShowing(event) {
+diff --git a/browser/base/content/main-popupset.inc.xhtml b/browser/base/content/main-popupset.inc.xhtml
+index f159dc25c9..2959f86ee8 100644
+--- a/browser/base/content/main-popupset.inc.xhtml
++++ b/browser/base/content/main-popupset.inc.xhtml
+@@ -693,28 +693,6 @@
+ 
+ 
+ 
+-  <html:template id="pageActionPanelTemplate">
+-    <panel id="pageActionPanel"
+-           class="cui-widget-panel panel-no-padding"
+-           role="group"
+-           type="arrow"
+-           hidden="true"
+-           flip="slide"
+-           position="bottomright topright"
+-           tabspecific="true"
+-           noautofocus="true">
+-      <panelmultiview id="pageActionPanelMultiView"
+-                      mainViewId="pageActionPanelMainView"
+-                      viewCacheId="appMenu-viewCache">
+-        <panelview id="pageActionPanelMainView"
+-                   context="pageActionContextMenu"
+-                   class="PanelUI-subView">
+-          <vbox class="panel-subview-body"/>
+-        </panelview>
+-      </panelmultiview>
+-    </panel>
+-  </html:template>
+-
+   <html:template id="confirmation-hint-wrapper">
+     <panel id="confirmation-hint"
+            role="alert"
+@@ -733,15 +711,6 @@
+     </panel>
+   </html:template>
+ 
+-  <menupopup id="pageActionContextMenu">
+-    <menuitem id="pageActionContextMenuManageExtension"
+-              class="pageActionContextMenuItem extensionPinned extensionUnpinned manageExtensionItem"
+-              data-l10n-id="page-action-manage-extension2"/>
+-    <menuitem id="pageActionContextMenuRemoveExtension"
+-              class="pageActionContextMenuItem extensionPinned extensionUnpinned removeExtensionItem"
+-              data-l10n-id="page-action-remove-extension2"/>
+-  </menupopup>
+-
+   <menupopup id="userContext-indicator-menu">
+     <menuitem data-l10n-id="user-context-manage-containers"
+               command="Browser:OpenAboutContainers"/>
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 8b6367deb9..28ae36e561 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -337,7 +337,7 @@
+                    data-l10n-id="urlbar-revert-button"/>
+           </hbox>
+ 
+-          <hbox id="page-action-buttons" context="pageActionContextMenu" align="center" urlbar-slot="page-actions">
++          <hbox id="page-action-buttons" align="center" urlbar-slot="page-actions">
+             <toolbartabstop/>
+             <hbox id="contextual-feature-recommendation" role="button" hidden="true">
+               <hbox id="cfr-label-container">
+@@ -354,12 +354,6 @@
+               <label id="userContext-label"/>
+               <image id="userContext-indicator"/>
+             </hbox>
+-            <hbox id="pageActionButton"
+-                  class="urlbar-page-action"
+-                  role="button"
+-                  data-l10n-id="urlbar-page-action-button">
+-              <image class="urlbar-icon"/>
+-            </hbox>
+           </hbox>
+         </html:moz-urlbar>
+         <toolbartabstop/>
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index adf752f676..02232e08d4 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -192,15 +192,6 @@ clear-search-history =
+     .label = Clear Search History
+     .accesskey = H
+ 
+-## Page Action Context Menu
+-
+-page-action-manage-extension2 =
+-    .label = Manage Extension…
+-    .accesskey = E
+-page-action-remove-extension2 =
+-    .label = Remove Extension
+-    .accesskey = v
+-
+ ## Auto-hide Context Menu
+ 
+ full-screen-autohide =
+@@ -609,8 +600,6 @@ urlbar-extension =
+ 
+ urlbar-go-button2 =
+   .title = Go to the address in the Location Bar
+-urlbar-page-action-button =
+-  .tooltiptext = Page actions
+ urlbar-revert-button =
+   .tooltiptext = Show the address in the Location Bar
+ 
+diff --git a/browser/themes/shared/customizableui/panelUI-shared.css b/browser/themes/shared/customizableui/panelUI-shared.css
+index 2c3d192d88..87c737253d 100644
+--- a/browser/themes/shared/customizableui/panelUI-shared.css
++++ b/browser/themes/shared/customizableui/panelUI-shared.css
+@@ -509,7 +509,6 @@ menupopup[emptyplacesresult] > .hide-if-empty-places-result {
+ }
+ 
+ #appMenu-libraryView,
+-#pageActionPanel panelview,
+ #widget-overflow panelview {
+   min-width: var(--menu-panel-width-wide);
+   max-width: var(--menu-panel-width-wide);
+diff --git a/browser/themes/shared/urlbar-searchbar.css b/browser/themes/shared/urlbar-searchbar.css
+index 407544e605..b41077bef8 100644
+--- a/browser/themes/shared/urlbar-searchbar.css
++++ b/browser/themes/shared/urlbar-searchbar.css
+@@ -559,27 +559,6 @@ toolbar[inactive="true"] .urlbar,
+   }
+ }
+ 
+-/* The page actions menu is hidden by default, it is only shown in small
+-   windows as the overflow target of multiple page action buttons */
+-#pageActionButton {
+-  display: none;
+-}
+-
+-/* 680px is just below half of popular 1366px wide screens, so when putting two
+-   browser windows next to each other on such a screen, they'll be above this
+-   threshold. */
+-@media (max-width: 680px) {
+-  /* Page action buttons are duplicated in the page action menu so we can
+-      safely hide them in small windows. */
+-  #pageActionSeparator,
+-  #pageActionButton[multiple-children] ~ .urlbar-page-action {
+-    display: none;
+-  }
+-  #pageActionButton[multiple-children] {
+-    display: revert;
+-  }
+-}
+-
+ @media (max-width: 550px) {
+   #identity-icon-box {
+     max-width: 70px;
+@@ -791,10 +770,6 @@ toolbar[inactive="true"] .urlbar,
+   }
+ }
+ 
+-#pageActionButton {
+-  list-style-image: url("chrome://global/skin/icons/more.svg");
+-}
+-
+ /*
+  * Display visual cue that browser is under remote control.
+  * This is to help users visually distinguish a user agent session that

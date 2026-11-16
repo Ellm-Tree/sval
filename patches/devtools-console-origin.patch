@@ -1,0 +1,237 @@
+Sval: console messages say where they came from, with filters by origin
+
+Each Web Console and Browser Console message gets a label for the page's
+own scripts, an extension, or Sval itself, an extension script's source
+link names its extension, and the filter bar gets Page, Extensions and Sval
+toggles and a one-extension menu. The logic is in Sval's added files
+(browser/components/sval/console-origin*.js), which the console requires by
+their chrome:// URLs; this has prepareMessage give each message's frame its
+origin, and wires the label, the filters' state and the visibility check
+into the console. The console's components, reducers and filter state are
+Mozilla's, and no chrome API reaches them.
+
+diff --git a/devtools/client/webconsole/actions/filters.js b/devtools/client/webconsole/actions/filters.js
+index 7468f6741a..0a517baee0 100644
+--- a/devtools/client/webconsole/actions/filters.js
++++ b/devtools/client/webconsole/actions/filters.js
+@@ -51,7 +51,7 @@ function filtersClear() {
+ 
+     const filterState = getAllFilters(getState());
+     for (const filter in filterState) {
+-      if (filter !== FILTERS.TEXT) {
++      if (filter !== FILTERS.TEXT && filter !== FILTERS.EXTENSION) {
+         prefsService.clearUserPref(PREFS.FILTER[filter.toUpperCase()]);
+       }
+     }
+diff --git a/devtools/client/webconsole/components/FilterBar/FilterBar.js b/devtools/client/webconsole/components/FilterBar/FilterBar.js
+index 342f930557..024ec3786d 100644
+--- a/devtools/client/webconsole/components/FilterBar/FilterBar.js
++++ b/devtools/client/webconsole/components/FilterBar/FilterBar.js
+@@ -45,6 +45,7 @@ const {
+ 
+ // Additional Components
+ const FilterButton = require("resource://devtools/client/webconsole/components/FilterBar/FilterButton.js");
++const OriginFilters = require("chrome://browser/content/sval/console-origin-filters.js");
+ const ConsoleSettings = createFactory(
+   require("resource://devtools/client/webconsole/components/FilterBar/ConsoleSettings.js")
+ );
+@@ -280,6 +281,12 @@ class FilterBar extends Component {
+         filterKey: FILTERS.DEBUG,
+         dispatch,
+       }),
++      ...OriginFilters({
++        dispatch,
++        filter,
++        getLabel,
++        webConsoleUI: this.props.webConsoleUI,
++      }),
+       dom.div({
+         className: "devtools-separator",
+       }),
+diff --git a/devtools/client/webconsole/components/Output/Message.js b/devtools/client/webconsole/components/Output/Message.js
+index 12db317c2a..8ea2a11c7c 100644
+--- a/devtools/client/webconsole/components/Output/Message.js
++++ b/devtools/client/webconsole/components/Output/Message.js
+@@ -27,6 +27,10 @@ const MessageIcon = require("resource://devtools/client/webconsole/components/Ou
+ const FrameView = createFactory(
+   require("resource://devtools/client/shared/components/Frame.js")
+ );
++const {
++  OriginBadge,
++  withOriginSource,
++} = require("chrome://browser/content/sval/console-origin.js");
+ 
+ loader.lazyRequireGetter(
+   this,
+@@ -419,8 +423,10 @@ class Message extends Component {
+       }
+     }
+ 
++    const origin = frame?.svalOrigin ?? null;
++
+     // Configure the location.
+-    const location = frame
++    const frameLocation = frame
+       ? FrameView({
+           className: "message-location devtools-monospace",
+           frame,
+@@ -432,6 +438,7 @@ class Message extends Component {
+           messageSource: source,
+         })
+       : null;
++    const location = withOriginSource(frameLocation, origin);
+ 
+     let learnMore;
+     if (exceptionDocURL) {
+@@ -479,6 +486,7 @@ class Message extends Component {
+           timestampEl ? " " : null,
+           dom.span(
+             { className: "message-body devtools-monospace" },
++            OriginBadge(origin),
+             ...bodyElements,
+             learnMore
+           ),
+diff --git a/devtools/client/webconsole/constants.js b/devtools/client/webconsole/constants.js
+index dbbfacee14..a3995451b3 100644
+--- a/devtools/client/webconsole/constants.js
++++ b/devtools/client/webconsole/constants.js
+@@ -23,6 +23,7 @@ const actionTypes = {
+   FILTER_TEXT_SET: "FILTER_TEXT_SET",
+   FILTER_TOGGLE: "FILTER_TOGGLE",
+   FILTERS_CLEAR: "FILTERS_CLEAR",
++  SVAL_FILTER_EXTENSION_SET: "SVAL_FILTER_EXTENSION_SET",
+   FILTERBAR_DISPLAY_MODE_SET: "FILTERBAR_DISPLAY_MODE_SET",
+   HISTORY_LOADED: "HISTORY_LOADED",
+   INITIALIZE: "INITIALIZE",
+@@ -70,6 +71,9 @@ const prefs = {
+       CSS: "filter.css",
+       NET: "filter.net",
+       NETXHR: "filter.netxhr",
++      PAGE: "filter.page",
++      EXTENSIONS: "filter.extensions",
++      SVAL: "filter.sval",
+     },
+     UI: {
+       // Persist is only used by the webconsole.
+@@ -108,6 +112,10 @@ const FILTERS = {
+   NETXHR: "netxhr",
+   TEXT: "text",
+   WARN: "warn",
++  PAGE: "page",
++  EXTENSIONS: "extensions",
++  EXTENSION: "extension",
++  SVAL: "sval",
+ };
+ 
+ const DEFAULT_FILTERS_VALUES = {
+@@ -120,6 +128,10 @@ const DEFAULT_FILTERS_VALUES = {
+   [FILTERS.CSS]: false,
+   [FILTERS.NET]: false,
+   [FILTERS.NETXHR]: false,
++  [FILTERS.PAGE]: true,
++  [FILTERS.EXTENSIONS]: true,
++  [FILTERS.EXTENSION]: "",
++  [FILTERS.SVAL]: true,
+ };
+ 
+ const DEFAULT_FILTERS = Object.keys(DEFAULT_FILTERS_VALUES).filter(
+diff --git a/devtools/client/webconsole/index.html b/devtools/client/webconsole/index.html
+index 17fd8ec394..61c7765e5b 100644
+--- a/devtools/client/webconsole/index.html
++++ b/devtools/client/webconsole/index.html
+@@ -18,6 +18,7 @@
+     />
+     <link rel="stylesheet" href="chrome://global/skin/global.css" />
+     <link rel="stylesheet" href="chrome://devtools/skin/webconsole.css" />
++    <link rel="stylesheet" href="chrome://browser/content/sval/sval-console-origin.css" />
+     <link rel="stylesheet" href="chrome://devtools/skin/components-frame.css" />
+     <link
+       rel="stylesheet"
+diff --git a/devtools/client/webconsole/reducers/filters.js b/devtools/client/webconsole/reducers/filters.js
+index 1f18ab92b4..6b452a88bf 100644
+--- a/devtools/client/webconsole/reducers/filters.js
++++ b/devtools/client/webconsole/reducers/filters.js
+@@ -21,6 +21,10 @@ function filters(state = FilterState(), action) {
+       const { text } = action;
+       return cloneState(state, { [constants.FILTERS.TEXT]: text });
+     }
++    case constants.SVAL_FILTER_EXTENSION_SET:
++      return cloneState(state, {
++        [constants.FILTERS.EXTENSION]: action.extension,
++      });
+   }
+ 
+   return state;
+diff --git a/devtools/client/webconsole/reducers/messages.js b/devtools/client/webconsole/reducers/messages.js
+index 8126aae56e..8d9235fee5 100644
+--- a/devtools/client/webconsole/reducers/messages.js
++++ b/devtools/client/webconsole/reducers/messages.js
+@@ -11,6 +11,9 @@ const {
+ 
+ const constants = require("resource://devtools/client/webconsole/constants.js");
+ const { DEFAULT_FILTERS, FILTERS, MESSAGE_TYPE, MESSAGE_SOURCE } = constants;
++const {
++  hiddenByOriginFilter,
++} = require("chrome://browser/content/sval/console-origin.js");
+ 
+ const { getGripPreviewItems } = ChromeUtils.importESModule(
+   "resource://devtools/client/shared/components/reps/index.mjs",
+@@ -741,6 +744,7 @@ function messages(
+     case constants.FILTER_TOGGLE:
+     case constants.FILTER_TEXT_SET:
+     case constants.FILTERS_CLEAR:
++    case constants.SVAL_FILTER_EXTENSION_SET:
+     case constants.DEFAULT_FILTERS_RESET:
+       return setVisibleMessages({
+         messagesState: state,
+@@ -1300,6 +1304,14 @@ function getMessageVisibility(
+     };
+   }
+ 
++  const hiddenByOrigin = hiddenByOriginFilter(message, filtersState);
++  if (hiddenByOrigin) {
++    return {
++      visible: false,
++      cause: hiddenByOrigin,
++    };
++  }
++
+   // This should always be the last check, or we might report that a message was hidden
+   // because of text search, while it may be hidden because its category is disabled.
+   // Do not check for search filters if it is part of a group and one of its ancestor
+diff --git a/devtools/client/webconsole/store.js b/devtools/client/webconsole/store.js
+index 23b79e1db0..496b9def46 100644
+--- a/devtools/client/webconsole/store.js
++++ b/devtools/client/webconsole/store.js
+@@ -85,6 +85,9 @@ function configureStore(webConsoleUI, options = {}) {
+       css: getBoolPref(PREFS.FILTER.CSS),
+       net: getBoolPref(PREFS.FILTER.NET),
+       netxhr: getBoolPref(PREFS.FILTER.NETXHR),
++      page: getBoolPref(PREFS.FILTER.PAGE, true),
++      extensions: getBoolPref(PREFS.FILTER.EXTENSIONS, true),
++      sval: getBoolPref(PREFS.FILTER.SVAL, true),
+     }),
+     ui: UiState({
+       networkMessageActiveTabId: "headers",
+diff --git a/devtools/client/webconsole/utils/messages.js b/devtools/client/webconsole/utils/messages.js
+index c14489279b..4b345d9a0a 100644
+--- a/devtools/client/webconsole/utils/messages.js
++++ b/devtools/client/webconsole/utils/messages.js
+@@ -100,6 +100,7 @@ const {
+   ConsoleMessage,
+   NetworkEventMessage,
+ } = require("resource://devtools/client/webconsole/types.js");
++const { originOf } = require("chrome://browser/content/sval/console-origin.js");
+ 
+ function prepareMessage(resource, idGenerator, persistLogs) {
+   if (!resource.source) {
+@@ -110,6 +111,9 @@ function prepareMessage(resource, idGenerator, persistLogs) {
+   // which aren't translated into any item in the console (Tracer frames)
+   if (resource) {
+     resource.id = idGenerator.getNextId(resource);
++    if (resource.frame) {
++      resource.frame.svalOrigin = originOf(resource);
++    }
+   }
+   return resource;
+ }

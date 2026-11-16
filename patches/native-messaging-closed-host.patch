@@ -1,0 +1,26 @@
+Sval: a write to a native host that stopped reading ends the port quietly
+
+NativeApp._startWrite reports every write failure with Cu.reportError. A
+host that has closed its stdin, or exited, makes the write fail with "File
+closed" (Subprocess.ERROR_END_OF_FILE), the same end of file _startRead and
+_cleanup already treat as an ordinary disconnect. Extensions that message
+their host on tab changes, such as iCloud Passwords, logged it as an error.
+NativeApp is Mozilla's, so no chrome API reaches it.
+
+diff --git a/toolkit/components/extensions/NativeMessaging.sys.mjs b/toolkit/components/extensions/NativeMessaging.sys.mjs
+index 0b7c2f33a8..e953b579cc 100644
+--- a/toolkit/components/extensions/NativeMessaging.sys.mjs
++++ b/toolkit/components/extensions/NativeMessaging.sys.mjs
+@@ -292,7 +292,11 @@ export class NativeApp extends EventEmitter {
+         this._startWrite();
+       })
+       .catch(err => {
+-        Cu.reportError(err.message);
++        // A host that has closed its end ends the port the way end of file
++        // on its stdout does in _startRead: quietly.
++        if (err.errorCode != lazy.Subprocess.ERROR_END_OF_FILE) {
++          Cu.reportError(err.message);
++        }
+         this._cleanup(err);
+       });
+   }

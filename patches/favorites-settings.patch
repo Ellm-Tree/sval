@@ -1,0 +1,112 @@
+Sval: settings and quick actions for Favorites
+
+Finishes Firefox's bookmark-era settings for Sval's Favorites
+(favorites-native spec §15.5): General's import button opens Sval's import
+page and its text names what Sval imports; the address bar's "Shortcuts"
+setting is named for what it does, since Sval's new tab draws no tiles; the
+Appearance link to Firefox Home and Home's copy of the default-browser group
+go. The address bar's "Manage bookmarks" and "Open Library" quick actions are
+removed, because Sval has no Library (decision 0099). Each change is a value
+in a settings config or a Fluent string, which no chrome API reaches.
+
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index eca006f322..3989bc4cde 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -673,8 +673,9 @@ Preferences.addSetting({
+   id: "data-migration",
+   visible: () =>
+     !Services.policies || Services.policies.isAllowed("profileImport"),
++  // Sval: import is Sval's own page (favorites-native spec §15.5).
+   onUserClick() {
+-    window.gMainPane.showMigrationWizardDialog();
++    window.SvalSettings.openImport();
+   },
+ });
+ 
+diff --git a/browser/components/preferences/config/appearance.mjs b/browser/components/preferences/config/appearance.mjs
+index fc9e8e81ec..a624e7a8d4 100644
+--- a/browser/components/preferences/config/appearance.mjs
++++ b/browser/components/preferences/config/appearance.mjs
+@@ -80,6 +80,9 @@ Preferences.addSetting({
+ 
+ Preferences.addSetting({
+   id: "related-settings-home-link",
++  // Sval: Sval's home page has nothing to customize (favorites-native
++  // spec §15.5).
++  visible: () => false,
+   onUserClick: e => {
+     e.preventDefault();
+     window.gotoPref("paneHome");
+diff --git a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+index b99a80ba9c..255d4672fa 100644
+--- a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
++++ b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+@@ -83,16 +83,6 @@ const DEFAULT_ACTIONS = {
+     label: "quickactions-addons",
+     onPick: openAddonsUrl("addons://discover/"),
+   },
+-  bookmarks: {
+-    l10nCommands: ["quickactions-cmd-bookmarks", "quickactions-bookmarks2"],
+-    icon: "chrome://browser/skin/bookmark.svg",
+-    label: "quickactions-bookmarks2",
+-    onPick: (_queryContext, controller) => {
+-      controller.browserWindow.top.PlacesCommandHook.showPlacesOrganizer(
+-        "BookmarksToolbar"
+-      );
+-    },
+-  },
+   clear: {
+     l10nCommands: [
+       "quickactions-cmd-clearrecenthistory2",
+@@ -170,14 +160,6 @@ const DEFAULT_ACTIONS = {
+       openColorPicker(controller.browserWindow);
+     },
+   },
+-  library: {
+-    l10nCommands: ["quickactions-cmd-library"],
+-    icon: "chrome://browser/skin/library.svg",
+-    label: "quickactions-library",
+-    onPick: (_queryContext, controller) => {
+-      controller.browserWindow.top.PlacesCommandHook.showPlacesOrganizer();
+-    },
+-  },
+   logins: {
+     l10nCommands: ["quickactions-cmd-logins"],
+     icon: "chrome://browser/skin/login.svg",
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 98ed2e1e8e..426f43b8f8 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -210,7 +210,7 @@ disable-extension =
+ 
+ preferences-data-migration-group =
+     .label = Import browser data
+-    .description = Bring your bookmarks, passwords, history, extensions, and autofill data from another browser.
++    .description = Bring your tabs, favorites and history from another browser.
+ preferences-data-migration-button =
+     .label = Import data
+     .accesskey = m
+@@ -1127,7 +1127,7 @@ addressbar-locbar-openpage-option =
+     .accesskey = O
+ # Shortcuts refers to the shortcut tiles on the new tab page, previously known as top sites. Translation should be consistent.
+ addressbar-locbar-shortcuts-option =
+-    .label = Shortcuts
++    .label = Most visited sites when the address bar is empty
+     .accesskey = S
+ addressbar-locbar-topsites-option =
+     .label = Top sites
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index c76a0647e1..295ca78ca9 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -315,7 +315,8 @@ const CONFIG_PANES = Object.freeze({
+   home: {
+     l10nId: "home-section",
+     iconSrc: "chrome://browser/skin/home.svg",
+-    groupIds: ["defaultBrowserHome", "startupHome", "homepage", "home"],
++    // Sval: General offers the default browser (favorites-native spec §15.5).
++    groupIds: ["startupHome", "homepage", "home"],
+     module: "chrome://browser/content/preferences/config/home-startup.mjs",
+     replaces: "home",
+   },

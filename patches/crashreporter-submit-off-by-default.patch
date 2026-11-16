@@ -1,0 +1,69 @@
+Sval: the crash reporter's "send" and "include the address" boxes start unticked
+
+After a main-process crash the crash reporter client offers to send the
+report, with a box to send it and a box to include the address of the page
+that was open. Upstream starts both ticked, so accepting the dialog as it
+stands posts the dump and the page's URL. Sval sends a crash report only
+when the user ticks the box, and the page's address only when the user
+ticks that box as well. Each box keeps the user's last choice through the
+client's settings file.
+
+Mozilla's tests in test.rs that expect a report sent by default fail under
+this patch; sval_boxes_start_unticked checks the defaults Sval ships.
+
+diff --git a/toolkit/crashreporter/client/app/src/settings.rs b/toolkit/crashreporter/client/app/src/settings.rs
+index a2cd333781..fea9af29b5 100644
+--- a/toolkit/crashreporter/client/app/src/settings.rs
++++ b/toolkit/crashreporter/client/app/src/settings.rs
+@@ -20,8 +20,11 @@ pub struct Settings {
+ impl Default for Settings {
+     fn default() -> Self {
+         Settings {
+-            submit_report: true,
+-            include_url: true,
++            // Sval: crash reports stay on the device unless the user ticks
++            // the box to send one, and the page's address goes with a report
++            // only when the user ticks that box too.
++            submit_report: false,
++            include_url: false,
+             test_hardware: true,
+         }
+     }
+diff --git a/toolkit/crashreporter/client/app/src/test.rs b/toolkit/crashreporter/client/app/src/test.rs
+index b84f79fa0d..5e389bd4ff 100644
+--- a/toolkit/crashreporter/client/app/src/test.rs
++++ b/toolkit/crashreporter/client/app/src/test.rs
+@@ -724,6 +724,33 @@ fn no_submit() {
+         .pending_unchanged_extra();
+ }
+ 
++// Sval: a first crash offers the report with both boxes unticked, and
++// quitting leaves it on the device.
++#[test]
++fn sval_boxes_start_unticked() {
++    let mut test = GuiTest::new();
++    test.mock.set(
++        net::report::MockReport,
++        Box::new(|_| panic!("a report was sent without the user ticking the box")),
++    );
++    test.run(|interact| {
++        interact.element("send", |_style, c: &model::Checkbox| {
++            assert!(!c.checked.get())
++        });
++        interact.element("include-url", |_style, c: &model::Checkbox| {
++            assert!(!c.checked.get())
++        });
++        interact.element("quit", |_style, b: &model::Button| b.click.fire(&()));
++    });
++    test.assert_files()
++        .saved_settings(Settings {
++            submit_report: false,
++            include_url: false,
++            test_hardware: true,
++        })
++        .pending_unchanged_extra();
++}
++
+ #[test]
+ fn ping_and_event_files() {
+     let mut test = GuiTest::new();

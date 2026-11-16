@@ -1,0 +1,817 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The element picker's overlay (`SvalElementPickerChild`), drawn in the
+ * page's anonymous content. Nothing of Sval's chrome reaches a page, so the
+ * overlay carries its own tokens, as element picker design round 3 gives
+ * them. The marks are drawn on the page's colours and are the same in both
+ * themes; the bar, the card and the toast follow the chrome's theme, which
+ * the parent names in the overlay's `scheme`.
+ *
+ * The type is the system's: Gecko leaves an `@font-face` in this shadow
+ * tree unused, and font visibility (`layout.css.font-visibility`) keeps a
+ * web page from installed fonts outside the system's own.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-scope.css");
+
+.overlay {
+  --remove-edge: #1f6bff;
+  --remove-fill: rgba(31, 107, 255, 0.14);
+  --remove-hatch: rgba(31, 107, 255, 0.24);
+  --remove-label-bg: #1f6bff;
+  --remove-label-ink: #ffffff;
+  --remove-halo-in: #ffffff;
+  --remove-halo-out: #03051a;
+  --snip-edge: #f47a12;
+  --snip-fill: rgba(244, 122, 18, 0.16);
+  --snip-label-ink: #03051a;
+  --snip-icon: #f47a12;
+  --overlay-surface: #0a1140;
+  --overlay-border: rgba(166, 232, 255, 0.34);
+  --overlay-shadow: 0 0 0 1px rgba(3, 5, 26, 0.7), 0 16px 48px rgba(3, 5, 26, 0.6);
+  --kbd-bg: rgba(166, 232, 255, 0.1);
+  --kbd-border: rgba(166, 232, 255, 0.22);
+  --kbd-ink: #d6ddf0;
+  --level-dot: rgba(166, 232, 255, 0.3);
+  --level-ring: transparent;
+  --slider-thumb: #ffffff;
+  --slider-thumb-edge: #1f6bff;
+  --done-icon: #4fcf6a;
+
+  /* The design system's tokens the overlay uses, at the values
+     `sval-header.css` and `sval-protection.css` give them. */
+  --text-strong: #ffffff;
+  --text-body: #b3bcdb;
+  --text-muted: #8f9bc7;
+  --icon: #d6ddf0;
+  --hover: rgba(166, 232, 255, 0.1);
+  --accent: #5cf2ff;
+  --slider-fill: #5cf2ff;
+  --action-primary: #1f6bff;
+  --action-primary-hover: #3a7dff;
+  --action-primary-text: #ffffff;
+  --focus-ring: #5cf2ff;
+  --well: rgba(166, 232, 255, 0.06);
+  --well-border: rgba(166, 232, 255, 0.1);
+  --secondary: rgba(166, 232, 255, 0.1);
+  --secondary-hover: rgba(166, 232, 255, 0.16);
+  --secondary-ink: #ffffff;
+  --secondary-border: transparent;
+  --cluster-border: rgba(166, 232, 255, 0.1);
+  --check-ring: #8f9bc7;
+
+  --dur-instant: 90ms;
+  --dur-fast: 160ms;
+  --ease-orbit: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --font: system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+}
+
+.overlay[scheme="light"] {
+  --snip-icon: #c2410a;
+  --overlay-surface: #ffffff;
+  --overlay-border: rgba(19, 50, 143, 0.28);
+  --overlay-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8), 0 16px 48px rgba(6, 10, 46, 0.28);
+  --kbd-bg: rgba(19, 50, 143, 0.06);
+  --kbd-border: rgba(19, 50, 143, 0.18);
+  --kbd-ink: #1c2a6b;
+  --level-dot: rgba(19, 50, 143, 0.25);
+  --done-icon: #1e8c3a;
+
+  --text-strong: #060a2e;
+  --text-body: #3a4673;
+  --text-muted: #5a6699;
+  --icon: #1c2a6b;
+  --hover: rgba(19, 50, 143, 0.08);
+  --accent: #1f6bff;
+  --slider-fill: #1f6bff;
+  --focus-ring: #1f6bff;
+  --well: rgba(19, 50, 143, 0.04);
+  --well-border: rgba(19, 50, 143, 0.1);
+  --secondary: rgba(19, 50, 143, 0.07);
+  --secondary-hover: rgba(19, 50, 143, 0.12);
+  --secondary-ink: #060a2e;
+  --cluster-border: rgba(19, 50, 143, 0.14);
+  --check-ring: #5a6699;
+}
+
+/* The overlay sets its own system colours, round 3's forced colours column,
+   and takes none from the forced palette. */
+@media (forced-colors) {
+  .overlay,
+  .overlay[scheme="light"] {
+    --remove-edge: Highlight;
+    --remove-fill: transparent;
+    --remove-hatch: transparent;
+    --remove-label-bg: Highlight;
+    --remove-label-ink: HighlightText;
+    --remove-halo-in: Canvas;
+    --remove-halo-out: Canvas;
+    --snip-edge: Highlight;
+    --snip-fill: transparent;
+    --snip-label-ink: HighlightText;
+    --snip-icon: CanvasText;
+    --overlay-surface: Canvas;
+    --overlay-border: CanvasText;
+    --overlay-shadow: none;
+    --kbd-bg: Canvas;
+    --kbd-border: CanvasText;
+    --kbd-ink: CanvasText;
+    --level-dot: transparent;
+    --level-ring: CanvasText;
+    --slider-thumb: Canvas;
+    --slider-thumb-edge: Highlight;
+    --done-icon: CanvasText;
+
+    --text-strong: CanvasText;
+    --text-body: CanvasText;
+    --text-muted: CanvasText;
+    --icon: CanvasText;
+    --hover: Canvas;
+    --accent: CanvasText;
+    --slider-fill: Highlight;
+    --action-primary: Highlight;
+    --action-primary-hover: Highlight;
+    --action-primary-text: HighlightText;
+    --focus-ring: Highlight;
+    --well: Canvas;
+    --well-border: CanvasText;
+    --secondary: ButtonFace;
+    --secondary-hover: ButtonFace;
+    --secondary-ink: ButtonText;
+    --secondary-border: ButtonText;
+    --cluster-border: CanvasText;
+    --check-ring: CanvasText;
+  }
+}
+
+* {
+  forced-color-adjust: none;
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font);
+  color: var(--text-strong);
+  user-select: none;
+  direction: ltr;
+  /* The page's inherited text and visibility stop at the overlay. */
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-transform: none;
+  text-align: start;
+  text-shadow: none;
+  white-space: normal;
+  visibility: visible;
+  cursor: default;
+}
+
+/* While the person picks, the overlay takes every pointer event, frames'
+   included, as Firefox's Screenshots overlay does (`overlay.css`). */
+.overlay[catching] {
+  pointer-events: auto;
+}
+
+/* Out of hit testing while the pointing asks what is under the pointer. */
+.overlay[probing],
+.overlay[probing] * {
+  pointer-events: none !important;
+}
+
+.visually-hidden {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Marks */
+
+.mark {
+  position: fixed;
+  border: 2px solid var(--remove-edge);
+  border-radius: 3px;
+  background: var(--remove-fill);
+  box-shadow:
+    inset 0 0 0 1px var(--remove-halo-in),
+    0 0 0 1px var(--remove-halo-out);
+  pointer-events: none;
+  transition-property: left, top, width, height;
+  transition-duration: var(--dur-instant);
+  transition-timing-function: var(--ease-standard);
+}
+
+.mark.match {
+  border-style: dashed;
+  background: repeating-linear-gradient(135deg, var(--remove-hatch) 0 6px, transparent 6px 12px);
+  transition: none;
+  animation: sval-picker-fade-in var(--dur-fast) var(--ease-standard);
+}
+
+.overlay[mode="snip"] .mark {
+  border-color: var(--snip-edge);
+  background: var(--snip-fill);
+}
+
+@media (forced-colors) {
+  .mark.match {
+    border-style: dotted;
+  }
+
+  .overlay[mode="snip"] .mark {
+    border-style: dashed;
+  }
+}
+
+.label {
+  position: absolute;
+  left: -2px;
+  top: -24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px 6px 6px 0;
+  background: var(--remove-label-bg);
+  color: var(--remove-label-ink);
+  box-shadow: 0 0 0 1px var(--remove-halo-out);
+  white-space: nowrap;
+
+  &[inside] {
+    top: -2px;
+    border-radius: 0 0 6px 0;
+  }
+}
+
+.overlay[mode="snip"] .label {
+  background: var(--snip-edge);
+  color: var(--snip-label-ink);
+}
+
+.label > .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.label-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.label-size {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Icons are Lucide's, drawn as masks in the colour of what wears them. */
+
+.icon {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.icon-scissors {
+  mask-image: url("chrome://browser/content/sval/icons/scissors.svg");
+}
+
+.icon-eraser {
+  mask-image: url("chrome://browser/content/sval/icons/eraser.svg");
+}
+
+.icon-eye-off {
+  mask-image: url("chrome://browser/content/sval/icons/eye-off.svg");
+}
+
+.icon-check {
+  mask-image: url("chrome://browser/content/sval/icons/check.svg");
+}
+
+.icon-undo {
+  mask-image: url("chrome://browser/content/sval/icons/undo-2.svg");
+}
+
+.icon-x {
+  mask-image: url("chrome://browser/content/sval/icons/x.svg");
+}
+
+/* Surfaces */
+
+.surface {
+  position: fixed;
+  pointer-events: auto;
+  background: var(--overlay-surface);
+  border: 1px solid var(--overlay-border);
+  box-shadow: var(--overlay-shadow);
+  color: var(--text-strong);
+}
+
+/* The bar and the toast keep 16px from each side of the page area and wrap
+   their parts onto more lines where one line does not fit. Auto margins
+   between the two insets centre a box narrower than the page. */
+.bar,
+.toast {
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: fit-content;
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  min-height: 48px;
+  padding: 5px 6px 5px 16px;
+  border-radius: 24px;
+  animation: sval-picker-bar-in var(--dur-fast) var(--ease-orbit);
+}
+
+.bar {
+  &[at-top] {
+    top: 16px;
+    bottom: auto;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  > .icon {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+  }
+}
+
+.overlay[mode="snip"] .bar > .icon {
+  color: var(--snip-icon);
+}
+
+.bar-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.hint {
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--kbd-border);
+  background: var(--kbd-bg);
+  color: var(--kbd-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--secondary-border);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.secondary {
+  background: var(--secondary);
+  color: var(--secondary-ink);
+
+  &:hover {
+    background: var(--secondary-hover);
+  }
+}
+
+.primary {
+  padding: 0 20px;
+  border-color: transparent;
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+
+  &:hover {
+    background: var(--action-primary-hover);
+  }
+}
+
+/* Card */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 420px;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 20px;
+  animation: sval-picker-rise var(--dur-fast) var(--ease-orbit);
+}
+
+/* The person moves the card by its header or by any of its bare surface
+   around and between the sections. */
+.card,
+.card-header {
+  cursor: grab;
+}
+
+.card > :not(.card-header) {
+  cursor: default;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card[moving] {
+  cursor: grabbing;
+
+  * {
+    cursor: grabbing;
+  }
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--hover);
+
+  > .icon {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+  }
+}
+
+.card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.depth {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  border-radius: 16px;
+  background: var(--well);
+  border: 1px solid var(--well-border);
+}
+
+.depth-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.depth-name {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.depth-selector {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.slider {
+  position: relative;
+  height: 20px;
+  border-radius: 999px;
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible .thumb {
+    box-shadow:
+      0 0 0 2px var(--overlay-surface),
+      0 0 0 4px var(--focus-ring);
+  }
+}
+
+.track {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: 8px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--level-dot);
+  box-shadow: 0 0 0 1px var(--level-ring);
+}
+
+.fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--slider-fill);
+  transition: width var(--dur-instant) var(--ease-standard);
+}
+
+.stop {
+  position: absolute;
+  top: -2px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: var(--level-dot);
+  box-shadow: 0 0 0 1px var(--level-ring);
+
+  &[reached] {
+    background: var(--slider-fill);
+  }
+}
+
+.thumb {
+  position: absolute;
+  top: -7px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  border: 2px solid var(--slider-thumb-edge);
+  background: var(--slider-thumb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: left var(--dur-instant) var(--ease-standard);
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.count-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+
+  > .icon {
+    color: var(--icon);
+  }
+}
+
+.rule {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.download {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.checkbox {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1.5px var(--check-ring);
+
+  > .icon {
+    display: none;
+    width: 14px;
+    height: 14px;
+    color: var(--action-primary-text);
+  }
+
+  &[aria-checked="true"] {
+    background: var(--action-primary);
+    box-shadow: none;
+
+    > .icon {
+      display: inline-block;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.download-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.download-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cluster-border);
+}
+
+/* The note keeps a readable width beside the buttons, and takes a line of
+   its own above them when the scope makes the primary button long. */
+.footer-note {
+  flex: 1 1 140px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-inline-start: auto;
+  max-width: 100%;
+
+  /* A label wider than the card wraps inside its button. */
+  > .button {
+    max-width: 100%;
+    height: auto;
+    min-height: 36px;
+    padding-block: 7px;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+/* Toast */
+
+.toast {
+  font-size: 14px;
+  font-weight: 600;
+
+  > .icon {
+    color: var(--done-icon);
+  }
+
+  .overlay[mode="snip"] & > .icon {
+    color: var(--snip-icon);
+  }
+
+  &.refused > .icon {
+    color: var(--text-muted);
+  }
+
+  > .undo {
+    padding: 0 14px 0 11px;
+  }
+
+  > .dismiss {
+    width: 36px;
+    padding: 0;
+  }
+}
+
+@keyframes sval-picker-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sval-picker-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes sval-picker-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Reduced motion, as the chrome asks for it. */
+.overlay[reduced-motion],
+.overlay[reduced-motion] * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* The card's title on a host with a choice of scope: "Remove from" and the
+   scope dropdown (`SvalScopeMenu`), whose menu is drawn over the card. */
+.card-title:has(> .sval-scope) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  overflow: visible;
+  white-space: normal;
+}
+
+.card-title-words {
+  padding-inline-end: 4px;
+}
+
+.card-title > .sval-scope > .sval-scope-button {
+  margin-inline-start: 0;
+}
+
+.overlay {
+  --sval-scope-text: var(--text-strong);
+  --sval-scope-muted: var(--text-muted);
+  --sval-scope-hover: var(--hover);
+  --sval-scope-popup: var(--overlay-surface);
+  --sval-scope-border: var(--overlay-border);
+  --sval-scope-shadow: var(--overlay-shadow);
+  --sval-scope-focus: var(--focus-ring);
+  --sval-scope-menu-width: 280px;
+}

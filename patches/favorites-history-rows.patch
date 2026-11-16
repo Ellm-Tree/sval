@@ -1,0 +1,99 @@
+Sval: History rows of a Favorite's page wear the star
+
+Sval's Favorites live in the engine's document, not in Places, so the
+providers that decide a row is a bookmark by looking its page up in
+`moz_bookmarks` find none. `UrlbarProviderPlaces` and
+`UrlbarProviderInputHistory` then offer a favorite's page as a history row,
+and `UrlbarProviderTopSites` as a plain site: no star, the page's own title,
+and a history row can win the muxer's dedupe over `SvalFavorites`' row.
+No API changes another provider's result, so each lookup asks
+`SvalFavoritesProvider.nameOf` in its place.
+
+diff --git a/browser/components/urlbar/UrlbarProviderInputHistory.sys.mjs b/browser/components/urlbar/UrlbarProviderInputHistory.sys.mjs
+index a8aa346b0c..c0084b5c42 100644
+--- a/browser/components/urlbar/UrlbarProviderInputHistory.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderInputHistory.sys.mjs
+@@ -18,6 +18,8 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
++  SvalFavoritesProvider:
++    "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+   UrlbarProviderOpenTabs:
+     "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
+@@ -119,10 +121,9 @@ export class UrlbarProviderInputHistory extends UrlbarProvider {
+       const url = row.getResultByName("url");
+       const openPageCount = row.getResultByName("open_count") || 0;
+       const historyTitle = row.getResultByName("title") || "";
+-      const bookmarked = row.getResultByName("bookmarked");
+-      const bookmarkTitle = bookmarked
+-        ? row.getResultByName("bookmark_title")
+-        : null;
++      const favoriteName = lazy.SvalFavoritesProvider.nameOf(url);
++      const bookmarked = favoriteName !== null;
++      const bookmarkTitle = favoriteName;
+       const tags = row.getResultByName("tags") || "";
+       let lastVisitPRTime = row.getResultByName("last_visit_date");
+       let lastVisit = lastVisitPRTime
+diff --git a/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs b/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs
+index 39ea0d0798..f71a4dfe1a 100644
+--- a/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs
+@@ -105,6 +105,8 @@ const lazy = XPCOMUtils.declareLazy({
+   ProvidersManager:
+     "moz-src:///browser/components/urlbar/UrlbarProvidersManager.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
++  SvalFavoritesProvider:
++    "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
+   UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
+   UrlbarSearchUtils:
+     "moz-src:///browser/components/urlbar/UrlbarSearchUtils.sys.mjs",
+@@ -1183,8 +1185,8 @@ class Search {
+     let url = row.getResultByName("url");
+     let openPageCount = row.getResultByName("open_count") || 0;
+     let historyTitle = row.getResultByName("title") || "";
+-    let bookmarked = row.getResultByName("bookmarked");
+-    let bookmarkTitle = bookmarked ? row.getResultByName("btitle") : null;
++    let bookmarkTitle = lazy.SvalFavoritesProvider.nameOf(url);
++    let bookmarked = bookmarkTitle !== null;
+     let tags = row.getResultByName("tags") || "";
+     let frecency = row.getResultByName("frecency");
+     let userContextId = row.getResultByName("userContextId");
+diff --git a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+index fe55e546a8..a50a65d843 100644
+--- a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+@@ -17,7 +17,8 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+-  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
++  SvalFavoritesProvider:
++    "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
+   TopSites: "resource:///modules/topsites/TopSites.sys.mjs",
+   TOP_SITES_DEFAULT_ROWS: "resource:///modules/topsites/constants.mjs",
+   TOP_SITES_MAX_SITES_PER_ROW: "resource:///modules/topsites/constants.mjs",
+@@ -250,17 +251,11 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+ 
+           /** @type {Values<typeof UrlbarUtils.RESULT_SOURCE>} */
+           let resultSource = UrlbarUtils.RESULT_SOURCE.OTHER_LOCAL;
+-          if (lazy.UrlbarPrefs.get("suggest.bookmark")) {
+-            let bookmark = await lazy.PlacesUtils.bookmarks.fetch({
+-              url: new URL(payload.url),
+-            });
+-            // Check if query has been cancelled.
+-            if (instance != this.queryInstance) {
+-              break;
+-            }
+-            if (bookmark) {
+-              resultSource = UrlbarUtils.RESULT_SOURCE.BOOKMARKS;
+-            }
++          if (
++            lazy.UrlbarPrefs.get("suggest.bookmark") &&
++            lazy.SvalFavoritesProvider.nameOf(payload.url) !== null
++          ) {
++            resultSource = UrlbarUtils.RESULT_SOURCE.BOOKMARKS;
+           }
+ 
+           let result = new lazy.UrlbarResult({

@@ -1,0 +1,46 @@
+Sval: Ctrl+Shift+Plus matches a '+' shortcut where Shift+'+' types another character
+
+On layouts that type '+' without Shift (German, the Nordic layouts), Shift
+with that key types '*' or '?', and Gecko offers a shortcut only the shifted
+character (WidgetKeyboardEvent::GetShortcutKeyCandidates), so a
+<key key="+" modifiers="control,shift"> never runs. Windows already treats
+VK_OEM_PLUS as '+' with Ctrl when the layout types it elsewhere; this adds
+'+' as the shifted alternative when the key types '+' unshifted, on Windows
+and GTK.
+
+diff --git a/widget/gtk/nsGtkKeyUtils.cpp b/widget/gtk/nsGtkKeyUtils.cpp
+index 5c44be04e2..04cebbf87b 100644
+--- a/widget/gtk/nsGtkKeyUtils.cpp
++++ b/widget/gtk/nsGtkKeyUtils.cpp
+@@ -2730,6 +2730,12 @@ void KeymapWrapper::WillDispatchKeyboardEventInternal(
+   if (altCharCodes.mUnshiftedCharCode || altCharCodes.mShiftedCharCode) {
+     aKeyEvent.mAlternativeCharCodes.AppendElement(altCharCodes);
+   }
++  // A key that types '+' unshifted is still '+' with Shift held, as for
++  // VK_OEM_PLUS on Windows, so Ctrl+Shift+Plus works where Shift+'+' is '*'.
++  if (altCharCodes.mUnshiftedCharCode == '+' &&
++      altCharCodes.mShiftedCharCode != '+') {
++    aKeyEvent.mAlternativeCharCodes.AppendElement(AlternativeCharCode(0, '+'));
++  }
+ 
+   bool needLatinKeyCodes = !isLatin;
+   if (!needLatinKeyCodes) {
+diff --git a/widget/windows/KeyboardLayout.cpp b/widget/windows/KeyboardLayout.cpp
+index 2ead65ec38..2e111a3c1e 100644
+--- a/widget/windows/KeyboardLayout.cpp
++++ b/widget/windows/KeyboardLayout.cpp
+@@ -3848,6 +3848,14 @@ void NativeKey::WillDispatchKeyboardEvent(WidgetKeyboardEvent& aKeyboardEvent,
+         charForOEMKeyCode != mShiftedLatinChar) {
+       AlternativeCharCode OEMChars(charForOEMKeyCode, charForOEMKeyCode);
+       altArray.AppendElement(OEMChars);
++    } else if (mVirtualKeyCode == VK_OEM_PLUS &&
++               !mUnshiftedString.IsEmpty() &&
++               charForOEMKeyCode == mUnshiftedString.CharAt(0) &&
++               (mShiftedString.IsEmpty() ||
++                charForOEMKeyCode != mShiftedString.CharAt(0))) {
++      // Where Shift+'+' types another character, Ctrl+Shift+'+' still
++      // matches a '+' shortcut, as native applications treat it.
++      altArray.AppendElement(AlternativeCharCode(0, charForOEMKeyCode));
+     }
+   }
+ }

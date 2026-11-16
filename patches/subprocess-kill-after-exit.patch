@@ -1,0 +1,34 @@
+Sval: Subprocess's kill() handles a process that exited a moment ago
+
+BaseProcess.kill() checks exitCode, then sends the worker a kill without
+handling its reply. The worker forgets a process once it has reaped it, a
+moment before the main thread hears of the exit, so a kill in that window
+rejects with "Invalid process ID" and nothing catches it. A caller cannot:
+its promise is wait()'s. xpcshell fails a test file on that rejection. The
+process has exited either way, and wait() reports it, so the rejection is
+dropped. mozilla-central's kill() is unchanged; drop the patch once Mozilla
+fixes it.
+
+diff --git a/toolkit/modules/subprocess/subprocess_common.sys.mjs b/toolkit/modules/subprocess/subprocess_common.sys.mjs
+index 819fd9159a..ff93d8346c 100644
+--- a/toolkit/modules/subprocess/subprocess_common.sys.mjs
++++ b/toolkit/modules/subprocess/subprocess_common.sys.mjs
+@@ -688,13 +688,16 @@ export class BaseProcess {
+       return this.wait();
+     }
+ 
++    // The worker forgets a process as soon as it has reaped it, before
++    // exitCode is set here, so a kill in that window finds no process. It has
++    // exited, and the returned promise reports that.
+     let force = timeout <= 0;
+-    this.worker.call("kill", [this.id, force]);
++    this.worker.call("kill", [this.id, force]).catch(() => {});
+ 
+     if (!force) {
+       lazy.setTimeout(() => {
+         if (this.exitCode == null) {
+-          this.worker.call("kill", [this.id, true]);
++          this.worker.call("kill", [this.id, true]).catch(() => {});
+         }
+       }, timeout);
+     }

@@ -1,0 +1,36 @@
+Sval: link to Sval's privacy policy from Settings > About
+
+The support group at the end of About is where Settings links to Sval's
+own pages, beside Get help. The policy is at sval.app/privacy/.
+
+diff --git a/browser/components/preferences/config/about-firefox.mjs b/browser/components/preferences/config/about-firefox.mjs
+index c4ebb54a9e..91adfc59a1 100644
+--- a/browser/components/preferences/config/about-firefox.mjs
++++ b/browser/components/preferences/config/about-firefox.mjs
+@@ -472,6 +472,9 @@ Preferences.addSetting({
+   // Sval: the link goes to Mozilla's feedback site (Sval spec §10.9).
+   visible: () => false,
+ });
++Preferences.addSetting({
++  id: "supportPrivacy",
++});
+ 
+ SettingGroupManager.registerGroups({
+   updates: {
+@@ -584,6 +587,16 @@ SettingGroupManager.registerGroups({
+               href: "https://connect.mozilla.org/",
+             },
+           },
++          {
++            // Sval: the privacy policy is outside the support pages that
++            // `supportPage` links build on (`app.support.baseURL`).
++            id: "supportPrivacy",
++            control: "moz-box-link",
++            controlAttrs: {
++              label: "Privacy",
++              href: "https://sval.app/privacy/",
++            },
++          },
+         ],
+       },
+     ],

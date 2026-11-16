@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  Sval's emoji picker, shown in the browser window's modal dialog by
+  `SvalEmojiPicker.sys.mjs`. The grid is built by `emoji-picker.js`: it is
+  every emoji Unicode lists, which is not markup anyone should maintain.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Emoji</title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/emoji-picker.css"
+    />
+    <script src="chrome://browser/content/sval/emoji-picker.js"></script>
+  </head>
+
+  <body>
+    <div class="sval-emoji-picker">
+      <input
+        class="sval-emoji-search"
+        type="search"
+        placeholder="Search emoji"
+        aria-label="Search emoji"
+        autocomplete="off"
+        autofocus="autofocus"
+      />
+      <div
+        class="sval-emoji-tones"
+        role="radiogroup"
+        aria-label="Skin tone"
+      ></div>
+      <!-- `tabindex`: the grid's one Tab stop is its current emoji, and
+           without one Gecko makes the scrolling box a stop of its own. -->
+      <div
+        class="sval-emoji-grid"
+        role="grid"
+        aria-label="Emoji"
+        tabindex="-1"
+      ></div>
+      <div class="sval-emoji-empty" role="status" hidden="hidden">
+        No emoji match.
+      </div>
+      <div class="sval-emoji-actions">
+        <button class="sval-emoji-none" type="button">No emoji</button>
+        <button class="sval-emoji-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </body>
+</html>

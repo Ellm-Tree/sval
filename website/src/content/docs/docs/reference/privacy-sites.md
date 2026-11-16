@@ -1,0 +1,85 @@
+---
+title: Sites
+description: What Settings › Sites shows, from the defaults every site gets to each site's own page.
+---
+
+Settings › Sites holds the defaults every site gets. It also lists every
+site you made a choice for.
+
+## Defaults
+
+Every site gets these settings until you make a choice for it.
+
+- **Run JavaScript on every site.** This switch is on by default. The
+  JavaScript button in the address bar turns JavaScript on or off for one
+  site.
+- **Video and audio.** This offers **Always allow**, **Ask first**, and
+  **Always deny**. It starts on Ask first.
+- **Permissions.** Each permission has a row with the same choices as the
+  site settings menu: **Ask**, **Allow**, or **Block**. Pop-ups offer
+  **Allow** or **Block**, and start blocked. The other permissions start on
+  **Ask**, so a site asks before it uses one.
+- **Pause notifications until Sval restarts** is Firefox's own setting.
+
+## Your sites
+
+Your sites lists each site you made a choice for. That includes choices you
+made with the Privacy and Security button. Your choices sync to your other
+devices. In a private window, the list shows that window's choices. Those
+choices last until you close the window, and they never sync.
+
+- **Find a site.** Typing in this field narrows the list.
+- **Show.** This filters the list. The filters are All sites, All
+  protections off, Fingerprinting protection off, Fingerprinting exceptions,
+  Removed elements, JavaScript allowed, and JavaScript blocked. The other
+  filters are With permissions, With extension switches, and one for each
+  Video and audio choice.
+- **Add site.** This opens the page of a site you type.
+- Each row says how the site differs from the defaults. An address with
+  choices of its own is listed under its site.
+- **Reset.** The site goes back to the defaults. Cookies and sign-ins stay.
+  When the site has removed elements, Sval asks first, because Reset
+  deletes their rules. On an address, Reset removes only that address's
+  choices.
+- Selecting a row opens the site's page.
+
+## A site's page
+
+**Choices for** shows once an address on the site has choices of its own.
+It picks the whole site or one address. **Add an address…** adds
+another address. Until an address has choices, the **More** button next to
+the site's name offers **Add an address…**.
+
+- **Protections.** The choices are **Default**, protections off,
+  fingerprinting protection off, and protections on without Mozilla's fix.
+- **Video and audio.** The choices are **Default**, **Always allow**,
+  **Ask first**, and **Always deny**.
+- **Fingerprinting exceptions.** Selecting this shows a switch for each
+  kind of device detail the site can read. The kinds are Canvas, Installed
+  fonts, All speech voices, All your languages, WebGPU timestamp queries,
+  and Standard audio hardware.
+- **JavaScript.** The choices are **Default**, **Allowed**, and
+  **Blocked**.
+- **Removed elements.** This lists what you removed with Remove from this
+  site.
+- **Extensions.** This lists the extensions you turned off or on for the
+  site.
+
+The cards under For all of example.com cover the whole site, whichever
+address Choices for shows:
+
+- **Permissions.** This lists the site's permissions. They apply in every
+  Workspace.
+- **Cookies and site data.** This lists each place that holds the site's
+  data, with its size and a **Clear** button. **Clear everywhere** asks you
+  to confirm, then signs you out of the site in every Workspace.
+  **Manage data…** and **Manage exceptions…** open Firefox's dialogs for
+  all sites.
+- **Forget this site.** After you confirm, Sval clears everything it keeps
+  for the site, in every Workspace. **Forget…** lists what Sval clears on
+  every device and on this device.
+
+In a private window, a site's page changes only Protections and Video and
+audio. Those changes last until the window closes. Everything else on the
+page is read-only, extension switches included, so a site you visit only
+in private windows is never kept in Your sites.

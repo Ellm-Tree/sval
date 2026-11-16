@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+[package]
+name = "sval-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+# The newest minimum any dependency declares (`aes` 0.9). An older compiler
+# fails here with this number, instead of deep inside a dependency.
+rust-version = "1.89"
+
+[lib]
+# `cdylib` is what `wasm-bindgen`'s exports need to produce a loadable
+# `.wasm`. `rlib` keeps native `cargo test` and non-WASM consumers working.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aes-gcm = "0.11.1"
+# `default-features = false` drops `password-hash`/PHC-string support this
+# crate has no use for. `alloc` gives `hash_password_into` its working memory
+# (64 MiB per Argon2id call). Without it only the caller-supplied-buffer
+# variant exists.
+argon2 = { version = "0.6.0", default-features = false, features = ["alloc"] }
+base64 = "0.23.0"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+fractional_index = "2.0.2"
+hkdf = "0.13.0"
+hmac = "0.13.0"
+http = "1.5.0"
+js-sys = { version = "0.3.106", optional = true }
+# Kagi's Privacy Pass (`privacypass`): the batched VOPRF over ristretto255,
+# at the exact revision Kagi's own `privacypass-lib` pins, because Kagi's
+# issuer is only known to accept what that revision sends. `kat` exposes
+# `issue_token_request_with_params`, the one way to rebuild a request's
+# client state after the issuance round trip: the library's `TokenState` is
+# not serialisable, and the host awaits the network between the two calls.
+privacypass = { git = "https://github.com/raphaelrobert/privacypass", rev = "35207d3bdc2c2d49daa000fd8272ec683ee3cb59", features = ["kat"] }
+# Not used directly. `privacypass` asks for `0.15`, and 0.15.2 does not
+# compile (its derives collide with a glob import), so this holds the version
+# Kagi's `privacypass-lib` pins.
+blind-rsa-signatures = "=0.15.0"
+# The randomness `privacypass` and `voprf` draw on (rand_core 0.6, so
+# getrandom 0.2; see the wasm target block below).
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+thiserror = "2.0.21"
+tls_codec = "0.4.2"
+# No "v4" feature: the library never mints ids itself (see the `Timestamp`
+# doc comment in `types.rs`), so it needs `uuid` only for the `NodeId` type and
+# its `serde` impl.
+#
+# Entropy is the one environmental input this crate reaches for: in
+# `crypto` (keys, pairing codes and salts, and the per-write nonce in
+# `crypto::seal`) and in `privacy_pass`, through `rand_core`. Ids and
+# clocks are injected because they carry policy (which id, whose clock) that
+# decides merge outcomes and must be pinnable in tests. A nonce carries no such
+# policy, and a caller who supplied one could reuse it, which breaks AES-GCM.
+# On wasm that entropy comes from the host's `crypto.getRandomValues`; see the
+# wasm target block below.
+uuid = { version = "1.26.1", features = ["serde", "v5"] }
+wasm-bindgen = { version = "0.2.130", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# wasm32-unknown-unknown has no OS entropy source of its own, so each
+# getrandom major in the graph must be told to use the browser's
+# `crypto.getRandomValues`. Getrandom 0.3 is reached only through the
+# dev-dependency `tempfile`, but feature unification across one `Cargo.lock`
+# means it is declared for every wasm build.
+getrandom = { version = "0.3", features = ["wasm_js"] }
+# `rand_core` 0.6, which `privacypass` and `voprf` use, draws on a third
+# getrandom major (0.2), whose browser gate is called "js".
+getrandom-02 = { version = "0.2.17", package = "getrandom", features = ["js"] }
+# aes-gcm's `Key::generate`/`Nonce::generate` (crypto.rs) reach getrandom 0.4
+# through crypto-common, and `uuid` uses it too. Its "wasm_js" gate is
+# separate from 0.3's: without this line `cargo build --target
+# wasm32-unknown-unknown` fails at getrandom 0.4's `compile_error!`.
+getrandom-04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+[dev-dependencies]
+proptest = "1.11.0"
+uuid = { version = "1.26.1", features = ["v4", "serde"] }
+# `store`'s atomic-write test uses it directly, so it is declared here at the
+# version proptest already resolves.
+tempfile = "3.27.0"
+# `privacypass`'s issuer key store is an `async_trait`; the round-trip tests
+# implement one in memory.
+async-trait = "0.1.92"
+
+[profile.release]
+# Sized for the WASM artifact the desktop fork ships: this crate has no CLI or
+# server consumer that wants a fast release build. `strip` drops debug info.
+# The rest is the standard smallest-binary recipe, because bundle size is a
+# fact decision 0008 (no CRDT) rests on.
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+# Test builds hash at release speed. Every pairing-file seal and open runs a
+# 64 MiB Argon2id derivation (src/pairing.rs), which an unoptimised build makes
+# the slowest part of `cargo test`. Only these crates are optimised, so the
+# rest of a test build still compiles fast and keeps its debug info.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
+[features]
+# Off by default: native builds and `cargo test` must not carry the WASM
+# surface (src/wasm.rs) or its dependencies. The desktop fork's build enables
+# this explicitly for its wasm32-unknown-unknown target.
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:console_error_panic_hook"]

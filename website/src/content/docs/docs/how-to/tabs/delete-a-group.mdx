@@ -1,0 +1,47 @@
+---
+title: Delete a group
+description: Remove a group from its Workspace, and keep its tabs or close them with it.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+Deleting a group removes the group from its Workspace. Sval asks whether the
+group's tabs move out of the group or go with it.
+
+Your release shipped, and the group of Codeberg issues you kept for it can
+go.
+
+<Screenshot name="docs-group-menu" frame="rounded" maxWidth={260} alt="The menu for the Kitchen reno group, with Delete group… at the bottom" />
+
+## Steps
+
+1. In the Workspace, right-click the group, then choose **Delete group…**.
+2. Choose what happens to the tabs and groups inside it.
+   - **Move out of group.** Sval keeps the tabs and groups that were
+     inside. They take the group's place, in the same order.
+   - **Delete all.** Sval closes every tab inside the group, and deletes
+     the groups inside it too.
+
+The group leaves the Workspace. A message at the bottom of the Workspace
+panel offers **Undo** for 8 seconds.
+
+## Details
+
+- Sval deletes an empty group without asking.
+- With the group's row focused, press Delete or Backspace to get the same
+  question.
+- In the dialog, **Cancel** has the focus, so pressing Enter or Escape keeps
+  the group.
+- Until the Undo message goes, your other devices still have the group.
+  Once the message goes, Sval deletes the group everywhere.
+
+## If something goes wrong
+
+You deleted the wrong group. Select **Undo** in the message at the bottom of
+the Workspace panel before the message goes. See
+[Undo closing tabs or deleting a group](/docs/how-to/tabs/undo-closing-tabs-or-deleting-a-group/).
+
+## Related pages
+
+- [Group tabs](/docs/how-to/tabs/group-tabs/)
+- [Tabs in a Workspace](/docs/reference/tabs/)

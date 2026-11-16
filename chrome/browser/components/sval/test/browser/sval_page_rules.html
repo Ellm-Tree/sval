@@ -1,0 +1,102 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Page rules test page</title>
+    <script>
+      // The test scriptlet sets svalScriptletRan; this records whether it had run
+      // before the page's first script.
+      window.scriptletBeforePage = window.svalScriptletRan === true;
+
+      // Fills frames the ways a page's script fills an ad slot, none of them
+      // giving the frame an address of its own. Resolves with the frames' ids,
+      // in the order they were added.
+      window.addFrames = async function (framed) {
+        const add = (id, setup) => {
+          const frame = document.createElement("iframe");
+          frame.id = id;
+          if (setup) {
+            setup(frame);
+          }
+          const loaded = new Promise(resolve =>
+            frame.addEventListener("load", resolve, { once: true })
+          );
+          document.body.append(frame);
+          return { frame, loaded };
+        };
+        const written = add("written").frame.contentDocument;
+        written.open();
+        written.write(framed);
+        written.close();
+        add("filled").frame.contentDocument.body.innerHTML = framed;
+        const blob = new Blob([framed], { type: "text/html" });
+        await Promise.all([
+          add("srcdoc", f => (f.srcdoc = framed)).loaded,
+          add("sandboxed", f => {
+            f.sandbox = "";
+            f.srcdoc = framed;
+          }).loaded,
+          add("blob", f => (f.src = URL.createObjectURL(blob))).loaded,
+          add(
+            "data",
+            f => (f.src = "data:text/html," + encodeURIComponent(framed))
+          ).loaded,
+        ]);
+        return [...document.querySelectorAll("iframe")].map(f => f.id);
+      };
+
+      // Makes a frame with no address, and a popup, and reads in the same task
+      // the global the test scriptlet sets, as a page takes a pristine `fetch`
+      // from a window before a scriptlet could patch it. The frame is then
+      // given a listed element, which shows when its own rules have arrived.
+      window.blankWindowsAtBirth = function (framed) {
+        const frame = document.createElement("iframe");
+        document.body.append(frame);
+        const frameRan = frame.contentWindow.svalScriptletRan === true;
+        frame.contentDocument.body.innerHTML = framed;
+        const popup = window.open("");
+        return { frame: frameRan, popup: popup.svalScriptletRan === true };
+      };
+
+      // Opens a popup and reads, in the same task, the global the test
+      // scriptlet sets, then closes it.
+      window.popupAtBirth = function () {
+        const popup = window.open("");
+        const ran = popup.svalScriptletRan === true;
+        popup.close();
+        return ran;
+      };
+
+      // Opens a popup and writes `framed` into it, with a srcdoc frame of the
+      // same, whose load comes after the popup's own rules were decided.
+      window.writePopup = function (framed) {
+        const popup = window.open("");
+        popup.document.open();
+        popup.document.write(
+          framed +
+            '<iframe id="inner" srcdoc="' +
+            framed.replaceAll('"', "&quot;") +
+            '"></iframe>'
+        );
+        popup.document.close();
+      };
+
+      // Opens `framed` as a page of its own at a blob: address.
+      window.openBlobPopup = function (framed) {
+        const blob = new Blob([framed], { type: "text/html" });
+        window.open(URL.createObjectURL(blob));
+      };
+    </script>
+  </head>
+  <body>
+    <div id="specific" class="sval-test-specific">Specific</div>
+    <div id="plain">Plain</div>
+    <div id="styled" class="sval-test-styled">Styled</div>
+    <div id="beacon" class="sval-test-beacon">Beacon</div>
+    <div id="sponsored"><span class="sval-test-label">Sponsored</span></div>
+    <div id="organic"><span class="sval-test-label">Organic</span></div>
+  </body>
+</html>

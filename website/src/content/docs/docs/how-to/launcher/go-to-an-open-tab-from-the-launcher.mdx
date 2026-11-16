@@ -1,0 +1,63 @@
+---
+title: Go to an open tab from the Launcher
+description: Find a tab by typing part of its name or address, in this Workspace or any other.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+As you type, the Launcher lists your open tabs from every Workspace. Pick
+a tab to go to it. If the tab is in another Workspace, Sval takes you to
+that Workspace too.
+
+You remember reading a Codeberg issue this morning, but not which Workspace
+it's in, and you have 40 tabs open.
+
+<Screenshot name="features-launcher" alt="The Launcher searching lisbon, with open tabs from other Workspaces, a Favorite, and history" />
+
+## Steps
+
+1. Press <kbd>⌘L</kbd> (<kbd>Ctrl+L</kbd> on Windows and Linux).
+2. Type a few letters of the tab's title or address.
+3. Under Open tabs, select the tab.
+
+The window shows the tab. If the tab is in another Workspace, the window
+switches to that Workspace first.
+
+## Details
+
+- With nothing typed, the Launcher lists the tabs you used most recently,
+  under Recent tabs.
+- When a tab is in another Workspace, its row shows that Workspace's emoji
+  and name, in the Workspace's color. The selected row reads Switch to and
+  the Workspace's name.
+<Until v="0.1.0-rc.10">
+
+- A strong match for what you typed becomes the first row, so pressing
+  Enter goes straight to it.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- The first row is always a search for what you typed, or the site when
+  you type an address. When what you typed starts a word in a tab's title,
+  or starts the tab's domain, Open tabs comes right after the first row.
+  Press <kbd>↓</kbd>, then Enter, to go to the tab.
+
+</Since>
+
+- <kbd>Shift+Enter</kbd> and <kbd>⇧⌘Enter</kbd> (<kbd>Ctrl+Shift+Enter</kbd>) also switch to the tab. They
+  never open a second copy of the tab.
+- <kbd>⌥Enter</kbd> (<kbd>Alt+Enter</kbd>) puts the tab next to the one you're on, in a Split.
+  If the tab is in another Workspace, Sval moves it into this one first.
+  Sval asks before it moves a tab into or out of an isolated Workspace.
+- Typing % and a space lists every open tab.
+- Open tabs lists up to 4 tabs while you type. To change the number, see
+  [Change what the Launcher lists](/docs/how-to/launcher/change-what-the-launcher-lists/).
+
+## Related pages
+
+- [Run a command from the Launcher](/docs/how-to/launcher/run-a-command-from-the-launcher/)
+- [Open a page in a new tab, window, or Split](/docs/how-to/launcher/open-a-page-in-a-new-tab-window-or-split/)
+- [Address bar and Launcher](/docs/reference/launcher/)

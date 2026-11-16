@@ -1,0 +1,184 @@
+Sval: the content classifier bumps its update generation where it picks the engines to rebuild
+
+Backport of Mozilla's Bug 2078831 (mozilla-central da99a869e530, Firefox
+161), unchanged. ESR 153 does not carry it.
+ContentClassifierService::ProcessListChanges read mEngines under the lock to
+choose the features to rebuild, and UpdateFeatures bumped mUpdateGeneration
+and the features' versions under a later lock. An older build closure could
+run Populate and Prune with its stale snapshot in between and prune an
+engine that the newer call had not scheduled for a rebuild, since it still
+existed then. ProcessListChanges bumps both under the lock it reads mEngines
+with and hands them to UpdateFeatures, which asserts its features are active
+in the snapshot where it used to drop the inactive ones.
+Drop this patch when the upstream pin reaches Firefox 161.
+
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.cpp b/toolkit/components/content-classifier/ContentClassifierService.cpp
+index 82fa4b992b..0c05d224b3 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.cpp
++++ b/toolkit/components/content-classifier/ContentClassifierService.cpp
+@@ -1452,6 +1452,8 @@ void ContentClassifierService::ProcessListChanges(
+   nsTHashSet<nsCString> activeNames = ActiveFeatureNames(snapshot);
+ 
+   nsTArray<const ContentClassifierFeature*> toUpdate;
++  nsTArray<uint64_t> featureVersions;
++  uint64_t generation;
+   {
+     MutexAutoLock lock(mLock);
+     for (const auto& feature : GetFeatures()) {
+@@ -1471,27 +1473,44 @@ void ContentClassifierService::ProcessListChanges(
+         toUpdate.AppendElement(&feature);
+       }
+     }
++
++    // Bump the global generation and (where applicable) per-feature
++    // versions under the lock. The build closure compares each captured
++    // version against the current one before installing, so a later
++    // ProcessListChanges call for the same feature can't be overwritten by
++    // an earlier in-flight rebuild. The global generation gates
++    // Populate / Prune / Notify so an older closure's stale snapshot
++    // can't clobber the active-engine lists set up by a newer call.
++    generation = ++mUpdateGeneration;
++    featureVersions.SetCapacity(toUpdate.Length());
++    for (const auto* feature : toUpdate) {
++      uint64_t& v = mFeatureVersions.LookupOrInsert(feature->mName);
++      featureVersions.AppendElement(++v);
++    }
+   }
+ 
+-  UpdateFeatures(toUpdate, std::move(snapshot));
++  UpdateFeatures(std::move(toUpdate), std::move(featureVersions), generation,
++                 std::move(snapshot));
+ }
+ 
+ void ContentClassifierService::UpdateFeatures(
+-    const nsTArray<const ContentClassifierFeature*>& aFeatures,
++    nsTArray<const ContentClassifierFeature*> aFeatures,
++    nsTArray<uint64_t> aFeatureVersions, uint64_t aGeneration,
+     EnginesPrefsSnapshot aPreferenceSnapshot) {
+   MOZ_ASSERT(NS_IsMainThread());
++  MOZ_ASSERT(aFeatures.Length() == aFeatureVersions.Length());
+ 
+-  // Drop inactive features before issuing fetches: their engines will be
+-  // removed by PruneInactiveEngines below, so fetching list bytes just to
+-  // throw the engine away would be wasted work.
++#ifdef DEBUG
++  // Ensure the features to update are all active in the snapshot.
+   nsTHashSet<nsCString> activeNames = ActiveFeatureNames(aPreferenceSnapshot);
+-  nsTArray<const ContentClassifierFeature*> features;
++  for (const auto* feature : aFeatures) {
++    MOZ_ASSERT(activeNames.Contains(nsCString(feature->mName)),
++               "UpdateFeatures expects only features active in the snapshot");
++  }
++#endif
++
+   nsTArray<RefPtr<EngineRulesPromise>> fetches;
+   for (const auto* feature : aFeatures) {
+-    if (!activeNames.Contains(nsCString(feature->mName))) {
+-      continue;
+-    }
+-    features.AppendElement(feature);
+     fetches.AppendElement(FetchEngineDataForFeature(*feature));
+   }
+ 
+@@ -1504,28 +1523,9 @@ void ContentClassifierService::UpdateFeatures(
+     return;
+   }
+ 
+-  // Bump the global generation and (where applicable) per-feature
+-  // versions under the lock. The build closure compares each captured
+-  // version against the current one before installing, so a later
+-  // UpdateFeatures call for the same feature can't be overwritten by
+-  // an earlier in-flight rebuild. The global generation gates
+-  // Populate / Prune / Notify so an older closure's stale snapshot
+-  // can't clobber the active-engine lists set up by a newer call.
+-  nsTArray<uint64_t> featureVersions;
+-  featureVersions.SetCapacity(features.Length());
+-  uint64_t generation;
+-  {
+-    MutexAutoLock lock(mLock);
+-    generation = ++mUpdateGeneration;
+-    for (const auto* feature : features) {
+-      uint64_t& v = mFeatureVersions.LookupOrInsert(feature->mName);
+-      featureVersions.AppendElement(++v);
+-    }
+-  }
+-
+   RefPtr<ContentClassifierService> self = this;
+ 
+-  if (features.IsEmpty()) {
++  if (aFeatures.IsEmpty()) {
+     // No fetches needed; still refresh the active lists and prune in
+     // case the snapshot changed. Run the lock-holding work on the
+     // build thread so it never blocks the main thread. The Notify is
+@@ -1533,7 +1533,8 @@ void ContentClassifierService::UpdateFeatures(
+     // call — otherwise a newer call's closure will fire it.
+     buildThread->Dispatch(NS_NewRunnableFunction(
+         "ContentClassifierService::UpdateFeaturesNoFetch",
+-        [self, snapshot = std::move(aPreferenceSnapshot), generation]() {
++        [self, snapshot = std::move(aPreferenceSnapshot),
++         generation = aGeneration]() {
+           {
+             MutexAutoLock lock(self->mLock);
+             if (self->mInitPhase != InitPhase::InitSucceeded) {
+@@ -1555,10 +1556,10 @@ void ContentClassifierService::UpdateFeatures(
+   EngineRulesPromise::AllSettled(GetMainThreadSerialEventTarget(), fetches)
+       ->Then(
+           GetMainThreadSerialEventTarget(), __func__,
+-          [self, features = std::move(features),
+-           featureVersions = std::move(featureVersions),
++          [self, features = std::move(aFeatures),
++           featureVersions = std::move(aFeatureVersions),
+            snapshot = std::move(aPreferenceSnapshot),
+-           buildThread = std::move(buildThread), generation](
++           buildThread = std::move(buildThread), generation = aGeneration](
+               EngineRulesPromise::AllSettledPromiseType::ResolveOrRejectValue&&
+                   aValue) mutable {
+             MOZ_ASSERT(NS_IsMainThread());
+diff --git a/toolkit/components/content-classifier/ContentClassifierService.h b/toolkit/components/content-classifier/ContentClassifierService.h
+index ac19915b4f..7eb71a44a9 100644
+--- a/toolkit/components/content-classifier/ContentClassifierService.h
++++ b/toolkit/components/content-classifier/ContentClassifierService.h
+@@ -306,10 +306,12 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   // This rebuilds the given features,
+   // according to that preference snapshot. This also means that features that
+   // aren't referenced by the current pref snapshot are going to have their
+-  // engine destroyed.
+-  void UpdateFeatures(
+-      const nsTArray<const ContentClassifierFeature*>& aFeatures,
+-      EnginesPrefsSnapshot aPreferenceSnapshot);
++  // engine destroyed. aFeatureVersions holds the version of each entry in
++  // aFeatures and aGeneration the update generation, both already bumped
++  // by ProcessListChanges.
++  void UpdateFeatures(nsTArray<const ContentClassifierFeature*> aFeatures,
++                      nsTArray<uint64_t> aFeatureVersions, uint64_t aGeneration,
++                      EnginesPrefsSnapshot aPreferenceSnapshot);
+ 
+   // Put the given engine into the authoritative map. Doesn't update references
+   // to this feature's engine elsewhere. See
+@@ -364,7 +366,7 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+       MOZ_GUARDED_BY(mLock);
+ 
+   // Per-feature monotonic version counter, bumped each time
+-  // UpdateFeatures decides to rebuild that feature's engine. The
++  // ProcessListChanges decides to rebuild that feature's engine. The
+   // version is captured into the build closure at dispatch time;
+   // when the closure later runs it skips installation for any feature
+   // whose recorded version no longer matches the current one (i.e. a
+@@ -372,11 +374,12 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
+   // can't write each other's stale results.
+   nsTHashMap<nsCStringHashKey, uint64_t> mFeatureVersions MOZ_GUARDED_BY(mLock);
+ 
+-  // Global update generation. Bumped under mLock on every UpdateFeatures
+-  // call (including the empty-features path). Each closure captures
+-  // its generation at dispatch time and only runs Populate / Prune /
+-  // Notify when its generation equals mUpdateGeneration — i.e., no
+-  // newer UpdateFeatures has been issued. This prevents an older
++  // Global update generation. Bumped under mLock on every
++  // ProcessListChanges call (including the empty-features path), under the
++  // same lock that decides which features to rebuild. Each
++  // closure captures its generation at dispatch time and only runs
++  // Populate / Prune / Notify when its generation equals mUpdateGeneration
++  // — i.e., no newer ProcessListChanges has been issued. This prevents an older
+   // closure with a stale snapshot from clobbering active-engine lists
+   // populated by a newer call's snapshot.
+   uint64_t mUpdateGeneration MOZ_GUARDED_BY(mLock) = 0;

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  The user's card (`SvalCard`), shown by `SvalCardArt.openCardDialog` in the
+  window's dialog box, in Sval's dialog frame. `card-dialog.js` draws the
+  card and fills in its dates.
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Your Sval Card</title>
+    <link rel="stylesheet" href="chrome://global/skin/global.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <link rel="stylesheet" href="chrome://browser/content/sval/card/card.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/card/card-dialog.css"
+    />
+    <script src="chrome://browser/content/sval/sval-dialog-frame.js"></script>
+    <script src="chrome://browser/content/sval/card/card-dialog.js"></script>
+  </head>
+
+  <body>
+    <div
+      class="sval-dialog sval-card-dialog"
+      role="dialog"
+      aria-labelledby="sval-card-dialog-title"
+    >
+      <div class="sval-card-dialog-holder"></div>
+      <div class="sval-card-dialog-about">
+        <h1 class="sval-dialog-title" id="sval-card-dialog-title"></h1>
+        <dl class="sval-card-dialog-facts">
+          <div data-fact="arc" hidden="hidden">
+            <dt>On Arc since</dt>
+            <dd></dd>
+          </div>
+          <div data-fact="sval">
+            <dt>On Sval since</dt>
+            <dd></dd>
+          </div>
+          <div data-fact="next">
+            <dt>Next star</dt>
+            <dd></dd>
+          </div>
+        </dl>
+        <!-- Each count's row is hidden until it is read, and stays hidden
+             when it cannot be. -->
+        <dl class="sval-card-dialog-stats">
+          <div data-stat="workspaces" hidden="hidden">
+            <dt>Workspaces</dt>
+            <dd></dd>
+          </div>
+          <div data-stat="tabs" hidden="hidden">
+            <dt>Open tabs</dt>
+            <dd></dd>
+          </div>
+          <div data-stat="favorites" hidden="hidden">
+            <dt>Favorites</dt>
+            <dd></dd>
+          </div>
+          <div data-stat="pins" hidden="hidden">
+            <dt>Pins</dt>
+            <dd></dd>
+          </div>
+          <div data-stat="devices" hidden="hidden">
+            <dt>Devices that have synced</dt>
+            <dd></dd>
+          </div>
+          <div data-stat="rules" hidden="hidden">
+            <dt>Rules in My filters</dt>
+            <dd></dd>
+          </div>
+          <div data-stat="blocked" hidden="hidden">
+            <dt>Trackers and ads blocked on this computer</dt>
+            <dd></dd>
+          </div>
+        </dl>
+        <p class="sval-card-dialog-status" role="status" aria-live="polite"></p>
+        <div class="sval-dialog-actions">
+          <button class="sval-dialog-btn sval-card-dialog-save" type="button">
+            Save image
+          </button>
+          <button
+            class="sval-dialog-btn sval-card-dialog-done primary"
+            type="button"
+            autofocus="autofocus"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

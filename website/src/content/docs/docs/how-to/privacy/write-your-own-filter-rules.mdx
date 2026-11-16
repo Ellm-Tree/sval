@@ -1,0 +1,48 @@
+---
+title: Write your own filter rules
+description: Add blocking and hiding rules of your own in My filters.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+My filters holds your own rules, one per line, in uBlock Origin's syntax.
+Sval uses your rules along with the lists.
+
+You want to block one ad server that no list catches, or hide a banner on a
+site you use every day.
+
+## Steps
+
+1. Open Settings › Privacy and protection.
+2. Under Ad and tracker blocking, open **Advanced**.
+3. In **My filters**, type one rule per line.
+4. Select **Save**.
+
+**Saved.** shows under the box.
+
+<Screenshot name="docs-my-filters" alt="Settings › Privacy and protection › Advanced, with three rules in My filters and the Save button" />
+
+## Details
+
+- A rule like `||ads.example.com^` blocks an address. A rule like
+  `example.com##.banner` hides part of a page.
+- Parts of pages you remove with Remove from this site are saved here too.
+  See [Remove or snip part of a page](/docs/how-to/privacy/remove-or-snip-part-of-a-page/).
+- Your rules sync to your other devices.
+- On **No Blocking**, your rules have no effect, apart from the parts of
+  pages you removed.
+- **Let My filters use trusted scriptlets.** Your rules can then run
+  trusted scriptlets. Sval asks first. The trust covers your rules as you
+  saved them on this device. When your rules change on another device, you
+  trust them again on this one.
+
+## If something goes wrong
+
+- **These filters are too long to save.** Remove some rules, then select
+  **Save** again.
+- **Filters can only hold plain text.** Remove anything that isn't text.
+
+## Related pages
+
+- [Add a filter list](/docs/how-to/privacy/add-a-filter-list/)
+- [Privacy and protection settings](/docs/reference/privacy/)

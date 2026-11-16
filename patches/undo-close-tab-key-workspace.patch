@@ -1,0 +1,66 @@
+Sval: undo close tab's key reopens the shown workspace's own closed tab
+
+SessionWindowUI.restoreLastClosedTabOrWindowOrSession takes the last close
+from SessionStore's global _lastClosedActions stack and reopens that tab
+from whichever window it closed in, and browser.sessionstore.
+closedTabsFromAllWindows does not reach it. A tab reopens in the jar it
+closed in and loads there, so a tab closed in an isolated workspace would
+load with that identity in another. A window that shows a workspace hands
+the key to Sval, which reopens the last tab that workspace closed in this
+window, straight into its jar (SvalTabs' reopenClosedTab). A Peek is in no
+saved session, so SessionStore keeps no closed Peek: in a Peek the key asks
+SvalPeek first, which reopens the Peek closed last. A private
+window is the only window as far as it knows: its key reopens only its
+own closed tabs, never a normal window or a tab closed in one.
+SessionStore offers no hook into the choice, so the patch asks Sval.
+
+diff --git a/browser/components/sessionstore/SessionWindowUI.sys.mjs b/browser/components/sessionstore/SessionWindowUI.sys.mjs
+index 1751a4c..b257096 100644
+--- a/browser/components/sessionstore/SessionWindowUI.sys.mjs
++++ b/browser/components/sessionstore/SessionWindowUI.sys.mjs
+@@ -8,6 +8,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
++  SvalPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
+   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
+ });
+ 
+@@ -23,11 +24,28 @@ export var SessionWindowUI = {
+    * If none of those were the last actions, restore the last session if possible.
+    */
+   restoreLastClosedTabOrWindowOrSession(window) {
++    // A Sval Peek reopens the Peek closed last.
++    if (lazy.SvalPeek.reopenClosed(window)) {
++      return;
++    }
++    // A private window reopens only its own closed tabs: the last closed
++    // action can be a normal window, or a tab closed in one.
++    if (lazy.PrivateBrowsingUtils.isWindowPrivate(window)) {
++      if (!window.SvalPanel?.reopenClosedTab()) {
++        this.undoCloseTab(window);
++      }
++      return;
++    }
+     let lastActionTaken = lazy.SessionStore.popLastClosedAction();
+     if (lastActionTaken) {
+       switch (lastActionTaken.type) {
+         case lazy.SessionStore.LAST_ACTION_CLOSED_TAB:
+           {
++            // A window that shows a Sval workspace reopens that workspace's
++            // own last closed tab.
++            if (window.SvalPanel?.reopenClosedTab()) {
++              break;
++            }
+             const sourceWindow = lazy.SessionStore.getWindowForTabClosedId(
+               lastActionTaken.closedId
+             );
+@@ -43,7 +61,7 @@ export var SessionWindowUI = {
+       let closedTabCount = lazy.SessionStore.getLastClosedTabCount(window);
+       if (lazy.SessionStore.canRestoreLastSession) {
+         lazy.SessionStore.restoreLastSession();
+-      } else if (closedTabCount) {
++      } else if (closedTabCount && !window.SvalPanel?.reopenClosedTab()) {
+         // we need to support users who have automatic session restore enabled
+         this.undoCloseTab(window);
+       }

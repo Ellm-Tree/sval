@@ -1,0 +1,63 @@
+Sval: the default-browser question at launch asks in Sval's dialog
+
+With Settings › General's check at launch on and Sval not the default,
+BrowserGlue asks through DefaultBrowserCheck.prompt, which opens Firefox's
+common dialog in Firefox's look. Every question Sval's chrome asks goes
+through SvalDialog.sys.mjs, so this one does too, with Firefox's strings
+and its answers handled as before. The prompt builds its dialog inside
+the function BrowserGlue calls, so no added file can reach it.
+
+diff --git a/browser/components/DefaultBrowserCheck.sys.mjs b/browser/components/DefaultBrowserCheck.sys.mjs
+index 602ccdeb17..c0e02c2cf4 100644
+--- a/browser/components/DefaultBrowserCheck.sys.mjs
++++ b/browser/components/DefaultBrowserCheck.sys.mjs
+@@ -7,8 +7,8 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ let lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+-  CommonDialog: "resource://gre/modules/CommonDialog.sys.mjs",
+   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
++  openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
+ });
+ 
+ export var DefaultBrowserCheck = {
+@@ -63,28 +63,17 @@ export var DefaultBrowserCheck = {
+       ])
+     ).map(({ value }) => value);
+ 
+-    let ps = Services.prompt;
+-    let buttonFlags =
+-      ps.BUTTON_TITLE_IS_STRING * ps.BUTTON_POS_0 +
+-      ps.BUTTON_TITLE_IS_STRING * ps.BUTTON_POS_1 +
+-      ps.BUTTON_POS_0_DEFAULT;
+-    let rv = await ps.asyncConfirmEx(
+-      win.browsingContext,
+-      ps.MODAL_TYPE_INTERNAL_WINDOW,
+-      promptTitle,
+-      promptMessage,
+-      buttonFlags,
+-      yesButton,
+-      notNowButton,
+-      null,
+-      askLabel,
+-      false, // checkbox state
+-      {
+-        headerIconCSSValue: lazy.CommonDialog.DEFAULT_APP_ICON_CSS,
+-      }
+-    );
+-    let buttonNumClicked = rv.get("buttonNumClicked");
+-    let checkboxState = rv.get("checked");
++    // Sval: asked in Sval's dialog, as every question Sval's chrome asks is.
++    let answer = await lazy.openSvalDialog(win, {
++      icon: "sval",
++      title: promptTitle,
++      body: promptMessage,
++      checkbox: { label: askLabel },
++      primary: yesButton,
++      secondary: notNowButton,
++    });
++    let buttonNumClicked = answer.ok ? 0 : 1;
++    let checkboxState = !!answer.checked;
+     if (buttonNumClicked == 0) {
+       // We must explicitly await pinning to the taskbar before
+       // trying to set as default. If we fall back to setting

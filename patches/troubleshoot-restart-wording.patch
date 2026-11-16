@@ -1,0 +1,38 @@
+Sval: the Troubleshoot Mode question names what it turns off
+
+Firefox's restart question says themes are turned off, and Sval has no
+themes of its own to turn off. It names the extensions and custom settings
+that are, and that they stay off until the next restart.
+
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 70457a35af..d73aed792f 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -462,8 +462,9 @@ BrowserGlue.prototype = {
+       "troubleshootModeRestartPromptTitle",
+       [productName]
+     );
+-    let promptMessage = strings.GetStringFromName(
+-      "troubleshootModeRestartPromptMessage"
++    let promptMessage = strings.formatStringFromName(
++      "troubleshootModeRestartPromptMessage",
++      [productName]
+     );
+     let restartText = strings.GetStringFromName(
+       "troubleshootModeRestartButton"
+diff --git a/browser/locales/en-US/chrome/browser/browser.properties b/browser/locales/en-US/chrome/browser/browser.properties
+index b54a6ab17c..19db9193f0 100644
+--- a/browser/locales/en-US/chrome/browser/browser.properties
++++ b/browser/locales/en-US/chrome/browser/browser.properties
+@@ -241,9 +241,9 @@ safebrowsing.reportedHarmfulSite=Reported Harmful Site!
+ addKeywordTitleAutoFill=Search %S
+ 
+ # troubleshootModeRestart
+-# LOCALIZATION NOTE (troubleshootModeRestartPromptTitle): %S is the name of the product (e.g., Firefox)
++# LOCALIZATION NOTE (troubleshootModeRestartPromptTitle, troubleshootModeRestartPromptMessage): %S is the name of the product (e.g., Firefox)
+ troubleshootModeRestartPromptTitle=Restart %S in Troubleshoot Mode?
+-troubleshootModeRestartPromptMessage=Your extensions, themes, and custom settings will be temporarily disabled.
++troubleshootModeRestartPromptMessage=%S will restart with your extensions and custom settings turned off until you restart again.
+ troubleshootModeRestartButton=Restart
+ 
+ # Process hang reporter
