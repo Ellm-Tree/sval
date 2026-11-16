@@ -54,3 +54,6 @@ Workspaces, and Sval syncs them through a folder you choose, with no account.
   updates once a day and asks you to restart when one is ready.
 - **[Troubleshooting](/docs/how-to/troubleshooting/send-feedback/).** Send
   feedback or a crash report, or find Sval's log file.
+- **[Source code](/docs/explanation/source-code/).** Sval's source code is
+  public on GitLab. You can report a problem there, or send a change as a
+  merge request.
