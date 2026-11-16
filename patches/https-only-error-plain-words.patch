@@ -1,0 +1,50 @@
+Sval: the HTTPS-Only Mode warning page says what is at risk in plain words
+
+The page named the mode, "HTTPS", and "mixed content blocking", and
+never said what an unsecured site exposes or when to stay away. It says
+who could read what you send, when opening the site is fine, when it is
+not, and how long the choice to open it lasts.
+
+diff --git a/toolkit/locales/en-US/toolkit/about/aboutHttpsOnlyError.ftl b/toolkit/locales/en-US/toolkit/about/aboutHttpsOnlyError.ftl
+index 85242568ba..c832fc8b8b 100644
+--- a/toolkit/locales/en-US/toolkit/about/aboutHttpsOnlyError.ftl
++++ b/toolkit/locales/en-US/toolkit/about/aboutHttpsOnlyError.ftl
+@@ -2,26 +2,26 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-about-httpsonly-title-alert = HTTPS-Only Mode Alert
+-about-httpsonly-title-site-not-available = Secure Site Not Available
++about-httpsonly-title-alert = Not secure
++about-httpsonly-title-site-not-available = This site isn’t secure
+ 
+ # Variables:
+ #   $websiteUrl (String) - Url of the website that failed to load. Example: www.example.com
+-about-httpsonly-explanation-unavailable2 = You’ve enabled HTTPS-Only Mode for enhanced security, and a HTTPS version of <em>{ $websiteUrl }</em> is not available.
+-about-httpsonly-explanation-question = What could be causing this?
+-about-httpsonly-explanation-nosupport = Most likely, the website simply does not support HTTPS.
+-about-httpsonly-explanation-risk = It’s also possible that an attacker is involved. If you decide to visit the website, you should not enter any sensitive information like passwords, emails, or credit card details.
+-about-httpsonly-explanation-continue = If you continue, HTTPS-Only Mode will be turned off temporarily for this site.
+-about-httpsonly-explanation-iframe = Due to mixed content blocking, it is not possible to manually allow this frame to load.
++about-httpsonly-explanation-unavailable2 = <em>{ $websiteUrl }</em> doesn’t use a secure connection. Anyone on your network, like your internet provider or other people on public Wi-Fi, could see what you do on it and change what you see.
++about-httpsonly-explanation-question = Should you open it?
++about-httpsonly-explanation-nosupport = It’s usually fine to look at. Many older sites, and devices like routers and printers, don’t use secure connections. But don’t send anything private through it, like passwords, card numbers, or messages.
++about-httpsonly-explanation-risk = Someone on your network can quietly reroute you to an unsecured copy of a site so they can read what you send. If this page shows up for a site you use every day, like your bank or email, do not open it.
++about-httpsonly-explanation-continue = If you open the site, { -brand-short-name } will not warn you about it again until you quit { -brand-short-name }.
++about-httpsonly-explanation-iframe = This part of the page comes from a site that isn’t secure, so { -brand-short-name } cannot show it inside a secure page.
+ 
+-about-httpsonly-button-continue-to-site = Continue to HTTP Site
++about-httpsonly-button-continue-to-site = I understand the risks - open the site
+ about-httpsonly-button-go-back = Go Back
+-about-httpsonly-link-learn-more = Learn More…
++about-httpsonly-link-learn-more = Learn more…
+ 
+ ## Suggestion Box that only shows up if a secure connection to www can be established
+ ## Variables:
+ ##   $websiteUrl (String) - Url of the website that can be securely loaded with these alternatives. Example: example.com
+ 
+-about-httpsonly-suggestion-box-header = Possible Alternative
+-about-httpsonly-suggestion-box-www-text = There is a secure version of <em>www.{ $websiteUrl }</em>. You can visit this page instead of <em>{ $websiteUrl }</em>.
++about-httpsonly-suggestion-box-header = A secure version is available
++about-httpsonly-suggestion-box-www-text = <em>www.{ $websiteUrl }</em> has a secure version of this site.
+ about-httpsonly-suggestion-box-www-button = Go to www.{ $websiteUrl }
