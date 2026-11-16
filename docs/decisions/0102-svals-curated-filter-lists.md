@@ -34,10 +34,12 @@ Findings that shape the choice:
   list, Brave's unbreak list, and the regional list for the browser's
   language, chosen the way uBlock Origin maps languages to lists.
 - **Strict:** Balanced, plus HaGeZi Pro mini, curben's Phishing list, uBlock
-  Annoyances (others) and Fanboy Social. It also turns on Firefox's query
-  stripping ([0104](0104-sval-supports-only-the-filter-syntax-adblock-rust-applies-and-strict-strips-query-parameters-with-firefoxs-own-list.md)). Strict also
-  carries the cookie banner lists (EasyList Cookie, uBlock Cookie Notices),
-  which page rules apply by hiding elements.
+  Annoyances (others) and Fanboy Social. Strict also carries the cookie
+  banner lists (EasyList Cookie, uBlock Cookie Notices), which page rules
+  apply by hiding elements.
+- **Every level but Off** strips the tracking parameters its lists name,
+  through Firefox's query stripping
+  ([0104](0104-sval-supports-only-the-filter-syntax-adblock-rust-applies-and-strips-the-query-parameters-its-lists-name.md)).
 - **Custom** offers, in addition: the other AdGuard lists (Base without
   EasyList, Tracking Protection, Annoyances, Cookie), HaGeZi's other tiers,
   OISD, Fanboy Annoyance and the other regional lists. A user may add any list

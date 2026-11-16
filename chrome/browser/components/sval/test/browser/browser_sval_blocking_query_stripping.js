@@ -3,13 +3,24 @@
 
 "use strict";
 
-// Strict turns on Firefox's query stripping in normal and private windows, and
-// so does Custom made from Strict; leaving them puts it back, and a value the
-// user set wins at every level, Firefox's Strict category among them
-// (decision 0104).
+/* import-globals-from head.js */
+/* import-globals-from sval_blocking_helpers.js */
+
+// Every level but Off turns on Firefox's query stripping in normal and private
+// windows, with the parameters the level's lists strip on every site; Off puts
+// it back, and a value the user set wins at every level, Firefox's Strict
+// category among them (decision 0104).
+
+Services.scriptloader.loadSubScript(
+  getRootDirectory(gTestPath) + "sval_blocking_helpers.js",
+  this
+);
 
 const { SvalBlocking } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
+);
+const { SvalBlockingLists } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalBlockingLists.sys.mjs"
 );
 
 const NORMAL = "privacy.query_stripping.enabled";
@@ -84,12 +95,14 @@ add_setup(async function () {
 
 /**
  * @param {Window} win
- * @returns {Promise<string>} The query a page loaded with {@link QUERY} kept.
+ * @param {string} [page] The page to load.
+ * @param {string} [query] The query to load it with.
+ * @returns {Promise<string>} The query the page kept.
  */
-async function queryAfterLoad(win) {
+async function queryAfterLoad(win, page = PAGE2, query = QUERY) {
   return within(
     BrowserTestUtils.withNewTab(
-      { gBrowser: win.gBrowser, url: `${PAGE2}?${QUERY}` },
+      { gBrowser: win.gBrowser, url: `${page}?${query}` },
       async browser => browser.currentURI.query
     ),
     10_000,
@@ -125,15 +138,15 @@ async function checkStripping(normal, inPrivate, what) {
   );
 }
 
-add_task(async function strict_strips_and_leaving_it_puts_it_back() {
+add_task(async function every_level_but_off_strips() {
   await checkStripping(false, false, "Off");
 
-  SvalBlocking.setLevel("strict");
-  await checkStripping(true, true, "Strict");
+  SvalBlocking.setLevel("balanced");
+  await checkStripping(true, true, "Balanced");
   ok(
     !Services.prefs.prefHasUserValue(NORMAL) &&
       !Services.prefs.prefHasUserValue(PRIVATE),
-    "Strict sets no value of the user's"
+    "the level sets no value of the user's"
   );
   Assert.equal(
     Services.prefs.getStringPref(CATEGORY),
@@ -141,34 +154,93 @@ add_task(async function strict_strips_and_leaving_it_puts_it_back() {
     "Firefox's tracking-protection category stays as it was"
   );
 
-  SvalBlocking.setLevel("balanced");
-  await checkStripping(false, false, "Balanced after Strict");
+  SvalBlocking.setLevel("strict");
+  await checkStripping(true, true, "Strict");
 
-  SvalBlocking.customize();
-  SvalBlocking.flush();
-  await checkStripping(false, false, "Custom from Balanced");
   SvalBlocking.setLevel("off");
+  await checkStripping(false, false, "Off after Strict");
 });
 
-add_task(async function custom_from_strict_keeps_stripping() {
-  SvalBlocking.setLevel("strict");
-  SvalBlocking.setListEnabled("sval-fanboy-social", false);
+add_task(async function custom_strips_from_any_level() {
+  SvalBlocking.setLevel("balanced");
+  SvalBlocking.setListEnabled("sval-easylist", false);
   SvalBlocking.flush();
   Assert.equal(SvalBlocking.level, "custom", "editing a list makes Custom");
-  await checkStripping(true, true, "Custom from Strict");
+  await checkStripping(true, true, "Custom from Balanced");
 
   Services.prefs.setBoolPref(NORMAL, false);
-  await checkStripping(false, true, "the user's choice in Custom from Strict");
+  await checkStripping(false, true, "the user's choice in Custom");
   Services.prefs.clearUserPref(NORMAL);
-
-  SvalBlocking.setLevel("balanced");
-  await checkStripping(false, false, "Balanced after Custom from Strict");
 
   SvalBlocking.setLevel("off");
   SvalBlocking.setListEnabled("sval-easylist", true);
   SvalBlocking.flush();
-  await checkStripping(false, false, "Custom from Off");
+  await checkStripping(true, true, "Custom from Off");
   SvalBlocking.setLevel("off");
+  backToStandard();
+});
+
+add_task(async function the_levels_lists_add_their_parameters() {
+  await serveLists({
+    "sval-ublock-privacy": [
+      "! Title: Test privacy",
+      "$removeparam=listparam",
+      "||example.com^$removeparam=sitescoped",
+      "@@||example.org^$removeparam",
+    ].join("\n"),
+  });
+  // Mozilla's list and the file's own parameter stay; the lists' parameters
+  // are the strip list's default, which a value of the user's would hide.
+  await SpecialPowers.pushPrefEnv({
+    clear: [["privacy.query_stripping.strip_list"]],
+  });
+  const STRIP_LIST = "privacy.query_stripping.strip_list";
+  const ALLOW_LIST = "privacy.query_stripping.allow_list";
+  const QUERY_WITH_LIST = "listparam=1&sitescoped=2&paramToKeep=456";
+  const defaults = Services.prefs.getDefaultBranch("");
+
+  SvalBlocking.setLevel("balanced");
+  const followed = TestUtils.waitForPrefChange(
+    STRIP_LIST,
+    value => value == "listparam"
+  );
+  ok(
+    await SvalBlockingLists.update("sval-ublock-privacy"),
+    "the list downloads"
+  );
+  await within(followed, 10_000, "the strip list following the download");
+  Assert.equal(defaults.getStringPref(ALLOW_LIST), "example.org");
+  Assert.equal(
+    await queryAfterLoad(normalWindow, PAGE2, QUERY_WITH_LIST),
+    "sitescoped=2&paramToKeep=456",
+    "a load strips the list's parameter and keeps the one scoped to a site"
+  );
+  Assert.equal(
+    await queryAfterLoad(privateWindow, PAGE2, QUERY_WITH_LIST),
+    "sitescoped=2&paramToKeep=456",
+    "and so does a private window's"
+  );
+  Assert.equal(
+    await queryAfterLoad(normalWindow, ORG_PAGE, QUERY_WITH_LIST),
+    QUERY_WITH_LIST,
+    "the site the list excepts keeps every parameter"
+  );
+
+  const emptied = TestUtils.waitForPrefChange(STRIP_LIST, value => !value);
+  SvalBlocking.setLevel("off");
+  await within(emptied, 10_000, "Off emptying the strip list");
+  Assert.equal(defaults.getStringPref(ALLOW_LIST), "");
+
+  // The profile keeps the copy, and the level the file found would read its
+  // rules back into the strip list, so a copy with none replaces it.
+  await serveLists();
+  ok(
+    await SvalBlockingLists.update("sval-ublock-privacy"),
+    "a copy with no rules replaces the test's"
+  );
+  await SpecialPowers.popPrefEnv();
+  await SpecialPowers.popPrefEnv();
+  await SpecialPowers.popPrefEnv();
   backToStandard();
 });
 
@@ -193,7 +265,7 @@ add_task(async function firefoxs_strict_category_outlasts_svals_strict() {
   Services.prefs.setStringPref(CATEGORY, "strict");
   await checkStripping(true, true, "both Stricts");
 
-  SvalBlocking.setLevel("balanced");
+  SvalBlocking.setLevel("off");
   Assert.equal(
     Services.prefs.getStringPref(CATEGORY),
     "strict",

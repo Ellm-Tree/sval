@@ -3,6 +3,9 @@ title: What Sval keeps private
 description: What Sval keeps on your computer, every service it contacts and why, and what it does against tracking and fingerprinting.
 ---
 
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
 Sval sends no usage data. It contacts only the services named on this
 page. A test launches a fresh install of Sval and records every connection
 Sval makes. The test fails on any host that isn't on Sval's list.
@@ -97,11 +100,25 @@ operating system.
 
 ## Against tracking
 
+<Until v="0.1.0-rc.10">
+
 Sval blocks ads and trackers with open-source filter lists. A new install
 uses Balanced Blocking, which blocks what uBlock Origin blocks out of the
 box. Strict Blocking also blocks trackers in links, social widgets, and
 scam sites. On top of that, Strict Blocking strips tracking parameters from
 the addresses you open.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+Sval blocks ads and trackers with open-source filter lists. A new install
+uses Balanced Blocking, which blocks what uBlock Origin blocks out of the
+box. Strict Blocking also blocks trackers in links, social widgets, and
+scam sites. At every level except No Blocking, Sval strips tracking
+parameters from the addresses you open. It uses Mozilla's list and the
+parameters the filter lists strip on every site.
+
+</Since>
 
 Some sites load a tracker from an address on their own domain that points
 to the tracker's servers. When blocking is on, Sval looks up where each of

@@ -39,12 +39,12 @@
  * the owners' exceptions (`SvalTrackerOwners`). Sval runs none of Mozilla's
  * own features, whose lists are Disconnect's.
  *
- * Strict also turns on Firefox's query stripping, as Firefox's own Strict
- * category does (`qps` and `qpsPBM` in
- * `browser.contentblocking.features.strict`), in place of the lists' query
- * parameter rules, which the classifier cannot apply (decision 0104). Query
- * stripping is not a list, so editing Strict's lists keeps it: Custom strips
- * when it started from Strict, `CUSTOM_FROM_PREF`.
+ * Every level but Off turns on Firefox's query stripping in place of the
+ * lists' query parameter rules, which the classifier cannot apply (decision
+ * 0104). Beside Mozilla's list, it strips the parameters the level's lists
+ * strip on every site and leaves alone the sites they except
+ * (`SvalBlockingLists.removeparams`), so a list's download brings its
+ * changes to stripping.
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
@@ -117,9 +117,17 @@ const QUERY_STRIPPING_PREFS = Object.freeze([
   "privacy.query_stripping.enabled.pbmode",
 ]);
 
+/**
+ * The parameters stripped beside Mozilla's list and the sites left alone,
+ * whose defaults the lists set, so a value the user chose wins over them.
+ * `URLQueryStrippingListService` follows both as they change.
+ */
+const STRIP_LIST_PREF = "privacy.query_stripping.strip_list";
+const STRIP_ALLOW_LIST_PREF = "privacy.query_stripping.allow_list";
+
 const CB_CATEGORY_PREF = "browser.contentblocking.category";
 
-/** Each query stripping pref's default as shipped, before Strict moved it. */
+/** Each query stripping pref's default as shipped, before the level moved it. */
 const shippedDefaults = new Map();
 
 const CURATED_LEVELS = Object.freeze(["off", "balanced", "strict"]);
@@ -287,8 +295,24 @@ export const SvalBlocking = {
     Cc["@mozilla.org/url-classifier/channel-classifier-service;1"]
       .getService(Ci.nsIChannelClassifierService)
       .addListener(blockedChannelListener);
+    Services.obs.addObserver(this._listUpdated, BLOCKING_TOPIC);
     this.apply();
     SvalBlockingLists.start();
+  },
+
+  /**
+   * Follows a download of one of the level's lists into the strip list.
+   * `SvalBlockingLists.update` names the list it tried; a change of level or
+   * lists announces none.
+   *
+   * @param {nsISupports} subject
+   * @param {string} topic
+   * @param {?string} id
+   */
+  _listUpdated(subject, topic, id) {
+    if (id && SvalBlocking.activeListIds().includes(id)) {
+      SvalBlocking._applyStripList();
+    }
   },
 
   observe(subject, topic, data) {
@@ -748,11 +772,7 @@ export const SvalBlocking = {
       Services.prefs.setStringPref(PROTECTION_ENGINES_PBM_PREF, blocking);
       Services.prefs.setStringPref(ANNOTATION_ENGINES_PREF, tagging);
       Services.prefs.setStringPref(ANNOTATION_ENGINES_PBM_PREF, tagging);
-      const level = this.level;
-      const strips =
-        level == "strict" ||
-        (level == "custom" &&
-          Services.prefs.getStringPref(CUSTOM_FROM_PREF, "") == "strict");
+      const strips = this.level != "off";
       const category = Services.prefs.getStringPref(CB_CATEGORY_PREF, "");
       const defaults = Services.prefs.getDefaultBranch("");
       for (const pref of QUERY_STRIPPING_PREFS) {
@@ -762,15 +782,37 @@ export const SvalBlocking = {
         defaults.setBoolPref(pref, strips || shippedDefaults.get(pref));
       }
       // Firefox's Strict category writes query stripping on, which matches
-      // Sval's Strict default and so stores no user value. Lowering the
-      // default then reads to `ContentBlockingPrefs.matchCBCategory` as a
-      // change to Custom; choosing the category again re-applies it.
+      // Sval's default and so stores no user value. Lowering the default
+      // then reads to `ContentBlockingPrefs.matchCBCategory` as a change to
+      // Custom; choosing the category again re-applies it.
       if (Services.prefs.getStringPref(CB_CATEGORY_PREF, "") != category) {
         Services.prefs.setStringPref(CB_CATEGORY_PREF, category);
       }
     } finally {
       applying = false;
     }
+    this._applyStripList();
+  },
+
+  _stripListWrites: 0,
+
+  /**
+   * Writes the level's lists' parameters and excepted sites as the strip
+   * list's defaults. The lists' state is read asynchronously, so only the
+   * latest call writes.
+   *
+   * @returns {Promise<void>}
+   */
+  async _applyStripList() {
+    const write = ++this._stripListWrites;
+    const ids = this.level == "off" ? [] : this.activeListIds();
+    const { params, sites } = await SvalBlockingLists.removeparams(ids);
+    if (write != this._stripListWrites) {
+      return;
+    }
+    const defaults = Services.prefs.getDefaultBranch("");
+    defaults.setStringPref(STRIP_LIST_PREF, params.join(" "));
+    defaults.setStringPref(STRIP_ALLOW_LIST_PREF, sites.join(","));
   },
 
   /**

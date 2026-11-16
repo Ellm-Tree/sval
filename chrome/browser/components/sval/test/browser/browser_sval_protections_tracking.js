@@ -223,11 +223,11 @@ add_task(async function the_rest_is_in_privacy_and_protection() {
 
   Assert.equal(Services.prefs.getStringPref(CATEGORY), "standard");
   const stripping = ui.byId("sval-query-stripping");
-  Assert.ok(!stripping.checked, "query stripping is off by default");
+  Assert.ok(stripping.checked, "the blocking level strips by default");
   stripping.click();
-  Assert.ok(Services.prefs.getBoolPref("privacy.query_stripping.enabled"));
+  Assert.ok(!Services.prefs.getBoolPref("privacy.query_stripping.enabled"));
   Assert.ok(
-    Services.prefs.getBoolPref("privacy.query_stripping.enabled.pbmode"),
+    !Services.prefs.getBoolPref("privacy.query_stripping.enabled.pbmode"),
     "in every window"
   );
   Assert.equal(
@@ -241,7 +241,7 @@ add_task(async function the_rest_is_in_privacy_and_protection() {
       !Services.prefs.prefHasUserValue(
         "privacy.query_stripping.enabled.pbmode"
       ),
-    "off is Firefox's default again"
+    "on is the level's default again"
   );
   Assert.equal(
     Services.prefs.getStringPref(CATEGORY),

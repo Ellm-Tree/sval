@@ -459,6 +459,11 @@ control of what you see and what is sent to websites.
   Sval's feedback server only once you choose to use them.
 - **Ad and tracker blocker.** Choose No Blocking, Balanced Blocking, Strict
   Blocking, or Custom to make your own lists. Out of the box, Sval uses open-source lists.
+- **Tracking parameters are stripped.** At every level except No Blocking,
+  Sval strips tracking parameters from the addresses you open. Sval takes
+  the parameters from Mozilla's list and from the parameters the blocking
+  lists in use strip on every site, so the parameters change when those
+  lists update.
 - **Hidden trackers are blocked too.** Some sites load a tracker from an
   address on their own domain, with a DNS record called a CNAME that points
   the address to the tracker's servers. Hiding a tracker this way is called

@@ -333,6 +333,89 @@ export function normalizeDomain(text) {
   return host;
 }
 
+/** A rule that strips one named parameter on every site and in every request. */
+const REMOVEPARAM_RULE = /^\*?\$removeparam=([\w.%[\]-]+)$/;
+/** An exception to `$removeparam`: its pattern, then its options. */
+const REMOVEPARAM_EXCEPTION = /^@@(?:\|\|)?([^$]*)\$(.*removeparam.*)$/;
+
+/**
+ * @param {string} host A host from a rule, which may hold a wildcard.
+ * @returns {?string} Its site, as Firefox's query stripping allow list keys
+ *   sites (`URLQueryStringStripper::CheckAllowList`), or null.
+ */
+function ruleSite(host) {
+  const domain = normalizeDomain(host);
+  if (!domain) {
+    return null;
+  }
+  try {
+    return Services.eTLD.getBaseDomainFromHost(domain);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The part of a list's `$removeparam` rules Firefox's query stripping can
+ * apply (decision 0104). Its strip list is parameter names stripped on every
+ * site, so only a rule naming one parameter with no other option counts; a
+ * rule scoped to sites, request types or a pattern is left out.
+ *
+ * An exception lifts stripping for every parameter on the sites it names, its
+ * pattern's host and its `to=` and `domain=` sites, because the allow list
+ * holds sites alone. That lifts more than the exception did, never less. An
+ * exception with no pattern keeps the parameter it names everywhere.
+ *
+ * @param {string} text A list, its `!#if` blocks resolved.
+ * @returns {{params: string[], sites: string[], kept: string[]}} Parameters
+ *   to strip, sites to leave alone and parameters never to strip, each
+ *   lower-cased as Gecko compares them.
+ */
+export function removeparamRules(text) {
+  const params = new Set();
+  const sites = new Set();
+  const kept = new Set();
+  for (const [raw] of text.matchAll(/^.*removeparam.*$/gm)) {
+    const line = raw.trim();
+    const rule = REMOVEPARAM_RULE.exec(line);
+    if (rule) {
+      params.add(rule[1].toLowerCase());
+      continue;
+    }
+    const exception = REMOVEPARAM_EXCEPTION.exec(line);
+    if (!exception) {
+      continue;
+    }
+    const [, pattern, optionText] = exception;
+    const options = optionText.split(",");
+    if (pattern == "" || pattern == "*") {
+      const named = options
+        .find(option => option.startsWith("removeparam="))
+        ?.slice("removeparam=".length);
+      if (named && /^[\w.%[\]-]+$/.test(named)) {
+        kept.add(named.toLowerCase());
+      }
+      continue;
+    }
+    const hosts = [
+      pattern.replace(/^\|?(?:[a-z]+:\/\/)?/, "").split(/[/^:?|]/)[0],
+    ];
+    for (const option of options) {
+      const [name, value] = option.split("=");
+      if ((name == "to" || name == "domain") && value) {
+        hosts.push(...value.split("|").filter(h => !h.startsWith("~")));
+      }
+    }
+    for (const candidate of hosts) {
+      const site = ruleSite(candidate);
+      if (site) {
+        sites.add(site);
+      }
+    }
+  }
+  return { params: [...params], sites: [...sites], kept: [...kept] };
+}
+
 /**
  * Whether an address may be fetched as a list the user added: https, no
  * credentials, and a public host name. IP literals, single-label names and the
@@ -933,6 +1016,47 @@ class ListLoader {
     );
   }
 
+  /**
+   * What the lists' `$removeparam` rules give Firefox's query stripping
+   * (`removeparamRules`), together. Each list's part is read when the list
+   * downloads and kept in `lists.json`; a list whose entry lacks it is read
+   * from its copy here, once.
+   *
+   * @param {string[]} ids
+   * @returns {Promise<{params: string[], sites: string[]}>} Both sorted.
+   */
+  async removeparams(ids) {
+    await this.#loadMeta();
+    const params = new Set();
+    const sites = new Set();
+    const kept = new Set();
+    for (const id of ids) {
+      const entry = this.#meta[id];
+      if (!entry?.fetchedAt) {
+        continue;
+      }
+      if (!entry.removeparam) {
+        try {
+          entry.removeparam = removeparamRules(
+            await IOUtils.readUTF8(this.#path(id))
+          );
+        } catch (err) {
+          SvalLog.warn(
+            `a blocking list's copy could not be read: ${id}: ${SvalLog.errorName(err)}`
+          );
+          continue;
+        }
+      }
+      entry.removeparam.params.forEach(param => params.add(param));
+      entry.removeparam.sites.forEach(site => sites.add(site));
+      entry.removeparam.kept.forEach(param => kept.add(param));
+    }
+    return {
+      params: [...params].filter(param => !kept.has(param)).sort(),
+      sites: [...sites].sort(),
+    };
+  }
+
   /** The list ids the engine uses. */
   enabledIds() {
     return listIds(ENGINE_LISTS_PREF);
@@ -1286,6 +1410,7 @@ class ListLoader {
         entry.title = headerLine(text, ["Title"]);
         entry.license = headerLine(text, ["License", "Licence"]);
         entry.listLifetime = listLifetime(text);
+        entry.removeparam = removeparamRules(text);
         entry.fetchedAt = now;
         entry.failedAt = null;
         entry.expiresAt = now + this.#lifetime(response, text, entry);

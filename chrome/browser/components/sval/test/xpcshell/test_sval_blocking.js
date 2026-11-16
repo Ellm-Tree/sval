@@ -20,6 +20,7 @@ const {
   FIRST_PARTIES_ID,
   listUrlPref,
   preprocessList,
+  removeparamRules,
   TRACKER_LISTS_PREF,
   TRACKER_TAG_LISTS_PREF,
   USER_LIST_BRANCH,
@@ -810,5 +811,109 @@ add_task(async function the_schedule_keeps_what_the_tag_and_trackers_run() {
   } finally {
     SvalBlockingLists.stop();
     Services.prefs.clearUserPref("browser.sval.adblock.updates.enabled");
+  }
+});
+
+add_task(function removeparam_rules_keep_what_query_stripping_applies() {
+  const rules = removeparamRules(
+    [
+      "! A comment about $removeparam=commented",
+      "$removeparam=gclid",
+      "*$removeparam=MC_EID",
+      "$removeparam=__cft__[0]",
+      "$removeparam=igshid,domain=instagram.com",
+      "||example.com^$removeparam=scoped",
+      "$removeparam=/^utm_/",
+      "||reddit.com^$doc,removeparam=/web_only=/",
+      "@@||web.archive.org/*/http$removeparam",
+      "@@||archive.*/http$removeparam,doc,to=archive.ph|~archive.is",
+      "@@|https://shop.example.co.uk/path$removeparam=cls",
+      "@@*$removeparam=gclid",
+    ].join("\n")
+  );
+  Assert.deepEqual(
+    rules.params.sort(),
+    ["__cft__[0]", "gclid", "mc_eid"],
+    "a rule naming one parameter with no option, lower-cased"
+  );
+  Assert.deepEqual(
+    rules.sites.sort(),
+    ["archive.org", "archive.ph", "example.co.uk"],
+    "an exception's sites, by their registrable domain"
+  );
+  Assert.deepEqual(rules.kept, ["gclid"], "an exception with no pattern");
+});
+
+add_task(async function the_lists_parameters_merge_from_their_downloads() {
+  await reset();
+  publish("sval-ublock-privacy", [
+    {
+      body: "$removeparam=fbclid\n$removeparam=gclid\n@@||a.example^$removeparam\n",
+    },
+  ]);
+  publish("sval-easyprivacy", [
+    { body: "$removeparam=yclid\n@@$removeparam=gclid\n" },
+  ]);
+  await SvalBlockingLists.update("sval-ublock-privacy");
+  await SvalBlockingLists.update("sval-easyprivacy");
+  Assert.deepEqual(
+    await SvalBlockingLists.removeparams([
+      "sval-ublock-privacy",
+      "sval-easyprivacy",
+      "sval-easylist",
+    ]),
+    { params: ["fbclid", "yclid"], sites: ["a.example"] },
+    "every list's parameters, less one any list keeps, and a list never downloaded adds none"
+  );
+
+  // A later launch reads the rules from the state file, and a state file
+  // without them from the list's copy.
+  const statePath = PathUtils.join(SvalBlockingLists.dir, "lists.json");
+  const state = await IOUtils.readJSON(statePath);
+  Assert.deepEqual(state["sval-ublock-privacy"].removeparam.params, [
+    "fbclid",
+    "gclid",
+  ]);
+  delete state["sval-ublock-privacy"].removeparam;
+  await IOUtils.writeJSON(statePath, state);
+  SvalBlockingLists.resetForTesting();
+  Assert.deepEqual(
+    await SvalBlockingLists.removeparams(["sval-ublock-privacy"]),
+    { params: ["fbclid", "gclid"], sites: ["a.example"] },
+    "read from the copy"
+  );
+});
+
+add_task(async function the_level_sets_the_strip_lists_defaults() {
+  await reset();
+  publish("sval-ublock-privacy", [
+    { body: "$removeparam=fbclid\n@@||a.example^$removeparam\n" },
+  ]);
+  await SvalBlockingLists.update("sval-ublock-privacy");
+  const defaults = Services.prefs.getDefaultBranch("");
+  try {
+    SvalBlocking.setLevel("balanced");
+    await SvalBlocking._applyStripList();
+    Assert.equal(
+      defaults.getStringPref("privacy.query_stripping.strip_list"),
+      "fbclid"
+    );
+    Assert.equal(
+      defaults.getStringPref("privacy.query_stripping.allow_list"),
+      "a.example"
+    );
+
+    SvalBlocking.setLevel("off");
+    await SvalBlocking._applyStripList();
+    Assert.equal(
+      defaults.getStringPref("privacy.query_stripping.strip_list"),
+      ""
+    );
+    Assert.equal(
+      defaults.getStringPref("privacy.query_stripping.allow_list"),
+      ""
+    );
+  } finally {
+    SvalBlocking.setLevel("off");
   }
 });

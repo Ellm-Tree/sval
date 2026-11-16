@@ -4,6 +4,8 @@ description: Pick the level of ad and tracker blocking, from No Blocking to Stri
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 Sval blocks ads and trackers with filter lists. The level you choose decides
 which lists Sval uses.
@@ -25,10 +27,22 @@ effect the next time a page loads.
 
 - **Balanced Blocking.** A new install starts on this level. It blocks ads
   and trackers with lists that rarely break sites.
+
+<Until v="0.1.0-rc.10">
+
 - **Strict Blocking.** This level adds lists that block more, including
   trackers in links, social widgets, and scam sites. Some sites might break.
   Strict Blocking also strips tracking parameters from the addresses you
   open.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Strict Blocking.** This level adds lists that block more, including
+  trackers in links, social widgets, and scam sites. Some sites might break.
+
+</Since>
+
 - **No Blocking.** Sval blocks nothing from the lists.
 - **Custom.** You start from the lists of the level you were on. Then you
   can switch lists on or off, and add your own. See
@@ -36,6 +50,22 @@ effect the next time a page loads.
 - On any level other than Custom, the card shows the lists in use and who
   publishes each one. Sval downloads each list from its publisher and keeps
   the list updated.
+- Sval checks a list for an update when the list's publisher says the copy
+  is out of date. Sval waits at least 12 hours between checks of a list,
+  and never more than about 15 days. Sval checks only while it's open. If
+  a check fell due while Sval was closed, Sval checks a few minutes after
+  you open it.
+
+<Since v="0.1.0-rc.10">
+
+- On every level except No Blocking, Sval strips tracking parameters from
+  the addresses you open. A tracking parameter is the part of an address
+  that tells a site which ad, email, or post you came from. Sval takes the
+  parameters from Mozilla's list and from the parameters the lists in use
+  strip on every site. The parameters change when those lists update.
+
+</Since>
+
 - Your level syncs to your other devices.
 - When you leave Custom for another level, Sval asks first, because the new
   level's lists replace your custom set. Sval removes the lists you added.
