@@ -725,7 +725,14 @@ state by top-level site, unconditionally.
 - **TLS ClientHello (JA3, JA4).** Any cipher or group change makes a user
   unique, so Sval sends release Firefox's: NSS's defaults without the cipher
   (`security.ssl3.ecdhe_ecdsa_aes_256_sha`) and the FFDHE groups release
-  Firefox has turned off.
+  Firefox has turned off. Accepted gap: the user agent stays Firefox ESR's
+  (§3 line 1), and no Firefox sends that version with release Firefox's
+  ClientHello. Release Firefox dropped the cipher one version after the
+  ESR, and the ESR still offers it. A bot check that matches a JA4 to the
+  versions that send it can tell Sval apart, or score it as a spoofed
+  client. Offering the cipher again gets a 403 from Akamai's edge at
+  eBay, and a release version in the user agent contradicts the ESR's
+  JavaScript and CSS surface.
 - **HTTP/2 and QUIC fingerprints.** The same class as JA4. Stock necko and
   neqo.
 - **UA Client Hints.** Not implemented in Gecko.
