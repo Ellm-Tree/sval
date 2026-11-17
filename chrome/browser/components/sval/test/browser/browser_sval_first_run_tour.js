@@ -31,7 +31,7 @@ const { SvalPasswordManager } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPasswordManager.sys.mjs"
 );
 const { shortcutCaps, shortcutText, keyOf } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 
 const { ROLE_RADIOBUTTON } = Ci.nsIAccessibleRole;

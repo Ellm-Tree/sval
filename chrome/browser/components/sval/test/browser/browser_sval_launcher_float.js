@@ -306,7 +306,7 @@ add_task(async function a_pick_returns_it() {
  */
 add_task(async function a_key_cap_names_the_key() {
   const { ariaShortcut, keyOf, shortcutText } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const keyEl = document.getElementById("focusURLBar");
   const cap = document.getElementById("sval-launcher-key");
@@ -349,7 +349,7 @@ add_task(async function the_key_cap_follows_the_key() {
     "moz-src:///browser/components/customkeys/CustomKeys.sys.mjs"
   );
   const { keyOf, shortcutText } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const cap = document.getElementById("sval-launcher-key");
   registerCleanupFunction(() => CustomKeys.resetKey("focusURLBar"));

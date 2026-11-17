@@ -21,7 +21,7 @@ Services.scriptloader.loadSubScript(
 );
 
 const { MODE_KEYS, MODE_NAMES } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 const { SvalElementPicker, MODE_TOPIC } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalElementPicker.sys.mjs"

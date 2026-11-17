@@ -196,7 +196,7 @@ add_task(async function new_tab_from_the_keyboard_focuses_the_search_field() {
  */
 add_task(async function the_home_page_holds_only_the_search_field() {
   const { keyOf, shortcutText } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const key = shortcutText(keyOf(document.getElementById("focusURLBar")));
   for (const url of ["about:home", "about:newtab"]) {

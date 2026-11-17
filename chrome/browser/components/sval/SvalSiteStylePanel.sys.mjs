@@ -23,7 +23,7 @@ import {
 import {
   STYLE_KEY,
   STYLE_NAME,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 import {
   ADJUSTMENTS,
   DEFAULT_COMPLEMENT,

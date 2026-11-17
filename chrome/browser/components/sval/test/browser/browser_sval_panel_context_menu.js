@@ -861,7 +861,7 @@ add_task(async function the_menu_names_the_keys_that_do_the_same() {
   );
   const { ids } = await withFreshPanel();
   const { ariaShortcut, MENU_KEYS } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const ariaKeys = {
     rename: "rename",

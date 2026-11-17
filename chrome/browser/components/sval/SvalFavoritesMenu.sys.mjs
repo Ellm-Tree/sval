@@ -22,8 +22,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ROOT_GUIDS: "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-  ariaShortcut: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  MENU_KEYS: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  MENU_KEYS: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
   PINS_ROOT: "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   applyShowIn: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",

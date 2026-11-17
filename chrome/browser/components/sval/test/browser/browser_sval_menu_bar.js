@@ -24,7 +24,7 @@ Services.scriptloader.loadSubScript(
 
 const { MODE_KEYS, NEW_WORKSPACE_KEY, PANEL_MENU_ITEM_ID } =
   ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
 
 add_setup(pinsSetup);

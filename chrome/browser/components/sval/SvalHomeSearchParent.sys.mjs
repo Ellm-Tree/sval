@@ -36,11 +36,11 @@ ChromeUtils.defineESModuleGetters(lazy, {
   meaningIds: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   footFor: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   keycap: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
-  LAUNCHER_KEY: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  MENU_KEYS: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  ariaShortcut: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  keyOf: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  shortcutText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  LAUNCHER_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  MENU_KEYS: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  keyOf: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   COMMANDS_PROVIDER:
     "moz-src:///browser/components/sval/SvalLauncherCommands.sys.mjs",
   PINS_GROUP:

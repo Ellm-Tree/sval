@@ -22,7 +22,7 @@ const { EDGE_ID, HIDE_DELAY_MS, REVEAL_PREF } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelReveal.sys.mjs"
 );
 const { PANEL_TOGGLE_KEY } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 
 const container = () => document.getElementById("sval-panel-container");

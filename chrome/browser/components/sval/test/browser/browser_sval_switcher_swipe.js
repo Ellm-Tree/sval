@@ -20,7 +20,7 @@ Services.scriptloader.loadSubScript(
 );
 
 const { SWIPE_WORKSPACES_PREF } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 
 /** `SWIPE_REST_MS` in `sval-panel-switcher.js`. */

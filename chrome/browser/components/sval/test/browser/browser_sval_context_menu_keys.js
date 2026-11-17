@@ -59,6 +59,12 @@ add_task(async function the_page_menu_shows_the_keys() {
       showsKey(document.getElementById("context-savepage"), "key_savePage");
       showsKey(document.getElementById("context-viewsource"), "key_viewSource");
       showsKey(document.getElementById("context-selectall"), "key_selectAll");
+      // `MozMenuItem._computeAccelTextFromKeyIfNeeded` logs an error for a
+      // key it cannot find, and the Inspector has a key only on macOS.
+      const missing = [...menu.querySelectorAll("[key]")]
+        .filter(item => !document.getElementById(item.getAttribute("key")))
+        .map(item => item.id);
+      Assert.deepEqual(missing, [], "every key an item names is in the window");
       await closed(menu);
 
       await opened(menu, () =>

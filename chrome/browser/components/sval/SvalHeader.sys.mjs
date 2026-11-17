@@ -33,8 +33,10 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { tidySeparators } from "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs";
 import {
   MODE_NAMES,
-  SvalShortcuts,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+  describeKey,
+  describePanelToggle,
+  keepKeyDescribed,
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 import {
   PANEL_ID as PROTECTION_PANEL_ID,
   SvalProtectionButton,
@@ -1295,7 +1297,7 @@ function buildHistoryButton(doc) {
   button.id = HISTORY_BUTTON_ID;
   button.className = "toolbarbutton-1 chromeclass-toolbar-additional";
   button.setAttribute("label", "History");
-  SvalShortcuts.keepDescribed(button, "key_gotoHistory", "History");
+  keepKeyDescribed(button, "key_gotoHistory", "History");
   button.addEventListener("command", () =>
     doc.defaultView.SidebarController.toggle("viewHistorySidebar").catch(err =>
       SvalLog.error(`could not show history: ${SvalLog.errorName(err)}`)
@@ -1416,7 +1418,7 @@ function buildReaderButton(doc) {
   // The user may remap the key in settings while the window is open.
   for (const type of ["mouseover", "focus"]) {
     button.addEventListener(type, () =>
-      SvalShortcuts.describe(
+      describeKey(
         button,
         "key_toggleReaderMode",
         button.hasAttribute("readeractive")
@@ -2080,10 +2082,10 @@ export const SvalHeader = {
     // change while the window is open.
     const panelButton = doc.getElementById(PANEL_BUTTON_ID);
     if (panelButton) {
-      SvalShortcuts.describeToggle(panelButton);
+      describePanelToggle(panelButton);
       for (const type of ["mouseover", "focus"]) {
         panelButton.addEventListener(type, () =>
-          SvalShortcuts.describeToggle(panelButton)
+          describePanelToggle(panelButton)
         );
       }
     }

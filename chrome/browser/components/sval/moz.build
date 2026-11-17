@@ -118,6 +118,7 @@ MOZ_SRC_FILES += [
     "SvalKagi.sys.mjs",
     "SvalKagiPrivacyPass.sys.mjs",
     "SvalKeyJoin.sys.mjs",
+    "SvalKeys.sys.mjs",
     "SvalLauncher.sys.mjs",
     "SvalLauncherCommands.sys.mjs",
     "SvalLauncherEnter.sys.mjs",

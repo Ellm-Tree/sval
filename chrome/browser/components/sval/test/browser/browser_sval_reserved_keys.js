@@ -20,7 +20,7 @@ const {
   NEW_WORKSPACE_KEY,
   STYLE_KEY,
 } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 const { CustomKeys } = ChromeUtils.importESModule(
   "moz-src:///browser/components/customkeys/CustomKeys.sys.mjs"

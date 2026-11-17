@@ -41,7 +41,7 @@ import {
   ariaShortcut,
   keyOf,
   shortcutText,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {

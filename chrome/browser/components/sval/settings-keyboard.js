@@ -33,7 +33,7 @@
     BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
     arrange: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
     clickModifiers: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
-    clickText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+    clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
     QUICK_PEEK_CLICK_PREF:
       "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
     QUICK_PEEK_CLICKS:
@@ -42,7 +42,7 @@
     QUICK_PEEK_PREF: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
     quickPeekClickText:
       "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-    shortcutText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+    shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   });
 

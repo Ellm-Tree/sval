@@ -58,7 +58,7 @@ const {
 );
 const { LAUNCHER_KEY, keyOf, shortcutCaps, shortcutText } =
   ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
 const { SvalPairingLook } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPairing.sys.mjs"

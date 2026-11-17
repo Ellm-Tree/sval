@@ -18,14 +18,16 @@ Services.scriptloader.loadSubScript(
   this
 );
 
+const { SVAL_SHORTCUTS } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+);
 const {
-  SVAL_SHORTCUTS,
   PANEL_TOGGLE_KEY,
   PANEL_MENU_ITEM_ID,
   NEW_WORKSPACE_KEY,
   COPY_ADDRESS_KEY,
 } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 const { keyCommand, GROUP, TAB } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"

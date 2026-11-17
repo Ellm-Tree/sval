@@ -45,7 +45,7 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
-  SvalShortcuts: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  keepKeyDescribed: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   ARCHIVE_CHANGED_TOPIC:
     "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
   SvalArchive: "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
@@ -746,7 +746,7 @@ export const SvalHistorySidebar = {
     const clear = doc.createXULElement("button");
     clear.id = CLEAR_BUTTON_ID;
     clear.setAttribute("label", "Clear Recent History…");
-    lazy.SvalShortcuts.keepDescribed(
+    lazy.keepKeyDescribed(
       clear,
       "key_sanitize",
       "Clear Recent History",

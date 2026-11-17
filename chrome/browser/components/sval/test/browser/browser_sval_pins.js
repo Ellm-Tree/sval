@@ -150,7 +150,7 @@ add_task(async function a_pin_off_its_page_goes_back_by_its_button() {
     "the wide tile names the page it is on"
   );
   const { keyOf, shortcutText } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const number = slot().dataset.number;
   Assert.equal(
@@ -446,7 +446,7 @@ add_task(async function an_open_pins_address_bar_row_is_the_pin() {
   Assert.greater(mark.getBoundingClientRect().width, 0, "drawn");
   // Its keys, as a screen reader hears them (`SvalLauncherRows`).
   const { ariaShortcut } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const option = pin.element.row.querySelector(".urlbarView-row-inner");
   await TestUtils.waitForCondition(

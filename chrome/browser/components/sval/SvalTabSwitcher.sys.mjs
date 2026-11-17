@@ -33,7 +33,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   GROUP: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
   shadeScrollEdges: "moz-src:///browser/components/sval/SvalDom.sys.mjs",
-  shortcutText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   switcherItemOf: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
   ancestorIds: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
   chipElement: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",

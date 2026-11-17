@@ -49,7 +49,7 @@ import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs"
 import {
   ariaShortcut,
   keycap,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {

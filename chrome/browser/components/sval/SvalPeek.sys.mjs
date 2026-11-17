@@ -52,7 +52,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   SvalWorkspaceJar:
     "moz-src:///browser/components/sval/SvalWorkspaceJar.sys.mjs",
-  clickText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   displayDomain: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
   openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
 });

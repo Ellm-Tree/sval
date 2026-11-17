@@ -57,8 +57,8 @@ import {
   MODE_NAMES,
   STYLE_KEY,
   STYLE_NAME,
-  SvalShortcuts,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+  describeKey,
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 import { SvalJavascript } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
 import {
   scopeChain,
@@ -1261,7 +1261,7 @@ class SiteControls {
       button.setAttribute("aria-label", tip);
       if (offer == "ok") {
         button.removeAttribute("aria-disabled");
-        SvalShortcuts.describe(button, MODE_KEYS[mode], label);
+        describeKey(button, MODE_KEYS[mode], label);
       } else {
         button.setAttribute("aria-disabled", "true");
         button.setAttribute("tooltiptext", tip);
@@ -1307,7 +1307,7 @@ class SiteControls {
     button.dataset.offer = offer;
     if (offer == "ok") {
       button.removeAttribute("aria-disabled");
-      SvalShortcuts.describe(button, STYLE_KEY, STYLE_NAME);
+      describeKey(button, STYLE_KEY, STYLE_NAME);
     } else {
       const tip = `${STYLE_NAME} (${OFF_IN_TOOLTIP[offer]})`;
       button.setAttribute("aria-disabled", "true");
@@ -2027,7 +2027,7 @@ class SiteControls {
     main.ariaDescribedByElements = dot ? [dot] : [words];
     const key = doc.getElementById(STYLE_KEY);
     if (!off && (key?.hasAttribute("key") || key?.hasAttribute("keycode"))) {
-      SvalShortcuts.describe(main, STYLE_KEY, label);
+      describeKey(main, STYLE_KEY, label);
     }
     main.addEventListener("click", () => {
       if (!off) {
@@ -2132,7 +2132,7 @@ class SiteControls {
     // Tab menu item name it.
     const key = doc.getElementById(MODE_KEYS[mode]);
     if (!off && (key?.hasAttribute("key") || key?.hasAttribute("keycode"))) {
-      SvalShortcuts.describe(main, MODE_KEYS[mode], label);
+      describeKey(main, MODE_KEYS[mode], label);
     }
     main.addEventListener("click", () => {
       if (!off) {

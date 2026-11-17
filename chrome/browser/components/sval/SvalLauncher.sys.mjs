@@ -33,10 +33,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
-  LAUNCHER_KEY: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  ariaShortcut: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  keyOf: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-  shortcutText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  LAUNCHER_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  keyOf: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
 });
 
 const LAUNCHER_CSS = "chrome://browser/content/sval/sval-launcher.css";

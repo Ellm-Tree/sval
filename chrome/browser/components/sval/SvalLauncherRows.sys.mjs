@@ -30,7 +30,7 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import {
   ariaShortcut,
   keycap,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 
 export { keycap };
 import { UrlbarUtils } from "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs";

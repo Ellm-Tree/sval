@@ -16,6 +16,7 @@
  * none.
  */
 
+import { newWorkspace } from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
 import {
   COPY_ADDRESS_KEY,
   COPY_ADDRESS_MENU_ITEM_ID,
@@ -25,8 +26,7 @@ import {
   PANEL_MENU_ITEM_ID,
   PANEL_TOGGLE_KEY,
   STYLE_KEY,
-  newWorkspace,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {

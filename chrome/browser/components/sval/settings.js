@@ -59,7 +59,7 @@
     PINS_QUICK_PEEK_PREF:
       "moz-src:///browser/components/sval/SvalPinsModel.sys.mjs",
     SWIPE_WORKSPACES_PREF:
-      "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+      "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
     SvalPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
     BOOKMARKLETS_PREF:
       "moz-src:///browser/components/sval/SvalFavorites.sys.mjs",

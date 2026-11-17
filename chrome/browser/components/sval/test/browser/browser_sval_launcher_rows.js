@@ -438,7 +438,7 @@ add_task(async function sections_are_groups_named_by_their_headings() {
  */
 add_task(async function a_commands_line_teaches_its_key() {
   const { keyOf, shortcutText } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   await workAndHome();
   const close = "Esc launcher-foot-close";
@@ -478,7 +478,7 @@ add_task(async function a_commands_line_teaches_its_key() {
  */
 add_task(async function each_row_names_its_keys() {
   const { ariaShortcut } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   await workAndHome();
   // A page in this tab, so Alt+Enter splits beside it.

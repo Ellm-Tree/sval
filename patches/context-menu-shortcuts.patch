@@ -10,9 +10,11 @@ MozMenuItem._computeAccelTextFromKeyIfNeeded logs an error for a key it
 cannot find, so they name a key only where their document has it. Back, Forward, Reload and Stop
 name theirs only on macOS, where they are text items; elsewhere they are
 icons whose tooltips name the key.
+Inspect names the Inspector's key only on macOS, where the Inspector has
+one: elsewhere its key is Copy Address's.
 
 diff --git a/browser/base/content/browser-context.inc.xhtml b/browser/base/content/browser-context.inc.xhtml
-index 621be24e4e..825cb70d60 100644
+index 621be24e4e..1e88421fd6 100644
 --- a/browser/base/content/browser-context.inc.xhtml
 +++ b/browser/base/content/browser-context.inc.xhtml
 @@ -7,17 +7,21 @@
@@ -113,11 +115,13 @@ index 621be24e4e..825cb70d60 100644
                  data-l10n-id="main-context-menu-view-page-source"
                  />
        <menuitem id="context-inspect-a11y"
-@@ -448,6 +464,7 @@
+@@ -448,6 +464,9 @@
                  data-l10n-id="main-context-menu-inspect-a11y-properties"
                  />
        <menuitem id="context-inspect"
++#ifdef XP_MACOSX
 +                key="key_inspector"
++#endif
                  hidden="true"
                  data-l10n-id="main-context-menu-inspect"
                  />

@@ -33,7 +33,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sval/SvalFavoriteIcons.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-  SvalShortcuts: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+  describeKey: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   isBookmarklet:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
 });
@@ -664,11 +664,7 @@ export const SvalFavorites = {
         button.setAttribute("tooltiptext", "Remove from Favorites");
         button.removeAttribute("aria-keyshortcuts");
       } else {
-        lazy.SvalShortcuts.describe(
-          button,
-          "addBookmarkAsKb",
-          "Add to Favorites"
-        );
+        lazy.describeKey(button, "addBookmarkAsKb", "Add to Favorites");
       }
     };
     const observer = { observe: update };

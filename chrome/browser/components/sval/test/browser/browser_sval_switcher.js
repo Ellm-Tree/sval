@@ -262,7 +262,7 @@ add_task(async function one_workspace_still_has_a_working_switcher() {
 add_task(async function new_workspace_shows_the_key_the_user_gave_it() {
   await withSwitcherPanel({ workspaces: 1 });
   const { NEW_WORKSPACE_KEY, shortcutText } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
   const key = document.getElementById(NEW_WORKSPACE_KEY);
 

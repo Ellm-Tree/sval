@@ -15,7 +15,7 @@ import {
   nameOf,
   pointable,
 } from "moz-src:///browser/components/sval/SvalElementCandidates.sys.mjs";
-import { keycap } from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+import { keycap } from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 
 // How far outside the element's border box the outline is drawn.
 const OUTSET = 2;

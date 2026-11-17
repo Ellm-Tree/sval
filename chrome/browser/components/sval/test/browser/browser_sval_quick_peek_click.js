@@ -24,7 +24,7 @@ const { SvalQuickPeek, QUICK_PEEK_PREF, QUICK_PEEK_CLICK_PREF } =
     "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs"
   );
 const { clickText } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 
 const LINKS_PAGE = ROOT + "sval_quick_peek_links.html";

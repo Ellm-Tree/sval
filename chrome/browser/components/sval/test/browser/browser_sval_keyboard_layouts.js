@@ -32,7 +32,7 @@
  */
 
 const { COPY_ADDRESS_KEY } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+  "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
 
 const NativeKeys = {};

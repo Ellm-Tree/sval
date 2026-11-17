@@ -453,7 +453,7 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalSiteStylePanel.sys.mjs",
         styleScopeOf:
           "moz-src:///browser/components/sval/SvalSiteStylePanel.sys.mjs",
-        STYLE_KEY: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+        STYLE_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
         unloadTabs: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
         ARCHIVE_DOCUMENT:
           "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
@@ -500,22 +500,19 @@ var SvalPanel = {
         SvalLocalSettings:
           "moz-src:///browser/components/sval/SvalLocalSettings.sys.mjs",
         SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
-        MENU_KEYS: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+        MENU_KEYS: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
         NEW_WORKSPACE_KEY:
-          "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+          "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
         SWIPE_WORKSPACES_PREF:
-          "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+          "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
         dropSide:
           "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
         showDropLine:
           "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
-        SvalShortcuts:
-          "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-        ariaShortcut:
-          "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-        shortcutText:
-          "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
-        clickText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+        keepKeyDescribed: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+        ariaShortcut: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+        shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+        clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
         describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
         SvalKeyJoin: "moz-src:///browser/components/sval/SvalKeyJoin.sys.mjs",
         SvalPairing: "moz-src:///browser/components/sval/SvalPairing.sys.mjs",
@@ -656,11 +653,7 @@ var SvalPanel = {
     const addTabLabel = make("span", { class: "sval-label" });
     addTabLabel.textContent = "New tab";
     addTab.append(addTabLabel);
-    this._modules.SvalShortcuts.keepDescribed(
-      addTab,
-      "key_newNavigatorTab",
-      "New tab"
-    );
+    this._modules.keepKeyDescribed(addTab, "key_newNavigatorTab", "New tab");
     // "New workspace" is not here: a workspace is made where workspaces are
     // chosen, the switcher (`_fillSwitcherMenu`).
     // Named in its tooltip as New tab is, which is all the 48px panel shows

@@ -29,7 +29,7 @@ const { CustomKeys } = ChromeUtils.importESModule(
 );
 const { ariaShortcut, keyOf, shortcutText, PANEL_TOGGLE_KEY } =
   ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs"
+    "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
   );
 const { SvalArchive } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalArchive.sys.mjs"

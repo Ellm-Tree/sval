@@ -29,7 +29,7 @@
     QUICK_PEEK_CLICK_PREF:
       "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
     QUICK_PEEK_PREF: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
-    clickText: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+    clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
     quickPeekClick: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
     SvalColor: "moz-src:///browser/components/sval/SvalColor.sys.mjs",
     SvalLinkRules: "moz-src:///browser/components/sval/SvalLinkRules.sys.mjs",

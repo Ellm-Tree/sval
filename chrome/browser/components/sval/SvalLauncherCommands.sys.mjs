@@ -43,15 +43,15 @@ import {
   isPane,
 } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import {
-  ariaShortcut,
   COPY_ADDRESS_KEY,
-  keyOf,
   NEW_PEEK_KEY,
-  STYLE_KEY,
   NEW_WORKSPACE_KEY,
   PANEL_TOGGLE_KEY,
+  STYLE_KEY,
+  ariaShortcut,
+  keyOf,
   shortcutText,
-} from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
