@@ -334,7 +334,7 @@ Object.assign(SvalPanel, {
     const button = event.target.closest?.("[data-command]");
     const rowElement = this._rowElementAt(event.target);
     const row = rowElement ? this._rowFor(rowElement.dataset.nodeId) : null;
-    const { SPLIT, TAB } = this._modules.SvalPanelModel;
+    const { SPLIT, TAB } = this._modules.SvalTree;
 
     if (row) {
       this._focusRow(row.id);
@@ -404,7 +404,7 @@ Object.assign(SvalPanel, {
     }
     // Two clicks have already folded and unfolded a group, so a third toggle
     // here would leave it flipped.
-    if (row.kind === this._modules.SvalPanelModel.TAB) {
+    if (row.kind === this._modules.SvalTree.TAB) {
       this.run("activate", row);
     }
   },

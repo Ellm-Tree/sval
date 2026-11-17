@@ -28,7 +28,7 @@ import {
   zip,
 } from "moz-src:///browser/components/sval/SvalExportModel.sys.mjs";
 import { importableUrl } from "moz-src:///browser/components/sval/SvalImportModel.sys.mjs";
-import { SYNC_DOCUMENT } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { SYNC_DOCUMENT } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {

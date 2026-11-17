@@ -79,7 +79,7 @@ async function addLaterWorkspace(engine) {
 
 add_task(async function devices_workspaces_have_their_own_section() {
   const { ids, engine } = await withSwitcherPanel();
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   const phone = await addDeviceWorkspace(engine, 2);
   const third = await addLaterWorkspace(engine);
   const agent = await engine.mutate({
@@ -162,7 +162,7 @@ add_task(async function the_strip_draws_devices_after_a_divider() {
       ? `divider:${el.dataset.divider}`
       : el.dataset.workspaceId
   );
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   Assert.deepEqual(
     order,
     [home, ...ids.workspaces, third, "divider:devices", phone],
@@ -186,7 +186,7 @@ add_task(async function the_strip_draws_devices_after_a_divider() {
 add_task(async function a_new_window_never_takes_a_devices_workspace() {
   const { ids, engine } = await withSwitcherPanel();
   const [, second] = ids.workspaces;
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   const phone = await addDeviceWorkspace(engine, 1);
   await SvalPanel.refresh();
 

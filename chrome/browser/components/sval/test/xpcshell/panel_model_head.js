@@ -3,10 +3,13 @@
 
 "use strict";
 
-/* exported SvalPanelModel, node, nestedDocument, allExpanded */
+/* exported SvalPanelModel, SvalTree, node, nestedDocument, allExpanded */
 
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+);
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 /**

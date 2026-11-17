@@ -62,7 +62,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   isOn: "moz-src:///browser/components/sval/SvalFingerprinting.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   verdictOf: "moz-src:///browser/components/sval/SvalExtensionCompat.sys.mjs",
-  workspaceIds: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+  workspaceIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
 });
 /**
  * An export of one of Sval's modules whose name another module shares, read

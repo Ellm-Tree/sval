@@ -126,7 +126,7 @@ add_task(async function a_new_window_on_a_workspace_takes_its_kept_tab() {
   const { ids, engine, baseline } = fixture;
   // The profile's own workspace comes first in sibling order, and the first
   // workspace made here right after it.
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   const tab = await keptAway(fixture, home);
 
   // ⌘N opens a window on the workspace after this window's, which is the one
@@ -239,7 +239,7 @@ add_task(async function a_picture_in_picture_video_plays_on_through_a_take() {
       return !video.paused && video.isCloningElementVisually;
     });
   Assert.ok(await playing(tab), "the video plays in picture-in-picture");
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   Assert.ok(await SvalPanel.switchTo(home), "switched away");
   Assert.ok(tab.hidden && tab.linkedPanel, "the video's tab is kept");
 

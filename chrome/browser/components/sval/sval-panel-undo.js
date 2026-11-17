@@ -410,8 +410,8 @@ Object.assign(SvalPanel, {
   async _deferRemoval(text, ids, { keepContents = false } = {}) {
     await this.commitPendingDelete();
     await this._observer?.settled();
-    const { WORKSPACE, descendantIds, rowIndexIn } =
-      this._modules.SvalPanelModel;
+    const { rowIndexIn } = this._modules.SvalPanelModel;
+    const { WORKSPACE, descendantIds } = this._modules.SvalTree;
     const present = ids.filter(id => this._nodes[id]);
     if (!present.length) {
       return;
@@ -653,7 +653,7 @@ Object.assign(SvalPanel, {
    * @returns {object}
    */
   _viewOf(nodes) {
-    const { descendantIds } = this._modules.SvalPanelModel;
+    const { descendantIds } = this._modules.SvalTree;
     const gone = new Set();
     for (const { ids, keepContents } of this._pendingTrees()) {
       if (keepContents) {

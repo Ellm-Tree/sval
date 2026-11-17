@@ -27,7 +27,7 @@ const { SvalSecretStore, MemoryKeyStore } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs"
 );
 const { SYNC_DOCUMENT } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 registerCleanupFunction(() => Services.prefs.setIntPref(SKEW_PREF, 0));

@@ -1127,7 +1127,7 @@ async function filedAt(tab) {
   }, "the tab is filed");
   const all = await nodes(SvalPanel.engine);
   const { childrenByParent } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+    "moz-src:///browser/components/sval/SvalTree.sys.mjs"
   );
   const parent = all[id].placement.parent;
   return { parent, last: childrenByParent(all).get(parent).at(-1) === id };

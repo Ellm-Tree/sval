@@ -52,7 +52,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   agentLabelOf: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   siteOfPage: "moz-src:///browser/components/sval/SvalPins.sys.mjs",
-  workspaceOfNode: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+  workspaceOfNode: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
 });
 
 /**

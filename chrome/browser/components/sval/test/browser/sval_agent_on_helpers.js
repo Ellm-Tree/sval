@@ -14,7 +14,7 @@
  * loads this with `loadSubScript` into its own scope.
  */
 
-/* exported SvalAgents, SvalQuickPeek, SvalPeek, SvalPanelModel, RED,
+/* exported SvalAgents, SvalQuickPeek, SvalPeek, SvalPanelModel, SvalTree, RED,
             agentAccessOn, titledRed, middlePixel, shows, linkFromAnotherApp,
             secondWindow, failFirstLoad, errorPageShown, movedInShows, dialogIn, typeIn,
             newWorkspace, switchVia, tearOffVia, rowIn, clickRow, rowNameIn,
@@ -32,6 +32,9 @@ const { SvalPeek } = ChromeUtils.importESModule(
 );
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+);
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 /** A page painted red edge to edge, which a blank or grey page is not. */

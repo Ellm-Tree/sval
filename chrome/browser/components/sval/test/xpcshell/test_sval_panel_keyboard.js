@@ -89,7 +89,7 @@ add_task(function the_keyboard_map_covers_every_action() {
     "close",
     "Backspace closes too, which is what a Mac keyboard's Delete key sends"
   );
-  const group = { ...closed, kind: SvalPanelModel.GROUP };
+  const group = { ...closed, kind: SvalTree.GROUP };
   Assert.equal(
     keyCommand(key("Delete"), group),
     "deleteGroup",

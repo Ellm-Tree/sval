@@ -11,10 +11,12 @@
  * away a code the engine generated.
  */
 
-const { BACKUP_ALPHABET, GROUP, WORKSPACE, normalizeCode } =
-  ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
-  );
+const { BACKUP_ALPHABET, normalizeCode } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+);
+const { GROUP, WORKSPACE } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 const { SvalColor } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalColor.sys.mjs"
 );

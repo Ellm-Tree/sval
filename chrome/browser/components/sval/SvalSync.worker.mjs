@@ -47,7 +47,7 @@ import {
 // judge it. Loaded into this worker's own global, the only one it has.
 const { childrenByParent, isUntouchedWorkspace, workspaceIds } =
   ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+    "moz-src:///browser/components/sval/SvalTree.sys.mjs",
     { global: "current" }
   );
 

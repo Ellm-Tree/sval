@@ -136,7 +136,8 @@ Object.assign(SvalPanel, {
    * @returns {string|object|null} a Workspace colour.
    */
   workspaceColor(id) {
-    const { agentLabelOf, appearanceOf } = this._modules.SvalPanelModel;
+    const { agentLabelOf } = this._modules.SvalPanelModel;
+    const { appearanceOf } = this._modules.SvalTree;
     if (!id || agentLabelOf(this._nodes, id, this.devices())) {
       return null;
     }
@@ -155,7 +156,8 @@ Object.assign(SvalPanel, {
    * @returns {number}
    */
   workspaceTransparency(id) {
-    const { agentLabelOf, appearanceOf } = this._modules.SvalPanelModel;
+    const { agentLabelOf } = this._modules.SvalPanelModel;
+    const { appearanceOf } = this._modules.SvalTree;
     if (!id || agentLabelOf(this._nodes, id, this.devices())) {
       return 0;
     }

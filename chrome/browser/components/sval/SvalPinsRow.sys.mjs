@@ -36,6 +36,7 @@ import {
   numberedSlot,
 } from "moz-src:///browser/components/sval/SvalPinsModel.sys.mjs";
 import * as SvalPanelModel from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import * as SvalTree from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
 import {
   ariaShortcut,
@@ -93,13 +94,11 @@ const POPOVER_ID = "sval-pins-popover";
  * opens where an agent acts.
  *
  * @param {object} nodes The tree's nodes, by id.
- * @param {object} model `SvalPanelModel`.
  * @returns {{id: string, name: string}[]}
  */
-export function showInWorkspaces(nodes, model) {
-  return model
-    .workspaceIds(nodes)
-    .filter(id => model.agentLabelOf(nodes, id) === null)
+export function showInWorkspaces(nodes) {
+  return SvalTree.workspaceIds(nodes)
+    .filter(id => SvalPanelModel.agentLabelOf(nodes, id) === null)
     .map(id => ({
       id,
       name: nodes[id]?.content?.name || "Untitled Workspace",
@@ -577,7 +576,7 @@ export class SvalPinsRow {
     changed.forEach(within);
     const tiles = store.home();
     const nodes = this.#panel.nodes ?? {};
-    const { WORKSPACE } = SvalPanelModel;
+    const { WORKSPACE } = SvalTree;
     const workspaces = new Set(
       Object.keys(nodes).filter(id => nodes[id]?.kind === WORKSPACE)
     );
@@ -597,7 +596,7 @@ export class SvalPinsRow {
     if (!this.#enabled) {
       return [];
     }
-    const { WORKSPACE } = SvalPanelModel;
+    const { WORKSPACE } = SvalTree;
     const nodes = this.#panel.nodes ?? {};
     const workspaces = new Set(
       Object.keys(nodes).filter(id => nodes[id]?.kind === WORKSPACE)
@@ -652,9 +651,7 @@ export class SvalPinsRow {
     this.#pages.tidy(
       this.#panel.workspaceId,
       new Set(
-        Object.keys(nodes).filter(
-          id => nodes[id]?.kind === SvalPanelModel.WORKSPACE
-        )
+        Object.keys(nodes).filter(id => nodes[id]?.kind === SvalTree.WORKSPACE)
       )
     );
 
@@ -1558,7 +1555,7 @@ export class SvalPinsRow {
         fillShowIn(
           showInPopup,
           menu._svalPin.pin.guid,
-          showInWorkspaces(this.#panel.nodes ?? {}, SvalPanelModel)
+          showInWorkspaces(this.#panel.nodes ?? {})
         );
       } else if (event.target === moveToPopup) {
         this.#fillMoveTo(moveToPopup, menu._svalPin.pin);
@@ -1807,7 +1804,8 @@ export class SvalPinsRow {
    */
   canPin(id) {
     const panel = this.#panel;
-    const { TAB, isPane } = SvalPanelModel;
+    const { isPane } = SvalPanelModel;
+    const { TAB } = SvalTree;
     const node = id && panel.nodes?.[id];
     return (
       this.#enabled &&

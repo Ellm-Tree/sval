@@ -174,7 +174,7 @@ add_task(async function a_sideways_scroll_over_the_panel_moves_one_workspace() {
   const { ids } = await withSwitcherPanel({ workspaces: 3 });
   const [first, second] = ids.workspaces;
   // The profile's own Workspace comes before the task's in sibling order.
-  const [profiles] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [profiles] = SvalTree.workspaceIds(SvalPanel.nodes);
   const tree = SvalPanel.container.querySelector(".sval-tree");
   const page = gBrowser.selectedBrowser;
   Assert.equal(SvalPanel.workspaceId, first, "the window starts on the first");
@@ -214,7 +214,7 @@ add_task(async function a_sideways_scroll_over_the_panel_moves_one_workspace() {
   await switchDone();
   Assert.equal(SvalPanel.workspaceId, profiles, "and to the list's first");
 
-  const last = SvalPanelModel.workspaceIds(SvalPanel.nodes).at(-1);
+  const last = SvalTree.workspaceIds(SvalPanel.nodes).at(-1);
   Assert.equal(last, ids.workspaces.at(-1), "the task's last is the list's");
   await wheelRests();
   wheel(tree, { deltaX: -20 });

@@ -29,6 +29,9 @@ const { SvalIdentity } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 const { SvalTestDeny } = ChromeUtils.importESModule(
   "resource://testing-common/SvalTestDeny.sys.mjs"
 );
@@ -64,7 +67,7 @@ async function publishOwnCopy({ root, keys }) {
       id: crypto.randomUUID(),
       now: Date.now(),
     });
-    const report = await mine.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now());
+    const report = await mine.sync(SvalTree.SYNC_DOCUMENT, Date.now());
     Assert.notEqual(report.wrote, null, "this device's copy was written");
     return {
       ws,

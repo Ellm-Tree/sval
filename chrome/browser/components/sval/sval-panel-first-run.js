@@ -120,7 +120,7 @@ Object.assign(SvalPanel, {
     if (this._settings.firstRunStarted) {
       return "run";
     }
-    if (this._modules.SvalPanelModel.workspaceIds(this._nodes).length) {
+    if (this._modules.SvalTree.workspaceIds(this._nodes).length) {
       return "existing";
     }
     if (ownPass?.hadLocalCopy || this.sharedRootSetting()) {

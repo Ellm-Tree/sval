@@ -20,6 +20,9 @@ const { SvalTabs } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 const { tabsIn } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs"
 );
@@ -278,7 +281,7 @@ add_task(async function tabs_open_before_attach_land_in_the_workspace() {
   const tree = await nodes(win.SvalPanel.engine);
   const workspace = win.SvalPanel.workspaceId;
   is(
-    SvalPanelModel.descendantIds(tree, workspace).filter(
+    SvalTree.descendantIds(tree, workspace).filter(
       node => tree[node].kind === "group"
     ).length,
     0,
@@ -445,7 +448,7 @@ add_task(async function a_tab_opened_mid_strip_is_filed_where_it_sits() {
   await settled();
 
   const ours = [taggedId(middle), taggedId(last)];
-  const siblings = SvalPanelModel.childrenByParent(await nodes(engine))
+  const siblings = SvalTree.childrenByParent(await nodes(engine))
     .get(workspace)
     .filter(id => ours.includes(id));
   Assert.deepEqual(
@@ -898,7 +901,7 @@ add_task(async function the_panel_redraws_when_the_window_changes() {
   await settled();
 
   const tree = await nodes(engine);
-  const inWorkspace = SvalPanelModel.descendantIds(tree, workspace)
+  const inWorkspace = SvalTree.descendantIds(tree, workspace)
     .filter(id => tree[id].kind === "tab")
     .sort();
   // A switch keeps some tabs of the workspace it left loaded, hidden.
@@ -1240,7 +1243,7 @@ add_task(async function settings_opens_last_outside_every_group() {
       `${how}: settings is filed at the top of the workspace`
     );
     is(
-      SvalPanelModel.childrenByParent(tree).get(workspace).at(-1),
+      SvalTree.childrenByParent(tree).get(workspace).at(-1),
       id,
       `${how}: as its last row`
     );
@@ -1295,7 +1298,7 @@ add_task(async function settings_is_filed_and_opening_it_again_reuses_it() {
   await settled();
   tree = await nodes(engine);
   is(
-    SvalPanelModel.descendantIds(tree, workspace).filter(node =>
+    SvalTree.descendantIds(tree, workspace).filter(node =>
       (tree[node].content?.url ?? "").startsWith(SETTINGS_PAGE_URL)
     ).length,
     1,

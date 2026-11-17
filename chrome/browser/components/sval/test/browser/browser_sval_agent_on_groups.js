@@ -42,7 +42,7 @@ async function newGroup(name) {
   await within(made, 10_000, "the new group");
   const id = Object.keys(SvalPanel.nodes).find(
     each =>
-      SvalPanel.nodes[each].kind === SvalPanelModel.GROUP &&
+      SvalPanel.nodes[each].kind === SvalTree.GROUP &&
       SvalPanel.nodes[each].content?.name === name
   );
   Assert.ok(id, `${name}: the group is made`);
@@ -76,7 +76,7 @@ async function moveToGroup(id, group) {
  * @returns {string[]} its children, in the order the panel draws them.
  */
 function drawnChildren(parent) {
-  const children = SvalPanelModel.childrenByParent(SvalPanel.nodes).get(parent);
+  const children = SvalTree.childrenByParent(SvalPanel.nodes).get(parent);
   return Array.from(SvalPanel._els.tree.querySelectorAll(".sval-row"))
     .map(row => row.dataset.nodeId)
     .filter(id => children?.includes(id));

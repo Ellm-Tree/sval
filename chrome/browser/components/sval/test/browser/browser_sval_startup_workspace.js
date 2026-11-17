@@ -27,6 +27,9 @@ Services.scriptloader.loadSubScript(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 const { SvalPairing } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPairing.sys.mjs"
@@ -86,7 +89,7 @@ add_task(async function a_second_device_adopts_the_workspace_in_the_folder() {
           name: "Already here",
           url: "https://example.com/already",
         });
-        await other.sync(SvalPanelModel.SYNC_DOCUMENT);
+        await other.sync(SvalTree.SYNC_DOCUMENT);
         published = { workspace, nodes: (await other.tree()).nodes };
       } finally {
         await stopEngine(other);
@@ -152,7 +155,7 @@ add_task(async function an_empty_folder_gets_a_nameless_workspace() {
   );
   Assert.equal(
     panel._els.switcher.textContent,
-    panel._untitled(SvalPanelModel.WORKSPACE),
+    panel._untitled(SvalTree.WORKSPACE),
     "and the switcher labels the nameless workspace, which is a label in " +
       "this window and not a value anywhere"
   );
@@ -324,7 +327,7 @@ add_task(async function an_empty_own_file_does_not_license_a_workspace() {
   const profile = await freshProfile({ shared: missing });
   const first = await profile.open();
   const report = await first.SvalPanel.engine.sync(
-    SvalPanelModel.SYNC_DOCUMENT,
+    SvalTree.SYNC_DOCUMENT,
     Date.now(),
     { shared: "skip" }
   );
@@ -389,7 +392,7 @@ add_task(async function the_workspace_a_peer_published_is_the_only_one() {
       id: crypto.randomUUID(),
       now: Date.now(),
     });
-    await peer.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now());
+    await peer.sync(SvalTree.SYNC_DOCUMENT, Date.now());
   } finally {
     await stopEngine(peer);
   }

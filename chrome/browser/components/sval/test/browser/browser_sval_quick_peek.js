@@ -18,6 +18,9 @@ const { SvalQuickPeek } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 /** A page of links, among them `#link` to QUICK_PEEKED. */
 const LINKS_PAGE = ROOT + "sval_quick_peek_links.html";
@@ -172,8 +175,7 @@ async function untilClosed(quickPeek, what) {
  */
 async function quickPeekedNodeCount() {
   return Object.values(await settledNodes()).filter(
-    node =>
-      node.kind === SvalPanelModel.TAB && node.content?.url === QUICK_PEEKED
+    node => node.kind === SvalTree.TAB && node.content?.url === QUICK_PEEKED
   ).length;
 }
 
@@ -476,7 +478,7 @@ add_task(async function open_as_tab_keeps_the_page_right_after_the_tab() {
   const id = SvalPanel.observer.nodeIdFor(quickPeek);
   forgetAtTaskEnd(() => [id]);
   const nodes = await settledNodes();
-  const order = SvalPanelModel.childrenByParent(nodes).get(home);
+  const order = SvalTree.childrenByParent(nodes).get(home);
   Assert.deepEqual(
     order.filter(each => [first.id, id, second.id].includes(each)),
     [first.id, id, second.id],
@@ -548,7 +550,7 @@ add_task(
       "the kept page is beside its tab, not in the selected group"
     );
     Assert.deepEqual(
-      SvalPanelModel.childrenByParent(nodes)
+      SvalTree.childrenByParent(nodes)
         .get(home)
         .filter(each => [first.id, id, second.id].includes(each)),
       [first.id, id, second.id],
@@ -564,8 +566,8 @@ add_task(
  */
 function splitPanesOf(nodes, id) {
   const split = nodes[id]?.placement?.parent;
-  return nodes[split]?.kind === SvalPanelModel.SPLIT
-    ? SvalPanelModel.childrenByParent(nodes).get(split)
+  return nodes[split]?.kind === SvalTree.SPLIT
+    ? SvalTree.childrenByParent(nodes).get(split)
     : [];
 }
 

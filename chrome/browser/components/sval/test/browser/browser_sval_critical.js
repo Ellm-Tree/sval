@@ -388,21 +388,21 @@ add_task(async function a_failed_shared_step_is_not_a_failed_save() {
     deviceId: crypto.getRandomValues(new Uint8Array(16)),
   });
   atTaskEnd(() => stopEngine(peer));
-  await peer.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now(), { shared: "wait" });
+  await peer.sync(SvalTree.SYNC_DOCUMENT, Date.now(), { shared: "wait" });
   await peer.mutate({
     kind: "addWorkspace",
     name: "Theirs",
     id: crypto.randomUUID(),
     now: Date.now(),
   });
-  await peer.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now(), { shared: "wait" });
+  await peer.sync(SvalTree.SYNC_DOCUMENT, Date.now(), { shared: "wait" });
 
   // Only the shared step may have something to save. A change of this
   // device's own still unsaved would make the pass's profile step fail to
   // save it, which is a failed save, so each is saved first.
   await within(SvalPanel.observer.settled(), 10_000, "the window settling");
   const profileOnly = () =>
-    SvalPanel.engine.sync(SvalPanelModel.SYNC_DOCUMENT, undefined, {
+    SvalPanel.engine.sync(SvalTree.SYNC_DOCUMENT, undefined, {
       shared: "skip",
     });
   await profileOnly();

@@ -179,7 +179,8 @@
      * @returns {Element|null} the node to snapshot, or null for the row itself.
      */
     _dragImageFor(row, element) {
-      const { GROUP, TAB, descendantTabCount } = this._modules.SvalPanelModel;
+      const { descendantTabCount } = this._modules.SvalPanelModel;
+      const { GROUP, TAB } = this._modules.SvalTree;
       const pane = row.kind === TAB && row.split && !row.panes;
       if (!pane && row.kind !== GROUP) {
         return null;
@@ -564,7 +565,8 @@
         return;
       }
       await this.refresh();
-      const { SPLIT, splitPanes } = this._modules.SvalPanelModel;
+      const { splitPanes } = this._modules.SvalPanelModel;
+      const { SPLIT } = this._modules.SvalTree;
       const tiles = new Set();
       for (const flashed of plan.flash) {
         if (this._nodes[flashed]?.kind === SPLIT) {

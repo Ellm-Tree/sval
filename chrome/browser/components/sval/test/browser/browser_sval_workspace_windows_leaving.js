@@ -37,7 +37,7 @@ add_task(async function a_window_left_with_no_free_workspace_closes() {
   const [first, second] = ids.workspaces;
 
   // The profile's own workspace in a window too, so none is free.
-  await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   const win = await tearOff(second);
   const observer = win.SvalPanel.observer;
   const closed = BrowserTestUtils.domWindowClosed(win);
@@ -169,7 +169,7 @@ add_task(async function a_stale_tab_dragged_across_resurrects_nothing() {
     );
     Assert.ok(filed in nodes, "and the document holds that node");
     Assert.ok(
-      SvalPanelModel.isWithin(nodes, filed, second),
+      SvalTree.isWithin(nodes, filed, second),
       "in the workspace that window shows"
     );
     for (const id of ids.workspaces) {

@@ -328,7 +328,7 @@ Object.assign(SvalPanel, {
     // The last workspace stays: a window always shows one (spec §5.4).
     remove.toggleAttribute(
       "disabled",
-      this._modules.SvalPanelModel.workspaceIds(this._nodes).length < 2
+      this._modules.SvalTree.workspaceIds(this._nodes).length < 2
     );
     // A private window's workspace already has a jar of its own, and goes
     // with the window.
@@ -365,7 +365,7 @@ Object.assign(SvalPanel, {
    * @returns {object[]} Firefox tabs.
    */
   _workspaceTabs(id) {
-    const { descendantIds } = this._modules.SvalPanelModel;
+    const { descendantIds } = this._modules.SvalTree;
     return [
       ...this._tabsOfNodes(descendantIds(this._nodes, id)),
       ...(this._pins?.pages.tabsOfWorkspace(id) ?? []),
@@ -668,7 +668,7 @@ Object.assign(SvalPanel, {
     }
     if (row?.split) {
       this._syncSplitItems(menu, row);
-    } else if (row?.kind === this._modules.SvalPanelModel.TAB) {
+    } else if (row?.kind === this._modules.SvalTree.TAB) {
       this._fillAddToSplit(menu, row);
     }
   },
@@ -766,7 +766,7 @@ Object.assign(SvalPanel, {
    * @returns {object[]} Firefox tabs.
    */
   _tabsUnder(row) {
-    const { descendantIds, TAB } = this._modules.SvalPanelModel;
+    const { descendantIds, TAB } = this._modules.SvalTree;
     // The engine refuses a tab as a parent (`childrenByParent`), so a tab's
     // row stands for its own tab alone.
     const under =
@@ -788,8 +788,8 @@ Object.assign(SvalPanel, {
    * @param {object} row A tab's row, not a pane's.
    */
   _fillAddToSplit(menu, row) {
-    const { addToSplitChoices, childrenByParent, TAB } =
-      this._modules.SvalPanelModel;
+    const { addToSplitChoices } = this._modules.SvalPanelModel;
+    const { childrenByParent, TAB } = this._modules.SvalTree;
     const parent = menu.querySelector('[data-command="addToSplit"]');
     const popup = parent.querySelector("menupopup");
     popup.textContent = "";
@@ -806,7 +806,7 @@ Object.assign(SvalPanel, {
         byParent
       ).map(
         id =>
-          this._modules.SvalPanelModel.displayName(this._nodes[id]) ||
+          this._modules.SvalTree.displayName(this._nodes[id]) ||
           this._untitled(TAB)
       );
       const entry = document.createXULElement("menuitem");
@@ -924,7 +924,8 @@ Object.assign(SvalPanel, {
    * @param {string[]} ids The nodes a move moves.
    */
   _fillMoveToGroup(menu, ids) {
-    const { moveToGroupChoices, WORKSPACE } = this._modules.SvalPanelModel;
+    const { moveToGroupChoices } = this._modules.SvalPanelModel;
+    const { WORKSPACE } = this._modules.SvalTree;
     const parent = menu.querySelector('[data-command="moveToGroup"]');
     const popup = parent.querySelector("menupopup");
     popup.textContent = "";

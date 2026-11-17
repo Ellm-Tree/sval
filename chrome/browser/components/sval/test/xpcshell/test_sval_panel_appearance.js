@@ -168,7 +168,7 @@ add_task(function a_row_inherits_its_groups_tint() {
  * (engine/CLAUDE.md, "Preserve unknown fields").
  */
 add_task(function the_write_path_reads_the_colour_unfiltered() {
-  const { appearanceOf } = SvalPanelModel;
+  const { appearanceOf } = SvalTree;
   const nodes = {
     ws: node({ kind: "workspace", name: "Work", order: "80" }),
     bare: node({ kind: "group", name: "Bare", parent: "ws", order: "80" }),

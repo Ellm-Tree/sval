@@ -359,7 +359,7 @@ Object.assign(SvalPanel, {
       let report;
       try {
         report = await this._engine.sync(
-          this._modules.SvalPanelModel.SYNC_DOCUMENT,
+          this._modules.SvalTree.SYNC_DOCUMENT,
           this._modules.SvalClock.now(),
           { shared, idleWithinMs, origin: this }
         );

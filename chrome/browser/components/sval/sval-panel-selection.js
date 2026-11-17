@@ -279,7 +279,7 @@ Object.assign(SvalPanel, {
   _selectedId() {
     const workspace = this._currentWorkspaceId;
     const id = this._settings.selectionIn(workspace);
-    return this._modules.SvalPanelModel.isWithin(this._nodes, id, workspace)
+    return this._modules.SvalTree.isWithin(this._nodes, id, workspace)
       ? id
       : null;
   },
@@ -349,7 +349,7 @@ Object.assign(SvalPanel, {
    */
   _revealSelection({ force = false } = {}) {
     const id = this._selectedId();
-    const above = this._modules.SvalPanelModel.ancestorIds(this._nodes, id);
+    const above = this._modules.SvalTree.ancestorIds(this._nodes, id);
     const path = [id, ...above].join(" ");
     if (!force && path === this._revealedPath) {
       return false;
@@ -381,7 +381,7 @@ Object.assign(SvalPanel, {
    * @param {object} row A row.
    */
   async activate(row) {
-    const { TAB } = this._modules.SvalPanelModel;
+    const { TAB } = this._modules.SvalTree;
     if (row.kind !== TAB) {
       await this._setCollapsed(row.id, row.expanded);
       return;
@@ -457,7 +457,8 @@ Object.assign(SvalPanel, {
     if (!this._engine) {
       return false;
     }
-    const { TAB, agentLabelOf, workspaceOfNode } = this._modules.SvalPanelModel;
+    const { agentLabelOf } = this._modules.SvalPanelModel;
+    const { TAB, workspaceOfNode } = this._modules.SvalTree;
     const nodes = (await this._engine.tree()).nodes ?? {};
     if (nodes[id]?.kind !== TAB) {
       return false;

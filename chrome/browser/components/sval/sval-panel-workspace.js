@@ -138,7 +138,8 @@ Object.assign(SvalPanel, {
    * @returns {Promise<string>} a node id that exists and can hold a tab.
    */
   async _newTabParent() {
-    const { WORKSPACE, GROUP, isPane } = this._modules.SvalPanelModel;
+    const { isPane } = this._modules.SvalPanelModel;
+    const { WORKSPACE, GROUP } = this._modules.SvalTree;
     const current = this._currentWorkspaceId;
     const selected = this._selectedId();
     const node = selected ? this._nodes[selected] : null;
@@ -278,7 +279,8 @@ Object.assign(SvalPanel, {
    * window is open, the one showing each remaining workspace.
    */
   async _resolveCurrentWorkspace() {
-    const { currentWorkspace, workspaceIds } = this._modules.SvalPanelModel;
+    const { currentWorkspace } = this._modules.SvalPanelModel;
+    const { workspaceIds } = this._modules.SvalTree;
     const remembered =
       this._currentWorkspaceId ?? this._rememberedWorkspaceId();
     const id = currentWorkspace(
@@ -676,7 +678,8 @@ Object.assign(SvalPanel, {
    * @returns {Promise<boolean>} whether the window changed workspace.
    */
   async _switchToOnce(id) {
-    const { WORKSPACE, closedWindowsDecided } = this._modules.SvalPanelModel;
+    const { closedWindowsDecided } = this._modules.SvalPanelModel;
+    const { WORKSPACE } = this._modules.SvalTree;
     // A workspace a closed window may still delete is taken elsewhere
     // (`_takenElsewhere`), so the next `_resolveCurrentWorkspace` would move
     // this window off it again. The switch goes once that window has decided,
@@ -781,10 +784,7 @@ Object.assign(SvalPanel, {
     this._switching
       .run(async () => {
         const nodes = (await this._engine.tree()).nodes ?? {};
-        const workspace = this._modules.SvalPanelModel.workspaceOfNode(
-          nodes,
-          id
-        );
+        const workspace = this._modules.SvalTree.workspaceOfNode(nodes, id);
         if (!workspace || workspace === this._currentWorkspaceId) {
           return;
         }

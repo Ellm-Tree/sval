@@ -357,7 +357,7 @@ add_task(async function a_window_handed_a_shown_workspace_takes_another() {
   const [first, second] = ids.workspaces;
   // The profile's own workspace in a window of its own, so the second is
   // the one workspace no window shows.
-  const torn = await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  const torn = await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   await settleBoth(engine, torn);
   const before = await treeJson(engine);
 
@@ -464,7 +464,7 @@ add_task(async function a_window_moved_off_its_remembered_workspace_lets_go() {
   forgetClosedWindows();
   // The profile's own workspace in a window of its own, so the second is
   // the one workspace no window shows.
-  const torn = await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  const torn = await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   await settleBoth(engine, torn);
 
   // A window on the first workspace, closed, while this one shows the
@@ -507,7 +507,7 @@ add_task(async function a_restored_window_lets_go_of_another_workspaces_tab() {
   forgetClosedWindows();
   // The profile's own workspace in a window of its own, so the second is
   // the one workspace no window shows.
-  const torn = await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  const torn = await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   await settleBoth(engine, torn);
 
   // A window on the second workspace with a second tab of its own, closed;
@@ -570,7 +570,7 @@ add_task(async function a_reopened_window_files_no_copy_of_a_shown_tab() {
   });
   const [first, second, third] = ids.workspaces;
   // The profile's own workspace in a window of its own, so it is not free.
-  const torn = await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  const torn = await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   await settleBoth(engine, torn);
   const forget = () => {
     for (const { closedId } of SessionStore.getClosedWindowData()) {
@@ -642,7 +642,7 @@ add_task(async function a_new_window_with_every_workspace_open_gets_its_own() {
     tabUrl: TITLED_TAB_URL,
   });
   const [, second] = ids.workspaces;
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
 
   // Every one of the user's workspaces in a window, the profile's own too.
   const torn = await tearOff(second);
@@ -696,7 +696,7 @@ add_task(async function a_new_window_never_takes_an_agents_workspace() {
     tabUrl: TITLED_TAB_URL,
   });
   const [, second] = ids.workspaces;
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   const agent = await addAgentWorkspace(engine);
   await SvalPanel.refresh();
 
@@ -755,7 +755,7 @@ add_task(async function a_new_window_never_takes_an_agents_workspace() {
  */
 add_task(async function agents_workspaces_have_their_own_section() {
   const { ids, engine } = await withSwitcherPanel();
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   const agent = await addAgentWorkspace(engine);
   const again = await addAgentWorkspace(engine);
   // After the agent's in sibling order, so the section is a regrouping of the
@@ -961,7 +961,7 @@ add_task(async function an_ordinary_new_window_holds_its_workspace() {
     tabUrl: TITLED_TAB_URL,
   });
   const [, second] = ids.workspaces;
-  const [home] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
   // The profile's own workspace in a window of its own, so the first no
   // window shows is one made here.
   const tornHome = await tearOff(home);

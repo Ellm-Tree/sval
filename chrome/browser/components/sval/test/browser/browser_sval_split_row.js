@@ -20,6 +20,9 @@ const { CustomKeys } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 const isMac = AppConstants.platform === "macosx";
 
@@ -109,9 +112,9 @@ async function settledNodes() {
  * @returns {string[][]} the tree's splits, each as its tabs in pane order.
  */
 function treeSplits(nodes) {
-  const byParent = SvalPanelModel.childrenByParent(nodes);
+  const byParent = SvalTree.childrenByParent(nodes);
   return Object.keys(nodes)
-    .filter(id => nodes[id].kind === SvalPanelModel.SPLIT)
+    .filter(id => nodes[id].kind === SvalTree.SPLIT)
     .map(id => byParent.get(id) ?? [])
     .filter(panes => panes.length);
 }
@@ -181,7 +184,7 @@ async function splitInTree(ids) {
   const nodes = await settledNodes();
   const split = crypto.randomUUID();
   const parent = nodes[ids[0]].placement.parent;
-  const siblings = SvalPanelModel.childrenByParent(nodes).get(parent);
+  const siblings = SvalTree.childrenByParent(nodes).get(parent);
   const ops = [
     {
       kind: "addSplit",
@@ -376,7 +379,7 @@ add_task(async function separate_from_a_panes_menu() {
   const nodes = await settledNodes();
   Assert.ok(!nodes[split], "the split is gone from the tree");
   Assert.deepEqual(
-    SvalPanelModel.childrenByParent(nodes)
+    SvalTree.childrenByParent(nodes)
       .get(home)
       .filter(id => ids.includes(id)),
     ids,
@@ -581,7 +584,7 @@ add_task(async function a_drop_on_a_split_rows_edge_goes_before_or_after_it() {
     );
   };
   const order = async () =>
-    SvalPanelModel.childrenByParent(await settledNodes())
+    SvalTree.childrenByParent(await settledNodes())
       .get(home)
       .filter(id => id === loose[0] || id === split);
 
@@ -860,8 +863,7 @@ async function untilGrouped(split, children) {
     group = nodes[split]?.placement.parent;
     return (
       nodes[group]?.kind === "group" &&
-      SvalPanelModel.childrenByParent(nodes).get(group).join() ===
-        children.join()
+      SvalTree.childrenByParent(nodes).get(group).join() === children.join()
     );
   }, "a group holds the two, the target first");
   forgetAtTaskEnd([group]);

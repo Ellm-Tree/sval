@@ -44,9 +44,12 @@ const { SvalSharedFolder } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 const { STEPS } = SvalFirstRunModel;
-const { SYNC_DOCUMENT } = SvalPanelModel;
+const { SYNC_DOCUMENT } = SvalTree;
 const FIRST_RUN_PREF = "browser.sval.firstRun.enabled";
 const LEVEL_PREF = "browser.sval.adblock.level";
 
@@ -208,7 +211,7 @@ const CODE = "K7Q4-8MTZ-3RJW";
  * @returns {Promise<string[]>} the workspaces in the panel's engine.
  */
 async function workspacesInEngine(panel = SvalPanel) {
-  return SvalPanelModel.workspaceIds((await panel.engine.tree()).nodes);
+  return SvalTree.workspaceIds((await panel.engine.tree()).nodes);
 }
 
 /**

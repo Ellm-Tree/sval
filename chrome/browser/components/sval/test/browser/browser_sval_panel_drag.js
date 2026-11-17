@@ -30,7 +30,7 @@ add_task(async function a_row_is_draggable() {
  */
 async function treeShape(engine) {
   const nodes = (await engine.tree()).nodes;
-  const byParent = SvalPanelModel.childrenByParent(nodes);
+  const byParent = SvalTree.childrenByParent(nodes);
   const shape = {};
   for (const [parent, ids] of byParent) {
     ids.forEach((id, index) => (shape[id] = [parent, index]));

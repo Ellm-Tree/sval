@@ -20,6 +20,9 @@ const { SvalWorkspaceJar } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 /** A page with one link, to PAGE. */
 const LINK_PAGE =
@@ -96,9 +99,9 @@ async function settledNodes() {
  * @returns {string[][]}
  */
 function treeSplits(nodes) {
-  const byParent = SvalPanelModel.childrenByParent(nodes);
+  const byParent = SvalTree.childrenByParent(nodes);
   return Object.keys(nodes)
-    .filter(id => nodes[id].kind === SvalPanelModel.SPLIT)
+    .filter(id => nodes[id].kind === SvalTree.SPLIT)
     .map(id => byParent.get(id) ?? []);
 }
 

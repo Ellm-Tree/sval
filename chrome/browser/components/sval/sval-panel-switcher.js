@@ -156,7 +156,7 @@
      * same two facts.
      */
     _renderSwitcher() {
-      const { WORKSPACE } = this._modules.SvalPanelModel;
+      const { WORKSPACE } = this._modules.SvalTree;
       const switcher = this._els.switcher;
       const current = this._currentWorkspaceId;
       // First run's Workspace step, before the Workspace exists: what its
@@ -169,12 +169,9 @@
       } else if (preview) {
         label = preview.name.trim() || this._untitled(WORKSPACE);
       }
-      const {
-        AGENT_EMOJI,
-        agentLabelOf,
-        appearanceOf,
-        WINDOW_WORKSPACE_TOPIC,
-      } = this._modules.SvalPanelModel;
+      const { AGENT_EMOJI, agentLabelOf, WINDOW_WORKSPACE_TOPIC } =
+        this._modules.SvalPanelModel;
+      const { appearanceOf } = this._modules.SvalTree;
       const { SvalColor } = this._modules;
       const stored = current
         ? appearanceOf(this._nodes, current)
@@ -1037,7 +1034,7 @@
      * @returns {string}
      */
     workspaceName(item) {
-      const { WORKSPACE } = this._modules.SvalPanelModel;
+      const { WORKSPACE } = this._modules.SvalTree;
       return item.name || this._untitled(WORKSPACE);
     },
 
@@ -1639,7 +1636,8 @@
       if (this._inMemory) {
         return null;
       }
-      const { WORKSPACE, handWorkspaceTo } = this._modules.SvalPanelModel;
+      const { handWorkspaceTo } = this._modules.SvalPanelModel;
+      const { WORKSPACE } = this._modules.SvalTree;
       if (this._nodes[id]?.kind !== WORKSPACE) {
         // A workspace another device deleted between the menu being built and an
         // entry being pressed. The redraw takes the entry away, which is the

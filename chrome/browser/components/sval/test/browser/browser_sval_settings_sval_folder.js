@@ -18,7 +18,7 @@ const { SvalSharedFolder } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs"
 );
 const { SYNC_DOCUMENT } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 /* import-globals-from ../../sval-panel.js */

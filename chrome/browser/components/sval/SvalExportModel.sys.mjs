@@ -24,13 +24,13 @@
  *     since the epoch, as Places keeps it.
  */
 
+import { agentLabelOf } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import {
-  agentLabelOf,
   childrenByParent,
   displayName,
   TAB,
   workspaceIds,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { importableUrl } from "moz-src:///browser/components/sval/SvalImportModel.sys.mjs";
 
 /** The folder every workspace folder sits in (export spec §3). */

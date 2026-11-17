@@ -20,7 +20,7 @@ const { runImport: runImportInto } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalImport.sys.mjs"
 );
 const { SPLIT, TAB, childrenByParent } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 const { SvalFavoritesStore: ImportFavorites } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs"

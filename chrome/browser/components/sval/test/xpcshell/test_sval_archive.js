@@ -22,7 +22,7 @@ const { SvalLocalSettings } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalLocalSettings.sys.mjs"
 );
 const { childrenByParent } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 const { within } = ChromeUtils.importESModule(
   "resource://testing-common/SvalTestWait.sys.mjs"

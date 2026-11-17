@@ -88,7 +88,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   createAgentGate: "moz-src:///browser/components/sval/SvalAgentGate.sys.mjs",
   createAgentTabs: "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs",
   createAgentTools: "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs",
-  SYNC_DOCUMENT: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+  SYNC_DOCUMENT: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
   TOOL_DEFINITIONS: "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs",
   untilStopped: "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs",
   refuseIfWorkspaceHeld:
@@ -101,7 +101,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs",
   pageToolsSettingOf:
     "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
-  workspaceIds: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+  workspaceIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
 });
 
 const PREF = "browser.sval.agents.enabled";

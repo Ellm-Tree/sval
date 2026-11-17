@@ -28,6 +28,9 @@ const { SvalSettingsSync } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 const { STEPS } = SvalFirstRunModel;
 
@@ -94,7 +97,7 @@ add_task(async function an_arc_import_runs_under_the_welcome() {
     },
   });
   const before = new Set(
-    SvalPanelModel.workspaceIds((await SvalPanel.engine.tree()).nodes)
+    SvalTree.workspaceIds((await SvalPanel.engine.tree()).nodes)
   );
 
   const shown = SvalFirstRun.open(window, {
@@ -163,7 +166,7 @@ add_task(async function an_arc_import_runs_under_the_welcome() {
   await within(shown, 10_000, "first run's end");
 
   const { nodes } = await SvalPanel.engine.tree();
-  const made = SvalPanelModel.workspaceIds(nodes).filter(id => !before.has(id));
+  const made = SvalTree.workspaceIds(nodes).filter(id => !before.has(id));
   Assert.equal(made.length, 1, "one Workspace is made");
   Assert.equal(
     nodes[made[0]].content.name,
@@ -171,7 +174,7 @@ add_task(async function an_arc_import_runs_under_the_welcome() {
     "and it is the one Arc's Space filled"
   );
   Assert.ok(
-    SvalPanelModel.childrenByParent(nodes).get(made[0])?.length,
+    SvalTree.childrenByParent(nodes).get(made[0])?.length,
     "with its tabs"
   );
   Assert.equal(

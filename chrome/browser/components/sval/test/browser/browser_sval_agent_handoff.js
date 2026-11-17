@@ -23,7 +23,7 @@ const { createAgentTabs } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs"
 );
 const { isWithin, WORKSPACE } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 add_setup(async function () {

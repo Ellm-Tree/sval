@@ -29,6 +29,9 @@ const { BasePromiseWorker } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 add_setup(privateSetup);
 
@@ -356,7 +359,7 @@ add_task(async function the_next_session_starts_empty() {
     Assert.ok(!(firstWorkspace in nodes), "nor its workspace");
     Assert.deepEqual(
       Object.keys(nodes).filter(
-        node => nodes[node].kind === SvalPanelModel.WORKSPACE
+        node => nodes[node].kind === SvalTree.WORKSPACE
       ),
       [second.SvalPanel.workspaceId],
       "the new window's workspace is the only one"

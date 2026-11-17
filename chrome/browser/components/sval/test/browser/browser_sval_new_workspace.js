@@ -80,9 +80,7 @@ const gAccService = Cc["@mozilla.org/accessibilityService;1"].getService(
  * @returns {Promise<Set<string>>} the workspaces the document holds.
  */
 async function workspacesHeld() {
-  return new Set(
-    SvalPanelModel.workspaceIds((await SvalPanel.engine.tree()).nodes)
-  );
+  return new Set(SvalTree.workspaceIds((await SvalPanel.engine.tree()).nodes));
 }
 
 /**
@@ -530,7 +528,7 @@ add_task(async function new_group_has_the_colour_and_emoji_pickers() {
   await dialogGone(reopened);
 
   const group = await nodeNamed("Recipes");
-  Assert.equal(group.kind, SvalPanelModel.GROUP, "a group is made");
+  Assert.equal(group.kind, SvalTree.GROUP, "a group is made");
   await TestUtils.waitForCondition(
     () => SvalPanel._rowElementFor(group.id),
     "the panel draws its row"

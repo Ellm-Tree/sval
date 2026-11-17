@@ -15,7 +15,7 @@
  */
 
 const { childrenByParent, isWithin } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 add_setup(async function () {

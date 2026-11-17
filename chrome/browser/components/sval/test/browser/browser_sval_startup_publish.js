@@ -20,6 +20,9 @@ Services.scriptloader.loadSubScript(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 /**
  * What a launch publishes into the shared folder, another device reads.
@@ -56,7 +59,7 @@ add_task(async function a_peer_reads_the_workspace_a_launch_published() {
     // The panel's own background steps share the one helper too.
     await TestUtils.waitForCondition(async () => {
       await SvalSharedFolder._whenIdle();
-      const report = await peer.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now());
+      const report = await peer.sync(SvalTree.SYNC_DOCUMENT, Date.now());
       return report.shared === "reached" && !report.sharedBusy;
     }, "the peer reached the folder");
     Assert.ok(

@@ -6,7 +6,7 @@
 /* import-globals-from shared_folder_head.js */
 
 const { childrenByParent } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 const { failEngineCalls } = ChromeUtils.importESModule(

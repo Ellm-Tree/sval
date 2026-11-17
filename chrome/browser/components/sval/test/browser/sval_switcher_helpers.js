@@ -31,8 +31,12 @@ const { SvalLocalSettings } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
-const { CURRENT_WORKSPACE_KEY, SYNC_DOCUMENT } = SvalPanelModel;
+const { CURRENT_WORKSPACE_KEY } = SvalPanelModel;
+const { SYNC_DOCUMENT } = SvalTree;
 
 const ConsoleAPIStorage = Cc["@mozilla.org/consoleAPI-storage;1"].getService(
   Ci.nsIConsoleAPIStorage
@@ -103,7 +107,7 @@ function leftWhenTheTaskEnds(workspaces) {
  */
 async function nameTheProfilesWorkspace(name) {
   const { engine } = SvalPanel;
-  const [id] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [id] = SvalTree.workspaceIds(SvalPanel.nodes);
   const was = SvalPanel.nodes[id].content?.name ?? "";
   const rename = to =>
     engine.mutate({ kind: "rename", id, name: to, now: Date.now() });

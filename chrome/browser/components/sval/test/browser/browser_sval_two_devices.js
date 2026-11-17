@@ -25,8 +25,11 @@ const { SvalEngine } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
-const { SYNC_DOCUMENT } = SvalPanelModel;
+const { SYNC_DOCUMENT } = SvalTree;
 
 /* import-globals-from ../../sval-panel.js */
 

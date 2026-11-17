@@ -292,8 +292,7 @@ Object.assign(SvalPanel, {
    * @returns {Promise<Uint8Array|null>}
    */
   async _keyInFolder(root) {
-    const { SvalICloudKeychain, SvalPanelModel, SvalSecretStore } =
-      this._modules;
+    const { SvalICloudKeychain, SvalTree, SvalSecretStore } = this._modules;
     const copies = (await this._engine.keyCopies(root).catch(() => null)) ?? [];
     const candidates = [];
     for (const sealed of copies) {
@@ -311,7 +310,7 @@ Object.assign(SvalPanel, {
         keyBytes?.length === 32 &&
         !isHeld(keyBytes) &&
         (await this._engine
-          .opensWorkspacesHere(keyBytes, SvalPanelModel.SYNC_DOCUMENT, root)
+          .opensWorkspacesHere(keyBytes, SvalTree.SYNC_DOCUMENT, root)
           .catch(() => false))
       ) {
         return keyBytes;
@@ -805,7 +804,7 @@ Object.assign(SvalPanel, {
    *   `no-folder`, `unreachable` or `mismatch`.
    */
   async restoreFromBackup(text) {
-    const { SvalPanelModel } = this._modules;
+    const { SvalPanelModel, SvalTree } = this._modules;
     const keyBytes = SvalPanelModel.fromBackupCode(text);
     if (!keyBytes) {
       return {
@@ -822,7 +821,7 @@ Object.assign(SvalPanel, {
       };
     }
     const opens = await this._engine
-      .opensWorkspacesHere(keyBytes, SvalPanelModel.SYNC_DOCUMENT)
+      .opensWorkspacesHere(keyBytes, SvalTree.SYNC_DOCUMENT)
       .catch(() => null);
     if (opens === null) {
       return {

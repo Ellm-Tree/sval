@@ -41,9 +41,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 // A namespace, because the module exports functions and no object of its
 // name for `defineESModuleGetters` to find.
-ChromeUtils.defineLazyGetter(lazy, "SvalPanelModel", () =>
+ChromeUtils.defineLazyGetter(lazy, "SvalTree", () =>
   ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+    "moz-src:///browser/components/sval/SvalTree.sys.mjs"
   )
 );
 
@@ -65,7 +65,7 @@ let inFlight = null;
  */
 async function isPublished(engine, ids) {
   try {
-    const json = await engine.publishedTree(lazy.SvalPanelModel.SYNC_DOCUMENT);
+    const json = await engine.publishedTree(lazy.SvalTree.SYNC_DOCUMENT);
     const present = JSON.parse(json).nodes ?? {};
     return ids.every(id => id in present);
   } catch (err) {
@@ -113,7 +113,7 @@ async function alreadyJoined(engine, offerPath) {
   let report;
   try {
     report = await engine.sync(
-      lazy.SvalPanelModel.SYNC_DOCUMENT,
+      lazy.SvalTree.SYNC_DOCUMENT,
       lazy.SvalClock.now(),
       {
         shared: "wait",
@@ -168,7 +168,7 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
   const publishHeld = !lazy.SvalClock.hasReading;
   if (!publishHeld) {
     try {
-      await engine.settleClock(lazy.SvalPanelModel.SYNC_DOCUMENT);
+      await engine.settleClock(lazy.SvalTree.SYNC_DOCUMENT);
     } catch (err) {
       return {
         outcome: "unchanged",
@@ -187,7 +187,7 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
     carried = await engine.treeJson();
     if (previous === null) {
       ({ json: carried, dropped: leftBehind } =
-        lazy.SvalPanelModel.withoutUntouchedWorkspaces(carried));
+        lazy.SvalTree.withoutUntouchedWorkspaces(carried));
     }
   } catch (err) {
     return {
@@ -214,7 +214,7 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
     try {
       await candidate.loadTree(carried);
       const passed = await candidate.sync(
-        lazy.SvalPanelModel.SYNC_DOCUMENT,
+        lazy.SvalTree.SYNC_DOCUMENT,
         lazy.SvalClock.now()
       );
       problem = passed?.sharedReason ?? null;
@@ -316,7 +316,7 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
   let report = null;
   try {
     report = await engine.sync(
-      lazy.SvalPanelModel.SYNC_DOCUMENT,
+      lazy.SvalTree.SYNC_DOCUMENT,
       lazy.SvalClock.now(),
       {
         shared: "wait",

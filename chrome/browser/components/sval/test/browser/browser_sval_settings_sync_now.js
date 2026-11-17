@@ -19,6 +19,9 @@ const { SvalSharedFolder } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 const { SvalEngine } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalEngine.sys.mjs"
 );
@@ -237,7 +240,7 @@ add_task(async function a_pass_asked_for_here_still_reports_in_the_panel() {
     id: crypto.randomUUID(),
     now: Date.now(),
   });
-  const { wrote } = await peer.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now());
+  const { wrote } = await peer.sync(SvalTree.SYNC_DOCUMENT, Date.now());
   Assert.notEqual(wrote, null, "the peer published its file");
   const file = PathUtils.join(root, ...wrote.split("/"));
   const bytes = await IOUtils.read(file);

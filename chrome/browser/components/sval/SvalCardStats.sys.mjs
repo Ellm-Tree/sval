@@ -22,7 +22,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalSettingsRegistry:
     "moz-src:///browser/components/sval/SvalSettingsRegistry.sys.mjs",
-  workspaceIds: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+  workspaceIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
 });
 
 /**

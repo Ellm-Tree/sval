@@ -124,7 +124,7 @@ add_task(async function the_dialog_counts_workspaces_and_tabs() {
   );
   const { nodes } = await SvalPanel.engine.tree();
   const { workspaceIds } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+    "moz-src:///browser/components/sval/SvalTree.sys.mjs"
   );
   const own = workspaceIds(nodes).filter(id => !nodes[id]?.agent);
   Assert.equal(

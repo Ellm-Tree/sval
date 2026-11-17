@@ -154,7 +154,7 @@ add_task(async function accel_n_opens_the_next_workspace_down() {
   });
   const [, second, third, fourth] = ids.workspaces;
   // The profile's own workspace, first in sibling order.
-  const [first] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [first] = SvalTree.workspaceIds(SvalPanel.nodes);
 
   const menu = await openSwitcher();
   await activateWorkspace(menu, second);

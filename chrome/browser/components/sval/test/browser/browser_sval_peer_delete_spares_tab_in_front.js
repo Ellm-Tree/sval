@@ -16,7 +16,7 @@ const { SvalEngine } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalEngine.sys.mjs"
 );
 const { SYNC_DOCUMENT } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 const CALL_PAGE = ROOT + "sval_capture_page.html";

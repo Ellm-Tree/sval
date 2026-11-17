@@ -28,7 +28,7 @@
  */
 
 import { SvalEngine } from "moz-src:///browser/components/sval/SvalEngine.sys.mjs";
-import { workspaceIds } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { workspaceIds } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import {
   waitForCondition,
   within,

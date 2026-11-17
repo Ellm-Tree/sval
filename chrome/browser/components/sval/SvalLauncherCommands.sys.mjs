@@ -35,13 +35,15 @@ import {
   onBoundary,
 } from "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs";
 import {
-  TAB,
-  WORKSPACE,
   agentLabelOf,
-  childrenByParent,
-  displayName,
   isPane,
 } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import {
+  TAB,
+  WORKSPACE,
+  childrenByParent,
+  displayName,
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import {
   COPY_ADDRESS_KEY,
   NEW_PEEK_KEY,

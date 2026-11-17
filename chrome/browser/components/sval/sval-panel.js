@@ -69,7 +69,7 @@ var SvalPanel = {
    * `SessionStore.setCustomWindowValue(window, SvalPanelModel
    * .CURRENT_WORKSPACE_KEY, id)`, which is per window and survives a restart.
    *
-   * The document Sval syncs is `SvalPanelModel.SYNC_DOCUMENT`, one document
+   * The document Sval syncs is `SvalTree.SYNC_DOCUMENT`, one document
    * holding every workspace.
    */
   _currentWorkspaceId: null,
@@ -559,6 +559,11 @@ var SvalPanel = {
       ChromeUtils.defineLazyGetter(this.__modules, "SvalPanelModel", () =>
         ChromeUtils.importESModule(
           "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+        )
+      );
+      ChromeUtils.defineLazyGetter(this.__modules, "SvalTree", () =>
+        ChromeUtils.importESModule(
+          "moz-src:///browser/components/sval/SvalTree.sys.mjs"
         )
       );
       ChromeUtils.defineLazyGetter(this.__modules, "SvalAgentControl", () =>

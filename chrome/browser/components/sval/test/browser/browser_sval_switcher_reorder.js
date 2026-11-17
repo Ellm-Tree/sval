@@ -46,7 +46,7 @@ function drag(type, target, dataTransfer, at = 0.5) {
 /** The document's Workspaces, in the order every list of them reads. */
 async function documentOrder() {
   const nodes = (await SvalPanel.engine.tree()).nodes ?? {};
-  return SvalPanelModel.workspaceIds(nodes);
+  return SvalTree.workspaceIds(nodes);
 }
 
 add_task(async function dragging_an_entry_reorders_the_workspaces() {

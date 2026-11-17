@@ -24,10 +24,8 @@ import {
   HOME_FAVORITES_PREF,
   SvalHomePage,
 } from "moz-src:///browser/components/sval/SvalHomePage.sys.mjs";
-import {
-  WINDOW_WORKSPACE_TOPIC,
-  WORKSPACE,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { WINDOW_WORKSPACE_TOPIC } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { WORKSPACE } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import {
   pinOf,
   slotsIn,

@@ -95,7 +95,7 @@ add_task(async function a_nameless_tab_row_draws_its_address() {
 
   Assert.equal(
     label(nameless.group),
-    SvalPanel._untitled(SvalPanelModel.GROUP),
+    SvalPanel._untitled(SvalTree.GROUP),
     "a nameless group still says so: it has no address to fall back on"
   );
 });

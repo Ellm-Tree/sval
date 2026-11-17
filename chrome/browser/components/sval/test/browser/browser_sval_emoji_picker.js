@@ -80,7 +80,7 @@ async function openPicker(initial = "") {
     reopened.querySelector(".sval-nw-create").click();
     await dialogGone(reopened);
     await within(SvalPanel.observer.settled(), 10_000, "the window settling");
-    return SvalPanelModel.appearanceOf(await nodes(engine), group).emoji ?? "";
+    return SvalTree.appearanceOf(await nodes(engine), group).emoji ?? "";
   };
   return { answer, doc };
 }

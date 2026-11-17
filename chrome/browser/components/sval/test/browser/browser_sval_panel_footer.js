@@ -67,7 +67,7 @@ async function anotherKeysWorkspaces(shared) {
     id: crypto.randomUUID(),
     now: Date.now(),
   });
-  await theirs.sync(SvalPanelModel.SYNC_DOCUMENT, Date.now(), {
+  await theirs.sync(SvalTree.SYNC_DOCUMENT, Date.now(), {
     shared: "wait",
   });
 }
@@ -340,7 +340,7 @@ add_task(async function a_device_with_its_clock_ahead_is_named() {
     valueJson: JSON.stringify("Work Laptop"),
     now,
   });
-  await peer.sync(SvalPanelModel.SYNC_DOCUMENT, now, { shared: "wait" });
+  await peer.sync(SvalTree.SYNC_DOCUMENT, now, { shared: "wait" });
   const ahead = now + 11 * 60_000;
   await peer.mutate({
     kind: "rename",
@@ -348,7 +348,7 @@ add_task(async function a_device_with_its_clock_ahead_is_named() {
     name: "Theirs",
     now: ahead,
   });
-  await peer.sync(SvalPanelModel.SYNC_DOCUMENT, ahead, { shared: "wait" });
+  await peer.sync(SvalTree.SYNC_DOCUMENT, ahead, { shared: "wait" });
 
   Assert.equal(await SvalPanel.syncWithFolder(), "reached", "a step merges it");
   const { indicator, syncDetail } = indicatorParts();

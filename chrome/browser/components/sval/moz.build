@@ -199,6 +199,7 @@ MOZ_SRC_FILES += [
     "SvalTitleHold.sys.mjs",
     "SvalTrackerOwners.sys.mjs",
     "SvalTrackingSettings.sys.mjs",
+    "SvalTree.sys.mjs",
     "SvalTreeSnapshot.sys.mjs",
     "SvalUpdateDelay.sys.mjs",
     "SvalVisitWorkspaces.sys.mjs",

@@ -11,7 +11,6 @@
  * dialog, tags, the Library and container items, none of which Sval has.
  */
 
-import * as SvalPanelModel from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 
 const lazy = {};
@@ -209,7 +208,7 @@ export const SvalFavoritesMenu = {
         lazy.fillShowIn(
           showInPopup,
           menu._svalTarget.guid,
-          panel?.nodes ? lazy.showInWorkspaces(panel.nodes, SvalPanelModel) : []
+          panel?.nodes ? lazy.showInWorkspaces(panel.nodes) : []
         );
       } else if (event.target === moveToPopup) {
         this._fillMoveTo(win, menu, moveToPopup).catch(err =>

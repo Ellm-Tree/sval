@@ -204,8 +204,8 @@ add_task(function the_robot_is_not_offered_for_a_workspace() {
  * is always prefaced, so a page's own title can never begin one.
  */
 add_task(function the_robot_is_reserved_wherever_a_user_could_put_it() {
-  const { appearanceOf, rows, switcherItems, windowTitlePreface } =
-    SvalPanelModel;
+  const { rows, switcherItems, windowTitlePreface } = SvalPanelModel;
+  const { appearanceOf } = SvalTree;
   for (const robot of ["🤖", "🤖\uFE0F"]) {
     const nodes = {
       w: {

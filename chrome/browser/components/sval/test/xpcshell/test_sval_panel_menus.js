@@ -12,7 +12,8 @@
  * offers "New workspace": the switcher is where a workspace is made.
  */
 add_task(function context_menu_items_depend_on_row_kind() {
-  const { contextMenuItems, TAB, GROUP, WORKSPACE } = SvalPanelModel;
+  const { contextMenuItems } = SvalPanelModel;
+  const { TAB, GROUP, WORKSPACE } = SvalTree;
 
   Assert.deepEqual(
     contextMenuItems(TAB),

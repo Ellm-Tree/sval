@@ -135,7 +135,7 @@
       if (!node || node.content?.name) {
         return null;
       }
-      const { childrenByParent, TAB } = this._modules.SvalPanelModel;
+      const { childrenByParent, TAB } = this._modules.SvalTree;
       const children = childrenByParent(this._nodes).get(id) ?? [];
       const onlyHome = children.every(
         child =>

@@ -10,7 +10,8 @@
  * device, because it is the shared fractional index.
  */
 add_task(function the_switcher_lists_every_workspace_in_sibling_order() {
-  const { workspaceIds, switcherItems } = SvalPanelModel;
+  const { switcherItems } = SvalPanelModel;
+  const { workspaceIds } = SvalTree;
   const nodes = {
     b: node({ kind: "workspace", name: "Second", order: "c0" }),
     a: node({ kind: "workspace", name: "First", order: "40" }),
@@ -156,7 +157,7 @@ add_task(function the_remembered_workspace_survives_or_falls_back() {
     early: node({ kind: "workspace", name: "Arrived", order: "10" }),
   };
   Assert.equal(
-    SvalPanelModel.workspaceIds(withArrival)[0],
+    SvalTree.workspaceIds(withArrival)[0],
     "early",
     "the arriving workspace sorts first, so this is not a vacuous check"
   );
@@ -667,7 +668,7 @@ add_task(function another_devices_agent_workspace_names_the_device() {
  * with no group and at most one tab still on a fresh window's page.
  */
 add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
-  const { withoutUntouchedWorkspaces } = SvalPanelModel;
+  const { withoutUntouchedWorkspaces } = SvalTree;
   const ws = (name = "") => ({ kind: "workspace", content: { name } });
   const tab = (parent, url) => ({
     kind: "tab",
@@ -723,7 +724,7 @@ add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
   );
   Assert.deepEqual(kept.seen, doc.seen, "and the rest of the document stays");
 
-  const { isUntouchedWorkspace } = SvalPanelModel;
+  const { isUntouchedWorkspace } = SvalTree;
   Assert.deepEqual(
     Object.keys(doc.nodes).filter(id => isUntouchedWorkspace(doc.nodes, id)),
     ["fresh", "empty"],

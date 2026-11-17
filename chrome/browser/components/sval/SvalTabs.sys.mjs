@@ -53,17 +53,19 @@ import { SvalTitleHold } from "moz-src:///browser/components/sval/SvalTitleHold.
 import { isQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeekTab.sys.mjs";
 import { isPin } from "moz-src:///browser/components/sval/SvalPinTab.sys.mjs";
 import {
+  moveIntoTarget,
+  splitShapeOps,
+} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import {
   SPLIT,
   TAB,
   childrenByParent,
   descendantIds,
   isUntouchedWorkspace,
   isWithin,
-  moveIntoTarget,
-  splitShapeOps,
   workspaceIds,
   workspaceOfNode,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import {
   sharesOf,
   splitChanges,

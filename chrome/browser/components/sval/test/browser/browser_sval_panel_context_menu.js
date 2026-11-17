@@ -477,7 +477,7 @@ add_task(async function delete_workspace_from_its_menu() {
     const after = (await engine.tree()).nodes;
     Assert.equal(
       after[SvalPanel.workspaceId]?.kind,
-      SvalPanelModel.WORKSPACE,
+      SvalTree.WORKSPACE,
       "to a workspace that still exists"
     );
     for (const [name, id] of Object.entries(ids)) {
@@ -489,7 +489,7 @@ add_task(async function delete_workspace_from_its_menu() {
     // holds the profile's workspaces too, and another device deletes them.
     await engine.mutate({
       kind: "batch",
-      ops: SvalPanelModel.workspaceIds(SvalPanel.nodes)
+      ops: SvalTree.workspaceIds(SvalPanel.nodes)
         .filter(id => id !== other)
         .map(id => ({ kind: "remove", id })),
       now: Date.now(),

@@ -537,7 +537,7 @@ add_task(async function the_current_workspace_opens_the_full_list() {
   info("End and Home go to the last and the first");
   EventUtils.synthesizeKey("KEY_End", {}, window);
   await switched(third);
-  const [profiles] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [profiles] = SvalTree.workspaceIds(SvalPanel.nodes);
   EventUtils.synthesizeKey("KEY_Home", {}, window);
   await switched(profiles);
 });

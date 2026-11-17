@@ -24,7 +24,7 @@ const { UrlbarTestUtils } = ChromeUtils.importESModule(
 );
 UrlbarTestUtils.init(this);
 const { ancestorIds } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 add_setup(failOnConsoleErrors);

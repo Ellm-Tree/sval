@@ -215,7 +215,7 @@ add_task(async function one_workspace_still_has_a_working_switcher() {
   await nameTheProfilesWorkspace("Home");
 
   Assert.equal(
-    SvalPanelModel.workspaceIds(SvalPanel.nodes).length,
+    SvalTree.workspaceIds(SvalPanel.nodes).length,
     1,
     "the profile's document holds exactly one workspace, which is the state " +
       "under test"
@@ -323,7 +323,7 @@ add_task(async function a_peers_workspace_does_not_move_this_window() {
   // window.
   Assert.ok(await SvalPanel._syncInBackground(), "the poll read the folder");
   Assert.ok(theirs in SvalPanel.nodes, "and brought the workspace in");
-  const order = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const order = SvalTree.workspaceIds(SvalPanel.nodes);
   Assert.less(
     order.indexOf(first),
     order.indexOf(theirs),
@@ -413,7 +413,7 @@ add_task(async function a_new_workspace_is_the_one_the_window_shows() {
   {
     let made;
     await TestUtils.waitForCondition(() => {
-      made = SvalPanelModel.workspaceIds(SvalPanel.nodes).find(
+      made = SvalTree.workspaceIds(SvalPanel.nodes).find(
         id => SvalPanel.nodes[id].content.name === "Made here"
       );
       return (

@@ -30,6 +30,9 @@ const { PlacesTestUtils } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 /** Sval's settings page, which the panel's notices open. */
 const SETTINGS_URL = "about:preferences";
@@ -409,5 +412,5 @@ async function chooseOnWorkspace(id, command) {
  */
 async function childrenOf(engine, parent) {
   const nodes = (await engine.tree()).nodes;
-  return SvalPanelModel.childrenByParent(nodes).get(parent) ?? [];
+  return SvalTree.childrenByParent(nodes).get(parent) ?? [];
 }

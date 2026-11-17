@@ -57,10 +57,8 @@ import {
 } from "moz-src:///browser/components/sval/SvalAgentTabRegistry.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { isQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeekTab.sys.mjs";
-import {
-  ancestorIds,
-  handWorkspaceTo,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { handWorkspaceTo } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { ancestorIds } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
 const lazy = {};

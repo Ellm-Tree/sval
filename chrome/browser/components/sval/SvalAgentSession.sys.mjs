@@ -34,7 +34,7 @@ import {
   SPLIT,
   TAB,
   childrenByParent,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 /**
  * The MCP versions Sval speaks. A legacy version opens with `initialize`, and

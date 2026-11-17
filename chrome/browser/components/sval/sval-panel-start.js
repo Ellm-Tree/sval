@@ -515,7 +515,7 @@ Object.assign(SvalPanel, {
     // while the claim is pending.
     if (
       this._modules.SvalFirstRun.pairing &&
-      !this._modules.SvalPanelModel.workspaceIds(this._nodes).length
+      !this._modules.SvalTree.workspaceIds(this._nodes).length
     ) {
       if (!this._heldByPairing) {
         this._heldByPairing = true;
@@ -534,7 +534,7 @@ Object.assign(SvalPanel, {
     }
 
     if (sharedFolder) {
-      const { SvalPanelModel } = this._modules;
+      const { SvalTree } = this._modules;
       // A document with no workspace in it, pointed at a shared folder, cannot
       // know whether that folder holds one until it has answered (local-copy
       // spec §4.4). The profile file alone does not say: the first pass writes
@@ -548,7 +548,7 @@ Object.assign(SvalPanel, {
       const canRead =
         this._syncKeyState ===
         this._modules.SvalIdentity.SYNC_KEY_STATES.present;
-      if (canRead && !SvalPanelModel.workspaceIds(this._nodes).length) {
+      if (canRead && !SvalTree.workspaceIds(this._nodes).length) {
         if ((await this.syncWithFolder()) !== "reached") {
           this._scheduleStartRetry(remembered);
           return;
@@ -687,12 +687,12 @@ Object.assign(SvalPanel, {
    * @returns {Promise<boolean>} whether the window was drawn.
    */
   async _drawFromEngine() {
-    const { SvalPanelModel } = this._modules;
-    if (!this._engine.hasRead(SvalPanelModel.SYNC_DOCUMENT)) {
+    const { SvalTree } = this._modules;
+    if (!this._engine.hasRead(SvalTree.SYNC_DOCUMENT)) {
       return false;
     }
     const nodes = (await this._engine.tree()).nodes ?? {};
-    if (!SvalPanelModel.workspaceIds(nodes).length) {
+    if (!SvalTree.workspaceIds(nodes).length) {
       return false;
     }
     await this.refresh(nodes);
@@ -758,7 +758,7 @@ Object.assign(SvalPanel, {
     if (this._observer || !this._currentWorkspaceId) {
       return;
     }
-    const { SvalTabs, SvalPanelModel } = this._modules;
+    const { SvalTabs, SvalTree } = this._modules;
     if (this._inMemory) {
       // No sync document, no flush and no poll: nothing here is ever written.
       // The debounce coalesces a burst of activity into one published file,
@@ -791,7 +791,7 @@ Object.assign(SvalPanel, {
       engine: this._engine,
       workspaceId: this._currentWorkspaceId,
       keep,
-      syncDocument: SvalPanelModel.SYNC_DOCUMENT,
+      syncDocument: SvalTree.SYNC_DOCUMENT,
       settings: this._settings,
       // There is always a root, so a burst of tab activity always ends in a
       // write. That write is what makes the tabs come back next launch, which is

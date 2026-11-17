@@ -36,7 +36,7 @@ function mixedDocument() {
  * @returns {Map<string, string[]>} each parent's children afterwards.
  */
 function applied(nodes, moves) {
-  const byParent = SvalPanelModel.childrenByParent(nodes);
+  const byParent = SvalTree.childrenByParent(nodes);
   for (const { id, newParent, before, after } of moves) {
     for (const children of byParent.values()) {
       const at = children.indexOf(id);
@@ -209,7 +209,8 @@ add_task(function a_dropped_selection_lands_together_where_it_was_dropped() {
 });
 
 add_task(function a_dragged_selection_drops_beside_or_into() {
-  const { dropIntent, TAB, GROUP } = SvalPanelModel;
+  const { dropIntent } = SvalPanelModel;
+  const { TAB, GROUP } = SvalTree;
   const nodes = mixedDocument();
   const at = y => ({ x: 10, y, w: 300, h: 32 });
   const carried = ["t-top", "g-c"];
@@ -263,7 +264,8 @@ add_task(function a_selection_makes_a_group_where_its_first_row_was() {
 });
 
 add_task(function a_menu_on_a_selection_offers_a_group_from_it() {
-  const { contextMenuItems, SELECTION_COMMANDS, TAB } = SvalPanelModel;
+  const { contextMenuItems, SELECTION_COMMANDS } = SvalPanelModel;
+  const { TAB } = SvalTree;
   const items = contextMenuItems(TAB, { several: true });
   Assert.equal(
     items[items.indexOf("moveToGroup") + 1],

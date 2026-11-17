@@ -60,7 +60,7 @@
 
 import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
-import { WORKSPACE } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { WORKSPACE } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 /**
  * Notified with a tab content's `browserId` as data whenever it changes

@@ -164,7 +164,7 @@ add_task(async function continuing_through_first_run_keeps_each_answer() {
     "with the name typed"
   );
   Assert.deepEqual(
-    SvalPanelModel.appearanceOf(SvalPanel.nodes, workspaces[0]),
+    SvalTree.appearanceOf(SvalPanel.nodes, workspaces[0]),
     { color: "pink", emoji, transparency: null },
     "and the colour and emoji chosen"
   );

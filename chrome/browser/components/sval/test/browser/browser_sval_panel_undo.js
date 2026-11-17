@@ -24,7 +24,7 @@ const { SvalFirefox } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalFirefox.sys.mjs"
 );
 const { SPLIT, TAB } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 const { SvalTabs } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalTabs.sys.mjs"

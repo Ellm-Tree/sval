@@ -43,13 +43,13 @@ import {
   matchableUrl,
   onBoundary,
 } from "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs";
+import { agentLabelOf } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import {
   TAB,
-  agentLabelOf,
   appearanceOf,
   displayName,
   workspaceOfNode,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { colorOf } from "moz-src:///browser/components/sval/SvalColor.sys.mjs";
 
 const lazy = {};

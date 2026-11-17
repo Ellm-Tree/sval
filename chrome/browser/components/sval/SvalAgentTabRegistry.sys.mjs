@@ -32,8 +32,8 @@ import {
 import {
   handWorkspaceTo,
   isHandedToAgent,
-  workspaceOfNode,
 } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { workspaceOfNode } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import {
   latestNodes,
   onTree,

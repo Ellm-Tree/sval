@@ -74,7 +74,7 @@
     },
 
     /**
-     * The children of each node of `_nodes` (`SvalPanelModel.childrenByParent`)
+     * The children of each node of `_nodes` (`SvalTree.childrenByParent`)
      * while a {@link _withTabLookups} pass runs, built on its first use in the
      * pass and dropped when the pass ends. `nodes` is the map it indexes,
      * and it is built again for any other `_nodes`.
@@ -108,13 +108,13 @@
     },
 
     /**
-     * `SvalPanelModel.childrenByParent(this._nodes)`, built once per
+     * `SvalTree.childrenByParent(this._nodes)`, built once per
      * {@link _withTabLookups} pass and afresh outside one.
      *
      * @returns {Map<string|null, string[]>}
      */
     _childrenByParent() {
-      const { childrenByParent } = this._modules.SvalPanelModel;
+      const { childrenByParent } = this._modules.SvalTree;
       const index = this._treeIndex;
       if (!index) {
         return childrenByParent(this._nodes);
@@ -328,7 +328,7 @@
       name.textContent = row.name || this._untitled(row.kind, row.url);
       if (row.url) {
         const why =
-          row.kind === this._modules.SvalPanelModel.TAB &&
+          row.kind === this._modules.SvalTree.TAB &&
           !this._observer?.isLoaded(row.id) &&
           !this._opensHere(row.id)
             ? `\n${UNOPENABLE_TEXT}`
@@ -360,7 +360,7 @@
       );
       el.setAttribute("tabindex", row.id === this._focusedId ? "0" : "-1");
       this._paintRowSound(el, row);
-      if (row.kind === this._modules.SvalPanelModel.TAB) {
+      if (row.kind === this._modules.SvalTree.TAB) {
         this._setTabLoaded(el, row.id, row);
       } else {
         this._describeRow(el, row);
@@ -376,7 +376,7 @@
      * @returns {?string}
      */
     _rowMedia(row) {
-      const { TAB, GROUP } = this._modules.SvalPanelModel;
+      const { TAB, GROUP } = this._modules.SvalTree;
       if (row.kind !== TAB && !(row.kind === GROUP && !row.expanded)) {
         return null;
       }
@@ -551,7 +551,7 @@
      * @param {object} row A row from `SvalPanelModel.rows`.
      */
     _describeRow(el, row) {
-      const { TAB, GROUP } = this._modules.SvalPanelModel;
+      const { TAB, GROUP } = this._modules.SvalTree;
       const parts = [];
       if (row.kind === TAB) {
         if (el.hasAttribute("data-unopenable")) {
@@ -606,7 +606,7 @@
      */
     _noteRowMotion(drawn) {
       const now = performance.now();
-      const { TAB } = this._modules.SvalPanelModel;
+      const { TAB } = this._modules.SvalTree;
       const tabs = new Set(
         Object.keys(this._nodes).filter(id => this._nodes[id].kind === TAB)
       );
@@ -704,7 +704,7 @@
       this._markBlocks(el, row);
       // A workspace is not a row (spec §10.7), but one in a broken chain can be
       // drawn as one; it has no siblings here to be dragged among.
-      if (row.kind !== this._modules.SvalPanelModel.WORKSPACE) {
+      if (row.kind !== this._modules.SvalTree.WORKSPACE) {
         el.setAttribute("draggable", "true");
       }
 
@@ -724,7 +724,7 @@
       // indent every nameless row differently from its siblings.
       if (row.emoji) {
         el.append(this._emojiElement(row.emoji, "sval-row-emoji"));
-      } else if (row.kind === this._modules.SvalPanelModel.GROUP) {
+      } else if (row.kind === this._modules.SvalTree.GROUP) {
         // A group with no emoji of its own still has to read as a container, so
         // it takes a folder in the slot an emoji would fill.
         const folder = this._html("span");
@@ -741,7 +741,7 @@
 
       // Every tab row has the slot, filled or not, so names start at the same
       // place whether or not a favicon has arrived or the tab is live here.
-      if (row.kind === this._modules.SvalPanelModel.TAB) {
+      if (row.kind === this._modules.SvalTree.TAB) {
         el.append(this._tabIconElement(row.id, row.url));
         // Every tab in an agent's workspace is the agent's, a tab the user
         // handed over included, so every one wears the robot (spec §6).
@@ -762,8 +762,8 @@
       // paused or muted (spec §10.7). Its menu's entry is the keyboard's way
       // to the same command.
       if (
-        row.kind === this._modules.SvalPanelModel.TAB ||
-        row.kind === this._modules.SvalPanelModel.GROUP
+        row.kind === this._modules.SvalTree.TAB ||
+        row.kind === this._modules.SvalTree.GROUP
       ) {
         const audio = this._html("button");
         audio.className = "sval-row-audio";
@@ -775,7 +775,7 @@
 
       // Shown by the stylesheet only while the group is collapsed, when its
       // children are out of sight and this is the only sign of what it holds.
-      if (row.hasChildren && row.kind !== this._modules.SvalPanelModel.TAB) {
+      if (row.hasChildren && row.kind !== this._modules.SvalTree.TAB) {
         const count = this._html("span");
         count.className = "sval-row-count";
         // A bare number in the row's name; the description says "12 tabs".
@@ -786,7 +786,7 @@
 
       // Only a tab closes. A group toggles, and is deleted from its menu
       // (spec §5.4).
-      if (row.kind === this._modules.SvalPanelModel.TAB) {
+      if (row.kind === this._modules.SvalTree.TAB) {
         const close = this._html("button");
         close.className = "sval-row-close";
         close.setAttribute("tabindex", "-1");
@@ -1327,7 +1327,7 @@
      * @returns {string}
      */
     _untitled(kind, url = null) {
-      const { WORKSPACE, GROUP } = this._modules.SvalPanelModel;
+      const { WORKSPACE, GROUP } = this._modules.SvalTree;
       if (kind === WORKSPACE) {
         return "Untitled Workspace";
       }
@@ -1372,7 +1372,7 @@
      * @returns {string}
      */
     _kindNoun(kind) {
-      const { WORKSPACE, GROUP } = this._modules.SvalPanelModel;
+      const { WORKSPACE, GROUP } = this._modules.SvalTree;
       if (kind === WORKSPACE) {
         return "Workspace";
       }

@@ -40,7 +40,7 @@ async function withNewWindowOnNewWorkspace() {
 
   // `tearOff` closes its window when the task ends.
   await tearOff(ids.workspaces[1]);
-  await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   const win = await within(
     BrowserTestUtils.openNewBrowserWindow(),
     20_000,
@@ -136,7 +136,7 @@ add_task(async function a_new_window_does_not_take_a_held_workspace() {
   const free = ids.workspaces[1];
   // The profile's own workspace in a window, so the held one is the only one
   // no window shows.
-  await tearOff(SvalPanelModel.workspaceIds(SvalPanel.nodes)[0]);
+  await tearOff(SvalTree.workspaceIds(SvalPanel.nodes)[0]);
   let release;
   SvalPanel._modules.SvalPanelModel.holdWhileClosing(
     free,

@@ -218,7 +218,8 @@ Object.assign(SvalPanel, {
    * whole.
    */
   async _addGroup() {
-    const { GROUP, defaultSlot } = this._modules.SvalPanelModel;
+    const { defaultSlot } = this._modules.SvalPanelModel;
+    const { GROUP } = this._modules.SvalTree;
     const parent = await this._newTabParent();
     if (!parent) {
       return;
@@ -272,7 +273,7 @@ Object.assign(SvalPanel, {
    * @param {object} row The row the user asked to rename.
    */
   async _rename(row) {
-    if (this._nodes[row.id]?.kind === this._modules.SvalPanelModel.TAB) {
+    if (this._nodes[row.id]?.kind === this._modules.SvalTree.TAB) {
       // A window with one temporary workspace names no tab, as its menu
       // offers no Rename (`SvalPanelModel.contextMenuItems`).
       if (!this._inMemory) {
@@ -311,8 +312,8 @@ Object.assign(SvalPanel, {
    * @param {string} id A tab's node id.
    */
   async renameTab(id) {
-    const { openSvalDialog, SvalPanelModel } = this._modules;
-    const shown = SvalPanelModel.displayName(this._nodes[id]);
+    const { openSvalDialog, SvalPanelModel, SvalTree } = this._modules;
+    const shown = SvalTree.displayName(this._nodes[id]);
     const answer = await openSvalDialog(window, {
       icon: "pencil",
       title: "Rename Tab",
@@ -374,8 +375,8 @@ Object.assign(SvalPanel, {
    * @param {object} row The workspace or group; only its id is read.
    */
   async edit(row) {
-    const { WORKSPACE, appearanceOf, chosenContainer } =
-      this._modules.SvalPanelModel;
+    const { chosenContainer } = this._modules.SvalPanelModel;
+    const { WORKSPACE, appearanceOf } = this._modules.SvalTree;
     const node = this._nodes[row.id];
     if (!node) {
       return;
@@ -510,7 +511,8 @@ Object.assign(SvalPanel, {
    * @returns {object|undefined} `{ choices, value }`, or undefined.
    */
   _autoArchiveField(id) {
-    const { WORKSPACE, agentLabelOf } = this._modules.SvalPanelModel;
+    const { agentLabelOf } = this._modules.SvalPanelModel;
+    const { WORKSPACE } = this._modules.SvalTree;
     if (
       this._inMemory ||
       this._nodes[id]?.kind !== WORKSPACE ||
@@ -573,7 +575,7 @@ Object.assign(SvalPanel, {
    * @returns {Promise<void>|undefined}
    */
   _closeRows(row) {
-    if (row.kind !== this._modules.SvalPanelModel.TAB) {
+    if (row.kind !== this._modules.SvalTree.TAB) {
       return undefined;
     }
     const several = this._selectionFor(row);
@@ -590,7 +592,7 @@ Object.assign(SvalPanel, {
    * @returns {boolean} whether Close can close them: every one is a tab.
    */
   _closesSelection(ids) {
-    const { TAB } = this._modules.SvalPanelModel;
+    const { TAB } = this._modules.SvalTree;
     return ids.every(id => this._nodes[id]?.kind === TAB);
   },
 
@@ -640,13 +642,9 @@ Object.assign(SvalPanel, {
    * @param {string} id A group id.
    */
   async _deleteGroup(id) {
-    const {
-      GROUP,
-      descendantIds,
-      descendantTabCount,
-      descendantGroupCount,
-      deleteGroupText,
-    } = this._modules.SvalPanelModel;
+    const { descendantTabCount, descendantGroupCount, deleteGroupText } =
+      this._modules.SvalPanelModel;
+    const { GROUP, descendantIds } = this._modules.SvalTree;
     if (this._nodes[id]?.kind !== GROUP) {
       return;
     }
@@ -685,13 +683,9 @@ Object.assign(SvalPanel, {
    * @param {string} id A workspace id.
    */
   async _deleteWorkspace(id) {
-    const {
-      WORKSPACE,
-      workspaceIds,
-      descendantTabCount,
-      descendantGroupCount,
-      deleteWorkspaceText,
-    } = this._modules.SvalPanelModel;
+    const { descendantTabCount, descendantGroupCount, deleteWorkspaceText } =
+      this._modules.SvalPanelModel;
+    const { WORKSPACE, workspaceIds } = this._modules.SvalTree;
     if (
       this._inMemory ||
       this._nodes[id]?.kind !== WORKSPACE ||
@@ -733,7 +727,8 @@ Object.assign(SvalPanel, {
    */
   async _removeSubtree(id, { keepContents = false } = {}) {
     await this.commitPendingDelete();
-    const { descendantIds, rowIndexIn } = this._modules.SvalPanelModel;
+    const { rowIndexIn } = this._modules.SvalPanelModel;
+    const { descendantIds } = this._modules.SvalTree;
     const ids = [id].flat();
     const index = rowIndexIn(this._rows, ids[0]);
     // Every tab event this window has seen is filed first, so a tab just
@@ -876,7 +871,8 @@ Object.assign(SvalPanel, {
     if (this._inMemory) {
       return;
     }
-    const { WORKSPACE, moveIntoTargets } = this._modules.SvalPanelModel;
+    const { moveIntoTargets } = this._modules.SvalPanelModel;
+    const { WORKSPACE } = this._modules.SvalTree;
     const ids = [id].flat();
     let targets;
     let first = [];
@@ -960,7 +956,7 @@ Object.assign(SvalPanel, {
     if (!observer || !current) {
       return;
     }
-    const { descendantIds, TAB } = this._modules.SvalPanelModel;
+    const { descendantIds, TAB } = this._modules.SvalTree;
     const keep = [current, ...descendantIds(this._nodes, current)];
     const selected = observer.nodeIdFor(window.gBrowser.selectedTab);
     if (selected && !keep.includes(selected)) {
@@ -1005,7 +1001,8 @@ Object.assign(SvalPanel, {
    * @returns {Promise<boolean>} whether the move happened.
    */
   async _applyMove(target, { flash = false, first = [], focus = null } = {}) {
-    const { isWithin, splitShapeOps } = this._modules.SvalPanelModel;
+    const { splitShapeOps } = this._modules.SvalPanelModel;
+    const { isWithin } = this._modules.SvalTree;
     const targets = [target].flat();
     const { id } = targets[0];
     // A tree in memory holds the workspace of every window on it; a move
@@ -1083,7 +1080,7 @@ Object.assign(SvalPanel, {
    * @param {string} id A workspace or group id.
    */
   _expandTo(id) {
-    const { ancestorIds } = this._modules.SvalPanelModel;
+    const { ancestorIds } = this._modules.SvalTree;
     const chain =
       id in this._nodes ? [id, ...ancestorIds(this._nodes, id)] : [];
     for (const container of chain) {
@@ -1214,7 +1211,8 @@ Object.assign(SvalPanel, {
    * @param {boolean} isolated What to make it.
    */
   async _setIsolation(id, isolated) {
-    const { WORKSPACE, isolationText } = this._modules.SvalPanelModel;
+    const { isolationText } = this._modules.SvalPanelModel;
+    const { WORKSPACE } = this._modules.SvalTree;
     if (this._inMemory || this._nodes[id]?.kind !== WORKSPACE) {
       return;
     }
@@ -1273,7 +1271,8 @@ Object.assign(SvalPanel, {
     source = this._currentWorkspaceId,
     nodes = this._nodes
   ) {
-    const { WORKSPACE, moveAcrossJarsText } = this._modules.SvalPanelModel;
+    const { moveAcrossJarsText } = this._modules.SvalPanelModel;
+    const { WORKSPACE } = this._modules.SvalTree;
     if (!this._crossesJar(nodes, source, destination, made)) {
       return true;
     }
@@ -1317,7 +1316,8 @@ Object.assign(SvalPanel, {
    * @returns {string[]} the tab nodes a move of `id` moves, each once.
    */
   _tabsMoving(nodes, id) {
-    const { TAB, descendantIds, outermostIds } = this._modules.SvalPanelModel;
+    const { outermostIds } = this._modules.SvalPanelModel;
+    const { TAB, descendantIds } = this._modules.SvalTree;
     return outermostIds(nodes, [id].flat())
       .flatMap(each => [each, ...descendantIds(nodes, each)])
       .filter(each => nodes[each]?.kind === TAB);

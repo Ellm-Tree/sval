@@ -96,9 +96,9 @@ async function workspaceWith(count, { split = null, shares = null } = {}) {
  */
 async function shape(engine, workspace) {
   const nodes = (await engine.tree()).nodes ?? {};
-  const byParent = SvalPanelModel.childrenByParent(nodes);
+  const byParent = SvalTree.childrenByParent(nodes);
   return (byParent.get(workspace) ?? []).map(id =>
-    nodes[id].kind === SvalPanelModel.SPLIT ? (byParent.get(id) ?? []) : id
+    nodes[id].kind === SvalTree.SPLIT ? (byParent.get(id) ?? []) : id
   );
 }
 
@@ -158,7 +158,7 @@ async function overfull(count) {
   await a.sync(SYNC, 1500);
   await b.sync(SYNC, 1600);
   const nodes = (await b.tree()).nodes ?? {};
-  const tabs = SvalPanelModel.childrenByParent(nodes).get(split);
+  const tabs = SvalTree.childrenByParent(nodes).get(split);
   Assert.equal(tabs.length, count, `the merge left ${count} tabs in the split`);
   return { engine: b, workspace, tabs };
 }
@@ -308,7 +308,7 @@ add_task(async function an_alt_click_splits_two_tabs_or_joins_a_split() {
     now: 2000,
   });
   nodes = (await engine.tree()).nodes;
-  const byParent = SvalPanelModel.childrenByParent(nodes);
+  const byParent = SvalTree.childrenByParent(nodes);
   const split = nodes[tabs[1]].placement.parent;
   Assert.equal(nodes[split].kind, "split", "the two are a split");
   Assert.deepEqual(
@@ -331,7 +331,7 @@ add_task(async function an_alt_click_splits_two_tabs_or_joins_a_split() {
     nodes = (await engine.tree()).nodes;
   }
   Assert.deepEqual(
-    SvalPanelModel.childrenByParent(nodes).get(split),
+    SvalTree.childrenByParent(nodes).get(split),
     [tabs[1], tabs[3], tabs[4], tabs[5]],
     "a split with room takes each clicked tab at its end"
   );
@@ -347,7 +347,7 @@ add_task(async function an_alt_click_splits_two_tabs_or_joins_a_split() {
     now: 4000,
   });
   nodes = (await engine.tree()).nodes;
-  const full = SvalPanelModel.childrenByParent(nodes);
+  const full = SvalTree.childrenByParent(nodes);
   const next = nodes[tabs[1]].placement.parent;
   Assert.notEqual(next, split, "a full split's viewed tab leaves it");
   Assert.deepEqual(full.get(next), [tabs[1], tabs[2]], "for a new split");
@@ -444,7 +444,7 @@ add_task(async function a_tab_joins_a_split_at_its_end() {
   });
   nodes = (await engine.tree()).nodes;
   Assert.deepEqual(
-    SvalPanelModel.childrenByParent(nodes).get(split),
+    SvalTree.childrenByParent(nodes).get(split),
     [tabs[0], tabs[1], tabs[4]],
     "the tab is the rightmost pane"
   );
@@ -630,7 +630,7 @@ add_task(async function the_combining_drops_are_writes_the_engine_takes() {
   });
   nodes = (await engine.tree()).nodes;
   Assert.deepEqual(
-    SvalPanelModel.childrenByParent(nodes).get(made),
+    SvalTree.childrenByParent(nodes).get(made),
     [tabs[3], tabs[2]],
     "the two tabs are a split"
   );
@@ -641,14 +641,14 @@ add_task(async function the_combining_drops_are_writes_the_engine_takes() {
   });
   nodes = (await engine.tree()).nodes;
   Assert.deepEqual(
-    SvalPanelModel.childrenByParent(nodes).get(split),
+    SvalTree.childrenByParent(nodes).get(split),
     [tabs[0], tabs[1], tabs[3], tabs[2]],
     "merged, in order"
   );
   Assert.ok(!nodes[made], "the dropped split is gone");
   Assert.ok(!nodes[split].content.shares, "and the widths are equal again");
   Assert.ok(
-    SvalPanelModel.childrenByParent(nodes).get(workspace).includes(tabs[4]),
+    SvalTree.childrenByParent(nodes).get(workspace).includes(tabs[4]),
     "with nothing else moved"
   );
 });

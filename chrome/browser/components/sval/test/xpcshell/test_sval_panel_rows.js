@@ -440,7 +440,7 @@ add_task(function rows_hold_nothing_from_another_workspace() {
  * inside the workspace it shows.
  */
 add_task(function containment_is_walked_to_the_root() {
-  const { isWithin } = SvalPanelModel;
+  const { isWithin } = SvalTree;
   const nodes = {
     ws: node({ kind: "workspace", name: "Work", order: "40" }),
     home: node({ kind: "workspace", name: "Home", order: "c0" }),
@@ -461,7 +461,7 @@ add_task(function containment_is_walked_to_the_root() {
  * selected tab's row on screen.
  */
 add_task(function ancestors_are_listed_nearest_first() {
-  const { ancestorIds } = SvalPanelModel;
+  const { ancestorIds } = SvalTree;
   const nodes = {
     ws: node({ kind: "workspace", name: "Work", order: "40" }),
     outer: node({ kind: "group", name: "Outer", parent: "ws", order: "80" }),

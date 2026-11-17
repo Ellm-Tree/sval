@@ -58,7 +58,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   openNormalWindow: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
-  TAB: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+  TAB: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
 });
 
 const SIDEBAR_ID = "viewHistorySidebar";

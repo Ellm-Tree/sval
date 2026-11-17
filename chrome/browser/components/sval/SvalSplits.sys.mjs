@@ -12,12 +12,12 @@
  * `SvalPanelModel.splitPanes`'s answer, the one the panel draws from.
  */
 
+import { splitPanes } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import {
   SPLIT,
   TAB,
   childrenByParent,
-  splitPanes,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 /**
  * The splits a window holding the tabs `present` shows for the document:

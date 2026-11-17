@@ -16,7 +16,7 @@ const { SvalTabs } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalTabs.sys.mjs"
 );
 const { childrenByParent } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 /* import-globals-from ../../sval-panel.js */

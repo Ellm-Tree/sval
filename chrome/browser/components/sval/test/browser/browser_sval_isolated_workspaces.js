@@ -20,6 +20,9 @@ const { SvalWorkspaceJar } = ChromeUtils.importESModule(
 const SvalPanelModel = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const SvalTree = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
+);
 
 const PAGE_A = "https://example.com/browser/?a";
 const PAGE_B = "https://example.org/browser/?b";
@@ -103,7 +106,7 @@ function tabsOf(id) {
   const nodes = SvalPanel.nodes;
   return gBrowser.tabs.filter(tab => {
     const node = SvalPanel.observer.nodeIdFor(tab);
-    return node && SvalPanelModel.isWithin(nodes, node, id);
+    return node && SvalTree.isWithin(nodes, node, id);
   });
 }
 
@@ -721,7 +724,7 @@ add_task(async function a_peers_switch_from_the_observers_queue_finishes() {
   Assert.notEqual(SvalPanel.workspaceId, shown, "the window moved off it");
   Assert.equal(
     SvalPanel.nodes[SvalPanel.workspaceId]?.kind,
-    SvalPanelModel.WORKSPACE,
+    SvalTree.WORKSPACE,
     "to a workspace the document holds"
   );
 });

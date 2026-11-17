@@ -18,8 +18,11 @@ const { SvalEngine } = ChromeUtils.importESModule(
 const { SvalIdentity } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalIdentity.sys.mjs"
 );
-const { SYNC_DOCUMENT, pairingLine } = ChromeUtils.importESModule(
+const { pairingLine } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+);
+const { SYNC_DOCUMENT } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 const { HISTORY_INDEX } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs"

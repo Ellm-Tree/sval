@@ -39,7 +39,7 @@ import { SvalTabs } from "moz-src:///browser/components/sval/SvalTabs.sys.mjs";
 import {
   TAB,
   descendantIds,
-} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 const lazy = {};
 

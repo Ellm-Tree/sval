@@ -29,8 +29,11 @@ const {
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalKeys.sys.mjs"
 );
-const { keyCommand, GROUP, TAB } = ChromeUtils.importESModule(
+const { keyCommand } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+);
+const { GROUP, TAB } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 
 const { CustomKeys } = ChromeUtils.importESModule(

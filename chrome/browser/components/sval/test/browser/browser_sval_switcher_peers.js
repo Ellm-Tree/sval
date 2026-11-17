@@ -25,7 +25,7 @@ Services.scriptloader.loadSubScript(
 add_task(async function the_observer_is_told_when_a_peer_moves_the_window() {
   const { ids, engine } = await withSwitcherPanel();
   const [, second] = ids.workspaces;
-  const [first] = SvalPanelModel.workspaceIds(SvalPanel.nodes);
+  const [first] = SvalTree.workspaceIds(SvalPanel.nodes);
 
   const menu = await openSwitcher();
   await activateWorkspace(menu, second);
