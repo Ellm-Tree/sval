@@ -18,6 +18,7 @@ const {
   POLITE_TOPIC,
   politeRate,
   forgetPolite,
+  limiterFor,
   setPolite,
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentPolite.sys.mjs"
@@ -236,4 +237,24 @@ add_task(function the_rules_an_agent_is_told() {
   });
   forgetPolite("agent-r");
   Services.prefs.clearUserPref(POLITE_RATE_PREF);
+});
+
+add_task(async function an_agent_has_one_limiter_across_its_sessions() {
+  const first = limiterFor("agent-one");
+  Assert.equal(limiterFor("agent-one"), first, "a second session shares it");
+  Assert.notEqual(limiterFor("agent-two"), first, "another agent has its own");
+
+  Assert.equal(await first.wait("example.com", 1), 0, "the first goes at once");
+  const waited = limiterFor("agent-one").wait("example.com", 1);
+  Assert.equal(
+    await limiterFor("agent-two").wait("example.com", 1),
+    0,
+    "another agent's turn on the site is its own"
+  );
+  Assert.greater(await waited, 0, "the agent's next action waits its turn");
+
+  forgetPolite("agent-one");
+  Assert.notEqual(limiterFor("agent-one"), first, "unpairing drops it");
+  forgetPolite("agent-one");
+  forgetPolite("agent-two");
 });

@@ -36,6 +36,9 @@ export const POLITE_TOPIC = "sval-agent-polite-changed";
 /** The ids of the agents whose user unticked Be polite. */
 const waived = new Set();
 
+/** Each paired agent's limiter, by the agent's id. */
+const limiters = new Map();
+
 /**
  * @param {string} agentId A paired agent's id.
  * @returns {boolean} Whether the agent is held to the limit.
@@ -68,6 +71,7 @@ export function setPolite(agentId, polite) {
  */
 export function forgetPolite(agentId) {
   setPolite(agentId, true);
+  limiters.delete(agentId);
 }
 
 /**
@@ -184,4 +188,19 @@ export function createLimiter({
       })();
     },
   };
+}
+
+/**
+ * The limiter that spaces one agent's actions. An agent has one however many
+ * connections it holds, so a second session shares the first one's turns on
+ * a site.
+ *
+ * @param {string} agentId A paired agent's id.
+ * @returns {{wait: Function}} As `createLimiter` makes one.
+ */
+export function limiterFor(agentId) {
+  if (!limiters.has(agentId)) {
+    limiters.set(agentId, createLimiter());
+  }
+  return limiters.get(agentId);
 }

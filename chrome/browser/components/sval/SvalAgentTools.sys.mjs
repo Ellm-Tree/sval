@@ -111,7 +111,7 @@ import {
   toolsOf as pageToolsOf,
 } from "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs";
 import {
-  createLimiter,
+  limiterFor,
   isPolite,
   MAX_QUEUED,
   politeRate,
@@ -1176,8 +1176,6 @@ function withThrottled(result, throttledMs) {
  * @param {{allowLoad: Function}} deps.sites
  * @param {{takeReport: Function}} deps.dialogs
  * @param {number} [deps.maxUploadBytes] The most one upload sends.
- * @param {{wait: Function}} [deps.limiter] Spaces an agent's actions per
- *   site while the agent is polite (`SvalAgentPolite`).
  * @returns {{[name: string]: Function}} Each takes `(agent, args, task)` and
  *   returns an MCP tool result.
  */
@@ -1187,7 +1185,6 @@ export function createAgentTools({
   sites,
   dialogs,
   maxUploadBytes = MAX_UPLOAD_BYTES,
-  limiter = createLimiter(),
 }) {
   if (
     typeof gate?.act !== "function" ||
@@ -2391,7 +2388,7 @@ export function createAgentTools({
       return 0;
     }
     try {
-      return await limiter.wait(site, politeRate(), () => {
+      return await limiterFor(agent.agentId).wait(site, politeRate(), () => {
         if (task) {
           foundFor.delete(task);
         }
