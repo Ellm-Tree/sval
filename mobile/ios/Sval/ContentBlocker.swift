@@ -161,9 +161,10 @@ final class ContentBlocker {
             }
             if !texts.isEmpty, !myFilters.isEmpty { texts.append(myFilters) }
             // The key names what the rules were made from, the downloads
-            // included, so the compiled rules are reused across launches
-            // until one changes.
-            let key = Self.digest([String(pageRules), myFilters, allowed.joined(separator: ",")] + texts.map { Self.digest([$0]) })
+            // and the converter included, so the compiled rules are reused
+            // across launches until one changes.
+            let key = Self.digest([converterVersion(), String(pageRules), myFilters, allowed.joined(separator: ",")]
+                + texts.map { Self.digest([$0]) })
             return (texts, key)
         }.value
         // Made apart from the rules, so a page waits on neither for the

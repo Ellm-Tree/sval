@@ -12,6 +12,8 @@ use adblock::lists::{FilterSet, ParseOptions, RuleTypes};
 use adblock::request::Request;
 use serde_json::{Value, json};
 
+use crate::filter_syntax::{HidingKind, hiding_off, hiding_rule, resolve_directives, site};
+
 /// The most rules WebKit compiles into one list. A larger list fails to
 /// compile, so the rules are split across lists under it.
 pub const MAX_RULES: usize = 150_000;
@@ -98,7 +100,12 @@ fn convert(lists: Vec<String>, rule_types: RuleTypes, allowed_domains: &[String]
         .chain(&exceptions.all_off)
         .cloned()
         .collect();
-    let all_off: Vec<String> = exceptions.all_off.iter().cloned().collect();
+    let specific_off: Vec<String> = exceptions
+        .specific_off
+        .iter()
+        .chain(&exceptions.all_off)
+        .cloned()
+        .collect();
     let mut blocking_lifts = lifts;
     blocking_lifts.extend(
         allowed_domains
@@ -121,12 +128,25 @@ fn convert(lists: Vec<String>, rule_types: RuleTypes, allowed_domains: &[String]
     ));
     lists.extend(chunked(
         &site_hiding,
-        &lift(&all_off).into_iter().collect::<Vec<_>>(),
+        &lift(&specific_off).into_iter().collect::<Vec<_>>(),
     ));
     ContentRules {
         lists,
         rules: total,
     }
+}
+
+/// What the conversion is, for the app's key to its compiled rules: this
+/// file and the crates it's built with, adblock-rust's version among them.
+/// A changed converter makes different rules from the same lists, so rules
+/// compiled by an earlier build are made again.
+#[uniffi::export]
+pub fn converter_version() -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    include_str!("blocking.rs").hash(&mut hasher);
+    include_str!("../Cargo.lock").hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
 }
 
 /// My filters' page rules alone, as rule lists of at most `MAX_RULES`, for
@@ -161,11 +181,14 @@ impl RequestBlocker {
         };
         let mut set = FilterSet::new(false);
         for list in lists {
-            set.add_filter_list(list, options);
+            set.add_filter_list(resolve_directives(&list).into_owned(), options);
         }
         Self {
             engine: Engine::new_with_filter_set(set),
-            allowed: allowed_domains.iter().filter_map(|domain| site(domain)).collect(),
+            allowed: allowed_domains
+                .iter()
+                .filter_map(|domain| site(domain))
+                .collect(),
         }
     }
 
@@ -288,9 +311,9 @@ fn chunked(rules: &[Value], lifts: &[Value]) -> Vec<String> {
 /// the selector on every site but `site`, which adds hiding the list never
 /// asked for and leaves the rule it excepts hiding on `site`. So those lines
 /// are taken out before conversion and applied to the hiding rules after it.
-/// The sites `$generichide` and `$elemhide` exceptions name, which
-/// adblock-rust can't convert at all, are lifted at the end of the hiding
-/// lists (`content_rules`).
+/// The sites `$generichide`, `$specifichide` and `$elemhide` exceptions
+/// name, which adblock-rust can't convert at all, are lifted at the end of
+/// the hiding lists (`content_rules`).
 #[derive(Default)]
 struct Exceptions {
     /// Selector to the sites it isn't hidden on. An empty name: anywhere.
@@ -299,61 +322,54 @@ struct Exceptions {
     generic_off: BTreeSet<String>,
     /// Sites with no hiding at all.
     all_off: BTreeSet<String>,
+    /// Sites with no hiding for named sites.
+    specific_off: BTreeSet<String>,
 }
 
 impl Exceptions {
-    /// `list` without its `#@#` lines, which are recorded.
+    /// `list` read for WebKit: its `!#if` blocks resolved, its `#@#` lines
+    /// and hiding exceptions recorded, and its hiding rules as WebKit can
+    /// carry them (`filter_syntax`).
     fn take_from(&mut self, list: &str) -> String {
+        let list = resolve_directives(list);
         let mut kept = String::with_capacity(list.len());
         for line in list.lines() {
             let trimmed = line.trim();
+            if trimmed.starts_with('!') {
+                continue;
+            }
             if let Some((sites, selector)) = trimmed.split_once("#@#")
-                && !trimmed.starts_with('!')
                 && !selector.starts_with("+js(")
             {
                 let entry = self.unhide.entry(selector.to_owned()).or_default();
-                if sites.is_empty() {
+                // An entity or regex site can't be named to WebKit, so the
+                // hiding it excepts goes on hiding there.
+                let sites: Vec<&str> = sites
+                    .split(',')
+                    .filter(|name| !name.trim().is_empty())
+                    .collect();
+                if sites.is_empty() || sites.contains(&"*") {
                     entry.insert(String::new());
                 }
-                entry.extend(sites.split(',').filter_map(site));
+                entry.extend(sites.into_iter().filter_map(site));
                 continue;
             }
-            if let Some(rest) = trimmed.strip_prefix("@@") {
-                self.note_hiding_off(rest);
+            if let Some(rest) = trimmed.strip_prefix("@@")
+                && let Some(off) = hiding_off(rest)
+            {
+                match off.kind {
+                    HidingKind::All => self.all_off.extend(off.sites),
+                    HidingKind::Generic => self.generic_off.extend(off.sites),
+                    HidingKind::Specific => self.specific_off.extend(off.sites),
+                }
+                continue;
             }
-            kept.push_str(line);
-            kept.push('\n');
+            if let Some(rule) = hiding_rule(trimmed) {
+                kept.push_str(&rule);
+                kept.push('\n');
+            }
         }
         kept
-    }
-
-    /// Records the site of `@@||site^$generichide` or `$elemhide`.
-    fn note_hiding_off(&mut self, rule: &str) {
-        let Some((pattern, options)) = rule.rsplit_once('$') else {
-            return;
-        };
-        let options: Vec<&str> = options.split(',').collect();
-        let all = options
-            .iter()
-            .any(|option| matches!(*option, "elemhide" | "ehide"));
-        let generic = options
-            .iter()
-            .any(|option| matches!(*option, "generichide" | "ghide"));
-        if !all && !generic {
-            return;
-        }
-        let Some(site) = pattern
-            .strip_prefix("||")
-            .map(|host| host.trim_end_matches(['^', '/', '*']))
-            .and_then(site)
-        else {
-            return;
-        };
-        if all {
-            self.all_off.insert(site);
-        } else {
-            self.generic_off.insert(site);
-        }
     }
 
     /// `rule` with the exceptions applied, or none when they leave it no
@@ -424,17 +440,6 @@ impl Exceptions {
     }
 }
 
-/// A list's site name, as WebKit's domain triggers take it, or none for a
-/// negated or wildcard entry, which WebKit can't express.
-fn site(name: &str) -> Option<String> {
-    let name = name.trim().trim_end_matches('.').to_ascii_lowercase();
-    (!name.is_empty()
-        && !name.starts_with('~')
-        && !name.contains(['*', '/', '|'])
-        && !name.ends_with(".*"))
-    .then_some(name)
-}
-
 /// Whether site `off` covers `name`: the same name, or one under it.
 fn covers(off: &str, name: &str) -> bool {
     name == off || name.ends_with(&format!(".{off}"))
@@ -459,14 +464,22 @@ mod tests {
     #[test]
     fn blocks_an_image_the_lists_block_outside_the_allowed_domains() {
         let blocker = RequestBlocker::new(
-            vec!["||ads.example.com^\n||tracker.example.net^\n@@||tracker.example.net/ok^\n".into()],
+            vec![
+                "||ads.example.com^\n||tracker.example.net^\n@@||tracker.example.net/ok^\n".into(),
+            ],
             vec!["Example.org.".into()],
         );
         let page = "https://news.example.co.uk/".to_owned();
         assert!(blocker.blocks_image("https://ads.example.com/icon.png".into(), page.clone()));
         assert!(blocker.blocks_image("https://tracker.example.net/icon.png".into(), page.clone()));
-        assert!(!blocker.blocks_image("https://tracker.example.net/ok/icon.png".into(), page.clone()));
-        assert!(!blocker.blocks_image("https://news.example.co.uk/favicon.ico".into(), page.clone()));
+        assert!(!blocker.blocks_image(
+            "https://tracker.example.net/ok/icon.png".into(),
+            page.clone()
+        ));
+        assert!(!blocker.blocks_image(
+            "https://news.example.co.uk/favicon.ico".into(),
+            page.clone()
+        ));
         assert!(blocker.blocks_image("not an address".into(), page.clone()));
 
         let allowing = RequestBlocker::new(
@@ -620,6 +633,232 @@ mod tests {
         let site = rules(&out.lists[1]);
         assert_eq!(site.len(), 1);
         assert_eq!(site[0]["action"]["selector"], ".promo");
+    }
+
+    /// Every hiding rule `lists` convert to, from every list, with each
+    /// list's lifts.
+    fn hiding(lists: &[&str]) -> Vec<Value> {
+        let out = content_rules(
+            lists.iter().map(|list| (*list).to_owned()).collect(),
+            true,
+            vec![],
+        );
+        out.lists
+            .iter()
+            .flat_map(|list| rules(list))
+            .filter(|rule| rule["action"]["type"] == "css-display-none")
+            .collect()
+    }
+
+    fn selectors(rules: &[Value]) -> Vec<String> {
+        rules
+            .iter()
+            .filter_map(|rule| rule["action"]["selector"].as_str().map(str::to_owned))
+            .collect()
+    }
+
+    fn rule_for<'a>(rules: &'a [Value], selector: &str) -> &'a Value {
+        rules
+            .iter()
+            .find(|rule| rule["action"]["selector"] == selector)
+            .unwrap_or_else(|| panic!("no rule hides {selector}"))
+    }
+
+    /// The sites each hiding list ends by lifting its rules on.
+    fn lifted(lists: &[&str]) -> Vec<Vec<String>> {
+        let out = content_rules(
+            lists.iter().map(|list| (*list).to_owned()).collect(),
+            true,
+            vec![],
+        );
+        out.lists
+            .iter()
+            .map(|list| rules(list))
+            .filter(|rules| {
+                rules
+                    .iter()
+                    .any(|rule| rule["action"]["type"] == "css-display-none")
+            })
+            .map(|rules| {
+                let last = rules.last().unwrap();
+                if last["action"]["type"] != "ignore-previous-rules" {
+                    return vec![];
+                }
+                last["trigger"]["if-domain"]
+                    .as_array()
+                    .map(|sites| {
+                        sites
+                            .iter()
+                            .filter_map(|site| site.as_str().map(str::to_owned))
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn hides_on_a_site_and_every_name_under_it() {
+        let rules = hiding(&["example.com,news.example.org##.ad\n"]);
+        assert_eq!(
+            rule_for(&rules, ".ad")["trigger"]["if-domain"],
+            json!(["*example.com", "*news.example.org"])
+        );
+    }
+
+    #[test]
+    fn skips_a_generic_rule_on_its_excepted_sites() {
+        let rules = hiding(&["~example.com##.ad\n"]);
+        let ad = rule_for(&rules, ".ad");
+        assert_eq!(ad["trigger"]["unless-domain"], json!(["*example.com"]));
+        assert!(ad["trigger"].get("if-domain").is_none());
+    }
+
+    #[test]
+    fn names_an_international_site_in_punycode() {
+        let rules = hiding(&["bücher.de##.ad\n"]);
+        assert_eq!(
+            rule_for(&rules, ".ad")["trigger"]["if-domain"],
+            json!(["*xn--bcher-kva.de"])
+        );
+    }
+
+    #[test]
+    fn hides_a_specific_generic_rule_everywhere() {
+        let rules = hiding(&["*##.everywhere\n*,~example.com##.mostly\n"]);
+        assert!(
+            rule_for(&rules, ".everywhere")["trigger"]
+                .get("if-domain")
+                .is_none()
+        );
+        assert_eq!(
+            rule_for(&rules, ".mostly")["trigger"]["unless-domain"],
+            json!(["*example.com"])
+        );
+    }
+
+    #[test]
+    fn hides_what_remove_takes_away_and_leaves_what_webkit_cant_do() {
+        let rules = hiding(&[concat!(
+            "example.com##.gone:remove()\n",
+            "example.com##.box:has-text(Sponsored)\n",
+            "example.com##.box:style(height: 0 !important)\n",
+            "example.com##+js(nowoif)\n",
+            "example.com##^script:has-text(ad)\n",
+            "example.com##.box:upward(2)\n",
+            "example.com##.box:matches-path(/ads)\n",
+            "example.com##.ünïcode\n",
+        )]);
+        assert_eq!(selectors(&rules), [".gone"]);
+    }
+
+    #[test]
+    fn keeps_a_native_has_selector() {
+        let rules = hiding(&["example.com##.card:has(> .sponsored)\n"]);
+        assert_eq!(selectors(&rules), [".card:has(> .sponsored)"]);
+    }
+
+    #[test]
+    fn leaves_out_a_rule_naming_both_sites_and_exceptions() {
+        // WebKit takes `if-domain` or `unless-domain`, never both, so
+        // adblock-rust converts neither; hiding less is the safe side.
+        let rules = hiding(&["example.com,~shop.example.com##.ad\n##.kept\n"]);
+        assert_eq!(selectors(&rules), [".kept"]);
+    }
+
+    #[test]
+    fn resolves_directives_before_converting() {
+        let rules = hiding(&[concat!(
+            "!#if env_firefox\n##.firefox\n!#else\n##.not-firefox\n!#endif\n",
+            "!#if env_mobile\n##.mobile\n!#endif\n",
+            "!#if false\n##.never\n!#endif\n",
+        )]);
+        assert_eq!(selectors(&rules), [".not-firefox", ".mobile"]);
+    }
+
+    #[test]
+    fn resolves_directives_for_requests_the_app_makes() {
+        let blocker = RequestBlocker::new(
+            vec!["!#if env_firefox\n||firefox.test^\n!#else\n||webkit.test^\n!#endif\n".into()],
+            vec![],
+        );
+        let page = "https://example.com/".to_owned();
+        assert!(blocker.blocks_image("https://webkit.test/a.png".into(), page.clone()));
+        assert!(!blocker.blocks_image("https://firefox.test/a.png".into(), page));
+    }
+
+    #[test]
+    fn lifts_generic_hiding_on_an_exceptions_domain_option() {
+        let lists = [
+            "##.banner\nexample.com##.promo\n@@*$ghide,domain=web.de|gmx.*\n@@||figma.com^$generichide\n",
+        ];
+        assert_eq!(
+            lifted(&lists),
+            [vec!["*figma.com".to_owned(), "*web.de".to_owned()], vec![]]
+        );
+    }
+
+    #[test]
+    fn specifichide_lifts_site_hiding_alone() {
+        let lists = ["##.banner\nexample.com##.promo\n@@||example.com^$shide\n"];
+        assert_eq!(lifted(&lists), [vec![], vec!["*example.com".to_owned()]]);
+    }
+
+    #[test]
+    fn a_star_exception_unhides_everywhere() {
+        assert_eq!(
+            selectors(&hiding(&["##.ad\n##.kept\n*#@#.ad\n"])),
+            [".kept"]
+        );
+    }
+
+    #[test]
+    fn an_exception_for_sites_webkit_cant_name_leaves_the_hiding() {
+        // `example.*` can't be named to WebKit, so `.ad` goes on hiding there.
+        let rules = hiding(&["##.ad\nexample.*#@#.ad\n"]);
+        assert!(
+            rule_for(&rules, ".ad")["trigger"]
+                .get("unless-domain")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn no_rule_hides_everywhere_that_the_list_scoped() {
+        // Each line hides on named sites alone, or nowhere WebKit can name;
+        // none may come out hiding on every site.
+        let rules = hiding(&[concat!(
+            "~vipbox.pl,vipbox.*,vipboxtv.*##.a\n",
+            "oxy.*,~oxy.edu##.b\n",
+            "~google.*,~bing.com##.c\n",
+            "/img[a-z]{3,5}\\.buzz/##.d\n",
+            "org,~/^example\\.org$/##.e\n",
+            "example.com,~shop.*##.f\n",
+            "amazon.*##.g\n",
+        )]);
+        assert_eq!(selectors(&rules), Vec::<String>::new());
+    }
+
+    #[test]
+    fn leaves_out_hiding_for_sites_webkit_cannot_name() {
+        let out = content_rules(
+            vec!["~vipbox.pl,vipbox.*##.position-absolute\nexample.*##.promo\n*##.banner\nexample.com,other.*##.ad\n".into()],
+            true,
+            vec![],
+        );
+        let all: Vec<Value> = out.lists.iter().flat_map(|list| rules(list)).collect();
+        let selectors: Vec<&str> = all
+            .iter()
+            .filter_map(|rule| rule["action"]["selector"].as_str())
+            .collect();
+        assert!(!selectors.contains(&".position-absolute"));
+        assert!(!selectors.contains(&".promo"));
+        assert!(selectors.contains(&".banner"));
+        let ad = all
+            .iter()
+            .find(|rule| rule["action"]["selector"] == ".ad")
+            .unwrap();
+        assert_eq!(ad["trigger"]["if-domain"], json!(["*example.com"]));
     }
 
     #[test]

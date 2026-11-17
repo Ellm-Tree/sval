@@ -9,6 +9,7 @@ pub use sval_core;
 
 pub mod blocking;
 pub mod dropbox;
+pub mod filter_syntax;
 pub mod site;
 pub mod smb;
 
