@@ -1468,7 +1468,7 @@ struct SyncProblemBadge: View {
     var body: some View {
         let theme = Theme(scheme, tint: sheetTint)
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            if SyncIndicator(model, now: context.date).icon == .warning {
+            if model.stage == .ready, SyncIndicator(model, now: context.date).icon == .warning {
                 Badge(diameter: 17, fill: theme.warning, ring: ring, ringWidth: 1) {
                     Image("badge-bang").resizable()
                         .foregroundStyle(theme.warningInk)

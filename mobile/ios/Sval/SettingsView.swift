@@ -70,7 +70,22 @@ struct SettingsView: View {
                     Button("Clear Browsing Data…") { clearing = true }
                 }
                 .listRowBackground(theme.cell)
-                if !syncProblem { syncSection }
+                if model.stage == .ready {
+                    if !syncProblem { syncSection }
+                } else {
+                    Section {
+                        Button("Set Up Sync…") {
+                            model.setUpRequested = true
+                            (onDone ?? { dismiss() })()
+                        }
+                        .font(.system(.body))
+                    } header: {
+                        caption("Sync")
+                    } footer: {
+                        footnote("Your devices share your Workspaces through one folder in iCloud Drive, Dropbox, or on your network.")
+                    }
+                    .listRowBackground(theme.cell)
+                }
             }
         }
         .foregroundStyle(theme.text)
@@ -129,7 +144,7 @@ struct SettingsView: View {
         }
     }
 
-    private var syncProblem: Bool { SyncIndicator(model, now: .now).icon == .warning }
+    private var syncProblem: Bool { model.stage == .ready && SyncIndicator(model, now: .now).icon == .warning }
 
     private var syncSection: some View {
         Section {

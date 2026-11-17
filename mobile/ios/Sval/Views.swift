@@ -28,12 +28,19 @@ struct RootView: View {
         Group {
             if #available(iOS 26, *), GlassCheck.requested {
                 GlassCheckView()
-            } else if model.stage == .ready && !model.welcoming {
-                BrowserView()
             } else {
-                FirstRunView()
+                // Setup covers the browser and never replaces it, so a link
+                // from another app always has a browser to open in.
+                BrowserView()
+                    .fullScreenCover(isPresented: Binding(
+                        get: { model.showsSetup },
+                        set: { if !$0 { model.settingUp = false } })) {
+                        FirstRunView()
+                    }
             }
         }
+        // Sval is the default browser: a link another app opens comes here.
+        .onOpenURL { url in Task { await model.openIncoming(url) } }
         .environment(\.appearance, systemScheme)
         .onChange(of: contrast, initial: true) { _, now in
             DesktopColor.contrast.more = now == .increased

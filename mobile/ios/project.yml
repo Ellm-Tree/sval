@@ -47,6 +47,11 @@ targets:
         UIAppFonts: [Outfit.ttf, JetBrainsMono.ttf]
         # The bar's fold follows the finger at the screen's full rate.
         CADisableMinimumFrameDurationOnPhone: true
+        # Web links, which Sval opens as the default browser
+        # (`com.apple.developer.web-browser`; `openIncoming`).
+        CFBundleURLTypes:
+          - CFBundleURLName: app.sval.ios.web
+            CFBundleURLSchemes: [http, https]
         # A row dragged in the Workspace tree (`TreeDrop.swift`).
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: app.sval.ios.node

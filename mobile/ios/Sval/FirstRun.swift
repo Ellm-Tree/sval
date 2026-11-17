@@ -165,6 +165,13 @@ private struct FolderSteps: View {
                     .font(.system(.footnote))
                     .foregroundStyle(FirstRunStyle.muted)
                     .multilineTextAlignment(.center)
+                // Sval browses without a folder, so setup can wait.
+                Button("Not Now") {
+                    model.message = nil
+                    model.settingUp = false
+                }
+                .foregroundStyle(FirstRunStyle.cyan)
+                .frame(minHeight: 44)
             }
         }
         .padding(.horizontal, 28)

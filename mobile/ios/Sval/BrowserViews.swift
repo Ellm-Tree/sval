@@ -205,6 +205,13 @@ struct BrowserView: View {
         // close is the app's own, so it leaves the Workspace open; only the
         // user's closing the sheet closes it.
         .onChange(of: showingTabs) { placeWorkspace() }
+        // Settings in the sideways panel is in no sheet, so setup opens at
+        // once.
+        .onChange(of: model.setUpRequested) {
+            guard model.setUpRequested, !sheetShown else { return }
+            model.setUpRequested = false
+            model.settingUp = true
+        }
         .onChange(of: verticalSize) {
             placeWorkspace()
             logSides()
@@ -216,6 +223,10 @@ struct BrowserView: View {
             if newTabAfterSheet {
                 newTabAfterSheet = false
                 enter(.newTab)
+            }
+            if model.setUpRequested {
+                model.setUpRequested = false
+                model.settingUp = true
             }
         }) {
             // A glass sheet inset from the screen's edges, which iOS draws

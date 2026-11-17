@@ -13,6 +13,8 @@ import UIKit
 @Observable
 final class AppModel {
     enum Stage {
+        /// No shared folder: the phone browses on its own copy alone, and
+        /// setup is an offer.
         case chooseFolder
         /// The folder has no Sval data: this phone can start syncing in it.
         case start
@@ -20,7 +22,31 @@ final class AppModel {
         case ready
     }
 
-    private(set) var stage: Stage = .chooseFolder
+    private(set) var stage: Stage = .chooseFolder {
+        didSet { if stage == .ready { settingUp = false } }
+    }
+    /// Whether the phone browses on its own copy: once it syncs, and before
+    /// it has a folder at all. A default browser opens on a place to type
+    /// an address (Apple's "Preparing your app to be the default browser"),
+    /// so a phone with no folder browses too.
+    var browsing: Bool { stage == .ready || stage == .chooseFolder }
+    /// Whether the user has setup open. It opens by itself on the first
+    /// launch alone, and from Settings after that.
+    var settingUp = false {
+        // Only closing setup counts as offering it: a launch with a folder,
+        // or the demo's, leaves a later launch without one its first run.
+        didSet { if oldValue, !settingUp { UserDefaults.standard.set(true, forKey: Self.offeredSetupKey) } }
+    }
+    private static let offeredSetupKey = "offeredSetup"
+    /// Setup asked for from Settings, which opens once the sheet Settings
+    /// is in has gone: one presentation can't open over another.
+    var setUpRequested = false
+    /// Whether setup shows over the browser: while the user has it open, on
+    /// a folder chosen and not yet synced, and on the Workspaces arriving
+    /// after a join.
+    var showsSetup: Bool {
+        welcoming || stage == .start || stage == .join || (settingUp && stage == .chooseFolder)
+    }
     private(set) var rows: [OutlineRow] = [] {
         didSet { tree = OutlineIndex(rows) }
     }
@@ -87,6 +113,7 @@ final class AppModel {
         } else {
             stage = source == nil ? .chooseFolder : (Secrets.syncKey() == nil || keyUnconfirmed ? .join : .ready)
         }
+        settingUp = stage == .chooseFolder && !UserDefaults.standard.bool(forKey: Self.offeredSetupKey)
         browser = Browser(model: self)
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
@@ -404,7 +431,7 @@ final class AppModel {
     /// after another device deleted it, when it comes back empty under a
     /// new id (decision 2254).
     private func keepOwnWorkspace() async {
-        guard stage == .ready, syncer != nil, ownWorkspace == nil, !makingOwnWorkspace else { return }
+        guard browsing, syncer != nil, ownWorkspace == nil, !makingOwnWorkspace else { return }
         makingOwnWorkspace = true
         defer { makingOwnWorkspace = false }
         let id = UUID().uuidString.lowercased()
@@ -649,10 +676,6 @@ final class AppModel {
         }
     }
 
-    /// Leaves the folder and drops everything this device took from it. The
-    /// app makes no Workspaces of its own, so its document holds only what
-    /// the folder brought, and a later join must not publish that into
-    /// another folder.
     /// Whether `key`, the sync key this phone holds, if any, opens the Sval data
     /// in `folder`. A key kept from another folder, or one this folder has
     /// since replaced, opens nothing there: syncing with it writes files no
@@ -759,6 +782,9 @@ final class AppModel {
         Diagnostics.log("pair: offer withdrawn")
     }
 
+    /// Leaves the folder. Once the phone has synced with it, everything it
+    /// took from the folder goes too, so a later join can't publish that
+    /// into another folder.
     func forgetFolder() {
         guard !syncing else { return }
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
@@ -766,6 +792,9 @@ final class AppModel {
         DropboxSettings.forget()
         source = nil
         stage = .chooseFolder
+        // Without a sync key the phone never synced with this folder, so its
+        // own copy holds only what was browsed here, and stays.
+        guard Secrets.syncKey() != nil else { return }
         // A kept key this folder didn't confirm belongs to another folder,
         // and so does the own copy beside it: leaving the folder chosen by
         // mistake keeps both, for the folder the key opens.
@@ -792,6 +821,10 @@ final class AppModel {
                 if leaving == nil { leaving = try? await loading?.value }
                 if let leaving { try await leaving.leave() } else { try Syncer.deleteLocalCopy() }
                 syncer = try Syncer.make()
+                // The phone browses on, in a fresh Workspace of its own.
+                await refreshRows()
+                await keepOwnWorkspace()
+                if let own = ownWorkspace?.id { browser.showWorkspace(own) }
             } catch {
                 message = error.localizedDescription
             }
@@ -1602,6 +1635,18 @@ final class AppModel {
         await edit([op], in: settingsDocument)
     }
 
+    /// Opens a link another app hands Sval, as its default browser, in a new
+    /// tab in front, over setup if it shows.
+    func openIncoming(_ url: URL) async {
+        guard Self.opensHere(url.absoluteString) else { return }
+        settingUp = false
+        _ = await loadedSyncer()
+        await keepOwnWorkspace()
+        guard let workspace = newTabWorkspace(from: browser.workspaceId) else { return }
+        Diagnostics.log("links: a link from another app")
+        await browser.openNewTab(url, in: workspace)
+    }
+
     /// Whether the phone can open `url`: a web address.
     static func opensHere(_ url: String) -> Bool {
         guard let scheme = URL(string: url)?.scheme?.lowercased() else { return false }
@@ -2080,7 +2125,7 @@ final class AppModel {
     /// does on start (`SvalFavoritesStore.start`, pins-root spec §8). A
     /// phone that starts syncing a folder has no roots until it makes them.
     private func keepFavoriteRoots() async {
-        guard stage == .ready, !keepingFavoriteRoots else { return }
+        guard browsing, !keepingFavoriteRoots else { return }
         let missing = Self.rootGuids.filter { guid in !favorites.contains { $0.guid == guid } }
         let marked = favorites.contains(where: \.marked)
         guard !missing.isEmpty || marked else { return }
