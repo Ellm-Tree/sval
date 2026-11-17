@@ -53,14 +53,9 @@ exclude_re = [
   # A stamp equal to `now` is set to `now`, the value it holds.
   'replace > with >= in Document::pull_back_own_stamps$',
   # These build or need a JsValue, which only a wasm host can: the panic
-  # hook, the error a refusal throws, the sync binding, which takes its
-  # files as a JS array, and the setAppearance binding, which takes its
-  # colour as any JS value. `run_sync_to` is what `sync` runs, and
-  # `apply_op` and `color_from_json` what `setAppearance` runs, and they are
-  # tested.
+  # hook, the error a refusal throws, and the sync binding, which takes its
+  # files as a JS array. `run_sync_to` is what `sync` runs, and it is tested.
   'replace init with \(\)$',
   'replace to_js_err -> JsValue',
   'in SvalDocument::sync$',
-  'in SvalDocument::set_appearance$',
-  'replace SvalDocument::set_appearance -> ',
 ]

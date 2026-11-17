@@ -1053,7 +1053,8 @@ class SvalSyncWorker {
   async markUsed(id, deviceId, now) {
     return this.#enqueue(() => {
       try {
-        return this.#doc.markUsed(id, deviceId, now);
+        const op = JSON.stringify({ kind: "markUsed", id });
+        return JSON.parse(this.#doc.apply(op, deviceId, now)).changed;
       } catch (err) {
         throw new SvalError(`sval: markUsed failed: ${describe(err)}`, err);
       }
@@ -1313,9 +1314,6 @@ class SvalSyncWorker {
         now: op.now ?? Date.now(),
       });
     } catch (err) {
-      if (err?.unknownOperation) {
-        throw new SvalError(err.message);
-      }
       throw new SvalError(`sval: ${op.kind} failed: ${describe(err)}`, err);
     }
   }

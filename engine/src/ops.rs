@@ -352,10 +352,13 @@ pub(crate) fn parse_favorite_guid(guid: &str) -> Result<&str, Invalid> {
 /// string. The device and the time are not part of it, because every change
 /// in a batch shares them.
 ///
-/// Each `#[wasm_bindgen]` mutator on `wasm::SvalDocument` builds one of these and
-/// applies it through [`apply_op`], and a batch applies a list of them
+/// One operation is applied through [`apply_op`] and a batch of them
 /// through [`apply_batch`], so an operation is checked the same way alone and
 /// inside a batch.
+///
+/// A field a host may leave out takes its default here and nowhere else. One
+/// that is not an `Option` reads `null` as left out, because a host that
+/// holds no value for it sends either.
 #[derive(Debug, serde::Deserialize)]
 #[serde(
     tag = "kind",
@@ -363,25 +366,33 @@ pub(crate) fn parse_favorite_guid(guid: &str) -> Result<&str, Invalid> {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum Op {
+    /// A workspace at the fresh id the host minted. `isolated` makes it
+    /// isolated from its creation (isolated workspaces spec §2); absent, it
+    /// is shared.
     AddWorkspace {
         name: String,
         icon: Option<String>,
         id: String,
         isolated: Option<bool>,
     },
+    /// An agent's workspace (agent-control spec §3.5). `agent_label` is the
+    /// agent's name as the user accepted it, and the device in the mark is the
+    /// writing device, the one the agent paired with.
     AddAgentWorkspace {
         name: String,
         agent_label: String,
         id: String,
         isolated: Option<bool>,
     },
-    AddDeviceWorkspace {
-        name: String,
-        id: String,
-    },
+    /// A device's own workspace (decision 2254), marked with the writing
+    /// device.
+    AddDeviceWorkspace { name: String, id: String },
+    /// Whether a workspace's tabs use a cookie jar of their own (isolated
+    /// workspaces spec §5). Only the lifecycle group is stamped, so it never
+    /// competes with a rename or a recolour made elsewhere (spec §5.1).
     SetIsolation {
         id: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         isolated: bool,
     },
     AddGroup {
@@ -390,9 +401,12 @@ pub(crate) enum Op {
         icon: Option<String>,
         id: String,
     },
+    /// An empty split under `parent`, placed between `before` and `after` as
+    /// `AddTab` places a tab. The batch that adds it moves its panes in
+    /// (split-view spec §5.2).
     AddSplit {
         parent: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         name: String,
         id: String,
         before: Option<String>,
@@ -405,7 +419,7 @@ pub(crate) enum Op {
         id: String,
         before: Option<String>,
         after: Option<String>,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         local: bool,
     },
     MoveNode {
@@ -414,45 +428,79 @@ pub(crate) enum Op {
         before: Option<String>,
         after: Option<String>,
     },
+    /// A workspace's place in the order every device lists them, between
+    /// the workspaces `before` and `after`. Placement only, as a move is.
     MoveWorkspace {
         id: String,
         before: Option<String>,
         after: Option<String>,
     },
-    Rename {
-        id: String,
-        name: String,
-    },
+    /// The name alone, stamping only the content group, so a rename never
+    /// drags the node away from where a peer moved it (spec §5.1, §5.3). A
+    /// remove followed by an add would turn the edit into a deletion, which a
+    /// peer's concurrent edit may beat (spec §5.4).
+    Rename { id: String, name: String },
+    /// The whole content group: name, url, icon and a split's `shares`.
+    /// Merge replaces a fact group entire, so whatever a host leaves out is
+    /// cleared, and following a tab as it navigates is a read-modify-write
+    /// by the host (`docs/host-contract.md` §3). `local` marks an address
+    /// that stays on this device (decision 1372), and only a write with an
+    /// address can carry it.
     SetContent {
         id: String,
         name: String,
         url: Option<String>,
         icon: Option<String>,
         shares: Option<Vec<f64>>,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         local: bool,
     },
+    /// The `local` mark alone, address kept, for a node the host holds back
+    /// for a reason other than its address (decision 2237). A change stamps
+    /// the content group, and a mark already as asked writes nothing.
     SetLocal {
         id: String,
+        #[serde(default, deserialize_with = "null_as_default")]
         local: bool,
     },
+    /// The whole appearance group: colour, emoji and transparency, as
+    /// `SetContent` sends the whole content group (spec §5.3). The colour and
+    /// transparency are checked against the node's kind ([`parse_color`],
+    /// [`parse_transparency`]). The emoji is stored as sent, since a flag or
+    /// a ZWJ sequence is several Unicode scalar values long.
     SetAppearance {
         id: String,
         color: Option<serde_json::Value>,
         emoji: Option<String>,
         transparency: Option<f64>,
     },
-    SetLabel {
-        id: String,
-        label: Option<String>,
-    },
-    Touch {
-        id: String,
-    },
+    /// The label a tab shows in place of its page's title, or none. It sits
+    /// in the appearance group, so a navigation on another device, which
+    /// rewrites the content group, never competes with it (spec §5.1).
+    SetLabel { id: String, label: Option<String> },
+    /// Work was done inside the node, which is an edit to it (decision
+    /// 0106). The stamp holds no value, so it competes with no edit made
+    /// elsewhere, and it is news to a peer that deleted the node unseen
+    /// (spec §5.4).
+    Touch { id: String },
+    /// A setting (settings-sync spec §3). `value_json` is JSON text, and
+    /// absent or the JSON text `null` resets the setting to its default.
     SetSetting {
         key: String,
         value_json: Option<String>,
     },
+    /// A value this device held before its key synced: a `SetSetting` while
+    /// the document holds nothing for the key, a reset included, and nothing
+    /// otherwise, so a seed never replaces what another device chose
+    /// (settings-sync spec §4.2, decision 0113).
+    SeedSetting {
+        key: String,
+        value_json: Option<String>,
+    },
+    /// A favorite, folder or separator in the `favorites` document
+    /// (favorites-native spec §16). Its id derives from the guid the host
+    /// mints, so every device names it alike. A Favorites root has no
+    /// `parent`.
     AddFavorite {
         favorite_kind: String,
         guid: String,
@@ -461,55 +509,100 @@ pub(crate) enum Op {
         after: Option<String>,
         name: String,
         url: Option<String>,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         local: bool,
     },
     /// The pass that moves a profile's pins into the pins root (pins-root
     /// spec §8).
     MovePinsToRoot,
+    /// The workspaces a pin shows in, or every one for none (pins spec §7),
+    /// stamped in the lifecycle group.
     SetPinScope {
         id: String,
         #[serde(default)]
         scope: Option<Vec<String>>,
     },
-    RemoveKeepingChildren {
-        id: String,
-    },
+    /// Deletes a container and keeps what is in it: its children go to its
+    /// parent, in their order, at its place (spec §5.4).
+    RemoveKeepingChildren { id: String },
+    /// A visit the writing device made, in its week's document
+    /// (history-sync spec §3), with the workspace it was made in or none
+    /// (decision 1287). Its id derives from the device, the page and the
+    /// moment, so adding it twice changes nothing.
     AddVisit {
         url: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         title: String,
         transition: u32,
         visited_at: f64,
         #[serde(default)]
         workspace: Option<String>,
     },
+    /// A visit's title, when it differs (history-sync spec §4.1).
     SetVisitTitle {
         id: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_as_default")]
         title: String,
     },
-    TouchShard {
-        name: String,
-    },
-    SetAutoArchive {
-        id: String,
-        choice: Option<String>,
-    },
-    MarkUsed {
-        id: String,
-    },
-    Remove {
-        id: String,
-    },
+    /// The history index learns that the writing device wrote to a week, so
+    /// every device knows to merge it (history-sync spec §3).
+    TouchShard { name: String },
+    /// A workspace's own choice for archiving idle tabs, or none to follow
+    /// the global one (idle-tab archive spec §5). Lifecycle only, as
+    /// isolation is.
+    SetAutoArchive { id: String, choice: Option<String> },
+    /// A tab was selected: it is touched when its touch is an hour old or
+    /// more (idle-tab archive spec §4.1).
+    MarkUsed { id: String },
+    /// Deletes a node and everything beneath it: closing a tab, or deleting
+    /// a group, a workspace or a Favorites folder with its contents. It
+    /// stamps nothing, because a deletion leaves no record (spec §5.4).
+    Remove { id: String },
+}
+
+/// Reads a field whose `null` means what leaving it out means.
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + serde::Deserialize<'de>,
+{
+    Ok(<Option<T> as serde::Deserialize>::deserialize(deserializer)?.unwrap_or_default())
+}
+
+/// What an operation did, as a host reads it.
+#[derive(Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct Applied {
+    /// The node it added. A batch names none.
+    pub(crate) id: Option<NodeId>,
+    /// Whether the document changed, from an operation that may leave it as
+    /// it was by design: `markUsed`, `seedSetting` and `movePinsToRoot`.
+    /// Every other operation reports nothing here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) changed: Option<bool>,
+}
+
+impl Applied {
+    fn added(id: NodeId) -> Self {
+        Applied {
+            id: Some(id),
+            changed: None,
+        }
+    }
+
+    fn changed(changed: bool) -> Self {
+        Applied {
+            id: None,
+            changed: Some(changed),
+        }
+    }
 }
 
 fn parse_optional_id(id: Option<String>) -> Result<Option<NodeId>, Invalid> {
     id.map(|id| parse_id(&id)).transpose()
 }
 
-/// Applies `op` to `doc`, stamped with `by` and `now`, and returns the id of
-/// the node it added, where it added one.
+/// Applies `op` to `doc`, stamped with `by` and `now`, and answers what it
+/// did.
 ///
 /// Every check comes before the change, and the change itself cannot fail,
 /// so a refused operation leaves `doc` exactly as it was.
@@ -518,7 +611,7 @@ pub(crate) fn apply_op(
     op: Op,
     by: DeviceId,
     now: Timestamp,
-) -> Result<Option<NodeId>, Failure> {
+) -> Result<Applied, Failure> {
     match op {
         Op::AddWorkspace {
             name,
@@ -530,7 +623,7 @@ pub(crate) fn apply_op(
             require_unused(doc, id)?;
             doc.add_workspace(name, icon, id, by, now);
             isolate_at_creation(doc, id, isolated);
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::AddAgentWorkspace {
             name,
@@ -545,7 +638,7 @@ pub(crate) fn apply_op(
             require_unused(doc, id)?;
             doc.add_agent_workspace(name, label, id, by, now);
             isolate_at_creation(doc, id, isolated);
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::AddDeviceWorkspace { name, id } => {
             // A device's own workspace (decision 2254). The device in the
@@ -553,7 +646,7 @@ pub(crate) fn apply_op(
             let id = parse_id(&id)?;
             require_unused(doc, id)?;
             doc.add_device_workspace(name, id, by, now);
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::SetIsolation { id, isolated } => {
             // Only a workspace has a cookie jar to choose (isolated
@@ -562,7 +655,7 @@ pub(crate) fn apply_op(
             require_node(doc, id)?;
             require_workspace(doc, id)?;
             doc.set_isolation(id, isolated, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::AddGroup {
             parent,
@@ -575,7 +668,7 @@ pub(crate) fn apply_op(
             crate::tree::validate_parent(doc, None, &NodeKind::Group, parent)?;
             require_unused(doc, id)?;
             doc.add_group(parent, name, icon, id, by, now);
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::AddSplit {
             parent,
@@ -599,7 +692,7 @@ pub(crate) fn apply_op(
                     node.placement.order = order;
                 }
             }
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::AddTab {
             parent,
@@ -626,7 +719,7 @@ pub(crate) fn apply_op(
                 crate::tree::insert_tab_between(doc, parent, before, after, name, url, id, by, now);
             }
             mark_local(doc, id, local);
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::MoveNode {
             id,
@@ -641,20 +734,20 @@ pub(crate) fn apply_op(
             // `tree::move_node` validates the node and its new parent itself,
             // so a native caller gets the same refusals a host does.
             crate::tree::move_node(doc, id, new_parent, before, after, by, now)?;
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::MoveWorkspace { id, before, after } => {
             let id = parse_id(&id)?;
             let before = parse_optional_id(before)?;
             let after = parse_optional_id(after)?;
             crate::tree::move_workspace(doc, id, before, after, by, now)?;
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::Rename { id, name } => {
             let id = parse_id(&id)?;
             require_node(doc, id)?;
             doc.rename(id, name, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::SetContent {
             id,
@@ -678,7 +771,7 @@ pub(crate) fn apply_op(
                 _ => local,
             };
             doc.set_content(id, name, url, icon, shares, local, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::SetLocal { id, local } => {
             let id = parse_id(&id)?;
@@ -699,7 +792,7 @@ pub(crate) fn apply_op(
                     now,
                 );
             }
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::SetAppearance {
             id,
@@ -712,25 +805,34 @@ pub(crate) fn apply_op(
             let color = parse_color(kind, color)?;
             let transparency = parse_transparency(kind, transparency)?;
             doc.set_appearance(id, color, emoji, transparency, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::SetLabel { id, label } => {
             let id = parse_id(&id)?;
             require_node(doc, id)?;
             doc.set_label(id, label, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::Touch { id } => {
             let id = parse_id(&id)?;
             require_node(doc, id)?;
             doc.touch(id, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::SetSetting { key, value_json } => {
             let key = parse_setting_key(&key)?;
             let value = parse_setting_value(value_json)?;
             doc.set_setting(key, value, by, now);
-            Ok(None)
+            Ok(Applied::default())
+        }
+        Op::SeedSetting { key, value_json } => {
+            if doc.settings().contains_key(&key) {
+                return Ok(Applied::changed(false));
+            }
+            let key = parse_setting_key(&key)?;
+            let value = parse_setting_value(value_json)?;
+            doc.set_setting(key, value, by, now);
+            Ok(Applied::changed(true))
         }
         Op::AddFavorite {
             favorite_kind,
@@ -753,23 +855,23 @@ pub(crate) fn apply_op(
             require_address_if_local(url.as_deref(), local)?;
             let id = doc.add_favorite(kind, guid, parent, before, after, name, url, by, now);
             mark_local(doc, id, local);
-            Ok(Some(id))
+            Ok(Applied::added(id))
         }
         Op::MovePinsToRoot => {
-            crate::pins::move_pins_to_root(doc, by, now);
-            Ok(None)
+            let moved = crate::pins::move_pins_to_root(doc, by, now);
+            Ok(Applied::changed(moved))
         }
         Op::SetPinScope { id, scope } => {
             let id = parse_id(&id)?;
             require_node(doc, id)?;
             require_pin(doc, id)?;
             doc.set_pin_scope(id, scope.map(|s| s.into_iter().collect()), by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::RemoveKeepingChildren { id } => {
             let id = parse_id(&id)?;
             crate::tree::remove_keeping_children(doc, id, by, now)?;
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::AddVisit {
             url,
@@ -783,7 +885,7 @@ pub(crate) fn apply_op(
                 return Err(Invalid::new(Reason::VisitWithoutUrl, "a visit needs a URL").into());
             }
             let workspace = workspace.as_deref().map(parse_id).transpose()?;
-            Ok(Some(doc.add_visit_in(
+            Ok(Applied::added(doc.add_visit_in(
                 &url, title, transition, at, workspace, by, now,
             )))
         }
@@ -792,24 +894,24 @@ pub(crate) fn apply_op(
             require_node(doc, id)?;
             require_visit(doc, id)?;
             doc.set_visit_title(id, title, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::TouchShard { name } => {
             let name = parse_shard_name(&name)?;
             doc.touch_shard(name, by, now);
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::SetAutoArchive { id, choice } => {
             let id = parse_id(&id)?;
             crate::archive::set_auto_archive(doc, id, choice.as_deref(), by, now)?;
-            Ok(None)
+            Ok(Applied::default())
         }
         Op::MarkUsed { id } => {
             let id = parse_id(&id)?;
-            crate::archive::mark_used(doc, id, by, now)?;
-            Ok(None)
+            let stamped = crate::archive::mark_used(doc, id, by, now)?;
+            Ok(Applied::changed(stamped))
         }
-        Op::Remove { id } => remove(doc, &id).map(|_| None),
+        Op::Remove { id } => remove(doc, &id).map(|_| Applied::default()),
     }
 }
 
@@ -917,20 +1019,38 @@ fn isolate_at_creation(doc: &mut Document, id: NodeId, isolated: Option<bool>) {
 ///
 /// A single operation is applied to `doc` directly: [`apply_op`] refuses one
 /// with the document untouched, so it needs no copy.
+///
+/// The mobile apps' boundary takes a batch this way. The desktop's sends
+/// one through [`apply_json`].
+#[cfg(any(feature = "ffi", test))]
 pub(crate) fn apply_batch(
     doc: &mut Document,
     ops_json: &str,
     device_id: &[u8],
     now: f64,
 ) -> Result<(), Failure> {
-    let mut ops: Vec<Op> = serde_json::from_str(ops_json).map_err(|err| {
-        Invalid::new(
-            Reason::BadBatch,
-            format!("not a batch of operations: {err}"),
-        )
-    })?;
+    let ops: Vec<Op> = serde_json::from_str(ops_json).map_err(not_a_batch)?;
     let by = parse_device_id(device_id)?;
     let now = parse_timestamp(now)?;
+    apply_all(doc, ops, by, now)
+}
+
+/// The refusal of JSON that is not a list of operations.
+fn not_a_batch(err: serde_json::Error) -> Invalid {
+    Invalid::new(
+        Reason::BadBatch,
+        format!("not a batch of operations: {err}"),
+    )
+}
+
+/// Applies `ops` to `doc` in order, all of them or none, as [`apply_batch`]
+/// describes.
+fn apply_all(
+    doc: &mut Document,
+    mut ops: Vec<Op>,
+    by: DeviceId,
+    now: Timestamp,
+) -> Result<(), Failure> {
     if ops.len() == 1
         && let Some(op) = ops.pop()
     {
@@ -942,6 +1062,35 @@ pub(crate) fn apply_batch(
     }
     *doc = candidate;
     Ok(())
+}
+
+/// Applies the change `op_json` spells to `doc`: one [`Op`], or
+/// `{ "kind": "batch", "ops": [...] }`, a list of them applied as
+/// [`apply_batch`] applies one. A refusal leaves `doc` as it was.
+///
+/// JSON that spells neither is refused as a malformed batch is, since a
+/// host builds both from the same operations.
+pub(crate) fn apply_json(
+    doc: &mut Document,
+    op_json: &str,
+    device_id: &[u8],
+    now: f64,
+) -> Result<Applied, Failure> {
+    let not_an_op =
+        |err: serde_json::Error| Invalid::new(Reason::BadBatch, format!("not an operation: {err}"));
+    let mut value: serde_json::Value = serde_json::from_str(op_json).map_err(not_an_op)?;
+    if value.get("kind").and_then(serde_json::Value::as_str) == Some("batch") {
+        let ops = value.get_mut("ops").map(serde_json::Value::take);
+        let ops: Vec<Op> = serde_json::from_value(ops.unwrap_or_default()).map_err(not_a_batch)?;
+        let by = parse_device_id(device_id)?;
+        let now = parse_timestamp(now)?;
+        apply_all(doc, ops, by, now)?;
+        return Ok(Applied::default());
+    }
+    let op: Op = serde_json::from_value(value).map_err(not_an_op)?;
+    let by = parse_device_id(device_id)?;
+    let now = parse_timestamp(now)?;
+    apply_op(doc, op, by, now)
 }
 
 /// What the tests of this module and of `host` share.
@@ -1259,8 +1408,8 @@ mod tests {
 
     #[test]
     fn a_nan_transparency_is_refused() {
-        // JSON has no NaN, so this reaches the check as `setAppearance`
-        // hands it over.
+        // JSON has no NaN, so no operation carries one. The range check
+        // refuses it all the same.
         let err = parse_transparency(&NodeKind::Workspace, Some(f64::NAN)).unwrap_err();
         assert_eq!(err.reason, Reason::BadColor);
     }
@@ -1754,6 +1903,285 @@ mod tests {
             assert_eq!(node.placement_at, 200, "{id} carries the batch's time");
             assert_eq!(node.placement_by, Some(DeviceId::from_bytes(ALICE)));
         }
+    }
+
+    // --- one change as a host spells it ----------------------------------
+
+    /// Applies `op` through [`apply_json`] from Alice at `now`.
+    fn apply_one(doc: &mut Document, now: f64, op: serde_json::Value) -> Result<Applied, Failure> {
+        apply_json(doc, &op.to_string(), &ALICE, now)
+    }
+
+    #[test]
+    fn an_operation_answers_the_node_it_added_and_nothing_for_any_other() {
+        let mut doc = Document::new();
+        let add = json!({ "kind": "addWorkspace", "name": "W", "id": uid(1) });
+        assert_eq!(apply_one(&mut doc, 1.0, add), Ok(Applied::added(uid(1))));
+        let rename = json!({ "kind": "rename", "id": uid(1), "name": "V" });
+        assert_eq!(apply_one(&mut doc, 2.0, rename), Ok(Applied::default()));
+        assert_eq!(doc.node(uid(1)).unwrap().content.name, "V");
+
+        let favorite = json!({
+            "kind": "addFavorite", "favoriteKind": "folder", "guid": "toolbar_____", "name": "",
+        });
+        assert_eq!(
+            apply_one(&mut doc, 3.0, favorite),
+            Ok(Applied::added(crate::types::favorite_id("toolbar_____")))
+        );
+        let visit = json!({
+            "kind": "addVisit", "url": "https://e.example/", "transition": 1, "visitedAt": 10.0,
+        });
+        let by = DeviceId::from_bytes(ALICE);
+        assert_eq!(
+            apply_one(&mut doc, 11.0, visit),
+            Ok(Applied::added(crate::types::visit_id(
+                by,
+                "https://e.example/",
+                10
+            )))
+        );
+    }
+
+    #[test]
+    fn what_an_operation_did_reads_as_an_id_and_a_change_only_where_one_is_reported() {
+        let added = serde_json::to_value(Applied::added(uid(1))).unwrap();
+        assert_eq!(added, json!({ "id": uid(1) }));
+        let nothing = serde_json::to_value(Applied::default()).unwrap();
+        assert_eq!(nothing, json!({ "id": null }));
+        let changed = serde_json::to_value(Applied::changed(false)).unwrap();
+        assert_eq!(changed, json!({ "id": null, "changed": false }));
+    }
+
+    #[test]
+    fn a_batch_through_one_change_lands_whole_or_not_at_all() {
+        let mut doc = two_groups();
+        let batch = json!({ "kind": "batch", "ops": merge_b_into_a() });
+        assert_eq!(apply_one(&mut doc, 200.0, batch), Ok(Applied::default()));
+        assert!(doc.node(uid(20)).is_none(), "B is gone");
+
+        let before = doc.to_json().unwrap();
+        let refused = json!({ "kind": "batch", "ops": [
+            { "kind": "rename", "id": uid(11), "name": "x" },
+            { "kind": "remove", "id": uid(99) },
+        ] });
+        assert_eq!(
+            apply_one(&mut doc, 300.0, refused).unwrap_err().code,
+            "no_such_node"
+        );
+        assert_eq!(doc.to_json().unwrap(), before);
+    }
+
+    #[test]
+    fn json_that_spells_no_operation_is_refused_as_a_bad_batch_and_changes_nothing() {
+        let mut doc = two_groups();
+        let before = doc.to_json().unwrap();
+        for bad in [
+            "{".to_string(),
+            "7".to_string(),
+            json!({ "name": "no kind" }).to_string(),
+            json!({ "kind": "paint", "id": uid(11) }).to_string(),
+            json!({ "kind": "rename", "id": uid(11) }).to_string(),
+            json!({ "kind": "rename", "id": uid(11), "name": 7 }).to_string(),
+            json!({ "kind": "addWorkspace", "name": "W", "id": uid(2), "isolated": "yes" })
+                .to_string(),
+            json!({ "kind": "batch" }).to_string(),
+            json!({ "kind": "batch", "ops": {} }).to_string(),
+            json!({ "kind": "batch", "ops": [{ "kind": "batch", "ops": [] }] }).to_string(),
+        ] {
+            let err = apply_json(&mut doc, &bad, &ALICE, 200.0).unwrap_err();
+            assert_eq!(
+                (err.code, err.reason),
+                ("invalid_argument", Some(Reason::BadBatch)),
+                "{bad}: {err:?}"
+            );
+            assert_eq!(doc.to_json().unwrap(), before, "{bad}");
+        }
+    }
+
+    #[test]
+    fn one_change_refuses_a_bad_device_id_and_a_bad_time_as_a_batch_does() {
+        let mut doc = two_groups();
+        let before = doc.to_json().unwrap();
+        let rename = json!({ "kind": "rename", "id": uid(11), "name": "x" }).to_string();
+        let batch = json!({ "kind": "batch", "ops": merge_b_into_a() }).to_string();
+        for op in [rename, batch] {
+            let err = apply_json(&mut doc, &op, &ALICE[..15], 200.0).unwrap_err();
+            assert_eq!(err.reason, Some(Reason::BadDeviceId), "{op}");
+            let err = apply_json(&mut doc, &op, &ALICE, f64::NAN).unwrap_err();
+            assert_eq!(err.reason, Some(Reason::TimestampNotFinite), "{op}");
+            assert_eq!(doc.to_json().unwrap(), before, "{op}");
+        }
+    }
+
+    #[test]
+    fn a_field_left_out_or_null_takes_its_default() {
+        let mut doc = Document::new();
+        let ops = json!([
+            { "kind": "addWorkspace", "name": "W", "id": uid(1), "icon": null, "isolated": null },
+            { "kind": "addTab", "parent": uid(1), "name": "t", "url": "https://t.example/",
+              "id": uid(2), "before": null, "after": null, "local": null },
+            { "kind": "addSplit", "parent": uid(1), "name": null, "id": uid(3) },
+            { "kind": "setIsolation", "id": uid(1), "isolated": null },
+            { "kind": "setContent", "id": uid(2), "name": "t", "url": "https://u.example/",
+              "icon": null, "shares": null, "local": null },
+            { "kind": "setLocal", "id": uid(2) },
+            { "kind": "setLocal", "id": uid(2), "local": null },
+            { "kind": "addVisit", "url": "https://v.example/", "title": null, "transition": 1,
+              "visitedAt": 5.0, "workspace": null },
+        ]);
+        for op in ops.as_array().unwrap() {
+            apply_one(&mut doc, 10.0, op.clone()).unwrap_or_else(|err| panic!("{op}: {err:?}"));
+        }
+        let workspace = doc.node(uid(1)).unwrap();
+        assert!(!workspace.lifecycle.isolated);
+        assert_eq!(workspace.content.icon, None);
+        assert!(!doc.node(uid(2)).unwrap().content.local);
+        assert_eq!(doc.node(uid(3)).unwrap().content.name, "");
+        let visit = crate::types::visit_id(DeviceId::from_bytes(ALICE), "https://v.example/", 5);
+        assert_eq!(doc.node(visit).unwrap().content.name, "");
+        let title = json!({ "kind": "setVisitTitle", "id": visit, "title": null });
+        apply_one(&mut doc, 11.0, title).unwrap();
+        assert_eq!(doc.node(visit).unwrap().content.name, "");
+    }
+
+    #[test]
+    fn mark_used_answers_whether_it_stamped() {
+        const HOUR: f64 = 3_600_000.0;
+        let mut doc = two_groups();
+        let used = json!({ "kind": "markUsed", "id": uid(11) });
+        assert_eq!(
+            apply_one(&mut doc, HOUR, used.clone()),
+            Ok(Applied::changed(true))
+        );
+        assert_eq!(doc.node(uid(11)).unwrap().touched_at, 3_600_000);
+        assert_eq!(
+            apply_one(&mut doc, HOUR + 1.0, used),
+            Ok(Applied::changed(false))
+        );
+        assert_eq!(doc.node(uid(11)).unwrap().touched_at, 3_600_000);
+    }
+
+    #[test]
+    fn the_pins_move_to_their_root_as_one_change_alone() {
+        let mut doc = Document::new();
+        let by = DeviceId::from_bytes(ALICE);
+        let toolbar = doc.add_favorite(
+            NodeKind::Folder,
+            "toolbar_____",
+            None,
+            None,
+            None,
+            "",
+            None,
+            by,
+            0,
+        );
+        let page = doc.add_favorite(
+            NodeKind::Favorite,
+            "page00000001",
+            Some(toolbar),
+            None,
+            None,
+            "One",
+            Some("https://1.example/".into()),
+            by,
+            1,
+        );
+        doc.node_mut(page).unwrap().lifecycle.pinned = true;
+        let op = json!({ "kind": "movePinsToRoot" });
+        assert_eq!(
+            apply_one(&mut doc, 4.0, op.clone()),
+            Ok(Applied::changed(false)),
+            "no pins root to move into"
+        );
+        let root = doc.add_favorite(
+            NodeKind::Folder,
+            crate::types::PINS_GUID,
+            None,
+            None,
+            None,
+            "",
+            None,
+            by,
+            0,
+        );
+
+        let moved = apply_one(&mut doc, 5.0, op.clone());
+
+        assert_eq!(moved, Ok(Applied::changed(true)));
+        assert_eq!(doc.node(page).unwrap().placement.parent, Some(root));
+        assert_eq!(apply_one(&mut doc, 6.0, op), Ok(Applied::changed(false)));
+    }
+
+    // --- a seed is written only while its key is unheld --------------------
+
+    fn seed(key: &str, value: &str) -> serde_json::Value {
+        json!({ "kind": "seedSetting", "key": key, "valueJson": value })
+    }
+
+    #[test]
+    fn a_seed_is_written_only_while_the_document_holds_nothing_for_its_key() {
+        let mut doc = Document::new();
+        assert_eq!(
+            apply_one(&mut doc, 10.0, seed("a", "1")),
+            Ok(Applied::changed(true))
+        );
+        assert_eq!(doc.settings()["a"], Some(json!(1)));
+        let at = doc.node(crate::types::setting_id("a")).unwrap().content_at;
+        assert_eq!(at, 10);
+
+        let before = doc.to_json().unwrap();
+        assert_eq!(
+            apply_one(&mut doc, 20.0, seed("a", "2")),
+            Ok(Applied::changed(false))
+        );
+        assert_eq!(doc.to_json().unwrap(), before, "a held key is left alone");
+
+        // A reset is a value another device chose, so it holds the key.
+        let reset = json!({ "kind": "setSetting", "key": "b", "valueJson": null });
+        apply_one(&mut doc, 30.0, reset).unwrap();
+        assert_eq!(
+            apply_one(&mut doc, 40.0, seed("b", "3")),
+            Ok(Applied::changed(false))
+        );
+        assert_eq!(doc.settings()["b"], None);
+    }
+
+    #[test]
+    fn a_seed_for_a_held_key_is_skipped_unchecked_and_one_for_an_unheld_key_is_checked() {
+        let mut doc = Document::new();
+        apply_one(&mut doc, 10.0, seed("a", "1")).unwrap();
+        assert_eq!(
+            apply_one(&mut doc, 20.0, seed("a", "{not json")),
+            Ok(Applied::changed(false))
+        );
+        let err = apply_one(&mut doc, 20.0, seed("b", "{not json")).unwrap_err();
+        assert_eq!(err.reason, Some(Reason::SettingNotJson));
+        let err = apply_one(&mut doc, 20.0, seed("", "1")).unwrap_err();
+        assert_eq!(err.reason, Some(Reason::EmptySettingKey));
+    }
+
+    #[test]
+    fn a_seed_in_a_batch_yields_to_the_document_and_to_an_earlier_write_in_the_batch() {
+        let mut doc = Document::new();
+        apply_one(&mut doc, 10.0, seed("held", "1")).unwrap();
+        let ops = json!([
+            seed("held", "2"),
+            seed("fresh", "3"),
+            seed("fresh", "4"),
+            { "kind": "setSetting", "key": "set", "valueJson": "5" },
+            seed("set", "6"),
+            seed("late", "7"),
+            { "kind": "setSetting", "key": "late", "valueJson": "8" },
+        ]);
+        apply_batch(&mut doc, &ops.to_string(), &ALICE, 20.0).unwrap();
+        let settings = doc.settings();
+        assert_eq!(settings["held"], Some(json!(1)));
+        assert_eq!(settings["fresh"], Some(json!(3)));
+        assert_eq!(settings["set"], Some(json!(5)));
+        assert_eq!(settings["late"], Some(json!(8)), "a set replaces a seed");
+        let held = doc.node(crate::types::setting_id("held")).unwrap();
+        assert_eq!(held.content_at, 10);
     }
 
     // --- splits ----------------------------------------------------------

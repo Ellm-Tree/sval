@@ -58,12 +58,9 @@ use crate::host::{
     group_code_for_display, own_device_path, run_archive_idle, run_archive_now,
     run_import_archived, run_restore, run_sync_to, seal_pairing_core,
 };
-use crate::ops::{
-    Op, apply_batch, apply_op, parse_device_id, parse_favorite_guid, parse_id, parse_timestamp,
-    remove,
-};
+use crate::ops::{apply_json, parse_device_id, parse_favorite_guid, parse_timestamp, remove};
 use crate::sync::Target;
-use crate::types::{Document, NodeId};
+use crate::types::Document;
 use crate::views::{archived_json, favorites_json, settings_json, shards_json, visits_json};
 use js_sys::{Array, Uint8Array};
 use wasm_bindgen::JsCast;
@@ -91,24 +88,6 @@ pub fn visit_id(device_id: &[u8], url: &str, visited_at: f64) -> Result<String, 
     let device = parse_device_id(device_id).map_err(to_js_err)?;
     let at = parse_timestamp(visited_at).map_err(to_js_err)?;
     Ok(crate::types::visit_id(device, url, at).to_string())
-}
-
-/// Reads the colour a host passed to `setAppearance`, as `JSON.stringify`
-/// wrote it. `None` is a value `JSON.stringify` could not write, such as a
-/// function.
-fn color_from_json(json: Option<String>) -> Result<serde_json::Value, Invalid> {
-    json.and_then(|json| serde_json::from_str(&json).ok())
-        .ok_or_else(|| {
-            Invalid::new(
-                Reason::BadColor,
-                "a colour must be a token or a plain object",
-            )
-        })
-}
-
-/// The id a host is handed back for a node an operation added.
-fn added(id: Option<NodeId>) -> String {
-    id.map(|id| id.to_string()).unwrap_or_default()
 }
 
 /// Installs a panic hook that prints a panic's file, line and message to
@@ -270,377 +249,18 @@ impl SvalDocument {
         self.0.to_json().map_err(to_js_err)
     }
 
-    fn apply(&mut self, op: Op, device_id: &[u8], now: f64) -> Result<Option<NodeId>, JsValue> {
-        let by = parse_device_id(device_id).map_err(to_js_err)?;
-        let now = parse_timestamp(now).map_err(to_js_err)?;
-        apply_op(&mut self.0, op, by, now).map_err(to_js_err)
-    }
-
-    /// Applies a batch: `ops_json` is a JSON array of operations, each shaped
-    /// as `SvalDocumentOps.mjs` spells one alone, minus `deviceId`. Every one
-    /// is stamped with `device_id` and `now`, and they land all together or
-    /// not at all: a refusal leaves the document as it was and answers with
-    /// the refused operation's own error (`docs/host-contract.md` §3).
-    #[wasm_bindgen(js_name = applyBatch)]
-    pub fn apply_batch(
-        &mut self,
-        ops_json: &str,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        apply_batch(&mut self.0, ops_json, device_id, now).map_err(to_js_err)
-    }
-
-    /// `id` is a fresh id the host generated (e.g. `crypto.randomUUID()`);
-    /// `now` is milliseconds since the epoch (e.g. `Date.now()`), rejected
-    /// if it is not finite or exceeds `Number.MAX_SAFE_INTEGER`. `isolated`
-    /// makes the workspace isolated from its creation (isolated workspaces
-    /// spec §2); absent, it is shared.
-    #[wasm_bindgen(js_name = addWorkspace)]
-    pub fn add_workspace(
-        &mut self,
-        name: &str,
-        icon: Option<String>,
-        id: &str,
-        device_id: &[u8],
-        now: f64,
-        isolated: Option<bool>,
-    ) -> Result<(), JsValue> {
-        let op = Op::AddWorkspace {
-            name: name.into(),
-            icon,
-            id: id.into(),
-            isolated,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// An agent's workspace (agent-control spec §3.5). `label` is the agent's
-    /// name as the user accepted it; the device in the mark is `device_id`,
-    /// the device the agent paired with.
-    #[wasm_bindgen(js_name = addAgentWorkspace)]
-    pub fn add_agent_workspace(
-        &mut self,
-        name: &str,
-        label: &str,
-        id: &str,
-        device_id: &[u8],
-        now: f64,
-        isolated: Option<bool>,
-    ) -> Result<(), JsValue> {
-        let op = Op::AddAgentWorkspace {
-            name: name.into(),
-            agent_label: label.into(),
-            id: id.into(),
-            isolated,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Sets whether workspace `id` is isolated (isolated workspaces spec §5),
-    /// stamping only `lifecycle_at`/`lifecycle_by`; `content`, `placement`
-    /// and `appearance` survive byte-identical (spec §5.1). Rejects a node
-    /// that is not a workspace: only a workspace has a cookie jar to choose.
-    #[wasm_bindgen(js_name = setIsolation)]
-    pub fn set_isolation(
-        &mut self,
-        id: &str,
-        isolated: bool,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetIsolation {
-            id: id.into(),
-            isolated,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    #[wasm_bindgen(js_name = addGroup)]
-    pub fn add_group(
-        &mut self,
-        parent: &str,
-        name: &str,
-        icon: Option<String>,
-        id: &str,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::AddGroup {
-            parent: parent.into(),
-            name: name.into(),
-            icon,
-            id: id.into(),
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// An empty split under `parent`, between `before` and `after` as in
-    /// `addTab` (split-view spec §5.2). Its panes are moved in by the
-    /// `moveNode`s that follow it in the same `applyBatch`. A parent that is
-    /// not a workspace or a group is refused, with the codes
-    /// `docs/host-contract.md` §8 lists.
-    #[wasm_bindgen(js_name = addSplit)]
-    #[expect(clippy::too_many_arguments)]
-    pub fn add_split(
-        &mut self,
-        parent: &str,
-        name: &str,
-        id: &str,
-        before: Option<String>,
-        after: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::AddSplit {
-            parent: parent.into(),
-            name: name.into(),
-            id: id.into(),
-            before,
-            after,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    #[wasm_bindgen(js_name = addTab)]
-    #[expect(clippy::too_many_arguments)]
-    pub fn add_tab(
-        &mut self,
-        parent: &str,
-        name: &str,
-        url: &str,
-        id: &str,
-        before: Option<String>,
-        after: Option<String>,
-        device_id: &[u8],
-        now: f64,
-        local: Option<bool>,
-    ) -> Result<(), JsValue> {
-        let op = Op::AddTab {
-            parent: parent.into(),
-            name: name.into(),
-            url: url.into(),
-            id: id.into(),
-            before,
-            after,
-            local: local.unwrap_or(false),
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    #[wasm_bindgen(js_name = moveNode)]
-    pub fn move_node(
-        &mut self,
-        id: &str,
-        new_parent: &str,
-        before: Option<String>,
-        after: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::MoveNode {
-            id: id.into(),
-            new_parent: new_parent.into(),
-            before,
-            after,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Puts the workspace `id` between the workspaces `before` and `after`
-    /// in the order every device lists them (`tree::move_workspace`).
-    #[wasm_bindgen(js_name = moveWorkspace)]
-    pub fn move_workspace(
-        &mut self,
-        id: &str,
-        before: Option<String>,
-        after: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::MoveWorkspace {
-            id: id.into(),
-            before,
-            after,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Sets `id`'s name, stamping only the content group, so a rename never
-    /// drags the node away from where a peer moved it (spec §5.1, §5.3).
-    /// `remove` followed by an add would turn the edit into a deletion, which
-    /// a peer's concurrent edit is allowed to beat (spec §5.4).
-    pub fn rename(
-        &mut self,
-        id: &str,
-        name: &str,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::Rename {
-            id: id.into(),
-            name: name.into(),
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Sets `id`'s whole content group (name, url, icon, shares), stamping
-    /// only `content_at` and `content_by` (spec §5.1, §5.3).
+    /// Applies the change `op_json` spells: one operation, an object named
+    /// by `kind` as `crate::ops::Op` lists them, or `{ kind: "batch", ops }`,
+    /// several applied all together or not at all. It is stamped with
+    /// `device_id` and `now`, and a refusal leaves the document as it was
+    /// (`docs/host-contract.md` §3).
     ///
-    /// **The group is the unit, so this is a read-modify-write.** Merge
-    /// replaces a fact group entire, so whatever this call omits is
-    /// overwritten: following a tab as it navigates means sending the name the
-    /// document holds alongside the new url, or the write clobbers a rename
-    /// made here or on a peer (`docs/host-contract.md` §3). `null` clears a
-    /// field.
-    ///
-    /// `shares` is a split's pane widths. `local` marks an address that stays
-    /// on this device (decision 1372), and only a write with an address can
-    /// carry it.
-    #[wasm_bindgen(js_name = setContent)]
-    #[expect(clippy::too_many_arguments)]
-    pub fn set_content(
-        &mut self,
-        id: &str,
-        name: &str,
-        url: Option<String>,
-        icon: Option<String>,
-        device_id: &[u8],
-        now: f64,
-        shares: Option<Vec<f64>>,
-        local: Option<bool>,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetContent {
-            id: id.into(),
-            name: name.into(),
-            url,
-            icon,
-            shares,
-            local: local.unwrap_or(false),
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Sets or clears `id`'s `local` mark with its address unchanged, for a
-    /// node the host keeps on this device for a reason other than its
-    /// address (decision 1372 as decision 2237 extends it). A change stamps
-    /// the content group; a mark already as asked writes nothing. Only a
-    /// node with an address can be local.
-    #[wasm_bindgen(js_name = setLocal)]
-    pub fn set_local(
-        &mut self,
-        id: &str,
-        local: bool,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetLocal {
-            id: id.into(),
-            local,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Sets `id`'s whole appearance group (colour, emoji and transparency),
-    /// stamping only `appearance_at`/`appearance_by` (spec §5.1, §5.3).
-    ///
-    /// **The group is the unit, as with [`Self::set_content`]**: `null` for
-    /// any field clears it, so send the appearance the document holds
-    /// alongside the one field changing.
-    ///
-    /// `color` is one of `COLOR_TOKENS`, or a plain object: `{h, c, l, mode}`
-    /// on a workspace, `{h, c}` on a group (decision 0057,
-    /// `crate::ops::parse_color`).
-    /// `transparency` is a number in `[0, 1]`, on a workspace only. `emoji`
-    /// is passed through unmodified: a flag or a ZWJ sequence is several
-    /// Unicode scalar values long.
-    #[wasm_bindgen(js_name = setAppearance)]
-    pub fn set_appearance(
-        &mut self,
-        id: &str,
-        color: JsValue,
-        emoji: Option<String>,
-        transparency: Option<f64>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        // `JSON.stringify` writes `NaN` and the infinities as `null`, so a
-        // colour holding one is refused as a missing number.
-        let color = if color.is_null() || color.is_undefined() {
-            None
-        } else {
-            let json = js_sys::JSON::stringify(&color)
-                .ok()
-                .and_then(|json| json.as_string());
-            Some(color_from_json(json).map_err(to_js_err)?)
-        };
-        let op = Op::SetAppearance {
-            id: id.into(),
-            color,
-            emoji,
-            transparency,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Sets the label a tab shows in place of its page's title, or clears it
-    /// with `null`, stamping only `appearance_at`/`appearance_by`. The colour
-    /// and emoji are kept, and the content group, which follows the page as
-    /// it navigates, is left alone (spec §5.1).
-    #[wasm_bindgen(js_name = setLabel)]
-    pub fn set_label(
-        &mut self,
-        id: &str,
-        label: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetLabel {
-            id: id.into(),
-            label,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
-    /// Stamps `touched_at`/`touched_by` on `id` and nothing else: work was
-    /// done inside it (decision 0106). Every fact group survives
-    /// byte-identical, so the stamp competes with no edit made elsewhere; it
-    /// is news to a peer that deleted the node without seeing it, which brings
-    /// the node back (spec §5.4).
-    #[wasm_bindgen(js_name = touch)]
-    pub fn touch(&mut self, id: &str, device_id: &[u8], now: f64) -> Result<(), JsValue> {
-        self.apply(Op::Touch { id: id.into() }, device_id, now)
-            .map(|_| ())
-    }
-
-    /// Records that tab `id` was selected: touches it when its touch is an
-    /// hour old or more, and answers whether it did (idle-tab archive spec
-    /// §4.1).
-    #[wasm_bindgen(js_name = markUsed)]
-    pub fn mark_used(&mut self, id: &str, device_id: &[u8], now: f64) -> Result<bool, JsValue> {
-        let id = parse_id(id).map_err(to_js_err)?;
-        let by = parse_device_id(device_id).map_err(to_js_err)?;
-        let now = parse_timestamp(now).map_err(to_js_err)?;
-        crate::archive::mark_used(&mut self.0, id, by, now).map_err(to_js_err)
-    }
-
-    /// Sets workspace `id`'s own choice for archiving idle tabs, one of
-    /// `12h`, `24h`, `7d`, `30d` and `never`, or clears it with `null` so it
-    /// follows the global choice (idle-tab archive spec §5). Stamps only the
-    /// lifecycle group.
-    #[wasm_bindgen(js_name = setAutoArchive)]
-    pub fn set_auto_archive(
-        &mut self,
-        id: &str,
-        choice: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetAutoArchive {
-            id: id.into(),
-            choice,
-        };
-        self.apply(op, device_id, now).map(|_| ())
+    /// Answers `{ id, changed }` as JSON: `id` is the node an operation
+    /// added, or null, and `changed` is present only from an operation that
+    /// may leave the document as it was by design.
+    pub fn apply(&mut self, op_json: &str, device_id: &[u8], now: f64) -> Result<String, JsValue> {
+        let applied = apply_json(&mut self.0, op_json, device_id, now).map_err(to_js_err)?;
+        serde_json::to_string(&applied).map_err(to_js_err)
     }
 
     /// The sweep (idle-tab archive spec §4.2), on this document as the tree
@@ -726,76 +346,9 @@ impl SvalDocument {
         archived_json(&self.0, now).map_err(to_js_err)
     }
 
-    /// Sets setting `key` to the JSON value `value_json`, or resets it to its
-    /// default when `value_json` is absent or the JSON text `null`
-    /// (settings-sync spec §3).
-    #[wasm_bindgen(js_name = setSetting)]
-    pub fn set_setting(
-        &mut self,
-        key: &str,
-        value_json: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetSetting {
-            key: key.into(),
-            value_json,
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
     /// Every setting as a JSON object, `{ key: value | null }`.
     pub fn settings(&self) -> Result<String, JsValue> {
         settings_json(&self.0).map_err(to_js_err)
-    }
-
-    /// Adds the favorite, folder or separator whose guid is `guid` at
-    /// `favoriteId(guid)`, under `parent` between the siblings `before` and
-    /// `after` (favorites-native spec §16). A Favorites root has no `parent`.
-    #[wasm_bindgen(js_name = addFavorite)]
-    #[expect(clippy::too_many_arguments)]
-    pub fn add_favorite(
-        &mut self,
-        kind: &str,
-        guid: &str,
-        parent: Option<String>,
-        before: Option<String>,
-        after: Option<String>,
-        name: &str,
-        url: Option<String>,
-        device_id: &[u8],
-        now: f64,
-        local: Option<bool>,
-    ) -> Result<String, JsValue> {
-        let op = Op::AddFavorite {
-            favorite_kind: kind.into(),
-            guid: guid.into(),
-            parent,
-            before,
-            after,
-            name: name.into(),
-            url,
-            local: local.unwrap_or(false),
-        };
-        self.apply(op, device_id, now).map(added)
-    }
-
-    /// Limits the pin `id` to the workspaces in `scope`, or shows it in
-    /// every workspace for null (pins spec §7). Only the lifecycle group is
-    /// stamped.
-    #[wasm_bindgen(js_name = setPinScope)]
-    pub fn set_pin_scope(
-        &mut self,
-        id: &str,
-        scope: Option<Vec<String>>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetPinScope {
-            id: id.into(),
-            scope,
-        };
-        self.apply(op, device_id, now).map(|_| ())
     }
 
     /// Every favorite, folder and separator as a JSON array of `{ id, kind,
@@ -806,62 +359,12 @@ impl SvalDocument {
         favorites_json(&self.0).map_err(to_js_err)
     }
 
-    /// Adds the visit this device made to `url` at `visitedAt` in
-    /// `workspace`, or in none when it is null, at `visitId(deviceId, url,
-    /// visitedAt)`, and returns that id (history-sync spec §3, decision
-    /// 1287). A visit already here is left as it is.
-    #[wasm_bindgen(js_name = addVisit)]
-    #[expect(clippy::too_many_arguments)]
-    pub fn add_visit(
-        &mut self,
-        url: &str,
-        title: &str,
-        transition: u32,
-        visited_at: f64,
-        workspace: Option<String>,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<String, JsValue> {
-        let op = Op::AddVisit {
-            url: url.into(),
-            title: title.into(),
-            transition,
-            visited_at,
-            workspace,
-        };
-        self.apply(op, device_id, now).map(added)
-    }
-
-    /// Sets visit `id`'s title, when it differs (history-sync spec §4.1).
-    #[wasm_bindgen(js_name = setVisitTitle)]
-    pub fn set_visit_title(
-        &mut self,
-        id: &str,
-        title: &str,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::SetVisitTitle {
-            id: id.into(),
-            title: title.into(),
-        };
-        self.apply(op, device_id, now).map(|_| ())
-    }
-
     /// Every visit as a JSON array of `{ id, url, title, visitedAt,
     /// transition, device, workspace }`, oldest first. `device` is the hex id
     /// of the device that made the visit, and `workspace` the id of the
     /// workspace it was made in, or null.
     pub fn visits(&self) -> Result<String, JsValue> {
         visits_json(&self.0).map_err(to_js_err)
-    }
-
-    /// Records in the history index that this device wrote to shard `name`
-    /// (history-sync spec §3).
-    #[wasm_bindgen(js_name = touchShard)]
-    pub fn touch_shard(&mut self, name: &str, device_id: &[u8], now: f64) -> Result<(), JsValue> {
-        self.apply(Op::TouchShard { name: name.into() }, device_id, now)
-            .map(|_| ())
     }
 
     /// Every shard the history index lists as a JSON array of `{ name,
@@ -877,21 +380,6 @@ impl SvalDocument {
     /// Firefox's own recently-closed list does, locally.
     pub fn remove(&mut self, id: &str) -> Result<(), JsValue> {
         remove(&mut self.0, id).map_err(to_js_err)
-    }
-
-    /// Deletes the container `id` and keeps what is in it: its children move
-    /// to its parent, in their order, at the place it held
-    /// ([`crate::tree::remove_keeping_children`]). "Delete group" when the
-    /// user moves the contents out (spec §5.4).
-    #[wasm_bindgen(js_name = removeKeepingChildren)]
-    pub fn remove_keeping_children(
-        &mut self,
-        id: &str,
-        device_id: &[u8],
-        now: f64,
-    ) -> Result<(), JsValue> {
-        let op = Op::RemoveKeepingChildren { id: id.into() };
-        self.apply(op, device_id, now).map(|_| ())
     }
 
     /// Runs one sync pass against a snapshot the host already fetched:
@@ -1043,23 +531,8 @@ pub fn pairing_expires_at(bytes: &[u8]) -> Result<f64, JsValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ops::{apply_batch, parse_id};
     use crate::store::DeviceId as StoreDeviceId;
-    use serde_json::json;
-
-    #[test]
-    fn color_from_json_reads_what_json_stringify_wrote() {
-        assert_eq!(color_from_json(Some("\"blue\"".into())), Ok(json!("blue")));
-        assert_eq!(
-            color_from_json(Some(r#"{"h":1,"c":0}"#.into())),
-            Ok(json!({ "h": 1, "c": 0 }))
-        );
-        for unwritable in [None, Some("{".into())] {
-            assert_eq!(
-                color_from_json(unwritable).unwrap_err().reason,
-                Reason::BadColor
-            );
-        }
-    }
 
     #[test]
     fn a_write_with_an_address_carries_its_local_mark_and_one_without_cannot() {
@@ -1110,9 +583,11 @@ mod tests {
 #[cfg(test)]
 mod binding_tests {
     use super::*;
+    use crate::ops::parse_id;
     use crate::ops::require_workspace;
     use crate::store::DeviceId;
     use crate::types::NodeKind;
+    use serde_json::json;
     use std::collections::BTreeMap;
 
     const DEVICE: [u8; 16] = [0xa; 16];
@@ -1121,42 +596,64 @@ mod binding_tests {
         uuid::Uuid::from_u128(n).to_string()
     }
 
+    /// Applies `op` through the binding and answers what it reports.
+    fn apply(doc: &mut SvalDocument, op: serde_json::Value, now: f64) -> serde_json::Value {
+        serde_json::from_str(&doc.apply(&op.to_string(), &DEVICE, now).unwrap()).unwrap()
+    }
+
+    /// A document holding workspace 1.
+    fn one_workspace() -> SvalDocument {
+        let mut doc = SvalDocument::new();
+        apply(
+            &mut doc,
+            json!({ "kind": "addWorkspace", "name": "W", "id": id(1) }),
+            1.0,
+        );
+        doc
+    }
+
+    fn add_tab(doc: &mut SvalDocument, n: u128, now: f64) {
+        let op = json!({
+            "kind": "addTab", "parent": id(1), "name": "T", "url": "https://t.example/", "id": id(n),
+        });
+        apply(doc, op, now);
+    }
+
     fn node(doc: &SvalDocument, n: u128) -> Option<&crate::types::Node> {
         doc.0.node(uuid::Uuid::from_u128(n))
     }
 
     #[test]
     fn set_local_marks_a_tab_through_the_binding() {
-        let mut doc = SvalDocument::new();
-        doc.add_workspace("W", None, &id(1), &DEVICE, 1.0, None)
-            .unwrap();
-        doc.add_tab(
-            &id(1),
-            "Call",
-            "https://meet.example/abc",
-            &id(2),
-            None,
-            None,
-            &DEVICE,
-            2.0,
-            None,
-        )
-        .unwrap();
-        doc.set_local(&id(2), true, &DEVICE, 3.0).unwrap();
+        let mut doc = one_workspace();
+        add_tab(&mut doc, 2, 2.0);
+        apply(
+            &mut doc,
+            json!({ "kind": "setLocal", "id": id(2), "local": true }),
+            3.0,
+        );
         assert!(node(&doc, 2).unwrap().content.local);
-        doc.set_local(&id(2), false, &DEVICE, 4.0).unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "setLocal", "id": id(2), "local": false }),
+            4.0,
+        );
         assert!(!node(&doc, 2).unwrap().content.local);
     }
 
     #[test]
     fn move_workspace_puts_a_workspace_in_its_new_place() {
-        let mut doc = SvalDocument::new();
-        for n in [1, 2] {
-            doc.add_workspace("W", None, &id(n), &DEVICE, 1.0, None)
-                .unwrap();
-        }
-        doc.move_workspace(&id(2), None, Some(id(1)), &DEVICE, 2.0)
-            .unwrap();
+        let mut doc = one_workspace();
+        apply(
+            &mut doc,
+            json!({ "kind": "addWorkspace", "name": "W", "id": id(2) }),
+            1.0,
+        );
+        apply(
+            &mut doc,
+            json!({ "kind": "moveWorkspace", "id": id(2), "after": id(1) }),
+            2.0,
+        );
         let order = |n| node(&doc, n).unwrap().placement.order.clone();
         assert!(order(2) < order(1), "the second now sorts first");
         assert_eq!(node(&doc, 2).unwrap().placement_at, 2);
@@ -1164,48 +661,26 @@ mod binding_tests {
 
     #[test]
     fn a_split_round_trips_through_to_json_and_load_json_with_its_name_and_shares() {
-        let mut doc = SvalDocument::new();
-        doc.add_workspace("W", None, &id(1), &DEVICE, 1.0, None)
-            .unwrap();
+        let mut doc = one_workspace();
         for n in [2, 3] {
-            doc.add_tab(
-                &id(1),
-                "T",
-                "https://t.example/",
-                &id(n),
-                None,
-                None,
-                &DEVICE,
-                2.0,
-                None,
-            )
-            .unwrap();
+            add_tab(&mut doc, n, 2.0);
         }
-        doc.add_split(
-            &id(1),
-            "Docs",
-            &id(4),
-            Some(id(2)),
-            Some(id(3)),
-            &DEVICE,
-            3.0,
-        )
-        .unwrap();
-        doc.move_node(&id(2), &id(4), None, None, &DEVICE, 4.0)
-            .unwrap();
-        doc.move_node(&id(3), &id(4), Some(id(2)), None, &DEVICE, 4.0)
-            .unwrap();
-        doc.set_content(
-            &id(4),
-            "Docs",
-            None,
-            None,
-            &DEVICE,
-            5.0,
-            Some(vec![40.0, 60.0]),
-            None,
-        )
-        .unwrap();
+        let split = json!({
+            "kind": "addSplit", "parent": id(1), "name": "Docs", "id": id(4),
+            "before": id(2), "after": id(3),
+        });
+        apply(&mut doc, split, 3.0);
+        apply(
+            &mut doc,
+            json!({ "kind": "moveNode", "id": id(2), "newParent": id(4) }),
+            4.0,
+        );
+        let second =
+            json!({ "kind": "moveNode", "id": id(3), "newParent": id(4), "before": id(2) });
+        apply(&mut doc, second, 4.0);
+        let shares =
+            json!({ "kind": "setContent", "id": id(4), "name": "Docs", "shares": [40.0, 60.0] });
+        apply(&mut doc, shares, 5.0);
 
         let json = doc.to_json().unwrap();
         let back = SvalDocument::load_json(&json).unwrap();
@@ -1229,35 +704,15 @@ mod binding_tests {
 
     #[test]
     fn a_tab_added_between_two_siblings_is_drawn_between_them() {
-        let mut doc = SvalDocument::new();
-        doc.add_workspace("W", None, &id(1), &DEVICE, 1.0, None)
-            .unwrap();
+        let mut doc = one_workspace();
         for n in [2, 3] {
-            doc.add_tab(
-                &id(1),
-                "T",
-                "https://t.example/",
-                &id(n),
-                None,
-                None,
-                &DEVICE,
-                2.0,
-                None,
-            )
-            .unwrap();
+            add_tab(&mut doc, n, 2.0);
         }
-        doc.add_tab(
-            &id(1),
-            "T",
-            "https://t.example/",
-            &id(4),
-            Some(id(2)),
-            Some(id(3)),
-            &DEVICE,
-            3.0,
-            None,
-        )
-        .unwrap();
+        let between = json!({
+            "kind": "addTab", "parent": id(1), "name": "T", "url": "https://t.example/",
+            "id": id(4), "before": id(2), "after": id(3),
+        });
+        apply(&mut doc, between, 3.0);
         let children: Vec<_> = crate::tree::children(&doc.0, uuid::Uuid::from_u128(1))
             .into_iter()
             .map(|n| n.as_u128())
@@ -1363,22 +818,24 @@ mod binding_tests {
     fn the_archive_methods_change_both_documents_and_answer_what_they_did() {
         const HOUR: f64 = 3_600_000.0;
         let (mut tree, mut archive) = (SvalDocument::new(), SvalDocument::new());
-        let ops = serde_json::json!([
+        let ops = json!([
             { "kind": "addWorkspace", "name": "W", "id": id(1) },
             { "kind": "addTab", "parent": id(1), "name": "T", "url": "https://t.example/", "id": id(10) },
             { "kind": "addTab", "parent": id(1), "name": "U", "url": "https://u.example/", "id": id(11) },
         ]);
-        tree.apply_batch(&ops.to_string(), &DEVICE, 1.0).unwrap();
+        let batch = apply(&mut tree, json!({ "kind": "batch", "ops": ops }), 1.0);
+        assert_eq!(batch, json!({ "id": null }));
         assert!(node(&tree, 11).is_some());
 
-        tree.set_auto_archive(&id(1), Some("12h".into()), &DEVICE, 2.0)
-            .unwrap();
+        let choice = json!({ "kind": "setAutoArchive", "id": id(1), "choice": "12h" });
+        apply(&mut tree, choice, 2.0);
         assert_eq!(
             node(&tree, 1).unwrap().lifecycle.auto_archive.as_deref(),
             Some("12h")
         );
-        assert!(tree.mark_used(&id(10), &DEVICE, HOUR).unwrap());
-        assert!(!tree.mark_used(&id(10), &DEVICE, HOUR + 1.0).unwrap());
+        let used = json!({ "kind": "markUsed", "id": id(10) });
+        assert_eq!(apply(&mut tree, used.clone(), HOUR)["changed"], true);
+        assert_eq!(apply(&mut tree, used, HOUR + 1.0)["changed"], false);
 
         let now: serde_json::Value = serde_json::from_str(
             &tree
@@ -1438,20 +895,29 @@ mod binding_tests {
     #[test]
     fn the_history_and_pin_methods_change_the_node_they_name() {
         let mut doc = SvalDocument::new();
-        let visit = doc
-            .add_visit("https://e.example/", "E", 1, 10.0, None, &DEVICE, 10.0)
-            .unwrap();
+        let visit = json!({
+            "kind": "addVisit", "url": "https://e.example/", "title": "E",
+            "transition": 1, "visitedAt": 10.0,
+        });
+        let visit = apply(&mut doc, visit, 10.0)["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         assert_eq!(
             visit,
             crate::types::visit_id(DeviceId::from_bytes(DEVICE), "https://e.example/", 10)
                 .to_string()
         );
-        doc.set_visit_title(&visit, "Renamed", &DEVICE, 11.0)
-            .unwrap();
+        let title = json!({ "kind": "setVisitTitle", "id": visit, "title": "Renamed" });
+        apply(&mut doc, title, 11.0);
         let visit_id = uuid::Uuid::parse_str(&visit).unwrap();
         assert_eq!(doc.0.node(visit_id).unwrap().content.name, "Renamed");
         assert_eq!(doc.visits().unwrap(), visits_json(&doc.0).unwrap());
-        doc.touch_shard("history-2026-W42", &DEVICE, 12.0).unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "touchShard", "name": "history-2026-W42" }),
+            12.0,
+        );
         let shard = doc
             .0
             .node(crate::types::shard_id("history-2026-W42"))
@@ -1459,36 +925,21 @@ mod binding_tests {
         assert_eq!(shard.content_at, 12);
         assert_eq!(doc.shards().unwrap(), shards_json(&doc.0).unwrap());
 
-        let pins = doc
-            .add_favorite(
-                "folder",
-                crate::types::PINS_GUID,
-                None,
-                None,
-                None,
-                "",
-                None,
-                &DEVICE,
-                1.0,
-                None,
-            )
-            .unwrap();
-        let pin = doc
-            .add_favorite(
-                "favorite",
-                "page00000001",
-                Some(pins),
-                None,
-                None,
-                "P",
-                Some("https://p.example/".into()),
-                &DEVICE,
-                2.0,
-                None,
-            )
-            .unwrap();
-        doc.set_pin_scope(&pin, Some(vec![id(1)]), &DEVICE, 3.0)
-            .unwrap();
+        let pins = json!({
+            "kind": "addFavorite", "favoriteKind": "folder", "guid": crate::types::PINS_GUID,
+            "name": "",
+        });
+        let pins = apply(&mut doc, pins, 1.0)["id"].clone();
+        let pin = json!({
+            "kind": "addFavorite", "favoriteKind": "favorite", "guid": "page00000001",
+            "parent": pins, "name": "P", "url": "https://p.example/",
+        });
+        let pin = apply(&mut doc, pin, 2.0)["id"].as_str().unwrap().to_owned();
+        apply(
+            &mut doc,
+            json!({ "kind": "setPinScope", "id": pin, "scope": [id(1)] }),
+            3.0,
+        );
         assert_eq!(
             doc.0
                 .node(parse_id(&pin).unwrap())
@@ -1502,71 +953,81 @@ mod binding_tests {
     #[test]
     fn every_workspace_mutator_changes_the_node_it_names() {
         let mut doc = SvalDocument::new();
-        doc.add_workspace("W", None, &id(1), &DEVICE, 1.0, Some(true))
-            .unwrap();
+        let isolated =
+            json!({ "kind": "addWorkspace", "name": "W", "id": id(1), "isolated": true });
+        assert_eq!(apply(&mut doc, isolated, 1.0), json!({ "id": id(1) }));
         assert!(node(&doc, 1).unwrap().lifecycle.isolated);
-        doc.add_workspace("Shared", None, &id(9), &DEVICE, 1.0, None)
-            .unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "addWorkspace", "name": "Shared", "id": id(9) }),
+            1.0,
+        );
         assert!(!node(&doc, 9).unwrap().lifecycle.isolated);
-        doc.add_agent_workspace("A", "Claude Code", &id(2), &DEVICE, 1.0, Some(true))
-            .unwrap();
+        let agent = json!({
+            "kind": "addAgentWorkspace", "name": "A", "agentLabel": "Claude Code",
+            "id": id(2), "isolated": true,
+        });
+        apply(&mut doc, agent, 1.0);
         let agent = node(&doc, 2).unwrap();
         assert_eq!(agent.agent.as_ref().unwrap().label, "Claude Code");
         assert!(agent.lifecycle.isolated);
 
-        doc.set_isolation(&id(1), false, &DEVICE, 2.0).unwrap();
+        let shared = json!({ "kind": "setIsolation", "id": id(1), "isolated": false });
+        assert_eq!(apply(&mut doc, shared, 2.0), json!({ "id": null }));
         assert!(!node(&doc, 1).unwrap().lifecycle.isolated);
 
-        doc.add_group(&id(1), "G", None, &id(3), &DEVICE, 3.0)
-            .unwrap();
+        let group = json!({ "kind": "addGroup", "parent": id(1), "name": "G", "id": id(3) });
+        apply(&mut doc, group, 3.0);
         assert_eq!(node(&doc, 3).unwrap().kind, NodeKind::Group);
-        doc.add_tab(
-            &id(1),
-            "T",
-            "https://t.example/",
-            &id(4),
-            None,
-            None,
-            &DEVICE,
-            4.0,
-            None,
-        )
-        .unwrap();
+        add_tab(&mut doc, 4, 4.0);
         assert_eq!(node(&doc, 4).unwrap().kind, NodeKind::Tab);
 
-        doc.move_node(&id(4), &id(3), None, None, &DEVICE, 5.0)
-            .unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "moveNode", "id": id(4), "newParent": id(3) }),
+            5.0,
+        );
         assert_eq!(
             node(&doc, 4).unwrap().placement.parent,
             Some(uuid::Uuid::from_u128(3))
         );
-        doc.rename(&id(4), "Renamed", &DEVICE, 6.0).unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "rename", "id": id(4), "name": "Renamed" }),
+            6.0,
+        );
         assert_eq!(node(&doc, 4).unwrap().content.name, "Renamed");
-        doc.set_content(
-            &id(4),
-            "Content",
-            Some("https://c.example/".into()),
-            None,
-            &DEVICE,
-            7.0,
-            None,
-            None,
-        )
-        .unwrap();
+        let content = json!({
+            "kind": "setContent", "id": id(4), "name": "Content", "url": "https://c.example/",
+        });
+        apply(&mut doc, content, 7.0);
         assert_eq!(
             node(&doc, 4).unwrap().content.url.as_deref(),
             Some("https://c.example/")
         );
-        doc.set_label(&id(4), Some("Mine".into()), &DEVICE, 8.5)
-            .unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "setAppearance", "id": id(3), "color": "blue" }),
+            8.0,
+        );
+        assert_eq!(node(&doc, 3).unwrap().appearance.color, Some(json!("blue")));
+        apply(
+            &mut doc,
+            json!({ "kind": "setLabel", "id": id(4), "label": "Mine" }),
+            8.5,
+        );
         assert_eq!(
             node(&doc, 4).unwrap().appearance.label.as_deref(),
             Some("Mine")
         );
-        doc.touch(&id(3), &DEVICE, 9.0).unwrap();
+        apply(&mut doc, json!({ "kind": "touch", "id": id(3) }), 9.0);
         assert_eq!(node(&doc, 3).unwrap().touched_at, 9);
 
-        doc.remove_keeping_children(&id(3), &DEVICE, 10.0).unwrap();
+        apply(
+            &mut doc,
+            json!({ "kind": "removeKeepingChildren", "id": id(3) }),
+            10.0,
+        );
         assert!(node(&doc, 3).is_none());
         assert_eq!(
             node(&doc, 4).unwrap().placement.parent,
@@ -1592,74 +1053,42 @@ mod binding_tests {
     #[test]
     fn settings_round_trip_through_the_bindings() {
         let mut doc = SvalDocument::new();
-        doc.set_setting("sval.search", Some("\"ddg\"".into()), &DEVICE, 1.0)
-            .unwrap();
+        let set = json!({ "kind": "setSetting", "key": "sval.search", "valueJson": "\"ddg\"" });
+        apply(&mut doc, set, 1.0);
+        let seed = json!({ "kind": "seedSetting", "key": "sval.search", "valueJson": "\"kagi\"" });
+        assert_eq!(
+            apply(&mut doc, seed, 2.0),
+            json!({ "id": null, "changed": false })
+        );
         let settings: serde_json::Value = serde_json::from_str(&doc.settings().unwrap()).unwrap();
-        assert_eq!(settings, serde_json::json!({"sval.search": "ddg"}));
+        assert_eq!(settings, json!({"sval.search": "ddg"}));
     }
 
     #[test]
     fn every_favorites_mutator_changes_the_node_it_names() {
         let mut doc = SvalDocument::new();
-        let toolbar = doc
-            .add_favorite(
-                "folder",
-                "toolbar_____",
-                None,
-                None,
-                None,
-                "",
-                None,
-                &DEVICE,
-                0.0,
-                None,
-            )
-            .unwrap();
+        let mut add =
+            |kind: &str, guid: &str, parent: Option<&str>, name: &str, url: Option<&str>| {
+                let op = json!({
+                    "kind": "addFavorite", "favoriteKind": kind, "guid": guid, "parent": parent,
+                    "name": name, "url": url,
+                });
+                apply(&mut doc, op, 1.0)["id"].as_str().unwrap().to_owned()
+            };
+        let toolbar = add("folder", "toolbar_____", None, "", None);
         assert_eq!(
             toolbar,
             crate::types::favorite_id("toolbar_____").to_string()
         );
-        let folder = doc
-            .add_favorite(
-                "folder",
-                "folder000001",
-                Some(toolbar.clone()),
-                None,
-                None,
-                "Work",
-                None,
-                &DEVICE,
-                1.0,
-                None,
-            )
-            .unwrap();
-        let page = doc
-            .add_favorite(
-                "favorite",
-                "page00000001",
-                Some(folder.clone()),
-                None,
-                None,
-                "Page",
-                Some("https://p.example/".into()),
-                &DEVICE,
-                1.0,
-                None,
-            )
-            .unwrap();
-        doc.add_favorite(
-            "separator",
-            "separator001",
-            Some(toolbar.clone()),
-            None,
-            None,
-            "",
-            None,
-            &DEVICE,
-            1.0,
-            None,
-        )
-        .unwrap();
+        let folder = add("folder", "folder000001", Some(&toolbar), "Work", None);
+        let page = add(
+            "favorite",
+            "page00000001",
+            Some(&folder),
+            "Page",
+            Some("https://p.example/"),
+        );
+        add("separator", "separator001", Some(&toolbar), "", None);
 
         let kinds: BTreeMap<String, String> =
             serde_json::from_str::<Vec<serde_json::Value>>(&doc.favorites().unwrap())

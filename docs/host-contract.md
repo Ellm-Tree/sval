@@ -128,21 +128,46 @@ is present by default and this never triggers; an embedder without a
 
 ## 3. Ids and timestamps are the host's to supply
 
-No mutator on `SvalDocument` reads a clock or generates an id internally.
-Every one of `addWorkspace`, `addAgentWorkspace`, `addGroup`, `addSplit`, `addTab`, `rename`, `setContent`, `setLocal`,
-`setAppearance`, `setIsolation`, `touch`, `setSetting`, `moveNode`, `moveWorkspace`,
-`removeKeepingChildren`, `markUsed`, `setAutoArchive`, `archiveIdle`, `archiveNow`, `restore` and `sync` takes an explicit id, device id and/or timestamp from the caller. (`remove`
-takes only the node id: closing a tab deletes the node, and a deletion stores
-nothing, so there is nothing to stamp or attribute — spec §5.4.)
+Nothing on `SvalDocument` reads a clock or generates an id internally.
+`apply`, `archiveIdle`, `archiveNow`, `restore`, `importArchived` and `sync`
+each take an explicit device id and timestamp from the caller, and an
+operation that adds a node names the new node's id. (`remove(id)` takes only
+the node id: closing a tab deletes the node, and a deletion stores nothing,
+so there is nothing to stamp or attribute — spec §5.4.)
+
+### One call makes every change
 
 ```
-SvalDocument.rename(
-  id:        string,       // a node already in the document
-  name:      string,
+SvalDocument.apply(
+  op_json:   string,       // one operation, or a batch of them, as JSON
   device_id: Uint8Array,   // 16 bytes
   now:       number,       // milliseconds, validated like every other timestamp
-) -> void
+) -> string                // JSON: { id: string|null, changed?: boolean }
 ```
+
+An operation is an object named by `kind`, with its other fields in
+camelCase and every node id a string. It carries neither the device id nor
+the time: those are `apply`'s own arguments. This section and §10 write each
+operation as `{ kind, field, field? }`, a `?` marking a field that may be
+left out or `null`. A field the object holds beyond those is ignored.
+
+`apply` answers what the operation did, as JSON. `id` is the id of the node
+it added, and `null` from an operation that adds none and from a batch.
+`changed` is present only from the three operations that may leave the
+document as it was by design: `markUsed`, `seedSetting` and `movePinsToRoot`.
+Every other operation either writes or throws.
+
+JSON has no `NaN` and no infinity, and `JSON.stringify` writes each as
+`null`, which reads as a field left out. A host sends a non-finite number as
+a string instead, which is refused as any field of the wrong type is. The
+browser's `applyOp` (`SvalDocumentOps.mjs`) does.
+
+A refused operation leaves the document exactly as it was and throws its own
+error (§8). JSON that is not an operation, such as an unknown `kind`, a
+missing field or a field of the wrong type, throws `invalid_argument` with
+the reason `bad_batch`.
+
+`{ kind: "rename", id, name }`
 
 `rename` sets a node's name and stamps **only** the content group's `_at` and
 `_by`. `placement` and `lifecycle` are left exactly as they were, which is what
@@ -152,15 +177,19 @@ lets a rename on one device and a move or a pin on another both survive (spec
 and silently reorders the node, and `remove` followed by an add turns an edit
 into a deletion, which a peer's concurrent edit is allowed to beat (spec §5.4).
 
-`addAgentWorkspace(name, label, id, deviceId, now, isolated?)` adds a workspace carrying the
-immutable agent mark `{label, device}` (agent-control spec §3.5); `device` is
-`deviceId`. It trims `label` and throws if the result is empty.
+`{ kind: "addWorkspace", name, icon?, id, isolated? }` adds a workspace, and
+`{ kind: "addGroup", parent, name, icon?, id }` a group under `parent`.
 
-`addWorkspace` and `addAgentWorkspace` take an optional last argument
-`isolated`. `true` creates the workspace isolated (isolated workspaces spec
-§2) under the same `lifecycle_at` as the add; absent or `false`, it is shared.
+`{ kind: "addAgentWorkspace", name, agentLabel, id, isolated? }` adds a
+workspace carrying the immutable agent mark `{label, device}` (agent-control
+spec §3.5); `device` is `deviceId`. It trims `agentLabel` and throws if the
+result is empty.
 
-`addTab(parent, name, url, id, before?, after?, deviceId, now, local?)` adds
+`addWorkspace` and `addAgentWorkspace` take an optional `isolated`. `true`
+creates the workspace isolated (isolated workspaces spec §2) under the same
+`lifecycle_at` as the add; absent or `false`, it is shared.
+
+`{ kind: "addTab", parent, name, url, id, before?, after?, local? }` adds
 a tab under `parent`. `before` and `after` are the siblings it goes between,
 as in `moveNode`; with neither, it goes last. A tab opened mid-strip is filed
 where it sits in the one add, so no peer reads it at the end of its parent
@@ -178,29 +207,29 @@ whatever `local` it sends: only a change of address changes the mark. A host
 that copies an address out of a node passes that node's mark. `local` on a write with no url is refused with `invalid_argument`.
 An Archive entry takes its tab's mark, and a restored tab its entry's.
 
-`setLocal(id, local, deviceId, now)` sets or clears the mark with the address
+`{ kind: "setLocal", id, local }` sets or clears the mark with the address
 kept, for a node the host holds on this device for another reason: a tab in
 a call (decision 2237). A change stamps the content group, so a node coming
 back is news to every peer. A mark already as asked writes nothing. `true` on
 a node with no url is refused with `invalid_argument`.
 
-`moveWorkspace(id, before?, after?, deviceId, now)` puts a workspace between
+`{ kind: "moveWorkspace", id, before?, after? }` puts a workspace between
 the workspaces `before` and `after`, as `moveNode` places a node among its
 siblings. A workspace is a root, so it takes no parent, and anything but a
 workspace at the top of the tree is refused with `not_a_root_workspace`.
 
-`addSplit(parent, name, id, before?, after?, deviceId, now)` adds an empty
+`{ kind: "addSplit", parent, name?, id, before?, after? }` adds an empty
 split under `parent`, placed between `before` and `after` as `addTab` places a
 tab (split-view spec §5.2). Its panes are tabs moved in with `moveNode`, in
-the same `applyBatch`: splitting X with Y is `addSplit` beside X, then
+the same batch: splitting X with Y is `addSplit` beside X, then
 `moveNode` X and then Y into it. `name` is empty unless the user names the
-split; in a batch it may be left out. The parent must be a workspace or a
+split. The parent must be a workspace or a
 group. A split holds tabs only, at most four, and its children in sibling
 order are its panes from left to right. Moving a pane within its split, as
 "Move Pane Left" does, is a `moveNode` into the same split. A host reads a
 split as a node of kind `"split"` (§10).
 
-`setIsolation(id, isolated, deviceId, now)` sets a workspace's
+`{ kind: "setIsolation", id, isolated }` sets a workspace's
 `lifecycle.isolated`, stamping only `lifecycle_at`/`lifecycle_by` and carrying
 `pinned` over; `content`, `placement` and `appearance` stay byte-identical. It
 throws `no_such_node` for an unknown id and `invalid_argument` for a node that
@@ -209,16 +238,15 @@ selects is each device's own (isolated workspaces spec §4). A host reads the
 flag as `lifecycle.isolated` on the node, absent meaning `false`.
 
 ```
-SvalDocument.setContent(
-  id:        string,       // a node already in the document
-  name:      string,
-  url:       string|null,  // null clears it: a workspace or group has none
-  icon:      string|null,
-  device_id: Uint8Array,   // 16 bytes
-  now:       number,       // milliseconds, validated like every other timestamp
-  shares?:   number[]|null, // a split's pane widths; absent or null clears them
-  local?:    boolean       // the address stays on this device (§3, addTab)
-) -> void
+{
+  kind:    "setContent",
+  id:      string,        // a node already in the document
+  name:    string,
+  url?:    string|null,   // absent or null clears it: a workspace or group has none
+  icon?:   string|null,
+  shares?: number[]|null, // a split's pane widths; absent or null clears them
+  local?:  boolean        // the address stays on this device (§3, addTab)
+}
 ```
 
 `setContent` writes the **whole content group** — name, url, icon, a split's
@@ -242,7 +270,7 @@ node's current url, icon and shares and goes through `setContent`, so the two
 cannot drift.
 
 A tab's `content.name` is its page's title. The name a user gives a tab is
-`appearance.label`, written with `setLabel(id, label, deviceId, now)`, where
+`appearance.label`, written with `{ kind: "setLabel", id, label? }`, where
 `null` clears it. It stamps only the appearance group and keeps the colour,
 emoji and transparency, and `setAppearance` keeps the label, so following a tab as it navigates
 never clobbers its label (decision 2210).
@@ -256,25 +284,21 @@ tab panes. An act that changes a split's panes leaves its shares as they
 were, so a host that reads a list whose length is not the pane count draws
 equal widths, and writes a new list, or none, in the same batch as the act.
 
-`touch(id, deviceId, now)` stamps `touched_at`/`touched_by` on a node and
+`{ kind: "touch", id }` stamps `touched_at`/`touched_by` on a node and
 nothing else (decision 0106): work was done inside it. It holds no value, so
 every fact group stays byte-identical and no edit made elsewhere is lost to it.
 A peer that deleted the node without seeing the stamp loses its delete (spec
 §5.4). It throws `no_such_node` for an unknown id.
 
 ```
-SvalDocument.setAppearance(
-  id:           string,              // a node already in the document
-  color:        string|object|null,  // a token, a custom colour, or null to clear it
-  emoji:        string|null,         // null clears it
-  transparency: number|null,         // 0..1, a workspace's only; null is solid
-  device_id:    Uint8Array,          // 16 bytes
-  now:          number,              // milliseconds, validated like every other timestamp
-) -> void
+{
+  kind:          "setAppearance",
+  id:            string,              // a node already in the document
+  color?:        string|object|null,  // a token, a custom colour, or null to clear it
+  emoji?:        string|null,         // null clears it
+  transparency?: number|null          // 0..1, a workspace's only; null is solid
+}
 ```
-
-In a batch the operation is `{ kind: "setAppearance", id, color, emoji,
-transparency }`, with the same values.
 
 `setAppearance` writes the **whole appearance group** (colour, emoji and
 transparency) under one `appearance_at`/`appearance_by`, leaving `content`,
@@ -297,7 +321,7 @@ read-modify-write obligation `setContent` places on a host.
 
 A custom colour has exactly those keys. Its numbers are stored as decimals
 (`200` is stored as `200.0`). `transparency` is a number from 0 to 1, taken
-only on a workspace. Anything else, a `NaN` included, is refused with
+only on a workspace. Anything else is refused with
 `bad_color`. `null` (clearing the colour) is always accepted. This validation
 is why an invalid colour never reaches the synced document: it would be a
 rendering bug on every device that later reads it, so this is the one place
@@ -364,32 +388,34 @@ Concretely:
 
 ### A batch: many changes as one
 
-`applyBatch(opsJson, deviceId, now)` applies several changes as one act, such
-as making a group of two tabs: all of them, or none. `opsJson` is a JSON array
-of operations, each an object named by `kind` and spelled as the mutator above
-takes it, in camelCase, without the device id or the time: every operation in
-the batch is stamped with the batch's `deviceId` and `now`.
+`{ kind: "batch", ops }` applies several changes as one act, such as making
+a group of two tabs: all of them, or none. `ops` is an array of operations,
+each spelled as it is alone, and every one is stamped with the call's
+`deviceId` and `now`.
 
 ```
-[
+{ "kind": "batch", "ops": [
   { "kind": "addGroup", "parent": "<workspace>", "name": "G", "id": "<new id>" },
   { "kind": "moveNode", "id": "<tab>", "newParent": "<new id>", "before": null, "after": null }
-]
+] }
 ```
 
-The kinds are `addWorkspace`, `addAgentWorkspace`, `setIsolation`, `addGroup`,
-`addSplit`, `addTab`, `moveNode`, `rename`, `setContent`, `setAppearance`, `setLabel`, `touch`,
-`setSetting`, `addFavorite` (its kind as `favoriteKind`), `setPinScope`,
-`movePinsToRoot`,
-`removeKeepingChildren`, `addVisit`, `setVisitTitle`, `touchShard`,
-`setAutoArchive`, `markUsed` and `remove`. An add
-names its own id, so a later operation can name the node an earlier one added.
-A batch never holds a batch.
+The kinds are `addWorkspace`, `addAgentWorkspace`, `addDeviceWorkspace`,
+`setIsolation`, `addGroup`, `addSplit`, `addTab`, `moveNode`,
+`moveWorkspace`, `rename`, `setContent`, `setLocal`, `setAppearance`,
+`setLabel`, `touch`, `setSetting`, `seedSetting`, `addFavorite`,
+`setPinScope`, `movePinsToRoot`, `removeKeepingChildren`, `addVisit`,
+`setVisitTitle`, `touchShard`, `setAutoArchive`, `markUsed` and `remove`,
+each alone or in a batch. An add names its own id, so a later operation can
+name the node an earlier one added. A batch never holds a batch.
 
 The operations apply in order. If any is refused, the document is left exactly
 as it was, every stamp and watermark included, and the call throws that
 operation's own error (§8): a host keeps no copy to put back. A malformed batch
 throws `invalid_argument` before anything is applied.
+
+The mobile apps' boundary takes a batch as `applyBatch(opsJson, deviceId,
+now)`, where `opsJson` is the `ops` array alone.
 
 ## 4. The document key
 
@@ -405,8 +431,8 @@ never a panic.
 ## 5. The device id
 
 `deviceId` is exactly 16 raw bytes, passed as a `Uint8Array` to
-`SvalDocument::sync` **and to every mutator that stamps a fact group** —
-`addWorkspace`, `addAgentWorkspace`, `addGroup`, `addTab`, `rename`, `setContent`, `setAppearance`, `setLabel`, `setIsolation`, `touch`, `setSetting`, `moveNode`, `setAutoArchive`, `markUsed`, `archiveIdle`, `archiveNow`, `restore` — because each group
+`SvalDocument::sync` **and to every call that stamps a fact group** —
+`apply`, `archiveIdle`, `archiveNow`, `restore`, `importArchived` — because each group
 records which device last wrote it (§3, spec §5.4). It is this device's identity
 within `sval-core`'s one-file-per-device storage layout (`sval/ws/<hashed>/<device-id-hex>.json`)
 — **the host generates it once, on first run, and persists it locally for
@@ -502,9 +528,10 @@ deletes the node outright (spec §5.4); recovering a tab the user closed is
 Firefox's own recently-closed list, which is local and already exists. The one
 retention window is the Archive's, a document of its own (§10, decision
 0136): `archiveRetention` is passed for that document and no other. `remove(id)` is
-the call. It deletes the node and everything beneath it, so deleting a group
+the call, and `{ kind: "remove", id }` the same deletion as an operation. It
+deletes the node and everything beneath it, so deleting a group
 or a workspace with its contents is the same one call.
-`removeKeepingChildren(id, deviceId, now)` deletes a container and keeps its
+`{ kind: "removeKeepingChildren", id }` deletes a container and keeps its
 contents: its children move to its parent, in their order, at the place it
 held, stamped as moves, and then it is removed. A node with no parent (a
 workspace) is refused with `no_parent`, and the document is left unchanged.
@@ -606,7 +633,7 @@ the message. Every other code carries no `reason`. The reasons:
 | `bad_shard_name` | a history shard name not of the form `history-YYYY-Www` |
 | `empty_setting_key`, `setting_not_json` | a setting with no key, or a value that is not JSON |
 | `bad_favorite_kind`, `bad_favorite_guid` | a Favorites node kind other than favorite, folder or separator, or a guid that is not twelve URL-safe characters |
-| `bad_sweep`, `bad_archived_tabs`, `bad_batch` | JSON that is not an idle-tab sweep, a list of archived tabs, or a batch of operations |
+| `bad_sweep`, `bad_archived_tabs`, `bad_batch` | JSON that is not an idle-tab sweep, a list of archived tabs, or an operation or a batch of them |
 | `visit_without_url` | a visit with an empty URL |
 | `shares_not_on_a_split`, `shares_count_mismatch`, `share_not_positive`, `shares_not_hundred` | split shares on a node that is not a split, one share per pane missing or extra, a share that is not a positive number, or shares that do not sum to 100 |
 | `local_without_url` | a `local` mark on a write with no address |
@@ -714,10 +741,16 @@ shapes as they are: the next act on the split writes them back to shape.
 
 ### Settings
 
-`setSetting(key, valueJson, deviceId, now)` sets one setting in a document the
+`{ kind: "setSetting", key, valueJson? }` sets one setting in a document the
 host syncs under the name `settings` (settings-sync spec). `valueJson` is JSON
-text; `null` or an absent argument resets the setting to its default, which
-syncs as a change. An empty key throws. `settings()` returns
+text; `null`, the JSON text `null` or an absent field resets the setting to
+its default, which syncs as a change. An empty key throws.
+`{ kind: "seedSetting", key, valueJson? }` is a value this device held before
+its key synced: it sets the setting only while the document holds nothing for
+the key, a reset included, so a seed never replaces what another device chose
+(settings-sync spec §4.2, decision 0113). In a batch it also yields to an
+earlier operation on the same key. `changed` says whether it wrote, and a
+seed that yields is not checked. `settings()` returns
 `{ key: value | null }` for every setting the document holds; a key absent from
 it was never set. The host chooses the keys; the engine derives each node's id
 from its key, so every platform agrees on it.
@@ -733,23 +766,24 @@ holds (favorites-native spec §3.1). Places holds none.
   UUIDv5, so every device derives the same id. The host mints a guid once,
   when the favorite is made, as twelve characters of `A–Z a–z 0–9 - _`;
   anything else throws.
-- `addFavorite(kind, guid, parent?, before?, after?, name, url?, deviceId,
-  now, local?)` adds a `favorite`, `folder` or `separator` at `favoriteId(guid)` and
-  returns that id. A root (`toolbar_____`, `menu________`, `unfiled_____`
+- `{ kind: "addFavorite", favoriteKind, guid, parent?, before?, after?,
+  name, url?, local? }` adds a `favorite`, `folder` or `separator`, named by
+  `favoriteKind`, at `favoriteId(guid)` and answers that id. A root (`toolbar_____`, `menu________`, `unfiled_____`
   and the pins root `pins________`) is a folder with no `parent`, written
   the first time a profile has none. `before` and `after` are the siblings it goes between,
   as in `moveNode`; with neither, it goes last. Adding a deleted favorite's
   guid again at a later `now`, as Undo does, is news to every peer.
 - `setContent` renames a favorite or changes its URL; the guid is kept.
   `moveNode` moves it.
-- `setPinScope(id, scope?, deviceId, now)` limits a pin, a node under the
+- `{ kind: "setPinScope", id, scope? }` limits a pin, a node under the
   pins root, to the workspaces whose node ids `scope` lists, or shows it in
   every workspace for null or an empty list (pins spec §7). It stamps only
   the lifecycle group, and throws `not_a_pin` for any other node.
-- `movePinsToRoot`, in a batch, moves every node marked `pinned` into the
+- `{ kind: "movePinsToRoot" }` moves every node marked `pinned` into the
   pins root in `homeOrder` order and clears both marks (pins-root spec §8).
   A node marked inside a marked folder stays there, and the row gets a copy
-  at a guid every device derives alike.
+  at a guid every device derives alike. `changed` says whether anything
+  moved.
 - `remove(id)` deletes a node and everything beneath it: a folder's delete.
 - `favorites()` returns every favorite, folder and separator as
   `[{ id, kind, guid, parent, order, name, url, pinned,
@@ -769,11 +803,11 @@ and a document named `history-index` that lists them (history-sync spec).
 
 - `visitId(deviceId, url, visitedAt)` is the node id of the visit a device
   made to a page at a moment: a UUIDv5, so every device derives the same id.
-- `addVisit(url, title, transition, visitedAt, workspace, deviceId, now)`
+- `{ kind: "addVisit", url, title?, transition, visitedAt, workspace? }`
   adds the visit this device made, in workspace `workspace` or in none when
-  it is null (decision 1287), and returns its id. A visit already in the
+  it is null (decision 1287), and answers its id. A visit already in the
   document is left as it is. An empty URL throws.
-- `setVisitTitle(id, title, deviceId, now)` changes a visit's title. It
+- `{ kind: "setVisitTitle", id, title? }` changes a visit's title. It
   writes nothing when the title is the same, and throws `not_a_visit` for a
   node that is not a visit.
 - `visits()` returns every visit in the document as `[{ id, url, title,
@@ -781,7 +815,7 @@ and a document named `history-index` that lists them (history-sync spec).
   hex id of the device that made it, and `workspace` the id of the workspace
   it was made in, or null.
 - `remove(id)` deletes a visit, on every device once it syncs.
-- `touchShard(name, deviceId, now)`, on the `history-index` document, records
+- `{ kind: "touchShard", name }`, on the `history-index` document, records
   that this device wrote to week `name`. A name that is not
   `history-YYYY-Www` throws. `shards()` returns `[{ name, changedAt }]`,
   newest week first. `changedAt` is when any device last wrote to that week.
@@ -796,10 +830,11 @@ parent, never repaired, and never tabs. The sweep and a restore are called on
 the tree's `SvalDocument` and take the Archive's `SvalDocument` as an argument,
 which must be a different object.
 
-- `markUsed(id, deviceId, now)` records that tab `id` was selected. It
+- `{ kind: "markUsed", id }` records that tab `id` was selected. It
   touches the tab, and for a pane its split and every pane, when the tab's
-  touch is an hour old or more, and answers whether it did. A tab only.
-- `setAutoArchive(id, choice, deviceId, now)` sets a workspace's own choice,
+  touch is an hour old or more, and `changed` says whether it did. A tab
+  only.
+- `{ kind: "setAutoArchive", id, choice? }` sets a workspace's own choice,
   one of `"12h"`, `"24h"`, `"7d"`, `"30d"` and `"never"`, or clears it with
   `null`. It stamps only the lifecycle group. A host reads it as
   `lifecycle.auto_archive`, absent meaning the global choice. A node that is
