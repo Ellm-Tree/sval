@@ -1,12 +1,15 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+import { SvalIdentity } from "moz-src:///browser/components/sval/SvalIdentity.sys.mjs";
+
 /** Each engine's state. */
 const states = new WeakMap();
 
 /**
  * What an engine's passes have found: the last report, what the shared
- * folder answered and since when, and whether this device's copy is saving.
+ * folder answered and since when, whether this device's copy is saving, and
+ * the state of the sync key the engine shares under.
  *
  * One per engine, because every window of a profile shares the engine and
  * its one document (`SvalEngine.forProfile`): what a pass found is the
@@ -47,6 +50,14 @@ export class SvalSyncState {
   saveFailingSince = null;
 
   /**
+   * The sync key's state, one of `SvalIdentity.SYNC_KEY_STATES`: `present`
+   * while the engine holds the key, and otherwise why it holds none, as
+   * `SvalIdentity.syncKey()` last answered. Null with no engine. Set through
+   * {@link setKeyState}.
+   */
+  keyState = null;
+
+  /**
    * The state of an engine nothing has passed on: what a window with no
    * engine, or on a tree in memory, shows.
    */
@@ -62,6 +73,10 @@ export class SvalSyncState {
     let state = states.get(engine);
     if (!state) {
       state = new SvalSyncState();
+      // Until a read of the stored key says why an engine holds none.
+      state.keyState = engine.syncKey
+        ? SvalIdentity.SYNC_KEY_STATES.present
+        : SvalIdentity.SYNC_KEY_STATES.none;
       states.set(engine, state);
       engine.addSharedListener(report => state.#heard(report));
       engine.addPassListener(report => {
@@ -75,6 +90,21 @@ export class SvalSyncState {
       });
     }
     return state;
+  }
+
+  /**
+   * Records the sync key's state and tells every window on the engine, on
+   * `SvalIdentity.SYNC_KEY_STATE_TOPIC`: a key one window put right is put
+   * right for all of them.
+   *
+   * @param {string} state One of `SvalIdentity.SYNC_KEY_STATES`.
+   */
+  setKeyState(state) {
+    if (state === this.keyState) {
+      return;
+    }
+    this.keyState = state;
+    Services.obs.notifyObservers(null, SvalIdentity.SYNC_KEY_STATE_TOPIC);
   }
 
   /**

@@ -256,7 +256,8 @@ Object.assign(SvalPanel, {
     // (2026-11-09 spec §1).
     if (
       this.sharedRootSetting() &&
-      this._syncKeyState !== this._modules.SvalIdentity.SYNC_KEY_STATES.present
+      this.syncState.keyState !==
+        this._modules.SvalIdentity.SYNC_KEY_STATES.present
     ) {
       await this.chooseSharedFolder(null);
     }
@@ -338,7 +339,8 @@ Object.assign(SvalPanel, {
     const folder = this.sharedRootSetting();
     if (
       folder &&
-      this._syncKeyState === this._modules.SvalIdentity.SYNC_KEY_STATES.present
+      this.syncState.keyState ===
+        this._modules.SvalIdentity.SYNC_KEY_STATES.present
     ) {
       earlier.folder = folder;
     }

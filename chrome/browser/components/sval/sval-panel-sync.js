@@ -19,12 +19,6 @@ Object.assign(SvalPanel, {
    */
   _passAfterDrawing: null,
 
-  /** What `SvalIdentity.syncKey()` last answered: one of `SYNC_KEY_STATES`. */
-  _syncKeyState: null,
-
-  /** Hears every window's sync key state; see `_setSyncKeyState`. */
-  _syncKeyObserver: null,
-
   /**
    * The state the sync indicator is drawn from, as JSON, or null before it is
    * drawn; see `drawIndicator`.
@@ -358,34 +352,6 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * Records what the sync key's state is, in every window of this profile:
-   * they share one engine, so a key this window put right is put right for
-   * all of them, and each redraws its line.
-   *
-   * @param {string} state One of `SvalIdentity.SYNC_KEY_STATES`.
-   */
-  _setSyncKeyState(state) {
-    Services.obs.notifyObservers(
-      null,
-      this._modules.SvalIdentity.SYNC_KEY_STATE_TOPIC,
-      state
-    );
-  },
-
-  /**
-   * Takes a state another window, or this one, recorded.
-   *
-   * @param {string} state One of `SvalIdentity.SYNC_KEY_STATES`.
-   */
-  _onSyncKeyState(state) {
-    if (state === this._syncKeyState) {
-      return;
-    }
-    this._syncKeyState = state;
-    this.drawIndicator();
-  },
-
-  /**
    * Reads the sync key again, for the indicator's Allow Access. Reading
    * is what lets the operating system show its own unlock prompt, when it has
    * one. A key that reads starts the shared passes without a restart.
@@ -396,15 +362,13 @@ Object.assign(SvalPanel, {
     SvalSecretStore.retry();
     let sync;
     try {
-      sync = this._engine
-        ? await SvalIdentity.useStoredSyncKey(this._engine)
-        : await SvalIdentity.syncKey();
+      sync = await SvalIdentity.useStoredSyncKey(this._engine);
     } catch (err) {
       SvalLog.warn(`could not read the sync key: ${describeError(err)}`);
       return;
     }
-    this._setSyncKeyState(sync.state);
-    if (sync.state === SvalIdentity.SYNC_KEY_STATES.present && this._engine) {
+    this.syncState.setKeyState(sync.state);
+    if (sync.state === SvalIdentity.SYNC_KEY_STATES.present) {
       await this.syncNow();
       return;
     }
@@ -453,7 +417,7 @@ Object.assign(SvalPanel, {
         sync.folderState !== "none" || sync.lastPass?.shared === "none",
       folder: { problem: sync.folderProblem, since: sync.unreachableSince },
       lastSynced: sync.lastSynced,
-      keyState: this._syncKeyState,
+      keyState: sync.keyState,
       platform: AppConstants.platform,
       // Only what was found in the folder now chosen: a list from a folder
       // since left says nothing about this one.

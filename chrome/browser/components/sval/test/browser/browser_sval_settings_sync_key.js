@@ -141,10 +141,10 @@ async function panelOnAFolderless() {
 }
 
 /**
- * A new window of this profile as a device that has never shared starts it:
+ * A new window of this profile as a device that has never shared has it:
  * its identity file records no sync key, so `SvalIdentity.syncKey()` answers
- * `none` to the window's startup. The key this profile shares under is
- * adopted afresh when the task ends.
+ * `none`, which the profile's windows hear from the read Allow Access makes.
+ * The key this profile shares under is adopted afresh when the task ends.
  *
  * @returns {Promise<Window>}
  */
@@ -155,6 +155,7 @@ async function aWindowThatNeverShared() {
   delete identity.adoptingSyncKeyFingerprint;
   atTaskEnd(() => svalKeys());
   await IOUtils.writeJSON(path, identity);
+  await within(SvalPanel.run("retrySyncKey"), 30_000, "the panel's key read");
   const win = await within(
     BrowserTestUtils.openNewBrowserWindow(),
     20_000,
@@ -163,7 +164,7 @@ async function aWindowThatNeverShared() {
   expectWorkspaceTabs(win);
   await within(win.SvalPanel.started, 40_000, "its panel's startup");
   Assert.equal(
-    win.SvalPanel.syncKeyState,
+    win.SvalPanel.syncState.keyState,
     SvalIdentity.SYNC_KEY_STATES.none,
     "the window starts with no sync key"
   );

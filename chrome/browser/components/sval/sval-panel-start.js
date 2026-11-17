@@ -263,21 +263,15 @@ Object.assign(SvalPanel, {
       SvalIdentity.localKey(),
       SvalIdentity.syncKey(),
     ]);
-    this._syncKeyState = sync.state;
-    if (!this._syncKeyObserver) {
-      this._syncKeyObserver = (subject, topic, state) =>
-        this._onSyncKeyState(state);
-      Services.obs.addObserver(
-        this._syncKeyObserver,
-        SvalIdentity.SYNC_KEY_STATE_TOPIC
-      );
-    }
     if (sync.reason) {
       this._modules.SvalLog.warn(`not syncing: ${sync.reason}`);
     }
     // Shared with every other window of this profile, because one profile is
     // one device and one device is one document. `SvalEngine.forProfile` carries
     // what a second engine for one device costs.
+    // A later window's read is not the engine's news: the engine keeps the
+    // keys its first window gave it (`SvalEngine.forProfile`).
+    const first = !SvalEngine.sharedInstance;
     this._engine = SvalEngine.forProfile({
       root: this._localRoot(),
       sharedRoot: this.sharedRootSetting(),
@@ -286,6 +280,9 @@ Object.assign(SvalPanel, {
       deviceId,
     });
     this._listenToEngine();
+    if (first) {
+      this.syncState.setKeyState(sync.state);
+    }
 
     // Housekeeping, not a sync step: an abandoned pairing offer sits in the
     // shared folder until some device notices it is stale, and spec §6.7 bounds
@@ -546,7 +543,7 @@ Object.assign(SvalPanel, {
       // so there is nothing to wait for: it starts on its own workspaces, and
       // the panel says why it is not syncing.
       const canRead =
-        this._syncKeyState ===
+        this.syncState.keyState ===
         this._modules.SvalIdentity.SYNC_KEY_STATES.present;
       if (canRead && !SvalTree.workspaceIds(this._nodes).length) {
         if ((await this.syncWithFolder()) !== "reached") {

@@ -203,7 +203,7 @@
       const panel = this.panel;
       const syncs =
         !!panel?.sharedRootSetting?.() &&
-        panel.syncKeyState === lazy.SvalIdentity.SYNC_KEY_STATES.present;
+        panel.syncState.keyState === lazy.SvalIdentity.SYNC_KEY_STATES.present;
       this._els.syncAdvanced.hidden = !panel?.sharedRootSetting?.();
       this._els.keyActions.hidden = !syncs;
       this._els.storageKeychain.hidden =

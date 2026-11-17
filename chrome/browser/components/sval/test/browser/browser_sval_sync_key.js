@@ -510,7 +510,7 @@ async function installedAgain(label, ourKey) {
   });
   const win = await profile.open();
   Assert.equal(
-    win.SvalPanel.syncKeyState,
+    win.SvalPanel.syncState.keyState,
     SvalIdentity.SYNC_KEY_STATES.none,
     "the installation holds no sync key"
   );

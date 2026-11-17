@@ -128,8 +128,30 @@ add_task(function a_pass_that_saves_ends_a_failure() {
   Assert.equal(state.saveFailingSince, null, "a pass saved");
 });
 
+add_task(function the_keys_state_starts_from_what_the_engine_holds() {
+  const { SvalIdentity } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalIdentity.sys.mjs"
+  );
+  const { none, present, unreadable } = SvalIdentity.SYNC_KEY_STATES;
+  const keyed = { ...engineStub(), syncKey: new Uint8Array(32) };
+  Assert.equal(SvalSyncState.of(keyed).keyState, present, "a key is held");
+
+  const state = SvalSyncState.of(engineStub());
+  Assert.equal(state.keyState, none, "no key is held");
+
+  let told = 0;
+  const observer = () => told++;
+  Services.obs.addObserver(observer, SvalIdentity.SYNC_KEY_STATE_TOPIC);
+  state.setKeyState(unreadable);
+  state.setKeyState(unreadable);
+  Services.obs.removeObserver(observer, SvalIdentity.SYNC_KEY_STATE_TOPIC);
+  Assert.equal(state.keyState, unreadable, "a read said why");
+  Assert.equal(told, 1, "and a change is told once");
+});
+
 add_task(function a_window_with_no_engine_reads_an_empty_state() {
   Assert.equal(SvalSyncState.none.folderState, "none");
   Assert.equal(SvalSyncState.none.lastPass, null);
+  Assert.equal(SvalSyncState.none.keyState, null);
   Assert.ok(Object.isFrozen(SvalSyncState.none), "which nothing writes");
 });

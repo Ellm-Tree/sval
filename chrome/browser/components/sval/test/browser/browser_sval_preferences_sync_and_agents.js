@@ -192,12 +192,15 @@ add_task(async function the_sync_readout_carries_the_indicators_detail() {
   };
   await SvalSecretStore.remove("sync key");
   atTaskEnd(async () => {
-    if (SvalPanel.syncKeyState !== SvalIdentity.SYNC_KEY_STATES.present) {
+    if (SvalPanel.syncState.keyState !== SvalIdentity.SYNC_KEY_STATES.present) {
       await putBack();
     }
   });
   await within(SvalPanel.run("retrySyncKey"), 30_000, "the key read again");
-  Assert.equal(SvalPanel.syncKeyState, SvalIdentity.SYNC_KEY_STATES.missing);
+  Assert.equal(
+    SvalPanel.syncState.keyState,
+    SvalIdentity.SYNC_KEY_STATES.missing
+  );
 
   const ui = await openSettings();
   const shown = SvalPanel.syncIndicator();
@@ -219,7 +222,10 @@ add_task(async function the_sync_readout_carries_the_indicators_detail() {
   );
 
   await putBack();
-  Assert.equal(SvalPanel.syncKeyState, SvalIdentity.SYNC_KEY_STATES.present);
+  Assert.equal(
+    SvalPanel.syncState.keyState,
+    SvalIdentity.SYNC_KEY_STATES.present
+  );
   await TestUtils.waitForCondition(
     () => !ui.byId("sval-sync-actions").childElementCount,
     "and none once the state has passed"
@@ -343,7 +349,10 @@ add_task(async function the_device_flow_shows_only_the_chosen_path() {
  */
 add_task(async function the_sync_card_holds_the_folder_and_its_state() {
   await panelWithFolder(await makeTempDir("sval-shared"));
-  Assert.equal(SvalPanel.syncKeyState, SvalIdentity.SYNC_KEY_STATES.present);
+  Assert.equal(
+    SvalPanel.syncState.keyState,
+    SvalIdentity.SYNC_KEY_STATES.present
+  );
   const ui = await openSettings();
   await showPane(ui.page, "svalSync");
   await TestUtils.waitForCondition(

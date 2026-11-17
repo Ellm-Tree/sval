@@ -55,8 +55,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 /**
- * The topic a sync key's state is announced on, with one of
- * `SYNC_KEY_STATES` as its data, so every window of the profile shows it.
+ * The topic a change of the sync key's state is announced on
+ * (`SvalSyncState.setKeyState`), so every window of the profile shows it.
  */
 const SYNC_KEY_STATE_TOPIC = "sval-sync-key-state";
 

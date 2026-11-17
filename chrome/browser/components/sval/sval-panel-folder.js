@@ -142,7 +142,8 @@ Object.assign(SvalPanel, {
     if (
       mint &&
       path !== null &&
-      this._syncKeyState === this._modules.SvalIdentity.SYNC_KEY_STATES.none
+      this.syncState.keyState ===
+        this._modules.SvalIdentity.SYNC_KEY_STATES.none
     ) {
       // A folder that already holds Sval workspaces belongs to the user's other
       // devices, and a new key would put a second set beside theirs. When
@@ -167,7 +168,8 @@ Object.assign(SvalPanel, {
       !found &&
       mint &&
       path !== null &&
-      this._syncKeyState === this._modules.SvalIdentity.SYNC_KEY_STATES.none
+      this.syncState.keyState ===
+        this._modules.SvalIdentity.SYNC_KEY_STATES.none
     ) {
       try {
         this._engine.useSyncKey(await this._modules.SvalIdentity.mintSyncKey());
@@ -187,7 +189,9 @@ Object.assign(SvalPanel, {
             "didn't change.",
         };
       }
-      this._setSyncKeyState(this._modules.SvalIdentity.SYNC_KEY_STATES.present);
+      this.syncState.setKeyState(
+        this._modules.SvalIdentity.SYNC_KEY_STATES.present
+      );
       this._settings.backupSaved = false;
       this._offerBackupLater();
     }
@@ -246,7 +250,8 @@ Object.assign(SvalPanel, {
     // other device's offer, arrives there.
     if (
       shared !== null &&
-      this._syncKeyState === this._modules.SvalIdentity.SYNC_KEY_STATES.none
+      this.syncState.keyState ===
+        this._modules.SvalIdentity.SYNC_KEY_STATES.none
     ) {
       if ((await this._engine.otherWorkspaces(shared)) !== null) {
         return { reached: true, message: null };
@@ -549,7 +554,7 @@ Object.assign(SvalPanel, {
     const { HISTORY_INDEX, SvalIdentity } = this._modules;
     const now = Date.now();
     if (
-      this._syncKeyState !== SvalIdentity.SYNC_KEY_STATES.present ||
+      this.syncState.keyState !== SvalIdentity.SYNC_KEY_STATES.present ||
       !report.sharedRead.includes(HISTORY_INDEX) ||
       (this._otherWorkspacesCheckedAt !== null &&
         now - this._otherWorkspacesCheckedAt < this._otherWorkspacesCheckMs)

@@ -70,7 +70,7 @@ async function chooseWithoutAKey(path) {
 add_task(async function a_joining_device_with_no_key_reaches_the_folder() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
   Assert.equal(
-    SvalPanel.syncKeyState,
+    SvalPanel.syncState.keyState,
     SvalIdentity.SYNC_KEY_STATES.none,
     "a profile that never shared holds no sync key"
   );

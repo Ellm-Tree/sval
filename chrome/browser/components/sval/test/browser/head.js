@@ -2222,7 +2222,7 @@ async function svalKeys() {
   const held = panel?.engine?.syncKey;
   if (
     panel?.engine &&
-    (panel.syncKeyState !== identity.SYNC_KEY_STATES.present ||
+    (panel.syncState.keyState !== identity.SYNC_KEY_STATES.present ||
       held?.length !== syncKey.length ||
       !held.every((byte, i) => byte === syncKey[i]))
   ) {
@@ -3046,7 +3046,7 @@ async function panelOnAFolder(label, { shared = false } = {}) {
   if ((await SvalIdentity.syncKey()).state !== present) {
     await SvalIdentity.adoptSyncKey(crypto.getRandomValues(new Uint8Array(32)));
   }
-  if (SvalPanel.syncKeyState !== present) {
+  if (SvalPanel.syncState.keyState !== present) {
     await within(SvalPanel.run("retrySyncKey"), 30_000, "the key read");
   }
 

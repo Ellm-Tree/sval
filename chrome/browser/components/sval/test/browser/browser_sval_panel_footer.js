@@ -265,14 +265,14 @@ add_task(async function a_warning_shows_its_button() {
   const { present } = SvalIdentity.SYNC_KEY_STATES;
   atTaskEnd(async () => {
     delete store.failing.asyncGetRecoveryPhrase;
-    if (SvalPanel.syncKeyState !== present) {
+    if (SvalPanel.syncState.keyState !== present) {
       await within(SvalPanel.run("retrySyncKey"), 30_000, "the key read");
     }
   });
   store.failing.asyncGetRecoveryPhrase = new Error("the keychain is locked");
   await within(SvalPanel.run("retrySyncKey"), 30_000, "the key read");
   Assert.equal(
-    SvalPanel.syncKeyState,
+    SvalPanel.syncState.keyState,
     SvalIdentity.SYNC_KEY_STATES.unreadable,
     "the store would not answer"
   );
@@ -309,7 +309,7 @@ add_task(async function a_warning_shows_its_button() {
   delete store.failing.asyncGetRecoveryPhrase;
   buttons[0].click();
   await TestUtils.waitForCondition(
-    () => SvalPanel.syncKeyState === present,
+    () => SvalPanel.syncState.keyState === present,
     "the button reads the key again"
   );
   await TestUtils.waitForCondition(

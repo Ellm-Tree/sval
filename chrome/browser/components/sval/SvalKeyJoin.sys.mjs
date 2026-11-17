@@ -38,6 +38,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalPairing: "moz-src:///browser/components/sval/SvalPairing.sys.mjs",
+  SvalSyncState: "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
 });
 // A namespace, because the module exports functions and no object of its
 // name for `defineESModuleGetters` to find.
@@ -306,9 +307,7 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
       reason: `the key did not save: ${storeError?.message ?? storeError}`,
     };
   }
-  Services.obs.notifyObservers(
-    null,
-    lazy.SvalIdentity.SYNC_KEY_STATE_TOPIC,
+  lazy.SvalSyncState.of(engine).setKeyState(
     lazy.SvalIdentity.SYNC_KEY_STATES.present
   );
 

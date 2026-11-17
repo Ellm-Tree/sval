@@ -207,11 +207,6 @@ var SvalPanel = {
       : SvalSyncState.none;
   },
 
-  /** What `SvalIdentity.syncKey()` last answered. */
-  get syncKeyState() {
-    return this._syncKeyState;
-  },
-
   async init() {
     if (this._initialized) {
       return;
@@ -857,6 +852,9 @@ var SvalPanel = {
     listening.add(() =>
       PlacesObservers.removeListener(["favicon-changed"], onFavicons)
     );
+    listening.topic(this._modules.SvalIdentity.SYNC_KEY_STATE_TOPIC, () =>
+      this.drawIndicator()
+    );
     listening.topic(this._modules.FAVORITE_ICONS_CHANGED_TOPIC, () =>
       this._fillEmptyTabIcons()
     );
@@ -896,13 +894,6 @@ var SvalPanel = {
   handleEvent(event) {
     switch (event.type) {
       case "unload":
-        if (this._syncKeyObserver) {
-          Services.obs.removeObserver(
-            this._syncKeyObserver,
-            this._modules.SvalIdentity.SYNC_KEY_STATE_TOPIC
-          );
-          this._syncKeyObserver = null;
-        }
         // A workspace is this window's own to delete, if nobody touched it,
         // when this window created it and no other window shows it. A window
         // on a tree in memory writes nothing, and a popup shows its opener's

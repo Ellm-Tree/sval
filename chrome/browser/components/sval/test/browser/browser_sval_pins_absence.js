@@ -51,7 +51,8 @@ async function twoDevices() {
       "the panel's own folder chosen again"
     )
   );
-  const minting = SvalPanel.syncKeyState === SvalIdentity.SYNC_KEY_STATES.none;
+  const minting =
+    SvalPanel.syncState.keyState === SvalIdentity.SYNC_KEY_STATES.none;
   const chosen = await within(
     SvalPanel.chooseSharedFolder(shared, { mint: true }),
     20_000,
