@@ -577,7 +577,6 @@ const STEM_PROPERTIES = [
   "--sval-stem-drop",
   "--sval-stem-face-h",
   "--sval-stem-w",
-  "--sval-stem-fill",
   "--sval-stem-room",
   "--sval-stem-top-trim",
   "--sval-stem-body-left",
@@ -1132,8 +1131,7 @@ function placeStem(event) {
 /**
  * `popupshowing`: marks the popover and its button before Gecko positions
  * the popover, so `sval-header.css` has already made room for the stem and,
- * for a header panel, kept it clear of the corners. The button takes the
- * popover's own fill, whatever palette set it. The popover's content is
+ * for a header panel, kept it clear of the corners. The popover's content is
  * watched for a change of size, which moves its edge: a menu gets no
  * `popuppositioned` (`nsXULPopupPositionedEvent::DispatchIfNeeded`), and a
  * resize observer is heard after layout and before the paint, so the path
@@ -1168,10 +1166,6 @@ function onStemPopupShowing(event) {
   );
   popup.style.setProperty("--sval-stem-face-h", `${face.height}px`);
   popup.style.setProperty("--sval-stem-w", `${face.width}px`);
-  root.style.setProperty(
-    "--sval-stem-fill",
-    win.getComputedStyle(popup).getPropertyValue("--panel-background-color")
-  );
   keepAboveWindowFoot(popup, win, {
     top: win.mozInnerScreenY + face.bottom + STEM_FILLET,
   });

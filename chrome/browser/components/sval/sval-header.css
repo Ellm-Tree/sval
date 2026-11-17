@@ -1934,13 +1934,7 @@ panel[type="arrow"] {
        its edge in overlapping drop shadows, which a translucent colour would
        darken where they overlap. */
     --sval-stem-edge: rgb(
-      from
-        color-mix(
-          in srgb,
-          rgb(from var(--sval-pill-border) r g b / 1) calc(var(--sval-pill-border-alpha) * 100%),
-          var(--sval-stem-fill, var(--panel-background-color))
-        )
-        r g b / 1
+      from color-mix(in srgb, rgb(from var(--sval-pill-border) r g b / 1) calc(var(--sval-pill-border-alpha) * 100%), var(--panel-background-color)) r g b / 1
     );
 
     @media (prefers-contrast) {
@@ -1965,8 +1959,13 @@ panel[type="arrow"] {
     -moz-window-shadow: none;
   }
 
+  /* A button under its popover's stem wears the popover's fill. Every
+     popover that grows a stem takes the root's `--panel-background-color`,
+     which the button inherits too, so the two follow the window's colours
+     together, through a Workspace's tint arriving or changing while the
+     popover is open. */
   #nav-bar toolbarbutton[sval-stem] > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
-    background-color: var(--sval-stem-fill);
+    background-color: var(--panel-background-color);
     border-end-start-radius: 0;
     border-end-end-radius: 0;
   }

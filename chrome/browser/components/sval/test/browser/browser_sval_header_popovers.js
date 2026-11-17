@@ -135,6 +135,41 @@ function outlineOf(popup) {
 }
 
 /**
+ * Checks the button `root` wears the fill `popup` draws its shape in.
+ *
+ * @param {Element} popup
+ * @param {Element} root
+ */
+function checkSameFill(popup, root) {
+  const rgba = color => {
+    const { r, g, b, a } = InspectorUtils.colorToRGBA(color);
+    return [r, g, b].map(Math.round).concat(+a.toFixed(3));
+  };
+  Assert.deepEqual(
+    rgba(getComputedStyle(faceOf(root)).backgroundColor),
+    rgba(getComputedStyle(outlineOf(popup).fill).fill),
+    "the button takes the popover's fill"
+  );
+}
+
+/**
+ * Waits for the button `root`'s pill to finish fading to its fill.
+ *
+ * @param {Element} root
+ */
+async function settled(root) {
+  await within(
+    Promise.all(
+      faceOf(root)
+        .getAnimations()
+        .map(a => a.finished)
+    ),
+    10_000,
+    "the button's fill settling"
+  );
+}
+
+/**
  * Checks `popup`, open, grows from `root`: the button wears its fill and
  * draws nothing else, and the popover's window draws the whole shape, from
  * the button's top to the content's foot, as one path with one edge.
@@ -143,7 +178,6 @@ function outlineOf(popup) {
  * @param {Element} root
  */
 function checkGrows(popup, root) {
-  const style = getComputedStyle(popup);
   Assert.equal(popup.getAttribute("sval-stem"), "placed", "the stem is placed");
   Assert.ok(root.hasAttribute("sval-stem"), "on the button that opened it");
   Assert.ok(
@@ -167,11 +201,7 @@ function checkGrows(popup, root) {
     return;
   }
 
-  Assert.equal(
-    root.style.getPropertyValue("--sval-stem-fill").trim(),
-    style.getPropertyValue("--panel-background-color").trim(),
-    "the button takes the popover's fill"
-  );
+  checkSameFill(popup, root);
   for (const el of new Set([root, faceOf(root)])) {
     Assert.equal(
       getComputedStyle(el).filter,
@@ -272,7 +302,6 @@ function checkGrows(popup, root) {
 function checkLetGo(popup, root) {
   Assert.ok(!popup.hasAttribute("sval-stem"), "the popover lets go");
   Assert.ok(!root.hasAttribute("sval-stem"), "and so does its button");
-  Assert.equal(root.style.getPropertyValue("--sval-stem-fill"), "");
 }
 
 /**
@@ -370,6 +399,7 @@ async function whileOpen(id, open, check, close = popup => popup.hidePopup()) {
     10_000,
     `${id}'s stem following its content`
   );
+  await settled(root);
   await check(popup, root);
   if (popup.state !== "closed") {
     const hidden = BrowserTestUtils.waitForPopupEvent(popup, "hidden");
@@ -394,6 +424,37 @@ add_task(async function the_notices_popover_grows_from_its_button() {
       Assert.equal(root, button, "the notices button");
       Assert.ok(root.hasAttribute("open"), "open");
       checkGrows(panel, root);
+    }
+  );
+  AppMenuNotifications.removeNotification(/.*/);
+});
+
+// An update notice opens the popover at startup, before the Workspace's
+// colours reach the window.
+add_task(async function the_button_follows_the_window_colour_while_open() {
+  if (OPAQUE_POPUPS) {
+    return;
+  }
+  const rootStyle = document.documentElement.style;
+  atTaskEnd(() => rootStyle.removeProperty("--sval-window-color"));
+  await whileOpen(
+    "sval-notices-panel",
+    () =>
+      AppMenuNotifications.showNotification(
+        "update-available",
+        { callback() {} },
+        { callback() {}, dismiss: true }
+      ),
+    async (panel, root) => {
+      const before = getComputedStyle(faceOf(root)).backgroundColor;
+      rootStyle.setProperty("--sval-window-color", "rgb(120, 30, 90)");
+      await settled(root);
+      Assert.notEqual(
+        getComputedStyle(faceOf(root)).backgroundColor,
+        before,
+        "the button's fill changes with the window's colour"
+      );
+      checkSameFill(panel, root);
     }
   );
   AppMenuNotifications.removeNotification(/.*/);

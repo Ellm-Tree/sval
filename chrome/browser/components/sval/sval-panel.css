@@ -1042,7 +1042,7 @@ menupopup:not([sval-stem]) {
 @media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
   /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
   .sval-favorites[sval-stem] {
-    background: var(--sval-stem-fill);
+    background: var(--panel-background-color);
     border-end-start-radius: 0;
     border-end-end-radius: 0;
   }
@@ -1050,7 +1050,7 @@ menupopup:not([sval-stem]) {
   /* The strip's list of an agent app's Workspaces grows from the app's tile
      the same way. */
   .sval-strip-face[sval-stem] {
-    background: var(--sval-stem-fill);
+    background: var(--panel-background-color);
     border-end-start-radius: 0;
     border-end-end-radius: 0;
   }

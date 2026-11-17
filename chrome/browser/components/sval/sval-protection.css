@@ -551,7 +551,7 @@
 
     &,
     &:hover {
-      background-color: var(--sval-stem-fill);
+      background-color: var(--panel-background-color);
       color: var(--sval-text);
     }
 
