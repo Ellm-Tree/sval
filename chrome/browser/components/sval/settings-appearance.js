@@ -71,9 +71,9 @@
      * Finds and wires the Panel side, Pins and Launcher sections cards.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initAppearance(byId, followPref) {
+    _initAppearance(byId, lifetime) {
       Object.assign(this._els, {
         sideStatus: byId("sval-side-status"),
       });
@@ -113,7 +113,7 @@
         );
       }
       showDisplay();
-      followPref(lazy.DISPLAY_PREF, showDisplay);
+      lifetime.pref(lazy.DISPLAY_PREF, showDisplay);
       // The pins row's line limit, which settings sync can move too.
       const pinsLines = document.getElementById("sval-pins-lines");
       const showPinsLines = () => {
@@ -125,8 +125,8 @@
         Services.prefs.setIntPref(lazy.PINS_LINES_PREF, Number(pinsLines.value))
       );
       showPinsLines();
-      followPref(lazy.PINS_LINES_PREF, showPinsLines);
-      this._initSwitcher(followPref);
+      lifetime.pref(lazy.PINS_LINES_PREF, showPinsLines);
+      this._initSwitcher(lifetime);
       // The Launcher's sections, which settings sync can move too.
       const drawSections = () =>
         this._drawLauncherSections().catch(err =>
@@ -136,7 +136,7 @@
         );
       drawSections();
       for (const name of Object.values(lazy.LAUNCHER_PREFS)) {
-        followPref(name, drawSections);
+        lifetime.pref(name, drawSections);
       }
     },
 
@@ -146,9 +146,9 @@
      * strip's two groups show only while Strip is chosen. Each choice applies
      * as it is checked, and every window follows the pref.
      *
-     * @param {Function} followPref Observes a pref until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initSwitcher(followPref) {
+    _initSwitcher(lifetime) {
       const groups = [
         ["sval-switcher", lazy.SWITCHER_PREF, lazy.SWITCHER_KINDS],
         ["sval-strip-names", lazy.STRIP_NAMES_PREF, lazy.STRIP_NAMES],
@@ -171,7 +171,7 @@
           );
         }
         show();
-        followPref(pref, show);
+        lifetime.pref(pref, show);
       }
       this._drawSwitcherPreviews();
     },

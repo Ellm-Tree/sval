@@ -38,9 +38,9 @@
      * Finds and wires the Fingerprinting and Privacy signals cards.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initFingerprinting(byId, followPref) {
+    _initFingerprinting(byId, lifetime) {
       Object.assign(this._els, {
         fpStrict: byId("sval-fp-strict"),
         fpStrictStatus: byId("sval-fp-strict-status"),
@@ -66,7 +66,7 @@
         this._describeFingerprinting();
       };
       for (const name of lazy.SvalFingerprinting.PREFS) {
-        followPref(name, fingerprintingPref);
+        lifetime.pref(name, fingerprintingPref);
       }
     },
 

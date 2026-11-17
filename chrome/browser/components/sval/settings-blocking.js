@@ -84,8 +84,7 @@
      * Finds and wires the Ad and tracker blocking and Address bar buttons cards.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
-     * @param {Function} followTopic Observes a topic until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
     /**
      * Opens the confirmation in the section `from` is in. A modal dialog
@@ -100,7 +99,7 @@
       dialog.showModal();
     },
 
-    _initBlocking(byId, followPref, followTopic) {
+    _initBlocking(byId, lifetime) {
       Object.assign(this._els, {
         blockingLevelDesc: byId("sval-blocking-level-desc"),
         blockingLists: byId("sval-blocking-lists"),
@@ -227,7 +226,7 @@
       }
       // Levels, lists and allowed domains move from sync, and a list's state
       // with each download.
-      followTopic(lazy.BLOCKING_TOPIC, () => {
+      lifetime.topic(lazy.BLOCKING_TOPIC, () => {
         this._describeBlocking();
         // Sites with hidden elements are the sites My filters names.
         if (lazy.SvalBlocking.myFilters !== this._sitesFilters) {
@@ -235,7 +234,7 @@
         }
       });
       // The site menu's pin buttons write the same pref.
-      followPref(lazy.SvalSiteControls.PINS_PREF, () =>
+      lifetime.pref(lazy.SvalSiteControls.PINS_PREF, () =>
         this._describeAddressPins()
       );
     },

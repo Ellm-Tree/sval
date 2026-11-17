@@ -119,10 +119,9 @@
      * Finds and wires the Sites card.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
-     * @param {Function} followTopic Observes a topic until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initSites(byId, followPref, followTopic) {
+    _initSites(byId, lifetime) {
       Object.assign(this._els, {
         sitesSync: byId("sval-sites-sync"),
         sitesTools: byId("sval-sites-tools"),
@@ -140,11 +139,11 @@
         lazy.STYLES_PREF,
         ...lazy.SvalJavascript.PREFS,
       ]) {
-        followPref(name, sitesPref);
+        lifetime.pref(name, sitesPref);
       }
-      followTopic(lazy.SvalSiteProtections.PRIVATE_TOPIC, sitesPref);
+      lifetime.topic(lazy.SvalSiteProtections.PRIVATE_TOPIC, sitesPref);
       // A permission a private window holds is never listed.
-      followTopic("perm-changed", (subject, topic, data) => {
+      lifetime.topic("perm-changed", (subject, topic, data) => {
         if (
           data === "cleared" ||
           !subject?.QueryInterface(Ci.nsIPermission).principal.privateBrowsingId

@@ -35,6 +35,7 @@
     SvalLinkRules: "moz-src:///browser/components/sval/SvalLinkRules.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     SvalPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
+    SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
     workspaceTitle: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   });
 
@@ -96,19 +97,15 @@
         this._els.body.querySelector(".sval-agent-add-input")?.focus();
       });
 
-      const removers = [];
-      const follow = (pref, observe) => {
-        Services.prefs.addObserver(pref, observe);
-        removers.push(() => Services.prefs.removeObserver(pref, observe));
-      };
+      const lifetime = lazy.SvalScope.forWindow(window);
       const switches = () => this.drawSwitches();
-      follow(peek.ENABLED_PREF, switches);
-      follow(peek.IDLE_PREF, switches);
-      follow(lazy.QUICK_PEEK_PREF, switches);
-      follow(lazy.QUICK_PEEK_CLICK_PREF, switches);
+      lifetime.pref(peek.ENABLED_PREF, switches);
+      lifetime.pref(peek.IDLE_PREF, switches);
+      lifetime.pref(lazy.QUICK_PEEK_PREF, switches);
+      lifetime.pref(lazy.QUICK_PEEK_CLICK_PREF, switches);
       // A sync can move the rules while the page is on screen. A change made
       // here redraws once it is written, with focus where it belongs.
-      follow(lazy.SvalLinkRules.RULES_PREF, () => {
+      lifetime.pref(lazy.SvalLinkRules.RULES_PREF, () => {
         if (!this._writing) {
           this.drawRules();
         }
@@ -116,11 +113,6 @@
       // Workspaces are deleted and renamed in a browser window, so coming
       // back to this one is when they may have changed.
       window.addEventListener("focus", () => this.drawRules());
-      window.addEventListener(
-        "unload",
-        () => removers.forEach(remove => remove()),
-        { once: true }
-      );
       this.drawSwitches();
       this.drawRules();
     },

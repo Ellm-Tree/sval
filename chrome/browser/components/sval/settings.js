@@ -204,26 +204,24 @@
       // Ended as the page goes, so no observer outlives the document it
       // writes into.
       const lifetime = new lazy.SvalScope();
-      const followPref = (name, observe) => lifetime.pref(name, observe);
-      const followTopic = (topic, observe) => lifetime.topic(topic, observe);
 
       this._els = {
         heading: byId("sval-settings-heading"),
       };
       this._initStorage(byId);
-      this._initSyncStatus(byId, followPref, followTopic);
+      this._initSyncStatus(byId, lifetime);
       this._initPairing(byId);
-      this._initBlocking(byId, followPref, followTopic);
+      this._initBlocking(byId, lifetime);
       this._initPasswords(byId);
-      this._initAppearance(byId, followPref);
-      this._initKagi(byId, followTopic);
-      this._initAgents(byId, followPref, followTopic);
-      this._initFingerprinting(byId, followPref);
-      this._initSites(byId, followPref, followTopic);
-      this._initTracking(byId, followPref);
-      this._initAdvanced(byId, followPref);
+      this._initAppearance(byId, lifetime);
+      this._initKagi(byId, lifetime);
+      this._initAgents(byId, lifetime);
+      this._initFingerprinting(byId, lifetime);
+      this._initSites(byId, lifetime);
+      this._initTracking(byId, lifetime);
+      this._initAdvanced(byId, lifetime);
       this._bindPrefSwitches();
-      this._initSitePage(followPref, followTopic);
+      this._initSitePage(lifetime);
 
       if (this._privateOnly) {
         this._showPrivateOnly();

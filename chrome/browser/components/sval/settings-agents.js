@@ -103,10 +103,9 @@
      * Finds and wires the Agents pane.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
-     * @param {Function} followTopic Observes a topic until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initAgents(byId, followPref, followTopic) {
+    _initAgents(byId, lifetime) {
       Object.assign(this._els, {
         agentsEnabled: byId("sval-agents-enabled"),
         agentsStatus: byId("sval-agents-status"),
@@ -192,13 +191,13 @@
       // A pref observer rather than a read on focus: the switch is the pref, and
       // about:config can move it while this page is on screen.
       const agentsPref = () => this._describeAgents();
-      followPref(lazy.SvalAgents.PREF, agentsPref);
-      followPref(lazy.SvalAgents.PAGE_TOOLS_PREF, agentsPref);
-      followPref(lazy.POLITE_RATE_PREF, agentsPref);
-      followPref(lazy.APPROVAL_WAIT_PREF, agentsPref);
-      followPref(lazy.SvalAgents.WORKSPACE_RETENTION_PREF, agentsPref);
+      lifetime.pref(lazy.SvalAgents.PREF, agentsPref);
+      lifetime.pref(lazy.SvalAgents.PAGE_TOOLS_PREF, agentsPref);
+      lifetime.pref(lazy.POLITE_RATE_PREF, agentsPref);
+      lifetime.pref(lazy.APPROVAL_WAIT_PREF, agentsPref);
+      lifetime.pref(lazy.SvalAgents.WORKSPACE_RETENTION_PREF, agentsPref);
       // And whether the listener could start, which it says once it has tried.
-      followTopic(lazy.SvalAgents.STATE_TOPIC, agentsPref);
+      lifetime.topic(lazy.SvalAgents.STATE_TOPIC, agentsPref);
     },
 
     /**

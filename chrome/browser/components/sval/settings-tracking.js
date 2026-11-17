@@ -84,9 +84,9 @@
      * Finds and wires the tracking switches and selects.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initTracking(byId, followPref) {
+    _initTracking(byId, lifetime) {
       for (const [id, prefs] of lazy.SvalTrackingSettings.SWITCHES) {
         const input = byId(id);
         input.addEventListener("change", () => {
@@ -111,7 +111,7 @@
       // Firefox's tracking prefs move from about:config.
       const trackingPref = () => this._describeTracking();
       for (const name of lazy.SvalTrackingSettings.PREFS) {
-        followPref(name, trackingPref);
+        lifetime.pref(name, trackingPref);
       }
     },
 

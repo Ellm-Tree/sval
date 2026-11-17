@@ -495,6 +495,7 @@ var SvalPanel = {
         SvalPasswordManager:
           "moz-src:///browser/components/sval/SvalPasswordManager.sys.mjs",
         SvalPinsRow: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
+        SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
         tidySeparators:
           "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
         SvalLocalSettings:
@@ -845,22 +846,19 @@ var SvalPanel = {
 
     // A row outlives renders, so a favicon cached after its row was built
     // reaches it here rather than through the next redraw.
-    this._forgetFavicons?.();
+    // What this build of the panel listens to, ended by the next build and
+    // by the window going.
+    this._listening?.end();
+    const listening = this._modules.SvalScope.forWindow(window);
+    this._listening = listening;
     const onFavicons = events => this._onFaviconsChanged(events);
     PlacesObservers.addListener(["favicon-changed"], onFavicons);
-    const iconsTopic = this._modules.FAVORITE_ICONS_CHANGED_TOPIC;
-    const onStoredIcons = () => this._fillEmptyTabIcons();
-    Services.obs.addObserver(onStoredIcons, iconsTopic);
-    // Each init adds an unload listener that calls this, and the observer
-    // service throws on a second removal.
-    this._forgetFavicons = () => {
-      this._forgetFavicons = null;
-      PlacesObservers.removeListener(["favicon-changed"], onFavicons);
-      Services.obs.removeObserver(onStoredIcons, iconsTopic);
-    };
-    window.addEventListener("unload", () => this._forgetFavicons?.(), {
-      once: true,
-    });
+    listening.add(() =>
+      PlacesObservers.removeListener(["favicon-changed"], onFavicons)
+    );
+    listening.topic(this._modules.FAVORITE_ICONS_CHANGED_TOPIC, () =>
+      this._fillEmptyTabIcons()
+    );
 
     // A private window shows no pins (pins spec §7).
     this._pins?.stop();
@@ -878,20 +876,9 @@ var SvalPanel = {
 
     // Settings › Workspaces picks the switcher and what the strip shows, and
     // every window follows as the choice is made.
-    this._forgetSwitcherPrefs?.();
     const { SWITCHER_PREF, STRIP_NAMES_PREF } = this._modules.SvalPanelModel;
-    const onSwitcherPref = () => this._applySwitcherKind();
-    const onStripNames = () => this._renderStrip();
-    Services.prefs.addObserver(SWITCHER_PREF, onSwitcherPref);
-    Services.prefs.addObserver(STRIP_NAMES_PREF, onStripNames);
-    this._forgetSwitcherPrefs = () => {
-      this._forgetSwitcherPrefs = null;
-      Services.prefs.removeObserver(SWITCHER_PREF, onSwitcherPref);
-      Services.prefs.removeObserver(STRIP_NAMES_PREF, onStripNames);
-    };
-    window.addEventListener("unload", () => this._forgetSwitcherPrefs?.(), {
-      once: true,
-    });
+    listening.pref(SWITCHER_PREF, () => this._applySwitcherKind());
+    listening.pref(STRIP_NAMES_PREF, () => this._renderStrip());
     this._applySwitcherKind();
   },
 

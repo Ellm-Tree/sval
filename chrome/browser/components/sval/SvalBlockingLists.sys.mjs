@@ -29,6 +29,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import {
   FIRST_PARTIES_URL_PREF,
   MAX_FIRST_PARTIES_BYTES,
@@ -904,7 +905,7 @@ class ListLoader {
   #timer = null;
   #running = null;
   #started = false;
-  #observer = null;
+  #listening = new SvalScope();
   /** Lists that changed during an update pass, rebuilt together after it. */
   #pendingChanges = new Set();
   #inPass = false;
@@ -1085,7 +1086,7 @@ class ListLoader {
     }
     this.#started = true;
     await this.#loadMeta();
-    this.#observer = (subject, topic, data) => {
+    const observer = (subject, topic, data) => {
       if (data.startsWith(ALLOWED_DOMAIN_BRANCH)) {
         this.#allowedChanged();
       } else {
@@ -1093,9 +1094,9 @@ class ListLoader {
       }
     };
     for (const pref of SCHEDULE_PREFS) {
-      Services.prefs.addObserver(pref, this.#observer);
+      this.#listening.pref(pref, observer);
     }
-    Services.prefs.addObserver(ALLOWED_DOMAIN_BRANCH, this.#observer);
+    this.#listening.pref(ALLOWED_DOMAIN_BRANCH, observer);
     this.schedule();
   }
 
@@ -1128,13 +1129,7 @@ class ListLoader {
 
   /** Stops the schedule. Used by tests. */
   stop() {
-    if (this.#observer) {
-      for (const pref of SCHEDULE_PREFS) {
-        Services.prefs.removeObserver(pref, this.#observer);
-      }
-      Services.prefs.removeObserver(ALLOWED_DOMAIN_BRANCH, this.#observer);
-      this.#observer = null;
-    }
+    this.#listening.end();
     lazy.clearTimeout(this.#timer);
     this.#timer = null;
     this.#started = false;

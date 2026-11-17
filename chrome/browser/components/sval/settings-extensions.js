@@ -30,6 +30,7 @@
     ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
     SvalAddonsNav: "moz-src:///browser/components/sval/SvalAddonsNav.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+    SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
     SvalUpdateDelay:
       "moz-src:///browser/components/sval/SvalUpdateDelay.sys.mjs",
     SvalExtensionSites:
@@ -332,14 +333,13 @@
           redraw();
         }
       };
+      const lifetime = new lazy.SvalScope();
       lazy.AddonManager.addAddonListener(listener);
+      lifetime.add(() => lazy.AddonManager.removeAddonListener(listener));
       lazy.ExtensionPermissions.addListener(permissions);
-      Services.prefs.addObserver(lazy.SITE_BRANCH, redraw);
-      window.addEventListener("pagehide", () => {
-        Services.prefs.removeObserver(lazy.SITE_BRANCH, redraw);
-        lazy.AddonManager.removeAddonListener(listener);
-        lazy.ExtensionPermissions.removeListener(permissions);
-      });
+      lifetime.add(() => lazy.ExtensionPermissions.removeListener(permissions));
+      lifetime.pref(lazy.SITE_BRANCH, redraw);
+      window.addEventListener("pagehide", () => lifetime.end());
 
       if (
         document.querySelector(`.sval-pane[data-category="${KEYBOARD_PANE}"]`)

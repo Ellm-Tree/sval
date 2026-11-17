@@ -20,6 +20,7 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { SvalFirefox } from "moz-src:///browser/components/sval/SvalFirefox.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { SvalPinPages } from "moz-src:///browser/components/sval/SvalPinPages.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { isPin } from "moz-src:///browser/components/sval/SvalPinTab.sys.mjs";
 import {
   NARROW_PANEL_PX,
@@ -365,8 +366,8 @@ export class SvalPinsRow {
   /** The pin dragged from the row. A tab's drag is the panel's (`draggedId`). */
   #drag = null;
 
-  /** Takes away each listener on something other than the row's block. */
-  #listening = [];
+  /** What the row listens to on anything other than its own block. */
+  #listening = new SvalScope();
 
   /**
    * @param {Window} win A browser window.
@@ -427,10 +428,9 @@ export class SvalPinsRow {
     // panel ends them through `dragEnded`.
     const root = block.parentNode;
     const listen = (target, type, capture = false) => {
-      target?.addEventListener(type, this, capture);
-      this.#listening.push(() =>
-        target?.removeEventListener(type, this, capture)
-      );
+      if (target) {
+        this.#listening.listen(target, type, this, capture);
+      }
     };
     listen(root, "dragstart");
     listen(win, "keydown", true);
@@ -463,38 +463,24 @@ export class SvalPinsRow {
         }
       }
     };
-    tabMenu?.addEventListener("popupshowing", hideFirefoxPins);
-    this.#listening.push(() =>
-      tabMenu?.removeEventListener("popupshowing", hideFirefoxPins)
-    );
+    if (tabMenu) {
+      this.#listening.listen(tabMenu, "popupshowing", hideFirefoxPins);
+    }
 
-    Services.obs.addObserver(this.#observer, lazy.FAVORITES_CHANGED_TOPIC);
-    Services.obs.addObserver(this.#observer, lazy.FAVORITE_ICONS_CHANGED_TOPIC);
-    Services.prefs.addObserver(PINS_LINES_PREF, this.#observer);
-    Services.prefs.addObserver(PINS_QUICK_PEEK_PREF, this.#observer);
+    this.#listening.topic(lazy.FAVORITES_CHANGED_TOPIC, this.#observer);
+    this.#listening.topic(lazy.FAVORITE_ICONS_CHANGED_TOPIC, this.#observer);
+    this.#listening.pref(PINS_LINES_PREF, this.#observer);
+    this.#listening.pref(PINS_QUICK_PEEK_PREF, this.#observer);
     win.addEventListener("unload", () => this.stop(), { once: true });
     this.refresh();
   }
 
   stop() {
-    for (const forget of this.#listening.splice(0)) {
-      forget();
-    }
+    this.#listening.end();
     this.#stopStore?.();
     this.#stopStore = null;
     this.#store = null;
     this.#resize?.disconnect();
-    try {
-      Services.obs.removeObserver(this.#observer, lazy.FAVORITES_CHANGED_TOPIC);
-      Services.obs.removeObserver(
-        this.#observer,
-        lazy.FAVORITE_ICONS_CHANGED_TOPIC
-      );
-      Services.prefs.removeObserver(PINS_LINES_PREF, this.#observer);
-      Services.prefs.removeObserver(PINS_QUICK_PEEK_PREF, this.#observer);
-    } catch {
-      // Already stopped.
-    }
   }
 
   /** The window's pin pages. */

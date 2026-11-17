@@ -421,11 +421,10 @@ async function noOtherBrowsers() {
  *
  * A method is a property whose function is named for its key: a stub
  * assigned to the property has no name, and a bound copy is named
- * "bound …", while a function the panel keeps as data, such as the stop
- * function in `_forgetFavicons`, is named otherwise and left alone. The
- * rest of the panel's data is its own bookkeeping, such as the observers it
- * has registered, which the panel keeps true itself and a reset would make
- * false. The observer is attached afresh, never put back: it is attached to
+ * "bound …", while a function the panel keeps as data is named otherwise
+ * and left alone. The rest of the panel's data is its own bookkeeping, such
+ * as the observers it has registered, which the panel keeps true itself and
+ * a reset would make false. The observer is attached afresh, never put back: it is attached to
  * the window, so a stale one put back beside one a file attached itself
  * would leave two filing the same tabs.
  *

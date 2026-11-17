@@ -70,6 +70,7 @@ import {
   SvalAgentSession,
   launchFrom,
 } from "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { PAGE_ACTOR } from "moz-src:///browser/components/sval/SvalAgentPageParent.sys.mjs";
 import { markProfile } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
 import {
@@ -985,6 +986,9 @@ const politeObserver = {
   QueryInterface: ChromeUtils.generateQI(["nsIObserver"]),
   observe: () => toolsMayHaveChanged(),
 };
+/** What `start` observes, until `stop`. */
+const listening = new SvalScope();
+
 const quitObserver = {
   QueryInterface: ChromeUtils.generateQI(["nsIObserver"]),
   observe: () =>
@@ -1126,11 +1130,11 @@ export const SvalAgents = {
         `updating AI apps' sval entries failed: ${SvalLog.errorName(err)}`
       )
     );
-    Services.prefs.addObserver(PREF, prefObserver);
-    Services.prefs.addObserver(PAGE_TOOLS_PREF, prefObserver);
-    Services.obs.addObserver(quitObserver, "quit-application");
-    Services.prefs.addObserver(POLITE_RATE_PREF, politeObserver);
-    Services.obs.addObserver(politeObserver, POLITE_TOPIC);
+    listening.pref(PREF, prefObserver);
+    listening.pref(PAGE_TOOLS_PREF, prefObserver);
+    listening.topic("quit-application", quitObserver);
+    listening.pref(POLITE_RATE_PREF, politeObserver);
+    listening.topic(POLITE_TOPIC, politeObserver);
     syncModelContext();
     holdShutdown();
     return settle();
@@ -1148,11 +1152,7 @@ export const SvalAgents = {
     // Quit and a test's cleanup can both call this; the second call waits
     // for the first rather than removing the observers twice.
     stopping ??= (async () => {
-      Services.prefs.removeObserver(PREF, prefObserver);
-      Services.prefs.removeObserver(PAGE_TOOLS_PREF, prefObserver);
-      Services.obs.removeObserver(quitObserver, "quit-application");
-      Services.prefs.removeObserver(POLITE_RATE_PREF, politeObserver);
-      Services.obs.removeObserver(politeObserver, POLITE_TOPIC);
+      listening.end();
       try {
         await transition;
         await close();

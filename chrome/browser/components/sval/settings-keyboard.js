@@ -32,6 +32,7 @@
     AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
     BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
     arrange: "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs",
+    SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
     clickModifiers: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
     clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
     QUICK_PEEK_CLICK_PREF:
@@ -149,21 +150,9 @@
           this._updateClick(row);
         }
       };
-      for (const pref of [lazy.QUICK_PEEK_PREF, lazy.QUICK_PEEK_CLICK_PREF]) {
-        Services.prefs.addObserver(pref, redrawClick);
-      }
-      window.addEventListener(
-        "unload",
-        () => {
-          for (const pref of [
-            lazy.QUICK_PEEK_PREF,
-            lazy.QUICK_PEEK_CLICK_PREF,
-          ]) {
-            Services.prefs.removeObserver(pref, redrawClick);
-          }
-        },
-        { once: true }
-      );
+      const lifetime = lazy.SvalScope.forWindow(window);
+      lifetime.pref(lazy.QUICK_PEEK_PREF, redrawClick);
+      lifetime.pref(lazy.QUICK_PEEK_CLICK_PREF, redrawClick);
     },
 
     /**

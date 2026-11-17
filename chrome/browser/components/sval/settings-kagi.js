@@ -45,9 +45,9 @@
      * Finds and wires the Kagi card, and follows the engine and the sign-in.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followTopic Observes a topic until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initKagi(byId, followTopic) {
+    _initKagi(byId, lifetime) {
       Object.assign(this._els, {
         kagiCard: byId("sval-kagi-card"),
         kagiAccount: byId("sval-kagi-account"),
@@ -72,7 +72,7 @@
         this.clearKagiToken()
       );
       this._els.kagiSignIn.addEventListener("click", () => this.signInToKagi());
-      followTopic(
+      lifetime.topic(
         "browser-search-engine-modified",
         (_subject, _topic, data) => {
           if (ENGINE_CHANGES.has(data)) {
@@ -82,7 +82,7 @@
       );
       // Kagi's sign-in and sign-out are its `kagi_session` cookie, which
       // `SvalKagi.signedIn` reads.
-      followTopic("cookie-changed", () => {
+      lifetime.topic("cookie-changed", () => {
         if (lazy.SvalKagi.signedIn() !== this._kagiSignedIn) {
           this._drawKagi();
         }

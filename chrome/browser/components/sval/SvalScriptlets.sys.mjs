@@ -28,6 +28,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import {
   ALLOWED_DOMAINS_LIST,
   download,
@@ -339,7 +340,7 @@ class Scriptlets {
   #ubo = null;
   #started = false;
   #timer = null;
-  #observer = null;
+  #listening = new SvalScope();
   #running = null;
 
   get #copyPath() {
@@ -355,22 +356,17 @@ class Scriptlets {
       return;
     }
     this.#started = true;
-    this.#observer = () => this.schedule();
-    Services.prefs.addObserver(ENGINE_LISTS_PREF, this.#observer);
-    Services.prefs.addObserver(PAGE_RULES_PREF, this.#observer);
-    Services.prefs.addObserver(UPDATES_PREF, this.#observer);
+    const schedule = () => this.schedule();
+    this.#listening.pref(ENGINE_LISTS_PREF, schedule);
+    this.#listening.pref(PAGE_RULES_PREF, schedule);
+    this.#listening.pref(UPDATES_PREF, schedule);
     await this.reload();
     this.schedule();
   }
 
   /** Stops the schedule. */
   stop() {
-    if (this.#observer) {
-      Services.prefs.removeObserver(ENGINE_LISTS_PREF, this.#observer);
-      Services.prefs.removeObserver(PAGE_RULES_PREF, this.#observer);
-      Services.prefs.removeObserver(UPDATES_PREF, this.#observer);
-      this.#observer = null;
-    }
+    this.#listening.end();
     lazy.clearTimeout(this.#timer);
     this.#timer = null;
     this.#started = false;

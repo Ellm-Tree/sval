@@ -63,10 +63,9 @@
      * Finds and wires the sync readout and this device's name.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
-     * @param {Function} followTopic Observes a topic until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initSyncStatus(byId, followPref, followTopic) {
+    _initSyncStatus(byId, lifetime) {
       Object.assign(this._els, {
         syncState: byId("sval-sync-state"),
         syncNow: byId("sval-sync-now"),
@@ -95,7 +94,7 @@
       // The panel's own signal, so a pass this page did not ask for still moves
       // the readout: spec §6.4 keeps the last-synced time in view, and §10.8
       // shows it beside the button.
-      followTopic(lazy.SvalPanelModel.SYNC_STATE_TOPIC, () => {
+      lifetime.topic(lazy.SvalPanelModel.SYNC_STATE_TOPIC, () => {
         // A pass that came back is newer news than how the last one asked for
         // here ended. A tab's title changing redraws the panel too, and that
         // is no news about the folder.
@@ -108,7 +107,7 @@
         this._describeSync();
         this._describeStorage();
       });
-      followPref(lazy.DEVICE_NAME_PREF, () => this._describeDeviceName());
+      lifetime.pref(lazy.DEVICE_NAME_PREF, () => this._describeDeviceName());
     },
 
     /**

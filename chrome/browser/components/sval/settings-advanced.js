@@ -24,9 +24,9 @@
      * Finds and wires the Advanced preferences, Release candidates and Diagnostics cards.
      *
      * @param {Function} byId Finds one of the page's elements by id.
-     * @param {Function} followPref Observes a pref until the page goes.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initAdvanced(byId, followPref) {
+    _initAdvanced(byId, lifetime) {
       Object.assign(this._els, {
         advancedOpen: byId("sval-advanced-open"),
         releaseCandidatesCard: byId("sval-release-candidates-card"),
@@ -45,7 +45,7 @@
         )
       );
       // The log level moves from about:config.
-      followPref(lazy.SVAL_LOG_LEVEL_PREF, () => this._describeDisplay());
+      lifetime.pref(lazy.SVAL_LOG_LEVEL_PREF, () => this._describeDisplay());
     },
 
     /**

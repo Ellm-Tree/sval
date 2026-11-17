@@ -445,12 +445,10 @@
     // An Arc import or another device's sync can change the card while the
     // page is open.
     const cardChanged = () => drawCard().catch(() => {});
-    Services.prefs.addObserver(CARD_PREF, cardChanged);
-    window.addEventListener(
-      "unload",
-      () => Services.prefs.removeObserver(CARD_PREF, cardChanged),
-      { once: true }
+    const { SvalScope } = ChromeUtils.importESModule(
+      "moz-src:///browser/components/sval/SvalScope.sys.mjs"
     );
+    SvalScope.forWindow(window).pref(CARD_PREF, cardChanged);
     document
       .getElementById("category-home")
       ?.setAttribute("iconsrc", `${ICONS}/panel-left.svg`);

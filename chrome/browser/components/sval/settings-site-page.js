@@ -284,10 +284,9 @@
     /**
      * Wires the page's own controls and follows what its cards read.
      *
-     * @param {Function} followPref As `init`'s, removed as the page goes.
-     * @param {Function} followTopic As `init`'s.
+     * @param {SvalScope} lifetime Ends as the page goes.
      */
-    _initSitePage(followPref, followTopic) {
+    _initSitePage(lifetime) {
       const byId = id => document.getElementById(id);
       this._siteEls = {
         page: byId("sval-site-page"),
@@ -351,9 +350,9 @@
         lazy.MEDIA_DEFAULT_PREF,
         ...lazy.SvalJavascript.PREFS,
       ]) {
-        followPref(name, redraw);
+        lifetime.pref(name, redraw);
       }
-      followTopic(lazy.SvalSiteProtections.PRIVATE_TOPIC, redraw);
+      lifetime.topic(lazy.SvalSiteProtections.PRIVATE_TOPIC, redraw);
       // What the site holds is counted from the stores once they have taken
       // a change: the choices and JavaScript rules from what each module
       // applied, which libpref's observers can reach after this page's.
@@ -366,12 +365,12 @@
         this._drawSitePage();
         count();
       };
-      followTopic(lazy.SvalSiteProtections.APPLIED_TOPIC, recount);
-      followTopic(lazy.APPLIED_TOPIC, recount);
-      followTopic(lazy.BLOCKING_TOPIC, recount);
+      lifetime.topic(lazy.SvalSiteProtections.APPLIED_TOPIC, recount);
+      lifetime.topic(lazy.APPLIED_TOPIC, recount);
+      lifetime.topic(lazy.BLOCKING_TOPIC, recount);
       // Of the cards, only the data card reads stored data, and what the
       // site holds counts it.
-      followTopic(lazy.SvalSiteData.TOPIC, () => {
+      lifetime.topic(lazy.SvalSiteData.TOPIC, () => {
         this._stopSiteDataWait();
         this._redrawSiteCard("data");
         count();
@@ -381,19 +380,15 @@
         this._redrawSiteCard("extensions");
         this._drawSiteScope();
       };
-      Services.prefs.addObserver(lazy.EXTENSION_SITE_BRANCH, extensionSites);
+      lifetime.pref(lazy.EXTENSION_SITE_BRANCH, extensionSites);
       window.addEventListener("pagehide", () => {
-        Services.prefs.removeObserver(
-          lazy.EXTENSION_SITE_BRANCH,
-          extensionSites
-        );
         this._stopSiteDataWait();
         clearTimeout(this._siteSearchTimer);
         this._siteSearchTimer = null;
       });
       // A permission change elsewhere would close a select the person has
       // open, so only the site's own, or the whole list cleared, redraws.
-      followTopic(PERM_CHANGED, (subject, topic, data) => {
+      lifetime.topic(PERM_CHANGED, (subject, topic, data) => {
         if (data === "cleared" || this._isSitePermission(subject)) {
           recount();
         }
