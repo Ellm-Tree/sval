@@ -38,7 +38,7 @@ const SvalFirstRunIntro = (() => {
     "moz-src:///browser/components/sval/SvalProtectionButton.sys.mjs"
   );
   const { scopeForURI } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalJavascript.sys.mjs"
+    "moz-src:///browser/components/sval/SvalSite.sys.mjs"
   );
   const { UrlbarUtils } = ChromeUtils.importESModule(
     "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs"

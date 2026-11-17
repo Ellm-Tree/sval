@@ -24,7 +24,7 @@ const {
   "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs"
 );
 const { siteForURI } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalJavascript.sys.mjs"
+  "moz-src:///browser/components/sval/SvalSite.sys.mjs"
 );
 
 const SITE = "a.com";

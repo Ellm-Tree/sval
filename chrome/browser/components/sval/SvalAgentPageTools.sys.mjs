@@ -16,7 +16,7 @@ import {
   printable,
   ToolError,
 } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
-import { mostSpecificRule } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+import { mostSpecificRule } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { sha256Hex } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
 import {
   raceTimeout,

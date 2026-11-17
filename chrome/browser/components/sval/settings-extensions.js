@@ -36,7 +36,7 @@
       "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
     SITE_BRANCH:
       "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
-    siteOfEntry: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   });
   const { DEFAULT_WAIT_DAYS, MAX_WAIT_DAYS, WAIT_PREF } =
     ChromeUtils.importESModule(

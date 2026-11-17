@@ -49,9 +49,9 @@
     SITE_BRANCH:
       "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
     BLOCKING_TOPIC: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
-    siteOfEntry: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-    siteOrigins: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
-    siteForURI: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+    siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+    siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+    siteForURI: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     linesForScope:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
@@ -59,7 +59,7 @@
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     exceptionsInFilters:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    scopeOfHost: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     SitePermissions: "resource:///modules/SitePermissions.sys.mjs",
     permissionsFor:
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",

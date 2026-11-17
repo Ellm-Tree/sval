@@ -18,7 +18,7 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  scopeOfHost: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+  scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 const COSMETIC = /^([^#\s]*)(##|#\?#)(.+)$/;

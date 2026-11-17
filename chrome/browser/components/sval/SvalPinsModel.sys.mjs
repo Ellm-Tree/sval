@@ -8,7 +8,7 @@
  * answer and decides nothing of its own.
  */
 
-import { siteOf } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+import { siteOf } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 
 /** How many lines the row shows before its last slot becomes "+N". Synced. */
 export const PINS_LINES_PREF = "browser.sval.pins.lines";
@@ -213,22 +213,6 @@ export function numberedSlot(slots, n) {
 }
 
 /**
- * A pin's site: its saved address's site, as `siteOf` answers it (§5). An
- * address `siteOf` refuses, such as a `file:` page, has no site, so every web
- * page leaves it.
- *
- * @param {string} url
- * @returns {string|null}
- */
-export function siteOfPin(url) {
-  try {
-    return siteOf(url);
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Whether a link to `href` leaves the pin whose site is `site` (§5): an http
  * or https page whose site, as `siteOf` answers it, differs. A link within
  * the site, or to something that is no web page, stays the page's.
@@ -238,12 +222,7 @@ export function siteOfPin(url) {
  * @returns {boolean}
  */
 export function leavesPin(href, site) {
-  let linkSite;
-  try {
-    linkSite = siteOf(href);
-  } catch {
-    return false;
-  }
+  const linkSite = siteOf(href);
   return linkSite !== null && linkSite !== site;
 }
 

@@ -28,7 +28,7 @@ const {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  siteOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+  siteOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 const ORIGIN = {
@@ -129,15 +129,10 @@ function originOf(message) {
     return null;
   }
   if (scheme === "http" || scheme === "https") {
-    // siteOf refuses a host it cannot classify, such as one with an empty
+    // siteOf has no site for a host it cannot classify, such as one with an empty
     // label; a page names its own script URLs, so the console labels such a
     // script by its raw host.
-    let site;
-    try {
-      site = lazy.siteOf(parsed.href);
-    } catch {
-      site = parsed.host;
-    }
+    const site = lazy.siteOf(parsed.href) ?? parsed.host;
     return { kind: ORIGIN.PAGE, key: site, name: site };
   }
   if (

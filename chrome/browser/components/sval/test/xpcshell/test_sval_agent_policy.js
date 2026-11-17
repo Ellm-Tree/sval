@@ -13,43 +13,48 @@ const {
   defaultOf,
   filePermissionFor,
   hostOf,
-  siteOfEntry,
-  siteOf,
+  agentSiteOf,
   siteOfPrincipal,
   levelFor,
   localPlaceOf,
+  uploadFoldersFor,
+} = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs"
+);
+const {
+  siteOf,
+  siteOfEntry,
   mostSpecificRule,
   scopeChain,
   scopeOf,
   scopeOfHost,
-  uploadFoldersFor,
 } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs"
+  "moz-src:///browser/components/sval/SvalSite.sys.mjs"
 );
 const { ToolError } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs"
 );
 
 add_task(function a_site_is_its_registrable_domain() {
-  Assert.equal(siteOf("https://www.ebay.co.uk/itm/1"), "ebay.co.uk");
-  Assert.equal(siteOf("http://a.b.example.com:8080/x"), "example.com");
-  Assert.equal(siteOf("https://192.0.2.4/"), "192.0.2.4");
-  Assert.equal(siteOf("http://localhost:3000/"), "localhost");
-  Assert.equal(siteOf("http://intranet/"), "intranet");
-  Assert.equal(siteOf("about:blank"), null);
+  Assert.equal(agentSiteOf("https://www.ebay.co.uk/itm/1"), "ebay.co.uk");
+  Assert.equal(agentSiteOf("http://a.b.example.com:8080/x"), "example.com");
+  Assert.equal(agentSiteOf("https://192.0.2.4/"), "192.0.2.4");
+  Assert.equal(agentSiteOf("http://localhost:3000/"), "localhost");
+  Assert.equal(agentSiteOf("http://intranet/"), "intranet");
+  Assert.equal(agentSiteOf("about:blank"), null);
 });
 
 // nsIURI.host is bracketless for IPv6, and getBaseDomainFromHost answers
 // NS_ERROR_HOST_IS_IP_ADDRESS (netwerk/dns/nsEffectiveTLDService.cpp), so the
 // site is the bare address.
 add_task(function an_ipv6_literal_is_its_own_site() {
-  Assert.equal(siteOf("http://[::1]/"), "::1");
-  Assert.equal(siteOf("http://[::1]:8080/x"), "::1");
+  Assert.equal(agentSiteOf("http://[::1]/"), "::1");
+  Assert.equal(agentSiteOf("http://[::1]:8080/x"), "::1");
 });
 
 add_task(function a_trailing_dot_does_not_make_a_second_site() {
-  Assert.equal(siteOf("https://www.ebay.com./"), "ebay.com");
-  Assert.equal(siteOf("http://localhost./"), "localhost");
+  Assert.equal(agentSiteOf("https://www.ebay.com./"), "ebay.com");
+  Assert.equal(agentSiteOf("http://localhost./"), "localhost");
 });
 
 add_task(function other_schemes_are_refused() {
@@ -63,7 +68,7 @@ add_task(function other_schemes_are_refused() {
     "",
   ]) {
     Assert.throws(
-      () => siteOf(url),
+      () => agentSiteOf(url),
       e => e instanceof ToolError && e.code === "unsupported_url",
       url
     );
@@ -109,7 +114,7 @@ add_task(function every_spelling_of_a_site_is_that_site() {
     ["about:blank", null],
   ];
   for (const [url, site] of SITES) {
-    Assert.strictEqual(siteOf(url), site, url);
+    Assert.strictEqual(agentSiteOf(url), site, url);
   }
 
   const REFUSED = [
@@ -136,7 +141,7 @@ add_task(function every_spelling_of_a_site_is_that_site() {
   ];
   for (const url of REFUSED) {
     Assert.throws(
-      () => siteOf(url),
+      () => agentSiteOf(url),
       e => e instanceof ToolError && e.code === "unsupported_url",
       url
     );
@@ -222,7 +227,7 @@ add_task(function a_local_sites_place_is_known_by_its_name_or_address() {
     ["https://local.example/", null],
     ["https://localhost.example/", null],
   ]) {
-    Assert.equal(localPlaceOf(siteOf(url)), place, url);
+    Assert.equal(localPlaceOf(agentSiteOf(url)), place, url);
   }
 });
 
@@ -534,7 +539,7 @@ add_task(function a_typed_site_is_the_site_a_load_of_it_has() {
     "Example.COM.",
   ]) {
     const { site, host } = siteOfEntry(text);
-    Assert.equal(site, siteOf(`https://${host}/`), text);
+    Assert.equal(site, agentSiteOf(`https://${host}/`), text);
   }
   Assert.equal(siteOfEntry("pages.github.io").site, "pages.github.io");
 });
@@ -801,4 +806,16 @@ add_task(function clean_policy_keeps_rules_named_by_a_host() {
   });
   Assert.deepEqual(policy.downloads, { "nas.example.org": "allow" });
   Assert.deepEqual(policy.pageToolSites, { "nas.example.org": "allow" });
+});
+
+add_task(function a_page_with_no_site_has_none() {
+  Assert.equal(siteOf("https://www.ebay.co.uk/itm/1"), "ebay.co.uk");
+  for (const url of [
+    "about:blank",
+    "file:///tmp/a.html",
+    "not a url",
+    "https://a..example.com/",
+  ]) {
+    Assert.strictEqual(siteOf(url), null, url);
+  }
 });

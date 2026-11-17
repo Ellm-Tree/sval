@@ -17,7 +17,7 @@
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
-  siteOfEntry: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+  siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 export const RULES_PREF = "browser.sval.links.rules";

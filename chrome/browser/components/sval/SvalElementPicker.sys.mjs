@@ -15,7 +15,7 @@
 import {
   scopeOf,
   siteOf,
-} from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 
 /** Notified with the browser as subject and the tab's mode, "" when it ends. */
 export const MODE_TOPIC = "sval-element-picker-mode";
@@ -42,14 +42,7 @@ const endings = new WeakMap();
  */
 function siteFor(browsingContext) {
   const spec = browsingContext?.currentURI?.spec;
-  if (!spec) {
-    return null;
-  }
-  try {
-    return siteOf(spec);
-  } catch {
-    return null;
-  }
+  return spec ? siteOf(spec) : null;
 }
 
 /**

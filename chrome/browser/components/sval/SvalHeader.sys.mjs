@@ -23,8 +23,11 @@ import {
   APPLIED_TOPIC,
   SvalJavascript,
   ENABLED_PREF,
-  scopeForURI,
 } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
+import {
+  mostSpecificRule,
+  scopeForURI,
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { SvalLoadLine } from "moz-src:///browser/components/sval/SvalLoadLine.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { tidySeparators } from "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs";
@@ -70,8 +73,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/customizableui/PanelMultiView.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   launcherKeyText: "moz-src:///browser/components/sval/SvalLauncher.sys.mjs",
-  mostSpecificRule:
-    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
 });
 
 const HEADER_CSS = "chrome://browser/content/sval/sval-header.css";
@@ -1598,7 +1599,7 @@ function describeJavascript(win) {
   }
   const enabled = SvalJavascript.enabledFor(scope.host);
   const isPrivate = lazy.PrivateBrowsingUtils.isWindowPrivate(win);
-  const exception = !!lazy.mostSpecificRule(scope.host, name =>
+  const exception = !!mostSpecificRule(scope.host, name =>
     SvalJavascript.ruleFor(name)
   );
   const place = scope.choice ? scope.host : "this site";

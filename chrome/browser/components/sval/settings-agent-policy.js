@@ -29,8 +29,8 @@
       "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
     pageToolsSettingOf:
       "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
-    scopeOfHost: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-    siteOfEntry: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+    siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     uploadFoldersOf:
       "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
   });

@@ -33,9 +33,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   forgetSite: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
   permissionCount:
     "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
-  scopeOfHost: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  siteOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  siteOrigins: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+  scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  siteOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 /**
@@ -80,26 +80,13 @@ function clearFlags() {
 }
 
 /**
- * @param {string} url
- * @returns {?string} The site of `url`, or null for an address `siteOf`
- *   refuses.
- */
-function siteOfUrl(url) {
-  try {
-    return lazy.siteOf(url);
-  } catch {
-    return null;
-  }
-}
-
-/**
  * @param {string} site
  * @returns {object[]} The favorite rows, pins among them, whose address is
  *   of the site.
  */
 function favoritesOf(site) {
   return (lazy.SvalFavoritesStore.instance?.all() ?? []).filter(
-    row => row.kind === "favorite" && siteOfUrl(row.url) === site
+    row => row.kind === "favorite" && lazy.siteOf(row.url) === site
   );
 }
 
@@ -135,7 +122,7 @@ function forgets(download, site) {
   return (
     download.stopped &&
     (!download.hasPartialData || !!download.error) &&
-    siteOfUrl(download.source.url) === site
+    lazy.siteOf(download.source.url) === site
   );
 }
 
@@ -184,7 +171,7 @@ function countCertExceptions(site) {
       return false;
     }
     const [uri] = lazy.siteOrigins(override.asciiHost, ["https"]);
-    return !!uri && siteOfUrl(uri.spec) === site;
+    return !!uri && lazy.siteOf(uri.spec) === site;
   }).length;
 }
 

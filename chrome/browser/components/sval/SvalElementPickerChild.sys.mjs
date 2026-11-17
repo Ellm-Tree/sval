@@ -19,7 +19,7 @@
  * hears before any listener of the page can stop it.
  */
 
-import { siteOf } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+import { siteOf } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { hidingSheet } from "moz-src:///browser/components/sval/SvalPageRulesChild.sys.mjs";
 import {
   nameOf,
@@ -876,11 +876,8 @@ class PickerOverlay {
    * @returns {boolean}
    */
   #otherSite(url) {
-    try {
-      return siteOf(url) != this.#site;
-    } catch {
-      return false;
-    }
+    const site = siteOf(url);
+    return site !== null && site != this.#site;
   }
 
   #showDownload() {

@@ -31,7 +31,7 @@
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
     permissionPhrase:
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
-    siteOrigins: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+    siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     SvalSiteProtections:
@@ -48,10 +48,10 @@
     removeSiteFromLine:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     showAgain: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    scopeOfHost: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     scopesInFilters:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    siteOfEntry: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   });
   // The module exports its branch as `SITE_BRANCH`, a name the stores
   // above export too.

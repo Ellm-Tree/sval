@@ -96,7 +96,7 @@ import {
 } from "moz-src:///browser/components/sval/SvalAgentPageParent.sys.mjs";
 import {
   PROFILE_MARK,
-  siteOf,
+  agentSiteOf,
   addressOfDocument,
   hostOfDocument,
   siteOfDocument,
@@ -2343,7 +2343,7 @@ export function createAgentTools({
   async function siteActedOn(agent, name, args, task) {
     try {
       if (name === "open_tab") {
-        return siteOf(args.url);
+        return agentSiteOf(args.url);
       }
       const found = await tabs.find(agent.workspaceId, args.tab);
       if (task) {
@@ -2351,17 +2351,17 @@ export function createAgentTools({
       }
       if (!found.tab.linkedPanel) {
         if (name !== "navigate_tab") {
-          return siteOf(found.url ?? "");
+          return agentSiteOf(found.url ?? "");
         }
         // An unloaded tab has no history to step through or page to reload.
         return ["back", "forward", "reload"].includes(args.to)
           ? null
-          : siteOf(args.to);
+          : agentSiteOf(args.to);
       }
       const browser = found.tab.linkedBrowser;
       if (name === "navigate_tab") {
         const checked = checkedTarget(browser, args.to);
-        return checked ? siteOf(checked.url) : null;
+        return checked ? agentSiteOf(checked.url) : null;
       }
       return siteOfDocument(browser.browsingContext?.currentWindowGlobal);
     } catch {

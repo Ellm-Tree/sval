@@ -179,6 +179,7 @@ MOZ_SRC_FILES += [
     "SvalSettingsSync.sys.mjs",
     "SvalSharedFolder.sys.mjs",
     "SvalShortcuts.sys.mjs",
+    "SvalSite.sys.mjs",
     "SvalSiteControls.sys.mjs",
     "SvalSiteData.sys.mjs",
     "SvalSitePermissionList.sys.mjs",

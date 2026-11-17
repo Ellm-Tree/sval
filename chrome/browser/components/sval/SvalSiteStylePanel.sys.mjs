@@ -36,7 +36,7 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   glyph: "moz-src:///browser/components/sval/SvalProtectionButton.sys.mjs",
-  scopeForURI: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+  scopeForURI: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 /** How far in from the page's top and end corner the dialog opens. */

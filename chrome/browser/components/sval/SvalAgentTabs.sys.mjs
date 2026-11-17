@@ -44,7 +44,7 @@ import {
   addressOfDocument,
   hostOf,
   hostOfDocument,
-  siteOf,
+  agentSiteOf,
 } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
 import { tabsIn } from "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs";
 import {
@@ -515,7 +515,7 @@ function isReplayable(entry) {
     return false;
   }
   try {
-    siteOf(entry.URI.spec);
+    agentSiteOf(entry.URI.spec);
   } catch {
     return false;
   }
@@ -576,7 +576,7 @@ function historyStep(browser, step, checked) {
   // agent is given its address to open as a load of its own, when it is one
   // an agent may open.
   try {
-    siteOf(entry.URI.spec);
+    agentSiteOf(entry.URI.spec);
   } catch {
     throw new ToolError(
       "no_history",
@@ -609,7 +609,7 @@ function reloadOf(browser) {
     return () => browser.reload();
   }
   const current = browser.currentURI;
-  siteOf(current.spec);
+  agentSiteOf(current.spec);
   return freshLoad(browser, current);
 }
 
@@ -806,7 +806,7 @@ export async function navigate(
   }
   let targetURI;
   if (target !== "back" && target !== "forward" && target !== "reload") {
-    siteOf(target);
+    agentSiteOf(target);
     targetURI = Services.io.newURI(target);
   }
   // What the tab's history and page say decides the load, so it is read
@@ -1019,7 +1019,7 @@ function materialize(win, tab, url) {
     return Promise.resolve();
   }
   const done = (async () => {
-    const site = siteOf(url || "about:blank");
+    const site = agentSiteOf(url || "about:blank");
     if (lazy.SvalFirefox.isLazy(tab)) {
       let timer;
       const restoring = new Promise(resolve => {
@@ -1082,7 +1082,7 @@ export function createAgentTabs({ engine, gate }) {
   async function openTab(agent, url, { blocked } = {}) {
     const { workspaceId } = agent;
     refuseIfWorkspaceHeld(workspaceId);
-    const site = siteOf(url);
+    const site = agentSiteOf(url);
     const win = await windowFor(workspaceId, { open: true });
     await win.SvalPanel.started;
     const observer = win.SvalPanel.observer;
@@ -1227,7 +1227,7 @@ export function createAgentTabs({ engine, gate }) {
     gate.watch(tab.linkedBrowser, agent);
     await materialize(win, tab, url);
     const browser = tab.linkedBrowser;
-    siteOf(browser.currentURI?.spec ?? "");
+    agentSiteOf(browser.currentURI?.spec ?? "");
     return { win, tab, browser };
   }
 

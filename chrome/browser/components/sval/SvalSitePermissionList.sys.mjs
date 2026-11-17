@@ -13,7 +13,7 @@
 import {
   siteForURI,
   siteOrigins,
-} from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {

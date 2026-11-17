@@ -20,7 +20,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
-import { scopeForURI } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
+import { scopeForURI } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import {
   ScopeDropdown,
   keepsLine,

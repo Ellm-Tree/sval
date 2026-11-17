@@ -59,11 +59,12 @@ import {
   STYLE_NAME,
   SvalShortcuts,
 } from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
+import { SvalJavascript } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
 import {
-  SvalJavascript,
+  scopeChain,
   scopeForURI,
   siteForURI,
-} from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import {
   ScopeDropdown,
   keepsLine,
@@ -106,7 +107,6 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  scopeChain: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
   CustomizableUI:
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
@@ -206,7 +206,7 @@ function shownOn(text, chain) {
  */
 function listedOn(host, scope) {
   const text = SvalBlocking.myFilters;
-  const chain = lazy.scopeChain(host);
+  const chain = scopeChain(host);
   const names = scope === host ? chain : [scope];
   const shown = shownOn(text, chain);
   return names.flatMap(name =>
@@ -2456,7 +2456,7 @@ class SiteControls {
     const { doc } = this;
     const popup = doc.createXULElement("menupopup");
     popup.id = "sval-site-show-again-menu";
-    const chain = lazy.scopeChain(media.host);
+    const chain = scopeChain(media.host);
     const everywhere = () => {
       const next = showAgainIn(SvalBlocking.myFilters, entry.line, entry.scope);
       return next === null

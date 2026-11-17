@@ -4,7 +4,7 @@
 import {
   scopeOf,
   siteOf,
-} from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { SvalBlocking } from "moz-src:///browser/components/sval/SvalBlocking.sys.mjs";
 import {
   SvalElementPicker,
@@ -62,12 +62,8 @@ function isPlainRule(scope, selector) {
  * @returns {boolean} whether `url` is a web address on another site.
  */
 function isOtherSite(url, site) {
-  try {
-    const other = siteOf(url);
-    return !!other && other != site;
-  } catch {
-    return false;
-  }
+  const other = siteOf(url);
+  return !!other && other != site;
 }
 
 /**
@@ -169,17 +165,13 @@ export class SvalElementPickerParent extends JSWindowActorParent {
     if (!this.#running() || availabilityOf(this.browsingContext) != "ok") {
       return { ok: false, error: "unavailable" };
     }
-    let site;
-    try {
-      site = siteOf(this.manager.documentURI.spec);
-    } catch {
+    const scopes = scopeOf(this.manager.documentURI.spec);
+    if (!scopes) {
       return { ok: false, error: "unavailable" };
     }
-    const scopes = scopeOf(this.manager.documentURI.spec);
+    const { site } = scopes;
     scope ??= site;
     if (
-      !site ||
-      !scopes ||
       (scope != scopes.site && scope != scopes.host) ||
       !isPlainRule(scope, selector)
     ) {

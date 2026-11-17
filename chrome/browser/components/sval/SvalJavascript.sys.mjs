@@ -33,15 +33,12 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
-
-const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
-  mostSpecificRule:
-    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  scopeChain: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  scopeOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  siteOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-});
+import {
+  SITE_SCHEMES,
+  mostSpecificRule,
+  scopeChain,
+  siteOrigins,
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 
 /** The branch each rule is a pref under, named for its site or host. */
 export const SITE_BRANCH = "browser.sval.javascript.site.";
@@ -58,61 +55,6 @@ export const APPLIED_TOPIC = "sval-javascript-applied";
  */
 function isRule(rule) {
   return rule === "allow" || rule === "block";
-}
-
-/** The schemes a site's own origins are made of (`siteOrigins`). */
-export const SITE_SCHEMES = Object.freeze(["http", "https"]);
-
-/**
- * The site a page address has a rule under, or null for an address no rule
- * can cover: anything but an http or https page.
- *
- * @param {nsIURI} uri
- * @returns {string|null}
- */
-export function siteForURI(uri) {
-  if (!uri) {
-    return null;
-  }
-  try {
-    return lazy.siteOf(uri.spec);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The scopes a choice made on a page address can be saved at (decision
- * 1980), or null for an address no rule can cover.
- *
- * @param {nsIURI} uri
- * @returns {{site: string, host: string, choice: boolean}|null} As
- *   `scopeOf` gives them.
- */
-export function scopeForURI(uri) {
-  return uri ? lazy.scopeOf(uri.spec) : null;
-}
-
-/**
- * A site's root address under each scheme, leaving out any that does not
- * parse.
- *
- * @param {string} site As `siteOf` cuts one.
- * @param {string[]} schemes
- * @returns {nsIURI[]}
- */
-export function siteOrigins(site, schemes) {
-  // `siteOf` gives an IPv6 literal without its brackets.
-  const host = site.includes(":") ? `[${site}]` : site;
-  const uris = [];
-  for (const scheme of schemes) {
-    try {
-      uris.push(Services.io.newURI(`${scheme}://${host}/`));
-    } catch {
-      // A name that is no host has no address, and so nothing to enter.
-    }
-  }
-  return uris;
 }
 
 /**
@@ -209,7 +151,7 @@ export const SvalJavascript = {
    *   has it: the rule of the most specific name above it, or the default.
    */
   enabledFor(host) {
-    const found = lazy.mostSpecificRule(host, name => this.ruleFor(name));
+    const found = mostSpecificRule(host, name => this.ruleFor(name));
     return found ? found.rule === "allow" : this.defaultEnabled();
   },
 
@@ -221,7 +163,7 @@ export const SvalJavascript = {
    * @returns {boolean}
    */
   inheritedFor(name) {
-    const above = lazy.scopeChain(name)[1];
+    const above = scopeChain(name)[1];
     return above === undefined ? this.defaultEnabled() : this.enabledFor(above);
   },
 

@@ -98,19 +98,18 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 
 import {
   SITE_SCHEMES,
+  mostSpecificRule,
+  scopeChain,
+  scopeOfHost,
   siteForURI,
   siteOrigins,
-} from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { MEDIA_PERMISSION } from "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs";
 
 import { SITE_EXCEPTIONS } from "moz-src:///browser/components/sval/SvalFingerprinting.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  mostSpecificRule:
-    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  scopeChain: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  scopeOfHost: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
 });
@@ -221,8 +220,7 @@ export const REMOTE_OVERRIDES_PREF =
 function isScopeName(name) {
   const [uri] = siteOrigins(name, ["https"]);
   return (
-    !!uri &&
-    (siteForURI(uri) === name || lazy.scopeOfHost(uri.host)?.host === name)
+    !!uri && (siteForURI(uri) === name || scopeOfHost(uri.host)?.host === name)
   );
 }
 
@@ -231,7 +229,7 @@ function isScopeName(name) {
  * @returns {boolean} Whether `name` is a host under its site.
  */
 function isHost(name) {
-  return lazy.scopeChain(name).length > 1;
+  return scopeChain(name).length > 1;
 }
 
 /**
@@ -535,10 +533,8 @@ export const SvalSiteProtections = {
    * @returns {*} The field's value, undefined where no name holds it.
    */
   resolvedFor(host, field, session = null) {
-    return lazy.mostSpecificRule(
-      host,
-      name => this.ruleFor(name, session)[field]
-    )?.rule;
+    return mostSpecificRule(host, name => this.ruleFor(name, session)[field])
+      ?.rule;
   },
 
   /**
@@ -551,7 +547,7 @@ export const SvalSiteProtections = {
    * @returns {*}
    */
   inheritedFor(name, field, session = null) {
-    const above = lazy.scopeChain(name)[1];
+    const above = scopeChain(name)[1];
     const value =
       above === undefined ? undefined : this.resolvedFor(above, field, session);
     return value ?? this._fieldDefault(field);
@@ -805,10 +801,7 @@ export const SvalSiteProtections = {
     const principals = sitePrincipals(name, session);
     const expire = Ci.nsIPermissionManager.EXPIRE_SESSION;
     const decide = (principal, field) =>
-      lazy.mostSpecificRule(
-        principal.host,
-        n => this.ruleFor(n, session)[field]
-      );
+      mostSpecificRule(principal.host, n => this.ruleFor(n, session)[field]);
     if (before.protections !== after.protections) {
       const type = allowListType(session);
       const all = [...principals, ...this._principalsWith(type, name, session)];
@@ -881,7 +874,7 @@ export const SvalSiteProtections = {
         principal =>
           sessionOfPrincipal(principal) === session &&
           !!siteOfPrincipal(principal) &&
-          lazy.scopeChain(principal.host).includes(name)
+          scopeChain(principal.host).includes(name)
       );
   },
 
@@ -1038,7 +1031,7 @@ export const SvalSiteProtections = {
         if (host && !own.protections && !own.exceptions) {
           continue;
         }
-        const site = lazy.scopeChain(name).at(-1);
+        const site = scopeChain(name).at(-1);
         const rule = host
           ? {
               protections: this.resolvedFor(name, "protections"),

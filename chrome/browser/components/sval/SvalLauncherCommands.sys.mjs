@@ -89,7 +89,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   isWorkspaceHeld:
     "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs",
-  scopeForURI: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+  scopeForURI: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   mediaOf: "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs",
   stateOf: "moz-src:///browser/components/sval/SvalProtectionButton.sys.mjs",
 });

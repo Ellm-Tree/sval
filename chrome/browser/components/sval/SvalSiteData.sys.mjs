@@ -22,8 +22,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
   SvalWorkspaceJar:
     "moz-src:///browser/components/sval/SvalWorkspaceJar.sys.mjs",
-  siteForURI: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
-  siteOrigins: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+  siteForURI: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   switcherItems: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
 });
 

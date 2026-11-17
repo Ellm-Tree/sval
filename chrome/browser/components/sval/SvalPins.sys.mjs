@@ -10,10 +10,8 @@
  */
 
 import { SvalPinPages } from "moz-src:///browser/components/sval/SvalPinPages.sys.mjs";
-import {
-  PINS_QUICK_PEEK_PREF,
-  siteOfPin,
-} from "moz-src:///browser/components/sval/SvalPinsModel.sys.mjs";
+import { PINS_QUICK_PEEK_PREF } from "moz-src:///browser/components/sval/SvalPinsModel.sys.mjs";
+import { siteOf } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 
 const ACTOR = "SvalPin";
 
@@ -114,5 +112,5 @@ export function answerFor(page) {
  * @returns {string}
  */
 export function siteOfPage(page) {
-  return siteOfPin(page.savedPage ?? page.url);
+  return siteOf(page.savedPage ?? page.url);
 }

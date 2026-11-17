@@ -18,9 +18,8 @@
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   Management: "resource://gre/modules/Extension.sys.mjs",
-  mostSpecificRule:
-    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  scopeChain: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+  mostSpecificRule: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  scopeChain: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 export const SITE_BRANCH = "browser.sval.extensions.offOn.";

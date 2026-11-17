@@ -34,7 +34,7 @@
  * - A content policy refuses a load outright. The channel's own open runs it
  *   (`nsContentSecurityManager::doContentSecurityCheck`), whatever the
  *   scheme, so it refuses the loads that open no HTTP channel, to any scheme
- *   `siteOf` refuses. An http(s) load it leaves to the next hook. A page's own load of a `blob:` or `data:`
+ *   `agentSiteOf` refuses. An http(s) load it leaves to the next hook. A page's own load of a `blob:` or `data:`
  *   address is the exception: it may be the download of a file the page
  *   made, which a content policy cannot tell from a page, so it goes ahead,
  *   and a page at such an address is never the agent's (`siteOfPrincipal`).

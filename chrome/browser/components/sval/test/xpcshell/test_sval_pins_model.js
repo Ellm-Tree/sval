@@ -15,11 +15,14 @@ const {
   pinsInFolder,
   scopeFor,
   showsIn,
-  siteOfPin,
   slotOf,
   slotsIn,
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPinsModel.sys.mjs"
+);
+
+const { siteOf } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalSite.sys.mjs"
 );
 
 const pin = (guid, scope = null) => ({
@@ -121,7 +124,7 @@ add_task(function a_folder_is_one_slot_holding_every_pin_in_it() {
 });
 
 add_task(function a_link_leaves_a_pin_for_another_site() {
-  const fastmail = siteOfPin("https://app.fastmail.com/mail/Inbox");
+  const fastmail = siteOf("https://app.fastmail.com/mail/Inbox");
   Assert.equal(fastmail, "fastmail.com", "a pin's site is its address's site");
   Assert.ok(!leavesPin("https://app.fastmail.com/mail/Sent", fastmail));
   Assert.ok(
@@ -136,7 +139,7 @@ add_task(function a_link_leaves_a_pin_for_another_site() {
   Assert.ok(!leavesPin("mailto:a@fastmail.com", fastmail), "no web page");
   Assert.ok(!leavesPin("not a url", fastmail));
   Assert.ok(
-    leavesPin("https://example.com/", siteOfPin("file:///tmp/page.html")),
+    leavesPin("https://example.com/", siteOf("file:///tmp/page.html")),
     "a pin with no site leaves for any web page"
   );
 });

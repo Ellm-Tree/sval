@@ -18,7 +18,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalExtensionSites:
     "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
-  scopeOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+  scopeOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   ScopeDropdown: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
   keepsLine: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
   scopeChoices: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",

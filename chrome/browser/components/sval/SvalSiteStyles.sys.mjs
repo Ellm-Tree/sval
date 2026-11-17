@@ -24,9 +24,8 @@ import { isSafeStyle } from "moz-src:///browser/components/sval/SvalPageRulesChi
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
-  mostSpecificRule:
-    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
-  scopeOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+  mostSpecificRule: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  scopeOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 export const STYLES_PREF = "browser.sval.siteStyles";
