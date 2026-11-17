@@ -115,14 +115,8 @@
      `toolbarbuttons.css` narrows it: the address pill reaches under its
      docked buttons by their exact width. */
   --toolbarbutton-padding-inner: 8px;
-  --toolbarbutton-outer-padding: 0px;
   --toolbarbutton-hover-background: var(--sval-wash);
   --toolbarbutton-active-background: var(--sval-wash-strong);
-  --urlbar-icon-border-radius: 999px;
-  /* The selected suggestion is a wash plus a bar, never a solid fill. */
-  --urlbarView-highlight-background: var(--sval-wash);
-  --urlbarView-highlight-color: inherit;
-  --arrowpanel-border-radius: 20px;
   --focus-outline-color: var(--sval-focus);
 }
 
@@ -1060,7 +1054,6 @@
 
 #urlbar {
   --urlbar-height: var(--sval-control-h);
-  --urlbar-toolbar-height: var(--sval-header-h);
   font-family: var(--sval-font);
 }
 

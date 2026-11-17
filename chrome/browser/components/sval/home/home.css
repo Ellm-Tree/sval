@@ -49,7 +49,6 @@
   --space-12: 48px;
   --page-gutter: 32px;
   --container-narrow: 760px;
-  --radius-icon: 22.5%;
   --radius-pill: 999px;
 
   --weight-regular: 400;
@@ -94,7 +93,6 @@
   --fav-panel-tile: 80px;
   --fav-panel-well: 48px;
   --fav-panel-icon: 24px;
-  --shadow-drag: 0 0 0 1px rgba(92, 242, 255, 0.35), 0 16px 40px rgba(3, 5, 26, 0.6);
   --glow-tile-hover: 0 0 24px rgba(31, 107, 255, 0.35);
   --focus-backing: var(--surface-glass);
   --surface-press: rgb(var(--sval-palette-wash-light) / 0.56);
@@ -117,7 +115,6 @@
   --surface-raised: #ffffff;
   --border-subtle: rgb(var(--sval-palette-wash-light) / 0.08);
   --border-default: rgb(var(--sval-palette-wash-light) / 0.14);
-  --shadow-drag: 0 0 0 1px rgba(31, 107, 255, 0.35), 0 16px 40px rgb(var(--sval-palette-wash-light) / 0.25);
   --glow-tile-hover: 0 0 0 transparent;
   --focus-backing: rgba(255, 255, 255, 0.55);
   --surface-press: var(--ink-100);

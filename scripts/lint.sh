@@ -51,6 +51,7 @@ python3 "$REPO_ROOT/scripts/check-comments-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-decisions-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-commit-msg-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-mask-icons-test.py" || checker_status=$?
+python3 "$REPO_ROOT/scripts/check-css-tokens-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-ui-labels-test.py" || checker_status=$?
 
 # The self-tests of any scripts/ci-*.py present.
@@ -165,6 +166,10 @@ fi
 # Sval's own eslint rules (tools/lint/eslint/eslint-plugin-sval) ran with the
 # rest above; this is their self-test, which needs the tree's eslint.
 ./mach node tools/lint/eslint/eslint-plugin-sval/tests/run.mjs || checker_status=$?
+# A custom property Sval's CSS sets for Firefox is one the tree's Firefox
+# reads (scripts/check-css-tokens.py says why).
+tokens_status=0
+python3 "$REPO_ROOT/scripts/check-css-tokens.py" || tokens_status=$?
 # Every control a docs page names, against Sval's strings and the tree's
 # Firefox strings.
 labels_status=0
@@ -189,6 +194,10 @@ fi
 if [[ "$prose_status" -ne 0 ]]; then
   echo "error: scripts/check-prose.sh found what docs/writing-style.md bans" >&2
   exit "$prose_status"
+fi
+if [[ "$tokens_status" -ne 0 ]]; then
+  echo "error: scripts/check-css-tokens.py found a custom property that nothing reads" >&2
+  exit "$tokens_status"
 fi
 if [[ "$mask_status" -ne 0 ]]; then
   echo "error: scripts/check-mask-icons.py found a mask on an icon it cannot draw" >&2

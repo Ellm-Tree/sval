@@ -393,8 +393,6 @@
 /* ---------------------------------------------------------------- popups */
 
 .sval-peek-popup {
-  --arrowpanel-border-radius: 14px;
-  --arrowpanel-padding: 6px;
   font-family: var(--sval-font);
 }
 

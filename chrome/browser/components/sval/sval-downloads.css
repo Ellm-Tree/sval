@@ -29,7 +29,6 @@
   --panel-border-color: var(--sval-dl-border);
   --panel-box-shadow: var(--sval-popup-shadow);
   --panel-border-radius: 20px;
-  --panel-color: var(--sval-dl-text);
 }
 
 #downloadsPanel-mainView {

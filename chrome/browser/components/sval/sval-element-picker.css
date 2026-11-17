@@ -67,7 +67,6 @@
   --dur-fast: 160ms;
   --ease-orbit: cubic-bezier(0.22, 0.8, 0.24, 1);
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --font: system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
 }
