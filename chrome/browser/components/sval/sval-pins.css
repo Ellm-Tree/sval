@@ -22,7 +22,7 @@
   --sval-pin-plate: rgb(var(--sval-palette-wash-dark) / 0.16);
   --sval-pin-border-strong: rgb(var(--sval-palette-wash-dark) / 0.34);
   --sval-pin-hairline: var(--sval-section-hairline);
-  --sval-pin-panel: var(--sidebar-background-color);
+  --sval-pin-panel: var(--sval-window-color);
   --sval-pin-dur: 200ms;
 }
 

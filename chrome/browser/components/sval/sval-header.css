@@ -82,11 +82,18 @@
     0 3px 8.25px 1px rgb(var(--sval-float-shade) / calc(var(--sval-float-far-alpha) * var(--sval-float-near-alpha)));
   --sval-wash: rgb(var(--sval-palette-wash-dark) / 0.1);
   --sval-wash-strong: rgb(var(--sval-palette-wash-dark) / 0.18);
+  /* The colour the window shows, opaque in every window. A see-through
+     window clears `--toolbar-background-color` and
+     `--sidebar-background-color`, the layers over its root, and sets this
+     to its tint (`sval-panel.css`, window tint). Whatever lies over the
+     page, or cuts a ring or a gap in the chrome's colour, paints with
+     this. */
+  --sval-window-color: var(--toolbar-background-color);
   /* The pressed look (header signals spec §1): a chip in the header's own
      ink with the glyph in the header's colour, so on against off is the
      ink's own contrast in every window, tinted ones included. */
   --sval-on-bg: var(--toolbar-text-color);
-  --sval-on-ink: var(--toolbar-background-color);
+  --sval-on-ink: var(--sval-window-color);
   --sval-on-hover: color-mix(in srgb, var(--sval-on-bg) 86%, var(--sval-on-ink));
   /* A camera, microphone or screen in use (`SvalSiteControls`). */
   --sval-live-bg: var(--sval-palette-neon);
@@ -196,7 +203,7 @@
    by the surface step (`sval-tokens.css`), on the side its scheme sets
    (`--sval-surface-dark`, `sval-panel.css`). */
   :root {
-    --sval-surface-ground: var(--toolbar-background-color);
+    --sval-surface-ground: var(--sval-window-color);
     --panel-background-color: var(--sval-surface);
     --sval-popup-bg: var(--sval-surface);
   }
@@ -530,7 +537,7 @@
       width: 8px;
       height: 8px;
       box-sizing: border-box;
-      border: 2px solid var(--toolbar-background-color);
+      border: 2px solid var(--sval-window-color);
       border-radius: 50%;
       background: var(--sval-dl-accent);
     }
@@ -2702,7 +2709,7 @@ button.sval-notice-row {
       outline: none;
       background:
         linear-gradient(var(--sval-pane-divider), var(--sval-pane-divider)) padding-box,
-        linear-gradient(var(--toolbar-background-color), var(--toolbar-background-color)) center / 6px 100% no-repeat border-box,
+        linear-gradient(var(--sval-window-color), var(--sval-window-color)) center / 6px 100% no-repeat border-box,
         linear-gradient(var(--sval-focus), var(--sval-focus)) center / 10px 100% no-repeat border-box;
     }
   }
@@ -2721,7 +2728,7 @@ split-view-footer {
   border: none;
   border-top: 1px solid var(--sval-pane-edge);
   border-radius: 0;
-  background: var(--toolbar-background-color);
+  background: var(--sval-window-color);
   font-size: 12px;
   fill: currentColor;
 
@@ -2835,7 +2842,7 @@ split-view-footer {
   --sval-status-r: 8px;
   --sval-status-h: 24px;
   --sval-status-edge: var(--sval-cluster-border);
-  --sval-status-bg: var(--toolbar-background-color);
+  --sval-status-bg: var(--sval-window-color);
   /* The width of the frame's line inside the panel's edges. */
   --sval-status-inset: 0px;
   /* The fillet's radius, to the inside of its ring. */
@@ -3003,7 +3010,7 @@ split-view-footer {
 .screenshotsPagePanel {
   --sval-shot-r: 8px;
   --sval-shot-edge: var(--sval-pane-edge-active);
-  --sval-shot-bg: var(--toolbar-background-color);
+  --sval-shot-bg: var(--sval-window-color);
   --sval-shot-ring-x: 0%;
 
   position: absolute;

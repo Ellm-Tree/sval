@@ -644,7 +644,7 @@
   border-radius: 50%;
   background: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
   color: light-dark(#ffffff, var(--sval-palette-ink-950));
-  box-shadow: 0 0 0 2px var(--sidebar-background-color);
+  box-shadow: 0 0 0 2px var(--sval-window-color);
 
   [data-isolated] > .sval-strip-tile > & {
     display: grid;
@@ -675,7 +675,7 @@
   border-radius: 999px;
   background: light-dark(var(--sval-palette-ink-700), var(--sval-palette-ink-200));
   color: light-dark(#ffffff, var(--sval-palette-ink-950));
-  box-shadow: 0 0 0 2px var(--sidebar-background-color);
+  box-shadow: 0 0 0 2px var(--sval-window-color);
   font: 600 9.5px/1 var(--sval-font);
   font-variant-numeric: tabular-nums;
 
@@ -710,7 +710,7 @@
   color: var(--sidebar-text-color);
   box-shadow:
     0 0 0 1px var(--sval-strip-frame),
-    0 0 0 2px var(--sidebar-background-color);
+    0 0 0 2px var(--sval-window-color);
 
   [data-media] > .sval-strip-tile > & {
     display: grid;
@@ -1154,7 +1154,7 @@ menupopup:not([sval-stem]) {
   .sval-row:is([aria-selected="true"], [data-sval-viewed]):not([data-sval-fill], [data-sval-nested]) {
     --sval-selected-step: 1;
     /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-    background: oklch(from var(--sidebar-background-color) calc(l + var(--sval-selected-step) * (-0.12 + 0.29 * var(--sval-surface-dark))) calc(c + 0.02) h);
+    background: oklch(from var(--sval-window-color) calc(l + var(--sval-selected-step) * (-0.12 + 0.29 * var(--sval-surface-dark))) calc(c + 0.02) h);
 
     &:hover {
       --sval-selected-step: 1.2;
@@ -1972,11 +1972,7 @@ menupopup:not([sval-stem]) {
     --toolbox-background-color-inactive: transparent;
     --toolbar-background-color: transparent;
     --sidebar-background-color: transparent;
-    --sval-on-ink: var(--sval-tint);
-    /* A pin's number and ring are cut in the panel's colour, which is clear
-       here: they take the colour the window shows. */
-    --sval-pin-panel: var(--sval-tint);
-    --sval-surface-ground: var(--sval-tint);
+    --sval-window-color: var(--sval-tint);
     /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
     background: var(--sval-tint-accent);
 
@@ -2633,8 +2629,7 @@ browser[sval-agent-layer] {
 /* A middle drop's mark: the row faded under the panel's colour, and its two
    halves, New group and the split. `_showDropMark` sets its box to the
    row's drop target.
-   The panel's colour is `--sval-pin-panel`, which holds the tint where a
-   see-through window clears `--sidebar-background-color`. */
+   The panel's colour is `--sval-window-color` (`sval-header.css`). */
 .sval-drop-mark {
   --sval-drop-c: var(--color-accent-primary);
   position: absolute;
@@ -2643,7 +2638,7 @@ browser[sval-agent-layer] {
   gap: 6px;
   padding: 4px;
   border-radius: var(--border-radius-medium);
-  background: color-mix(in srgb, var(--sval-pin-panel) 85%, transparent);
+  background: color-mix(in srgb, var(--sval-window-color) 85%, transparent);
   pointer-events: none;
 }
 
@@ -2764,7 +2759,8 @@ browser[sval-agent-layer] {
   translate: 0 -50%;
   border: var(--focus-outline-width) solid var(--color-accent-primary);
   border-radius: var(--border-radius-circle);
-  background: var(--sidebar-background-color);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  background: var(--sval-window-color);
 }
 
 .sval-drop-line[hidden] {
@@ -3040,7 +3036,7 @@ browser[sval-agent-layer] {
   --sval-sync-warning-mark: #241600;
   --sval-sync-error: #ff6b70;
   --sval-sync-error-mark: #2a0008;
-  --sval-sync-ring: var(--sidebar-background-color);
+  --sval-sync-ring: var(--sval-window-color);
   flex: 1;
   min-width: 0;
   display: flex;

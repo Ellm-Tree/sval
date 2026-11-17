@@ -276,6 +276,46 @@ add_task(async function an_alt_click_shows_the_link_over_the_tab() {
 });
 
 /**
+ * A Quick Peek's card lies over the page, so in a coloured window it wears
+ * the colour the window shows, opaque, where a see-through window's toolbar
+ * is clear over its root (`sval-panel.css`, window tint).
+ */
+add_task(async function the_card_is_opaque_in_a_coloured_window() {
+  const { SvalColor } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalColor.sys.mjs"
+  );
+  const shown = SvalPanel._tintArgs ?? [null];
+  registerCleanupFunction(() => SvalPanel._applyWindowTint(...shown));
+
+  const { tab } = await openLinks();
+  const quickPeek = await quickPeekAt(tab.linkedBrowser);
+  // The panel draws the window's look again as tabs come and go, so the
+  // colour goes on once the Quick Peek is up.
+  SvalPanel._applyWindowTint("purple", 0.4);
+  const probe = document.createElement("div");
+  probe.style.backgroundColor = SvalColor.css(
+    SvalPanel.windowLookOf("purple", 0.4).tint
+  );
+  document.documentElement.append(probe);
+  const tint = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  Assert.equal(
+    getComputedStyle(cardOf(quickPeek)).backgroundColor,
+    tint,
+    "the card is the colour the window shows"
+  );
+  Assert.equal(
+    InspectorUtils.colorToRGBA(tint).a,
+    1,
+    "which lets nothing through"
+  );
+
+  buttonOf(quickPeek, "close").click();
+  await untilClosed(quickPeek, "the Quick Peek closing");
+  SvalPanel._applyWindowTint(...shown);
+});
+
+/**
  * The Quick Peek's bar draws the loading line for its own page, whichever
  * tab the window shows under it.
  */
