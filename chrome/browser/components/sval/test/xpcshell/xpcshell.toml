@@ -279,6 +279,8 @@ head = "panel_model_head.js"
 ["test_sval_restore.js"]
 head = "tabs_head.js"
 
+["test_sval_scope.js"]
+
 ["test_sval_secret_store.js"]
 
 ["test_sval_secure_dns.js"]

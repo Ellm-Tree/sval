@@ -46,6 +46,7 @@
       "moz-src:///browser/components/sval/SvalWebDriver.sys.mjs",
     SvalPrivateJars:
       "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
+    SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     PAGE_RULES_PREF: "moz-src:///browser/components/sval/SvalPageRules.sys.mjs",
     BREACH_WARNINGS_PREF:
@@ -200,18 +201,11 @@
 
     init() {
       const byId = id => document.getElementById(id);
-      // Each observer is removed as the page goes, by the remover its line
-      // adds, so none outlives the document it writes into.
-      const removers = [];
-      const followPref = (name, observe) => {
-        Services.prefs.addObserver(name, observe);
-        removers.push(() => Services.prefs.removeObserver(name, observe));
-      };
-      const followTopic = (topic, observe) => {
-        const observer = { observe };
-        Services.obs.addObserver(observer, topic);
-        removers.push(() => Services.obs.removeObserver(observer, topic));
-      };
+      // Ended as the page goes, so no observer outlives the document it
+      // writes into.
+      const lifetime = new lazy.SvalScope();
+      const followPref = (name, observe) => lifetime.pref(name, observe);
+      const followTopic = (topic, observe) => lifetime.topic(topic, observe);
 
       this._els = {
         heading: byId("sval-settings-heading"),
@@ -248,9 +242,7 @@
         this._claims.stop();
         this._stopCountdown();
         this._unwatchPrivacyPass?.();
-        for (const remove of removers) {
-          remove();
-        }
+        lifetime.end();
       });
 
       this._describeAll();

@@ -30,6 +30,7 @@ import {
 } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { SvalLoadLine } from "moz-src:///browser/components/sval/SvalLoadLine.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { tidySeparators } from "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs";
 import {
   MODE_NAMES,
@@ -2189,22 +2190,14 @@ export const SvalHeader = {
       ]),
     };
     gBrowser.addProgressListener(listener);
-    Services.prefs.addObserver(DISPLAY_PREF, showLabel);
+    const lifetime = SvalScope.forWindow(win);
+    lifetime.add(() => resized.disconnect());
+    lifetime.add(() => gBrowser.removeProgressListener(listener));
+    lifetime.pref(DISPLAY_PREF, showLabel);
     // The rules as the policy holds them, which it does only once
     // `SvalJavascript` has applied the branch.
-    Services.obs.addObserver(update, APPLIED_TOPIC);
-    Services.prefs.addObserver(ENABLED_PREF, update);
-    win.addEventListener(
-      "unload",
-      () => {
-        resized.disconnect();
-        Services.prefs.removeObserver(DISPLAY_PREF, showLabel);
-        Services.obs.removeObserver(update, APPLIED_TOPIC);
-        Services.prefs.removeObserver(ENABLED_PREF, update);
-        gBrowser.removeProgressListener(listener);
-      },
-      { once: true }
-    );
+    lifetime.topic(APPLIED_TOPIC, update);
+    lifetime.pref(ENABLED_PREF, update);
     update();
   },
 };

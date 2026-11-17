@@ -20,6 +20,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { scopeForURI } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import {
   ScopeDropdown,
@@ -1049,20 +1050,13 @@ export class ProtectionButton {
     win.gBrowser.tabContainer.addEventListener("TabSelect", onSelect);
     // The choices as Gecko's stores hold them, which they do only once
     // `SvalSiteProtections` has applied the branch.
-    Services.obs.addObserver(onSelect, APPLIED_TOPIC);
-    Services.prefs.addObserver(BREACH_WARNINGS_PREF, onSelect);
-    const onEmbed = context => this.askToAllowEmbeds(context);
-    Services.obs.addObserver(onEmbed, EMBED_CLICKED_TOPIC);
-    win.addEventListener(
-      "unload",
-      () => {
-        win.gBrowser.removeTabsProgressListener(progress);
-        classifier.removeListener(blocked);
-        Services.obs.removeObserver(onSelect, APPLIED_TOPIC);
-        Services.obs.removeObserver(onEmbed, EMBED_CLICKED_TOPIC);
-        Services.prefs.removeObserver(BREACH_WARNINGS_PREF, onSelect);
-      },
-      { once: true }
+    const lifetime = SvalScope.forWindow(win);
+    lifetime.add(() => win.gBrowser.removeTabsProgressListener(progress));
+    lifetime.add(() => classifier.removeListener(blocked));
+    lifetime.topic(APPLIED_TOPIC, onSelect);
+    lifetime.pref(BREACH_WARNINGS_PREF, onSelect);
+    lifetime.topic(EMBED_CLICKED_TOPIC, context =>
+      this.askToAllowEmbeds(context)
     );
     this.update();
     return true;

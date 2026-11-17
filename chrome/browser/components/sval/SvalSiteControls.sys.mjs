@@ -52,6 +52,7 @@ import {
   SvalFirefox,
 } from "moz-src:///browser/components/sval/SvalFirefox.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import {
   MODE_KEYS,
   MODE_NAMES,
@@ -919,36 +920,20 @@ class SiteControls {
         this.drawPins();
       }
     };
-    Services.obs.addObserver(update, APPLIED_TOPIC);
-    Services.obs.addObserver(onPermission, "perm-changed");
-    Services.obs.addObserver(update, "browser-perm-changed");
-    Services.obs.addObserver(onDeviceBlocked, WEBRTC_BLOCKED_TOPIC);
-    Services.obs.addObserver(onRefused, PERMISSION_REFUSED_TOPIC);
-    Services.obs.addObserver(update, BLOCKING_TOPIC);
-    Services.obs.addObserver(onMode, MODE_TOPIC);
-    Services.obs.addObserver(onSnips, SNIPS_TOPIC);
-    Services.prefs.addObserver(MEDIA_DEFAULT_PREF, update);
-    Services.prefs.addObserver(PINS_PREF, update);
-    Services.prefs.addObserver(STYLES_PREF, update);
-    win.addEventListener(
-      "unload",
-      () => {
-        win.gBrowser.removeTabsProgressListener(progress);
-        geoSharing.disconnect();
-        Services.obs.removeObserver(update, APPLIED_TOPIC);
-        Services.obs.removeObserver(onPermission, "perm-changed");
-        Services.obs.removeObserver(update, "browser-perm-changed");
-        Services.obs.removeObserver(onDeviceBlocked, WEBRTC_BLOCKED_TOPIC);
-        Services.obs.removeObserver(onRefused, PERMISSION_REFUSED_TOPIC);
-        Services.obs.removeObserver(update, BLOCKING_TOPIC);
-        Services.obs.removeObserver(onMode, MODE_TOPIC);
-        Services.obs.removeObserver(onSnips, SNIPS_TOPIC);
-        Services.prefs.removeObserver(MEDIA_DEFAULT_PREF, update);
-        Services.prefs.removeObserver(PINS_PREF, update);
-        Services.prefs.removeObserver(STYLES_PREF, update);
-      },
-      { once: true }
-    );
+    const lifetime = SvalScope.forWindow(win);
+    lifetime.add(() => win.gBrowser.removeTabsProgressListener(progress));
+    lifetime.add(() => geoSharing.disconnect());
+    lifetime.topic(APPLIED_TOPIC, update);
+    lifetime.topic("perm-changed", onPermission);
+    lifetime.topic("browser-perm-changed", update);
+    lifetime.topic(WEBRTC_BLOCKED_TOPIC, onDeviceBlocked);
+    lifetime.topic(PERMISSION_REFUSED_TOPIC, onRefused);
+    lifetime.topic(BLOCKING_TOPIC, update);
+    lifetime.topic(MODE_TOPIC, onMode);
+    lifetime.topic(SNIPS_TOPIC, onSnips);
+    lifetime.pref(MEDIA_DEFAULT_PREF, update);
+    lifetime.pref(PINS_PREF, update);
+    lifetime.pref(STYLES_PREF, update);
     this.update();
   }
 
