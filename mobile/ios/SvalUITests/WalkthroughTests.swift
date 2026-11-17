@@ -454,6 +454,47 @@ final class WalkthroughTests: XCTestCase {
         shot("grid-edit")
     }
 
+    /// A card dragged out of its group in the grid: held at the side of a
+    /// card outside the group, it lands beside that card; let go in a
+    /// group's box off its cards, at the group's end; and let go below
+    /// every card, at the Workspace's end.
+    func testGridDragOutOfGroup() {
+        waitForBar()
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch.tap()
+        sleep(2)
+        app.buttons["Workspace options"].firstMatch.tap()
+        sleep(1)
+        app.buttons["Grid"].firstMatch.tap()
+        sleep(2)
+        app.buttons["Work"].firstMatch.tap()
+        sleep(2)
+        startEditing()
+        sleep(1)
+        let card = { (name: String) in
+            self.app.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        }
+        shot("grid-drag-before")
+        let swift = card("Swift")
+        drag(card("Wikipedia"), to: swift.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.4)), marked: "grid-out")
+        shot("grid-drag-after")
+        XCTAssertEqual(card("Wikipedia").frame.midY, card("Swift").frame.midY, accuracy: 4,
+                       "the card left its group for Swift's row")
+        // Let go in the group's box beside its last card: Swift joins the
+        // group, at its end.
+        let besideApple = card("Apple").coordinate(withNormalizedOffset: CGVector(dx: 1.5, dy: 0.5))
+        drag(card("Swift"), to: besideApple, marked: "grid-group-end")
+        shot("grid-drag-group-end")
+        XCTAssertEqual(card("Swift").frame.midY, card("Apple").frame.midY, accuracy: 4, "Swift joined the group")
+        XCTAssertGreaterThan(card("Swift").frame.midX, card("Apple").frame.midX, "after its last card")
+        // Let go below every card: the group's card leaves it for the
+        // Workspace's end.
+        let below = card("Wikipedia").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: 60))
+        drag(card("Apple"), to: below, marked: "grid-tail")
+        shot("grid-drag-tail")
+        XCTAssertGreaterThan(card("Apple").frame.midX, card("Wikipedia").frame.midX, "the card landed after Wikipedia")
+        XCTAssertEqual(card("Apple").frame.midY, card("Wikipedia").frame.midY, accuracy: 4, "in the Workspace's row")
+    }
+
     /// Setup's pairing code: one field that groups the code in fours as
     /// it's typed or pasted.
     func testPairingCode() {

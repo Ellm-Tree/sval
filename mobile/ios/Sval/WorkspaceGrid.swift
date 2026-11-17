@@ -54,8 +54,8 @@ enum GridMetrics {
     static let boxTop: CGFloat = 2
     static let boxBottom: CGFloat = 10
     /// The part of a card's picture at each side that drops before or
-    /// after it; the rest is the middle (15f2).
-    static let side: CGFloat = 24
+    /// after it, a third of its width; the rest is the middle (15f2).
+    static func side(_ width: CGFloat) -> CGFloat { width / 3 }
 
     /// A card's picture height at `depth` groups in: 140, 132, 124, and on
     /// in 8pt steps, or 104, 96, 90 sideways, where the page is wide.
@@ -205,6 +205,8 @@ struct GridSection {
     /// Workspace.
     let container: String
     let depth: Int
+    /// The groups it is in, outermost first.
+    let groups: [String]
     /// The group whose header this section starts with.
     let header: OutlineRow?
     var items: [String]
@@ -260,7 +262,10 @@ struct TabGridView: UIViewRepresentable {
         /// The card side the finger rests on, and since when.
         private var edge: (key: String, since: Date)?
         /// How long a finger rests on a card's side before the gap opens.
-        static let edgeRest: TimeInterval = 0.35
+        static let edgeRest: TimeInterval = 0.15
+        /// Where the card lands with the finger off every card: the end
+        /// of the group or Workspace around the finger.
+        private var placed: (DropOver, DropKind)?
 
         func make(_ parent: TabGridView) -> UICollectionView {
             self.parent = parent
@@ -335,7 +340,7 @@ struct TabGridView: UIViewRepresentable {
             var index = 0
             func section(_ items: [String]) -> GridSection {
                 defer { index += 1 }
-                return GridSection(id: "\(parentId)#\(index)", container: parentId, depth: depth,
+                return GridSection(id: "\(parentId)#\(index)", container: parentId, depth: depth, groups: chain.map(\.id),
                                    header: index == 0 ? header : nil, items: items,
                                    layers: chain.map { GridLayer(tint: $0.color, top: false, bottom: false) })
             }
@@ -540,7 +545,8 @@ struct TabGridView: UIViewRepresentable {
                             withDestinationIndexPath path: IndexPath?) -> UICollectionViewDropProposal {
             guard let id = dragged(session) else { return UICollectionViewDropProposal(operation: .cancel) }
             let point = session.location(in: view)
-            if let over = view.indexPathForItem(at: point), let overId = dataSource.itemIdentifier(for: over), overId != id,
+            let overPath = view.indexPathForItem(at: point)
+            if let over = overPath, let overId = dataSource.itemIdentifier(for: over), overId != id,
                let cell = view.cellForItem(at: over) {
                 if let hover = middle(of: overId, cell: cell, at: point, in: view, dragged: id) {
                     edge = nil
@@ -562,6 +568,8 @@ struct TabGridView: UIViewRepresentable {
                 edge = nil
             }
             if parent.dropState.hover != nil { parent.dropState.hover = nil }
+            placed = overPath == nil ? empty(at: point, in: view, dragged: id) : nil
+            if placed != nil { return UICollectionViewDropProposal(operation: .move, intent: .unspecified) }
             guard let path else { return UICollectionViewDropProposal(operation: .forbidden) }
             if dataSource.itemIdentifier(for: path) == id, lastLanding != nil {
                 return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
@@ -582,13 +590,23 @@ struct TabGridView: UIViewRepresentable {
             parent.dropState.hover = nil
             lastLanding = nil
             edge = nil
+            placed = nil
         }
 
         func collectionView(_ view: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
             defer { parent.dropState.hover = nil }
+            let model = parent.model
+            if let (over, kind) = placed, let id = dragged(coordinator.session),
+               let plan = model.dropPlan(id, over: over, kind) {
+                Diagnostics.log("sheet: dropped in the grid off the cards, \(kind)")
+                if let item = coordinator.items.first, let path = moveAhead(id, over: over, kind) {
+                    coordinator.drop(item.dragItem, toItemAt: path)
+                }
+                parent.actions.drop(plan)
+                return
+            }
             guard let id = dragged(coordinator.session), let item = coordinator.items.first,
                   let path = coordinator.destinationIndexPath else { return }
-            let model = parent.model
             if coordinator.proposal.intent == .unspecified { return }
             if coordinator.proposal.intent == .insertIntoDestinationIndexPath {
                 guard let hover = parent.dropState.hover, let plan = model.dropPlan(id, over: hover.over, hover.kind),
@@ -602,8 +620,52 @@ struct TabGridView: UIViewRepresentable {
             guard let (over, kind) = held ?? landing(at: path, dragged: id),
                   let plan = model.dropPlan(id, over: over, kind) else { return }
             Diagnostics.log("sheet: dropped in the grid, \(kind)")
-            coordinator.drop(item.dragItem, toItemAt: path)
+            coordinator.drop(item.dragItem, toItemAt: moveAhead(id, over: over, kind) ?? path)
             parent.actions.drop(plan)
+        }
+
+        /// Moves the dropped card to where it lands in the grid at once, and
+        /// gives its place. The tree's edit is written after, and the grid
+        /// drawn from it then matches: without the move, the system puts
+        /// the card back until that edit arrives. Nil where the landing
+        /// opens a section the grid doesn't have yet.
+        private func moveAhead(_ id: String, over: DropOver, _ kind: DropKind) -> IndexPath? {
+            var snapshot = dataSource.snapshot()
+            let items = Set(snapshot.itemIdentifiers)
+            guard items.contains(id) else { return nil }
+            /// The last section `container` holds directly.
+            func lastSection(of container: String) -> String? {
+                sections.last { $0.container == container }?.id
+            }
+            switch kind {
+            case .before where items.contains(over.id) && over.id != id:
+                snapshot.moveItem(id, beforeItem: over.id)
+            case .after where items.contains(over.id) && over.id != id:
+                snapshot.moveItem(id, afterItem: over.id)
+            case .after:
+                // After a group: the start of the section that follows the
+                // group's own, in the group's parent.
+                guard let last = sections.lastIndex(where: { $0.groups.contains(over.id) }),
+                      let parentId = parent.model.row(over.id)?.parentId,
+                      last + 1 < sections.count, sections[last + 1].container == parentId else { return nil }
+                if let first = sections[last + 1].items.first(where: { $0 != id }) {
+                    snapshot.moveItem(id, beforeItem: first)
+                } else {
+                    snapshot.deleteItems([id])
+                    snapshot.appendItems([id], toSection: sections[last + 1].id)
+                }
+            case .into, .end:
+                guard let section = lastSection(of: over.id) else { return nil }
+                snapshot.deleteItems([id])
+                snapshot.appendItems([id], toSection: section)
+            default:
+                return nil
+            }
+            for index in sections.indices {
+                sections[index].items = snapshot.itemIdentifiers(inSection: sections[index].id)
+            }
+            dataSource.apply(snapshot, animatingDifferences: true)
+            return dataSource.indexPath(for: id)
         }
 
         private func dragged(_ session: UIDropSession) -> String? {
@@ -620,11 +682,12 @@ struct TabGridView: UIViewRepresentable {
             let width = cell.bounds.width - 2 * ring
             let picture = cell.bounds.height - 35 - 2 * ring
             let x = local.x - ring, y = local.y - ring
-            guard y >= 0, y < picture, x >= GridMetrics.side, x <= width - GridMetrics.side else { return nil }
+            let side = GridMetrics.side(width)
+            guard y >= 0, y < picture, x >= side, x <= width - side else { return nil }
             let model = parent.model
             let over = DropOver(id: id, kind: row.kind, expanded: false)
-            let span = width - 2 * GridMetrics.side
-            let kind = model.dropIntent(dragged, over: over, x: x - GridMetrics.side, y: picture / 2, w: span, h: picture)
+            let span = width - 2 * side
+            let kind = model.dropIntent(dragged, over: over, x: x - side, y: picture / 2, w: span, h: picture)
             guard [DropKind.newGroup, .split, .join, .merge, .refused(full: true)].contains(kind) else { return nil }
             let split = model.dropIntent(dragged, over: over, x: span - 1, y: picture / 2, w: span, h: picture)
             var hover = GridHover(id: id, over: over, kind: kind, writes: model.dropPlan(dragged, over: over, kind) != nil)
@@ -632,6 +695,76 @@ struct TabGridView: UIViewRepresentable {
                                       group: model.dropPlan(dragged, over: over, .newGroup) != nil, split: split,
                                       splits: model.dropPlan(dragged, over: over, split) != nil)
             return hover
+        }
+
+        /// Whether `point` is below the last card.
+        private func below(_ point: CGPoint, in view: UICollectionView) -> Bool {
+            guard let section = sections.indices.last(where: { !sections[$0].items.isEmpty }),
+                  let last = view.layoutAttributesForItem(
+                      at: IndexPath(item: sections[section].items.count - 1, section: section))
+            else { return false }
+            return point.y > last.frame.maxY
+        }
+
+        /// Where a card lands let go off every card: below them all, at
+        /// the Workspace's end; in a group's box, after the last card of
+        /// the row of cards the finger is beside, or at the group's end;
+        /// and the same outside every box, in the Workspace.
+        private func empty(at point: CGPoint, in view: UICollectionView, dragged id: String) -> (DropOver, DropKind)? {
+            let model = parent.model
+            func row(_ id: String) -> DropOver {
+                DropOver(id: id, kind: model.row(id)?.kind ?? "tab", expanded: false)
+            }
+            func valid(_ landing: (DropOver, DropKind)) -> (DropOver, DropKind)? {
+                model.dropPlan(id, over: landing.0, landing.1) == nil ? nil : landing
+            }
+            func end(of container: String) -> (DropOver, DropKind)? {
+                if let last = model.children(of: container).last(where: { $0.id != id }) {
+                    return valid((row(last.id), .after))
+                }
+                return container == parent.workspace
+                    ? valid((DropOver(id: container, kind: "workspace", expanded: true), .end))
+                    : valid((DropOver(id: container, kind: "group", expanded: false), .into))
+            }
+            if below(point, in: view) { return end(of: parent.workspace) }
+            guard let index = section(at: point.y, in: view) else { return nil }
+            let section = sections[index]
+            // The innermost box around the finger; each level's box is
+            // inset a step further.
+            var level = -1
+            for i in section.groups.indices {
+                let inset = GridMetrics.edge + CGFloat(i) * GridMetrics.nest
+                guard point.x >= inset, point.x <= view.bounds.width - inset else { break }
+                level = i
+            }
+            let container = level < 0 ? parent.workspace : section.groups[level]
+            if container == section.container, let last = section.items.last(where: { $0 != id }) {
+                return valid((row(last), .after))
+            }
+            // Beside a group inside the container: after that group.
+            if level + 1 < section.groups.count {
+                return valid((row(section.groups[level + 1]), .after))
+            }
+            return end(of: container)
+        }
+
+        /// The section whose rows run past `y`: the last one starting at or
+        /// above it.
+        private func section(at y: CGFloat, in view: UICollectionView) -> Int? {
+            var found: Int?
+            for index in sections.indices {
+                let top: CGFloat?
+                if sections[index].header != nil {
+                    top = view.layoutAttributesForSupplementaryElement(
+                        ofKind: UICollectionView.elementKindSectionHeader, at: IndexPath(item: 0, section: index))?.frame.minY
+                } else if !sections[index].items.isEmpty {
+                    top = view.layoutAttributesForItem(at: IndexPath(item: 0, section: index))?.frame.minY
+                } else {
+                    top = nil
+                }
+                if let top, top <= y { found = index }
+            }
+            return found
         }
 
         /// Where a card lands at the system's gap: before the card that

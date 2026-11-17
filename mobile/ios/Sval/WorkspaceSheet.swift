@@ -164,15 +164,17 @@ struct WorkspaceSheet: View {
             }
         }
         .confirmationDialog(
-            deletingGroup.map { "Delete the “\(name($0))” group?" } ?? "",
+            deletingGroup.map { "Delete “\(name($0))”?" } ?? "",
             isPresented: Binding(get: { deletingGroup != nil }, set: { if !$0 { deletingGroup = nil } }),
             titleVisibility: .visible, presenting: deletingGroup
         ) { group in
-            Button("Move Out of Group") { Task { await model.deleteGroup(group, keepingContents: true) } }
-            Button("Delete All", role: .destructive) { Task { await model.deleteGroup(group, keepingContents: false) } }
+            let inside = model.tree.inside(group.id)
+            let text = Self.deleteGroupText(tabs: inside.tabs, groups: inside.groups)
+            Button(text.keep) { Task { await model.deleteGroup(group, keepingContents: true) } }
+            Button(text.delete, role: .destructive) { Task { await model.deleteGroup(group, keepingContents: false) } }
         } message: { group in
-            Text(model.contents(of: group).map { "The \($0) inside it can move out of the group, or be deleted with it." }
-                 ?? "The group is empty.")
+            let inside = model.tree.inside(group.id)
+            Text(Self.deleteGroupText(tabs: inside.tabs, groups: inside.groups).message)
         }
     }
 
@@ -1142,6 +1144,40 @@ struct WorkspaceSheet: View {
         UserDefaults.standard.set(Array(collapsed.filter { !model.isPrivate($0) }), forKey: Self.collapsedKey)
     }
 
+    /// Delete Group: an empty group goes at once, with Undo, as on the
+    /// desktop; a group with something in it asks what becomes of that.
+    func deleteGroup(_ row: OutlineRow) {
+        let inside = model.tree.inside(row.id)
+        guard inside.tabs == 0, inside.groups == 0 else {
+            deletingGroup = row
+            return
+        }
+        let place = model.place(of: row)
+        Task {
+            await model.deleteGroup(row, keepingContents: false)
+            toast = Toast(text: "Deleted the “\(name(row))” group") {
+                guard let place else { return }
+                Task { await model.reopenGroup(row, at: place) }
+            }
+        }
+    }
+
+    /// What Delete Group's question says for a group holding `tabs` tabs
+    /// and `groups` groups, at any depth, and its two buttons.
+    static func deleteGroupText(tabs: Int, groups: Int) -> (message: String, keep: String, delete: String) {
+        func count(_ n: Int, _ noun: String) -> String { n == 1 ? "the \(noun)" : "the \(n) \(noun)s" }
+        if groups == 0 {
+            let noun = tabs == 1 ? "Tab" : "Tabs"
+            return ("Keep or close \(count(tabs, "tab")) inside.", "Keep \(noun)", "Close \(noun)")
+        }
+        if tabs == 0 {
+            let noun = groups == 1 ? "Group" : "Groups"
+            return ("Keep or delete \(count(groups, "group")) inside.", "Keep \(noun)", "Delete \(noun)")
+        }
+        let tabsText = tabs == 1 ? "1 tab" : "\(tabs) tabs", groupsText = groups == 1 ? "1 group" : "\(groups) groups"
+        return ("Keep or delete the \(tabsText) and \(groupsText) inside.", "Keep All", "Delete All")
+    }
+
     /// A group's long-press menu, in the list and the grid.
     func groupMenu(_ row: OutlineRow) -> [[MenuItem]] {
         let edit = row.kind == "group"
@@ -1150,7 +1186,7 @@ struct WorkspaceSheet: View {
         return [[edit, MenuItem(title: "Move to…", symbol: "folder") { moving = row }],
                 orderItems(row),
                 row.kind == "group"
-                    ? [MenuItem(title: "Delete Group…", symbol: "trash", destructive: true) { deletingGroup = row }] : []]
+                    ? [MenuItem(title: "Delete Group…", symbol: "trash", destructive: true) { deleteGroup(row) }] : []]
     }
 
     /// A group's emoji, or its folder in its colour's ink: the block

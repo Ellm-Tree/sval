@@ -1471,6 +1471,24 @@ final class AppModel {
         await edit(["kind": keepingContents ? "removeKeepingChildren" : "remove", "id": row.id])
     }
 
+    /// Makes deleted empty group `row` again where it was, under its own
+    /// id, with its name and look: Undo of deleting it, which asks nothing.
+    func reopenGroup(_ row: OutlineRow, at place: Place) async {
+        guard self.row(place.parent) != nil else { return }
+        var ops: [[String: Any]] = [["kind": "addGroup", "parent": place.parent, "name": row.name, "id": row.id]]
+        if row.emoji != nil || row.color != nil {
+            var look: [String: Any] = ["kind": "setAppearance", "id": row.id]
+            look["emoji"] = row.emoji
+            look["color"] = Self.appearanceColor(row.color)
+            ops.append(look)
+        }
+        var move: [String: Any] = ["kind": "moveNode", "id": row.id, "newParent": place.parent]
+        move["before"] = sibling(place.previous, in: place.parent)
+        move["after"] = sibling(place.next, in: place.parent)
+        ops.append(move)
+        await edit(ops)
+    }
+
     /// Deletes a workspace and everything in it (decision 0077), and shows
     /// the next Workspace in the order.
     func deleteWorkspace(_ id: String) async {
