@@ -46,7 +46,9 @@ entries() {
 with_default() {
   local name="${1%%=*}" value="${1#*=}" default
   if [[ "$value" == *@default@* ]]; then
-    default="$(sed -n "s/^pref(\"${name//./\\.}\", \"\(.*\)\");.*/\1/p" "$PREFS")"
+    # A pref() call may wrap its name and value onto lines of their own.
+    default="$(tr '\n' ' ' < "$PREFS" |
+      sed -n "s/.*pref( *\"${name//./\\.}\", *\"\([^\"]*\)\" *);.*/\1/p")"
     [[ -n "$default" ]] || { echo "error: no default for $name in $PREFS" >&2; exit 1; }
     value="${value//@default@/$default}"
   fi

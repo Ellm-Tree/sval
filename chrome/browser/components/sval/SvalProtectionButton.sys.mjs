@@ -1781,6 +1781,14 @@ export class ProtectionButton {
       id._getHttpsOnlyPermission() > 0
     ) {
       body.append(this.httpsOnlySwitch());
+      const host = this.httpPrincipal().host;
+      if (
+        !state.isPrivate &&
+        id._getHttpsOnlyPermission() === 2 &&
+        SvalSiteProtections.canChooseFor(host)
+      ) {
+        body.append(this.httpsOnlyAlways(host));
+      }
     }
     if (kind === "exception") {
       const remove = htmlElement(
@@ -1845,13 +1853,63 @@ export class ProtectionButton {
    * HTTPS-Only Mode. Turning it on removes the exception and reloads, as
    * Firefox's site panel does (`gIdentityHandler.changeHttpsOnlyPermission`).
    */
+  /**
+   * @returns {nsIPrincipal} The http origin of the tab's page, which holds
+   *   HTTPS-Only Mode's exception: HTTPS-Only checks it before it upgrades a
+   *   load.
+   */
+  httpPrincipal() {
+    const { gBrowser } = this.win;
+    let uri = gBrowser.currentURI;
+    if (uri instanceof Ci.nsINestedURI) {
+      uri = uri.QueryInterface(Ci.nsINestedURI).innermostURI;
+    }
+    return Services.scriptSecurityManager.createContentPrincipal(
+      uri.mutate().setScheme("http").finalize(),
+      gBrowser.contentPrincipal.originAttributes
+    );
+  }
+
+  /**
+   * Turns the exception the warning page made until quit into one saved for
+   * the host on every device (`SvalSiteProtections.setInsecure`).
+   *
+   * @param {string} host
+   * @returns {Element}
+   */
+  httpsOnlyAlways(host) {
+    const always = htmlElement(
+      this.doc,
+      "button",
+      {
+        type: "button",
+        className: "sval-prot-pill sval-prot-secondary",
+        id: "sval-prot-https-only-always",
+      },
+      "Always open this site without a warning"
+    );
+    always.addEventListener("click", () => {
+      SvalSiteProtections.setInsecure(host, true);
+      this.close();
+    });
+    return htmlElement(
+      this.doc,
+      "div",
+      { className: "sval-prot-remove-row" },
+      always
+    );
+  }
+
   httpsOnlySwitch() {
     const { doc, win } = this;
+    const saved = SvalSiteProtections.insecureFor(this.httpPrincipal().host);
     const line = htmlElement(
       doc,
       "span",
       { className: "sval-prot-sub" },
-      "Off because you made an exception. Turn on to try HTTPS first. Reloads the tab."
+      saved
+        ? "Off for this site on every device. Turn on to see the warning again. Reloads the tab."
+        : "Off because you made an exception. Turn on to try HTTPS first. Reloads the tab."
     );
     const toggle = htmlElement(doc, "button", {
       type: "button",
@@ -1865,17 +1923,10 @@ export class ProtectionButton {
     });
     toggle.ariaDescribedByElements = [line];
     toggle.addEventListener("click", () => {
-      const { gBrowser } = win;
-      let uri = gBrowser.currentURI;
-      if (uri instanceof Ci.nsINestedURI) {
-        uri = uri.QueryInterface(Ci.nsINestedURI).innermostURI;
+      const principal = this.httpPrincipal();
+      if (saved) {
+        SvalSiteProtections.setInsecure(principal.host, false);
       }
-      // The exception is kept on the http address, which is the one
-      // HTTPS-Only checks before it upgrades a load.
-      const principal = Services.scriptSecurityManager.createContentPrincipal(
-        uri.mutate().setScheme("http").finalize(),
-        gBrowser.contentPrincipal.originAttributes
-      );
       lazy.SitePermissions.removeFromPrincipal(
         principal,
         HTTPS_ONLY_PERMISSION

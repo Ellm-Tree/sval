@@ -55,6 +55,11 @@
  *   host's resolved fields, since Gecko takes the entry of the page's host,
  *   or the nearest name above it, before its site's (Sval's
  *   `fp-overrides-host-scope` patch).
+ * - `insecure: true` is HTTPS-Only Mode's exception, the
+ *   `https-only-load-insecure` permission at `LOAD_INSECURE_ALLOW`, on the
+ *   name's own http origin alone. Gecko matches it to the exact origin
+ *   (`nsHTTPSOnlyUtils::TestIfPrincipalIsExempt`), so the field covers no
+ *   host below its name, and a host's field never comes from its site.
  * - `media: "ask" | "allow" | "block"` is the `autoplay-media` permission
  *   Gecko's media gate reads: Firefox's own per-site states,
  *   `AUTOPLAY_BLOCKED_ALL`, `ALLOW` and `DENY` (`mediaAction`). A site with
@@ -158,6 +163,9 @@ export const OVERRIDE_PREFS = Object.freeze([
   "browser.sval.protection.fingerprintingOverrides",
   BASELINE_OVERRIDE_PREF,
 ]);
+
+/** HTTPS-Only Mode's exception for an origin. */
+export const HTTPS_ONLY_PERMISSION = "https-only-load-insecure";
 
 /** The content-blocking allow list's permission type, and a private window's. */
 const ALLOW_LIST = "trackingprotection";
@@ -276,6 +284,9 @@ function cleanRule(rule) {
   }
   if (MEDIA.has(rule.media)) {
     clean.media = rule.media;
+  }
+  if (rule.insecure === true) {
+    clean.insecure = true;
   }
   if (Array.isArray(rule.exceptions)) {
     const exceptions = SITE_EXCEPTIONS.map(e => e.id).filter(id =>
@@ -615,6 +626,43 @@ export const SvalSiteProtections = {
   },
 
   /**
+   * @param {string} name A site or a host.
+   * @returns {boolean} Whether `name`'s own http origin opens without
+   *   HTTPS-Only Mode's warning on every device.
+   */
+  insecureFor(name) {
+    return this.ruleFor(name).insecure === true;
+  },
+
+  /**
+   * @param {string} name
+   * @returns {boolean} Whether a choice can be saved for `name`: a site, or
+   *   a host under one.
+   */
+  canChooseFor(name) {
+    return isScopeName(name);
+  },
+
+  /**
+   * Lets `name`'s own http origin open without HTTPS-Only Mode's warning on
+   * every device, or takes that away. The field is the name's own, so it
+   * skips `_change`'s comparison with the names above it. Outside private
+   * windows only.
+   *
+   * @param {string} name A site or a host.
+   * @param {boolean} allowed
+   */
+  setInsecure(name, allowed) {
+    const rule = { ...this.ruleFor(name) };
+    if (allowed) {
+      rule.insecure = true;
+    } else {
+      delete rule.insecure;
+    }
+    this._put(name, rule, null);
+  },
+
+  /**
    * Puts a site's or host's whole rule back, or takes it away with none.
    * Settings' remove and its Undo.
    *
@@ -709,7 +757,8 @@ export const SvalSiteProtections = {
       const after = rules.get(name) ?? {};
       if (
         before.protections !== after.protections ||
-        before.media !== after.media
+        before.media !== after.media ||
+        before.insecure !== after.insecure
       ) {
         this._applyName(name, before, after, null);
       }
@@ -782,6 +831,19 @@ export const SvalSiteProtections = {
         } else {
           Services.perms.removeFromPrincipal(principal, type);
         }
+      }
+    }
+    if (session === null && before.insecure !== after.insecure) {
+      const http = principals.find(principal => principal.schemeIs("http"));
+      if (after.insecure) {
+        Services.perms.addFromPrincipal(
+          http,
+          HTTPS_ONLY_PERMISSION,
+          Ci.nsIHttpsOnlyModePermission.LOAD_INSECURE_ALLOW,
+          expire
+        );
+      } else {
+        Services.perms.removeFromPrincipal(http, HTTPS_ONLY_PERMISSION);
       }
     }
     if (before.media !== after.media) {

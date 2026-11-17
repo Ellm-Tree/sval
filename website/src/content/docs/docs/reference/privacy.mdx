@@ -164,6 +164,8 @@ following a list Mozilla publishes.
 
 ## HTTPS-Only Mode
 
+<Until v="0.1.0-rc.10">
+
 Sval opens the secure version of every site that has one. HTTPS-Only Mode
 decides what happens when a site has no secure version. With it on, Sval
 shows a warning first, and you choose whether to open the site. The choices
@@ -171,6 +173,28 @@ are **Enable HTTPS-Only Mode in all windows**, **Enable HTTPS-Only Mode in
 private windows only**, and **Don't enable HTTPS-Only Mode**. The last one
 is the default. **Manage Exceptions…** lists the sites you let open
 without a secure connection.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+Sval opens the secure version of every site that has one. HTTPS-Only Mode
+decides what happens when a site has no secure version. With it on, Sval
+shows a warning first, and you choose whether to open the site. The choices
+are **Enable HTTPS-Only Mode in all windows**, **Enable HTTPS-Only Mode in
+private windows only**, and **Don't enable HTTPS-Only Mode**. The first one
+is the default. **Manage Exceptions…** lists the sites you let open
+without a secure connection.
+
+- When you open a site from the warning, Sval doesn't warn you about it
+  again until you quit Sval.
+- **Always open this site without a warning.** After you open a site from
+  the warning, this button shows when you select the connection line in the
+  Privacy and Security button. The site then opens without the warning on
+  all your devices, and the site shows in Settings › Sites.
+- Sval never shows the warning for your own computer, like localhost, or
+  for a local network address written as numbers, like 192.168.1.1.
+
+</Since>
 
 ## Secure DNS
 

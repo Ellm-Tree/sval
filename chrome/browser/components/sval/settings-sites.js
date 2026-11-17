@@ -671,6 +671,12 @@
           `Fingerprinting exceptions: ${chosen.map(e => e.label).join(", ")}`,
         ]);
       }
+      if (rule.insecure) {
+        words.push([
+          "insecure",
+          "Opens without a warning when it isn't secure",
+        ]);
+      }
       if (rule.media) {
         const media = new Map(lazy.MEDIA_CHOICES).get(rule.media);
         words.push([

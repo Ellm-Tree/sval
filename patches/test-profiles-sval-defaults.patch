@@ -1,4 +1,4 @@
-Sval: test profiles start without Sval's first run or list downloads
+Sval: test profiles start without Sval's first run, list downloads or HTTPS-Only Mode
 
 Every harness profile starts from testing/profiles/base, so a pref set there
 covers every mochitest and xpcshell profile, Mozilla's own tests included.
@@ -11,6 +11,10 @@ covers every mochitest and xpcshell profile, Mozilla's own tests included.
   (MOZ_DISABLE_NONLOCAL_CONNECTIONS), and a blocking level would otherwise
   fetch its lists from their publishers. A test that needs a list serves it
   itself.
+- HTTPS-Only Mode stops a plain-http load at its warning page, and the
+  harness serves its own pages from http://mochi.test:8888, which has no
+  secure version, so a run hangs before its first test. Sval's HTTPS-Only
+  tests turn it on for themselves.
 
 The harness reads these files from the source tree; no test manifest or
 chrome API reaches every profile.
@@ -19,7 +23,7 @@ diff --git a/testing/profiles/base/user.js b/testing/profiles/base/user.js
 index eb09e84d30..bc43450bea 100644
 --- a/testing/profiles/base/user.js
 +++ b/testing/profiles/base/user.js
-@@ -26,3 +26,13 @@ user_pref("browser.startup.couldRestoreSession.count", -1);
+@@ -26,3 +26,18 @@ user_pref("browser.startup.couldRestoreSession.count", -1);
  // This is used to disable address autofill telemetry since we cannot download
  // the model within tests.
  user_pref("extensions.formautofill.useml", false);
@@ -33,3 +37,8 @@ index eb09e84d30..bc43450bea 100644
 +// the harness forbids (MOZ_DISABLE_NONLOCAL_CONNECTIONS). A test that needs a
 +// download serves the list itself.
 +user_pref("browser.sval.adblock.updates.enabled", false);
++
++// Sval: HTTPS-Only Mode stops a plain-http load at its warning page, and the
++// harness serves its pages from http://mochi.test:8888, which has no secure
++// version. Sval's HTTPS-Only tests turn it on for themselves.
++user_pref("dom.security.https_only_mode", false);

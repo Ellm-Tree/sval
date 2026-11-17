@@ -460,6 +460,11 @@ control of what you see and what is sent to websites.
   Sval's feedback server only once you choose to use them.
 - **Ad and tracker blocker.** Choose No Blocking, Balanced Blocking, Strict
   Blocking, or Custom to make your own lists. Out of the box, Sval uses open-source lists.
+- **A warning before sites that aren't secure.** HTTPS-Only Mode is on by
+  default. Sval opens the secure version of every site that has one. When a
+  site has none, Sval shows a warning first, and you choose whether to open
+  it. From the Privacy and Security button, you can let a site always open
+  without the warning, and that choice syncs to your other devices.
 - **Tracking parameters are stripped.** At every level except No Blocking,
   Sval strips tracking parameters from the addresses you open. Sval takes
   the parameters from Mozilla's list and from the parameters the blocking

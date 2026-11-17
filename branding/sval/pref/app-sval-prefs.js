@@ -79,6 +79,10 @@ pref("privacy.fingerprintingProtection.remoteOverrides.enabled", false);
 // first request with a 403 error page.
 pref("security.ssl3.ecdhe_ecdsa_aes_256_sha", false); // upstream: true
 pref("privacy.globalprivacycontrol.enabled", true);
+// A site with no secure version opens only after the person chooses to,
+// from the warning page, in every window. Local and loopback addresses are
+// exempt (nsHTTPSOnlyUtils::LoopbackOrLocalException).
+pref("dom.security.https_only_mode", true); // upstream: false
 pref("widget.non-native-theme.use-theme-accent", false);
 pref("media.peerconnection.ice.proxy_only_if_behind_proxy", true);
 pref("privacy.partition.network_state.connection_with_proxy", true);
