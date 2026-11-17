@@ -124,7 +124,7 @@ add_task(async function a_folder_sval_cannot_reach_yet_is_kept_and_explained() {
   );
   Assert.equal(ui.els.folderPath.textContent, missing, "and names it");
   Assert.equal(device.settings.sharedFolder, missing, "the choice is kept");
-  Assert.equal(SvalPanel.folderState, "unreachable");
+  Assert.equal(SvalPanel.syncState.folderState, "unreachable");
   Assert.ok(!ui.els.storageChoose.disabled, "and the button works again");
 });
 

@@ -193,19 +193,18 @@ var SvalPanel = {
     return this._agentMarking;
   },
 
-  /** What the last pass found at the shared folder (`_folderState`). */
-  get folderState() {
-    return this._folderState;
-  },
-
-  /** The last pass's report, or null before the first. */
-  get lastPass() {
-    return this._lastPass;
-  },
-
-  /** When a pass last reached the shared folder, or null. */
-  get lastSynced() {
-    return this._lastSynced;
+  /**
+   * What the passes of this window's engine have found, which every window
+   * on that engine reads. A window with no engine, or on a tree in memory,
+   * reads the state of an engine nothing has passed on.
+   *
+   * @returns {SvalSyncState}
+   */
+  get syncState() {
+    const { SvalSyncState } = this._modules;
+    return this._engine && !this._inMemory
+      ? SvalSyncState.of(this._engine)
+      : SvalSyncState.none;
   },
 
   /** What `SvalIdentity.syncKey()` last answered. */
@@ -496,6 +495,8 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalPasswordManager.sys.mjs",
         SvalPinsRow: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
         SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
+        SvalSyncState:
+          "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
         tidySeparators:
           "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
         SvalLocalSettings:

@@ -189,9 +189,9 @@ add_task(async function a_pass_in_one_window_is_drawn_in_the_others() {
     );
     Assert.ok(report, "this window ran a pass");
     Assert.equal(
-      other.SvalPanel.lastPass,
+      other.SvalPanel.syncState.lastPass,
       report,
-      "and the other window drew it"
+      "which the other window reads too"
     );
   } finally {
     await within(

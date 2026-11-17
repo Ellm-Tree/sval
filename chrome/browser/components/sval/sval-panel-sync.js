@@ -14,42 +14,10 @@
 
 Object.assign(SvalPanel, {
   /**
-   * When a pass last reached the shared folder, in milliseconds since the
-   * epoch, or null. What the indicator's tooltip and offline label report.
-   * Always null with no shared folder: nothing is synced then.
-   */
-  _lastSynced: null,
-
-  /**
-   * What the last pass found at the shared folder: "none" when none is chosen,
-   * "reached", "unreachable" (local-copy spec §4.3), or "too-large" when it
-   * holds more than a step reads (decision 0032).
-   */
-  _folderState: "none",
-
-  /**
-   * Why the last step could not use the shared folder, as
-   * `SvalSharedFolder.folderProblem` names it, or null while it answers.
-   */
-  _folderProblem: null,
-
-  /** When the current outage began, or null when the folder is answering. */
-  _unreachableSince: null,
-
-  /** The last pass's report, or null before the first. */
-  _lastPass: null,
-
-  /**
    * The pass a window drawn from the engine's tree runs once drawn
    * (`_drawFromEngine`), or null for a window whose startup ran its pass.
    */
   _passAfterDrawing: null,
-
-  /**
-   * When passes began failing to save this device's copy, or null while
-   * they save; see `_saveFailed`.
-   */
-  _saveFailingSince: null,
 
   /** What `SvalIdentity.syncKey()` last answered: one of `SYNC_KEY_STATES`. */
   _syncKeyState: null,
@@ -72,6 +40,9 @@ Object.assign(SvalPanel, {
    * fixture's engine as `_start` attaches it to the profile's.
    */
   _listenToEngine() {
+    // Made before this window's listeners are added, so the state has taken
+    // a report by the time they run.
+    this._modules.SvalSyncState.of(this._engine);
     // Background shared steps finish after the pass that started them, so
     // their outcome arrives here rather than as that pass's report.
     // Adopting a key runs `_start` again, so the earlier listener goes first.
@@ -86,7 +57,7 @@ Object.assign(SvalPanel, {
     this._forgetPassListener = this._engine.addPassListener(
       (report, origin) => {
         if (origin !== this) {
-          this._onPass(report);
+          this._onPass();
         }
       }
     );
@@ -96,8 +67,6 @@ Object.assign(SvalPanel, {
     this._forgetFailureListener?.();
     this._forgetFailureListener = this._engine.addFailureListener(
       (err, origin) => {
-        // The pass's `now` is corrected time (decision 1714), and how long
-        // saving has failed is measured on the system clock.
         if (origin !== this) {
           this._saveFailed(err);
           this._drawSyncState();
@@ -120,9 +89,9 @@ Object.assign(SvalPanel, {
    * reports is over.
    */
   _savedAgain() {
-    if (this._saveFailingSince !== null) {
-      this._saveFailingSince = null;
-      this._modules.SvalCritical.clear(window);
+    const { SvalCritical } = this._modules;
+    if (SvalCritical.current(window)?.kind === "save") {
+      SvalCritical.clear(window);
     }
   },
 
@@ -132,13 +101,13 @@ Object.assign(SvalPanel, {
    * succeeds in that time cancels it.
    *
    * @param {Error} err What the pass rejected with.
-   * @param {number} [now] When the pass ran, by the clock its caller gave
-   *   the engine, so every window counts the minute alike.
    */
-  _saveFailed(err, now = Date.now()) {
-    this._saveFailingSince ??= now;
+  _saveFailed(err) {
     if (
-      this._modules.SvalPanelModel.saveFailureDue(this._saveFailingSince, now)
+      this._modules.SvalPanelModel.saveFailureDue(
+        this.syncState.saveFailingSince,
+        Date.now()
+      )
     ) {
       this._modules.SvalCritical.show(window, {
         kind: "save",
@@ -286,8 +255,6 @@ Object.assign(SvalPanel, {
    * @param {object} report A shared step's report (`sharedRan` is true).
    */
   _onSharedStep(report) {
-    this._lastPass = report;
-    this._noteFolder(report);
     if (report.shared === "reached") {
       if (this._sweepPending) {
         this._sweepPending = false;
@@ -307,13 +274,9 @@ Object.assign(SvalPanel, {
    * A pass this window did not ask for: another window's, or the settings
    * page's. They share this profile's one document, so what it brought in is
    * drawn here as if this window had run it.
-   *
-   * @param {object} report A `SvalEngine.sync()` result.
    */
-  _onPass(report) {
-    this._lastPass = report;
+  _onPass() {
     this._savedAgain();
-    this._noteFolder(report);
     this._drawSyncState();
     this._refreshIfChanged().catch(err =>
       this._modules.SvalLog.warn(
@@ -355,7 +318,6 @@ Object.assign(SvalPanel, {
       return null;
     }
     try {
-      const now = Date.now();
       let report;
       try {
         report = await this._engine.sync(
@@ -368,16 +330,14 @@ Object.assign(SvalPanel, {
         // that fails below, or the pass's shared step, says nothing about
         // the profile. The engine's failure listener hears the same.
         if (!this._engine.failedInSharedStep(err)) {
-          this._saveFailed(err, now);
+          this._saveFailed(err);
         }
         throw err;
       }
       if (!report) {
-        return this._lastPass;
+        return this.syncState.lastPass;
       }
-      this._lastPass = report;
       this._savedAgain();
-      this._noteFolder(report);
       if (interactive) {
         await this.refresh();
       } else {
@@ -386,7 +346,7 @@ Object.assign(SvalPanel, {
       return report;
     } catch (err) {
       // Only the profile can fail a pass. An unreachable shared folder is a
-      // state, reported by `_noteFolder` (local-copy spec §4.6). The engine's
+      // state, which `syncState` holds (local-copy spec §4.6). The engine's
       // wording is for the log (spec §10.7).
       this._modules.SvalLog.error(
         `a sync pass failed: ${this._modules.describeError(err)}`
@@ -395,59 +355,6 @@ Object.assign(SvalPanel, {
     } finally {
       this._drawSyncState();
     }
-  },
-
-  /**
-   * Records what a pass found at the shared folder.
-   *
-   * @param {object} report A `SvalEngine.sync()` result.
-   */
-  _noteFolder(report) {
-    const now = Date.now();
-    if (report.shared === "none") {
-      this._folderState = "none";
-      this._folderProblem = null;
-      this._unreachableSince = null;
-      this._lastSynced = null;
-      return;
-    }
-    // A pass that ran no shared step reports the engine's last known state,
-    // which a window that opened between steps has not heard yet. That is all
-    // it can tell: when the step ran and for how long is not its to say.
-    if (
-      !report.sharedRan &&
-      this._folderState === "none" &&
-      (report.shared === "reached" ||
-        report.shared === "unreachable" ||
-        report.shared === "too-large")
-    ) {
-      this._folderState = report.shared;
-      this._folderProblem = report.sharedReason ?? null;
-    }
-    // A pass that ran no shared step, or whose step has not yet got an answer
-    // from the folder, says nothing new about it.
-    if (!report.sharedRan || report.shared === "unknown") {
-      return;
-    }
-    this._folderState = report.shared;
-    this._folderProblem = report.sharedReason ?? null;
-    if (report.shared === "unreachable") {
-      // A pass that could not read this device's own file heard from the
-      // folder, and Sval recovers that file (messages spec §8.2), so the
-      // folder's wait (decision 0032) does not start.
-      if (this._folderProblem === "own-file") {
-        this._unreachableSince = null;
-      } else {
-        this._unreachableSince ??= now;
-      }
-      return;
-    }
-    this._unreachableSince = null;
-    // The folder answered, and nothing in it was synced.
-    if (report.shared === "too-large") {
-      return;
-    }
-    this._lastSynced = now;
   },
 
   /**
@@ -532,6 +439,7 @@ Object.assign(SvalPanel, {
   indicatorState() {
     const { AppConstants, SvalPanelModel } = this._modules;
     const shared = this._inMemory ? null : this.sharedRootSetting();
+    const sync = this.syncState;
     let kind = "normal";
     if (this._inMemory) {
       kind = this._isPrivate ? "private" : "automated";
@@ -542,9 +450,9 @@ Object.assign(SvalPanel, {
       // A shared step has answered this launch, or the engine shares nowhere
       // because this device holds no sync key, and so has no step to wait on.
       firstPassDone:
-        this._folderState !== "none" || this._lastPass?.shared === "none",
-      folder: { problem: this._folderProblem, since: this._unreachableSince },
-      lastSynced: this._lastSynced,
+        sync.folderState !== "none" || sync.lastPass?.shared === "none",
+      folder: { problem: sync.folderProblem, since: sync.unreachableSince },
+      lastSynced: sync.lastSynced,
       keyState: this._syncKeyState,
       platform: AppConstants.platform,
       // Only what was found in the folder now chosen: a list from a folder
@@ -553,8 +461,8 @@ Object.assign(SvalPanel, {
         shared !== null &&
         this._otherWorkspacesIn === shared &&
         !!this._otherWorkspaces.length,
-      newerSchema: !!this._lastPass?.schemaTooNew?.length,
-      harmedByClock: [...new Set(this._lastPass?.harmedByClock ?? [])].map(
+      newerSchema: !!sync.lastPass?.schemaTooNew?.length,
+      harmedByClock: [...new Set(sync.lastPass?.harmedByClock ?? [])].map(
         device => this._modules.SvalDeviceNames.nameOf(device)
       ),
       hasReading: this._modules.SvalClock.hasReading,

@@ -47,15 +47,21 @@ add_task(async function other_windows_wait_for_the_first_windows_first_run() {
     "the private window's close"
   );
 
+  // The windows share one engine, which names the window each pass is for.
+  const passed = new Set();
+  const forget = SvalPanel.engine.addPassListener((report, origin) =>
+    passed.add(origin)
+  );
   const second = await within(
     BrowserTestUtils.openNewBrowserWindow(),
     10_000,
     "the second window's opening"
   );
   await TestUtils.waitForCondition(
-    () => second.SvalPanel.lastPass,
+    () => passed.has(second.SvalPanel),
     "the second window has read the document"
   );
+  forget();
   const secondStarted = settledFlag(second.SvalPanel.started);
   Assert.ok(!secondStarted.settled, "and is waiting for first run");
   Assert.ok(!second.gDialogBox.isOpen, "with no dialog of its own");

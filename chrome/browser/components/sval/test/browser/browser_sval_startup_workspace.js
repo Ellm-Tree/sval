@@ -229,8 +229,16 @@ add_task(async function no_name_sval_invented_reaches_the_document() {
 add_task(async function no_shared_folder_shows_no_indicator() {
   const profile = await freshProfile();
   const { SvalPanel: panel } = await profile.open();
-  Assert.equal(panel.folderState, "none", "no shared folder is chosen");
-  Assert.strictEqual(panel.lastSynced, null, "nothing has been synced");
+  Assert.equal(
+    panel.syncState.folderState,
+    "none",
+    "no shared folder is chosen"
+  );
+  Assert.strictEqual(
+    panel.syncState.lastSynced,
+    null,
+    "nothing has been synced"
+  );
   Assert.ok(
     BrowserTestUtils.isHidden(panel._els.syncRow),
     "the footer shows no sync indicator"
@@ -308,7 +316,11 @@ add_task(
       panel.workspaceId,
       "an empty profile gets its unnamed workspace without waiting"
     );
-    Assert.equal(panel.folderState, "none", "and no folder is tracked");
+    Assert.equal(
+      panel.syncState.folderState,
+      "none",
+      "and no folder is tracked"
+    );
     Assert.strictEqual(
       panel.engine.sharedRoot,
       null,

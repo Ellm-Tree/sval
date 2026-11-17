@@ -472,9 +472,9 @@ Object.assign(SvalPanel, {
     // the folder depends on what this pass finds in the document.
     let sharedFolder = this.sharedRootSetting();
     let synced;
-    // This window's own pass, for first run's gate: `_lastPass` also takes
-    // other windows' reports, and a second window's pass finds the file this
-    // one's wrote.
+    // This window's own pass, for first run's gate: `syncState.lastPass` is
+    // any window's, and a second window's pass finds the file this one's
+    // wrote.
     let ownPass = null;
     // A later window of the session draws what the engine holds and runs its
     // pass once it is drawn, because every window waits on its turn in the one

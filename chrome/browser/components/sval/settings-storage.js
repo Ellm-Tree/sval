@@ -148,7 +148,8 @@
       // finds one now has to offer the control again.
       this._els.storageChoose.hidden = false;
       const chosen = panel.sharedRootSetting();
-      const unreachable = chosen && panel.folderState === "unreachable";
+      const unreachable =
+        chosen && panel.syncState.folderState === "unreachable";
       this._els.storageReuse.hidden = !unreachable;
       this._els.storageStop.hidden = !chosen;
       this._els.folderReveal.hidden = !chosen || unreachable;
@@ -157,7 +158,8 @@
       this._els.folderField.classList.toggle("sval-unreachable", !!unreachable);
       if (
         this._statusFolder !== null &&
-        (chosen !== this._statusFolder || panel.folderState === "reached")
+        (chosen !== this._statusFolder ||
+          panel.syncState.folderState === "reached")
       ) {
         this._showStorageReport({ message: null });
       }

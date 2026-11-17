@@ -170,7 +170,7 @@
       if (this._privateWindow) {
         sync.textContent =
           "These are your choices for each site in this window, including the ones you made with the protection button in the address bar. They last until you close this window and never sync.";
-      } else if (this.panel && this.panel.folderState === "none") {
+      } else if (this.panel && this.panel.syncState.folderState === "none") {
         sync.textContent =
           "These are your choices for each site, including the ones you made with the protection button in the address bar. Sync is off, so they stay on this device.";
       }

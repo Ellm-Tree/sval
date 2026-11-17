@@ -181,7 +181,11 @@ function buttonsOf(doc) {
 add_task(async function a_save_failure_says_nothing_at_first() {
   const panel = await panelWithFailingSaves();
   await panel.fail();
-  Assert.notEqual(SvalPanel._saveFailingSince, null, "the save failed");
+  Assert.notEqual(
+    SvalPanel.syncState.saveFailingSince,
+    null,
+    "the save failed"
+  );
   await panel.fail();
   Assert.ok(!gDialogBox.isOpen, "no dialog yet");
   Assert.equal(SvalCritical.current(window), null, "and no critical state");
@@ -422,7 +426,7 @@ add_task(async function a_failed_shared_step_is_not_a_failed_save() {
     null,
     "the pass failed in its shared step"
   );
-  Assert.equal(SvalPanel._saveFailingSince, null, "no save failed");
+  Assert.equal(SvalPanel.syncState.saveFailingSince, null, "no save failed");
   Assert.equal(SvalCritical.current(window), null, "and nothing is critical");
   Assert.ok(!gDialogBox.isOpen, "so no dialog opens");
 });
@@ -454,22 +458,20 @@ add_task(async function every_window_hears_a_failed_save() {
 
   await panel.fail();
   Assert.notEqual(
-    SvalPanel._saveFailingSince,
+    SvalPanel.syncState.saveFailingSince,
     null,
     "this window's save failed"
   );
-  // Each window measures how long saving has failed on its own clock
-  // (`SvalPanel._listenToEngine`).
-  Assert.notEqual(
-    other.SvalPanel._saveFailingSince,
-    null,
-    "the other window heard the failure"
+  Assert.equal(
+    other.SvalPanel.syncState,
+    SvalPanel.syncState,
+    "the other window reads the same state"
   );
 
   await panel.succeed();
   Assert.ok(await SvalPanel.syncNow(), "a pass saves");
   Assert.equal(
-    other.SvalPanel._saveFailingSince,
+    other.SvalPanel.syncState.saveFailingSince,
     null,
     "and the other window heard that too"
   );

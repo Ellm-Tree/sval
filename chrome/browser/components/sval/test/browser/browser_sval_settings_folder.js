@@ -150,7 +150,7 @@ add_task(async function stop_syncing_keeps_the_workspaces() {
   );
   Assert.equal(device.settings.sharedFolder, null, "the setting is none");
   Assert.equal(device.engine.sharedRoot, null, "the engine shares nowhere");
-  Assert.equal(SvalPanel.folderState, "none");
+  Assert.equal(SvalPanel.syncState.folderState, "none");
   Assert.equal(
     ui.els.storageChoose.dataset.tone,
     "primary",
@@ -185,7 +185,7 @@ add_task(async function sync_now_leaves_a_gone_folder_to_the_indicator() {
     recursive: true,
   });
   await syncFromSettings(ui);
-  Assert.equal(SvalPanel._folderProblem, "gone", "the folder is gone");
+  Assert.equal(SvalPanel.syncState.folderProblem, "gone", "the folder is gone");
   const shown = ui.page.document.getElementById("sval-sync-state");
   Assert.equal(ui.els.syncStatus.textContent, "", "and nothing says so yet");
   Assert.equal(shown.dataset.state, "synced");
@@ -225,7 +225,7 @@ add_task(
       () => ui.els.storageStatus.textContent === "",
       "the open page withdrew the sentence once the folder answered"
     );
-    Assert.equal(SvalPanel.folderState, "reached");
+    Assert.equal(SvalPanel.syncState.folderState, "reached");
     Assert.equal(ui.els.folderPath.textContent, later);
     Assert.equal(ui.els.storageText.textContent, "");
 

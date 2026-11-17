@@ -178,7 +178,7 @@
       const byId = new Map(choices.map(choice => [choice.id, choice]));
       els.add.disabled = !!view.adding;
       els.sync.textContent =
-        ui().panel?.folderState === "none"
+        ui().panel?.syncState.folderState === "none"
           ? "Sync is off, so rules stay on this device."
           : "Rules sync to all your devices.";
 

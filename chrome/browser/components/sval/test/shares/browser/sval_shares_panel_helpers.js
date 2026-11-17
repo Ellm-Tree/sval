@@ -183,11 +183,11 @@ function shareTask(share, body) {
  * A launch starts its first shared step in the background, so the answer
  * arrives after `_start` has returned.
  *
- * @param {string} state The `_folderState` to wait for.
+ * @param {string} state The `folderState` to wait for.
  */
 async function folderIs(state) {
   await TestUtils.waitForCondition(
-    () => SvalPanel.folderState === state,
+    () => SvalPanel.syncState.folderState === state,
     `the panel hears that the folder is ${state}`,
     100,
     UNREACHABLE_WITHIN_MS / 100

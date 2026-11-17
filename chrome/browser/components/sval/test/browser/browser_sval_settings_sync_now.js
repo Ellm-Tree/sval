@@ -38,7 +38,7 @@ const JUST_NOW = SvalPanelModel.lastSyncedText(0, 0);
  * Chooses a shared folder that is not there yet, so the panel has synced
  * nothing with it and its readouts have nothing to report, then makes it
  * there as a folder Sval chose, holding `sval/`, for the next pass to reach.
- * A choice resets what the panel knew of the last folder, `_lastSynced`
+ * A choice resets what the panel knew of the last folder, `lastSynced`
  * included, and its pass finds this one away.
  *
  * @param {object} device `panelOnAFolder`'s result.
@@ -49,7 +49,11 @@ async function aFolderNotYetSynced(device) {
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
   const chosen = await SvalPanel.chooseSharedFolder(shared);
   Assert.ok(!chosen.reached, "the folder is not there yet");
-  Assert.strictEqual(SvalPanel.lastSynced, null, "so nothing has synced");
+  Assert.strictEqual(
+    SvalPanel.syncState.lastSynced,
+    null,
+    "so nothing has synced"
+  );
   await IOUtils.makeDirectory(PathUtils.join(shared, "sval"), {
     createAncestors: true,
   });
@@ -101,7 +105,11 @@ add_task(async function settings_shows_no_last_synced_text_with_no_folder() {
   await panelOnAFolder("none");
   const ui = await openSvalSettings();
 
-  Assert.equal(SvalPanel.folderState, "none", "no shared folder is chosen");
+  Assert.equal(
+    SvalPanel.syncState.folderState,
+    "none",
+    "no shared folder is chosen"
+  );
   Assert.equal(
     ui.els.syncLast.textContent,
     "",
@@ -283,7 +291,7 @@ add_task(async function an_unreadable_peer_file_leaves_the_panel_synced() {
 
   await syncFromSettings(ui);
   Assert.ok(
-    SvalPanel.lastPass?.errors?.length,
+    SvalPanel.syncState.lastPass?.errors?.length,
     "the pass met the file it cannot read"
   );
   Assert.equal(

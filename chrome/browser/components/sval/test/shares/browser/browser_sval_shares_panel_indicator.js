@@ -78,11 +78,11 @@ for (const share of ["nfs", "smb"]) {
               {
                 answers,
                 severity: indicator.dataset.severity,
-                problem: SvalPanel._folderProblem,
+                problem: SvalPanel.syncState.folderProblem,
                 awayMs:
-                  SvalPanel._unreachableSince === null
+                  SvalPanel.syncState.unreachableSince === null
                     ? null
-                    : Date.now() - SvalPanel._unreachableSince,
+                    : Date.now() - SvalPanel.syncState.unreachableSince,
                 state: await Shares.state(),
               }
             )}`

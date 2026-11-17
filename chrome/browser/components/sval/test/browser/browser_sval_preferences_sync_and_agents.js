@@ -86,7 +86,11 @@ add_task(async function the_folder_field_shows_changes_and_reveals() {
 
 add_task(async function the_sync_readout_says_one_state() {
   await panelWithFolder(await makeTempDir("sval-shared"));
-  Assert.equal(SvalPanel.folderState, "reached", "the folder answers");
+  Assert.equal(
+    SvalPanel.syncState.folderState,
+    "reached",
+    "the folder answers"
+  );
   const ui = await openSettings();
   const state = ui.byId("sval-sync-state");
   Assert.equal(state.dataset.state, "synced");
@@ -108,7 +112,7 @@ add_task(async function the_sync_readout_says_one_state() {
 
   // A pass fails when it cannot save this device's copy in the profile, as
   // a directory that refuses a new file makes it fail.
-  const wrote = SvalPanel.lastPass?.wrote;
+  const wrote = SvalPanel.syncState.lastPass?.wrote;
   Assert.ok(wrote, "the pass saved this device's copy");
   const ownDir = PathUtils.parent(
     PathUtils.join(SvalPanel.engine.root, ...wrote.split("/"))
@@ -151,7 +155,7 @@ add_task(async function the_sync_readout_says_one_state() {
 add_task(async function an_unreadable_own_file_shows_no_fault() {
   const shared = await makeTempDir("sval-shared");
   await panelWithFolder(shared);
-  const wrote = SvalPanel.lastPass?.sharedWrote;
+  const wrote = SvalPanel.syncState.lastPass?.sharedWrote;
   Assert.ok(wrote, "this device published its file");
   const own = PathUtils.join(shared, ...wrote.split("/"));
   await SvalTestDeny.read(own);
@@ -162,7 +166,11 @@ add_task(async function an_unreadable_own_file_shows_no_fault() {
     () => !ui.byId("sval-sync-now").disabled,
     "the pass came back"
   );
-  Assert.equal(SvalPanel.folderState, "unreachable", "the read was refused");
+  Assert.equal(
+    SvalPanel.syncState.folderState,
+    "unreachable",
+    "the read was refused"
+  );
   Assert.equal(SvalPanel.syncIndicator().severity, "synced");
   Assert.equal(ui.byId("sval-sync-state").dataset.state, "synced");
   Assert.equal(ui.byId("sval-sync-status").textContent, "");
@@ -234,7 +242,11 @@ add_task(async function an_unreachable_folder_is_said_once() {
     () => !ui.byId("sval-sync-now").disabled,
     "the pass came back"
   );
-  Assert.equal(SvalPanel.folderState, "unreachable", "the folder is gone");
+  Assert.equal(
+    SvalPanel.syncState.folderState,
+    "unreachable",
+    "the folder is gone"
+  );
   const shown = SvalPanel.syncIndicator();
   Assert.notEqual(
     ui.byId("sval-sync-state").dataset.outcome,

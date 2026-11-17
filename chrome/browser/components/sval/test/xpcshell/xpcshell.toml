@@ -394,6 +394,8 @@ head = "tabs_head.js panel_model_head.js"
 ["test_sval_sync.js"]
 head = "shared_folder_head.js"
 
+["test_sval_sync_state.js"]
+
 ["test_sval_syncable_address.js"]
 
 ["test_sval_tab_actions.js"]

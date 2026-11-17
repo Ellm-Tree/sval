@@ -179,7 +179,7 @@ add_task(
     // The launch's background step can wait its turn behind a helper an
     // earlier task's folder still holds, then a step's allowance.
     await TestUtils.waitForCondition(
-      () => panel.folderState === "unreachable",
+      () => panel.syncState.folderState === "unreachable",
       "the launch's background step finds the folder missing",
       100,
       450
@@ -208,8 +208,16 @@ add_task(async function a_missing_folder_is_quiet_and_clears_when_back() {
   );
 
   const { indicator, syncLabel } = panel._els;
-  Assert.equal(panel.folderState, "unreachable", "the folder is away");
-  Assert.equal(panel._folderProblem, "gone", "because it is not there");
+  Assert.equal(
+    panel.syncState.folderState,
+    "unreachable",
+    "the folder is away"
+  );
+  Assert.equal(
+    panel.syncState.folderProblem,
+    "gone",
+    "because it is not there"
+  );
   Assert.equal(
     indicator.dataset.severity,
     "synced",
@@ -223,7 +231,7 @@ add_task(async function a_missing_folder_is_quiet_and_clears_when_back() {
     await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
     return (await panel.syncWithFolder()) === "reached";
   }, "the folder answers again");
-  Assert.equal(panel.folderState, "reached", "the panel knows");
+  Assert.equal(panel.syncState.folderState, "reached", "the panel knows");
   Assert.equal(indicator.dataset.severity, "synced", "and the moon is back");
   Assert.equal(syncLabel.textContent, "", "with no label");
 });

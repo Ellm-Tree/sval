@@ -109,10 +109,13 @@ async function thisDevice(label) {
   await TestUtils.waitForCondition(
     async () =>
       (await SvalPanel.syncWithFolder()) === "reached" &&
-      SvalPanel.lastPass?.sharedWrote,
+      SvalPanel.syncState.lastPass?.sharedWrote,
     "this device's pass published its tree to the folder"
   );
-  const ourDirectory = directoryOf(root, SvalPanel.lastPass.sharedWrote);
+  const ourDirectory = directoryOf(
+    root,
+    SvalPanel.syncState.lastPass.sharedWrote
+  );
   return {
     root,
     engine: device.engine,

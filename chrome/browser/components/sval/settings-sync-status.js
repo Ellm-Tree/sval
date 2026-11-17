@@ -49,7 +49,7 @@
     _syncOutcome: null,
 
     /**
-     * The panel's `_lastPass` when `_syncOutcome` was settled. The panel's
+     * The engine's last pass when `_syncOutcome` was settled. The panel's
      * signal fires on every redraw of its last-synced line, which includes
      * each redraw of its rows and each poll the engine skipped; only a pass
      * that came back since says anything newer than the outcome does.
@@ -100,7 +100,7 @@
         // is no news about the folder.
         if (
           this._syncOutcome !== "syncing" &&
-          this.panel?.lastPass !== this._syncOutcomePass
+          this.panel?.syncState.lastPass !== this._syncOutcomePass
         ) {
           this._syncOutcome = null;
         }
@@ -147,7 +147,7 @@
           state = "problem";
           label = shown.label;
         } else {
-          state = panel.lastSynced === null ? "waiting" : "synced";
+          state = panel.syncState.lastSynced === null ? "waiting" : "synced";
         }
       }
       if (this._els.syncState.dataset.state !== state) {
@@ -248,7 +248,7 @@
       }
       this._els.syncNow.disabled = false;
       this._syncOutcome = outcome;
-      this._syncOutcomePass = panel.lastPass;
+      this._syncOutcomePass = panel.syncState.lastPass;
       this._describeSync();
     },
 

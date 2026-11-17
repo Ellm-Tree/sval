@@ -54,7 +54,7 @@ add_task(async function a_deleted_sval_folder_is_not_recreated_until_asked() {
   await IOUtils.remove(PathUtils.join(shared, "sval"), { recursive: true });
   await SvalPanel.syncWithFolder();
   Assert.equal(
-    SvalPanel.folderState,
+    SvalPanel.syncState.folderState,
     "unreachable",
     "a used folder without sval/"
   );
@@ -153,7 +153,7 @@ add_task(async function a_chosen_folder_without_sval_waits_to_be_confirmed() {
     () => ui.els.storageReuse.hidden,
     "the page redrew once the folder was reached"
   );
-  Assert.equal(SvalPanel.folderState, "reached");
+  Assert.equal(SvalPanel.syncState.folderState, "reached");
   Assert.ok(
     (await IOUtils.getChildren(PathUtils.join(shared, "sval", "ws"))).length,
     "the folder received this device's document"
@@ -173,7 +173,7 @@ add_task(async function a_chosen_folder_without_sval_waits_to_be_confirmed() {
     () => ui.els.storageReuse.hidden,
     "choosing the same folder again confirms it"
   );
-  Assert.equal(SvalPanel.folderState, "reached");
+  Assert.equal(SvalPanel.syncState.folderState, "reached");
   Assert.ok(await IOUtils.exists(PathUtils.join(shared, "sval", "ws")));
 });
 
@@ -199,7 +199,7 @@ add_task(async function picking_sval_itself_chooses_its_folder() {
     "the picked folder is chosen"
   );
   Assert.equal(SvalPanel.sharedRootSetting(), shared, "its folder is stored");
-  Assert.equal(SvalPanel.folderState, "reached", "and reached");
+  Assert.equal(SvalPanel.syncState.folderState, "reached", "and reached");
   Assert.ok(
     await IOUtils.exists(PathUtils.join(inner, "ws")),
     "this device's document went into the sval folder picked"

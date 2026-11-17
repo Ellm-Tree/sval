@@ -194,20 +194,20 @@ Object.assign(SvalPanel, {
     // A key found in the folder is joined even when the folder is the one
     // already chosen, so Try Again after a failed join tries the join again.
     if (!found && path === this.sharedRootSetting()) {
-      if (path !== null && this._folderState === "unreachable") {
+      if (path !== null && this.syncState.folderState === "unreachable") {
         return this.useFolderAgain();
       }
-      return { reached: this._folderState !== "unreachable", message: null };
+      return {
+        reached: this.syncState.folderState !== "unreachable",
+        message: null,
+      };
     }
     this._settings.sharedFolder = path;
     const shared = this.sharedRootSetting();
     this._engine.setSharedRoot(shared);
     // What was known belonged to the folder just left, and the next step to
     // reach this one looks in it for another key's workspaces.
-    this._folderState = "none";
-    this._folderProblem = null;
-    this._unreachableSince = null;
-    this._lastSynced = null;
+    this.syncState.leftFolder();
     this._otherWorkspacesCheckedAt = null;
     await this._flushSettings();
     if (shared !== null) {
@@ -258,21 +258,21 @@ Object.assign(SvalPanel, {
       };
     }
     await this.syncWithFolder();
-    if (shared === null || this._folderState === "reached") {
+    if (shared === null || this.syncState.folderState === "reached") {
       return { reached: true, message: null };
     }
-    if (this._folderState === "too-large") {
+    if (this.syncState.folderState === "too-large") {
       return {
         reached: false,
         unreachable: true,
-        problem: this._folderProblem,
+        problem: this.syncState.folderProblem,
         message: this._modules.SvalPanelModel.SYNC_FILES_TOO_LARGE,
       };
     }
     return {
       reached: false,
       unreachable: true,
-      problem: this._folderProblem,
+      problem: this.syncState.folderProblem,
       message: "Can't reach this folder yet. Sval syncs when it's back.",
     };
   },
@@ -407,15 +407,15 @@ Object.assign(SvalPanel, {
     }
     await this._engine.markSharedRoot();
     await this.syncWithFolder();
-    if (this._folderState === "too-large") {
+    if (this.syncState.folderState === "too-large") {
       return {
         reached: false,
         unreachable: true,
-        problem: this._folderProblem,
+        problem: this.syncState.folderProblem,
         message: this._modules.SvalPanelModel.SYNC_FILES_TOO_LARGE,
       };
     }
-    return this._folderState === "reached"
+    return this.syncState.folderState === "reached"
       ? { reached: true, message: null }
       : {
           reached: false,

@@ -171,7 +171,7 @@ add_task(async function synced_shows_the_moon_alone() {
     SvalPanel.syncIndicator().tooltip,
     "the tooltip says when"
   );
-  Assert.ok(SvalPanel.lastSynced, "which a pass recorded");
+  Assert.ok(SvalPanel.syncState.lastSynced, "which a pass recorded");
   Assert.equal(
     indicator.dataset.command,
     "openSyncSettings",
@@ -202,7 +202,11 @@ add_task(async function an_away_folder_says_nothing_at_first() {
     "unreachable",
     "the folder is away"
   );
-  Assert.equal(SvalPanel.folderState, "unreachable", "the panel knows it");
+  Assert.equal(
+    SvalPanel.syncState.folderState,
+    "unreachable",
+    "the panel knows it"
+  );
   Assert.equal(indicator.dataset.severity, "synced", "and says nothing yet");
 
   await IOUtils.move(away, shared);
@@ -229,7 +233,7 @@ add_task(async function an_unreadable_own_file_starts_no_offline_wait() {
     now: Date.now(),
   });
   await SvalPanel.syncWithFolder();
-  const wrote = SvalPanel.lastPass?.sharedWrote;
+  const wrote = SvalPanel.syncState.lastPass?.sharedWrote;
   Assert.ok(wrote, "this device published its file");
   const own = PathUtils.join(shared, ...wrote.split("/"));
   await SvalTestDeny.read(own);
@@ -239,7 +243,11 @@ add_task(async function an_unreadable_own_file_starts_no_offline_wait() {
     "unreachable",
     "the read was refused"
   );
-  Assert.equal(SvalPanel._unreachableSince, null, "no offline wait starts");
+  Assert.equal(
+    SvalPanel.syncState.unreachableSince,
+    null,
+    "no offline wait starts"
+  );
   Assert.equal(
     indicatorParts().indicator.dataset.severity,
     "synced",

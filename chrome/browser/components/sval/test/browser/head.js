@@ -493,10 +493,6 @@ async function noOtherBrowsers() {
     "_nodes",
     "_rows",
     "_focusedId",
-    "_folderState",
-    "_lastPass",
-    "_lastSynced",
-    "_unreachableSince",
   ];
   const methodsOf = panel =>
     new Map(
@@ -3102,7 +3098,7 @@ async function panelOnAFolder(label, { shared = false } = {}) {
       await SvalSharedFolder._whenIdle();
       return (
         (await SvalPanel.chooseSharedFolder(sharedRoot)).reached &&
-        SvalPanel.folderState === "reached"
+        SvalPanel.syncState.folderState === "reached"
       );
     }, "a pass reached the shared folder");
   }
