@@ -198,7 +198,7 @@ class StylePanel {
 
   /**
    * Follows the setting while the editor is open, so a change from a synced
-   * device shows whether the scope has a saved style to reset.
+   * device shows whether the host keeps a style of its own.
    *
    * @param {boolean} on
    */
@@ -481,7 +481,7 @@ class StylePanel {
       this.colorSection(scope, values),
       this.themeSection(scope, values),
       this.fontSection(scope, values),
-      this.footer(scope, at)
+      this.footer()
     );
     const focused = this.panel.querySelector(":focus")?.id;
     this.panel.replaceChildren(body);
@@ -866,7 +866,6 @@ class StylePanel {
       attrs: {
         name: "sval-style-theme",
         label: "Theme",
-        description: "Prefers the site's own light or dark theme",
         value: values.theme ?? "auto",
       },
     });
@@ -977,14 +976,11 @@ class StylePanel {
 
   /**
    * The dialog's buttons, as the element picker's card has them: Cancel,
-   * then Save, primary and last. Reset style comes first, where the scope
-   * has a saved style: it puts the page's own look back in the dialog, which
-   * Save then keeps and Cancel undoes.
-   *
-   * @param {object} scope
-   * @param {string} at
+   * then Save, primary and last. Reset comes first and leaves the dialog
+   * open: it puts the page's own look back in the dialog, which Save then
+   * keeps, removing a saved style, and Cancel undoes.
    */
-  footer(scope, at) {
+  footer() {
     const { doc } = this;
     const button = (id, className, label, onClick) => {
       const el = htmlElement(
@@ -996,24 +992,21 @@ class StylePanel {
       el.addEventListener("click", onClick);
       return el;
     };
-    const reset = SvalSiteStyles.styleAt(at)
-      ? button(
-          "sval-style-reset",
-          "sval-prot-pill sval-prot-secondary sval-style-reset",
-          "Reset style",
-          () => {
-            this.draft = {};
-            SvalSiteStyles.previewIn(this.browser, this.draft);
-            this.redraw();
-            this.focusFirst();
-          }
-        )
-      : null;
     return htmlElement(
       doc,
       "div",
       { className: "sval-prot-footer sval-style-footer" },
-      reset,
+      button(
+        "sval-style-reset",
+        "sval-prot-pill sval-prot-secondary sval-style-reset",
+        "Reset",
+        () => {
+          this.draft = {};
+          SvalSiteStyles.previewIn(this.browser, this.draft);
+          this.redraw();
+          this.focusFirst();
+        }
+      ),
       button(
         "sval-style-cancel",
         "sval-prot-pill sval-prot-secondary sval-style-action",

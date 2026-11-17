@@ -591,9 +591,10 @@ control of what you see and what is sent to websites.
   - **Save.** Sval keeps your changes for the site and closes Colorshift.
   - **Cancel.** The page goes back to how it looked when you opened
     Colorshift, and Colorshift closes. Close and Escape do the same.
-  - **Reset style.** This button appears when the site has a saved
-    Colorshift. Select it, and the page shows the site's own look. Save
-    then removes the saved Colorshift, and Cancel keeps it.
+  - **Reset.** Every control goes back to the setting that leaves the
+    site as it is, and the page shows the site's own look. Colorshift
+    stays open. When the site has a saved Colorshift, Save then removes
+    it, and Cancel keeps it.
 
   You can open the site settings menu while Colorshift is open. On an
   address like `nas.example.com`, you choose whether the changes cover that

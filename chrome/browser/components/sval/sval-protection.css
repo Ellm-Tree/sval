@@ -2203,7 +2203,7 @@
   scrollbar-color: var(--sval-scrollbar-thumb) transparent;
 }
 
-/* Reset style at the start, then Cancel and Save at the end, as the
+/* Reset at the start, then Cancel and Save at the end, as the
    element picker's card orders its buttons. */
 .sval-style-footer {
   position: sticky;

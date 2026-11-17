@@ -199,17 +199,43 @@ changes sync to all your devices. See
   closer together.
 - **Brightness.** This makes every color on the page lighter or darker.
 - **Saturation.** This makes the page's colors more vivid, or grayer.
+<Until v="0.1.0-rc.10">
+
 - **Theme.** This picks **Automatic**, **Light**, or **Dark**, under
   **Prefers the site's own light or dark theme**. Automatic lets the site
   follow Sval's own light or dark theme. Light and Dark ask the site for
   that theme. When the site has none, Sval turns the page's colors light or
   dark and leaves pictures and videos as they are.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Theme.** This picks **Automatic**, **Light**, or **Dark**. Automatic
+  lets the site follow Sval's own light or dark theme. Light and Dark ask
+  the site for that theme. When the site has none, Sval turns the page's
+  colors light or dark and leaves pictures and videos as they are.
+
+</Since>
+
 - **Font.** This picks Original, System, Serif, Monospace, or Readable.
   Original keeps the site's own font.
+<Until v="0.1.0-rc.10">
+
 - **Reset style.** This shows only when the site has a saved Colorshift.
   It sets every control to leave the site as it is, and the page shows the
   site's own look at once.
   **Save** then removes the saved Colorshift, and **Cancel** keeps it.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Reset.** This sets every control to leave the site as it is, and the
+  page shows the site's own look at once. Colorshift stays open.
+  When the site has a saved Colorshift, **Save** then removes it, and
+  **Cancel** keeps it.
+
+</Since>
+
 - **Cancel.** The page goes back to how it looked when Colorshift opened,
   and Colorshift closes. Escape does the same, and so does switching tabs.
 - **Save.** Sval keeps the changes for the site and closes Colorshift.

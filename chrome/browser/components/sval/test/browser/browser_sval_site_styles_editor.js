@@ -203,8 +203,27 @@ add_task(async function reset_shows_the_sites_own_look_until_save() {
   const tab = await openPage(STYLE_PAGE);
   const browser = tab.linkedBrowser;
   await openFromSiteMenu();
-  Assert.ok(!byId("sval-style-reset"), "no Reset without a saved style");
-  await closeEditor();
+  byId("sval-style-accent").focus();
+  for (let i = 0; i < 8; i++) {
+    EventUtils.synthesizeKey("KEY_ArrowUp");
+  }
+  await until(
+    async () => !sameColor(await drawnBackground(browser), WHITE_RGB),
+    "the page showing an unsaved tint"
+  );
+  byId("sval-style-reset").click();
+  await until(
+    async () => sameColor(await drawnBackground(browser), WHITE_RGB),
+    "Reset putting back the site's own look with nothing saved"
+  );
+  Assert.equal(editor().state, "open", "Reset leaves the dialog open");
+  Assert.equal(
+    byId("sval-style-accent").dataset.strength,
+    "0",
+    "the wheel is back at its middle"
+  );
+  await pressToClose("sval-style-save");
+  Assert.ok(!saved().length, "Save after Reset saves no style");
 
   SvalSiteStyles.setStyle("example.com", TINT);
   registerCleanupFunction(() => Services.prefs.clearUserPref(STYLES_PREF));
