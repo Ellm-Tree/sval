@@ -116,7 +116,7 @@ opt-level = 3
 # surface (src/wasm.rs) or its dependencies. The desktop fork's build enables
 # this explicitly for its wasm32-unknown-unknown target.
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:console_error_panic_hook"]
-# The mobile apps' native surface (`src/ffi.rs`). It builds on `wasm`'s
-# host-facing checks, which compile natively, so a phone refuses exactly what
-# the desktop refuses.
+# The mobile apps' native surface (`src/ffi.rs`). It calls the host-facing
+# checks the `wasm` surface calls, so a phone refuses exactly what the desktop
+# refuses.
 ffi = ["wasm", "dep:uniffi"]

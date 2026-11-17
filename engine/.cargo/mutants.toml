@@ -3,10 +3,9 @@
 #
 # cargo-mutants' settings for this crate, read by every run, CI's included.
 
-# `src/wasm.rs` holds the tests of the wasm boundary and of several sync rules
-# a host reaches only through it, and `src/ffi.rs` is the mobile apps'
-# boundary. A run without their features compiles neither, so no test can
-# catch a mutant in them. `ffi` turns on `wasm`.
+# `src/wasm.rs` is the desktop's boundary and `src/ffi.rs` the mobile apps'.
+# A run without their features compiles neither, so no test can catch a
+# mutant in them. `ffi` turns on `wasm`.
 features = ["ffi"]
 
 # Optimised dependencies keep the 64 MiB Argon2id calls fast.

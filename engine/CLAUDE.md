@@ -138,8 +138,8 @@ instantiation.
 Mutation testing runs in CI. It mutates every function a pull
 request changes, and the nightly mutates the whole crate on Sundays, both
 through `scripts/engine-mutants.sh`, which fails on a mutant no test fails.
-`.cargo/mutants.toml` holds the settings every run shares (the `wasm`
-feature, whose file holds tests of the sync rules a host reaches through it,
+`.cargo/mutants.toml` holds the settings every run shares (the `ffi`
+feature, which turns on `wasm` so both boundaries and their tests compile,
 and optimised dependencies) and the equivalent mutants, each with its reason.
 Run it on a branch's change before pushing, or on one file:
 

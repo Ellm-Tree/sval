@@ -127,6 +127,19 @@ mod local_tests;
 #[cfg(test)]
 mod sync_schedule_tests;
 
+// What the boundaries call: refusals, the operations on a document with
+// their checks, the JSON a host reads, and sync, the Archive and pairing over
+// plain values. Nothing else in the crate calls these four, so they compile
+// with a boundary, and under test.
+#[cfg(any(feature = "wasm", feature = "ffi", test))]
+mod failure;
+#[cfg(any(feature = "wasm", feature = "ffi", test))]
+mod host;
+#[cfg(any(feature = "wasm", feature = "ffi", test))]
+mod ops;
+#[cfg(any(feature = "wasm", feature = "ffi", test))]
+mod views;
+
 /// The `wasm32-unknown-unknown` boundary: an opaque handle plus a
 /// host-supplied storage shim. Behind a feature so native builds and
 /// `cargo test` never carry `wasm-bindgen` or `js-sys` (see `Cargo.toml`).

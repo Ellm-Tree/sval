@@ -11,13 +11,13 @@
 //! and writes back the one file it returns.
 
 use crate::crypto::Key;
+use crate::failure::Failure;
+use crate::host::{JsSyncReport, own_device_path, run_sync_to};
+use crate::ops::{apply_batch, parse_device_id, parse_timestamp};
 use crate::sync::Target;
 use crate::tree;
 use crate::types::{Document, NodeId, NodeKind};
-use crate::wasm::{
-    Failure, JsSyncReport, apply_batch, favorites_json, own_device_path, parse_device_id,
-    parse_timestamp, run_sync_to, shards_json, visits_json,
-};
+use crate::views::{favorites_json, shards_json, visits_json};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// A refusal, as `docs/host-contract.md` §8 spells it for every host.
@@ -304,7 +304,7 @@ impl SvalDocument {
     }
 
     /// Applies a batch of operations in `SvalDocumentOps.mjs`'s shape, all or
-    /// none (`crate::wasm::apply_batch`).
+    /// none (`crate::ops::apply_batch`).
     pub fn apply_batch(
         &self,
         ops_json: String,
@@ -460,7 +460,7 @@ pub fn device_path(
 #[uniffi::export]
 pub fn open_pairing(bytes: Vec<u8>, code: String) -> Result<Vec<u8>, EngineError> {
     let code = crate::pairing::normalize_code(&code)
-        .and_then(|code| crate::wasm::group_code_for_display(&code))
+        .and_then(|code| crate::host::group_code_for_display(&code))
         .ok_or_else(|| EngineError::Refused {
             code: "bad_pairing_code".to_owned(),
             reason: None,
@@ -475,7 +475,7 @@ pub fn open_pairing(bytes: Vec<u8>, code: String) -> Result<Vec<u8>, EngineError
 #[uniffi::export]
 pub fn generate_pairing_code() -> Result<String, EngineError> {
     let code = crate::pairing::generate_code().map_err(refused)?;
-    crate::wasm::group_code_for_display(&code).ok_or_else(|| EngineError::Refused {
+    crate::host::group_code_for_display(&code).ok_or_else(|| EngineError::Refused {
         code: "internal_error".to_owned(),
         reason: None,
         message: "a generated pairing code had the wrong shape".to_owned(),
@@ -492,7 +492,7 @@ pub fn seal_pairing(
     now: f64,
     ttl_ms: f64,
 ) -> Result<Vec<u8>, EngineError> {
-    crate::wasm::seal_pairing_core(&key, &code, now, ttl_ms).map_err(EngineError::from)
+    crate::host::seal_pairing_core(&key, &code, now, ttl_ms).map_err(EngineError::from)
 }
 
 /// When a pairing offer expires, read without the code.
@@ -703,8 +703,8 @@ mod tests {
     fn a_pairing_offer_opens_with_the_typed_code_and_refuses_another() {
         // Sealed as a desktop seals it: under the grouped code it shows.
         let code = crate::pairing::generate_code().unwrap();
-        let shown = crate::wasm::group_code_for_display(&code).unwrap();
-        let offer = crate::wasm::seal_pairing_core(&KEY, &shown, 1_000.0, 60_000.0).unwrap();
+        let shown = crate::host::group_code_for_display(&code).unwrap();
+        let offer = crate::host::seal_pairing_core(&KEY, &shown, 1_000.0, 60_000.0).unwrap();
         let typed = format!("{}{} {}", &code[..4], &code[4..8], code[8..].to_lowercase());
         assert_eq!(open_pairing(offer.clone(), typed).unwrap(), KEY.to_vec());
         assert_eq!(pairing_expires_at(offer.clone()).unwrap(), 61_000.0);

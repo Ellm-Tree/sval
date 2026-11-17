@@ -709,7 +709,7 @@ pub struct Document {
     ///
     /// "Never written" must be distinguishable from every device id, and a
     /// host may hand this crate sixteen zero bytes as its own id, as the tests
-    /// in `wasm.rs` do.
+    /// in `host.rs` do.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub written_by: Option<crate::store::DeviceId>,
     /// The version vector: for each peer, the `written_at` of the newest file
@@ -2981,7 +2981,7 @@ mod tests {
     #[test]
     fn rename_on_an_unknown_id_changes_nothing() {
         // The native mutators no-op on a missing id. The WASM boundary is
-        // where an unknown id becomes an error (`wasm::require_node`).
+        // where an unknown id becomes an error (`ops::require_node`).
         let mut doc = Document::new();
         let ws = doc.add_workspace(
             "W",

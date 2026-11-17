@@ -6,9 +6,11 @@ app later — must supply to load `sval-core` compiled for
 deviates from it produces silent data loss or a build that fails at
 runtime, not merely a bug in one feature.
 
-The Rust side of this contract is `src/wasm.rs`. Read this document and that
-file's doc comments together; if they disagree, the code is either the bug
-or has moved on and this document is stale — say which, don't guess.
+The Rust side of this contract is `src/wasm.rs`, and the checks it calls in
+`src/ops.rs`, `src/host.rs`, `src/views.rs` and `src/failure.rs`. Read this
+document and those files' doc comments together; if they disagree, the code
+is either the bug or has moved on and this document is stale — say which,
+don't guess.
 
 ## 1. Storage: the host does all I/O, the engine never calls back into JS
 
@@ -532,7 +534,7 @@ together; there is no case where only one is set.
 ## 7. The sync report
 
 `reportJson` parses to an object with exactly these fields — the names are
-pinned by a test (`wasm::tests::sync_report_field_names_are_the_contracts_promise`)
+pinned by a test (`host::tests::sync_report_field_names_are_the_contracts_promise`)
 specifically so a rename here is caught rather than silently breaking every
 host reading the old name:
 
