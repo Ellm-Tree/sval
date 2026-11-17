@@ -33,6 +33,7 @@ add_task(function the_switcher_lists_every_workspace_in_sibling_order() {
         emoji: null,
         agent: null,
         brand: null,
+        device: false,
         current: false,
         elsewhere: false,
       },
@@ -43,6 +44,7 @@ add_task(function the_switcher_lists_every_workspace_in_sibling_order() {
         emoji: null,
         agent: null,
         brand: null,
+        device: false,
         current: false,
         elsewhere: false,
       },
@@ -53,6 +55,7 @@ add_task(function the_switcher_lists_every_workspace_in_sibling_order() {
         emoji: null,
         agent: null,
         brand: null,
+        device: false,
         current: true,
         elsewhere: false,
       },
@@ -93,6 +96,7 @@ add_task(function one_workspace_still_makes_a_switcher_entry() {
         emoji: null,
         agent: null,
         brand: null,
+        device: false,
         current: true,
         elsewhere: false,
       },
@@ -237,6 +241,62 @@ add_task(function a_new_window_takes_an_agents_workspace_only_when_alone() {
     currentWorkspace({ bot: nodes.bot }, null),
     "bot",
     "with no workspace of the user's at all, the agent's is the one there is"
+  );
+});
+
+/**
+ * A phone's or tablet's own workspace (decision 2254) is passed over as an
+ * agent's is: a window the user opens takes it only when the document holds
+ * no workspace of the user's, and one that remembers it keeps it. The
+ * switcher's entry says it is a device's.
+ */
+add_task(function a_new_window_takes_a_devices_workspace_only_when_alone() {
+  const { currentWorkspace, isDeviceWorkspace, switcherItems } = SvalPanelModel;
+  const nodes = {
+    phone: {
+      ...node({ kind: "workspace", name: "iPhone", order: "20" }),
+      device_home: { device: "d" },
+    },
+    a: node({ kind: "workspace", name: "First", order: "40" }),
+    b: node({ kind: "workspace", name: "Second", order: "c0" }),
+  };
+
+  Assert.ok(isDeviceWorkspace(nodes, "phone"), "the phone's is a device's");
+  Assert.ok(!isDeviceWorkspace(nodes, "a"), "the user's is not");
+  Assert.deepEqual(
+    switcherItems(nodes, "a").map(item => item.device),
+    [true, false, false],
+    "and the switcher's entries say so"
+  );
+  Assert.equal(
+    currentWorkspace(nodes, null),
+    "a",
+    "a new window passes over the device's workspace, though it sorts first"
+  );
+  Assert.strictEqual(
+    currentWorkspace(nodes, null, new Set(["a", "b"])),
+    null,
+    "and with the user's all shown elsewhere it gets none"
+  );
+  Assert.equal(
+    currentWorkspace(nodes, "phone", new Set(["a", "b"])),
+    "phone",
+    "while a window that remembers it still shows it"
+  );
+  Assert.equal(
+    currentWorkspace(nodes, null, new Set(), "a"),
+    "b",
+    "the next one down from A is B"
+  );
+  Assert.equal(
+    currentWorkspace(nodes, null, new Set(), "b"),
+    "a",
+    "and from B the wrap passes over the device's to A"
+  );
+  Assert.equal(
+    currentWorkspace({ phone: nodes.phone }, null),
+    "phone",
+    "with no workspace of the user's at all, the device's is the one there is"
   );
 });
 

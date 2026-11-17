@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# XcodeGen's description of the iOS app. `xcodegen generate` in this
+# directory writes Sval.xcodeproj, which is not committed.
+name: Sval
+options:
+  bundleIdPrefix: app.sval
+  preGenCommand: ./make-icons.sh
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: WN6TRJ4H8P
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    # The engine is built for Apple silicon simulators only
+    # (`build-engine.sh`).
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
+targets:
+  Sval:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sval
+      - path: Generated/swift
+      - path: Generated/Icons.xcassets
+      # The home screen icon, which make-icons.sh writes.
+      - path: Generated/AppIcon.icon
+      # Outfit, the brand typeface, as the desktop's home page ships it.
+      - path: ../../chrome/browser/components/sval/home/Outfit.ttf
+        buildPhase: resources
+      # The desktop's colour maths, which draws a custom colour
+      # (`DesktopColor.swift`).
+      - path: ../../chrome/browser/components/sval/SvalColor.sys.mjs
+        buildPhase: resources
+    dependencies:
+      - framework: Generated/SvalEngine.xcframework
+        embed: false
+    # Keys the build settings can't set. XcodeGen writes this file from here.
+    info:
+      path: Generated/Info.plist
+      properties:
+        # A page playing in the tab in front keeps playing in the background
+        # (`BackgroundAudio.swift`).
+        UIBackgroundModes: [audio]
+        UIAppFonts: [Outfit.ttf, JetBrainsMono.ttf]
+        # The bar's fold follows the finger at the screen's full rate.
+        CADisableMinimumFrameDurationOnPhone: true
+        # A row dragged in the Workspace tree (`TreeDrop.swift`).
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: app.sval.ios.node
+            UTTypeDescription: Sval Workspace row
+            UTTypeConformsTo: [public.data]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.sval.ios
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Sval's blue, which every system control takes.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Sval
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Sval connects to the server on your network that holds your shared folder.
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        TARGETED_DEVICE_FAMILY: "1,2"
+  # Walks the app's screens in the simulator with the demo tree
+  # (`Demo.swift`), saving a screenshot at each step to the folder in
+  # SVAL_SHOTS, so a change can be looked at without a device.
+  SvalUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SvalUITests
+    dependencies:
+      - target: Sval
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.sval.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Sval
+  # Checks the colour maths and what each surface draws from it, in the
+  # app's own process, so a colour every screen gets wrong fails here.
+  SvalTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SvalTests
+    dependencies:
+      - target: Sval
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.sval.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Sval:
+    build:
+      targets:
+        Sval: all
+    test:
+      targets:
+        - SvalTests
+        - SvalUITests

@@ -22,3 +22,14 @@ regexes = ['''"[0-9a-f]+"\.repeat\(\d+\)''']
 description = "XUL <key> elements in patches to Firefox's shortcut sets"
 regexTarget = "line"
 regexes = ['''^[ +-]?\s*<key id="[\w-]+"''']
+
+# The iPhone app's Dropbox app key is public by design: the app signs in
+# with PKCE and holds no secret, and Dropbox's own redirect scheme carries
+# the key in the clear. The generic-api-key rule reads its assignment as a
+# credential.
+[[allowlists]]
+description = "the iPhone app's public Dropbox app key"
+condition = "AND"
+paths = ['''^mobile/ios/Sval/Shared\.swift$''']
+regexTarget = "line"
+regexes = ['''^\s*static let key = "[a-z0-9]{15}"$''']

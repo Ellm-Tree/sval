@@ -536,6 +536,17 @@ pub struct AgentMark {
     pub device: crate::store::DeviceId,
 }
 
+/// Marks a workspace as a device's own (decision 2254): the one a phone or
+/// tablet keeps for the tabs opened on it, which every device shows under
+/// Devices.
+///
+/// Set when the workspace is created and never changed afterwards, as
+/// [`AgentMark`] is. `device` is the device whose workspace this is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceMark {
+    pub device: crate::store::DeviceId,
+}
+
 /// Each fact group records **when** it was last written and **by whom**: the
 /// `_at` timestamp decides conflicts between two copies of that group (spec
 /// §5.3), and the `_by` device id lets absence be judged against that
@@ -592,6 +603,11 @@ pub struct Node {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<AgentMark>,
 
+    /// Present only on a device's own workspace, on the same terms as
+    /// `agent`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_home: Option<DeviceMark>,
+
     /// Unrecognised keys at the node's own level, which is what a whole fact
     /// group a build does not know looks like. The per-group buckets cannot
     /// hold one, because the unrecognised key *is* the group (rule 6).
@@ -638,6 +654,7 @@ impl Node {
             touched_at: 0,
             touched_by: None,
             agent: None,
+            device_home: None,
             extra: BTreeMap::new(),
         }
     }
@@ -666,6 +683,7 @@ impl Node {
             touched_at,
             touched_by,
             agent: _,
+            device_home: _,
             extra: _,
         } = self;
         [
@@ -956,6 +974,21 @@ impl Document {
                 label: label.into(),
                 device: by,
             });
+        }
+        id
+    }
+
+    /// A device's own workspace (decision 2254), marked as `by`'s.
+    pub fn add_device_workspace(
+        &mut self,
+        name: impl Into<String>,
+        id: NodeId,
+        by: crate::store::DeviceId,
+        now: Timestamp,
+    ) -> NodeId {
+        let id = self.insert_node(NodeKind::Workspace, name, None, None, None, id, by, now);
+        if let Some(node) = self.nodes.get_mut(&id) {
+            node.device_home = Some(DeviceMark { device: by });
         }
         id
     }
@@ -1563,6 +1596,7 @@ pub(crate) mod test_support {
             touched_at: 0,
             touched_by: None,
             agent: None,
+            device_home: None,
             extra: BTreeMap::new(),
         };
         doc.nodes.insert(BASE_WORKSPACE_ID, node);
@@ -1722,6 +1756,7 @@ pub(crate) mod test_support {
                 touched_at: 0,
                 touched_by: None,
                 agent: None,
+                device_home: None,
                 extra: BTreeMap::new(),
             },
         );
@@ -1784,6 +1819,7 @@ pub(crate) mod test_support {
                     touched_at: 0,
                     touched_by: None,
                     agent: None,
+                    device_home: None,
                     extra: BTreeMap::new(),
                 },
             );
@@ -1957,6 +1993,7 @@ pub(crate) mod test_support {
                         touched_at: 0,
                         touched_by: None,
                         agent: None,
+                        device_home: None,
                         extra: BTreeMap::new(),
                     },
                 );
@@ -2365,6 +2402,32 @@ mod tests {
         assert!(
             !node.extra.contains_key("agent"),
             "a named field must never land in the node-level bucket"
+        );
+    }
+
+    #[test]
+    fn a_device_workspace_carries_its_mark_through_a_round_trip() {
+        let mut doc = Document::new();
+        let id = crate::types::test_support::test_id();
+        let by = test_device();
+        doc.add_device_workspace("iPhone", id, by, 10);
+
+        let back = Document::from_json(&doc.to_json().unwrap()).unwrap();
+        let node = back.node(id).unwrap();
+        assert_eq!(node.device_home, Some(DeviceMark { device: by }));
+        assert_eq!(node.agent, None);
+        assert!(!node.extra.contains_key("device_home"));
+    }
+
+    #[test]
+    fn an_ordinary_workspace_writes_no_device_key() {
+        let mut doc = Document::new();
+        let id = crate::types::test_support::test_id();
+        doc.add_workspace("W", None, id, test_device(), 10);
+        let json = doc.to_json().unwrap();
+        assert!(
+            !json.contains("\"device_home\""),
+            "absent, not null: {json}"
         );
     }
 

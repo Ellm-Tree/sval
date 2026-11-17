@@ -241,7 +241,7 @@ const MAX_SAFE_TIMESTAMP: f64 = 9_007_199_254_740_991.0;
 /// get timestamp `0`, and the edit would lose every last-writer-wins
 /// comparison. `Infinity` would pin a node at `u64::MAX`, un-editable on
 /// every device. Both are rejected.
-fn parse_timestamp(now: f64) -> Result<Timestamp, Invalid> {
+pub(crate) fn parse_timestamp(now: f64) -> Result<Timestamp, Invalid> {
     if !now.is_finite() {
         return Err(Invalid::new(
             Reason::TimestampNotFinite,
@@ -420,7 +420,7 @@ fn parse_transparency(kind: &NodeKind, transparency: Option<f64>) -> Result<Opti
 /// identity of its own, as it has no clock. It must be the value the host
 /// uses for its own file name, the same across the device's lifetime, or its
 /// peers' watermarks name a device that never writes again.
-fn parse_device_id(bytes: &[u8]) -> Result<DeviceId, Invalid> {
+pub(crate) fn parse_device_id(bytes: &[u8]) -> Result<DeviceId, Invalid> {
     let bytes: [u8; 16] = bytes.try_into().map_err(|_| {
         Invalid::new(
             Reason::BadDeviceId,
@@ -662,7 +662,7 @@ struct JsVisit {
 }
 
 /// Every visit in a week's document, oldest first.
-fn visits_json(doc: &Document) -> Result<String, Failure> {
+pub(crate) fn visits_json(doc: &Document) -> Result<String, Failure> {
     let mut rows: Vec<JsVisit> = doc
         .nodes
         .iter()
@@ -695,7 +695,7 @@ struct JsShard {
 }
 
 /// Every shard the history index lists, newest first.
-fn shards_json(doc: &Document) -> Result<String, Failure> {
+pub(crate) fn shards_json(doc: &Document) -> Result<String, Failure> {
     let mut rows: Vec<JsShard> = doc
         .nodes
         .values()
@@ -801,7 +801,7 @@ struct JsFavorite {
 
 /// Every favorite, folder and separator, ordered by parent and then by
 /// order among siblings, so a host reads each folder's children in order.
-fn favorites_json(doc: &Document) -> Result<String, Failure> {
+pub(crate) fn favorites_json(doc: &Document) -> Result<String, Failure> {
     let mut rows: Vec<JsFavorite> = doc
         .nodes
         .iter()
@@ -1153,6 +1153,10 @@ pub(crate) enum Op {
         id: String,
         isolated: Option<bool>,
     },
+    AddDeviceWorkspace {
+        name: String,
+        id: String,
+    },
     SetIsolation {
         id: String,
         #[serde(default)]
@@ -1319,6 +1323,14 @@ pub(crate) fn apply_op(
             require_unused(doc, id)?;
             doc.add_agent_workspace(name, label, id, by, now);
             isolate_at_creation(doc, id, isolated);
+            Ok(Some(id))
+        }
+        Op::AddDeviceWorkspace { name, id } => {
+            // A device's own workspace (decision 2254). The device in the
+            // mark is `by`, the device that made it.
+            let id = parse_id(&id)?;
+            require_unused(doc, id)?;
+            doc.add_device_workspace(name, id, by, now);
             Ok(Some(id))
         }
         Op::SetIsolation { id, isolated } => {
@@ -3195,6 +3207,22 @@ mod tests {
             crate::tree::children(&doc, uid(40)),
             vec![uid(11), uid(12), uid(22), uid(21)]
         );
+    }
+
+    #[test]
+    fn add_device_workspace_marks_it_as_the_writing_devices() {
+        let mut doc = Document::new();
+        let ops = serde_json::json!([
+            { "kind": "addDeviceWorkspace", "name": "iPhone", "id": uid(70) },
+        ]);
+        apply_batch(&mut doc, &ops.to_string(), &ALICE, 300.0).unwrap();
+        let node = doc.node(uid(70)).unwrap();
+        assert_eq!(node.kind, NodeKind::Workspace);
+        assert_eq!(
+            node.device_home.as_ref().map(|mark| mark.device),
+            Some(DeviceId::from_bytes(ALICE))
+        );
+        assert_eq!(node.agent, None);
     }
 
     #[test]

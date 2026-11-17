@@ -32,6 +32,7 @@ one directory.
 - branding/sval/*.sfx, the icon in its resources
 - branding/sval/content/*.png
 - branding/sval/content/*.svg
+- branding/sval/ios/*.png
 - branding/sval/msix/Assets/*.png
 - branding/sval/stubinstaller/bgstub.jpg
 - branding/sval/src/icon.svg

@@ -133,6 +133,13 @@ mod sync_schedule_tests;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
+/// The iOS and Android boundary: [`wasm`]'s surface as UniFFI exports.
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
+#[cfg(feature = "ffi")]
+uniffi::setup_scaffolding!();
+
 /// Schema version written into every file.
 ///
 /// Bump `MAJOR` only for a change that an older build cannot safely read; it

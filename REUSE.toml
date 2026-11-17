@@ -25,6 +25,10 @@ path = [
   "tools/sval-mcp/Cargo.lock",
   "tools/sval-folder/Cargo.lock",
   "engine/Cargo.lock",
+  "mobile/uniffi-bindgen/Cargo.lock",
+  "mobile/sval-mobile/Cargo.lock",
+  "mobile/ios/Sval/Assets.xcassets/Contents.json",
+  "mobile/ios/Sval/Assets.xcassets/**/*.json",
   "chrome/toolkit/mozapps/update/updater/*.der",
 ]
 SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."
@@ -47,6 +51,7 @@ path = [
   "branding/sval/*.png",
   "branding/sval/content/*.png",
   "branding/sval/content/*.svg",
+  "branding/sval/ios/*.png",
   "branding/sval/msix/Assets/*.png",
   "branding/sval/stubinstaller/bgstub.jpg",
   "branding/sval/src/icon.svg",
@@ -69,6 +74,13 @@ SPDX-License-Identifier = "LicenseRef-sval-brand-art"
 [[annotations]]
 path = "chrome/browser/components/sval/home/Outfit.ttf"
 SPDX-FileCopyrightText = "2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)"
+SPDX-License-Identifier = "OFL-1.1"
+
+# JetBrains Mono, for codes and addresses in the iPhone app. Taken
+# unmodified from google/fonts (ofl/jetbrainsmono).
+[[annotations]]
+path = "mobile/ios/Sval/Fonts/JetBrainsMono.ttf"
+SPDX-FileCopyrightText = "2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)"
 SPDX-License-Identifier = "OFL-1.1"
 
 # Audiowide, the user's card's display face, shipped so the card loads no
@@ -313,8 +325,9 @@ SPDX-License-Identifier = "MPL-2.0"
 # copied from browser/branding/unofficial and changed, the search
 # configuration, which carries Mozilla's Wikipedia engine records, the Linux
 # package templates, from browser/installer/linux/app, Mozilla's extensions
-# bookmarks test, run against Sval's Favorites, the installer's
-# ServicesHelper plugin, built from Mozilla's source as patched
+# bookmarks test, run against Sval's Favorites, the phone's Public Suffix
+# List, normalized from Gecko's (mobile/sval-mobile/generate-psl.py), the
+# installer's ServicesHelper plugin, built from Mozilla's source as patched
 # (scripts/build-serviceshelper.sh), and the executables' manifests, each
 # from Mozilla's manifest of the executable it renames.
 [[annotations]]
@@ -339,6 +352,7 @@ path = [
   "chrome/other-licenses/nsis/Plugins/ServicesHelper.dll",
   "packaging/linux/debian/*",
   "packaging/linux/rpm/*",
+  "mobile/sval-mobile/src/effective_tld_names.txt",
 ]
 SPDX-FileCopyrightText = ["Mozilla contributors", "2026 Ellm Tree, Inc."]
 SPDX-License-Identifier = "MPL-2.0"

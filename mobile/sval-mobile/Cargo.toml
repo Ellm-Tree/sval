@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+[package]
+name = "sval-mobile"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only WITH AdditionRef-sval-app-store"
+publish = false
+
+# The one native library the phone apps link: the engine, and the connectors
+# that reach a shared folder no phone can open as a folder (mobile spec §8.1).
+# The connectors stay out of `engine/`, which does no network I/O (its rule 3).
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+# Converts the filter lists the desktop blocks with into WebKit's content
+# rules (mobile spec §4.1). MPL-2.0, as Mozilla's own files are.
+# Without its default `single-thread`, so `RequestBlocker`'s engine can be
+# shared with the threads the app calls in on.
+adblock = { version = "0.13.5", default-features = false, features = [
+    "content-blocking",
+    "embedded-domain-resolver",
+    "full-regex-handling",
+] }
+sval-core = { path = "../../engine", features = ["ffi"] }
+# `smol` brings its own reactor, so a blocking call works from any thread the
+# app calls in on, with no tokio runtime to keep alive.
+smb2 = { version = "0.43.0", default-features = false, features = ["smol"] }
+# Dropbox's API, for a Sval folder in the user's Dropbox (mobile spec
+# §8.1). Apache-2.0. Its client is ureq on rustls with ring, which builds
+# for iOS and Android.
+dropbox-sdk = { version = "0.21.0", default-features = false, features = ["dbx_files", "default_client"] }
+smol = "2.0.2"
+serde_json = "1"
+thiserror = "2"
+# Must match the engine's, or the generated bindings disagree with the library.
+uniffi = "=0.32.2"
+
+[dev-dependencies]
+# Reads the rules' WebKit patterns in tests, as a check on what they match.
+regex = "1"
+url = "2"

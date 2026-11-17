@@ -216,6 +216,10 @@ Tab        id, kind, + the four fact groups
 
 A workspace's `isolated` (§10.1) and `auto_archive` (§10.2) are lifecycle
 fields, so they merge by lifecycle's timestamp and never compete with a rename.
+A workspace can carry a mark saying whose it is, set when it is made and never
+edited: `agent`, an agent's (agent-control spec §3.5), or `device_home`, a
+phone's or tablet's own (decision 2254). Merge keeps either side's mark, and a
+build that doesn't know one keeps it as an unknown field.
 A split holds two to four tabs shown side by side (`2026-10-18-split-view-design.md`).
 The other documents hold kinds of their own: `setting` (§5.6), `favorite`,
 `folder` and `separator` (Favorites), `visit` and `shard` (history), and
@@ -1827,12 +1831,14 @@ switcher, a tear-off, an agent's window, session restore, a new window — becau
 it is enforced at the one place a window changes workspace, which never takes a
 workspace another window shows. A window still starting keeps its claim: what it
 was handed, or what the session remembers for it, counts as shown. A new window
-never takes an agent's workspace (agent-control spec §3.5) while the user has a
-workspace of their own, open or not: a window the user opens is the user's.
+never takes an agent's workspace (agent-control spec §3.5), or a phone's or
+tablet's own (decision 2254), while the user has a workspace of their own, open
+or not: a window the user opens is the user's.
 ⌘N (Ctrl+N) takes the next free workspace down from the window's own,
 wrapping at the bottom (`2026-10-22-launcher-design.md`). So
 a new window with every one of the user's workspaces already open gets a new,
-nameless workspace of its own, even when an agent's workspace has no window; a
+nameless workspace of its own, even when an agent's or a device's workspace has
+no window; a
 window whose workspace is deleted, with every other workspace of the user's
 open elsewhere, has nothing left to show and closes, deleting nothing (§5.4).
 A popup a page opened is outside the rule: it shows the page that opened it and
@@ -2220,6 +2226,12 @@ a time:
 **Search** contacts only the engine the user picked (§13 item 3), and with none
 of Mozilla's partner codes: they credit Mozilla under a contract Sval is not
 party to.
+
+**On iPhone** the same rule holds. Dropbox's hosts (`www.dropbox.com`,
+`api.dropboxapi.com`, `content.dropboxapi.com`, `notify.dropboxapi.com`) are
+contacted only when the user keeps the shared folder in Dropbox (mobile spec
+§8.1). A site's icon is fetched from that site, without cookies, once a page
+of it has loaded, which the page has already done.
 
 
 ## 11. Mobile (v2 fast-follow, designed for now)

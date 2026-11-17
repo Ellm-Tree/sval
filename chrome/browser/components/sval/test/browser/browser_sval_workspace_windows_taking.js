@@ -750,7 +750,7 @@ add_task(async function a_new_window_never_takes_an_agents_workspace() {
 
 /**
  * The switcher lists agents' workspaces apart from the user's, after them,
- * under a "🤖 Agent Workspaces" caption: one menu for each app, wearing the
+ * under an "Agent Workspaces" caption: one menu for each app, wearing the
  * robot face, with a row for each of its workspaces (decision 1998).
  */
 add_task(async function agents_workspaces_have_their_own_section() {

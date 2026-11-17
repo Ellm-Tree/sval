@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+#
+# The Rust this crate builds with, here, in CI and in Sval. rustup applies this
+# file to any cargo run below this checkout, and Sval's build-core-wasm.sh runs
+# cargo from it, so a developer's Mac and Sval's CI build the pinned engine with
+# the same compiler. Without it rustup falls back to each machine's default.
+#
+# The channel is the one Sval's image installs as its default, the release Sval's
+# own rust-toolchain.toml pins for Gecko, so the image already has it and Sval's
+# engine job downloads nothing. rust-version in Cargo.toml stays the minimum.
+
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
+targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim"]

@@ -592,13 +592,15 @@ export function workspaceIds(nodes) {
  * workspace of the user's at all: a window the user opened is the user's, and
  * handing it an agent's workspace would put the user to work inside the
  * agent's window (agent-control spec §6). A window opened for an agent
- * (`SvalAgentTabs`) reaches its workspace as the remembered id.
+ * (`SvalAgentTabs`) reaches its workspace as the remembered id. A phone's or
+ * tablet's own workspace ({@link isDeviceWorkspace}) is passed over on the
+ * same terms: its tabs are the ones opened on that device (decision 2254).
  *
  * A workspace has one window (spec §10.7), so a workspace another window
  * already shows is never the answer, remembered or not. `null` is the answer
  * only when no workspace is left for this window: the document holds none,
  * every one it holds has a window of its own, or every one left is an
- * agent's while the user has workspaces of their own.
+ * agent's or a device's while the user has workspaces of their own.
  *
  * @param {object} nodes The document's `nodes` map.
  * @param {string|null} remembered What the window last showed, or null.
@@ -619,7 +621,8 @@ export function currentWorkspace(
   after = null
 ) {
   const all = workspaceIds(nodes);
-  const usersOwn = id => agentLabelOf(nodes, id) === null;
+  const usersOwn = id =>
+    agentLabelOf(nodes, id) === null && !isDeviceWorkspace(nodes, id);
   const from = after === null ? -1 : all.indexOf(after);
   if (from !== -1) {
     for (let step = 1; step < all.length; step++) {
@@ -659,7 +662,8 @@ export function currentWorkspace(
  * colour. `agent` is the agent's label for an agent's workspace
  * ({@link agentLabelOf}), which the switcher marks with its app's mark,
  * `brand` ({@link agentBrandOf}), or with the robot face when the app is
- * none Sval knows.
+ * none Sval knows. `device` is whether it is a phone's or tablet's own
+ * ({@link isDeviceWorkspace}), which the switcher lists under Devices.
  * `elsewhere` is whether another window shows it, which is what keeps it out
  * of the switcher's "Open in New Window" list.
  *
@@ -668,8 +672,8 @@ export function currentWorkspace(
  * @param {{has: (id: string) => boolean}} [elsewhere] The workspaces other
  *   windows show.
  * @param {object} [devices] As {@link agentLabelOf} takes it.
- * @returns {object[]} `{ id, name, color, emoji, agent, brand, current,
- *   elsewhere }`,
+ * @returns {object[]} `{ id, name, color, emoji, agent, brand, device,
+ *   current, elsewhere }`,
  *   in sibling order.
  */
 export function switcherItems(
@@ -881,6 +885,7 @@ function itemOf(nodes, id, current, elsewhere, devices) {
     emoji: unreserved(nodes[id]?.appearance?.emoji),
     agent: agentLabelOf(nodes, id, devices),
     brand: agentBrandOf(nodes[id]?.agent?.label),
+    device: isDeviceWorkspace(nodes, id),
     current: id === current,
     elsewhere: elsewhere.has(id),
   };
@@ -964,6 +969,19 @@ export function agentLabelOf(nodes, id, devices = null) {
       ? devices.nameOf(mark.device)
       : null;
   return device ? `${label} · ${device}` : label;
+}
+
+/**
+ * Whether `id` is a phone's or tablet's own workspace: one whose node
+ * carries the `device_home` mark (decision 2254).
+ *
+ * @param {object} nodes The document's `nodes` map.
+ * @param {string|null} id A node id.
+ * @returns {boolean}
+ */
+export function isDeviceWorkspace(nodes, id) {
+  const node = id === null || id === undefined ? null : nodes[id];
+  return node?.kind === WORKSPACE && !!node.device_home;
 }
 
 /**

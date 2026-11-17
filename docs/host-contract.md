@@ -418,6 +418,14 @@ installation — 16 bytes from the same `crypto.getRandomValues` used
 elsewhere is sufficient. A wrong-length device id is rejected with an `Err`
 (never a panic): 15 or 17 bytes cannot be a `deviceId`, only exactly 16.
 
+**The id lives exactly as long as the device's own document.** A host whose
+own document starts empty again (the user left the folder, the app's data
+was deleted, the app was installed again) takes a new id, even where the old
+one could still be read, as from an iOS Keychain that survives deleting the
+app. An empty document written under the old id vouches for every fact that
+id wrote: each node it made is then not news to the device, so it reads as
+deleted here, and the next file the device writes deletes it on every peer.
+
 Pass the **same** bytes to the mutators and to `sync`. They are not two
 identities: a group attributed to one id while the file is written under another
 means no peer can match the two up, so those groups are read as news forever and

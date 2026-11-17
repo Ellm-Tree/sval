@@ -27,11 +27,20 @@
   /** What an agent's mark means, for its tooltip and description. */
   const AGENT_TEXT = "Agent Workspace";
 
+  /** The phone that marks a phone's or tablet's own workspace (decision 2254). */
+  const DEVICE_PHONE_URL = "chrome://browser/skin/device-phone.svg";
+
   /**
-   * The heading over the agents' part of a workspace list, led by the robot,
-   * the face each entry under it wears.
+   * The heading over the agents' part of a workspace list. It wears the
+   * robot, the face each entry under it wears.
    */
-  const AGENTS_CAPTION = "🤖 Agent Workspaces";
+  const AGENTS_CAPTION = "Agent Workspaces";
+
+  /**
+   * The heading over the phones' and tablets' own workspaces. It wears the
+   * phone, as each entry under it does.
+   */
+  const DEVICES_CAPTION = "Devices";
 
   /** A workspace entry of the switcher being dragged, by id. */
   const WORKSPACE_DRAG_TYPE = "application/x-sval-workspace";
@@ -417,13 +426,23 @@
       // _stepWorkspace}).
       const items = this._switcherList();
       menu.textContent = "";
-      for (const item of items.filter(entry => !entry.agent)) {
+      for (const item of items.filter(entry => this._usersOwn(entry))) {
         const el = this._workspaceEntry(item);
         // The user's own workspaces are put in order by dragging, as
-        // Favorites are in theirs; the agents' list keeps its own order.
+        // Favorites are in theirs; the devices' and agents' lists keep
+        // their own order.
         if (!this._inMemory) {
           el.setAttribute("draggable", "true");
         }
+        menu.append(el);
+      }
+      const devices = items.filter(entry => entry.device);
+      if (devices.length) {
+        this._appendDevicesCaption(menu);
+      }
+      for (const item of devices) {
+        const el = this._workspaceEntry(item);
+        this._countDeviceTabs(el, item);
         menu.append(el);
       }
       this._appendSwitcherAgentApps(
@@ -616,11 +635,12 @@
     },
 
     /**
-     * The switcher's entries: the user's own workspaces, then the agents'
-     * (agent-control spec §3.5), each part in sibling order. The agents' come
-     * last and under a caption of their own ({@link _appendAgentsCaption}), so
-     * the list the user works from is never interleaved with places an agent
-     * works.
+     * The switcher's entries: the user's own workspaces, then the phones'
+     * and tablets' (decision 2254), then the agents' (agent-control spec
+     * §3.5), each part in sibling order. The devices' and the agents' each
+     * come under a caption of their own ({@link _appendDevicesCaption},
+     * {@link _appendAgentsCaption}), so the list the user works from is never
+     * interleaved with places another device or an agent works.
      *
      * @returns {object[]} `SvalPanelModel.switcherItems` entries.
      */
@@ -631,7 +651,73 @@
         this.workspacesShownElsewhere(),
         this.devices()
       );
-      return [...items.filter(i => !i.agent), ...items.filter(i => i.agent)];
+      return [
+        ...items.filter(i => this._usersOwn(i)),
+        ...items.filter(i => i.device),
+        ...items.filter(i => i.agent),
+      ];
+    },
+
+    /**
+     * Whether a `switcherItems` entry is one of the user's own workspaces:
+     * neither a device's nor an agent's.
+     *
+     * @param {object} item
+     * @returns {boolean}
+     */
+    _usersOwn(item) {
+      return !item.agent && !item.device;
+    },
+
+    /**
+     * Starts the devices' part of a workspace list: a separator after any of
+     * the user's entries, then {@link DEVICES_CAPTION}. A `menucaption` in a
+     * menu Gecko draws, which the arrow keys pass over, and a disabled item
+     * in one a native menu bar can show, which draws no `menucaption`.
+     *
+     * @param {Element} popup The `menupopup` being filled.
+     * @param {object} [options]
+     * @param {boolean} [options.native] Whether a native menu bar shows it.
+     */
+    _appendDevicesCaption(popup, { native = false } = {}) {
+      if (native || popup.querySelector(":scope > [data-workspace-id]")) {
+        popup.append(document.createXULElement("menuseparator"));
+      }
+      const caption = document.createXULElement(
+        native ? "menuitem" : "menucaption"
+      );
+      caption.setAttribute("label", DEVICES_CAPTION);
+      caption.setAttribute("data-devices-caption", "true");
+      if (native) {
+        caption.setAttribute("disabled", "true");
+        caption.classList.add("menuitem-iconic", "sval-device-menuitem");
+        caption.setAttribute("image", DEVICE_PHONE_URL);
+      } else {
+        caption.className = "sval-devices-caption";
+      }
+      popup.append(caption);
+    },
+
+    /**
+     * Says how many tabs a device's workspace holds, beside its name and in
+     * its accessible description. Its tabs are open on that device and none
+     * of them in a window here, so the count is the tree's.
+     *
+     * @param {Element} el A workspace `menu` or `menuitem`.
+     * @param {object} item Its `switcherItems` entry.
+     */
+    _countDeviceTabs(el, item) {
+      const count = this._modules.SvalPanelModel.descendantTabCount(
+        this._nodes,
+        item.id
+      );
+      const text = count === 1 ? "1 tab" : `${count} tabs`;
+      el.setAttribute("acceltext", text);
+      const described = el.getAttribute("description");
+      el.setAttribute(
+        "description",
+        described ? `${text}. ${described}` : text
+      );
     },
 
     /**
@@ -670,6 +756,8 @@
       caption.setAttribute("label", AGENTS_CAPTION);
       caption.setAttribute("disabled", "true");
       caption.setAttribute("data-agents-caption", "true");
+      caption.classList.add("menuitem-iconic", "sval-agent-menuitem");
+      caption.setAttribute("image", AGENT_ROBOT_URL);
       popup.append(document.createXULElement("menuseparator"), caption);
     },
 
@@ -691,6 +779,7 @@
       // entry reads, and is announced, as the button does once chosen.
       this._labelWorkspaceEntry(el, item);
       this._markAgentItem(el, item);
+      this._markDeviceItem(el, item);
       this._markIsolatedItem(el, item);
       if (item.current) {
         el.setAttribute("aria-current", "true");
@@ -867,6 +956,15 @@
     },
 
     /**
+     * The mark a phone's or tablet's Workspace wears.
+     *
+     * @returns {string}
+     */
+    _deviceMarkURL() {
+      return DEVICE_PHONE_URL;
+    },
+
+    /**
      * Labels an agent workspace's entry in its app's menu: its task, then
      * where its session ran, the model, and when a session last used it.
      *
@@ -1001,6 +1099,21 @@
     },
 
     /**
+     * Gives a phone's or tablet's workspace entry the phone, as its image, as
+     * {@link _markAgentItem} gives an agent's the robot.
+     *
+     * @param {Element} el A workspace `menu` or `menuitem`.
+     * @param {object} item Its `switcherItems` entry.
+     */
+    _markDeviceItem(el, item) {
+      if (!item.device) {
+        return;
+      }
+      el.classList.add(this._iconicClass(el), "sval-device-menuitem");
+      el.setAttribute("image", DEVICE_PHONE_URL);
+    },
+
+    /**
      * The class that shows an entry's `image`: Firefox's `menu.css` keys a
      * `menu`'s icon on `menu-iconic` and a `menuitem`'s on `menuitem-iconic`.
      *
@@ -1028,8 +1141,8 @@
     /**
      * Gives an isolated workspace's entry the box (isolated workspaces spec
      * §10), as its image, as {@link _markAgentItem} does. An agent's entry
-     * keeps its robot, the one image an item has, and its description says
-     * both.
+     * keeps its robot and a device's its phone, the one image an item has,
+     * and its description says it is isolated.
      *
      * @param {Element} el A workspace `menu` or `menuitem`.
      * @param {object} item The entry it draws.
@@ -1042,7 +1155,7 @@
         el,
         item.agent ? `${AGENT_TEXT}. ${ISOLATED_TEXT}` : ISOLATED_TEXT
       );
-      if (!item.agent) {
+      if (!item.agent && !item.device) {
         el.classList.add(this._iconicClass(el), "sval-isolated-menuitem");
         el.setAttribute("image", ISOLATED_BOX_URL);
       }
@@ -1290,8 +1403,9 @@
     /**
      * Moves the window `step` places along the switcher's list of the user's
      * own workspaces, through the switcher's own switch, wrapping from either
-     * end to the other. The agents' workspaces are a list of their own in the switcher
-     * ({@link _switcherList}), and one an agent controls lays its overlay
+     * end to the other. The devices' and the agents' workspaces are lists of
+     * their own in the switcher ({@link _switcherList}), and one an agent
+     * controls lays its overlay
      * over the whole window, panel included (`SvalAgentMarking`), so a swipe
      * into it could not swipe back out.
      *
@@ -1303,7 +1417,7 @@
      * @param {number} step 1 for the next workspace, -1 for the previous.
      */
     _stepWorkspace(step) {
-      const items = this._switcherList().filter(item => !item.agent);
+      const items = this._switcherList().filter(item => this._usersOwn(item));
       const here = items.findIndex(item => item.current);
       const next =
         here === -1 ? null : items[(here + step + items.length) % items.length];
@@ -1326,7 +1440,7 @@
      */
     _workspaceOrder() {
       return this._switcherList()
-        .filter(item => !item.agent)
+        .filter(item => this._usersOwn(item))
         .map(item => item.id);
     },
 

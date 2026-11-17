@@ -1012,6 +1012,7 @@ mod tests {
             touched_at: 0,
             touched_by: None,
             agent: None,
+            device_home: None,
             extra: Default::default(),
         }
     }

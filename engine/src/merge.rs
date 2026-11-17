@@ -5,7 +5,7 @@
 //! and a version vector that tells a deletion from a node never seen.
 
 use crate::store::DeviceId;
-use crate::types::{AgentMark, Document, Node, NodeId, Timestamp};
+use crate::types::{Document, Node, NodeId, Timestamp};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
@@ -82,7 +82,7 @@ fn is_news_to(
 /// text is free to change between releases.
 ///
 /// `to_value` fails on a map whose keys are not strings, and every type
-/// passed here (the fact groups, `Value`, [`AgentMark`]) derives `Serialize`
+/// passed here (the fact groups, `Value`, [`crate::types::AgentMark`]) derives `Serialize`
 /// and keys its maps by `String`.
 fn canonical_bytes<T: serde::Serialize>(value: &T) -> Vec<u8> {
     let value = serde_json::to_value(value).expect("a fact group serialises to a JSON value");
@@ -212,11 +212,12 @@ fn merge_untimestamped_extra(
     }
 }
 
-/// The agent mark is set once and never edited, so the sides normally agree.
-/// When one side lacks it, the mark is adopted. When both carry different marks,
-/// the greater canonical bytes win, the same `max` over a total order as
-/// `merge_untimestamped_extra`, so both devices land on one value.
-fn merge_agent_mark(local: &mut Option<AgentMark>, remote: &Option<AgentMark>) {
+/// A workspace's agent or device mark is set once and never edited, so the
+/// sides normally agree. When one side lacks it, the mark is adopted. When
+/// both carry different marks, the greater canonical bytes win, the same
+/// `max` over a total order as `merge_untimestamped_extra`, so both devices
+/// land on one value.
+fn merge_mark<T: Clone + serde::Serialize>(local: &mut Option<T>, remote: &Option<T>) {
     let Some(remote_mark) = remote else { return };
     let take = match local {
         None => true,
@@ -349,6 +350,7 @@ pub fn merge_unheld(
                     touched_at,
                     touched_by,
                     agent,
+                    device_home,
                     extra,
                 } = local_node;
                 merge_fact(
@@ -392,7 +394,8 @@ pub fn merge_unheld(
                     (&(), remote_node.touched_at, remote_node.touched_by),
                 );
 
-                merge_agent_mark(agent, &remote_node.agent);
+                merge_mark(agent, &remote_node.agent);
+                merge_mark(device_home, &remote_node.device_home);
                 merge_untimestamped_extra(extra, &remote_node.extra);
             }
         }
@@ -516,6 +519,26 @@ mod tests {
             plain.node(id).unwrap().agent,
             marked.node(id).unwrap().agent
         );
+    }
+
+    #[test]
+    fn a_side_without_the_device_mark_adopts_it() {
+        let id = crate::types::test_support::test_id();
+        let by = test_device();
+        let mut marked = Document::new();
+        marked.add_device_workspace("iPhone", id, by, 10);
+        let mut plain = marked.clone();
+        plain.nodes.get_mut(&id).unwrap().device_home = None;
+
+        let mut forward = plain.clone();
+        merge(&mut forward, &marked);
+        let mut backward = marked.clone();
+        merge(&mut backward, &plain);
+        assert_eq!(
+            forward.node(id).unwrap().device_home,
+            marked.node(id).unwrap().device_home
+        );
+        assert_eq!(shared_state(&forward), shared_state(&backward));
     }
 
     /// Two peers of [`base_doc`] that have each published once at `at` and

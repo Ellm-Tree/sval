@@ -222,8 +222,8 @@
 
     /**
      * Draws the strip from the document as it stands: one tab per Workspace
-     * in the switcher's order, the agents' after a divider, and the current
-     * one selected. Items are kept from one render to the next, so a width
+     * in the switcher's order, the devices' and the agents' each after a
+     * divider, and the current one selected. Items are kept from one render to the next, so a width
      * or a slide animates and focus stays where it is.
      */
     _renderStrip() {
@@ -245,11 +245,21 @@
         ])
       );
       const wanted = [];
-      let divider = tabs.querySelector(":scope > .sval-strip-divider");
+      const dividers = new Map(
+        Array.from(
+          tabs.querySelectorAll(":scope > .sval-strip-divider"),
+          el => [el.dataset.divider, el]
+        )
+      );
+      let part = null;
       for (const entry of this._stripEntries(items)) {
-        if (entry.item.agent && !wanted.some(el => el === divider)) {
-          divider ??= this._stripDivider();
-          wanted.push(divider);
+        const its = this._stripPart(entry.item);
+        if (its !== part) {
+          part = its;
+          if (!dividers.has(part)) {
+            dividers.set(part, this._stripDivider(part));
+          }
+          wanted.push(dividers.get(part));
         }
         const el = kept.get(entry.key) ?? this._stripItem(entry.key);
         kept.delete(entry.key);
@@ -259,8 +269,10 @@
       for (const el of kept.values()) {
         el.remove();
       }
-      if (divider && !wanted.includes(divider)) {
-        divider.remove();
+      for (const divider of dividers.values()) {
+        if (!wanted.includes(divider)) {
+          divider.remove();
+        }
       }
       // Moved only when the order changed: a focused element moved in the
       // document loses focus.
@@ -306,17 +318,35 @@
       this._placeStrip();
     },
 
-    /** @returns {Element} the line between the user's and the agents' items. */
-    _stripDivider() {
+    /**
+     * Which part of the strip an item is in, each after a divider of its own
+     * but the user's, which comes first.
+     *
+     * @param {object} item A `switcherItems` entry.
+     * @returns {?string} `"devices"`, `"agents"`, or null for the user's own.
+     */
+    _stripPart(item) {
+      if (item.agent) {
+        return "agents";
+      }
+      return item.device ? "devices" : null;
+    },
+
+    /**
+     * @param {string} part What the divider starts ({@link _stripPart}).
+     * @returns {Element} the line before that part's items.
+     */
+    _stripDivider(part) {
       const el = this._html("div");
       el.className = "sval-strip-divider";
+      el.dataset.divider = part;
       el.setAttribute("aria-hidden", "true");
       return el;
     },
 
     /**
      * What the strip draws for `items`: one entry for each of the user's
-     * Workspaces, and one for each agent app (`item.agent`), however many
+     * and the devices' Workspaces, and one for each agent app (`item.agent`), however many
      * Workspaces it has, so every session an agent starts does not lengthen
      * the strip. An app with one Workspace is that Workspace's item. An app
      * with more stands for the Workspace the window shows, when it is one of
@@ -436,8 +466,11 @@
       el.toggleAttribute("data-shows-name", showsName);
       el.toggleAttribute("data-isolated", isolated);
       // The user's own Workspaces are put in order by dragging, as in the
-      // menu; the agents' keep theirs.
-      el.setAttribute("draggable", String(!item.agent && !this._inMemory));
+      // menu; the devices' and the agents' keep theirs.
+      el.setAttribute(
+        "draggable",
+        String(this._usersOwn(item) && !this._inMemory)
+      );
       el.setAttribute("aria-label", label);
       const described = [
         item.agent ? this._agentText : null,
@@ -463,13 +496,13 @@
       }
 
       const face = el.querySelector(".sval-strip-face");
-      const emoji = item.agent ? null : item.emoji;
+      const emoji = item.agent || item.device ? null : item.emoji;
       face.textContent = emoji ?? "";
-      face.classList.toggle("sval-strip-agent", !!item.agent);
-      if (item.agent) {
+      face.classList.toggle("sval-strip-agent", !!(item.agent || item.device));
+      if (item.agent || item.device) {
         face.style.setProperty(
           "--sval-agent-mark",
-          `url("${this._agentMarkURL(item.brand)}")`
+          `url("${item.agent ? this._agentMarkURL(item.brand) : this._deviceMarkURL()}")`
         );
       } else {
         face.style.removeProperty("--sval-agent-mark");

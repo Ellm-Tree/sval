@@ -351,6 +351,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_default_browser_prompt.js"]
 
+["browser_sval_device_workspaces.js"]
+
 ["browser_sval_devtools_close.js"]
 
 ["browser_sval_devtools_defaults.js"]

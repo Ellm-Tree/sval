@@ -194,7 +194,8 @@ const rings = front => {
       for (let i = 0; i < 4000 && placed < q.n; i++) { const x = 30 + r() * 964, y = 30 + r() * 964; if (Math.hypot(x - 512, y - 512) < 425) continue; placed++; const big = r() < q.big; const rad = big ? 2.6 + r() * 2 : 1 + Math.pow(r(), 2) * 2.2; const warm = r() < .18; o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${warm ? '#fff1c2' : '#dceaff'}" opacity="${(0.45 + 0.55 * r()).toFixed(2)}"/>`; }
       (q.sparks || []).forEach(([x, y, k]) => { o += `<circle cx="${x}" cy="${y}" r="${k * 1.1}" fill="url(#${p}sglow)"/>` + spark(x, y, k, 0) + `<g opacity=".7">${spark(x, y, k * 0.55, 45)}</g>`; });
       return `<radialGradient id="${p}sglow"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".7"/><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"/></radialGradient>` + o; };
-    let body = starfield() + (v.light ? '' : `<circle cx="512" cy="512" r="440" fill="url(#${p}glow)"/>`) + ring(false);
+    const stars = starfield(), behind = (v.light ? '' : `<circle cx="512" cy="512" r="440" fill="url(#${p}glow)"/>`) + ring(false);
+    let body = stars + behind;
     const gs = globe + ring(true);
     const shSoft = (o = .55) => `<g transform="translate(8 18)" opacity="${o}" filter="url(#${p}soft)">${S('#020830', 14)}</g>`;
     const shHard = `<g transform="translate(14 20)" opacity=".6">${S('#04103f', 14)}</g>`;
@@ -208,7 +209,13 @@ const rings = front => {
       return `<g mask="url(#${p}bm0)">${out}</g>`; };
     const glow = (c, k, o) => `<g filter="url(#${p}neon)" opacity="${o}">${S(c, k)}</g>`;
     if (v.fx === 'cust' && v.bOnly) { body = `<circle cx="512" cy="512" r="470" fill="#1f6bff" opacity=".18"/><g transform="translate(512 512) scale(1.5) translate(-520 -522)">${shSoft(.8)}${S('#ffffff', 8)}${S(`url(#${p}cust)`)}</g>`; }
-    else if (v.fx === 'cust') { const deb = v.erode && v.erode.shape ? erode(true, 'dots') : ''; body += gs + (v.bFront ? deb : '') + shSoft(.7) + (v.glow ? glow(v.glow, 14, .9) : '') + (v.bKey ? S(v.bKey, 8) : '') + S(`url(#${p}cust)`) + (v.bFront ? '' : deb); }
+    else if (v.fx === 'cust') { const deb = v.erode && v.erode.shape ? erode(true, 'dots') : ''; const letter = shSoft(.7) + (v.glow ? glow(v.glow, 14, .9) : '') + (v.bKey ? S(v.bKey, 8) : '') + S(`url(#${p}cust)`);
+      // A layered icon's three layers: the plate and its stars, the globe
+      // with its glow and ring, and the letter.
+      if (v.layer === 'back') body = stars;
+      else if (v.layer === 'globe') body = behind + gs;
+      else if (v.layer === 'letter') body = letter;
+      else body += gs + (v.bFront ? deb : '') + letter + (v.bFront ? '' : deb); }
     else if (v.fx === 'nIce') body += gs + shSoft(.7) + S(`url(#${p}nIce)`);
     else if (v.fx === 'nElec') body += gs + shSoft(.75) + S('#ffffff', 8) + S(`url(#${p}nElec)`);
     else if (v.fx === 'nGlow') body += gs + shSoft(.7) + glow('#00e5ff', 14, .95) + S(`url(#${p}ice)`);
@@ -235,7 +242,7 @@ const rings = front => {
     } else {
       body += globe + ring(true) + `<g transform="translate(10 16)" opacity=".45">${bS('#04103f', 32)}</g>${bS('#ffffff', 32)}${bS(`url(#${p}gel)`, 0)}<g opacity=".55">${bS('#ffffff', -Math.round(b.w * 0.72))}</g>`;
     }
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}">${defs}${v.unplated ? '' : `<rect width="1024" height="1024" fill="url(#${p}plate)"/>`}${body}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="${size}" height="${size}">${defs}${v.unplated || (v.layer && v.layer !== 'back') ? '' : `<rect width="1024" height="1024" fill="url(#${p}plate)"/>`}${body}</svg>`;
   }
 }
 
@@ -304,6 +311,7 @@ const LIGHT = {
 // opts.kW: stroke width of the whole k (default 112)
 // opts.armW: stroke width of the k's upper arm (default 112, same as the stem)
 // opts.unplated: no plate, no starfield (transparent background)
+// opts.layer: 'back' | 'globe' | 'letter', one layer of a layered icon
 // opts.light: tuned for light backgrounds: deeper "k" with a navy keyline, deeper ribbon with a dark outline, no outer glow
 export const SVAL = { moon: 'aurora', glyph: 'S', skew: 6, kW: 124 };
 export function icon(tier = 'full', priv = false, opts = {}) {
@@ -319,6 +327,7 @@ export function icon(tier = 'full', priv = false, opts = {}) {
     opts.noLetter ? { bmask: () => '' } : {},
     opts.unplated ? { unplated: true } : {},
     opts.light ? LIGHT : {},
+    opts.layer ? { layer: opts.layer } : {},
     { id: 'i' + (uid++) });
   return A.svg3(v, 1024, SEED);
 }

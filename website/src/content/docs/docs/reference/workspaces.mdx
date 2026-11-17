@@ -23,10 +23,23 @@ window's title starts with the Workspace's emoji and name.
 - When you select the switcher, the list of Workspaces opens.
 - When you right-click the switcher, the Workspace menu opens for the
   Workspace you're in.
+<Until v="0.1.0-rc.10">
+
 - When you swipe sideways over the Workspace panel, the window goes to the
   Workspace before or after the current one, in the list's order. A swipe
   skips Agent Workspaces. Settings › Keyboard shortcuts has a switch that
   turns swiping off.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- When you swipe sideways over the Workspace panel, the window goes to the
+  Workspace before or after the current one, in the list's order. A swipe
+  skips device Workspaces and Agent Workspaces. Settings › Keyboard shortcuts has a switch that
+  turns swiping off.
+
+</Since>
+
 
 ## The strip
 
@@ -50,6 +63,13 @@ tab is, with a bar at its start.
 - **A media button on a Workspace's icon.** This shows while a tab in that
   Workspace has sound or media. Clicking it does what the media entry in
   the Workspace menu says.
+<Since v="0.1.0-rc.10">
+
+- **Device Workspaces.** After a line, the strip shows the Workspace each
+  of your phones and tablets keeps for the tabs you open on it, each with a
+  phone icon.
+
+</Since>
 <Until v="0.1.0-rc.10">
 
 - **Agent Workspaces.** After a line, the strip shows the Workspaces that
@@ -97,6 +117,13 @@ Workspace you're in is in bold.
 - **A media button next to a name.** This shows while a tab in that
   Workspace has sound or media. Clicking the button does what the media
   entry in the Workspace menu says.
+<Since v="0.1.0-rc.10">
+
+- **Devices.** After your own Workspaces, the list shows the Workspace each
+  of your phones and tablets keeps, with a phone icon and the number of tabs
+  in it. You can't drag a device Workspace.
+
+</Since>
 - **Agent Workspaces.** After your own Workspaces, the list shows the
   Workspaces that agents work in.
 - **New Workspace…** The New Workspace dialog opens.

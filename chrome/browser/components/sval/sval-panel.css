@@ -351,7 +351,7 @@
  * (.sval-strip-tabs[role=tablist] > .sval-strip-item[role=tab] >
  * .sval-strip-tile > .sval-strip-face + .sval-strip-isolated +
  * button.sval-strip-audio, then .sval-strip-name; .sval-strip-divider before
- * the agents' items) + button.sval-strip-add; then .sval-strip-dots and
+ * the devices' items and before the agents') + button.sval-strip-add; then .sval-strip-dots and
  * .sval-strip-hairline.
  */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
@@ -2008,9 +2008,26 @@ menupopup:not([sval-stem]) {
 }
 
 .sval-agent-menuitem,
+.sval-device-menuitem,
 .sval-isolated-menuitem {
   -moz-context-properties: fill;
   fill: currentColor;
+}
+
+/* A `menucaption` draws no image, so the agents' and the devices' headings
+   wear their mark here, as their entries wear it in `image`. */
+menucaption:is(.sval-agents-caption, .sval-devices-caption)::before {
+  content: "";
+  flex: none;
+  width: var(--size-item-small);
+  height: var(--size-item-small);
+  margin-inline-end: calc(1.5 * var(--space-xsmall));
+  background: currentColor;
+  mask: url("chrome://browser/content/sval/agent-robot.svg") center / contain no-repeat;
+}
+
+menucaption.sval-devices-caption::before {
+  mask-image: url("chrome://browser/skin/device-phone.svg");
 }
 
 /*

@@ -109,6 +109,16 @@ control of what you see and what is sent to websites.
   so you can be signed in to two accounts on the same site at once.
 - **Workspace Sync.** Your Workspaces sync to your other devices, along with
   their tabs and groups. See [Sync](#sync).
+- **Device Workspaces.** Each phone or tablet that syncs with Sval keeps a
+  Workspace of its own for the tabs you open on it. On your computer, the
+  switcher lists the device Workspaces under Devices, after your own
+  Workspaces, each with a phone icon and the number of tabs in it. The strip
+  shows the device Workspaces after a line of their own, each with a phone
+  icon. While you have Workspaces of your
+  own, a new window never opens in a device Workspace. You can open, rename,
+  recolor, or delete a device Workspace like any other Workspace, or close
+  every tab in it. A device that stops syncing keeps its Workspace until you
+  delete it.
 - **Archive idle tabs (if you want).** Turn on Archive idle tabs in Settings ›
   Workspaces › Idle tabs, or for one Workspace in its Edit Workspace dialog.
   Sval then moves tabs you haven't used in a while to History › Archived
@@ -857,7 +867,7 @@ so a terminal in a web page can use it.
   Workspace panel, or scroll sideways with your mouse. The window goes to the
   next or previous Workspace in the switcher's list. Hold Shift to scroll sideways
   with your mouse's main wheel. Each swipe moves the window by one
-  Workspace. A swipe skips Agent Workspaces. If another window already shows
+  Workspace. A swipe skips device Workspaces and Agent Workspaces. If another window already shows
   the Workspace you swipe to, Sval brings that window to the front. Past
   your last Workspace, a swipe goes to your first, and before the first it
   goes to the last. A swipe over the page still goes back or forward. You

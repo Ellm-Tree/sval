@@ -972,8 +972,9 @@ Object.assign(SvalPanel, {
 
   /**
    * Fills "Move to workspace" with every workspace of the user's but this
-   * window's, then "New workspace…" (import spec §6), then the agents'
-   * workspaces after a caption of their own, grouped by app
+   * window's, then "New workspace…" (import spec §6), then the devices'
+   * workspaces (decision 2254) and the agents' after a caption each, the
+   * agents' grouped by app
    * ({@link _appendAgentApps}). A row moved into an agent's workspace is
    * handed to the agent, once the user has agreed (`moveToWorkspace`), so
    * those entries never mix with the user's.
@@ -992,7 +993,7 @@ Object.assign(SvalPanel, {
     const others = this._switcherList().filter(
       item => !item.current && !ids.includes(item.id)
     );
-    const own = others.filter(item => !item.agent);
+    const own = others.filter(item => this._usersOwn(item));
     for (const item of own) {
       const entry = document.createXULElement("menuitem");
       entry.setAttribute("data-move-workspace", item.id);
@@ -1006,6 +1007,17 @@ Object.assign(SvalPanel, {
     fresh.setAttribute("data-move-workspace", "");
     this._labelMenuEntry(fresh, "New Workspace…");
     popup.append(fresh);
+    const devices = others.filter(item => item.device);
+    if (devices.length) {
+      this._appendDevicesCaption(popup, { native: true });
+    }
+    for (const item of devices) {
+      const entry = document.createXULElement("menuitem");
+      entry.setAttribute("data-move-workspace", item.id);
+      this._labelWorkspaceEntry(entry, item);
+      this._markDeviceItem(entry, item);
+      popup.append(entry);
+    }
     const agents = others.filter(item => item.agent);
     if (agents.length) {
       this._appendAgentsMenuCaption(popup);
@@ -1080,8 +1092,9 @@ Object.assign(SvalPanel, {
    * (`SvalMenuBar`): every workspace the switcher lists, this window's
    * checked, then the workspace menu's commands on this window's workspace.
    *
-   * A native menu bar draws no submenu style, so agents' workspaces follow
-   * {@link _appendAgentsMenuCaption}'s caption, grouped by app
+   * A native menu bar draws no submenu style, so the devices' workspaces
+   * follow {@link _appendDevicesCaption}'s caption, and the agents'
+   * {@link _appendAgentsMenuCaption}'s, grouped by app
    * ({@link _appendAgentApps}), and entries carry no mark.
    *
    * @param {Element} popup
@@ -1100,9 +1113,19 @@ Object.assign(SvalPanel, {
       return el;
     };
     const items = this._switcherList();
-    for (const item of items.filter(i => !i.agent)) {
+    for (const item of items.filter(i => this._usersOwn(i))) {
       const el = entry(item);
       this._labelWorkspaceEntry(el, item);
+      popup.append(el);
+    }
+    const devices = items.filter(i => i.device);
+    if (devices.length) {
+      this._appendDevicesCaption(popup, { native: true });
+    }
+    for (const item of devices) {
+      const el = entry(item);
+      this._labelWorkspaceEntry(el, item);
+      this._markDeviceItem(el, item);
       popup.append(el);
     }
     const agents = items.filter(i => i.agent);
@@ -1117,7 +1140,7 @@ Object.assign(SvalPanel, {
     const commands = this._workspaceCommandItems();
     popup.append(document.createXULElement("menuseparator"), ...commands);
     this._syncWorkspaceCommands(popup, this._currentWorkspaceId);
-    // With no workspace of the person's own, the agents' caption follows the
+    // With no workspace of the person's own, the first caption follows the
     // menu bar's own separator (`SvalMenuBar`).
     this._modules.tidySeparators(popup);
   },

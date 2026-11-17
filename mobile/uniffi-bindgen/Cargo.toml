@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+[package]
+name = "uniffi-bindgen"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Generates the engine's Swift and Kotlin bindings from its compiled library
+# (`mobile/ios/build-engine.sh`). Its `uniffi` must match the engine's, or the
+# bindings disagree with the library's checksums and fail at load.
+[dependencies]
+uniffi = { version = "=0.32.2", features = ["cli"] }

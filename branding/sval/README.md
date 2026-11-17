@@ -36,7 +36,8 @@ and `node`, and installs the `ds_store` and `mac_alias` Python packages into
 It produces (see the script for the exact list):
 
 - PNGs: the toolbar and window icons (`default*.png`), the Windows Visual
-  Elements tiles, the About-dialog logos, every `msix/Assets/*.png`,
+  Elements tiles, the About-dialog logos, every `msix/Assets/*.png`, the
+  iPhone app icon's three layers (`ios/*.png`),
   `content/about.png` and the DMG window background (`background.png`, 144 dpi)
 - Multi-resolution `.ico` files with upstream's frame sizes, as 32-bit bitmaps
   below 256 px and PNG at 256 px

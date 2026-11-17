@@ -328,8 +328,16 @@ try:
                     "const { writeFileSync } = await import('node:fs');"
                     "writeFileSync(process.argv[2], art.icon('full', false, { unplated: true }));"
                     "writeFileSync(process.argv[3], art.icon('full', false, { unplated: true, light: true }));"
-                    "writeFileSync(process.argv[4], art.icon('full', true, { unplated: true }));",
-                    "file://" + art, unplated_svg, unplated_light_svg, unplated_private_svg], check=True)
+                    "writeFileSync(process.argv[4], art.icon('full', true, { unplated: true }));"
+                    "for (const [i, layer] of ['back', 'globe', 'letter'].entries())"
+                    "  writeFileSync(process.argv[5 + i], art.icon('full', false, { layer }));",
+                    "file://" + art, unplated_svg, unplated_light_svg, unplated_private_svg,
+                    *(os.path.join(work, f"{layer}.svg") for layer in ("back", "globe", "letter"))], check=True)
+    # The iPhone app's icon is layered, so iOS draws its glass between the
+    # layers: the plate and stars, the globe, and the "S", each at the
+    # 1024-point canvas iOS's icon format is drawn on.
+    for layer in ("back", "globe", "letter"):
+        write(f"ios/{layer}.png", rsvg(os.path.join(work, f"{layer}.svg"), 1024), f"1024x1024, the icon's {layer} layer")
     # The home and private-window pages draw the mark straight on their own
     # background, so they ship the unplated icons as SVG: the light variant on
     # the light home page, the dark one on the dark home page, and the private

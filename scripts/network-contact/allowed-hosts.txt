@@ -47,3 +47,7 @@ kagisuggest.com                           opt-in   Kagi suggestions, only when t
 dns.quad9.net                             opt-in   Secure DNS through Quad9, only once the user picks encrypted DNS (decision 0105)
 cloudflare-dns.com                        opt-in   Secure DNS through Cloudflare, only once the user picks encrypted DNS and Cloudflare (decision 0105)
 feedback.sval.app                         opt-in   Sval's feedback collector, only when the user presses Send in the Send Feedback form or ticks a crash dialog's box to send a crash report (feedback spec §7, decision 1199)
+www.dropbox.com                           opt-in   iPhone: Dropbox sign-in, only when the user keeps the shared folder in Dropbox (mobile spec §8.1)
+api.dropboxapi.com                        opt-in   iPhone: Dropbox's API for the shared folder, only when the user keeps it in Dropbox (mobile spec §8.1)
+content.dropboxapi.com                    opt-in   iPhone: the shared folder's files in Dropbox, only when the user keeps it there (mobile spec §8.1)
+notify.dropboxapi.com                     opt-in   iPhone: Dropbox's notice of a change to the shared folder, only when the user keeps it there (mobile spec §8.1)
