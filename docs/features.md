@@ -336,7 +336,9 @@ control of what you see and what is sent to websites.
   Workspace you don't have open can open in a new window, so the window
   you're in stays on its Workspace. To open the page in a new window,
   Shift-click the Workspace in the Peek's menu.
-  Installers and other files go straight to your downloads folder. In a
+  Installers and other files go straight to your downloads folder. When a
+  page in a Peek downloads a file, a downloads button shows in the Peek, with
+  a ring that fills in as the file downloads. In a
   Peek, the Launcher opens its tabs in your main window. The Launcher's
   commands for Settings, Downloads, History, Extensions, and Passwords open
   in your main window too. To reopen the Peek you closed last, press ⇧⌘T

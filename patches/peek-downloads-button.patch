@@ -1,0 +1,41 @@
+Sval: a Peek shows the downloads button only while it has downloads
+
+A Peek lists only the downloads its own page started
+(SvalDownloadWorkspaces), and Sval keeps the button in an ordinary
+window's toolbar before the first download (browser.download.autohideButton
+off). A Peek with none would show an empty button, so a Peek autohides it
+whatever the pref says. No chrome API reaches this: DownloadsButton reads
+the pref itself in hide and checkForAutoHide.
+
+diff --git a/browser/components/downloads/content/indicator.js b/browser/components/downloads/content/indicator.js
+index ab35688797..bc7b1c33b6 100644
+--- a/browser/components/downloads/content/indicator.js
++++ b/browser/components/downloads/content/indicator.js
+@@ -144,9 +144,17 @@ const DownloadsButton = {
+     return wasHidden;
+   },
+ 
++  // Sval: a Peek shows the button only while it has downloads of its own.
++  get _svalAutoHides() {
++    return (
++      this.autoHideDownloadsButton ||
++      document.documentElement.hasAttribute("svalpeek")
++    );
++  },
++
+   hide() {
+     let button = this._placeholder;
+-    if (this.autoHideDownloadsButton && button && button.closest("toolbar")) {
++    if (this._svalAutoHides && button && button.closest("toolbar")) {
+       DownloadsPanel.hidePanel();
+       button.hidden = true;
+       this._navBar.removeAttribute("downloadsbuttonshown");
+@@ -165,7 +173,7 @@ const DownloadsButton = {
+     let button = this._placeholder;
+     if (
+       !this._customizing &&
+-      this.autoHideDownloadsButton &&
++      this._svalAutoHides &&
+       button &&
+       button.closest("toolbar")
+     ) {

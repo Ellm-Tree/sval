@@ -13,7 +13,8 @@
  * to be a download closes its peek. Either way the download opens the
  * window's Downloads panel, and no peek or empty tab is left. A page or a PDF
  * stays in its peek. Agent access holds a peek's first load, so the response
- * check runs with it on too.
+ * check runs with it on too. A download from a page a peek shows is the
+ * peek's: its own downloads button and panel announce it.
  */
 
 const { SvalAgents } = ChromeUtils.importESModule(
@@ -258,4 +259,98 @@ add_task(async function a_page_and_a_pdf_stay_in_their_peeks() {
     Assert.equal(win.gBrowser.selectedTab.isEmpty, false, "showing its page");
   }
   Assert.deepEqual(await list.getAll(), [], "nothing was downloaded");
+});
+
+/**
+ * Clicks a link to `url` in the page `win` shows.
+ *
+ * @param {Window} win
+ * @param {string} url
+ */
+async function clickLinkIn(win, url) {
+  await SpecialPowers.spawn(win.gBrowser.selectedBrowser, [url], href => {
+    const link = content.document.createElement("a");
+    link.href = href;
+    link.textContent = "a file";
+    content.document.body.append(link);
+    link.click();
+  });
+}
+
+/**
+ * @param {Window} win
+ * @returns {string[]} The file names `win`'s Downloads panel lists.
+ */
+function listedIn(win) {
+  return [...win.DownloadsView.richListBox.itemChildren].map(
+    row => row.querySelector(".downloadTarget")?.value
+  );
+}
+
+add_task(async function a_download_from_a_peeks_page_shows_in_the_peek() {
+  const list = await downloadsGoToATempFolder();
+  const peek = await peekShows(RED);
+  const button = () => peek.document.getElementById("downloads-button");
+  Assert.ok(
+    !BrowserTestUtils.isVisible(button()),
+    "a Peek with no downloads of its own shows no downloads button"
+  );
+
+  await clickLinkIn(peek, `${BASE}/attachment`);
+  await TestUtils.waitForCondition(
+    () => peek.document.getElementById("downloadsPanel")?.state === "open",
+    "the Peek's Downloads panel opens on its own"
+  );
+  Assert.ok(BrowserTestUtils.isVisible(button()), "its downloads button shows");
+  await TestUtils.waitForCondition(
+    () => listedIn(peek).includes("attached.txt"),
+    "the Peek's panel lists the download"
+  );
+  Assert.notEqual(
+    document.getElementById("downloadsPanel")?.state,
+    "open",
+    "the window behind the Peek opens no panel"
+  );
+
+  await clickLinkIn(peek, `${BASE}/binary`);
+  await TestUtils.waitForCondition(
+    () => listedIn(peek).length === 2,
+    "a second download joins the Peek's list"
+  );
+  await TestUtils.waitForCondition(
+    async () => (await list.getAll()).every(d => d.succeeded),
+    "both are downloaded"
+  );
+  Assert.ok(!peek.closed, "the Peek stays open on its page");
+  Assert.ok(
+    peek.document.getElementById("sval-downloads-views") === null ||
+      !BrowserTestUtils.isVisible(
+        peek.document.getElementById("sval-downloads-views")
+      ),
+    "the panel offers no switch between workspaces"
+  );
+
+  const panelHidden = BrowserTestUtils.waitForPopupEvent(
+    peek.document.getElementById("downloadsPanel"),
+    "hidden"
+  );
+  peek.DownloadsPanel.hidePanel();
+  await within(panelHidden, 10_000, "the Peek's Downloads panel closing");
+  const narrowest = 720;
+  peek.resizeBy(narrowest - peek.innerWidth, 0);
+  await TestUtils.waitForCondition(
+    () => peek.innerWidth === narrowest,
+    `the Peek ${narrowest}px wide`
+  );
+  const doc = peek.document;
+  Assert.ok(
+    !doc.getElementById("nav-bar").hasAttribute("overflowing"),
+    "at the narrowest, the downloads button stays in the row"
+  );
+  const main = doc.getElementById("sval-peek-open-main");
+  Assert.lessOrEqual(
+    main.scrollWidth,
+    main.clientWidth,
+    "and the open button shows all it holds"
+  );
 });

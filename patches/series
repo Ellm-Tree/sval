@@ -270,6 +270,7 @@ sval-reserved-keys.patch
 devtools-inspector-copy-address.patch
 content-thin-scrollbars.patch
 header-overflow.patch
+peek-downloads-button.patch
 overflow-hidden-node-returns.patch
 context-menu-shortcuts.patch
 widget-shifted-plus-shortcut.patch

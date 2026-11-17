@@ -57,24 +57,35 @@
 }
 
 /* What a page in no workspace has no use for: the panel and its toggle, the
-   records of downloads and history, the split button, and the extensions,
-   which belong to the window a page is kept in. */
+   record of history, the split button, and the extensions, which belong to
+   the window a page is kept in. */
 :root[svalpeek]
   #nav-bar
-  :is(
-    #sval-panel-button,
-    #downloads-button,
-    #sval-history-button,
-    #split-view-button,
-    #sval-private-badge,
-    #unified-extensions-button,
-    .unified-extensions-item
-  ) {
+  :is(#sval-panel-button, #sval-history-button, #split-view-button, #sval-private-badge, #unified-extensions-button, .unified-extensions-item) {
   display: none !important;
 }
 
 :root[svalpeek] #nav-bar {
   gap: 6px;
+}
+
+/* The downloads button shows while the Peek has downloads of its own
+   (`SvalDownloadWorkspaces`, `DownloadsButton` autohiding it), alone in the
+   records' pill, so it closes the pill too. Its panel lists only the
+   Peek's, so the switch between workspaces has nothing to switch. */
+:root[svalpeek] #nav-bar:not([downloadsbuttonshown]) #downloads-button {
+  display: none !important;
+}
+
+:root[svalpeek] #nav-bar #downloads-button {
+  border-inline-end: 1px solid var(--sval-cluster-border);
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
+  padding-inline-end: 2px;
+}
+
+:root[svalpeek] #sval-downloads-views {
+  display: none;
 }
 
 /* The pill fills the row between the tag and the open button, and gives way

@@ -23,6 +23,7 @@ import {
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   isPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
+  SvalPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -47,6 +48,24 @@ const listingAll = new WeakSet();
 const indicatorData = new WeakMap();
 
 /**
+ * The Peek each download of this session was started in, held weakly so a
+ * download kept on the list keeps no closed Peek alive.
+ *
+ * @type {WeakMap<object, WeakRef<Window>>}
+ */
+const startedInPeek = new WeakMap();
+
+/**
+ * @param {object} download
+ * @returns {Window|null} The Peek `download` was started in, while it stays
+ *   open. A Peek handed over to a window as it closes is gone already.
+ */
+function peekOf(download) {
+  const win = startedInPeek.get(download)?.deref();
+  return win && !win.closed && !lazy.SvalPeek.isHandedOff(win) ? win : null;
+}
+
+/**
  * @param {object} download
  * @returns {string|null} The workspace that started `download`, or null for
  *   one from before Sval kept it.
@@ -57,30 +76,45 @@ export function workspaceOfDownload(download) {
 }
 
 /**
- * The workspace a download starts in: the one holding the tab that started
- * it, `UNKNOWN_WORKSPACE` for a tab that cannot be found, or, for a
- * download no tab started, the one the focused window shows. A private
- * download always gets a private window's workspace.
+ * The top browsing context whose page started a download, its browser and
+ * its window, each null when no live context has the download's id.
  *
  * @param {object} download
- * @returns {string|null}
+ * @returns {{top: BrowsingContext|null, browser: Element|null, win: Window|null}}
  */
-function startingWorkspace(download) {
+function startingPlace(download) {
   const contextId = download.source?.browsingContextId;
-  let browser = null;
   // A module has no `BrowsingContext` global; a window has, as
   // `DownloadUIHelper` reaches it.
   const any = lazy.BrowserWindowTracker.getTopWindow({
     allowPopups: true,
     allowFromInactiveWorkspace: true,
   });
-  let win = null;
-  let top = null;
   try {
-    top = contextId ? any?.BrowsingContext.get(contextId)?.top : null;
-    browser = top?.embedderElement ?? null;
-    win = top?.topChromeWindow ?? null;
-  } catch {}
+    const top = contextId ? any?.BrowsingContext.get(contextId)?.top : null;
+    return {
+      top,
+      browser: top?.embedderElement ?? null,
+      win: top?.topChromeWindow ?? null,
+    };
+  } catch {
+    return { top: null, browser: null, win: null };
+  }
+}
+
+/**
+ * The workspace a download starts in: the one holding the tab that started
+ * it, `UNKNOWN_WORKSPACE` for a tab that cannot be found, or, for a
+ * download no tab started, the one the focused window shows. A private
+ * download always gets a private window's workspace.
+ *
+ * @param {object} download
+ * @param {{top: BrowsingContext|null, browser: Element|null, win: Window|null}} place
+ *   Where it started, from {@link startingPlace}.
+ * @returns {string|null}
+ */
+function startingWorkspace(download, { top, browser, win }) {
+  const contextId = download.source?.browsingContextId;
   // A private popup has no toolbar to list a download in, so its download is
   // the window's whose session it shares (`SvalPrivateJars.windowOf`).
   if (download.source?.isPrivate && win && !win.toolbar.visible) {
@@ -125,7 +159,8 @@ function startingWorkspace(download) {
 
 /**
  * Records the workspace a download was started in, once, as it joins the
- * list. A download restored from a past session keeps the one it has.
+ * list, and the Peek it was started in, if any. A download restored from a
+ * past session keeps the workspace it has.
  *
  * @param {object} download
  */
@@ -133,7 +168,11 @@ export function record(download) {
   if (workspaceOfDownload(download) !== null) {
     return;
   }
-  const id = startingWorkspace(download);
+  const place = startingPlace(download);
+  if (lazy.isPeek(place.win)) {
+    startedInPeek.set(download, new WeakRef(place.win));
+  }
+  const id = startingWorkspace(download, place);
   if (id !== null) {
     download._unknownProperties ??= {};
     download._unknownProperties[WORKSPACE_PROPERTY] = id;
@@ -146,9 +185,12 @@ export function record(download) {
  * @returns {boolean} Whether `download` is of the workspace `win` shows. One
  *   from before Sval kept workspaces is every workspace's. A private window's
  *   workspace is its own session's (`SvalPrivateJars`), so it has only the
- *   downloads started in it.
+ *   downloads started in it, and a Peek, in no workspace, has only its own.
  */
 export function inShownWorkspace(win, download) {
+  if (lazy.isPeek(win)) {
+    return peekOf(download) === win;
+  }
   const id = workspaceOfDownload(download);
   if (lazy.PrivateBrowsingUtils.isWindowPrivate(win)) {
     return id !== null && id === win.SvalPanel?.workspaceId;
@@ -250,7 +292,8 @@ function isAgentWorkspace(win, id) {
 
 /**
  * The window to tell about `download` starting, finishing or failing: the
- * most recent one showing its workspace, or none for an agent's download or
+ * Peek it was started in while that stays open, the most recent window
+ * showing its workspace, or none for an agent's download or
  * one whose workspace no window shows. A download Sval has no workspace for
  * goes to the most recent window, as Firefox's does.
  *
@@ -259,6 +302,10 @@ function isAgentWorkspace(win, id) {
  * @returns {Window|null}
  */
 export function windowToTell(download, isPrivate) {
+  const peek = peekOf(download);
+  if (peek) {
+    return peek;
+  }
   const id = workspaceOfDownload(download);
   const top = lazy.BrowserWindowTracker.getTopWindow({
     private: isPrivate,

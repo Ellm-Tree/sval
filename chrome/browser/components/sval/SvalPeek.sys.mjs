@@ -1435,12 +1435,13 @@ export const SvalPeek = {
    * @returns {Promise<void>}
    */
   async handOver(win, download) {
+    // Handed off first, so `windowToTell` passes over this Peek.
+    handedOff.add(win);
     const target =
       lazy.SvalDownloadWorkspaces.windowToTell(download, false) ??
       (await openNormalWindow());
     target.focus();
     lazy.SvalMacWindowOrder.bringForward(target);
-    handedOff.add(win);
     win.close();
     if (Services.focus.activeWindow === target) {
       return;
@@ -1449,6 +1450,15 @@ export const SvalPeek = {
       target.addEventListener("activate", resolve, { once: true });
       target.addEventListener("unload", resolve, { once: true });
     });
+  },
+
+  /**
+   * @param {Window} win A Peek.
+   * @returns {boolean} Whether `win` is closing because its page went on to
+   *   a workspace or a download.
+   */
+  isHandedOff(win) {
+    return handedOff.has(win);
   },
 
   /**

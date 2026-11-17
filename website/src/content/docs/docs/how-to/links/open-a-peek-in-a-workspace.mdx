@@ -4,6 +4,7 @@ description: Move the page a link from another app opened in a Peek into one of 
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
 
 When Sval is your default browser, a link you open in another app, like
 Slack, Mail, or a terminal, opens in a Peek. A Peek is a small window that
@@ -52,6 +53,15 @@ Workspace.
   close one. You can also select **Close all peeks** there.
 - A link to an installer or another file doesn't open a Peek. The file goes
   to your downloads.
+
+<Since v="0.1.0-rc.10">
+
+- When a page in a Peek downloads a file, a downloads button shows in the
+  Peek. The button's ring fills in as the file downloads. Select it to see
+  the files the Peek downloaded.
+
+</Since>
+
 - In a Peek, the Launcher opens your tabs, Settings, Downloads, History,
   Extensions, and Passwords in your main window.
 - A Peek you don't use closes after 6 hours. Its page stays in History.
