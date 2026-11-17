@@ -33,6 +33,15 @@ or delete the other's state.
   folders gives little in return: Bitwarden's desktop app writes the Firefox
   manifest on macOS and Linux only where Firefox's folder exists, so on a
   machine with Sval alone it never helps.
+- The one exception is on macOS, where Sval reads a single manifest from a
+  Mozilla folder: `com.apple.passwordmanager.json` in
+  `/Library/Application Support/Mozilla/NativeMessagingHosts`. macOS installs
+  the file there for the iCloud Passwords extension and writes no copy to a
+  folder of Sval's. The file is Apple's and Firefox never writes it, so
+  reading it reads none of Firefox's state. Sval carrying a copy of its own
+  is rejected: the manifest names the path of Apple's helper app inside the
+  system volume and the ids of Apple's extension, and a copy goes stale when
+  a macOS update changes either.
 - `docs/audits/2026-11-01-firefox-coexistence.md` has the audit with a verdict
   for each name.
 
@@ -40,7 +49,7 @@ or delete the other's state.
 
 - Sval loads no add-on from the shared system and user extension folders.
 - A password manager's desktop integration needs the manager to list Sval,
-  or a manifest the user copies.
+  or a manifest the user copies. iCloud Passwords on macOS needs neither.
 - On Linux, Sval's data directory is `~/.sval` from the first launch.
 - On Linux, Sval's application id is `app.sval.sval`. The desktop portal,
   notifications, and MPRIS know Sval by it, and it names Sval's desktop

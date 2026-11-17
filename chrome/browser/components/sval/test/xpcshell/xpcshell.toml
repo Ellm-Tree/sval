@@ -56,6 +56,10 @@ requesttimeoutfactor = 2
 
 ["test_sval_agents_listener.js"]
 
+# The manifest is one macOS installs.
+["test_sval_apple_passwords_manifest.js"]
+run-if = ["os == 'mac'"]
+
 ["test_sval_archive.js"]
 
 ["test_sval_blocking.js"]

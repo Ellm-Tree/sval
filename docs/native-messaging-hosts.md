@@ -5,10 +5,11 @@ extension, for example, asks its desktop app to unlock with Touch ID or
 Windows Hello. The desktop app makes this possible by installing a small
 file, called a native messaging manifest, where the browser looks for it.
 
-Sval looks for these files in its own folders, and it never reads the
-folders Firefox uses. Some desktop apps don't know about Sval yet, so they
-only install the file for Firefox. You can copy the file into Sval's
-folder yourself.
+Sval looks for these files in its own folders. The only file Sval reads
+from a Firefox folder is the one macOS installs for
+[iCloud Passwords](#icloud-passwords). Some desktop apps don't know about
+Sval yet, so they only install the file for Firefox. You can copy the file
+into Sval's folder yourself.
 
 ## Find the app's manifest
 
@@ -51,6 +52,13 @@ On macOS and Linux, KeePassXC can write its file into Sval's folder itself:
 5. Set Config Location to Sval's folder from the list above.
 
 KeePassXC writes the file as soon as the setting is saved.
+
+## iCloud Passwords
+
+On a Mac, you don't need to copy anything for Apple's iCloud Passwords
+extension. macOS installs the extension's file in
+`/Library/Application Support/Mozilla/NativeMessagingHosts`, and Sval reads
+that one file from the folder.
 
 ## For administrators
 

@@ -276,6 +276,7 @@ a11y-checks-aria-rowgroup.patch
 linux-own-names.patch
 linux-desktop-id.patch
 native-messaging-manifests.patch
+apple-passwords-manifest.patch
 a11y-checks-roving-treeitem.patch
 app-name.patch
 windows-own-progids.patch
