@@ -53,6 +53,13 @@ targets:
           - CFBundleURLName: app.sval.ios.web
             CFBundleURLSchemes: [http, https]
         # A row dragged in the Workspace tree (`TreeDrop.swift`).
+        # iPad multitasking needs every orientation, and App Store Connect
+        # refuses an iPad build without them.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: app.sval.ios.node
             UTTypeDescription: Sval Workspace row
@@ -63,7 +70,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Sval's blue, which every system control takes.
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        MARKETING_VERSION: "0.1"
+        MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Sval

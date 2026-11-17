@@ -20,6 +20,10 @@ CRATE="$REPO_ROOT/mobile/sval-mobile"
 export CARGO_TARGET_DIR="$ENGINE/target"
 OUT="$REPO_ROOT/mobile/ios/Generated"
 TARGETS=(aarch64-apple-ios aarch64-apple-ios-sim)
+# The app's deployment target (`project.yml`). rustc and the cc crate read it
+# from here; without it ring's C objects target the SDK's own iOS version,
+# newer than the app runs on.
+export IPHONEOS_DEPLOYMENT_TARGET="$(sed -n 's/^ *iOS: "\(.*\)"$/\1/p' "$REPO_ROOT/mobile/ios/project.yml")"
 
 TREE="$(git -C "$REPO_ROOT" rev-parse HEAD:engine)"
 if [[ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no -- engine)" ]]; then

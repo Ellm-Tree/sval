@@ -52,6 +52,19 @@ Find the iPhone's identifier with `xcrun devicectl list devices`, and set
 
 Installing works over Wi-Fi once the iPhone has been paired with the Mac.
 
+## Upload to TestFlight
+
+From the repository's root, with a build number higher than any uploaded
+for the version in `project.yml`:
+
+    mobile/ios/upload-testflight.sh 2
+
+The script builds the engine, archives the app, and uploads it to App
+Store Connect, signed with the Apple account signed in to Xcode. With
+`ASC_KEY_PATH`, `ASC_KEY_ID` and `ASC_ISSUER_ID` set, it signs with that
+App Store Connect API key instead. The build appears in App Store
+Connect's TestFlight tab once Apple has processed it.
+
 ## Read the app's log
 
 The app writes its own log to `Library/Caches/diagnostics.log` in its
