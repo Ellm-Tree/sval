@@ -32,6 +32,11 @@
     permissionPhrase:
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
     siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+    STYLES_PREF: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    removeStyles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    setStyle: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    styleAt: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    styles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     SvalSiteProtections:
@@ -132,6 +137,7 @@
         lazy.SITE_BRANCH,
         lazy.MEDIA_DEFAULT_PREF,
         lazy.EXTENSION_SITE_BRANCH,
+        lazy.STYLES_PREF,
         ...lazy.SvalJavascript.PREFS,
       ]) {
         followPref(name, sitesPref);
@@ -194,6 +200,7 @@
       const all = lazy.SvalSiteProtections.rules(this._siteSession);
       this._sitesPermissions = lazy.permissionsBySite();
       this._sitesJavascript = lazy.SvalJavascript.rules();
+      this._sitesStyles = new Set(lazy.styles().map(style => style.scope));
       // A `#@#` line is a choice of the host it names alone: under a line
       // hiding the element on its site, it shows the element there again.
       this._sitesShown = new Map(
@@ -206,6 +213,7 @@
         ...this._sitesShown.keys(),
         ...lazy.SvalExtensionSites.names(),
         ...this._sitesJavascript.keys(),
+        ...this._sitesStyles,
         ...this._sitesPermissions.keys(),
       ]) {
         if (!all.has(name)) {
@@ -603,6 +611,7 @@
         !!Object.keys(rule).length ||
         (!isPrivate &&
           (this._sitesJavascript.has(name) ||
+            this._sitesStyles.has(name) ||
             !!lines.length ||
             !!shown.length ||
             !!this._siteSwitches(name).length ||
@@ -652,7 +661,8 @@
      * @returns {Array<[string, string]>} What differs from the defaults on
      *   the site, each as a key naming the setting and its value, and a
      *   phrase: protections, fingerprinting exceptions, video and audio,
-     *   JavaScript, each permission, removed elements, each extension switch,
+     *   JavaScript, Colorshift, each permission, removed elements, each
+     *   extension switch,
      *   then elements shown again. A permission held by another origin under the site names its
      *   host.
      */
@@ -690,6 +700,9 @@
           `javascript:${js}`,
           js === "allow" ? "JavaScript allowed" : "JavaScript blocked",
         ]);
+      }
+      if (this._sitesStyles.has(site)) {
+        words.push(["style", "Colorshift"]);
       }
       const own = new Set(
         lazy.siteOrigins(site, ["https", "http"]).map(uri => uri.prePath)
@@ -1051,7 +1064,8 @@
     /**
      * Puts a site's or a host's choices back to the defaults: its
      * `SvalSiteProtections` choices, and, outside a private window, its
-     * JavaScript rule, its permissions, its extension switches and a
+     * JavaScript rule, its Colorshift style, its permissions, its extension
+     * switches and a
      * host's lines in My filters showing an element again, which are stored
      * ones. The status line offers Undo, which takes the focus.
      *
@@ -1064,6 +1078,7 @@
       lazy.SvalSiteProtections.setRule(site, null, this._siteSession);
       if (!this._privateWindow) {
         lazy.SvalJavascript.removeRule(site);
+        lazy.removeStyles([site]);
         for (const perm of lazy.permissionsBySite().get(site) ?? []) {
           if (!perm.isDefault) {
             Services.perms.removePermission(perm);
@@ -1106,6 +1121,7 @@
         javascript: isPrivate
           ? undefined
           : (lazy.SvalJavascript.rules().get(site) ?? null),
+        style: isPrivate ? null : lazy.styleAt(site),
         switches: isPrivate ? [] : this._siteSwitches(site),
         shown:
           isPrivate || lazy.siteOfEntry(site).site === site
@@ -1175,12 +1191,21 @@
      * @param {string} snapshot.site
      * @param {?object} snapshot.rule
      * @param {?string} [snapshot.javascript] Left out in a private window.
+     * @param {?object} snapshot.style Its Colorshift style's values.
      * @param {object[]} snapshot.permissions
      * @param {string[]} snapshot.shown The selectors a host showed again.
      * @param {Array<[string, string]>} snapshot.switches From
      *   `_siteSwitches`.
      */
-    _restoreSite({ site, rule, javascript, permissions, shown, switches }) {
+    _restoreSite({
+      site,
+      rule,
+      javascript,
+      style,
+      permissions,
+      shown,
+      switches,
+    }) {
       // Undo follows a Reset of this name alone, so each switch differs
       // from what the name inherits as it did, and `setOff` keeps it.
       for (const [id, state] of switches) {
@@ -1207,6 +1232,9 @@
         } else {
           js.removeRule(site);
         }
+      }
+      if (style) {
+        lazy.setStyle(site, style);
       }
       for (const perm of permissions) {
         Services.perms.addFromPrincipal(

@@ -473,6 +473,37 @@ add_task(async function the_keyboard_keeps_its_place_in_the_sites() {
 });
 
 /**
+ * A site whose only choice is its Colorshift style is listed, Reset takes
+ * the style with the rest, and Undo brings it back.
+ */
+add_task(async function a_colorshift_style_is_a_choice_of_its_site() {
+  reset();
+  const { removeStyles, setStyle, styleAt } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs"
+  );
+  registerCleanupFunction(() => removeStyles(["example.net"]));
+  setStyle("example.net", { theme: "dark" });
+  const ui = await openSites();
+  await within(SimpleTest.promiseFocus(ui.page), 10_000, "the page's focus");
+  const differs = () =>
+    rowFor(ui, "example.net")?.querySelector(".sval-sites-summary").dataset
+      .differs;
+  Assert.equal(differs(), "style", "the row says the site has a style");
+
+  rowFor(ui, "example.net").querySelector(".sval-sites-reset").click();
+  Assert.equal(styleAt("example.net"), null, "Reset takes the style");
+  Assert.ok(!rowFor(ui, "example.net"), "and the row goes");
+
+  ui.byId("sval-sites-status").querySelector("button").click();
+  Assert.deepEqual(
+    styleAt("example.net"),
+    { theme: "dark" },
+    "Undo brings the style back"
+  );
+  Assert.equal(differs(), "style", "and its row");
+});
+
+/**
  * Reset on a row whose site has hidden-element lines confirms first (site
  * page design 8b), saying what goes and what stays; one without acts at
  * once.

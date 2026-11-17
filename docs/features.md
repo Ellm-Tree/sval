@@ -608,14 +608,14 @@ control of what you see and what is sent to websites.
   theme, serif font". Private windows show your changes, but you can't open
   Colorshift there. The color wheel comes from Zen Browser's Boosts.
 - **Per-site controls.** Settings › Sites lists every site you've made choices
-  for, including the extensions you turned off or on for a site. Each site
-  has its own page for its permissions, JavaScript, removed elements, and
-  stored data. Reset on a site's row clears the site's choices, extension
-  switches included. Forget this site clears everything Sval keeps for the
-  site. In Defaults, at the top of Settings › Sites, you set what every site
-  gets until you make a choice for that site. Defaults covers JavaScript,
-  video and audio, and each permission, with the same choices and controls
-  as the site menu.
+  for, including the extensions you turned off or on for a site and a site's
+  saved Colorshift. Each site has its own page for its permissions,
+  JavaScript, removed elements, and stored data. Reset on a site's row
+  clears the site's choices, extension switches and Colorshift included.
+  Forget this site clears everything Sval keeps for the site. In Defaults,
+  at the top of Settings › Sites, you set what every site gets until you
+  make a choice for that site. Defaults covers JavaScript, video and audio,
+  and each permission, with the same choices and controls as the site menu.
 - **Choices for one address on a site.** A choice can cover one address,
   like `nas.example.com`, or all of `example.com`. Settings › Sites lists an
   address with its own choices under its site. The address's Reset puts
