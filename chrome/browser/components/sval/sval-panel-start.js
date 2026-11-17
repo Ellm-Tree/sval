@@ -253,36 +253,13 @@ Object.assign(SvalPanel, {
     this._els.tree.hidden = false;
     this._els.header.hidden = false;
 
-    const { SvalEngine, SvalIdentity } = this._modules;
-    // The sync key is read before the first pass: a device with a shared
-    // folder waits for that folder before it makes a first workspace, and it
-    // can only wait for a folder it holds the key to. A key that cannot be
-    // read starts the panel without sharing, and the panel says why.
-    const [deviceId, localKey, sync] = await Promise.all([
-      SvalIdentity.deviceId(),
-      SvalIdentity.localKey(),
-      SvalIdentity.syncKey(),
-    ]);
-    if (sync.reason) {
-      this._modules.SvalLog.warn(`not syncing: ${sync.reason}`);
-    }
-    // Shared with every other window of this profile, because one profile is
-    // one device and one device is one document. `SvalEngine.forProfile` carries
-    // what a second engine for one device costs.
-    // A later window's read is not the engine's news: the engine keeps the
-    // keys its first window gave it (`SvalEngine.forProfile`).
-    const first = !SvalEngine.sharedInstance;
-    this._engine = SvalEngine.forProfile({
+    // Shared with every other window of this profile (`SvalSession`).
+    this._engine = await this._modules.SvalSession.start({
       root: this._localRoot(),
       sharedRoot: this.sharedRootSetting(),
-      localKey,
-      syncKey: sync.bytes,
-      deviceId,
+      settings: this._settings,
     });
     this._listenToEngine();
-    if (first) {
-      this.syncState.setKeyState(sync.state);
-    }
 
     // Housekeeping, not a sync step: an abandoned pairing offer sits in the
     // shared folder until some device notices it is stale, and spec §6.7 bounds
@@ -292,18 +269,11 @@ Object.assign(SvalPanel, {
     // shared step that reaches the folder (`_onSharedStep`).
     this._sweepPending = true;
 
-    // Agent access (agent-control spec §3.2). One listener per process, so
-    // every window calls this and the first one starts it. Each window redraws
-    // when an agent's workspace is added; `SvalAgents` runs the one pass that
-    // publishes it, which every window draws through `_onPass`. Adopting a key
-    // runs `_start` again, so the window's earlier listener goes first.
-    const { AppConstants, askToPair, SvalAgents } = this._modules;
-    SvalAgents.start({
-      profileDir: PathUtils.profileDir,
-      engine: this._engine,
-      askToPair,
-      version: AppConstants.MOZ_APP_VERSION_DISPLAY,
-    });
+    // Each window redraws when an agent's workspace is added; `SvalAgents`
+    // runs the one pass that publishes it, which every window draws through
+    // `_onPass`. Adopting a key runs `_start` again, so the window's earlier
+    // listener goes first.
+    const { SvalAgents } = this._modules;
     this._forgetAgentListener?.();
     this._forgetAgentListener = SvalAgents.addChangeListener(() =>
       this.refresh()
@@ -325,53 +295,6 @@ Object.assign(SvalPanel, {
       Services.obs.removeObserver(onControl, DEVICE_NAMES_TOPIC);
     };
 
-    // Before the first pass: a seed that lands after this device's first
-    // publication is read by its peers as a deletion (settings-sync spec §2).
-    // The documents are independent (spec §6), so settings sync that cannot
-    // start costs the settings and never the tabs.
-    try {
-      await this._startSettingsSync(this._engine);
-    } catch (err) {
-      this._modules.SvalLog.warn(
-        `settings sync did not start, and tab sync goes on: ${this._modules.SvalLog.errorName(err)}`
-      );
-    }
-    // Not awaited: Favorites are the profile's from its engine's start, first
-    // run included, so an import there lands in them (favorites-native spec
-    // §5.1). Whatever writes them waits until they are read, and Favorites
-    // that cannot start cost nothing else.
-    this._startFavorites(this._engine).catch(err =>
-      this._modules.SvalLog.warn(
-        `favorites did not start, and tab sync goes on: ${this._modules.SvalLog.errorName(err)}`
-      )
-    );
-    // Not awaited, for the same reasons: history begins past first run, and
-    // history that cannot sync costs nothing else. Device names go through
-    // the settings document, so they start once settings sync has.
-    this._startHistorySync(this._engine).catch(err =>
-      this._modules.SvalLog.warn(
-        `history sync did not start, and tab sync goes on: ${this._modules.SvalLog.errorName(err)}`
-      )
-    );
-    // Not awaited either: the archive begins past first run, and its sweep
-    // waits for a pass (idle-tab archive spec §7.1).
-    this._modules.SvalArchive.startFor(this._engine).catch(err =>
-      this._modules.SvalLog.warn(
-        `the archive did not start: ${this._modules.SvalLog.errorName(err)}`
-      )
-    );
-    this._modules.SvalDeviceNames.startFor(this._engine).catch(err =>
-      this._modules.SvalLog.warn(
-        `device names did not start: ${this._modules.SvalLog.errorName(err)}`
-      )
-    );
-
-    // Private windows sign in to Kagi whenever it is the engine, on every
-    // launch (first-run spec §5). Once per process; nothing here waits on it.
-    this._modules.SvalKagi.watchSearch(
-      this._modules.SvalSettingsSync.searchService()
-    );
-
     await this._startFromSync(remembered);
   },
 
@@ -386,7 +309,7 @@ Object.assign(SvalPanel, {
    */
   async _landOnPin(guid, landed) {
     try {
-      await this._startFavorites(this._engine);
+      await this._modules.SvalFavoritesStore.startFor(this._engine);
     } catch {
       // `_start` warned of this failure as it started Favorites.
       return;
@@ -399,48 +322,6 @@ Object.assign(SvalPanel, {
     if (pin) {
       this._pins.select(pin);
     }
-  },
-
-  /**
-   * Starts the profile's Favorites over `engine`, once for the process as
-   * settings sync is (`SvalFavoritesStore.startFor`).
-   *
-   * @param {SvalEngine} engine This profile's engine.
-   */
-  async _startFavorites(engine) {
-    await this._modules.SvalFavoritesStore.startFor(engine);
-  },
-
-  /**
-   * Starts history sync for `engine`, once for the process (history-sync
-   * spec §4.1), as Favorites start.
-   *
-   * @param {SvalEngine} engine This profile's engine.
-   */
-  async _startHistorySync(engine) {
-    await this._modules.SvalHistorySync.startFor(engine);
-  },
-
-  /**
-   * Starts settings sync for `engine`. There is one instance for the process
-   * (settings-sync spec §4.2), so every window calls this and the module
-   * answers with the one that is running.
-   *
-   * @param {SvalEngine} engine This profile's engine.
-   */
-  async _startSettingsSync(engine) {
-    const { SvalLog, SvalSettingsSync, ensureCard } = this._modules;
-    // The user's card is made before settings sync starts, so sync takes it
-    // as a value this device already held: written to the document only
-    // where no other device's card is there, which is applied in its place
-    // (settings-sync spec §4.2).
-    try {
-      await ensureCard();
-    } catch (err) {
-      SvalLog.warn(`the card could not be made: ${SvalLog.errorName(err)}`);
-    }
-    // The panel's own store, which also says whether first run is under way.
-    await SvalSettingsSync.startFor(engine, { settings: this._settings });
   },
 
   /**

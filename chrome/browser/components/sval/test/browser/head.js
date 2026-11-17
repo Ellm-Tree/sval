@@ -459,16 +459,23 @@ async function noOtherBrowsers() {
   const { SvalDeviceNames } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs"
   );
-  /**
-   * The document modules with one instance for the process, each with the
-   * panel method that starts it. A fixture that starts one on its own engine
-   * moves it for every later file, so Known Good puts back the engine each
-   * runs over.
-   */
+  const { SvalSession } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSession.sys.mjs"
+  );
+  // The document modules with one instance for the process, each with what
+  // starts it for a panel over an engine. A fixture that starts one on its
+  // own engine moves it for every later file, so Known Good puts back the
+  // engine each runs over.
   const SHARED_MODULES = [
-    [SvalSettingsSync, "_startSettingsSync"],
-    [SvalFavoritesStore, "_startFavorites"],
-    [SvalHistorySync, "_startHistorySync"],
+    [
+      SvalSettingsSync,
+      (panel, engine) => SvalSession.startSettingsSync(engine, panel._settings),
+    ],
+    [
+      SvalFavoritesStore,
+      (panel, engine) => SvalFavoritesStore.startFor(engine),
+    ],
+    [SvalHistorySync, (panel, engine) => SvalHistorySync.startFor(engine)],
   ];
   const { SvalTestSlate } = ChromeUtils.importESModule(
     "resource://testing-common/SvalTestSlate.sys.mjs"
@@ -727,7 +734,7 @@ async function noOtherBrowsers() {
     for (const [i, [module, start]] of SHARED_MODULES.entries()) {
       const want = known.modules[i];
       if ((module.shared?.engine ?? null) !== want) {
-        await (want ? panel[start](want) : module.stopShared());
+        await (want ? start(panel, want) : module.stopShared());
       }
     }
     await putBackWhatTheEngineFeeds(panel, known, replaced);
@@ -2404,7 +2411,7 @@ let favoritesFixtureEngine = null;
  * does not take back, so a task starts with nothing to undo.
  *
  * A window that opens starts the process's Favorites over the profile's
- * engine (`SvalPanel._startFavorites`), which stops the file's. So every
+ * engine (`SvalSession.start`), which stops the file's. So every
  * task's teardown begins with the file's Favorites started again, over the
  * same engine and the favorites it holds ({@link restoreFixtureFavorites}),
  * which a task that opens a window calls too before it files more, and

@@ -396,7 +396,6 @@ var SvalPanel = {
         askNewContainer:
           "moz-src:///browser/components/sval/SvalNewWorkspace.sys.mjs",
         AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
-        askToPair: "moz-src:///browser/components/sval/SvalAgentAlerts.sys.mjs",
         openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
         AgentWindowMarking:
           "moz-src:///browser/components/sval/SvalAgentMarking.sys.mjs",
@@ -433,9 +432,6 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalFavoritesMenu.sys.mjs",
         SvalFavoritesView:
           "moz-src:///browser/components/sval/SvalFavoritesView.sys.mjs",
-        SvalHistorySync:
-          "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs",
-        SvalArchive: "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
         canUnload: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
         isKeptLoaded:
           "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
@@ -490,6 +486,7 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalPasswordManager.sys.mjs",
         SvalPinsRow: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
         SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
+        SvalSession: "moz-src:///browser/components/sval/SvalSession.sys.mjs",
         SvalSyncState:
           "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
         tidySeparators:
@@ -529,7 +526,6 @@ var SvalPanel = {
         SvalSettingsRegistry:
           "moz-src:///browser/components/sval/SvalSettingsRegistry.sys.mjs",
         SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
-        ensureCard: "moz-src:///browser/components/sval/SvalCard.sys.mjs",
         takeArcCard: "moz-src:///browser/components/sval/SvalCard.sys.mjs",
         latestNodes:
           "moz-src:///browser/components/sval/SvalTreeSnapshot.sys.mjs",

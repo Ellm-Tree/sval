@@ -177,6 +177,7 @@ MOZ_SRC_FILES += [
     "SvalSecretStore.sys.mjs",
     "SvalSecureDns.sys.mjs",
     "SvalSerialQueue.sys.mjs",
+    "SvalSession.sys.mjs",
     "SvalSettingsRegistry.sys.mjs",
     "SvalSettingsSync.sys.mjs",
     "SvalSharedFolder.sys.mjs",
