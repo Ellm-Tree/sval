@@ -363,13 +363,14 @@ final class AppModel {
     }
 
     /// What an agent's Workspaces go under: the agent's label, then the
-    /// device that paired the agent when it's another device whose name has
-    /// arrived, as the desktop's `agentLabelOf` reads (agent-control spec
-    /// §3.5). Nil for a Workspace that is no agent's.
+    /// device that paired the agent once its name has arrived, as the
+    /// desktop's `agentLabelOf` reads for another device (agent-control spec
+    /// §3.5). An agent pairs with a computer, so on the phone it is always
+    /// another device. Nil for a Workspace that is no agent's.
     func agentName(_ row: OutlineRow) -> String? {
         guard let label = row.agent else { return nil }
         let name = label.trimmingCharacters(in: .whitespaces).isEmpty ? "An agent" : label
-        guard let device = row.agentDevice, device != syncer?.device,
+        guard let device = row.agentDevice,
               let other = settings["sval.device.name.\(device.map { String(format: "%02x", $0) }.joined())"] as? String,
               !other.isEmpty
         else { return name }
