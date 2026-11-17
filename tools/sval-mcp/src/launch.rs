@@ -79,6 +79,10 @@ pub fn start(profile: &Path) -> io::Result<()> {
 /// - `SSLKEYLOGFILE`: Sval's NSS is built to honour it
 ///   (`enable_sslkeylogfile` in `security/moz.build`), and appends every TLS
 ///   secret to the file it names (`ssl_SetDefaultsFromEnvironmentCallOnce`).
+/// - `XUL_APP_FILE`: names an `application.ini` that Sval's binary runs as
+///   its application in place of Sval's own (`do_main` in
+///   `nsBrowserApp.cpp`), with chrome privilege, on the profile `--profile`
+///   names.
 ///
 /// None of them is the agent's to set on the user's browser, so none is
 /// passed on but `MOZ_ENABLE_WAYLAND`, which only chooses GTK's display
@@ -87,7 +91,7 @@ pub fn start(profile: &Path) -> io::Result<()> {
 /// reads variable names without regard to case.
 fn passes_on(name: &OsStr) -> bool {
     const PREFIXES: [&[u8]; 4] = [b"MOZ_", b"NSPR_", b"NSS_", b"XRE_"];
-    const NAMES: [&[u8]; 1] = [b"SSLKEYLOGFILE"];
+    const NAMES: [&[u8]; 2] = [b"SSLKEYLOGFILE", b"XUL_APP_FILE"];
     const KEEP: &[u8] = b"MOZ_ENABLE_WAYLAND";
     let name = name.as_encoded_bytes();
     let same = |a: &[u8], b: &[u8]| {
@@ -441,6 +445,7 @@ mod tests {
             "XRE_PROFILE_PATH",
             "XRE_CONSOLE_LOG",
             "SSLKEYLOGFILE",
+            "XUL_APP_FILE",
         ] {
             assert!(!passes_on(OsStr::new(name)), "{name}");
         }
@@ -454,6 +459,7 @@ mod tests {
             "XMOZ_LOG",
             "NSS",
             "SSLKEYLOGFILE_X",
+            "XUL_APP_FILE_X",
         ] {
             assert!(passes_on(OsStr::new(name)), "{name}");
         }
@@ -462,6 +468,7 @@ mod tests {
             "nspr_log_modules",
             "Xre_Profile_Path",
             "SslKeyLogFile",
+            "Xul_App_File",
         ] {
             assert_eq!(
                 passes_on(OsStr::new(name)),

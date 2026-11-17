@@ -94,10 +94,10 @@ export const CRASH_WARNING = "May include parts of pages you had open.";
 const ANSWER_WAIT_MS = 60 * 1000;
 
 /**
- * Annotations Gecko allows in a report that the form still leaves out
- * (spec §3.6): the page being loaded, and free text the form asks for itself.
+ * The annotation Gecko allows in a report that the form still leaves out
+ * (spec §3.6): free text the form asks for itself.
  */
-const ANNOTATIONS_LEFT_OUT = new Set(["URL", "Comments"]);
+const ANNOTATION_LEFT_OUT = "Comments";
 
 /**
  * A string setting value short and plain enough to be an enumerated value.
@@ -371,8 +371,9 @@ function graphics(snapshot) {
 
 /**
  * A crash's annotations as a report carries them (spec §3.6): the keys Gecko
- * allows in a report, the list `CrashSubmit` applies, less `URL` and
- * `Comments`.
+ * allows in a report, the list `CrashSubmit` applies, less `Comments`. Gecko
+ * as Sval builds it has no annotation for a page's address
+ * (crash-reports-no-page-address.patch).
  *
  * @param {object} extra The `.extra` file's JSON.
  * @returns {object}
@@ -390,7 +391,7 @@ export function reportedAnnotations(extra) {
   };
   return Object.fromEntries(
     Object.entries(extra ?? {}).filter(
-      ([key]) => !ANNOTATIONS_LEFT_OUT.has(key) && allowed(key)
+      ([key]) => key !== ANNOTATION_LEFT_OUT && allowed(key)
     )
   );
 }

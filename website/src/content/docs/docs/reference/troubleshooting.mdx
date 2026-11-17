@@ -3,6 +3,9 @@ title: Troubleshooting and data collection
 description: What Sval keeps and sends when something goes wrong, from the log file to the feedback form and crash reports.
 ---
 
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
 Your feedback and crash reports leave your computer only when you send
 them. They go to Sval's own server.
 
@@ -59,14 +62,32 @@ the report over 25 MB, the part says **Too large to send**.
 
 ## Crash reports
 
+<Until v="0.1.0-rc.10">
+
 - **The Sval Crash Reporter dialog.** This opens after Sval crashes. The
   box for telling Sval about the crash starts unchecked, and so does
   **Include the address of the page I was on.** Sval sends the report only
   when you check the first box. The dialog remembers your last choice.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **The Sval Crash Reporter dialog.** This opens after Sval crashes. The
+  box for telling Sval about the crash starts unchecked. Sval sends the
+  report only when you check the box. The dialog remembers your last
+  choice.
+
+</Since>
 - **The crashed tab's page.** This page opens in a tab that crashed.
   **Send an automated crash report so we can fix issues like this** starts
   unchecked. **Restore This Tab** reloads the page. If the box is checked,
   it also sends the report.
+
+<Since v="0.1.0-rc.10">
+
+Sval doesn't add the address of the page you were on to a crash report.
+
+</Since>
 
 ## The log file
 

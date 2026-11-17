@@ -51,3 +51,24 @@ add_task(async function a_damaged_table_costs_only_its_own_records() {
   }
   Assert.deepEqual(text(await readLevelDB(dir, "k-")), { "k-d": "logged" });
 });
+
+add_task(async function a_key_sharing_more_than_the_one_before_is_refused() {
+  // One uncompressed data block whose only entry claims four bytes of a
+  // previous key that does not exist, then its index block and the footer.
+  const trailer = [0, 0, 0, 0, 0];
+  const restarts = [0, 0, 0, 0];
+  const internal = [...new TextEncoder().encode("k-z"), 1, 1, 0, 0, 0, 0, 0, 0];
+  const data = [4, internal.length, 1, ...internal, 0x76, ...restarts];
+  const handle = [0, data.length];
+  const index = [0, 1, handle.length, 0x7a, ...handle, ...restarts];
+  const indexAt = data.length + trailer.length;
+  const footer = new Uint8Array(48);
+  footer.set([0, 0, indexAt, index.length]);
+  footer.set([0x57, 0xfb, 0x80, 0x8b, 0x24, 0x75, 0x47, 0xdb], 40);
+  const dir = await makeTempDir("sval-leveldb-shared");
+  await IOUtils.write(
+    PathUtils.join(dir, "000005.ldb"),
+    new Uint8Array([...data, ...trailer, ...index, ...trailer, ...footer])
+  );
+  Assert.equal((await readLevelDB(dir, "")).size, 0);
+});

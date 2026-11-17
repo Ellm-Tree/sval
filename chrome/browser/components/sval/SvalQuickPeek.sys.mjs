@@ -653,6 +653,9 @@ class QuickPeek {
     });
     if (focused && this.tab.closing) {
       gBrowser.selectedBrowser.focus();
+      // A dialog the owner's page opened under the Quick Peek was kept from
+      // taking the keyboard (quick-peek-dialog-waits-for-focus.patch).
+      gBrowser.getTabDialogBox(gBrowser.selectedBrowser).focus();
     }
   }
 

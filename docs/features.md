@@ -910,7 +910,8 @@ so a terminal in a web page can use it.
   report would include, and you can view or uncheck each part. Nothing in it
   identifies you unless you choose to add your email.
 - **Crash reports.** Sval sends a crash report only if you check a box to
-  send it.
+  send it. Sval doesn't add the address of the page you were on to a crash
+  report.
 
 ## License
 

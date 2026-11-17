@@ -34,8 +34,6 @@ pref("browser.crashReports.unsubmittedCheck.enabled", false);
 pref("browser.crashReports.unsubmittedCheck.autoSubmit2", false, locked);
 // The crashed-tab page's "Send crash report" box starts from this, and Restore
 // submits whatever it is left at (ContentCrashHandlers.sys.mjs, TabCrashHandler).
-// Its include-URL box follows browser.tabs.crashReporting.includeURL, false
-// upstream.
 pref("browser.tabs.crashReporting.sendReport", false); // upstream: true
 
 // Enhanced Tracking Protection on by default (spec section 10.3). Its

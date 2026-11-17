@@ -317,6 +317,9 @@ function* entries(bytes) {
     const shared = c.varint();
     const own = c.varint();
     const length = c.varint();
+    if (shared > key.length) {
+      throw new Error("LevelDB: shares more than the key before");
+    }
     const next = new Uint8Array(shared + own);
     next.set(key.subarray(0, shared));
     next.set(c.slice(own), shared);
@@ -334,7 +337,14 @@ function* entries(bytes) {
  */
 function unsnappy(bytes) {
   const c = new Cursor(bytes);
-  const out = new Uint8Array(c.varint());
+  const size = c.varint();
+  // The densest element is a three-byte copy of 64 bytes, so a size past
+  // that ratio is one the input can't fill, and is refused before it is
+  // allocated.
+  if (size * 3 > bytes.length * 64) {
+    throw new Error("Snappy: larger than its input can hold");
+  }
+  const out = new Uint8Array(size);
   let at = 0;
   const copy = (offset, length) => {
     if (offset < 1 || offset > at || at + length > out.length) {

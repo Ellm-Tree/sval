@@ -16,8 +16,10 @@ unless the user chooses to send one, through the Send Feedback form or a
 crash dialog's box, to `feedback.sval.app`
 ([1199](1199-sval-s-one-server-receives-only-the-reports-a-user-sends.md)).
 `--with-crashreporter-url` points the submit URL there. Sval's prefs turn
-every automatic submission off, and every crash dialog's send box and
-include-address box start unticked.
+every automatic submission off, and every crash dialog's send box starts
+unticked. A crash file's annotations never hold a page's address: Gecko as
+Sval builds it has no such annotation, and no crash dialog offers to add one
+(`crash-reports-no-page-address.patch`).
 
 ## Consequences
 

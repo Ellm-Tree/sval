@@ -337,6 +337,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_context_menu_separators.js"]
 
+["browser_sval_crash_no_address.js"]
+
 ["browser_sval_credentials.js"]
 
 ["browser_sval_critical.js"]

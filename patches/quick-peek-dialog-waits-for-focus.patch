@@ -1,0 +1,31 @@
+Sval: a dialog under a Quick Peek waits for the keyboard
+
+A Quick Peek is drawn over its owner tab, which stays selected and keeps
+running. A dialog that tab's page opens, such as a prompt(), is hidden behind
+the Quick Peek, and SubDialogManager focused it all the same, so what the
+user typed for the page in the Quick Peek went to a box they could not see
+and back to the page that opened it. The dialog is left unfocused while a
+Quick Peek covers its tab, and SvalQuickPeek focuses it on closing.
+
+diff --git a/toolkit/modules/SubDialog.sys.mjs b/toolkit/modules/SubDialog.sys.mjs
+index a2c8c12e70..a59ea38ab4 100644
+--- a/toolkit/modules/SubDialog.sys.mjs
++++ b/toolkit/modules/SubDialog.sys.mjs
+@@ -1151,7 +1151,16 @@ export class SubDialogManager {
+   _onDialogOpen(dialog) {
+     let lowerDialogs = [];
+     if (dialog == this._topDialog) {
+-      dialog.focus(true);
++      // Sval: a Quick Peek covers the tab under it and has the keyboard, so
++      // that tab's dialog takes focus when the Quick Peek closes
++      // (SvalQuickPeek.sys.mjs).
++      if (
++        !this._dialogStack.matches(
++          "#tabbrowser-tabpanels[sval-quick-peek] > :not(.sval-quick-peek-panel) *"
++        )
++      ) {
++        dialog.focus(true);
++      }
+     } else {
+       // Opening dialog is not on top, hide it
+       lowerDialogs.push(dialog);

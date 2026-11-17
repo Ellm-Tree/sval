@@ -263,3 +263,57 @@ add_task(async function an_install_the_quick_peeks_page_asks_for_installs() {
 function cardOf(quickPeek) {
   return document.getElementById(quickPeek.linkedPanel);
 }
+
+/**
+ * A dialog of the page under a Quick Peek is hidden by it, so it leaves the
+ * keyboard with the Quick Peek, and takes it once the Quick Peek closes.
+ */
+add_task(async function a_dialog_under_a_quick_peek_waits_for_the_keyboard() {
+  const owner = await openPage(LINKS_PAGE);
+  const quickPeek = await quickPeekAt(owner.linkedBrowser);
+  quickPeek.linkedBrowser.focus();
+  Assert.equal(
+    document.activeElement,
+    quickPeek.linkedBrowser,
+    "the Quick Peek has the keyboard"
+  );
+
+  const dialogs = () =>
+    gBrowser.getTabDialogBox(owner.linkedBrowser).getContentDialogManager()
+      ._dialogs;
+  await SpecialPowers.spawn(owner.linkedBrowser, [], () => {
+    content.setTimeout(() => content.prompt("A question"), 0);
+  });
+  await within(
+    TestUtils.waitForCondition(
+      () => dialogs().length,
+      "the page's dialog opens"
+    ),
+    10_000,
+    "the page's dialog opening"
+  );
+  const [dialog] = dialogs();
+  // The manager focuses a dialog once it is ready (`_onDialogOpen`).
+  await within(dialog._dialogReady, 10_000, "the page's dialog being ready");
+  Assert.equal(
+    document.activeElement,
+    quickPeek.linkedBrowser,
+    "the Quick Peek keeps the keyboard"
+  );
+
+  SvalQuickPeek.close(window);
+  await within(
+    TestUtils.waitForCondition(
+      () => document.activeElement === dialog._frame,
+      "the dialog has the keyboard"
+    ),
+    10_000,
+    "the dialog taking the keyboard"
+  );
+  dialog._frame.contentDocument.querySelector("dialog").cancelDialog();
+  await within(
+    TestUtils.waitForCondition(() => !dialogs().length, "the dialog closes"),
+    10_000,
+    "the dialog closing"
+  );
+});

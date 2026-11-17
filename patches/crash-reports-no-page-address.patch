@@ -1,0 +1,257 @@
+Sval: a crash report never holds the address of a page
+
+Gecko records the address being loaded as the URL annotation: the selected
+tab's in the parent, each load's in its content process, and each
+transaction's in the GPU process. It does so in private windows too. A crash
+writes every annotation to the report's .extra file, where it stays, and
+about:crashes posts it with the report. Sval keeps and sends nothing that
+says what the user is browsing, so the annotation is gone from
+CrashAnnotations.yaml, which makes any code that records it fail to compile
+or throw, and so are its writers. The boxes that offered to include the
+address, in the crash reporter window and on about:tabcrashed, go with it.
+
+diff --git a/browser/base/content/aboutTabCrashed.js b/browser/base/content/aboutTabCrashed.js
+index 602f7fe79f..da277eea1f 100644
+--- a/browser/base/content/aboutTabCrashed.js
++++ b/browser/base/content/aboutTabCrashed.js
+@@ -153,7 +153,6 @@ var AboutTabCrashed = {
+       document.documentElement.classList.add("crashDumpAvailable");
+ 
+       document.getElementById("sendReport").checked = data.sendReport;
+-      document.getElementById("includeURL").checked = data.includeURL;
+ 
+       this.showCrashReportUI(data.sendReport);
+     } else {
+@@ -231,11 +230,6 @@ var AboutTabCrashed = {
+       sendReport = document.getElementById("sendReport").checked;
+       if (sendReport) {
+         comments = document.getElementById("comments").value.trim();
+-
+-        includeURL = document.getElementById("includeURL").checked;
+-        if (includeURL) {
+-          URL = this.pageData.URL.trim();
+-        }
+       }
+     }
+ 
+diff --git a/browser/base/content/aboutTabCrashed.xhtml b/browser/base/content/aboutTabCrashed.xhtml
+index 96fb6e06ea..9edb7ffccd 100644
+--- a/browser/base/content/aboutTabCrashed.xhtml
++++ b/browser/base/content/aboutTabCrashed.xhtml
+@@ -74,13 +74,6 @@
+               rows="4"
+             ></textarea>
+           </li>
+-
+-          <li>
+-            <label class="toggle-container-with-text">
+-              <input type="checkbox" id="includeURL" role="checkbox" />
+-              <span data-l10n-id="crashed-include-URL-2"></span>
+-            </label>
+-          </li>
+         </ul>
+ 
+         <div id="requestAutoSubmit" hidden="true">
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index a5e71a8d9f..9995330a7c 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -2328,25 +2328,6 @@ var XULBrowserWindow = {
+     } else {
+       this.asyncUpdateUI();
+     }
+-
+-    if (AppConstants.MOZ_CRASHREPORTER && aLocationURI) {
+-      let uri = aLocationURI;
+-      try {
+-        // If the current URI contains a username/password, remove it.
+-        uri = aLocationURI.mutate().setUserPass("").finalize();
+-      } catch (ex) {
+-        /* Ignore failures on about: URIs. */
+-      }
+-
+-      try {
+-        Services.appinfo.annotateCrashReport("URL", uri.spec);
+-      } catch (ex) {
+-        // Don't make noise when the crash reporter is built but not enabled.
+-        if (ex.result != Cr.NS_ERROR_NOT_INITIALIZED) {
+-          throw ex;
+-        }
+-      }
+-    }
+   },
+ 
+   _updateElementsForContentType() {
+diff --git a/dom/ipc/BrowserChild.cpp b/dom/ipc/BrowserChild.cpp
+index 5e4f470d2e..e618cb109a 100644
+--- a/dom/ipc/BrowserChild.cpp
++++ b/dom/ipc/BrowserChild.cpp
+@@ -856,9 +856,6 @@ mozilla::ipc::IPCResult BrowserChild::RecvLoadURL(
+ 
+     ApplyParentShowInfo(aInfo);
+   }
+-  nsAutoCString spec;
+-  aLoadState->URI()->GetSpec(spec);
+-
+   nsCOMPtr<nsIDocShell> docShell = do_GetInterface(WebNavigation());
+   if (!docShell) {
+     NS_WARNING("WebNavigation does not have a docshell");
+@@ -866,8 +863,6 @@ mozilla::ipc::IPCResult BrowserChild::RecvLoadURL(
+   }
+   docShell->LoadURI(aLoadState, true);
+ 
+-  CrashReporter::RecordAnnotationNSCString(CrashReporter::Annotation::URL,
+-                                           spec);
+   return IPC_OK();
+ }
+ 
+@@ -4031,23 +4026,6 @@ NS_IMETHODIMP BrowserChild::OnLocationChange(nsIWebProgress* aWebProgress,
+       MOZ_TRY(loadGroup->GetRequestContextID(&requestContextID));
+       locationChangeData->requestContextID() = Some(requestContextID);
+     }
+-
+-#ifdef MOZ_CRASHREPORTER
+-    if (CrashReporter::GetEnabled()) {
+-      nsCOMPtr<nsIURI> annotationURI;
+-
+-      nsresult rv =
+-          NS_MutateURI(aLocation).SetUserPass(""_ns).Finalize(annotationURI);
+-
+-      if (NS_FAILED(rv)) {
+-        // Ignore failures on about: URIs.
+-        annotationURI = aLocation;
+-      }
+-
+-      CrashReporter::RecordAnnotationNSCString(
+-          CrashReporter::Annotation::URL, annotationURI->GetSpecOrDefault());
+-    }
+-#endif
+   }
+ 
+   (void)SendOnLocationChange(webProgressData, requestData, aLocation, aFlags,
+diff --git a/dom/ipc/ContentChild.cpp b/dom/ipc/ContentChild.cpp
+index 1c5b588af7..984e646f52 100644
+--- a/dom/ipc/ContentChild.cpp
++++ b/dom/ipc/ContentChild.cpp
+@@ -4348,24 +4348,6 @@ mozilla::ipc::IPCResult ContentChild::RecvLoadURI(
+     bc->NotifyNavigationFinished();
+   }
+ 
+-#ifdef MOZ_CRASHREPORTER
+-  if (CrashReporter::GetEnabled()) {
+-    nsCOMPtr<nsIURI> annotationURI;
+-
+-    nsresult rv = NS_MutateURI(aLoadState->URI())
+-                      .SetUserPass(""_ns)
+-                      .Finalize(annotationURI);
+-
+-    if (NS_FAILED(rv)) {
+-      // Ignore failures on about: URIs.
+-      annotationURI = aLoadState->URI();
+-    }
+-
+-    CrashReporter::RecordAnnotationNSCString(CrashReporter::Annotation::URL,
+-                                             annotationURI->GetSpecOrDefault());
+-  }
+-#endif
+-
+   return IPC_OK();
+ }
+ 
+@@ -4382,24 +4364,6 @@ mozilla::ipc::IPCResult ContentChild::RecvInternalLoad(
+ 
+   context->InternalLoad(aLoadState);
+ 
+-#ifdef MOZ_CRASHREPORTER
+-  if (CrashReporter::GetEnabled()) {
+-    nsCOMPtr<nsIURI> annotationURI;
+-
+-    nsresult rv = NS_MutateURI(aLoadState->URI())
+-                      .SetUserPass(""_ns)
+-                      .Finalize(annotationURI);
+-
+-    if (NS_FAILED(rv)) {
+-      // Ignore failures on about: URIs.
+-      annotationURI = aLoadState->URI();
+-    }
+-
+-    CrashReporter::RecordAnnotationNSCString(CrashReporter::Annotation::URL,
+-                                             annotationURI->GetSpecOrDefault());
+-  }
+-#endif
+-
+   return IPC_OK();
+ }
+ 
+diff --git a/gfx/layers/wr/WebRenderBridgeParent.cpp b/gfx/layers/wr/WebRenderBridgeParent.cpp
+index ba8465d0e6..def2f411e0 100644
+--- a/gfx/layers/wr/WebRenderBridgeParent.cpp
++++ b/gfx/layers/wr/WebRenderBridgeParent.cpp
+@@ -1489,11 +1489,6 @@ mozilla::ipc::IPCResult WebRenderBridgeParent::RecvSetDisplayList(
+       wr::AsUint64(mPipelineId), wr::AsUint64(mLateInit->mApi->GetId()),
+       IsRootWebRenderBridgeParent());
+ 
+-  if (!IsRootWebRenderBridgeParent()) {
+-    CrashReporter::RecordAnnotationNSCString(CrashReporter::Annotation::URL,
+-                                             aTxnURL);
+-  }
+-
+   CompositorBridgeParent* cbp = GetRootCompositorBridgeParent();
+   uint64_t innerWindowId = cbp ? cbp->GetInnerWindowId() : 0;
+   AUTO_PROFILER_MARKER_INNERWINDOWID("SetDisplayList", GRAPHICS, innerWindowId);
+@@ -1628,11 +1623,6 @@ mozilla::ipc::IPCResult WebRenderBridgeParent::RecvEmptyTransaction(
+       wr::AsUint64(mPipelineId), wr::AsUint64(mLateInit->mApi->GetId()),
+       IsRootWebRenderBridgeParent());
+ 
+-  if (!IsRootWebRenderBridgeParent()) {
+-    CrashReporter::RecordAnnotationNSCString(CrashReporter::Annotation::URL,
+-                                             aTxnURL);
+-  }
+-
+   AUTO_PROFILER_MARKER("EmptyTransaction", GRAPHICS);
+   UpdateFwdTransactionId(aFwdTransactionId);
+ 
+diff --git a/toolkit/crashreporter/CrashAnnotations.yaml b/toolkit/crashreporter/CrashAnnotations.yaml
+index ed16edd578..c88bf0e886 100644
+--- a/toolkit/crashreporter/CrashAnnotations.yaml
++++ b/toolkit/crashreporter/CrashAnnotations.yaml
+@@ -1528,12 +1528,6 @@ UptimeTS:
+     type: timespan
+     time_unit: millisecond
+ 
+-URL:
+-  description: >
+-    URL being loaded.
+-  type: string
+-  scope: report
+-
+ URLSegments:
+   description: >
+     The offsets of the nsStandardURL segments that fail a sanity check
+diff --git a/toolkit/crashreporter/client/app/src/test.rs b/toolkit/crashreporter/client/app/src/test.rs
+index b117611efd..1067b2f4db 100644
+--- a/toolkit/crashreporter/client/app/src/test.rs
++++ b/toolkit/crashreporter/client/app/src/test.rs
+@@ -737,9 +737,6 @@ fn sval_boxes_start_unticked() {
+         interact.element("send", |_style, c: &model::Checkbox| {
+             assert!(!c.checked.get())
+         });
+-        interact.element("include-url", |_style, c: &model::Checkbox| {
+-            assert!(!c.checked.get())
+-        });
+         interact.element("quit", |_style, b: &model::Button| b.click.fire(&()));
+     });
+     test.assert_files()
+diff --git a/toolkit/crashreporter/client/app/src/ui/mod.rs b/toolkit/crashreporter/client/app/src/ui/mod.rs
+index 7f01e3c427..32865d7c7f 100644
+--- a/toolkit/crashreporter/client/app/src/ui/mod.rs
++++ b/toolkit/crashreporter/client/app/src/ui/mod.rs
+@@ -284,8 +284,6 @@ impl ReportCrashUI {
+                                 enabled(&send_report_and_input_enabled)
+                                 halign(Alignment::Fill) valign(Alignment::Fill)
+                         },
+-                        Checkbox["include-url"] checked(include_address)
+-                            label(config.string("crashreporter-checkbox-include-url")) enabled(&send_report_and_input_enabled),
+                         Label text(&submit_status_text) margin_top(20),
+                         Progress halign(Alignment::Fill) visible(&progress_visible),
+                     },

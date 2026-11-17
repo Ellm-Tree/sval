@@ -134,11 +134,18 @@ export const UBO_PIN = Object.freeze({
 const UBO_ENTRY = "src/js/resources/scriptlets.js";
 
 /**
- * The permission bit a uBlock Origin scriptlet marked `requiresTrust` needs:
- * the bit adblock-rust's `PermissionMask` documentation and Brave give uBlock
+ * The permission bit a uBlock Origin trusted scriptlet needs: the bit
+ * adblock-rust's `PermissionMask` documentation and Brave give uBlock
  * Origin's trusted scriptlets. A list gets it only through its parse options.
  */
 const TRUSTED_PERMISSION = 1;
+
+/**
+ * The start of the name uBlock Origin gives a scriptlet that takes arbitrary
+ * content from its rule. Its `trusted-prevent-xhr` is registered without
+ * `requiresTrust`, so the name counts as well as the mark.
+ */
+const TRUSTED_NAME = "trusted-";
 
 /** The most the pinned files may weigh together. */
 const MAX_UBO_BYTES = 4 * 1024 * 1024;
@@ -326,7 +333,12 @@ export function convertUbo(files) {
         content: base64(s.source),
         dependencies: strings(s.dependencies),
       };
-      if (s.requiresTrust === true) {
+      if (
+        s.requiresTrust === true ||
+        [resource.name, ...resource.aliases].some(name =>
+          name.startsWith(TRUSTED_NAME)
+        )
+      ) {
         resource.permission = TRUSTED_PERMISSION;
       }
       return resource;

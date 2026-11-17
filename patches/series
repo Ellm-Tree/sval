@@ -136,6 +136,7 @@ customkeys-in-settings.patch
 crashreporter-submit-off-by-default.patch
 crashreporter-no-crash-ping.patch
 crashreporter-window-in-app-switcher.patch
+crash-reports-no-page-address.patch
 split-view-pane-footer.patch
 split-view-footer-reconnect.patch
 hsts-private-jar.patch
@@ -299,6 +300,7 @@ content-classifier-off-features-go-stale.patch
 a11y-hanging-child-document.patch
 remove-firefox-taskbar-tabs.patch
 quick-peek-popup-notifications.patch
+quick-peek-dialog-waits-for-focus.patch
 page-actions-in-extensions-menu.patch
 pip-toggle-top-corner.patch
 videocontrols-measure-on-init.patch

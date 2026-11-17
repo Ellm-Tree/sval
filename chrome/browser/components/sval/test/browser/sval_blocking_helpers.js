@@ -72,6 +72,12 @@ const TRUSTED_PROBE_FILES = {
     "    name: 'trusted-sval-probe.js',",
     "    requiresTrust: true,",
     "});",
+    "function trustedSvalUnmarked(name = '') {",
+    "    window[name] = true;",
+    "}",
+    "registerScriptlet(trustedSvalUnmarked, {",
+    "    name: 'trusted-sval-unmarked.js',",
+    "});",
     "",
   ].join("\n"),
 };

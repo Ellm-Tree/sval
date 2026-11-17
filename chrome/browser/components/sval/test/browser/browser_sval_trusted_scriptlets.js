@@ -38,7 +38,8 @@ const SCRIPTLETS_PAGE =
   "https://example.net/browser/browser/components/sval/test/browser/sval_scriptlets.html";
 const BUILTIN = "sval-ublock-filters";
 const listFor = flag =>
-  `! Title: Trusted test\nexample.net##+js(trusted-sval-probe, ${flag})\n`;
+  `! Title: Trusted test\nexample.net##+js(trusted-sval-probe, ${flag})\n` +
+  `example.net##+js(trusted-sval-unmarked, ${flag}Unmarked)\n`;
 
 /**
  * A page only the added list blocks, so a page tells when that list is in
@@ -167,6 +168,21 @@ add_task(async function only_ublock_origins_own_list_is_trusted() {
     { builtin: true, user: false },
     "uBlock Origin's list runs a trusted scriptlet and the added list cannot"
   );
+});
+
+add_task(async function a_trusted_name_needs_trust_without_the_mark() {
+  // uBlock Origin registers `trusted-prevent-xhr` without `requiresTrust`,
+  // as the stand-in `trusted-sval-unmarked` is.
+  await BrowserTestUtils.withNewTab(SCRIPTLETS_PAGE, async browser => {
+    Assert.deepEqual(
+      await SpecialPowers.spawn(browser, [], () => ({
+        builtin: content.wrappedJSObject.svalBuiltinProbeUnmarked === true,
+        user: content.wrappedJSObject.svalUserProbeUnmarked === true,
+      })),
+      { builtin: true, user: false },
+      "only uBlock Origin's list runs a scriptlet named trusted"
+    );
+  });
 });
 
 add_task(async function trust_from_another_device_waits_for_this_one() {

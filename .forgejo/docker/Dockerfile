@@ -102,9 +102,19 @@ RUN wine --version && command -v msiextract && command -v Xvfb \
 # install` with no toolchain named installs what the file in its directory
 # says. The engine also builds for wasm32-unknown-unknown, which only the image
 # needs.
+#
+# rustup-init is fetched at one version and checked against the SHA-256 its
+# release publishes beside it, since the release compile and the Windows
+# signing step run in this image.
 COPY --from=repo rust-toolchain.toml /tmp/rust-pin/
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-      | sh -s -- -y --no-modify-path --profile minimal --default-toolchain none \
+ARG RUSTUP_VERSION=1.29.3
+ARG RUSTUP_SHA256=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
+RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
+      "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init" \
+    && echo "${RUSTUP_SHA256}  /tmp/rustup-init" | sha256sum -c - \
+    && chmod +x /tmp/rustup-init \
+    && /tmp/rustup-init -y --no-modify-path --profile minimal --default-toolchain none \
+    && rm /tmp/rustup-init \
     && cd /tmp/rust-pin && rustup toolchain install \
     && rustup default "$(rustup show active-toolchain | cut -d' ' -f1)" \
     && cd / && rm -rf /tmp/rust-pin \
