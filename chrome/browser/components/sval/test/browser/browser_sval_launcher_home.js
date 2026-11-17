@@ -469,6 +469,48 @@ add_task(async function move_this_tab_lists_its_choices_in_the_field() {
 });
 
 /**
+ * A workspace among a command's choices wears its colour, as it does in the
+ * address bar: its tint and its ink, solved for both schemes.
+ */
+add_task(async function a_choice_wears_its_workspaces_colour() {
+  const { work } = pinsFixture;
+  await SvalPanel.engine.mutate({
+    kind: "setAppearance",
+    id: work,
+    color: "green",
+    now: Date.now(),
+  });
+  await SvalPanel.refresh();
+  const { tab } = await homeTab();
+  const browser = tab.linkedBrowser;
+  await typeInHomeField(browser, "move");
+  await arrowToCommand(browser, "move-tab");
+  await BrowserTestUtils.synthesizeKey("KEY_Enter", {}, browser);
+  const painted = () =>
+    SpecialPowers.spawn(browser, [], () => {
+      const row = [
+        ...content.document.querySelectorAll(".suggestions .result"),
+      ].find(li => li.querySelector(".title")?.textContent === "Work");
+      return row
+        ? {
+            swatch: row.hasAttribute("data-swatch"),
+            color: row.dataset.color ?? null,
+            tint: row.style.getPropertyValue("--sval-launcher-tint"),
+            ink: row.style.getPropertyValue("--sval-launcher-ink"),
+          }
+        : null;
+    });
+  await TestUtils.waitForCondition(
+    async () => (await painted())?.swatch,
+    "the field lists Work among the choices"
+  );
+  const { color, tint, ink } = await painted();
+  Assert.equal(color, "green", "the row says which colour it wears");
+  Assert.ok(tint.startsWith("light-dark("), "its tint, for both schemes");
+  Assert.ok(ink.startsWith("light-dark("), "and the ink on it");
+});
+
+/**
  * Makes a request of the page's actor as a script of the page could, with or
  * without the user's activation, then waits until the actor has answered a
  * later request, so the first has been taken or dropped by then. A request

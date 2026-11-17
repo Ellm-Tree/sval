@@ -33,6 +33,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   accessOf: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   describeRow: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
+  SvalColor: "moz-src:///browser/components/sval/SvalColor.sys.mjs",
   meaningIds: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   footFor: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   keycap: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
@@ -78,6 +79,29 @@ ChromeUtils.defineLazyGetter(
 );
 
 /**
+ * A Workspace's colour as the page paints it: its fill and the ink on it
+ * (`SvalColor.chipOf`) in each scheme, since the page's scheme is its own
+ * (`home/workspace.js`) and it has no `SvalColor` to solve them with.
+ *
+ * @param {string|object|null} color A filtered colour.
+ * @param {Window} window The browser window, for the contrast the user asks.
+ * @returns {{name: string, light: object, dark: object}|null} A preset by
+ *   its name and a custom colour as "custom", with `{fill, ink}` for each
+ *   scheme; null for no colour.
+ */
+function tintOf(color, window) {
+  if (!color) {
+    return null;
+  }
+  const more = window.matchMedia("(prefers-contrast: more)").matches;
+  return {
+    name: typeof color === "string" ? color : "custom",
+    light: lazy.SvalColor.chipOf(color, { scheme: "light", more }),
+    dark: lazy.SvalColor.chipOf(color, { scheme: "dark", more }),
+  };
+}
+
+/**
  * What a row teaches (`SvalLauncherRows`), for the page: its chip, the glyph
  * a row with no favicon shows, a workspace's swatch, Enter's key and the
  * line under the list while it is selected, and the messages of its hint
@@ -95,9 +119,14 @@ function teach(result, window, choosing) {
   return {
     row: {
       enterKey: lazy.keycap("VK_RETURN"),
-      chip: taught?.chip ?? null,
+      chip: taught?.chip
+        ? { ...taught.chip, tint: tintOf(taught.chip.color, window) }
+        : null,
       glyph: taught?.icon ?? null,
-      swatch: taught?.swatch ?? null,
+      // A workspace among a command's choices: null for a row that is none,
+      // and whether it has a colour, which `swatchTint` then is.
+      swatch: taught ? taught.swatch !== null : false,
+      swatchTint: tintOf(taught?.swatch, window),
       foot: lazy.footFor(taught, { choosing }),
     },
     hint: taught?.hint ?? null,

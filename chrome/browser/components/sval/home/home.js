@@ -383,11 +383,9 @@ function rowElement(row, i) {
   if (row.glyph) {
     option.dataset.glyph = row.glyph;
   }
-  if (row.swatch !== null) {
+  if (row.swatch) {
     option.dataset.swatch = "";
-    if (row.swatch) {
-      option.dataset.color = row.swatch;
-    }
+    paintColor(option, row.swatchTint);
   }
   const keyshortcuts = row.ariaShortcut ?? row.keyshortcuts;
   if (keyshortcuts) {
@@ -499,11 +497,35 @@ function keycap(text) {
 }
 
 /**
+ * Gives `el` a Workspace's colour as its fill with its ink on it, as
+ * `SvalLauncherRows.paintColor` does in the address bar, in whichever
+ * scheme the page is in.
+ *
+ * @param {Element} el
+ * @param {{name: string, light: object, dark: object}|null} tint As
+ *   `SvalHomeSearchParent` solves one; null for no colour.
+ */
+function paintColor(el, tint) {
+  if (!tint) {
+    return;
+  }
+  el.dataset.color = tint.name;
+  el.style.setProperty(
+    "--sval-launcher-tint",
+    `light-dark(${tint.light.fill}, ${tint.dark.fill})`
+  );
+  el.style.setProperty(
+    "--sval-launcher-ink",
+    `light-dark(${tint.light.ink}, ${tint.dark.ink})`
+  );
+}
+
+/**
  * A tab's workspace or agent, as a chip: a dot in the workspace's colour, or
  * the agent's glyph, the workspace's emoji, and its name.
  *
- * @param {{name: string, color: string|null, emoji: string|null,
- *   agent: boolean}} chip
+ * @param {{name: string, tint: object|null, emoji: string|null,
+ *   agent: boolean}} chip `tint` as {@link paintColor} takes it.
  * @returns {Element}
  */
 function chipElement(chip) {
@@ -512,8 +534,8 @@ function chipElement(chip) {
   el.setAttribute("aria-hidden", "true");
   if (chip.agent) {
     el.dataset.agent = "";
-  } else if (chip.color) {
-    el.dataset.color = chip.color;
+  } else {
+    paintColor(el, chip.tint);
   }
   const glyph = document.createElement("span");
   glyph.className = "sval-chip-glyph";
