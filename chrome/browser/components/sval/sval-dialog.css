@@ -682,7 +682,7 @@ fieldset.sval-dialog-well {
   }
 }
 
-/* A third answer, such as "Move out of group", sits apart at the start. */
+/* A third answer, such as "Keep tabs", sits apart at the start. */
 .sval-dialog-actions > .sval-dialog-extra {
   margin-inline-end: auto;
 }

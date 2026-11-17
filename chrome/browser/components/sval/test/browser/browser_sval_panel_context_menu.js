@@ -248,8 +248,8 @@ const DELETE_GROUP_BUTTON = { delete: "ok", move: "extra", cancel: "cancel" };
 
 /**
  * "Delete group" asks what becomes of the tabs, and cancelling leaves the group
- * and everything in it untouched. "Delete All" takes the group and every tab in
- * it (spec §5.4).
+ * and everything in it untouched. Deleting takes the group and every tab in it
+ * (spec §5.4).
  */
 add_task(async function delete_group_with_its_tabs() {
   const { engine, ids } = await withFreshPanel();
@@ -265,13 +265,14 @@ add_task(async function delete_group_with_its_tabs() {
       Object.keys(before).sort(),
       "cancelling left the group and its tabs in place"
     );
+    const { title, body } = SvalPanelModel.deleteGroupText(
+      "Reading",
+      3,
+      SvalPanelModel.descendantGroupCount(SvalPanel.nodes, ids.groupA)
+    );
     Assert.deepEqual(
       { title: asked.title, body: asked.body },
-      SvalPanelModel.deleteGroupText(
-        "Reading",
-        3,
-        SvalPanelModel.descendantGroupCount(SvalPanel.nodes, ids.groupA)
-      ),
+      { title, body },
       "the question named the group's three tabs, not just its one level"
     );
   }

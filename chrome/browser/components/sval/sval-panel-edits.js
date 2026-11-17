@@ -1416,18 +1416,18 @@ Object.assign(SvalPanel, {
    * focus, and Escape answers it, so no key press deletes anything by
    * accident.
    *
-   * @param {{title: string, body: string}} text
+   * @param {{title: string, body: string, keep: string, remove: string}} text
    *   {@link SvalPanelModel.deleteGroupText}'s result.
    * @returns {Promise<string|null>} `"move"`, `"delete"`, or null for cancel.
    */
-  async _askDeleteGroup({ title, body }) {
+  async _askDeleteGroup({ title, body, keep, remove }) {
     const answer = await this._modules.openSvalDialog(window, {
       icon: "trash",
       tone: "danger",
       title,
       body,
-      extra: "Move out of group",
-      primary: "Delete all",
+      extra: keep,
+      primary: remove,
     });
     if (answer.ok) {
       return "delete";

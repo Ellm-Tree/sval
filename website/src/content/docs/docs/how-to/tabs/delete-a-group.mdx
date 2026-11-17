@@ -4,6 +4,8 @@ description: Remove a group from its Workspace, and keep its tabs or close them 
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 Deleting a group removes the group from its Workspace. Sval asks whether the
 group's tabs move out of the group or go with it.
@@ -16,11 +18,26 @@ go.
 ## Steps
 
 1. In the Workspace, right-click the group, then choose **Delete group…**.
+<Until v="0.1.0-rc.10">
+
 2. Choose what happens to the tabs and groups inside it.
    - **Move out of group.** Sval keeps the tabs and groups that were
      inside. They take the group's place, in the same order.
    - **Delete all.** Sval closes every tab inside the group, and deletes
      the groups inside it too.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+2. Choose what happens to the tabs and groups inside it. The buttons name
+   what the group holds: its tabs, its groups, or both.
+   - **Keep tabs**, **Keep groups**, or **Keep all.** Sval keeps what was
+     inside the group. The tabs and groups take the group's place, in the
+     same order.
+   - **Close tabs**, **Delete groups**, or **Delete all.** Sval closes
+     every tab inside the group, and deletes the groups inside it too.
+
+</Since>
 
 The group leaves the Workspace. A message at the bottom of the Workspace
 panel offers **Undo** for 8 seconds.

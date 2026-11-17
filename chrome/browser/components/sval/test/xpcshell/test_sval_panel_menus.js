@@ -228,26 +228,48 @@ add_task(function delete_workspace_text_says_the_tabs_go_too() {
   Assert.ok(!/\d/.test(empty.body), "and names nothing inside it");
 });
 
-add_task(function delete_group_text_offers_both_fates() {
+add_task(function delete_group_text_names_what_the_group_holds() {
   const { deleteGroupText } = SvalPanelModel;
 
-  const reading = deleteGroupText("Reading", 3, 0);
-  Assert.stringContains(
-    reading.title,
-    "Reading",
-    "the question names the group"
+  Assert.deepEqual(
+    deleteGroupText("Reading", 3, 0),
+    {
+      title: "Delete “Reading”?",
+      body: "Keep or close the 3 tabs inside.",
+      keep: "Keep tabs",
+      remove: "Close tabs",
+    },
+    "a group of tabs asks whether to keep or close them"
   );
-  Assert.stringContains(reading.body, "3", "and counts its tabs");
-  const projects = deleteGroupText("Projects", 0, 1).body;
-  Assert.stringContains(
-    projects,
-    "1",
-    "a group holding only a group counts that group"
+  Assert.deepEqual(
+    deleteGroupText("Reading", 1, 0),
+    {
+      title: "Delete “Reading”?",
+      body: "Keep or close the tab inside.",
+      keep: "Keep tab",
+      remove: "Close tab",
+    },
+    "one tab is named as the tab"
   );
-  Assert.notEqual(
-    projects,
-    deleteGroupText("Projects", 1, 0).body,
-    "as a group"
+  Assert.deepEqual(
+    deleteGroupText("Projects", 0, 2),
+    {
+      title: "Delete “Projects”?",
+      body: "Keep or delete the 2 groups inside.",
+      keep: "Keep groups",
+      remove: "Delete groups",
+    },
+    "a group holding only groups names the groups"
+  );
+  Assert.deepEqual(
+    deleteGroupText("Projects", 3, 1),
+    {
+      title: "Delete “Projects”?",
+      body: "Keep or delete the 3 tabs and 1 group inside.",
+      keep: "Keep all",
+      remove: "Delete all",
+    },
+    "a group holding both names both"
   );
 });
 

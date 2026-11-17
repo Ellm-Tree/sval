@@ -2875,18 +2875,43 @@ export function handToAgentText(agent, tabs, signIns, history = false) {
 
 /**
  * The question "Delete group" asks of a group with something in it: whether
- * its contents move out of the group or are deleted with it (spec §5.4).
+ * its contents stay, moving out of the group, or go with it (spec §5.4).
+ * The body and both answers name what the group holds: its tabs, its
+ * groups, or both. The iPhone app asks the same, in title case.
  *
  * @param {string} name The group's name, already resolved to its placeholder.
  * @param {number} tabs {@link descendantTabCount}'s result for it.
  * @param {number} groups {@link descendantGroupCount}'s result for it.
- * @returns {{title: string, body: string}}
+ * @returns {{title: string, body: string, keep: string, remove: string}}
  */
 export function deleteGroupText(name, tabs, groups) {
-  const what = contentsPhrase(tabs, groups);
+  const title = `Delete “${name}”?`;
+  const the = (count, noun) =>
+    count === 1 ? `the ${noun}` : `the ${count} ${noun}s`;
+  if (!groups) {
+    const noun = tabs === 1 ? "tab" : "tabs";
+    return {
+      title,
+      body: `Keep or close ${the(tabs, "tab")} inside.`,
+      keep: `Keep ${noun}`,
+      remove: `Close ${noun}`,
+    };
+  }
+  if (!tabs) {
+    const noun = groups === 1 ? "group" : "groups";
+    return {
+      title,
+      body: `Keep or delete ${the(groups, "group")} inside.`,
+      keep: `Keep ${noun}`,
+      remove: `Delete ${noun}`,
+    };
+  }
+  const count = (n, noun) => (n === 1 ? `1 ${noun}` : `${n} ${noun}s`);
   return {
-    title: `Delete the “${name}” group?`,
-    body: `The ${what} inside it can move out of the group, or be deleted with it.`,
+    title,
+    body: `Keep or delete the ${count(tabs, "tab")} and ${count(groups, "group")} inside.`,
+    keep: "Keep all",
+    remove: "Delete all",
   };
 }
 

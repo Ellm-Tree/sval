@@ -244,9 +244,23 @@ are dimmed.
   The group moves with everything in it.
 - **Put to Sleep.** Every tab in the group goes to sleep.
 - **Pause Media.** This acts on every tab in the group.
+<Until v="0.1.0-rc.10">
+
 - **Delete group…** Sval asks what happens to the group's tabs.
   **Move out of group** moves them out, and **Delete all** deletes them
   with the group. An empty group is deleted without asking.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Delete group…** Sval asks what happens to what's inside the group. A
+  group of tabs offers **Keep tabs** and **Close tabs**, and a group of
+  groups offers **Keep groups** and **Delete groups**. A group with both
+  offers **Keep all** and **Delete all**. A Keep button moves what's inside
+  out of the group. The other button closes the tabs and deletes the groups
+  with it. An empty group is deleted without asking.
+
+</Since>
 
 ## A Split pane's menu
 
