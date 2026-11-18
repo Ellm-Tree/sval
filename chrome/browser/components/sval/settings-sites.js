@@ -20,54 +20,21 @@
   ChromeUtils.defineESModuleGetters(lazy, {
     MEDIA_CHOICES:
       "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
-    MEDIA_DEFAULT_PREF:
-      "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
-    SITE_BRANCH:
-      "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
-    SvalJavascript: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
-    SvalExtensionSites:
-      "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
-    permissionsBySite:
-      "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
     permissionPhrase:
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
     siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
-    STYLES_PREF: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
-    removeStyles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
-    setStyle: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
-    styleAt: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
-    styles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+    SvalSiteChoices:
+      "moz-src:///browser/components/sval/SvalSiteChoices.sys.mjs",
     SvalSiteProtections:
       "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
-    appendLines: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    exceptionLine:
-      "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    exceptionsInFilters:
-      "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    forgetSite: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    linesBySite: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     linesForScope:
-      "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    removeSiteFromLine:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     showAgain: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
-    scopesInFilters:
-      "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   });
-  // The module exports its branch as `SITE_BRANCH`, a name the stores
-  // above export too.
-  ChromeUtils.defineLazyGetter(
-    lazy,
-    "EXTENSION_SITE_BRANCH",
-    () =>
-      ChromeUtils.importESModule(
-        "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs"
-      ).SITE_BRANCH
-  );
   // `SvalFingerprinting.sys.mjs` exports functions rather than one object of that
   // name, so it is imported as a namespace.
   ChromeUtils.defineLazyGetter(lazy, "SvalFingerprinting", () =>
@@ -132,16 +99,12 @@
       // The site choices move from the protection button, the JavaScript
       // button and from sync. These are the prefs the list reads.
       const sitesPref = () => this._describeSites();
-      for (const name of [
-        lazy.SITE_BRANCH,
-        lazy.MEDIA_DEFAULT_PREF,
-        lazy.EXTENSION_SITE_BRANCH,
-        lazy.STYLES_PREF,
-        ...lazy.SvalJavascript.PREFS,
-      ]) {
+      for (const name of lazy.SvalSiteChoices.PREFS) {
         lifetime.pref(name, sitesPref);
       }
-      lifetime.topic(lazy.SvalSiteProtections.PRIVATE_TOPIC, sitesPref);
+      for (const topic of lazy.SvalSiteChoices.TOPICS) {
+        lifetime.topic(topic, sitesPref);
+      }
       // A permission a private window holds is never listed.
       lifetime.topic("perm-changed", (subject, topic, data) => {
         if (
@@ -185,46 +148,24 @@
     },
 
     /**
-     * Every site and host the list shows: those with a stored choice, and
-     * those with a JavaScript rule, a permission, an extension switch or
-     * lines in My filters, which have no choice of `SvalSiteProtections`'
-     * own. A host's site is listed too, since its row holds the host's
-     * (decision 1980).
+     * Every site and host the list shows: those holding a choice
+     * (`SvalSiteChoices`). A host's site is listed too, since its row holds
+     * the host's (decision 1980).
      *
-     * @returns {Map<string, object>} The stored choices, by site or host.
+     * @returns {Map<string, object>} What each holds itself, by site or
+     *   host, as `SiteChoiceReading.at` answers.
      */
     _siteRules() {
-      const rules = lazy.SvalBlocking.myFilters;
-      this._sitesFilters = rules;
-      const all = lazy.SvalSiteProtections.rules(this._siteSession);
-      this._sitesPermissions = lazy.permissionsBySite();
-      this._sitesJavascript = lazy.SvalJavascript.rules();
-      this._sitesStyles = new Set(lazy.styles().map(style => style.scope));
-      // A `#@#` line is a choice of the host it names alone: under a line
-      // hiding the element on its site, it shows the element there again.
-      this._sitesShown = new Map(
-        [...lazy.exceptionsInFilters(rules)].filter(
-          ([name]) => lazy.siteOfEntry(name).site !== name
-        )
-      );
-      for (const name of [
-        ...lazy.scopesInFilters(rules),
-        ...this._sitesShown.keys(),
-        ...lazy.SvalExtensionSites.names(),
-        ...this._sitesJavascript.keys(),
-        ...this._sitesStyles,
-        ...this._sitesPermissions.keys(),
-      ]) {
-        if (!all.has(name)) {
-          all.set(name, {});
-        }
-      }
-      for (const name of [...all.keys()]) {
+      this._sitesFilters = lazy.SvalBlocking.myFilters;
+      const reading = lazy.SvalSiteChoices.read(this._siteSession);
+      const all = new Map();
+      for (const name of reading.names()) {
         const { site } = lazy.siteOfEntry(name);
-        if (!site) {
-          all.delete(name);
-        } else if (!all.has(site)) {
-          all.set(site, {});
+        if (site) {
+          all.set(name, reading.at(name));
+          if (!all.has(site)) {
+            all.set(site, reading.at(site));
+          }
         }
       }
       return all;
@@ -283,8 +224,8 @@
         undo &&
           (() => {
             this._sitesView = { ...this._sitesView, msg: "", undo: null };
-            this._restoreSite(undo);
-            this._describeSites([`site-link:${undo.site}`, "sites-search"]);
+            lazy.SvalSiteChoices.restore(undo, this._siteSession);
+            this._describeSites([`site-link:${undo.name}`, "sites-search"]);
           }),
         "sites-undo"
       );
@@ -373,18 +314,13 @@
     _siteList(rules) {
       const view = this._sitesView;
       const q = view.q.trim().toLowerCase();
-      const byFilterSite = lazy.linesBySite(lazy.SvalBlocking.myFilters);
       const { sites, hostsOf } = this._siteGroups(rules);
-      // A row holds only the lines saved for its own name.
-      const linesOf = name =>
-        (byFilterSite.get(lazy.siteOfEntry(name).site) ?? []).filter(
-          entry => entry.scope === name
-        );
       const kept = site => {
-        const rule = rules.get(site);
+        const own = rules.get(site);
+        const rule = own.protections ?? {};
         switch (view.filt) {
           case "hidden":
-            return !!linesOf(site).length;
+            return !!own.removed;
           case "off":
           case "fingerprinting":
             return rule.protections === view.filt;
@@ -399,11 +335,11 @@
             return rule.media === view.filt;
           case "js-allow":
           case "js-block":
-            return this._sitesJavascript.get(site) === view.filt.slice(3);
+            return own.javascript === view.filt.slice(3);
           case "permissions":
-            return this._sitesPermissions.has(site);
+            return !!own.permissions;
           case "extensions":
-            return !!this._siteSwitches(site).length;
+            return !!own.switches;
           default:
             return true;
         }
@@ -436,14 +372,10 @@
       for (const site of shown) {
         const hosts = hostsOf.get(site) ?? [];
         list.append(
-          this._siteRow(site, rules.get(site), linesOf(site), {
-            hosts: hosts.length,
-          })
+          this._siteRow(site, rules.get(site), { hosts: hosts.length })
         );
         for (const host of hostsShown.get(site)) {
-          list.append(
-            this._siteRow(host, rules.get(host), linesOf(host), { site })
-          );
+          list.append(this._siteRow(host, rules.get(host), { site }));
         }
       }
       wrap.append(list);
@@ -558,24 +490,21 @@
      * its hosts' choices (host-scoped rules spec §5).
      *
      * @param {string} name A site, or a host under one.
-     * @param {object} rule
-     * @param {Array<{line: string}>} lines The lines in My filters saved
-     *   for `name` itself.
+     * @param {object} own What `name` holds itself (`_siteRules`).
      * @param {object} where
      * @param {string} [where.site] For a host, its site.
      * @param {number} [where.hosts] For a site, how many hosts it lists.
      * @returns {Element}
      */
-    _siteRow(name, rule, lines, { site = null, hosts = 0 }) {
+    _siteRow(name, own, { site = null, hosts = 0 }) {
       const isPrivate = this._privateWindow;
       const summaryId = `sval-sites-summary-${name}`;
-      const shown = this._sitesShown.get(name) ?? [];
-      const differences = this._siteDifferences(name, rule, lines, shown);
+      const differences = this._siteDifferences(name, own);
       const link = site
         ? this._hostLink(name, site, `site-link:${name}`)
         : this._siteLink(name, `site-link:${name}`);
       link.setAttribute("aria-describedby", summaryId);
-      const own = differences.length || !hosts;
+      const differs = differences.length || !hosts;
       const row = this._el(
         "li",
         {
@@ -594,27 +523,21 @@
               id: summaryId,
               dataset: {
                 differs: differences.map(([key]) => key).join(" "),
-                ...(own ? {} : { own: "none" }),
+                ...(differs ? {} : { own: "none" }),
               },
             },
-            own
+            differs
               ? differences.map(([, words]) => words).join(" · ")
               : `Choices only for addresses on ${name}`
           )
         )
       );
       // A private window's choices are its own, and the stored ones show
-      // there and are not reset from it; a permission the defaults file
-      // grants is no choice to reset.
-      const resettable =
-        !!Object.keys(rule).length ||
-        (!isPrivate &&
-          (this._sitesJavascript.has(name) ||
-            this._sitesStyles.has(name) ||
-            !!lines.length ||
-            !!shown.length ||
-            !!this._siteSwitches(name).length ||
-            (this._sitesPermissions.get(name) ?? []).some(p => !p.isDefault)));
+      // there and are not reset from it.
+      const resettable = lazy.SvalSiteChoices.resettable(
+        own,
+        this._siteSession
+      );
       const cell = this._el("span", { className: "sval-sites-reset-cell" });
       if (resettable) {
         let title = `Puts ${name} back to the defaults. Cookies and logins stay.`;
@@ -635,7 +558,7 @@
           "Reset"
         );
         reset.addEventListener("click", () => {
-          if (lines.length && !isPrivate) {
+          if (own.removed && !isPrivate) {
             this._askResetSite(name);
             return;
           }
@@ -654,9 +577,7 @@
 
     /**
      * @param {string} site
-     * @param {object} rule
-     * @param {Array<{line: string}>} lines
-     * @param {string[]} [shown] For a host, the selectors it shows again.
+     * @param {object} own What it holds itself (`_siteRules`).
      * @returns {Array<[string, string]>} What differs from the defaults on
      *   the site, each as a key naming the setting and its value, and a
      *   phrase: protections, fingerprinting exceptions, video and audio,
@@ -665,8 +586,11 @@
      *   then elements shown again. A permission held by another origin under the site names its
      *   host.
      */
-    _siteDifferences(site, rule, lines, shown = []) {
+    _siteDifferences(site, own) {
       const words = [];
+      const rule = own.protections ?? {};
+      const lines = own.removed ?? [];
+      const shown = own.shown ?? [];
       const protections = new Map(SITE_PROTECTIONS).get(rule.protections);
       if (protections && rule.protections !== "on") {
         words.push([`protections:${rule.protections}`, protections]);
@@ -693,22 +617,24 @@
           `Video and audio: ${media.toLowerCase()}`,
         ]);
       }
-      const js = this._sitesJavascript.get(site);
+      const js = own.javascript;
       if (js) {
         words.push([
           `javascript:${js}`,
           js === "allow" ? "JavaScript allowed" : "JavaScript blocked",
         ]);
       }
-      if (this._sitesStyles.has(site)) {
+      if (own.style) {
         words.push(["style", "Colorshift"]);
       }
-      const own = new Set(
+      const origins = new Set(
         lazy.siteOrigins(site, ["https", "http"]).map(uri => uri.prePath)
       );
-      for (const perm of this._sitesPermissions.get(site) ?? []) {
+      for (const perm of own.permissions ?? []) {
         const principal = perm.principal;
-        const host = own.has(principal.originNoSuffix) ? null : principal.host;
+        const host = origins.has(principal.originNoSuffix)
+          ? null
+          : principal.host;
         words.push([
           `${perm.type}:${perm.capability}${host ? `@${host}` : ""}${
             perm.isDefault ? ":default" : ""
@@ -722,7 +648,7 @@
           counted(lines.length, "removed element"),
         ]);
       }
-      for (const [id, state] of this._siteSwitches(site)) {
+      for (const [id, state] of own.switches ?? []) {
         const extension = WebExtensionPolicy.getByID(id)?.name ?? id;
         words.push([`extension:${id}:${state}`, `${extension} ${state}`]);
       }
@@ -1025,225 +951,38 @@
       if (!site) {
         return;
       }
-      const { text, removed } = this._withoutOwnLines(
+      const removed = lazy.linesForScope(
         lazy.SvalBlocking.myFilters,
         site
-      );
-      if (removed) {
-        try {
-          lazy.SvalBlocking.setMyFilters(text);
-        } catch (err) {
-          lazy.SvalLog.warn(
-            `could not delete a site's rules: ${lazy.SvalLog.errorName(err)}`
-          );
-          return;
-        }
+      ).length;
+      try {
+        lazy.SvalSiteChoices.clear("removed", site);
+      } catch (err) {
+        lazy.SvalLog.warn(
+          `could not delete a site's rules: ${lazy.SvalLog.errorName(err)}`
+        );
+        return;
       }
       this._resetChoices(site, removed > 0);
     },
 
     /**
-     * The text with `name` taken out of each line saved for it, leaving the
-     * lines of the hosts under a site and of the site above a host.
-     *
-     * @param {string} text
-     * @param {string} name A site or a host.
-     * @returns {{text: string, removed: number}}
-     */
-    _withoutOwnLines(text, name) {
-      const lines = lazy.linesForScope(text, name);
-      // Newest first is last in the text first, so each edit leaves the
-      // index of the next one where it was.
-      for (const { index } of lines) {
-        text = lazy.removeSiteFromLine(text, index, name);
-      }
-      return { text, removed: lines.length };
-    },
-
-    /**
-     * Puts a site's or a host's choices back to the defaults: its
-     * `SvalSiteProtections` choices, and, outside a private window, its
-     * JavaScript rule, its Colorshift style, its permissions, its extension
-     * switches and a
-     * host's lines in My filters showing an element again, which are stored
-     * ones. The status line offers Undo, which takes the focus.
+     * Puts a site's or a host's choices back to the defaults
+     * (`SvalSiteChoices.reset`). The status line offers Undo, which takes
+     * the focus.
      *
      * @param {string} site
      * @param {boolean} [deletedLines] Whether its lines went too, which
      *   Undo cannot bring back, so there is no Undo.
      */
     _resetChoices(site, deletedLines = false) {
-      const before = this._siteSnapshot(site);
-      lazy.SvalSiteProtections.setRule(site, null, this._siteSession);
-      if (!this._privateWindow) {
-        lazy.SvalJavascript.removeRule(site);
-        lazy.removeStyles([site]);
-        for (const perm of lazy.permissionsBySite().get(site) ?? []) {
-          if (!perm.isDefault) {
-            Services.perms.removePermission(perm);
-          }
-        }
-        // Each tab of the name loads again, as after a switch on the site's
-        // page, so an extension's scripts go or run there.
-        if (before.switches.length) {
-          lazy.SvalExtensionSites.removeAll(site);
-          lazy.SvalExtensionSites.reloadSite(site);
-        }
-        // A host has no line hiding an element left here, since the
-        // confirm took them, so `forgetSite`, which reads a host's name as
-        // that name alone, takes only its `#@#` lines.
-        if (before.shown.length) {
-          this._writeFilters(
-            lazy.forgetSite(lazy.SvalBlocking.myFilters, site).text
-          );
-        }
-      }
+      const before = lazy.SvalSiteChoices.reset(site, this._siteSession);
       this._sitesView = {
         ...this._sitesView,
         msg: `Reset ${site}.`,
         undo: deletedLines ? null : before,
       };
       this._describeSites(["sites-undo", "sites-search"], true);
-    },
-
-    /**
-     * @param {string} site
-     * @returns {object} What `_restoreSite` needs to put the site's choices
-     *   back as they are now.
-     */
-    _siteSnapshot(site) {
-      const isPrivate = this._privateWindow;
-      return {
-        site,
-        rule:
-          lazy.SvalSiteProtections.rules(this._siteSession).get(site) ?? null,
-        javascript: isPrivate
-          ? undefined
-          : (lazy.SvalJavascript.rules().get(site) ?? null),
-        style: isPrivate ? null : lazy.styleAt(site),
-        switches: isPrivate ? [] : this._siteSwitches(site),
-        shown:
-          isPrivate || lazy.siteOfEntry(site).site === site
-            ? []
-            : (lazy
-                .exceptionsInFilters(lazy.SvalBlocking.myFilters)
-                .get(site) ?? []),
-        permissions: isPrivate
-          ? []
-          : (lazy.permissionsBySite().get(site) ?? [])
-              .filter(perm => !perm.isDefault)
-              .map(perm => ({
-                principal: perm.principal,
-                type: perm.type,
-                capability: perm.capability,
-                expireType: perm.expireType,
-                expireTime: perm.expireTime,
-              })),
-      };
-    },
-
-    /**
-     * @param {string} name A site or a host.
-     * @returns {Array<[string, "off"|"on"]>} The extension switches saved
-     *   under `name` itself, by extension id.
-     */
-    _siteSwitches(name) {
-      const ext = lazy.SvalExtensionSites;
-      return [
-        ...ext.idsOffOn(name).map(id => [id, "off"]),
-        ...ext.idsOnAt(name).map(id => [id, "on"]),
-      ];
-    },
-
-    /**
-     * Logs a switch that did not reach every process.
-     *
-     * @param {Promise<void>} applied From `SvalExtensionSites.setOff`.
-     */
-    _applySwitch(applied) {
-      applied.catch(err =>
-        lazy.SvalLog.warn(
-          `an extension's site switch did not apply: ${lazy.SvalLog.errorName(err)}`
-        )
-      );
-    },
-
-    /**
-     * Saves My filters, logging a write that fails.
-     *
-     * @param {string} text
-     */
-    _writeFilters(text) {
-      try {
-        lazy.SvalBlocking.setMyFilters(text);
-      } catch (err) {
-        lazy.SvalLog.warn(
-          `could not save My filters: ${lazy.SvalLog.errorName(err)}`
-        );
-      }
-    },
-
-    /**
-     * Puts back what `_siteSnapshot` read.
-     *
-     * @param {object} snapshot
-     * @param {string} snapshot.site
-     * @param {?object} snapshot.rule
-     * @param {?string} [snapshot.javascript] Left out in a private window.
-     * @param {?object} snapshot.style Its Colorshift style's values.
-     * @param {object[]} snapshot.permissions
-     * @param {string[]} snapshot.shown The selectors a host showed again.
-     * @param {Array<[string, string]>} snapshot.switches From
-     *   `_siteSwitches`.
-     */
-    _restoreSite({
-      site,
-      rule,
-      javascript,
-      style,
-      permissions,
-      shown,
-      switches,
-    }) {
-      // Undo follows a Reset of this name alone, so each switch differs
-      // from what the name inherits as it did, and `setOff` keeps it.
-      for (const [id, state] of switches) {
-        this._applySwitch(
-          lazy.SvalExtensionSites.setOff(id, site, state === "off")
-        );
-      }
-      if (switches.length) {
-        lazy.SvalExtensionSites.reloadSite(site);
-      }
-      if (shown.length) {
-        this._writeFilters(
-          lazy.appendLines(
-            lazy.SvalBlocking.myFilters,
-            shown.map(selector => lazy.exceptionLine(site, selector))
-          )
-        );
-      }
-      lazy.SvalSiteProtections.setRule(site, rule, this._siteSession);
-      if (javascript !== undefined) {
-        const js = lazy.SvalJavascript;
-        if (javascript) {
-          js.setEnabled(site, javascript === "allow");
-        } else {
-          js.removeRule(site);
-        }
-      }
-      if (style) {
-        lazy.setStyle(site, style);
-      }
-      for (const perm of permissions) {
-        Services.perms.addFromPrincipal(
-          perm.principal,
-          perm.type,
-          perm.capability,
-          perm.expireType,
-          perm.expireTime
-        );
-      }
     },
 
     /**

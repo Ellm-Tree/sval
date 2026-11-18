@@ -345,6 +345,58 @@ add_task(async function the_sites_card_lists_hidden_elements_read_only() {
 });
 
 /**
+ * Colorshift is off in a private window, so a site whose only choice is a
+ * style has no row there, as it has no card on a site's page.
+ */
+add_task(async function a_colorshift_style_lists_no_site_there() {
+  const { SvalSiteProtections } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs"
+  );
+  const { removeStyles, setStyle } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs"
+  );
+  const session = gBrowser.defaultUserContextId;
+  setStyle("example.net", { theme: "dark" });
+  setStyle("example.org", { theme: "dark" });
+  SvalSiteProtections.setMedia("example.org", "allow", session);
+  const tab = SvalPanel.openSettingsPage();
+  try {
+    await within(
+      TestUtils.waitForCondition(
+        () =>
+          tab.linkedBrowser.contentWindow?.document.documentElement?.dataset
+            .svalSettings === "ready",
+        "the settings page started"
+      ),
+      10_000,
+      "the settings page started"
+    );
+    const page = tab.linkedBrowser.contentWindow;
+    await showPane(page, "svalSites");
+    const row = site =>
+      page.document.querySelector(`#sval-sites-body [data-site="${site}"]`);
+    await within(
+      TestUtils.waitForCondition(
+        () => row("example.org")?.checkVisibility(),
+        "the site with a choice of the window's has its row"
+      ),
+      10_000,
+      "the site with a choice of the window's has its row"
+    );
+    Assert.equal(
+      row("example.org").querySelector(".sval-sites-summary").dataset.differs,
+      "media:allow",
+      "which leaves its style out"
+    );
+    Assert.ok(!row("example.net"), "and a site with only a style has none");
+  } finally {
+    BrowserTestUtils.removeTab(tab);
+    SvalSiteProtections.setRule("example.org", null, session);
+    removeStyles(["example.net", "example.org"]);
+  }
+});
+
+/**
  * A site's page in a private window says its changes are the window's own,
  * edits the window's choices, and shows JavaScript as plain text.
  */

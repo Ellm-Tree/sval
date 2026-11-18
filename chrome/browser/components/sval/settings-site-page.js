@@ -39,6 +39,8 @@
     SvalJavascript: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
     APPLIED_TOPIC: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+    SvalSiteChoices:
+      "moz-src:///browser/components/sval/SvalSiteChoices.sys.mjs",
     SvalSiteData: "moz-src:///browser/components/sval/SvalSiteData.sys.mjs",
     SvalSiteProtections:
       "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
@@ -58,13 +60,8 @@
     removeStyles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
     setStyle: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
     styleFor: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
-    styles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     linesForScope:
-      "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    scopesInFilters:
-      "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
-    exceptionsInFilters:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
     scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     SitePermissions: "resource:///modules/SitePermissions.sys.mjs",
@@ -722,46 +719,22 @@
     },
 
     /**
+     * @returns {object} The choices the scoped cards show, as they stand
+     *   (`SiteChoiceReading`).
+     */
+    _scopedChoices() {
+      return lazy.SvalSiteChoices.read(this._siteSession, { scoped: true });
+    },
+
+    /**
      * @param {string} site
      * @returns {string[]} The hosts under `site` holding a choice of their
      *   own in any store the scoped cards read, by name.
      */
     _siteHosts(site) {
-      const names = new Set([
-        ...lazy.SvalSiteProtections.rules(this._siteSession).keys(),
-        ...lazy.SvalJavascript.rules().keys(),
-        ...lazy.SvalExtensionSites.names(),
-        ...lazy.scopesInFilters(lazy.SvalBlocking.myFilters),
-        ...lazy.exceptionsInFilters(lazy.SvalBlocking.myFilters).keys(),
-        ...this._siteStyles().keys(),
-      ]);
-      return [...names]
+      return [...this._scopedChoices().names()]
         .filter(name => name !== site && lazy.siteOfEntry(name).site === site)
         .sort();
-    },
-
-    /**
-     * @param {string} name A site or a host.
-     * @returns {number} How many choices are saved for `name` itself, as the
-     *   scoped cards show them: each field, rule, removed element, element
-     *   shown again, Colorshift style and extension switch.
-     */
-    _scopeChoices(name) {
-      const rule =
-        lazy.SvalSiteProtections.rules(this._siteSession).get(name) ?? {};
-      const ext = lazy.SvalExtensionSites;
-      return (
-        Number(!!rule.protections) +
-        Number(!!rule.media) +
-        (rule.exceptions?.length ?? 0) +
-        Number(lazy.SvalJavascript.rules().has(name)) +
-        lazy.linesForScope(lazy.SvalBlocking.myFilters, name).length +
-        (lazy.exceptionsInFilters(lazy.SvalBlocking.myFilters).get(name)
-          ?.length ?? 0) +
-        Number(this._siteStyles().has(name)) +
-        ext.idsOffOn(name).length +
-        ext.idsOnAt(name).length
-      );
     },
 
     /**
@@ -867,8 +840,12 @@
      */
     _siteScopeParts(site, hosts) {
       const page = this._sitePage;
+      const choices = this._scopedChoices();
+      // How many choices are saved for a name itself, as the scoped cards
+      // show them.
+      const saved = name => lazy.SvalSiteChoices.count(choices.at(name));
       const labelled = name => {
-        const n = this._scopeChoices(name);
+        const n = saved(name);
         return n ? `${name} · ${counted(n, "choice")}` : name;
       };
       const select = document.createElement("moz-select");
@@ -883,7 +860,7 @@
         el.setAttribute("label", label);
         return el;
       };
-      const allOf = this._scopeChoices(site);
+      const allOf = saved(site);
       select.append(
         option(
           site,
@@ -1902,19 +1879,6 @@
         );
       }
       return card;
-    },
-
-    /**
-     * @returns {Map<string, object>} The Colorshift styles the page shows, by
-     *   the site or host each is saved at. None in a private window, where
-     *   Colorshift is off.
-     */
-    _siteStyles() {
-      return new Map(
-        this._privateWindow
-          ? []
-          : lazy.styles().map(({ scope, ...values }) => [scope, values])
-      );
     },
 
     /**
