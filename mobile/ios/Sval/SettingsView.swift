@@ -86,6 +86,13 @@ struct SettingsView: View {
                     }
                     .listRowBackground(theme.cell)
                 }
+                Section {
+                    NavigationLink("Licenses") {
+                        LicensesView(onDone: onDone ?? { dismiss() })
+                    }
+                    .font(.system(.body))
+                }
+                .listRowBackground(theme.cell)
             }
         }
         .foregroundStyle(theme.text)

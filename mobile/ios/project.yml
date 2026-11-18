@@ -34,6 +34,10 @@ targets:
       # (`DesktopColor.swift`).
       - path: ../../chrome/browser/components/sval/SvalColor.sys.mjs
         buildPhase: resources
+      # What Settings › Licenses lists, which scripts/generate-app-license.py
+      # --ios writes.
+      - path: Licenses.json
+        buildPhase: resources
       # The desktop's rules for which app an agent is (`AgentBrands.swift`).
       - path: ../../chrome/browser/components/sval/SvalAgentBrands.sys.mjs
         buildPhase: resources

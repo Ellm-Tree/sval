@@ -29,6 +29,7 @@ path = [
   "mobile/sval-mobile/Cargo.lock",
   "mobile/ios/Sval/Assets.xcassets/Contents.json",
   "mobile/ios/Sval/Assets.xcassets/**/*.json",
+  "mobile/ios/Licenses.json",
   "chrome/toolkit/mozapps/update/updater/*.der",
 ]
 SPDX-FileCopyrightText = "2026 Ellm Tree, Inc."

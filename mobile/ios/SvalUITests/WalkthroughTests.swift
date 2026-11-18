@@ -121,6 +121,36 @@ final class WalkthroughTests: XCTestCase {
         app.navigationBars["Favorites"].buttons["Close"].tap()
     }
 
+    /// Settings › Licenses lists Sval's notice and every component; a
+    /// search finds a component, whose page shows its license.
+    func testLicensesPage() {
+        waitForBar()
+        let workspace = app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch
+        workspace.tap()
+        sleep(2)
+        app.buttons["Settings"].firstMatch.tap()
+        sleep(2)
+        app.collectionViews.firstMatch.swipeUp()
+        sleep(1)
+        app.buttons["Licenses"].firstMatch.tap()
+        let notice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Sval is made by Ellm Tree'")).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 10), "the list opens with Sval's notice")
+        sleep(1)
+        shot("licenses")
+        XCTAssertTrue(app.navigationBars["Licenses"].exists, "Licenses has the system's bar")
+        app.searchFields.firstMatch.tap()
+        app.typeText("seahash")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'seahash'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "a search finds the component")
+        sleep(1)
+        shot("licenses-search")
+        row.tap()
+        let text = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Permission is hereby granted'")).firstMatch
+        XCTAssertTrue(text.waitForExistence(timeout: 5), "the component's page shows its license")
+        sleep(1)
+        shot("licenses-detail")
+    }
+
     /// The sheet's New Tab: the sheet goes, then the Launcher comes up and
     /// keeps the keyboard.
     func testSheetNewTab() {
@@ -545,7 +575,7 @@ final class WalkthroughTests: XCTestCase {
         sleep(2)
         app.buttons["Settings"].firstMatch.tap()
         sleep(2)
-        // Sync is Settings' last section.
+        // Sync is at the end of Settings, above Licenses.
         app.collectionViews.firstMatch.swipeUp()
         sleep(1)
         shot("settings-sync")

@@ -32,6 +32,7 @@ SPDX 3.0's AdditionRef- prefix, for an addition the SPDX list does not hold.
 """
 
 import html
+import json
 import pathlib
 import re
 import subprocess
@@ -222,14 +223,28 @@ def main():
     if art_notice.is_file() and art_copy.is_file() and art_notice.read_bytes() != art_copy.read_bytes():
         problems.append(f"branding/sval/LICENSE and LICENSES/{BRAND_ART}.txt differ; they are one notice")
 
-    # about:license shows Sval's license texts, so they must be LICENSES/'s.
-    page = REPO / "chrome/browser/base/content/overrides/app-license.html"
-    if page.is_file():
+    # about:license and the iPhone app's Settings › Licenses show Sval's
+    # license texts, so they must be LICENSES/'s. The app's are in its
+    # Licenses.json, as strings in "texts".
+    for page in (
+        REPO / "chrome/browser/base/content/overrides/app-license.html",
+        REPO / "mobile/ios/Licenses.json",
+    ):
+        if not page.is_file():
+            continue
         shown = page.read_text(encoding="utf-8")
+        if page.suffix == ".json":
+            shown = json.loads(shown)["texts"]
         for license in identifiers(SVAL):
             text = REPO / "LICENSES" / f"{license}.txt"
-            escaped = html.escape(text.read_text(encoding="utf-8"), quote=False) if text.is_file() else None
-            if escaped is not None and escaped not in shown:
+            if not text.is_file():
+                continue
+            text = text.read_text(encoding="utf-8")
+            if page.suffix == ".json":
+                missing = text not in shown
+            else:
+                missing = html.escape(text, quote=False) not in shown
+            if missing:
                 problems.append(
                     f"{page.relative_to(REPO)}: does not show LICENSES/{license}.txt as it stands"
                 )
