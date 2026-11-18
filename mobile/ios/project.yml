@@ -52,6 +52,12 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: app.sval.ios.web
             CFBundleURLSchemes: [http, https]
+        # Apple: NO when an app's encryption is "exempt from export
+        # compliance documentation requirements" ("Complying with encryption
+        # export regulations"). App Store Connect's questions put the sync's
+        # standard encryption there while the app isn't sold in France, and
+        # without the key every upload waits on them.
+        ITSAppUsesNonExemptEncryption: false
         # A row dragged in the Workspace tree (`TreeDrop.swift`).
         # iPad multitasking needs every orientation, and App Store Connect
         # refuses an iPad build without them.
