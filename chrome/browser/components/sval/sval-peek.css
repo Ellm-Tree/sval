@@ -89,9 +89,9 @@
 }
 
 /* The pill fills the row between the tag and the open button, and gives way
-   first in a narrow window, down to the room to read the address. Flex
-   shrinking is weighted by basis times `flex-shrink`, so the target's large
-   factor spends the address's room before the open button's. */
+   first in a narrow window, down to the room to read the address. The row's
+   target keeps its content's width as its floor, so only once the address is
+   at its own does the open button give way. */
 :root[svalpeek] #urlbar-container {
   flex: 1 1 auto !important;
   min-width: var(--urlbar-container-min-width);
@@ -106,7 +106,6 @@
 }
 
 :root[svalpeek] #nav-bar-customization-target {
-  flex: 1 1000 auto !important;
   min-width: auto !important;
 }
 
