@@ -24,16 +24,13 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   SvalArchive: "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
   SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
-  SvalExtensionSites:
-    "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-  SvalJavascript: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
   SvalLinkRules: "moz-src:///browser/components/sval/SvalLinkRules.sys.mjs",
+  SvalSiteChoices: "moz-src:///browser/components/sval/SvalSiteChoices.sys.mjs",
   SvalSiteData: "moz-src:///browser/components/sval/SvalSiteData.sys.mjs",
   SvalSiteProtections:
     "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
-  SvalSiteStyles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
   APPLIED_PERMISSIONS:
     "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
   forgetSite: "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
@@ -243,12 +240,16 @@ function scopesOf(site, names) {
 }
 
 /**
- * @param {string} site
- * @returns {string[]} The site and its hosts that hold a site style.
+ * The stores the `choices` part forgets whole (`SvalSiteChoices`). A site's
+ * protections are not among them: the part leaves their fingerprinting
+ * exceptions, which are the `exceptions` part.
+ *
+ * @returns {object[]}
  */
-function styleScopesOf(site) {
-  const held = lazy.SvalSiteStyles.styles().map(entry => entry.scope);
-  return scopesOf(site, held).filter(name => held.includes(name));
+function wholeChoices() {
+  return lazy.SvalSiteChoices.CHOICES.filter(
+    choice => choice.forget === "choices" && choice.id !== "protections"
+  );
 }
 
 /**
@@ -302,13 +303,12 @@ const SVAL_PARTS = {
       const { exceptions } = protections.ruleFor(name);
       protections.setRule(name, exceptions ? { exceptions } : null);
     }
-    for (const name of scopesOf(site, lazy.SvalJavascript.rules().keys())) {
-      lazy.SvalJavascript.removeRule(name);
+    const names = scopesOf(site, lazy.SvalSiteChoices.read().names());
+    for (const { id } of wholeChoices()) {
+      for (const name of names) {
+        lazy.SvalSiteChoices.clear(id, name);
+      }
     }
-    for (const name of scopesOf(site, lazy.SvalExtensionSites.names())) {
-      lazy.SvalExtensionSites.removeAll(name);
-    }
-    lazy.SvalSiteStyles.removeStyles(styleScopesOf(site));
     const linkRules = lazy.SvalLinkRules.rules();
     const kept = linkRules.filter(rule => !namesSite(rule, site));
     if (kept.length < linkRules.length) {
@@ -401,11 +401,13 @@ export const SvalForgetSite = {
     const rules = scopesOf(site, protections.rules().keys()).map(name =>
       protections.ruleFor(name)
     );
-    const switches = scopesOf(site, lazy.SvalExtensionSites.names()).map(
-      name =>
-        lazy.SvalExtensionSites.idsOffOn(name).length +
-        lazy.SvalExtensionSites.idsOnAt(name).length
-    );
+    const saved = lazy.SvalSiteChoices.read();
+    const whole = scopesOf(site, saved.names()).flatMap(name => {
+      const own = saved.at(name);
+      return wholeChoices()
+        .filter(choice => choice.id in own)
+        .map(choice => choice.count(own[choice.id]));
+    });
     const data = lazy.SvalSiteData.ready
       ? lazy.SvalSiteData.heldFor(site)
       : null;
@@ -423,11 +425,7 @@ export const SvalForgetSite = {
             sum + Number(!!rule.protections) + Number(!!rule.media),
           0
         ) +
-        scopesOf(site, lazy.SvalJavascript.rules().keys()).filter(name =>
-          lazy.SvalJavascript.hasRule(name)
-        ).length +
-        switches.reduce((sum, count) => sum + count, 0) +
-        styleScopesOf(site).length +
+        whole.reduce((sum, count) => sum + count, 0) +
         lazy.SvalLinkRules.rules().filter(rule => namesSite(rule, site))
           .length +
         allowedDomainsOf(site).length,

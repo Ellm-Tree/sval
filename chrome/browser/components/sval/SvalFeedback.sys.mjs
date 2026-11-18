@@ -48,13 +48,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
   SvalEngine: "moz-src:///browser/components/sval/SvalEngine.sys.mjs",
-  SvalExtensionSites:
-    "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
+  SvalSiteChoices: "moz-src:///browser/components/sval/SvalSiteChoices.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   SvalSecureDns: "moz-src:///browser/components/sval/SvalSecureDns.sys.mjs",
-  SvalSiteProtections:
-    "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
   Troubleshoot: "resource://gre/modules/Troubleshoot.sys.mjs",
   UpdateUtils: "resource://gre/modules/UpdateUtils.sys.mjs",
   choiceOf: "moz-src:///browser/components/sval/SvalFingerprinting.sys.mjs",
@@ -137,12 +134,7 @@ function pretty(value) {
  * @returns {string[]}
  */
 function siteBranches() {
-  return [
-    exportOf("SvalSiteProtections", "SITE_BRANCH"),
-    exportOf("SvalJavascript", "SITE_BRANCH"),
-    exportOf("SvalExtensionSites", "SITE_BRANCH"),
-    lazy.ALLOWED_DOMAIN_BRANCH,
-  ];
+  return [...lazy.SvalSiteChoices.SITE_BRANCHES, lazy.ALLOWED_DOMAIN_BRANCH];
 }
 
 /**
@@ -259,8 +251,14 @@ async function svalState() {
       ),
       secureDns: lazy.SvalSecureDns.current()?.value ?? null,
       pageRules: Services.prefs.getBoolPref(lazy.PAGE_RULES_PREF, true),
-      sitesWithOwnSettings: lazy.SvalSiteProtections.rules().size,
-      sitesWithExtensionSwitches: lazy.SvalExtensionSites.names().length,
+      // How many sites and hosts hold each kind of choice, by the kind's
+      // id in `SvalSiteChoices`.
+      sitesWithChoices: Object.fromEntries(
+        lazy.SvalSiteChoices.CHOICES.map(choice => [
+          choice.id,
+          choice.read(null).size,
+        ])
+      ),
     },
     agents: {
       access: agentStore ? "on" : "off",

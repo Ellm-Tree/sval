@@ -21,6 +21,7 @@ import {
 import {
   SvalJavascript,
   PREFS as JAVASCRIPT_PREFS,
+  SITE_BRANCH as JAVASCRIPT_BRANCH,
 } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
 import {
   SvalExtensionSites,
@@ -91,6 +92,11 @@ function switchesAt(name) {
  *   and changes none, and `"off"` shows none, the feature being off there.
  * - `prefs` and `topics`: what changes when a choice of its kind may have.
  *   Left out where the reader has to look at the notification itself.
+ * - `siteBranch`: the pref branch it keeps a pref per name under, where it
+ *   keeps one. Those prefs' names are sites, so nothing that leaves the
+ *   device names them (`CONTRIBUTING.md` rule 10).
+ * - `forget`: the part of Forget this site (`SvalForgetSite.PARTS`) that
+ *   takes it.
  * - `read(session)`: every name holding one, with what it holds, as a Map.
  * - `count(own)`: how many choices `own` is, as a site's page counts them.
  * - `taken(own)`: the part of `own` Reset takes, in the form `restore`
@@ -98,12 +104,18 @@ function switchesAt(name) {
  * - `clear(name, own, session)` removes it, and `restore(name, taken,
  *   session)` puts it back. An entry with no `restore` is one Undo cannot
  *   bring back, so Reset leaves it to its caller.
+ * - `reload(name)`: loads the name's tabs again, where a change shows only
+ *   in a page loaded after it. Reset and Undo do, and Forget this site does
+ *   not: a page loading as its site's data is cleared can store it again.
  */
 const CHOICES = Object.freeze([
   {
     id: "protections",
     scoped: true,
     private: "session",
+    siteBranch: PROTECTION_BRANCH,
+    // Its fingerprinting exceptions are a part of their own, `exceptions`.
+    forget: "choices",
     prefs: [PROTECTION_BRANCH, MEDIA_DEFAULT_PREF],
     topics: [PRIVATE_TOPIC],
     read: session => SvalSiteProtections.rules(session),
@@ -120,6 +132,8 @@ const CHOICES = Object.freeze([
     id: "javascript",
     scoped: true,
     private: "stored",
+    siteBranch: JAVASCRIPT_BRANCH,
+    forget: "choices",
     prefs: JAVASCRIPT_PREFS,
     read: () => SvalJavascript.rules(),
     count: () => 1,
@@ -130,6 +144,7 @@ const CHOICES = Object.freeze([
     id: "style",
     scoped: true,
     private: "off",
+    forget: "choices",
     prefs: [STYLES_PREF],
     read: () =>
       new Map(styles().map(({ scope, ...values }) => [scope, values])),
@@ -141,6 +156,7 @@ const CHOICES = Object.freeze([
     id: "permissions",
     scoped: false,
     private: "stored",
+    forget: "permissions",
     read: () => lazy.permissionsBySite(),
     count: permissions => permissions.length,
     // A permission the defaults file grants is no choice to reset.
@@ -177,16 +193,13 @@ const CHOICES = Object.freeze([
     id: "switches",
     scoped: true,
     private: "stored",
+    siteBranch: EXTENSION_SITE_BRANCH,
+    forget: "choices",
     prefs: [EXTENSION_SITE_BRANCH],
     read: () =>
       new Map(SvalExtensionSites.names().map(name => [name, switchesAt(name)])),
     count: switches => switches.length,
-    // Each tab of the name loads again, as after a switch on the site's
-    // page, so an extension's scripts go or run there.
-    clear(name) {
-      SvalExtensionSites.removeAll(name);
-      SvalExtensionSites.reloadSite(name);
-    },
+    clear: name => SvalExtensionSites.removeAll(name),
     // Undo follows a Reset of this name alone, so each switch differs from
     // what the name inherits as it did, and `setOff` keeps it.
     restore(name, switches) {
@@ -197,8 +210,10 @@ const CHOICES = Object.freeze([
           )
         );
       }
-      SvalExtensionSites.reloadSite(name);
     },
+    // Each tab of the name loads again, as after a switch on the site's
+    // page, so an extension's scripts go or run there.
+    reload: name => SvalExtensionSites.reloadSite(name),
   },
   {
     // The lines in My filters that hide an element or block a request on
@@ -206,6 +221,7 @@ const CHOICES = Object.freeze([
     id: "removed",
     scoped: true,
     private: "stored",
+    forget: "hiddenLines",
     read() {
       const text = lazy.SvalBlocking.myFilters;
       const byName = new Map(scopesInFilters(text).map(name => [name, []]));
@@ -241,6 +257,7 @@ const CHOICES = Object.freeze([
     id: "shown",
     scoped: true,
     private: "stored",
+    forget: "hiddenLines",
     read: () =>
       new Map(
         [...exceptionsInFilters(lazy.SvalBlocking.myFilters)].filter(
@@ -339,6 +356,11 @@ export const SvalSiteChoices = {
     return CHOICES.flatMap(choice => choice.prefs ?? []);
   },
 
+  /** The pref branches whose prefs are each named for a site. */
+  get SITE_BRANCHES() {
+    return CHOICES.flatMap(choice => choice.siteBranch ?? []);
+  },
+
   /** The topics a reader watches to follow the choices. */
   get TOPICS() {
     return CHOICES.flatMap(choice => choice.topics ?? []);
@@ -423,6 +445,7 @@ export const SvalSiteChoices = {
       const part = choice.taken?.(own[choice.id]) ?? own[choice.id];
       if (!isEmpty(part)) {
         choice.clear(name, own[choice.id], session);
+        choice.reload?.(name);
         taken[choice.id] = part;
       }
     }
@@ -439,6 +462,7 @@ export const SvalSiteChoices = {
     for (const choice of CHOICES) {
       if (choice.id in taken) {
         choice.restore(name, taken[choice.id], session);
+        choice.reload?.(name);
       }
     }
   },

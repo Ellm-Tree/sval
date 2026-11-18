@@ -328,7 +328,7 @@ add_task(async function the_value_rule() {
     (await report.parts.find(p => p.id === "state").view()).text
   );
   Assert.equal(
-    state.protections.sitesWithExtensionSwitches,
+    state.protections.sitesWithChoices.switches,
     1,
     "the sites with an extension switch are counted instead"
   );

@@ -178,3 +178,19 @@ add_task(async function forget_removes_the_sites_archived_tabs() {
   Assert.deepEqual(await urls(), [`https://${OTHER}/`]);
   Assert.equal((await SvalForgetSite.countsFor(SITE)).archive, 0);
 });
+
+/**
+ * Forget takes every choice a site can hold: each kind `SvalSiteChoices`
+ * lists names the part of Forget that takes it.
+ */
+add_task(function every_site_choice_names_the_part_that_forgets_it() {
+  const { SvalSiteChoices } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSiteChoices.sys.mjs"
+  );
+  for (const choice of SvalSiteChoices.CHOICES) {
+    Assert.ok(
+      SvalForgetSite.PARTS.includes(choice.forget),
+      `${choice.id} is forgotten with a part of Forget`
+    );
+  }
+});
