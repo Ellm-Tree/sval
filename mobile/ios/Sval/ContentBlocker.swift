@@ -15,8 +15,12 @@ final class ContentBlocker {
     /// The compiled rule lists a page chooses from by its site's protections
     /// (`Page.useRules`).
     struct Rules {
-        /// The level's lists, My filters with them.
+        /// The level's lists, with My filters' exceptions.
         var lists: [WKContentRuleList] = []
+        /// My filters, with the level's exceptions, compiled apart so that a
+        /// line added to them compiles this small list alone
+        /// (`exceptionLines`).
+        var mine: [WKContentRuleList] = []
         /// My filters' page rules alone, for a page the lists skip
         /// (decision 1993).
         var own: [WKContentRuleList] = []
@@ -24,12 +28,12 @@ final class ContentBlocker {
         /// on any page (`scriptRules`).
         var scripts: WKContentRuleList?
 
-        /// The lists a page blocks with, in order: the level's where its
-        /// site has protections on, My filters' page rules alone where it
-        /// hasn't or no list runs (decision 1993), and the scripts'
-        /// everywhere.
+        /// The lists a page blocks with, in order: the level's and My
+        /// filters' where its site has protections on, My filters' page
+        /// rules alone where it hasn't or no list runs (decision 1993), and
+        /// the scripts' everywhere.
         func installed(protected: Bool) -> [WKContentRuleList] {
-            (protected && !lists.isEmpty ? lists : own) + (scripts.map { [$0] } ?? [])
+            (protected && !lists.isEmpty ? lists + mine : own) + (scripts.map { [$0] } ?? [])
         }
     }
 
@@ -76,10 +80,8 @@ final class ContentBlocker {
 
     /// How long a downloaded list is used before it is fetched again.
     nonisolated static let listLifetime: TimeInterval = 24 * 60 * 60
-    private static let compiledKey = "contentRulesKey"
-    private static let compiledCount = "contentRulesCount"
-    private static let ownCount = "contentRulesOwnCount"
     private static let idPrefix = "sval-rules-"
+    private static let minePrefix = "sval-mine-"
     private static let ownPrefix = "sval-own-"
     private static let scriptsId = "sval-scripts"
 
@@ -99,7 +101,7 @@ final class ContentBlocker {
                 inputsKey = "off"
                 requestsGeneration += 1
                 requests = nil
-                apply([], own: [])
+                apply(Rules())
                 Diagnostics.log("blocking: off by launch option")
             }
             return
@@ -140,7 +142,7 @@ final class ContentBlocker {
         let generation = requestsGeneration
         if lists.isEmpty && own.isEmpty {
             requests = nil
-            apply([], own: [])
+            apply(Rules())
             Diagnostics.log("blocking: off")
             return
         }
@@ -151,50 +153,78 @@ final class ContentBlocker {
         defer { applying = false }
         // The lists run to megabytes each, read and hashed at every launch,
         // so they are kept off the main thread.
-        let (texts, key) = await Task.detached(priority: .userInitiated) {
+        let texts = await Task.detached(priority: .userInitiated) {
             var texts: [String] = []
             for (id, address) in lists.sorted(by: { $0.key < $1.key }) {
                 if let text = await Self.list(id: id, address: address) {
                     texts.append(text)
                 }
             }
-            if !texts.isEmpty, !myFilters.isEmpty { texts.append(myFilters) }
-            // The key names what the rules were made from, the downloads
-            // and the converter included, so the compiled rules are reused
-            // across launches until one changes.
-            let key = Self.digest([converterVersion(), String(pageRules), myFilters, allowed.joined(separator: ",")]
-                + texts.map { Self.digest([$0]) })
-            return (texts, key)
+            return texts
         }.value
         // Made apart from the rules, so a page waits on neither for the
         // other.
         Task {
             let made = await Task.detached(priority: .utility) {
-                texts.isEmpty ? nil : RequestBlocker(lists: texts, allowedDomains: allowed)
+                texts.isEmpty ? nil : RequestBlocker(lists: texts + [myFilters], allowedDomains: allowed)
             }.value
             if generation == requestsGeneration { requests = made }
         }
+        // Each key names what its rules are made from, the converter
+        // included, so compiled rules are reused across launches until one
+        // changes.
+        let common = [converterVersion(), String(pageRules), allowed.joined(separator: ",")]
+        let level = await Task.detached(priority: .utility) { () -> (key: String, convert: @Sendable () -> ContentRules)? in
+            guard !texts.isEmpty else { return nil }
+            let theirs = exceptionLines(list: myFilters)
+            let inputs = texts + (theirs.isEmpty ? [] : [theirs])
+            return (Self.digest(common + inputs.map { Self.digest([$0]) }),
+                    { contentRules(lists: inputs, pageRules: pageRules, allowedDomains: allowed) })
+        }.value
+        let mine = await Task.detached(priority: .utility) { () -> (key: String, convert: @Sendable () -> ContentRules)? in
+            guard !texts.isEmpty, !myFilters.isEmpty else { return nil }
+            let inputs = [texts.map(exceptionLines).joined(), myFilters]
+            return (Self.digest(common + inputs),
+                    { contentRules(lists: inputs, pageRules: pageRules, allowedDomains: allowed) })
+        }.value
+        typealias Part = (part: WritableKeyPath<Rules, [WKContentRuleList]>, prefix: String,
+                          key: String?, convert: (@Sendable () -> ContentRules)?)
+        var next = Rules()
+        var counts: [Int] = []
+        let parts: [Part] = [
+            (\Rules.lists, Self.idPrefix, level?.key, level?.convert),
+            (\Rules.mine, Self.minePrefix, mine?.key, mine?.convert),
+            (\Rules.own, Self.ownPrefix, own.isEmpty ? nil : Self.digest(common + [own]),
+             own.isEmpty ? nil : { @Sendable in ownPageRules(myFilters: own) }),
+        ]
+        for (part, prefix, key, convert) in parts {
+            guard let key, let convert else { continue }
+            guard let compiled = await made(prefix: prefix, key: key, convert: convert) else { return }
+            next[keyPath: part] = compiled.lists
+            counts.append(compiled.rules)
+        }
+        apply(next)
+        Diagnostics.log("blocking: \(counts.reduce(0, +)) rule(s) converted in \(next.lists.count + next.mine.count + next.own.count) list(s) from \(texts.count) source(s), \(Int(Date.now.timeIntervalSince(started))) s")
+    }
+
+    /// The rules `convert` makes, compiled under `prefix`, or those compiled
+    /// earlier when `key` names the same inputs. Returns how many rules it
+    /// converted, 0 for rules reused, or nil when a list fails to compile.
+    private func made(prefix: String, key: String,
+                      convert: @escaping @Sendable () -> ContentRules) async -> (lists: [WKContentRuleList], rules: Int)? {
         let defaults = UserDefaults.standard
-        if key == defaults.string(forKey: Self.compiledKey),
-           let stored = await Self.storedLists(Self.idPrefix, count: defaults.integer(forKey: Self.compiledCount)),
-           let storedOwn = await Self.storedLists(Self.ownPrefix, count: defaults.integer(forKey: Self.ownCount)) {
-            apply(stored, own: storedOwn)
-            Diagnostics.log("blocking: \(stored.count + storedOwn.count) compiled list(s) reused")
-            return
+        let keyName = "contentRules.\(prefix).key"
+        let countName = "contentRules.\(prefix).count"
+        if key == defaults.string(forKey: keyName),
+           let stored = await Self.storedLists(prefix, count: defaults.integer(forKey: countName)) {
+            return (stored, 0)
         }
         applying = true
-        let (converted, ownConverted) = await Task.detached(priority: .utility) {
-            (texts.isEmpty ? ContentRules(lists: [], rules: 0)
-                : contentRules(lists: texts, pageRules: pageRules, allowedDomains: allowed),
-             own.isEmpty ? ContentRules(lists: [], rules: 0) : ownPageRules(myFilters: own))
-        }.value
-        guard let compiled = await Self.compile(converted.lists, prefix: Self.idPrefix),
-              let compiledOwn = await Self.compile(ownConverted.lists, prefix: Self.ownPrefix) else { return }
-        defaults.set(key, forKey: Self.compiledKey)
-        defaults.set(compiled.count, forKey: Self.compiledCount)
-        defaults.set(compiledOwn.count, forKey: Self.ownCount)
-        apply(compiled, own: compiledOwn)
-        Diagnostics.log("blocking: \(converted.rules + ownConverted.rules) rule(s) in \(compiled.count + compiledOwn.count) list(s) from \(texts.count) source(s), \(Int(Date.now.timeIntervalSince(started))) s")
+        let converted = await Task.detached(priority: .utility) { convert() }.value
+        guard let compiled = await Self.compile(converted.lists, prefix: prefix) else { return nil }
+        defaults.set(key, forKey: keyName)
+        defaults.set(compiled.count, forKey: countName)
+        return (compiled, Int(converted.rules))
     }
 
     /// `lists` compiled, each under `prefix` and its place, or none when one
@@ -214,9 +244,12 @@ final class ContentBlocker {
         return compiled.count == lists.count ? compiled : nil
     }
 
-    private func apply(_ lists: [WKContentRuleList], own: [WKContentRuleList]) {
-        rules.lists = lists
-        rules.own = own
+    /// Takes the lists `made` holds, leaving the scripts', which change
+    /// apart (`updateScripts`).
+    private func apply(_ made: Rules) {
+        rules.lists = made.lists
+        rules.mine = made.mine
+        rules.own = made.own
         onChange?()
     }
 

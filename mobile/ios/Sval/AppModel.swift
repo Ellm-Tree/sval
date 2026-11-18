@@ -1646,12 +1646,20 @@ final class AppModel {
     /// to its default when `value` is nil, as the desktop's pref would be
     /// set or cleared (settings-sync spec §3).
     func setSetting(_ key: String, to value: Any?) async {
-        var op: [String: Any] = ["kind": "setSetting", "key": key]
-        if let value,
-           let json = try? JSONSerialization.data(withJSONObject: value, options: .fragmentsAllowed) {
-            op["valueJson"] = String(decoding: json, as: UTF8.self)
+        await setSettings([(key, value)])
+    }
+
+    /// Sets several synced settings in one write, as `setSetting` sets one.
+    func setSettings(_ changes: [(key: String, value: Any?)]) async {
+        let ops = changes.map { key, value -> [String: Any] in
+            var op: [String: Any] = ["kind": "setSetting", "key": key]
+            if let value,
+               let json = try? JSONSerialization.data(withJSONObject: value, options: .fragmentsAllowed) {
+                op["valueJson"] = String(decoding: json, as: UTF8.self)
+            }
+            return op
         }
-        await edit([op], in: settingsDocument)
+        await edit(ops, in: settingsDocument)
     }
 
     /// Opens a link another app hands Sval, as its default browser, in a new

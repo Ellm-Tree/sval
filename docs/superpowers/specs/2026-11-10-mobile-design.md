@@ -87,6 +87,10 @@ registry gains a platform column, and each phone reads only its own.
 - **Levels, My filters and allowed domains sync** as they do on the
   desktop. An allowed domain becomes a rule that ignores the rules before
   it, for that domain.
+- **My filters compile apart from the lists.** An exception reaches only
+  the rules compiled with it, so each side compiles with the other's
+  exception lines. A line added to My filters compiles the small list
+  alone, and the lists recompile only when My filters' exceptions change.
 - **Trusted scriptlets don't apply.** WebKit can't run them.
 
 ### 4.2 Android

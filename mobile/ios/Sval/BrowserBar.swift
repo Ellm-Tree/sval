@@ -353,6 +353,10 @@ struct BrowserBar: View {
 
     private func shield(size: CGFloat, frame: CGSize) -> some View {
         let state = ShieldState(url: browser.currentURL, rules: model.siteRules(private: browser.privateInFront))
+        // My filters' lines that remove something on this site, which
+        // apply at every level and with protections off (decision 1993).
+        let removals = state == .plain ? 0
+            : browser.currentURL?.host().map { MyFilters.removals(on: $0, settings: model.settings).count } ?? 0
         return Button(action: onSite) {
             Image(state.image)
                 .resizable()
@@ -373,6 +377,21 @@ struct BrowserBar: View {
                         .accessibilityHidden(true)
                     }
                 }
+                // How many removal rules the site has, as the desktop's
+                // Remove from this site button counts them.
+                .overlay(alignment: .topTrailing) {
+                    if removals > 0 {
+                        Text(removals > 99 ? "99+" : String(removals))
+                            .font(.system(size: 9, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(colors.ink)
+                            .padding(.horizontal, 3)
+                            .frame(minWidth: 13, minHeight: 13)
+                            .background(colors.badge, in: .capsule)
+                            .offset(x: 7, y: -5)
+                            .accessibilityHidden(true)
+                    }
+                }
                 .frame(width: frame.width, height: frame.height)
                 .contentShape(.rect)
         }
@@ -380,7 +399,8 @@ struct BrowserBar: View {
         .accessibilityLabel("Site settings")
         .accessibilityShowsLargeContentViewer()
         .accessibilityValue([state == .off ? "Protections off" : nil,
-                             browser.frontDenied ? "Video and audio blocked" : nil]
+                             browser.frontDenied ? "Video and audio blocked" : nil,
+                             removals == 0 ? nil : removals == 1 ? "1 removal rule" : "\(removals) removal rules"]
             .compactMap { $0 }.joined(separator: ", "))
     }
 
@@ -601,6 +621,8 @@ enum PageAction {
     case pin(OutlineRow, URL)
     case moveToFavorites(PinRow)
     case star(StarAction)
+    /// Remove from This Site: pick an element on the page to hide there.
+    case removeElement
 }
 
 enum StarAction {

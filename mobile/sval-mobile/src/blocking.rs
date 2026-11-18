@@ -158,6 +158,26 @@ pub fn own_page_rules(my_filters: String) -> ContentRules {
     convert(vec![my_filters], RuleTypes::CosmeticOnly, &[])
 }
 
+/// The exception lines of `list`, its `!#if` blocks resolved: the `@@`
+/// lines and the page-rule exceptions (`#@#` and its kin).
+///
+/// An exception reaches only the rules converted with it (`content_rules`),
+/// so My filters compile apart from the downloaded lists with each side's
+/// exceptions added to the other. A line My filters gain then compiles the
+/// small list alone.
+#[uniffi::export]
+pub fn exception_lines(list: String) -> String {
+    let mut kept = String::new();
+    for line in resolve_directives(&list).lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('!') && (trimmed.starts_with("@@") || trimmed.contains("#@")) {
+            kept.push_str(trimmed);
+            kept.push('\n');
+        }
+    }
+    kept
+}
+
 /// The lists' request blocking, for a request the app makes itself, which
 /// no content rule sees: a site's icon, fetched as the desktop's
 /// `FaviconLoader` fetches one through its channel's classifier.
@@ -927,6 +947,53 @@ mod tests {
         assert_eq!(list.len(), 1);
         assert!(list[0]["trigger"].get("if-frame-url").is_none());
         assert!(script_rules(true, vec![]).is_none());
+    }
+
+    #[test]
+    fn exception_lines_keep_the_exceptions_alone() {
+        let list = "! a note\n||ads.example.com^\n@@||ads.example.com/ok^\nexample.com##.promo\nexample.com#@#.promo\n@@||example.org^$generichide\n!#if false\n@@||hidden.test^\n!#endif\n";
+        assert_eq!(
+            exception_lines(list.into()),
+            "@@||ads.example.com/ok^\nexample.com#@#.promo\n@@||example.org^$generichide\n"
+        );
+    }
+
+    /// My filters compiled apart from the lists still meet the lists'
+    /// exceptions, and the lists meet My filters'.
+    #[test]
+    fn exceptions_carried_across_lift_the_other_sides_rules() {
+        let downloaded = "||ads.example.com^\nexample.com##.promo\n@@||ads.example.com/ok^\nshop.test#@#.banner\n";
+        let mine = "||ads.example.com/ok/more^\n##.banner\nexample.com#@#.promo\n";
+        let all = |lists: Vec<String>| -> Vec<Value> {
+            content_rules(lists, true, vec![])
+                .lists
+                .iter()
+                .flat_map(|list| rules(list))
+                .collect()
+        };
+        let lists = all(vec![downloaded.into(), exception_lines(mine.into())]);
+        assert!(
+            !lists
+                .iter()
+                .any(|rule| rule["action"]["selector"] == ".promo"),
+            "My filters' exception unhides the lists' rule"
+        );
+        let own = all(vec![exception_lines(downloaded.into()), mine.into()]);
+        let banner = own
+            .iter()
+            .find(|rule| rule["action"]["selector"] == ".banner")
+            .unwrap();
+        assert_eq!(banner["trigger"]["unless-domain"], json!(["*shop.test"]));
+        let block = own
+            .iter()
+            .position(|rule| rule["action"]["type"] == "block")
+            .unwrap();
+        assert!(
+            own[block..]
+                .iter()
+                .any(|rule| rule["action"]["type"] == "ignore-previous-rules"),
+            "the lists' exception follows My filters' block"
+        );
     }
 
     #[test]

@@ -54,6 +54,8 @@ struct BrowserView: View {
     @State private var movingFavorite: Favorite?
     /// The split whose Rename Split card is open over the page.
     @State private var renamingSplit: OutlineRow?
+    /// Remove from This Site, while the person picks an element.
+    @State private var picking: ElementPick?
 
     private enum Entry { case current, newTab }
 
@@ -137,6 +139,7 @@ struct BrowserView: View {
                     .padding(.bottom, barHeight + 8)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
             }
+            pickCard
             if let entering {
                 AddressEntry(newTab: entering == .newTab) { enter(nil) }
                     // A dark keyboard in private, as Firefox's is.
@@ -268,6 +271,37 @@ struct BrowserView: View {
             Task { notice = await model.moveToFavoritesKeepingPage(pin, title: pin.name.isEmpty ? pin.url ?? "" : pin.name) }
         case .star(let star):
             self.star(star)
+        case .removeElement:
+            picking = browser.currentPage().flatMap(ElementPick.init(view:))
+            Diagnostics.log("picker: \(picking == nil ? "no page to pick on" : "open")")
+        }
+    }
+
+    /// Remove from This Site's card, while the person picks.
+    @ViewBuilder private var pickCard: some View {
+        if let picking {
+            PickCard(pick: picking, bottomRoom: barHeight, onCancel: { self.picking = nil }, onRemove: { remove(picking) })
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
+        }
+    }
+
+    /// Saves the picked element's rule in My filters, hides it in the open
+    /// page at once, and offers Undo, which takes out that line alone.
+    private func remove(_ pick: ElementPick) {
+        guard let stop = pick.stop, let line = pick.line,
+              let (key, value) = MyFilters.adding(line, settings: model.settings) else { return }
+        let place = pick.scope == pick.site && pick.hostScope != nil ? "all of \(pick.site)" : pick.scope
+        picking = nil
+        Task {
+            await model.setSetting(key, to: value)
+            let sheet = await pick.hide(stop.selector)
+            Diagnostics.log("picker: saved a line at depth \(pick.depth), \(stop.count) match(es), hidden at once: \(sheet != nil)")
+            notice = Toast(text: "Removed from \(place)", undo: {
+                Task {
+                    await model.setSetting(key, to: nil)
+                    if let sheet { await pick.unhide(sheet) }
+                }
+            }, seconds: 8)
         }
     }
 
@@ -368,6 +402,9 @@ struct BrowserView: View {
             let split = browser.splitInFront
             WebContainer(pages: browser.stagedPages(), showsFront: split == nil,
                          bottomCover: verticalSize == .compact ? Browser.sidewaysBarRoom : Browser.barRoom)
+            if let picking {
+                PickSurface(pick: picking, tint: UIColor(theme.accent))
+            }
             if let split {
                 SplitStage(split: split)
             } else if browser.onPrivateHome {
@@ -595,6 +632,9 @@ struct SiteMenuView: View {
 
     /// The page's zoom as the zoom row last set or found it.
     @State private var zoom: Double = 1
+    @State private var rulesShown = false
+    /// How many elements each hiding rule matches on the page, by line.
+    @State private var ruleCounts: [String: Int?] = [:]
 
     private var theme: Theme { Theme(scheme, tint: sheetTint) }
     private var host: String? { model.browser.currentURL?.host() }
@@ -605,11 +645,7 @@ struct SiteMenuView: View {
         let site = host.flatMap { host in
             SiteRules.scope(of: host).flatMap { scope in SiteRules.site(of: host).map { (host, scope, $0) } }
         }
-        VStack(alignment: .leading, spacing: 0) {
-            header(title: site?.1 ?? "Sval", protections: site.map { rules.protectionsOn(for: $0.0) })
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-            Form {
+        Form {
                 pageGroup
                 if let (host, scope, _) = site {
                     let protections = rules.protectionsOn(for: host)
@@ -654,8 +690,14 @@ struct SiteMenuView: View {
                                 Image("media").resizable().frame(width: 20, height: 20).foregroundStyle(theme.muted)
                             }
                         }
-                    } header: {
-                        SectionCaption(host, color: theme.muted)
+                        // A rule names the site and syncs, so a private
+                        // page can't make one (element picker spec).
+                        pageRow(icon: "eraser", title: "Remove from This Site",
+                                detail: inPrivate ? "Off in private, because it saves a rule." : nil) {
+                            act(.removeElement)
+                        }
+                        .disabled(inPrivate)
+                        removalRules(on: host)
                     }
                     .listRowBackground(theme.cell)
                     Section {
@@ -665,23 +707,14 @@ struct SiteMenuView: View {
                     }
                     .listRowBackground(theme.cell)
                 }
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label {
-                            Text("Ad and Tracker Blocking").font(.system(.body))
-                        } icon: {
-                            Image("pr-ads").resizable().frame(width: 20, height: 20).foregroundStyle(theme.muted)
-                        }
-                        BlockingLevelPicker()
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    SectionCaption("Every site", color: theme.muted)
-                } footer: {
-                    Text("Your choices sync to all your devices.")
-                }
-                .listRowBackground(theme.cell)
-            }
+        }
+        .listSectionSpacing(.compact)
+        // A bar keeps the rows' scroll edge effect under the header.
+        .safeAreaBar(edge: .top) {
+            header(title: site?.1 ?? "Sval", protections: site.map { rules.protectionsOn(for: $0.0) })
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 12)
         }
         .foregroundStyle(theme.text)
         .sheetGround()
@@ -800,6 +833,83 @@ struct SiteMenuView: View {
                 }
             }
             .listRowBackground(theme.cell)
+        }
+    }
+
+    /// The site's removal rules, collapsed each time the menu opens, as
+    /// the desktop's site menu lists them (element picker spec §6): a row
+    /// for each line that removes something here, newest first. Its X
+    /// takes this site out of the line; a private page lists them alone.
+    @ViewBuilder private func removalRules(on host: String) -> some View {
+        let removals = MyFilters.removals(on: host, settings: model.settings)
+        if !removals.isEmpty {
+            DisclosureGroup(isExpanded: $rulesShown) {
+                ForEach(removals) { removal in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(removal.shown)
+                                .font(.system(.footnote).monospaced())
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                            Text(removalWords(removal))
+                                .font(.system(.footnote))
+                                .foregroundStyle(theme.muted)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if !inPrivate {
+                            Button { showAgain(removal) } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(theme.muted)
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Delete Rule")
+                        }
+                    }
+                    .frame(minHeight: 44)
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 17))
+                        .foregroundStyle(theme.muted)
+                        .frame(width: 20, height: 20)
+                    Text("Removed from This Site").font(.system(.body))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("\(removals.count)")
+                        .monospacedDigit()
+                        .foregroundStyle(theme.muted)
+                }
+                .frame(minHeight: 44)
+            }
+            .tint(theme.muted)
+            .task(id: rulesShown ? removals.map(\.line) : []) {
+                guard rulesShown, let view = model.browser.currentPage() else { return }
+                let hiding = removals.filter { $0.kind == .hide }
+                let found = await ElementPick.counts(hiding.map(\.shown), in: view)
+                ruleCounts = Dictionary(zip(hiding.map(\.id), found), uniquingKeysWith: { a, _ in a })
+            }
+        }
+    }
+
+    /// What a rule's row says it does on this page.
+    private func removalWords(_ removal: MyFilters.Removal) -> String {
+        if removal.kind == .network { return "Stops a download" }
+        guard let n = ruleCounts[removal.id] ?? nil else { return "" }
+        return n == 0 ? "Not currently removing anything on this page"
+            : "Removes \(n) \(n == 1 ? "element" : "elements") on this page"
+    }
+
+    /// Takes this site out of the rule, and shows what it hid in the open
+    /// page where Remove hid it this visit.
+    private func showAgain(_ removal: MyFilters.Removal) {
+        let writes = MyFilters.showingAgain(removal, settings: model.settings)
+        Task {
+            await model.setSettings(writes.map { ($0.key, $0.value as Any?) })
+            if removal.kind == .hide, let view = model.browser.currentPage() {
+                await ElementPick.showAgain(removal.shown, in: view)
+            }
         }
     }
 

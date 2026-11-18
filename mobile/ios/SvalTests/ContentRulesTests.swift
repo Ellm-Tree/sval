@@ -112,7 +112,7 @@ final class ContentRulesTests: XCTestCase {
 
 /// Waits for a page's load to finish.
 @MainActor
-private final class Loaded: NSObject, WKNavigationDelegate {
+final class Loaded: NSObject, WKNavigationDelegate {
     private var continuation: CheckedContinuation<Void, Error>?
     private var done = false
 
