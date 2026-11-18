@@ -58,6 +58,13 @@ developers to have what they need to fix the crash.
 - Sval doesn't add the address of the page you were on to a crash report.
   To say which page you were on, type the page's address in the crash
   dialog's comment box, or in your message in the feedback form.
+- When a tab showing a website crashes in a private window, Sval keeps no
+  crash report of that crash. The crashed tab's page has no box for sending
+  a report.
+- While a private window is open, Sval keeps no crash report when Sval
+  itself or one of its background processes crashes. If Sval itself crashes
+  while a private window is open, Sval closes without opening the Sval
+  Crash Reporter dialog and doesn't restart.
 
 </Since>
 - The feedback form lists the crashes of the last three days. If you

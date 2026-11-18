@@ -7,8 +7,9 @@
 
 // A crash report never says what page was open (CONTRIBUTING.md rule 10):
 // Gecko has no annotation for a page's address, a crashed tab's report file
-// names neither the page nor its site, in a private window as in any other,
-// and the crashed-tab page offers no box to add the address.
+// names neither the page nor its site, and the crashed-tab page offers no box
+// to add the address. browser_sval_crash_private.js covers a private window,
+// whose crash keeps no report.
 
 const HOST = "example.com";
 const MARK = "svalcrashmark";
@@ -70,16 +71,4 @@ add_task(async function a_crashed_tabs_report_does_not_name_its_page() {
     !browser.contentDocument.getElementById("includeURL"),
     "and no box to include the page's address"
   );
-});
-
-add_task(async function a_private_tabs_report_does_not_name_its_page() {
-  const win = await within(
-    BrowserTestUtils.openNewBrowserWindow({ private: true }),
-    15_000,
-    "a private window opening"
-  );
-  const browser = win.gBrowser.selectedBrowser;
-  BrowserTestUtils.startLoadingURIString(browser, CRASH_PAGE);
-  await pageReady(browser, CRASH_PAGE);
-  assertNoAddress(await crashed(browser), "a private tab");
 });

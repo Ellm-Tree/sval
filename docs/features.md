@@ -253,7 +253,9 @@ control of what you see and what is sent to websites.
   is its own session. A private window can't see another private window's
   cookies or site data. Nothing about its tabs is saved to disk, and Sval
   deletes the window's data when you close the window. Choices made there for a site last until the window
-  closes, and Settings opened there can't change anything Sval keeps.
+  closes, and Settings opened there can't change anything Sval keeps. When a
+  tab showing a website crashes in a private window, Sval keeps no crash
+  report of that crash.
 
 ## Address bar and Launcher
 
@@ -913,7 +915,12 @@ so a terminal in a web page can use it.
   identifies you unless you choose to add your email.
 - **Crash reports.** Sval sends a crash report only if you check a box to
   send it. Sval doesn't add the address of the page you were on to a crash
-  report.
+  report. When a tab showing a website crashes in a private window, Sval
+  keeps no crash report of that crash. While a private window is open, Sval
+  also keeps no crash report when Sval itself or one of its background
+  processes crashes. If Sval itself crashes while a private window is open,
+  Sval closes without opening the Sval Crash Reporter dialog and doesn't
+  restart.
 
 ## License
 

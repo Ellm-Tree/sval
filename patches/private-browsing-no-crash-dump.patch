@@ -1,0 +1,294 @@
+Sval: a crash keeps no minidump while private browsing is in use
+
+A minidump holds the crashed process's stacks and the memory they point at,
+so one written while a private window is open can hold fragments of its
+pages, and it stays on disk after the window closes. Sval keeps nothing of a
+private window, so such a crash keeps no minidump, and with no minidump
+there is no .extra file, no crash event and no crash reporter window.
+
+One flag says so, in toolkit/crashreporter/SvalCrashPrivacy.cpp. A content
+process sets it when its remote type is a private one, and its exception
+filter then ends the process in place of asking for a minidump. The parent
+process sets it while a private browsing context exists or
+browser.privatebrowsing.autostart is on. Its own filter then ends the
+process too, it takes no paired minidump of a hung child and itself, and it
+removes the minidump the crash helper wrote for any child that serves every
+window: the GPU, RDD, socket, utility, VR and GMP processes, and a content
+process that is not one site's, such as the one for local files or for
+extensions. A content process for a normal window's sites holds no private
+page, and its crash keeps its report.
+
+On macOS and Linux the filters call _exit. A filter that returns false
+hands the crash to the system's handler, and a sandboxed content process on
+macOS then stays suspended and never exits. On Windows the filters return
+AbortWithoutMinidump, which ends the process the same way.
+
+TakeMinidumpForChild takes the crashed process's type to tell the two
+apart.
+
+diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
+index 590843de90..e3ecd89e9f 100644
+--- a/docshell/base/CanonicalBrowsingContext.cpp
++++ b/docshell/base/CanonicalBrowsingContext.cpp
+@@ -44,6 +44,7 @@
+ #include "mozilla/StaticPrefs_docshell.h"
+ #include "mozilla/StaticPrefs_fission.h"
+ #include "mozilla/StaticPrefs_security.h"
++#include "mozilla/SvalCrashPrivacy.h"
+ #include "mozilla/glean/DomMetrics.h"
+ #include "mozilla/ProfilerMarkers.h"
+ #include "nsILayoutHistoryState.h"
+@@ -99,6 +100,8 @@ static void IncreasePrivateCount() {
+     return;
+   }
+ 
++  mozilla::SvalCrashPrivacy::Set(true);
++
+   static bool sHasSeenPrivateContext = false;
+   if (!sHasSeenPrivateContext) {
+     sHasSeenPrivateContext = true;
+@@ -115,6 +118,7 @@ static void DecreasePrivateCount() {
+            gNumberOfPrivateContexts + 1, gNumberOfPrivateContexts));
+   if (!gNumberOfPrivateContexts &&
+       !mozilla::StaticPrefs::browser_privatebrowsing_autostart()) {
++    mozilla::SvalCrashPrivacy::Set(false);
+     nsCOMPtr<nsIObserverService> observerService =
+         mozilla::services::GetObserverService();
+     if (observerService) {
+diff --git a/dom/ipc/ContentChild.cpp b/dom/ipc/ContentChild.cpp
+index 984e646f52..a05c7c6345 100644
+--- a/dom/ipc/ContentChild.cpp
++++ b/dom/ipc/ContentChild.cpp
+@@ -47,6 +47,7 @@
+ #include "mozilla/StaticPrefs_media.h"
+ #include "mozilla/StaticPrefs_threads.h"
+ #include "mozilla/StorageAccessAPIHelper.h"
++#include "mozilla/SvalCrashPrivacy.h"
+ #include "mozilla/TelemetryIPC.h"
+ #include "mozilla/WebBrowserPersistDocumentChild.h"
+ #include "mozilla/devtools/HeapSnapshotTempFileHelperChild.h"
+@@ -2775,6 +2776,14 @@ mozilla::ipc::IPCResult ContentChild::RecvRemoteType(
+   CrashReporter::RecordAnnotationNSCString(
+       CrashReporter::Annotation::RemoteType, remoteTypePrefix);
+ 
++  // Sval: a process for a private window's pages keeps no minidump.
++  nsCOMPtr<nsIPrincipal> isolationPrincipal =
++      ContentParent::CreateRemoteTypeIsolationPrincipal(mRemoteType);
++  if (isolationPrincipal &&
++      isolationPrincipal->OriginAttributesRef().IsPrivateBrowsing()) {
++    SvalCrashPrivacy::Set(true);
++  }
++
+   return IPC_OK();
+ }
+ 
+diff --git a/ipc/glue/CrashReporterHost.cpp b/ipc/glue/CrashReporterHost.cpp
+index dd41b0798d..99cd2860ce 100644
+--- a/ipc/glue/CrashReporterHost.cpp
++++ b/ipc/glue/CrashReporterHost.cpp
+@@ -65,8 +65,8 @@ RefPtr<nsIFile> CrashReporterHost::TakeCrashedChildMinidump() {
+   MOZ_ASSERT(!HasMinidump());
+ 
+   RefPtr<nsIFile> crashDump;
+-  if (!CrashReporter::TakeMinidumpForChild(mChildID, getter_AddRefs(crashDump),
+-                                           annotations)) {
++  if (!CrashReporter::TakeMinidumpForChild(
++          mChildID, mProcessType, getter_AddRefs(crashDump), annotations)) {
+     return nullptr;
+   }
+   if (!AdoptMinidump(crashDump, annotations)) {
+diff --git a/toolkit/crashreporter/moz.build b/toolkit/crashreporter/moz.build
+index e442274b8d..f879590003 100644
+--- a/toolkit/crashreporter/moz.build
++++ b/toolkit/crashreporter/moz.build
+@@ -11,11 +11,16 @@ EXPORTS += [
+     "nsExceptionHandler.h",
+ ]
+ 
++EXPORTS.mozilla += [
++    "SvalCrashPrivacy.h",
++]
++
+ JAR_MANIFESTS += ["jar.mn"]
+ 
+ UNIFIED_SOURCES = [
+     "ExtraFileParser.cpp",
+     "nsExceptionHandlerUtils.cpp",
++    "SvalCrashPrivacy.cpp",
+ ]
+ 
+ PREPROCESSED_IPDL_SOURCES = [
+diff --git a/toolkit/crashreporter/nsDummyExceptionHandler.cpp b/toolkit/crashreporter/nsDummyExceptionHandler.cpp
+index ef3dbe6d05..abe615ba74 100644
+--- a/toolkit/crashreporter/nsDummyExceptionHandler.cpp
++++ b/toolkit/crashreporter/nsDummyExceptionHandler.cpp
+@@ -229,8 +229,8 @@ bool ChildProcessProxyRendezvous(GeckoChildID aID, DWORD aPid, HANDLE aHandle) {
+ 
+ bool SetRemoteExceptionHandler(int& aArgc, char** aArgv) { return false; }
+ 
+-bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** aDump,
+-                          AnnotationTable& aAnnotations) {
++bool TakeMinidumpForChild(GeckoChildID aChildId, GeckoProcessType aType,
++                          nsIFile** aDump, AnnotationTable& aAnnotations) {
+   return false;
+ }
+ 
+diff --git a/toolkit/crashreporter/nsExceptionHandler.cpp b/toolkit/crashreporter/nsExceptionHandler.cpp
+index a4e041f8b2..7bd91e528e 100644
+--- a/toolkit/crashreporter/nsExceptionHandler.cpp
++++ b/toolkit/crashreporter/nsExceptionHandler.cpp
+@@ -24,6 +24,7 @@
+ #include "mozilla/ScopeExit.h"
+ #include "mozilla/Sprintf.h"
+ #include "mozilla/StaticPrefs_browser.h"
++#include "mozilla/SvalCrashPrivacy.h"
+ #include "mozilla/SyncRunnable.h"
+ #include "mozilla/ToString.h"
+ #include "mozilla/TimeStamp.h"
+@@ -1867,6 +1868,11 @@ static ExceptionHandler::FilterResult Filter(void* context,
+     return ExceptionHandler::FilterResult::ContinueSearch;
+   }
+ 
++  // Sval: a minidump of this process could hold a private window's pages.
++  if (mozilla::SvalCrashPrivacy::Get()) {
++    return ExceptionHandler::FilterResult::AbortWithoutMinidump;
++  }
++
+   PrepareForMinidump(/* isChildProcess */ false);
+   return ExceptionHandler::FilterResult::HandleException;
+ }
+@@ -1877,7 +1883,9 @@ static ExceptionHandler::FilterResult ChildFilter(
+     return ExceptionHandler::FilterResult::ContinueSearch;
+   }
+ 
+-  if (gEncounteredChildException.exchange(true)) {
++  // Sval: a minidump of this process could hold a private window's pages.
++  if (mozilla::SvalCrashPrivacy::Get() ||
++      gEncounteredChildException.exchange(true)) {
+     return ExceptionHandler::FilterResult::AbortWithoutMinidump;
+   }
+ 
+@@ -1912,11 +1920,25 @@ static MINIDUMP_TYPE GetMinidumpType() {
+ #else
+ 
+ static bool Filter(void* context) {
++  // Sval: a minidump of this process could hold a private window's pages.
++  // Returning false would hand the crash to the system's own handler, which
++  // on macOS leaves the process suspended while it writes its report.
++  if (mozilla::SvalCrashPrivacy::Get()) {
++    _exit(1);
++  }
++
+   PrepareForMinidump(/* isChildProcess */ false);
+   return true;
+ }
+ 
+ static bool ChildFilter(void* context) {
++  // Sval: a minidump of this process could hold a private window's pages.
++  // Returning false would hand the crash to the system's own handler, and a
++  // sandboxed process on macOS then stays suspended and never exits.
++  if (mozilla::SvalCrashPrivacy::Get()) {
++    _exit(1);
++  }
++
+   if (gEncounteredChildException.exchange(true)) {
+     return false;
+   }
+@@ -3623,8 +3645,8 @@ bool SetRemoteExceptionHandler(int& aArgc, char** aArgv) {
+   return gExceptionHandler->IsOutOfProcess();
+ }  // namespace CrashReporter
+ 
+-bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** dump,
+-                          AnnotationTable& aAnnotations) {
++bool TakeMinidumpForChild(GeckoChildID aChildId, GeckoProcessType aType,
++                          nsIFile** dump, AnnotationTable& aAnnotations) {
+   if (!GetEnabled()) {
+     return false;
+   }
+@@ -3650,6 +3672,24 @@ bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** dump,
+   nsCOMPtr<nsIFile> extra = nullptr;
+   NS_ENSURE_TRUE(GetExtraFileForMinidump(*dump, getter_AddRefs(extra)), false);
+ 
++  // Sval: any process that could hold a private window's pages could put
++  // them in its minidump. A content process for a private window's sites
++  // declines its own in ChildFilter. One for a normal window's sites, whose
++  // remote type is FISSION_WEB_REMOTE_TYPE or WITH_COOP_COEP_REMOTE_TYPE,
++  // holds none. Every other process serves every window.
++  if (mozilla::SvalCrashPrivacy::Get()) {
++    AnnotationTable seen;
++    const nsCString& remoteType = seen[Annotation::RemoteType];
++    if (aType != GeckoProcessType_Content ||
++        NS_FAILED(ReadExtraFile(extra, seen)) ||
++        !(remoteType.EqualsLiteral("webIsolated") ||
++          remoteType.EqualsLiteral("webCOOP+COEP"))) {
++      (*dump)->Remove(false);
++      extra->Remove(false);
++      return false;
++    }
++  }
++
+   if (ShouldReport()) {
+     nsCOMPtr<nsIFile> memoryReport;
+     if (!memoryReportPath.empty()) {
+@@ -3686,7 +3717,8 @@ bool FinalizeOrphanedMinidump(GeckoChildID aChildId, GeckoProcessType aType,
+   AnnotationTable annotations;
+   nsCOMPtr<nsIFile> minidump;
+ 
+-  if (!TakeMinidumpForChild(aChildId, getter_AddRefs(minidump), annotations)) {
++  if (!TakeMinidumpForChild(aChildId, aType, getter_AddRefs(minidump),
++                            annotations)) {
+     return false;
+   }
+ 
+@@ -3808,7 +3840,9 @@ bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
+                             const nsACString& aIncomingPairName,
+                             AnnotationTable& aTargetAnnotations,
+                             nsIFile** aMainDumpOut) {
+-  if (!GetEnabled()) {
++  // Sval: the pair holds a minidump of this process, which could hold a
++  // private window's pages.
++  if (!GetEnabled() || mozilla::SvalCrashPrivacy::Get()) {
+     return false;
+   }
+ 
+diff --git a/toolkit/crashreporter/nsExceptionHandler.h b/toolkit/crashreporter/nsExceptionHandler.h
+index eeeba84cef..fcbca3ccf2 100644
+--- a/toolkit/crashreporter/nsExceptionHandler.h
++++ b/toolkit/crashreporter/nsExceptionHandler.h
+@@ -214,9 +214,9 @@ nsresult SetSubmitReports(bool aSubmitReport);
+ // Return true if a dump was found for |aChildID|, and return the
+ // path in |dump|.  The caller owns the last reference to |dump| if it
+ // is non-nullptr. The annotations for the crash will be stored in
+-// |aAnnotations|.
+-bool TakeMinidumpForChild(GeckoChildID aChildID, nsIFile** dump,
+-                          AnnotationTable& aAnnotations);
++// |aAnnotations|. |aType| is the type of the crashed process.
++bool TakeMinidumpForChild(GeckoChildID aChildID, GeckoProcessType aType,
++                          nsIFile** dump, AnnotationTable& aAnnotations);
+ 
+ /**
+  * If a dump was found for |aChildID| then write a minimal .extra file to
+diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
+index 84548aa3d2..8f37a0c5c2 100644
+--- a/toolkit/xre/nsAppRunner.cpp
++++ b/toolkit/xre/nsAppRunner.cpp
+@@ -31,6 +31,7 @@
+ #include "mozilla/StaticPrefs_fission.h"
+ #include "mozilla/StaticPrefs_security.h"
+ #include "mozilla/StaticPrefs_widget.h"
++#include "mozilla/SvalCrashPrivacy.h"
+ #include "mozilla/glean/SecuritySandboxMetrics.h"
+ #include "mozilla/Telemetry.h"
+ #include "mozilla/Try.h"
+@@ -5998,6 +5999,11 @@ nsresult XREMain::XRE_mainRun() {
+     // ready in time for early consumers, such as the component loader.
+     mDirProvider.InitializeUserPrefs();
+ 
++    // Sval: with this pref on, every window is a private one.
++    if (StaticPrefs::browser_privatebrowsing_autostart()) {
++      SvalCrashPrivacy::Set(true);
++    }
++
+     // Now that preferences are loaded the profile service may be able to
+     // determine the correct startup profile.
+     mProfileSvc->UpdateCurrentProfile();

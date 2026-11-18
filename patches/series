@@ -338,3 +338,4 @@ windows-backdrop-on-request.patch
 gtk-wayland-background-blur.patch
 gtk-wayland-commit-toplevel-opaque-region.patch
 https-only-error-plain-words.patch
+private-browsing-no-crash-dump.patch

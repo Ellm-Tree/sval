@@ -87,6 +87,12 @@ the report over 25 MB, the part says **Too large to send**.
 
 Sval doesn't add the address of the page you were on to a crash report.
 
+When a tab showing a website crashes in a private window, Sval keeps no
+crash report of that crash. While a private window is open, Sval also keeps
+no crash report when Sval itself or one of its background processes
+crashes. If Sval itself crashes while a private window is open, Sval closes
+without opening the Sval Crash Reporter dialog and doesn't restart.
+
 </Since>
 
 ## The log file

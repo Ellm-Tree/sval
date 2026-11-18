@@ -43,9 +43,24 @@ They never sync.
 - **The log.** Sval writes warnings and errors to `sval-log.txt` in its data
   folder. The log never includes a Workspace, group, or tab name, a URL, or
   a secret.
+<Until v="0.1.0-rc.10">
+
 - **Crash reports.** A crash report leaves your computer only when you check
   the box to send it. It goes to Sval's feedback server, which stores no IP
   address and no identifier.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **Crash reports.** A crash report leaves your computer only when you check
+  the box to send it. It goes to Sval's feedback server, which stores no IP
+  address and no identifier. A crash report can include parts of pages you
+  had open. When a tab showing a website crashes in a private window, Sval
+  keeps no crash report of that crash. While a private window is open, Sval
+  also keeps no crash report when Sval itself or one of its background
+  processes crashes.
+
+</Since>
 - **Feedback.** When you use Send Feedback, Sval sends the report only
   once you select Send.
 
