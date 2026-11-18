@@ -261,14 +261,6 @@ Object.assign(SvalPanel, {
     });
     this._listenToEngine();
 
-    // Housekeeping, not a sync step: an abandoned pairing offer sits in the
-    // shared folder until some device notices it is stale, and spec §6.7 bounds
-    // that window at an hour. Startup is where it belongs: it happens on every
-    // launch whether or not anyone opens settings, and it costs one directory
-    // listing per launch rather than one per poll. It waits for the first
-    // shared step that reaches the folder (`_onSharedStep`).
-    this._sweepPending = true;
-
     // Each window redraws when an agent's workspace is added; `SvalAgents`
     // runs the one pass that publishes it, which every window draws through
     // `_onPass`. Adopting a key runs `_start` again, so the window's earlier

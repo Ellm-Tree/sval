@@ -8,8 +8,9 @@ const states = new WeakMap();
 
 /**
  * What an engine's passes have found: the last report, what the shared
- * folder answered and since when, whether this device's copy is saving, and
- * the state of the sync key the engine shares under.
+ * folder answered and since when, whether this device's copy is saving,
+ * the state of the sync key the engine shares under, and another key's
+ * workspaces found in the folder.
  *
  * One per engine, because every window of a profile shares the engine and
  * its one document (`SvalEngine.forProfile`): what a pass found is the
@@ -58,6 +59,21 @@ export class SvalSyncState {
   keyState = null;
 
   /**
+   * Another sync key's directories in the shared folder that are not
+   * dismissed (`SvalFolderUpkeep`). Set through {@link setOtherWorkspaces}.
+   */
+  otherWorkspaces = [];
+
+  /** The folder {@link otherWorkspaces} was found in, or null. */
+  otherWorkspacesIn = null;
+
+  /**
+   * The topic a change the passes do not bring is told on, so every window
+   * on the engine redraws its indicator.
+   */
+  static CHANGED_TOPIC = "sval-sync-state-changed";
+
+  /**
    * The state of an engine nothing has passed on: what a window with no
    * engine, or on a tree in memory, shows.
    */
@@ -93,9 +109,8 @@ export class SvalSyncState {
   }
 
   /**
-   * Records the sync key's state and tells every window on the engine, on
-   * `SvalIdentity.SYNC_KEY_STATE_TOPIC`: a key one window put right is put
-   * right for all of them.
+   * Records the sync key's state and tells every window on the engine: a
+   * key one window put right is put right for all of them.
    *
    * @param {string} state One of `SvalIdentity.SYNC_KEY_STATES`.
    */
@@ -104,7 +119,26 @@ export class SvalSyncState {
       return;
     }
     this.keyState = state;
-    Services.obs.notifyObservers(null, SvalIdentity.SYNC_KEY_STATE_TOPIC);
+    Services.obs.notifyObservers(null, SvalSyncState.CHANGED_TOPIC);
+  }
+
+  /**
+   * Records another key's workspaces found in `folder`, and tells every
+   * window on the engine when they differ from the ones known.
+   *
+   * @param {string[]} names The directories found and not dismissed.
+   * @param {string|null} folder The shared folder they were found in.
+   */
+  setOtherWorkspaces(names, folder) {
+    if (
+      folder === this.otherWorkspacesIn &&
+      names.join() === this.otherWorkspaces.join()
+    ) {
+      return;
+    }
+    this.otherWorkspaces = names;
+    this.otherWorkspacesIn = folder;
+    Services.obs.notifyObservers(null, SvalSyncState.CHANGED_TOPIC);
   }
 
   /**

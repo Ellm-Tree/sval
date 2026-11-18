@@ -440,7 +440,7 @@ async function sharingInstallation(root) {
  * Sval as this user ran it before on this machine: a device that shares
  * `root` under a sync key of its own, has published a workspace there, and
  * has left its sealed copy of the key there, as a window does once a step
- * reaches the folder (`_afterReachingFolder` in sval-panel-folder.js). It is
+ * reaches the folder (`SvalFolderUpkeep`). It is
  * an engine of its own, because a window of it would still show its
  * workspace when the installation after it joins, and no window shows a
  * workspace another window shows (spec §10.7).

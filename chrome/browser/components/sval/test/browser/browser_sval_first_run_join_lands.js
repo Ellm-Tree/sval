@@ -70,11 +70,12 @@ add_task(async function the_join_path_makes_nothing_of_its_own() {
     "a step reaches the folder"
   );
   await TestUtils.waitForCondition(
-    () => SvalPanel._otherWorkspacesIn === SvalPanel.sharedRootSetting(),
+    () =>
+      SvalPanel.syncState.otherWorkspacesIn === SvalPanel.sharedRootSetting(),
     "the window looked for another key's workspaces"
   );
   Assert.deepEqual(
-    SvalPanel._otherWorkspaces,
+    SvalPanel.syncState.otherWorkspaces,
     [],
     "the other device's week is this key's"
   );

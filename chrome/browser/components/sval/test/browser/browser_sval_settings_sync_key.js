@@ -248,10 +248,9 @@ async function aWindowThatFailedToStart() {
 
 /**
  * Opens a new window, has it reach the shared folder, and waits for the look
- * for another key's workspaces its first reach starts
- * (`_afterReachingFolder`). A window looks at most once per
- * `_otherWorkspacesCheckMs`, so a look after the harness window's first is
- * a new window's.
+ * for another key's workspaces that reach starts (`SvalFolderUpkeep`). The
+ * profile looks at most once per `OTHER_WORKSPACES_CHECK_MS`, so the step is
+ * told to look again.
  *
  * @returns {Promise<Window>}
  */
@@ -265,14 +264,15 @@ async function aWindowThatLooked() {
   expectWorkspaceTabs(win);
   await within(win.SvalPanel.started, 40_000, "its panel's startup");
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+  lookForOtherWorkspacesAgain(win.SvalPanel);
   await TestUtils.waitForCondition(
     async () => (await win.SvalPanel.syncWithFolder()) === "reached",
     "the window reaches the folder"
   );
-  // A window's first look records the folder it looked in, whatever it found.
+  // A look records the folder it looked in, whatever it found.
   await TestUtils.waitForCondition(
-    () => win.SvalPanel._otherWorkspacesIn === shared,
-    "the window's first look ended"
+    () => win.SvalPanel.syncState.otherWorkspacesIn === shared,
+    "the look ended"
   );
   return win;
 }
@@ -386,7 +386,11 @@ add_task(async function another_keys_workspaces_found_later_are_offered() {
   const { settings } = await panelOnAFolder("found-later", { shared: true });
   const shared = SvalPanel.sharedRootSetting();
   const first = await aWindowThatLooked();
-  Assert.deepEqual(first.SvalPanel._otherWorkspaces, [], "nothing at first");
+  Assert.deepEqual(
+    first.SvalPanel.syncState.otherWorkspaces,
+    [],
+    "nothing at first"
+  );
 
   const ours = await workspaceDirs(shared);
   await anotherKeysWorkspaces(shared);
@@ -417,7 +421,7 @@ add_task(async function another_keys_workspaces_found_later_are_offered() {
   );
   const later = await aWindowThatLooked();
   Assert.deepEqual(
-    later.SvalPanel._otherWorkspaces,
+    later.SvalPanel.syncState.otherWorkspaces,
     [],
     "and it is not raised again"
   );
@@ -473,7 +477,7 @@ add_task(async function a_peers_document_under_this_key_is_not_another_keys() {
 
   const win = await aWindowThatLooked();
   Assert.deepEqual(
-    win.SvalPanel._otherWorkspaces,
+    win.SvalPanel.syncState.otherWorkspaces,
     [],
     "the peer's week is this key's"
   );

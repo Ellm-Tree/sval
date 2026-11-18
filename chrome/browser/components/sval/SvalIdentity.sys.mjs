@@ -54,12 +54,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
   WindowsRegistry: "resource://gre/modules/WindowsRegistry.sys.mjs",
 });
 
-/**
- * The topic a change of the sync key's state is announced on
- * (`SvalSyncState.setKeyState`), so every window of the profile shows it.
- */
-const SYNC_KEY_STATE_TOPIC = "sval-sync-key-state";
-
 /** Host contract §5. */
 const DEVICE_ID_BYTES = 16;
 
@@ -287,7 +281,6 @@ function newKey() {
 
 export const SvalIdentity = {
   SYNC_KEY_STATES,
-  SYNC_KEY_STATE_TOPIC,
   fingerprintOf,
 
   /**

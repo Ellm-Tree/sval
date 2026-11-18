@@ -141,12 +141,27 @@ add_task(function the_keys_state_starts_from_what_the_engine_holds() {
 
   let told = 0;
   const observer = () => told++;
-  Services.obs.addObserver(observer, SvalIdentity.SYNC_KEY_STATE_TOPIC);
+  Services.obs.addObserver(observer, SvalSyncState.CHANGED_TOPIC);
   state.setKeyState(unreadable);
   state.setKeyState(unreadable);
-  Services.obs.removeObserver(observer, SvalIdentity.SYNC_KEY_STATE_TOPIC);
+  Services.obs.removeObserver(observer, SvalSyncState.CHANGED_TOPIC);
   Assert.equal(state.keyState, unreadable, "a read said why");
   Assert.equal(told, 1, "and a change is told once");
+});
+
+add_task(function another_keys_workspaces_are_told_when_they_change() {
+  const state = SvalSyncState.of(engineStub());
+  let told = 0;
+  const observer = () => told++;
+  Services.obs.addObserver(observer, SvalSyncState.CHANGED_TOPIC);
+  state.setOtherWorkspaces(["theirs"], "/folder");
+  state.setOtherWorkspaces(["theirs"], "/folder");
+  Assert.equal(told, 1, "the same find is told once");
+  state.setOtherWorkspaces([], "/folder");
+  Services.obs.removeObserver(observer, SvalSyncState.CHANGED_TOPIC);
+  Assert.equal(told, 2, "and a dismissal is told");
+  Assert.deepEqual(state.otherWorkspaces, []);
+  Assert.equal(state.otherWorkspacesIn, "/folder");
 });
 
 add_task(function a_window_with_no_engine_reads_an_empty_state() {

@@ -161,7 +161,7 @@ add_task(async function a_chosen_folder_without_sval_waits_to_be_confirmed() {
 
   // The step that reached the folder can still be writing in it. The key
   // copy is not written again, since this session wrote it here
-  // (`_publishKeyCopy`).
+  // (`SvalFolderUpkeep`).
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
   await IOUtils.remove(PathUtils.join(shared, "sval"), { recursive: true });
   await SvalSharedFolder._whenIdle();

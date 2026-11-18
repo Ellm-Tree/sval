@@ -86,6 +86,7 @@ MOZ_SRC_FILES += [
     "SvalFirefox.sys.mjs",
     "SvalFirstRun.sys.mjs",
     "SvalFirstRunModel.sys.mjs",
+    "SvalFolderUpkeep.sys.mjs",
     "SvalForgetSite.sys.mjs",
     "SvalHeader.sys.mjs",
     "SvalHeadless.sys.mjs",

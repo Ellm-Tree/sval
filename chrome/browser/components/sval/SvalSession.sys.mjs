@@ -12,6 +12,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalArchive: "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
   SvalDeviceNames: "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
   SvalEngine: "moz-src:///browser/components/sval/SvalEngine.sys.mjs",
+  SvalFolderUpkeep:
+    "moz-src:///browser/components/sval/SvalFolderUpkeep.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   SvalHistorySync: "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs",
@@ -78,6 +80,8 @@ export const SvalSession = {
     if (first) {
       state.setKeyState(sync.state);
     }
+
+    lazy.SvalFolderUpkeep.startFor(engine, settings);
 
     // Agent access (agent-control spec §3.2). One listener per process.
     lazy.SvalAgents.start({

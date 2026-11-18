@@ -41,8 +41,8 @@ Object.assign(SvalPanel, {
     // their outcome arrives here rather than as that pass's report.
     // Adopting a key runs `_start` again, so the earlier listener goes first.
     this._forgetSharedListener?.();
-    this._forgetSharedListener = this._engine.addSharedListener(report =>
-      this._onSharedStep(report)
+    this._forgetSharedListener = this._engine.addSharedListener(() =>
+      this._onSharedStep()
     );
     // Every window's pass is every window's news: they share one document, and
     // a window whose idle poll found another window's pass just behind it runs
@@ -244,18 +244,9 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * What a background shared step found, when it finishes.
-   *
-   * @param {object} report A shared step's report (`sharedRan` is true).
+   * A background shared step finished: `syncState` holds what it found.
    */
-  _onSharedStep(report) {
-    if (report.shared === "reached") {
-      if (this._sweepPending) {
-        this._sweepPending = false;
-        this._sweepPairingOffers();
-      }
-      this._afterReachingFolder(report);
-    }
+  _onSharedStep() {
     this._drawSyncState();
     this._refreshIfChanged().catch(err =>
       this._modules.SvalLog.warn(
@@ -423,8 +414,8 @@ Object.assign(SvalPanel, {
       // since left says nothing about this one.
       unpairedDevice:
         shared !== null &&
-        this._otherWorkspacesIn === shared &&
-        !!this._otherWorkspaces.length,
+        sync.otherWorkspacesIn === shared &&
+        !!sync.otherWorkspaces.length,
       newerSchema: !!sync.lastPass?.schemaTooNew?.length,
       harmedByClock: [...new Set(sync.lastPass?.harmedByClock ?? [])].map(
         device => this._modules.SvalDeviceNames.nameOf(device)

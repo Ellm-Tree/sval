@@ -74,10 +74,10 @@ async function anotherKeysWorkspaces(shared) {
 
 /**
  * A second window, on a folder that holds another key's workspaces, once its
- * indicator is in its unpaired-device state. A window looks for another
+ * indicator is in its unpaired-device state. The profile looks for another
  * key's workspaces when a step first reaches the folder and then at most
- * once per `_otherWorkspacesCheckMs`, so a window of its own is one that has
- * not looked yet.
+ * once per `SvalFolderUpkeep.OTHER_WORKSPACES_CHECK_MS`, so the window's
+ * step is told to look again.
  *
  * @returns {Promise<Window>}
  */
@@ -99,6 +99,7 @@ async function windowFindingAnotherKey() {
     10_000,
     "the window's first pass"
   );
+  lookForOtherWorkspacesAgain(win.SvalPanel);
   Assert.equal(
     await win.SvalPanel.syncWithFolder(),
     "reached",
@@ -433,7 +434,7 @@ add_task(async function the_unpaired_line_dismisses() {
     "bound to the dismissal"
   );
 
-  const found = [...win.SvalPanel._otherWorkspaces];
+  const found = [...win.SvalPanel.syncState.otherWorkspaces];
   Assert.equal(found.length, 1, "the other key's directory was found");
   dismiss.click();
   await TestUtils.waitForCondition(

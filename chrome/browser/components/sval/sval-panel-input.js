@@ -270,7 +270,9 @@ Object.assign(SvalPanel, {
       case "pairAgain":
         return this.openSettingsPage("claim");
       case "dismissOtherWorkspaces":
-        return this._dismissOtherWorkspaces();
+        return this._modules.SvalFolderUpkeep.of(
+          this._engine
+        ).dismissOtherWorkspaces();
       default:
         return undefined;
     }

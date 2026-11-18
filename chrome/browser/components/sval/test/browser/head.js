@@ -3123,7 +3123,7 @@ async function panelOnAFolder(label, { shared = false } = {}) {
 /**
  * Waits for one sealed copy of a sync key in `root`, written and its write
  * finished. A step that reaches the folder starts that write and does not
- * wait for it (`_afterReachingFolder` in sval-panel-folder.js), so a task
+ * wait for it (`SvalFolderUpkeep`), so a task
  * that changes the folder's files after a step reached it waits here first.
  * The helper writes the copy under a temporary name in the same directory
  * and renames it (`write_atomically` in tools/sval-folder), so only the
@@ -3269,4 +3269,20 @@ function useUpdateChannel(channel) {
   }
   defaults.unlockPref("app.update.channel");
   defaults.setCharPref("app.update.channel", channel);
+}
+
+/**
+ * Has the next step that reaches the shared folder look for another key's
+ * workspaces, and forgets what the last look found, so a task can wait for
+ * `syncState.otherWorkspacesIn` to name the folder again. The profile looks
+ * at most once per `SvalFolderUpkeep.OTHER_WORKSPACES_CHECK_MS`.
+ *
+ * @param {object} [panel] A window's `SvalPanel`.
+ */
+function lookForOtherWorkspacesAgain(panel = SvalPanel) {
+  const { SvalFolderUpkeep } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalFolderUpkeep.sys.mjs"
+  );
+  panel.syncState.setOtherWorkspaces([], null);
+  SvalFolderUpkeep.of(panel.engine).lookAgain();
 }

@@ -14,80 +14,6 @@
 
 Object.assign(SvalPanel, {
   /**
-   * Another sync key's directories in the shared folder that are not
-   * dismissed; see `_lookForOtherWorkspaces`.
-   */
-  _otherWorkspaces: [],
-
-  /** The folder `_otherWorkspaces` was found in, or null. */
-  _otherWorkspacesIn: null,
-
-  /**
-   * The folder this device's sealed key copy was written into, and the
-   * fingerprint of that key, or null.
-   */
-  _keyCopyPublished: null,
-
-  /** The removal of a replaced key's directories in flight, or null. */
-  _removingOldKeyDirs: null,
-
-  /** When the shared folder was last looked at for them, or null. */
-  _otherWorkspacesCheckedAt: null,
-
-  /** How often it is looked at: ten minutes. A test shortens it. */
-  _otherWorkspacesCheckMs: 10 * 60 * 1000,
-
-  /**
-   * Whether this launch still owes the shared folder its sweep of stale
-   * pairing offers; see `_sweepPairingOffers`.
-   */
-  _sweepPending: false,
-
-  /**
-   * Clears an abandoned pairing offer out of the shared folder.
-   *
-   * Spec §6.7 bounds an offer at an hour and says any device that sees a stale
-   * one may remove it, because the device that made it may have been closed
-   * before it could withdraw its own. The settings page sweeps too, but only
-   * someone who opens it sweeps there, and nobody opens a settings page to
-   * clean up after a device they have already stopped using.
-   *
-   * **Startup, not the sync pass.** A sweep is a directory listing plus a read
-   * per file; on the five-second poll that is a cost paid every five seconds
-   * for an hour-long window. Once a launch is often enough for an expiry
-   * measured in an hour.
-   *
-   * Only when the folder is shared: this device's own location holds no offer
-   * and none is looked for there.
-   */
-  _sweepPairingOffers() {
-    const root = this.sharedRootSetting();
-    if (!root) {
-      return Promise.resolve();
-    }
-    return this._modules.SvalPairing.sweep(root).catch(err =>
-      this._modules.SvalLog.warn(
-        `sweeping stale pairing offers failed: ${this._modules.describeError(err)}`
-      )
-    );
-  },
-
-  /**
-   * What a step that reached the shared folder is followed by: looking for
-   * another key's workspaces, leaving this device's sealed key copy, and
-   * removing what a replaced key could read.
-   *
-   * @param {object} report The step's report.
-   */
-  _afterReachingFolder(report) {
-    this._lookForOtherWorkspaces(report);
-    this._publishKeyCopy();
-    if (this._settings.oldKeyDirs.length) {
-      this._removeOldKeysFiles();
-    }
-  },
-
-  /**
    * Makes `path` the folder this device exchanges files through, or stops
    * sharing when it is null (local-copy spec §4.5).
    *
@@ -212,7 +138,7 @@ Object.assign(SvalPanel, {
     // What was known belonged to the folder just left, and the next step to
     // reach this one looks in it for another key's workspaces.
     this.syncState.leftFolder();
-    this._otherWorkspacesCheckedAt = null;
+    this._modules.SvalFolderUpkeep.of(this._engine).lookAgain();
     await this._flushSettings();
     if (shared !== null) {
       // A folder it could not be made in is still the choice: the steps find
@@ -359,44 +285,6 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * Writes this device's sealed copy of the sync key into the folder, once
-   * per key and folder per session, so Sval installed again for this user
-   * finds it in whichever folder it is pointed at.
-   * Nothing is written on a machine whose secrets live in the profile: it has
-   * no system secret to seal with.
-   */
-  async _publishKeyCopy() {
-    const { SvalIdentity, SvalLog, SvalSecretStore } = this._modules;
-    const keyBytes = this._engine?.syncKey;
-    if (!keyBytes) {
-      return;
-    }
-    const copy = {
-      root: this.sharedRootSetting(),
-      fingerprint: await SvalIdentity.fingerprintOf(keyBytes),
-    };
-    const published = this._keyCopyPublished;
-    if (
-      published?.root === copy.root &&
-      published.fingerprint === copy.fingerprint
-    ) {
-      return;
-    }
-    this._keyCopyPublished = copy;
-    try {
-      const sealed = await SvalSecretStore.wrap(keyBytes);
-      if (!sealed || !(await this._engine.publishKeyCopy(sealed, copy.root))) {
-        this._keyCopyPublished = sealed ? null : copy;
-      }
-    } catch (err) {
-      this._keyCopyPublished = null;
-      SvalLog.warn(
-        `the sealed key copy was not written: ${SvalLog.errorName(err)}`
-      );
-    }
-  },
-
-  /**
    * Makes `sval/` in the chosen folder again and syncs with it. The settings
    * page's answer to a folder Sval cannot find its files in: one that was
    * deleted, a share that is back but empty (local-copy spec §4.6), or a
@@ -537,98 +425,6 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * Looks in the shared folder for another sync key's workspaces, at most
-   * once per {@link _otherWorkspacesCheckMs}: two devices set up as new
-   * before either's files reached the other each made a key, and providers
-   * take up to half an hour to deliver (spec §6.4). One found and not
-   * dismissed puts the indicator in its unpaired-device state.
-   *
-   * Only after a step that read this key's history index from the folder:
-   * before that, the index lists none of the weeks a peer published, and
-   * their directories would read as another key's. A device that joins in
-   * first run reaches the folder before history has begun.
-   *
-   * @param {object} report The step's report.
-   */
-  async _lookForOtherWorkspaces(report) {
-    const { HISTORY_INDEX, SvalIdentity } = this._modules;
-    const now = Date.now();
-    if (
-      this.syncState.keyState !== SvalIdentity.SYNC_KEY_STATES.present ||
-      !report.sharedRead.includes(HISTORY_INDEX) ||
-      (this._otherWorkspacesCheckedAt !== null &&
-        now - this._otherWorkspacesCheckedAt < this._otherWorkspacesCheckMs)
-    ) {
-      return;
-    }
-    this._otherWorkspacesCheckedAt = now;
-    const folder = this.sharedRootSetting();
-    const names = this._engine
-      ? await this._engine
-          .otherWorkspaces(undefined, await this._documentsOfThisKey())
-          .catch(() => null)
-      : null;
-    if (!names) {
-      // The folder did not answer: try next step.
-      this._otherWorkspacesCheckedAt = null;
-      return;
-    }
-    const shown = names.filter(
-      name => !this._settings.isDismissedOtherWorkspace(name)
-    );
-    if (
-      folder === this._otherWorkspacesIn &&
-      shown.join() === this._otherWorkspaces.join()
-    ) {
-      return;
-    }
-    this._otherWorkspaces = shown;
-    this._otherWorkspacesIn = folder;
-    this.drawIndicator();
-  },
-
-  /**
-   * Every document a device on this sync key publishes besides the tree,
-   * which the engine names for itself: the ones every device runs, and each
-   * week the history index lists. A peer publishes weeks this device has
-   * never held, and the index is the only place their names are found
-   * (history-sync spec §2).
-   *
-   * @returns {Promise<string[]>}
-   */
-  async _documentsOfThisKey() {
-    const {
-      ARCHIVE_DOCUMENT,
-      FAVORITES_DOCUMENT,
-      HISTORY_INDEX,
-      SvalSettingsRegistry,
-    } = this._modules;
-    const weeks = await this._engine.shards(HISTORY_INDEX).catch(err => {
-      this._modules.SvalLog.warn(
-        `could not read the history index: ${this._modules.describeError(err)}`
-      );
-      return [];
-    });
-    return [
-      ARCHIVE_DOCUMENT,
-      FAVORITES_DOCUMENT,
-      SvalSettingsRegistry.SETTINGS_DOCUMENT,
-      HISTORY_INDEX,
-      ...weeks.map(week => week.name),
-    ];
-  },
-
-  /** The unpaired-device indicator's dismiss button. */
-  async _dismissOtherWorkspaces() {
-    for (const name of this._otherWorkspaces) {
-      this._settings.dismissOtherWorkspace(name);
-    }
-    this._otherWorkspaces = [];
-    this._settings.saveSoon();
-    this.drawIndicator();
-  },
-
-  /**
    * Offers the backup of the sync key once the current step has returned, so
    * the dialog never holds up the settings page or first run that made the
    * key.
@@ -720,10 +516,11 @@ Object.assign(SvalPanel, {
     // Recorded by the join once the new key is stored, in the same step as
     // the swap, so the list never names the directories of a key this device
     // is still on.
+    const upkeep = this._modules.SvalFolderUpkeep.of(this._engine);
     const oldDirs = previous
       ? await this._engine.workspaceDirsOf(
           previous,
-          await this._publishedDocumentNames()
+          await upkeep.publishedDocumentNames()
         )
       : [];
     const result = await this.adoptKey(fresh, null, {
@@ -732,7 +529,7 @@ Object.assign(SvalPanel, {
     if (!result.adopted) {
       return { done: false, failure: result.failure };
     }
-    if (!(await this._removeOldKeysFiles())) {
+    if (!(await upkeep.removeOldKeysFiles())) {
       this._modules.SvalLog.warn(
         "the old sync key's files were not all removed"
       );
@@ -741,60 +538,6 @@ Object.assign(SvalPanel, {
     await this._flushSettings();
     this._offerBackupLater();
     return { done: true, failure: null };
-  },
-
-  /**
-   * Every document this profile's syncs publish besides the tree, whether or
-   * not one is loaded: a launch whose Favorites, history or archive have not
-   * started yet holds none of theirs, and a history week is let go of once it
-   * is past. The history index lists every week (history-sync spec §2).
-   *
-   * @returns {Promise<string[]>}
-   */
-  async _publishedDocumentNames() {
-    const {
-      ARCHIVE_DOCUMENT,
-      FAVORITES_DOCUMENT,
-      HISTORY_INDEX,
-      SvalSettingsRegistry,
-    } = this._modules;
-    const weeks = await this._engine.shards(HISTORY_INDEX);
-    return [
-      SvalSettingsRegistry.SETTINGS_DOCUMENT,
-      FAVORITES_DOCUMENT,
-      ARCHIVE_DOCUMENT,
-      HISTORY_INDEX,
-      ...weeks.map(week => week.name),
-    ];
-  },
-
-  /**
-   * Removes the directories a replaced sync key could read, and keeps trying
-   * on later steps, across restarts, until they are gone: setting up sync
-   * again is what shuts a lost device out, so its files must not quietly
-   * stay. Only the directories' names are kept, never the key.
-   *
-   * @returns {Promise<boolean>} whether everything is gone.
-   */
-  async _removeOldKeysFiles() {
-    // One removal at a time, and anything recorded while it ran is kept: a
-    // second Set Up Sync Again can add directories mid-removal.
-    this._removingOldKeyDirs ??= (async () => {
-      const dirs = this._settings.oldKeyDirs;
-      if (!dirs.length || !this._engine) {
-        return;
-      }
-      const left = await this._engine.removeWorkspaceDirs(dirs);
-      const added = this._settings.oldKeyDirs.filter(
-        dir => !dirs.includes(dir)
-      );
-      this._settings.oldKeyDirs = [...left, ...added];
-      await this._flushSettings();
-    })().finally(() => {
-      this._removingOldKeyDirs = null;
-    });
-    await this._removingOldKeyDirs;
-    return !this._settings.oldKeyDirs.length;
   },
 
   /**

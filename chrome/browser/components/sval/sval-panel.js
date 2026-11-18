@@ -445,12 +445,6 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalSiteStylePanel.sys.mjs",
         STYLE_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
         unloadTabs: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
-        ARCHIVE_DOCUMENT:
-          "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
-        FAVORITES_DOCUMENT:
-          "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
-        HISTORY_INDEX:
-          "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs",
         ARCHIVE_TIMES: "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
         AUTO_ARCHIVE_PREF:
           "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
@@ -485,6 +479,8 @@ var SvalPanel = {
         SvalPasswordManager:
           "moz-src:///browser/components/sval/SvalPasswordManager.sys.mjs",
         SvalPinsRow: "moz-src:///browser/components/sval/SvalPinsRow.sys.mjs",
+        SvalFolderUpkeep:
+          "moz-src:///browser/components/sval/SvalFolderUpkeep.sys.mjs",
         SvalScope: "moz-src:///browser/components/sval/SvalScope.sys.mjs",
         SvalSession: "moz-src:///browser/components/sval/SvalSession.sys.mjs",
         SvalSyncState:
@@ -523,8 +519,6 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalSearchConfig.sys.mjs",
         SvalSettingsSync:
           "moz-src:///browser/components/sval/SvalSettingsSync.sys.mjs",
-        SvalSettingsRegistry:
-          "moz-src:///browser/components/sval/SvalSettingsRegistry.sys.mjs",
         SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
         takeArcCard: "moz-src:///browser/components/sval/SvalCard.sys.mjs",
         latestNodes:
@@ -848,7 +842,7 @@ var SvalPanel = {
     listening.add(() =>
       PlacesObservers.removeListener(["favicon-changed"], onFavicons)
     );
-    listening.topic(this._modules.SvalIdentity.SYNC_KEY_STATE_TOPIC, () =>
+    listening.topic(this._modules.SvalSyncState.CHANGED_TOPIC, () =>
       this.drawIndicator()
     );
     listening.topic(this._modules.FAVORITE_ICONS_CHANGED_TOPIC, () =>
