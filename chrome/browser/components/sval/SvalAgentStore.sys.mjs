@@ -1047,6 +1047,17 @@ export class SvalAgentStore {
     }));
   }
 
+  /**
+   * Whether an agent paired under `launchId` is on record. Pairing under it
+   * again keeps that agent's policy and workspaces (`pair`).
+   *
+   * @param {string} launchId
+   * @returns {boolean}
+   */
+  pairedBefore(launchId) {
+    return [...this.#agents.values()].some(r => r.launchId === launchId);
+  }
+
   agents() {
     return Array.from(this.#agents, ([agentId, r]) => ({
       agentId,

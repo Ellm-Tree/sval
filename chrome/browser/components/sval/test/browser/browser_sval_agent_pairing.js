@@ -59,6 +59,10 @@ add_task(async function allow_answers_allow() {
     doc.getElementById("sval-ap-question").textContent.includes("Test Agent")
   );
   Assert.ok(doc.getElementById("sval-ap-facts").hidden, "no facts, no list");
+  Assert.ok(
+    !doc.querySelector("#sval-ap-facts [data-again]"),
+    "a first pairing is not said to keep anything"
+  );
   await pair(doc);
   Assert.deepEqual(await answerOf(answer), {
     action: "allow",
@@ -400,4 +404,19 @@ add_task(async function a_paired_agents_workspace_carries_the_mark() {
   Assert.equal(node.agent.label, "Test Agent");
   Assert.ok(/^[0-9a-f]{32}$/.test(node.agent.device));
   await engine.mutate({ kind: "remove", id });
+});
+
+/** An app with a pairing on record is told to keep what that one had. */
+add_task(async function pairing_again_says_what_is_kept() {
+  const answer = askToPair("Test Agent", ["Task: A task"], false, true);
+  const doc = await dialogDocument();
+  const list = doc.getElementById("sval-ap-facts");
+  Assert.ok(!list.hidden, "the list shows");
+  Assert.ok(
+    list.firstElementChild.dataset.again,
+    "and starts with what the app keeps"
+  );
+  Assert.equal(list.children.length, 2, "ahead of the other facts");
+  doc.querySelector(".sval-ap-deny").click();
+  Assert.deepEqual(await answerOf(answer), { action: "deny" });
 });

@@ -1182,7 +1182,8 @@ export class SvalAgentSession {
           this.#deps.askToPair(
             label,
             [`Task: ${task}`, ...launchLines(facts)],
-            isolated
+            isolated,
+            Boolean(launch?.id && this.#deps.store.pairedBefore(launch.id))
           ))(),
         created: null,
       };

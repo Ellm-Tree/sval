@@ -320,11 +320,14 @@ add_task(
 add_task(async function an_app_that_pairs_again_stays_one_agent() {
   const path = freshPath("again");
   const store = await SvalAgentStore.open(path);
+  Assert.ok(!store.pairedBefore("0123456789abcdef"), "no pairing on record");
   const first = await store.pair({
     label: "Claude Code",
     launchId: "0123456789abcdef",
     workspaceId: "ws-1",
   });
+  Assert.ok(store.pairedBefore("0123456789abcdef"), "its pairing is on record");
+  Assert.ok(!store.pairedBefore("fedcba9876543210"), "another app's is not");
   await store.setSiteLevel(first.agentId, "reddit.com", "full");
 
   const again = await store.pair({

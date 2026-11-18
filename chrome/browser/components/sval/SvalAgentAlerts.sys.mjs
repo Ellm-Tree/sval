@@ -335,13 +335,21 @@ async function closedInPlace(win, closed) {
  *   name it gave (`launchLines`).
  * @param {boolean} [isolated] Whether the agent asked for an isolated
  *   workspace, which the alert offers and the user may change.
+ * @param {boolean} [again] Whether the app has a pairing on record, whose
+ *   policy and workspaces this one keeps (`SvalAgentStore.pair`). The alert
+ *   says so.
  * @returns {Promise<{action: "allow"|"deny"|"no_window", isolated?: boolean}>}
  *   `isolated` is the kind the user allowed. A dialog closed any other way
  *   is a deny. With no browser window to show it in, or with the
  *   window closed before the user answered, the user gave no answer, which
  *   is `no_window`.
  */
-export async function askToPair(label, facts = [], isolated = false) {
+export async function askToPair(
+  label,
+  facts = [],
+  isolated = false,
+  again = false
+) {
   // Never over a private window: an agent has no business there. Under
   // permanent private browsing `getTopWindow` ignores `private`
   // (`BrowserWindowTracker.getTopWindow`), so the window is checked too.
@@ -353,6 +361,7 @@ export async function askToPair(label, facts = [], isolated = false) {
     label,
     facts,
     isolated,
+    again,
     result: null,
     // While the window is in a modal state, `gDialogBox.open` reads this as
     // an `nsIPropertyBag` and refuses a caller that is not "async", since a

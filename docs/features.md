@@ -716,8 +716,8 @@ control of what you see and what is sent to websites.
   says so, and Fix points the app to the Sval you're using.
 - **Approve an app once.** You allow an AI app like Claude Code one time, and
   every session of it can use Sval after that, from any folder. If Sval asks
-  you to approve the app again, the app keeps the permissions and Workspaces
-  you gave it.
+  you to approve the app again, the question says that the app keeps the
+  permissions and Workspaces you gave it.
 - **Each session gets its own Workspace** in its own window. The window opens
   behind yours, so an agent never steals your focus, and the agent sees only
   its own tabs. When you resume a conversation, the agent can go back to the

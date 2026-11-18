@@ -35,7 +35,15 @@ const SvalAgentPair = {
       item.textContent = line;
       list.append(item);
     }
-    list.hidden = !facts.length;
+    // Pairing again gives the app what its earlier pairing was allowed,
+    // which the question alone would not say.
+    if (args.again === true) {
+      const item = document.createElement("li");
+      item.dataset.again = "true";
+      item.textContent = `“${args.label}” was paired before. Workspaces and permissions are kept from previous sessions.`;
+      list.prepend(item);
+    }
+    list.hidden = !list.children.length;
     // The request line says what the agent asked for and never changes. The
     // box overrides it, and the pill shows whenever the answer isolates.
     const asked = args.isolated === true;
