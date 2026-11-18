@@ -1090,6 +1090,20 @@ Each entry gives:
 - **Upstream**: the patch, with a test beside
   `toolkit/components/cleardata/tests/unit`. Not submitted.
 
+### The crash reporter client names a file by the id the server sends
+
+- **Patch**: `patches/crash-client-checks-crash-id.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `Response::parse` in the client's `net/report.rs` takes
+  `CrashID` as it came, and `handle_crash_report_response` in `logic.rs`
+  writes `submitted/<CrashID>.txt`. An id holding a path separator writes
+  the file outside that directory. `CrashSubmit.sys.mjs` checks the same id
+  against `SUBMISSION_REGEX`.
+- **Evidence**: read in the code. No test: Sval's CI does not run the
+  client's Rust tests.
+- **Upstream**: the patch, with a case in `report_response` in the same
+  file. Not submitted.
+
 ## Worked around in Sval's code, Mozilla's code unchanged
 
 ### A page asking to stay is discarded when it answers late

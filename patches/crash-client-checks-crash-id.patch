@@ -1,0 +1,27 @@
+Sval: the crash reporter client takes only an id that can name a file
+
+The client writes submitted/<CrashID>.txt, with the id from the server's
+answer as it came. An id holding a path separator would put the file
+elsewhere. Gecko's own submitter checks the id (SUBMISSION_REGEX in
+CrashSubmit.sys.mjs), and the client takes one made of letters, digits and
+hyphens, as the ids Sval's collector sends are.
+
+diff --git a/toolkit/crashreporter/client/app/src/net/report.rs b/toolkit/crashreporter/client/app/src/net/report.rs
+index 2f71576998..80899b8821 100644
+--- a/toolkit/crashreporter/client/app/src/net/report.rs
++++ b/toolkit/crashreporter/client/app/src/net/report.rs
+@@ -121,7 +121,13 @@ impl Response {
+                         ret.stop_sending_reports_for = Some(value.to_owned())
+                     }
+                     "Discarded" => ret.discarded = true,
+-                    "CrashID" => ret.crash_id = Some(value.to_owned()),
++                    // The id names the file that records the submission.
++                    "CrashID"
++                        if !value.is_empty()
++                            && value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') =>
++                    {
++                        ret.crash_id = Some(value.to_owned())
++                    }
+                     "ViewURL" => ret.view_url = Some(value.to_owned()),
+                     _ => (),
+                 }
