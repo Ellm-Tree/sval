@@ -133,7 +133,7 @@ directory, and every file read lands as a raw copy under `files-<id>/`; the
 answer names the copies. No base64 and no file contents cross the pipe, and
 the engine's worker reads `readDirs`' copies (`SvalSync.worker.mjs`), so no
 large response is parsed on the main thread
-(`docs/audits/2026-10-24-security-audit.md`, SC5). The 1 MiB cap is a bound
+(the security audit of 2026-10-24, SC5). The 1 MiB cap is a bound
 chosen well above the largest answer: a listing's answer is names and copy
 numbers, at most 1000 entries.
 

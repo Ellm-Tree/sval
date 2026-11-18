@@ -42,8 +42,7 @@ or delete the other's state.
   is rejected: the manifest names the path of Apple's helper app inside the
   system volume and the ids of Apple's extension, and a copy goes stale when
   a macOS update changes either.
-- `docs/audits/2026-11-01-firefox-coexistence.md` has the audit with a verdict
-  for each name.
+- The Firefox coexistence audit of 2026-11-01 has a verdict for each name.
 
 ## Consequences
 
