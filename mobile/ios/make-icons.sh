@@ -22,12 +22,29 @@ for path in "$icons/pr-shield.svg" "$icons/pr-shield-fill.svg" "$icons/pr-shield
     "$header/back.svg" "$header/forward.svg" "$header/reload.svg" "$header/stop.svg" \
     "$sync/satellite.svg" "$sync/badge-bang.svg" "$sync/badge-x.svg" "$sync/badge-pause.svg" \
     "$header/javascript.svg" "$header/javascript-off.svg" "$header/media.svg" "$header/split.svg" "$header/private.svg" \
-    "$here/../../chrome/browser/components/sval/workspace-isolated.svg"; do
+    "$here/../../chrome/browser/components/sval/workspace-isolated.svg" \
+    "$here/../../chrome/browser/components/sval/agent-robot.svg" \
+    "$here/../../chrome/browser/components/sval/device-phone.svg" \
+    "$here/../../chrome/browser/components/sval/device-tablet.svg"; do
   name=$(basename "$path" .svg)
   set="$out/$name.imageset"
   mkdir -p "$set"
   sed -e 's/stroke="context-fill\( black\)\{0,1\}"/stroke="#000"/' -e 's/ stroke-opacity="context-fill-opacity"//' \
-    -e 's/fill="context-fill"/fill="#000"/' "$path" > "$set/$name.svg"
+    -e 's/fill="context-fill\( black\)\{0,1\}"/fill="#000"/' -e 's/ fill-opacity="context-fill-opacity"//' \
+    "$path" > "$set/$name.svg"
+  cat > "$set/Contents.json" <<JSON
+{"images":[{"filename":"$name.svg","idiom":"universal"}],"info":{"author":"xcode","version":1},
+ "properties":{"preserves-vector-representation":true,"template-rendering-intent":"template"}}
+JSON
+done
+
+# Each agent app's mark (SvalAgentBrands.sys.mjs), tinted as the robot is.
+for path in "$here/../../chrome/browser/components/sval/agent-brands/"*.svg; do
+  name=agent-brand-$(basename "$path" .svg)
+  set="$out/$name.imageset"
+  mkdir -p "$set"
+  sed -e 's/fill="context-fill\( black\)\{0,1\}"/fill="#000"/' -e 's/ fill-opacity="context-fill-opacity"//' \
+    "$path" > "$set/$name.svg"
   cat > "$set/Contents.json" <<JSON
 {"images":[{"filename":"$name.svg","idiom":"universal"}],"info":{"author":"xcode","version":1},
  "properties":{"preserves-vector-representation":true,"template-rendering-intent":"template"}}

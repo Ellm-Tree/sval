@@ -664,6 +664,7 @@ enum ShieldState {
 }
 
 /// A Workspace's tile: its emoji, or its name's first letter, on its tint.
+/// An agent's or a device's own wears its mark (`AppModel.markImage`).
 struct WorkspaceTile: View {
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
@@ -703,7 +704,13 @@ struct WorkspaceTile: View {
                     .strokeBorder(surface.tileRing, lineWidth: 1.5)
             }
             .overlay {
-                if let emoji = workspace?.emoji, !emoji.isEmpty {
+                if let image = workspace.flatMap(model.markImage) {
+                    Image(image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: size * 0.5, height: size * 0.5)
+                        .foregroundStyle(tint == nil && fill == nil ? surface.text : Theme(scheme, tint: workspace?.color).text)
+                } else if let emoji = workspace?.emoji, !emoji.isEmpty {
                     Text(emoji).font(.system(size: size * 0.55)).accessibilityIgnoresInvertColors()
                 } else {
                     Text(workspace.map { String(Self.name($0).prefix(1)).uppercased() } ?? "")
@@ -793,8 +800,10 @@ struct BarPreview: View {
 }
 
 /// A Workspace's mark in the bar: its emoji, its name's initial when it
-/// has none, or the private mask, in the ink around it.
+/// has none, the private mask, or an agent's or device's mark
+/// (`AppModel.markImage`), in the ink around it.
 struct WorkspaceMark: View {
+    @Environment(AppModel.self) private var model
     let workspace: OutlineRow?
     let isPrivate: Bool
     let size: CGFloat
@@ -802,6 +811,8 @@ struct WorkspaceMark: View {
     var body: some View {
         if isPrivate {
             Image("private").resizable().scaledToFit().frame(width: size, height: size)
+        } else if let image = workspace.flatMap(model.markImage) {
+            Image(image).resizable().scaledToFit().frame(width: size * 0.8, height: size * 0.8)
         } else if let emoji = workspace?.emoji, !emoji.isEmpty {
             Text(emoji).font(.system(size: size * 0.9)).accessibilityIgnoresInvertColors()
         } else {

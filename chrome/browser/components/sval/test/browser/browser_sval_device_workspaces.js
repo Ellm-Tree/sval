@@ -179,6 +179,77 @@ add_task(async function the_strip_draws_devices_after_a_divider() {
 });
 
 /**
+ * A device's Workspace wears the phone until its device says it is a tablet
+ * in the settings document, then the tablet, in the switcher and the strip
+ * alike.
+ */
+add_task(async function a_tablets_workspace_wears_the_tablet() {
+  const { engine } = await withSwitcherPanel();
+  const device = await addDeviceWorkspace(engine, 1);
+  await SvalPanel.refresh();
+  const PHONE = "chrome://browser/content/sval/device-phone.svg";
+  const TABLET = "chrome://browser/content/sval/device-tablet.svg";
+  const imageOf = async () => {
+    const menu = await openSwitcher();
+    try {
+      return menu
+        .querySelector(`:scope > [data-workspace-id="${CSS.escape(device)}"]`)
+        .getAttribute("image");
+    } finally {
+      await closeSwitcher(menu);
+    }
+  };
+  Assert.equal(await imageOf(), PHONE, "the phone, while its kind is unsaid");
+
+  // The device in the mark is the engine's own, which wrote it.
+  const { SETTINGS_DOCUMENT } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSettingsRegistry.sys.mjs"
+  ).SvalSettingsRegistry;
+  const { SvalDeviceNames } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs"
+  );
+  const key = `sval.device.kind.${engine.deviceIdHex}`;
+  await engine.mutate({
+    kind: "setSetting",
+    document: SETTINGS_DOCUMENT,
+    key,
+    valueJson: JSON.stringify("tablet"),
+    now: Date.now(),
+  });
+  atTaskEnd(() =>
+    engine.mutate({
+      kind: "setSetting",
+      document: SETTINGS_DOCUMENT,
+      key,
+      now: Date.now(),
+    })
+  );
+  // A kind arrives by a pass, and names are read again as they start.
+  SvalDeviceNames.stop();
+  await SvalDeviceNames.startFor(engine);
+  Assert.equal(
+    SvalDeviceNames.kindOf(engine.deviceIdHex),
+    "tablet",
+    "the kind is read"
+  );
+  await SvalPanel.refresh();
+  Assert.equal(await imageOf(), TABLET, "the tablet in the switcher");
+
+  await SpecialPowers.pushPrefEnv({
+    set: [[SvalPanelModel.SWITCHER_PREF, "strip"]],
+  });
+  atTaskEnd(() => SpecialPowers.popPrefEnv());
+  const face = SvalPanel._els.strip.querySelector(
+    `.sval-strip-item[data-workspace-id="${CSS.escape(device)}"] .sval-strip-face`
+  );
+  Assert.equal(
+    face.style.getPropertyValue("--sval-agent-mark"),
+    `url("${TABLET}")`,
+    "and in the strip"
+  );
+});
+
+/**
  * A new window with every one of the user's Workspaces open never takes a
  * device's Workspace that has no window: it gets a new, nameless one of the
  * user's own, as it does beside an agent's.

@@ -43,13 +43,20 @@ struct WorkspaceStrip: View {
                     group(label: nil, people, reorders: true)
                     if !devices.isEmpty {
                         divider
-                        group(label: "Devices", glyph: "📱", devices, reorders: false)
+                        group(label: "Devices", glyph: "device-phone", devices, reorders: false)
                     }
                     if !agents.isEmpty {
                         divider
                         ForEach(agentNames(agents), id: \.self) { name in
-                            group(label: name, agents.filter { model.agentName($0) == name }, reorders: false)
+                            let own = agents.filter { model.agentName($0) == name }
+                            group(label: name, glyph: own.first.flatMap(model.markImage) ?? "agent-robot",
+                                  own, reorders: false)
                         }
+                    }
+                    // New is the user's own: a line sets it apart from the
+                    // devices' and agents' Workspaces before it.
+                    if !devices.isEmpty || !agents.isEmpty {
+                        divider
                     }
                     newTile
                 }
@@ -91,18 +98,23 @@ struct WorkspaceStrip: View {
             .padding(.bottom, compact ? 0 : 20)
     }
 
-    private func group(label: String?, glyph: String = "🤖", _ workspaces: [OutlineRow], reorders: Bool) -> some View {
+    /// `glyph` is the heading's mark, the one its tiles wear, as the
+    /// desktop's menu headings wear it.
+    private func group(label: String?, glyph: String = "agent-robot", _ workspaces: [OutlineRow], reorders: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Group {
                 if let label {
                     HStack(spacing: 6) {
-                        Text(glyph).font(.system(size: 10))
+                        Image(glyph)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 10, height: 10)
+                            .foregroundStyle(theme.muted)
                         Text(label)
                             .font(.system(.caption2, weight: .semibold))
                             .foregroundStyle(theme.muted)
                             .lineLimit(1)
                             .fixedSize()
-                        theme.divider.frame(height: 1)
                     }
                     .padding(.horizontal, 10)
                     .accessibilityAddTraits(.isHeader)

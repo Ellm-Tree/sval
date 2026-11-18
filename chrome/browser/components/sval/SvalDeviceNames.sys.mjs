@@ -13,11 +13,17 @@ const { SETTINGS_DOCUMENT } = SvalSettingsRegistry;
  */
 export const DEVICE_NAME_PREF = "browser.sval.device.name";
 
-/** Notified when any device's name may have changed. */
+/** Notified when any device's name or kind may have changed. */
 export const DEVICE_NAMES_TOPIC = "sval-device-names-changed";
 
 /** The setting each device's name syncs under (history-sync spec §3.1). */
 export const KEY_PREFIX = "sval.device.name.";
+
+/**
+ * The setting a phone or tablet says which it is under: `"phone"` or
+ * `"tablet"`, so its Workspace wears that device's mark (decision 2254).
+ */
+export const KIND_PREFIX = "sval.device.kind.";
 
 /** Longest name kept: a label, never a paragraph. */
 const MAX_LENGTH = 64;
@@ -27,6 +33,9 @@ let current = null;
 
 /** Every device's name by hex id, as the settings document last held them. */
 let names = new Map();
+
+/** Every phone's and tablet's kind by hex id, as the document last held them. */
+let kinds = new Map();
 
 /**
  * The computer's name, as the system reports it: its host name without the
@@ -87,6 +96,17 @@ export const SvalDeviceNames = {
   },
 
   /**
+   * Whether the device with hex id `device` is a `"phone"` or a `"tablet"`,
+   * or null when it has not said.
+   *
+   * @param {string} device
+   * @returns {string|null}
+   */
+  kindOf(device) {
+    return kinds.get(device) ?? null;
+  },
+
+  /**
    * Starts publishing this device's name through `engine`'s settings
    * document, and reading every device's after each pass that brings a
    * change to that document. One engine for the process; another stops the
@@ -128,6 +148,7 @@ export const SvalDeviceNames = {
     Services.prefs.removeObserver(DEVICE_NAME_PREF, current.observer);
     current = null;
     names = new Map();
+    kinds = new Map();
   },
 };
 
@@ -163,18 +184,22 @@ async function refresh(entry) {
     return;
   }
   const next = new Map();
+  const nextKinds = new Map();
   for (const [key, value] of Object.entries(synced)) {
     if (key.startsWith(KEY_PREFIX) && typeof value === "string") {
       const name = clean(value);
       if (name) {
         next.set(key.slice(KEY_PREFIX.length), name);
       }
+    } else if (key.startsWith(KIND_PREFIX) && typeof value === "string") {
+      nextKinds.set(key.slice(KIND_PREFIX.length), value);
     }
   }
-  const changed =
-    next.size !== names.size ||
-    [...next].some(([device, name]) => names.get(device) !== name);
+  const differs = (a, b) =>
+    a.size !== b.size || [...a].some(([device, v]) => b.get(device) !== v);
+  const changed = differs(next, names) || differs(nextKinds, kinds);
   names = next;
+  kinds = nextKinds;
   if (changed) {
     Services.obs.notifyObservers(null, DEVICE_NAMES_TOPIC);
   }

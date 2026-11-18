@@ -238,8 +238,16 @@ final class AppModel {
     private func nameThisDevice() async {
         guard let syncer else { return }
         let key = "sval.device.name.\(syncer.deviceHex)"
-        guard settings[key] == nil else { return }
-        await setSetting(key, to: UIDevice.current.name)
+        if settings[key] == nil {
+            await setSetting(key, to: UIDevice.current.name)
+        }
+        // Whether this is a phone or a tablet, so every device draws its
+        // Workspace with that device's mark.
+        let kindKey = "sval.device.kind.\(syncer.deviceHex)"
+        let kind = UIDevice.current.userInterfaceIdiom == .pad ? "tablet" : "phone"
+        if settings[kindKey] as? String != kind {
+            await setSetting(kindKey, to: kind)
+        }
     }
 
     /// Opens the chosen folder, if there is one, and watches it for changes.
@@ -402,6 +410,17 @@ final class AppModel {
               !other.isEmpty
         else { return name }
         return "\(name) · \(other)"
+    }
+
+    /// The mark a Workspace wears in place of an emoji, as on the desktop:
+    /// an agent's app's mark, or the robot for an app Sval doesn't know, and
+    /// a phone or a tablet for a device's own, as that device says it is.
+    /// Nil for the user's own Workspaces.
+    func markImage(_ row: OutlineRow) -> String? {
+        if let label = row.agent { return AgentBrands.image(for: label) ?? "agent-robot" }
+        guard let device = row.device else { return nil }
+        let hex = device.map { String(format: "%02x", $0) }.joined()
+        return settings["sval.device.kind.\(hex)"] as? String == "tablet" ? "device-tablet" : "device-phone"
     }
 
     /// Whether `row` is another device's own Workspace.

@@ -328,8 +328,9 @@ SPDX-License-Identifier = "MPL-2.0"
 # bookmarks test, run against Sval's Favorites, the phone's Public Suffix
 # List, normalized from Gecko's (mobile/sval-mobile/generate-psl.py), the
 # installer's ServicesHelper plugin, built from Mozilla's source as patched
-# (scripts/build-serviceshelper.sh), and the executables' manifests, each
-# from Mozilla's manifest of the executable it renames.
+# (scripts/build-serviceshelper.sh), the executables' manifests, each
+# from Mozilla's manifest of the executable it renames, and Firefox's phone
+# and tablet icons, given a fallback paint so they work as a mask.
 [[annotations]]
 path = [
   "patches/*.patch",
@@ -353,6 +354,8 @@ path = [
   "packaging/linux/debian/*",
   "packaging/linux/rpm/*",
   "mobile/sval-mobile/src/effective_tld_names.txt",
+  "chrome/browser/components/sval/device-phone.svg",
+  "chrome/browser/components/sval/device-tablet.svg",
 ]
 SPDX-FileCopyrightText = ["Mozilla contributors", "2026 Ellm Tree, Inc."]
 SPDX-License-Identifier = "MPL-2.0"

@@ -110,14 +110,14 @@ control of what you see and what is sent to websites.
 - **Workspace Sync.** Your Workspaces sync to your other devices, along with
   their tabs and groups. See [Sync](#sync).
 - **Device Workspaces.** Each phone or tablet that syncs with Sval keeps a
-  Workspace of its own for the tabs you open on it. On your computer, the
-  switcher lists the device Workspaces under Devices, after your own
-  Workspaces, each with a phone icon and the number of tabs in it. The strip
-  shows the device Workspaces after a line of their own, each with a phone
-  icon. While you have Workspaces of your
-  own, a new window never opens in a device Workspace. You can open, rename,
-  recolor, or delete a device Workspace like any other Workspace, or close
-  every tab in it. A device that stops syncing keeps its Workspace until you
+  Workspace of its own for the tabs you open on it. A phone's Workspace
+  shows a phone icon and a tablet's shows a tablet icon, on your computer
+  and on your phone. On your computer, the switcher lists the device
+  Workspaces under Devices, after your own Workspaces, each with the number
+  of tabs in it. The strip shows the device Workspaces after a line of their
+  own. While you have Workspaces of your own, a new window never opens in a
+  device Workspace. You can open, rename, recolor, or delete a device
+  Workspace like any other Workspace, or close every tab in it. A device that stops syncing keeps its Workspace until you
   delete it.
 - **Archive idle tabs (if you want).** Turn on Archive idle tabs in Settings ›
   Workspaces › Idle tabs, or for one Workspace in its Edit Workspace dialog.
@@ -733,7 +733,8 @@ control of what you see and what is sent to websites.
   Settings › Agents, or delete the Workspace.
 - **See which app and model each agent uses.** An agent Workspace shows its
   app's icon, for apps like Claude Code, Codex, Grok, Mistral, and LM Studio.
-  Sval shows a robot for an app it doesn't know. The switcher, the
+  Sval shows a robot for an app it doesn't know. Your phone shows the same
+  icons. The switcher, the
   Workspaces menu, Move to Workspace, and the strip list each app's
   Workspaces. There, each Workspace shows the icon of the model its agent
   named, like Claude, GPT, Qwen, DeepSeek, or Llama. A Workspace whose agent named no

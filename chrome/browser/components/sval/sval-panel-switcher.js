@@ -27,8 +27,12 @@
   /** What an agent's mark means, for its tooltip and description. */
   const AGENT_TEXT = "Agent Workspace";
 
-  /** The phone that marks a phone's or tablet's own workspace (decision 2254). */
-  const DEVICE_PHONE_URL = "chrome://browser/skin/device-phone.svg";
+  /**
+   * The phone that marks a phone's own workspace (decision 2254), and the
+   * devices' heading. A tablet's wears {@link DEVICE_TABLET_URL}.
+   */
+  const DEVICE_PHONE_URL = "chrome://browser/content/sval/device-phone.svg";
+  const DEVICE_TABLET_URL = "chrome://browser/content/sval/device-tablet.svg";
 
   /**
    * The heading over the agents' part of a workspace list. It wears the
@@ -183,11 +187,13 @@
       // An agent's workspace wears the robot face and the agent's hue, never an
       // emoji of its own (`workspaceColor` says the same of its colour).
       const agent = agentLabelOf(this._nodes, current, this.devices());
+      // A phone's or tablet's workspace wears its device's mark in place of
+      // an emoji, as it does in the strip and the menus.
       const agentMark = agent
         ? this._agentMarkURL(
             this._modules.agentBrandOf(this._nodes[current]?.agent?.label)
           )
-        : null;
+        : this._deviceMarkURL(current);
       this._agentLabel = agent;
       const color = current
         ? this.workspaceColor(current)
@@ -200,15 +206,15 @@
         transparency: agent ? 0 : (stored.transparency ?? 0),
       };
       this._shownLook = shownLook;
-      const emoji = agent ? null : stored.emoji;
+      const emoji = agentMark ? null : stored.emoji;
 
       switcher.textContent = "";
       // Always present: the stylesheet draws a workspace icon in an empty tile,
       // so a workspace with no emoji still has a tile to carry its colour.
       const tile = this._html("span");
       tile.className = "sval-switcher-emoji";
-      if (agent) {
-        // The robot is drawn by the stylesheet, and the accessible name below
+      if (agentMark) {
+        // The mark is drawn by the stylesheet, and the accessible name below
         // says whose workspace it is.
         tile.classList.add("sval-agent-glyph");
         tile.setAttribute("aria-hidden", "true");
@@ -953,12 +959,20 @@
     },
 
     /**
-     * The mark a phone's or tablet's Workspace wears.
+     * The mark a phone's or tablet's Workspace wears: the tablet for a
+     * device that says it is one (`SvalDeviceNames.kindOf`), else the phone.
      *
-     * @returns {string}
+     * @param {string} id A workspace's id.
+     * @returns {string|null} null for a workspace that is no device's.
      */
-    _deviceMarkURL() {
-      return DEVICE_PHONE_URL;
+    _deviceMarkURL(id) {
+      const device = this._nodes[id]?.device_home?.device;
+      if (!device) {
+        return null;
+      }
+      return this._modules.SvalDeviceNames.kindOf(device) === "tablet"
+        ? DEVICE_TABLET_URL
+        : DEVICE_PHONE_URL;
     },
 
     /**
@@ -1096,8 +1110,8 @@
     },
 
     /**
-     * Gives a phone's or tablet's workspace entry the phone, as its image, as
-     * {@link _markAgentItem} gives an agent's the robot.
+     * Gives a phone's or tablet's workspace entry its device's mark, as its
+     * image, as {@link _markAgentItem} gives an agent's the robot.
      *
      * @param {Element} el A workspace `menu` or `menuitem`.
      * @param {object} item Its `switcherItems` entry.
@@ -1107,7 +1121,7 @@
         return;
       }
       el.classList.add(this._iconicClass(el), "sval-device-menuitem");
-      el.setAttribute("image", DEVICE_PHONE_URL);
+      el.setAttribute("image", this._deviceMarkURL(item.id));
     },
 
     /**

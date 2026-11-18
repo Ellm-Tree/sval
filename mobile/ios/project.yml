@@ -34,6 +34,9 @@ targets:
       # (`DesktopColor.swift`).
       - path: ../../chrome/browser/components/sval/SvalColor.sys.mjs
         buildPhase: resources
+      # The desktop's rules for which app an agent is (`AgentBrands.swift`).
+      - path: ../../chrome/browser/components/sval/SvalAgentBrands.sys.mjs
+        buildPhase: resources
     dependencies:
       - framework: Generated/SvalEngine.xcframework
         embed: false

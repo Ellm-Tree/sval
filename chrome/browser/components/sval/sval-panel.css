@@ -2027,7 +2027,7 @@ menucaption:is(.sval-agents-caption, .sval-devices-caption)::before {
 }
 
 menucaption.sval-devices-caption::before {
-  mask-image: url("chrome://browser/skin/device-phone.svg");
+  mask-image: url("chrome://browser/content/sval/device-phone.svg");
 }
 
 /*

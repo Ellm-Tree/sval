@@ -279,12 +279,14 @@ Object.assign(SvalPanel, {
       }
     };
     Services.obs.addObserver(onControl, SvalAgentControl.CONTROL_TOPIC);
-    // Another device's agent workspace is labelled with that device's name.
+    // Another device's agent workspace is labelled with that device's name,
+    // and a phone's or tablet's workspace wears its kind's mark.
     const { DEVICE_NAMES_TOPIC } = this._modules;
-    Services.obs.addObserver(onControl, DEVICE_NAMES_TOPIC);
+    const onDevices = () => this.render();
+    Services.obs.addObserver(onDevices, DEVICE_NAMES_TOPIC);
     this._forgetControlListener = () => {
       Services.obs.removeObserver(onControl, SvalAgentControl.CONTROL_TOPIC);
-      Services.obs.removeObserver(onControl, DEVICE_NAMES_TOPIC);
+      Services.obs.removeObserver(onDevices, DEVICE_NAMES_TOPIC);
     };
 
     await this._startFromSync(remembered);

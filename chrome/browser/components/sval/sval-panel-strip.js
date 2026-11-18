@@ -502,7 +502,7 @@
       if (item.agent || item.device) {
         face.style.setProperty(
           "--sval-agent-mark",
-          `url("${item.agent ? this._agentMarkURL(item.brand) : this._deviceMarkURL()}")`
+          `url("${item.agent ? this._agentMarkURL(item.brand) : this._deviceMarkURL(item.id)}")`
         );
       } else {
         face.style.removeProperty("--sval-agent-mark");

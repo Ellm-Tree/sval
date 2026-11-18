@@ -772,6 +772,44 @@ add_task(async function a_renamed_device_reaches_names_already_read() {
   );
 });
 
+/**
+ * Decision 2254: a phone or tablet says which it is in the settings document,
+ * so every device draws its Workspace with that device's mark.
+ */
+add_task(async function a_devices_kind_reaches_the_other_devices() {
+  const { make } = devices();
+  const a = await make();
+  const b = await make();
+  for (const device of [a, b]) {
+    await device.engine.addDocument("settings");
+  }
+  registerCleanupFunction(() => SvalDeviceNames.stop());
+  await a.engine.mutate({
+    kind: "setSetting",
+    document: "settings",
+    key: `sval.device.kind.${a.engine.deviceIdHex}`,
+    valueJson: JSON.stringify("tablet"),
+    now: Date.now(),
+  });
+  await a.pass();
+  await SvalDeviceNames.startFor(b.engine);
+  Assert.equal(
+    SvalDeviceNames.kindOf(a.engine.deviceIdHex),
+    null,
+    "nothing before the pass brings it in"
+  );
+  await b.pass();
+  await waitForCondition(
+    () => SvalDeviceNames.kindOf(a.engine.deviceIdHex) === "tablet",
+    "B reads that A is a tablet"
+  );
+  Assert.equal(
+    SvalDeviceNames.kindOf(b.engine.deviceIdHex),
+    null,
+    "and a device that never said has no kind"
+  );
+});
+
 add_task(async function places_holds_what_the_store_inserts_and_removes() {
   await PlacesUtils.history.clear();
   registerCleanupFunction(() => PlacesUtils.history.clear());

@@ -169,6 +169,8 @@ browser.jar:
     content/browser/sval/header-icons/switch-tab.svg (header-icons/switch-tab.svg)
     content/browser/sval/sval-glyph.svg        (sval-glyph.svg)
     content/browser/sval/agent-robot.svg      (agent-robot.svg)
+    content/browser/sval/device-phone.svg     (device-phone.svg)
+    content/browser/sval/device-tablet.svg    (device-tablet.svg)
     content/browser/sval/color-pencil.svg      (color-pencil.svg)
     content/browser/sval/color-plus.svg      (color-plus.svg)
     content/browser/sval/agent-brands/amp.svg (agent-brands/amp.svg)
