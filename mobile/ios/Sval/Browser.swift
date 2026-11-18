@@ -67,6 +67,8 @@ final class Browser {
     @ObservationIgnored private var offloaded: [String: (state: Any, address: String?)] = [:]
     @ObservationIgnored private let model: AppModel
     @ObservationIgnored let blocker = ContentBlocker()
+    /// The files the pages download.
+    let downloads = Downloads()
     @ObservationIgnored let audio = BackgroundAudio()
     @ObservationIgnored private var memoryWarning: NSObjectProtocol?
     /// When the user left each workspace they have left, by id.
@@ -188,6 +190,74 @@ final class Browser {
             if let home = UserDefaults.standard.string(forKey: Self.workspaceKey) ?? model.workspaces.first?.id {
                 showWorkspace(home)
             }
+        }
+    }
+
+    /// A window a page asked for, whose page is made before its tab:
+    /// WebKit takes the new page at once, and the tab waits for a web
+    /// address, since the phone writes no other into the tree. `adding`
+    /// while the tab's edit runs.
+    struct OpeningWindow {
+        let parent: String
+        let opener: String
+        var adding = false
+    }
+    private var windowsOpening: [String: OpeningWindow] = [:]
+    /// The tab each page-opened window came from, which comes back to the
+    /// front when the page closes its window.
+    private var openers: [String: String] = [:]
+
+    /// Opens a link with a target, or a script's `window.open`, in a new
+    /// tab at the end of the opener's Workspace, its own Workspace for
+    /// another device's. WebKit requires the page made with the
+    /// configuration it passes (`UIDelegate::UIClient::createNewPage`),
+    /// which keeps the opener's session and its `window.opener`, so a
+    /// sign-in window can hand its result back.
+    func openWindow(from opener: String, configuration: WKWebViewConfiguration,
+                    for action: WKNavigationAction) -> WKWebView? {
+        guard let workspace = model.workspace(of: opener) ?? Self.pinParts(opener)?.workspace,
+              let parent = model.newTabWorkspace(from: workspace) else { return nil }
+        let id = UUID().uuidString.lowercased()
+        windowsOpening[id] = OpeningWindow(parent: parent, opener: opener)
+        openers[id] = opener
+        let page = makePage(id, address: nil, opens: nil, pin: false,
+                            privately: model.isPrivate(opener), configuration: configuration)
+        Diagnostics.log("tabs: a page opened a window")
+        // A window opened on a blank page gets its tab once a script sends
+        // it to a web address (`navigated`).
+        if let url = action.request.url, AppModel.opensHere(url.absoluteString) {
+            addWindowTab(id, url: url)
+        }
+        return page.view
+    }
+
+    private func addWindowTab(_ id: String, url: URL) {
+        guard var opening = windowsOpening[id] else { return }
+        opening.adding = true
+        windowsOpening[id] = opening
+        Task {
+            let last = model.children(of: opening.parent).last?.id
+            let added = await model.addTab(to: opening.parent, url: url, after: last, id: id)
+            windowsOpening[id] = nil
+            guard added != nil else {
+                closePage(id)
+                return
+            }
+            select(id)
+        }
+    }
+
+    /// Closes the tab of a window its page closed, with `window.close`,
+    /// and brings back the tab that opened it.
+    private func closeWindow(_ id: String) {
+        let opener = openers.removeValue(forKey: id)
+        guard windowsOpening.removeValue(forKey: id) == nil, let row = model.row(id) else {
+            closePage(id)
+            return
+        }
+        Task {
+            _ = await close(row)
+            if let opener, model.row(opener) != nil { select(opener) }
         }
     }
 
@@ -809,7 +879,7 @@ final class Browser {
         let tabs = Set(model.rows.filter { $0.kind == "tab" }.map(\.id))
         // A pin's page lasts while the pin shows in its Workspace; unpinned,
         // deleted or limited elsewhere, it closes (pins spec §13).
-        let live = { (id: String) in tabs.contains(id) || self.pin(for: id) != nil }
+        let live = { (id: String) in tabs.contains(id) || self.pin(for: id) != nil || self.windowsOpening[id] != nil }
         for id in pages.keys where !live(id) {
             pages.removeValue(forKey: id)?.close()
         }
@@ -831,6 +901,7 @@ final class Browser {
         splitFocus = splitFocus.filter { exists($0.key) }
         if splitSlots.keys.contains(where: { !exists($0) }) { splitSlots = splitSlots.filter { exists($0.key) } }
         visits = visits.filter { live($0.key) }
+        openers = openers.filter { live($0.key) }
         if let id = currentTabId, live(id) {
             if workspaceId == nil { workspaceId = model.workspace(of: id) }
             makeShownPages()
@@ -1382,8 +1453,9 @@ final class Browser {
 
     /// A page for `id`, put back as it was let go when it was at `address`,
     /// or else loading `opens`.
-    private func makePage(_ id: String, address: String?, opens: URL?, pin: Bool, at site: URL? = nil) -> Page {
-        let isPrivate = model.isPrivate(id)
+    private func makePage(_ id: String, address: String?, opens: URL?, pin: Bool, at site: URL? = nil,
+                          privately: Bool? = nil, configuration: WKWebViewConfiguration? = nil) -> Page {
+        let isPrivate = privately ?? model.isPrivate(id)
         let rules = model.siteRules(private: isPrivate)
         let host = site?.host() ?? offloaded[id]?.address.flatMap(URL.init(string:))?.host() ?? opens?.host()
         // A page made at another site than its tab's visit ends the visit.
@@ -1391,7 +1463,8 @@ final class Browser {
         visits[id] = visit
         let page = Page(tabId: id, media: visit == nil ? rules.media(for: host) : .allow, visit: visit,
                         reportsTouch: pin,
-                        privateStore: isPrivate ? privateStore : nil) { [weak self] action, webView in
+                        privateStore: isPrivate ? privateStore : nil,
+                        configuration: configuration) { [weak self] action, webView in
             JavaScriptRules.allowed(action, in: webView, settings: self?.model.settings ?? [:])
         } onNavigate: { [weak self] tabId, url, title, isPrivate, fromHistory in
             self?.navigated(tabId: tabId, url: url, title: title, isPrivate: isPrivate, fromHistory: fromHistory)
@@ -1445,6 +1518,7 @@ final class Browser {
             if self?.media[id] != nil { self?.startMediaChecks() }
             self?.mediaLog("tab \(Self.tag(id)) video \(page?.inPictureInPicture == true ? "went into" : "left") Picture in Picture")
         }
+        page.onDownload = { [weak self] download, asked in self?.downloads.start(download, asked: asked) }
         page.onMedia = { [weak self] id, playing, muted, gesture in
             self?.mediaReport(id, playing: playing, muted: muted, gesture: gesture)
         }
@@ -1453,6 +1527,10 @@ final class Browser {
         }
         page.protected = rules.protectionsOn(for: host ?? "")
         page.useRules(blocker.rules)
+        page.onNewWindow = { [weak self] configuration, action in
+            self?.openWindow(from: id, configuration: configuration, for: action)
+        }
+        page.onCloseWindow = { [weak self] in self?.closeWindow(id) }
         // Made while the view is drawn; the bar takes its state after.
         Task { @MainActor [weak self] in self?.refreshState() }
         // A page let go comes back as it was, unless another device has
@@ -1494,6 +1572,11 @@ final class Browser {
     /// private tab leaves the session's ids while its page still reports,
     /// and asking the model then would call it the user's.
     private func navigated(tabId: String, url: URL, title: String, isPrivate: Bool, fromHistory: Bool) {
+        if let opening = windowsOpening[tabId] {
+            guard !opening.adding, AppModel.opensHere(url.absoluteString) else { return }
+            addWindowTab(tabId, url: url)
+            return
+        }
         Task { await model.followNavigation(tabId: tabId, url: url, title: title, isPrivate: isPrivate) }
         // A private tab's pages are never history.
         guard !isPrivate else { return }
@@ -1663,6 +1746,20 @@ final class Page: NSObject, WKNavigationDelegate {
     let isPrivate: Bool
     /// The view's UI delegate, which the view holds weakly.
     private let panels: PagePanels
+    /// Makes the page for a window this page opens, or nil to open none.
+    var onNewWindow: (@MainActor (WKWebViewConfiguration, WKNavigationAction) -> WKWebView?)? {
+        get { panels.onNewWindow }
+        set { panels.onNewWindow = newValue }
+    }
+    /// Told when a load becomes a download, and whether the user asked for
+    /// it: a tap WebKit counts (`WKDownload.isUserInitiated`), or a load
+    /// Sval started, such as a typed address, which WebKit doesn't count.
+    var onDownload: (@MainActor (WKDownload, Bool) -> Void)?
+    /// Told when the page closes its own window.
+    var onCloseWindow: (@MainActor () -> Void)? {
+        get { panels.onClose }
+        set { panels.onClose = newValue }
+    }
     let view: WKWebView
     let tabId: String
     /// The video and audio choice the page was made for. WebKit fixes a
@@ -1810,6 +1907,7 @@ final class Page: NSObject, WKNavigationDelegate {
         visit: Visit? = nil,
         reportsTouch: Bool = false,
         privateStore: WKWebsiteDataStore? = nil,
+        configuration given: WKWebViewConfiguration? = nil,
         scriptAllowed: @escaping @MainActor (WKNavigationAction, WKWebView) -> Bool,
         onNavigate: @escaping @MainActor (String, URL, String, Bool, Bool) -> Void,
         onState: @escaping @MainActor () -> Void,
@@ -1819,7 +1917,17 @@ final class Page: NSObject, WKNavigationDelegate {
         self.media = media
         self.visit = visit
         self.scriptAllowed = scriptAllowed
-        let configuration = WKWebViewConfiguration()
+        let configuration = given ?? WKWebViewConfiguration()
+        // WebKit's configuration for a new window is a copy of the opener's,
+        // which shares its content controller (`API::PageConfiguration::copy`),
+        // and a handler added twice to one controller raises. The page gets
+        // a controller of its own: WebKit checks only that the view is
+        // related to its opener (`UIDelegate::UIClient::createNewPage`).
+        if given != nil {
+            configuration.userContentController = WKUserContentController()
+            configuration.mediaTypesRequiringUserActionForPlayback =
+                WKWebViewConfiguration().mediaTypesRequiringUserActionForPlayback
+        }
         // A private tab keeps cookies, cache and site storage in the
         // session's store, in memory, which WebKit writes nowhere.
         isPrivate = privateStore != nil
@@ -1866,6 +1974,9 @@ final class Page: NSObject, WKNavigationDelegate {
         }
         configuration.userContentController.addUserScript(WKUserScript(
             source: Self.keepPictureInPicture, injectionTime: .atDocumentStart,
+            forMainFrameOnly: false, in: .page))
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.slowFailedFetch, injectionTime: .atDocumentStart,
             forMainFrameOnly: false, in: .page))
         configuration.userContentController.addUserScript(WKUserScript(
             source: BackgroundAudio.visibilityGuard, injectionTime: .atDocumentStart,
@@ -1996,6 +2107,15 @@ final class Page: NSObject, WKNavigationDelegate {
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
     ) {
         preferences.allowsContentJavaScript = scriptAllowed(navigationAction, webView)
+        // `<a download>` and a blob or data link marked to save.
+        if navigationAction.shouldPerformDownload {
+            if appLoading, navigationAction.targetFrame?.isMainFrame == true, navigationAction.navigationType == .other,
+               let url = navigationAction.request.url {
+                askedDownloads.insert(url)
+            }
+            decisionHandler(.download, preferences)
+            return
+        }
         // A link the user follows from a pin to another site leaves the pin,
         // so its icon always says what is behind it (pins spec §5). The
         // pin's own redirects, a login bounce, stay.
@@ -2273,6 +2393,27 @@ final class Page: NSObject, WKNavigationDelegate {
             if (this.webkitPresentationMode === "picture-in-picture") return;
             return exit.apply(this, arguments);
           };
+        })();
+        """
+
+    /// A failed fetch rejects no sooner than 50 ms after the call. WebKit
+    /// rejects a request its content rules block within a millisecond, and
+    /// some sites race on that: Figma's sign-in never draws when its
+    /// blocked report fails that fast. 50 ms held for Figma with every list
+    /// on, and 20 ms did not. A real network failure takes longer, and a
+    /// fetch that answers is untouched. A proxy keeps `fetch` a native
+    /// function to the page.
+    static let slowFailedFetch = """
+        (() => {
+          const least = 50;
+          window.fetch = new Proxy(window.fetch, {
+            apply(target, self, args) {
+              const start = performance.now();
+              return Reflect.apply(target, self, args).catch(error => new Promise((_, reject) => {
+                setTimeout(() => reject(error), Math.max(0, least - (performance.now() - start)));
+              }));
+            },
+          });
         })();
         """
 
@@ -2572,6 +2713,36 @@ final class Page: NSObject, WKNavigationDelegate {
     /// was parsed may have added one since. A page on screen gives the
     /// grid its picture once loaded, a second on so its images have drawn;
     /// a page off screen has drawn nothing new to take.
+    /// A response WebKit can't show, or one the site sends as an attachment,
+    /// is downloaded. A PDF, which WebKit shows, stays in the tab.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                 decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
+        let disposition = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")?.lowercased() ?? ""
+        let attachment = disposition.hasPrefix("attachment")
+        let downloads = !navigationResponse.canShowMIMEType || attachment
+        if downloads, appLoading, navigationResponse.isForMainFrame, let url = navigationResponse.response.url {
+            askedDownloads.insert(url)
+        }
+        decisionHandler(downloads ? .download : .allow)
+    }
+
+    /// The addresses of Sval's own top-frame loads turned into downloads,
+    /// taken as the decision is made: WebKit fails the load before it hands
+    /// over the download, which ends `appLoading`. Each is used once, by
+    /// the download of that same address.
+    private var askedDownloads: Set<URL> = []
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        let asked = navigationAction.request.url.map { askedDownloads.remove($0) != nil } ?? false
+        onDownload?(download, download.isUserInitiated || asked)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        let asked = navigationResponse.response.url.map { askedDownloads.remove($0) != nil } ?? false
+        onDownload?(download, download.isUserInitiated || asked)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !isPrivate { SiteIcons.shared.learn(page: webView.url, named: nil) }
         if Browser.pinParts(tabId) == nil {
@@ -2694,6 +2865,20 @@ final class Page: NSObject, WKNavigationDelegate {
 /// every panel as dismissed, and the page never shows it. A page out of
 /// view gets the answer a dismissed panel gives.
 class PagePanels: NSObject, WKUIDelegate {
+    var onNewWindow: (@MainActor (WKWebViewConfiguration, WKNavigationAction) -> WKWebView?)?
+    var onClose: (@MainActor () -> Void)?
+
+    /// Without this method WebKit opens no page for a link with a target
+    /// or a script's `window.open` (`UIDelegate::UIClient::createNewPage`).
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        onNewWindow?(configuration, navigationAction)
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        onClose?()
+    }
+
     private func present(_ alert: UIAlertController, over webView: WKWebView) -> Bool {
         var controller = webView.window?.rootViewController
         while let next = controller?.presentedViewController { controller = next }

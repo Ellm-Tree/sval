@@ -155,6 +155,11 @@ struct BrowserView: View {
             guard let message else { return }
             notice = Toast(text: message, symbol: "exclamationmark.triangle.fill")
         }
+        .onAppear {
+            browser.downloads.onFailure = { [weak browser] name in
+                browser?.toast = Toast(text: "Couldn’t download “\(name)”", symbol: "exclamationmark.triangle.fill")
+            }
+        }
         .onChange(of: browser.toast?.id) {
             guard let toast = browser.toast else { return }
             notice = toast

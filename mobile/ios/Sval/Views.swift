@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
+import QuickLook
 import SwiftUI
 import WebKit
 
@@ -39,6 +40,10 @@ struct RootView: View {
                     }
             }
         }
+        // A finished download shows in Quick Look over everything, sheets
+        // and setup included (`Downloads.preview`).
+        .quickLookPreview(Binding(get: { model.browser.downloads.preview },
+                                  set: { model.browser.downloads.preview = $0 }))
         // Sval is the default browser: a link another app opens comes here.
         .onOpenURL { url in Task { await model.openIncoming(url) } }
         .environment(\.appearance, systemScheme)

@@ -69,6 +69,10 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # Downloads go to Documents/Downloads (`Downloads.swift`), which the
+        # Files app shows under On My iPhone › Sval with these two.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: app.sval.ios.node
             UTTypeDescription: Sval Workspace row

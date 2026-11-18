@@ -51,6 +51,17 @@ struct BrowserBar: View {
     /// refused it, and nothing of its plays.
     private var asks: Bool { browser.frontAsks && frontMedia == nil }
 
+    /// The capsules above the bar: the download under way, then the ask for
+    /// video and audio, which stays nearest the bar. Each rises by its own
+    /// height and spacing above the one under it.
+    @ViewBuilder private var notices: some View {
+        VStack(spacing: 8) {
+            DownloadCapsule(colors: colors)
+            if asks { MediaAsk(colors: colors) }
+        }
+        .alignmentGuide(.top) { $0[.bottom] - 44 }
+    }
+
     /// Whether the page in front has media to show in the address capsule.
     private var frontMedia: String? {
         guard let id = browser.currentTabId, browser.mediaShown(id) else { return nil }
@@ -73,10 +84,7 @@ struct BrowserBar: View {
                 // Above the full bar and the folded pill alike, and above
                 // another tab's now-playing capsule while that shows.
                 .overlay(alignment: .top) {
-                    if asks {
-                        MediaAsk(colors: colors)
-                            .offset(y: otherMedia != nil && browser.barFold < 1 ? -112 : -52)
-                    }
+                    notices.offset(y: otherMedia != nil && browser.barFold < 1 ? -112 : -52)
                 }
                 .padding(.bottom, 24)
             }
@@ -301,9 +309,7 @@ struct BrowserBar: View {
         }
         .foregroundStyle(colors.ink)
         .overlay(alignment: .top) {
-            if asks {
-                MediaAsk(colors: colors).offset(y: -52)
-            }
+            notices.offset(y: -52)
         }
         // Clear of the screen's rounded corners.
         .padding(.horizontal, 20)

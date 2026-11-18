@@ -1244,12 +1244,14 @@ final class AppModel {
     }
 
     /// Adds a tab for `url` at the end of `parent`, named by its address
-    /// until the page gives it a title, and returns its id.
-    func addTab(to parent: String, url: URL, after previous: String? = nil, before next: String? = nil, name: String? = nil) async -> String? {
+    /// until the page gives it a title, and returns its id: `id` when given,
+    /// for a tab whose page is made ahead of its row.
+    func addTab(to parent: String, url: URL, after previous: String? = nil, before next: String? = nil, name: String? = nil,
+                id given: String? = nil) async -> String? {
         // The phone writes only web addresses into synced data: any other
         // stays on the device it was made on (decision 1372).
         guard Self.opensHere(url.absoluteString) else { return nil }
-        let id = UUID().uuidString.lowercased()
+        let id = given ?? UUID().uuidString.lowercased()
         var op: [String: Any] = [
             "kind": "addTab", "parent": parent, "name": name ?? url.absoluteString,
             "url": url.absoluteString, "id": id,
