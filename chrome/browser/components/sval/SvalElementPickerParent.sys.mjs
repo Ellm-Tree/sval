@@ -76,9 +76,6 @@ function write(text) {
   try {
     SvalBlocking.setMyFilters(text);
   } catch (err) {
-    if (err.message == "too-large") {
-      return { ok: false, error: "too-large" };
-    }
     SvalLog.warn(
       `element picker: writing My filters failed: ${SvalLog.errorName(err)}`
     );

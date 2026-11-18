@@ -26,9 +26,6 @@ const SIBLING_PAGE = `https://test2.example.com${PATH}sval_javascript_page.html`
 const SITE_PAGE = `https://example.com${PATH}sval_javascript_page.html`;
 
 add_setup(async function () {
-  await SpecialPowers.pushPrefEnv({
-    clear: [["browser.sval.adblock.myFilters"]],
-  });
   registerCleanupFunction(() => {
     clearPrefBranches(JS_BRANCH, PROTECTION_BRANCH);
     SvalBlocking.setMyFilters("");

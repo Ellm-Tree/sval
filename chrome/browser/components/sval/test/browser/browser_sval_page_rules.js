@@ -740,9 +740,7 @@ async function listAndOwnDisplays(browser) {
 add_task(async function my_filters_apply_where_the_lists_do_not() {
   SvalBlocking.setListEnabled("sval-easylist", true);
   SvalBlocking.flush();
-  await SpecialPowers.pushPrefEnv({
-    set: [["browser.sval.adblock.myFilters", "example.net###plain"]],
-  });
+  SvalBlocking.setMyFilters("example.net###plain");
   try {
     await untilEachLoad(
       RULES_PAGE,
@@ -771,6 +769,6 @@ add_task(async function my_filters_apply_where_the_lists_do_not() {
       "My filters hiding with ad blocking Off"
     );
   } finally {
-    await SpecialPowers.popPrefEnv();
+    SvalBlocking.setMyFilters("");
   }
 });

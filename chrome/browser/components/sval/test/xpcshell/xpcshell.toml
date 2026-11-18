@@ -209,6 +209,8 @@ run-if = [
 
 ["test_sval_mirror.js"]
 
+["test_sval_my_filters_lines.js"]
+
 # The registry is Windows's.
 ["test_sval_native_manifests_key.js"]
 run-if = ["os == 'win'"]

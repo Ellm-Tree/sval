@@ -8,7 +8,7 @@ const { SvalSettingsRegistry } = ChromeUtils.importESModule(
 );
 
 add_task(function the_list_has_every_synced_pref() {
-  Assert.equal(SvalSettingsRegistry.SYNCED_PREFS.length, 166);
+  Assert.equal(SvalSettingsRegistry.SYNCED_PREFS.length, 165);
 });
 
 // Synced prefs that have no default on the default branch of an xpcshell run.

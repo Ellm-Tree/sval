@@ -135,10 +135,10 @@ Sval's component directory.
   rule. They are separate rules from then on: each is listed, counted and
   removed alone. When the URL cannot make a narrow rule (§8), the save is the
   hiding line alone.
-- **Through My filters.** The lines are appended to `MY_FILTERS_PREF` through
+- **Through My filters.** The lines are appended to My filters through
   `SvalBlocking`, the path the settings field takes, so they sync and reach
-  the engine as an edit there does. An append the pref store refuses
-  (`MAX_PREF_LENGTH`) is reported to the user and nothing is saved.
+  the engine as an edit there does. Each line is a pref of its own
+  (decision 0117), and a picked line is far under the pref store's limit.
 - **The selector is checked in the parent.** It is at most 1024 characters
   (a URL at most 2048). It holds no brace, line break or comment, and the
   CSS parser, run on an element of a document the parent makes, takes it as
@@ -149,9 +149,8 @@ Sval's component directory.
   `hidingSheet` applies) before it asks, and so does the parent.
 - **A refused save shows an error toast.** When the parent refuses a save,
   the toast takes the place of the success toast, with no Undo and the same
-  8-second timer, and the page is left as it is. It says whether My
-  filters is full (the pref store refused the append) or the mode is off
-  here (the picker became unavailable or the selector was refused). The mode
+  8-second timer, and the page is left as it is. It says the mode is off
+  here: the picker became unavailable or the selector was refused. The mode
   ends as it does for a save.
 - **The open page hides it at once.** Page rules load at document start, so
   the child loads the new rule into the open document with `hidingSheet` and

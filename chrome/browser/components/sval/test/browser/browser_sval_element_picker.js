@@ -21,7 +21,7 @@ Services.scriptloader.loadSubScript(
   this
 );
 
-const { SvalBlocking } = ChromeUtils.importESModule(
+const { SvalBlocking, MY_FILTER_BRANCH } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
 );
 const { SvalBlockingLists } = ChromeUtils.importESModule(
@@ -47,8 +47,6 @@ const UNDO = "SvalElementPicker:Undo";
 const HIDE_AD = "example.net##.sval-test-ad";
 const BLOCK_IMAGE = "||example.org/ads/banner.png$domain=example.net";
 const IMAGE_URL = "https://example.org/ads/banner.png?size=2#top";
-// The longest string the pref store takes (`MAX_PREF_LENGTH`).
-const PREF_LIMIT = 1024 * 1024;
 
 /**
  * What the child's messages reach: the tab's parent actor.
@@ -122,10 +120,10 @@ add_setup(async function () {
     set: [...CONTENT_BLOCKING_TEST_PREFS],
     clear: [
       ["browser.sval.adblock.customFrom"],
-      ["browser.sval.adblock.myFilters"],
       ["browser.sval.adblock.myFiltersTrustedHere"],
     ],
   });
+  registerCleanupFunction(() => clearPrefBranches(MY_FILTER_BRANCH));
   await serveLists();
   registerCleanupFunction(async () => {
     SvalBlocking.setLevel("off");
@@ -441,20 +439,6 @@ add_task(async function a_save_needs_the_picker_running_on_that_actor() {
     );
     SvalElementPicker.stop(browser);
     is(filters(), "", "nothing was written");
-  });
-});
-
-add_task(async function a_save_past_the_pref_limit_is_too_large() {
-  await BrowserTestUtils.withNewTab(PICKER_PAGE, async browser => {
-    const full = "!".repeat(PREF_LIMIT - 10);
-    SvalBlocking.setMyFilters(full);
-    Assert.deepEqual(
-      await saveFrom(browser, { selector: ".sval-test-ad" }),
-      { ok: false, error: "too-large" },
-      "the pref store's limit is reported"
-    );
-    is(filters(), full, "nothing changed");
-    SvalBlocking.setMyFilters("");
   });
 });
 
@@ -905,8 +889,13 @@ add_task(
   async function a_refused_save_shows_an_error_toast_and_saves_nothing() {
     await clearingFilters(async () => {
       await BrowserTestUtils.withNewTab(PICKER_PAGE, async browser => {
-        const full = "!".repeat(PREF_LIMIT - 10);
-        SvalBlocking.setMyFilters(full);
+        const store = SvalBlocking.setMyFilters;
+        SvalBlocking.setMyFilters = () => {
+          throw new Error("invalid");
+        };
+        registerCleanupFunction(() => {
+          SvalBlocking.setMyFilters = store;
+        });
         await startPicking(browser);
         await choose(browser, "#ad");
         const ended = within(
@@ -917,7 +906,8 @@ add_task(
         await BrowserTestUtils.synthesizeKey("KEY_Enter", {}, browser);
         const state = await overlayUntil(browser, s => s?.toast, "the toast");
         await ended;
-        is(state.refused, "too-large", "the toast says why");
+        SvalBlocking.setMyFilters = store;
+        is(state.refused, "other", "the toast says why");
         is(state.focused, "dismiss", "focus starts on Dismiss");
         ok(!state.bar && !state.card, "the picker has gone");
         const undo = await SpecialPowers.spawn(
@@ -929,7 +919,7 @@ add_task(
               .overlay.getElementById("undo")
         );
         ok(!undo, "there is no Undo");
-        is(filters(), full, "nothing was saved");
+        is(filters(), "", "nothing was saved");
         is(await displayOf(browser, "ad"), "block", "the element stays");
 
         await clickOverlay(browser, "dismiss");

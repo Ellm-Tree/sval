@@ -21,7 +21,6 @@
   ChromeUtils.defineESModuleGetters(lazy, {
     BLOCKING_TOPIC: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     MY_FILTERS_LIST: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
-    MY_FILTERS_PREF: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     SvalSiteControls:
       "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs",
@@ -1020,26 +1019,17 @@
         els.myFiltersText.value = stored;
         view.mfShown = stored;
       }
-      const unusable = !!(
-        !stored && Services.prefs.getStringPref(lazy.MY_FILTERS_PREF, "")
-      );
-      els.myFiltersNote.dataset.unusable = String(unusable);
       els.myFiltersNote.dataset.changedElsewhere = String(
-        !unusable && bb.myFiltersChangedElsewhere
+        bb.myFiltersChangedElsewhere
       );
-      els.myFiltersNote.textContent = unusable
-        ? "Your saved filters aren't plain text, so Sval isn't using them. Save new ones to replace them."
-        : `${
-            level === "off"
-              ? "Blocking is off, so these have no effect now. "
-              : ""
-          }Write your own rules here, one per line, in uBlock Origin's syntax. Sval uses them with the lists, and they sync like the lists do.${
-            bb.myFiltersChangedElsewhere
-              ? " They changed on another device, so trust them here again to let them run trusted scriptlets."
-              : ""
-          }`;
-      els.myFiltersSave.disabled =
-        els.myFiltersText.value === stored && !unusable;
+      els.myFiltersNote.textContent = `${
+        level === "off" ? "Blocking is off, so these have no effect now. " : ""
+      }Write your own rules here, one per line, in uBlock Origin's syntax. Sval uses them with the lists, and they sync like the lists do.${
+        bb.myFiltersChangedElsewhere
+          ? " They changed on another device, so trust them here again to let them run trusted scriptlets."
+          : ""
+      }`;
+      els.myFiltersSave.disabled = els.myFiltersText.value === stored;
       els.myFiltersTrusted.checked = bb.myFiltersTrusted;
     },
 

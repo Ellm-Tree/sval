@@ -40,6 +40,7 @@ import {
 import { readJSONOrSetAside } from "moz-src:///browser/components/sval/SvalJSONFile.sys.mjs";
 import { sha256HexSync } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
 import { HOST } from "moz-src:///browser/components/sval/SvalElementRules.sys.mjs";
+import { storedText as myFiltersText } from "moz-src:///browser/components/sval/SvalMyFilters.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -85,8 +86,6 @@ export const USER_LIST_BRANCH = "browser.sval.adblock.userList.";
 /** Whether lists download on their schedule. Test harnesses turn it off. */
 export const UPDATES_PREF = "browser.sval.adblock.updates.enabled";
 /** The user's own filter rules, one per line: "My filters". */
-export const MY_FILTERS_PREF = "browser.sval.adblock.myFilters";
-
 export const ALLOWED_DOMAINS_LIST = "sval-allowed-domains";
 export const MY_FILTERS_LIST = "sval-my-filters";
 export const USER_LIST_PREFIX = "sval-user-";
@@ -268,17 +267,13 @@ export function preprocessList(text) {
 }
 
 /**
- * The user's own filter rules as stored, or "" when there are none or they
- * are not plain text. The value syncs, so it is checked here, where it
- * reaches the engine, as an allowed domain is. Its size is bounded by the
- * pref store, which refuses a string past `MAX_PREF_LENGTH`
- * (`nsPrefBranch::CheckSanityOfStringLength`).
+ * The user's own filter rules, a line each (`SvalMyFilters`). They sync, so
+ * each line is checked where it is read, as an allowed domain is.
  *
  * @returns {string}
  */
 export function myFilters() {
-  const text = Services.prefs.getStringPref(MY_FILTERS_PREF, "");
-  return isPlainText(text) ? text : "";
+  return myFiltersText();
 }
 
 /**
@@ -1120,7 +1115,7 @@ class ListLoader {
   /**
    * Has the engine read the user's own rules again, for an edit that leaves
    * the engine's list ids as they were. `SvalBlocking` alone follows
-   * `MY_FILTERS_PREF`, because an edit that adds or removes the list changes
+   * `MY_FILTER_BRANCH`, because an edit that adds or removes the list changes
    * those ids, and that change rebuilds the engine by itself.
    */
   myFiltersChanged() {
@@ -1185,9 +1180,6 @@ class ListLoader {
     }
     if (id == MY_FILTERS_LIST) {
       const text = myFilters();
-      if (!text && Services.prefs.getStringPref(MY_FILTERS_PREF, "")) {
-        SvalLog.warn("my filters are not plain text and are not used");
-      }
       Services.obs.notifyObservers(null, "sval-blocking-list-served", id);
       return new TextEncoder().encode(preprocessList(text));
     }

@@ -115,7 +115,6 @@ const SNIP_COPY = {
 
 const SNIPPED = "Snipped. Reload brings it back.";
 const SAVE_REFUSED = {
-  "too-large": "Couldn't save. My filters is full.",
   other: "Remove from this site is off here.",
 };
 
@@ -1071,9 +1070,7 @@ class PickerOverlay {
     }
     if (!answer?.ok) {
       SvalLog.warn(`element picker: the save was refused: ${answer?.error}`);
-      this.#showRefusal(
-        Object.hasOwn(SAVE_REFUSED, answer?.error) ? answer.error : "other"
-      );
+      this.#showRefusal("other");
       return;
     }
     // The parent ended the mode with the save; the toast stays for Undo.

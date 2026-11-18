@@ -136,3 +136,41 @@ final class PageRuleListsTests: XCTestCase {
         XCTAssertEqual(installed(protected: rules.protectionsOn(for: "example.org")), ["level-1", "level-2", "scripts"])
     }
 }
+
+/// My filters as the desktop syncs them, a setting per line
+/// (`SvalMyFilters.sys.mjs`).
+final class MyFiltersTests: XCTestCase {
+    private func line(_ text: String, _ order: String) -> String {
+        String(decoding: try! JSONSerialization.data(withJSONObject: ["line": text, "order": order]), as: UTF8.self)
+    }
+
+    func testLinesReadInOrderAsOneText() {
+        let settings: [String: Any] = [
+            MyFilters.branch + "c": line("third", "r"),
+            MyFilters.branch + "a": line("first", "9"),
+            MyFilters.branch + "b": line("", "i"),
+            "browser.sval.adblock.level": "strict",
+        ]
+        XCTAssertEqual(MyFilters.text(settings: settings), "first\n\nthird")
+    }
+
+    func testLinesOfOneOrderSortByKey() {
+        let settings: [String: Any] = [
+            MyFilters.branch + "b": line("second", "i"),
+            MyFilters.branch + "a": line("first", "i"),
+        ]
+        XCTAssertEqual(MyFilters.text(settings: settings), "first\nsecond")
+    }
+
+    func testAValueThatIsNotALineIsLeftOut() {
+        let settings: [String: Any] = [
+            MyFilters.branch + "0": line("kept", "i"),
+            MyFilters.branch + "1": "not json",
+            MyFilters.branch + "2": line("two\nlines", "i"),
+            MyFilters.branch + "3": line("control\u{1}", "i"),
+            MyFilters.branch + "4": line("ends in zero", "i0"),
+            MyFilters.branch + "5": 42,
+        ]
+        XCTAssertEqual(MyFilters.text(settings: settings), "kept")
+    }
+}

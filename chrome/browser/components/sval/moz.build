@@ -136,6 +136,7 @@ MOZ_SRC_FILES += [
     "SvalMacWindowOrder.sys.mjs",
     "SvalMenuBar.sys.mjs",
     "SvalMirror.sys.mjs",
+    "SvalMyFilters.sys.mjs",
     "SvalNewWorkspace.sys.mjs",
     "SvalNoticesButton.sys.mjs",
     "SvalPageRules.sys.mjs",

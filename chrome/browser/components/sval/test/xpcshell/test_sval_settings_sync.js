@@ -28,10 +28,14 @@ const { SITE_BRANCH: EXTENSION_SITE_BRANCH } = ChromeUtils.importESModule(
 const { SITE_BRANCH: JAVASCRIPT_BRANCH } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalJavascript.sys.mjs"
 );
-const { ALLOWED_DOMAIN_BRANCH, CUSTOM_LIST_BRANCH, USER_LIST_BRANCH } =
-  ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
-  );
+const {
+  ALLOWED_DOMAIN_BRANCH,
+  CUSTOM_LIST_BRANCH,
+  MY_FILTER_BRANCH,
+  USER_LIST_BRANCH,
+} = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
+);
 
 const { waitForCondition, within } = ChromeUtils.importESModule(
   "resource://testing-common/SvalTestWait.sys.mjs"
@@ -1070,6 +1074,16 @@ const ENTRY_CHOICES = [
     [
       USER_LIST_BRANCH + "sval-user-0002",
       JSON.stringify({ url: "https://lists.example.org/b.txt" }),
+    ],
+  ],
+  [
+    [
+      MY_FILTER_BRANCH + "0a",
+      JSON.stringify({ line: "a.com##.x", order: "i" }),
+    ],
+    [
+      MY_FILTER_BRANCH + "0b",
+      JSON.stringify({ line: "b.com##.y", order: "r" }),
     ],
   ],
 ];

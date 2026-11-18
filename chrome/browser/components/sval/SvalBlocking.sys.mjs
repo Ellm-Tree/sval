@@ -10,8 +10,8 @@
  * `CUSTOM_LIST_BRANCH`, which may hold lists they added,
  * `USER_LIST_BRANCH`. Any edit to the lists switches to Custom, starting from
  * the lists the level had. The allowed domains, `ALLOWED_DOMAIN_BRANCH`, are
- * excepted on every site at every level. The user's own rules,
- * `browser.sval.adblock.myFilters`, are one more list beside the level's at
+ * excepted on every site at every level. The user's own rules, a pref per
+ * line under `MY_FILTER_BRANCH` (`SvalMyFilters`), are one more list beside the level's at
  * every level but Off. The `my-filters` engine holds them alone at every
  * level and serves only page rules, for the pages the lists' rules skip
  * (decision 1993). All of these sync (settings-sync spec), each entry of a
@@ -64,7 +64,6 @@ import {
   isTrue,
   myFilters,
   MY_FILTERS_LIST,
-  MY_FILTERS_PREF,
   storeUserList,
   TRUSTED_HERE_PREF,
   TRUSTED_LISTS_PREF,
@@ -73,6 +72,11 @@ import {
   userLists,
 } from "moz-src:///browser/components/sval/SvalBlockingLists.sys.mjs";
 import { sha256HexSync } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
+import {
+  MY_FILTER_BRANCH,
+  moveText,
+  store as storeMyFilters,
+} from "moz-src:///browser/components/sval/SvalMyFilters.sys.mjs";
 
 export const LEVEL_PREF = "browser.sval.adblock.level";
 /** Custom's lists: a pref each, this branch and the list's id, `true`. */
@@ -92,8 +96,8 @@ const TRUSTED_LIST_PREFIX = "sval-ublock-";
 export {
   ALLOWED_DOMAIN_BRANCH,
   BLOCKING_TOPIC,
+  MY_FILTER_BRANCH,
   MY_FILTERS_LIST,
-  MY_FILTERS_PREF,
   USER_LIST_BRANCH,
 };
 
@@ -186,7 +190,7 @@ const OBSERVED_PREFS = [
   ...LIST_BRANCHES,
   ALLOWED_DOMAIN_BRANCH,
   TRUSTED_SCRIPTLETS_PREF,
-  MY_FILTERS_PREF,
+  MY_FILTER_BRANCH,
   MY_FILTERS_TRUSTED_PREF,
   TRUSTED_HERE_PREF,
 ];
@@ -289,6 +293,7 @@ export const SvalBlocking = {
       return;
     }
     initialized = true;
+    this._moveMyFilters();
     for (const pref of OBSERVED_PREFS) {
       Services.prefs.addObserver(pref, this);
     }
@@ -328,9 +333,8 @@ export const SvalBlocking = {
       this._applySoon();
       return;
     }
-    if (data == MY_FILTERS_PREF) {
-      this._myFiltersEdit(() => this.apply());
-      changed();
+    if (data.startsWith(MY_FILTER_BRANCH)) {
+      this._myFiltersSoon();
       return;
     }
     if (!data.startsWith(ALLOWED_DOMAIN_BRANCH)) {
@@ -355,6 +359,37 @@ export const SvalBlocking = {
       after.join(",") == before.join(",")
     ) {
       SvalBlockingLists.myFiltersChanged();
+    }
+  },
+
+  _myFiltersPending: false,
+
+  /**
+   * Applies once for all the lines of My filters that changed in one turn,
+   * as a sync pass or another device's edit changes several at once.
+   */
+  _myFiltersSoon() {
+    if (this._myFiltersPending) {
+      return;
+    }
+    this._myFiltersPending = true;
+    Promise.resolve().then(() => {
+      this._myFiltersPending = false;
+      this._myFiltersEdit(() => this.apply());
+      changed();
+    });
+  },
+
+  /**
+   * Moves rules a profile holds as one text into a pref per line
+   * (`SvalMyFilters.moveText`). Rules moved alone read as the same text, so
+   * trust given here to the text holds for them.
+   */
+  _moveMyFilters() {
+    try {
+      moveText();
+    } catch (err) {
+      SvalLog.warn(`could not move my filters: ${SvalLog.errorName(err)}`);
     }
   },
 
@@ -591,7 +626,7 @@ export const SvalBlocking = {
    *
    * @param {string} text One rule per line.
    * @throws {Error} "invalid" for text that is not plain text, "too-large"
-   *   for text the pref store refuses.
+   *   for a line the pref store refuses.
    */
   setMyFilters(text) {
     if (!isPlainText(text)) {
@@ -602,14 +637,10 @@ export const SvalBlocking = {
     const trusted = this.myFiltersTrusted;
     this._myFiltersEdit(() =>
       this.batch(() => {
-        if (!text.trim()) {
-          Services.prefs.clearUserPref(MY_FILTERS_PREF);
-        } else {
-          try {
-            Services.prefs.setStringPref(MY_FILTERS_PREF, text);
-          } catch {
-            throw new Error("too-large");
-          }
+        try {
+          storeMyFilters(text.trim() ? text : "");
+        } catch {
+          throw new Error("too-large");
         }
         if (trusted) {
           Services.prefs.setStringPref(

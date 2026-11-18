@@ -3,6 +3,7 @@
 
 import {
   ALLOWED_DOMAIN_BRANCH,
+  MY_FILTER_BRANCH,
   CUSTOM_LIST_BRANCH,
   SYNC_RULES as BLOCKING_RULES,
   USER_LIST_BRANCH,
@@ -151,6 +152,7 @@ export const SvalSettingsRegistry = Object.freeze({
     JAVASCRIPT_BRANCH,
     PROTECTION_BRANCH,
     EXTENSION_SITE_BRANCH,
+    MY_FILTER_BRANCH,
   ]),
 
   SYNCED_PREFS: Object.freeze([
@@ -161,7 +163,6 @@ export const SvalSettingsRegistry = Object.freeze({
       "accessibility.typeaheadfind.linksonly",
       "browser.sval.adblock.customFrom",
       "browser.sval.adblock.level",
-      "browser.sval.adblock.myFilters",
       "browser.sval.adblock.pageRules",
       "browser.sval.breachWarnings",
       "browser.sval.card",

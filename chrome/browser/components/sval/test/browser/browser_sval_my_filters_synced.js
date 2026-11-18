@@ -7,10 +7,11 @@
 /* import-globals-from sval_preferences_helpers.js */
 /* import-globals-from sval_blocking_helpers.js */
 
-// My filters as they arrive from another device, through settings sync: rules
-// another device writes run no trusted scriptlet until the user trusts them on
-// this device, even while the question is open, and a value that is too large
-// or not plain text is refused.
+// My filters as they arrive from another device, through settings sync: lines
+// changed on two devices are all kept, rules another device writes run no
+// trusted scriptlet until the user trusts them on this device, even while the
+// question is open, and a line that is too large or not plain text is
+// refused.
 // The uBlock Origin files are stand-ins written for the test
 // (`TRUSTED_PROBE_FILES`).
 
@@ -23,7 +24,7 @@ Services.scriptloader.loadSubScript(
   this
 );
 
-const { SvalBlocking, CUSTOM_LIST_BRANCH, MY_FILTERS_PREF } =
+const { SvalBlocking, CUSTOM_LIST_BRANCH, MY_FILTER_BRANCH } =
   ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
   );
@@ -32,6 +33,9 @@ const { SvalBlockingLists } = ChromeUtils.importESModule(
 );
 const { SvalScriptlets } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalScriptlets.sys.mjs"
+);
+const { lineKey, lines, orderBetween } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalMyFilters.sys.mjs"
 );
 
 const MY_FILTERS = "sval-my-filters";
@@ -44,6 +48,32 @@ const AD_URL =
 const BLOCK = "||example.org^";
 const HIDE = "example.net##.sval-test-specific";
 const TRUSTED = "example.net##+js(trusted-sval-probe, svalMineProbe)";
+
+/**
+ * The setting another device writes to add `line` after the last line.
+ *
+ * @param {string} line
+ * @returns {object} `{ pref: value }`, as `syncedSettings` applies it.
+ */
+function lineAdded(line) {
+  const last = lines().at(-1)?.order ?? "";
+  return {
+    [MY_FILTER_BRANCH + lineKey(line, 0)]: JSON.stringify({
+      line,
+      order: orderBetween(last, null),
+    }),
+  };
+}
+
+/**
+ * The setting another device writes to remove the first line of `line`.
+ *
+ * @param {string} line
+ * @returns {object} As `lineAdded` returns.
+ */
+function lineRemoved(line) {
+  return { [MY_FILTER_BRANCH + lineKey(line, 0)]: null };
+}
 
 /**
  * What the user's rules did on a page.
@@ -120,10 +150,10 @@ add_setup(async function () {
     clear: [
       ["browser.sval.adblock.customFrom"],
       ["browser.sval.adblock.trustedScriptlets"],
-      ["browser.sval.adblock.myFilters"],
       ["browser.sval.adblock.myFiltersTrustedHere"],
     ],
   });
+  registerCleanupFunction(() => clearPrefBranches(MY_FILTER_BRANCH));
   clearPrefBranches(CUSTOM_LIST_BRANCH);
   await serveLists();
   await serveUboFiles(TRUSTED_PROBE_FILES);
@@ -147,6 +177,20 @@ add_setup(async function () {
   await listsInForce();
 });
 
+add_task(async function lines_changed_on_two_devices_are_all_kept() {
+  SvalBlocking.setMyFilters(`${BLOCK}\n! one\n! two`);
+  const apply = await syncedSettings({ branches: [MY_FILTER_BRANCH] });
+  // Each device changes a different line before the next pass.
+  SvalBlocking.setMyFilters(`${BLOCK}\n! one\n! two, edited here`);
+  await apply({ ...lineRemoved("! one"), ...lineAdded("! three") });
+  is(
+    SvalBlocking.myFilters,
+    `${BLOCK}\n! two, edited here\n! three`,
+    "both devices' changes hold"
+  );
+  SvalBlocking.setMyFilters("");
+});
+
 add_task(async function rules_another_device_writes_wait_for_trust_here() {
   SvalBlocking.setMyFilters(`${BLOCK}\n${HIDE}\n${TRUSTED}\n`);
   await BrowserTestUtils.withNewTab(REQUEST_PAGE, browser =>
@@ -156,10 +200,8 @@ add_task(async function rules_another_device_writes_wait_for_trust_here() {
   SvalBlocking.flush();
   await untilTrustedRuns(true);
 
-  const apply = await syncedSettings({ keys: [MY_FILTERS_PREF] });
-  await apply({
-    [MY_FILTERS_PREF]: `${BLOCK}\n${HIDE}\n${TRUSTED}\n! changed elsewhere\n`,
-  });
+  const apply = await syncedSettings({ branches: [MY_FILTER_BRANCH] });
+  await apply(lineAdded("! changed elsewhere"));
   await untilTrustedRuns(false);
 
   const ui = await openBlocking();
@@ -175,9 +217,7 @@ add_task(async function rules_another_device_writes_wait_for_trust_here() {
   await TestUtils.waitForCondition(() => dialog.open, "the dialog opens");
 
   // Another device changes them while the question is open.
-  await apply({
-    [MY_FILTERS_PREF]: `${BLOCK}\n${HIDE}\n${TRUSTED}\n! changed again\n`,
-  });
+  await apply(lineAdded("! changed again"));
   ui.byId("sval-blocking-dialog-confirm").click();
   ok(dialog.open, "a yes to rules that changed since asks again");
   is(dialog.dataset.confirm, "trust-changed", "and says why");
@@ -189,30 +229,27 @@ add_task(async function rules_another_device_writes_wait_for_trust_here() {
   await untilTrustedRuns(true);
 });
 
-add_task(async function bad_synced_rules_are_refused() {
-  const apply = await syncedSettings({ keys: [MY_FILTERS_PREF] });
+add_task(async function bad_synced_lines_are_refused() {
+  SvalBlocking.setMyFilters(HIDE);
+  const apply = await syncedSettings({ branches: [MY_FILTER_BRANCH] });
   const before = SvalBlocking.myFilters;
 
-  await apply({ [MY_FILTERS_PREF]: `${BLOCK}\n${"!".repeat(1024 * 1024)}` });
-  is(SvalBlocking.myFilters, before, "an oversized value is not stored");
+  await apply(lineAdded("!".repeat(1024 * 1024)));
+  is(SvalBlocking.myFilters, before, "an oversized line is not stored");
 
-  await apply({ [MY_FILTERS_PREF]: 42 });
+  await apply({ [MY_FILTER_BRANCH + lineKey(BLOCK, 0)]: 42 });
   is(SvalBlocking.myFilters, before, "nor is a value that is not text");
 
-  await apply({ [MY_FILTERS_PREF]: `${HIDE}\u0001` });
-  is(SvalBlocking.myFilters, "", "text with a control character is not used");
+  await apply({ [MY_FILTER_BRANCH + lineKey(BLOCK, 0)]: "not a line" });
+  is(SvalBlocking.myFilters, before, "nor is text that is not a line");
+
+  await apply(lineAdded(`${BLOCK}\u0001`));
+  is(SvalBlocking.myFilters, before, "a control character is not used");
   await untilEachLoad(
     RULES_PAGE,
     rulesOn,
-    { blocked: false, hidden: false },
+    { blocked: false, hidden: true },
     "and the engine has none of it"
   );
-
-  const ui = await openBlocking();
-  is(
-    ui.byId("sval-my-filters-note").dataset.unusable,
-    "true",
-    "settings says why they are not used"
-  );
-  BrowserTestUtils.removeTab(ui.tab);
+  SvalBlocking.setMyFilters("");
 });

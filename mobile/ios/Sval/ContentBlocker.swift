@@ -72,7 +72,6 @@ final class ContentBlocker {
 
     static let levelKey = "browser.sval.adblock.level"
     static let pageRulesKey = "browser.sval.adblock.pageRules"
-    static let myFiltersKey = "browser.sval.adblock.myFilters"
     static let allowedBranch = "browser.sval.adblock.allowedDomain."
 
     /// How long a downloaded list is used before it is fetched again.
@@ -114,7 +113,7 @@ final class ContentBlocker {
         }
         let pageRules = (settings[Self.pageRulesKey] as? Bool ?? true)
             && !LaunchOption.given("-svalNoPageRules")
-        let myFilters = settings[Self.myFiltersKey] as? String ?? ""
+        let myFilters = MyFilters.text(settings: settings)
         let allowed = settings
             .filter { $0.key.hasPrefix(Self.allowedBranch) && ($0.value as? Bool) == true }
             .map { String($0.key.dropFirst(Self.allowedBranch.count)) }

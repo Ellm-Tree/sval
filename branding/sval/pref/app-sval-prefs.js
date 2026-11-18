@@ -141,10 +141,9 @@ pref("browser.sval.adblock.pageRules", true);
 // them: uBlock Origin's own and the added lists the user trusts. Local: trust
 // is given on each device (SvalBlocking).
 pref("browser.sval.adblock.trustedScriptlets", true);
-// The user's own filter rules, one per line ("My filters"), which sync, and
-// the SHA-256 of the rules the user trusted on this device to run trusted
-// scriptlets, which is local (SvalBlocking).
-pref("browser.sval.adblock.myFilters", "");
+// The SHA-256 of the user's own filter rules ("My filters") as they trusted
+// them on this device to run trusted scriptlets, which is local
+// (SvalBlocking).
 pref("browser.sval.adblock.myFiltersTrustedHere", "");
 // Which buttons are pinned in the site controls, a JSON array of
 // "javascript", "remove" (Remove from this site) and "snip" (Snip).

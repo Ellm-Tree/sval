@@ -103,8 +103,9 @@ Facts from the tree pinned in `sval/upstream.txt` (153.5.0esr, `0bfb786f`).
   blocked, anywhere: a request to them is let through on every site, at every
   level. This differs from the protection button's site exception, which
   turns protections off for the site being visited.
-- **My filters.** The user's own rules, `browser.sval.adblock.myFilters`, are
-  one more list beside the level's at every level but Off.
+- **My filters.** The user's own rules, a pref per line under
+  `browser.sval.adblock.myFilter.` (decision 0117), are one more list beside
+  the level's at every level but Off.
 
 ### 1.3 Ad-blocking levels
 

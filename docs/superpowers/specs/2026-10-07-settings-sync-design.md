@@ -176,6 +176,7 @@ branch, and `SvalSettingsRegistry.SYNCED_BRANCHES` lists the branches:
 | `browser.sval.adblock.userList.` | list the user added, by id | `{url, category}` as JSON, with `trusted`, which takes effect on a device once its user trusts the list there (design spec §10.3) |
 | `browser.sval.adblock.allowedDomain.` | allowed domain | `true` |
 | `browser.sval.extensions.offOn.` | site | the ids of the extensions off there, sorted (extension controls spec, Part 2) |
+| `browser.sval.adblock.myFilter.` | line of My filters, by its key | `{line, order}` as JSON (§4.5) |
 
 - **The key is the pref's name**, so `setting_id` gives every device the same
   node for the same entry.
@@ -190,6 +191,30 @@ branch, and `SvalSettingsRegistry.SYNCED_BRANCHES` lists the branches:
 
 A new list-shaped setting is a branch added to `SYNCED_BRANCHES`, never a JSON
 pref in the §5 list.
+
+### 4.5 My filters, a line each
+
+My filters is text the user edits as a whole, and syncs a line at a time
+(decision 0117). `SvalMyFilters.sys.mjs` keeps it, and the iPhone reads it
+by the same rules (`MyFilters.swift`).
+
+- **A line's key** is the first 32 hex digits of the SHA-256 of its text, a
+  line break, and how many lines of the same text come before it. Devices
+  that add the same line write the same setting, and a line repeated in the
+  text keeps every copy.
+- **A line's order** is a string of the digits `0`-`9` and `a`-`z` that never
+  ends in `0`, read as a base-36 fraction. Lines sort by order, then by key,
+  both compared as bytes. A new line takes an order between its neighbours'.
+- **An edit writes only what changed.** A line of the new text takes the
+  first stored line of the same text not yet taken. The taken lines whose
+  orders still rise keep them; every other line is written with an order
+  between its neighbours, and a stored line not taken is cleared. An edited
+  line is a removal and an addition, so it never competes with another
+  device's edit to a different line.
+- **A value that is not a line** (not JSON, a line break or control
+  character in the line, or an order that breaks the rule above) is left out
+  where the lines are read, so a bad value from another device never reaches
+  the engine.
 
 ## 5. The synced pref list
 

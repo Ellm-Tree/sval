@@ -14,7 +14,7 @@ Services.scriptloader.loadSubScript(
   this
 );
 
-const { SvalBlocking } = ChromeUtils.importESModule(
+const { SvalBlocking, MY_FILTER_BRANCH } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
 );
 
@@ -58,9 +58,9 @@ add_setup(async function () {
     clear: [
       ["browser.sval.adblock.level"],
       ["browser.sval.adblock.customFrom"],
-      ["browser.sval.adblock.myFilters"],
     ],
   });
+  registerCleanupFunction(() => clearPrefBranches(MY_FILTER_BRANCH));
   registerCleanupFunction(() => {
     SvalBlocking.setMyFilters("");
     SvalBlocking.setLevel("balanced");
