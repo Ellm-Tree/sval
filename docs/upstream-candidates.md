@@ -151,6 +151,19 @@ Each entry gives:
   fail without the patch.
 - **Upstream**: one bug, with the patch as it is. Not submitted.
 
+### The query stripping list service misses a pref change during its init
+
+- **Patch**: `patches/qps-observe-prefs-before-reading.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `URLQueryStrippingListService.#init` reads
+  `privacy.query_stripping.strip_list` and `allow_list`, then awaits
+  `_notifyStripOnShareObservers`, which awaits the strip-on-share list, and
+  only then adds its pref observers. A change in that gap is never seen, so
+  loads keep the old strip list until the pref changes again. The fix adds
+  the observers before the reads.
+- **Evidence**: `the_levels_lists_add_their_parameters` in
+  `browser_sval_blocking_query_stripping.js` failed on a load that kept a
+  downloaded list's parameter.
 ### PageThumbUtils logs an error for a page that has gone
 
 - **Patch**: `patches/page-thumbs-closed-page-quiet.patch`

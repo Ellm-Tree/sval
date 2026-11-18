@@ -1,0 +1,34 @@
+Sval: the query stripping list service observes its prefs before reading them
+
+#init read the strip and allow list prefs, then awaited the
+strip-on-share list, and only then added its pref observers. A change
+in that gap was never seen, and the strip list missed it until the next
+change. Sval's blocking lists set the strip list's default as they
+download, which can land just after stripping turns on.
+
+diff --git a/toolkit/components/antitracking/URLQueryStrippingListService.sys.mjs b/toolkit/components/antitracking/URLQueryStrippingListService.sys.mjs
+index 0b62de5190..24622dd0a2 100644
+--- a/toolkit/components/antitracking/URLQueryStrippingListService.sys.mjs
++++ b/toolkit/components/antitracking/URLQueryStrippingListService.sys.mjs
+@@ -194,6 +194,11 @@ export class URLQueryStrippingListService {
+       this._onRemoteSettingsUpdate(data);
+     }
+ 
++    // Observe before reading, so a change while the reads await the
++    // strip-on-share list is not missed.
++    Services.prefs.addObserver(PREF_STRIP_LIST_NAME, this);
++    Services.prefs.addObserver(PREF_ALLOW_LIST_NAME, this);
++
+     // Get the list from pref.
+     await this._onPrefUpdate(
+       PREF_STRIP_LIST_NAME,
+@@ -204,9 +209,6 @@ export class URLQueryStrippingListService {
+       Services.prefs.getStringPref(PREF_ALLOW_LIST_NAME, "")
+     );
+ 
+-    Services.prefs.addObserver(PREF_STRIP_LIST_NAME, this);
+-    Services.prefs.addObserver(PREF_ALLOW_LIST_NAME, this);
+-
+     Services.obs.addObserver(this, "xpcom-shutdown");
+ 
+     this.#initResolver();
