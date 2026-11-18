@@ -319,7 +319,7 @@ export const COMMANDS = [
     // forward (`_showWorkspace`).
     each: win =>
       userPanel(win)
-        ._switcherList()
+        .switcherList()
         .filter(item => !item.agent && !item.current)
         .map(item => ({
           id: item.id,
@@ -327,7 +327,7 @@ export const COMMANDS = [
         })),
     shiftWindow: true,
     run: (win, choice, _text, { shift }) =>
-      win.SvalPanel._pickWorkspace(choice.id, shift),
+      win.SvalPanel.pickWorkspace(choice.id, shift),
   },
   {
     id: "new-workspace",
@@ -361,7 +361,7 @@ export const COMMANDS = [
     // named with what was typed (launcher design, "A command that picks").
     choices: win => [
       ...userPanel(win)
-        ._switcherList()
+        .switcherList()
         .filter(item => !item.agent)
         .map(item => ({
           id: item.id,

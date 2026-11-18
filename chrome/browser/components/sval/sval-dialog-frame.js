@@ -113,10 +113,10 @@
       ? frame.documentGlobal.SvalPanel
       : null;
     windowColor = panel?.windowColor ?? null;
-    windowTransparency = panel?._windowLook?.transparency ?? 0;
+    windowTransparency = panel?.windowLook?.transparency ?? 0;
     // Whether the window can see through, whatever it shows now, so a
     // Workspace's dialog previews a transparency on a window that is solid.
-    windowSeeThrough = frame?.documentGlobal.SvalPanel?._seeThrough() ?? null;
+    windowSeeThrough = frame?.documentGlobal.SvalPanel?.seeThrough() ?? null;
     paintTint();
     const { shapeDialogBox } = ChromeUtils.importESModule(
       "moz-src:///browser/components/sval/SvalDialogBox.sys.mjs"

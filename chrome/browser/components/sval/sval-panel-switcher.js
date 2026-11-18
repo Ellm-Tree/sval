@@ -247,7 +247,7 @@
         );
         tile.style.setProperty(
           "--sval-switcher-fill",
-          SvalColor.css(this._windowLook.tint)
+          SvalColor.css(this.windowLook.tint)
         );
       } else {
         switcher.removeAttribute("data-sval-color");
@@ -421,7 +421,7 @@
       // The window's own workspace keeps its place, so the list reads the same
       // from every window and in the order a swipe goes ({@link
       // _stepWorkspace}).
-      const items = this._switcherList();
+      const items = this.switcherList();
       menu.textContent = "";
       for (const item of items.filter(entry => this._usersOwn(entry))) {
         const el = this._workspaceEntry(item);
@@ -551,9 +551,9 @@
       if (menu.state !== "open" && menu.state !== "showing") {
         return;
       }
-      const items = this._switcherList();
+      const items = this.switcherList();
       const wanted = items.map(
-        item => `${item.id}\t${this._switcherItemLabel(item)}\t${item.current}`
+        item => `${item.id}\t${this.switcherItemLabel(item)}\t${item.current}`
       );
       const drawn = Array.from(
         menu.querySelectorAll("[data-workspace-id]"),
@@ -641,7 +641,7 @@
      *
      * @returns {object[]} `SvalPanelModel.switcherItems` entries.
      */
-    _switcherList() {
+    switcherList() {
       const items = this._modules.SvalPanelModel.switcherItems(
         this._nodes,
         this._currentWorkspaceId,
@@ -771,7 +771,7 @@
       // What {@link _refillOpenSwitcher} compares. An agent's entry is
       // labelled with its last use too ({@link _labelAgentEntry}), which
       // changes as time passes.
-      el.dataset.entryName = this._switcherItemLabel(item);
+      el.dataset.entryName = this.switcherItemLabel(item);
       // The emoji leads the label as it leads the switcher's own name, so an
       // entry reads, and is announced, as the button does once chosen.
       this._labelWorkspaceEntry(el, item);
@@ -1019,7 +1019,7 @@
      * @param {object} item
      * @returns {string}
      */
-    _switcherItemLabel(item) {
+    switcherItemLabel(item) {
       const name = this.workspaceName(item);
       return item.emoji && !item.agent ? `${item.emoji} ${name}` : name;
     },
@@ -1039,7 +1039,7 @@
     },
 
     /**
-     * Labels a workspace's menu entry ({@link _switcherItemLabel}), keyed by
+     * Labels a workspace's menu entry ({@link switcherItemLabel}), keyed by
      * its name, which is what type-ahead finds it by.
      *
      * @param {Element} el A `menuitem`.
@@ -1048,7 +1048,7 @@
     _labelWorkspaceEntry(el, item) {
       this._labelMenuEntry(
         el,
-        this._switcherItemLabel(item),
+        this.switcherItemLabel(item),
         this.workspaceName(item)
       );
     },
@@ -1184,7 +1184,7 @@
         return;
       }
       if (workspaceId) {
-        this._pickWorkspace(workspaceId, event.shiftKey);
+        this.pickWorkspace(workspaceId, event.shiftKey);
       }
     },
 
@@ -1220,7 +1220,7 @@
         return;
       }
       this._els.switcherMenu.hidePopup();
-      this._pickWorkspace(el.dataset.workspaceId, event.shiftKey);
+      this.pickWorkspace(el.dataset.workspaceId, event.shiftKey);
     },
 
     /**
@@ -1253,7 +1253,7 @@
       event.preventDefault();
       event.stopPropagation();
       menu.hidePopup();
-      this._pickWorkspace(el.dataset.workspaceId, event.shiftKey);
+      this.pickWorkspace(el.dataset.workspaceId, event.shiftKey);
     },
 
     /**
@@ -1264,7 +1264,7 @@
      * @param {boolean} inNewWindow
      * @returns {Promise<void>} settled once the switch has run.
      */
-    _pickWorkspace(id, inNewWindow) {
+    pickWorkspace(id, inNewWindow) {
       if (this._inMemory) {
         return Promise.resolve();
       }
@@ -1401,7 +1401,7 @@
      * Moves the window `step` places along the switcher's list of the user's
      * own workspaces, through the switcher's own switch, wrapping from either
      * end to the other. The devices' and the agents' workspaces are lists of
-     * their own in the switcher ({@link _switcherList}), and one an agent
+     * their own in the switcher ({@link switcherList}), and one an agent
      * controls lays its overlay
      * over the whole window, panel included (`SvalAgentMarking`), so a swipe
      * into it could not swipe back out.
@@ -1414,7 +1414,7 @@
      * @param {number} step 1 for the next workspace, -1 for the previous.
      */
     _stepWorkspace(step) {
-      const items = this._switcherList().filter(item => this._usersOwn(item));
+      const items = this.switcherList().filter(item => this._usersOwn(item));
       const here = items.findIndex(item => item.current);
       const next =
         here === -1 ? null : items[(here + step + items.length) % items.length];
@@ -1426,7 +1426,7 @@
           .get(next.id)
           ?.SvalPanel?.catchSwipe(step);
       }
-      this._pickWorkspace(next.id, false);
+      this.pickWorkspace(next.id, false);
     },
 
     /**
@@ -1436,7 +1436,7 @@
      * @returns {string[]}
      */
     _workspaceOrder() {
-      return this._switcherList()
+      return this.switcherList()
         .filter(item => this._usersOwn(item))
         .map(item => item.id);
     },

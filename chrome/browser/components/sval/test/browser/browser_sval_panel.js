@@ -23,7 +23,7 @@ Services.scriptloader.loadSubScript(
 
 /**
  * A nameless tab row draws its address, or for a blank page the new tab
- * placeholder (`SvalPanel._tabPlaceholder` says why). Workspaces and groups
+ * placeholder (`SvalPanel.tabPlaceholder` says why). Workspaces and groups
  * keep their placeholders.
  */
 add_task(async function a_nameless_tab_row_draws_its_address() {
@@ -84,12 +84,12 @@ add_task(async function a_nameless_tab_row_draws_its_address() {
   );
   Assert.equal(
     label(nameless.blank),
-    SvalPanel._tabPlaceholder(null),
+    SvalPanel.tabPlaceholder(null),
     "and a genuinely blank page is a new tab"
   );
   Assert.equal(
     label(nameless.nowhere),
-    SvalPanel._tabPlaceholder(null),
+    SvalPanel.tabPlaceholder(null),
     "as is a tab filed with no address at all"
   );
 

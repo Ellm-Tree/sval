@@ -5,7 +5,7 @@
  * The Kagi card in Search and Launcher. It shows while Kagi is the default
  * engine or private windows' engine, and while a Session Link is saved, so
  * the link can still be cleared under another engine. Signed out, it offers
- * the sign-in first run offers (`SvalPanel._signInToKagi`), since first run
+ * the sign-in first run offers (`SvalPanel.signInToKagi`), since first run
  * may not be the only route to it (spec §10.8). Signed in, it says how
  * private windows sign in, and offers the Session Link field when the plan
  * lacks Privacy Pass. The link is saved and cleared through `SvalKagi`.
@@ -212,7 +212,7 @@
         "Sign in to Kagi in the window that opened.";
       this._els.kagiAccount.hidden = false;
       try {
-        await panel._signInToKagi(lazy.SvalKagi.SIGNIN_URL, {
+        await panel.signInToKagi(lazy.SvalKagi.SIGNIN_URL, {
           stillAsked: () => !this._gone,
         });
       } catch (err) {

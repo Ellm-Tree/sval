@@ -400,7 +400,7 @@ Object.assign(SvalPanel, {
       openSyncSettings: async () => {
         this._firstRunOpensSync = true;
       },
-      signInToKagi: url => this._signInToKagi(url),
+      signInToKagi: url => this.signInToKagi(url),
       kagiSignedIn: async () => this._modules.SvalKagi.signedIn(),
     };
   },
@@ -742,7 +742,7 @@ Object.assign(SvalPanel, {
    * @returns {Promise<{signedIn: boolean}>} once signed in, or once the
    *   window closes without it.
    */
-  async _signInToKagi(url, { stillAsked = () => this._firstRunInFlight } = {}) {
+  async signInToKagi(url, { stillAsked = () => this._firstRunInFlight } = {}) {
     const { SvalKagi } = this._modules;
     if (url !== SvalKagi.SIGNIN_URL && url !== SvalKagi.TRIAL_URL) {
       throw new Error("sval: that is not one of Kagi's pages");

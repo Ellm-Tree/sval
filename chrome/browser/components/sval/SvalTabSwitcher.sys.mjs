@@ -639,7 +639,7 @@ export class SvalTabSwitcher {
 
   /**
    * "Recent tabs in" the window's Workspace, named as the Workspace panel's
-   * switcher names it (`SvalPanel._switcherItemLabel`), or "Recent tabs" in
+   * switcher names it (`SvalPanel.switcherItemLabel`), or "Recent tabs" in
    * a window that shows no Workspace, as a Peek.
    *
    * @returns {string}
@@ -649,7 +649,7 @@ export class SvalTabSwitcher {
     const id = panel?.workspaceId;
     const item = id ? lazy.switcherItemOf(panel.nodes, id, id) : null;
     return item
-      ? `Recent tabs in ${panel._switcherItemLabel(item)}`
+      ? `Recent tabs in ${panel.switcherItemLabel(item)}`
       : "Recent tabs";
   }
 
@@ -690,7 +690,7 @@ export class SvalTabSwitcher {
       siteIcon.setAttribute("alt", "");
       const site = el("span", "sval-switcher-site");
       site.textContent =
-        this.#win.SvalPanel?._tabPlaceholder(this.#urlOf(tab)) ?? "";
+        this.#win.SvalPanel?.tabPlaceholder(this.#urlOf(tab)) ?? "";
       placeholder.append(siteIcon, site);
       preview.append(placeholder);
       preview.dataset.preview = "placeholder";
@@ -785,7 +785,7 @@ export class SvalTabSwitcher {
 
   /**
    * Fills an option's icons as the tab's row in the panel fills its own
-   * (`SvalPanel._fillTabIcon`), which finds an icon for a tab that has not
+   * (`SvalPanel.fillTabIcon`), which finds an icon for a tab that has not
    * loaded; a window with no panel has the tab's own.
    *
    * @param {Element} item
@@ -796,7 +796,7 @@ export class SvalTabSwitcher {
     const id = lazy.SvalTabs.nodeIdOf(tab);
     for (const img of item.querySelectorAll(".sval-switcher-icon")) {
       if (panel && id) {
-        panel._fillTabIcon(img, id, this.#urlOf(tab));
+        panel.fillTabIcon(img, id, this.#urlOf(tab));
       } else if (tab.image) {
         img.setAttribute("src", tab.image);
       }

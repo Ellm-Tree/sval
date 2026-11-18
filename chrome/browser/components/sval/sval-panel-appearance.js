@@ -197,7 +197,7 @@ Object.assign(SvalPanel, {
    *
    * @returns {"hud"|"acrylic"|"blur"|null}
    */
-  _seeThrough() {
+  seeThrough() {
     return this._modules.SvalColor.seeThroughMaterial(
       this._modules.AppConstants.platform,
       query => window.matchMedia(query).matches
@@ -218,7 +218,7 @@ Object.assign(SvalPanel, {
       {
         scheme: this._scheme(),
         more: this._moreContrast(),
-        seeThrough: this._seeThrough(),
+        seeThrough: this.seeThrough(),
       }
     );
   },
@@ -246,7 +246,7 @@ Object.assign(SvalPanel, {
     this._watchAppearance();
     const root = document.documentElement;
     const look = this.windowLookOf(color, transparency);
-    this._windowLook = look;
+    this.windowLook = look;
     this.windowColor = look ? color : null;
     for (const name of this._tintProperties ?? []) {
       root.style.removeProperty(name);
@@ -284,8 +284,8 @@ Object.assign(SvalPanel, {
    * @returns {{l: number, surfaceDark: boolean, dir: number}}
    */
   windowBlockSurface() {
-    if (this._windowLook) {
-      return this._windowLook.block;
+    if (this.windowLook) {
+      return this.windowLook.block;
     }
     const root = document.documentElement;
     const alwaysDark =
@@ -304,7 +304,7 @@ Object.assign(SvalPanel, {
    * @returns {string}
    */
   _blockSurfaceKey() {
-    const on = this._windowLook?.block;
+    const on = this.windowLook?.block;
     return [
       on ? `${on.l}|${on.surfaceDark}|${on.dir}` : this._scheme(),
       this._moreContrast(),

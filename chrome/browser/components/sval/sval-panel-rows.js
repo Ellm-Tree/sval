@@ -198,7 +198,7 @@
             }
             const icon = element.querySelector(".sval-row-icon");
             if (icon && kept.url !== row.url) {
-              this._fillTabIcon(icon, row.id, row.url);
+              this.fillTabIcon(icon, row.id, row.url);
             }
           }
         } else {
@@ -938,7 +938,7 @@
         }
         const icon = cell.querySelector(".sval-row-icon");
         if (icon && (kept?.element !== cell || kept.url !== pane.url)) {
-          this._fillTabIcon(icon, pane.id, pane.url);
+          this.fillTabIcon(icon, pane.id, pane.url);
         }
       }
       el.setAttribute(
@@ -1100,7 +1100,7 @@
       img.className = "sval-row-icon";
       img.setAttribute("alt", "");
       img.setAttribute("aria-hidden", "true");
-      this._fillTabIcon(img, id, url);
+      this.fillTabIcon(img, id, url);
       return img;
     },
 
@@ -1121,7 +1121,7 @@
      * @param {string} id The tab's node id.
      * @param {string|null} url The node's address.
      */
-    async _fillTabIcon(img, id, url) {
+    async fillTabIcon(img, id, url) {
       const live = this._observer?.iconFor(id) ?? null;
       if (live) {
         img.setAttribute("src", live);
@@ -1166,7 +1166,7 @@
           const img =
             url && urls.has(url) && element.querySelector(".sval-row-icon");
           if (img) {
-            this._fillTabIcon(img, id, url);
+            this.fillTabIcon(img, id, url);
           }
         }
       });
@@ -1186,7 +1186,7 @@
             .closest("[data-node-id]")
             ?.getAttribute("data-node-id");
           if (id) {
-            this._fillTabIcon(img, id, this._nodes?.[id]?.content?.url ?? null);
+            this.fillTabIcon(img, id, this._nodes?.[id]?.content?.url ?? null);
           }
         }
       });
@@ -1278,7 +1278,7 @@
     _paintTabIcon(id) {
       const img = this._rowElementFor(id)?.querySelector(".sval-row-icon");
       if (img) {
-        this._fillTabIcon(img, id, this._nodes[id]?.content?.url ?? null);
+        this.fillTabIcon(img, id, this._nodes[id]?.content?.url ?? null);
       }
     },
 
@@ -1331,7 +1331,7 @@
       if (kind === WORKSPACE) {
         return "Untitled Workspace";
       }
-      return kind === GROUP ? "Untitled group" : this._tabPlaceholder(url);
+      return kind === GROUP ? "Untitled group" : this.tabPlaceholder(url);
     },
 
     /**
@@ -1348,7 +1348,7 @@
      * @param {string|null} url The tab's address.
      * @returns {string}
      */
-    _tabPlaceholder(url) {
+    tabPlaceholder(url) {
       if (!url || window.isBlankPageURL(url)) {
         return "New tab";
       }

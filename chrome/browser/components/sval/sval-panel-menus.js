@@ -991,7 +991,7 @@ Object.assign(SvalPanel, {
     const parent = menu.querySelector('[data-command="moveToWorkspace"]');
     const popup = parent.querySelector("menupopup");
     popup.textContent = "";
-    const others = this._switcherList().filter(
+    const others = this.switcherList().filter(
       item => !item.current && !ids.includes(item.id)
     );
     const own = others.filter(item => this._usersOwn(item));
@@ -1113,7 +1113,7 @@ Object.assign(SvalPanel, {
       }
       return el;
     };
-    const items = this._switcherList();
+    const items = this.switcherList();
     for (const item of items.filter(i => this._usersOwn(i))) {
       const el = entry(item);
       this._labelWorkspaceEntry(el, item);
@@ -1159,7 +1159,7 @@ Object.assign(SvalPanel, {
     } else if (workspaceId && workspaceId !== this._currentWorkspaceId) {
       // The agent's window stays the agent's while it holds it, so the
       // workspace opens in a window of its own (`SvalAgentMarking`).
-      this._pickWorkspace(workspaceId, !!this._agentMarking?.blocking);
+      this.pickWorkspace(workspaceId, !!this._agentMarking?.blocking);
     }
   },
 

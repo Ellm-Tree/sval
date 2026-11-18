@@ -5,8 +5,8 @@
  * The strip: the Workspace switcher that shows every Workspace in a row, in
  * place of the switcher button, when Settings › Workspaces picks it
  * (`SvalPanelModel.SWITCHER_PREF`). It lists what the switcher's menu lists,
- * in the same order ({@link SvalPanel._switcherList}), and goes to a
- * Workspace through the same switch ({@link SvalPanel._pickWorkspace}).
+ * in the same order ({@link SvalPanel.switcherList}), and goes to a
+ * Workspace through the same switch ({@link SvalPanel.pickWorkspace}).
  *
  * `SvalWindow` loads this as a classic script after `sval-panel-switcher.js`;
  * it adds its methods to `SvalPanel`, whose state and helpers it shares.
@@ -237,7 +237,7 @@
       // Narrower than the wide layout, an item's name would be cut to a few
       // letters, so the items show icons and the caption the current name.
       const names = layout === "wide" ? chosen : "none";
-      const items = this._switcherList();
+      const items = this.switcherList();
       const kept = new Map(
         Array.from(tabs.querySelectorAll(":scope > [data-strip-key]"), el => [
           el.dataset.stripKey,
@@ -353,7 +353,7 @@
      * them, or else the one a session used last, and opens a list of them
      * all ({@link _openStripAppMenu}).
      *
-     * @param {object[]} items {@link _switcherList}'s entries.
+     * @param {object[]} items {@link switcherList}'s entries.
      * @returns {{key: string, item: object, app: ?{label: string,
      *   ids: string[]}}[]}
      */
@@ -437,7 +437,7 @@
       const name = app ? app.label : this.workspaceName(item);
       const label = app
         ? `${app.label}, ${app.ids.length} Workspaces`
-        : this._switcherItemLabel(item);
+        : this.switcherItemLabel(item);
       const isolated =
         !app && SvalWorkspaceJar.isIsolated(this._nodes, item.id);
       const showsName =
@@ -715,7 +715,7 @@
         this._openSwitcher();
         return;
       }
-      this._pickWorkspace(el.dataset.workspaceId, event.shiftKey);
+      this.pickWorkspace(el.dataset.workspaceId, event.shiftKey);
     },
 
     /**
@@ -799,7 +799,7 @@
       // something took it first (`_adjustFocusAfterTabSwitch`), so the strip
       // takes it back for the next key.
       const id = next.dataset.workspaceId;
-      this._pickWorkspace(id, false).then(() =>
+      this.pickWorkspace(id, false).then(() =>
         this._els.strip
           .querySelector(
             `.sval-strip-item[data-workspace-id="${CSS.escape(id)}"]`
@@ -818,7 +818,7 @@
      */
     _openStripAppMenu(el) {
       const label = el.dataset.agentApp;
-      const items = this._switcherList().filter(item => item.agent === label);
+      const items = this.switcherList().filter(item => item.agent === label);
       if (items.length < 2) {
         return;
       }
@@ -844,7 +844,7 @@
       menu.addEventListener("command", event => {
         const id = event.target.dataset?.workspaceId;
         if (id) {
-          this._pickWorkspace(id, event.shiftKey);
+          this.pickWorkspace(id, event.shiftKey);
         }
       });
       menu.addEventListener("popuphidden", event => {
@@ -1015,7 +1015,7 @@
       }
       this._strip.pending = next;
       this._strip.pendingAt = now;
-      this._pickWorkspace(next, false);
+      this.pickWorkspace(next, false);
     },
 
     /**

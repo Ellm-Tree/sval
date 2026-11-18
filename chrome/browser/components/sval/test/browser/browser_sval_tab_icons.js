@@ -41,7 +41,7 @@ add_task(async function a_tab_icon_outlasts_history_and_goes_with_the_tab() {
     const img = document.createElement("img");
     SvalPanel._els.tree.append(img);
     try {
-      await SvalPanel._fillTabIcon(img, "no-live-tab", ICON_PAGE);
+      await SvalPanel.fillTabIcon(img, "no-live-tab", ICON_PAGE);
       Assert.equal(
         img.getAttribute("src"),
         SvalFavoriteIcons.iconFor(ICON_PAGE),
