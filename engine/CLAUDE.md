@@ -33,7 +33,8 @@ numbered and written as `docs/decisions/README.md` describes.
    rejected (spec §5.4); do not reintroduce one, nor `retention`, in the tree
    document. Auto-archived tabs go to the separate `archive` document, which
    only adds entries and expires them itself (decision 0136); nothing in it
-   becomes a tree node by merging.
+   becomes a tree node by merging. The host deletes a forgotten site's
+   entries from it, as it closes a tab (decision 2376).
 
    `Lifecycle` stays one of the four fact groups because a node's state
    (`pinned`, and whatever a later build adds beside it) lives there. The

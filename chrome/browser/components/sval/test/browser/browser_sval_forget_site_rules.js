@@ -6,9 +6,9 @@
 /* import-globals-from head.js */
 
 /**
- * Forget this site (site page spec §2): the rules that name a site outside
- * the site's own page, which are the rules paired agents hold for it, the
- * link rules for it and the allowed domains of it.
+ * Forget this site (site page spec §2): what names a site outside the
+ * site's own page, which is the rules paired agents hold for it, the link
+ * rules for it, the allowed domains of it and its archived tabs.
  */
 
 const { SvalForgetSite } = ChromeUtils.importESModule(
@@ -19,6 +19,9 @@ const { SvalAgents } = ChromeUtils.importESModule(
 );
 const { SvalBlocking } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalBlocking.sys.mjs"
+);
+const { SvalArchive } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalArchive.sys.mjs"
 );
 const { SvalLinkRules } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalLinkRules.sys.mjs"
@@ -129,3 +132,49 @@ add_task(
     Assert.equal((await SvalForgetSite.countsFor(SITE)).choices, 0);
   }
 );
+
+add_task(async function forget_removes_the_sites_archived_tabs() {
+  // Another file may have stopped the process's Archive when it ended.
+  await SvalArchive.stopShared();
+  const archive = await SvalArchive.startFor(SvalPanel.engine, {
+    canBegin: () => true,
+    requestPass: () => {},
+  });
+  const entry = url => ({
+    title: "Page",
+    url,
+    workspace: SvalPanel.workspaceId,
+    workspaceName: "",
+    closedAt: Date.now() - 60_000,
+  });
+  const added = [
+    `https://${SITE}/one`,
+    `https://${HOST}/two`,
+    `https://${OTHER}/`,
+  ];
+  // The Archive may hold what earlier files left.
+  const urls = async () =>
+    (await archive.entries())
+      .map(e => e.url)
+      .filter(url => added.includes(url))
+      .sort();
+  atTaskEnd(async () => {
+    await within(
+      archive.forget(row => added.includes(row.url)),
+      30_000,
+      "the test's entries leaving the Archive"
+    );
+    await SvalArchive.stopShared();
+  });
+  await within(
+    archive.importEntries(added.map(entry)),
+    30_000,
+    "the entries reaching the Archive"
+  );
+
+  Assert.equal((await SvalForgetSite.countsFor(SITE)).archive, 2);
+  await forget("archive");
+
+  Assert.deepEqual(await urls(), [`https://${OTHER}/`]);
+  Assert.equal((await SvalForgetSite.countsFor(SITE)).archive, 0);
+});

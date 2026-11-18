@@ -7,8 +7,8 @@
  *
  * Firefox's parts go through `Services.clearData` with Forget About This
  * Site's flags, in every jar. Sval's are its stored choices, its My filters
- * lines and its Favorites and pins, each the site's own and those of every
- * host under it (decision 1980). The choices are the site's rules, its site
+ * lines, its Favorites and pins and its archived tabs, each the site's own
+ * and those of every host under it (decision 1980). The choices are the site's rules, its site
  * styles, the link rules that name it and the allowed domains of it. The
  * rules paired agents hold for the site go with its permissions. A private
  * window's own state is none of
@@ -22,6 +22,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Downloads: "resource://gre/modules/Downloads.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
+  SvalArchive: "moz-src:///browser/components/sval/SvalArchive.sys.mjs",
   SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
   SvalExtensionSites:
     "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
@@ -52,6 +53,7 @@ export const PARTS = Object.freeze([
   "exceptions",
   "hiddenLines",
   "favorites",
+  "archive",
   "history",
   "downloads",
   "data",
@@ -93,6 +95,33 @@ function favoritesOf(site) {
   return (lazy.SvalFavoritesStore.instance?.all() ?? []).filter(
     row => row.kind === "favorite" && lazy.siteOf(row.url) === site
   );
+}
+
+/**
+ * @param {string} site
+ * @returns {(entry: object) => boolean} Whether an Archive entry is a tab of
+ *   the site.
+ */
+function archivedOf(site) {
+  return entry => lazy.siteOf(entry.url) === site;
+}
+
+/**
+ * @returns {?SvalArchive} The Archive once its entries can be listed, which
+ *   is once this device's sync key is settled.
+ */
+function archive() {
+  const instance = lazy.SvalArchive.instance;
+  return instance?.ready ? instance : null;
+}
+
+/**
+ * @param {string} site
+ * @returns {Promise<number>} The archived tabs of the site.
+ */
+async function countArchived(site) {
+  const entries = (await archive()?.entries()) ?? [];
+  return entries.filter(archivedOf(site)).length;
 }
 
 /**
@@ -310,6 +339,10 @@ const SVAL_PARTS = {
     }
   },
 
+  async archive(site) {
+    await archive()?.forget(archivedOf(site));
+  },
+
   // Paired agents' rules are this device's alone, as Gecko's permissions are.
   async permissions(site) {
     await lazy.SvalAgents.withStore(async store => {
@@ -356,7 +389,8 @@ export const SvalForgetSite = {
    *
    * @param {string} site As `siteOf` cuts one.
    * @returns {Promise<{choices: number, exceptions: number,
-   *   hiddenLines: number, favorites: number, history: number,
+   *   hiddenLines: number, favorites: number, archive: number,
+   *   history: number,
    *   downloads: number, dataBytes: ?number, dataJars: ?number,
    *   permissions: number, certExceptions: number}>} `dataBytes` and
    *   `dataJars`, the jars holding the site's data, are null until
@@ -376,10 +410,11 @@ export const SvalForgetSite = {
       ? lazy.SvalSiteData.heldFor(site)
       : null;
     await lazy.SvalFavoritesStore.instance?.whenReady();
-    const [history, downloads, agentRules] = await Promise.all([
+    const [history, downloads, agentRules, archived] = await Promise.all([
       countVisits(site),
       countDownloads(site),
       agentRulesOf(site),
+      countArchived(site),
     ]);
     return {
       choices:
@@ -402,6 +437,7 @@ export const SvalForgetSite = {
       ),
       hiddenLines: lazy.forgetSite(lazy.SvalBlocking.myFilters, site).removed,
       favorites: favoritesOf(site).length,
+      archive: archived,
       history,
       downloads,
       dataBytes: data?.usage ?? null,

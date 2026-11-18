@@ -3,6 +3,9 @@ title: Forget a site
 description: Clear everything Sval keeps for a site, in every Workspace, from choices and history to cookies and caches.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 When you forget a site, Sval clears everything it keeps for that site, in
 every Workspace.
 
@@ -19,10 +22,25 @@ You stopped using a service and want no trace of it left in Sval.
 
 ## Details
 
+<Until v="0.1.0-rc.10">
+
 - The list shows how much the site holds in each part. The parts are
   settings for the site, fingerprinting exceptions, removed-element rules,
   Favorites and pins, history, downloads, cookies and site data, caches,
   permissions, and certificate exceptions.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- The list shows how much the site holds in each part. The parts are
+  settings for the site, fingerprinting exceptions, removed-element rules,
+  Favorites and pins, archived tabs, history, downloads, cookies and site
+  data, caches, permissions, and certificate exceptions.
+- Settings for the site include the site's Link Docking rules and any of
+  the site's domains in Allowed domains. Permissions include the rules
+  your agents have for the site.
+
+</Since>
 - Parts listed under On every device are removed from your other devices
   too. Parts listed under On this device are cleared only on this device.
 - You can't undo Forget.

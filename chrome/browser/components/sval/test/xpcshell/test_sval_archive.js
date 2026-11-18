@@ -373,6 +373,48 @@ add_task(async function imported_tabs_are_listed_restored_and_synced() {
   Assert.equal((await laptop.archive.restore(kept.id, work)).workspace, home);
 });
 
+add_task(async function forgotten_entries_leave_every_device() {
+  const device = devices();
+  const laptop = await device();
+  const home = await laptop.add({ kind: "addWorkspace", name: "Home" });
+  const entry = url => ({
+    title: "Page",
+    url,
+    workspace: home,
+    workspaceName: "Home",
+    closedAt: Date.now() - DAY_MS,
+  });
+  await laptop.archive.importEntries([
+    entry("https://forgotten.example/a"),
+    entry("https://forgotten.example/b"),
+    entry("https://kept.example/"),
+  ]);
+  const desktop = await device();
+  await laptop.pass();
+  await desktop.pass();
+  Assert.equal((await desktop.archive.entries()).length, 3, "all arrived");
+
+  const removed = await laptop.archive.forget(row =>
+    row.url.startsWith("https://forgotten.example/")
+  );
+  Assert.equal(removed.length, 2);
+  const urls = async archive => (await archive.entries()).map(e => e.url);
+  Assert.deepEqual(await urls(laptop.archive), ["https://kept.example/"]);
+
+  // The desktop still holds the entries, and its next writes must not bring
+  // them back to the laptop.
+  await laptop.pass();
+  await desktop.pass();
+  Assert.deepEqual(await urls(desktop.archive), ["https://kept.example/"]);
+  await laptop.pass();
+  Assert.deepEqual(await urls(laptop.archive), ["https://kept.example/"]);
+  Assert.deepEqual(
+    await laptop.archive.forget(() => false),
+    [],
+    "nothing to forget removes nothing"
+  );
+});
+
 add_task(async function an_import_waits_for_the_archive_to_open() {
   const root = await makeTempDir("sval-archive-waits");
   const engine = new SvalEngine({

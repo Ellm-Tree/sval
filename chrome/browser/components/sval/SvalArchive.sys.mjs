@@ -423,6 +423,31 @@ export class SvalArchive {
   }
 
   /**
+   * Removes the entries `forgets` answers true for, on every device (decision
+   * 2376). Queued behind any sweep or restore, so it reads the entries they
+   * left.
+   *
+   * @param {(entry: object) => boolean} forgets Whether to remove an entry.
+   * @returns {Promise<string[]>} the ids of the entries removed.
+   */
+  forget(forgets) {
+    return this.#queue.run(async () => {
+      const ids = (await this.entries()).filter(forgets).map(row => row.id);
+      if (!ids.length) {
+        return [];
+      }
+      const removed = await this.#engine.forgetArchived(
+        ARCHIVE_DOCUMENT,
+        ids,
+        this.#now()
+      );
+      this.#notify();
+      this.#requestPass();
+      return removed;
+    });
+  }
+
+  /**
    * What follows tabs leaving the tree for the Archive.
    *
    * @param {object} swept `{ tabs, entries }`.

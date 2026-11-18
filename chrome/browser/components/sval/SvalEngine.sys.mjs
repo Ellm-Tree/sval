@@ -2726,6 +2726,30 @@ export class SvalEngine extends SvalWorkerClient {
   }
 
   /**
+   * Removes entries from the Archive document `name`, for a site the user
+   * forgot (decision 2376), writing the Archive before it changes, as
+   * {@link archiveIdle} does.
+   *
+   * @param {string} name The Archive's document name.
+   * @param {string[]} ids The entries' ids.
+   * @param {number} [now] Milliseconds since the epoch.
+   * @returns {Promise<string[]>} the ids of the entries removed.
+   */
+  async forgetArchived(name, ids, now = SvalClock.now()) {
+    return this.post("forgetArchived", [
+      {
+        archive: name,
+        ids,
+        root: this.#root,
+        keyBytes: this.#localKey,
+        deviceId: this.#deviceId,
+        now,
+        archiveRetention: this.#retention.get(name)?.(),
+      },
+    ]);
+  }
+
+  /**
    * Restores Archive entry `entry` from document `name` into the tree, as a
    * new tab, or with the rest of its split as a new split (idle-tab archive
    * spec §2).

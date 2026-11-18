@@ -1166,6 +1166,62 @@ class SvalSyncWorker {
   }
 
   /**
+   * Removes entries from the Archive `archive`, for a site the user forgot
+   * (decision 2376). It runs on a copy, which is written to this device's
+   * file before it takes the Archive's place, as {@link importArchived}
+   * writes its copy. An id the Archive does not hold is passed over.
+   *
+   * @param {object} options
+   * @param {string} options.archive The Archive's document name.
+   * @param {string[]} options.ids The entries' ids.
+   * @param {string} options.root Absolute path of the profile's storage.
+   * @param {Uint8Array} options.keyBytes The profile's 32-byte key.
+   * @param {Uint8Array} options.deviceId This device's 16 bytes.
+   * @param {number} options.now Milliseconds since the epoch.
+   * @param {number} [options.archiveRetention] As {@link sync} takes it.
+   * @returns {Promise<string[]>} the ids of the entries removed.
+   */
+  async forgetArchived({ archive, ids, ...written }) {
+    const { root, keyBytes, deviceId, now, archiveRetention } = written;
+    return this.#enqueue(async () => {
+      const held = this.#registered(archive);
+      let copy = null;
+      try {
+        copy = SvalDocument.loadJson(held.toJson());
+        const entries = new Set(
+          JSON.parse(copy.archived(now)).map(entry => entry.id)
+        );
+        const removed = ids.filter(id => entries.has(id));
+        for (const id of removed) {
+          copy.remove(id);
+        }
+        if (removed.length) {
+          await this.#syncOnce({
+            root,
+            workspace: archive,
+            keyBytes,
+            deviceId,
+            now,
+            archiveRetention,
+            doc: copy,
+          });
+          this.#extra.set(archive, copy);
+          held.free();
+          copy = null;
+        }
+        return removed;
+      } catch (err) {
+        throw new SvalError(
+          `sval: forgetting archived tabs failed: ${describe(err)}`,
+          err
+        );
+      } finally {
+        copy?.free();
+      }
+    });
+  }
+
+  /**
    * Runs `step` on copies of the tree and the Archive `archive`, writes the
    * Archive's copy to this device's file when the step archived anything,
    * and only then puts both copies in place.

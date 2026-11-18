@@ -165,6 +165,7 @@
     exceptions: "Fingerprinting exceptions",
     hiddenLines: "Removed-element rules",
     favorites: "Favorites and pins",
+    archive: "Archived tabs",
     history: "History",
     downloads: "Downloads",
     data: "Cookies and site data",
@@ -179,6 +180,7 @@
     "exceptions",
     "hiddenLines",
     "favorites",
+    "archive",
   ]);
 
   /** Why a part was not forgotten: `SvalForgetSite` puts every failure down to the disk. */
