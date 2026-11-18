@@ -31,6 +31,7 @@ import { SvalTabs } from "moz-src:///browser/components/sval/SvalTabs.sys.mjs";
 import { SvalTabSwitcher } from "moz-src:///browser/components/sval/SvalTabSwitcher.sys.mjs";
 import { SvalTabHoverPreview } from "moz-src:///browser/components/sval/SvalTabHoverPreview.sys.mjs";
 import { SPLIT_MAX_PANES } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { SvalWindowWorkspace } from "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs";
 
 const PANEL_CSS = "chrome://browser/content/sval/sval-panel.css";
 /**
@@ -168,7 +169,7 @@ function bindPrivateWindowKey(doc) {
  * Makes the new-window command, Accel+N and File > New Window, open the new
  * window on the next workspace down from this window's (launcher spec §3).
  * Firefox's command opens a window and leaves it to take the first workspace
- * no window shows (`SvalPanel._adoptOrCreateWorkspace`), so the command is
+ * no window shows (`SvalWindowWorkspace.adoptOrCreate`), so the command is
  * answered here, on the command element, before `mainCommandSet`'s listener.
  * A window with no panel, a Peek, keeps Firefox's. Sval turns the AI
  * window off (`browser_sval_no_ai.js`), so Firefox's branch for it never runs.
@@ -182,7 +183,7 @@ function openNewWindowOnNextWorkspace(doc) {
       return;
     }
     event.stopImmediatePropagation();
-    win.SvalPanel.openWindowOnNextWorkspace();
+    SvalWindowWorkspace.of(win).openWindowOnNext();
   });
 }
 

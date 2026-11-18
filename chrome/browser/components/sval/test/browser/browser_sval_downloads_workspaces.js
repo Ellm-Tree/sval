@@ -439,10 +439,10 @@ add_task(async function a_switch_lists_the_new_workspaces_downloads() {
   const opened = event => expectOpened(event.target);
   gBrowser.tabContainer.addEventListener("TabOpen", opened);
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(here);
+    await SvalWindowWorkspace.of(window).switchTo(here);
     gBrowser.tabContainer.removeEventListener("TabOpen", opened);
   });
-  await SvalPanel.switchTo(workspace);
+  await SvalWindowWorkspace.of(window).switchTo(workspace);
   await TestUtils.waitForCondition(
     () => segment(false).getAttribute("aria-checked") === "true",
     "the switch goes back to This Workspace"

@@ -51,10 +51,10 @@ Object.assign(SvalPanel, {
     // Before the switch. A window that had no workspace yet (one whose sync
     // pass failed, so `_start` stopped before creating anything) has one now,
     // because the redraw above resolved it, so this is where its observer
-    // starts rather than at the next window. `switchTo` then tells that
+    // starts rather than at the next window. The switch then tells that
     // observer where to file, which is why attaching first costs nothing.
     await this._attachTabs();
-    await this.switchTo(id);
+    await this._workspace.switchTo(id);
     await this._select(id);
     this._publishSoon();
   },
@@ -851,7 +851,7 @@ Object.assign(SvalPanel, {
    * so any of the moved tabs this window holds leave it, kept in the
    * document, as a switch releases a workspace's tabs; they
    * materialise wherever the other workspace is shown, and one the release
-   * kept loaded moves to the window showing it ({@link takeKeptTabs}).
+   * kept loaded moves to the window showing it (`SvalWindowWorkspace.takeKeptTabs`).
    *
    * A move into an agent's workspace hands what moves to the agent
    * (agent-control spec §5.4): the tree's agent mark makes it the agent's
@@ -938,7 +938,9 @@ Object.assign(SvalPanel, {
     // What stayed loaded goes to the window that shows its workspace now.
     const shownBy =
       workspaceId && this._workspace.shownElsewhere().get(workspaceId);
-    await shownBy?.SvalPanel?.takeKeptTabs();
+    if (shownBy) {
+      await this._modules.SvalWindowWorkspace.of(shownBy).takeKeptTabs();
+    }
     this._publishSoon();
   },
 
@@ -946,7 +948,7 @@ Object.assign(SvalPanel, {
    * Lets go of every tab in this window whose node is no longer in the
    * workspace the window shows, putting one of the workspace's own on screen
    * first if the selected tab is among them, for the reasons
-   * {@link _handOverWindowOnce} gives.
+   * `SvalWindowWorkspace.handOver` gives.
    *
    * @returns {Promise<void>}
    */
@@ -966,7 +968,7 @@ Object.assign(SvalPanel, {
       const tabs = keep.filter(
         n => this._nodes[n]?.kind === TAB && observer.tabFor(n)
       );
-      const next = this._mostRecentlyActive(tabs);
+      const next = this._workspace.mostRecentlyActive(tabs);
       if (!next || !observer.selectNode(next)) {
         observer.openUnfiledTab();
       }

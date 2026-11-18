@@ -470,7 +470,7 @@ add_task(async function an_isolated_workspace_asks_then_opens_in_its_jar() {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(home);
+    await SvalWindowWorkspace.of(window).switchTo(home);
     await within(
       SvalPanel.observer.settled(),
       10_000,

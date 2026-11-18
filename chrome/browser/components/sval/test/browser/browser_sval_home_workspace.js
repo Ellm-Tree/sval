@@ -175,7 +175,10 @@ add_task(async function a_home_tab_wears_its_workspaces_colour() {
     () => !observer.tabFor(node),
     "the moved tab leaves the window"
   );
-  Assert.ok(await SvalPanel.switchTo(second), "the window shows its workspace");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window shows its workspace"
+  );
   const moved = observer.tabFor(node);
   Assert.ok(moved, "where the moved tab is");
   await selectTab(moved);

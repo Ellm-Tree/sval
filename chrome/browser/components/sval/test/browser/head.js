@@ -670,7 +670,7 @@ async function noOtherBrowsers() {
       return;
     }
     await within(
-      panel.switchTo(known.shown),
+      SvalWindowWorkspace.of(window).switchTo(known.shown),
       10_000,
       "the switch back to the recorded workspace"
     );
@@ -2611,7 +2611,7 @@ async function switchDone(win = window) {
     () => loadState(win.gBrowser.selectedBrowser)
   );
   await within(
-    win.SvalPanel?._switching?.idle() ?? Promise.resolve(),
+    SvalWindowWorkspace.of(win).switchesSettled(),
     10_000,
     "the workspace switch"
   );
@@ -3104,7 +3104,7 @@ async function panelOnAFolder(label, { shared = false } = {}) {
   expectWorkspaceTabs();
   Assert.ok(
     await within(
-      SvalPanel.switchTo(workspace),
+      SvalWindowWorkspace.of(window).switchTo(workspace),
       10_000,
       "the switch to the task's workspace"
     ),

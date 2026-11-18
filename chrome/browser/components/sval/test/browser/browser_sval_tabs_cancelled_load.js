@@ -99,14 +99,17 @@ add_task(async function a_cancelled_restore_keeps_the_nodes_address() {
   const id = ids.tabs[0];
   const before = (await engine.tree()).nodes[id].content;
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switches away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switches away"
+  );
   // The tab it left is let go, as the idle unload does, so the switch back
   // restores it. Only its page is refused: the second workspace's tab may
   // still be loading its own.
   await releaseHiddenNow(observer);
   Assert.ok(!observer.tabFor(id), "the first workspace's tab is let go");
   const refused = refuseLoadsOf(before.url);
-  Assert.ok(await SvalPanel.switchTo(first), "and back");
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(first), "and back");
   const tab = observer.tabFor(id);
   Assert.equal(gBrowser.selectedTab, tab, "on the workspace's tab");
   await within(

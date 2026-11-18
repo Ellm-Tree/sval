@@ -421,7 +421,7 @@ async function newWorkspace(name, win = window) {
       return;
     }
     if (!win.closed && SvalWindowWorkspace.of(win).id === id) {
-      await win.SvalPanel.switchTo(left);
+      await SvalWindowWorkspace.of(win).switchTo(left);
       await switchDone(win);
     }
     await removeWorkspace(id);
@@ -681,7 +681,7 @@ async function workspaceWith(name, { pages = [], isolated = false } = {}) {
   });
   atTaskEnd(async () => {
     if (SvalWindowWorkspace.of(window).id === id) {
-      await SvalPanel.switchTo(home);
+      await SvalWindowWorkspace.of(window).switchTo(home);
       await switchDone(window);
     }
     if ((await engine.tree()).nodes?.[id]) {

@@ -47,7 +47,7 @@ async function workspace(name) {
   });
   atTaskEnd(async () => {
     if (SvalWindowWorkspace.of(window).id !== home) {
-      await SvalPanel.switchTo(home);
+      await SvalWindowWorkspace.of(window).switchTo(home);
       await within(
         SvalPanel.observer.settled(),
         10_000,

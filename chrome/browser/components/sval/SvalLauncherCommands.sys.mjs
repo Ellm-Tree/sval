@@ -320,7 +320,7 @@ export const COMMANDS = [
     keyId: null,
     available: win => !!userPanel(win),
     // The user's own workspaces other than this one; another window's comes
-    // forward (`_showWorkspace`).
+    // forward (`SvalWindowWorkspace.show`).
     each: win =>
       userPanel(win)
         .switcherList()

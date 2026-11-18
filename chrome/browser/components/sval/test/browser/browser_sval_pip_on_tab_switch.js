@@ -74,12 +74,18 @@ add_task(async function leaving_a_workspace_takes_its_video_into_a_window() {
   Assert.equal(await startVideo(tab.linkedBrowser), "playing");
 
   const player = await leaveOpensPlayer(tab.linkedBrowser, async () => {
-    Assert.ok(await SvalPanel.switchTo(away), "switched away");
+    Assert.ok(
+      await SvalWindowWorkspace.of(window).switchTo(away),
+      "switched away"
+    );
     await switchDone();
   });
   Assert.ok(tab.hidden && tab.linkedPanel, "the video's tab is kept");
   await returnClosesPlayer(player, async () => {
-    Assert.ok(await SvalPanel.switchTo(home), "switched back");
+    Assert.ok(
+      await SvalWindowWorkspace.of(window).switchTo(home),
+      "switched back"
+    );
     await switchDone();
   });
   Assert.equal(gBrowser.selectedTab, tab, "the video's tab is shown");

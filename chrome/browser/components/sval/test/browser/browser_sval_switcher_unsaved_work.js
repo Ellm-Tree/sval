@@ -43,7 +43,10 @@ add_task(async function text_typed_into_a_form_survives_a_switch() {
   await typeInto(tab, "textarea", "half a reply");
   await markPage(tab);
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await releaseHiddenNow(observer);
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
@@ -52,7 +55,10 @@ add_task(async function text_typed_into_a_form_survives_a_switch() {
   Assert.equal(dialogsOver(tab), 0, "with no dialog");
   Assert.notEqual(gBrowser.selectedTab, tab, "out of sight");
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(gBrowser.selectedTab, tab, "the user is back on that page");
   Assert.deepEqual(
     await pageState(tab, "textarea"),
@@ -69,7 +75,10 @@ add_task(async function a_rich_editor_holding_unsaved_text_survives_a_switch() {
   await typeInto(tab, "div", "a draft");
   await markPage(tab);
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await releaseHiddenNow(observer);
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
@@ -77,7 +86,10 @@ add_task(async function a_rich_editor_holding_unsaved_text_survives_a_switch() {
   );
   Assert.equal(dialogsOver(tab), 0, "with no dialog");
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(gBrowser.selectedTab, tab, "the user is back in the editor");
   const { text, marked } = await pageState(tab, "div");
   Assert.ok(text.includes("a draft"), "with the draft in it");
@@ -101,7 +113,10 @@ add_task(async function an_untouched_page_asking_to_stay_is_unloaded() {
     "the page holds a beforeunload handler"
   );
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await releaseHiddenNow(observer);
   Assert.ok(
     !gBrowser.tabs.includes(tab),
@@ -120,10 +135,16 @@ add_task(async function a_kept_page_is_unloaded_once_the_user_leaves_it() {
 
   const tab = observer.tabFor(ids.tabs[0]);
   await typeInto(tab, "textarea", "sent");
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await releaseHiddenNow(observer);
   Assert.ok(gBrowser.tabs.includes(tab), "keeping the page typed into");
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
 
   // The user goes on from the page they typed into.
   const after = "data:text/html,%3Ctitle%3ETab%20in%201%3C/title%3Edone";
@@ -135,7 +156,10 @@ add_task(async function a_kept_page_is_unloaded_once_the_user_leaves_it() {
   BrowserTestUtils.startLoadingURIString(tab.linkedBrowser, after);
   await within(loaded, 10_000, "the next page loading");
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await releaseHiddenNow(observer);
   Assert.ok(
     !gBrowser.tabs.includes(tab),

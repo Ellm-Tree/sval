@@ -39,20 +39,20 @@ async function keptAway(fixture, to = fixture.ids.workspaces[1]) {
   const tab = observer.tabFor(ids.tabs[0]);
   await typeInto(tab, "textarea", "half a reply");
   await markPage(tab);
-  Assert.ok(await SvalPanel.switchTo(to), "switched away");
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(to), "switched away");
   Assert.ok(tab.hidden && tab.linkedPanel, "the typed-into tab is kept");
   return tab;
 }
 
 /**
- * Opens a window as ⌘N does (`openWindowOnNextWorkspace`), and waits for its
+ * Opens a window as ⌘N does (`SvalWindowWorkspace.openWindowOnNext`), and waits for its
  * panel to have started.
  *
  * @returns {Promise<DOMWindow>}
  */
 async function newWindowOnNextWorkspace() {
   const opening = BrowserTestUtils.waitForNewWindow();
-  SvalPanel.openWindowOnNextWorkspace();
+  SvalWindowWorkspace.of(window).openWindowOnNext();
   const win = await within(opening, 20_000, "a new window's opening");
   registerCleanupFunction(async () => {
     if (!win.closed) {
@@ -240,7 +240,10 @@ add_task(async function a_picture_in_picture_video_plays_on_through_a_take() {
     });
   Assert.ok(await playing(tab), "the video plays in picture-in-picture");
   const [home] = SvalTree.workspaceIds(SvalPanel.nodes);
-  Assert.ok(await SvalPanel.switchTo(home), "switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(home),
+    "switched away"
+  );
   Assert.ok(tab.hidden && tab.linkedPanel, "the video's tab is kept");
 
   // ⌘N takes the workspace after this window's, the one it left, and with
@@ -293,7 +296,10 @@ add_task(async function a_kept_tab_moved_to_another_windows_workspace() {
   const fixture = await withSwitcherTabs({ body: FORM });
   const { ids, observer } = fixture;
   const [first, second] = ids.workspaces;
-  Assert.ok(await SvalPanel.switchTo(second), "switched to the second");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "switched to the second"
+  );
   const win = await tearOff(first);
   window.focus();
   await untilFocused(window, "this window has focus again");
@@ -441,7 +447,10 @@ add_task(async function a_reopened_window_takes_a_kept_tab_without_a_copy() {
   const tab = keeping.SvalPanel.observer.tabFor(ids.tabs[1]);
   await typeInto(tab, "textarea", "half a reply");
   await markPage(tab);
-  Assert.ok(await keeping.SvalPanel.switchTo(third), "that window moved on");
+  Assert.ok(
+    await SvalWindowWorkspace.of(keeping).switchTo(third),
+    "that window moved on"
+  );
   Assert.ok(tab.hidden && tab.linkedPanel, "keeping the tab loaded");
   await within(keeping.SvalPanel.observer.settled(), 10_000, "its settling");
   const before = await treeJson(engine);

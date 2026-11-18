@@ -112,7 +112,7 @@ async function openDialog() {
     // The window opens the empty workspace's tab after the switch and files
     // it in the workspace later, from its `TabOpen`. A switch away before
     // then passes over the tab, which carries no node yet, and leaves it on
-    // screen in the workspace switched to (`_handOverWindowOnce`).
+    // screen in the workspace switched to (`SvalWindowWorkspace.handOver`).
     await TestUtils.waitForCondition(async () => {
       const tabId = taggedId(gBrowser.selectedTab);
       const { nodes } = await SvalPanel.engine.tree();
@@ -123,7 +123,11 @@ async function openDialog() {
     // deleted workspace moves off it at its next redraw, whenever that is,
     // and opens that workspace's tabs in whatever task is running then.
     atTaskEnd(async () => {
-      await within(SvalPanel.switchTo(home), 10_000, "the switch back");
+      await within(
+        SvalWindowWorkspace.of(window).switchTo(home),
+        10_000,
+        "the switch back"
+      );
       await removeWorkspace(id);
       await SvalPanel.refresh();
       await within(SvalPanel.observer.settled(), 10_000, "the window settling");

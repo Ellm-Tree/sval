@@ -48,7 +48,7 @@ add_task(async function closing_tabs_in_a_second_window_stays_in_it() {
 
   // ⌘N: the new window takes the workspace after this window's.
   const opening = BrowserTestUtils.waitForNewWindow();
-  SvalPanel.openWindowOnNextWorkspace();
+  SvalWindowWorkspace.of(window).openWindowOnNext();
   const win = await within(opening, 20_000, "a new window's opening");
   registerCleanupFunction(async () => {
     if (!win.closed) {

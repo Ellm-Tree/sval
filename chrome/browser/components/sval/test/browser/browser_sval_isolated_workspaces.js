@@ -44,7 +44,11 @@ add_setup(async function () {
   });
   expectWorkspaceTabs();
   Assert.ok(
-    await within(SvalPanel.switchTo(home), 10_000, "the switch to Home"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(home),
+      10_000,
+      "the switch to Home"
+    ),
     "the window shows this file's workspace"
   );
   await within(
@@ -82,7 +86,7 @@ async function workspace({ isolated = false, urls = [] } = {}) {
     });
   }
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(home);
+    await SvalWindowWorkspace.of(window).switchTo(home);
     await within(
       SvalPanel.observer.settled(),
       10_000,
@@ -158,7 +162,10 @@ async function setIsolation(id, isolated, ok) {
 
 add_task(async function an_isolated_workspaces_tabs_share_a_jar_of_their_own() {
   const id = await workspace({ isolated: true, urls: [PAGE_A] });
-  Assert.ok(await SvalPanel.switchTo(id), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(id),
+    "the window switched"
+  );
   await within(
     SvalPanel.observer.settled(),
     10_000,
@@ -219,7 +226,7 @@ add_task(async function an_isolated_workspaces_tabs_share_a_jar_of_their_own() {
     Assert.equal(tab.userContextId, jar, "every tab of it uses its jar");
   }
 
-  Assert.ok(await SvalPanel.switchTo(home));
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(home));
   Assert.equal(
     gBrowser.defaultUserContextId,
     0,
@@ -235,7 +242,10 @@ add_task(async function an_isolated_workspaces_tabs_share_a_jar_of_their_own() {
  */
 add_task(async function a_link_from_another_app_loads_in_the_workspaces_jar() {
   const id = await workspace({ isolated: true });
-  Assert.ok(await SvalPanel.switchTo(id), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(id),
+    "the window switched"
+  );
   await within(
     SvalPanel.observer.settled(),
     10_000,
@@ -289,7 +299,7 @@ add_task(async function a_link_from_another_app_loads_in_the_workspaces_jar() {
 add_task(
   async function a_tab_arriving_in_another_jar_reopens_in_the_workspaces() {
     const id = await workspace({ isolated: true });
-    Assert.ok(await SvalPanel.switchTo(id));
+    Assert.ok(await SvalWindowWorkspace.of(window).switchTo(id));
     await within(
       SvalPanel.observer.settled(),
       10_000,
@@ -332,7 +342,7 @@ add_task(
 add_task(
   async function isolating_and_sharing_reopen_the_tabs_and_drop_the_jar() {
     const id = await workspace({ urls: [PAGE_A, PAGE_B] });
-    Assert.ok(await SvalPanel.switchTo(id));
+    Assert.ok(await SvalWindowWorkspace.of(window).switchTo(id));
     await within(
       SvalPanel.observer.settled(),
       10_000,
@@ -409,7 +419,7 @@ add_task(async function a_cancelled_isolation_changes_nothing() {
 add_task(async function a_move_into_another_jar_asks_first() {
   const shared = await workspace({ urls: [PAGE_A] });
   const isolated = await workspace({ isolated: true });
-  Assert.ok(await SvalPanel.switchTo(shared));
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(shared));
   await within(
     SvalPanel.observer.settled(),
     10_000,
@@ -438,7 +448,7 @@ add_task(async function a_move_into_another_jar_asks_first() {
 
 add_task(async function deleting_an_isolated_workspace_drops_its_jar() {
   const id = await workspace({ isolated: true, urls: [PAGE_A] });
-  Assert.ok(await SvalPanel.switchTo(id));
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(id));
   await within(
     SvalPanel.observer.settled(),
     10_000,
@@ -447,7 +457,7 @@ add_task(async function deleting_an_isolated_workspace_drops_its_jar() {
   const name = `sval.workspace.${id}`;
   Assert.ok(ContextualIdentityService.getPrivateIdentity(name));
 
-  await SvalPanel.switchTo(home);
+  await SvalWindowWorkspace.of(window).switchTo(home);
   await within(
     SvalPanel.observer.settled(),
     10_000,
@@ -674,7 +684,7 @@ add_task(async function a_peers_switch_from_the_observers_queue_finishes() {
   );
   const shown = await workspace({ isolated: true, urls: [PAGE_A] });
   const other = await workspace({ urls: [PAGE_B] });
-  Assert.ok(await SvalPanel.switchTo(shown));
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(shown));
   await within(
     SvalPanel.observer.settled(),
     10_000,
@@ -712,7 +722,7 @@ add_task(async function a_peers_switch_from_the_observers_queue_finishes() {
   );
   Assert.ok(
     await within(
-      SvalPanel._handingOver.idle(),
+      SvalWindowWorkspace.of(window).handOversSettled(),
       10_000,
       "the peer's hand-over"
     ).then(

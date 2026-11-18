@@ -153,7 +153,10 @@ add_task(async function the_address_bar_wears_its_workspaces_colours() {
   gURLBar.handleRevert();
 
   // ⌘L's float, after the window switches to the purple workspace.
-  Assert.ok(await SvalPanel.switchTo(work), "the window shows Work");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(work),
+    "the window shows Work"
+  );
   await TestUtils.waitForCondition(
     () => SvalPanel.windowColor === "purple",
     "the window wears purple"
@@ -169,7 +172,10 @@ add_task(async function the_address_bar_wears_its_workspaces_colours() {
     () => !gURLBar.hasAttribute("sval-launcher-floating"),
     "the float returns to the toolbar"
   );
-  Assert.ok(await SvalPanel.switchTo(home), "the window shows Home again");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(home),
+    "the window shows Home again"
+  );
 });
 
 add_task(async function homes_card_wears_its_workspaces_colours() {

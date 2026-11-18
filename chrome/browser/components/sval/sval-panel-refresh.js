@@ -119,7 +119,7 @@ Object.assign(SvalPanel, {
     this._dropOrphanTabs();
     // Before drawing: a pass can have taken away the workspace this window
     // was showing, and `render` draws whatever workspace the window shows.
-    await this._resolveCurrentWorkspace();
+    await this._workspace.resolve();
     this._keepKeptTabsWithTheirWindows();
     await this._keepJar();
     this.keepSplits();
@@ -142,66 +142,12 @@ Object.assign(SvalPanel, {
     if (this._inMemory) {
       return;
     }
-    // Queued and not waited for (`SvalSerialQueue.post`): a redraw can run
-    // inside a switch's task, which the queue cannot get past to answer.
-    if (window.toolbar.visible) {
-      this._switching ??= new this._modules.SvalSerialQueue("workspace switch");
-      this._switching.post(() => this._takeKeptTabsNow());
-    }
+    this._workspace.takeKeptTabsLater();
     const { isHiddenForWorkspace } = this._modules.SvalFirefox;
     if (window.gBrowser.tabs.some(tab => isHiddenForWorkspace(tab))) {
       for (const other of this._workspace.shownElsewhere().values()) {
-        other.SvalPanel?.takeKeptTabs();
+        this._modules.SvalWindowWorkspace.of(other).takeKeptTabs();
       }
-    }
-  },
-
-  /**
-   * Takes into this window the tabs other windows keep loaded for the
-   * workspace it shows (`SvalRestore.takeKept`), in the switch's queue, so
-   * the workspace it takes for is the one it shows once any switch is over.
-   *
-   * @returns {Promise<void>}
-   */
-  takeKeptTabs() {
-    if (this._inMemory || !window.toolbar.visible) {
-      return Promise.resolve();
-    }
-    this._switching ??= new this._modules.SvalSerialQueue("workspace switch");
-    return this._switching
-      .run(() => this._takeKeptTabsNow())
-      .catch(err => {
-        this._modules.SvalLog.error(
-          `taking kept tabs failed: ${this._modules.describeError(err)}`
-        );
-      });
-  },
-
-  /** {@link takeKeptTabs}'s work, for a caller in the switch's queue. */
-  async _takeKeptTabsNow() {
-    if (!this._engine || window.closed || this._workspace.closing) {
-      return;
-    }
-    // The latest read: every change that can bring a kept tab here is
-    // read back and redrawn, and each redraw asks again.
-    const nodes =
-      this._modules.latestNodes(this._engine) ??
-      (await this._engine.tree()).nodes ??
-      {};
-    // A window closed while the tree was read has no tab strip left:
-    // tabbrowser fails to make a tab in it (`aWindow.docShell` is null).
-    if (window.closed) {
-      return;
-    }
-    const id = this._workspace.id;
-    if (id) {
-      this._modules.SvalRestore.takeKept(window, {
-        nodes,
-        workspaceId: id,
-      });
-      // A kept split's tabs come one at a time, and Firefox separates
-      // what each leaves behind.
-      this.keepSplits();
     }
   },
 

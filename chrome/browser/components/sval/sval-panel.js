@@ -192,6 +192,7 @@ var SvalPanel = {
       return;
     }
     this._initialized = true;
+    this._attachWorkspace();
 
     // A private window, and a window a WebDriver client opened, get Sval's
     // panel like any other, on a tree that cannot be written anywhere

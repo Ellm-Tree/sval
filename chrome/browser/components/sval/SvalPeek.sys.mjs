@@ -588,7 +588,7 @@ async function showWorkspace(workspaceId, nodes, { newWindow = false } = {}) {
   }
   if (
     lazy.SvalWindowWorkspace.of(target).id !== workspaceId &&
-    !(await target.SvalPanel.switchTo(workspaceId))
+    !(await lazy.SvalWindowWorkspace.of(target).switchTo(workspaceId))
   ) {
     return null;
   }

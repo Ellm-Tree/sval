@@ -342,13 +342,13 @@ add_task(async function switching_workspace_keeps_where_a_pin_was() {
     "the pin goes elsewhere in its site"
   );
   expectWorkspaceTabs();
-  await SvalPanel.switchTo(work);
+  await SvalWindowWorkspace.of(window).switchTo(work);
   Assert.notEqual(selectedPinGuid(), guid, "Work shows its own tab");
   Assert.ok(
     tileOf(guid).closest(".sval-pin-slot").hasAttribute("data-unloaded"),
     "the pin has no page in Work yet"
   );
-  await SvalPanel.switchTo(home);
+  await SvalWindowWorkspace.of(window).switchTo(home);
   Assert.equal(selectedPinGuid(), guid, "back in Home, the pin is selected");
   Assert.equal(gBrowser.selectedTab, page, "on the page it had");
   await TestUtils.waitForCondition(
@@ -373,8 +373,8 @@ add_task(async function a_tab_chosen_after_a_pin_is_where_a_switch_returns() {
   );
   Assert.equal(gBrowser.selectedTab, tab, "the tab is chosen after the pin");
   expectWorkspaceTabs();
-  await SvalPanel.switchTo(work);
-  await SvalPanel.switchTo(home);
+  await SvalWindowWorkspace.of(window).switchTo(work);
+  await SvalWindowWorkspace.of(window).switchTo(home);
   Assert.equal(selectedPinGuid(), null, "back in Home, no pin is selected");
   Assert.equal(
     SvalPanel.observer.nodeIdFor(gBrowser.selectedTab),
@@ -610,7 +610,10 @@ add_task(async function a_pin_asking_to_stay_does_not_halt_a_switch() {
 
   // Another tab of Home is shown, so the pin is one the switch parks.
   await selectTab(gBrowser.tabs.find(t => !t.hidden && t !== page));
-  Assert.ok(await SvalPanel.switchTo(work), "the window switches");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(work),
+    "the window switches"
+  );
   Assert.equal(SvalWindowWorkspace.of(window).id, work, "to Work");
   Assert.ok(page.linkedPanel, "the asking page stays loaded");
 
@@ -631,7 +634,7 @@ add_task(async function a_pin_asking_to_stay_does_not_halt_a_switch() {
   await SpecialPowers.spawn(page.linkedBrowser, [], () => {
     content.onbeforeunload = null;
   });
-  await SvalPanel.switchTo(home);
+  await SvalWindowWorkspace.of(window).switchTo(home);
 });
 
 /**
@@ -665,7 +668,10 @@ add_task(async function a_pin_kept_loaded_is_out_of_reach_elsewhere() {
     "the pin's page holds what was typed"
   );
   expectWorkspaceTabs();
-  Assert.ok(await SvalPanel.switchTo(work), "the window switches to Work");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(work),
+    "the window switches to Work"
+  );
   Assert.ok(page.linkedPanel, "the typed page stays loaded");
   const { tab: other } = await aTab();
 

@@ -243,7 +243,7 @@ Object.assign(SvalPanel, {
     // workspace (torn off, or brought back by the session with what it was
     // showing) from an ordinary new window, which remembers nothing. The sync
     // pass below redraws on its way out, a redraw resolves the workspace
-    // through `_showWorkspace`, and `_showWorkspace` records it: read any later
+    // through `SvalWindowWorkspace.show`, which records it: read any later
     // and every window looks like one that remembered something.
     const remembered = this._workspace.remembered();
     this._workspace.restoreMade();
@@ -444,15 +444,15 @@ Object.assign(SvalPanel, {
     }
     // Through the funnel like every other change of workspace, so the window's
     // record of what it shows is written even if everything after this fails.
-    await this._showWorkspace(await this._adoptOrCreateWorkspace());
+    await this._workspace.show(await this._workspace.adoptOrCreate());
     // A launch lands where this device left the workspace, as a switch back
-    // to it does (`_handOverWindow`): on the tab looked at last, or on a pin
+    // to it does (`SvalWindowWorkspace.handOver`): on the tab looked at last, or on a pin
     // looked at after it. The pin is chosen here, before selecting the tab
     // marks that tab as looked at.
     let pinGuid = null;
     const show = ids => {
-      const target = this._mostRecentlyActive(ids);
-      pinGuid = this._lastPinAfter(target);
+      const target = this._workspace.mostRecentlyActive(ids);
+      pinGuid = this._workspace.lastPinAfter(target);
       return target;
     };
     const restored = await SvalRestore.restoreOnce(window, {
@@ -530,7 +530,7 @@ Object.assign(SvalPanel, {
     // observer is attached: it materialises the adopted workspace and
     // releases the rest, which nobody left here to come back to.
     if (remembered && remembered !== this._workspace.id) {
-      await this._handOverWindow(this._workspace.id, { hold: false });
+      await this._workspace.handOver(this._workspace.id, { hold: false });
     } else if (remembered && wanted && !window.closed) {
       // A window the session brought back on its own workspace can hold tabs
       // the tree has since moved to another workspace. They go as a move's
@@ -696,7 +696,7 @@ Object.assign(SvalPanel, {
       // A tab an extension hid has no row, as in Firefox's tab strip, and
       // comes back when it is shown.
       onTabHiddenChanged: () => this.render(),
-      onKeptTabShown: id => this._onKeptTabShown(id),
+      onKeptTabShown: id => this._workspace.keptTabShown(id),
       onTabSoundChanged: () => this._paintSound(),
     });
     // A tab restored at launch was selected before the observer existed, so no

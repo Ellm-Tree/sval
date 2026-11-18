@@ -175,7 +175,7 @@ add_task(async function the_undo_key_reopens_the_shown_workspaces_tab() {
     now: Date.now(),
   });
   const show = async id => {
-    await panel.switchTo(id);
+    await SvalWindowWorkspace.of(win).switchTo(id);
     await within(panel._observer.settled(), 10_000, "panel._observer settling");
   };
   try {
@@ -255,7 +255,7 @@ add_task(
       within(panel._observer.settled(), 10_000, "panel._observer settling");
     try {
       forgetClosedTabs(win);
-      await panel.switchTo(id);
+      await SvalWindowWorkspace.of(win).switchTo(id);
       await settled();
       await openAndClose(win, CLOSED_URL);
       // The workspace has a jar of its own since the tab closed, so the key
@@ -293,7 +293,7 @@ add_task(
         opener,
         "closing it returns to the tab it was reopened over"
       );
-      await panel.switchTo(home);
+      await SvalWindowWorkspace.of(win).switchTo(home);
       await settled();
     } finally {
       await within(

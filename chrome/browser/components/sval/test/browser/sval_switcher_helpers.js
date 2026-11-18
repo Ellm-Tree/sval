@@ -80,7 +80,11 @@ function leftWhenTheTaskEnds(workspaces) {
   expectWorkspaceTabs();
   atTaskEnd(async () => {
     if (home && SvalWindowWorkspace.of(window).id !== home) {
-      await within(SvalPanel.switchTo(home), 10_000, "the switch back home");
+      await within(
+        SvalWindowWorkspace.of(window).switchTo(home),
+        10_000,
+        "the switch back home"
+      );
     }
     const left = (await SvalPanel.engine.tree()).nodes ?? {};
     for (const id of workspaces) {
@@ -179,7 +183,7 @@ async function withSwitcherPanel({
   await SvalPanel.refresh();
   Assert.ok(
     await within(
-      SvalPanel.switchTo(ids.workspaces[0]),
+      SvalWindowWorkspace.of(window).switchTo(ids.workspaces[0]),
       10_000,
       "the switch to the first workspace"
     ),
@@ -257,7 +261,7 @@ async function activateWorkspace(menu, id) {
   );
   // The switch reads the document before it moves the window.
   await within(
-    SvalPanel._switching?.idle() ?? Promise.resolve(),
+    SvalWindowWorkspace.of(window).switchesSettled(),
     10_000,
     "the switch"
   );
@@ -601,7 +605,11 @@ async function withSwitcherTabs({
   let baseline = await quiet(fixture.engine, observer);
   const [first, ...rest] = fixture.ids.workspaces;
   for (const id of [...rest, first]) {
-    await within(SvalPanel.switchTo(id), 10_000, "a warm-up switch");
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(id),
+      10_000,
+      "a warm-up switch"
+    );
     baseline = await quiet(fixture.engine, observer);
   }
   // The warm-up leaves the other workspaces hidden and loaded; a task

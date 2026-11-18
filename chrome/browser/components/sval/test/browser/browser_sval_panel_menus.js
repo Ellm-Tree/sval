@@ -281,7 +281,7 @@ add_task(async function the_workspace_menu_works_from_the_keyboard() {
     "Enter switching the window to Web"
   );
   await within(
-    SvalPanel._switching.idle(),
+    SvalWindowWorkspace.of(window).switchesSettled(),
     10_000,
     "the switch to Web finishing"
   );

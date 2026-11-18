@@ -80,7 +80,7 @@ function selectedOnStrip() {
  */
 async function switched(id) {
   await within(
-    SvalPanel._switching?.idle() ?? Promise.resolve(),
+    SvalWindowWorkspace.of(window).switchesSettled(),
     10_000,
     "the switch"
   );
@@ -186,7 +186,11 @@ async function settled(strip) {
 add_task(async function choosing_the_strip_keeps_the_workspace() {
   const { ids } = await withSwitcherPanel({ workspaces: 3 });
   const [, second] = ids.workspaces;
-  await within(SvalPanel.switchTo(second), 10_000, "the switch to the second");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(second),
+    10_000,
+    "the switch to the second"
+  );
   Assert.ok(
     SvalPanel._els.switcher.checkVisibility(),
     "the menu's button shows by default"
@@ -425,7 +429,11 @@ add_task(async function names_show_whole_up_to_the_track_less_two_icons() {
   await SpecialPowers.pushPrefEnv({ set: [[STRIP_NAMES_PREF, "current"]] });
   await settled(strip);
   Assert.ok(nameFits(itemOf(development)), "the current name shows whole");
-  await within(SvalPanel.switchTo(printing), 10_000, "the switch");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(printing),
+    10_000,
+    "the switch"
+  );
   await settled(strip);
   Assert.ok(nameFits(itemOf(printing)), "as does the next one's");
 

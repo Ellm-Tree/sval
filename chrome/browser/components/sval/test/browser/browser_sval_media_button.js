@@ -327,7 +327,10 @@ add_task(
     const tab = observer.tabFor(ids.tabs[0]);
     await untilRestored(tab);
     await playVideo(tab);
-    Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+    Assert.ok(
+      await SvalWindowWorkspace.of(window).switchTo(second),
+      "the window switched"
+    );
 
     const menu = await openSwitcher();
     const [entry] = switcherEntries(menu, [first]);
@@ -377,7 +380,10 @@ add_task(async function the_footer_controls_what_plays_last() {
 
   await playVideo(tab);
   await TestUtils.waitForCondition(() => !bar.hidden, "the controls show");
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched"
+  );
   Assert.ok(!bar.hidden, "and stay for the workspace left playing");
   Assert.equal(bar.getAttribute("data-media"), "pause", "offering to pause");
 

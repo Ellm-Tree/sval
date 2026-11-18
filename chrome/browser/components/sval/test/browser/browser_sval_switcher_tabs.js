@@ -48,7 +48,10 @@ add_task(async function switching_away_and_back_loses_no_node() {
       "workspace is data, not Firefox tabs (§10.4)"
   );
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await releaseHiddenNow(observer);
   const away = await quiet(engine, observer);
 
@@ -66,7 +69,10 @@ add_task(async function switching_away_and_back_loses_no_node() {
       "window is not closing a tab"
   );
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   await releaseHiddenNow(observer);
   Assert.equal(
     await quiet(engine, observer),
@@ -119,7 +125,10 @@ add_task(async function a_refused_discard_leaves_the_tab_where_it_is() {
     dialog.close();
     await within(closedPromise, 10_000, "the dialog closing");
   });
-  Assert.ok(await SvalPanel.switchTo(second), "the switch still completed");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the switch still completed"
+  );
 
   Assert.equal(
     SvalWindowWorkspace.of(window).id,
@@ -156,7 +165,10 @@ add_task(async function a_switch_while_a_sync_is_in_flight_loses_nothing() {
 
   // A real pass against the real folder, not awaited.
   const pass = engine.sync(SYNC_DOCUMENT, Date.now());
-  Assert.ok(await SvalPanel.switchTo(second), "the switch went through");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the switch went through"
+  );
   await pass;
 
   Assert.equal(
@@ -175,7 +187,7 @@ add_task(async function a_switch_while_a_sync_is_in_flight_loses_nothing() {
     "and the pass and the switch between them changed nothing"
   );
 
-  Assert.ok(await SvalPanel.switchTo(first), "back again");
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(first), "back again");
   Assert.equal(
     await quiet(engine, observer),
     baseline,
@@ -199,8 +211,8 @@ add_task(async function two_real_switches_in_succession_end_in_one_place() {
 
   // Not awaited between them, which is what a person pressing twice does.
   const both = await Promise.all([
-    SvalPanel.switchTo(second),
-    SvalPanel.switchTo(third),
+    SvalWindowWorkspace.of(window).switchTo(second),
+    SvalWindowWorkspace.of(window).switchTo(third),
   ]);
   Assert.deepEqual(both, [true, true], "both switches ran");
 
@@ -220,7 +232,10 @@ add_task(async function two_real_switches_in_succession_end_in_one_place() {
     "and two switches racing deleted nothing between them"
   );
 
-  Assert.ok(await SvalPanel.switchTo(first), "and the way back still works");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and the way back still works"
+  );
   Assert.equal(await quiet(engine, observer), baseline, "with the tree intact");
   Assert.deepEqual(
     shownIds(),
@@ -233,14 +248,17 @@ add_task(async function two_real_switches_in_succession_end_in_one_place() {
  * Two switches pressed in succession through workspaces whose tabs earlier
  * switches kept loaded and hidden. A switch lands on a kept tab by selecting
  * it, and that shows the tab as anything outside Sval going to a kept tab
- * shows it (`_onKeptTabShown`). The window ends where the user pressed last
+ * shows it (`SvalWindowWorkspace.keptTabShown`). The window ends where the user pressed last
  * and goes nowhere after it.
  */
 add_task(async function two_switches_through_kept_tabs_end_in_one_place() {
   const { ids, observer } = await withSwitcherTabs({ workspaces: 3 });
   const [first, second, third] = ids.workspaces;
   for (const id of [second, third, first]) {
-    Assert.ok(await SvalPanel.switchTo(id), "a switch that keeps tabs");
+    Assert.ok(
+      await SvalWindowWorkspace.of(window).switchTo(id),
+      "a switch that keeps tabs"
+    );
   }
   Assert.ok(
     [1, 2].every(i => observer.tabFor(ids.tabs[i])?.hidden),
@@ -248,8 +266,8 @@ add_task(async function two_switches_through_kept_tabs_end_in_one_place() {
   );
 
   const both = await Promise.all([
-    SvalPanel.switchTo(second),
-    SvalPanel.switchTo(third),
+    SvalWindowWorkspace.of(window).switchTo(second),
+    SvalWindowWorkspace.of(window).switchTo(third),
   ]);
   Assert.deepEqual(both, [true, true], "both switches ran");
   const selected = [];
@@ -258,7 +276,11 @@ add_task(async function two_switches_through_kept_tabs_end_in_one_place() {
   atTaskEnd(() =>
     gBrowser.tabContainer.removeEventListener("TabSelect", onSelect)
   );
-  await within(SvalPanel._switching.idle(), 10_000, "the switches settling");
+  await within(
+    SvalWindowWorkspace.of(window).switchesSettled(),
+    10_000,
+    "the switches settling"
+  );
 
   Assert.deepEqual(selected, [], "the window selected nothing after them");
   Assert.equal(
@@ -287,7 +309,10 @@ add_task(async function an_empty_workspace_gets_its_home_tab() {
   SvalPanel.settings.setCollapsed(empty, false);
   await SvalPanel.refresh();
 
-  Assert.ok(await SvalPanel.switchTo(empty), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(empty),
+    "the window switched"
+  );
   const blank = gBrowser.selectedTab;
   await TestUtils.waitForCondition(
     () => taggedId(blank),
@@ -365,7 +390,10 @@ add_task(
     let home = null;
 
     for (let visit = 1; visit <= 5; visit++) {
-      Assert.ok(await SvalPanel.switchTo(empty), `visit ${visit} switched in`);
+      Assert.ok(
+        await SvalWindowWorkspace.of(window).switchTo(empty),
+        `visit ${visit} switched in`
+      );
       await TestUtils.waitForCondition(
         () => shownIds().length === 1,
         `visit ${visit} holds the workspace's one tab`
@@ -381,7 +409,10 @@ add_task(
       home ??= held;
       Assert.equal(held, home, `visit ${visit} shows the same home tab`);
 
-      Assert.ok(await SvalPanel.switchTo(first), `visit ${visit} switched out`);
+      Assert.ok(
+        await SvalWindowWorkspace.of(window).switchTo(first),
+        `visit ${visit} switched out`
+      );
       await quiet(engine, observer);
       Assert.equal(
         gBrowser.tabs.length,
@@ -417,8 +448,8 @@ add_task(
 );
 
 /**
- * `_switchTo` is serialised, but `_showWorkspace` is also reached from
- * `_resolveCurrentWorkspace`, which `_refresh` calls, and `_refresh` is the
+ * `switchTo` is serialised, but `show` is also reached from
+ * `resolve`, which the panel's `refresh` calls, and `refresh` is the
  * tab observer's `onTreeChanged` as well as the poll's path. So a peer taking
  * away the workspace this window was showing can start a hand-over with no
  * switch involved. Two hand-overs with different ideas of what to keep leave
@@ -436,8 +467,8 @@ add_task(async function a_hand_over_in_flight_serialises_the_next_one() {
 
   await within(
     Promise.all([
-      SvalPanel._showWorkspace(second),
-      SvalPanel._showWorkspace(third),
+      SvalWindowWorkspace.of(window).show(second),
+      SvalWindowWorkspace.of(window).show(third),
     ]),
     10_000,
     "both hand-overs"

@@ -129,7 +129,7 @@ async function withFreshPanel({ before } = {}) {
   expectWorkspaceTabs();
   Assert.ok(
     await within(
-      SvalPanel.switchTo(ids.workspace),
+      SvalWindowWorkspace.of(window).switchTo(ids.workspace),
       10_000,
       "the switch to the fixture's workspace"
     ),

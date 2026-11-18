@@ -4150,7 +4150,7 @@ class SvalTabObserver {
         (await this.#fromWindow(this.#newTabParent())) ?? this.#workspaceId;
     }
     // A window whose workspace the document no longer holds is about to show
-    // another one or none (`_resolveCurrentWorkspace`). The tab `keepOneTab`
+    // another one or none (`SvalWindowWorkspace.resolve`). The tab `keepOneTab`
     // opens meanwhile stays unfiled: filed under the gone workspace, it would
     // carry an id with no node.
     const shown = (await this.#latestTree())[this.#workspaceId];

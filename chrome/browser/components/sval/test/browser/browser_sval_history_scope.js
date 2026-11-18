@@ -275,7 +275,7 @@ add_task(async function showing_another_workspace_lists_its_history() {
   const here = SvalWindowWorkspace.of(window).id;
   const tabsBefore = new Set(gBrowser.tabs);
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(here);
+    await SvalWindowWorkspace.of(window).switchTo(here);
     // An empty workspace is shown with a new tab of its own.
     for (const tab of gBrowser.tabs) {
       if (!tabsBefore.has(tab)) {
@@ -290,7 +290,7 @@ add_task(async function showing_another_workspace_lists_its_history() {
     () => listed(tree).length === 2,
     "All Workspaces"
   );
-  await SvalPanel.switchTo(there);
+  await SvalWindowWorkspace.of(window).switchTo(there);
   await TestUtils.waitForCondition(
     () => listed(tree).length === 1 && listed(tree)[0] === THERE,
     "the window's other workspace lists its own"

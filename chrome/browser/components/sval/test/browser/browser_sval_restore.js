@@ -34,7 +34,7 @@ Services.scriptloader.loadSubScript(
  * A workspace of this task's in the window's own document, shown in the
  * window by its own switch while it is still empty, plus helpers that file
  * tab nodes into it. An empty workspace's switch leaves the window on a home
- * page tab of the workspace's own (`_handOverWindowOnce`), so a node filed
+ * page tab of the workspace's own (`SvalWindowWorkspace.handOver`), so a node filed
  * afterwards has no tab until a restore opens one.
  *
  * @returns {Promise<object>} `{ engine, workspace, addTab, addPeersTab }`.
@@ -51,7 +51,7 @@ async function aShownWorkspace() {
   expectWorkspaceTabs();
   Assert.ok(
     await within(
-      SvalPanel.switchTo(workspace),
+      SvalWindowWorkspace.of(window).switchTo(workspace),
       10_000,
       "the switch to the task's workspace"
     ),
@@ -110,7 +110,7 @@ async function aWindowOnAnEmptyWorkspace() {
 
 /**
  * Restores the workspace the window shows into it, as a switch's hand-over
- * does (`_handOverWindowOnce`): on the window's own engine, with its tab
+ * does (`SvalWindowWorkspace.handOver`): on the window's own engine, with its tab
  * observer attached, and without closing empty tabs.
  *
  * @param {object} [options] More of `SvalRestore.restore`'s options.

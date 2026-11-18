@@ -701,7 +701,11 @@ add_task(async function undo_shows_a_workspace_again_in_the_window_it_left() {
   // The switch names its workspace before it redraws and fades in. Closing
   // the window before then leaves the switch unfinished, and the redraw's
   // queued `takeKeptTabs` then trips `SvalSerialQueue`'s re-entry check.
-  await within(panel._switching.idle(), 10_000, "the workspace switch");
+  await within(
+    SvalWindowWorkspace.of(win).switchesSettled(),
+    10_000,
+    "the workspace switch"
+  );
   Assert.ok(!win.closed, "the other window stays open");
   await within(BrowserTestUtils.closeWindow(win), 10_000, "the window closing");
 });

@@ -67,7 +67,10 @@ add_task(async function coming_back_finds_the_same_page() {
   const left = observer.tabFor(ids.tabs[0]);
   await untilRestored(left);
   markPage(left);
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched"
+  );
 
   Assert.ok(
     gBrowser.tabs.includes(left),
@@ -79,7 +82,10 @@ add_task(async function coming_back_finds_the_same_page() {
   );
   Assert.ok(left.linkedPanel, "and still loaded");
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(
     observer.tabFor(ids.tabs[0]),
     left,
@@ -103,7 +109,10 @@ add_task(async function three_hours_away_unloads_the_workspace() {
 
   const left = observer.tabFor(ids.tabs[0]);
   await untilRestored(left);
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched"
+  );
 
   const soon = SvalClock.now() + HIDDEN_WORKSPACE_UNLOAD_MS - 60_000;
   await observer.releaseIdle(soon);
@@ -136,7 +145,10 @@ add_task(async function a_tab_playing_sound_outlasts_the_time() {
   const noisy = observer.tabFor(ids.tabs[0]);
   await untilRestored(noisy);
   await playTone(noisy);
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched"
+  );
   Assert.ok(
     noisy.hasAttribute("soundplaying"),
     "the workspace left goes on playing"
@@ -154,7 +166,10 @@ add_task(async function closing_the_last_tab_keeps_the_window() {
   const [, second] = ids.workspaces;
   const left = observer.tabFor(ids.tabs[0]);
   await untilRestored(left);
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched"
+  );
   Assert.ok(SvalFirefox.isHiddenForWorkspace(left), "the left tab is hidden");
 
   const closing = observer.tabFor(ids.tabs[1]);

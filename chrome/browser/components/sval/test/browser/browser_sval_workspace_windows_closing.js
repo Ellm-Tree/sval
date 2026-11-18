@@ -188,7 +188,7 @@ add_task(async function a_switch_to_a_held_workspace_waits_for_its_window() {
   );
   registerCleanupFunction(() => release());
 
-  const switched = SvalPanel.switchTo(held);
+  const switched = SvalWindowWorkspace.of(window).switchTo(held);
   // The engine answers in order, so by the second answer the switch has read
   // the tree it goes by.
   await SvalPanel.engine.tree();

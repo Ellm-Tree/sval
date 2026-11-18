@@ -56,11 +56,19 @@ async function workspaceOfManyTabs() {
   await SvalPanel.refresh();
   expectWorkspaceTabs();
   Assert.ok(
-    await within(SvalPanel.switchTo(second), 10_000, "the switch away"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(second),
+      10_000,
+      "the switch away"
+    ),
     "the window shows the second workspace"
   );
   Assert.ok(
-    await within(SvalPanel.switchTo(first), 10_000, "the switch back"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(first),
+      10_000,
+      "the switch back"
+    ),
     "and the first again"
   );
   await within(SvalPanel.observer.settled(), 10_000, "the observer settling");

@@ -172,7 +172,7 @@ add_task(async function a_switch_started_during_the_deleting_pass_wins() {
   // The switcher's own action, started in the turn the pass started in. The
   // pass rebuilds an open switcher as it takes the shown workspace away, so
   // an entry cannot be chosen from the menu while it runs.
-  const switched = SvalPanel.switchTo(wanted.id);
+  const switched = SvalWindowWorkspace.of(window).switchTo(wanted.id);
   Assert.ok(
     await within(pass, 20_000, "the pass"),
     "the pass read the other device's deletion"

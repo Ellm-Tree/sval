@@ -48,7 +48,11 @@ const pinsFixture = {};
  * @param {string} id
  */
 async function showWorkspace(id) {
-  await within(SvalPanel.switchTo(id), 10_000, "the workspace switch");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(id),
+    10_000,
+    "the workspace switch"
+  );
   await within(
     SvalPanel.observer.settled(),
     10_000,

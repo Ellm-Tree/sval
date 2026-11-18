@@ -1290,7 +1290,7 @@
       // there is nobody above it to reject to, and a switch that fails silently
       // would leave the panel drawing one workspace while the window believed
       // it was in another.
-      return this.switchTo(id).then(
+      return this._workspace.switchTo(id).then(
         () => {},
         err => {
           this._modules.SvalLog.error(
@@ -1421,7 +1421,7 @@
      * into it could not swipe back out.
      *
      * A workspace another window shows brings that window forward
-     * (`_showWorkspace`), and the gesture's momentum may go on arriving over
+     * (`SvalWindowWorkspace.show`), and the gesture's momentum may go on arriving over
      * it, so that window's panel takes the spent gesture
      * ({@link catchSwipe}).
      *

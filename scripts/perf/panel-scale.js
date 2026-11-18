@@ -171,9 +171,9 @@ async function runSize(total) {
       "switch-into-big",
       async i => {
         if (i) {
-          await SvalPanel.switchTo(home);
+          await SvalWindowWorkspace.of(window).switchTo(home);
         }
-        await SvalPanel.switchTo(big.ws);
+        await SvalWindowWorkspace.of(window).switchTo(big.ws);
         await settledObserver();
       },
       3
@@ -239,7 +239,7 @@ async function runSize(total) {
     restore();
   }
 
-  await SvalPanel.switchTo(home);
+  await SvalWindowWorkspace.of(window).switchTo(home);
   for (const each of ids) {
     for (const g of each.groups) {
       settings.setCollapsed(g.id, true);

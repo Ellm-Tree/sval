@@ -47,7 +47,11 @@ add_setup(async function () {
   });
   expectWorkspaceTabs();
   Assert.ok(
-    await within(SvalPanel.switchTo(home), 10_000, "the switch to Home"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(home),
+      10_000,
+      "the switch to Home"
+    ),
     "the window shows this file's workspace"
   );
   await within(
@@ -237,7 +241,7 @@ async function otherWorkspace({ isolated = false } = {}) {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(home);
+    await SvalWindowWorkspace.of(window).switchTo(home);
     await within(
       SvalPanel.observer.settled(),
       10_000,
@@ -509,14 +513,17 @@ add_task(async function a_split_comes_back_whole_after_switching_away() {
   const before = JSON.stringify(await settledNodes());
 
   const elsewhere = await otherWorkspace();
-  Assert.ok(await SvalPanel.switchTo(elsewhere), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(elsewhere),
+    "the window switched away"
+  );
   await settledNodes();
   Assert.ok(
     tabs.every(tab => !gBrowser.visibleTabs.includes(tab)),
     "the split went out of sight with its workspace"
   );
 
-  Assert.ok(await SvalPanel.switchTo(home), "and back");
+  Assert.ok(await SvalWindowWorkspace.of(window).switchTo(home), "and back");
   await untilSplits([ids], "the split is back, both panes in order");
   await TestUtils.waitForCondition(
     () => gBrowser.selectedTab.splitview,
@@ -562,9 +569,9 @@ add_task(async function a_divider_let_go_keeps_its_place_after_a_switch() {
   Assert.less(Math.abs(left + right - 100), 0.1, "and the two make 100");
 
   const elsewhere = await otherWorkspace();
-  await SvalPanel.switchTo(elsewhere);
+  await SvalWindowWorkspace.of(window).switchTo(elsewhere);
   await settledNodes();
-  await SvalPanel.switchTo(home);
+  await SvalWindowWorkspace.of(window).switchTo(home);
   await untilSplits([ids], "the split is back");
   const shown = gBrowser.tabs.find(
     tab => SvalPanel.observer.nodeIdFor(tab) === ids[0]
@@ -584,7 +591,7 @@ add_task(async function a_divider_let_go_keeps_its_place_after_a_switch() {
 
 add_task(async function a_picked_pane_in_an_isolated_workspace_stays_split() {
   const isolated = await otherWorkspace({ isolated: true });
-  await SvalPanel.switchTo(isolated);
+  await SvalWindowWorkspace.of(window).switchTo(isolated);
   const { tabs, ids } = await openTabs(1);
   Assert.equal(gBrowser.selectedTab, tabs[0], "the tab is on screen");
 

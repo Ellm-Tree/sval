@@ -63,7 +63,11 @@ add_setup(async function () {
   });
   expectWorkspaceTabs();
   Assert.ok(
-    await within(SvalPanel.switchTo(home), 10_000, "the switch to Home"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(home),
+      10_000,
+      "the switch to Home"
+    ),
     "the window shows the file's workspace"
   );
   await within(

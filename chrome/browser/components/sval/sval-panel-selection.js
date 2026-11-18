@@ -420,9 +420,9 @@ Object.assign(SvalPanel, {
    * it is. An agent's workspace no window shows gets a window of its own:
    * the Launcher never puts the user to work in an agent's workspace
    * (launcher spec §6), as does any workspace at `newWindow`. Any other
-   * workspace is switched to here, through {@link switchTo}. The tab is marked used before a switch, so the window
+   * workspace is switched to here, through `SvalWindowWorkspace.switchTo`. The tab is marked used before a switch, so the window
    * that shows the workspace selects it as it starts or is handed over
-   * ({@link _mostRecentlyActive}), and no other tab of the workspace loads
+   * (`SvalWindowWorkspace.mostRecentlyActive`), and no other tab of the workspace loads
    * on the way.
    *
    * Nothing here makes a node: a tab gone from the tree since its row was
@@ -489,7 +489,7 @@ Object.assign(SvalPanel, {
     if (newWindow || agentLabelOf(nodes, workspace) !== null) {
       return this._openWorkspaceInNewWindow(workspace) !== null;
     }
-    if (!(await this.switchTo(workspace))) {
+    if (!(await this._workspace.switchTo(workspace))) {
       return false;
     }
     await this.activate(row);

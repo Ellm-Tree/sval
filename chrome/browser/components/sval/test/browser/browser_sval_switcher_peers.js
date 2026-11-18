@@ -85,7 +85,7 @@ add_task(
     // back from this press.
     SvalPanel._els.tree.textContent = "";
     Assert.strictEqual(
-      await SvalPanel.switchTo(second),
+      await SvalWindowWorkspace.of(window).switchTo(second),
       false,
       "the switch is a no-op rather than leaving the window on an id that " +
         "draws nothing"
@@ -239,8 +239,8 @@ add_task(async function two_switches_in_a_row_do_not_interleave() {
 
   // Not awaited between them, as a person pressing twice does.
   const both = Promise.all([
-    SvalPanel.switchTo(second),
-    SvalPanel.switchTo(first),
+    SvalWindowWorkspace.of(window).switchTo(second),
+    SvalWindowWorkspace.of(window).switchTo(first),
   ]);
   Assert.deepEqual(
     await within(both, 10_000, "both switches"),

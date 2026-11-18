@@ -85,7 +85,11 @@ async function withAppearancePanel() {
   await engine.sync(SYNC_DOCUMENT, now);
   await SvalPanel.refresh();
   Assert.ok(
-    await within(SvalPanel.switchTo(ids.workspace), 10_000, "the switch"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(ids.workspace),
+      10_000,
+      "the switch"
+    ),
     "the window shows the workspace made"
   );
   await within(
@@ -802,7 +806,10 @@ add_task(async function a_dialog_wears_the_workspaces_tint() {
   Assert.deepEqual(await cardIn(), red, "the dialog's card is the tint");
 
   const play = await addColouredWorkspace(engine, "yellow");
-  Assert.ok(await SvalPanel.switchTo(play.id), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(play.id),
+    "the window switched"
+  );
   await SvalPanel.refresh();
   const yellow = paintedInWindow("var(--sval-tint)");
   Assert.notDeepEqual(yellow, red, "the other workspace has its own tint");
@@ -871,7 +878,7 @@ add_task(async function a_tinted_window_follows_the_os_scheme() {
   await engine.sync(SYNC_DOCUMENT, Date.now());
 
   const switchTo = async token => {
-    await SvalPanel.switchTo(workspaces[token]);
+    await SvalWindowWorkspace.of(window).switchTo(workspaces[token]);
     await SvalPanel.refresh();
     Assert.equal(
       SvalPanel._els.switcher.getAttribute("data-sval-color"),

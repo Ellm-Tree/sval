@@ -175,7 +175,7 @@ async function splitWithTab(win, viewed, id) {
   // only when the tree next tells it.
   await shownBy?.SvalPanel?.refresh();
   await shownBy?.SvalPanel?.releaseTabsElsewhere();
-  await panel.takeKeptTabs();
+  await lazy.SvalWindowWorkspace.of(win).takeKeptTabs();
   await panel.goToTab(id);
   // A pane's tab that has just come here is shown in its split once it is
   // here (`_keepSplits`), as a restore shows it.

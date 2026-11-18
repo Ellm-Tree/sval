@@ -70,7 +70,7 @@ async function showIsolatedWorkspace() {
   });
   atTaskEnd(async () => {
     if (SvalWindowWorkspace.of(window).id !== home) {
-      await SvalPanel.switchTo(home);
+      await SvalWindowWorkspace.of(window).switchTo(home);
       await within(
         SvalPanel.observer.settled(),
         10_000,
@@ -84,7 +84,10 @@ async function showIsolatedWorkspace() {
     await SvalPanel.refresh();
   });
   await SvalPanel.refresh();
-  Assert.ok(await SvalPanel.switchTo(id), "the window shows Work");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(id),
+    "the window shows Work"
+  );
   await within(
     SvalPanel.observer.settled(),
     10_000,

@@ -205,7 +205,11 @@ add_task(async function a_switch_of_workspace_clears_the_selection() {
   });
   for (const id of [other, ids.workspace]) {
     Assert.ok(
-      await within(SvalPanel.switchTo(id), 10_000, "a switch of workspace"),
+      await within(
+        SvalWindowWorkspace.of(window).switchTo(id),
+        10_000,
+        "a switch of workspace"
+      ),
       "the window switched"
     );
   }

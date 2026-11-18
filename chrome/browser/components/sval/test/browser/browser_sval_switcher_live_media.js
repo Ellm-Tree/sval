@@ -80,7 +80,10 @@ add_task(async function a_call_goes_on_across_a_switch() {
     "the tab shows the camera in use"
   );
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
     "the call's page is still loaded"
@@ -91,7 +94,10 @@ add_task(async function a_call_goes_on_across_a_switch() {
     "and the call goes on"
   );
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(gBrowser.selectedTab, tab, "the user is back in the call");
   Assert.deepEqual(
     await live(),
@@ -166,7 +172,10 @@ add_task(async function a_picture_in_picture_video_plays_on_across_a_switch() {
     });
   Assert.ok(await playing(), "the video plays in picture-in-picture");
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
     "the video's page is still loaded"
@@ -175,7 +184,10 @@ add_task(async function a_picture_in_picture_video_plays_on_across_a_switch() {
   Assert.ok(!player.closed, "the picture-in-picture window is still open");
   Assert.ok(await playing(), "and the video plays on in it");
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(gBrowser.selectedTab, tab, "the user is back on its page");
   Assert.ok(await playing(), "with the video still playing");
 });

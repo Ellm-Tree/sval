@@ -84,13 +84,19 @@ add_task(async function a_kept_tab_outlasts_the_idle_unload() {
     "session restore keeps the mark"
   );
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await sweepPastTheTime(observer);
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
     "the kept tab is still loaded"
   );
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(observer.tabFor(id), tab, "the same tab is back");
 
   await SvalPanel.run("keepLoaded", SvalPanel._rowFor(id));
@@ -99,13 +105,19 @@ add_task(async function a_kept_tab_outlasts_the_idle_unload() {
     !keepLoadedItem(id).hasAttribute("checked"),
     "and its menu shows it unchecked"
   );
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   await sweepPastTheTime(observer);
   Assert.ok(
     !gBrowser.tabs.includes(tab) || !tab.linkedPanel,
     "the idle unload releases the tab"
   );
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
 });
 
 add_task(async function the_launcher_keeps_the_selected_tab_loaded() {

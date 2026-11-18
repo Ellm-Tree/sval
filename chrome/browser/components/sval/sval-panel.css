@@ -3661,7 +3661,7 @@ browser[sval-agent-layer] {
 }
 
 /* A workspace switch blends the window from one workspace's tint to the
-   next (`_switchToOnce`). Registered as a colour so it interpolates; nothing
+   next (`SvalWindowWorkspace.switchTo`). Registered as a colour so it interpolates; nothing
    reads it with a fallback. */
 @property --sval-tint {
   syntax: "<color>";

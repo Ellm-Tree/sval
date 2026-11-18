@@ -398,7 +398,7 @@ Object.assign(SvalPanel, {
    * message shows; the tab on screen hands over first to the tab a close
    * would land on (`_findTabToBlurTo`), or to a new home tab when they are
    * every tab the window has (`keepOneTab`). A Workspace the window shows
-   * is left as a switch leaves one (`_resolveCurrentWorkspace`), and any of
+   * is left as a switch leaves one (`SvalWindowWorkspace.resolve`), and any of
    * its tabs a window kept loaded is unloaded.
    *
    * @param {string} text What went, in a few words.
@@ -552,14 +552,14 @@ Object.assign(SvalPanel, {
     }
     const [id] = pending.tree.ids;
     if (pending.showing && this._treeNodes[id]) {
-      await this.switchTo(id);
+      await this._workspace.switchTo(id);
     }
     // The window that showed it, if still open, shows it again.
     const other = pending.shownElsewhere?.closed
       ? null
-      : pending.shownElsewhere?.SvalPanel;
-    if (other?._engine && this._treeNodes[id]) {
-      await other.switchTo(id);
+      : pending.shownElsewhere;
+    if (other?.SvalPanel?._engine && this._treeNodes[id]) {
+      await this._modules.SvalWindowWorkspace.of(other).switchTo(id);
     }
   },
 

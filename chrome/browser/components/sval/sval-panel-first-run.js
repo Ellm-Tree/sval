@@ -201,7 +201,7 @@ Object.assign(SvalPanel, {
       return;
     }
     try {
-      await this._adoptOrCreateWorkspace();
+      await this._workspace.adoptOrCreate();
     } catch (err) {
       SvalLog.warn(
         `first run's workspace was not made: ${SvalLog.errorName(err)}`
@@ -278,7 +278,10 @@ Object.assign(SvalPanel, {
       !fillsWorkspace && answers.workspace
         ? SvalPanelModel.chosenContainer(true, answers.workspace)
         : null;
-    const id = await this._createOwnWorkspace(made);
+    const id = await this._workspace.createOwn(
+      made,
+      made ? own => this._chosenAppearanceOps(own, made) : undefined
+    );
     this._firstRunReuse = made ? null : id;
     return { importing: !!plan.length };
   },

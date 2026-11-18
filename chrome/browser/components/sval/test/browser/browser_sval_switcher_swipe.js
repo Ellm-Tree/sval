@@ -405,7 +405,7 @@ add_task(async function a_swipe_to_another_windows_workspace_raises_it() {
   const [first, second] = ids.workspaces;
   Assert.ok(
     await within(
-      SvalPanel.switchTo(second),
+      SvalWindowWorkspace.of(window).switchTo(second),
       10_000,
       "the switch to the second"
     ),

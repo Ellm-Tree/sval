@@ -168,7 +168,7 @@ add_task(async function workspaces_lists_and_switches() {
   );
 
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(home);
+    await SvalWindowWorkspace.of(window).switchTo(home);
   });
   entry(work).doCommand();
   await TestUtils.waitForCondition(

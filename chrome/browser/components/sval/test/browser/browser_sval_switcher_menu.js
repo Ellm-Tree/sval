@@ -44,7 +44,11 @@ add_task(async function the_menu_opens_over_the_switcher_in_order() {
     names: ["Work", "Home", "3D Printing"],
   });
   const last = ids.workspaces.at(-1);
-  await within(SvalPanel.switchTo(last), 10_000, "the switch to the last");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(last),
+    10_000,
+    "the switch to the last"
+  );
 
   const switcher = SvalPanel._els.switcher;
   const menu = await openSwitcher();
@@ -101,7 +105,7 @@ add_task(async function picking_a_workspace_closes_the_menu_on_it() {
   EventUtils.synthesizeMouseAtCenter(switcherEntries(menu, [third])[0], {});
   await within(hidden, 10_000, "the menu closing");
   await within(
-    SvalPanel._switching?.idle() ?? Promise.resolve(),
+    SvalWindowWorkspace.of(window).switchesSettled(),
     10_000,
     "the switch"
   );

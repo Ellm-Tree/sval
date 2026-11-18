@@ -238,7 +238,7 @@ add_task(async function new_workspace_runs_from_its_row() {
   await switchDone();
   Assert.equal(purpose, "new-workspace", "the dialog asked");
   atTaskEnd(async () => {
-    await SvalPanel.switchTo(home);
+    await SvalWindowWorkspace.of(window).switchTo(home);
     await engine.mutate({ kind: "remove", id: trips, now: Date.now() });
     await SvalPanel.refresh();
   });

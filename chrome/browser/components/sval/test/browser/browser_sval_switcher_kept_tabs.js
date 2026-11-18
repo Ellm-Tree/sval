@@ -80,7 +80,10 @@ async function assertKeptOutOfReach(fixture, tab, selector, typed) {
   const { ids, engine, observer, baseline } = fixture;
   const [first, second] = ids.workspaces;
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
     "the page is still loaded"
@@ -103,7 +106,10 @@ async function assertKeptOutOfReach(fixture, tab, selector, typed) {
     "and the document is as it was: the tab is still its workspace's"
   );
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(gBrowser.selectedTab, tab, "the user is back on that page");
   Assert.ok(gBrowser.visibleTabs.includes(tab), "among the window's tabs");
   const { text, marked } = await pageState(tab, selector);
@@ -167,7 +173,10 @@ add_task(async function a_hung_page_does_not_hold_up_a_switch() {
     return Date.now();
   });
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched away");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched away"
+  );
   const switched = Date.now();
   Assert.ok(
     gBrowser.tabs.includes(tab) && tab.linkedPanel,
@@ -177,7 +186,10 @@ add_task(async function a_hung_page_does_not_hold_up_a_switch() {
   const recovered = await within(hung, 30_000, "the page's script ending");
   Assert.less(switched, recovered, "the switch finished while the page hung");
 
-  Assert.ok(await SvalPanel.switchTo(first), "and switched back");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(first),
+    "and switched back"
+  );
   Assert.equal(gBrowser.selectedTab, tab, "the user is back on that page");
   Assert.ok(
     (await pageState(tab, "title")).marked,

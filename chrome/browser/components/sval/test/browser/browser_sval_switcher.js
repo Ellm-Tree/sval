@@ -141,12 +141,12 @@ add_task(async function switching_redraws_and_the_window_remembers() {
   );
 
   Assert.strictEqual(
-    await SvalPanel.switchTo(second),
+    await SvalWindowWorkspace.of(window).switchTo(second),
     false,
     "switching to the workspace already shown is not a switch"
   );
   Assert.strictEqual(
-    await SvalPanel.switchTo(ids.tabs[0]),
+    await SvalWindowWorkspace.of(window).switchTo(ids.tabs[0]),
     false,
     "and a node that is not a workspace is refused rather than shown, which " +
       "would leave the window remembering an id that draws nothing"
@@ -370,7 +370,10 @@ add_task(async function a_switch_keeps_new_tabs_in_the_workspace_shown() {
     "a tab selected in the first workspace files beside itself"
   );
 
-  Assert.ok(await SvalPanel.switchTo(second), "the window switched");
+  Assert.ok(
+    await SvalWindowWorkspace.of(window).switchTo(second),
+    "the window switched"
+  );
   await assertNoHandOverFailure();
   // One of the browser's own pages is filed in the workspace the tab observer
   // was told the window shows, whatever is selected (`SvalTabs`' `fileTab`).

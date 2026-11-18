@@ -148,7 +148,7 @@ export async function showRestored(win, { tabs, workspace }) {
   if (lazy.SvalWindowWorkspace.of(target).id === workspace) {
     await panel.refresh();
   } else {
-    await panel.switchTo(workspace);
+    await lazy.SvalWindowWorkspace.of(target).switchTo(workspace);
   }
   await panel.activate({ kind: lazy.TAB, id: tabs[0] });
   target.focus();

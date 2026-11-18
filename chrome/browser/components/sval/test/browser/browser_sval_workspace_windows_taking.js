@@ -235,7 +235,7 @@ add_task(async function shift_click_opens_a_workspace_in_a_new_window() {
   entry.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
   await within(hidden, 10_000, "a click closing the switcher");
   await within(
-    SvalPanel._switching?.idle() ?? Promise.resolve(),
+    SvalWindowWorkspace.of(window).switchesSettled(),
     10_000,
     "the switch"
   );
@@ -485,9 +485,17 @@ add_task(async function a_window_moved_off_its_remembered_workspace_lets_go() {
 
   // A window on the first workspace, closed, while this one shows the
   // second; then this window goes back to the first.
-  await within(SvalPanel.switchTo(second), 10_000, "the switch away");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(second),
+    10_000,
+    "the switch away"
+  );
   await closeForTheSession(engine, await tearOff(first));
-  await within(SvalPanel.switchTo(first), 10_000, "the switch back");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(first),
+    10_000,
+    "the switch back"
+  );
   await settleBoth(engine, torn);
   const before = await treeJson(engine);
 
@@ -599,7 +607,11 @@ add_task(async function a_reopened_window_files_no_copy_of_a_shown_tab() {
   // A window on the first workspace, closed while this one shows the third;
   // then another window on the first holds its tab, so the second is the one
   // workspace no window shows.
-  await within(SvalPanel.switchTo(third), 10_000, "the switch away");
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(third),
+    10_000,
+    "the switch away"
+  );
   const closing = await tearOff(first);
   await settleBoth(engine, closing);
   await within(
@@ -1034,7 +1046,7 @@ add_task(async function an_ordinary_new_window_holds_its_workspace() {
  * A workspace another device closed between the menu being built and the entry
  * being pressed opens no window, and says nothing.
  *
- * The same no-op and redraw {@link SvalPanel._switchToOnce} answers with
+ * The same no-op and redraw `SvalWindowWorkspace.switchTo` answers with
  * (spec §10.7). A window opened on something else would be a window nobody
  * asked for, and an explanation would describe a state that has gone.
  */

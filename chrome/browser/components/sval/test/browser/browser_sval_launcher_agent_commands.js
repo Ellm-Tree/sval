@@ -227,7 +227,7 @@ add_task(async function go_to_a_workspace_is_the_switchers() {
   });
   atTaskEnd(async () => {
     if (!win.closed && SvalWindowWorkspace.of(win).id === trips) {
-      await win.SvalPanel.switchTo(ws);
+      await SvalWindowWorkspace.of(win).switchTo(ws);
     }
     await engine.mutate({ kind: "remove", id: trips, now: Date.now() });
     await SvalPanel.refresh();

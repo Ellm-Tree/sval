@@ -231,7 +231,10 @@ async function checkColouredWindows(colors) {
         emoji: null,
         now,
       });
-      Assert.ok(await win.SvalPanel.switchTo(id), `switched to ${color}`);
+      Assert.ok(
+        await SvalWindowWorkspace.of(win).switchTo(id),
+        `switched to ${color}`
+      );
       await TestUtils.waitForCondition(
         () => win.SvalPanel.windowColor === color,
         `the window wears ${color}`

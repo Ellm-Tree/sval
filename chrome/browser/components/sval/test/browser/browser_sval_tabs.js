@@ -78,7 +78,7 @@ async function ourWorkspace({ fill, second = false } = {}) {
   expectWorkspaceTabs();
   Assert.ok(
     await within(
-      SvalPanel.switchTo(workspace),
+      SvalWindowWorkspace.of(window).switchTo(workspace),
       10_000,
       "the switch to the task's workspace"
     ),
@@ -1311,7 +1311,11 @@ add_task(async function settings_is_filed_and_opening_it_again_reuses_it() {
 
   const other = tree[elsewhere].placement.parent;
   Assert.ok(
-    await within(SvalPanel.switchTo(other), 10_000, "the switch away"),
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(other),
+      10_000,
+      "the switch away"
+    ),
     "the window shows the other workspace"
   );
   await settled();
