@@ -19,7 +19,9 @@
             secondWindow, failFirstLoad, errorPageShown, movedInShows, dialogIn, typeIn,
             newWorkspace, switchVia, tearOffVia, rowIn, clickRow, rowNameIn,
             switcherNameIn, contextMenuIn, menuCommand, nodeOfTab,
-            selectedShows, clickRowShows */
+            selectedShows, clickRowShows, workspaceWith, rowIdsIn,
+            shownTabIdsIn, openSwitcherIn, closeSwitcherIn, switcherIdsIn,
+            newWindowCommand, newTabCommand */
 
 const { SvalAgents } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
@@ -213,11 +215,13 @@ async function linkFromAnotherApp(url) {
 }
 
 /**
+ * @param {?Function} [open] Opens the window another way, and resolves
+ *   with it.
  * @returns {Promise<Window>} a second Sval window, opened as ⌘N opens one,
  *   its panel started and its pages visible to themselves. A workspace the
  *   window made for itself goes when the task ends, after the window.
  */
-async function secondWindow() {
+async function secondWindow(open = null) {
   const before = new Set(Object.keys(SvalPanel.nodes));
   let shown = null;
   atTaskEnd(async () => {
@@ -231,11 +235,13 @@ async function secondWindow() {
       await SvalPanel.refresh();
     }
   });
-  const win = await within(
-    BrowserTestUtils.openNewBrowserWindow(),
-    10_000,
-    "a second window"
-  );
+  const win = open
+    ? await within(open(), 10_000, "a second window")
+    : await within(
+        BrowserTestUtils.openNewBrowserWindow(),
+        10_000,
+        "a second window"
+      );
   atTaskEnd(async () => {
     if (!win.closed) {
       shown = win.SvalPanel.workspaceId;
@@ -455,13 +461,57 @@ function switcherNameIn(win) {
  * @param {string} selector
  */
 async function fromSwitcher(win, selector) {
+  const menu = await openSwitcherIn(win);
+  await chooseMenuItem(menu.querySelector(selector), menu, selector);
+}
+
+/**
+ * Opens `win`'s switcher, as a click on it does.
+ *
+ * @param {Window} win
+ * @returns {Promise<Element>} the open `menupopup`.
+ */
+async function openSwitcherIn(win) {
   // A popup opens only in the focused window on Windows.
   await within(SimpleTest.promiseFocus(win), 10_000, "the window's focus");
   const menu = win.SvalPanel._els.switcherMenu;
   const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
   win.SvalPanel._els.switcher.click();
   await within(shown, 10_000, "the switcher opening");
-  await chooseMenuItem(menu.querySelector(selector), menu, selector);
+  return menu;
+}
+
+/**
+ * Closes the open switcher `menu` without choosing anything.
+ *
+ * @param {Element} menu
+ */
+async function closeSwitcherIn(menu) {
+  const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
+  menu.hidePopup();
+  await within(hidden, 10_000, "the switcher closing");
+}
+
+/**
+ * What `win`'s switcher lists, read from the open menu as a person reads it.
+ *
+ * @param {Window} win
+ * @returns {Promise<{listed: string[], free: string[]}>} the workspaces it
+ *   lists, in order, and those it offers a window of their own, which are the
+ *   ones no window shows (spec §10.7).
+ */
+async function switcherIdsIn(win) {
+  const menu = await openSwitcherIn(win);
+  const listed = Array.from(
+    menu.querySelectorAll("[data-workspace-id]"),
+    el => el.dataset.workspaceId
+  );
+  const free = Array.from(
+    menu.querySelectorAll("[data-open-workspace-id]"),
+    el => el.dataset.openWorkspaceId
+  );
+  await closeSwitcherIn(menu);
+  return { listed, free };
 }
 
 /**
@@ -582,4 +632,114 @@ function contextMenuIn(win, id) {
  */
 function menuCommand(menu, selector) {
   return chooseMenuItem(menu.querySelector(selector), menu, selector);
+}
+
+/**
+ * @param {Window} win
+ * @returns {string[]} the node ids of the rows `win`'s panel draws, in order.
+ */
+function rowIdsIn(win) {
+  return Array.from(
+    win.SvalPanel._els.tree.querySelectorAll(
+      ".sval-row[data-node-id]:not(.sval-row-leaving)"
+    ),
+    row => row.dataset.nodeId
+  );
+}
+
+/**
+ * @param {Window} win
+ * @returns {string[]} the nodes of the tabs `win` has on show: those it
+ *   holds, less the tabs a switch kept loaded and hid.
+ */
+function shownTabIdsIn(win) {
+  return win.gBrowser.visibleTabs.map(taggedId).filter(Boolean);
+}
+
+/**
+ * Adds a workspace named `name` to the profile's document, holding a tab for
+ * each of `pages`, as a workspace made on another day does. It goes when the
+ * task ends, with this window back on the workspace it shows now.
+ *
+ * @param {string} name
+ * @param {object} [options]
+ * @param {Array<{url: string, title: string}>} [options.pages] Its tabs, in
+ *   order. A tab named for its page's own title leaves the observer nothing
+ *   to write when the page loads.
+ * @param {boolean} [options.isolated] Whether it has a jar of its own.
+ * @returns {Promise<{id: string, tabs: string[]}>} its id and its tabs'.
+ */
+async function workspaceWith(name, { pages = [], isolated = false } = {}) {
+  const { engine } = SvalPanel;
+  const home = SvalPanel.workspaceId;
+  const id = await engine.mutate({
+    kind: "addWorkspace",
+    name,
+    isolated,
+    id: crypto.randomUUID(),
+    now: Date.now(),
+  });
+  atTaskEnd(async () => {
+    if (SvalPanel.workspaceId === id) {
+      await SvalPanel.switchTo(home);
+      await switchDone(window);
+    }
+    if ((await engine.tree()).nodes?.[id]) {
+      await removeWorkspace(id);
+    }
+    await SvalPanel.refresh();
+    await within(
+      SvalPanel.observer?.settled(),
+      10_000,
+      "SvalPanel.observer settling"
+    );
+  });
+  const tabs = [];
+  for (const { url, title } of pages) {
+    tabs.push(
+      await engine.mutate({
+        kind: "addTab",
+        parent: id,
+        name: title,
+        url,
+        id: crypto.randomUUID(),
+        now: Date.now(),
+      })
+    );
+  }
+  await SvalPanel.refresh();
+  return { id, tabs };
+}
+
+/**
+ * Opens a window from `win` with the New Window command, as its key does,
+ * and waits for the new window's panel. The window closes when the task
+ * ends, and a workspace it made for itself goes after it.
+ *
+ * @param {Window} win
+ * @returns {Promise<Window>}
+ */
+function newWindowCommand(win) {
+  return secondWindow(() =>
+    newWindowAfter(() => EventUtils.synthesizeKey("n", { accelKey: true }, win))
+  );
+}
+
+/**
+ * Opens a tab in `win` with the New Tab command's key.
+ *
+ * @param {Window} win
+ * @returns {Promise<object>} the tab, in front.
+ */
+async function newTabCommand(win) {
+  const opened = BrowserTestUtils.waitForEvent(
+    win.gBrowser.tabContainer,
+    "TabOpen"
+  );
+  EventUtils.synthesizeKey("t", { accelKey: true }, win);
+  const tab = expectOpened(
+    (await within(opened, 10_000, "the new tab")).target
+  );
+  await switchDone(win);
+  return tab;
 }

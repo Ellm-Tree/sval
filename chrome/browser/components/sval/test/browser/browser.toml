@@ -501,6 +501,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_isolated_workspaces.js"]
 
+["browser_sval_isolated_workspaces_windows.js"]
+
 ["browser_sval_javascript.js"]
 
 ["browser_sval_kagi.js"]
@@ -647,6 +649,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 ["browser_sval_pins_folders.js"]
 
 ["browser_sval_pins_launch.js"]
+
+["browser_sval_pins_left_workspace.js"]
 
 ["browser_sval_pins_links.js"]
 
@@ -820,6 +824,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_surrogate_pair_keys.js"]
 
+["browser_sval_switch_lands.js"]
+
 ["browser_sval_switcher.js"]
 
 ["browser_sval_switcher_agent_work.js"]
@@ -902,9 +908,15 @@ run-if = ["os == 'win'"]
 
 ["browser_sval_workspace_windows_closing.js"]
 
+["browser_sval_workspace_windows_deleted.js"]
+
 ["browser_sval_workspace_windows_leaving.js"]
 
 ["browser_sval_workspace_windows_moving.js"]
+
+["browser_sval_workspace_windows_new.js"]
+
+["browser_sval_workspace_windows_start.js"]
 
 ["browser_sval_workspace_windows_taking.js"]
 
