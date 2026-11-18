@@ -343,3 +343,4 @@ gtk-wayland-commit-toplevel-opaque-region.patch
 https-only-error-plain-words.patch
 private-browsing-no-crash-dump.patch
 client-auth-choice-cleared-with-jar.patch
+page-thumbs-closed-page-quiet.patch

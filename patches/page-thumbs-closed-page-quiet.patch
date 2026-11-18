@@ -1,0 +1,36 @@
+Sval: PageThumbUtils logs nothing for a page that has gone
+
+getContentSize and determineCropSize catch getScrollbarSize throwing for a
+window with no presShell and go on without scrollbars, but also log a
+console error. A tab closed before a capture's query reaches its page
+has no presShell, as Sval's tab switcher preview of a page that just
+loaded meets in normal use, so the error says nothing is wrong.
+
+diff --git a/toolkit/components/thumbnails/PageThumbUtils.sys.mjs b/toolkit/components/thumbnails/PageThumbUtils.sys.mjs
+index 2def1e9118..dfb712b76e 100644
+--- a/toolkit/components/thumbnails/PageThumbUtils.sys.mjs
++++ b/toolkit/components/thumbnails/PageThumbUtils.sys.mjs
+@@ -115,8 +115,9 @@ export var PageThumbUtils = {
+     try {
+       utils.getScrollbarSize(false, sbWidth, sbHeight);
+     } catch (e) {
+-      // This might fail if the window does not have a presShell.
+-      console.error("Unable to get scrollbar size in determineCropSize.");
++      // A window has no presShell once its page has gone, as a closing
++      // tab's has before a capture's query reaches it. That is expected, and
++      // the capture goes on with no scrollbars.
+       sbWidth.value = sbHeight.value = 0;
+     }
+ 
+@@ -327,8 +328,9 @@ export var PageThumbUtils = {
+     try {
+       utils.getScrollbarSize(false, sbWidth, sbHeight);
+     } catch (e) {
+-      // This might fail if the window does not have a presShell.
+-      console.error("Unable to get scrollbar size in determineCropSize.");
++      // A window has no presShell once its page has gone, as a closing
++      // tab's has before a capture's query reaches it. That is expected, and
++      // the capture goes on with no scrollbars.
+       sbWidth.value = sbHeight.value = 0;
+     }
+ 

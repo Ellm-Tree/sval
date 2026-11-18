@@ -151,6 +151,21 @@ Each entry gives:
   fail without the patch.
 - **Upstream**: one bug, with the patch as it is. Not submitted.
 
+### PageThumbUtils logs an error for a page that has gone
+
+- **Patch**: `patches/page-thumbs-closed-page-quiet.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `PageThumbUtils.getContentSize` and `determineCropSize` catch
+  `getScrollbarSize` throwing for a window with no pres shell and go on
+  without scrollbars, but also log a console error. A tab closed before a
+  capture's `Browser:Thumbnail:ContentInfo` query reaches its page has no
+  pres shell, so `PageThumbs.captureTabPreviewThumbnail` of a tab the user
+  closes as it loads logs an error for an expected case. The fix keeps the
+  fallback and drops the log.
+- **Evidence**: `browser_sval_workspace_windows_taking.js` failed on the
+  logged error when its teardown closed a tab the tab switcher was drawing.
+- **Upstream**: one bug, with the patch as it is. Not submitted.
+
 ### A popup that closes unseen turns tab hover previews off for good
 
 - **Patch**: `patches/tab-hover-preview-stale-popups.patch`
