@@ -151,6 +151,7 @@ struct DownloadCapsule: View {
     var body: some View {
         let downloads = model.browser.downloads
         if let item = downloads.items.last {
+            let title = downloads.items.count > 1 ? "\(item.name) and \(downloads.items.count - 1) more" : item.name
             HStack(spacing: 0) {
                 HStack(spacing: 10) {
                     Gauge(value: item.fraction) { EmptyView() }
@@ -158,7 +159,7 @@ struct DownloadCapsule: View {
                         .tint(colors.ink)
                         .scaleEffect(0.4)
                         .frame(width: 22, height: 22)
-                    Text(downloads.items.count > 1 ? "\(item.name) and \(downloads.items.count - 1) more" : item.name)
+                    Text(title)
                         .font(.system(.subheadline, weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -167,11 +168,11 @@ struct DownloadCapsule: View {
                 .padding(.trailing, 10)
                 .frame(minHeight: 44)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Downloading \(item.name)")
+                .accessibilityLabel("Downloading \(title)")
                 .accessibilityValue(Text(item.fraction, format: .percent.precision(.fractionLength(0))))
                 colors.rule.frame(width: 1, height: 22)
                 Button { downloads.cancel(item) } label: {
-                    Label("Cancel Download", systemImage: "xmark")
+                    Label("Cancel \(item.name)", systemImage: "xmark")
                         .labelStyle(.iconOnly)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(colors.ink.opacity(0.75))
