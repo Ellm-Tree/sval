@@ -13,9 +13,12 @@
 # about that delay set it back for themselves. A device publishes nothing
 # before its first time reading (decision 1714), and the harness reaches no
 # Remote Settings server, so every profile starts with a reading of no
-# difference.
+# difference. The harness drives the browser through Marionette, which draws
+# the address bar's remote-control cue (`gRemoteControl`), a button no window
+# of a person's has, so a test would measure a fuller row than theirs.
 [DEFAULT]
 prefs = [
+  "browser.chrome.disableRemoteControlCueForTests=true",
   "browser.sval.firstRun.enabled=false",
   "browser.sval.sync.background.enabled=false",
   "services.settings.clock_skew_seconds=0",

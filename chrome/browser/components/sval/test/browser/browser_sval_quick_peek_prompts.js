@@ -111,6 +111,11 @@ add_task(async function a_quick_peeks_prompt_shows_over_it_and_goes_with_it() {
     PopupNotifications.getNotification("geolocation", quickPeekBrowser),
     "the prompt is the Quick Peek's page asking"
   );
+  Assert.equal(
+    PopupNotifications.panel.anchorNode.id,
+    "sval-protection-button",
+    "with no cell of its own to point at, the prompt points at the shield"
+  );
 
   cardOf(quickPeek).querySelector(".sval-quick-peek-close").click();
   await untilPromptOf(null, "closing the Quick Peek takes its prompt");

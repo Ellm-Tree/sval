@@ -73,6 +73,7 @@ import {
   scopePhrase,
 } from "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs";
 import {
+  BUTTON_ID as PROTECTION_BUTTON_ID,
   SvalProtectionButton,
   glyph,
   protectionFooter,
@@ -3212,7 +3213,19 @@ export const SvalSiteControls = {
    */
   promptAnchor(win, anchor, fallback) {
     const control = controls.get(win);
-    return control ? control.promptAnchor(anchor, fallback) : fallback;
+    const answer = control ? control.promptAnchor(anchor, fallback) : fallback;
+    const drawn = element =>
+      element?.checkVisibility({ visibilityProperty: true });
+    if (drawn(answer)) {
+      return answer;
+    }
+    // Firefox falls back to its padlock and search switch, which Sval's
+    // address field lacks, then to its remote-control icon, which passes a
+    // plain `checkVisibility()` while collapsed. A prompt anchored to an
+    // element with no box closes as it opens, again and again. The shield
+    // stands where the padlock did.
+    const shield = win.document.getElementById(PROTECTION_BUTTON_ID);
+    return drawn(shield) ? shield : answer;
   },
 
   /** @param {Window} win */
