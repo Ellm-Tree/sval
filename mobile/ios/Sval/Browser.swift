@@ -1497,6 +1497,7 @@ final class Browser {
         }
         page.onLoad = { [weak self, weak page] in
             guard let self else { return }
+            downloads.forget(tab: id)
             mediaRefused[id] = nil
             askClosed.remove(id)
             // The new document has no media of its own yet. Media in Picture
@@ -1518,7 +1519,12 @@ final class Browser {
             if self?.media[id] != nil { self?.startMediaChecks() }
             self?.mediaLog("tab \(Self.tag(id)) video \(page?.inPictureInPicture == true ? "went into" : "left") Picture in Picture")
         }
-        page.onDownload = { [weak self] download, asked in self?.downloads.start(download, asked: asked) }
+        // A load that became a download in a tab that had shown nothing
+        // leaves the tab to show the file (`DownloadPage`).
+        page.onDownload = { [weak self, weak page] download, asked in
+            let empty = page?.view.backForwardList.currentItem == nil
+            self?.downloads.start(download, asked: asked, tab: empty ? id : nil)
+        }
         page.onMedia = { [weak self] id, playing, muted, gesture in
             self?.mediaReport(id, playing: playing, muted: muted, gesture: gesture)
         }

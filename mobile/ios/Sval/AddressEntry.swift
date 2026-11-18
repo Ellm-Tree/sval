@@ -26,6 +26,12 @@ struct AddressEntry: View {
     /// In the private palette while a private tab is in front (13g).
     private var theme: Theme { Theme(scheme, tint: browser.inPrivate ?Theme.privateToken : nil) }
     private var browser: Browser { model.browser }
+    /// The address of the tab in front. A tab whose load became a
+    /// download has no page, so its address is the tab's own, as the bar
+    /// shows it.
+    private var address: URL? {
+        browser.currentURL ?? browser.currentTabId.flatMap { model.row($0)?.url }.flatMap(URL.init(string:))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,8 +52,8 @@ struct AddressEntry: View {
             return .handled
         }
         .onAppear {
-            if !newTab, let url = browser.currentURL {
-                text = url.absoluteString
+            if !newTab, let address {
+                text = address.absoluteString
                 original = text
             }
             focused = true
@@ -351,7 +357,7 @@ struct AddressEntry: View {
         GlassEffectContainer(spacing: 6) {
             HStack(spacing: 6) {
                 HStack(spacing: 2) {
-                    if !newTab, let url = browser.currentURL {
+                    if !newTab, let url = address {
                         ShareLink(item: url) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 17, weight: .medium))
