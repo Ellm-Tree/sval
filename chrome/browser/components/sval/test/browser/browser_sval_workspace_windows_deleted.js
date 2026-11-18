@@ -117,14 +117,7 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
     "its observer settling"
   );
   Assert.ok(!win.closed, "and it is still open once it has settled");
-  // A window whose every tab on show is deleted is given a home page tab so
-  // that it stays open (`SvalTabObserver.keepOneTab`), which the workspace it
-  // moves to can gain as a row, so the rows are read for the workspace's own.
-  Assert.deepEqual(
-    rowIdsIn(win).filter(id => free.tabs.includes(id)),
-    free.tabs,
-    "that workspace's tab is drawn"
-  );
+  Assert.deepEqual(rowIdsIn(win), free.tabs, "that workspace's rows are drawn");
   Assert.deepEqual(shownTabIdsIn(win), free.tabs, "and is the one on show");
   Assert.equal(taggedId(win.gBrowser.selectedTab), free.tabs[0], "on screen");
 

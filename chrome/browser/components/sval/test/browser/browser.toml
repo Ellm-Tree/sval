@@ -830,6 +830,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_switch_lands.js"]
 
+["browser_sval_switch_races.js"]
+
 ["browser_sval_switcher.js"]
 
 ["browser_sval_switcher_agent_work.js"]

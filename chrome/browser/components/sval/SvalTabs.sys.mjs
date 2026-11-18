@@ -3005,38 +3005,46 @@ class SvalTabObserver {
       }
       this.#keeping.set(tab, id);
       const parent = before[id]?.placement?.parent ?? null;
-      this.#enqueue(() => this.#putBack(tab, id, parent)).finally(() => {
-        if (this.#keeping.get(tab) === id) {
-          this.#keeping.delete(tab);
+      const workspace = workspaceOfNode(before, id);
+      this.#enqueue(() => this.#putBack(tab, id, parent, workspace)).finally(
+        () => {
+          if (this.#keeping.get(tab) === id) {
+            this.#keeping.delete(tab);
+          }
         }
-      });
+      );
     }
   }
 
   /**
    * Re-adds `id`, which another device deleted, for `tab`, at `parent` when
-   * the tree still holds it within this window's workspace and at the top of
-   * the workspace otherwise, as a hand-back from the recently-closed list
+   * the tree still holds it within the tab's workspace and at the top of
+   * that workspace otherwise, as a hand-back from the recently-closed list
    * goes (`#reconcile`). A workspace the tree no longer holds is left to the
    * orphan sweep.
+   *
+   * The workspace is the one the node was in, read before the delete. This
+   * runs on the queue, and the window may show another by then: a switch in
+   * flight, or the move off a workspace the same change deleted.
    *
    * @param {object} tab
    * @param {string} id
    * @param {?string} parent Its parent before the delete.
+   * @param {?string} workspace Its workspace before the delete.
    */
-  async #putBack(tab, id, parent) {
+  async #putBack(tab, id, parent, workspace) {
     if (this.#gone(tab)) {
       return;
     }
     const nodes = await this.#readTree();
-    if (id in nodes || !nodes[this.#workspaceId] || this.#gone(tab)) {
+    if (id in nodes || !nodes[workspace] || this.#gone(tab)) {
       return;
     }
     const former = placeBeside(nodes, parent);
     const into =
-      former && nodes[former] && isWithin(nodes, former, this.#workspaceId)
+      former && nodes[former] && isWithin(nodes, former, workspace)
         ? former
-        : this.#workspaceId;
+        : workspace;
     SvalLog.info(`kept tab ${id} in front of the user, deleted by a peer`);
     await this.#addTab(tab, id, into);
   }
@@ -3098,7 +3106,13 @@ class SvalTabObserver {
         orphans.push([id, tab]);
       }
     }
-    return this.#releaseOrphans(orphans);
+    // A window whose workspace went with its tabs is about to move to another
+    // or close. The tab that keeps it open until then stays unfiled, so the
+    // move takes it back (`closeUnfiledTabs`): a home page would be filed in
+    // the workspace arrived at once it showed.
+    return this.#releaseOrphans(orphans, {
+      blank: !(this.#workspaceId in nodes),
+    });
   }
 
   /**
@@ -3108,13 +3122,17 @@ class SvalTabObserver {
    * is already gone and there is nothing for the close to delete.
    *
    * @param {Array<[string, object]>} orphans Each tab, with its node id.
+   * @param {object} [options] As {@link openUnfiledTab}.
    * @returns {string[]} the node ids whose tabs were closed.
    */
-  #releaseOrphans(orphans) {
+  #releaseOrphans(orphans, options = {}) {
     if (!orphans.length) {
       return [];
     }
-    this.keepOneTab(orphans.map(([id]) => id));
+    this.keepOneTab(
+      orphans.map(([id]) => id),
+      options
+    );
     const closed = [];
     for (const [id, tab] of orphans) {
       filedIds.delete(tab);
