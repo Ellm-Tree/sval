@@ -91,7 +91,13 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
 
   const windows = [
     await tearOffVia(window, first.id),
-    await tearOffVia(window, second.id),
+    // Opened as a Shift-release on its switcher entry opens it. A second
+    // trip through this window's switcher waits for the focus to come back
+    // from the window just opened, which a window manager may refuse a
+    // script.
+    await windowShowing(second.id, () =>
+      SvalPanel.pickWorkspace(second.id, true)
+    ),
   ];
   const peer = await anotherDevice();
   await deleteElsewhere(peer, [first, second]);

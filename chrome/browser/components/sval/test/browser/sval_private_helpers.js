@@ -31,6 +31,12 @@ const { SvalSettingsSync } = ChromeUtils.importESModule(
 const { SvalHistorySync } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs"
 );
+const { SvalFavoritesStore } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs"
+);
+const { SvalArchive } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalArchive.sys.mjs"
+);
 const { SvalIdentity } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalIdentity.sys.mjs"
 );
@@ -382,13 +388,23 @@ async function flushEverything() {
     "the identity file's queued writes"
   );
   await SessionSaver.run();
-  // A pass whose extra document fails leaves its changes unpublished, and
-  // every publish after it runs again; that fails here rather than spinning.
+  // A pass hands its report to each module that feeds the profile's engine,
+  // and each answers on a queue of its own: history announces a week in its
+  // index, settings seeds, Favorites and the Archive write their documents.
+  // Any of them can hand the engine a change the next publish writes, so
+  // each settles before every publish. A pass whose extra document fails
+  // leaves its changes unpublished, and every publish after it runs again;
+  // that fails here rather than spinning.
   for (let passes = 0; ; passes++) {
     await within(
-      SvalHistorySync.instance?.whenIdle(),
+      Promise.all([
+        SvalHistorySync.instance?.whenIdle(),
+        SvalSettingsSync.shared?.sync?.whenIdle(),
+        SvalFavoritesStore.instance?.whenIdle(),
+        SvalArchive.instance?.whenIdle(),
+      ]),
       10_000,
-      "history sync's queued work"
+      "the queued work of what feeds the profile's engine"
     );
     if (!(await SvalPanel.engine?.publishPending?.())) {
       break;

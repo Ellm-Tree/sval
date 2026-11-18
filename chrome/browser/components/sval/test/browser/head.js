@@ -2149,18 +2149,25 @@ async function listedAs(call, name, state) {
  * Follows the requests to `path` on `host`: how many started, and the
  * status each stopped with, one per channel. A channel cancelled while it
  * starts notifies `http-on-stop-request` twice, so stops are counted by
- * channel.
+ * channel. `answered` counts the channels a response came back on, which
+ * says a request reached the server whatever status it stops with: a
+ * beacon's own listener cancels it once its response starts
+ * (`BeaconStreamListener::OnStartRequest`).
  *
  * @param {string} path
  * @param {string} [host]
- * @returns {{started: number, stopped: number[], whenStopped: Function}}
+ * @returns {{started: number, answered: number, stopped: number[], whenStopped: Function}}
  *   `whenStopped(count)` resolves once `count` requests have stopped.
  */
 function requestsTo(path, host = "example.com") {
   const stops = new Map();
+  const answers = new Set();
   const waiters = [];
   const seen = {
     started: 0,
+    get answered() {
+      return answers.size;
+    },
     get stopped() {
       return [...stops.values()];
     },
@@ -2186,6 +2193,8 @@ function requestsTo(path, host = "example.com") {
       }
       if (topic === "http-on-modify-request") {
         seen.started++;
+      } else if (topic === "http-on-examine-response") {
+        answers.add(channel.channelId);
       } else if (!stops.has(channel.channelId)) {
         stops.set(channel.channelId, channel.status);
         for (const waiter of waiters.filter(w => stops.size >= w.count)) {
@@ -2196,9 +2205,11 @@ function requestsTo(path, host = "example.com") {
     },
   };
   Services.obs.addObserver(observer, "http-on-modify-request");
+  Services.obs.addObserver(observer, "http-on-examine-response");
   Services.obs.addObserver(observer, "http-on-stop-request");
   atTaskEnd(() => {
     Services.obs.removeObserver(observer, "http-on-modify-request");
+    Services.obs.removeObserver(observer, "http-on-examine-response");
     Services.obs.removeObserver(observer, "http-on-stop-request");
   });
   return seen;

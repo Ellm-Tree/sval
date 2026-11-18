@@ -21,7 +21,7 @@
             switcherNameIn, contextMenuIn, menuCommand, nodeOfTab,
             selectedShows, clickRowShows, workspaceWith, rowIdsIn,
             shownTabIdsIn, openSwitcherIn, closeSwitcherIn, switcherIdsIn,
-            newWindowCommand, newTabCommand */
+            newWindowCommand, newTabCommand, windowShowing */
 
 const { SvalAgents } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
@@ -535,8 +535,22 @@ async function switchVia(win, id) {
  * @returns {Promise<Window>}
  */
 async function tearOffVia(win, id) {
+  return windowShowing(id, () =>
+    fromSwitcher(win, `[data-open-workspace-id="${CSS.escape(id)}"]`)
+  );
+}
+
+/**
+ * Waits for the window `open` opens on workspace `id`, and for its panel.
+ * The window closes when the task ends.
+ *
+ * @param {string} id
+ * @param {Function} open
+ * @returns {Promise<Window>}
+ */
+async function windowShowing(id, open) {
   const opening = BrowserTestUtils.domWindowOpenedAndLoaded();
-  await fromSwitcher(win, `[data-open-workspace-id="${CSS.escape(id)}"]`);
+  await open();
   const opened = await within(opening, 20_000, "the new window's opening");
   atTaskEnd(async () => {
     if (!opened.closed) {

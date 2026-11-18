@@ -367,6 +367,18 @@ function dropRowOn(id, from, onto, to) {
     { clientY: rect.top + rect.height / 4 }
   );
   source.dispatchEvent(new from.DragEvent("dragend", { bubbles: true }));
+  // The release a user's drop ends with. synthesizeDrop presses the button
+  // and never lets it go, and while a press is held, a script's move or
+  // resize of any window suppresses the drag service until a trusted mouseup
+  // (`nsGlobalWindowOuter::CanMoveResizeWindows`), so every later drag in
+  // the run would start without a session.
+  EventUtils.synthesizeMouse(
+    target,
+    rect.width / 2,
+    rect.height / 4,
+    { type: "mouseup" },
+    to
+  );
   return effect;
 }
 

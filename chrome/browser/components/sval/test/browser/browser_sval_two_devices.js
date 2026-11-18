@@ -314,6 +314,7 @@ add_task(async function choosing_where_to_sync_loses_no_workspace() {
     (await SvalPanel.chooseSharedFolder(empty)).reached,
     "an empty folder is published to"
   );
+  await keyCopyIn(empty, "the key the step that reached the folder left");
   Assert.equal(engine.sharedRoot, empty);
   Assert.deepEqual(Object.keys(await nodes(engine)).sort(), idsBefore);
   Assert.ok(
@@ -348,6 +349,7 @@ add_task(async function choosing_where_to_sync_loses_no_workspace() {
   const leftBehind = await filesIn(PathUtils.join(empty, "sval"));
 
   Assert.ok((await SvalPanel.chooseSharedFolder(occupied)).reached);
+  await keyCopyIn(occupied, "the key the step that reached the folder left");
   Assert.deepEqual(
     await filesIn(PathUtils.join(empty, "sval")),
     leftBehind,

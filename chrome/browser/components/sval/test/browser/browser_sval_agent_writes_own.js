@@ -96,7 +96,7 @@ add_task(async function a_beacon_the_click_sends_is_never_held() {
   const seen = requestsTo("/sval-beacon");
   const result = await call("click_element", { tab, ref: await ref(FETCH) });
   await stopped(seen);
-  Assert.ok(Components.isSuccessCode(seen.stopped[0]), "the beacon went out");
+  Assert.equal(seen.answered, 1, "the beacon reached the server");
   Assert.equal(alerts.opened, 0, "unasked");
   Assert.equal(result.writes, "allowed");
 });
@@ -115,6 +115,7 @@ add_task(async function a_read_only_site_still_refuses_a_beacon() {
   Assert.equal(result.writes, "refused_read_only");
   await stopped(seen);
   Assert.deepEqual(seen.stopped, [Cr.NS_ERROR_ABORT]);
+  Assert.equal(seen.answered, 0, "the beacon never reached the server");
   Assert.equal(alerts.opened, 0);
 });
 

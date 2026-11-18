@@ -137,8 +137,11 @@ add_task(async function the_card_shows_while_kagi_is_an_engine() {
  * changes.
  *
  * `network.dns.localDomains` sends `kagi.com` to this machine, where nothing
- * answers, so Kagi's page and any refill the session starts fail to connect
- * and nothing leaves the machine.
+ * answers, so Kagi's page fails to connect. The Privacy Pass refill the
+ * session cookie starts runs on after the task's last step, and a lookup it
+ * makes once the pref is undone reaches the real `kagi.com`. So the refill
+ * gets no network at all, and is over, its retry cancelled, before the pref
+ * is undone (teardowns run last first).
  */
 add_task(async function signed_out_the_card_offers_the_sign_in() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
@@ -146,6 +149,22 @@ add_task(async function signed_out_the_card_offers_the_sign_in() {
     set: [["network.dns.localDomains", "kagi.com,account.kagi.com"]],
   });
   atTaskEnd(() => SpecialPowers.popPrefEnv());
+  const privacyPass = SvalKagiPrivacyPass;
+  const fetchWas = privacyPass._fetch;
+  privacyPass._fetch = () =>
+    Promise.reject(new TypeError("no network in tests"));
+  atTaskEnd(async () => {
+    await within(
+      privacyPass._refilling ?? Promise.resolve(),
+      10_000,
+      "the refill the sign-in started"
+    );
+    privacyPass._fetch = fetchWas;
+    // Cancels the retry the failed refill set, and reads the stored stock
+    // back, as a running Sval holds it.
+    privacyPass._reset();
+    await within(privacyPass._load(), 10_000, "the stored stock's reading");
+  });
   await SvalKagi.clearToken();
   removeSessionCookie();
   atTaskEnd(removeSessionCookie);

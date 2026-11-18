@@ -245,6 +245,42 @@ add_task(async function two_real_switches_in_succession_end_in_one_place() {
 });
 
 /**
+ * A window closed while it fades in the workspace it switched to. Its
+ * switch ends, so nothing queued behind it in that window waits for good.
+ */
+add_task(async function a_window_closed_as_its_switch_fades_ends_the_switch() {
+  const { ids } = await withSwitcherTabs({ workspaces: 3 });
+  await SpecialPowers.pushPrefEnv({ set: [["ui.prefersReducedMotion", 0]] });
+  const other = await within(
+    BrowserTestUtils.openNewBrowserWindow(),
+    20_000,
+    "the other window's opening"
+  );
+  await within(other.SvalPanel.started, 10_000, "the other window's panel");
+  const workspace = SvalWindowWorkspace.of(other);
+  const target = ids.workspaces.find(
+    id => id !== SvalWindowWorkspace.of(window).id && id !== workspace.id
+  );
+
+  const switching = workspace.switchTo(target);
+  await TestUtils.waitForCondition(
+    () => other.gBrowser.tabbox.getAnimations().length,
+    "the switch fading the window in"
+  );
+  await within(
+    BrowserTestUtils.closeWindow(other),
+    10_000,
+    "the window closing"
+  );
+  await within(switching, 10_000, "the switch of the closed window");
+  await within(
+    workspace.switchesSettled(),
+    10_000,
+    "the closed window's switch queue"
+  );
+});
+
+/**
  * Two switches pressed in succession through workspaces whose tabs earlier
  * switches kept loaded and hidden. A switch lands on a kept tab by selecting
  * it, and that shows the tab as anything outside Sval going to a kept tab

@@ -825,10 +825,24 @@ export class SvalWindowWorkspace {
       if (fade) {
         // The switch ends once the window shows the workspace as it stays:
         // whoever awaits it reads the tint blended in. The fade outlasts the
-        // blend, which starts with the redraw.
-        await Promise.allSettled(
-          this.#host.fadeIn().map(animation => animation.finished)
-        );
+        // blend, which starts with the redraw. A window closed mid-fade has no
+        // pres shell, and its timeline never ticks again
+        // (`DocumentTimeline::WillRefresh`), so its animations are cancelled
+        // as it unloads, or at once if it already has, or the switch would
+        // hold its queue for good.
+        const animations = this.#host.fadeIn();
+        const stop = () => animations.forEach(animation => animation.cancel());
+        this.#win.addEventListener("unload", stop, { once: true });
+        if (this.#win.closed) {
+          stop();
+        }
+        try {
+          await Promise.allSettled(
+            animations.map(animation => animation.finished)
+          );
+        } finally {
+          this.#win.removeEventListener("unload", stop);
+        }
       }
       return true;
     } finally {
