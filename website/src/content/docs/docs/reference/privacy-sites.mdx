@@ -3,6 +3,8 @@ title: Sites
 description: What Settings › Sites shows, from the defaults every site gets to each site's own page.
 ---
 
+import Since from "../../../../components/docs/Since.astro";
+
 Settings › Sites holds the defaults every site gets. It also lists every
 site you made a choice for.
 
@@ -63,6 +65,18 @@ the site's name offers **Add an address…**.
   **Blocked**.
 - **Removed elements.** This lists what you removed with Remove from this
   site.
+
+<Since v="0.1.0-rc.10">
+
+- **Colorshift.** This says what the site's saved Colorshift changes, such
+  as "Blue tint, dark theme, serif font". **Remove** deletes the saved
+  Colorshift. **Undo** puts the Colorshift back, until the page shows
+  another site or address. An address with no Colorshift of its own shows
+  the Colorshift that applies to that address. Private windows don't show
+  this card.
+
+</Since>
+
 - **Extensions.** This lists the extensions you turned off or on for the
   site.
 

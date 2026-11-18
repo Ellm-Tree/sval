@@ -792,6 +792,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_site_page_permissions.js"]
 
+["browser_sval_site_page_style.js"]
+
 ["browser_sval_site_permission_list.js"]
 
 ["browser_sval_site_permissions_cleared.js"]

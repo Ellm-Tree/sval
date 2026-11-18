@@ -3754,7 +3754,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   color: var(--sval-ink-muted);
 }
 
-:is(.sval-site-perm-name, .sval-site-data-name) {
+:is(.sval-site-perm-name, .sval-site-data-name, .sval-site-named) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3952,6 +3952,22 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
 
 .sval-glyph-puzzle {
   --sval-glyph-icon: url("chrome://browser/content/sval/icons/puzzle.svg");
+}
+
+.sval-glyph-palette {
+  --sval-glyph-icon: url("chrome://browser/content/sval/icons/palette.svg");
+}
+
+.sval-glyph-pr-shield {
+  --sval-glyph-icon: url("chrome://browser/content/sval/protection-icons/pr-shield.svg");
+}
+
+.sval-glyph-pr-fingerprint {
+  --sval-glyph-icon: url("chrome://browser/content/sval/protection-icons/pr-fingerprint.svg");
+}
+
+.sval-glyph-media {
+  --sval-glyph-icon: url("chrome://browser/content/sval/header-icons/media.svg");
 }
 
 .sval-extension {

@@ -52,6 +52,13 @@
     siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     siteOrigins: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     siteForURI: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+    STYLES_PREF: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    describeStyle:
+      "moz-src:///browser/components/sval/SvalSiteStylePanel.sys.mjs",
+    removeStyles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    setStyle: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    styleFor: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
+    styles: "moz-src:///browser/components/sval/SvalSiteStyles.sys.mjs",
     SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
     linesForScope:
       "moz-src:///browser/components/sval/SvalElementRules.sys.mjs",
@@ -101,6 +108,7 @@
     "_siteCardProtections",
     "_siteCardJavascript",
     "_siteCardHidden",
+    "_siteCardStyle",
     "_siteCardExtensions",
     "_siteCardWhole",
     "_siteCardPermissions",
@@ -210,7 +218,8 @@
     /**
      * The page's view: the site it shows, or null; the host under it whose
      * choices it shows, or null for the site's; the Add a host field's text
-     * while it is open; whether the site holds
+     * while it is open; a Colorshift style removed here, `{ name, values }`,
+     * which Undo puts back; whether the site holds
      * anything Forget would clear (null until counted); the site whose icon
      * `icon` is; whether its fingerprinting exceptions are open; a failed
      * Forget, and whether stored data is still being read.
@@ -219,6 +228,7 @@
       site: null,
       scope: null,
       addingHost: null,
+      removedStyle: null,
       held: null,
       icon: null,
       iconFor: null,
@@ -383,6 +393,11 @@
         this._drawSiteScope();
       };
       lifetime.pref(lazy.EXTENSION_SITE_BRANCH, extensionSites);
+      lifetime.pref(lazy.STYLES_PREF, () => {
+        this._redrawSiteCard("style");
+        this._drawSiteScope();
+        count();
+      });
       window.addEventListener("pagehide", () => {
         this._stopSiteDataWait();
         clearTimeout(this._siteSearchTimer);
@@ -652,6 +667,7 @@
           site,
           scope,
           addingHost: null,
+          removedStyle: null,
           held: null,
           exceptionsOpen: false,
           failed: null,
@@ -664,6 +680,7 @@
           ...page,
           scope,
           addingHost: null,
+          removedStyle: null,
           exceptionsOpen: false,
         };
       }
@@ -716,6 +733,7 @@
         ...lazy.SvalExtensionSites.names(),
         ...lazy.scopesInFilters(lazy.SvalBlocking.myFilters),
         ...lazy.exceptionsInFilters(lazy.SvalBlocking.myFilters).keys(),
+        ...this._siteStyles().keys(),
       ]);
       return [...names]
         .filter(name => name !== site && lazy.siteOfEntry(name).site === site)
@@ -726,7 +744,7 @@
      * @param {string} name A site or a host.
      * @returns {number} How many choices are saved for `name` itself, as the
      *   scoped cards show them: each field, rule, removed element, element
-     *   shown again and extension switch.
+     *   shown again, Colorshift style and extension switch.
      */
     _scopeChoices(name) {
       const rule =
@@ -740,6 +758,7 @@
         lazy.linesForScope(lazy.SvalBlocking.myFilters, name).length +
         (lazy.exceptionsInFilters(lazy.SvalBlocking.myFilters).get(name)
           ?.length ?? 0) +
+        Number(this._siteStyles().has(name)) +
         ext.idsOffOn(name).length +
         ext.idsOnAt(name).length
       );
@@ -760,6 +779,7 @@
         ...this._sitePage,
         scope,
         addingHost: null,
+        removedStyle: null,
         exceptionsOpen: false,
       };
       history.replaceState(
@@ -1067,6 +1087,7 @@
         site: null,
         scope: null,
         addingHost: null,
+        removedStyle: null,
         held: null,
       };
       this._stopSiteDataWait();
@@ -1258,6 +1279,35 @@
     },
 
     /**
+     * A card's or a row's name behind the icon the site menu and the toolbar
+     * draw for the same thing.
+     *
+     * @param {string} icon A glyph of `settings.css`.
+     * @param {string} text
+     * @param {object} [options]
+     * @param {boolean} [options.heading] Whether it is the card's heading.
+     * @param {string} [options.count] What follows the name, muted.
+     * @returns {Element}
+     */
+    _siteName(icon, text, { heading = false, count = "" } = {}) {
+      const words = this._el("span", {}, text);
+      if (count) {
+        words.append(
+          " ",
+          this._el("span", { className: "sval-site-card-count" }, count)
+        );
+      }
+      return this._el(
+        heading ? "h2" : "span",
+        {
+          className: `${heading ? "sval-site-card-title" : "sval-site-row-label"} sval-site-named`,
+        },
+        this._glyph(icon, "sval-site-perm-icon"),
+        words
+      );
+    },
+
+    /**
      * One row: a label, the line under it, and its control.
      *
      * @param {string} key The row's name, for ids.
@@ -1401,7 +1451,7 @@
       }
       const mediaRow = this._sitePageRow(
         "media",
-        "Video and audio",
+        this._siteName("media", "Video and audio"),
         `Default for all sites: ${mediaWords.get(sp.mediaDefault())}`,
         media
       );
@@ -1416,14 +1466,14 @@
         },
         this._sitePageRow(
           "protections",
-          this._el("h2", { className: "sval-site-card-title" }, "Protections"),
+          this._siteName("pr-shield", "Protections", { heading: true }),
           "Protections block trackers and ads, and resist fingerprinting.",
           protections
         ),
         mediaRow,
         this._sitePageRow(
           "exceptions",
-          "Fingerprinting exceptions",
+          this._siteName("pr-fingerprint", "Fingerprinting exceptions"),
           "These scripts can read details of your device.",
           this._siteExceptionsPill(name, rule, !own.exceptions)
         )
@@ -1546,7 +1596,7 @@
         },
         this._sitePageRow(
           "javascript",
-          this._el("h2", { className: "sval-site-card-title" }, "JavaScript"),
+          this._siteName("javascript", "JavaScript", { heading: true }),
           scope
             ? ""
             : `Default for all sites: ${js.defaultEnabled() ? "allowed" : "blocked"}`,
@@ -1592,20 +1642,24 @@
      * @param {string} title
      * @param {string} [sub]
      * @param {string} [count]
+     * @param {string} [icon] A glyph of `settings.css`, drawn before the
+     *   title.
      * @returns {Element}
      */
-    _siteCardHead(key, title, sub = "", count = "") {
-      const heading = this._el(
-        "h2",
-        { className: "sval-site-card-title", id: `sval-site-${key}-label` },
-        title
-      );
-      if (count) {
-        heading.append(
-          " ",
-          this._el("span", { className: "sval-site-card-count" }, count)
-        );
+    _siteCardHead(key, title, sub = "", count = "", icon = "") {
+      let heading;
+      if (icon) {
+        heading = this._siteName(icon, title, { heading: true, count });
+      } else {
+        heading = this._el("h2", { className: "sval-site-card-title" }, title);
+        if (count) {
+          heading.append(
+            " ",
+            this._el("span", { className: "sval-site-card-count" }, count)
+          );
+        }
       }
+      heading.id = `sval-site-${key}-label`;
       return this._el(
         "div",
         { className: "sval-site-card-head" },
@@ -1739,7 +1793,7 @@
           ariaLabelledby: "sval-site-extensions-label",
           dataset: { siteCard: "extensions" },
         },
-        this._siteCardHead("extensions", "Extensions")
+        this._siteCardHead("extensions", "Extensions", "", "", "puzzle")
       );
       for (const policy of policies) {
         const key = `extension-${card.children.length}`;
@@ -1813,7 +1867,7 @@
           ariaLabelledby: "sval-site-hidden-label",
           dataset: { siteCard: "hidden" },
         },
-        this._siteCardHead("hidden", "Removed elements")
+        this._siteCardHead("hidden", "Removed elements", "", "", "eraser")
       );
       if (!lines.length) {
         card.append(
@@ -1848,6 +1902,103 @@
         );
       }
       return card;
+    },
+
+    /**
+     * @returns {Map<string, object>} The Colorshift styles the page shows, by
+     *   the site or host each is saved at. None in a private window, where
+     *   Colorshift is off.
+     */
+    _siteStyles() {
+      return new Map(
+        this._privateWindow
+          ? []
+          : lazy.styles().map(({ scope, ...values }) => [scope, values])
+      );
+    },
+
+    /**
+     * Colorshift: what the style saved for the site or the host in view
+     * changes, in the site menu's words, and Remove. A host with none of its
+     * own shows the one it takes from a wider name. A style removed here can
+     * be put back until the page shows another name. The card's
+     * `data-style` says which of these it shows.
+     *
+     * @param {string} site
+     * @returns {?Element} null in a private window.
+     */
+    _siteCardStyle(site) {
+      if (this._privateWindow) {
+        return null;
+      }
+      const name = this._sitePage.scope ?? site;
+      const applied = lazy.styleFor(name);
+      const own = applied?.scope === name ? applied.values : null;
+      const removed = this._sitePage.removedStyle;
+      const section = (state, ...children) =>
+        this._el(
+          "section",
+          {
+            className: "sval-card sval-site-card",
+            ariaLabelledby: "sval-site-style-label",
+            dataset: { siteCard: "style", style: state },
+          },
+          ...children
+        );
+      const row = (state, sub, label, act) => {
+        const button = this._el(
+          "button",
+          {
+            type: "button",
+            className: "sval-button sval-agent-small",
+            dataset: { svalKey: "site-style-action" },
+          },
+          label
+        );
+        button.addEventListener("click", act);
+        return section(
+          state,
+          this._sitePageRow(
+            "style",
+            this._siteName("palette", "Colorshift", { heading: true }),
+            sub,
+            button
+          )
+        );
+      };
+      if (own) {
+        return row("own", lazy.describeStyle(own), "Remove", () => {
+          // Before the write, whose observer redraws this card.
+          this._sitePage.removedStyle = { name, values: own };
+          lazy.removeStyles([name]);
+        });
+      }
+      if (removed?.name === name) {
+        return row("removed", "Removed", "Undo", () => {
+          this._sitePage.removedStyle = null;
+          lazy.setStyle(name, removed.values);
+        });
+      }
+      if (applied) {
+        return section(
+          "inherited",
+          this._siteCardHead(
+            "style",
+            "Colorshift",
+            `${lazy.describeStyle(applied.values)}. This Colorshift is saved for ${applied.scope === site ? `all of ${site}` : applied.scope}.`,
+            "",
+            "palette"
+          )
+        );
+      }
+      return section(
+        "none",
+        this._siteCardHead("style", "Colorshift", "", "", "palette"),
+        this._emptyState(
+          "No Colorshift yet",
+          "The colors, theme, and font you choose with Colorshift appear here."
+        )
+      );
     },
 
     /**
@@ -1939,7 +2090,8 @@
           "data",
           "Cookies and site data",
           "",
-          total ? sizeOf(total) : ""
+          total ? sizeOf(total) : "",
+          "sc-cookie"
         )
       );
       if (live && (!ready || rows.length)) {

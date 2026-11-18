@@ -614,8 +614,9 @@ control of what you see and what is sent to websites.
 - **Per-site controls.** Settings › Sites lists every site you've made choices
   for, including the extensions you turned off or on for a site and a site's
   saved Colorshift. Each site has its own page for its permissions,
-  JavaScript, removed elements, and stored data. Reset on a site's row
-  clears the site's choices, extension switches and Colorshift included.
+  JavaScript, removed elements, Colorshift, and stored data. The Colorshift
+  card says what the saved Colorshift changes, and Remove deletes that
+  Colorshift. Reset on a site's row clears the site's choices, extension switches and Colorshift included.
   Forget this site clears everything Sval keeps for the site. In Defaults,
   at the top of Settings › Sites, you set what every site gets until you
   make a choice for that site. Defaults covers JavaScript, video and audio,
