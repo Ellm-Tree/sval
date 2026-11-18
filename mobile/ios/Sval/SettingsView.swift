@@ -91,6 +91,9 @@ struct SettingsView: View {
                         LicensesView(onDone: onDone ?? { dismiss() })
                     }
                     .font(.system(.body))
+                    Button("Privacy Policy") { openPrivacyPolicy() }
+                        .font(.system(.body))
+                        .foregroundStyle(theme.text)
                 }
                 .listRowBackground(theme.cell)
             }
@@ -152,6 +155,14 @@ struct SettingsView: View {
     }
 
     private var syncProblem: Bool { model.stage == .ready && SyncIndicator(model, now: .now).icon == .warning }
+
+    private func openPrivacyPolicy() {
+        guard let workspace = model.browser.workspaceId else { return }
+        Task { await model.browser.openNewTab(Self.privacyPolicy, in: workspace) }
+        (onDone ?? { dismiss() })()
+    }
+
+    private static let privacyPolicy = URL(string: "https://sval.app/privacy/")!
 
     private var syncSection: some View {
         Section {
