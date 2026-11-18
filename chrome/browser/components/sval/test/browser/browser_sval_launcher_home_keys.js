@@ -606,6 +606,9 @@ add_task(async function the_engine_menu_lists_and_picks_alike() {
   );
   const engineName = engine.dataset.engineName;
   const hidden = BrowserTestUtils.waitForEvent(list, "hidden");
+  // The list opens above the field with the room there is and scrolls the
+  // rest (`setAlign` in panel-list.mjs), and a press past its edge closes it.
+  engine.scrollIntoView({ block: "nearest" });
   EventUtils.synthesizeMouseAtCenter(engine, {});
   await within(hidden, 10_000, "the engine list closes");
   await TestUtils.waitForCondition(
