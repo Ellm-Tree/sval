@@ -2145,7 +2145,7 @@ final class Page: NSObject, WKNavigationDelegate {
         guard navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url,
               let host = url.host(), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               let choice = mediaChoice?(host) else {
-            decisionHandler(isPrivate ? Self.allowWithoutAppLink : .allow, preferences)
+            decisionHandler(.allow, preferences)
             return
         }
         var covered = false
@@ -2163,7 +2163,7 @@ final class Page: NSObject, WKNavigationDelegate {
         case .keep(let guarding):
             guardDocuments(guarding)
         }
-        decisionHandler(isPrivate ? Self.allowWithoutAppLink : .allow, preferences)
+        decisionHandler(.allow, preferences)
     }
 
     /// What a top-level load does with the page, whose video and audio
@@ -2188,15 +2188,6 @@ final class Page: NSObject, WKNavigationDelegate {
         if asked, method ?? "GET" == "GET", canRemake, !covered, choice != media { return .remake }
         return .keep(covered ? .allow : choice)
     }
-
-    /// WebKit's `_WKNavigationActionPolicyAllowWithoutTryingAppLink`
-    /// (`WKNavigationDelegatePrivate.h`, `WKNavigationActionPolicyAllow + 2`):
-    /// a load that stays in the page, where `.allow` lets a universal link
-    /// open its app. A private tab keeps its links inside Sval, so no other
-    /// app learns what it opened. It is private API; removing it leaves
-    /// private links opening apps as normal tabs do.
-    private static let allowWithoutAppLink =
-        WKNavigationActionPolicy(rawValue: WKNavigationActionPolicy.allow.rawValue + 2) ?? .allow
 
     /// What makes a page a pin's: its saved address's site, whether a link
     /// to another site leaves it, and where such a link goes.
