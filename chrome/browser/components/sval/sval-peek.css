@@ -98,6 +98,13 @@
   max-width: none;
 }
 
+/* Firefox widens the address's base width by a button's room for each of the
+   downloads and extensions buttons the row is not showing
+   (`urlbar-searchbar.css`), room a Peek's row has no button to fill. */
+:root[svalpeek] #nav-bar #urlbar-container {
+  width: var(--urlbar-container-min-width);
+}
+
 :root[svalpeek] #nav-bar-customization-target {
   flex: 1 1000 auto !important;
   min-width: auto !important;
