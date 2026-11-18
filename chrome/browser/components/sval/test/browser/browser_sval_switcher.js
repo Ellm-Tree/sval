@@ -363,7 +363,7 @@ add_task(async function a_switch_keeps_new_tabs_in_the_workspace_shown() {
   const { ids } = await withSwitcherPanel();
   const [first, second] = ids.workspaces;
 
-  await SvalPanel._select(ids.tabs[0]);
+  await SvalPanel.selection.select(ids.tabs[0]);
   Assert.equal(
     await SvalPanel._newTabParent(),
     first,
@@ -393,7 +393,7 @@ add_task(async function a_switch_keeps_new_tabs_in_the_workspace_shown() {
     "the workspace that was left keeps its selection"
   );
   Assert.notEqual(
-    SvalPanel._selectedId(),
+    SvalPanel.selection.selectedId(),
     ids.tabs[0],
     "which is not the window's selection"
   );
@@ -519,7 +519,7 @@ add_task(async function a_new_group_is_made_with_the_look_it_was_given() {
  */
 add_task(async function a_new_group_does_not_take_the_selection() {
   const { ids } = await withSwitcherPanel();
-  await SvalPanel._select(ids.tabs[0]);
+  await SvalPanel.selection.select(ids.tabs[0]);
 
   // The pulse is a class its animation's end takes off again, so it is
   // recorded as it goes on.
@@ -548,7 +548,7 @@ add_task(async function a_new_group_does_not_take_the_selection() {
     watch.disconnect();
   }
   Assert.equal(
-    SvalPanel._selectedId(),
+    SvalPanel.selection.selectedId(),
     ids.tabs[0],
     "the selection stays with the tab"
   );

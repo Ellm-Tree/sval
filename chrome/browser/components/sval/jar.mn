@@ -220,7 +220,7 @@ browser.jar:
     content/browser/sval/sval-panel-strip.js (sval-panel-strip.js)
     content/browser/sval/sval-panel-appearance.js (sval-panel-appearance.js)
     content/browser/sval/sval-panel-workspace.js (sval-panel-workspace.js)
-    content/browser/sval/sval-panel-selection.js (sval-panel-selection.js)
+    content/browser/sval/sval-panel-activation.js (sval-panel-activation.js)
     content/browser/sval/sval-panel-edits.js   (sval-panel-edits.js)
     content/browser/sval/sval-panel-splits.js  (sval-panel-splits.js)
     content/browser/sval/sval-panel-start.js   (sval-panel-start.js)

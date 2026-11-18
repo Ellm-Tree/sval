@@ -76,7 +76,7 @@ Object.assign(SvalPanel, {
    * @param {object} row The clicked tab's row.
    */
   async _altClickSplit(row) {
-    if (await this.splitBeside(this._selectedId(), row.id)) {
+    if (await this.splitBeside(this.selection.selectedId(), row.id)) {
       this._focusRow(row.id);
     }
   },

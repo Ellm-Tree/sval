@@ -354,7 +354,7 @@ Object.assign(SvalPanel, {
     const held = offer.el.contains(document.activeElement);
     offer.el.remove();
     if (refocus || held) {
-      this._focusRow(this._focusedId ?? this._selectedId());
+      this._focusRow(this._focusedId ?? this.selection.selectedId());
     }
     return true;
   },

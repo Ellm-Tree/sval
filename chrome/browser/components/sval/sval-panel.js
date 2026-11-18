@@ -123,6 +123,40 @@ var SvalPanel = {
     return this._modules.SvalWindowWorkspace.of(window);
   },
 
+  /**
+   * The tab this window's user is working in, and the rows selected beside
+   * it.
+   *
+   * @returns {SvalPanelSelection}
+   */
+  get selection() {
+    if (!this._selection) {
+      const panel = this;
+      this._selection = new this._modules.SvalPanelSelection({
+        get nodes() {
+          return panel._nodes;
+        },
+        get rows() {
+          return panel._rows;
+        },
+        get settings() {
+          return panel._settings;
+        },
+        get workspace() {
+          return panel._workspace;
+        },
+        get pinShown() {
+          return !!panel._pins?.pages.selectedGuid;
+        },
+        rowElementFor: id => panel._rowElementFor(id),
+        movingId: id => panel._movingId(panel._rowFor(id) ?? { id }),
+        paintSplit: (element, row) => panel._paintSplitState(element, row),
+        render: () => panel.render(),
+      });
+    }
+    return this._selection;
+  },
+
   /** The document's `nodes` map as last read. */
   get nodes() {
     return this._nodes;
@@ -345,7 +379,7 @@ var SvalPanel = {
   /**
    * The panel toggle's key and its Workspaces menu item (`SvalMenuBar`):
    * shows the panel with focus on the row of the tab being viewed, which
-   * always has one (`_revealSelection`), or hides it. Focus in the panel as
+   * always has one (`SvalPanelSelection.reveal`), or hides it. Focus in the panel as
    * it hides goes to the page, so it is not left in a panel out of sight.
    */
   toggleFromKey() {
@@ -359,7 +393,7 @@ var SvalPanel = {
     }
     this.toggleVisible();
     if (show) {
-      this._focusRow(this._selectedId());
+      this._focusRow(this.selection.selectedId());
     }
   },
 
@@ -441,6 +475,8 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
         SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
         slide: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
+        SvalPanelSelection:
+          "moz-src:///browser/components/sval/SvalPanelSelection.sys.mjs",
         SvalPanelReveal:
           "moz-src:///browser/components/sval/SvalPanelReveal.sys.mjs",
         SvalFirstRun: "moz-src:///browser/components/sval/SvalFirstRun.sys.mjs",

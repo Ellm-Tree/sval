@@ -123,7 +123,7 @@ Object.assign(SvalPanel, {
     this._keepKeptTabsWithTheirWindows();
     await this._keepJar();
     this.keepSplits();
-    const revealed = this._revealSelection();
+    const revealed = this.selection.reveal();
     this.render();
     if (revealed) {
       this._settings.saveSoon();

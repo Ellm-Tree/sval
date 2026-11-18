@@ -55,7 +55,7 @@ Object.assign(SvalPanel, {
     // observer where to file, which is why attaching first costs nothing.
     await this._attachTabs();
     await this._workspace.switchTo(id);
-    await this._select(id);
+    await this.selection.select(id);
     this._publishSoon();
   },
 
@@ -578,7 +578,7 @@ Object.assign(SvalPanel, {
     if (row.kind !== this._modules.SvalTree.TAB) {
       return undefined;
     }
-    const several = this._selectionFor(row);
+    const several = this.selection.around(row);
     if (!several) {
       return this._close(row.id);
     }
@@ -605,9 +605,9 @@ Object.assign(SvalPanel, {
    * @returns {Promise<boolean>|undefined}
    */
   _groupSelection(row) {
-    const several = this._selectionFor(row);
+    const several = this.selection.around(row);
     return several
-      ? this._newGroupWith(this._selectionRoots(several))
+      ? this._newGroupWith(this.selection.roots(several))
       : undefined;
   },
 

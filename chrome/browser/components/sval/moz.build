@@ -147,6 +147,7 @@ MOZ_SRC_FILES += [
     "SvalPairing.sys.mjs",
     "SvalPanelModel.sys.mjs",
     "SvalPanelReveal.sys.mjs",
+    "SvalPanelSelection.sys.mjs",
     "SvalPasswordManager.sys.mjs",
     "SvalPeek.sys.mjs",
     "SvalPinChild.sys.mjs",

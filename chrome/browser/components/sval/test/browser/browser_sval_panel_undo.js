@@ -125,9 +125,9 @@ async function openTabs(count) {
  * @param {string[]} ids
  */
 async function closeRows(ids) {
-  await SvalPanel._select(ids[0]);
+  await SvalPanel.selection.select(ids[0]);
   for (const id of ids.slice(1)) {
-    SvalPanel._toggleSelected(id);
+    SvalPanel.selection.toggle(id);
   }
   await within(
     SvalPanel.run("close", SvalPanel._rowFor(ids.at(-1))),
@@ -546,8 +546,8 @@ add_task(async function closing_the_window_makes_the_delete() {
     const all = await nodes(panel._engine);
     return ids.every(id => id && all[id]);
   }, "both tabs are filed");
-  await panel._select(ids[0]);
-  panel._toggleSelected(ids[1]);
+  await panel.selection.select(ids[0]);
+  panel.selection.toggle(ids[1]);
   await within(panel.run("close", panel._rowFor(ids[1])), 10_000, "the close");
   Assert.ok(message(win), "Undo is offered");
 

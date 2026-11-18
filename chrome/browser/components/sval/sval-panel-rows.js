@@ -138,18 +138,18 @@
       this._rows = rows(this._nodes, {
         isCollapsed: id => this._settings.isCollapsed(id),
         root: this._workspace.id,
-        selected: this._viewedId(),
+        selected: this.selection.viewedId(),
         hidden: this._hiddenTabIds(),
         transparent: this._transparentIds(),
         pendingName: id => this._observer?.pendingName(id),
       });
 
       this._blockEnds = this._modules.SvalPanelModel.blockEnds(this._rows);
-      this._pruneSelection();
+      this.selection.prune();
 
       const hadFocus = tree.contains(document.activeElement);
       const drawsId = id => !!this._rowFor(id);
-      const selected = this._selectedId();
+      const selected = this.selection.selectedId();
       if (!hadFocus && drawsId(selected)) {
         // The tree is entered on the tab being viewed (the ARIA tree pattern),
         // so Tab into the panel after Ctrl+Tab lands where the user is.
@@ -356,7 +356,7 @@
       }
       el.setAttribute(
         "aria-selected",
-        this._isSelectedRow(row.id) ? "true" : "false"
+        this.selection.has(row.id) ? "true" : "false"
       );
       el.setAttribute("tabindex", row.id === this._focusedId ? "0" : "-1");
       this._paintRowSound(el, row);
@@ -964,7 +964,7 @@
         if (!cell) {
           continue;
         }
-        const selected = this._isSelectedRow(pane.id);
+        const selected = this.selection.has(pane.id);
         viewed ||= selected;
         cell.setAttribute("aria-selected", selected ? "true" : "false");
         cell.setAttribute("tabindex", pane.id === this._focusedId ? "0" : "-1");

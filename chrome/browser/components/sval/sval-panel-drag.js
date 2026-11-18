@@ -100,12 +100,12 @@
       // mid-drag, and `dragend` is dispatched to the element the drag began on,
       // which by then is no longer inside it.
       element.addEventListener("dragend", this, { once: true });
-      const several = this._selectionFor(row);
+      const several = this.selection.around(row);
       this._drag = {
         id,
         row: row.id,
         rows: several ?? [row.id],
-        carried: several ? this._selectionRoots(several) : null,
+        carried: several ? this.selection.roots(several) : null,
         dimmed: false,
         over: null,
         intent: null,

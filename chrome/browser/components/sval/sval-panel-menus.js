@@ -442,9 +442,9 @@ Object.assign(SvalPanel, {
    */
   _openRowMenu(row, event) {
     this._focusRow(row.id);
-    if (!this._selectionFor(row)) {
-      this._clearSelection(row.id);
-      this._select(row.id);
+    if (!this.selection.around(row)) {
+      this.selection.clear(row.id);
+      this.selection.select(row.id);
     }
     this._contextRowId = row.id;
     this._openMenu(this._els.contextMenu, this._rowElementFor(row.id), event);
@@ -608,7 +608,7 @@ Object.assign(SvalPanel, {
       return;
     }
     const row = this._rowFor(this._contextRowId);
-    this._syncRowMenu(this._els.contextMenu, row, this._selectionFor(row));
+    this._syncRowMenu(this._els.contextMenu, row, this.selection.around(row));
     // An entry the row's list names can still be hidden here, as a pin is
     // where `canPin` refuses, and its block's separator goes with it.
     this._modules.tidySeparators(this._els.contextMenu);
@@ -888,7 +888,7 @@ Object.assign(SvalPanel, {
   _syncSelectionItems(menu, several) {
     const { SELECTION_COMMANDS, groupSelectionTarget } =
       this._modules.SvalPanelModel;
-    const roots = this._selectionRoots(several);
+    const roots = this.selection.roots(several);
     for (const child of menu.children) {
       if (
         child.localName !== "menuseparator" &&
@@ -1034,7 +1034,7 @@ Object.assign(SvalPanel, {
    */
   _onContextMenuCommand(event) {
     const row = this._rowFor(this._contextRowId);
-    this._runRowMenuCommand(event, row, this._selectionFor(row));
+    this._runRowMenuCommand(event, row, this.selection.around(row));
   },
 
   /**
@@ -1052,7 +1052,7 @@ Object.assign(SvalPanel, {
     }
     // A pane's moves move its split (split-view spec §6.3).
     const moving = several
-      ? this._selectionRoots(several)
+      ? this.selection.roots(several)
       : this._movingId(row);
     if (event.target.hasAttribute("data-move-parent")) {
       const parent = event.target.getAttribute("data-move-parent");

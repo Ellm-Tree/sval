@@ -111,7 +111,7 @@ add_task(async function accel_click_adds_a_row_or_takes_it_out() {
   accelClick(ids.tab3);
   Assert.deepEqual(selectedIds(), [ids.tab1, ids.groupB], "and out again");
   Assert.equal(
-    SvalPanel._selectedId(),
+    SvalPanel.selection.selectedId(),
     ids.tab1,
     "the tab on screen stays the same"
   );

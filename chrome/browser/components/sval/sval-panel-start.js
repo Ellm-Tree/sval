@@ -647,7 +647,7 @@ Object.assign(SvalPanel, {
         onFlush: () => {},
         newTabParent: () => this._newTabParent(),
         onTreeChanged: nodes => this.refresh(nodes),
-        onTabSelected: id => this._select(id),
+        onTabSelected: id => this.selection.select(id),
         onTabIconChanged: id => this._paintTabIcon(id),
         onTabLoadChanged: id => this._paintTabLoaded(id),
         onTitleHeld: id => this._paintTabName(id),
@@ -656,7 +656,7 @@ Object.assign(SvalPanel, {
       });
       const shown = this._observer.nodeIdFor(window.gBrowser.selectedTab);
       if (shown) {
-        await this._select(shown);
+        await this.selection.select(shown);
       }
       return;
     }
@@ -687,7 +687,7 @@ Object.assign(SvalPanel, {
       // The selection is the tab the user is viewing, so it follows the
       // browser's own tab selection rather than only the panel's clicks: a
       // workspace switch shows a tab without anyone clicking its row.
-      onTabSelected: id => this._select(id),
+      onTabSelected: id => this.selection.select(id),
       // A favicon arrives after the page does, and redrawing every row for it
       // would take focus from whichever one the user is on.
       onTabIconChanged: id => this._paintTabIcon(id),
@@ -703,7 +703,7 @@ Object.assign(SvalPanel, {
     // `TabSelect` will report it. Read what the window shows now.
     const shown = this._observer.nodeIdFor(window.gBrowser.selectedTab);
     if (shown) {
-      await this._select(shown);
+      await this.selection.select(shown);
     }
     // A window opened from an isolated tab carries that tab's jar into a
     // window that may show another workspace, and no `TabOpen` reached the

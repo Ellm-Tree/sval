@@ -64,7 +64,7 @@ Object.assign(SvalPanel, {
    * selection can name a node another device deleted between two tabs opening.
    *
    * Only inside the workspace this window shows, which is all
-   * {@link _selectedId} answers with.
+   * `SvalPanelSelection.selectedId` answers with.
    *
    * @returns {Promise<string>} a node id that exists and can hold a tab.
    */
@@ -72,7 +72,7 @@ Object.assign(SvalPanel, {
     const { isPane } = this._modules.SvalPanelModel;
     const { WORKSPACE, GROUP } = this._modules.SvalTree;
     const current = this._workspace.id;
-    const selected = this._selectedId();
+    const selected = this.selection.selectedId();
     const node = selected ? this._nodes[selected] : null;
     if (node && (node.kind === WORKSPACE || node.kind === GROUP)) {
       return selected;

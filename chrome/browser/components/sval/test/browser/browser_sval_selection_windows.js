@@ -66,16 +66,20 @@ add_task(async function a_window_files_by_its_own_selection() {
     const shown = win.SvalPanel.observer.tabFor(ids.tabs[1]);
     await selectTab(shown);
     Assert.equal(
-      win.SvalPanel._selectedId(),
+      win.SvalPanel.selection.selectedId(),
       ids.tabs[1],
       "the new window views its workspace's tab"
     );
 
     // What this window's `TabSelect` reports when the user views the pane.
-    await SvalPanel._select(ids.tabs[0]);
-    Assert.equal(SvalPanel._selectedId(), ids.tabs[0], "this window views it");
+    await SvalPanel.selection.select(ids.tabs[0]);
     Assert.equal(
-      win.SvalPanel._selectedId(),
+      SvalPanel.selection.selectedId(),
+      ids.tabs[0],
+      "this window views it"
+    );
+    Assert.equal(
+      win.SvalPanel.selection.selectedId(),
       ids.tabs[1],
       "and the other window's selection stays its own"
     );
@@ -103,7 +107,7 @@ add_task(async function a_window_files_by_its_own_selection() {
 
     await selectTab(tab);
     Assert.equal(
-      SvalPanel._selectedId(),
+      SvalPanel.selection.selectedId(),
       ids.tabs[0],
       "and viewing it there leaves this window's selection alone"
     );

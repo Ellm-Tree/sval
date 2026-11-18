@@ -514,7 +514,7 @@ add_task(async function clicking_a_tab_row_opens_it() {
   );
   await switchDone();
 
-  const selectionBefore = SvalPanel._selectedId();
+  const selectionBefore = SvalPanel.selection.selectedId();
   const expandedBefore = SvalPanel._rowElementFor(ids.groupA).getAttribute(
     "aria-expanded"
   );
@@ -531,7 +531,7 @@ add_task(async function clicking_a_tab_row_opens_it() {
     "and shows no other page"
   );
   Assert.equal(
-    SvalPanel._selectedId(),
+    SvalPanel.selection.selectedId(),
     selectionBefore,
     "and does not take the selection from the tab"
   );

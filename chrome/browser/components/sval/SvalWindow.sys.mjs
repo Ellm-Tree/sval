@@ -49,7 +49,7 @@ const PANEL_SCRIPTS = [
   "chrome://browser/content/sval/sval-panel-strip.js",
   "chrome://browser/content/sval/sval-panel-appearance.js",
   "chrome://browser/content/sval/sval-panel-workspace.js",
-  "chrome://browser/content/sval/sval-panel-selection.js",
+  "chrome://browser/content/sval/sval-panel-activation.js",
   "chrome://browser/content/sval/sval-panel-edits.js",
   "chrome://browser/content/sval/sval-panel-splits.js",
   "chrome://browser/content/sval/sval-panel-start.js",

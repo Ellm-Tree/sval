@@ -612,7 +612,7 @@ async function drivePrivateSession(win, afterStep = async () => {}) {
 
   // A group with a marker name, a colour and an emoji, holding two tabs.
   const groupName = mark();
-  await panel._select(a.id);
+  await panel.selection.select(a.id);
   const adding = panel.run("addGroup", null);
   await answerContainerDialogIn(win, {
     name: groupName,
@@ -642,7 +642,7 @@ async function drivePrivateSession(win, afterStep = async () => {}) {
   await within(renaming, 10_000, "the rename");
   await panel._setCollapsed(group, true);
   await panel._setCollapsed(group, false);
-  await panel._select(c.id);
+  await panel.selection.select(c.id);
   await selectTab(b.tab);
   win.gBrowser.moveTabTo(a.tab, { tabIndex: 0 });
   await step();

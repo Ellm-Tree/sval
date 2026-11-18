@@ -29,7 +29,7 @@ Object.assign(SvalPanel, {
     }
     const row = this._rowFor(this._focusedId);
     const command = keyCommand(event, row, {
-      selecting: this._multiSelected.size > 0,
+      selecting: this.selection.several,
     });
     if (!command) {
       if (event.key === "Escape" && this.dismissUndo()) {
@@ -160,8 +160,8 @@ Object.assign(SvalPanel, {
     const selecting = {
       extendNext: () => this._extendSelection(1),
       extendPrevious: () => this._extendSelection(-1),
-      toggleSelected: () => this._toggleSelected(row.id),
-      clearSelection: () => this._clearSelection(),
+      toggleSelected: () => this.selection.toggle(row.id),
+      clearSelection: () => this.selection.clear(),
     }[command];
     if (selecting) {
       return selecting();
@@ -202,7 +202,7 @@ Object.assign(SvalPanel, {
       case "toggle":
         return this._setCollapsed(row.id, row.expanded);
       case "activate":
-        this._clearSelection(row.id);
+        this.selection.clear(row.id);
         return this.activate(row);
       case "rename":
         return this._rename(row);
@@ -354,22 +354,22 @@ Object.assign(SvalPanel, {
     // §10.5), as `MozTabbrowserTab.on_mousedown` reads the same modifiers.
     const accel = event.getModifierState("Accel");
     if (event.shiftKey) {
-      this._selectRange(row.id, { add: accel });
+      this.selection.selectTo(row.id, { add: accel });
       return;
     }
     if (accel) {
-      this._toggleSelected(row.id);
+      this.selection.toggle(row.id);
       return;
     }
     // Alt-click on a second tab splits it with the one being viewed, as
     // Firefox's tab strip does (split-view spec §6.3).
     if (event.altKey && row.kind === TAB) {
-      if (row.id !== this._selectedId()) {
+      if (row.id !== this.selection.selectedId()) {
         this.run("altClickSplit", row);
       }
       return;
     }
-    this._clearSelection(row.id);
+    this.selection.clear(row.id);
     // A tab's page loads on click (spec §10.4). A group has no page, so a click
     // only folds or unfolds it. Selection stays on the tab the user is viewing.
     if (row.kind === TAB) {
@@ -409,6 +409,18 @@ Object.assign(SvalPanel, {
     if (row.kind === this._modules.SvalTree.TAB) {
       this.run("activate", row);
     }
+  },
+
+  /**
+   * Moves the focus `delta` rows and selects every row from the selection's
+   * anchor to it: Shift with Up or Down.
+   *
+   * @param {number} delta
+   */
+  _extendSelection(delta) {
+    const from = this._focusedId;
+    this._moveFocus(delta);
+    this.selection.extend(from, this._focusedId);
   },
 
   /**
