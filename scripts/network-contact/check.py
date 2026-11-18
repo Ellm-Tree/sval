@@ -6,14 +6,20 @@
 Run by scripts/network-contact-test.sh, which starts the browser with
 Marionette and Gecko's network logging. This file talks to Marionette
 directly so that it needs nothing beyond the standard library.
+
+With --capture it judges the iPhone app instead, from the packet capture
+scripts/network-contact-ios.sh takes of a simulator session.
 """
 
 import argparse
 import glob
+import ipaddress
 import json
 import os
 import re
 import socket
+import struct
+import subprocess
 import sys
 import time
 
@@ -261,6 +267,36 @@ CHANGESET = re.compile(r"/buckets/([^/]+)/collections/([^/?]+)")
 ATTACHMENT = re.compile(r"^https://firefox-settings-attachments\.cdn\.mozilla\.net/([^/]+)/([^/]+)/")
 
 
+def read_rules(allowed_file):
+    """allowed-hosts.txt as {host: (status, reason)}."""
+    rules = {}
+    with open(allowed_file) as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()
+            if line:
+                host, status, reason = line.split(None, 2)
+                rules[host] = (status, reason)
+    return rules
+
+
+def judge_hosts(hosts, rules, opt_in_allowed):
+    """Prints each host's verdict, in the order `hosts`' values sort, and
+    returns the hosts that fail."""
+    failures = []
+    for host, first in sorted(hosts.items(), key=lambda kv: kv[1]):
+        status, reason = rules.get(host, (None, None))
+        if status == "allowed":
+            print(f"network-contact: ok       {host}")
+        elif status == "pending":
+            print(f"network-contact: PENDING  {host} — {reason}")
+        elif status == "opt-in" and opt_in_allowed:
+            print(f"network-contact: opt-in   {host} — {reason}")
+        else:
+            print(f"network-contact: FAIL     {host} (first at {first})")
+            failures.append(host)
+    return failures
+
+
 def judge(log_dir, allowed_file, collections, opt_in_allowed=False):
     hosts = {}
     synced = set()
@@ -288,26 +324,7 @@ def judge(log_dir, allowed_file, collections, opt_in_allowed=False):
                                 synced.add(found.group(2))
                     break
 
-    rules = {}
-    with open(allowed_file) as f:
-        for line in f:
-            line = line.split("#", 1)[0].strip()
-            if line:
-                host, status, reason = line.split(None, 2)
-                rules[host] = (status, reason)
-
-    failures = []
-    for host, first in sorted(hosts.items(), key=lambda kv: kv[1]):
-        status, reason = rules.get(host, (None, None))
-        if status == "allowed":
-            print(f"network-contact: ok       {host}")
-        elif status == "pending":
-            print(f"network-contact: PENDING  {host} — {reason}")
-        elif status == "opt-in" and opt_in_allowed:
-            print(f"network-contact: opt-in   {host} — {reason}")
-        else:
-            print(f"network-contact: FAIL     {host} (first at {first})")
-            failures.append(host)
+    failures = judge_hosts(hosts, read_rules(allowed_file), opt_in_allowed)
 
     for collection in sorted(synced - collections):
         print(f"network-contact: FAIL     Remote Settings collection {collection} is not in browser.sval.remoteSettings.collections")
@@ -320,6 +337,266 @@ def judge(log_dir, allowed_file, collections, opt_in_allowed=False):
         if pattern not in matched:
             failures.append(f"<no {name} line>")
             print(f"network-contact: FAIL     no log line matched {name} ({pattern.pattern}), so the contacts it sees were not checked")
+    return failures
+
+
+# The iPhone app's processes, by executable name, among the simulator's: the
+# app and the WebKit processes its web views and their Safe Browsing checks
+# run in. The simulator's system daemons are the operating system's, as the
+# desktop check leaves out the operating system's own contacts.
+DEVICE_PROCESSES = re.compile(r"^(Sval|com\.apple\.WebKit\..+|com\.apple\.Safari\.SafeBrowsing\.Service)$")
+
+
+def device_pids(processes_file, launchd_pid):
+    """{pid: name} for every Sval or WebKit process the simulator ran.
+
+    `processes_file` holds `ps -axo pid=,ppid=,comm=` snapshots taken through
+    the session. The simulator's launchd_sim starts each of the device's
+    processes, so its children are the device's alone, and another booted
+    simulator's WebKit processes, which share these names, are left out.
+    """
+    found = {}
+    with open(processes_file, errors="replace") as f:
+        for line in f:
+            parts = line.split(None, 2)
+            if len(parts) != 3 or parts[1] != str(launchd_pid):
+                continue
+            name = os.path.basename(parts[2].strip())
+            if DEVICE_PROCESSES.match(name):
+                found[int(parts[0])] = name
+    return found
+
+
+def capture_packets(path):
+    """Yields (link type, bytes) for each packet of a pcapng or pcap file."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:4] in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4"):
+        e = "<" if data[:4] == b"\xd4\xc3\xb2\xa1" else ">"
+        link = struct.unpack_from(e + "I", data, 20)[0]
+        off = 24
+        while off + 16 <= len(data):
+            length = struct.unpack_from(e + "I", data, off + 8)[0]
+            yield link, data[off + 16:off + 16 + length]
+            off += 16 + length
+        return
+    e, links, off = "<", [], 0
+    while off + 12 <= len(data):
+        kind = struct.unpack_from(e + "I", data, off)[0]
+        if kind == 0x0A0D0D0A:
+            e = "<" if data[off + 8:off + 12] == b"\x4d\x3c\x2b\x1a" else ">"
+            links = []
+        length = struct.unpack_from(e + "I", data, off + 4)[0]
+        if length < 12:
+            sys.exit(f"network-contact: {path} is not a capture this check can read")
+        body = off + 8
+        if kind == 1:
+            links.append(struct.unpack_from(e + "H", data, body)[0])
+        elif kind == 6:
+            iface, _, _, caplen = struct.unpack_from(e + "IIII", data, body)
+            yield links[iface], data[body + 20:body + 20 + caplen]
+        off += length
+
+
+def ip_layer(link, frame):
+    """The IP packet in a frame of the given link type, or None."""
+    if link in (0, 108):  # NULL and LOOP: a 4-byte address family
+        return frame[4:]
+    if link == 1:  # Ethernet
+        kind, start = struct.unpack_from("!H", frame, 12)[0], 14
+        if kind == 0x8100:
+            kind, start = struct.unpack_from("!H", frame, 16)[0], 18
+        return frame[start:] if kind in (0x0800, 0x86DD) else None
+    if link in (12, 14, 101, 228, 229):  # raw IP
+        return frame
+    if link in (149, 258):  # PKTAP: its header, then the frame it carries
+        header, inner = struct.unpack_from("<I", frame, 0)[0], struct.unpack_from("<I", frame, 8)[0]
+        return ip_layer(inner, frame[header:])
+    return None
+
+
+def transport(packet):
+    """(protocol, source, destination, source port, destination port, payload)."""
+    if not packet:
+        return None
+    version = packet[0] >> 4
+    if version == 4 and len(packet) >= 20:
+        start, proto = (packet[0] & 15) * 4, packet[9]
+        end = struct.unpack_from("!H", packet, 2)[0]
+        src, dst = ipaddress.ip_address(packet[12:16]), ipaddress.ip_address(packet[16:20])
+    elif version == 6 and len(packet) >= 40:
+        start, proto = 40, packet[6]
+        end = 40 + struct.unpack_from("!H", packet, 4)[0]
+        src, dst = ipaddress.ip_address(packet[8:24]), ipaddress.ip_address(packet[24:40])
+        while proto in (0, 43, 60) and start + 8 <= len(packet):
+            proto, start = packet[start], start + (packet[start + 1] + 1) * 8
+    else:
+        return None
+    body = packet[start:end]
+    if proto == 6 and len(body) >= 20:
+        sport, dport = struct.unpack_from("!HH", body)
+        return "tcp", src, dst, sport, dport, body[(body[12] >> 4) * 4:]
+    if proto == 17 and len(body) >= 8:
+        sport, dport = struct.unpack_from("!HH", body)
+        return "udp", src, dst, sport, dport, body[8:]
+    return None
+
+
+def dns_name(msg, off):
+    labels, jumps = [], 0
+    while off < len(msg):
+        n = msg[off]
+        if n == 0:
+            return ".".join(labels), off + 1
+        if n & 0xC0 == 0xC0:
+            if jumps > 20 or off + 1 >= len(msg):
+                return None, None
+            jumps += 1
+            name, _ = dns_name(msg, ((n & 0x3F) << 8) | msg[off + 1])
+            return (".".join(labels + [name]) if name is not None else None), off + 2
+        labels.append(msg[off + 1:off + 1 + n].decode("ascii", "replace"))
+        off += 1 + n
+    return None, None
+
+
+def dns_message(msg):
+    """(the names asked, [(name asked, address answered)]) of a DNS message."""
+    try:
+        qd, an = struct.unpack_from("!HH", msg, 4)
+        off, names, answers = 12, [], []
+        for _ in range(qd):
+            name, off = dns_name(msg, off)
+            if name is None:
+                return [], []
+            names.append(name)
+            off += 4
+        for _ in range(an):
+            _, off = dns_name(msg, off)
+            if off is None:
+                break
+            kind, _, _, length = struct.unpack_from("!HHIH", msg, off)
+            rdata = msg[off + 10:off + 10 + length]
+            off += 10 + length
+            if names and ((kind == 1 and length == 4) or (kind == 28 and length == 16)):
+                answers.append((names[0], ipaddress.ip_address(rdata)))
+        return names, answers
+    except (struct.error, ValueError):
+        return [], []
+
+
+def client_hello_name(stream):
+    """The server name a TLS ClientHello at the start of `stream` asks for;
+    None when there is none, and "" while the hello is still incomplete."""
+    if len(stream) < 5 or stream[0] != 0x16:
+        return None
+    if len(stream) < 5 + struct.unpack_from("!H", stream, 3)[0]:
+        return ""
+    try:
+        if stream[5] != 1:
+            return None
+        off = 5 + 4 + 2 + 32
+        off += 1 + stream[off]
+        off += 2 + struct.unpack_from("!H", stream, off)[0]
+        off += 1 + stream[off]
+        end = off + 2 + struct.unpack_from("!H", stream, off)[0]
+        off += 2
+        while off + 4 <= end:
+            kind, length = struct.unpack_from("!HH", stream, off)
+            if kind == 0:
+                size = struct.unpack_from("!H", stream, off + 7)[0]
+                return stream[off + 9:off + 9 + size].decode("ascii", "replace")
+            off += 4 + length
+    except (struct.error, IndexError):
+        pass
+    return None
+
+
+HTTP_HOST = re.compile(rb"^[A-Z]+ \S+ HTTP/1\.[01]\r\n(?:.*\r\n)*?host:\s*([^\s:]+)", re.I)
+
+
+def remote(address):
+    return not (address.is_loopback or address.is_link_local or address.is_multicast
+                or address.is_unspecified)
+
+
+def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_allowed):
+    pids = device_pids(processes_file, launchd_pid)
+    names = sorted(set(pids.values()))
+    print(f"network-contact: {len(pids)} processes measured: {', '.join(names) or 'none'}")
+    if "Sval" not in names:
+        print("network-contact: FAIL     the capture names no Sval process, so nothing was tested")
+        return ["<no Sval process>"]
+
+    # The device resolves through the Mac's mDNSResponder, which asks on the
+    # app's behalf, so its queries carry the app as their effective process
+    # (tcpdump's `epid`). The answers to any process tie an address to the
+    # names it was looked up by.
+    answered = {}
+    for link, frame in capture_packets(capture):
+        found = transport(ip_layer(link, frame))
+        if found and found[0] == "udp" and found[3] == 53:
+            for name, address in dns_message(found[5])[1]:
+                answered.setdefault(address, set()).add(name.rstrip(".").lower())
+
+    ours = capture + ".device"
+    expression = " or ".join(f"pid={p} or epid={p}" for p in sorted(pids))
+    subprocess.run(["tcpdump", "-r", capture, "-Q", f"({expression}) and dir=out", "-w", ours],
+                   check=True, stderr=subprocess.DEVNULL)
+
+    hosts, flows, streams, named, settled, hellos = {}, {}, {}, set(), set(), 0
+    for index, (link, frame) in enumerate(capture_packets(ours)):
+        found = transport(ip_layer(link, frame))
+        if not found:
+            continue
+        proto, _, dst, sport, dport, payload = found
+        first = f"packet {index:07d}"
+        if proto == "udp" and dport == 53:
+            for name in dns_message(payload)[0]:
+                hosts.setdefault(name.rstrip(".").lower(), first)
+            continue
+        if not remote(dst) or (proto == "udp" and dport == 5353):
+            continue
+        flow = (proto, sport, dst, dport)
+        flows.setdefault(flow, first)
+        if proto != "tcp" or flow in settled or not payload:
+            continue
+        stream = streams.get(flow, b"") + payload
+        streams[flow] = stream[:65536]
+        name = client_hello_name(stream)
+        if name:
+            hellos += 1
+        elif name is None:
+            match = HTTP_HOST.match(stream)
+            name = match.group(1).decode("ascii", "replace") if match else None
+        if name:
+            hosts.setdefault(name.rstrip(".").lower(), first)
+            named.add(flow)
+        if name != "":
+            settled.add(flow)
+            streams.pop(flow, None)
+
+    rules = read_rules(allowed_file)
+    failures = []
+    for flow, first in sorted(flows.items(), key=lambda kv: kv[1]):
+        if flow in named:
+            continue
+        candidates = answered.get(flow[2], set())
+        # An address several names share, as a CDN's are, counts as the
+        # listed ones: the session's own lookups are among them.
+        listed = {n for n in candidates if n in rules}
+        for name in listed or candidates:
+            hosts.setdefault(name, first)
+        if not candidates:
+            print(f"network-contact: FAIL     {flow[0]} to {flow[2]} port {flow[3]}, an address no "
+                  f"lookup or server name in the capture explains (first at {first})")
+            failures.append(str(flow[2]))
+    failures += judge_hosts(hosts, rules, opt_in_allowed)
+    if not flows:
+        failures.append("<no contact>")
+        print("network-contact: FAIL     the app's processes sent nothing, so nothing was tested")
+    if not hellos:
+        failures.append("<no server name>")
+        print("network-contact: FAIL     no TLS server name was read, so the names were not checked")
     return failures
 
 
@@ -392,9 +669,12 @@ def collect_switches(port, profile):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--collect-switches", metavar="OUT")
-    parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--profile", required=True)
-    parser.add_argument("--log-dir", required=True)
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--profile")
+    parser.add_argument("--log-dir")
+    parser.add_argument("--capture", help="a pktap capture of the iPhone simulator, in pcapng")
+    parser.add_argument("--processes", help="ps snapshots taken during the capture")
+    parser.add_argument("--launchd-pid", type=int, help="the simulator's launchd_sim")
     parser.add_argument("--page")
     parser.add_argument("--untrusted-page")
     parser.add_argument("--allowed")
@@ -403,6 +683,17 @@ def main():
     parser.add_argument("--shared-folder")
     parser.add_argument("--first-run", action="store_true")
     args = parser.parse_args()
+
+    if args.capture:
+        failures = judge_capture(args.capture, args.processes, args.launchd_pid,
+                                 args.allowed, args.opt_in_allowed)
+        if failures:
+            print(f"network-contact: {len(failures)} unexpected contact(s); see spec §10.9")
+            return 1
+        print("network-contact: every contact is on the list")
+        return 0
+    if args.port is None or args.profile is None or args.log_dir is None:
+        parser.error("--port, --profile and --log-dir are required without --capture")
 
     if args.collect_switches:
         switches = collect_switches(args.port, args.profile)

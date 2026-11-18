@@ -2227,11 +2227,16 @@ a time:
 of Mozilla's partner codes: they credit Mozilla under a contract Sval is not
 party to.
 
-**On iPhone** the same rule holds. Dropbox's hosts (`www.dropbox.com`,
+**On iPhone** the same rule holds, and `scripts/network-contact-ios.sh`
+measures it nightly in the simulator from a packet capture, with Balanced and
+with Strict blocking. The blocking lists come from the same publishers as the
+desktop's. Dropbox's hosts (`www.dropbox.com`,
 `api.dropboxapi.com`, `content.dropboxapi.com`, `notify.dropboxapi.com`) are
 contacted only when the user keeps the shared folder in Dropbox (mobile spec
-§8.1). A site's icon is fetched from that site, without cookies, once a page
-of it has loaded, which the page has already done.
+§8.1). A site's icon is fetched without cookies once a page of the site has
+loaded: from the address the page names, which can be on another host, else
+from the site's `/favicon.ico`, and never from an address the page's blocking
+lists block.
 
 
 ## 11. Mobile (v2 fast-follow, designed for now)
