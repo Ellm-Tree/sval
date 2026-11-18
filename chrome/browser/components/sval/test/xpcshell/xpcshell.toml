@@ -68,6 +68,8 @@ run-if = ["os == 'mac'"]
 
 ["test_sval_clear_site_per_jar.js"]
 
+["test_sval_client_auth_jar.js"]
+
 ["test_sval_clock.js"]
 
 ["test_sval_clock_first_reading.js"]

@@ -339,6 +339,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_crash_no_address.js"]
 
+["browser_sval_crash_no_link.js"]
+
 ["browser_sval_crash_private.js"]
 
 ["browser_sval_credentials.js"]
@@ -436,6 +438,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_firefox_questions.js"]
 
 ["browser_sval_forget_site.js"]
+
+["browser_sval_forget_site_rules.js"]
 
 ["browser_sval_fp_audio.js"]
 

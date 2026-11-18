@@ -59,6 +59,7 @@ script-policy-most-specific.patch
 service-worker-script-policy.patch
 media-autoplay-site-permission.patch
 media-autoplay-press.patch
+autoplay-actor-known-events.patch
 fp-webgpu-timestamp-query-hidden.patch
 history-opens-in-tabs.patch
 app-menu-notices-need-the-button.patch
@@ -137,6 +138,7 @@ crashreporter-submit-off-by-default.patch
 crashreporter-no-crash-ping.patch
 crashreporter-window-in-app-switcher.patch
 crash-reports-no-page-address.patch
+crash-reports-no-mozilla-link.patch
 split-view-pane-footer.patch
 split-view-footer-reconnect.patch
 hsts-private-jar.patch
@@ -339,3 +341,4 @@ gtk-wayland-background-blur.patch
 gtk-wayland-commit-toplevel-opaque-region.patch
 https-only-error-plain-words.patch
 private-browsing-no-crash-dump.patch
+client-auth-choice-cleared-with-jar.patch

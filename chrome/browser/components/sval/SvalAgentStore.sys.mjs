@@ -103,6 +103,9 @@ function sameInConstantTime(a, b) {
   return diff === 0;
 }
 
+/** The policy's maps of a site's answer about its tools and its tools. */
+const TOOL_MAPS = ["pageToolSites", "pageToolGrants"];
+
 /**
  * @param {object} policy
  * @param {string} map One of the policy's maps keyed by site.
@@ -908,6 +911,19 @@ export class SvalAgentStore {
   }
 
   /**
+   * @param {string} agentId
+   * @returns {string[]} The sites and hosts the agent's policy holds a rule
+   *   for, of any kind `removeSite` takes.
+   */
+  ruledSites(agentId) {
+    const policy = this.#agents.get(String(agentId))?.policy ?? {};
+    const maps = ["sites", ...FILE_KINDS, "apps", ...TOOL_MAPS];
+    return [
+      ...new Set(maps.flatMap(map => Object.keys(entriesOf(policy, map)))),
+    ];
+  }
+
+  /**
    * Removes, in one write, the rules the policy holds for one site: its
    * level, its file and app permissions and, unless `keepTools`, its answer about
    * site tools and the tools remembered on it.
@@ -920,7 +936,7 @@ export class SvalAgentStore {
   async removeSite(agentId, site, { keepTools = false } = {}) {
     const maps = ["sites", ...FILE_KINDS, "apps"];
     if (!keepTools) {
-      maps.push("pageToolSites", "pageToolGrants");
+      maps.push(...TOOL_MAPS);
     }
     await this.#editPolicy(agentId, policy =>
       maps.reduce((edited, map) => withoutEntry(edited, map, site), policy)

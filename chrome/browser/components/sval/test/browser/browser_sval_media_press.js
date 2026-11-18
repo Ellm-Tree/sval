@@ -203,3 +203,26 @@ add_task(async function on_always_deny_a_press_plays_nothing() {
   Assert.ok(!reported, "and no press is reported as playing it");
   BrowserTestUtils.removeTab(tab);
 });
+
+add_task(async function a_pages_process_cannot_name_the_event_chrome_gets() {
+  reset();
+  const tab = await openPage(PRESS_PAGE);
+  const forged = [];
+  const listener = event => forged.push(event.type);
+  gBrowser.addEventListener("SvalForgedEvent", listener);
+  atTaskEnd(() => gBrowser.removeEventListener("SvalForgedEvent", listener));
+  const blocked = within(
+    BrowserTestUtils.waitForEvent(gBrowser, "GloballyAutoplayBlocked"),
+    10_000,
+    "the actor's message arriving as the event Gecko sends"
+  );
+  // What a page's process could send if it were taken over.
+  await SpecialPowers.spawn(tab.linkedBrowser, [], () => {
+    content.windowGlobalChild
+      .getActor("Autoplay")
+      .sendAsyncMessage("SvalForgedEvent", {});
+  });
+  await blocked;
+  Assert.deepEqual(forged, [], "no event of the name the process chose");
+  BrowserTestUtils.removeTab(tab);
+});

@@ -149,6 +149,7 @@ add_setup(async function () {
       agent: request.getHeader("User-Agent"),
       cookie: request.hasHeader("Cookie"),
       referer: request.hasHeader("Referer"),
+      origin: request.hasHeader("Origin"),
       body: NetUtil.readInputStreamToString(
         request.bodyInputStream,
         request.bodyInputStream.available()
@@ -203,6 +204,10 @@ add_task(async function the_preview_is_the_post() {
   Assert.deepEqual(result, { ok: true, reference: "F-0042" }, "it was sent");
   Assert.equal(request.agent, `Sval/${Services.appinfo.version}`, "as Sval");
   Assert.ok(!request.cookie && !request.referer, "with no cookie or Referer");
+  Assert.ok(
+    !request.origin,
+    "with no Origin, which the collector takes for a web page's post"
+  );
 
   const byName = name => parts.filter(part => part.name === name);
   Assert.equal(byName("context")[0].body, "Import failed", "the context");

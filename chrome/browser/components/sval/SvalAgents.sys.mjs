@@ -1041,6 +1041,28 @@ export const SvalAgents = {
   },
 
   /**
+   * Runs `use` with the store of paired agents: the open listener's or,
+   * while agent access is off, the agents file read for this call. The call
+   * waits its turn with the listener's opening and closing, so the file has
+   * one writer at a time.
+   *
+   * @param {(store: SvalAgentStore) => any} use
+   * @returns {Promise<any>} What `use` returns, or undefined before `start`.
+   */
+  withStore(use) {
+    const run = transition.then(async () => {
+      if (!config) {
+        return undefined;
+      }
+      return use(
+        open?.store ?? (await SvalAgentStore.open(agentPath(AGENTS_FILE)))
+      );
+    });
+    transition = run.catch(() => {});
+    return run;
+  },
+
+  /**
    * The open listener's gate, which every session's tabs share, or null
    * while agent access is off. Its readers, such as `agentOf`, answer for
    * every connection's tabs.

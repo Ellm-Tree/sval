@@ -1,0 +1,43 @@
+Sval: clearing a jar forgets the client certificates chosen in it
+
+A remembered choice of client certificate is kept by host and origin
+attributes, and ClientAuthRememberCleaner had no deleteByOriginAttributes,
+so deleteDataFromOriginAttributesPattern left it. A deleted Workspace's jar
+is cleared that way, and its choices stayed in the profile for a jar that
+no longer exists.
+
+diff --git a/toolkit/components/cleardata/ClearDataService.sys.mjs b/toolkit/components/cleardata/ClearDataService.sys.mjs
+index 39ea7660e4..0abd82fcf7 100644
+--- a/toolkit/components/cleardata/ClearDataService.sys.mjs
++++ b/toolkit/components/cleardata/ClearDataService.sys.mjs
+@@ -1830,6 +1830,30 @@ const ClientAuthRememberCleaner = {
+       .forEach(({ entryKey }) => cars.forgetRememberedDecision(entryKey));
+   },
+ 
++  async deleteByOriginAttributes(aOriginAttributesString) {
++    let cars = Cc[
++      "@mozilla.org/security/clientAuthRememberService;1"
++    ].getService(Ci.nsIClientAuthRememberService);
++    let pattern = JSON.parse(aOriginAttributesString);
++
++    cars
++      .getDecisions()
++      .filter(({ entryKey }) => {
++        try {
++          return ChromeUtils.originAttributesMatchPattern(
++            ChromeUtils.CreateOriginAttributesFromOriginSuffix(
++              decodeURIComponent(entryKey.split(",")[2])
++            ),
++            pattern
++          );
++        } catch (e) {
++          console.error(e);
++          return false;
++        }
++      })
++      .forEach(({ entryKey }) => cars.forgetRememberedDecision(entryKey));
++  },
++
+   async deleteAll() {
+     let cars = Cc[
+       "@mozilla.org/security/clientAuthRememberService;1"

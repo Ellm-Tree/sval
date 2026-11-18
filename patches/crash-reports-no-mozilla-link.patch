@@ -1,0 +1,39 @@
+Sval: a sent crash report has no link to Mozilla's crash site
+
+about:crashes and about:support link each sent report to breakpad.reportURL,
+Mozilla's crash-stats site. Sval's reports go to Sval's own collector, which
+has no public page for a report, so the link led to a page that says the
+report does not exist. Each lists the report's id as text.
+
+diff --git a/toolkit/content/aboutSupport.js b/toolkit/content/aboutSupport.js
+index 3d913633c7..7d4427561d 100644
+--- a/toolkit/content/aboutSupport.js
++++ b/toolkit/content/aboutSupport.js
+@@ -315,9 +315,7 @@ var snapshotFormatters = {
+           formattedDateStrArgs = { minutes: minutesPassed };
+         }
+         return $.new("tr", [
+-          $.new("td", [
+-            $.new("a", crash.id, null, { href: reportURL + crash.id }),
+-          ]),
++          $.new("td", crash.id),
+           $.new("td", null, null, {
+             "data-l10n-id": formattedDateStrId,
+             "data-l10n-args": formattedDateStrArgs,
+diff --git a/toolkit/crashreporter/content/crashes.js b/toolkit/crashreporter/content/crashes.js
+index f2e98b2986..d887b295f6 100644
+--- a/toolkit/crashreporter/content/crashes.js
++++ b/toolkit/crashreporter/content/crashes.js
+@@ -106,12 +106,6 @@ function addReportRow(isPending, isIgnored, id, date, dateFormatter) {
+     cells[2].appendChild(button);
+     document.getElementById("unsubmitted").appendChild(row);
+   } else {
+-    const linkTemplate = document.getElementById("viewCrashLink");
+-    const link = document
+-      .importNode(linkTemplate.content, true)
+-      .querySelector("a");
+-    link.href = `${reportURL}${id}`;
+-    cells[2].appendChild(link);
+     document.getElementById("submitted").appendChild(row);
+   }
+ }

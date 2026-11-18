@@ -1,0 +1,27 @@
+Sval: the Autoplay actor sends chrome only the events it knows
+
+The actor's parent side makes a chrome event from each message of its child
+side, and Sval's press of play gave the event the message's name. The name
+comes from the content process and chrome trusts the event, so a content
+process that was taken over could raise a chrome event of any name on the
+tab's browser. The parent raises SvalMediaPressPlayed for that message and
+Gecko's GloballyAutoplayBlocked for any other.
+
+diff --git a/toolkit/actors/AutoplayParent.sys.mjs b/toolkit/actors/AutoplayParent.sys.mjs
+index 6032f09bd9..563d68fbd8 100644
+--- a/toolkit/actors/AutoplayParent.sys.mjs
++++ b/toolkit/actors/AutoplayParent.sys.mjs
+@@ -8,7 +8,12 @@ export class AutoplayParent extends JSWindowActorParent {
+     let browser = topBrowsingContext.embedderElement;
+     let document = browser.ownerDocument;
+     let event = document.createEvent("CustomEvent");
+-    event.initCustomEvent(message.name, true, false, {
++    // The content process names the message, and chrome trusts the event.
++    let name =
++      message.name == "SvalMediaPressPlayed"
++        ? message.name
++        : "GloballyAutoplayBlocked";
++    event.initCustomEvent(name, true, false, {
+       url: this.documentURI,
+       userGesture: !!message.data?.userGesture,
+       kind: message.data?.kind ?? "media",

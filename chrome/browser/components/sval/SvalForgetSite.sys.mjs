@@ -6,9 +6,12 @@
  * site, counted part by part for the confirm, and all of it forgotten.
  *
  * Firefox's parts go through `Services.clearData` with Forget About This
- * Site's flags, in every jar. Sval's are its stored choices, site styles
- * among them, its My filters lines and its Favorites and pins, each the
- * site's own and those of every host under it (decision 1980). A private window's own state is none of
+ * Site's flags, in every jar. Sval's are its stored choices, its My filters
+ * lines and its Favorites and pins, each the site's own and those of every
+ * host under it (decision 1980). The choices are the site's rules, its site
+ * styles, the link rules that name it and the allowed domains of it. The
+ * rules paired agents hold for the site go with its permissions. A private
+ * window's own state is none of
  * these: Forget is never offered there (spec §5).
  */
 
@@ -18,12 +21,14 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   Downloads: "resource://gre/modules/Downloads.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+  SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
   SvalExtensionSites:
     "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
   SvalFavoritesStore:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   SvalJavascript: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+  SvalLinkRules: "moz-src:///browser/components/sval/SvalLinkRules.sys.mjs",
   SvalSiteData: "moz-src:///browser/components/sval/SvalSiteData.sys.mjs",
   SvalSiteProtections:
     "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs",
@@ -218,6 +223,46 @@ function styleScopesOf(site) {
 }
 
 /**
+ * @param {string} site
+ * @returns {Promise<Array<{agentId: string, name: string}>>} Each paired
+ *   agent's rules for the site and its hosts, by the name the rule is under.
+ */
+async function agentRulesOf(site) {
+  const held = await lazy.SvalAgents.withStore(store =>
+    store.agents().flatMap(({ agentId }) => {
+      const names = store.ruledSites(agentId);
+      return scopesOf(site, names)
+        .filter(name => names.includes(name))
+        .map(name => ({ agentId, name }));
+    })
+  );
+  return held ?? [];
+}
+
+/**
+ * @param {object} rule A link rule.
+ * @param {string} site
+ * @returns {boolean} Whether the rule is for the site or a host under it. A
+ *   rule for text an address contains names no site.
+ */
+function namesSite(rule, site) {
+  return (
+    rule.kind === lazy.SvalLinkRules.SITE &&
+    lazy.scopeOfHost(rule.value)?.site === site
+  );
+}
+
+/**
+ * @param {string} site
+ * @returns {string[]} The allowed domains that are the site or under it.
+ */
+function allowedDomainsOf(site) {
+  return lazy.SvalBlocking.allowedDomains().filter(
+    domain => lazy.scopeOfHost(domain)?.site === site
+  );
+}
+
+/**
  * Sval's own parts, each forgetting the share of one store held by the site
  * and its hosts.
  */
@@ -235,6 +280,14 @@ const SVAL_PARTS = {
       lazy.SvalExtensionSites.removeAll(name);
     }
     lazy.SvalSiteStyles.removeStyles(styleScopesOf(site));
+    const linkRules = lazy.SvalLinkRules.rules();
+    const kept = linkRules.filter(rule => !namesSite(rule, site));
+    if (kept.length < linkRules.length) {
+      lazy.SvalLinkRules.setRules(kept);
+    }
+    for (const domain of allowedDomainsOf(site)) {
+      lazy.SvalBlocking.removeAllowedDomain(domain);
+    }
   },
 
   exceptions(site) {
@@ -255,6 +308,18 @@ const SVAL_PARTS = {
     if (removed) {
       lazy.SvalBlocking.setMyFilters(text);
     }
+  },
+
+  // Paired agents' rules are this device's alone, as Gecko's permissions are.
+  async permissions(site) {
+    await lazy.SvalAgents.withStore(async store => {
+      for (const { agentId } of store.agents()) {
+        const names = store.ruledSites(agentId);
+        for (const name of scopesOf(site, names)) {
+          await store.removeSite(agentId, name);
+        }
+      }
+    });
   },
 
   async favorites(site) {
@@ -311,9 +376,10 @@ export const SvalForgetSite = {
       ? lazy.SvalSiteData.heldFor(site)
       : null;
     await lazy.SvalFavoritesStore.instance?.whenReady();
-    const [history, downloads] = await Promise.all([
+    const [history, downloads, agentRules] = await Promise.all([
       countVisits(site),
       countDownloads(site),
+      agentRulesOf(site),
     ]);
     return {
       choices:
@@ -326,7 +392,10 @@ export const SvalForgetSite = {
           lazy.SvalJavascript.hasRule(name)
         ).length +
         switches.reduce((sum, count) => sum + count, 0) +
-        styleScopesOf(site).length,
+        styleScopesOf(site).length +
+        lazy.SvalLinkRules.rules().filter(rule => namesSite(rule, site))
+          .length +
+        allowedDomainsOf(site).length,
       exceptions: rules.reduce(
         (sum, rule) => sum + (rule.exceptions?.length ?? 0),
         0
@@ -337,7 +406,9 @@ export const SvalForgetSite = {
       downloads,
       dataBytes: data?.usage ?? null,
       dataJars: data?.jars ?? null,
-      permissions: lazy.permissionCount(site, lazy.APPLIED_PERMISSIONS),
+      permissions:
+        lazy.permissionCount(site, lazy.APPLIED_PERMISSIONS) +
+        agentRules.length,
       certExceptions: countCertExceptions(site),
     };
   },

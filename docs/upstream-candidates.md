@@ -1076,6 +1076,20 @@ Each entry gives:
 - **Upstream**: a small patch with a test in `toolkit/mozapps/update/tests`.
   Not submitted.
 
+### Deleting a container keeps the client certificates chosen in it
+
+- **Patch**: `patches/client-auth-choice-cleared-with-jar.patch`
+- **Mozilla bug**: none found in a search of Bugzilla.
+- **Defect**: `ClientAuthRememberCleaner` in `ClearDataService.sys.mjs` has no
+  `deleteByOriginAttributes`, so `deleteDataFromOriginAttributesPattern`
+  skips it. `ContextualIdentityService.remove` clears a container that way,
+  and the remembered choices keyed by its `userContextId` stay in
+  `ClientAuthRememberList` after the container is gone.
+- **Evidence**: read in the code. `test_sval_client_auth_jar.js` fails without
+  the patch.
+- **Upstream**: the patch, with a test beside
+  `toolkit/components/cleardata/tests/unit`. Not submitted.
+
 ## Worked around in Sval's code, Mozilla's code unchanged
 
 ### A page asking to stay is discarded when it answers late
