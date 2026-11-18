@@ -166,6 +166,8 @@ Object.assign(SvalPanel, {
     if (!this._observer) {
       return;
     }
-    this._observer.closeOrphanTabs(this._treeNodes);
+    this._observer.closeOrphanTabs(this._treeNodes, {
+      movingOn: this._workspace.handingOver,
+    });
   },
 });

@@ -3084,9 +3084,12 @@ class SvalTabObserver {
    * window a page opened, and leave a blank tab in its place.
    *
    * @param {object} nodes The document's `nodes` map.
+   * @param {object} [options]
+   * @param {boolean} [options.movingOn] Whether the window's tabs are being
+   *   handed over to another workspace as this runs.
    * @returns {string[]} the node ids whose tabs were closed.
    */
-  closeOrphanTabs(nodes) {
+  closeOrphanTabs(nodes, { movingOn = false } = {}) {
     if (!nodes || !Object.keys(nodes).length) {
       return [];
     }
@@ -3109,11 +3112,12 @@ class SvalTabObserver {
       }
     }
     // A window whose workspace went with its tabs is about to move to another
-    // or close. The tab that keeps it open until then stays unfiled, so the
-    // move takes it back (`closeUnfiledTabs`): a home page would be filed in
-    // the workspace arrived at once it showed.
+    // or close, and one in the middle of a hand-over is moving already. The
+    // tab that keeps it open until then stays unfiled, so the move takes it
+    // back (`closeUnfiledTabs`): a home page would be filed in the workspace
+    // arrived at once it showed.
     return this.#releaseOrphans(orphans, {
-      blank: !(this.#workspaceId in nodes),
+      blank: movingOn || !(this.#workspaceId in nodes),
     });
   }
 

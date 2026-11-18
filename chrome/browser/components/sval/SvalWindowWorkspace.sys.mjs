@@ -79,6 +79,9 @@ export class SvalWindowWorkspace {
    */
   #handingOver = null;
 
+  /** How many hand-overs are queued or running; see {@link handingOver}. */
+  #handOvers = 0;
+
   /**
    * Whether the window is on a tree in memory: a private window, or one a
    * WebDriver client opened. It has one temporary workspace no other window
@@ -590,7 +593,21 @@ export class SvalWindowWorkspace {
    */
   handOver(id, { hold = true } = {}) {
     this.#handingOver ??= new lazy.SvalSerialQueue("hand-over");
-    return this.#handingOver.run(() => this.#handOverOnce(id, hold));
+    this.#handOvers++;
+    return this.#handingOver
+      .run(() => this.#handOverOnce(id, hold))
+      .finally(() => this.#handOvers--);
+  }
+
+  /**
+   * Whether the window's tabs are being handed over to the workspace it
+   * shows. Until that ends, the tab on screen can be one of the workspace
+   * left, and the hand-over is what puts one of the workspace's own there.
+   *
+   * @returns {boolean}
+   */
+  get handingOver() {
+    return this.#handOvers > 0;
   }
 
   /**

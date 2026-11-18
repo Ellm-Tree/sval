@@ -82,18 +82,11 @@ async function deleteElsewhere(peer, workspaces) {
  * Asserts that `win` is on `workspace` in everything a person reads: the
  * switcher, the rows, the tabs on show and the one on screen.
  *
- * The rows are asserted by what they hold of the workspace's own tabs and of
- * the deleted ones. A window whose every tab on show is deleted is given a
- * home page tab so that it stays open (`SvalTabObserver.keepOneTab`), and
- * that tab is filed in the workspace the window shows by the time its page
- * loads, so the workspace arrived at can hold a row for it.
- *
  * @param {Window} win
  * @param {{id: string, tabs: string[]}} workspace
  * @param {string} name
- * @param {Array<{id: string, tabs: string[]}>} deleted
  */
-async function assertWindowIsOn(win, workspace, name, deleted) {
+async function assertWindowIsOn(win, workspace, name) {
   await switchDone(win);
   await within(
     win.SvalPanel.observer.settled(),
@@ -101,16 +94,10 @@ async function assertWindowIsOn(win, workspace, name, deleted) {
     "the window's observer settling"
   );
   Assert.equal(switcherNameIn(win), name, "the switcher names it");
-  const rows = rowIdsIn(win);
   Assert.deepEqual(
-    rows.filter(id => workspace.tabs.includes(id)),
+    rowIdsIn(win),
     workspace.tabs,
-    "its tabs are drawn"
-  );
-  Assert.deepEqual(
-    rows.filter(id => deleted.some(gone => gone.tabs.includes(id))),
-    [],
-    "and none of a deleted workspace's"
+    "its tabs are drawn, and no row nobody opened"
   );
   Assert.deepEqual(
     shownTabIdsIn(win),
@@ -148,7 +135,7 @@ add_task(async function a_switch_holds_when_the_workspace_left_is_deleted() {
     "the pass read the other device's deletion"
   );
 
-  await assertWindowIsOn(window, wanted, "Wanted", [shown]);
+  await assertWindowIsOn(window, wanted, "Wanted");
   await selectedShows(window, titledRed("Staying"), "the wanted page");
   Assert.ok(
     !(await switcherIdsIn(window)).listed.includes(shown.id),
@@ -179,10 +166,38 @@ add_task(async function a_switch_started_during_the_deleting_pass_wins() {
   );
   await within(switched, 10_000, "the switch");
 
-  await assertWindowIsOn(window, wanted, "Wanted", [shown]);
+  await assertWindowIsOn(window, wanted, "Wanted");
   await selectedShows(window, titledRed("Staying"), "the wanted page");
   Assert.ok(
     !(await switcherIdsIn(window)).listed.includes(shown.id),
     "and the deleted workspace is gone from the switcher"
   );
+});
+
+/**
+ * The redraw that takes the deleted workspace's tabs out of the window lands
+ * while the window's tabs are being handed over to the workspace switched
+ * to. Every tab on show is one of the deleted workspace's then, so the window
+ * is given a tab to stay open on, and that tab is no row of the workspace
+ * arrived at.
+ *
+ * The redraw is given the tree such a pass leaves, in the turn the hand-over
+ * starts in, so the order is the one asserted about.
+ */
+add_task(async function a_window_emptied_mid_switch_gains_no_row() {
+  const shown = await workspaceWith("Shown", { pages: [page("Going")] });
+  const wanted = await workspaceWith("Wanted", { pages: [page("Staying")] });
+  await switchVia(window, shown.id);
+  const left = { ...(await SvalPanel.engine.tree()).nodes };
+  for (const id of [shown.id, ...shown.tabs]) {
+    delete left[id];
+  }
+
+  const showing = SvalWindowWorkspace.of(window).show(wanted.id);
+  const redrawn = SvalPanel.refresh(left);
+  await within(Promise.all([showing, redrawn]), 10_000, "the hand-over");
+  await SvalPanel.refresh(left);
+
+  await assertWindowIsOn(window, wanted, "Wanted");
+  await selectedShows(window, titledRed("Staying"), "the wanted page");
 });
