@@ -63,7 +63,7 @@ Object.assign(SvalPanel, {
    * @returns {{color: string|object|null, transparency: number}}
    */
   shownLookOf(id) {
-    if (id && id === this._currentWorkspaceId && this._shownLook) {
+    if (id && id === this._workspace.id && this._shownLook) {
       return this._shownLook;
     }
     return {

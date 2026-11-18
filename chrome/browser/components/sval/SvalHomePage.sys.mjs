@@ -25,6 +25,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
 });
@@ -109,7 +111,7 @@ function publish(win) {
   // Every content process reads sharedData, web content included, so only
   // the colour goes there. The workspace's id reaches the page through its
   // actor alone.
-  const look = lookIn(win, win.SvalPanel.workspaceId ?? null);
+  const look = lookIn(win, lazy.SvalWindowWorkspace.of(win).id);
   Services.ppmm.sharedData.set(key, {
     key: look.key,
     tint: look.tint,
@@ -232,10 +234,7 @@ export const SvalHomePage = {
     }
     return lookIn(
       win,
-      lazy.SvalTabs.workspaceOfTab(
-        panel,
-        win.gBrowser?.getTabForBrowser(browser)
-      )
+      lazy.SvalTabs.workspaceOfTab(win, win.gBrowser?.getTabForBrowser(browser))
     );
   },
 

@@ -54,7 +54,7 @@ add_task(async function a_window_left_with_no_free_workspace_closes() {
   Assert.ok(first in nodes, "the other workspace is still there");
   Assert.ok(ids.tabs[0] in nodes, "with its tab");
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     first,
     "and the window showing it still does"
   );

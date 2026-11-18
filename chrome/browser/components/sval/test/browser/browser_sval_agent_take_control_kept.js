@@ -94,7 +94,7 @@ add_task(async function a_take_survives_a_discard() {
  */
 add_task(async function a_take_kept_by_tab_is_dropped() {
   const { win, tab, call } = await layerSetup();
-  const workspace = win.SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(win).id;
   SvalPanel.settings.setUserHeld(tab, true);
   atTaskEnd(() => SvalPanel.settings.setUserHeld(tab, false));
   Assert.ok(
@@ -335,7 +335,7 @@ add_task(async function a_popup_opened_while_the_user_holds_stays_in_it() {
   );
   Assert.ok(!popupWin.toolbar.visible, "it stays a popup");
   Assert.equal(
-    popupWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(popupWin).id,
     agent.workspaceId,
     "showing the agent's workspace"
   );

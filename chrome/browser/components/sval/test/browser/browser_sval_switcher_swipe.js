@@ -177,20 +177,36 @@ add_task(async function a_sideways_scroll_over_the_panel_moves_one_workspace() {
   const [profiles] = SvalTree.workspaceIds(SvalPanel.nodes);
   const tree = SvalPanel.container.querySelector(".sval-tree");
   const page = gBrowser.selectedBrowser;
-  Assert.equal(SvalPanel.workspaceId, first, "the window starts on the first");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "the window starts on the first"
+  );
 
   wheel(page, { deltaX: 20 });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, first, "a scroll over the page stays");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "a scroll over the page stays"
+  );
 
   wheel(tree, { deltaY: 20 });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, first, "a vertical scroll stays");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "a vertical scroll stays"
+  );
 
   await SpecialPowers.pushPrefEnv({ set: [[SWIPE_WORKSPACES_PREF, false]] });
   wheel(tree, { deltaX: 20 });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, first, "with the switch off, it stays");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "with the switch off, it stays"
+  );
   await SpecialPowers.popPrefEnv();
 
   // The vertical scroll above was a gesture of its own, locked upright.
@@ -202,29 +218,49 @@ add_task(async function a_sideways_scroll_over_the_panel_moves_one_workspace() {
   await carryOnUntilSwitched(tree, { momentum: true });
   wheel(tree, { deltaX: 20, momentum: true });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, second, "one gesture moves one place");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "one gesture moves one place"
+  );
 
   // A swipe back before the momentum has ended is a swipe of its own.
   wheel(tree, { deltaX: -20, start: true });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, first, "the other way moves back one");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "the other way moves back one"
+  );
 
   await wheelRests();
   wheel(tree, { deltaX: -20 });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, profiles, "and to the list's first");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    profiles,
+    "and to the list's first"
+  );
 
   const last = SvalTree.workspaceIds(SvalPanel.nodes).at(-1);
   Assert.equal(last, ids.workspaces.at(-1), "the task's last is the list's");
   await wheelRests();
   wheel(tree, { deltaX: -20 });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, last, "before the first, it wraps");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    last,
+    "before the first, it wraps"
+  );
 
   await wheelRests();
   wheel(tree, { deltaX: 20 });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, profiles, "and past the last, too");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    profiles,
+    "and past the last, too"
+  );
 
   // Shift turns a wheel sideways where Firefox scrolls sideways for it. On
   // macOS the system does that, and the event arrives with a deltaX.
@@ -234,7 +270,7 @@ add_task(async function a_sideways_scroll_over_the_panel_moves_one_workspace() {
   const sideways =
     Services.prefs.getIntPref("mousewheel.with_shift.action") === 4;
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     sideways ? first : profiles,
     sideways ? "Shift with the wheel moves one" : "Shift with the wheel stays"
   );
@@ -248,16 +284,24 @@ add_task(async function a_swipe_that_slows_and_speeds_up_moves_once() {
   const { ids } = await withSwitcherPanel({ workspaces: 3 });
   const [first, second] = ids.workspaces;
   const tree = SvalPanel.container.querySelector(".sval-tree");
-  Assert.equal(SvalPanel.workspaceId, first, "the window starts on the first");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "the window starts on the first"
+  );
   await wheelRests();
 
   fingers(tree, [2, 5, 10, 20, 30, 30, 25, 15, 8, 4, 3, 2, 2]);
   await carryOnUntilSwitched(tree, { momentum: false });
-  Assert.equal(SvalPanel.workspaceId, second, "the swipe moves one place");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "the swipe moves one place"
+  );
   fingers(tree, [6, 12, 20, 30, 30, 25], false);
   wheel(tree, { deltaX: 20, momentum: true });
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, second, "and only one");
+  Assert.equal(SvalWindowWorkspace.of(window).id, second, "and only one");
 });
 
 /**
@@ -269,15 +313,27 @@ add_task(async function swipe_after_swipe_moves_each_time() {
   const { ids } = await withSwitcherPanel({ workspaces: 3 });
   const [first, second, third] = ids.workspaces;
   const tree = SvalPanel.container.querySelector(".sval-tree");
-  Assert.equal(SvalPanel.workspaceId, first, "the window starts on the first");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "the window starts on the first"
+  );
   await wheelRests();
 
   fingers(tree, [2, 5, 10, 20, 30, 30, 25]);
   await carryOnUntilSwitched(tree, { momentum: true });
-  Assert.equal(SvalPanel.workspaceId, second, "a swipe right moves one");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "a swipe right moves one"
+  );
   fingers(tree, [10, 20, 30, 30, 25]);
   await carryOnUntilSwitched(tree, { momentum: true });
-  Assert.equal(SvalPanel.workspaceId, third, "the next swipe right one more");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    third,
+    "the next swipe right one more"
+  );
 });
 
 /**
@@ -316,7 +372,11 @@ add_task(async function a_gesture_keeps_to_the_axis_it_starts_on() {
     "the mostly upright scroll scrolling the tree"
   );
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, first, "and moving no Workspace");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "and moving no Workspace"
+  );
   Assert.ok(!prevented.includes(true), "it is left to scroll the tree");
 
   await wheelRests();
@@ -328,7 +388,11 @@ add_task(async function a_gesture_keeps_to_the_axis_it_starts_on() {
     "the mostly sideways swipe holds the tree still"
   );
   await switchDone();
-  Assert.equal(SvalPanel.workspaceId, second, "and moves one Workspace");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "and moves one Workspace"
+  );
 });
 
 /**
@@ -360,9 +424,13 @@ add_task(async function a_swipe_to_another_windows_workspace_raises_it() {
   await untilFocused(other, "the other window coming forward");
   await switchDone(window);
   await switchDone(other);
-  Assert.equal(SvalPanel.workspaceId, second, "this window stays where it is");
   Assert.equal(
-    other.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "this window stays where it is"
+  );
+  Assert.equal(
+    SvalWindowWorkspace.of(other).id,
     first,
     "and the rest of the gesture moves nothing in the window it raised"
   );

@@ -86,7 +86,7 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
   const first = await workspaceWith("First", { pages: [page("One")] });
   const second = await workspaceWith("Second", { pages: [page("Two")] });
   const free = await workspaceWith("Free", { pages: [page("Spare")] });
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const homeRows = rowIdsIn(window);
 
   const windows = [
@@ -121,7 +121,11 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
   Assert.deepEqual(shownTabIdsIn(win), free.tabs, "and is the one on show");
   Assert.equal(taggedId(win.gBrowser.selectedTab), free.tabs[0], "on screen");
 
-  Assert.equal(SvalPanel.workspaceId, home, "this window stayed where it was");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    home,
+    "this window stayed where it was"
+  );
   Assert.deepEqual(rowIdsIn(window), homeRows, "drawing what it drew");
   const { listed, free: offered } = await switcherIdsIn(window);
   Assert.ok(

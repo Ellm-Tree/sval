@@ -166,7 +166,7 @@ add_setup(async function () {
 
 add_task(
   async function a_window_lists_its_workspaces_history_and_all_on_request() {
-    const here = SvalPanel.workspaceId;
+    const here = SvalWindowWorkspace.of(window).id;
     const there = await otherWorkspace("Research");
     await visitIn([
       [BEFORE, null],
@@ -226,7 +226,7 @@ add_task(async function a_search_keeps_to_the_workspace() {
   const there = await otherWorkspace("Research");
   await visitIn([
     [THERE, there],
-    [HERE, SvalPanel.workspaceId],
+    [HERE, SvalWindowWorkspace.of(window).id],
   ]);
   atTaskEnd(() => PlacesUtils.history.clear());
   const { doc, tree } = await showHistory();
@@ -250,7 +250,7 @@ add_task(async function a_search_keeps_to_the_workspace() {
 add_task(async function a_deleted_workspaces_pages_show_only_under_all() {
   await visitIn([
     [GONE, crypto.randomUUID()],
-    [HERE, SvalPanel.workspaceId],
+    [HERE, SvalWindowWorkspace.of(window).id],
   ]);
   atTaskEnd(() => PlacesUtils.history.clear());
   const { doc, tree } = await showHistory();
@@ -270,9 +270,9 @@ add_task(async function showing_another_workspace_lists_its_history() {
   const there = await otherWorkspace("Research");
   await visitIn([
     [THERE, there],
-    [HERE, SvalPanel.workspaceId],
+    [HERE, SvalWindowWorkspace.of(window).id],
   ]);
-  const here = SvalPanel.workspaceId;
+  const here = SvalWindowWorkspace.of(window).id;
   const tabsBefore = new Set(gBrowser.tabs);
   atTaskEnd(async () => {
     await SvalPanel.switchTo(here);
@@ -304,7 +304,7 @@ add_task(async function showing_another_workspace_lists_its_history() {
 
 add_task(async function a_private_window_lists_every_page_with_no_switch() {
   await visitIn([
-    [HERE, SvalPanel.workspaceId],
+    [HERE, SvalWindowWorkspace.of(window).id],
     [BEFORE, null],
   ]);
   atTaskEnd(() => PlacesUtils.history.clear());

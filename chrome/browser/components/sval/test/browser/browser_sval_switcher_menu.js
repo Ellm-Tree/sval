@@ -84,13 +84,17 @@ add_task(async function the_menu_opens_over_the_switcher_in_order() {
   );
 
   await closeSwitcher(menu);
-  Assert.equal(SvalPanel.workspaceId, last, "closing changes nothing");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    last,
+    "closing changes nothing"
+  );
 });
 
 add_task(async function picking_a_workspace_closes_the_menu_on_it() {
   const { ids } = await withSwitcherPanel({ workspaces: 3 });
   const [first, , third] = ids.workspaces;
-  Assert.equal(SvalPanel.workspaceId, first);
+  Assert.equal(SvalWindowWorkspace.of(window).id, first);
   const menu = await openSwitcher();
 
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
@@ -101,7 +105,11 @@ add_task(async function picking_a_workspace_closes_the_menu_on_it() {
     10_000,
     "the switch"
   );
-  Assert.equal(SvalPanel.workspaceId, third, "the window shows the pick");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    third,
+    "the window shows the pick"
+  );
 });
 
 add_task(async function the_ring_follows_the_keyboard_alone() {

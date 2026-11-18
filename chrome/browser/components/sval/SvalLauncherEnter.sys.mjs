@@ -41,6 +41,8 @@ import { leavesPin } from "moz-src:///browser/components/sval/SvalPinsModel.sys.
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   SvalFavorites: "moz-src:///browser/components/sval/SvalFavorites.sys.mjs",
   SvalFavoritesProvider:
     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
@@ -120,7 +122,7 @@ function leavesPinPage(win, url, browser) {
  */
 function showsAgent(win) {
   const panel = win.SvalPanel;
-  const id = panel?.workspaceId;
+  const id = lazy.SvalWindowWorkspace.of(win).id;
   return !!id && lazy.agentLabelOf(panel.nodes ?? {}, id) !== null;
 }
 
@@ -158,12 +160,14 @@ async function splitWithTab(win, viewed, id) {
   const panel = win.SvalPanel;
   const nodes = panel?.nodes ?? {};
   const from = lazy.workspaceOfNode(nodes, id);
-  const here = panel?.workspaceId;
+  const here = lazy.SvalWindowWorkspace.of(win).id;
   const elsewhere = !!from && from !== here;
   if (elsewhere && !(await panel.confirmJarCrossing(id, here, null, from))) {
     return true;
   }
-  const shownBy = elsewhere ? panel.workspacesShownElsewhere().get(from) : null;
+  const shownBy = elsewhere
+    ? lazy.SvalWindowWorkspace.of(win).shownElsewhere().get(from)
+    : null;
   if (!(await splitBeside(win, viewed, id))) {
     return false;
   }

@@ -162,7 +162,7 @@
     _renderSwitcher() {
       const { WORKSPACE } = this._modules.SvalTree;
       const switcher = this._els.switcher;
-      const current = this._currentWorkspaceId;
+      const current = this._workspace.id;
       // First run's Workspace step, before the Workspace exists: what its
       // fields hold as the user fills them (`_previewFirstWorkspace`).
       const preview = current ? null : this._switcherPreview;
@@ -650,8 +650,8 @@
     switcherList() {
       const items = this._modules.SvalPanelModel.switcherItems(
         this._nodes,
-        this._currentWorkspaceId,
-        this.workspacesShownElsewhere(),
+        this._workspace.id,
+        this._workspace.shownElsewhere(),
         this.devices()
       );
       return [
@@ -1436,7 +1436,8 @@
         return;
       }
       if (next.elsewhere) {
-        this.workspacesShownElsewhere()
+        this._workspace
+          .shownElsewhere()
           .get(next.id)
           ?.SvalPanel?.catchSwipe(step);
       }
@@ -1659,11 +1660,11 @@
         this.render();
         return null;
       }
-      if (id === this._currentWorkspaceId) {
+      if (id === this._workspace.id) {
         window.focus();
         return null;
       }
-      const shownBy = this.workspacesShownElsewhere().get(id);
+      const shownBy = this._workspace.shownElsewhere().get(id);
       if (shownBy) {
         shownBy.focus();
         return null;

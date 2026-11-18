@@ -465,7 +465,7 @@ add_task(async function move_this_tab_lists_its_choices_in_the_field() {
     () => !gBrowser.visibleTabs.includes(tab),
     "the moved tab leaves what the window shows"
   );
-  Assert.equal(SvalPanel.workspaceId, home, "the window stayed");
+  Assert.equal(SvalWindowWorkspace.of(window).id, home, "the window stayed");
 });
 
 /**

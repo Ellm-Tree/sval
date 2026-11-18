@@ -114,7 +114,7 @@ add_task(async function a_failed_startup_pass_is_tried_again_backing_off() {
   const panel = win.SvalPanel;
 
   Assert.strictEqual(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     null,
     "nothing was created: a device that cannot read its copy must not " +
       "decide it holds nothing"
@@ -137,16 +137,24 @@ add_task(async function a_failed_startup_pass_is_tried_again_backing_off() {
     100,
     150
   );
-  Assert.strictEqual(panel.workspaceId, null, "still creating nothing");
+  Assert.strictEqual(
+    SvalWindowWorkspace.of(win).id,
+    null,
+    "still creating nothing"
+  );
 
   await allow();
   await TestUtils.waitForCondition(
-    () => panel.workspaceId,
+    () => SvalWindowWorkspace.of(win).id,
     "the next try reads the copy and shows its workspace",
     100,
     250
   );
-  Assert.equal(panel.workspaceId, planted.ws, "the one this device kept");
+  Assert.equal(
+    SvalWindowWorkspace.of(win).id,
+    planted.ws,
+    "the one this device kept"
+  );
   Assert.strictEqual(
     panel._startRetryWaitMs,
     null,
@@ -166,9 +174,10 @@ add_task(
         planted = await publishOwnCopy(fixture);
       },
     });
-    const { SvalPanel: panel } = await profile.open();
+    const win = await profile.open();
+    const panel = win.SvalPanel;
     Assert.equal(
-      panel.workspaceId,
+      SvalWindowWorkspace.of(win).id,
       planted.ws,
       "the window shows the workspace from the profile copy"
     );
@@ -199,7 +208,8 @@ add_task(
  */
 add_task(async function a_missing_folder_is_quiet_and_clears_when_back() {
   const profile = await freshProfile();
-  const { SvalPanel: panel } = await profile.open();
+  const win = await profile.open();
+  const panel = win.SvalPanel;
   const missing = tempPath("sval-missing");
   await within(
     panel.chooseSharedFolder(missing),

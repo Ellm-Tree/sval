@@ -136,7 +136,7 @@ add_task(async function groups_keep_their_tabs_through_every_move() {
 });
 
 add_task(async function a_renamed_group_keeps_its_name_in_a_new_window() {
-  const start = SvalPanel.workspaceId;
+  const start = SvalWindowWorkspace.of(window).id;
   const named = await newWorkspace("Naming");
   const url = titledRed("Grouped");
   const id = await nodeOfTab(await openPage(url));

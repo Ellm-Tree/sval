@@ -68,7 +68,7 @@ async function colour(id, color) {
     now: Date.now(),
   });
   await SvalPanel.refresh();
-  if (SvalPanel.workspaceId === id) {
+  if (SvalWindowWorkspace.of(window).id === id) {
     await TestUtils.waitForCondition(
       () => SvalPanel.windowColor === color,
       `the window wears ${color}`

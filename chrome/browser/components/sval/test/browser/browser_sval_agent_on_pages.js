@@ -49,7 +49,7 @@ async function filedAndNamed(tab, title) {
   const id = await nodeOfTab(tab);
   Assert.equal(
     SvalPanel.nodes[id]?.placement.parent,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     `${title}: filed in the workspace the window shows`
   );
   await TestUtils.waitForCondition(

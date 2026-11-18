@@ -64,7 +64,7 @@ add_task(async function closing_tabs_in_a_second_window_stays_in_it() {
     20_000,
     "the new window's panel starting"
   );
-  Assert.equal(win.SvalPanel.workspaceId, second, "on the second");
+  Assert.equal(SvalWindowWorkspace.of(win).id, second, "on the second");
 
   // The user goes to the middle row and reads the page.
   const middle = win.SvalPanel._rows.find(row => row.id === order[1]);
@@ -95,12 +95,12 @@ add_task(async function closing_tabs_in_a_second_window_stays_in_it() {
     "and closing that shows the one before"
   );
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     second,
     "the window is still on the second workspace"
   );
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     first,
     "and the first window on the first"
   );

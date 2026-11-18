@@ -67,7 +67,7 @@ async function linkFromAnotherApp() {
 }
 
 add_task(async function a_workspace_opens_in_a_new_window_from_its_menu() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await sharedWorkspace();
   const win = await linkFromAnotherApp();
   const doc = win.document;
@@ -89,7 +89,7 @@ add_task(async function a_workspace_opens_in_a_new_window_from_its_menu() {
   await within(other.SvalPanel.started, 10_000, "its panel's startup");
   await within(closed, 10_000, "the Peek closing");
 
-  Assert.equal(other.SvalPanel.workspaceId, id, "the new window shows it");
+  Assert.equal(SvalWindowWorkspace.of(other).id, id, "the new window shows it");
   await TestUtils.waitForCondition(
     () =>
       other.gBrowser.tabs.some(
@@ -98,7 +98,7 @@ add_task(async function a_workspace_opens_in_a_new_window_from_its_menu() {
     "with the page"
   );
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     home,
     "the window the user was in keeps its workspace"
   );

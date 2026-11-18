@@ -230,7 +230,7 @@ add_task(async function new_workspace_runs_from_its_row() {
   await TestUtils.waitForCondition(async () => {
     const all = (await engine.tree()).nodes ?? {};
     trips = Object.keys(all).find(id => all[id].content?.name === "Trips");
-    return trips && SvalPanel.workspaceId === trips;
+    return trips && SvalWindowWorkspace.of(window).id === trips;
   }, "the window shows the new workspace");
   // The switch goes on past that: its tab switch moves focus to the page
   // when the tab's layers are ready (AsyncTabSwitcher.updateDisplay), which
@@ -248,7 +248,7 @@ add_task(async function new_workspace_runs_from_its_row() {
   Assert.ok(row.result.payload.title.includes("Home"), "named for it");
   enterOn(row);
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === home,
+    () => SvalWindowWorkspace.of(window).id === home,
     "Enter goes to it"
   );
 });
@@ -358,7 +358,7 @@ add_task(async function move_lists_the_workspaces_then_moves_the_tab() {
   }, "the tab moved to Work");
   Assert.ok(!gURLBar.view.isOpen, "the address bar closed");
   Assert.ok(!document.getElementById("sval-launcher-chip"), "with no chip");
-  Assert.equal(SvalPanel.workspaceId, home, "the window stayed");
+  Assert.equal(SvalWindowWorkspace.of(window).id, home, "the window stayed");
 });
 
 /**

@@ -43,7 +43,7 @@ function tabOf(id, win = window) {
 }
 
 add_task(async function each_workspace_shows_its_own_tabs() {
-  const start = SvalPanel.workspaceId;
+  const start = SvalWindowWorkspace.of(window).id;
   const here = titledRed("Here");
   const hereId = await nodeOfTab(await openPage(here));
 
@@ -87,7 +87,7 @@ add_task(async function each_workspace_shows_its_own_tabs() {
 });
 
 add_task(async function a_renamed_workspace_keeps_its_name_in_a_new_window() {
-  const start = SvalPanel.workspaceId;
+  const start = SvalWindowWorkspace.of(window).id;
   const draft = await newWorkspace("Draft");
   const page = titledRed("Kept");
   const id = await nodeOfTab(await openPage(page));
@@ -114,7 +114,7 @@ add_task(async function a_renamed_workspace_keeps_its_name_in_a_new_window() {
 });
 
 add_task(async function a_tab_moved_to_another_workspace_loads_there() {
-  const start = SvalPanel.workspaceId;
+  const start = SvalWindowWorkspace.of(window).id;
   const elsewhere = await newWorkspace("Elsewhere");
   await switchVia(window, start);
   const page = titledRed("Moving");
@@ -157,7 +157,7 @@ add_task(async function a_closed_tab_comes_back_in_its_workspace() {
 });
 
 add_task(async function a_workspace_opened_in_a_new_window_loads_its_tabs() {
-  const start = SvalPanel.workspaceId;
+  const start = SvalWindowWorkspace.of(window).id;
   const travel = await newWorkspace("Travel");
   const first = titledRed("First");
   const second = titledRed("Second");
@@ -177,7 +177,7 @@ add_task(async function a_workspace_opened_in_a_new_window_loads_its_tabs() {
 
 add_task(async function a_new_window_loads_what_is_typed_in_it() {
   const win = await secondWindow();
-  const workspace = win.SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(win).id;
   Assert.ok(workspace, "the new window shows a workspace");
   const page = titledRed("Typed");
   await within(

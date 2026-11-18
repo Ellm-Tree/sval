@@ -146,7 +146,7 @@ add_task(async function a_tab_is_pinned_to_this_workspace() {
   const [guid] = rowGuids();
   Assert.deepEqual(
     pinsFixture.store.pinScopeOf(guid),
-    [SvalPanel.workspaceId],
+    [SvalWindowWorkspace.of(window).id],
     "limited to this workspace"
   );
   Assert.equal(selectedPinGuid(), guid, "and is the pin's page, selected");
@@ -311,7 +311,7 @@ add_task(async function the_panels_undo_brings_a_deleted_pin_back() {
   const first = await pinFavorite(PAGE2, "First");
   const guid = await pinFavorite(LINKS_PAGE, "Links");
   const last = await pinFavorite(ORG_PAGE, "Last");
-  const scope = [SvalPanel.workspaceId];
+  const scope = [SvalWindowWorkspace.of(window).id];
   await store.setPinScope(guid, scope);
   await TestUtils.waitForCondition(
     () => rowGuids().join() === [first, guid, last].join(),
@@ -354,7 +354,7 @@ add_task(async function the_panels_undo_brings_a_pin_moved_to_favorites_back() {
     afterGuid: first,
     beforeGuid: last,
   });
-  const scope = [SvalPanel.workspaceId];
+  const scope = [SvalWindowWorkspace.of(window).id];
   await store.setPinScope(guid, scope);
   await TestUtils.waitForCondition(
     () => rowGuids().join() === [first, guid, last].join(),

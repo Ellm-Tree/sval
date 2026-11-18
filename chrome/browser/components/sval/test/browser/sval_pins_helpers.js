@@ -69,7 +69,7 @@ async function pinsSetup() {
     10_000,
     "the profile's Favorites"
   );
-  const started = SvalPanel.workspaceId;
+  const started = SvalWindowWorkspace.of(window).id;
   const add = name =>
     engine.mutate({
       kind: "addWorkspace",

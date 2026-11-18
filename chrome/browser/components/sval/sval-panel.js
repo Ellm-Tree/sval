@@ -60,30 +60,6 @@ var SvalPanel = {
   _pins: null,
 
   /**
-   * The workspace **this window shows** (spec §10.7): the rows drawn are its
-   * children, the switcher names it, and new tabs and groups are filed under
-   * it. Null only while the document holds no workspace at all.
-   *
-   * It is device-local and per window, never in the synced document (spec
-   * §5.6), and remembered through
-   * `SessionStore.setCustomWindowValue(window, SvalPanelModel
-   * .CURRENT_WORKSPACE_KEY, id)`, which is per window and survives a restart.
-   *
-   * The document Sval syncs is `SvalTree.SYNC_DOCUMENT`, one document
-   * holding every workspace.
-   */
-  _currentWorkspaceId: null,
-
-  /**
-   * The workspace {@link _adoptOrCreateWorkspace} created for this window,
-   * the one workspace its close may delete (decision 0101). A workspace the
-   * user made, or one this window was handed, is theirs whatever it holds.
-   * Kept in the session store under `SvalPanelModel.MADE_WORKSPACE_KEY`, so a
-   * window the session brings back knows it too.
-   */
-  _madeWorkspaceId: null,
-
-  /**
    * The document's `nodes` map as last read, without what waits on an Undo
    * message (`_viewOf`), and the rows drawn from it.
    */
@@ -138,9 +114,13 @@ var SvalPanel = {
     return this._els?.container;
   },
 
-  /** The workspace this window shows, or null. */
-  get workspaceId() {
-    return this._currentWorkspaceId;
+  /**
+   * Which workspace this window shows, and what the other windows show.
+   *
+   * @returns {SvalWindowWorkspace}
+   */
+  get _workspace() {
+    return this._modules.SvalWindowWorkspace.of(window);
   },
 
   /** The document's `nodes` map as last read. */
@@ -520,6 +500,8 @@ var SvalPanel = {
         SvalSettingsSync:
           "moz-src:///browser/components/sval/SvalSettingsSync.sys.mjs",
         SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
+        SvalWindowWorkspace:
+          "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
         takeArcCard: "moz-src:///browser/components/sval/SvalCard.sys.mjs",
         latestNodes:
           "moz-src:///browser/components/sval/SvalTreeSnapshot.sys.mjs",
@@ -892,12 +874,12 @@ var SvalPanel = {
           const dropUntouched =
             !this._inMemory &&
             window.toolbar.visible &&
-            this._currentWorkspaceId === this._madeWorkspaceId &&
-            !this.workspacesShownElsewhere().has(this._currentWorkspaceId);
+            this._workspace.id === this._workspace.madeId &&
+            !this._workspace.shownElsewhere().has(this._workspace.id);
           const flushed = this._observer.detach({ dropUntouched });
-          if (dropUntouched && this._currentWorkspaceId) {
+          if (dropUntouched && this._workspace.id) {
             this._modules.SvalPanelModel.holdWhileClosing(
-              this._currentWorkspaceId,
+              this._workspace.id,
               flushed
             );
           }

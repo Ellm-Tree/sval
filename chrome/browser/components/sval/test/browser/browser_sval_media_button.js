@@ -357,7 +357,11 @@ add_task(
       async () => !(await videoPaused(tab)),
       "the video plays again"
     );
-    Assert.equal(SvalPanel.workspaceId, second, "all without switching");
+    Assert.equal(
+      SvalWindowWorkspace.of(window).id,
+      second,
+      "all without switching"
+    );
     await closeSwitcher(menu);
   }
 );

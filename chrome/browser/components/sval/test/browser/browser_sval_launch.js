@@ -283,7 +283,7 @@ add_task(async function a_fresh_profile_gets_a_workspace_unasked() {
   Assert.equal(workspaces.length, 1, "exactly one workspace exists");
   const [id, workspace] = workspaces[0];
   Assert.equal(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     id,
     "and it is the one this window files under"
   );
@@ -328,10 +328,10 @@ add_task(async function a_fresh_profile_gets_a_workspace_unasked() {
 
   // The workspace that exists at launch is still there at the next launch:
   // every window closes, its engine stops, and a new one reads the folder.
-  const { SvalPanel: relaunched } = await profile.relaunch();
-  Assert.notEqual(relaunched.engine, panel.engine, "on a new engine");
+  const relaunched = await profile.relaunch();
+  Assert.notEqual(relaunched.SvalPanel.engine, panel.engine, "on a new engine");
   Assert.equal(
-    relaunched.workspaceId,
+    SvalWindowWorkspace.of(relaunched).id,
     id,
     "the relaunch shows the same workspace, by its id"
   );

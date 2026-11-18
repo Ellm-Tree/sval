@@ -143,7 +143,7 @@ async function settledObserver() {
 async function runSize(total) {
   const engine = SvalPanel._engine;
   const settings = SvalPanel._settings;
-  const home = SvalPanel._currentWorkspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const ops = [];
   const ids = [];
   const wsCount = total <= 500 ? 5 : 20;

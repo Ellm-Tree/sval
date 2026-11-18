@@ -47,6 +47,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   FAVORITES_CHANGED_TOPIC:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
   PINS_ROOT: "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
@@ -404,7 +406,7 @@ export class SvalPinsRow {
     block.hidden = true;
 
     this.#pages = SvalPinPages.for(win, {
-      workspaceId: () => this.#panel.workspaceId,
+      workspaceId: () => lazy.SvalWindowWorkspace.of(this.#window).id,
       jar: () => win.gBrowser.defaultUserContextId ?? 0,
       onChange: () => this.#pagesChanged(),
       onViewed: (workspaceId, guid) =>
@@ -499,7 +501,7 @@ export class SvalPinsRow {
     return (
       !panel.inMemory &&
       !panel.isPrivate &&
-      !!panel.workspaceId &&
+      !!lazy.SvalWindowWorkspace.of(this.#window).id &&
       !panel.agentLabel
     );
   }
@@ -590,9 +592,11 @@ export class SvalPinsRow {
     // A pin whose delete waits on any window's Undo message is left out
     // (`SvalPanel.pendingPinGuids`).
     const deleting = this.#panel.pendingPinGuids?.() ?? new Set();
-    return slotsIn(this.#tiles, this.#panel.workspaceId, workspaces).filter(
-      slot => !deleting.has(slot.guid)
-    );
+    return slotsIn(
+      this.#tiles,
+      lazy.SvalWindowWorkspace.of(this.#window).id,
+      workspaces
+    ).filter(slot => !deleting.has(slot.guid));
   }
 
   /**
@@ -635,7 +639,7 @@ export class SvalPinsRow {
     }
     const nodes = this.#panel.nodes ?? {};
     this.#pages.tidy(
-      this.#panel.workspaceId,
+      lazy.SvalWindowWorkspace.of(this.#window).id,
       new Set(
         Object.keys(nodes).filter(id => nodes[id]?.kind === SvalTree.WORKSPACE)
       )
@@ -2100,7 +2104,10 @@ export class SvalPinsRow {
       title: name,
       parentGuid,
       index,
-      scope: !folderGuid && thisWorkspace ? [panel.workspaceId] : null,
+      scope:
+        !folderGuid && thisWorkspace
+          ? [lazy.SvalWindowWorkspace.of(this.#window).id]
+          : null,
       duplicate: true,
       beforeUndo,
       local,

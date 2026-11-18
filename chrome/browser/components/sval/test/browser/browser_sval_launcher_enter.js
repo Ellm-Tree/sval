@@ -384,7 +384,7 @@ add_task(async function modifiers_on_an_open_tab_switch_or_split() {
     EventUtils.synthesizeKey("KEY_Enter", modifiers);
     await TestUtils.waitForCondition(
       () =>
-        SvalPanel.workspaceId === work &&
+        SvalWindowWorkspace.of(window).id === work &&
         taggedId(gBrowser.selectedTab) === calendar,
       `${JSON.stringify(modifiers)} switches to Calendar`
     );
@@ -435,7 +435,11 @@ add_task(async function modifiers_on_an_open_tab_switch_or_split() {
       JSON.stringify([fixture.shownId, journal]),
     "Alt+Enter splits this tab with Journal, from Home"
   );
-  Assert.equal(SvalPanel.workspaceId, fixture.work, "on Work still");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    fixture.work,
+    "on Work still"
+  );
 });
 
 /**
@@ -472,7 +476,7 @@ add_task(async function alt_enter_brings_a_tab_from_another_window() {
       () => !win.gBrowser.tabs.some(tab => taggedId(tab) === calendar),
       "the other window no longer has Calendar"
     );
-    Assert.equal(win.SvalPanel.workspaceId, home, "it stays on Home");
+    Assert.equal(SvalWindowWorkspace.of(win).id, home, "it stays on Home");
   } finally {
     await within(BrowserTestUtils.closeWindow(win), 10_000, "closing it");
   }

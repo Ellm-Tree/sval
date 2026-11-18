@@ -44,6 +44,8 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   keepKeyDescribed: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   ARCHIVE_CHANGED_TOPIC:
@@ -133,7 +135,7 @@ export async function showRestored(win, { tabs, workspace }) {
     if (
       !other.closed &&
       !lazy.PrivateBrowsingUtils.isWindowPrivate(other) &&
-      other.SvalPanel?.workspaceId === workspace
+      lazy.SvalWindowWorkspace.of(other).id === workspace
     ) {
       target = other;
       break;
@@ -143,7 +145,7 @@ export async function showRestored(win, { tabs, workspace }) {
     lazy.handWorkspaceTo(w, workspace)
   );
   const panel = target.SvalPanel;
-  if (panel.workspaceId === workspace) {
+  if (lazy.SvalWindowWorkspace.of(target).id === workspace) {
     await panel.refresh();
   } else {
     await panel.switchTo(workspace);
@@ -306,7 +308,7 @@ function archivedView(win, doc, places) {
       return;
     }
     archive
-      .restore(entry.id, win.SvalPanel?.workspaceId ?? null)
+      .restore(entry.id, lazy.SvalWindowWorkspace.of(win).id)
       .then(restored => showRestored(win, restored))
       .catch(err =>
         SvalLog.error(`history: a restore failed: ${SvalLog.errorName(err)}`)
@@ -366,7 +368,7 @@ export function workspaceLabel(win, id) {
   const item = lazy.switcherItemOf(
     panel?.nodes ?? {},
     id,
-    panel?.workspaceId ?? null
+    lazy.SvalWindowWorkspace.of(win).id
   );
   return item ? panel.workspaceName(item) : "Deleted Workspace";
 }
@@ -808,7 +810,7 @@ export const SvalHistorySidebar = {
   _scope(win, doc, tree, column, workspaces) {
     const isPrivate = lazy.PrivateBrowsingUtils.isWindowPrivate(win);
     let all = isPrivate;
-    let shownWorkspace = win.SvalPanel?.workspaceId ?? null;
+    let shownWorkspace = lazy.SvalWindowWorkspace.of(win).id;
     const reload = () => {
       // A private window's switcher holds its own session's workspaces
       // alone, so it could name none of the others.
@@ -867,7 +869,7 @@ export const SvalHistorySidebar = {
     }
 
     const shown = subject => {
-      const now = win.SvalPanel?.workspaceId ?? null;
+      const now = lazy.SvalWindowWorkspace.of(win).id;
       if (subject !== win || now === shownWorkspace) {
         tree.invalidate();
         return;

@@ -54,6 +54,8 @@ import { colorOf } from "moz-src:///browser/components/sval/SvalColor.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   LAUNCHER_PREFS:
     "moz-src:///browser/components/sval/SvalLauncherPrefs.sys.mjs",
   launcherLimit: "moz-src:///browser/components/sval/SvalLauncherPrefs.sys.mjs",
@@ -268,7 +270,7 @@ function lookUp(queryContext, query, win) {
     return null;
   }
   const options = {
-    currentWorkspaceId: panel.workspaceId,
+    currentWorkspaceId: lazy.SvalWindowWorkspace.of(host).id,
     lastActive: id => panel.settings.lastActive(id),
     onlyCurrent: !!panel.inMemory,
     exclude: panel.observer?.nodeIdFor(host.gBrowser.selectedTab) ?? null,

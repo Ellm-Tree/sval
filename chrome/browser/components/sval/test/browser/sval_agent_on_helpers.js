@@ -244,7 +244,7 @@ async function secondWindow(open = null) {
       );
   atTaskEnd(async () => {
     if (!win.closed) {
-      shown = win.SvalPanel.workspaceId;
+      shown = SvalWindowWorkspace.of(win).id;
       await within(
         BrowserTestUtils.closeWindow(win),
         10_000,
@@ -253,7 +253,7 @@ async function secondWindow(open = null) {
     }
   });
   await within(win.SvalPanel.started, 10_000, "its panel's startup");
-  shown = win.SvalPanel.workspaceId;
+  shown = SvalWindowWorkspace.of(win).id;
   expectWorkspaceTabs(win);
   const context = win.browsingContext;
   context.forceAppWindowActive = true;
@@ -414,13 +414,13 @@ function typeIn(field, text) {
  */
 async function newWorkspace(name, win = window) {
   const panel = win.SvalPanel;
-  const left = panel._currentWorkspaceId;
+  const left = SvalWindowWorkspace.of(win).id;
   let id = null;
   atTaskEnd(async () => {
     if (!id) {
       return;
     }
-    if (!win.closed && win.SvalPanel.workspaceId === id) {
+    if (!win.closed && SvalWindowWorkspace.of(win).id === id) {
       await win.SvalPanel.switchTo(left);
       await switchDone(win);
     }
@@ -438,7 +438,7 @@ async function newWorkspace(name, win = window) {
   doc.querySelector(".sval-nw-create").click();
   await within(made, 10_000, "the new workspace");
   await switchDone(win);
-  id = panel._currentWorkspaceId;
+  id = SvalWindowWorkspace.of(win).id;
   Assert.notEqual(id, left, `${name}: the window moved to it`);
   Assert.equal(switcherNameIn(win), name, `${name}: the switcher names it`);
   return id;
@@ -523,7 +523,7 @@ async function switcherIdsIn(win) {
 async function switchVia(win, id) {
   await fromSwitcher(win, `[data-workspace-id="${CSS.escape(id)}"]`);
   await switchDone(win);
-  Assert.equal(win.SvalPanel.workspaceId, id, "the window switched");
+  Assert.equal(SvalWindowWorkspace.of(win).id, id, "the window switched");
 }
 
 /**
@@ -560,7 +560,7 @@ async function tearOffVia(win, id) {
       context.forceAppWindowActive = false;
     }
   });
-  Assert.equal(opened.SvalPanel.workspaceId, id, "it shows the one");
+  Assert.equal(SvalWindowWorkspace.of(opened).id, id, "it shows the one");
   return opened;
 }
 
@@ -671,7 +671,7 @@ function shownTabIdsIn(win) {
  */
 async function workspaceWith(name, { pages = [], isolated = false } = {}) {
   const { engine } = SvalPanel;
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await engine.mutate({
     kind: "addWorkspace",
     name,
@@ -680,7 +680,7 @@ async function workspaceWith(name, { pages = [], isolated = false } = {}) {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    if (SvalPanel.workspaceId === id) {
+    if (SvalWindowWorkspace.of(window).id === id) {
       await SvalPanel.switchTo(home);
       await switchDone(window);
     }

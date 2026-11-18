@@ -49,7 +49,7 @@ async function pairTwo() {
   atTaskEnd(unpairAll);
   const claude = await store.pair({
     label: "Claude Code",
-    workspaceId: SvalPanel.workspaceId,
+    workspaceId: SvalWindowWorkspace.of(window).id,
     client: "claude-code",
     dir: "/work/sval",
     started: 1_700_000_000_000,

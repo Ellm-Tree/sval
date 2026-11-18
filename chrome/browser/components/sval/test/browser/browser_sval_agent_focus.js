@@ -136,7 +136,7 @@ add_task(async function the_agents_window_opens_behind_the_users() {
   const win = await newWindowAfter(() =>
     tabs.windowFor(agent.workspaceId, { open: true })
   );
-  Assert.equal(win.SvalPanel.workspaceId, agent.workspaceId);
+  Assert.equal(SvalWindowWorkspace.of(win).id, agent.workspaceId);
   Assert.equal(
     Services.focus.activeWindow,
     window,

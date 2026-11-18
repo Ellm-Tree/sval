@@ -36,7 +36,7 @@ async function paired() {
   await agentAccessForTask();
   const { agentId } = await SvalAgents.store.pair({
     label: "Claude Code",
-    workspaceId: SvalPanel.workspaceId,
+    workspaceId: SvalWindowWorkspace.of(window).id,
   });
   atTaskEnd(() => SvalAgents.withStore(store => store.unpair(agentId)));
   return agentId;
@@ -98,7 +98,7 @@ add_task(async function forget_reaches_the_agents_file_while_access_is_off() {
 
 add_task(
   async function forget_removes_the_sites_link_rules_and_allowed_domains() {
-    const workspace = SvalPanel.workspaceId;
+    const workspace = SvalWindowWorkspace.of(window).id;
     const contains = {
       kind: SvalLinkRules.CONTAINS,
       value: "a.com/docs",
@@ -143,7 +143,7 @@ add_task(async function forget_removes_the_sites_archived_tabs() {
   const entry = url => ({
     title: "Page",
     url,
-    workspace: SvalPanel.workspaceId,
+    workspace: SvalWindowWorkspace.of(window).id,
     workspaceName: "",
     closedAt: Date.now() - 60_000,
   });

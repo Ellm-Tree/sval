@@ -122,7 +122,7 @@ add_task(async function a_refused_discard_leaves_the_tab_where_it_is() {
   Assert.ok(await SvalPanel.switchTo(second), "the switch still completed");
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     second,
     "the window is in the workspace the user chose"
   );
@@ -160,7 +160,7 @@ add_task(async function a_switch_while_a_sync_is_in_flight_loses_nothing() {
   await pass;
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     second,
     "the window is where the user put it"
   );
@@ -205,7 +205,7 @@ add_task(async function two_real_switches_in_succession_end_in_one_place() {
   Assert.deepEqual(both, [true, true], "both switches ran");
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     third,
     "the window ends on the one pressed last"
   );
@@ -262,7 +262,7 @@ add_task(async function two_switches_through_kept_tabs_end_in_one_place() {
 
   Assert.deepEqual(selected, [], "the window selected nothing after them");
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     third,
     "the window ends on the one pressed last"
   );
@@ -444,7 +444,7 @@ add_task(async function a_hand_over_in_flight_serialises_the_next_one() {
   );
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     third,
     "the window is in the workspace it was last told to show"
   );
@@ -478,8 +478,12 @@ add_task(async function a_dragged_tab_is_not_described_by_the_window_it_left() {
   // The window attaches its tab observer once its panel's first sync pass is
   // done (`SvalPanel.started`). A tab adopted before then arrives unwatched.
   await within(other.SvalPanel.started, 10_000, "the other window's panel");
-  const joined = other.SvalPanel.workspaceId;
-  Assert.notEqual(joined, SvalPanel.workspaceId, "it shows another workspace");
+  const joined = SvalWindowWorkspace.of(other).id;
+  Assert.notEqual(
+    joined,
+    SvalWindowWorkspace.of(window).id,
+    "it shows another workspace"
+  );
 
   const tab = observer.tabFor(id);
   Assert.ok(tab, "the window holds the shown workspace's tab");

@@ -191,7 +191,7 @@ add_task(async function alt_enter_on_an_agents_tab_goes_to_it() {
   EventUtils.synthesizeKey("KEY_Enter", { altKey: true }, window);
   await untilFocused(agentWin, "the agent's window comes forward");
   Assert.equal(await parentOf(engine, atlas), agentWs, "the tab stays");
-  Assert.equal(SvalPanel.workspaceId, work, "this window stays");
+  Assert.equal(SvalWindowWorkspace.of(window).id, work, "this window stays");
   Assert.deepEqual(shownSplit(window), [], "in no split");
   Assert.equal(taggedId(gBrowser.selectedTab), shownId, "on its tab");
 });
@@ -238,7 +238,7 @@ add_task(async function alt_enter_into_another_jar_asks_first() {
     "SvalPanel.observer settling"
   );
   Assert.equal(await parentOf(engine, calendar), home, "Cancel moves nothing");
-  Assert.equal(SvalPanel.workspaceId, work, "this window stays");
+  Assert.equal(SvalWindowWorkspace.of(window).id, work, "this window stays");
   Assert.equal(taggedId(gBrowser.selectedTab), shownId, "on its tab");
   Assert.deepEqual(shownSplit(window), [], "in no split");
 

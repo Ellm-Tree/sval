@@ -107,7 +107,7 @@ add_task(async function nothing_private_leaves() {
 
   await SvalPanel.engine.mutate({
     kind: "rename",
-    id: SvalPanel.workspaceId,
+    id: SvalWindowWorkspace.of(window).id,
     name: PROFILE_MARKERS.workspace,
     now: Date.now(),
   });

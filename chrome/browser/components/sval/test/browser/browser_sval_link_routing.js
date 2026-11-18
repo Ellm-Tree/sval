@@ -37,7 +37,7 @@ const ROUTED = "https://example.com/browser/?routed";
  * @returns {Promise<string>} its id.
  */
 async function workspace(name) {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await SvalPanel.engine.mutate({
     kind: "addWorkspace",
     name,
@@ -46,7 +46,7 @@ async function workspace(name) {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    if (SvalPanel.workspaceId !== home) {
+    if (SvalWindowWorkspace.of(window).id !== home) {
       await SvalPanel.switchTo(home);
       await within(
         SvalPanel.observer.settled(),
@@ -102,7 +102,7 @@ async function routedTo(workspaceId) {
   runCommandLine(["-url", ROUTED]);
   await TestUtils.waitForCondition(
     () =>
-      SvalPanel.workspaceId === workspaceId &&
+      SvalWindowWorkspace.of(window).id === workspaceId &&
       gBrowser.selectedTab.linkedBrowser.currentURI.spec === ROUTED,
     "the link opens as a tab in the rule's workspace"
   );
@@ -230,7 +230,7 @@ add_task(async function with_no_rule_matching_a_link_opens_a_peek() {
   const work = await workspace("Work");
   rulesAre([{ kind: "site", value: "example.org", workspace: work }]);
   await peekFor();
-  Assert.notEqual(SvalPanel.workspaceId, work, "nothing switched");
+  Assert.notEqual(SvalWindowWorkspace.of(window).id, work, "nothing switched");
 });
 
 add_task(async function a_rule_whose_workspace_was_deleted_falls_through() {
@@ -258,7 +258,7 @@ add_task(async function with_every_rule_on_a_deleted_workspace_a_peek() {
 });
 
 add_task(async function reordering_changes_which_rule_wins() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const work = await workspace("Work");
   rulesAre([
     { kind: "contains", value: "example", workspace: home },
@@ -330,7 +330,7 @@ add_task(async function deleting_a_rule_can_be_undone() {
 });
 
 add_task(async function editing_a_rule_changes_where_its_links_open() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const work = await workspace("Work");
   rulesAre([
     { kind: "site", value: "example.org", workspace: home },

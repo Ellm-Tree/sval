@@ -464,7 +464,7 @@ Object.assign(SvalPanel, {
    */
   _openWorkspaceMenu(
     event,
-    id = this._currentWorkspaceId,
+    id = this._workspace.id,
     anchor = this._els.switcher,
     onStrip = false
   ) {
@@ -515,7 +515,7 @@ Object.assign(SvalPanel, {
     const item = this._modules.SvalPanelModel.switcherItemOf(
       this._nodes,
       id,
-      this._currentWorkspaceId
+      this._workspace.id
     );
     // A Workspace has one window (spec §10.7). The switcher's menu offers
     // a new one in each entry's submenu, and the strip here.
@@ -525,7 +525,7 @@ Object.assign(SvalPanel, {
       !!this._inMemory ||
       !item ||
       item.current ||
-      this.workspacesShownElsewhere().has(id);
+      this._workspace.shownElsewhere().has(id);
     open.nextElementSibling.hidden = open.hidden;
     // The column shows no names whatever the choice, so it offers no names
     // controls.
@@ -793,11 +793,7 @@ Object.assign(SvalPanel, {
     const parent = menu.querySelector('[data-command="addToSplit"]');
     const popup = parent.querySelector("menupopup");
     popup.textContent = "";
-    const choices = addToSplitChoices(
-      this._nodes,
-      row.id,
-      this._currentWorkspaceId
-    );
+    const choices = addToSplitChoices(this._nodes, row.id, this._workspace.id);
     const byParent = childrenByParent(this._nodes);
     for (const split of choices) {
       const titles = this._modules.SvalPanelModel.splitTabs(
@@ -929,12 +925,9 @@ Object.assign(SvalPanel, {
     const parent = menu.querySelector('[data-command="moveToGroup"]');
     const popup = parent.querySelector("menupopup");
     popup.textContent = "";
-    const choices = moveToGroupChoices(
-      this._nodes,
-      ids,
-      this._currentWorkspaceId,
-      { transparent: this._transparentIds() }
-    );
+    const choices = moveToGroupChoices(this._nodes, ids, this._workspace.id, {
+      transparent: this._transparentIds(),
+    });
     for (const choice of choices) {
       const entry = document.createXULElement("menuitem");
       entry.setAttribute("data-move-parent", choice.id);
@@ -1140,7 +1133,7 @@ Object.assign(SvalPanel, {
     });
     const commands = this._workspaceCommandItems();
     popup.append(document.createXULElement("menuseparator"), ...commands);
-    this._syncWorkspaceCommands(popup, this._currentWorkspaceId);
+    this._syncWorkspaceCommands(popup, this._workspace.id);
     // With no workspace of the person's own, the first caption follows the
     // menu bar's own separator (`SvalMenuBar`).
     this._modules.tidySeparators(popup);
@@ -1155,8 +1148,8 @@ Object.assign(SvalPanel, {
     }
     const { workspaceId, command } = event.target.dataset;
     if (command) {
-      this._runWorkspaceCommand(command, this._currentWorkspaceId);
-    } else if (workspaceId && workspaceId !== this._currentWorkspaceId) {
+      this._runWorkspaceCommand(command, this._workspace.id);
+    } else if (workspaceId && workspaceId !== this._workspace.id) {
       // The agent's window stays the agent's while it holds it, so the
       // workspace opens in a window of its own (`SvalAgentMarking`).
       this.pickWorkspace(workspaceId, !!this._agentMarking?.blocking);

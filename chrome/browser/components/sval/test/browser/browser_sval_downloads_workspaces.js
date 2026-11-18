@@ -65,8 +65,8 @@ async function secondWindow(name) {
     "a new window's opening"
   );
   await within(win.SvalPanel.started, 20_000, "its panel starting");
-  const workspace = win.SvalPanel.workspaceId;
-  Assert.notEqual(workspace, SvalPanel.workspaceId);
+  const workspace = SvalWindowWorkspace.of(win).id;
+  Assert.notEqual(workspace, SvalWindowWorkspace.of(window).id);
   await SvalPanel.engine.mutate({
     kind: "rename",
     id: workspace,
@@ -423,7 +423,7 @@ add_task(async function a_download_from_a_closed_tab_is_of_no_workspace() {
 /** Switching the window to another workspace goes back to This Workspace. */
 add_task(async function a_switch_lists_the_new_workspaces_downloads() {
   await downloadsGoToATempFolder();
-  const here = SvalPanel.workspaceId;
+  const here = SvalWindowWorkspace.of(window).id;
   const { win, workspace } = await secondWindow("Research");
   await pageDownloads(win, "there.txt");
   await within(

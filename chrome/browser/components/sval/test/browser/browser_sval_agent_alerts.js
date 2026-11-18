@@ -85,7 +85,7 @@ add_task(async function alerts_in_a_window_that_closes_record_nothing() {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
       if (
         w !== win &&
-        w.SvalPanel?.workspaceId === agent.workspaceId &&
+        SvalWindowWorkspace.of(w).id === agent.workspaceId &&
         w.gDialogBox?.isOpen
       ) {
         return w;
@@ -114,7 +114,7 @@ add_task(async function a_popups_alert_asks_in_the_agents_window() {
   const popup = popupWin.gBrowser.selectedBrowser;
   await committed(popup, PAGE2);
   Assert.equal(
-    popupWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(popupWin).id,
     agent.workspaceId,
     "the popup shows the agent's workspace"
   );

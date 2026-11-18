@@ -61,7 +61,7 @@ export function workspaceOfBrowser(browser) {
   if (!panel || !tab) {
     return null;
   }
-  return lazy.SvalTabs.workspaceOfTab(panel, tab);
+  return lazy.SvalTabs.workspaceOfTab(win, tab);
 }
 
 /** `@sval/visit-workspaces;1`, which Places asks as it records a visit. */

@@ -232,7 +232,7 @@ add_task(async function a_group_row_and_a_switched_off_preview_show_nothing() {
   const tab = await openPage(titledPage("Grouped away"));
   const group = await SvalPanel.engine.mutate({
     kind: "addGroup",
-    parent: SvalPanel.workspaceId,
+    parent: SvalWindowWorkspace.of(window).id,
     name: "Shelf",
     id: crypto.randomUUID(),
     now: Date.now(),
@@ -432,7 +432,7 @@ add_task(async function a_row_drawn_anew_takes_its_preview_with_it() {
   // its row drawn anew at the group's depth.
   const group = await SvalPanel.engine.mutate({
     kind: "addGroup",
-    parent: SvalPanel.workspaceId,
+    parent: SvalWindowWorkspace.of(window).id,
     name: "Away",
     id: crypto.randomUUID(),
     now: Date.now(),

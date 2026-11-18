@@ -168,7 +168,7 @@ add_task(async function a_duplicate_in_another_window_outlives_its_original() {
   await within(other.SvalPanel.started, 20_000, "the other window's startup");
   const otherObserver = other.SvalPanel.observer;
   await within(otherObserver.settled(), 10_000, "otherObserver settling");
-  const elsewhere = other.SvalPanel.workspaceId;
+  const elsewhere = SvalWindowWorkspace.of(other).id;
   Assert.ok(elsewhere, "the other window shows a workspace");
   const original = await openFiled(observer, "https://example.com/original");
 

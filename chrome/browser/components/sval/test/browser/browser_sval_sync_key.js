@@ -145,7 +145,7 @@ async function startingWithoutTheKey({ refusing = false } = {}) {
 add_task(async function a_missing_key_is_named_and_pairing_restores_it() {
   const { win, panel, ourKey, peer, storedKey } = await startingWithoutTheKey();
   Assert.ok(panel.engine, "sval started");
-  Assert.ok(panel.workspaceId, "on a workspace of its own");
+  Assert.ok(SvalWindowWorkspace.of(win).id, "on a workspace of its own");
   const { indicator, syncActions } = syncRowOf(win);
   Assert.equal(indicator.dataset.severity, "error", "the indicator errs");
   Assert.equal(indicator.dataset.state, "key-gone", "and says syncing is off");

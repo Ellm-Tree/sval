@@ -43,7 +43,7 @@ add_task(async function a_tab_taken_and_closed_at_once_comes_back_the_users() {
   const { tab } = await call("open_tab", { url: PAGE2 });
   const found = await tabs.tabIn(agent, tab);
   const observer = SvalPanel.observer;
-  const userWs = SvalPanel.workspaceId;
+  const userWs = SvalWindowWorkspace.of(window).id;
   const closedBefore = SessionStore.getClosedTabCountForWindow(window);
 
   // Taken into the user's window, and closed before the window files it
@@ -203,7 +203,7 @@ add_task(async function a_tab_taken_with_access_off_is_the_users() {
   const userWin = await newWindowAfter(() =>
     win.gBrowser.replaceTabWithWindow(tab)
   );
-  const userWs = userWin.SvalPanel.workspaceId;
+  const userWs = SvalWindowWorkspace.of(userWin).id;
   Assert.notEqual(userWs, agent.workspaceId, "the user's window");
   const taken = userWin.gBrowser.selectedTab;
   await within(
@@ -409,7 +409,7 @@ async function takeFromIsolatedAgent() {
   const taken = gBrowser.adoptTab(found.tab, { selectTab: false });
   const doc = await jarQuestion();
   atTaskEnd(() => closeLeftoverDialog());
-  const here = SvalPanel.nodes[SvalPanel.workspaceId];
+  const here = SvalPanel.nodes[SvalWindowWorkspace.of(window).id];
   Assert.stringContains(
     doc.getElementById("sval-dialog-title").textContent,
     here?.content?.name || SvalPanel._untitled(WORKSPACE),
@@ -467,7 +467,7 @@ add_task(async function cancelling_a_take_across_jars_hands_the_tab_back() {
 
 add_task(async function a_take_across_jars_moves_once_asked() {
   const { agentJar, answer, tab } = await takeFromIsolatedAgent();
-  const userWs = SvalPanel.workspaceId;
+  const userWs = SvalWindowWorkspace.of(window).id;
   await answer(true);
   await TestUtils.waitForCondition(() => {
     const mine = gBrowser.tabs.find(

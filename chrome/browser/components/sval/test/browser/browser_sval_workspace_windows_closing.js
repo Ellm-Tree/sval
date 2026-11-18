@@ -51,7 +51,7 @@ async function withNewWindowOnNewWorkspace() {
     20_000,
     "the new window's panel starting"
   );
-  const shown = win.SvalPanel.workspaceId;
+  const shown = SvalWindowWorkspace.of(win).id;
   leftWhenTheTaskEnds([shown]);
   // Registered after, so it runs first: the window closes before its
   // workspace is deleted.
@@ -164,7 +164,7 @@ add_task(async function a_new_window_does_not_take_a_held_workspace() {
     "the new window's panel starting"
   );
 
-  const shown = win.SvalPanel.workspaceId;
+  const shown = SvalWindowWorkspace.of(win).id;
   leftWhenTheTaskEnds([shown]);
   Assert.ok(shown, "the new window shows a workspace");
   Assert.notEqual(shown, free, "one of its own");
@@ -195,7 +195,7 @@ add_task(async function a_switch_to_a_held_workspace_waits_for_its_window() {
   await SvalPanel.engine.tree();
   await SvalPanel.refresh();
   Assert.notEqual(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     held,
     "the window waits while the workspace is held"
   );
@@ -205,7 +205,7 @@ add_task(async function a_switch_to_a_held_workspace_waits_for_its_window() {
     "the window switches once it is let go"
   );
   await SvalPanel.refresh();
-  Assert.equal(SvalPanel.workspaceId, held, "and stays there");
+  Assert.equal(SvalWindowWorkspace.of(window).id, held, "and stays there");
 });
 
 /**
@@ -318,7 +318,7 @@ add_task(
       "the reopened window's panel starting"
     );
     Assert.equal(
-      reopened.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(reopened).id,
       shown,
       "the reopened window shows its workspace"
     );
@@ -351,7 +351,7 @@ for (const how of ["window", "lastTab"]) {
     await SvalPanel.refresh();
 
     const win = await tearOff(made);
-    Assert.equal(win.SvalPanel.workspaceId, made, "it shows it");
+    Assert.equal(SvalWindowWorkspace.of(win).id, made, "it shows it");
     await settleBoth(engine, win);
 
     await closeWindowBy(win, how);
@@ -397,7 +397,7 @@ add_task(async function closing_an_agents_window_keeps_its_workspace() {
   const win = await tearOff(agentWs);
   await settleBoth(engine, win);
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     agentWs,
     "the window shows the agent's workspace"
   );

@@ -36,7 +36,7 @@ add_task(async function a_link_from_another_app_moves_into_the_workspace() {
   const id = await nodeOfTab(tab);
   Assert.equal(
     SvalPanel.nodes[id]?.placement.parent,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "filed in the workspace the window shows"
   );
   await TestUtils.waitForCondition(
@@ -89,7 +89,7 @@ async function quickPeekAndKeep(win, url) {
   const id = await nodeOfTab(quickPeek);
   Assert.equal(
     win.SvalPanel.nodes[id]?.placement.parent,
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     "filed in the workspace its window shows"
   );
   await TestUtils.waitForCondition(

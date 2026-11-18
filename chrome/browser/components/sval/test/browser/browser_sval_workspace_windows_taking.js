@@ -75,7 +75,7 @@ add_task(async function tearing_off_a_workspace_opens_a_window_showing_it() {
   const win = await tearOff(second);
   try {
     Assert.equal(
-      win.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(win).id,
       second,
       "the new window shows the workspace that was torn off"
     );
@@ -95,7 +95,11 @@ add_task(async function tearing_off_a_workspace_opens_a_window_showing_it() {
       "the new window materialised that workspace's tab for itself"
     );
 
-    Assert.equal(SvalPanel.workspaceId, first, "this window did not move");
+    Assert.equal(
+      SvalWindowWorkspace.of(window).id,
+      first,
+      "this window did not move"
+    );
     Assert.deepEqual(
       drawnIds(),
       [ids.tabs[0]],
@@ -179,7 +183,7 @@ add_task(async function a_window_opened_on_a_page_keeps_it() {
     );
     const page = win.gBrowser.tabs[0];
     await within(win.SvalPanel.started, 20_000, "the window's panel starting");
-    Assert.equal(win.SvalPanel.workspaceId, second, "on the workspace");
+    Assert.equal(SvalWindowWorkspace.of(win).id, second, "on the workspace");
     Assert.ok(
       win.SvalPanel.observer?.tabFor(ids.tabs[1]),
       "which brought its own tab"
@@ -215,11 +219,15 @@ add_task(async function shift_click_opens_a_workspace_in_a_new_window() {
 
   const win = await tearOff(second, { shiftClick: true });
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     second,
     "the new window shows the Shift+clicked workspace"
   );
-  Assert.equal(SvalPanel.workspaceId, first, "this window did not move");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "this window did not move"
+  );
 
   const menu = await openSwitcher();
   const entry = menu.querySelector(`menu[data-workspace-id="${third}"]`);
@@ -231,7 +239,11 @@ add_task(async function shift_click_opens_a_workspace_in_a_new_window() {
     10_000,
     "the switch"
   );
-  Assert.equal(SvalPanel.workspaceId, third, "a click switched to it");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    third,
+    "a click switched to it"
+  );
 });
 
 /**
@@ -305,11 +317,11 @@ add_task(async function an_open_workspace_is_not_offered_a_second_window() {
       await untilFocused(win, "choosing it brings its window forward");
     }
     Assert.equal(
-      SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(window).id,
       first,
       "and this window stays where it was"
     );
-    Assert.equal(win.SvalPanel.workspaceId, second, "as does that one");
+    Assert.equal(SvalWindowWorkspace.of(win).id, second, "as does that one");
 
     if (raisable) {
       window.focus();
@@ -372,11 +384,15 @@ add_task(async function a_window_handed_a_shown_workspace_takes_another() {
       "the handed window's panel starting"
     );
     Assert.equal(
-      win.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(win).id,
       second,
       "the new window shows the workspace no window shows"
     );
-    Assert.equal(SvalPanel.workspaceId, first, "and this one stays");
+    Assert.equal(
+      SvalWindowWorkspace.of(window).id,
+      first,
+      "and this one stays"
+    );
     Assert.equal(
       await settleBoth(engine, win),
       before,
@@ -477,7 +493,7 @@ add_task(async function a_window_moved_off_its_remembered_workspace_lets_go() {
 
   const win = await reopenClosedWindow();
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     second,
     "the window shows the workspace no window shows"
   );
@@ -541,7 +557,7 @@ add_task(async function a_restored_window_lets_go_of_another_workspaces_tab() {
 
   const win = await reopenClosedWindow();
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     second,
     "the window shows the workspace it remembers"
   );
@@ -616,7 +632,7 @@ add_task(async function a_reopened_window_files_no_copy_of_a_shown_tab() {
     "the reopened window's panel starting"
   );
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     second,
     "the reopened window shows the workspace no window shows"
   );
@@ -659,7 +675,7 @@ add_task(async function a_new_window_with_every_workspace_open_gets_its_own() {
       20_000,
       "the new window's panel starting"
     );
-    const shown = win.SvalPanel.workspaceId;
+    const shown = SvalWindowWorkspace.of(win).id;
     leftWhenTheTaskEnds([shown]);
     Assert.ok(
       shown && !ids.workspaces.includes(shown) && shown !== home,
@@ -715,7 +731,7 @@ add_task(async function a_new_window_never_takes_an_agents_workspace() {
       20_000,
       "the new window's panel starting"
     );
-    const shown = win.SvalPanel.workspaceId;
+    const shown = SvalWindowWorkspace.of(win).id;
     leftWhenTheTaskEnds([shown]);
     Assert.notEqual(shown, agent, "the agent's workspace is not taken");
     Assert.ok(
@@ -980,7 +996,7 @@ add_task(async function an_ordinary_new_window_holds_its_workspace() {
       "the new window's panel starting"
     );
     Assert.equal(
-      win.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(win).id,
       second,
       "it shows the first workspace no window shows, having remembered none"
     );
@@ -1050,5 +1066,9 @@ add_task(async function tearing_off_a_vanished_workspace_opens_nothing() {
     [ids.tabs[0]],
     "the panel redrew instead, which is what takes the entry away"
   );
-  Assert.equal(SvalPanel.workspaceId, first, "and this window did not move");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "and this window did not move"
+  );
 });

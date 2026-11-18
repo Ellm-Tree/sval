@@ -76,10 +76,10 @@ add_setup(function the_console_is_read() {
  *   caller may fill the array after this call.
  */
 function leftWhenTheTaskEnds(workspaces) {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   expectWorkspaceTabs();
   atTaskEnd(async () => {
-    if (home && SvalPanel.workspaceId !== home) {
+    if (home && SvalWindowWorkspace.of(window).id !== home) {
       await within(SvalPanel.switchTo(home), 10_000, "the switch back home");
     }
     const left = (await SvalPanel.engine.tree()).nodes ?? {};

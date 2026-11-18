@@ -429,9 +429,9 @@ Object.assign(SvalPanel, {
       tabs: [],
       home: null,
       selected: null,
-      showing: workspace && present.includes(this._currentWorkspaceId),
+      showing: workspace && present.includes(this._workspace.id),
       shownElsewhere: workspace
-        ? (this.workspacesShownElsewhere().get(present[0]) ?? null)
+        ? (this._workspace.shownElsewhere().get(present[0]) ?? null)
         : null,
     };
     pending.undo = () => this._undoTreeRemoval(pending);

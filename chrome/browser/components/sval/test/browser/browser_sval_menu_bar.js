@@ -172,7 +172,7 @@ add_task(async function workspaces_lists_and_switches() {
   });
   entry(work).doCommand();
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === work,
+    () => SvalWindowWorkspace.of(window).id === work,
     "choosing Work shows it"
   );
   showing("sval-workspaces-menu-popup");

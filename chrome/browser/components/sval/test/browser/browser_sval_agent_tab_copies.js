@@ -79,7 +79,7 @@ add_task(async function a_copy_of_a_taken_tab_is_the_users() {
     "the copy is in the user's control"
   );
   Assert.ok(
-    SvalPanel.settings.isUserHeld(win.SvalPanel.workspaceId),
+    SvalPanel.settings.isUserHeld(SvalWindowWorkspace.of(win).id),
     "with the workspace"
   );
   Assert.ok((await listed(tabs, agent, id))?.user_in_control, "list_tabs");
@@ -108,7 +108,7 @@ add_task(async function a_copy_of_the_users_tab_in_an_agents_window() {
     "the copy is in the user's control"
   );
   Assert.ok(
-    SvalPanel.settings.isUserHeld(win.SvalPanel.workspaceId),
+    SvalPanel.settings.isUserHeld(SvalWindowWorkspace.of(win).id),
     "for the user took the workspace it landed in"
   );
   Assert.ok((await listed(tabs, agent, id))?.user_in_control, "list_tabs");
@@ -188,7 +188,7 @@ add_task(async function a_copy_not_yet_filed_reaches_no_agent_tool() {
   const id = nodeIdOf(copy);
   Assert.ok(id && id !== tab, "filed, the copy is a node of its own");
   Assert.ok(
-    SvalPanel.settings.isUserHeld(win.SvalPanel.workspaceId),
+    SvalPanel.settings.isUserHeld(SvalWindowWorkspace.of(win).id),
     "the workspace is the user's"
   );
 });

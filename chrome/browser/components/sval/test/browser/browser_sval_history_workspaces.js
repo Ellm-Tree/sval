@@ -50,7 +50,7 @@ add_task(async function a_tabs_visit_takes_its_workspace() {
   );
   Assert.equal(
     await recordedWorkspace(url),
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "the workspace the window shows"
   );
   BrowserTestUtils.removeTab(tab);
@@ -63,8 +63,8 @@ add_task(async function another_windows_visit_takes_that_windows_workspace() {
     "a new window's opening"
   );
   await within(win.SvalPanel.started, 20_000, "its panel starting");
-  const workspace = win.SvalPanel.workspaceId;
-  Assert.notEqual(workspace, SvalPanel.workspaceId);
+  const workspace = SvalWindowWorkspace.of(win).id;
+  Assert.notEqual(workspace, SvalWindowWorkspace.of(window).id);
   atTaskEnd(async () => {
     await within(BrowserTestUtils.closeWindow(win), 20_000, "its closing");
     if (SvalPanel.nodes[workspace]) {
@@ -109,7 +109,7 @@ add_task(async function a_quick_peeks_visit_takes_its_tabs_workspace() {
   );
   Assert.equal(
     await recordedWorkspace(url),
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "the Quick Peek's page is in the tab's workspace"
   );
   document
@@ -154,7 +154,7 @@ add_task(async function a_peeks_page_takes_a_workspace_once_moved() {
   await pageReady(tab.linkedBrowser, next);
   Assert.equal(
     await recordedWorkspace(next),
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "a visit after the move takes the workspace"
   );
   Assert.equal(

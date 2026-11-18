@@ -52,7 +52,7 @@ async function openPicker(initial = "") {
     ops: [
       {
         kind: "addGroup",
-        parent: SvalPanel.workspaceId,
+        parent: SvalWindowWorkspace.of(window).id,
         name: "Picked",
         id: group,
       },

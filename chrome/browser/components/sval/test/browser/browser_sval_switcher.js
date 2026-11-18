@@ -29,7 +29,7 @@ add_task(async function the_panel_draws_one_workspace_and_names_it() {
   const [first, second] = ids.workspaces;
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     first,
     "the window shows the workspace it switched to"
   );
@@ -106,7 +106,7 @@ add_task(async function switching_redraws_and_the_window_remembers() {
   await activateWorkspace(menu, second);
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     second,
     "the window shows the workspace that was chosen"
   );
@@ -135,7 +135,7 @@ add_task(async function switching_redraws_and_the_window_remembers() {
   );
 
   Assert.equal(
-    SvalPanel._rememberedWorkspaceId(),
+    SvalWindowWorkspace.of(window).remembered(),
     second,
     "a window reopened reads back what it was showing, not the first"
   );
@@ -152,7 +152,7 @@ add_task(async function switching_redraws_and_the_window_remembers() {
       "would leave the window remembering an id that draws nothing"
   );
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     second,
     "neither refusal moved the window"
   );
@@ -171,7 +171,7 @@ add_task(async function a_workspace_closed_elsewhere_falls_back_to_the_first() {
 
   const menu = await openSwitcher();
   await activateWorkspace(menu, second);
-  Assert.equal(SvalPanel.workspaceId, second, "showing the second");
+  Assert.equal(SvalWindowWorkspace.of(window).id, second, "showing the second");
 
   // A peer's close arrives as the node gone (spec §5.4: no tombstone, no
   // closed state).
@@ -180,7 +180,7 @@ add_task(async function a_workspace_closed_elsewhere_falls_back_to_the_first() {
   await SvalPanel.refresh();
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     first,
     "the window falls back to the first workspace in sibling order"
   );
@@ -301,7 +301,7 @@ add_task(async function a_peers_workspace_does_not_move_this_window() {
 
   const chosen = await openSwitcher();
   await activateWorkspace(chosen, second);
-  Assert.equal(SvalPanel.workspaceId, second, "showing the second");
+  Assert.equal(SvalWindowWorkspace.of(window).id, second, "showing the second");
   const before = drawnIds();
 
   const peer = new SvalEngine({
@@ -331,7 +331,7 @@ add_task(async function a_peers_workspace_does_not_move_this_window() {
   );
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     second,
     "and the window is still in the workspace its user was working in"
   );
@@ -418,14 +418,14 @@ add_task(async function a_new_workspace_is_the_one_the_window_shows() {
       );
       return (
         made &&
-        SvalPanel.workspaceId === made &&
+        SvalWindowWorkspace.of(window).id === made &&
         SvalPanel._els.switcher.querySelector(".sval-switcher-name")
           ?.textContent === "Made here"
       );
     }, "the workspace reaches the document and the window shows it");
     atTaskEnd(() => removeWorkspace(made));
     Assert.equal(
-      SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(window).id,
       made,
       "and the window shows it rather than leaving the user where they were"
     );
@@ -465,7 +465,8 @@ add_task(async function a_new_workspace_is_made_with_the_look_it_was_given() {
     await answerNewContainer(answer);
     await TestUtils.waitForCondition(
       () =>
-        SvalPanel.nodes[SvalPanel.workspaceId]?.content.name === answer.name &&
+        SvalPanel.nodes[SvalWindowWorkspace.of(window).id]?.content.name ===
+          answer.name &&
         SvalPanel._els.switcher.querySelector(".sval-switcher-name")
           ?.textContent === answer.name,
       "the workspace is made and the window shows it"

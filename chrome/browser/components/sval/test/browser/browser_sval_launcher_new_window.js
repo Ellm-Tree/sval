@@ -168,12 +168,20 @@ add_task(async function shift_enter_on_another_workspaces_tab() {
   EventUtils.synthesizeKey("KEY_Enter", { shiftKey: true }, window);
   const win = await openedWindow(opening);
 
-  Assert.equal(win.SvalPanel.workspaceId, home, "the new window shows Home");
+  Assert.equal(
+    SvalWindowWorkspace.of(win).id,
+    home,
+    "the new window shows Home"
+  );
   await TestUtils.waitForCondition(
     () => taggedId(win.gBrowser.selectedTab) === notes,
     "the new window shows the tab"
   );
-  Assert.equal(SvalPanel.workspaceId, work, "this window stays on Work");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    work,
+    "this window stays on Work"
+  );
   Assert.equal(taggedId(gBrowser.selectedTab), shown, "on its tab");
 
   window.focus();
@@ -194,7 +202,11 @@ add_task(async function shift_enter_on_another_workspaces_tab() {
     windows,
     "no other window opens"
   );
-  Assert.equal(SvalPanel.workspaceId, work, "this window stays on Work");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    work,
+    "this window stays on Work"
+  );
 });
 
 /**
@@ -224,7 +236,7 @@ add_task(async function shift_enter_on_a_tab_here_goes_to_it() {
     () => taggedId(gBrowser.selectedTab) === here,
     "the window goes to the tab"
   );
-  Assert.equal(SvalPanel.workspaceId, work, "on its workspace");
+  Assert.equal(SvalWindowWorkspace.of(window).id, work, "on its workspace");
   Assert.equal(
     [...Services.wm.getEnumerator("navigator:browser")].length,
     windows,
@@ -257,6 +269,14 @@ add_task(async function shift_enter_on_go_to_opens_a_window() {
   );
   EventUtils.synthesizeKey("KEY_Enter", { shiftKey: true }, window);
   const win = await openedWindow(opening);
-  Assert.equal(win.SvalPanel.workspaceId, home, "the new window shows Home");
-  Assert.equal(SvalPanel.workspaceId, work, "this window stays on Work");
+  Assert.equal(
+    SvalWindowWorkspace.of(win).id,
+    home,
+    "the new window shows Home"
+  );
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    work,
+    "this window stays on Work"
+  );
 });

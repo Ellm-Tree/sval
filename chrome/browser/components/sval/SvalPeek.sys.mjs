@@ -35,6 +35,8 @@ import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs"
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SessionHistory: "resource://gre/modules/sessionstore/SessionHistory.sys.mjs",
@@ -519,7 +521,7 @@ async function destinations() {
   const ids = choices.map(choice => choice.id);
   const first =
     windows
-      .map(win => win.SvalPanel.workspaceId)
+      .map(win => lazy.SvalWindowWorkspace.of(win).id)
       .find(id => ids.includes(id)) ?? currentWorkspace(nodes, null);
   choices.sort((a, b) => (b.id === first) - (a.id === first));
   return { nodes, choices };
@@ -568,13 +570,16 @@ export async function openNormalWindow(prepare) {
 async function showWorkspace(workspaceId, nodes, { newWindow = false } = {}) {
   const windows = normalWindows();
   let target =
-    windows.find(win => win.SvalPanel.workspaceId === workspaceId) ??
+    windows.find(win => lazy.SvalWindowWorkspace.of(win).id === workspaceId) ??
     (newWindow
       ? null
       : // Never a window showing an agent's workspace: the user is watching it.
         windows.find(
           win =>
-            lazy.model.agentLabelOf(nodes, win.SvalPanel.workspaceId) === null
+            lazy.model.agentLabelOf(
+              nodes,
+              lazy.SvalWindowWorkspace.of(win).id
+            ) === null
         ));
   if (!target) {
     target = await openNormalWindow(win =>
@@ -582,7 +587,7 @@ async function showWorkspace(workspaceId, nodes, { newWindow = false } = {}) {
     );
   }
   if (
-    target.SvalPanel.workspaceId !== workspaceId &&
+    lazy.SvalWindowWorkspace.of(target).id !== workspaceId &&
     !(await target.SvalPanel.switchTo(workspaceId))
   ) {
     return null;
@@ -1485,7 +1490,7 @@ export const SvalPeek = {
         win =>
           lazy.model.agentLabelOf(
             win.SvalPanel.nodes,
-            win.SvalPanel.workspaceId
+            lazy.SvalWindowWorkspace.of(win).id
           ) === null
       ) ?? null
     );

@@ -72,13 +72,13 @@ Object.assign(SvalPanel, {
    */
   async _adoptOrCreateWorkspace() {
     if (this._inMemory) {
-      return this._currentWorkspaceId;
+      return this._workspace.id;
     }
     const { currentWorkspace } = this._modules.SvalPanelModel;
     const adopted = currentWorkspace(
       this._nodes,
-      this._rememberedWorkspaceId(),
-      this._takenElsewhere()
+      this._workspace.remembered(),
+      this._workspace.takenElsewhere()
     );
     if (adopted) {
       return adopted;
@@ -108,10 +108,10 @@ Object.assign(SvalPanel, {
       now: this._modules.SvalClock.now(),
     });
     // Claimed before the first wait, so that no window starting meanwhile
-    // takes it (`workspacesShownElsewhere` reads the claim) before
+    // takes it (`SvalWindowWorkspace`'s `shownElsewhere` reads the claim) before
     // `_showWorkspace` shows it here.
-    this._rememberWorkspace(id);
-    this._recordMadeWorkspace(id);
+    this._workspace.remember(id);
+    this._workspace.recordMade(id);
     this._settings.setCollapsed(id, false);
     this._settings.saveSoon();
     await this.refresh();
@@ -140,7 +140,7 @@ Object.assign(SvalPanel, {
   async _newTabParent() {
     const { isPane } = this._modules.SvalPanelModel;
     const { WORKSPACE, GROUP } = this._modules.SvalTree;
-    const current = this._currentWorkspaceId;
+    const current = this._workspace.id;
     const selected = this._selectedId();
     const node = selected ? this._nodes[selected] : null;
     if (node && (node.kind === WORKSPACE || node.kind === GROUP)) {
@@ -157,106 +157,7 @@ Object.assign(SvalPanel, {
   },
 
   /**
-   * The workspace this window last showed, as the session store holds it.
-   *
-   * Per window and persisted across a restart, which is what §10.7 asks of a
-   * torn-off window, and what `SvalLocalSettings` cannot give, being per
-   * profile and unable to tell two windows apart.
-   *
-   * A window the session store is not tracking throws rather than answering
-   * (`SessionStore.sys.mjs`'s `getCustomWindowValue`), which is a window that
-   * has nothing remembered: the same case as a brand new one.
-   *
-   * @returns {string|null} a node id, or null when nothing is remembered.
-   */
-  _rememberedWorkspaceId() {
-    const { SessionStore } = this._modules;
-    const { CURRENT_WORKSPACE_KEY } = this._modules.SvalPanelModel;
-    try {
-      return (
-        SessionStore.getCustomWindowValue(window, CURRENT_WORKSPACE_KEY) || null
-      );
-    } catch (err) {
-      this._modules.SvalLog.warn(
-        `could not read which workspace this window shows: ${this._modules.describeError(err)}`
-      );
-      return null;
-    }
-  },
-
-  /**
-   * The workspace this window created for itself, as the session store holds
-   * it ({@link _recordMadeWorkspace}). Read as {@link _rememberedWorkspaceId}
-   * is, and for the same reason: it survives a restart.
-   *
-   * @returns {string|null} a node id, or null when this window made none.
-   */
-  _madeWorkspaceRecord() {
-    const { SessionStore } = this._modules;
-    const { MADE_WORKSPACE_KEY } = this._modules.SvalPanelModel;
-    try {
-      return (
-        SessionStore.getCustomWindowValue(window, MADE_WORKSPACE_KEY) || null
-      );
-    } catch (err) {
-      this._modules.SvalLog.warn(
-        `could not read which workspace this window made: ${this._modules.describeError(err)}`
-      );
-      return null;
-    }
-  },
-
-  /**
-   * Records `id` as the workspace this window created for itself, in
-   * `_madeWorkspaceId` and in the session store.
-   *
-   * @param {string} id
-   */
-  _recordMadeWorkspace(id) {
-    this._madeWorkspaceId = id;
-    const { SessionStore } = this._modules;
-    const { MADE_WORKSPACE_KEY } = this._modules.SvalPanelModel;
-    try {
-      SessionStore.setCustomWindowValue(window, MADE_WORKSPACE_KEY, id);
-    } catch (err) {
-      this._modules.SvalLog.warn(
-        `could not record which workspace this window made: ${this._modules.describeError(err)}`
-      );
-    }
-  },
-
-  /**
-   * Records the workspace this window shows. Device-local and per window
-   * (spec §5.6, §10.7). It never reaches the engine, because a window's
-   * attention is a fact about a machine and syncing it would drag one
-   * device's onto another's.
-   *
-   * @param {string|null} id A workspace id, or null to remember nothing.
-   */
-  _rememberWorkspace(id) {
-    if (this._inMemory) {
-      return;
-    }
-    const { SessionStore } = this._modules;
-    const { CURRENT_WORKSPACE_KEY } = this._modules.SvalPanelModel;
-    try {
-      // The store holds strings only, so "nothing remembered" is the empty
-      // string rather than a deletion: `getCustomWindowValue` already reads an
-      // absent key as `""`, so the two are the same state and one path sets it.
-      SessionStore.setCustomWindowValue(
-        window,
-        CURRENT_WORKSPACE_KEY,
-        id ?? ""
-      );
-    } catch (err) {
-      this._modules.SvalLog.warn(
-        `could not record which workspace this window shows: ${this._modules.describeError(err)}`
-      );
-    }
-  },
-
-  /**
-   * Keeps `_currentWorkspaceId` naming a workspace that exists.
+   * Keeps the window on a workspace that exists.
    *
    * Run wherever the document changes (`refresh` and `_refreshIfChanged`),
    * so it is checked against every document the panel ever draws rather than
@@ -281,98 +182,23 @@ Object.assign(SvalPanel, {
   async _resolveCurrentWorkspace() {
     const { currentWorkspace } = this._modules.SvalPanelModel;
     const { workspaceIds } = this._modules.SvalTree;
-    const remembered =
-      this._currentWorkspaceId ?? this._rememberedWorkspaceId();
+    const remembered = this._workspace.id ?? this._workspace.remembered();
     const id = currentWorkspace(
       this._nodes,
       remembered,
-      this._takenElsewhere()
+      this._workspace.takenElsewhere()
     );
-    if (
-      id === null &&
-      this._currentWorkspaceId &&
-      workspaceIds(this._nodes).length
-    ) {
+    if (id === null && this._workspace.id && workspaceIds(this._nodes).length) {
       this._modules.SvalLog.info(
         "every workspace has a window of its own, so this window closes"
       );
       // Marked first, so that no other window, resolving at the same moment,
       // counts this one as still showing anything and closes as well.
-      this._closing = true;
+      this._workspace.closing = true;
       window.close();
       return false;
     }
     return this._showWorkspace(id);
-  },
-
-  /**
-   * The workspaces other windows show, each with the window showing it.
-   *
-   * A workspace has one window (spec §10.7). Every other full, non-private
-   * browser window counts: by what its panel shows, or, before its panel has
-   * started, by what it was handed (`SvalPanelModel.handWorkspaceTo`) or what
-   * the session remembers for it, so a window still starting keeps its claim
-   * against one that starts first.
-   *
-   * A popup a page opened neither counts nor is held to the rule. It shows the
-   * page that opened it and closes with it (`_startFromSync`), and an agent's
-   * sign-in popup is handed the agent's workspace on purpose (`SvalAgentGate`).
-   * A private window has its own temporary workspace, which no other window
-   * can show.
-   *
-   * @returns {Map<string, Window>} workspace id to the window showing it.
-   */
-  workspacesShownElsewhere() {
-    const shown = new Map();
-    if (this._inMemory || !window.toolbar.visible) {
-      return shown;
-    }
-    const { PrivateBrowsingUtils, SessionStore } = this._modules;
-    const { CURRENT_WORKSPACE_KEY, pendingHandOffs } =
-      this._modules.SvalPanelModel;
-    const counts = win =>
-      win !== window &&
-      !win.closed &&
-      !win.SvalPanel?._closing &&
-      win.toolbar?.visible &&
-      !PrivateBrowsingUtils.isWindowPrivate(win);
-    for (const [win, id] of pendingHandOffs()) {
-      if (counts(win)) {
-        shown.set(id, win);
-      }
-    }
-    for (const win of Services.wm.getEnumerator("navigator:browser")) {
-      if (!counts(win)) {
-        continue;
-      }
-      let id = win.SvalPanel?._currentWorkspaceId ?? null;
-      if (!id) {
-        try {
-          id = SessionStore.getCustomWindowValue(win, CURRENT_WORKSPACE_KEY);
-        } catch {
-          // Not tracked by the session store yet: it remembers nothing.
-        }
-      }
-      if (id && !shown.has(id)) {
-        shown.set(id, win);
-      }
-    }
-    return shown;
-  },
-
-  /**
-   * The workspaces this window may not take: those {@link
-   * workspacesShownElsewhere} names, and those a closed window may still
-   * delete (`SvalPanelModel.holdWhileClosing`).
-   *
-   * @returns {Set<string>} workspace ids.
-   */
-  _takenElsewhere() {
-    const taken = this._modules.SvalPanelModel.heldWhileClosing();
-    for (const id of this.workspacesShownElsewhere().keys()) {
-      taken.add(id);
-    }
-    return taken;
   },
 
   /**
@@ -384,7 +210,7 @@ Object.assign(SvalPanel, {
    *
    * The workspace is chosen here and handed over, and not left for the new
    * window to choose, because a hand-off is what keeps every other window from
-   * taking it first (`workspacesShownElsewhere`). Only this command carries
+   * taking it first (`SvalWindowWorkspace`'s `shownElsewhere`). Only this command carries
    * the workspace this window shows; a restored, torn-off or agent's window
    * does not.
    */
@@ -395,8 +221,8 @@ Object.assign(SvalPanel, {
       : currentWorkspace(
           this._nodes,
           null,
-          this._takenElsewhere(),
-          this._currentWorkspaceId
+          this._workspace.takenElsewhere(),
+          this._workspace.id
         );
     const opened = window.OpenBrowserWindow();
     if (next) {
@@ -431,18 +257,17 @@ Object.assign(SvalPanel, {
    * @returns {Promise<boolean>} whether the window changed workspace.
    */
   async _showWorkspace(id) {
-    if (id === this._currentWorkspaceId || this._inMemory) {
+    if (id === this._workspace.id || this._inMemory) {
       return false;
     }
-    const left = this._currentWorkspaceId;
-    const shownBy = id && this.workspacesShownElsewhere().get(id);
+    const left = this._workspace.id;
+    const shownBy = id && this._workspace.shownElsewhere().get(id);
     if (shownBy) {
       shownBy.focus();
       return false;
     }
-    this._currentWorkspaceId = id;
+    this._workspace.setShown(id);
     this._modules.SvalDownloadWorkspaces.workspaceShown(window);
-    this._rememberWorkspace(id);
     // Before the hand-over, so the tabs it opens and every tab opened after
     // it are in the jar of the workspace now shown.
     this._setJar();
@@ -511,7 +336,7 @@ Object.assign(SvalPanel, {
    */
   async _handOverWindowOnce(id, hold) {
     const observer = this._observer;
-    if (id !== this._currentWorkspaceId) {
+    if (id !== this._workspace.id) {
       // Queued behind a hand-over for somewhere else, and the window has since
       // moved on. Materialising a workspace the window has already left would
       // fill it with tabs it is not showing, and the hand-over that overtook
@@ -617,9 +442,7 @@ Object.assign(SvalPanel, {
    * @returns {string|null}
    */
   _lastPinAfter(tabId) {
-    const last = this._pins
-      ? this._settings.lastPin(this._currentWorkspaceId)
-      : null;
+    const last = this._pins ? this._settings.lastPin(this._workspace.id) : null;
     if (!last) {
       return null;
     }
@@ -681,7 +504,7 @@ Object.assign(SvalPanel, {
     const { closedWindowsDecided } = this._modules.SvalPanelModel;
     const { WORKSPACE } = this._modules.SvalTree;
     // A workspace a closed window may still delete is taken elsewhere
-    // (`_takenElsewhere`), so the next `_resolveCurrentWorkspace` would move
+    // (`SvalWindowWorkspace`'s `takenElsewhere`), so the next `_resolveCurrentWorkspace` would move
     // this window off it again. The switch goes once that window has decided,
     // to the workspace if it is kept.
     await closedWindowsDecided(id);
@@ -785,7 +608,7 @@ Object.assign(SvalPanel, {
       .run(async () => {
         const nodes = (await this._engine.tree()).nodes ?? {};
         const workspace = this._modules.SvalTree.workspaceOfNode(nodes, id);
-        if (!workspace || workspace === this._currentWorkspaceId) {
+        if (!workspace || workspace === this._workspace.id) {
           return;
         }
         // A switch's own hand-over selects a kept tab of the workspace it

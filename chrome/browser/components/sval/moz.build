@@ -211,6 +211,7 @@ MOZ_SRC_FILES += [
     "SvalWebDriver.sys.mjs",
     "SvalWindow.sys.mjs",
     "SvalWindowsAcl.sys.mjs",
+    "SvalWindowWorkspace.sys.mjs",
     "SvalWorkerClient.sys.mjs",
     "SvalWorkspaceJar.sys.mjs",
 ]

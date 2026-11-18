@@ -457,7 +457,7 @@ Object.assign(SvalPanel, {
     };
     // The workspace this window shows tries each colour on the window
     // itself; a closed dialog puts the window's own colour back.
-    const live = node.kind === WORKSPACE && row.id === this._currentWorkspaceId;
+    const live = node.kind === WORKSPACE && row.id === this._workspace.id;
     const preview = live
       ? (fields, done) =>
           this.previewColor(
@@ -774,9 +774,9 @@ Object.assign(SvalPanel, {
     }
     // Read as stored, so a selection already gone from `_nodes` is cleared
     // with the rest.
-    const selected = this._settings.selectionIn(this._currentWorkspaceId);
+    const selected = this._settings.selectionIn(this._workspace.id);
     if (ids.includes(selected) || descendants.includes(selected)) {
-      this._settings.setSelection(this._currentWorkspaceId, null);
+      this._settings.setSelection(this._workspace.id, null);
     }
     this._settings.saveSoon();
     await this.refresh();
@@ -937,7 +937,7 @@ Object.assign(SvalPanel, {
     await this.releaseTabsElsewhere();
     // What stayed loaded goes to the window that shows its workspace now.
     const shownBy =
-      workspaceId && this.workspacesShownElsewhere().get(workspaceId);
+      workspaceId && this._workspace.shownElsewhere().get(workspaceId);
     await shownBy?.SvalPanel?.takeKeptTabs();
     this._publishSoon();
   },
@@ -952,7 +952,7 @@ Object.assign(SvalPanel, {
    */
   async releaseTabsElsewhere() {
     const observer = this._observer;
-    const current = this._currentWorkspaceId;
+    const current = this._workspace.id;
     if (!observer || !current) {
       return;
     }
@@ -1010,7 +1010,7 @@ Object.assign(SvalPanel, {
     if (
       this._inMemory &&
       targets.some(
-        each => !isWithin(this._nodes, each.newParent, this._currentWorkspaceId)
+        each => !isWithin(this._nodes, each.newParent, this._workspace.id)
       )
     ) {
       return false;
@@ -1268,7 +1268,7 @@ Object.assign(SvalPanel, {
     id,
     destination,
     made,
-    source = this._currentWorkspaceId,
+    source = this._workspace.id,
     nodes = this._nodes
   ) {
     const { moveAcrossJarsText } = this._modules.SvalPanelModel;
@@ -1351,7 +1351,7 @@ Object.assign(SvalPanel, {
     let signIns = "kept";
     if (isIsolated(nodes, destination)) {
       signIns = "separate";
-    } else if (this._crossesJar(nodes, this._currentWorkspaceId, destination)) {
+    } else if (this._crossesJar(nodes, this._workspace.id, destination)) {
       signIns = "shared";
     }
     let history = false;

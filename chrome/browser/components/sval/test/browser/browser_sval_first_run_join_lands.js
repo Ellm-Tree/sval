@@ -53,7 +53,7 @@ add_task(async function the_join_path_makes_nothing_of_its_own() {
     [theirs],
     "the other device's workspace is the only one"
   );
-  Assert.equal(SvalPanel.workspaceId, theirs, "and it is shown");
+  Assert.equal(SvalWindowWorkspace.of(window).id, theirs, "and it is shown");
   await TestUtils.waitForCondition(
     () => Services.prefs.getStringPref(LEVEL_PREF) === level,
     "the other device's ad-blocking level arrives, and first run wrote none"

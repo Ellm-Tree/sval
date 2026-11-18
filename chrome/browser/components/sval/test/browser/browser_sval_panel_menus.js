@@ -186,7 +186,7 @@ add_task(async function the_workspace_menu_works_from_the_keyboard() {
   leftWhenTheTaskEnds([web]);
   await SvalPanel.refresh();
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === work,
+    () => SvalWindowWorkspace.of(window).id === work,
     "the window showing the first workspace"
   );
   const button = SvalPanel._els.switcher;
@@ -277,7 +277,7 @@ add_task(async function the_workspace_menu_works_from_the_keyboard() {
   EventUtils.synthesizeKey("KEY_Enter", {}, window);
   await within(hidden, 10_000, "Enter closing the menu");
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === web,
+    () => SvalWindowWorkspace.of(window).id === web,
     "Enter switching the window to Web"
   );
   await within(
@@ -299,11 +299,15 @@ add_task(async function the_workspace_menu_works_from_the_keyboard() {
   const win = await within(opening, 20_000, "Writing's window opening");
   await within(win.SvalPanel.started, 20_000, "its panel starting");
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     writing,
     "Shift+Enter opened Writing in a window of its own"
   );
-  Assert.equal(SvalPanel.workspaceId, web, "and this window stayed on Web");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    web,
+    "and this window stayed on Web"
+  );
   await within(BrowserTestUtils.closeWindow(win), 10_000, "its window closing");
 
   info("Space opens it too, and Escape closes it");
@@ -334,7 +338,7 @@ add_task(async function type_ahead_reaches_a_workspace_named_after_an_emoji() {
   });
   await SvalPanel.refresh();
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === work,
+    () => SvalWindowWorkspace.of(window).id === work,
     "the window showing the first workspace"
   );
   const button = SvalPanel._els.switcher;

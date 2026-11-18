@@ -76,7 +76,11 @@ add_task(async function skip_setup_makes_one_workspace_and_asks_once() {
     "",
     "unnamed, since the Workspace step was never continued through"
   );
-  Assert.equal(SvalPanel.workspaceId, workspaces[0], "and is shown");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    workspaces[0],
+    "and is shown"
+  );
   Assert.equal(SvalPanel.settings.placement, "left");
   Assert.equal(
     Services.prefs.getStringPref(LEVEL_PREF),

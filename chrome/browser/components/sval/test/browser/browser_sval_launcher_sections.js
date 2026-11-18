@@ -559,7 +559,11 @@ add_task(async function an_early_enter_searches() {
   EventUtils.synthesizeKey("KEY_Enter");
   await within(searched, 10_000, "the search loading in this tab");
   Assert.equal(gBrowser.selectedTab, here, "this tab stays selected");
-  Assert.equal(SvalPanel.workspaceId, work, "and this window stays on Work");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    work,
+    "and this window stays on Work"
+  );
   late.resolve();
   await SpecialPowers.popPrefEnv();
 });

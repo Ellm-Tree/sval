@@ -47,7 +47,7 @@ add_task(async function set_up_later_while_waiting_keeps_claiming() {
   // The next look finds the offer, a poll later, and the join's first
   // exchange with the folder takes every document.
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === theirs && !SvalFirstRun.pairing,
+    () => SvalWindowWorkspace.of(window).id === theirs && !SvalFirstRun.pairing,
     "pairing lands, its workspace is shown and the claim stops",
     250,
     160

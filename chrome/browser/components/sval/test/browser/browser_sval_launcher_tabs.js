@@ -70,7 +70,11 @@ async function workAndHome() {
     now: Date.now(),
   });
   await SvalPanel.refresh();
-  Assert.equal(SvalPanel.workspaceId, work, "the window is on Work");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    work,
+    "the window is on Work"
+  );
   Assert.ok(!fixture.observer.tabFor(calendar), "Calendar is not loaded");
   return { ...fixture, work, home, calendar };
 }
@@ -157,7 +161,7 @@ add_task(async function enter_goes_to_a_tab_in_another_workspace() {
   EventUtils.synthesizeKey("KEY_Enter");
   await TestUtils.waitForCondition(
     () =>
-      SvalPanel.workspaceId === home &&
+      SvalWindowWorkspace.of(window).id === home &&
       taggedId(gBrowser.selectedTab) === calendar,
     "the window shows Home with Calendar selected"
   );
@@ -212,7 +216,11 @@ add_task(async function a_typed_address_is_visited_over_an_open_tab() {
   EventUtils.synthesizeKey("KEY_Enter");
   await within(loaded, 10_000, "the address loading in this tab");
   Assert.equal(gBrowser.selectedTab, here, "this tab stays selected");
-  Assert.equal(SvalPanel.workspaceId, work, "and this window stays on Work");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    work,
+    "and this window stays on Work"
+  );
 });
 
 /**
@@ -226,7 +234,7 @@ add_task(async function a_workspace_another_window_shows_is_brought_forward() {
   const win = await tearOff(home);
   expectWorkspaceTabs(win);
   try {
-    Assert.equal(win.SvalPanel.workspaceId, home, "it shows Home");
+    Assert.equal(SvalWindowWorkspace.of(win).id, home, "it shows Home");
     // Calendar loaded there, and another of Home's tabs on screen.
     await win.SvalPanel.activate({ id: calendar, kind: "tab" });
     await untilRestored(win.gBrowser.selectedTab);
@@ -254,8 +262,8 @@ add_task(async function a_workspace_another_window_shows_is_brought_forward() {
       () => taggedId(win.gBrowser.selectedTab) === calendar,
       "and selects Calendar"
     );
-    Assert.equal(SvalPanel.workspaceId, work, "this window stays");
-    Assert.equal(win.SvalPanel.workspaceId, home, "and so does that");
+    Assert.equal(SvalWindowWorkspace.of(window).id, work, "this window stays");
+    Assert.equal(SvalWindowWorkspace.of(win).id, home, "and so does that");
   } finally {
     await within(
       BrowserTestUtils.closeWindow(win),
@@ -328,7 +336,7 @@ add_task(async function an_agents_tab_goes_to_the_agents_window() {
     EventUtils.synthesizeKey("KEY_ArrowDown");
     EventUtils.synthesizeKey("KEY_Enter");
     await untilFocused(agentWin, "the agent's window comes forward");
-    Assert.equal(SvalPanel.workspaceId, work, "this window stays");
+    Assert.equal(SvalWindowWorkspace.of(window).id, work, "this window stays");
   } finally {
     await within(
       BrowserTestUtils.closeWindow(agentWin),
@@ -349,7 +357,7 @@ add_task(async function an_agents_tab_goes_to_the_agents_window() {
   try {
     await within(opened.SvalPanel.started, 20_000, "its panel starting");
     Assert.equal(
-      opened.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(opened).id,
       agentWs,
       "it shows the agent's workspace"
     );
@@ -357,7 +365,7 @@ add_task(async function an_agents_tab_goes_to_the_agents_window() {
       () => taggedId(opened.gBrowser.selectedTab) === atlas,
       "with the agent's tab selected"
     );
-    Assert.equal(SvalPanel.workspaceId, work, "this window stays");
+    Assert.equal(SvalWindowWorkspace.of(window).id, work, "this window stays");
   } finally {
     await within(
       BrowserTestUtils.closeWindow(opened),
@@ -471,7 +479,7 @@ add_task(async function the_empty_tab_picked_from_closes() {
     }
     await TestUtils.waitForCondition(
       () =>
-        SvalPanel.workspaceId === home &&
+        SvalWindowWorkspace.of(window).id === home &&
         taggedId(gBrowser.selectedTab) === calendar,
       `${where}: the window shows Calendar in Home`
     );

@@ -53,6 +53,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   SvalClock: "moz-src:///browser/components/sval/SvalClock.sys.mjs",
   SvalWorkspaceJar:
     "moz-src:///browser/components/sval/SvalWorkspaceJar.sys.mjs",
@@ -279,7 +281,7 @@ export const SvalWebDriver = {
         for (const id of left) {
           const nodes = (await engine.tree()).nodes ?? {};
           const shown = lazy.BrowserWindowTracker.orderedWindows.some(
-            win => !win.closed && win.SvalPanel?.workspaceId === id
+            win => !win.closed && lazy.SvalWindowWorkspace.of(win).id === id
           );
           if (nodes[id] && !shown && lazy.workspaceIds(nodes).length > 1) {
             await lazy.SvalTabs.removeNodes(engine, settings, nodes, [id]);

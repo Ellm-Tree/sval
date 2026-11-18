@@ -209,7 +209,7 @@ async function whereItLands(surface, pick) {
     const id = SvalPanel.observer.nodeIdFor(opened.tab);
     const all = (await SvalPanel.engine.tree()).nodes ?? {};
     Assert.ok(
-      ancestorIds(all, id).includes(SvalPanel.workspaceId),
+      ancestorIds(all, id).includes(SvalWindowWorkspace.of(window).id),
       `${what}: the new tab is in the workspace the window shows`
     );
     BrowserTestUtils.removeTab(opened.tab);

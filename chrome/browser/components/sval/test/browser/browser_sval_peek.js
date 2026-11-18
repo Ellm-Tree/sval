@@ -51,7 +51,7 @@ async function linkFromAnotherApp(url) {
 
 /** @returns {string} the name the window's workspace is shown with. */
 function currentName() {
-  const id = SvalPanel.workspaceId;
+  const id = SvalWindowWorkspace.of(window).id;
   return SvalPanel.nodes[id]?.content?.name || "Untitled Workspace";
 }
 
@@ -461,7 +461,7 @@ add_task(async function an_idle_peek_closes_even_across_a_sleep() {
 });
 
 add_task(async function an_isolated_workspace_asks_then_opens_in_its_jar() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await SvalPanel.engine.mutate({
     kind: "addWorkspace",
     name: "Work",
@@ -519,7 +519,11 @@ add_task(async function an_isolated_workspace_asks_then_opens_in_its_jar() {
   question.querySelector('button[data-button="ok"]').click();
   await within(closed, 10_000, "the Peek closing");
 
-  Assert.equal(SvalPanel.workspaceId, id, "the window switched to it");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    id,
+    "the window switched to it"
+  );
   const tab = gBrowser.selectedTab;
   expectOpened(tab);
   await TestUtils.waitForCondition(
@@ -642,7 +646,7 @@ async function resizeTo(win, width) {
 add_task(async function the_row_fits_at_every_width_down_to_the_minimum() {
   // The most the row holds: the tag with a count and its chevron, and the
   // open button with its menu of other workspaces.
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await SvalPanel.engine.mutate({
     kind: "addWorkspace",
     name: "Work",
@@ -654,7 +658,7 @@ add_task(async function the_row_fits_at_every_width_down_to_the_minimum() {
     await SvalPanel.refresh();
   });
   await SvalPanel.refresh();
-  Assert.equal(SvalPanel.workspaceId, home, "the window stays put");
+  Assert.equal(SvalWindowWorkspace.of(window).id, home, "the window stays put");
   await linkFromAnotherApp(QUICK_PAGE);
   const win = await linkFromAnotherApp(QUICK_OTHER);
   const doc = win.document;

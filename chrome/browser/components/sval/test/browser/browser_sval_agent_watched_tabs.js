@@ -113,7 +113,7 @@ add_task(async function a_window_the_page_opens_is_watched() {
   const popup = popupWin.gBrowser.selectedBrowser;
   await within(popupWin.SvalPanel.started, 10_000, "the panel's startup");
   Assert.equal(
-    popupWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(popupWin).id,
     agent.workspaceId,
     "the window shows the agent's workspace"
   );
@@ -188,7 +188,7 @@ add_task(async function a_window_the_page_opens_is_the_agents_tab() {
     }, "the popup loaded its page");
   } catch (err) {
     info(
-      `popup: toolbar ${popupWin.toolbar.visible}, its workspace ${popupWin.SvalPanel.workspaceId === agent.workspaceId ? "the agent's" : "another"}, ${popupWin.gBrowser.tabs.length} tabs, showing ${popup.currentURI.spec}, loading ${popup.webProgress?.isLoadingDocument}, watched ${gate.agentOf(popup)?.agentId === agent.agentId}`
+      `popup: toolbar ${popupWin.toolbar.visible}, its workspace ${SvalWindowWorkspace.of(popupWin).id === agent.workspaceId ? "the agent's" : "another"}, ${popupWin.gBrowser.tabs.length} tabs, showing ${popup.currentURI.spec}, loading ${popup.webProgress?.isLoadingDocument}, watched ${gate.agentOf(popup)?.agentId === agent.agentId}`
     );
     throw err;
   }
@@ -382,7 +382,7 @@ add_task(async function a_popup_opened_without_an_opener_is_watched() {
   Assert.equal(popup.browsingContext.opener, null, "the popup has no opener");
   await within(popupWin.SvalPanel.started, 10_000, "the panel's startup");
   Assert.equal(
-    popupWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(popupWin).id,
     agent.workspaceId,
     "the popup shows the agent's workspace"
   );

@@ -99,6 +99,7 @@ Object.assign(SvalPanel, {
    */
   async _startInMemory(session, { isPrivate }) {
     this._inMemory = true;
+    this._workspace.inMemory = true;
     this._isPrivate = isPrivate;
     this._hideTabStrip({ persist: false });
     // The same browser as any other window: the region and the hidden
@@ -163,7 +164,7 @@ Object.assign(SvalPanel, {
     this._modules.SvalKagi.watchSearch(
       this._modules.SvalSettingsSync.searchService()
     );
-    this._currentWorkspaceId = joined.workspaceId;
+    this._workspace.setShown(joined.workspaceId);
     this._modules.SvalDownloadWorkspaces.workspaceShown(window);
     await this._attachTabs();
     await this.refresh();
@@ -234,7 +235,7 @@ Object.assign(SvalPanel, {
     }
     const handed = this._modules.SvalPanelModel.takeHandedWorkspace(window);
     if (handed) {
-      this._rememberWorkspace(handed);
+      this._workspace.remember(handed);
     }
 
     // **Read here, before anything else in this method can write it.** What
@@ -244,8 +245,8 @@ Object.assign(SvalPanel, {
     // pass below redraws on its way out, a redraw resolves the workspace
     // through `_showWorkspace`, and `_showWorkspace` records it: read any later
     // and every window looks like one that remembered something.
-    const remembered = this._rememberedWorkspaceId();
-    this._madeWorkspaceId = this._madeWorkspaceRecord();
+    const remembered = this._workspace.remembered();
+    this._workspace.restoreMade();
 
     // The footer is always on: it carries the feedback button as well as
     // the sync indicator, which `drawIndicator` shows or hides.
@@ -394,7 +395,7 @@ Object.assign(SvalPanel, {
         this._modules.SvalFirstRun.afterPairing(() => {
           this._heldByPairing = false;
           if (!window.closed) {
-            this._startFromSync(this._rememberedWorkspaceId()).catch(err =>
+            this._startFromSync(this._workspace.remembered()).catch(err =>
               this._modules.SvalLog.warn(
                 `startup after pairing failed: ${this._modules.SvalLog.errorName(err)}`
               )
@@ -456,7 +457,7 @@ Object.assign(SvalPanel, {
     };
     const restored = await SvalRestore.restoreOnce(window, {
       engine: this._engine,
-      workspaceId: this._currentWorkspaceId,
+      workspaceId: this._workspace.id,
       show,
     });
     let wanted = restored?.wanted ?? null;
@@ -476,7 +477,7 @@ Object.assign(SvalPanel, {
     if (
       !restored &&
       remembered &&
-      remembered === this._currentWorkspaceId &&
+      remembered === this._workspace.id &&
       window.toolbar.visible
     ) {
       // `restoreOnce` belongs to the first window of a session, so that the
@@ -490,7 +491,7 @@ Object.assign(SvalPanel, {
       // the workspace, as a launch and a switch do.
       ({ wanted } = await SvalRestore.restore(window, {
         engine: this._engine,
-        workspaceId: this._currentWorkspaceId,
+        workspaceId: this._workspace.id,
         show,
       }));
     } else if (!restored && window.toolbar.visible) {
@@ -509,7 +510,7 @@ Object.assign(SvalPanel, {
       );
       ({ wanted } = await SvalRestore.restore(window, {
         engine: this._engine,
-        workspaceId: this._currentWorkspaceId,
+        workspaceId: this._workspace.id,
         show: startupTab ? show : undefined,
       }));
     }
@@ -528,8 +529,8 @@ Object.assign(SvalPanel, {
     // window, and no row here draws them. The hand-over runs now that the
     // observer is attached: it materialises the adopted workspace and
     // releases the rest, which nobody left here to come back to.
-    if (remembered && remembered !== this._currentWorkspaceId) {
-      await this._handOverWindow(this._currentWorkspaceId, { hold: false });
+    if (remembered && remembered !== this._workspace.id) {
+      await this._handOverWindow(this._workspace.id, { hold: false });
     } else if (remembered && wanted && !window.closed) {
       // A window the session brought back on its own workspace can hold tabs
       // the tree has since moved to another workspace. They go as a move's
@@ -627,7 +628,7 @@ Object.assign(SvalPanel, {
    * @returns {Promise<void>}
    */
   async _attachTabs({ keep = null } = {}) {
-    if (this._observer || !this._currentWorkspaceId) {
+    if (this._observer || !this._workspace.id) {
       return;
     }
     const { SvalTabs, SvalTree } = this._modules;
@@ -638,7 +639,7 @@ Object.assign(SvalPanel, {
       // its row as they arrive.
       this._observer = await SvalTabs.attach(window, {
         engine: this._engine,
-        workspaceId: this._currentWorkspaceId,
+        workspaceId: this._workspace.id,
         nodeIds: this._memoryNodeIds,
         settings: this._settings,
         debounceMs: 0,
@@ -661,7 +662,7 @@ Object.assign(SvalPanel, {
     }
     this._observer = await SvalTabs.attach(window, {
       engine: this._engine,
-      workspaceId: this._currentWorkspaceId,
+      workspaceId: this._workspace.id,
       keep,
       syncDocument: SvalTree.SYNC_DOCUMENT,
       settings: this._settings,

@@ -593,7 +593,10 @@ add_task(
       "and the location is the profile directory, not nowhere"
     );
 
-    Assert.ok(SvalPanel.workspaceId, "a workspace exists with nothing asked");
+    Assert.ok(
+      SvalWindowWorkspace.of(window).id,
+      "a workspace exists with nothing asked"
+    );
     Assert.ok(
       await SvalPanel.syncNow(),
       "and a pass runs: storing and syncing are one path, not two"

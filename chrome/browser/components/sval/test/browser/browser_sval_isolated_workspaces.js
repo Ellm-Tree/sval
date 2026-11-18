@@ -721,9 +721,13 @@ add_task(async function a_peers_switch_from_the_observers_queue_finishes() {
     ),
     "and the hand-over it started finishes"
   );
-  Assert.notEqual(SvalPanel.workspaceId, shown, "the window moved off it");
+  Assert.notEqual(
+    SvalWindowWorkspace.of(window).id,
+    shown,
+    "the window moved off it"
+  );
   Assert.equal(
-    SvalPanel.nodes[SvalPanel.workspaceId]?.kind,
+    SvalPanel.nodes[SvalWindowWorkspace.of(window).id]?.kind,
     SvalTree.WORKSPACE,
     "to a workspace the document holds"
   );

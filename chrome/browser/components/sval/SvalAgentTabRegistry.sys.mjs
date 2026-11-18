@@ -41,6 +41,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   PictureInPicture: "resource://gre/modules/PictureInPicture.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
@@ -123,7 +125,7 @@ function quickPeekAgentHomeOf(browser) {
   if (!isQuickPeek(tab) || !win?.SvalPanel || isPrivateOrInMemory(win)) {
     return null;
   }
-  const id = win.SvalPanel.workspaceId;
+  const id = lazy.SvalWindowWorkspace.of(win).id;
   return id && latestNodes(win.SvalPanel.engine)?.[id]?.agent ? id : null;
 }
 
@@ -215,7 +217,7 @@ function windowOwner(win) {
     return "agent";
   }
   const panel = win.SvalPanel;
-  const id = panel?.workspaceId;
+  const id = lazy.SvalWindowWorkspace.of(win).id;
   const node = id ? latestNodes(panel.engine)?.[id] : null;
   if (!node) {
     return "unknown";
@@ -682,13 +684,9 @@ export function createTabRegistry({ isClosed, agentFor }) {
       return;
     }
     const found = openerAgent(tab.linkedBrowser?.browsingContext);
-    const panel = tab.documentGlobal?.SvalPanel;
-    if (
-      !found ||
-      found.user ||
-      !panel?.workspaceId ||
-      panel.workspaceId === found.agent.workspaceId
-    ) {
+    const win = tab.documentGlobal;
+    const shown = win ? lazy.SvalWindowWorkspace.of(win).id : null;
+    if (!found || found.user || !shown || shown === found.agent.workspaceId) {
       return;
     }
     SvalLog.warn(

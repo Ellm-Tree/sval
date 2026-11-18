@@ -52,7 +52,7 @@ async function treeNodes() {
 function removedAtTaskEnd(id) {
   atTaskEnd(async () => {
     for (const win of BrowserWindowTracker.orderedWindows) {
-      if (win !== window && win.SvalPanel?.workspaceId === id) {
+      if (win !== window && SvalWindowWorkspace.of(win).id === id) {
         const observer = win.SvalPanel.observer;
         await within(
           BrowserTestUtils.closeWindow(win),
@@ -81,9 +81,9 @@ async function otherWindow() {
     "a new window's opening"
   );
   await within(win.SvalPanel.started, 20_000, "its panel starting");
-  const workspace = win.SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(win).id;
   Assert.ok(workspace, "the new window shows a workspace");
-  Assert.notEqual(workspace, SvalPanel.workspaceId, "of its own");
+  Assert.notEqual(workspace, SvalWindowWorkspace.of(window).id, "of its own");
   removedAtTaskEnd(workspace);
   return { win, workspace };
 }
@@ -138,7 +138,7 @@ async function dialogIn(win) {
 
 add_task(
   async function a_tab_dragged_into_another_workspaces_window_joins_it() {
-    const home = SvalPanel.workspaceId;
+    const home = SvalWindowWorkspace.of(window).id;
     const { win, workspace } = await otherWindow();
     const { tab, id } = await filedTab(PAGE);
     const before = (await treeNodes())[id];
@@ -187,14 +187,14 @@ add_task(async function a_grouped_tab_dragged_across_leaves_its_group() {
   );
   Assert.equal(
     nodes[group].placement.parent,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "and its group stays where it was"
   );
 });
 
 add_task(
   async function a_windows_last_tab_dragged_out_joins_the_window_it_reached() {
-    const home = SvalPanel.workspaceId;
+    const home = SvalWindowWorkspace.of(window).id;
     const { win } = await otherWindow();
     const { tab, id } = await filedTab(PAGE, win);
     for (const other of Array.from(win.gBrowser.tabs)) {
@@ -224,7 +224,7 @@ add_task(
 );
 
 add_task(async function a_tab_moved_to_a_new_window_joins_its_workspace() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const { tab, id } = await filedTab(PAGE);
 
   const win = await newWindowAfter(() => {
@@ -233,7 +233,7 @@ add_task(async function a_tab_moved_to_a_new_window_joins_its_workspace() {
       "Move to New Window takes the tab out"
     );
   });
-  const workspace = win.SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(win).id;
   removedAtTaskEnd(workspace);
   Assert.notEqual(workspace, home, "the new window shows another workspace");
   await settledIn(win);
@@ -272,7 +272,7 @@ async function dragIntoAnIsolatedWindow() {
   Assert.ok(moved, "the tab moves to the isolated workspace's window");
   const question = await dialogIn(win);
   Assert.ok(
-    isWithin(await treeNodes(), id, SvalPanel.workspaceId),
+    isWithin(await treeNodes(), id, SvalWindowWorkspace.of(window).id),
     "until the answer the tab stays in its workspace"
   );
   Assert.equal(moved.userContextId, jar, "and in its jar");
@@ -302,7 +302,7 @@ add_task(async function a_drag_into_another_jar_moves_once_asked() {
 
 add_task(
   async function cancelling_a_drag_into_another_jar_hands_the_tab_back() {
-    const home = SvalPanel.workspaceId;
+    const home = SvalWindowWorkspace.of(window).id;
     const { win, id, jar, question } = await dragIntoAnIsolatedWindow();
     const placed = (await treeNodes())[id].placement;
     question
@@ -404,7 +404,7 @@ async function aRowToDropOnAnotherWindow({ isolated = false } = {}) {
 
 add_task(
   async function a_tab_row_dropped_on_another_windows_panel_moves_there() {
-    const home = SvalPanel.workspaceId;
+    const home = SvalWindowWorkspace.of(window).id;
     const { win, workspace, id, first, children } =
       await aRowToDropOnAnotherWindow();
     const jar = SvalPanel.observer.tabFor(id).userContextId;
@@ -452,7 +452,7 @@ add_task(async function a_tab_row_dropped_into_another_jar_moves_once_asked() {
   Assert.equal(dropRowOn(id, window, first, win), "move", "the drop is taken");
   const question = await dialogIn(win);
   Assert.ok(
-    isWithin(await treeNodes(), id, SvalPanel.workspaceId),
+    isWithin(await treeNodes(), id, SvalWindowWorkspace.of(window).id),
     "until the answer the tab stays in its workspace"
   );
   question
@@ -485,7 +485,7 @@ add_task(async function another_windows_panel_refuses_a_group_row() {
   );
   Assert.equal(
     (await treeNodes())[group].placement.parent,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "and the group stays where it was"
   );
 });

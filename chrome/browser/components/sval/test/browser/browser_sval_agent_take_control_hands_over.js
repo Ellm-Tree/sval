@@ -646,7 +646,7 @@ async function dragOut(taken) {
   // window, and a later window with no workspace of its own would adopt it
   // and restore the page. It goes with the task.
   atTaskEnd(async () => {
-    const workspace = panel._currentWorkspaceId;
+    const workspace = SvalWindowWorkspace.of(userWin).id;
     const observer = panel._observer;
     await within(
       BrowserTestUtils.closeWindow(userWin),

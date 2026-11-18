@@ -30,7 +30,10 @@ add_setup(async function () {
 function agentWindowAsking(workspaceId) {
   return TestUtils.waitForCondition(() => {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
-      if (w.SvalPanel?.workspaceId === workspaceId && w.gDialogBox?.isOpen) {
+      if (
+        SvalWindowWorkspace.of(w).id === workspaceId &&
+        w.gDialogBox?.isOpen
+      ) {
         return w;
       }
     }

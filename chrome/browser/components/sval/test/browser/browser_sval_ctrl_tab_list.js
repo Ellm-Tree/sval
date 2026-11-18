@@ -125,7 +125,8 @@ add_task(async function every_tab_of_the_workspace_and_no_other() {
     "the list is a listbox"
   );
   const heading = document.getElementById("sval-tab-switcher-list-heading");
-  const workspaceName = SvalPanel.nodes[SvalPanel.workspaceId].content.name;
+  const workspaceName =
+    SvalPanel.nodes[SvalWindowWorkspace.of(window).id].content.name;
   Assert.ok(
     heading.textContent.endsWith(` ${workspaceName}`),
     "the heading names the Workspace the tabs are in"

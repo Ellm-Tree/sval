@@ -94,7 +94,7 @@ async function workspacesHeld() {
  */
 async function openDialog() {
   const before = await workspacesHeld();
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   await chooseNewWorkspace();
   const doc = await dialogDocument(".sval-nw-name");
   const made = async () => {
@@ -104,7 +104,7 @@ async function openDialog() {
       id = [...(await workspacesHeld())].find(each => !before.has(each));
       return (
         id &&
-        SvalPanel.workspaceId === id &&
+        SvalWindowWorkspace.of(window).id === id &&
         SvalPanel._els.switcher.querySelector(".sval-switcher-name")
           ?.textContent === SvalPanel.nodes[id]?.content.name
       );

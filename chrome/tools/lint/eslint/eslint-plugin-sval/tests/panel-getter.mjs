@@ -12,25 +12,25 @@ const fixed = (code, output) => ({
 
 ruleTester.run("panel-getter", rule, {
   valid: [
-    passes(task("Assert.equal(SvalPanel.workspaceId, id);")),
-    passes(task("SvalPanel._currentWorkspaceId = id;")),
+    passes(task("Assert.equal(SvalPanel.engine, engine);")),
+    passes(task("SvalPanel._engine = engine;")),
     passes(task("delete SvalPanel._nodes;")),
     passes(task("await SvalPanel._promptForNewGroup();")),
-    passes(task("Assert.equal(other._currentWorkspaceId, id);")),
+    passes(task("Assert.equal(other._engine, engine);")),
     passes(task('await within(SvalPanel.started, 10_000, "start");')),
   ],
   invalid: [
     fixed(
-      "Assert.equal(SvalPanel._currentWorkspaceId, id);",
-      "Assert.equal(SvalPanel.workspaceId, id);"
+      "Assert.equal(SvalPanel._nodes, nodes);",
+      "Assert.equal(SvalPanel.nodes, nodes);"
     ),
     fixed(
       "await win.SvalPanel._engine.tree();",
       "await win.SvalPanel.engine.tree();"
     ),
     fixed(
-      "const id = w.SvalPanel?._currentWorkspaceId;",
-      "const id = w.SvalPanel?.workspaceId;"
+      "const pins = w.SvalPanel?._pins;",
+      "const pins = w.SvalPanel?.pins;"
     ),
     fixed(
       'await within(SvalPanel._started.promise, 10_000, "start");',

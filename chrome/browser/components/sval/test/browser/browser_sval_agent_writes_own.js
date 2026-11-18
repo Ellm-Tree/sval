@@ -224,7 +224,7 @@ add_task(async function a_popup_of_another_sites_page_writes_on_its_own() {
   });
   Assert.ok(!popupWin.toolbar.visible, "the popup stays a popup");
   Assert.equal(
-    popupWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(popupWin).id,
     agent.workspaceId,
     "in the agent's workspace"
   );
@@ -329,7 +329,7 @@ async function writeThroughPopup(onclick, path = "/sval-fetch") {
     clicked = call("click_element", { tab, ref });
   });
   Assert.equal(
-    popupWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(popupWin).id,
     agent.workspaceId,
     "the popup is in the agent's workspace"
   );

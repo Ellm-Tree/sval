@@ -37,7 +37,7 @@ add_task(async function the_observer_is_told_when_a_peer_moves_the_window() {
   Assert.ok(await SvalPanel._syncInBackground(), "the poll ran");
 
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     first,
     "the window fell back to the first workspace in sibling order"
   );
@@ -90,7 +90,11 @@ add_task(
       "the switch is a no-op rather than leaving the window on an id that " +
         "draws nothing"
     );
-    Assert.equal(SvalPanel.workspaceId, first, "the window did not move");
+    Assert.equal(
+      SvalWindowWorkspace.of(window).id,
+      first,
+      "the window did not move"
+    );
     Assert.deepEqual(
       drawnIds(),
       [ids.tabs[0]],
@@ -117,7 +121,7 @@ add_task(async function a_peer_closing_the_shown_workspace_moves_the_window() {
 
   const chosen = await openSwitcher();
   await activateWorkspace(chosen, second);
-  Assert.equal(SvalPanel.workspaceId, second, "showing the second");
+  Assert.equal(SvalWindowWorkspace.of(window).id, second, "showing the second");
 
   const peer = new SvalEngine({
     root,
@@ -150,7 +154,7 @@ add_task(async function a_peer_closing_the_shown_workspace_moves_the_window() {
     "the close arrived — the node is simply gone (spec \u00a75.4)"
   );
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     home,
     "the window moved to the first workspace in sibling order on the pass " +
       "itself, not when the user next tried something"
@@ -244,7 +248,7 @@ add_task(async function two_switches_in_a_row_do_not_interleave() {
     "each switch ran to its end"
   );
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     first,
     "the window ends on the one pressed last"
   );
@@ -324,7 +328,7 @@ add_task(
     Assert.ok(await SvalPanel._syncInBackground(), "the poll read the folder");
     Assert.equal(SvalPanel.nodes[host].kind, "tab", "the host is this tab");
 
-    if (SvalPanel.workspaceId !== higher) {
+    if (SvalWindowWorkspace.of(window).id !== higher) {
       const menu = await openSwitcher();
       await activateWorkspace(menu, higher);
     }

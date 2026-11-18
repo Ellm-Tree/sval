@@ -215,7 +215,7 @@ add_task(async function a_tab_the_tree_files_elsewhere_is_not_the_agents() {
   const target = moveIntoTarget(
     (await engine.tree()).nodes,
     tab,
-    SvalPanel.workspaceId
+    SvalWindowWorkspace.of(window).id
   );
   await engine.mutate({ kind: "moveNode", ...target, now: Date.now() });
   await win.SvalPanel.refresh();
@@ -527,7 +527,7 @@ add_task(async function a_first_load_before_the_panel_starts_waits() {
     if (channel.URI.spec === url && bc?.embedderElement) {
       const win = bc.embedderElement.documentGlobal;
       seen.resolve({
-        started: !!win.SvalPanel?.workspaceId,
+        started: !!SvalWindowWorkspace.of(win).id,
         waits: awaitsFiling(bc.embedderElement),
       });
     }

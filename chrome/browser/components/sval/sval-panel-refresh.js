@@ -59,7 +59,7 @@ Object.assign(SvalPanel, {
     }
     const jar = this._modules.SvalWorkspaceJar.userContextIdFor(
       this._nodes,
-      this._currentWorkspaceId
+      this._workspace.id
     );
     if ((window.gBrowser.defaultUserContextId ?? 0) === jar) {
       return false;
@@ -118,7 +118,7 @@ Object.assign(SvalPanel, {
     this._showStrandedDeleteHides();
     this._dropOrphanTabs();
     // Before drawing: a pass can have taken away the workspace this window
-    // was showing, and `render` draws whatever `_currentWorkspaceId` names.
+    // was showing, and `render` draws whatever workspace the window shows.
     await this._resolveCurrentWorkspace();
     this._keepKeptTabsWithTheirWindows();
     await this._keepJar();
@@ -150,7 +150,7 @@ Object.assign(SvalPanel, {
     }
     const { isHiddenForWorkspace } = this._modules.SvalFirefox;
     if (window.gBrowser.tabs.some(tab => isHiddenForWorkspace(tab))) {
-      for (const other of this.workspacesShownElsewhere().values()) {
+      for (const other of this._workspace.shownElsewhere().values()) {
         other.SvalPanel?.takeKeptTabs();
       }
     }
@@ -179,7 +179,7 @@ Object.assign(SvalPanel, {
 
   /** {@link takeKeptTabs}'s work, for a caller in the switch's queue. */
   async _takeKeptTabsNow() {
-    if (!this._engine || window.closed || this._closing) {
+    if (!this._engine || window.closed || this._workspace.closing) {
       return;
     }
     // The latest read: every change that can bring a kept tab here is
@@ -193,7 +193,7 @@ Object.assign(SvalPanel, {
     if (window.closed) {
       return;
     }
-    const id = this._currentWorkspaceId;
+    const id = this._workspace.id;
     if (id) {
       this._modules.SvalRestore.takeKept(window, {
         nodes,

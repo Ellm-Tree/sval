@@ -34,6 +34,9 @@ const { makeTempDir, tempPath } = ChromeUtils.importESModule(
             viewingAGroupedTab, writesSetup, chooseNewWorkspace, chooseNewGroup,
             nodeNamed, noOtherBrowsers, keyCopyIn */
 
+const { SvalWindowWorkspace } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs"
+);
 const { within, explained, waitForCondition } = ChromeUtils.importESModule(
   "resource://testing-common/SvalTestWait.sys.mjs"
 );
@@ -494,13 +497,7 @@ async function noOtherBrowsers() {
     "_localRoot",
     "_startRetryWaitMs",
   ];
-  const PANEL_STATE = [
-    ...PANEL_CONFIG,
-    "_currentWorkspaceId",
-    "_nodes",
-    "_rows",
-    "_focusedId",
-  ];
+  const PANEL_STATE = [...PANEL_CONFIG, "_nodes", "_rows", "_focusedId"];
   const methodsOf = panel =>
     new Map(
       Object.entries(panel).filter(
@@ -560,6 +557,7 @@ async function noOtherBrowsers() {
       ...methodsOf(window.SvalPanel),
       ...PANEL_STATE.map(key => [key, window.SvalPanel[key]]),
     ]);
+  const shownAtLoad = SvalWindowWorkspace.of(window).id;
 
   async function record() {
     const panel = window.SvalPanel;
@@ -595,6 +593,7 @@ async function noOtherBrowsers() {
       tabId: taggedId(gBrowser.tabs[0]),
       methods: panel && methodsOf(panel),
       state: panel && new Map(PANEL_STATE.map(key => [key, panel[key]])),
+      shown: SvalWindowWorkspace.of(window).id,
       // A private window's panel draws from its session's tree, which keeps
       // no document of the profile's to snapshot.
       tree:
@@ -637,6 +636,25 @@ async function noOtherBrowsers() {
   }
 
   /**
+   * Puts the window's record of the workspace it shows back to the run's,
+   * which is drawn from the engine as the rest of the panel's data is. At a
+   * file's start, a workspace the file's own top level moved the window to
+   * stays.
+   *
+   * @param {object} known The recorded state.
+   * @param {boolean} replaced Whether a fixture's engine replaced the
+   *   profile's.
+   * @param {boolean} atStart Whether this is a file's start.
+   */
+  function putBackShownWorkspace(known, replaced, atStart) {
+    const workspace = SvalWindowWorkspace.of(window);
+    const filesOwn = atStart && workspace.id !== shownAtLoad;
+    if (replaced && workspace.id !== known.shown && !filesOwn) {
+      workspace.setShown(known.shown);
+    }
+  }
+
+  /**
    * Switches the window back to the workspace it showed when the run was
    * recorded, if the document put back lacks the one it shows. An observer
    * attached to a workspace the document lacks files the window's tabs under
@@ -648,11 +666,11 @@ async function noOtherBrowsers() {
    * @param {object} restored The nodes of the document put back.
    */
   async function showRecordedWorkspace(panel, known, restored) {
-    if (panel._currentWorkspaceId in restored) {
+    if (SvalWindowWorkspace.of(window).id in restored) {
       return;
     }
     await within(
-      panel.switchTo(known.state.get("_currentWorkspaceId")),
+      panel.switchTo(known.shown),
       10_000,
       "the switch back to the recorded workspace"
     );
@@ -728,6 +746,7 @@ async function noOtherBrowsers() {
         panel[key] = value;
       }
     }
+    putBackShownWorkspace(known, replaced, atStart);
     if (SvalEngine.sharedInstance !== known.shared) {
       SvalEngine.setSharedInstance(known.shared);
     }
@@ -786,7 +805,7 @@ async function noOtherBrowsers() {
       // document lacks as one another device closed.
       const restored = (await engine.tree()).nodes ?? {};
       await showRecordedWorkspace(panel, known, restored);
-      const workspace = panel._currentWorkspaceId;
+      const workspace = SvalWindowWorkspace.of(window).id;
       // Mozilla's harness replaces the window's tab before every file
       // (`Tester.nextTest` in browser-test.js). At a file's start the tab in
       // its place stands for the node recorded with the one it replaced, so
@@ -1046,7 +1065,7 @@ const AGENT_LABEL = "Test Agent";
  */
 async function removeWorkspace(id) {
   for (const win of BrowserWindowTracker.orderedWindows) {
-    if (win.SvalPanel?.workspaceId === id && win !== window) {
+    if (SvalWindowWorkspace.of(win).id === id && win !== window) {
       await within(
         BrowserTestUtils.closeWindow(win),
         10_000,
@@ -1074,7 +1093,7 @@ async function removeWorkspace(id) {
  * @returns {Promise<{workspace: string, group: string}>}
  */
 async function viewingAGroupedTab() {
-  const workspace = SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(window).id;
   const group = await SvalPanel.engine.mutate({
     kind: "addGroup",
     parent: workspace,

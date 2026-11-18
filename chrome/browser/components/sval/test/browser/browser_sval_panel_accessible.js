@@ -149,7 +149,7 @@ add_task(async function the_tree_is_entered_on_the_selected_tab() {
     '[data-command="addGroup"]'
   );
   before.focus();
-  settings.setSelection(SvalPanel.workspaceId, ids.tab3);
+  settings.setSelection(SvalWindowWorkspace.of(window).id, ids.tab3);
   await SvalPanel.refresh();
 
   EventUtils.synthesizeKey("KEY_Tab");
@@ -158,7 +158,7 @@ add_task(async function the_tree_is_entered_on_the_selected_tab() {
     ids.tab3,
     "Tab into the tree lands on the selected tab"
   );
-  settings.setSelection(SvalPanel.workspaceId, null);
+  settings.setSelection(SvalWindowWorkspace.of(window).id, null);
 });
 
 /**

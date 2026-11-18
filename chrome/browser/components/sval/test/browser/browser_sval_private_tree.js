@@ -111,7 +111,7 @@ add_task(async function a_refused_private_batch_changes_nothing() {
         ops: [
           {
             kind: "addGroup",
-            parent: win.SvalPanel.workspaceId,
+            parent: SvalWindowWorkspace.of(win).id,
             name: "g",
             id: group,
           },
@@ -291,7 +291,7 @@ add_task(async function svalTabs_will_not_mix_private_and_saved() {
     await Assert.rejects(
       SvalTabs.attach(win, {
         engine: SvalPanel.engine,
-        workspaceId: SvalPanel.workspaceId,
+        workspaceId: SvalWindowWorkspace.of(window).id,
         nodeIds,
         onFlush: () => {},
         pollMs: 0,
@@ -302,7 +302,7 @@ add_task(async function svalTabs_will_not_mix_private_and_saved() {
     await Assert.rejects(
       SvalTabs.attach(win, {
         engine: tree,
-        workspaceId: win.SvalPanel.workspaceId,
+        workspaceId: SvalWindowWorkspace.of(win).id,
         onFlush: () => {},
         pollMs: 0,
       }),
@@ -312,7 +312,7 @@ add_task(async function svalTabs_will_not_mix_private_and_saved() {
     await Assert.rejects(
       SvalTabs.attach(win, {
         engine: tree,
-        workspaceId: win.SvalPanel.workspaceId,
+        workspaceId: SvalWindowWorkspace.of(win).id,
         nodeIds,
         syncDocument: "workspaces",
         pollMs: 0,
@@ -323,7 +323,7 @@ add_task(async function svalTabs_will_not_mix_private_and_saved() {
     await Assert.rejects(
       SvalTabs.attach(window, {
         engine: tree,
-        workspaceId: win.SvalPanel.workspaceId,
+        workspaceId: SvalWindowWorkspace.of(win).id,
         nodeIds,
         onFlush: () => {},
         pollMs: 0,
@@ -346,7 +346,7 @@ add_task(async function the_next_session_starts_empty() {
   let second = null;
   try {
     const { id } = await openMarked(first, marker());
-    const firstWorkspace = first.SvalPanel.workspaceId;
+    const firstWorkspace = SvalWindowWorkspace.of(first).id;
     await closeIt(first);
     await TestUtils.waitForCondition(
       () => !SvalPrivateSession.isLive,
@@ -361,7 +361,7 @@ add_task(async function the_next_session_starts_empty() {
       Object.keys(nodes).filter(
         node => nodes[node].kind === SvalTree.WORKSPACE
       ),
-      [second.SvalPanel.workspaceId],
+      [SvalWindowWorkspace.of(second).id],
       "the new window's workspace is the only one"
     );
   } finally {
@@ -396,7 +396,7 @@ add_task(async function a_window_opening_as_the_last_one_closes() {
     const { id } = await openMarked(joining, marker());
     const nodes = await privateTree(joining);
     Assert.ok(
-      nodes[joining.SvalPanel.workspaceId],
+      nodes[SvalWindowWorkspace.of(joining).id],
       "its workspace is in the tree"
     );
     Assert.ok(nodes[id], "and so is the tab it files");

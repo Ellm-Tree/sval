@@ -166,7 +166,7 @@ async function footItems(win) {
  */
 add_task(async function alt_enter_on_a_users_tab_goes_to_it() {
   const { win, browser, ws } = await layerSetup();
-  const users = SvalPanel.workspaceId;
+  const users = SvalWindowWorkspace.of(window).id;
   const viewed = gBrowser.selectedTab;
   const page = await within(
     BrowserTestUtils.openNewForegroundTab(gBrowser, PAGE2),
@@ -207,7 +207,7 @@ add_task(async function alt_enter_on_a_users_tab_goes_to_it() {
   );
   const nodes = (await SvalPanel.engine.tree()).nodes ?? {};
   Assert.equal(nodes[id].placement.parent, users, "the tab stays the user's");
-  Assert.equal(win.SvalPanel.workspaceId, ws, "the agent's window stays");
+  Assert.equal(SvalWindowWorkspace.of(win).id, ws, "the agent's window stays");
   Assert.ok(!win.gBrowser.selectedTab.splitview, "in no split");
   await giveBackFrom(win, browser);
 });
@@ -226,7 +226,7 @@ add_task(async function go_to_a_workspace_is_the_switchers() {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    if (!win.closed && win.SvalPanel.workspaceId === trips) {
+    if (!win.closed && SvalWindowWorkspace.of(win).id === trips) {
       await win.SvalPanel.switchTo(ws);
     }
     await engine.mutate({ kind: "remove", id: trips, now: Date.now() });
@@ -251,7 +251,7 @@ add_task(async function go_to_a_workspace_is_the_switchers() {
   }
   EventUtils.synthesizeKey("KEY_Enter", {}, win);
   await TestUtils.waitForCondition(
-    () => win.SvalPanel.workspaceId === trips,
+    () => SvalWindowWorkspace.of(win).id === trips,
     "the agent's window goes to Trips, as its switcher does"
   );
 });

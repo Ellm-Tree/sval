@@ -185,7 +185,7 @@ add_task(async function the_agents_window_is_never_a_popup() {
     clickIn(browser, "#allowed-popup")
   );
   await within(popupWin.SvalPanel.started, 10_000, "the panel's startup");
-  Assert.equal(popupWin.SvalPanel.workspaceId, agent.workspaceId);
+  Assert.equal(SvalWindowWorkspace.of(popupWin).id, agent.workspaceId);
   await within(BrowserTestUtils.closeWindow(win), 10_000, "the window closing");
   Assert.equal(
     await tabs.windowFor(agent.workspaceId),
@@ -239,7 +239,7 @@ add_task(async function a_popups_tab_opens_a_window_of_the_agents_own() {
   );
   Assert.ok(agentWin.toolbar.visible, "a full window opened");
   Assert.equal(
-    agentWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(agentWin).id,
     agent.workspaceId,
     "showing the agent's workspace"
   );
@@ -385,7 +385,7 @@ add_task(async function a_tab_torn_off_into_the_users_workspace_is_let_go() {
   });
   await within(userWin.SvalPanel.started, 10_000, "the panel's startup");
   Assert.notEqual(
-    userWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(userWin).id,
     agent.workspaceId,
     "the new window shows the user's workspace"
   );
@@ -440,7 +440,7 @@ add_task(async function a_tab_the_user_takes_is_theirs_for_good() {
     win.gBrowser.replaceTabWithWindow(win.gBrowser.getTabForBrowser(born))
   );
   await within(userWin.SvalPanel.started, 10_000, "the panel's startup");
-  Assert.notEqual(userWin.SvalPanel.workspaceId, agent.workspaceId);
+  Assert.notEqual(SvalWindowWorkspace.of(userWin).id, agent.workspaceId);
   const taken = userWin.gBrowser.selectedBrowser;
   await TestUtils.waitForCondition(
     () => gate.agentOf(taken) === null,
@@ -510,7 +510,7 @@ add_task(async function a_taken_tab_closed_and_restored_stays_the_users() {
     found.win.gBrowser.replaceTabWithWindow(found.tab)
   );
   await within(userWin.SvalPanel.started, 10_000, "the panel's startup");
-  const userWs = userWin.SvalPanel.workspaceId;
+  const userWs = SvalWindowWorkspace.of(userWin).id;
   Assert.notEqual(userWs, agent.workspaceId, "the user's window");
   const taken = userWin.gBrowser.selectedTab;
   await TestUtils.waitForCondition(
@@ -549,7 +549,7 @@ add_task(async function a_tab_moved_to_a_group_comes_back_to_it() {
   const observer = SvalPanel.observer;
   const group = await engine.mutate({
     kind: "addGroup",
-    parent: SvalPanel.workspaceId,
+    parent: SvalWindowWorkspace.of(window).id,
     name: "Kept",
     id: crypto.randomUUID(),
     now: Date.now(),

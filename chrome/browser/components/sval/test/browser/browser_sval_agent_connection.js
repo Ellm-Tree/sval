@@ -204,7 +204,7 @@ add_task(async function waiting_calls_leave_the_connection_free() {
   Assert.equal(created.length, 1, "pairing made the agent's workspace");
   const agentWin = await TestUtils.waitForCondition(() => {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
-      if (w.SvalPanel?.workspaceId === created[0] && w.gDialogBox?.isOpen) {
+      if (SvalWindowWorkspace.of(w).id === created[0] && w.gDialogBox?.isOpen) {
         return w;
       }
     }
@@ -248,7 +248,7 @@ add_task(async function a_busy_page_leaves_the_connection_free() {
   c.call(3, "tools/call", { name: "open_tab", arguments: { url: PAGE2 } });
   const agentWin = await TestUtils.waitForCondition(() => {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
-      if (w.SvalPanel?.workspaceId === created && w.gDialogBox?.isOpen) {
+      if (SvalWindowWorkspace.of(w).id === created && w.gDialogBox?.isOpen) {
         return w;
       }
     }
@@ -417,7 +417,7 @@ add_task(async function a_burst_of_actions_on_one_site_queues_then_refuses() {
   c.call(3, "tools/call", { name: "open_tab", arguments: { url: PAGE2 } });
   const agentWin = await TestUtils.waitForCondition(() => {
     for (const w of Services.wm.getEnumerator("navigator:browser")) {
-      if (w.SvalPanel?.workspaceId === created && w.gDialogBox?.isOpen) {
+      if (SvalWindowWorkspace.of(w).id === created && w.gDialogBox?.isOpen) {
         return w;
       }
     }

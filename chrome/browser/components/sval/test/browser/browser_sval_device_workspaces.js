@@ -133,7 +133,11 @@ add_task(async function devices_workspaces_have_their_own_section() {
       "and the agents' come after the devices'"
     );
     await activateWorkspace(menu, phone);
-    Assert.equal(SvalPanel.workspaceId, phone, "it opens as any Workspace");
+    Assert.equal(
+      SvalWindowWorkspace.of(window).id,
+      phone,
+      "it opens as any Workspace"
+    );
   } finally {
     if (menu.state !== "closed") {
       await closeSwitcher(menu);
@@ -275,7 +279,7 @@ add_task(async function a_new_window_never_takes_a_devices_workspace() {
       20_000,
       "the new window's panel starting"
     );
-    const shown = win.SvalPanel.workspaceId;
+    const shown = SvalWindowWorkspace.of(win).id;
     leftWhenTheTaskEnds([shown]);
     Assert.notEqual(shown, phone, "the device's Workspace is not taken");
     const nodes = JSON.parse(await treeJson(engine));

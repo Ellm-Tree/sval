@@ -62,7 +62,7 @@ async function currentIn(win) {
  * on down.
  */
 add_task(async function new_window_wraps_from_the_last_workspace() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const homeRows = rowIdsIn(window);
   const middle = await workspaceWith("Middle", { pages: [page("Between")] });
   const last = await workspaceWith("Last", { pages: [page("Bottom")] });
@@ -100,7 +100,7 @@ add_task(async function new_window_wraps_from_the_last_workspace() {
  * workspace it gets one of its own, which every other window then lists.
  */
 add_task(async function new_window_with_every_workspace_shown_makes_one() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const only = await workspaceWith("Only", { pages: [page("Alone")] });
 
   const taken = await newWindowCommand(window);
@@ -143,7 +143,7 @@ add_task(async function new_window_with_every_workspace_shown_makes_one() {
  * workspace away from the other windows, and its own is not theirs to go to.
  */
 add_task(async function a_private_window_holds_no_workspace() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const spare = await workspaceWith("Spare", { pages: [page("Unshown")] });
   const priv = await openPrivate();
   atTaskEnd(() => closePrivate(priv));

@@ -78,10 +78,10 @@ add_task(async function a_bidi_client_opens_a_window() {
     !win.document.documentElement.hasAttribute("data-sval-agent"),
     "the window is not marked as an agent's"
   );
-  Assert.ok(win.SvalPanel.workspaceId, "the window shows a workspace");
+  Assert.ok(SvalWindowWorkspace.of(win).id, "the window shows a workspace");
   Assert.notEqual(
-    win.SvalPanel.workspaceId,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
+    SvalWindowWorkspace.of(window).id,
     "a workspace no other window shows"
   );
 
@@ -138,7 +138,7 @@ async function settled(win) {
  * @param {number} jar
  */
 function assertWebDriverJar(win, jar) {
-  const workspaceId = win.SvalPanel.workspaceId;
+  const workspaceId = SvalWindowWorkspace.of(win).id;
   const node = win.SvalPanel.nodes[workspaceId];
   Assert.notEqual(jar, 0, "the tab is not in the default jar");
   Assert.notEqual(
@@ -148,7 +148,7 @@ function assertWebDriverJar(win, jar) {
   );
   Assert.notEqual(
     workspaceId,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "the window shows a workspace the user's window does not"
   );
   Assert.equal(node?.content?.name, "WebDriver", "named WebDriver");
@@ -492,7 +492,7 @@ function routedTab(run) {
 add_task(async function a_webdriver_window_never_reaches_the_document() {
   const run = await bidiSession();
   const win = await routedTab(run);
-  const workspaceId = win.SvalPanel.workspaceId;
+  const workspaceId = SvalWindowWorkspace.of(win).id;
   const url = `https://example.com/?webdriver=${crypto.randomUUID()}`;
   const loaded = BrowserTestUtils.browserLoaded(
     win.gBrowser.selectedBrowser,
@@ -597,8 +597,8 @@ add_task(async function closing_a_window_removes_its_workspace() {
   const second = await newWindowAfter(async () => {
     ({ context } = await run("browsingContext", "create", { type: "window" }));
   });
-  const firstId = first.SvalPanel.workspaceId;
-  const secondId = second.SvalPanel.workspaceId;
+  const firstId = SvalWindowWorkspace.of(first).id;
+  const secondId = SvalWindowWorkspace.of(second).id;
   const jarName = id => `sval.workspace.${id}`;
   Assert.ok(
     ContextualIdentityService.getPrivateIdentity(jarName(firstId)),
@@ -669,7 +669,7 @@ add_task(async function a_recorded_webdriver_workspace_is_deleted() {
   const nodes = (await engine.tree()).nodes ?? {};
   Assert.ok(!nodes[left], "the recorded workspace is deleted");
   Assert.ok(!nodes[tab], "with its tab");
-  Assert.ok(nodes[SvalPanel.workspaceId], "the user's stays");
+  Assert.ok(nodes[SvalWindowWorkspace.of(window).id], "the user's stays");
   Assert.ok(
     !("webDriverWorkspaces" in (await IOUtils.readJSON(path))),
     "and the record is gone from the file"
@@ -775,7 +775,10 @@ add_task(async function a_window_that_never_starts_fails_alone() {
   const run = await bidiSession();
   const win = await routedTab(run);
   Assert.ok(
-    SvalWorkspaceJar.isIsolated(win.SvalPanel.nodes, win.SvalPanel.workspaceId),
+    SvalWorkspaceJar.isIsolated(
+      win.SvalPanel.nodes,
+      SvalWindowWorkspace.of(win).id
+    ),
     "and a later command opens its window"
   );
 });

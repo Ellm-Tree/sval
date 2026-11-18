@@ -79,7 +79,7 @@ add_task(async function going_to_a_kept_tab_goes_to_its_workspace() {
   // As an extension's `tabs.update` goes to a tab.
   await selectTab(tab);
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === ids.workspaces[0],
+    () => SvalWindowWorkspace.of(window).id === ids.workspaces[0],
     "the window goes to the tab's workspace"
   );
   await quiet(engine, observer);
@@ -109,7 +109,7 @@ add_task(async function switching_to_a_kept_tab_by_address_goes_there() {
     "Firefox finds the kept tab"
   );
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === ids.workspaces[0],
+    () => SvalWindowWorkspace.of(window).id === ids.workspaces[0],
     "the window goes to the tab's workspace"
   );
   await quiet(engine, observer);
@@ -133,7 +133,7 @@ add_task(async function a_new_window_on_a_workspace_takes_its_kept_tab() {
   // this window just left.
   const win = await newWindowOnNextWorkspace();
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     ids.workspaces[0],
     "the new window shows the workspace this one left"
   );
@@ -247,7 +247,7 @@ add_task(async function a_picture_in_picture_video_plays_on_through_a_take() {
   // it the video's tab.
   const win = await newWindowOnNextWorkspace();
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     ids.workspaces[0],
     "the new window shows the video's workspace"
   );
@@ -309,8 +309,8 @@ add_task(async function a_kept_tab_moved_to_another_windows_workspace() {
   Assert.ok(!heldIds().includes(ids.tabs[1]), "and left this window");
   const { text, marked } = await pageState(there, "textarea");
   Assert.ok(text.includes("half a reply") && marked, "with its page");
-  Assert.equal(SvalPanel.workspaceId, second, "this window stays");
-  Assert.equal(win.SvalPanel.workspaceId, first, "as does that one");
+  Assert.equal(SvalWindowWorkspace.of(window).id, second, "this window stays");
+  Assert.equal(SvalWindowWorkspace.of(win).id, first, "as does that one");
   Assert.equal(Services.focus.activeWindow, window, "and keeps the focus");
 
   await within(
@@ -349,7 +349,11 @@ add_task(async function a_kept_tab_a_peer_moves_goes_to_its_window() {
   Assert.ok(!heldIds().includes(ids.tabs[0]), "which left this window");
   const { text, marked } = await pageState(there, "textarea");
   Assert.ok(text.includes("half a reply") && marked, "with its text");
-  Assert.equal(SvalPanel.workspaceId, ids.workspaces[1], "no switch");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    ids.workspaces[1],
+    "no switch"
+  );
   Assert.equal(Services.focus.activeWindow, window, "and no focus taken");
 
   await within(
@@ -371,7 +375,11 @@ add_task(async function a_kept_tab_shown_without_going_to_it_hides_again() {
     () => !gBrowser.visibleTabs.includes(tab),
     "the tab goes back out of reach"
   );
-  Assert.equal(SvalPanel.workspaceId, ids.workspaces[1], "no switch");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    ids.workspaces[1],
+    "no switch"
+  );
   Assert.equal(gBrowser.selectedTab, observer.tabFor(ids.tabs[1]), "or move");
   Assert.ok(
     SvalFirefox.isHiddenForWorkspace(tab) || !tab.linkedPanel,
@@ -391,7 +399,7 @@ add_task(async function a_tab_an_extension_hid_is_left_alone() {
   await selectTab(opened);
   await quiet(engine, observer);
   Assert.equal(gBrowser.selectedTab, opened, "going to it shows it");
-  Assert.equal(SvalPanel.workspaceId, ids.workspaces[0], "here");
+  Assert.equal(SvalWindowWorkspace.of(window).id, ids.workspaces[0], "here");
   Assert.ok(gBrowser.tabs.includes(opened), "where it stays");
 });
 
@@ -456,7 +464,7 @@ add_task(async function a_reopened_window_takes_a_kept_tab_without_a_copy() {
     await win.SvalPanel.refresh();
   }
 
-  Assert.equal(reopened.SvalPanel.workspaceId, second, "on its workspace");
+  Assert.equal(SvalWindowWorkspace.of(reopened).id, second, "on its workspace");
   Assert.deepEqual(
     reopened.gBrowser.tabs.map(each => taggedId(each) ?? "untagged"),
     [ids.tabs[1]],

@@ -85,6 +85,6 @@ add_task(async function a_backup_key_brings_the_workspaces_back() {
     [theirs],
     "the other device's workspace is the only one"
   );
-  Assert.equal(SvalPanel.workspaceId, theirs, "and it is shown");
+  Assert.equal(SvalWindowWorkspace.of(window).id, theirs, "and it is shown");
   Assert.ok(SvalPanel.settings.firstRunDone, "first run is done");
 });

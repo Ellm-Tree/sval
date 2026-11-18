@@ -369,7 +369,7 @@ async function chooseOnRow(id, command) {
  */
 async function chooseOnWorkspace(id, command) {
   const menu = SvalPanel._els.workspaceMenu;
-  if (id === SvalPanel.workspaceId) {
+  if (id === SvalWindowWorkspace.of(window).id) {
     await activateMenuItem(
       await rightClickOpens(SvalPanel._els.switcher, menu),
       command

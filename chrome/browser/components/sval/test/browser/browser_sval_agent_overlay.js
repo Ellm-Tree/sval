@@ -744,9 +744,13 @@ add_task(async function the_menu_bar_opens_a_workspace_beside_the_agents() {
     "the new window's panel starting"
   );
   expectWorkspaceTabs(opened);
-  Assert.equal(opened.SvalPanel.workspaceId, own, "the new window shows it");
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(opened).id,
+    own,
+    "the new window shows it"
+  );
+  Assert.equal(
+    SvalWindowWorkspace.of(win).id,
     ws,
     "and the agent's window stays the agent's"
   );
@@ -778,7 +782,7 @@ add_task(async function settings_open_in_the_users_window() {
     "the agent's window opens no tab"
   );
   Assert.equal(
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     ws,
     "and stays on the agent's workspace"
   );

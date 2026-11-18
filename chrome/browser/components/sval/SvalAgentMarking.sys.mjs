@@ -147,6 +147,8 @@ import {
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   SvalQuickPeek: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
@@ -823,7 +825,7 @@ export class AgentWindowMarking {
 
   /** @returns {string|null} The workspace this window shows. */
   #workspaceId() {
-    return this.#win.SvalPanel?.workspaceId ?? null;
+    return lazy.SvalWindowWorkspace.of(this.#win).id;
   }
 
   /**
@@ -1216,7 +1218,7 @@ export class AgentWindowMarking {
    *   window shows: what Be polite is kept under. Null when none is paired.
    */
   #agentId() {
-    const workspace = this.#win.SvalPanel?.workspaceId;
+    const workspace = lazy.SvalWindowWorkspace.of(this.#win).id;
     return lazy.SvalAgents.store?.agentOfWorkspace(workspace)?.agentId ?? null;
   }
 

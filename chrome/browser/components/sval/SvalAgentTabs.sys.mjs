@@ -64,6 +64,8 @@ import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
   SvalQuickPeek: "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs",
   SvalRestore: "moz-src:///browser/components/sval/SvalRestore.sys.mjs",
@@ -267,7 +269,7 @@ const opening = new Map();
 function windowsShowing(workspaceId) {
   // An agent never sees or acts in a private window.
   return lazy.BrowserWindowTracker.getOrderedWindows({ private: false }).filter(
-    win => !win.closed && win.SvalPanel?.workspaceId === workspaceId
+    win => !win.closed && lazy.SvalWindowWorkspace.of(win).id === workspaceId
   );
 }
 
@@ -288,7 +290,7 @@ function openElsewhere(workspaceId) {
     if (
       win.closed ||
       lazy.PrivateBrowsingUtils.isWindowPrivate(win) ||
-      win.SvalPanel?.workspaceId === workspaceId
+      lazy.SvalWindowWorkspace.of(win).id === workspaceId
     ) {
       continue;
     }
@@ -381,7 +383,7 @@ async function openWindowFor(workspaceId) {
   handWorkspaceTo(win, workspaceId, { agent: true });
   await delayedStartupOf(win);
   await win.SvalPanel.started;
-  if (win.SvalPanel.workspaceId !== workspaceId) {
+  if (lazy.SvalWindowWorkspace.of(win).id !== workspaceId) {
     // The workspace was not in the document by the time the window read it,
     // so the window adopted another one. It is the user's window now.
     SvalLog.warn(`agent window did not open on workspace ${workspaceId}`);

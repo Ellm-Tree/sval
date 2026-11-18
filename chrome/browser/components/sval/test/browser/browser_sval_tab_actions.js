@@ -138,7 +138,7 @@ add_task(async function unload_on_a_group_unloads_its_tabs() {
   const group = crypto.randomUUID();
   await engine.mutate({
     kind: "addGroup",
-    parent: SvalPanel.workspaceId,
+    parent: SvalWindowWorkspace.of(window).id,
     name: "Unload me",
     id: group,
     now: Date.now(),

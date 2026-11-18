@@ -564,7 +564,7 @@ add_task(async function a_row_click_writes_the_settings_file_once() {
   );
   const saved = await IOUtils.readJSON(settings.path);
   Assert.equal(
-    saved.selections[SvalPanel.workspaceId],
+    saved.selections[SvalWindowWorkspace.of(window).id],
     ids.tab1,
     "the file holds the selection"
   );

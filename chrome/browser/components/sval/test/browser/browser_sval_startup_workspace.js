@@ -116,7 +116,7 @@ add_task(async function a_second_device_adopts_the_workspace_in_the_folder() {
     "there is exactly one workspace, and it is the one already in the folder"
   );
   Assert.equal(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     published.workspace,
     "and the panel adopted it rather than minting its own"
   );
@@ -149,7 +149,7 @@ add_task(async function an_empty_folder_gets_a_nameless_workspace() {
     "with no name in the document"
   );
   Assert.equal(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     id,
     "and it is the workspace this window files under"
   );
@@ -193,7 +193,7 @@ add_task(async function no_name_sval_invented_reaches_the_document() {
 
   await answerNameDialog(
     win,
-    panel.run("rename", { id: panel.workspaceId }),
+    panel.run("rename", { id: SvalWindowWorkspace.of(win).id }),
     ".sval-dialog-input",
     "Réunions"
   );
@@ -228,7 +228,8 @@ add_task(async function no_name_sval_invented_reaches_the_document() {
  */
 add_task(async function no_shared_folder_shows_no_indicator() {
   const profile = await freshProfile();
-  const { SvalPanel: panel } = await profile.open();
+  const win = await profile.open();
+  const panel = win.SvalPanel;
   Assert.equal(
     panel.syncState.folderState,
     "none",
@@ -253,9 +254,10 @@ add_task(async function no_shared_folder_shows_no_indicator() {
 add_task(async function no_local_copy_and_no_folder_creates_nothing() {
   const missing = tempPath("sval-missing");
   const profile = await freshProfile({ shared: missing });
-  const { SvalPanel: panel } = await profile.open();
+  const win = await profile.open();
+  const panel = win.SvalPanel;
   Assert.strictEqual(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     null,
     "a device with no copy of its own creates no workspace while the folder is away"
   );
@@ -274,7 +276,7 @@ add_task(async function no_local_copy_and_no_folder_creates_nothing() {
     150
   );
   Assert.strictEqual(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     null,
     "and a retry while the folder is still away creates none either"
   );
@@ -282,13 +284,13 @@ add_task(async function no_local_copy_and_no_folder_creates_nothing() {
   // The folder comes back as the chosen one, holding `sval/`.
   await IOUtils.makeDirectory(PathUtils.join(missing, "sval"));
   await TestUtils.waitForCondition(
-    () => panel.workspaceId,
+    () => SvalWindowWorkspace.of(win).id,
     "the window's own retry finds the folder",
     100,
     300
   );
   Assert.ok(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     "once the folder answers, the device has a workspace"
   );
 });
@@ -306,14 +308,15 @@ add_task(
       shared: `${local}/`,
       localRoot: local,
     });
-    const { SvalPanel: panel } = await profile.open();
+    const win = await profile.open();
+    const panel = win.SvalPanel;
     Assert.strictEqual(
       panel.sharedRootSetting(),
       null,
       "the profile folder, chosen explicitly, is no shared folder"
     );
     Assert.ok(
-      panel.workspaceId,
+      SvalWindowWorkspace.of(win).id,
       "an empty profile gets its unnamed workspace without waiting"
     );
     Assert.equal(
@@ -345,14 +348,14 @@ add_task(async function an_empty_own_file_does_not_license_a_workspace() {
   );
   Assert.ok(report.hadLocalCopy, "the profile now holds this device's file");
 
-  const { SvalPanel: second } = await profile.open();
+  const second = await profile.open();
   Assert.strictEqual(
-    second.workspaceId,
+    SvalWindowWorkspace.of(second).id,
     null,
     "a second window with the folder still away creates no workspace"
   );
   Assert.equal(
-    Object.keys(second.nodes).length,
+    Object.keys(second.SvalPanel.nodes).length,
     0,
     "and the document holds nothing it invented"
   );
@@ -364,13 +367,14 @@ add_task(async function a_relaunch_before_the_folder_answers_creates_nothing() {
   const first = await profile.open();
   const engine = first.SvalPanel.engine;
 
-  const { SvalPanel: panel } = await profile.relaunch();
+  const win = await profile.relaunch();
+  const panel = win.SvalPanel;
   Assert.ok(
     panel.engine && panel.engine !== engine,
     "a new engine reads the same profile folder"
   );
   Assert.strictEqual(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     null,
     "and the relaunch creates no workspace while the folder is away"
   );
@@ -384,9 +388,10 @@ add_task(async function a_relaunch_before_the_folder_answers_creates_nothing() {
 add_task(async function the_workspace_a_peer_published_is_the_only_one() {
   const missing = tempPath("sval-missing");
   const profile = await freshProfile({ shared: missing });
-  const { SvalPanel: panel } = await profile.open();
+  const win = await profile.open();
+  const panel = win.SvalPanel;
   Assert.strictEqual(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     null,
     "nothing is created while the folder is away"
   );
@@ -410,13 +415,13 @@ add_task(async function the_workspace_a_peer_published_is_the_only_one() {
   }
 
   await TestUtils.waitForCondition(
-    () => panel.workspaceId,
+    () => SvalWindowWorkspace.of(win).id,
     "the window's own retry finds the folder",
     100,
     300
   );
   Assert.equal(
-    panel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     theirs,
     "once the folder answers, the peer's workspace is the one shown"
   );

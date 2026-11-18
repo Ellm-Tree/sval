@@ -75,8 +75,8 @@ add_task(async function two_private_windows() {
   const second = await openPrivate();
   const mark = marker();
   try {
-    const firstWs = first.SvalPanel.workspaceId;
-    const secondWs = second.SvalPanel.workspaceId;
+    const firstWs = SvalWindowWorkspace.of(first).id;
+    const secondWs = SvalWindowWorkspace.of(second).id;
     Assert.notEqual(firstWs, secondWs, "each window has its own workspace");
     Assert.equal(
       first.SvalPanel.engine,

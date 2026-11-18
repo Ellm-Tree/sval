@@ -70,7 +70,10 @@ add_task(async function adopting_a_key_keeps_this_devices_workspaces() {
     "this device's tab is a row the panel draws"
   );
   Assert.deepEqual(
-    SvalPanelModel.switcherItems(SvalPanel.nodes, SvalPanel.workspaceId)
+    SvalPanelModel.switcherItems(
+      SvalPanel.nodes,
+      SvalWindowWorkspace.of(window).id
+    )
       .map(item => item.id)
       .filter(id => id === us.workspace || id === them.id)
       .sort(),

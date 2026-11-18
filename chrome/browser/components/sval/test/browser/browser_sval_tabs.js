@@ -279,7 +279,7 @@ add_task(async function tabs_open_before_attach_land_in_the_workspace() {
   ok(id, "attaching tagged the page the window opened on");
 
   const tree = await nodes(win.SvalPanel.engine);
-  const workspace = win.SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(win).id;
   is(
     SvalTree.descendantIds(tree, workspace).filter(
       node => tree[node].kind === "group"
@@ -632,7 +632,7 @@ add_task(async function a_tab_dragged_to_another_window_joins_its_workspace() {
     "the tabs left behind keep their order"
   );
   Assert.ok(
-    tabsIn(await nodes(engine), other.SvalPanel.workspaceId)
+    tabsIn(await nodes(engine), SvalWindowWorkspace.of(other).id)
       .map(t => t.tab)
       .includes(ids[1]),
     "and the tab that left is filed in the other window's workspace"
@@ -1031,7 +1031,7 @@ add_task(async function typing_a_url_into_the_startup_tab_files_it() {
   );
   is(
     tree[id].placement.parent,
-    win.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(win).id,
     "filed in the workspace the window shows, where a new tab goes"
   );
 });

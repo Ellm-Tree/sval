@@ -12,7 +12,6 @@ import { propertyName } from "../ast.mjs";
 
 /** The panel's fields that a getter of the same meaning reads. */
 const GETTERS = new Map([
-  ["_currentWorkspaceId", "workspaceId"],
   ["_engine", "engine"],
   ["_observer", "observer"],
   ["_nodes", "nodes"],

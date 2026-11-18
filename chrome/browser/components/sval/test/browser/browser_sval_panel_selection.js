@@ -22,7 +22,7 @@
  */
 async function fourTabs() {
   const engine = SvalPanel.engine;
-  const workspace = SvalPanel.workspaceId;
+  const workspace = SvalWindowWorkspace.of(window).id;
   const names = ["looseA", "looseB", "groupedA", "groupedB"];
   const tabs = {};
   for (const name of names) {

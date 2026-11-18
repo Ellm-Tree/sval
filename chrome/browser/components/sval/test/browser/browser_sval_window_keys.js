@@ -158,7 +158,11 @@ add_task(async function accel_n_opens_the_next_workspace_down() {
 
   const menu = await openSwitcher();
   await activateWorkspace(menu, second);
-  Assert.equal(SvalPanel.workspaceId, second, "this window shows 2");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "this window shows 2"
+  );
 
   for (const open of [
     () => windowOpenedBy("n", { accelKey: true }),
@@ -176,11 +180,11 @@ add_task(async function accel_n_opens_the_next_workspace_down() {
         "the new window's panel starting"
       );
       Assert.equal(
-        win.SvalPanel.workspaceId,
+        SvalWindowWorkspace.of(win).id,
         third,
         "the new window shows workspace 3"
       );
-      Assert.equal(SvalPanel.workspaceId, second, "this one stays");
+      Assert.equal(SvalWindowWorkspace.of(window).id, second, "this one stays");
     } finally {
       await close(win);
     }
@@ -198,7 +202,7 @@ add_task(async function accel_n_opens_the_next_workspace_down() {
       "that window's panel starting"
     );
     Assert.equal(
-      other.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(other).id,
       first,
       "which takes the first no window shows"
     );
@@ -216,7 +220,7 @@ add_task(async function accel_n_opens_the_next_workspace_down() {
       "the new window's panel starting"
     );
     Assert.equal(
-      win.SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(win).id,
       first,
       "from the last workspace the next is the first"
     );

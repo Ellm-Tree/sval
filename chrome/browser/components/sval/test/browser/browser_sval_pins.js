@@ -611,7 +611,7 @@ add_task(async function a_pin_asking_to_stay_does_not_halt_a_switch() {
   // Another tab of Home is shown, so the pin is one the switch parks.
   await selectTab(gBrowser.tabs.find(t => !t.hidden && t !== page));
   Assert.ok(await SvalPanel.switchTo(work), "the window switches");
-  Assert.equal(SvalPanel.workspaceId, work, "to Work");
+  Assert.equal(SvalWindowWorkspace.of(window).id, work, "to Work");
   Assert.ok(page.linkedPanel, "the asking page stays loaded");
 
   // The switch leaves the page's own question for the user to answer. The

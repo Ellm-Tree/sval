@@ -38,8 +38,9 @@ add_task(async function a_peer_reads_the_workspace_a_launch_published() {
   await IOUtils.makeDirectory(PathUtils.join(shared, "sval"));
   const profile = await freshProfile({ shared });
   const { keys } = profile;
-  const { SvalPanel: panel } = await profile.open();
-  const ours = panel.workspaceId;
+  const win = await profile.open();
+  const panel = win.SvalPanel;
+  const ours = SvalWindowWorkspace.of(win).id;
   Assert.ok(ours, "the launch made a workspace");
   // One helper at a time: while the launch's sweep is winding down, the
   // folder answers "busy", so the pass is asked again until it answers.

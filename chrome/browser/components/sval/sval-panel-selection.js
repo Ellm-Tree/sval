@@ -56,10 +56,10 @@ Object.assign(SvalPanel, {
    * @param {string} id A node id.
    */
   async _select(id) {
-    if (!this._currentWorkspaceId) {
+    if (!this._workspace.id) {
       return;
     }
-    this._settings.setSelection(this._currentWorkspaceId, id);
+    this._settings.setSelection(this._workspace.id, id);
     // A row drawn only because it led to the old selection goes with it.
     const pathDrawn = this._rows.some(row => row.showsSelection);
     if (this._revealSelection({ force: true }) || pathDrawn) {
@@ -277,7 +277,7 @@ Object.assign(SvalPanel, {
    * @returns {string|null}
    */
   _selectedId() {
-    const workspace = this._currentWorkspaceId;
+    const workspace = this._workspace.id;
     const id = this._settings.selectionIn(workspace);
     return this._modules.SvalTree.isWithin(this._nodes, id, workspace)
       ? id
@@ -465,18 +465,18 @@ Object.assign(SvalPanel, {
     }
     const workspace = workspaceOfNode(nodes, id);
     const row = { id, kind: TAB };
-    if (workspace === this._currentWorkspaceId) {
+    if (workspace === this._workspace.id) {
       await this.activate(row);
       return true;
     }
     if (!workspace || this._inMemory) {
       return false;
     }
-    const shownBy = this.workspacesShownElsewhere().get(workspace);
+    const shownBy = this._workspace.shownElsewhere().get(workspace);
     if (shownBy) {
       shownBy.focus();
       // A window still starting selects what its start restores.
-      if (shownBy.SvalPanel?._currentWorkspaceId !== workspace) {
+      if (this._modules.SvalWindowWorkspace.of(shownBy).id !== workspace) {
         return false;
       }
       await shownBy.SvalPanel.activate(row);

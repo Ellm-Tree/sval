@@ -44,7 +44,7 @@ async function pairWithTools() {
   atTaskEnd(unpairAll);
   const { agentId: id } = await store.pair({
     label: "Claude Code",
-    workspaceId: SvalPanel.workspaceId,
+    workspaceId: SvalWindowWorkspace.of(window).id,
   });
   await store.setSiteLevel(id, "github.com", "ask-before-writes");
   await store.setPageToolSite(id, "github.com", "allow");

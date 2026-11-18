@@ -356,7 +356,7 @@ add_task(async function another_devices_archived_tab_is_listed_and_restores() {
   );
   AccessibilityUtils.resetEnv();
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === ids.workspaces[1],
+    () => SvalWindowWorkspace.of(window).id === ids.workspaces[1],
     "the window goes to the tab's workspace"
   );
   await TestUtils.waitForCondition(

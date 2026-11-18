@@ -704,7 +704,7 @@ add_task(async function a_home_tab_open_before_attach_is_filed() {
   is(node?.kind, "tab", "the home tab is a tab node");
   is(
     node.placement.parent,
-    homeWin.SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(homeWin).id,
     "in the window's workspace"
   );
   is(node.content.url, "about:home", "for the home page");

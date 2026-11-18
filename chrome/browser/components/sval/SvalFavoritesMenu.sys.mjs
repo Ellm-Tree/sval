@@ -15,6 +15,8 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   SvalFavorites: "moz-src:///browser/components/sval/SvalFavorites.sys.mjs",
   FAVORITES_ROOT:
     "moz-src:///browser/components/sval/SvalFavoritesStore.sys.mjs",
@@ -439,7 +441,7 @@ export const SvalFavoritesMenu = {
     menu.querySelector('[data-command="pinHere"]').hidden =
       !show.pinHome ||
       pin ||
-      !win.SvalPanel?.workspaceId ||
+      !lazy.SvalWindowWorkspace.of(win).id ||
       !!win.SvalPanel.inMemory;
     lazy.tidySeparators(menu);
   },
@@ -528,7 +530,7 @@ export const SvalFavoritesMenu = {
       },
       pinHere: () =>
         lazy.SvalFavoritesStore.readyInstance?.pin(target.guid, {
-          scope: [win.SvalPanel.workspaceId],
+          scope: [lazy.SvalWindowWorkspace.of(win).id],
         }),
       rename: () => this._rename(win, target),
       editAddress: () => this._editAddress(win, target),

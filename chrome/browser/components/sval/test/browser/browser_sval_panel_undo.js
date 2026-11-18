@@ -146,7 +146,7 @@ async function aGroupOf(tabs) {
   const engine = SvalPanel.engine;
   const group = await engine.mutate({
     kind: "addGroup",
-    parent: SvalPanel.workspaceId,
+    parent: SvalWindowWorkspace.of(window).id,
     name: "Reading",
     id: crypto.randomUUID(),
     now: Date.now(),
@@ -412,7 +412,7 @@ add_task(async function a_group_whose_tabs_move_out_shows_them_meanwhile() {
   Assert.ok(!(group in all), "the group went");
   Assert.equal(
     all[ids[0]].placement.parent,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "and its tabs moved out"
   );
 });
@@ -474,12 +474,12 @@ add_task(async function a_workspace_waits_on_the_message_then_goes() {
 add_task(async function the_workspace_on_screen_is_left_and_shown_on_undo() {
   messageLasts();
   expectWorkspaceTabs();
-  const shown = SvalPanel.workspaceId;
+  const shown = SvalWindowWorkspace.of(window).id;
   const other = await anotherWorkspace();
 
   await deleteWorkspace(shown);
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     other,
     "the window shows the Workspace that is left"
   );
@@ -488,7 +488,7 @@ add_task(async function the_workspace_on_screen_is_left_and_shown_on_undo() {
     "the document still holds the one deleted"
   );
 
-  await pressUndo(() => SvalPanel.workspaceId === shown);
+  await pressUndo(() => SvalWindowWorkspace.of(window).id === shown);
 });
 
 add_task(async function a_second_delete_makes_the_first() {
@@ -527,7 +527,7 @@ add_task(async function closing_the_window_makes_the_delete() {
   );
   const panel = win.SvalPanel;
   await TestUtils.waitForCondition(
-    () => panel._observer && panel._currentWorkspaceId,
+    () => panel._observer && SvalWindowWorkspace.of(win).id,
     "the window's panel starts"
   );
   messageLasts(win);
@@ -685,19 +685,19 @@ add_task(async function undo_shows_a_workspace_again_in_the_window_it_left() {
   );
   const panel = win.SvalPanel;
   await TestUtils.waitForCondition(
-    () => panel._observer && panel._currentWorkspaceId,
+    () => panel._observer && SvalWindowWorkspace.of(win).id,
     "the window's panel starts"
   );
-  const shown = panel._currentWorkspaceId;
+  const shown = SvalWindowWorkspace.of(win).id;
   // Somewhere for the other window to go while its Workspace is held back.
   await anotherWorkspace();
   await deleteWorkspace(shown);
   await TestUtils.waitForCondition(
-    () => panel._currentWorkspaceId !== shown,
+    () => SvalWindowWorkspace.of(win).id !== shown,
     "the other window leaves it"
   );
 
-  await pressUndo(() => panel._currentWorkspaceId === shown);
+  await pressUndo(() => SvalWindowWorkspace.of(win).id === shown);
   // The switch names its workspace before it redraws and fades in. Closing
   // the window before then leaves the switch unfinished, and the redraw's
   // queued `takeKeptTabs` then trips `SvalSerialQueue`'s re-entry check.
@@ -755,7 +755,7 @@ add_task(async function one_pane_of_a_split_waits_on_the_message() {
   Assert.ok(!(split in all), "with the split it left one page in");
   Assert.equal(
     all[ids[1]].placement.parent,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     "the other is an ordinary tab"
   );
   Assert.less(splitOf(tabs[1]).length, 2, "shown alone");

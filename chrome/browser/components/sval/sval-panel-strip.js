@@ -304,15 +304,12 @@
       // A slide is a look along the strip from the Workspace shown. Once the
       // window shows another, the strip goes straight from where it was slid
       // to the new one, with the slide's own ease.
-      if (this._strip.placedFor !== this._currentWorkspaceId) {
-        this._strip.placedFor = this._currentWorkspaceId;
+      if (this._strip.placedFor !== this._workspace.id) {
+        this._strip.placedFor = this._workspace.id;
         this._strip.offset = 0;
         this._strip.sliding = false;
       }
-      if (
-        this._strip.pending &&
-        this._strip.pending === this._currentWorkspaceId
-      ) {
+      if (this._strip.pending && this._strip.pending === this._workspace.id) {
         this._strip.pending = null;
       }
       this._placeStrip();
@@ -1007,7 +1004,7 @@
       const from =
         this._strip.pending && now - this._strip.pendingAt < 1000
           ? this._strip.pending
-          : this._currentWorkspaceId;
+          : this._workspace.id;
       const at = ids.indexOf(from);
       const next = ids[Math.max(0, Math.min(ids.length - 1, at + step))];
       if (at === -1 || next === from) {

@@ -467,7 +467,9 @@ add_task(async function delete_workspace_from_its_menu() {
     // The window leaves the workspace as the delete is held for Undo, and
     // the delete is made when the message goes.
     await TestUtils.waitForCondition(
-      () => SvalPanel.workspaceId && SvalPanel.workspaceId !== ids.workspace,
+      () =>
+        SvalWindowWorkspace.of(window).id &&
+        SvalWindowWorkspace.of(window).id !== ids.workspace,
       "the window moves off the deleted workspace"
     );
     await dismissUndoMessage();
@@ -477,7 +479,7 @@ add_task(async function delete_workspace_from_its_menu() {
     );
     const after = (await engine.tree()).nodes;
     Assert.equal(
-      after[SvalPanel.workspaceId]?.kind,
+      after[SvalWindowWorkspace.of(window).id]?.kind,
       SvalTree.WORKSPACE,
       "to a workspace that still exists"
     );
@@ -497,7 +499,7 @@ add_task(async function delete_workspace_from_its_menu() {
     });
     await SvalPanel.refresh();
     await TestUtils.waitForCondition(
-      () => SvalPanel.workspaceId === other,
+      () => SvalWindowWorkspace.of(window).id === other,
       "the window shows the one workspace left"
     );
     const menu = await openWorkspaceMenu();
@@ -519,7 +521,7 @@ add_task(async function delete_workspace_from_its_menu() {
  */
 add_task(async function each_switcher_entry_has_its_workspace_commands() {
   const { engine } = await withFreshPanel();
-  const shown = SvalPanel.workspaceId;
+  const shown = SvalWindowWorkspace.of(window).id;
   const other = crypto.randomUUID();
   await engine.mutate({
     kind: "addWorkspace",
@@ -584,7 +586,7 @@ add_task(async function each_switcher_entry_has_its_workspace_commands() {
       "after asking for it by name"
     );
     Assert.equal(
-      SvalPanel.workspaceId,
+      SvalWindowWorkspace.of(window).id,
       shown,
       "and the window still shows its own"
     );
@@ -846,7 +848,7 @@ add_task(async function move_to_workspace_takes_a_group_with_its_tabs() {
     "with its tabs, in their order"
   );
   Assert.equal(
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(window).id,
     ids.workspace,
     "and the window stayed where it was"
   );

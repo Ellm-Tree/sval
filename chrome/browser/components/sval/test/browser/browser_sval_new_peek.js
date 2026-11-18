@@ -60,7 +60,7 @@ async function peekFrom(open) {
  * @returns {Promise<string>} its id.
  */
 async function showIsolatedWorkspace() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await SvalPanel.engine.mutate({
     kind: "addWorkspace",
     name: "Work",
@@ -69,7 +69,7 @@ async function showIsolatedWorkspace() {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    if (SvalPanel.workspaceId !== home) {
+    if (SvalWindowWorkspace.of(window).id !== home) {
       await SvalPanel.switchTo(home);
       await within(
         SvalPanel.observer.settled(),
@@ -166,7 +166,7 @@ add_task(async function a_peek_from_an_isolated_workspace_uses_its_jar() {
 });
 
 add_task(async function moving_it_to_a_shared_workspace_reloads_it_there() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const homeName = SvalPanel.nodes[home]?.content?.name || "Untitled Workspace";
   await showIsolatedWorkspace();
   const win = await peekFrom(() => SvalPeek.openEmpty(window));
@@ -196,7 +196,11 @@ add_task(async function moving_it_to_a_shared_workspace_reloads_it_there() {
   question.querySelector('button[data-button="ok"]').click();
   await within(closed, 10_000, "the Peek closing");
 
-  Assert.equal(SvalPanel.workspaceId, home, "the window switched back");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    home,
+    "the window switched back"
+  );
   const tab = expectOpened(gBrowser.selectedTab);
   await pageReady(tab.linkedBrowser, PEEK_PAGE);
   Assert.equal(tab.userContextId, 0, "and the page loaded in the shared jar");

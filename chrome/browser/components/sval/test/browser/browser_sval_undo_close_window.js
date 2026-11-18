@@ -157,7 +157,7 @@ add_task(async function the_undo_key_reopens_the_shown_workspaces_tab() {
   );
   const panel = win.SvalPanel;
   await within(panel._started.promise, 10_000, "its panel's startup");
-  const home = panel._currentWorkspaceId;
+  const home = SvalWindowWorkspace.of(win).id;
   const isolated = await panel._engine.mutate({
     kind: "addWorkspace",
     name: "Isolated undo",
@@ -228,7 +228,7 @@ add_task(
     );
     const panel = win.SvalPanel;
     await within(panel._started.promise, 10_000, "its panel's startup");
-    const home = panel._currentWorkspaceId;
+    const home = SvalWindowWorkspace.of(win).id;
     const id = await panel._engine.mutate({
       kind: "addWorkspace",
       name: "Reopen",

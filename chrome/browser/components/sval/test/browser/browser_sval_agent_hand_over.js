@@ -178,7 +178,7 @@ add_task(async function cancelling_hands_nothing_over() {
     sites: { "example.com": "full" },
   });
   const { tab, id } = await usersTab();
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
 
   await moveVia(id, ws);
   Assert.deepEqual(

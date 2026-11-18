@@ -57,6 +57,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   copyAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   copyMarkdownLink: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   canUnload: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
@@ -124,7 +126,9 @@ const NEW_WORKSPACE = "new-workspace";
  */
 export function userPanel(win) {
   const panel = win.SvalPanel;
-  return panel?.engine && !panel.inMemory && panel.workspaceId ? panel : null;
+  return panel?.engine && !panel.inMemory && lazy.SvalWindowWorkspace.of(win).id
+    ? panel
+    : null;
 }
 
 /**
@@ -142,7 +146,7 @@ function selectedNode(win) {
  */
 function agentWorkspace(win) {
   const panel = userPanel(win);
-  const id = panel?.workspaceId;
+  const id = panel && lazy.SvalWindowWorkspace.of(win).id;
   return id && agentLabelOf(panel.nodes, id) ? id : null;
 }
 
@@ -344,7 +348,7 @@ export const COMMANDS = [
     keyId: null,
     available: win => !!userPanel(win) && !agentWorkspace(win),
     // Today's Edit workspace sheet (launcher spec §3).
-    run: win => win.SvalPanel.edit({ id: win.SvalPanel.workspaceId }),
+    run: win => win.SvalPanel.edit({ id: lazy.SvalWindowWorkspace.of(win).id }),
   },
   {
     id: "move-tab",
@@ -592,7 +596,7 @@ export const COMMANDS = [
           }
         }
       };
-      walk(panel.workspaceId);
+      walk(lazy.SvalWindowWorkspace.of(win).id);
       return out;
     },
     run: (win, choice) =>

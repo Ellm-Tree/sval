@@ -130,7 +130,7 @@
      *   that the window does not show yet.
      * @returns {string|null}
      */
-    _emptyUnnamedWorkspace(id = this._currentWorkspaceId) {
+    _emptyUnnamedWorkspace(id = this._workspace.id) {
       const node = id ? this._nodes[id] : null;
       if (!node || node.content?.name) {
         return null;

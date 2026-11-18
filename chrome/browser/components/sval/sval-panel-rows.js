@@ -137,7 +137,7 @@
       const drawn = this._rows;
       this._rows = rows(this._nodes, {
         isCollapsed: id => this._settings.isCollapsed(id),
-        root: this._currentWorkspaceId,
+        root: this._workspace.id,
         selected: this._viewedId(),
         hidden: this._hiddenTabIds(),
         transparent: this._transparentIds(),
@@ -561,9 +561,7 @@
         }
         if (this._agentLabel) {
           parts.push(
-            this._modules.SvalAgentControl.isWorkspaceHeld(
-              this._currentWorkspaceId
-            )
+            this._modules.SvalAgentControl.isWorkspaceHeld(this._workspace.id)
               ? "you control this Workspace"
               : `controlled by ${this._agentLabel}`
           );
@@ -611,7 +609,7 @@
         Object.keys(this._nodes).filter(id => this._nodes[id].kind === TAB)
       );
       const before = this._drawnFrom;
-      this._drawnFrom = { workspace: this._currentWorkspaceId, tabs };
+      this._drawnFrom = { workspace: this._workspace.id, tabs };
 
       for (const [id, since] of this._openingRows) {
         if (now - since >= ROW_FADE_MS) {
@@ -619,7 +617,7 @@
         }
       }
       if (
-        before?.workspace !== this._currentWorkspaceId ||
+        before?.workspace !== this._workspace.id ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ) {
         return now;

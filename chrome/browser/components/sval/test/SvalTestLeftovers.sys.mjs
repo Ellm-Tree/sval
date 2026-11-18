@@ -28,6 +28,7 @@
  */
 
 import { SvalEngine } from "moz-src:///browser/components/sval/SvalEngine.sys.mjs";
+import { SvalWindowWorkspace } from "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs";
 import { workspaceIds } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import {
   waitForCondition,
@@ -121,7 +122,7 @@ export const SvalTestLeftovers = {
     }
     const shown = new Set();
     for (const other of Services.wm.getEnumerator("navigator:browser")) {
-      const id = other.SvalPanel?.workspaceId;
+      const id = SvalWindowWorkspace.of(other).id;
       if (id) {
         shown.add(id);
       }

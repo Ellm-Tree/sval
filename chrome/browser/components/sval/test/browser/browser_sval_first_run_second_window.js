@@ -93,13 +93,13 @@ add_task(async function other_windows_wait_for_the_first_windows_first_run() {
   const workspaces = await workspacesInEngine();
   Assert.equal(workspaces.length, 2, "one workspace per window");
   Assert.ok(
-    workspaces.includes(SvalPanel.workspaceId) &&
-      workspaces.includes(second.SvalPanel.workspaceId),
+    workspaces.includes(SvalWindowWorkspace.of(window).id) &&
+      workspaces.includes(SvalWindowWorkspace.of(second).id),
     "each window shows one of them"
   );
   Assert.notEqual(
-    second.SvalPanel.workspaceId,
-    SvalPanel.workspaceId,
+    SvalWindowWorkspace.of(second).id,
+    SvalWindowWorkspace.of(window).id,
     "and not the same one"
   );
   await within(

@@ -32,7 +32,7 @@ add_setup(async function () {
  * @returns {Promise<string>} its id.
  */
 async function isolatedWorkspace() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   const id = await SvalPanel.engine.mutate({
     kind: "addWorkspace",
     name: "Work",
@@ -41,7 +41,7 @@ async function isolatedWorkspace() {
     now: Date.now(),
   });
   atTaskEnd(async () => {
-    if (SvalPanel.workspaceId !== home) {
+    if (SvalWindowWorkspace.of(window).id !== home) {
       await SvalPanel.switchTo(home);
       await within(
         SvalPanel.observer.settled(),
@@ -150,7 +150,11 @@ async function openInWork(win, id) {
   const closed = BrowserTestUtils.domWindowClosed(win);
   question.querySelector('button[data-button="ok"]').click();
   await within(closed, 10_000, "the Peek closing");
-  Assert.equal(SvalPanel.workspaceId, id, "the window switched to it");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    id,
+    "the window switched to it"
+  );
   const tab = expectOpened(gBrowser.selectedTab);
   Assert.greater(tab.userContextId, 0, "in a jar of its own");
   Assert.equal(
@@ -224,7 +228,7 @@ add_task(async function view_source_opens_again_in_the_isolated_jar() {
  * main window stays where it was.
  */
 add_task(async function a_page_that_cannot_load_again_is_refused_first() {
-  const home = SvalPanel.workspaceId;
+  const home = SvalWindowWorkspace.of(window).id;
   await isolatedWorkspace();
   const file = getChromeDir(getResolvedURI(gTestPath));
   file.normalize();
@@ -256,5 +260,9 @@ add_task(async function a_page_that_cannot_load_again_is_refused_first() {
   );
   Assert.ok(!win.closed, "the Peek stays");
   Assert.equal(win.gBrowser.currentURI.spec, url, "with its page as it was");
-  Assert.equal(SvalPanel.workspaceId, home, "the window did not switch");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    home,
+    "the window did not switch"
+  );
 });

@@ -343,7 +343,7 @@ add_task(async function a_users_own_tab_is_never_gated() {
       null,
       "its popup is not gated"
     );
-    Assert.notEqual(popupWin.SvalPanel.workspaceId, agent.workspaceId);
+    Assert.notEqual(SvalWindowWorkspace.of(popupWin).id, agent.workspaceId);
     BrowserTestUtils.removeTab(
       newTab.documentGlobal.gBrowser.getTabForBrowser(newTab)
     );

@@ -127,6 +127,8 @@ async function removeNodes(engine, settings, nodes, ids) {
 }
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   isPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   REOPENED_DETAIL: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   SvalRestore: "moz-src:///browser/components/sval/SvalRestore.sys.mjs",
@@ -5267,16 +5269,15 @@ export const SvalTabs = {
    * for (`nodeIdOf`), or, for a tab no node describes yet, such as a copy or
    * an open Quick Peek, the workspace its window shows.
    *
-   * @param {object} panel The window's `SvalPanel`.
+   * @param {Window} win A window with a panel.
    * @param {object|null} tab A tab of that window.
    * @returns {string|null}
    */
-  workspaceOfTab(panel, tab) {
+  workspaceOfTab(win, tab) {
     const node = tab ? this.nodeIdOf(tab) : null;
     return (
-      (node ? workspaceOfNode(panel.nodes ?? {}, node) : null) ??
-      panel.workspaceId ??
-      null
+      (node ? workspaceOfNode(win.SvalPanel.nodes ?? {}, node) : null) ??
+      lazy.SvalWindowWorkspace.of(win).id
     );
   },
 

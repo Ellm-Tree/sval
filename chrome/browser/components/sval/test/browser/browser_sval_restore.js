@@ -119,7 +119,7 @@ async function aWindowOnAnEmptyWorkspace() {
 async function restoreHere(options = {}) {
   const result = await SvalRestore.restore(window, {
     engine: SvalPanel.engine,
-    workspaceId: SvalPanel.workspaceId,
+    workspaceId: SvalWindowWorkspace.of(window).id,
     closeDebris: false,
     ...options,
   });
@@ -500,7 +500,8 @@ add_task(async function every_launch_resumes_the_session_without_asking() {
 add_task(async function a_killed_session_comes_back_from_the_tree() {
   const profile = await freshProfile();
   const first = await profile.open();
-  const { engine, workspaceId } = first.SvalPanel;
+  const { engine } = first.SvalPanel;
+  const workspaceId = SvalWindowWorkspace.of(first).id;
   const id = await engine.mutate({
     kind: "addTab",
     parent: workspaceId,
@@ -517,7 +518,11 @@ add_task(async function a_killed_session_comes_back_from_the_tree() {
   const win = await profile.relaunch();
   const panel = win.SvalPanel;
   Assert.notEqual(panel.engine, engine, "the relaunch has a new worker");
-  Assert.equal(panel.workspaceId, workspaceId, "on the same workspace");
+  Assert.equal(
+    SvalWindowWorkspace.of(win).id,
+    workspaceId,
+    "on the same workspace"
+  );
   const tab = win.gBrowser.tabs.find(candidate => taggedId(candidate) === id);
   ok(tab, "the killed session's tab came back as the same node it was");
   // The window shows the tab it lands on, so its page may still be loading
@@ -646,7 +651,8 @@ add_task(async function a_tab_restored_in_place_for_a_gone_node_is_kept() {
   // A new window's blank startup tab is one its observer holds and never
   // filed (`a_blank_tab_open_before_attach_gets_no_node`).
   const win = await aWindowOnAnEmptyWorkspace();
-  const { engine, observer, workspaceId: workspace } = win.SvalPanel;
+  const { engine, observer } = win.SvalPanel;
+  const workspace = SvalWindowWorkspace.of(win).id;
   const tab = win.gBrowser.tabs[0];
   is(taggedId(tab), null, "the blank tab is filed under nothing");
 

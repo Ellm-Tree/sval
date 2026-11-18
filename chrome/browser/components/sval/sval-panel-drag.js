@@ -421,7 +421,7 @@
           carried,
           overId,
           intent.kind,
-          this._currentWorkspaceId
+          this._workspace.id
         );
         return moves && { move: moves };
       }
@@ -458,7 +458,7 @@
             id,
             overId,
             intent.kind,
-            this._currentWorkspaceId
+            this._workspace.id
           );
           return move && { move };
         }

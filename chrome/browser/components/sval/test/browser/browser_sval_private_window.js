@@ -251,7 +251,7 @@ add_task(async function a_private_window_offers_no_workspace_actions() {
     );
     Assert.ok(!win.gDialogBox.isOpen, "New Workspace asks nothing");
     Assert.equal(
-      panel._openWorkspaceInNewWindow(panel.workspaceId),
+      panel._openWorkspaceInNewWindow(SvalWindowWorkspace.of(win).id),
       null,
       "no workspace opens in a new window"
     );
@@ -350,7 +350,7 @@ add_task(async function an_agent_never_sees_a_private_tab() {
       "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs"
     );
     Assert.equal(
-      fullWindowShowing(win.SvalPanel.workspaceId),
+      fullWindowShowing(SvalWindowWorkspace.of(win).id),
       null,
       "and no agent lookup finds the private window"
     );

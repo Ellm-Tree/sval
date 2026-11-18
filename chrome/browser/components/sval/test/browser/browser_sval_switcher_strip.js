@@ -85,7 +85,7 @@ async function switched(id) {
     "the switch"
   );
   await TestUtils.waitForCondition(
-    () => SvalPanel.workspaceId === id && selectedOnStrip() === id,
+    () => SvalWindowWorkspace.of(window).id === id && selectedOnStrip() === id,
     "the window and the strip on the Workspace"
   );
 }
@@ -194,7 +194,11 @@ add_task(async function choosing_the_strip_keeps_the_workspace() {
 
   const strip = await useStrip();
   Assert.ok(!SvalPanel._els.switcher.checkVisibility(), "in its place");
-  Assert.equal(SvalPanel.workspaceId, second, "the window stays put");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "the window stays put"
+  );
   Assert.equal(selectedOnStrip(), second, "and the strip marks where it is");
   Assert.equal(
     strip.querySelectorAll('[aria-selected="true"]').length,
@@ -216,7 +220,11 @@ add_task(async function choosing_the_strip_keeps_the_workspace() {
     "the button back"
   );
   Assert.ok(!strip.checkVisibility(), "for the strip");
-  Assert.equal(SvalPanel.workspaceId, second, "and the window stays put");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "and the window stays put"
+  );
   await SpecialPowers.popPrefEnv();
 });
 
@@ -261,7 +269,11 @@ add_task(async function the_wheel_slides_either_end_to_the_centre() {
     1,
     "until its end meets the track's centre, and no further"
   );
-  Assert.equal(SvalPanel.workspaceId, ids.workspaces[0], "without switching");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    ids.workspaces[0],
+    "without switching"
+  );
 
   turnWheel(-100_000, WheelEvent.DOM_DELTA_PIXEL);
   await settled(strip);
@@ -326,7 +338,11 @@ add_task(async function a_swipe_that_slows_and_speeds_up_switches_once() {
 
   swipe([2, 5, 10, 20, 30, 30, 25, 15, 8, 4, 3, 2, 2, 6, 12, 20, 30, 30, 25]);
   await switched(second);
-  Assert.equal(SvalPanel.workspaceId, second, "one Workspace along, no more");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    second,
+    "one Workspace along, no more"
+  );
   await SpecialPowers.popPrefEnv();
 });
 
@@ -499,7 +515,11 @@ add_task(async function the_current_workspace_opens_the_full_list() {
   const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
   EventUtils.synthesizeMouseAtCenter(itemOf(first), {});
   await within(shown, 10_000, "a click on the current Workspace opening it");
-  Assert.equal(SvalPanel.workspaceId, first, "the click switches nothing");
+  Assert.equal(
+    SvalWindowWorkspace.of(window).id,
+    first,
+    "the click switches nothing"
+  );
   Assert.equal(itemOf(first).getAttribute("aria-expanded"), "true");
   const track = strip
     .querySelector(".sval-strip-track")

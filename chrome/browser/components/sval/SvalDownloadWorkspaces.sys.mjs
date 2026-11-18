@@ -22,6 +22,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   isPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   SvalPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
@@ -122,7 +124,7 @@ function startingWorkspace(download, { top, browser, win }) {
       top?.originAttributes?.userContextId
     );
     if (owner) {
-      return owner.SvalPanel?.workspaceId ?? null;
+      return lazy.SvalWindowWorkspace.of(owner).id;
     }
   }
   const panel = win?.SvalPanel;
@@ -130,12 +132,11 @@ function startingWorkspace(download, { top, browser, win }) {
   // list it: one whose tab is gone, or that no tab started, is the focused
   // private window's.
   if (download.source?.isPrivate && !panel) {
-    return (
-      lazy.BrowserWindowTracker.getTopWindow({
-        private: true,
-        allowPopups: true,
-      })?.SvalPanel?.workspaceId ?? null
-    );
+    const front = lazy.BrowserWindowTracker.getTopWindow({
+      private: true,
+      allowPopups: true,
+    });
+    return front ? lazy.SvalWindowWorkspace.of(front).id : null;
   }
   // A Peek's page is in no workspace, so its download is no
   // workspace's either, and goes to the most recent window, as Firefox's
@@ -148,13 +149,12 @@ function startingWorkspace(download, { top, browser, win }) {
   }
   if (panel) {
     return lazy.SvalTabs.workspaceOfTab(
-      panel,
+      win,
       win.gBrowser?.getTabForBrowser(browser)
     );
   }
-  return (
-    lazy.BrowserWindowTracker.getTopWindow()?.SvalPanel?.workspaceId ?? null
-  );
+  const front = lazy.BrowserWindowTracker.getTopWindow();
+  return front ? lazy.SvalWindowWorkspace.of(front).id : null;
 }
 
 /**
@@ -193,9 +193,9 @@ export function inShownWorkspace(win, download) {
   }
   const id = workspaceOfDownload(download);
   if (lazy.PrivateBrowsingUtils.isWindowPrivate(win)) {
-    return id !== null && id === win.SvalPanel?.workspaceId;
+    return id !== null && id === lazy.SvalWindowWorkspace.of(win).id;
   }
-  return id === null || id === win.SvalPanel?.workspaceId;
+  return id === null || id === lazy.SvalWindowWorkspace.of(win).id;
 }
 
 /**
@@ -322,7 +322,7 @@ export function windowToTell(download, isPrivate) {
       win =>
         !win.closed &&
         lazy.PrivateBrowsingUtils.isWindowPrivate(win) === isPrivate &&
-        win.SvalPanel?.workspaceId === id
+        lazy.SvalWindowWorkspace.of(win).id === id
     ) ?? null
   );
 }
@@ -343,7 +343,7 @@ export function labelOf(win, download) {
   const panel = win.SvalPanel;
   const item = switcherItems(
     panel?.nodes ?? {},
-    panel?.workspaceId ?? null
+    lazy.SvalWindowWorkspace.of(win).id
   ).find(entry => entry.id === id);
   if (!item) {
     return {

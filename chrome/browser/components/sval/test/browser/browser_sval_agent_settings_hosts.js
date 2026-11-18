@@ -39,7 +39,7 @@ async function pairOne() {
   atTaskEnd(unpairAll);
   const { agentId } = await store.pair({
     label: "Claude Code",
-    workspaceId: SvalPanel.workspaceId,
+    workspaceId: SvalWindowWorkspace.of(window).id,
   });
   return { store, id: agentId };
 }
