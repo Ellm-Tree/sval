@@ -79,6 +79,7 @@ tab-permission-removal-site-key.patch
 backport-bug-2064716-site-permissions-cleared.patch
 backport-bug-2083168-theme-after-window-unload.patch
 backport-bug-2080226-classifier-client-after-shutdown.patch
+backport-bug-2093687-compositor-animations-cleared.patch
 backport-bug-2054792-rfp-window-rounding-tests.patch
 backport-bug-2063670-xpcshell-blocked-test-thread.patch
 backport-bug-1933337-mozprocess-returncode-races.patch

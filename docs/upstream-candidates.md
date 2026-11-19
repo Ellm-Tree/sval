@@ -1870,6 +1870,7 @@ dropped on time.
 | `backport-bug-2064716-site-permissions-cleared.patch` | 2064716 | Firefox 156 |
 | `backport-bug-2083168-theme-after-window-unload.patch` | 2083168 | Firefox 161 |
 | `backport-bug-2080226-classifier-client-after-shutdown.patch` | 2080226 | Firefox 161 |
+| `backport-bug-2093687-compositor-animations-cleared.patch` | 2093687 | Firefox 162 |
 | `backport-bug-2054792-rfp-window-rounding-tests.patch` (with Bug 1710902's change to its two tests) | 2054792 | Firefox 155 |
 | `backport-bug-2063670-xpcshell-blocked-test-thread.patch` | 2063670 | Firefox 156 |
 | `backport-bug-1933337-mozprocess-returncode-races.patch` (with Bug 1916979's one line) | 1933337 | Firefox 161 |
