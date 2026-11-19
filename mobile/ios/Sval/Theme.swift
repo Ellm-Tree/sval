@@ -116,9 +116,8 @@ struct Theme {
 /// The colours of everything drawn on a Workspace's glass: the bar's
 /// capsules, the media ask and now-playing capsule, the media card, the
 /// Launcher, toasts and the top notice. The glass carries the Workspace's
-/// light swatch in either appearance, so the system's ink, which follows
-/// the appearance, can land white on a light tint. The ink here is the one
-/// that reads best on the tint laid over the glass's own ground.
+/// window colour, the one its sheet takes ([`Theme.sheet`]), with that
+/// window's ink, so every surface of a Workspace shows one colour.
 struct BarColors {
     /// The colour the glass is tinted with ([`workspaceGlass`]).
     let layer: Color
@@ -128,9 +127,14 @@ struct BarColors {
     let darkInk: Bool
 
     init(token: String?, dark: Bool) {
-        let layer = Self.layer(token: token)
-        self.layer = layer
-        darkInk = Self.readsDark(layer, opacity: Self.glassTint, dark: dark)
+        if token == Theme.privateToken {
+            layer = Self.privateLayer
+            darkInk = Self.readsDark(layer, opacity: Self.glassTint, dark: dark)
+        } else {
+            let theme = Theme(dark ? .dark : .light, tint: token)
+            layer = theme.sheet
+            darkInk = !theme.dark
+        }
         ink = darkInk ? Color(hex: 0x060A2E) : .white
         muted = darkInk ? Color(hex: 0x060A2E, opacity: 0.6) : Color(hex: 0xFFFFFF, opacity: 0.66)
     }
@@ -173,14 +177,8 @@ struct BarColors {
         return (l + 0.05) / 0.05 >= 1.05 / (l + 0.05)
     }
 
-    /// The Workspace colour the bar's glass is tinted with (round 6, 14i):
-    /// the colour's own mark, the private violet, or for a Workspace with
-    /// no colour Sval's blue, as the desktop draws one
-    /// (`--sval-palette-blue`).
-    static func layer(token: String?) -> Color {
-        if token == Theme.privateToken { return Color(hex: 0x8B6CFF) }
-        return token.flatMap(WorkspaceTint.init(rawValue:))?.swatch(dark: false) ?? Theme.blue
-    }
+    /// The private session's glass: the desktop's private header violet.
+    static let privateLayer = Color(hex: 0x8B6CFF)
 }
 
 /// A Workspace's or group's colour as the tree syncs it: a preset's

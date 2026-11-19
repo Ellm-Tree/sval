@@ -30,6 +30,10 @@ enum Demo {
     /// with no sync key.
     static let starting = LaunchOption.given("-svalDemoStart")
 
+    /// Whether the demo fills the tree for the App Store's screenshots:
+    /// Workspaces a person might keep, on pages that show without a login.
+    static let showroom = LaunchOption.given("-svalDemoShowroom")
+
     /// The stand-in shared folder, made with a sync key on first use.
     static func source() -> Source? {
         guard requested else { return nil }
@@ -56,7 +60,8 @@ enum Demo {
     @MainActor
     static func fill(_ model: AppModel) async {
         guard requested, model.workspaces.filter({ $0.device == nil }).isEmpty else { return }
-        guard let reading = await model.addWorkspace(named: "Reading", emoji: "📚", color: "blue"),
+        if showroom { return await fillShowroom(model) }
+        guard let reading = await model.addWorkspace(named: "Reading", emoji: "📚", color: "cyan"),
               let work = await model.addWorkspace(named: "Work", emoji: "💼", color: "green"),
               await model.addWorkspace(named: "Travel", emoji: "✈️", color: "cyan") != nil
         else { return }
@@ -74,5 +79,30 @@ enum Demo {
             _ = await model.demoTab("Rail transport", "https://en.wikipedia.org/wiki/Rail_transport", in: own)
         }
         Diagnostics.log("demo: tree filled")
+    }
+
+    @MainActor
+    private static func fillShowroom(_ model: AppModel) async {
+        guard let trip = await model.addWorkspace(named: "Road Trip", emoji: "🏞️", color: "blue"),
+              let work = await model.addWorkspace(named: "Work", emoji: "💼", color: "green"),
+              let music = await model.addWorkspace(named: "Listening", emoji: "🎧", color: "purple"),
+              await model.addWorkspace(named: "Reading", emoji: "📚", color: "cyan") != nil
+        else { return }
+        let parks = "https://www.nps.gov/"
+        if let utah = await model.addGroup(named: "Utah", emoji: "🌵", color: "orange", in: trip) {
+            for (name, park) in [("Zion", "zion"), ("Arches", "arch"), ("Bryce Canyon", "brca")] {
+                _ = await model.demoTab(name, parks + park + "/index.htm", in: utah)
+            }
+        }
+        for (name, park) in [("Grand Canyon", "grca"), ("Yosemite", "yose"), ("Death Valley", "deva")] {
+            _ = await model.demoTab(name, parks + park + "/index.htm", in: trip)
+        }
+        _ = await model.demoTab("Fastmail", "https://www.fastmail.com/", in: work)
+        _ = await model.demoSplit([("Swift", "https://www.swift.org/"), ("WebKit", "https://webkit.org/")], in: work)
+        _ = await model.demoTab("Roon", "https://roon.app/", in: music)
+        if let own = model.ownWorkspace?.id {
+            _ = await model.demoTab("WebKit blog", "https://webkit.org/blog/", in: own)
+        }
+        Diagnostics.log("demo: showroom tree filled")
     }
 }

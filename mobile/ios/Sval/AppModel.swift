@@ -444,6 +444,23 @@ final class AppModel {
         return await edit([op]) ? id : nil
     }
 
+    /// A split of `tabs`, each a name and an address, for the demo tree.
+    func demoSplit(_ tabs: [(String, String)], in parent: String) async -> String? {
+        let id = UUID().uuidString.lowercased()
+        var split: [String: Any] = ["kind": "addSplit", "parent": parent, "name": "", "id": id]
+        split["before"] = children(of: parent).last?.id
+        var ops = [split]
+        var previous: String?
+        for (name, url) in tabs {
+            let tab = UUID().uuidString.lowercased()
+            var add: [String: Any] = ["kind": "addTab", "parent": id, "name": name, "url": url, "id": tab]
+            add["before"] = previous
+            ops.append(add)
+            previous = tab
+        }
+        return await edit(ops) ? id : nil
+    }
+
     @ObservationIgnored private var makingOwnWorkspace = false
 
     /// Makes this phone's own Workspace when it has none: on first run, or

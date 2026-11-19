@@ -103,6 +103,25 @@ pull request changes what the app is built from: `mobile/`, `engine/`,
 and the desktop's files the app takes its icons and art from. A change to
 Markdown files alone doesn't run it.
 
+## App Store screenshots
+
+`SvalUITests/StoreShots` stages the App Store's six screenshots on sample
+Workspaces made for them (`-svalDemoShowroom`). App Store Connect needs
+the screenshots from three simulators: iPhone 18 Pro, iPhone 18 Pro Max,
+and iPad Pro 13-inch. On each one, set the status bar, then run the test:
+
+    xcrun simctl status_bar <simulator> override --time 2027-01-12T17:41:00.000Z \
+      --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active \
+      --cellularBars 4 --batteryState charged --batteryLevel 100
+    TEST_RUNNER_SVAL_SHOTS=<folder> xcodebuild test -project Sval.xcodeproj \
+      -scheme Sval -destination 'id=<simulator>' -only-testing:SvalUITests/StoreShots
+
+The time is UTC, and the status bar shows it in the Mac's time zone:
+17:41 UTC is 9:41 in Pacific time. Each
+screenshot is saved as `<device>-<height in pixels>-<shot>.png`. The sample
+Workspaces' tabs load live sites, so check every screenshot for a banner
+or popup before you upload it.
+
 ## Launch options
 
 Pass these after `--` to `xcrun devicectl device process launch`, or in

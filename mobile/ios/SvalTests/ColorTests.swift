@@ -37,32 +37,17 @@ final class ColorTests: XCTestCase {
         }
     }
 
-    /// The bar's glass takes the Workspace's colour: never the grey a
-    /// colour that failed to resolve falls back to, opaque, and of the
-    /// window's hue.
-    func testBarLayerIsTheWorkspacesColour() throws {
-        for colour in colours {
-            let layer = try XCTUnwrap(BarColors.layer(token: colour), "\(colour) has no bar layer")
-            let ui = UIColor(layer)
-            XCTAssertNotEqual(ui, UIColor(Color.gray), "\(colour): the bar fell back to grey")
-            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            XCTAssertTrue(ui.getHue(&h, saturation: &s, brightness: &b, alpha: &a))
-            XCTAssertEqual(a, 1, accuracy: 0.001, "\(colour): the bar layer is see-through")
-            let tile = UIColor(try XCTUnwrap(WorkspaceTint(rawValue: colour)).tile(dark: false))
-            var th: CGFloat = 0, ts: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
-            XCTAssertTrue(tile.getHue(&th, saturation: &ts, brightness: &tb, alpha: &ta))
-            // Hue means nothing for a grey. A chromatic colour's bar stays
-            // in its window's hue family: the desktop's table sets a
-            // preset's block and window hues apart by up to 40 degrees.
-            guard s > 0.15, ts > 0.15 else { continue }
-            let apart = min(abs(h - th), 1 - abs(h - th))
-            XCTAssertLessThan(apart, 0.125, "\(colour): the bar's hue is \(h), its window's \(th)")
+    /// The bar's glass takes the colour the Workspace's sheet takes, with
+    /// the sheet's ink, in either appearance.
+    func testBarIsTheSheetsColour() {
+        for colour in colours + [nil] {
+            for dark in [false, true] {
+                let bar = BarColors(token: colour, dark: dark)
+                let sheet = Theme(dark ? .dark : .light, tint: colour)
+                XCTAssertEqual(UIColor(bar.layer), UIColor(sheet.sheet), "\(colour ?? "none"): the bar's colour")
+                XCTAssertEqual(bar.darkInk, !sheet.dark, "\(colour ?? "none"): the bar's ink")
+            }
         }
-    }
-
-    func testNoColourAndPrivateHaveTheirOwnLayers() {
-        XCTAssertNotNil(BarColors.layer(token: nil))
-        XCTAssertNotNil(BarColors.layer(token: Theme.privateToken))
     }
 
     /// A hue that rounds up to 360 is stored as 0, which the engine takes:
