@@ -24,8 +24,8 @@ import {
   DIALOG_OPENED,
   ON_PAGE,
   PAGE,
-  settled,
 } from "moz-src:///browser/components/sval/SvalAgentToolCall.sys.mjs";
+import { settled } from "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs";
 import {
   ACTS,
   input,

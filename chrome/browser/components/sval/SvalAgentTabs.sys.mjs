@@ -55,10 +55,14 @@ import {
   agentHomeOf,
   browserIdOf,
 } from "moz-src:///browser/components/sval/SvalAgentTabRegistry.sys.mjs";
-import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import {
+  describeError,
+  SvalLog,
+} from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { isQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeekTab.sys.mjs";
 import { handWorkspaceTo } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
 import { ancestorIds } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
+import { raceTimeout } from "moz-src:///browser/components/sval/SvalTimeout.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
 const lazy = {};
@@ -700,6 +704,57 @@ function topLevelProgressListener() {
 }
 
 /**
+ * How long a click or key press waits for the navigation it may have
+ * started. Marionette's element click waits the same 200 ms for a load to
+ * begin (Navigate.sys.mjs `DEFAULT_UNLOAD_TIMEOUT`).
+ */
+const SETTLE_START_MS = 200;
+/** How long it then waits for that navigation to finish. */
+const SETTLE_MAX_MS = 30_000;
+
+/**
+ * Waits for a navigation the last input may have started: up to
+ * `SETTLE_START_MS` for one to begin, then up to `SETTLE_MAX_MS` for it to
+ * finish. A navigation that fails still leaves a page to report, so a
+ * failure is not an error here.
+ *
+ * An input may move a frame alone, so a frame's load counts, while the top
+ * level loads no document (`topLevelProgressListener`, `frames`).
+ *
+ * @param {object} browser
+ * @returns {Promise<void>}
+ */
+export async function settled(browser) {
+  const webProgress = browser.browsingContext?.webProgress;
+  if (!webProgress) {
+    return;
+  }
+  const TopLevelProgressListener = topLevelProgressListener();
+  const listener = new TopLevelProgressListener(webProgress, {
+    frames: true,
+    unloadTimeout: SETTLE_START_MS,
+  });
+  try {
+    await raceTimeout(listener.start(), SETTLE_MAX_MS);
+  } catch (err) {
+    SvalLog.debug(
+      `a navigation after agent input failed: ${describeError(err)}`
+    );
+  } finally {
+    try {
+      if (listener.isStarted) {
+        listener.stop();
+      }
+      listener.destroy();
+    } catch (err) {
+      SvalLog.debug(
+        `stopping a navigation listener threw ${SvalLog.errorName(err)}`
+      );
+    }
+  }
+}
+
+/**
  * Ends the document load `browser` is in, if any, and waits until the parent
  * has heard it end.
  *
@@ -1021,16 +1076,13 @@ function materialize(win, tab, url) {
   const done = (async () => {
     const site = agentSiteOf(url || "about:blank");
     if (lazy.SvalFirefox.isLazy(tab)) {
-      let timer;
       const restoring = new Promise(resolve => {
         tab.addEventListener("SSTabRestoring", resolve, { once: true });
-        timer = setTimeout(resolve, RESTORE_WAIT_MS);
       });
       lazy.SvalFirefox.insertBrowser(win, tab);
       if (lazy.SvalFirefox.isRestoring(tab)) {
-        await restoring;
+        await raceTimeout(restoring, RESTORE_WAIT_MS);
       }
-      clearTimeout(timer);
     }
     if (site !== null) {
       await navigate(tab.linkedBrowser, url);

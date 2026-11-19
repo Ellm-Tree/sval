@@ -61,28 +61,15 @@ import {
   hostOfDocument,
   siteOfDocument,
 } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
-import { workIn } from "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs";
+import {
+  settled,
+  workIn,
+} from "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs";
 import {
   refuseIfUserHolds,
   reportActivity,
 } from "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs";
 import { detect } from "moz-src:///browser/components/sval/SvalAgentChallenge.sys.mjs";
-import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
-
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  ProgressListener: "chrome://remote/content/shared/Navigate.sys.mjs",
-});
-
-/**
- * How long a click or key press waits for the navigation it may have
- * started. Marionette's element click waits the same 200 ms for a load to
- * begin (Navigate.sys.mjs `DEFAULT_UNLOAD_TIMEOUT`).
- */
-const SETTLE_START_MS = 200;
-/** How long it then waits for that navigation to finish. */
-const SETTLE_MAX_MS = 30_000;
 
 /**
  * What an input's query settles with when a `confirm` or `prompt` opened
@@ -173,50 +160,6 @@ export const ON_PAGE = (args, found) =>
         found.tab.linkedBrowser.browsingContext?.currentWindowGlobal
       )
     : agentSiteOf(found.url ?? "");
-
-/**
- * Waits for a navigation the last input may have started: up to
- * `SETTLE_START_MS` for one to begin, then up to `SETTLE_MAX_MS` for it to
- * finish. A navigation that fails still leaves a page to report, so a
- * failure is not an error here.
- *
- * @param {object} browser
- * @returns {Promise<void>}
- */
-export async function settled(browser) {
-  const webProgress = browser.browsingContext?.webProgress;
-  if (!webProgress) {
-    return;
-  }
-  const listener = new lazy.ProgressListener(webProgress, {
-    unloadTimeout: SETTLE_START_MS,
-  });
-  let timer;
-  try {
-    await Promise.race([
-      listener.start(),
-      new Promise(resolve => {
-        timer = setTimeout(resolve, SETTLE_MAX_MS);
-      }),
-    ]);
-  } catch (err) {
-    SvalLog.debug(
-      `a navigation after agent input failed: ${describeError(err)}`
-    );
-  } finally {
-    clearTimeout(timer);
-    try {
-      if (listener.isStarted) {
-        listener.stop();
-      }
-      listener.destroy();
-    } catch (err) {
-      SvalLog.debug(
-        `stopping a navigation listener threw ${SvalLog.errorName(err)}`
-      );
-    }
-  }
-}
 
 /**
  * What an input did before the user took its tab, which is all a result
