@@ -346,3 +346,12 @@ client-auth-choice-cleared-with-jar.patch
 qps-observe-prefs-before-reading.patch
 page-thumbs-closed-page-quiet.patch
 local-performance-recording.patch
+backport-bug-2038325-masked-svg-activity.patch
+backport-bug-2068559-offscreen-canvas-hidden.patch
+backport-bug-2068103-offscreen-background-decode.patch
+backport-bug-1766397-drop-shadow-blur-grid.patch
+backport-bug-2063377-rotated-text-subpixel.patch
+backport-bug-2090212-swapchain-pool-cspace.patch
+backport-bug-2093090-remote-texture-gone-owner.patch
+backport-bug-2093091-image-bridge-ready-check.patch
+backport-bug-2085382-wr-error-after-overlay-failure.patch

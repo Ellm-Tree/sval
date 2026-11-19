@@ -1,0 +1,183 @@
+Sval: Stop piling up OffscreenCanvas frames while the window is hidden
+
+Backport of Mozilla's Bug 2068559 (mozilla-central 60fb197bead1,
+Firefox 159). Only the context of the OffscreenCanvasDisplayHelper.h
+member hunk is adapted, to ESR 153's member list; the logic is
+unchanged. Mozilla landed no test for it.
+
+While a window was minimized or occluded, its compositor was paused,
+but a page drawing to an OffscreenCanvas kept presenting a frame each
+time. Each frame held a remote texture the paused compositor never
+consumed, so memory grew by gigabytes in seconds until the window was
+shown again, on Linux, Windows and macOS alike. The canvas element
+now observes its document's activity and tells the display helper
+whether its browsing context is active. While it is inactive, the
+helper keeps the drawn content in the context's own buffers and
+presents only the latest frame once the document is active again.
+
+diff --git a/dom/base/Document.cpp b/dom/base/Document.cpp
+index 2b7044329b0cc..efea9aa9238fb 100644
+--- a/dom/base/Document.cpp
++++ b/dom/base/Document.cpp
+@@ -180,6 +180,7 @@
+ #include "mozilla/dom/FromParser.h"
+ #include "mozilla/dom/HTMLAllCollection.h"
+ #include "mozilla/dom/HTMLBodyElement.h"
++#include "mozilla/dom/HTMLCanvasElement.h"
+ #include "mozilla/dom/HTMLCollectionBinding.h"
+ #include "mozilla/dom/HTMLDialogElement.h"
+ #include "mozilla/dom/HTMLEmbedElement.h"
+@@ -8506,6 +8507,9 @@ static void NotifyActivityChangedCallback(nsISupports* aSupports) {
+   if (auto* mediaElem = HTMLMediaElement::FromNodeOrNull(content)) {
+     mediaElem->NotifyOwnerDocumentActivityChanged();
+   }
++  if (auto* canvasElem = HTMLCanvasElement::FromNodeOrNull(content)) {
++    canvasElem->NotifyOwnerDocumentActivityChanged();
++  }
+   nsCOMPtr<nsIDocumentActivity> objectDocumentActivity(
+       do_QueryInterface(aSupports));
+   if (objectDocumentActivity) {
+diff --git a/dom/canvas/OffscreenCanvasDisplayHelper.cpp b/dom/canvas/OffscreenCanvasDisplayHelper.cpp
+index cc55e6899b6fa..65fdd703a352d 100644
+--- a/dom/canvas/OffscreenCanvasDisplayHelper.cpp
++++ b/dom/canvas/OffscreenCanvasDisplayHelper.cpp
+@@ -217,6 +217,25 @@ void OffscreenCanvasDisplayHelper::FlushForDisplay() {
+   task->Dispatch(mWorkerRef->Private());
+ }
+ 
++void OffscreenCanvasDisplayHelper::SetPresentationEnabled(bool aEnabled) {
++  MOZ_ASSERT(NS_IsMainThread());
++
++  bool needsFlush;
++  {
++    MutexAutoLock lock(mMutex);
++    if (mPresentationEnabled == aEnabled) {
++      return;
++    }
++    mPresentationEnabled = aEnabled;
++    needsFlush = aEnabled && mPendingPresent;
++    mPendingPresent = false;
++  }
++
++  if (needsFlush) {
++    FlushForDisplay();
++  }
++}
++
+ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
+     nsICanvasRenderingContextInternal* aContext,
+     const Maybe<OffscreenCanvasDisplayData>& aData) {
+@@ -246,6 +265,15 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
+     return false;
+   }
+ 
++  if (!mPresentationEnabled) {
++    // Nothing on the other end is going to composite what we produce, so
++    // presenting the front buffer would just pile up textures the compositor
++    // never consumes. The context keeps the drawn content in its own buffers
++    // and we present the latest of it once we are visible again.
++    mPendingPresent = true;
++    return false;
++  }
++
+   if (mData.mIsOpaque) {
+     flags |= layers::TextureFlags::IS_OPAQUE;
+     format = gfx::SurfaceFormat::B8G8R8X8;
+diff --git a/dom/canvas/OffscreenCanvasDisplayHelper.h b/dom/canvas/OffscreenCanvasDisplayHelper.h
+index 082c96346b167..72d6e4a5b780b 100644
+--- a/dom/canvas/OffscreenCanvasDisplayHelper.h
++++ b/dom/canvas/OffscreenCanvasDisplayHelper.h
+@@ -51,6 +51,11 @@ class OffscreenCanvasDisplayHelper final {
+ 
+   void FlushForDisplay();
+ 
++  // While presentation is disabled, the frames the canvas draws are kept in
++  // the context's own buffers instead of being handed to the compositor. The
++  // latest one is presented when presentation is enabled again.
++  void SetPresentationEnabled(bool aEnabled);
++
+   bool CommitFrameToCompositor(nsICanvasRenderingContextInternal* aContext,
+                                const Maybe<OffscreenCanvasDisplayData>& aData);
+ 
+@@ -107,6 +112,8 @@ class OffscreenCanvasDisplayHelper final {
+   mozilla::layers::ImageContainer::FrameID mLastFrameID MOZ_GUARDED_BY(mMutex) =
+       0;
+   bool mPendingInvalidate MOZ_GUARDED_BY(mMutex) = false;
++  bool mPresentationEnabled MOZ_GUARDED_BY(mMutex) = true;
++  bool mPendingPresent MOZ_GUARDED_BY(mMutex) = false;
+   bool mIsWriteOnly MOZ_GUARDED_BY(mMutex) = false;
+   RefPtr<nsIPrincipal> mExpandedReader MOZ_GUARDED_BY(mMutex);
+   bool mCreatedOnMainThread MOZ_GUARDED_BY(mMutex) = false;
+diff --git a/dom/html/HTMLCanvasElement.cpp b/dom/html/HTMLCanvasElement.cpp
+index 127b1fc1d18cb..e40c9fef90e5a 100644
+--- a/dom/html/HTMLCanvasElement.cpp
++++ b/dom/html/HTMLCanvasElement.cpp
+@@ -24,9 +24,11 @@
+ #include "mozilla/ProfilerMarkers.h"
+ #include "mozilla/StaticPrefs_privacy.h"
+ #include "mozilla/dom/BlobImpl.h"
++#include "mozilla/dom/BrowsingContext.h"
+ #include "mozilla/dom/CanvasCaptureMediaStream.h"
+ #include "mozilla/dom/CanvasRenderingContext2D.h"
+ #include "mozilla/dom/Document.h"
++#include "mozilla/dom/ElementInlines.h"
+ #include "mozilla/dom/Event.h"
+ #include "mozilla/dom/File.h"
+ #include "mozilla/dom/GeneratePlaceholderCanvasData.h"
+@@ -510,6 +512,7 @@ HTMLCanvasElement::~HTMLCanvasElement() { Destroy(); }
+ 
+ void HTMLCanvasElement::Destroy() {
+   if (mOffscreenDisplay) {
++    UnregisterActivityObserver();
+     mOffscreenDisplay->DestroyElement();
+     mOffscreenDisplay = nullptr;
+     mImageContainer = nullptr;
+@@ -1168,6 +1171,8 @@ OffscreenCanvas* HTMLCanvasElement::TransferControlToOffscreen(
+   CSSIntSize sz = GetWidthHeight();
+   mOffscreenDisplay =
+       MakeRefPtr<OffscreenCanvasDisplayHelper>(this, sz.width, sz.height);
++  RegisterActivityObserver();
++  NotifyOwnerDocumentActivityChanged();
+   mOffscreenCanvas = new OffscreenCanvas(win->AsGlobal(), sz.width, sz.height,
+                                          backend, do_AddRef(mOffscreenDisplay),
+                                          FragmentOrElement::GetLang());
+@@ -1293,6 +1298,22 @@ void HTMLCanvasElement::FlushOffscreenCanvas() {
+   }
+ }
+ 
++void HTMLCanvasElement::NotifyOwnerDocumentActivityChanged() {
++  if (!mOffscreenDisplay) {
++    return;
++  }
++
++  BrowsingContext* bc = OwnerDoc()->GetBrowsingContext();
++  mOffscreenDisplay->SetPresentationEnabled(bc && bc->IsActive());
++}
++
++void HTMLCanvasElement::NodeInfoChanged(Document* aOldDoc) {
++  nsGenericHTMLElement::NodeInfoChanged(aOldDoc);
++
++  // The activity observer registration itself is moved over by nsINode::Adopt.
++  NotifyOwnerDocumentActivityChanged();
++}
++
+ void HTMLCanvasElement::InvalidateCanvasPlaceholder(uint32_t aWidth,
+                                                     uint32_t aHeight) {
+   ErrorResult rv;
+diff --git a/dom/html/HTMLCanvasElement.h b/dom/html/HTMLCanvasElement.h
+index bd70fbd9bb961..4280abcde7c04 100644
+--- a/dom/html/HTMLCanvasElement.h
++++ b/dom/html/HTMLCanvasElement.h
+@@ -362,6 +362,12 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
+   OffscreenCanvas* GetOffscreenCanvas() const { return mOffscreenCanvas; }
+   void FlushOffscreenCanvas();
+ 
++  // Only canvases which have been transferred to an OffscreenCanvas observe
++  // the document activity, to let the display helper know whether the frames
++  // it produces would end up on the screen at all.
++  void NotifyOwnerDocumentActivityChanged();
++  void NodeInfoChanged(Document* aOldDoc) override;
++
+   layers::ImageContainer* GetImageContainer() const { return mImageContainer; }
+ 
+   bool UsingCaptureStream() const { return !!mRequestedFrameRefreshObserver; }

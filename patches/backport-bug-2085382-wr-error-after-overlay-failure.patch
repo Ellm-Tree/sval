@@ -1,0 +1,30 @@
+Sval: Handle WebRender errors after video overlays fail to start
+
+Backport of Mozilla's Bug 2085382 (mozilla-central 7876c1cabdfc,
+Firefox 161), unchanged.
+
+When DCLayerTree::Initialize failed to set up video overlay support, it
+reported VIDEO_OVERLAY through RenderThread::HandleWebRenderError. That
+sets mHandlingWebRenderError and drops every later error until all
+renderers are destroyed, because it expects the error to disable
+WebRender. A VIDEO_OVERLAY error only disables overlays, so the renderers
+stay and the flag stays set: a later fatal error such as RENDER,
+NEW_SURFACE or BEGIN_DRAW never reached GPUProcessManager, and the GPU
+process neither restarted nor fell back from hardware WebRender. The
+other video overlay failures in DCLayerTree.cpp already use
+NotifyWebRenderError, which forwards the error without setting the flag,
+and this makes the initialization failure do the same.
+
+diff --git a/gfx/webrender_bindings/DCLayerTree.cpp b/gfx/webrender_bindings/DCLayerTree.cpp
+index b1243eb0b84ba..0bfdfa9171233 100644
+--- a/gfx/webrender_bindings/DCLayerTree.cpp
++++ b/gfx/webrender_bindings/DCLayerTree.cpp
+@@ -327,7 +327,7 @@ bool DCLayerTree::Initialize(HWND aHwnd, nsACString& aError) {
+   if (gfx::gfxVars::UseWebRenderDCompVideoHwOverlayWin() ||
+       gfx::gfxVars::UseWebRenderDCompVideoSwOverlayWin()) {
+     if (!InitializeVideoOverlaySupport()) {
+-      RenderThread::Get()->HandleWebRenderError(WebRenderError::VIDEO_OVERLAY);
++      RenderThread::Get()->NotifyWebRenderError(WebRenderError::VIDEO_OVERLAY);
+     }
+   }
+   if (!sGpuOverlayInfo) {

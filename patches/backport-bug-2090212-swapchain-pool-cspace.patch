@@ -1,0 +1,51 @@
+Sval: Reuse pooled WebGL surfaces when the factory coerces color space
+
+Backport of Mozilla's Bug 2090212 (mozilla-central f67e972f790c,
+Firefox 162), unchanged.
+
+A SurfaceFactory that does not support color spaces creates every
+surface as Display, but SwapChain::Acquire compared the pooled surface
+against the color space the canvas requested. Any canvas asking for
+sRGB or Display P3 then never matched, so the pool was cleared and a
+new shared surface allocated on every frame. Normalising the requested
+color space through the factory before the comparison lets the pooled
+surface be recycled.
+
+diff --git a/gfx/gl/GLScreenBuffer.cpp b/gfx/gl/GLScreenBuffer.cpp
+index d75911c8e8c2e..fadd51b67a824 100644
+--- a/gfx/gl/GLScreenBuffer.cpp
++++ b/gfx/gl/GLScreenBuffer.cpp
+@@ -27,7 +27,7 @@ UniquePtr<SwapChainPresenter> SwapChain::Acquire(
+     const auto& existingDesc = mPool.front()->mDesc;
+     auto newDesc = existingDesc;
+     newDesc.size = size;
+-    newDesc.colorSpace = colorSpace;
++    newDesc.colorSpace = mFactory->GetFactoryCspace(colorSpace);
+     newDesc.transferFunction = transferFunction;
+     if (newDesc != existingDesc || !mPool.front()->IsValid()) {
+       mPool = {};
+diff --git a/gfx/gl/SharedSurface.h b/gfx/gl/SharedSurface.h
+index f5051fa7033a0..5cd079e151327 100644
+--- a/gfx/gl/SharedSurface.h
++++ b/gfx/gl/SharedSurface.h
+@@ -210,12 +210,16 @@ class SurfaceFactory {
+  public:
+   virtual bool SupportsCspaces() const { return false; }
+ 
+-  UniquePtr<SharedSurface> CreateShared(const gfx::IntSize& size,
+-                                        gfx::ColorSpace2 cs) {
++  gfx::ColorSpace2 GetFactoryCspace(const gfx::ColorSpace2 cs) const {
+     if (!SupportsCspaces()) {
+-      cs = gfx::ColorSpace2::Display;
++      return gfx::ColorSpace2::Display;
+     }
+-    return CreateSharedImpl({mDesc, size, cs});
++    return cs;
++  }
++
++  UniquePtr<SharedSurface> CreateShared(const gfx::IntSize& size,
++                                        const gfx::ColorSpace2 cs) {
++    return CreateSharedImpl({mDesc, size, GetFactoryCspace(cs)});
+   }
+ };
+ 

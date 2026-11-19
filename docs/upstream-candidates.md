@@ -1866,6 +1866,15 @@ dropped on time.
 | `backport-bug-1470011-download-content-encoding.patch` | 1470011 | Firefox 154 |
 | `network.http.http3.apple_fast_datapath=false` in `app-sval-prefs.js` | 2065491 | Firefox 156 |
 | `media.webrtc.send_mlkem_keyshare=false` in `app-sval-prefs.js` | 2047968 | Firefox 158 |
+| `backport-bug-2038325-masked-svg-activity.patch` (with Bug 2087421's fix) | 2038325 | Firefox 161 |
+| `backport-bug-2068559-offscreen-canvas-hidden.patch` | 2068559 | Firefox 159 |
+| `backport-bug-2068103-offscreen-background-decode.patch` | 2068103 | Firefox 161 |
+| `backport-bug-1766397-drop-shadow-blur-grid.patch` | 1766397 | Firefox 158 |
+| `backport-bug-2063377-rotated-text-subpixel.patch` (with Bug 2072715's fix) | 2063377 | Firefox 158 |
+| `backport-bug-2090212-swapchain-pool-cspace.patch` | 2090212 | Firefox 162 |
+| `backport-bug-2093090-remote-texture-gone-owner.patch` | 2093090 | Firefox 162 |
+| `backport-bug-2093091-image-bridge-ready-check.patch` | 2093091 | Firefox 162 |
+| `backport-bug-2085382-wr-error-after-overlay-failure.patch` | 2085382 | Firefox 161 |
 | `dom.event.keypress.key.allow_lone_surrogate=false` in `app-sval-prefs.js` | 1849790 | Firefox 154 |
 | `apz.axis_lock.mode=2` in `app-sval-prefs.js` | 2035075, 2046884 | Firefox 154 |
 | `security.ssl3.ecdhe_ecdsa_aes_256_sha` in `app-sval-prefs.js` | 2052302 | Firefox 154 |

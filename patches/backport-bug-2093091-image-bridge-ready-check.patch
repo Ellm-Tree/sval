@@ -1,0 +1,552 @@
+Sval: Keep ImageBridge canvases updating while a texture is pending
+
+Backport of Mozilla's Bug 2093091 (mozilla-central af13fcc7d2f0,
+5b40e4921d04, df7c14f5e7f5, Firefox 162). It needs the Bug 2093090
+backport applied first. Adapted to ESR 153: RemoteTextureMap.cpp uses
+MakeUnique where mozilla-central uses std::make_unique, and ESR lacks
+Bug 2045240's aCalledInCallback parameter of
+WebRenderImageHost::UseRemoteTexture, so the new
+WaitForPendingRemoteTexture calls UseRemoteTexture() without it. The
+logic is otherwise unchanged.
+
+SuppressRemoteTextureReadyCheck dropped every pending ready check for
+an unregistered owner, including those of unrelated image hosts. Those
+hosts were never called back, kept mWaitingReadyCallback set and
+ignored every later texture, so OffscreenCanvas and WebGPU canvases
+presented through ImageBridge stopped updating. CancelRemoteTextureReadyCheck
+cancels only the caller's own checks. WebRenderImageHost tracks its
+pending check by generation and cancels it whenever its pending
+textures are cleared. RecvGetSnapshot waits for pending async remote
+textures, so compositor snapshots show the latest frame.
+
+diff --git a/gfx/layers/RemoteTextureMap.cpp b/gfx/layers/RemoteTextureMap.cpp
+index 8974900..d8db2c6 100644
+--- a/gfx/layers/RemoteTextureMap.cpp
++++ b/gfx/layers/RemoteTextureMap.cpp
+@@ -1290,7 +1290,7 @@ void RemoteTextureMap::UnregisterRemoteTextureHostWrapper(
+ }
+ 
+ bool RemoteTextureMap::CheckRemoteTextureReady(
+-    const RemoteTextureInfo& aInfo,
++    const RemoteTextureInfo& aInfo, const void* aRequester,
+     std::function<void(const RemoteTextureInfo&)>&& aCallback) {
+   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+ 
+@@ -1319,7 +1319,7 @@ bool RemoteTextureMap::CheckRemoteTextureReady(
+     WaitingTextureOwner* waitingOwner = mWaitingTextureOwners[key].get();
+ 
+     auto callbackHolder = MakeUnique<RenderingReadyCallbackHolder>(
+-        aInfo.mTextureId, std::move(aCallback));
++        aInfo.mTextureId, aRequester, std::move(aCallback));
+     waitingOwner->mRenderingReadyCallbackHolders.push_back(
+         std::move(callbackHolder));
+ 
+@@ -1337,7 +1337,7 @@ bool RemoteTextureMap::CheckRemoteTextureReady(
+   }
+ 
+   auto callbackHolder = MakeUnique<RenderingReadyCallbackHolder>(
+-      aInfo.mTextureId, std::move(aCallback));
++      aInfo.mTextureId, aRequester, std::move(aCallback));
+   owner->mRenderingReadyCallbackHolders.push_back(std::move(callbackHolder));
+ 
+   return false;
+@@ -1420,25 +1420,49 @@ bool RemoteTextureMap::WaitRemoteTextureReady(const RemoteTextureInfo& aInfo) {
+   return true;
+ }
+ 
+-void RemoteTextureMap::SuppressRemoteTextureReadyCheck(
+-    const RemoteTextureInfo& aInfo) {
++void RemoteTextureMap::CancelRemoteTextureReadyCheck(
++    const RemoteTextureInfo& aInfo, const void* aRequester) {
+   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+-  MonitorAutoLock lock(mMonitor);
+ 
+-  // Clear if WaitingTextureOwner exists.
+-  auto itWaiting =
+-      mWaitingTextureOwners.find(std::pair(aInfo.mForPid, aInfo.mOwnerId));
+-  if (itWaiting != mWaitingTextureOwners.end()) {
+-    mWaitingTextureOwners.erase(itWaiting);
++  std::vector<UniquePtr<RenderingReadyCallbackHolder>> cancelled;
++  auto cancel =
++      [&](std::deque<UniquePtr<RenderingReadyCallbackHolder>>& aHolders) {
++        for (auto it = aHolders.begin(); it != aHolders.end();) {
++          if ((*it)->mRequester == aRequester) {
++            cancelled.push_back(std::move(*it));
++            it = aHolders.erase(it);
++          } else {
++            ++it;
++          }
++        }
++      };
++
++  {
++    MonitorAutoLock lock(mMonitor);
++
++    const auto key = std::pair(aInfo.mForPid, aInfo.mOwnerId);
++    auto itWaiting = mWaitingTextureOwners.find(key);
++    if (itWaiting != mWaitingTextureOwners.end()) {
++      cancel(itWaiting->second->mRenderingReadyCallbackHolders);
++      if (itWaiting->second->mRenderingReadyCallbackHolders.empty()) {
++        mWaitingTextureOwners.erase(itWaiting);
++      }
++    }
++
++    if (auto* owner = GetTextureOwner(lock, aInfo.mOwnerId, aInfo.mForPid)) {
++      cancel(owner->mRenderingReadyCallbackHolders);
++    }
+   }
+ 
+-  const auto key = std::pair(aInfo.mForPid, aInfo.mTextureId);
+-  auto it = mRemoteTextureHostWrapperHolders.find(key);
+-  if (it == mRemoteTextureHostWrapperHolders.end()) {
+-    MOZ_ASSERT_UNREACHABLE("unexpected to be called");
++  if (cancelled.empty()) {
+     return;
+   }
+-  it->second->mReadyCheckSuppressed = true;
++
++  // The callbacks may hold the last reference to aRequester, so release them
++  // after it is done with this call.
++  GetCurrentSerialEventTarget()->Dispatch(
++      NS_NewRunnableFunction("RemoteTextureMap::CancelRemoteTextureReadyCheck",
++                             [cancelled = std::move(cancelled)]() {}));
+ }
+ 
+ UniquePtr<TextureData> RemoteTextureMap::GetRecycledTextureData(
+@@ -1540,9 +1564,11 @@ RemoteTextureMap::TextureDataHolder::TextureDataHolder(
+       mResourceWrapper(std::move(aResourceWrapper)) {}
+ 
+ RemoteTextureMap::RenderingReadyCallbackHolder::RenderingReadyCallbackHolder(
+-    const RemoteTextureId aTextureId,
++    const RemoteTextureId aTextureId, const void* aRequester,
+     std::function<void(const RemoteTextureInfo&)>&& aCallback)
+-    : mTextureId(aTextureId), mCallback(std::move(aCallback)) {}
++    : mTextureId(aTextureId),
++      mRequester(aRequester),
++      mCallback(std::move(aCallback)) {}
+ 
+ RemoteTextureMap::RemoteTextureHostWrapperHolder::
+     RemoteTextureHostWrapperHolder(
+diff --git a/gfx/layers/RemoteTextureMap.h b/gfx/layers/RemoteTextureMap.h
+index 83d9f72..0ee8270 100644
+--- a/gfx/layers/RemoteTextureMap.h
++++ b/gfx/layers/RemoteTextureMap.h
+@@ -342,13 +342,18 @@ class RemoteTextureMap {
+                                           const RemoteTextureOwnerId aOwnerId,
+                                           const base::ProcessId aForPid);
+ 
++  // Returns true if the texture is ready. Otherwise aCallback will be called
++  // once it should be checked again, unless aRequester cancels it with
++  // CancelRemoteTextureReadyCheck first.
+   bool CheckRemoteTextureReady(
+-      const RemoteTextureInfo& aInfo,
++      const RemoteTextureInfo& aInfo, const void* aRequester,
+       std::function<void(const RemoteTextureInfo&)>&& aCallback);
+ 
+   bool WaitRemoteTextureReady(const RemoteTextureInfo& aInfo);
+ 
+-  void SuppressRemoteTextureReadyCheck(const RemoteTextureInfo& aInfo);
++  // Cancels the pending ready checks aRequester made for aInfo's owner.
++  void CancelRemoteTextureReadyCheck(const RemoteTextureInfo& aInfo,
++                                     const void* aRequester);
+ 
+   UniquePtr<TextureData> GetRecycledTextureData(
+       const RemoteTextureOwnerId aOwnerId, const base::ProcessId aForPid,
+@@ -392,10 +397,12 @@ class RemoteTextureMap {
+ 
+   struct RenderingReadyCallbackHolder {
+     RenderingReadyCallbackHolder(
+-        const RemoteTextureId aTextureId,
++        const RemoteTextureId aTextureId, const void* aRequester,
+         std::function<void(const RemoteTextureInfo&)>&& aCallback);
+ 
+     const RemoteTextureId mTextureId;
++    // Identifies who made the ready check, so it may be cancelled.
++    const void* const mRequester;
+     // callback of RemoteTexture ready
+     std::function<void(const RemoteTextureInfo&)> mCallback;
+   };
+@@ -440,7 +447,6 @@ class RemoteTextureMap {
+     const RefPtr<TextureHost> mRemoteTextureHostWrapper;
+     // Hold compositable ref of remote texture of the RemoteTextureId.
+     CompositableTextureHostRef mRemoteTextureHost;
+-    bool mReadyCheckSuppressed = false;
+   };
+ 
+   void UpdateTexture(const MonitorAutoLock& aProofOfLock,
+diff --git a/gfx/layers/wr/AsyncImagePipelineManager.cpp b/gfx/layers/wr/AsyncImagePipelineManager.cpp
+index 53d0b12..f46593b 100644
+--- a/gfx/layers/wr/AsyncImagePipelineManager.cpp
++++ b/gfx/layers/wr/AsyncImagePipelineManager.cpp
+@@ -368,6 +368,20 @@ AsyncImagePipelineManager::UpdateWithoutExternalImage(
+   return Some(aOp);
+ }
+ 
++bool AsyncImagePipelineManager::WaitForPendingRemoteTextures() {
++  if (mDestroyed) {
++    return false;
++  }
++
++  bool waited = false;
++  for (const auto& entry : mAsyncImagePipelines) {
++    if (WebRenderImageHost* host = entry.GetData()->mImageHost) {
++      waited |= host->WaitForPendingRemoteTexture();
++    }
++  }
++  return waited;
++}
++
+ void AsyncImagePipelineManager::ApplyAsyncImagesOfImageBridge(
+     wr::TransactionBuilder& aSceneBuilderTxn,
+     wr::TransactionBuilder& aFastTxn) {
+diff --git a/gfx/layers/wr/AsyncImagePipelineManager.h b/gfx/layers/wr/AsyncImagePipelineManager.h
+index b5f716f..f2550cc 100644
+--- a/gfx/layers/wr/AsyncImagePipelineManager.h
++++ b/gfx/layers/wr/AsyncImagePipelineManager.h
+@@ -109,6 +109,12 @@ class AsyncImagePipelineManager final {
+                                 const wr::MixBlendMode& aMixBlendMode);
+   void ApplyAsyncImagesOfImageBridge(wr::TransactionBuilder& aSceneBuilderTxn,
+                                      wr::TransactionBuilder& aFastTxn);
++
++  // Waits for the remote textures that async image pipelines are waiting on to
++  // become ready, so that they are used by the next composite. Returns true if
++  // any were.
++  bool WaitForPendingRemoteTextures();
++
+   void ApplyAsyncImageForPipeline(
+       const wr::PipelineId& aPipelineId, wr::TransactionBuilder& aTxn,
+       wr::TransactionBuilder& aTxnForImageBridge,
+diff --git a/gfx/layers/wr/WebRenderBridgeParent.cpp b/gfx/layers/wr/WebRenderBridgeParent.cpp
+index ba8465d..943bb56 100644
+--- a/gfx/layers/wr/WebRenderBridgeParent.cpp
++++ b/gfx/layers/wr/WebRenderBridgeParent.cpp
+@@ -2128,6 +2128,13 @@ mozilla::ipc::IPCResult WebRenderBridgeParent::RecvGetSnapshot(
+     return IPC_FAIL_NO_REASON(this);
+   }
+ 
++  // Snapshots must include async remote texture frames that are not ready yet,
++  // which would otherwise only be shown by a later composite. Applying them
++  // may update the scene, so do so before flushing the scene builds.
++  if (mLateInit->mAsyncImageManager->WaitForPendingRemoteTextures()) {
++    FlushFrameGeneration(wr::RenderReasons::SNAPSHOT);
++  }
++
+   FlushSceneBuilds();
+   FlushFrameGeneration(wr::RenderReasons::SNAPSHOT);
+   mLateInit->mApi->Readback(start, size, bufferTexture->GetFormat(),
+diff --git a/gfx/layers/wr/WebRenderImageHost.cpp b/gfx/layers/wr/WebRenderImageHost.cpp
+index ad53efa..455eb65 100644
+--- a/gfx/layers/wr/WebRenderImageHost.cpp
++++ b/gfx/layers/wr/WebRenderImageHost.cpp
+@@ -47,20 +47,33 @@ WebRenderImageHost::~WebRenderImageHost() {
+ 
+ void WebRenderImageHost::OnReleased() {
+   ImageComposite::ClearImages();
+-  if (!mPendingRemoteTextureWrappers.empty()) {
+-    mPendingRemoteTextureWrappers.clear();
+-  }
++  ClearPendingRemoteTextures();
+   SetCurrentTextureHost(nullptr);
+ }
+ 
++void WebRenderImageHost::ClearPendingRemoteTextures() {
++  mPendingRemoteTextureWrappers.clear();
++
++  if (!mWaitingReadyCallback) {
++    return;
++  }
++
++  mWaitingReadyCallback = false;
++  ++mReadyCallbackGeneration;
++  if (auto* remoteTextureMap = RemoteTextureMap::Get()) {
++    remoteTextureMap->CancelRemoteTextureReadyCheck(
++        RemoteTextureInfo(RemoteTextureId{0}, mReadyCallbackOwnerId,
++                          mReadyCallbackForPid),
++        this);
++  }
++}
++
+ void WebRenderImageHost::UseTextureHost(
+     const nsTArray<TimedTexture>& aTextures) {
+   CompositableHost::UseTextureHost(aTextures);
+   MOZ_ASSERT(aTextures.Length() >= 1);
+ 
+-  if (!mPendingRemoteTextureWrappers.empty()) {
+-    mPendingRemoteTextureWrappers.clear();
+-  }
++  ClearPendingRemoteTextures();
+ 
+   if (mCurrentTextureHost &&
+       mCurrentTextureHost->AsRemoteTextureHostWrapper()) {
+@@ -136,8 +149,7 @@ void WebRenderImageHost::PushPendingRemoteTexture(
+     MOZ_ASSERT(wrapper);
+     if (wrapper->mOwnerId != aOwnerId || wrapper->mForPid != aForPid) {
+       // Clear when RemoteTextureOwner is different.
+-      mPendingRemoteTextureWrappers.clear();
+-      mWaitingReadyCallback = false;
++      ClearPendingRemoteTextures();
+       mWaitForRemoteTextureOwner = true;
+     }
+   }
+@@ -169,22 +181,19 @@ void WebRenderImageHost::UseRemoteTexture() {
+     }
+     MOZ_ASSERT(!mWaitingReadyCallback);
+ 
+-    auto readyCallback = [self = RefPtr<WebRenderImageHost>(this)](
+-                             const RemoteTextureInfo aInfo) {
++    // The callback may be for a texture being pushed, or for its owner going
++    // away or losing its context, so check the pending textures again
++    // regardless, unless the ready check has since been cancelled.
++    auto readyCallback = [self = RefPtr<WebRenderImageHost>(this),
++                          generation = mReadyCallbackGeneration](
++                             const RemoteTextureInfo&) {
+       RefPtr<nsIRunnable> runnable = NS_NewRunnableFunction(
+           "WebRenderImageHost::UseRemoteTexture",
+-          [self = std::move(self), aInfo]() {
++          [self = std::move(self), generation]() {
+             MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+ 
+-            if (self->mPendingRemoteTextureWrappers.empty()) {
+-              return;
+-            }
+-
+-            auto* wrapper = self->mPendingRemoteTextureWrappers.front()
+-                                ->AsRemoteTextureHostWrapper();
+-            MOZ_ASSERT(wrapper);
+-            if (wrapper->mOwnerId != aInfo.mOwnerId ||
+-                wrapper->mForPid != aInfo.mForPid) {
++            if (!self->mWaitingReadyCallback ||
++                self->mReadyCallbackGeneration != generation) {
+               // obsoleted callback
+               return;
+             }
+@@ -206,8 +215,10 @@ void WebRenderImageHost::UseRemoteTexture() {
+         RemoteTextureMap::Get()->WaitForRemoteTextureOwner(wrapper);
+       }
+       mWaitingReadyCallback = !RemoteTextureMap::Get()->CheckRemoteTextureReady(
+-          wrapper->GetRemoteTextureInfo(), readyCallback);
++          wrapper->GetRemoteTextureInfo(), this, readyCallback);
+       if (mWaitingReadyCallback) {
++        mReadyCallbackOwnerId = wrapper->mOwnerId;
++        mReadyCallbackForPid = wrapper->mForPid;
+         break;
+       }
+       RemoteTextureMap::Get()->GetRemoteTexture(wrapper);
+@@ -251,6 +262,37 @@ void WebRenderImageHost::UseRemoteTexture() {
+   }
+ }
+ 
++bool WebRenderImageHost::WaitForPendingRemoteTexture() {
++  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
++
++  if (!mWaitingReadyCallback || mPendingRemoteTextureWrappers.empty()) {
++    return false;
++  }
++
++  // Textures are pushed in order, so once the most recent pending texture is
++  // ready, so are the ones before it.
++  const RemoteTextureInfo front = mPendingRemoteTextureWrappers.front()
++                                      ->AsRemoteTextureHostWrapper()
++                                      ->GetRemoteTextureInfo();
++  const RemoteTextureInfo back = mPendingRemoteTextureWrappers.back()
++                                     ->AsRemoteTextureHostWrapper()
++                                     ->GetRemoteTextureInfo();
++  if (!RemoteTextureMap::Get()->WaitRemoteTextureReady(
++          RemoteTextureInfo(back.mTextureId, back.mOwnerId, back.mForPid,
++                            front.mWaitForRemoteTextureOwner))) {
++    return false;
++  }
++
++  mWaitingReadyCallback = false;
++  ++mReadyCallbackGeneration;
++  RemoteTextureMap::Get()->CancelRemoteTextureReadyCheck(
++      RemoteTextureInfo(RemoteTextureId{0}, mReadyCallbackOwnerId,
++                        mReadyCallbackForPid),
++      this);
++  UseRemoteTexture();
++  return true;
++}
++
+ void WebRenderImageHost::CleanupResources() {
+   ImageComposite::ClearImages();
+   SetCurrentTextureHost(nullptr);
+@@ -263,9 +305,7 @@ void WebRenderImageHost::RemoveTextureHost(TextureHost* aTexture) {
+ void WebRenderImageHost::ClearImages(ClearImagesType aType) {
+   ImageComposite::ClearImages();
+   if (aType == ClearImagesType::All) {
+-    if (!mPendingRemoteTextureWrappers.empty()) {
+-      mPendingRemoteTextureWrappers.clear();
+-    }
++    ClearPendingRemoteTextures();
+     SetCurrentTextureHost(nullptr);
+ 
+     if (GetAsyncRef()) {
+diff --git a/gfx/layers/wr/WebRenderImageHost.h b/gfx/layers/wr/WebRenderImageHost.h
+index 91c05d1..d2695ef 100644
+--- a/gfx/layers/wr/WebRenderImageHost.h
++++ b/gfx/layers/wr/WebRenderImageHost.h
+@@ -51,6 +51,10 @@ class WebRenderImageHost : public CompositableHost, public ImageComposite {
+                                 const TextureFlags aFlags);
+   void UseRemoteTexture();
+ 
++  // If a remote texture ready check is pending, wait for the texture to be
++  // ready and use it. Returns true if it did.
++  bool WaitForPendingRemoteTexture();
++
+   TextureHost* GetAsTextureHostForComposite(
+       AsyncImagePipelineManager* aAsyncImageManager);
+ 
+@@ -79,6 +83,9 @@ class WebRenderImageHost : public CompositableHost, public ImageComposite {
+ 
+   void SetCurrentTextureHost(TextureHost* aTexture);
+ 
++  // Drops the pending remote textures and any ready check waiting for them.
++  void ClearPendingRemoteTextures();
++
+   std::unordered_map<uint64_t, RefPtr<WebRenderBridgeParentRef>> mWrBridges;
+ 
+   AsyncImagePipelineManager* mCurrentAsyncImageManager;
+@@ -87,6 +94,10 @@ class WebRenderImageHost : public CompositableHost, public ImageComposite {
+ 
+   std::deque<CompositableTextureHostRef> mPendingRemoteTextureWrappers;
+   bool mWaitingReadyCallback = false;
++  // Identifies the pending ready check, so that stale callbacks are ignored.
++  uint64_t mReadyCallbackGeneration = 0;
++  RemoteTextureOwnerId mReadyCallbackOwnerId;
++  base::ProcessId mReadyCallbackForPid = 0;
+   bool mWaitForRemoteTextureOwner = true;
+ 
+   RefPtr<wr::RenderTextureHostUsageInfo> mRenderTextureHostUsageInfo;
+diff --git a/gfx/tests/gtest/TestRemoteTextureMap.cpp b/gfx/tests/gtest/TestRemoteTextureMap.cpp
+index ca99db4..d7e9dd6 100644
+--- a/gfx/tests/gtest/TestRemoteTextureMap.cpp
++++ b/gfx/tests/gtest/TestRemoteTextureMap.cpp
+@@ -120,7 +120,7 @@ TEST_F(RemoteTextureMapTest, UnregisteredOwnerIsNotWaitedFor) {
+ 
+     auto called = std::make_shared<int>(0);
+     EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                               Counter(called)));
++                                               this, Counter(called)));
+     EXPECT_EQ(*called, 0);
+   });
+ }
+@@ -145,7 +145,7 @@ TEST_F(RemoteTextureMapTest, NewWrapperForUnregisteredOwnerIsNotWaitedFor) {
+ 
+     auto called = std::make_shared<int>(0);
+     EXPECT_TRUE(Map()->CheckRemoteTextureReady(
+-        WaitingInfo(lateTextureId, ownerId), Counter(called)));
++        WaitingInfo(lateTextureId, ownerId), this, Counter(called)));
+   });
+ }
+ 
+@@ -157,7 +157,7 @@ TEST_F(RemoteTextureMapTest, NotYetRegisteredOwnerIsWaitedFor) {
+     CreateWrapper(textureId, ownerId);
+     auto called = std::make_shared<int>(0);
+     EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                                Counter(called)));
++                                                this, Counter(called)));
+ 
+     mClient->RegisterTextureOwner(ownerId);
+     EXPECT_EQ(*called, 0);
+@@ -176,7 +176,7 @@ TEST_F(RemoteTextureMapTest, ReleasedWrapperIsReady) {
+ 
+     auto called = std::make_shared<int>(0);
+     EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                               Counter(called)));
++                                               this, Counter(called)));
+     EXPECT_EQ(*called, 0);
+   });
+ }
+@@ -197,9 +197,34 @@ TEST_F(RemoteTextureMapTest, UnregisteredOwnerIsForgottenWithItsWrappers) {
+     CreateWrapper(laterTextureId, ownerId);
+     auto called = std::make_shared<int>(0);
+     EXPECT_FALSE(Map()->CheckRemoteTextureReady(
+-        WaitingInfo(laterTextureId, ownerId), Counter(called)));
+-    Map()->SuppressRemoteTextureReadyCheck(
+-        WaitingInfo(laterTextureId, ownerId));
++        WaitingInfo(laterTextureId, ownerId), this, Counter(called)));
++    Map()->CancelRemoteTextureReadyCheck(WaitingInfo(laterTextureId, ownerId),
++                                         this);
++  });
++}
++
++TEST_F(RemoteTextureMapTest, CancelOnlyCancelsTheRequestersChecks) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto textureId = RemoteTextureId::GetNext();
++    auto requesterA = std::make_shared<int>(0);
++    auto requesterB = std::make_shared<int>(0);
++
++    CreateWrapper(textureId, ownerId);
++    EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                                requesterA.get(),
++                                                Counter(requesterA)));
++    EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                                requesterB.get(),
++                                                Counter(requesterB)));
++
++    Map()->CancelRemoteTextureReadyCheck(WaitingInfo(textureId, ownerId),
++                                         requesterA.get());
++
++    mClient->RegisterTextureOwner(ownerId);
++    mClient->PushDummyTexture(textureId, ownerId);
++    EXPECT_EQ(*requesterA, 0);
++    EXPECT_EQ(*requesterB, 1);
+   });
+ }
+ 
+@@ -212,12 +237,12 @@ TEST_F(RemoteTextureMapTest, ContextLossWakesReadyChecks) {
+     CreateWrapper(textureId, ownerId);
+     auto called = std::make_shared<int>(0);
+     EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                                Counter(called)));
++                                                this, Counter(called)));
+ 
+     mClient->NotifyContextLost();
+     EXPECT_EQ(*called, 1);
+     EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                               Counter(called)));
++                                               this, Counter(called)));
+   });
+ }
+ 
+@@ -232,13 +257,13 @@ TEST_F(RemoteTextureMapTest, DeferredUnregisterWakesReadyChecks) {
+     CreateWrapper(textureId, ownerId);
+     auto called = std::make_shared<int>(0);
+     EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                                Counter(called)));
++                                                this, Counter(called)));
+ 
+     EXPECT_TRUE(mClient->WaitForTxn(ownerId, kTestTxnType, 1));
+     mClient->UnregisterTextureOwner(ownerId);
+     EXPECT_EQ(*called, 1);
+     EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
+-                                               Counter(called)));
++                                               this, Counter(called)));
+ 
+     scheduler->NotifyTxn(1);
+   });
+diff --git a/gfx/webrender_bindings/WebRenderAPI.cpp b/gfx/webrender_bindings/WebRenderAPI.cpp
+index 3e86bab..35213a0 100644
+--- a/gfx/webrender_bindings/WebRenderAPI.cpp
++++ b/gfx/webrender_bindings/WebRenderAPI.cpp
+@@ -527,7 +527,7 @@ bool WebRenderAPI::CheckIsRemoteTextureReady(
+   while (!aList->mList.empty() && isReady) {
+     auto& front = aList->mList.front();
+     isReady &= layers::RemoteTextureMap::Get()->CheckRemoteTextureReady(
+-        front, callback);
++        front, this, callback);
+     if (isReady) {
+       aList->mList.pop();
+     }
+@@ -601,8 +601,8 @@ void WebRenderAPI::HandleWrTransactionEvents(RemoteTextureWaitType aType) {
+           auto* list = front.RemoteTextureInfoList();
+           while (!list->mList.empty()) {
+             auto& front = list->mList.front();
+-            layers::RemoteTextureMap::Get()->SuppressRemoteTextureReadyCheck(
+-                front);
++            layers::RemoteTextureMap::Get()->CancelRemoteTextureReadyCheck(
++                front, this);
+             list->mList.pop();
+           }
+         }

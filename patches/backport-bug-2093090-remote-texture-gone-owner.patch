@@ -1,0 +1,646 @@
+Sval: Stop compositing stalls on remote textures from gone canvases
+
+Backport of Mozilla's Bug 2093090 (mozilla-central 340c6c79ba2b,
+4d222f0c59ba, d7161e35da77, Firefox 162), unchanged. The first landing
+of part 3 was backed out for a gtest build bustage; this takes the
+relanded commit. Bug 2093091 builds on this patch.
+
+RemoteTextureMap could not tell an owner that had not registered yet
+from one that had already unregistered. A texture that reached the
+compositor after its canvas went away was waited on for the full
+10 second owner timeout on the compositor thread, which stalls
+compositing for every window. Ready checks for an owner that lost its
+context, or deferred its unregistration, were also never woken. The fix
+remembers which owners live wrappers have seen registered, skips waits
+nothing can use, and wakes those ready checks. It adds the gtests in
+TestRemoteTextureMap.cpp.
+
+diff --git a/gfx/layers/RemoteTextureMap.cpp b/gfx/layers/RemoteTextureMap.cpp
+index 781ae2f..8974900 100644
+--- a/gfx/layers/RemoteTextureMap.cpp
++++ b/gfx/layers/RemoteTextureMap.cpp
+@@ -610,6 +610,11 @@ void RemoteTextureMap::RegisterTextureOwner(
+   }
+ 
+   mTextureOwners.emplace(key, std::move(owner));
++
++  auto itConsumers = mTextureOwnerConsumers.find(key);
++  if (itConsumers != mTextureOwnerConsumers.end()) {
++    itConsumers->second.mWasRegistered = true;
++  }
+ }
+ 
+ void RemoteTextureMap::KeepTextureDataAliveForTextureHostIfNecessary(
+@@ -657,12 +662,13 @@ RemoteTextureMap::UnregisterTextureOwner(
+   // unregistering.
+   if (owner->mWaitForTxn) {
+     owner->mDeferUnregister = GetCurrentSerialEventTarget();
+-    // If another thread is waiting on this owner to produce textures,
+-    // it must be notified that owner is going away.
+-    if (!owner->mLatestTextureHost &&
+-        owner->mWaitingTextureDataHolders.empty()) {
+-      aProofOfLock.Notify();
+-    }
++    // Anything waiting on this owner to produce textures must be notified
++    // that the owner is going away.
++    aProofOfLock.Notify();
++    // No more textures will be pushed, so anything waiting for one should
++    // check again.
++    GetAllRenderingReadyCallbacks(aProofOfLock, owner,
++                                  aRenderingReadyCallbacks);
+     return nullptr;
+   }
+ 
+@@ -716,15 +722,12 @@ void RemoteTextureMap::UnregisterTextureOwner(
+ 
+     releasingOwner = UnregisterTextureOwner(
+         lock, aOwnerId, aForPid, releasingTextures, renderingReadyCallbacks);
+-    if (!releasingOwner) {
+-      return;
++    if (releasingOwner) {
++      mMonitor.Notify();
+     }
+-
+-    mMonitor.Notify();
+   }
+ 
+-  const auto info =
+-      RemoteTextureInfo(RemoteTextureId{0}, RemoteTextureOwnerId{0}, 0);
++  const auto info = RemoteTextureInfo(RemoteTextureId{0}, aOwnerId, aForPid);
+   for (auto& callback : renderingReadyCallbacks) {
+     callback(info);
+   }
+@@ -738,6 +741,7 @@ void RemoteTextureMap::UnregisterTextureOwners(
+       releasingTextures;  // Release outside the monitor
+   std::vector<std::function<void(const RemoteTextureInfo&)>>
+       renderingReadyCallbacks;  // Call outside the monitor
++  std::vector<RemoteTextureInfo> renderingReadyInfos;
+   {
+     MonitorAutoLock lock(mMonitor);
+ 
+@@ -746,19 +750,41 @@ void RemoteTextureMap::UnregisterTextureOwners(
+               lock, id, aForPid, releasingTextures, renderingReadyCallbacks)) {
+         releasingOwners.push_back(std::move(releasingOwner));
+       }
++      while (renderingReadyInfos.size() < renderingReadyCallbacks.size()) {
++        renderingReadyInfos.emplace_back(RemoteTextureId{0}, id, aForPid);
++      }
+     }
+ 
+-    if (releasingOwners.empty()) {
+-      return;
++    if (!releasingOwners.empty()) {
++      mMonitor.Notify();
+     }
++  }
+ 
+-    mMonitor.Notify();
++  for (size_t i = 0; i < renderingReadyCallbacks.size(); ++i) {
++    renderingReadyCallbacks[i](renderingReadyInfos[i]);
+   }
++}
+ 
+-  const auto info =
+-      RemoteTextureInfo(RemoteTextureId{0}, RemoteTextureOwnerId{0}, 0);
+-  for (auto& callback : renderingReadyCallbacks) {
+-    callback(info);
++void RemoteTextureMap::ClearDestroyedProcess(const base::ProcessId aForPid) {
++  std::vector<UniquePtr<WaitingTextureOwner>>
++      releasingWaitingOwners;  // Release outside the monitor
++  {
++    MonitorAutoLock lock(mMonitor);
++
++    for (auto it = mWaitingTextureOwners.lower_bound(
++             std::pair(aForPid, RemoteTextureOwnerId{0}));
++         it != mWaitingTextureOwners.end() && it->first.first == aForPid;) {
++      releasingWaitingOwners.push_back(std::move(it->second));
++      it = mWaitingTextureOwners.erase(it);
++    }
++
++    // The pid may be reused by a new process, whose owners must not be
++    // mistaken for these.
++    for (auto it = mTextureOwnerConsumers.lower_bound(
++             std::pair(aForPid, RemoteTextureOwnerId{0}));
++         it != mTextureOwnerConsumers.end() && it->first.first == aForPid;) {
++      it = mTextureOwnerConsumers.erase(it);
++    }
+   }
+ }
+ 
+@@ -870,25 +896,44 @@ void RemoteTextureMap::ClearRecycledTextures(
+ 
+ void RemoteTextureMap::NotifyContextLost(
+     const RemoteTextureOwnerIdSet& aOwnerIds, const base::ProcessId aForPid) {
+-  MonitorAutoLock lock(mMonitor);
++  std::vector<
++      std::pair<RemoteTextureInfo,
++                std::vector<std::function<void(const RemoteTextureInfo&)>>>>
++      renderingReadyCallbacks;  // Call outside the monitor
++  {
++    MonitorAutoLock lock(mMonitor);
+ 
+-  bool changed = false;
+-  for (const auto& id : aOwnerIds) {
+-    const auto key = std::pair(aForPid, id);
+-    auto it = mTextureOwners.find(key);
+-    if (it == mTextureOwners.end()) {
+-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+-      continue;
++    bool changed = false;
++    for (const auto& id : aOwnerIds) {
++      const auto key = std::pair(aForPid, id);
++      auto it = mTextureOwners.find(key);
++      if (it == mTextureOwners.end()) {
++        MOZ_ASSERT_UNREACHABLE("unexpected to be called");
++        continue;
++      }
++      auto& owner = it->second;
++      if (!owner->mIsContextLost) {
++        owner->mIsContextLost = true;
++        changed = true;
++
++        // No more textures are expected, so anything waiting for one should
++        // check again rather than wait for a push that may never come.
++        auto& entry = renderingReadyCallbacks.emplace_back(
++            RemoteTextureInfo(owner->mLatestPushedTextureId, id, aForPid),
++            std::vector<std::function<void(const RemoteTextureInfo&)>>());
++        GetAllRenderingReadyCallbacks(lock, owner.get(), entry.second);
++      }
+     }
+-    auto& owner = it->second;
+-    if (!owner->mIsContextLost) {
+-      owner->mIsContextLost = true;
+-      changed = true;
++
++    if (changed) {
++      mMonitor.Notify();
+     }
+   }
+ 
+-  if (changed) {
+-    mMonitor.Notify();
++  for (auto& [info, callbacks] : renderingReadyCallbacks) {
++    for (auto& callback : callbacks) {
++      callback(info);
++    }
+   }
+ }
+ 
+@@ -1032,6 +1077,10 @@ bool RemoteTextureMap::WaitForRemoteTextureOwner(
+         // If the context was lost, no further updates are expected.
+         return false;
+       }
++      if (IsTextureOwnerGone(lock, ownerId, forPid)) {
++        // The owner has already gone away, so it will never be pushed to.
++        return false;
++      }
+       CVStatus status = mMonitor.Wait(timeout);
+       if (status == CVStatus::Timeout) {
+         return false;
+@@ -1197,6 +1246,12 @@ RefPtr<TextureHost> RemoteTextureMap::GetOrCreateRemoteTextureHostWrapper(
+ 
+   mRemoteTextureHostWrapperHolders.emplace(key, std::move(wrapperHolder));
+ 
++  auto& consumers = mTextureOwnerConsumers[std::pair(aForPid, aOwnerId)];
++  ++consumers.mWrapperCount;
++  if (GetTextureOwner(lock, aOwnerId, aForPid)) {
++    consumers.mWasRegistered = true;
++  }
++
+   return wrapper;
+ }
+ 
+@@ -1222,6 +1277,14 @@ void RemoteTextureMap::UnregisterRemoteTextureHostWrapper(
+     }
+ 
+     mRemoteTextureHostWrapperHolders.erase(it);
++
++    auto itConsumers =
++        mTextureOwnerConsumers.find(std::pair(aForPid, aOwnerId));
++    if (itConsumers != mTextureOwnerConsumers.end() &&
++        --itConsumers->second.mWrapperCount == 0) {
++      mTextureOwnerConsumers.erase(itConsumers);
++    }
++
+     mMonitor.Notify();
+   }
+ }
+@@ -1233,8 +1296,15 @@ bool RemoteTextureMap::CheckRemoteTextureReady(
+ 
+   MonitorAutoLock lock(mMonitor);
+ 
++  if (!mRemoteTextureHostWrapperHolders.count(
++          std::pair(aInfo.mForPid, aInfo.mTextureId))) {
++    // Nothing can use the remote texture any more.
++    return true;
++  }
++
+   auto* owner = GetTextureOwner(lock, aInfo.mOwnerId, aInfo.mForPid);
+-  if (aInfo.mWaitForRemoteTextureOwner && !owner) {
++  if (aInfo.mWaitForRemoteTextureOwner && !owner &&
++      !IsTextureOwnerGone(lock, aInfo.mOwnerId, aInfo.mForPid)) {
+     // Remote texture owner is not registered yet. Waiting for remote texture
+     // owner
+ 
+@@ -1256,17 +1326,9 @@ bool RemoteTextureMap::CheckRemoteTextureReady(
+     return false;
+   }
+ 
+-  if (!owner || owner->mIsContextLost) {
+-    // Owner is already removed or context lost. No need to wait texture ready.
+-    return true;
+-  }
+-
+-  const auto key = std::pair(aInfo.mForPid, aInfo.mTextureId);
+-  auto it = mRemoteTextureHostWrapperHolders.find(key);
+-  if (it == mRemoteTextureHostWrapperHolders.end()) {
+-    MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+-    gfxCriticalNoteOnce << "Remote texture does not exist id:"
+-                        << uint64_t(aInfo.mTextureId);
++  if (!owner || owner->mIsContextLost || owner->mDeferUnregister) {
++    // Owner is already removed, context lost, or going away. No need to wait
++    // texture ready.
+     return true;
+   }
+ 
+@@ -1297,6 +1359,13 @@ bool RemoteTextureMap::WaitRemoteTextureReady(const RemoteTextureInfo& aInfo) {
+         // If the context was lost, no further updates are expected.
+         return false;
+       }
++      if (IsTextureOwnerGone(lock, aInfo.mOwnerId, aInfo.mForPid) ||
++          !mRemoteTextureHostWrapperHolders.count(
++              std::pair(aInfo.mForPid, aInfo.mTextureId))) {
++        // The owner has already gone away, so it will never be pushed to, or
++        // nothing can use the remote texture any more.
++        return false;
++      }
+       CVStatus status = mMonitor.Wait(timeout);
+       if (status == CVStatus::Timeout) {
+         return false;
+@@ -1322,6 +1391,10 @@ bool RemoteTextureMap::WaitRemoteTextureReady(const RemoteTextureInfo& aInfo) {
+   const TimeDuration timeout = TimeDuration::FromMilliseconds(1000);
+ 
+   while (owner->mLatestPushedTextureId < aInfo.mTextureId) {
++    if (owner->mDeferUnregister) {
++      // The owner is going away, so no more textures will be pushed.
++      return false;
++    }
+     CVStatus status = mMonitor.Wait(timeout);
+     if (status == CVStatus::Timeout) {
+       MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+@@ -1447,6 +1520,16 @@ RemoteTextureMap::TextureOwner* RemoteTextureMap::GetTextureOwner(
+   return it->second.get();
+ }
+ 
++bool RemoteTextureMap::IsTextureOwnerGone(const MonitorAutoLock& aProofOfLock,
++                                          const RemoteTextureOwnerId aOwnerId,
++                                          const base::ProcessId aForPid) {
++  if (GetTextureOwner(aProofOfLock, aOwnerId, aForPid)) {
++    return false;
++  }
++  auto it = mTextureOwnerConsumers.find(std::pair(aForPid, aOwnerId));
++  return it != mTextureOwnerConsumers.end() && it->second.mWasRegistered;
++}
++
+ RemoteTextureMap::TextureDataHolder::TextureDataHolder(
+     const RemoteTextureId aTextureId, RefPtr<TextureHost> aTextureHost,
+     UniquePtr<TextureData>&& aTextureData,
+diff --git a/gfx/layers/RemoteTextureMap.h b/gfx/layers/RemoteTextureMap.h
+index 5140047..83d9f72 100644
+--- a/gfx/layers/RemoteTextureMap.h
++++ b/gfx/layers/RemoteTextureMap.h
+@@ -311,6 +311,9 @@ class RemoteTextureMap {
+   void UnregisterTextureOwners(const RemoteTextureOwnerIdSet& aOwnerIds,
+                                const base::ProcessId aForPid);
+ 
++  // Forgets the pending ready checks of a process that has gone away.
++  void ClearDestroyedProcess(const base::ProcessId aForPid);
++
+   void ClearRecycledTextures(
+       const RemoteTextureOwnerIdSet& aOwnerIds, const base::ProcessId aForPid,
+       const RefPtr<RemoteTextureRecycleBin>& aRecycleBin = nullptr);
+@@ -473,6 +476,13 @@ class RemoteTextureMap {
+       const MonitorAutoLock& aProofOfLock, const RemoteTextureOwnerId aOwnerId,
+       const base::ProcessId aForPid);
+ 
++  // Whether the owner was registered and has since been unregistered, so it
++  // will never push another texture. This is only known while a
++  // RemoteTextureHostWrapper for the owner exists.
++  bool IsTextureOwnerGone(const MonitorAutoLock& aProofOfLock,
++                          const RemoteTextureOwnerId aOwnerId,
++                          const base::ProcessId aForPid);
++
+   void NotifyTxn(const MonitorAutoLock& aProofOfLock,
+                  const RemoteTextureOwnerId aOwnerId,
+                  const base::ProcessId aForPid);
+@@ -490,6 +500,17 @@ class RemoteTextureMap {
+            UniquePtr<TextureOwner>>
+       mTextureOwners;
+ 
++  // Texture owners named by live RemoteTextureHostWrappers. This tells an owner
++  // that has been unregistered apart from one that is not registered yet, for
++  // as long as anything may still wait for it.
++  struct TextureOwnerConsumers {
++    uint32_t mWrapperCount = 0;
++    bool mWasRegistered = false;
++  };
++  std::map<std::pair<base::ProcessId, RemoteTextureOwnerId>,
++           TextureOwnerConsumers>
++      mTextureOwnerConsumers;
++
+   std::map<std::pair<base::ProcessId, RemoteTextureId>,
+            UniquePtr<RemoteTextureHostWrapperHolder>>
+       mRemoteTextureHostWrapperHolders;
+diff --git a/gfx/layers/ipc/ImageBridgeParent.cpp b/gfx/layers/ipc/ImageBridgeParent.cpp
+index 3d7c726..7cd814c 100644
+--- a/gfx/layers/ipc/ImageBridgeParent.cpp
++++ b/gfx/layers/ipc/ImageBridgeParent.cpp
+@@ -155,6 +155,9 @@ void ImageBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
+     MonitorAutoLock lock(*sImageBridgesLock);
+     sImageBridges.erase(OtherPid());
+   }
++  if (auto* remoteTextureMap = RemoteTextureMap::Get()) {
++    remoteTextureMap->ClearDestroyedProcess(OtherPid());
++  }
+   GetThread()->Dispatch(
+       NewRunnableMethod("layers::ImageBridgeParent::DeferredDestroy", this,
+                         &ImageBridgeParent::DeferredDestroy));
+diff --git a/gfx/layers/wr/WebRenderImageHost.cpp b/gfx/layers/wr/WebRenderImageHost.cpp
+index b1960c3..ad53efa 100644
+--- a/gfx/layers/wr/WebRenderImageHost.cpp
++++ b/gfx/layers/wr/WebRenderImageHost.cpp
+@@ -211,7 +211,9 @@ void WebRenderImageHost::UseRemoteTexture() {
+         break;
+       }
+       RemoteTextureMap::Get()->GetRemoteTexture(wrapper);
+-      texture = mPendingRemoteTextureWrappers.front();
++      if (wrapper->IsReadyForRendering()) {
++        texture = mPendingRemoteTextureWrappers.front();
++      }
+       mPendingRemoteTextureWrappers.pop_front();
+     }
+   } else {
+diff --git a/gfx/tests/gtest/TestRemoteTextureMap.cpp b/gfx/tests/gtest/TestRemoteTextureMap.cpp
+new file mode 100644
+index 0000000..ca99db4
+--- /dev/null
++++ b/gfx/tests/gtest/TestRemoteTextureMap.cpp
+@@ -0,0 +1,246 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
++/* vim: set ts=8 sts=2 et sw=2 tw=80: */
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include <functional>
++#include <memory>
++
++#include "base/process_util.h"
++#include "gfxPlatform.h"
++#include "gtest/gtest.h"
++#include "mozilla/SyncRunnable.h"
++#include "mozilla/TimeStamp.h"
++#include "mozilla/layers/CompositorThread.h"
++#include "mozilla/layers/RemoteTextureHostWrapper.h"
++#include "mozilla/layers/RemoteTextureMap.h"
++#include "mozilla/webrender/RenderThread.h"
++
++using namespace mozilla;
++using namespace mozilla::layers;
++
++namespace {
++
++constexpr RemoteTextureTxnType kTestTxnType = 0xFFFFFFFE;
++
++// Long enough to not be flaky, but well short of the 10 second owner wait.
++constexpr double kPromptlyMs = 2000;
++
++}  // namespace
++
++class RemoteTextureMapTest : public ::testing::Test {
++ protected:
++  void SetUp() override {
++    gfxPlatform::GetPlatform();
++    if (!CompositorThread()) {
++      GTEST_SKIP() << "No compositor thread";
++    }
++    // Pushing textures needs the render thread, which is in the GPU process
++    // when there is one.
++    if (!wr::RenderThread::Get()) {
++      GTEST_SKIP() << "No render thread";
++    }
++    RunOnCompositorThread([&] {
++      ASSERT_TRUE(RemoteTextureMap::Get());
++      mClient = MakeRefPtr<RemoteTextureOwnerClient>(Pid());
++    });
++  }
++
++  void TearDown() override {
++    if (!mClient) {
++      return;
++    }
++    RunOnCompositorThread([&] {
++      for (const auto& [textureId, ownerId] : mWrappers) {
++        Map()->UnregisterRemoteTextureHostWrapper(textureId, ownerId, Pid());
++      }
++      mWrappers.clear();
++      mClient->UnregisterAllTextureOwners();
++      mClient = nullptr;
++    });
++    // Let any deferred work from the tests run before the next test.
++    RunOnCompositorThread([] {});
++  }
++
++  static void RunOnCompositorThread(std::function<void()>&& aTest) {
++    RefPtr<Runnable> runnable = NS_NewRunnableFunction(
++        "RemoteTextureMapTest", [test = std::move(aTest)]() { test(); });
++    SyncRunnable::DispatchToThread(CompositorThread(), runnable);
++  }
++
++  static base::ProcessId Pid() { return base::GetCurrentProcId(); }
++  static RemoteTextureMap* Map() { return RemoteTextureMap::Get(); }
++
++  RefPtr<TextureHost> CreateWrapper(RemoteTextureId aTextureId,
++                                    RemoteTextureOwnerId aOwnerId) {
++    mWrappers.emplace_back(aTextureId, aOwnerId);
++    return Map()->GetOrCreateRemoteTextureHostWrapper(aTextureId, aOwnerId,
++                                                      Pid(), gfx::IntSize(1, 1),
++                                                      TextureFlags::NO_FLAGS);
++  }
++
++  void ReleaseWrapper(RemoteTextureId aTextureId,
++                      RemoteTextureOwnerId aOwnerId) {
++    std::erase(mWrappers, std::pair(aTextureId, aOwnerId));
++    Map()->UnregisterRemoteTextureHostWrapper(aTextureId, aOwnerId, Pid());
++  }
++
++  static RemoteTextureInfo WaitingInfo(RemoteTextureId aTextureId,
++                                       RemoteTextureOwnerId aOwnerId) {
++    return RemoteTextureInfo(aTextureId, aOwnerId, Pid(),
++                             /* aWaitForRemoteTextureOwner */ true);
++  }
++
++  // Callbacks may outlive a failed test, so count on the heap.
++  static std::function<void(const RemoteTextureInfo&)> Counter(
++      const std::shared_ptr<int>& aCount) {
++    return [aCount](const RemoteTextureInfo&) { ++*aCount; };
++  }
++
++  RefPtr<RemoteTextureOwnerClient> mClient;
++  std::vector<std::pair<RemoteTextureId, RemoteTextureOwnerId>> mWrappers;
++};
++
++TEST_F(RemoteTextureMapTest, UnregisteredOwnerIsNotWaitedFor) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto textureId = RemoteTextureId::GetNext();
++
++    mClient->RegisterTextureOwner(ownerId);
++    RefPtr<TextureHost> wrapper = CreateWrapper(textureId, ownerId);
++    mClient->UnregisterTextureOwner(ownerId);
++
++    const auto start = TimeStamp::Now();
++    EXPECT_FALSE(Map()->WaitForRemoteTextureOwner(
++        wrapper->AsRemoteTextureHostWrapper()));
++    EXPECT_FALSE(
++        Map()->WaitRemoteTextureReady(WaitingInfo(textureId, ownerId)));
++    EXPECT_LT((TimeStamp::Now() - start).ToMilliseconds(), kPromptlyMs);
++
++    auto called = std::make_shared<int>(0);
++    EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                               Counter(called)));
++    EXPECT_EQ(*called, 0);
++  });
++}
++
++TEST_F(RemoteTextureMapTest, NewWrapperForUnregisteredOwnerIsNotWaitedFor) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto firstTextureId = RemoteTextureId::GetNext();
++    const auto lateTextureId = RemoteTextureId::GetNext();
++
++    mClient->RegisterTextureOwner(ownerId);
++    CreateWrapper(firstTextureId, ownerId);
++    mClient->UnregisterTextureOwner(ownerId);
++
++    // A texture for the owner arrives after it went away, while an earlier
++    // texture of it is still in use.
++    RefPtr<TextureHost> late = CreateWrapper(lateTextureId, ownerId);
++    const auto start = TimeStamp::Now();
++    EXPECT_FALSE(
++        Map()->WaitForRemoteTextureOwner(late->AsRemoteTextureHostWrapper()));
++    EXPECT_LT((TimeStamp::Now() - start).ToMilliseconds(), kPromptlyMs);
++
++    auto called = std::make_shared<int>(0);
++    EXPECT_TRUE(Map()->CheckRemoteTextureReady(
++        WaitingInfo(lateTextureId, ownerId), Counter(called)));
++  });
++}
++
++TEST_F(RemoteTextureMapTest, NotYetRegisteredOwnerIsWaitedFor) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto textureId = RemoteTextureId::GetNext();
++
++    CreateWrapper(textureId, ownerId);
++    auto called = std::make_shared<int>(0);
++    EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                                Counter(called)));
++
++    mClient->RegisterTextureOwner(ownerId);
++    EXPECT_EQ(*called, 0);
++    mClient->PushDummyTexture(textureId, ownerId);
++    EXPECT_EQ(*called, 1);
++  });
++}
++
++TEST_F(RemoteTextureMapTest, ReleasedWrapperIsReady) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto textureId = RemoteTextureId::GetNext();
++
++    CreateWrapper(textureId, ownerId);
++    ReleaseWrapper(textureId, ownerId);
++
++    auto called = std::make_shared<int>(0);
++    EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                               Counter(called)));
++    EXPECT_EQ(*called, 0);
++  });
++}
++
++TEST_F(RemoteTextureMapTest, UnregisteredOwnerIsForgottenWithItsWrappers) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto firstTextureId = RemoteTextureId::GetNext();
++    const auto laterTextureId = RemoteTextureId::GetNext();
++
++    mClient->RegisterTextureOwner(ownerId);
++    CreateWrapper(firstTextureId, ownerId);
++    mClient->UnregisterTextureOwner(ownerId);
++    ReleaseWrapper(firstTextureId, ownerId);
++
++    // Once nothing referred to the owner, nothing is kept about it, so a later
++    // texture for it waits as if the owner was not registered yet.
++    CreateWrapper(laterTextureId, ownerId);
++    auto called = std::make_shared<int>(0);
++    EXPECT_FALSE(Map()->CheckRemoteTextureReady(
++        WaitingInfo(laterTextureId, ownerId), Counter(called)));
++    Map()->SuppressRemoteTextureReadyCheck(
++        WaitingInfo(laterTextureId, ownerId));
++  });
++}
++
++TEST_F(RemoteTextureMapTest, ContextLossWakesReadyChecks) {
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto textureId = RemoteTextureId::GetNext();
++
++    mClient->RegisterTextureOwner(ownerId);
++    CreateWrapper(textureId, ownerId);
++    auto called = std::make_shared<int>(0);
++    EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                                Counter(called)));
++
++    mClient->NotifyContextLost();
++    EXPECT_EQ(*called, 1);
++    EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                               Counter(called)));
++  });
++}
++
++TEST_F(RemoteTextureMapTest, DeferredUnregisterWakesReadyChecks) {
++  RefPtr<RemoteTextureTxnScheduler> scheduler;
++  RunOnCompositorThread([&] {
++    const auto ownerId = RemoteTextureOwnerId::GetNext();
++    const auto textureId = RemoteTextureId::GetNext();
++    scheduler = Map()->RegisterTxnScheduler(Pid(), kTestTxnType);
++
++    mClient->RegisterTextureOwner(ownerId);
++    CreateWrapper(textureId, ownerId);
++    auto called = std::make_shared<int>(0);
++    EXPECT_FALSE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                                Counter(called)));
++
++    EXPECT_TRUE(mClient->WaitForTxn(ownerId, kTestTxnType, 1));
++    mClient->UnregisterTextureOwner(ownerId);
++    EXPECT_EQ(*called, 1);
++    EXPECT_TRUE(Map()->CheckRemoteTextureReady(WaitingInfo(textureId, ownerId),
++                                               Counter(called)));
++
++    scheduler->NotifyTxn(1);
++  });
++  RunOnCompositorThread([&] { scheduler = nullptr; });
++}
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index d373fd7..3c873b7 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -23,6 +23,7 @@ UNIFIED_SOURCES += [
+     "TestPolygon.cpp",
+     "TestQcms.cpp",
+     "TestRegion.cpp",
++    "TestRemoteTextureMap.cpp",
+     "TestSkipChars.cpp",
+     "TestSwizzle.cpp",
+     "TestTextures.cpp",
