@@ -2,6 +2,7 @@
 // Copyright 2026 Ellm Tree, Inc.
 
 import Foundation
+import UIKit
 
 /// The document every screen shows: the `workspaces` document
 /// (`SvalPanelModel.SYNC_DOCUMENT` on the desktop).
@@ -553,7 +554,9 @@ enum SyncError: LocalizedError {
         case .notASvalFolder:
             return "This folder has no Sval data. Choose the folder your other devices sync through."
         case .ownFileUnreadable:
-            return "This iPhone's own file in the folder can't be read yet. Sval will try again."
+            // Read by AppModel alone, on the main actor.
+            let device = MainActor.assumeIsolated { UIDevice.current.model }
+            return "This \(device)'s own file in the folder can't be read yet. Sval will try again."
         }
     }
 }

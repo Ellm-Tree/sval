@@ -752,7 +752,7 @@ final class AppModel {
         var key = Data(count: 32)
         let made = key.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
         guard made == errSecSuccess else {
-            message = "This iPhone couldn't make a sync key. Try again."
+            message = "This \(UIDevice.current.model) couldn't make a sync key. Try again."
             return
         }
         do {
@@ -899,7 +899,7 @@ final class AppModel {
                     } catch JoinError.noOffer {
                         Diagnostics.log("join: no offer yet")
                         waitingForOffer = true
-                        message = "Waiting for the code to reach this iPhone. Keep Sval open."
+                        message = "Waiting for the code to reach this \(UIDevice.current.model). Keep Sval open."
                         let sleep = Task { try await Task.sleep(for: Self.claimInterval) }
                         joinSleep = sleep
                         _ = try? await sleep.value

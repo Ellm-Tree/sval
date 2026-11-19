@@ -10,16 +10,26 @@ import UniformTypeIdentifiers
 /// main button stays at the bottom, in reach of the thumb.
 struct FirstRunView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var horizontalSize
+    @Environment(\.verticalSizeClass) private var verticalSize
+
+    /// On an iPad the steps keep to the width iPadOS gives a sheet,
+    /// centred under the sky. UIKit's readable content guide spans the
+    /// whole width of an upright 11-inch iPad.
+    static let sheetWidth: CGFloat = 580
 
     var body: some View {
         ZStack {
             NightSky()
-            switch model.stage {
-            case .chooseFolder: FolderSteps()
-            case .start: StartStep()
-            case .join: CodeStep()
-            case .ready: ArrivalStep()
+            Group {
+                switch model.stage {
+                case .chooseFolder: FolderSteps()
+                case .start: StartStep()
+                case .join: CodeStep()
+                case .ready: ArrivalStep()
+                }
             }
+            .frame(maxWidth: horizontalSize == .regular && verticalSize == .regular ? Self.sheetWidth : nil)
         }
         .foregroundStyle(.white)
         .preferredColorScheme(.dark)
@@ -161,7 +171,7 @@ private struct FolderSteps: View {
             .frame(maxHeight: .infinity)
             VStack(spacing: 14) {
                 FirstRunStyle.primary("Choose Your Folder") { step = .choose }
-                Text("Choose the folder your other devices sync to, or an empty folder to start syncing from this iPhone.")
+                Text("Choose the folder your other devices sync to, or an empty folder to start syncing from this \(UIDevice.current.model).")
                     .font(.system(.footnote))
                     .foregroundStyle(FirstRunStyle.muted)
                     .multilineTextAlignment(.center)
@@ -302,7 +312,7 @@ private struct ServerStep: View {
                 } header: {
                     caption("Sign in")
                 } footer: {
-                    Text("Sval connects over SMB. The password stays in this iPhone's Keychain.")
+                    Text("Sval connects over SMB. The password stays in this \(UIDevice.current.model)'s Keychain.")
                         .font(.system(.footnote))
                         .foregroundStyle(FirstRunStyle.muted)
                 }
@@ -333,7 +343,7 @@ private struct ServerStep: View {
 
     private func problem(_ error: Error) -> some View {
         let (title, detail): (String, String) = switch ring {
-        case .host: ("Can't reach \(triedHost)", "Check that the server is on, and that this iPhone is on the same network.")
+        case .host: ("Can't reach \(triedHost)", "Check that the server is on, and that this \(UIDevice.current.model) is on the same network.")
         case .signIn: ("\(triedHost) didn't accept that user name and password.", "")
         default: (error.localizedDescription, "")
         }
@@ -563,7 +573,7 @@ private struct StartStep: View {
                 .padding(.horizontal, 4)
                 .padding(.top, 24)
                 .accessibilityAddTraits(.isHeader)
-            Text("This folder doesn't hold any Sval Workspaces yet. Sval on this iPhone can start syncing to this folder. Your other devices can then join this folder.")
+            Text("This folder doesn't hold any Sval Workspaces yet. Sval on this \(UIDevice.current.model) can start syncing to this folder. Your other devices can then join this folder.")
                 .font(.system(.subheadline))
                 .foregroundStyle(FirstRunStyle.lead)
                 .padding(.horizontal, 4)
@@ -591,7 +601,7 @@ private struct BackupStep: View {
                 .padding(.horizontal, 4)
                 .padding(.top, 24)
                 .accessibilityAddTraits(.isHeader)
-            Text("Keep it in your password manager. With this key, a new device can open your Workspaces in this folder, even if you lose this iPhone.")
+            Text("Keep it in your password manager. With this key, a new device can open your Workspaces in this folder, even if you lose this \(UIDevice.current.model).")
                 .font(.system(.subheadline))
                 .foregroundStyle(FirstRunStyle.lead)
                 .padding(.horizontal, 4)
@@ -812,7 +822,7 @@ private struct JoiningView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if waiting {
-                Text("Keep Sval open. Your computer's code reaches this iPhone through your folder.")
+                Text("Keep Sval open. Your computer's code reaches this \(UIDevice.current.model) through your folder.")
                     .font(.system(.subheadline))
                     .foregroundStyle(FirstRunStyle.muted)
                     .multilineTextAlignment(.center)

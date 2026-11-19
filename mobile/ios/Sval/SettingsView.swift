@@ -33,7 +33,7 @@ struct SettingsView: View {
                 } header: {
                     caption("Show Tabs As")
                 } footer: {
-                    footnote("Your choice applies only to this iPhone.")
+                    footnote("Your choice applies only to this \(UIDevice.current.model).")
                 }
                 .listRowBackground(theme.cell)
                 Section {
@@ -108,14 +108,14 @@ struct SettingsView: View {
                 (onDone ?? { dismiss() })()
             }
         } message: {
-            Text("This iPhone forgets your Workspaces. The folder and your other devices keep them.")
+            Text("This \(UIDevice.current.model) forgets your Workspaces. The folder and your other devices keep them.")
         }
         .confirmationDialog("Clear Browsing Data?", isPresented: $clearing, titleVisibility: .visible) {
             Button("Clear Browsing Data", role: .destructive) {
                 Task { await model.browser.clearBrowsingData() }
             }
         } message: {
-            Text("Sval deletes cookies, site data, cached files, site icons, and tab pictures from this iPhone. Sval keeps your tabs, history, and settings.")
+            Text("Sval deletes cookies, site data, cached files, site icons, and tab pictures from this \(UIDevice.current.model). Sval keeps your tabs, history, and settings.")
         }
     }
 
@@ -342,7 +342,7 @@ struct BlockingLevelPicker: View {
         return switch level {
         case "off": "Nothing is blocked."
         case "strict": "Adds lists that block more, including trackers in links, social widgets, and scam sites. Some sites may break."
-        case "custom": "Your computer is set to Custom, with lists this iPhone doesn't have. This iPhone uses Balanced."
+        case "custom": "Your computer is set to Custom, with lists this \(UIDevice.current.model) doesn't have. This \(UIDevice.current.model) uses Balanced."
         default: "Blocks ads and trackers with lists that rarely break sites."
         }
     }

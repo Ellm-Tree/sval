@@ -10,6 +10,7 @@ struct BrowserView: View {
     @Environment(\.appearance) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSize
+    @Environment(\.horizontalSizeClass) private var horizontalSize
     @State private var showingTabs = false
     @State private var showingSite = false
     /// What to say once the site menu closes, after the page reloads.
@@ -40,6 +41,9 @@ struct BrowserView: View {
     /// Whether the Workspace shows as the upright sheet; sideways it is
     /// the panel.
     @State private var sheetShown = false
+    /// Whether the Workspace shows as the popover from the bar's Workspace
+    /// button, where the screen is regular both ways: an iPad's.
+    @State private var popoverShown = false
     /// Set while the app itself takes the sheet away to show the panel.
     @State private var swappingSheet = false
     /// The room iOS keeps clear at each side of a sideways screen. Pages
@@ -216,7 +220,7 @@ struct BrowserView: View {
         // Settings in the sideways panel is in no sheet, so setup opens at
         // once.
         .onChange(of: model.setUpRequested) {
-            guard model.setUpRequested, !sheetShown else { return }
+            guard model.setUpRequested, !sheetShown, !popoverShown else { return }
             model.setUpRequested = false
             model.settingUp = true
         }
@@ -224,24 +228,37 @@ struct BrowserView: View {
             placeWorkspace()
             logSides()
         }
+        .onChange(of: horizontalSize) { placeWorkspace() }
         .sheet(isPresented: $sheetShown, onDismiss: {
             if swappingSheet { swappingSheet = false } else { showingTabs = false }
-            // The sheet's New Tab opens the Launcher once the sheet has
-            // gone, so its leaving can't take the keyboard with it.
-            if newTabAfterSheet {
-                newTabAfterSheet = false
-                enter(.newTab)
-            }
-            if model.setUpRequested {
-                model.setUpRequested = false
-                model.settingUp = true
-            }
+            workspaceSheetGone()
         }) {
             // A glass sheet inset from the screen's edges, which iOS draws
             // for a sheet short of full height (14b1).
             WorkspaceSheet(onNewTab: { newTabAfterSheet = true })
                 .presentationDetents([.fraction(0.8)])
                 .presentationDragIndicator(.hidden)
+        }
+        .overlayPreferenceValue(WorkspaceButtonBounds.self) { anchor in
+            GeometryReader { proxy in
+                if let anchor {
+                    let button = proxy[anchor]
+                    Color.clear
+                        .popover(isPresented: $popoverShown, attachmentAnchor: .rect(.rect(button)), arrowEdge: .bottom) {
+                            WorkspaceSheet(onNewTab: { newTabAfterSheet = true })
+                                // The size the sheet has on the largest
+                                // iPhone, 80% of its 956pt height, within
+                                // the room above the button.
+                                .frame(width: 440, height: min(765, button.minY - proxy.safeAreaInsets.top - 16))
+                                .onDisappear(perform: workspaceSheetGone)
+                        }
+                }
+            }
+            .allowsHitTesting(false)
+        }
+        .onChange(of: popoverShown) {
+            guard !popoverShown else { return }
+            if swappingSheet { swappingSheet = false } else { showingTabs = false }
         }
         .sheet(isPresented: $showingSite, onDismiss: {
             if let text = pendingNotice {
@@ -358,9 +375,25 @@ struct BrowserView: View {
     }
 
     private func placeWorkspace() {
-        let sheet = showingTabs && verticalSize != .compact
-        if sheetShown && !sheet && showingTabs { swappingSheet = true }
+        let popover = showingTabs && horizontalSize == .regular && verticalSize == .regular
+        let sheet = showingTabs && verticalSize != .compact && !popover
+        if showingTabs && (sheetShown && !sheet || popoverShown && !popover) { swappingSheet = true }
         sheetShown = sheet
+        popoverShown = popover
+    }
+
+    /// Once the Workspace's sheet or popover has gone: its New Tab opens
+    /// the Launcher, so its leaving can't take the keyboard with it, and
+    /// Settings' setup opens.
+    private func workspaceSheetGone() {
+        if newTabAfterSheet {
+            newTabAfterSheet = false
+            enter(.newTab)
+        }
+        if model.setUpRequested {
+            model.setUpRequested = false
+            model.settingUp = true
+        }
     }
 
     /// What iOS keeps clear on each side, for the device log.
@@ -444,12 +477,12 @@ struct BrowserView: View {
                 .background(theme.well, in: .rect(cornerRadius: 20))
                 .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(theme.divider, lineWidth: 1) }
                 .accessibilityHidden(true)
-            Text("Sval on iPhone can't open this tab")
+            Text("Sval on \(UIDevice.current.model) can't open this tab")
                 .font(SvalFont.outfit(22, .bold, relativeTo: .title2))
                 .foregroundStyle(theme.text)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
-            Text("Sval on iPhone opens only web pages, and this tab's address isn't a web address. The tab stays in your Workspace and keeps syncing to your other devices.")
+            Text("Sval on \(UIDevice.current.model) opens only web pages, and this tab's address isn't a web address. The tab stays in your Workspace and keeps syncing to your other devices.")
                 .font(.system(.body))
                 .foregroundStyle(theme.body)
                 .multilineTextAlignment(.center)

@@ -202,7 +202,7 @@ struct WorkspaceSheet: View {
                             frames.rows[entry.id] = $0
                         }
                         .onDrag { startDrag(entry) } preview: { dragPreview(entry) }
-                        .modifier(DragEnded(action: endDrag))
+                        .modifier(DragSessionPhases(began: { if !lifted { lifted = true } }, ended: endDrag))
                         .padding(.top, gaps.contains(entry.id) ? 4 : 0)
                         .listRowInsets(EdgeInsets(top: 0, leading: TreeFrames.inset, bottom: 0, trailing: TreeFrames.inset))
                         .listRowSeparator(.hidden)
@@ -524,8 +524,12 @@ struct WorkspaceSheet: View {
     func startDrag(_ entry: TreeEntry) -> NSItemProvider {
         let id = entry.row.id
         if !lifted {
-            lifted = true
             dragging = id
+            // The system also asks for a row's item after a drop, with no
+            // drag under way. Lifted there, the tree's drop target would
+            // cover the rows and take the next long press. Where the
+            // system reports the drag's session, the session lifts it.
+            if #unavailable(iOS 27.0) { lifted = true }
         }
         let provider = NSItemProvider()
         provider.registerDataRepresentation(forTypeIdentifier: UTType.svalNode.identifier, visibility: .ownProcess) { done in
@@ -745,7 +749,7 @@ struct WorkspaceSheet: View {
     /// A tab row's spoken label: its title, its site, and whether it plays
     /// or can't open here.
     private func rowLabel(_ row: OutlineRow, elsewhere: Bool, playing: Bool) -> String {
-        [name(row), site(of: row), playing ? "playing" : nil, elsewhere ? "can't open on iPhone" : nil]
+        [name(row), site(of: row), playing ? "playing" : nil, elsewhere ? "can't open on \(UIDevice.current.model)" : nil]
             .compactMap { $0 }.joined(separator: ", ")
     }
 
@@ -944,7 +948,7 @@ struct WorkspaceSheet: View {
                     .font(.system(size: 14))
                     .foregroundStyle(rowInk.muted)
                     .frame(width: 36, height: 36)
-                    .accessibilityLabel("Can't open on iPhone")
+                    .accessibilityLabel("Can't open on \(UIDevice.current.model)")
             }
             // Every row closes from its ×, which a playing tab's speaker
             // takes the place of (14b1).
@@ -968,7 +972,7 @@ struct WorkspaceSheet: View {
             // A tab the phone can't open never takes the screen: it stays
             // in the tree, where it can be closed (decision 1372).
             if elsewhere {
-                toast = Toast(text: "Sval on iPhone can't open this tab", undo: { close(row) }, action: "Close Tab")
+                toast = Toast(text: "Sval on \(UIDevice.current.model) can't open this tab", undo: { close(row) }, action: "Close Tab")
                 return
             }
             browser.select(row.id)
@@ -1633,16 +1637,19 @@ struct DropHalvesMark: View {
     }
 }
 
-/// Tells when a drag from the view ends, wherever it's let go, on the
-/// systems that report it.
-struct DragEnded: ViewModifier {
-    let action: () -> Void
+/// Tells when a drag from the view is under way, and when it ends
+/// wherever it's let go, on the systems that report its session.
+struct DragSessionPhases: ViewModifier {
+    let began: () -> Void
+    let ended: () -> Void
 
     func body(content: Content) -> some View {
         if #available(iOS 27.0, *) {
             content.onDragSessionUpdated { session in
-                if case .ended = session.phase {
-                    action()
+                switch session.phase {
+                case .initial, .active: began()
+                case .ended: ended()
+                default: break
                 }
             }
         } else {

@@ -135,7 +135,7 @@ extension WorkspaceSheet {
                     return
                 }
                 if Browser.openable(row) == nil, row.url != nil {
-                    toast = Toast(text: "Sval on iPhone can't open this tab", undo: { close(row) }, action: "Close Tab")
+                    toast = Toast(text: "Sval on \(UIDevice.current.model) can't open this tab", undo: { close(row) }, action: "Close Tab")
                     return
                 }
                 browser.select(row.id)
@@ -955,7 +955,7 @@ struct GridCard: View {
         var parts = [row.displayTitle]
         if let host = row.url.flatMap(URL.init(string:))?.host() { parts.append(SiteRules.site(of: host) ?? host) }
         if playing { parts.append("playing") }
-        if elsewhere { parts.append("can't open on iPhone") }
+        if elsewhere { parts.append("can't open on \(UIDevice.current.model)") }
         return parts.joined(separator: ", ")
     }
 }
@@ -1135,7 +1135,7 @@ struct CardPicture: View {
                                 .lineLimit(1)
                         }
                         if elsewhere {
-                            Label("Can't open on iPhone", systemImage: "laptopcomputer")
+                            Label("Can't open on \(UIDevice.current.model)", systemImage: "laptopcomputer")
                                 .font(.system(.caption, weight: .semibold))
                                 .foregroundStyle(theme.text)
                                 .padding(.horizontal, 9)

@@ -37,6 +37,13 @@ final class WalkthroughTests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Edit Tabs'")).firstMatch.tap()
     }
 
+    /// Swipes a list up by coordinates. XCTest finds a list inside an
+    /// iPad's popover no visible frame, and refuses to swipe the element.
+    private func swipeUp(_ list: XCUIElement) {
+        list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
+            .press(forDuration: 0.05, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
+    }
+
     private func waitForBar() {
         XCTAssertTrue(app.buttons["New Tab"].firstMatch.waitForExistence(timeout: 30), "the bar's New Tab button shows")
         sleep(2)
@@ -66,6 +73,46 @@ final class WalkthroughTests: XCTestCase {
 
     /// The site menu's video and audio choice: the desktop's three, saved
     /// for the site, and the page made again for it.
+    /// On an iPad the Workspace opens as a popover over its button, which
+    /// keeps what opens from it: Settings, and the grid filling its width.
+    func testLauncherPopoverOnIPad() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "an iPhone opens the Workspace as a sheet")
+        waitForBar()
+        let button = app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch
+        button.tap()
+        sleep(2)
+        shot("popover-list")
+        let popover = app.popovers.firstMatch
+        XCTAssertTrue(popover.exists, "the Workspace opens as a popover")
+        XCTAssertLessThanOrEqual(popover.frame.maxY, button.frame.minY, "above its button, its arrow at the button's edge")
+        XCTAssertLessThan(popover.frame.minX, button.frame.midX, "reaching over its button")
+        XCTAssertGreaterThan(popover.frame.maxX, button.frame.midX - 60, "near its button")
+        XCTAssertTrue(popover.buttons["Workspace options"].exists, "the popover holds the Workspace")
+        popover.buttons["Workspace options"].tap()
+        sleep(1)
+        app.buttons["Grid"].firstMatch.tap()
+        sleep(2)
+        app.buttons["Work"].firstMatch.tap()
+        sleep(2)
+        shot("popover-grid")
+        let cards = popover.collectionViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Wikipedia' OR label BEGINSWITH 'Swift'"))
+        XCTAssertEqual(cards.count, 2, "Work shows its two cards")
+        let frames = cards.allElementsBoundByIndex.map(\.frame).sorted { $0.minX < $1.minX }
+        let left = frames[0], right = frames[frames.count - 1]
+        XCTAssertEqual(left.minX - popover.frame.minX, popover.frame.maxX - right.maxX, accuracy: 24,
+                       "the grid's two columns fill the popover")
+        app.buttons["Settings"].firstMatch.tap()
+        sleep(2)
+        shot("popover-settings")
+        XCTAssertTrue(app.popovers.firstMatch.navigationBars["Settings"].exists, "Settings opens inside the popover")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
+        sleep(2)
+        XCTAssertFalse(app.popovers.firstMatch.exists, "a tap outside closes the popover")
+        button.tap()
+        sleep(2)
+        XCTAssertTrue(app.popovers.firstMatch.exists, "the popover opens again")
+    }
+
     func testMediaChoice() {
         waitForBar()
         app.buttons["Site settings"].firstMatch.tap()
@@ -130,7 +177,7 @@ final class WalkthroughTests: XCTestCase {
         sleep(2)
         app.buttons["Settings"].firstMatch.tap()
         sleep(2)
-        app.collectionViews.firstMatch.swipeUp()
+        swipeUp(app.collectionViews.firstMatch)
         sleep(1)
         app.buttons["Licenses"].firstMatch.tap()
         let notice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Sval is made by Ellm Tree'")).firstMatch
@@ -138,7 +185,8 @@ final class WalkthroughTests: XCTestCase {
         sleep(1)
         shot("licenses")
         XCTAssertTrue(app.navigationBars["Licenses"].exists, "Licenses has the system's bar")
-        app.searchFields.firstMatch.tap()
+        // The page behind an iPad's popover has search fields of its own.
+        app.navigationBars["Licenses"].searchFields.firstMatch.tap()
         app.typeText("seahash")
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'seahash'")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5), "a search finds the component")
@@ -299,9 +347,11 @@ final class WalkthroughTests: XCTestCase {
         sleep(2)
         app.buttons["Work"].firstMatch.tap()
         sleep(2)
-        // Let go at the end of Apple's row, its split zone.
+        // Let go at the end of Apple's row, its split zone, where the
+        // tree ends: the sheet's edge, or the popover's.
         let apple = row("Apple").frame
-        let zone = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width - 44, dy: apple.midY))
+        let tree = app.collectionViews.containing(NSPredicate(format: "label == %@", "Apple")).firstMatch.frame
+        let zone = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: tree.maxX - 44, dy: apple.midY))
         drag(row("Swift"), to: zone, marked: "split")
         shot("split-made")
         row("Apple").tap()
@@ -576,7 +626,7 @@ final class WalkthroughTests: XCTestCase {
         app.buttons["Settings"].firstMatch.tap()
         sleep(2)
         // Sync is at the end of Settings, above Licenses.
-        app.collectionViews.firstMatch.swipeUp()
+        swipeUp(app.collectionViews.firstMatch)
         sleep(1)
         shot("settings-sync")
         app.buttons["Sync with Another Device"].firstMatch.tap()

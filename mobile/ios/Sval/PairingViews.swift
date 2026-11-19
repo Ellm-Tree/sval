@@ -43,7 +43,7 @@ struct PairingSheet: View {
                         } header: {
                             SectionCaption("Type this code on the other device", color: theme.muted)
                         } footer: {
-                            Text("On a computer, open Settings › Sync and devices › Sync with another device, then choose \"The other device shows a code\". On an iPhone, choose this folder when you first set up Sval. The code works until \(offer.expiresAt, style: .time).")
+                            Text("On a computer, open Settings › Sync and devices › Sync with another device, then choose \"The other device shows a code\". On an iPhone or iPad, choose this folder when you first set up Sval. The code works until \(offer.expiresAt, style: .time).")
                         }
                     } else if let failure {
                         Section { Text(failure) }

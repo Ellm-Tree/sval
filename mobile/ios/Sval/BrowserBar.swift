@@ -7,6 +7,14 @@ import SwiftUI
 /// the page, each in the Workspace's colour (round 6). Back and Forward,
 /// the address with the site menu and reload, New Tab, and the Workspace.
 /// As the page scrolls down they fold into one pill (`Browser.barFold`).
+/// The bar's Workspace button, as the bar draws it.
+struct WorkspaceButtonBounds: PreferenceKey {
+    static let defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = value ?? nextValue()
+    }
+}
+
 struct BrowserBar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearance) private var scheme
@@ -519,6 +527,8 @@ struct BrowserBar: View {
         .contextMenu {
             if isPrivateSession { privateMenu }
         }
+        // Where the iPad's Workspace popover points.
+        .anchorPreference(key: WorkspaceButtonBounds.self, value: .bounds) { $0 }
         .accessibilityLabel(isPrivateSession
             ? (tabCount == 1 ? "Private, 1 tab" : "Private, \(tabCount) tabs")
             : "\(workspace.map(WorkspaceTile.name) ?? "Workspace"), \(tabCount) tabs")
