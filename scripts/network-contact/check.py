@@ -552,8 +552,9 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
 
     # The device resolves through the Mac's mDNSResponder, which asks on the
     # app's behalf, so its queries carry the app as their effective process
-    # (tcpdump's `epid`). The answers to any process tie an address to the
-    # names it was looked up by.
+    # (tcpdump's `epid`). An answer names an address only for a name the
+    # app's processes asked for: a CDN address serves many names, and the
+    # Mac's own processes look up names the app never contacts.
     answered = {}
     for link, frame in capture_packets(capture):
         found = transport(ip_layer(link, frame))
@@ -567,6 +568,7 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
                    check=True, stderr=subprocess.DEVNULL)
 
     hosts, flows, streams, named, settled, hellos = {}, {}, {}, set(), set(), 0
+    asked = set()
     # The TCP connections whose opening packet is in the capture. One that
     # was already open when the capture began had its lookup and server
     # name before it.
@@ -579,7 +581,9 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
         first = f"packet {index:07d}"
         if proto == "udp" and dport == 53:
             for name in dns_message(payload)[0]:
-                hosts.setdefault(name.rstrip(".").lower(), first)
+                name = name.rstrip(".").lower()
+                hosts.setdefault(name, first)
+                asked.add(name)
             continue
         if not remote(dst) or (proto == "udp" and dport == 5353):
             continue
@@ -610,7 +614,7 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
     for flow, first in sorted(flows.items(), key=lambda kv: kv[1]):
         if flow in named:
             continue
-        candidates = answered.get(flow[2], set())
+        candidates = answered.get(flow[2], set()) & asked
         if not candidates:
             if resolved is None:
                 resolved = listed_addresses(rules)
