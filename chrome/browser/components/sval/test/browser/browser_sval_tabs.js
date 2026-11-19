@@ -24,7 +24,7 @@ const SvalTree = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalTree.sys.mjs"
 );
 const { tabsIn } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs"
+  "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs"
 );
 
 /* import-globals-from ../../sval-panel.js */

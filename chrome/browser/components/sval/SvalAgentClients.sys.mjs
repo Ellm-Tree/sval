@@ -28,9 +28,10 @@
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 
+import { AGENT_DIR } from "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs";
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  AGENT_DIR: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
   Subprocess: "resource://gre/modules/Subprocess.sys.mjs",
   writePrivateFile:
@@ -75,11 +76,7 @@ export function defaultEnv() {
     wayland: Services.env.get("WAYLAND_DISPLAY"),
     shim: shimPath(),
     installShim,
-    recordPath: PathUtils.join(
-      PathUtils.profileDir,
-      lazy.AGENT_DIR,
-      "clients.json"
-    ),
+    recordPath: PathUtils.join(PathUtils.profileDir, AGENT_DIR, "clients.json"),
     async find(name) {
       const path = [Services.env.get("PATH"), ...toolDirs(home)]
         .filter(Boolean)

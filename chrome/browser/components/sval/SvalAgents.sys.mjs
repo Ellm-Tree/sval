@@ -78,6 +78,14 @@ import {
   POLITE_TOPIC,
 } from "moz-src:///browser/components/sval/SvalAgentPolite.sys.mjs";
 
+import {
+  AGENT_DIR,
+  AGENTS_FILE,
+  MODEL_CONTEXT_PREF,
+  PORT_FILE,
+  STATE_TOPIC,
+} from "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -142,13 +150,6 @@ export function workspaceRetentionDays() {
 const HELLO = 3;
 /** "Let sites offer tools to agents" (site-tools spec §4.1, layer A). */
 const PAGE_TOOLS_PREF = "browser.sval.agents.pageTools.enabled";
-/** Gecko's own switch for WebMCP, which Sval derives from the two above. */
-export const MODEL_CONTEXT_PREF = "dom.modelcontext.enabled";
-/**
- * Told whenever `SvalAgents.problem` may have changed, or the paired agents
- * and their policies have.
- */
-const STATE_TOPIC = "sval-agents-state";
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 /**
  * What a connection may send before its handshake succeeds: room for the
@@ -166,10 +167,6 @@ const PRE_AUTH_MAX_BYTES = 4096;
  * two round trips, so a few places serve agents that start together.
  */
 export const MAX_UNPROVEN_CONNECTIONS = 8;
-/** Sval's private directory in the profile, and the files it holds. */
-export const AGENT_DIR = "sval-agents";
-const PORT_FILE = "port.json";
-const AGENTS_FILE = "agents.json";
 
 // The output pipe holds the largest frame and its 4-byte header with room to
 // spare, so writing one frame never blocks.

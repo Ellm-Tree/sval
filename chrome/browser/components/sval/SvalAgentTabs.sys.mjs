@@ -46,7 +46,6 @@ import {
   hostOfDocument,
   agentSiteOf,
 } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
-import { tabsIn } from "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs";
 import {
   detect,
   foundIn,
@@ -61,7 +60,13 @@ import {
 } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { isQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeekTab.sys.mjs";
 import { handWorkspaceTo } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
-import { ancestorIds } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
+import {
+  ancestorIds,
+  childrenByParent,
+  GROUP,
+  SPLIT,
+  TAB,
+} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { raceTimeout } from "moz-src:///browser/components/sval/SvalTimeout.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
@@ -1090,6 +1095,34 @@ function materialize(win, tab, url) {
   })().finally(() => materializing.delete(tab));
   materializing.set(tab, done);
   return done;
+}
+
+/**
+ * Every tab under `workspaceId`, depth first, each level in placement order.
+ *
+ * @param {object} nodes The tree JSON's `nodes` map.
+ * @param {string} workspaceId
+ */
+export function tabsIn(nodes, workspaceId) {
+  const byParent = childrenByParent(nodes);
+  const out = [];
+  const walk = parent => {
+    for (const id of byParent.get(parent) ?? []) {
+      const node = nodes[id];
+      if (node.kind === TAB) {
+        out.push({
+          tab: id,
+          title: node.content?.name ?? "",
+          url: node.content?.url ?? null,
+        });
+      } else if (node.kind === GROUP || node.kind === SPLIT) {
+        // A split's panes are tabs like any other (split-view spec §9.2).
+        walk(id);
+      }
+    }
+  };
+  walk(workspaceId);
+  return out;
 }
 
 /**

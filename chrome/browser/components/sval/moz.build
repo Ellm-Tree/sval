@@ -15,6 +15,7 @@ MOZ_SRC_FILES += [
     "SvalAgentChallenge.sys.mjs",
     "SvalAgentClients.sys.mjs",
     "SvalAgentConsole.sys.mjs",
+    "SvalAgentConst.sys.mjs",
     "SvalAgentControl.sys.mjs",
     "SvalAgentDownloads.sys.mjs",
     "SvalAgentErrors.sys.mjs",

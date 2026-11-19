@@ -29,7 +29,7 @@ const { SvalTabs } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalTabs.sys.mjs"
 );
 const { tabsIn } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs"
+  "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs"
 );
 const { moveIntoTarget } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"

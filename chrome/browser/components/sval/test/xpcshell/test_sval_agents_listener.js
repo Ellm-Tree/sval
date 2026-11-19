@@ -9,10 +9,12 @@
  * any agent it needs itself, so a task passes run alone.
  */
 
-const { AGENT_DIR, MAX_UNPROVEN_CONNECTIONS, SvalAgents } =
-  ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
-  );
+const { MAX_UNPROVEN_CONNECTIONS, SvalAgents } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
+);
+const { AGENT_DIR } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs"
+);
 const { SESSION_TOOLS, TOOLS } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentToolTable.sys.mjs"
 );

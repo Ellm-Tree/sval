@@ -248,10 +248,11 @@ import {
 export { ActionWindow, CAP_MS, decideLoad, OPEN_MAX_MS, QUIET_MS };
 export { releaseAgentTab } from "moz-src:///browser/components/sval/SvalAgentTabRegistry.sys.mjs";
 
+import { STATE_TOPIC } from "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs";
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
-  SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   recordResponse:
     "moz-src:///browser/components/sval/SvalAgentChallenge.sys.mjs",
   watchConsole:
@@ -1182,7 +1183,7 @@ export function createAgentGate({
     rulesSeen.set(agentId, siteRulesOf(agentId));
   }
   forgetCachedPages(() => true);
-  Services.obs.addObserver(rules, lazy.SvalAgents.STATE_TOPIC);
+  Services.obs.addObserver(rules, STATE_TOPIC);
   /**
    * The site that decides a download a page in `top` started: the site of
    * the page it shows (spec §5.2), or, for a tab with no page of its own
@@ -1922,7 +1923,7 @@ export function createAgentGate({
       Services.obs.removeObserver(contexts, BEFORE_SHOW_TOPIC);
       Services.obs.removeObserver(contexts, GLOBAL_CREATED_TOPIC);
       Services.obs.removeObserver(takes, CONTROL_TOPIC);
-      Services.obs.removeObserver(rules, lazy.SvalAgents.STATE_TOPIC);
+      Services.obs.removeObserver(rules, STATE_TOPIC);
       for (const category of ["content-policy", "net-channel-event-sinks"]) {
         Services.catMan.deleteCategoryEntry(category, contractID, false);
       }

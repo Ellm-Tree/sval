@@ -15,10 +15,11 @@ import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sy
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 
+import { AGENT_DIR } from "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
-  AGENT_DIR: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
 });
 
@@ -163,7 +164,7 @@ const PROFILE_MARKERS = [
  */
 function inAProfile(file) {
   for (let dir = file.parent; dir; dir = dir.parent) {
-    if (comparable(dir.leafName) === comparable(lazy.AGENT_DIR)) {
+    if (comparable(dir.leafName) === comparable(AGENT_DIR)) {
       return true;
     }
     for (const marker of PROFILE_MARKERS) {

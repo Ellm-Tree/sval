@@ -43,12 +43,6 @@ import {
   MAX_MODEL_CHARS,
   MAX_TASK_CHARS,
 } from "moz-src:///browser/components/sval/SvalAgentToolsWorkspace.sys.mjs";
-import {
-  GROUP,
-  SPLIT,
-  TAB,
-  childrenByParent,
-} from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 const MAX_LABEL_CHARS = 64;
 /** The most characters of a launch directory Sval keeps. */
@@ -169,34 +163,6 @@ export function launchLines(
     lines.push(`${when}: ${time}`);
   }
   return lines;
-}
-
-/**
- * Every tab under `workspaceId`, depth first, each level in placement order.
- *
- * @param {object} nodes The tree JSON's `nodes` map.
- * @param {string} workspaceId
- */
-export function tabsIn(nodes, workspaceId) {
-  const byParent = childrenByParent(nodes);
-  const out = [];
-  const walk = parent => {
-    for (const id of byParent.get(parent) ?? []) {
-      const node = nodes[id];
-      if (node.kind === TAB) {
-        out.push({
-          tab: id,
-          title: node.content?.name ?? "",
-          url: node.content?.url ?? null,
-        });
-      } else if (node.kind === GROUP || node.kind === SPLIT) {
-        // A split's panes are tabs like any other (split-view spec §9.2).
-        walk(id);
-      }
-    }
-  };
-  walk(workspaceId);
-  return out;
 }
 
 const result = (id, value) => ({ jsonrpc: "2.0", id, result: value });

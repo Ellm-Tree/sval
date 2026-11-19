@@ -11,10 +11,13 @@
  * `browser_sval_agent_session_pairing.js`.
  */
 
-const { labelFrom, launchFrom, modelFrom, taskFrom, tabsIn } =
+const { labelFrom, launchFrom, modelFrom, taskFrom } =
   ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs"
   );
+const { tabsIn } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs"
+);
 
 /** What sval-mcp says of a launch in /work/sval, as `launchFrom` keeps it. */
 const LAUNCH = launchFrom({

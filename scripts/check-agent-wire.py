@@ -32,12 +32,12 @@ SHARED = [
     ),
     (
         "the agents directory",
-        (SVAL + "SvalAgents.sys.mjs", r'^export const AGENT_DIR = "([^"]+)";$'),
+        (SVAL + "SvalAgentConst.sys.mjs", r'^export const AGENT_DIR = "([^"]+)";$'),
         (SHIM + "bridge.rs", r'^const AGENT_DIR: &str = "([^"]+)";$'),
     ),
     (
         "the port file",
-        (SVAL + "SvalAgents.sys.mjs", r'^const PORT_FILE = "([^"]+)";$'),
+        (SVAL + "SvalAgentConst.sys.mjs", r'^export const PORT_FILE = "([^"]+)";$'),
         (SHIM + "bridge.rs", r'^const PORT_FILE: &str = "([^"]+)";$'),
     ),
     (

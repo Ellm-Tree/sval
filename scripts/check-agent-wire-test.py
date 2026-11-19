@@ -22,9 +22,10 @@ check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
 
 AGREEING = {
-    check.SVAL + "SvalAgents.sys.mjs": (
-        'const HELLO = 3;\nexport const AGENT_DIR = "sval-agents";\n'
-        'const PORT_FILE = "port.json";\n'
+    check.SVAL + "SvalAgents.sys.mjs": "const HELLO = 3;\n",
+    check.SVAL + "SvalAgentConst.sys.mjs": (
+        'export const AGENT_DIR = "sval-agents";\n'
+        'export const PORT_FILE = "port.json";\n'
     ),
     check.SVAL + "SvalAgentWire.sys.mjs": "export const MAX_FRAME_BYTES = 1024 * 1024;\n",
     check.SHIM + "bridge.rs": (

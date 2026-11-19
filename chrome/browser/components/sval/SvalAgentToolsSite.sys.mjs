@@ -32,11 +32,7 @@ import {
   WRITES,
 } from "moz-src:///browser/components/sval/SvalAgentToolSchema.sys.mjs";
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  MODEL_CONTEXT_PREF: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
-});
+import { MODEL_CONTEXT_PREF } from "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs";
 
 /** What the site-tools tools say about tools the site wrote (spec §5.5). */
 const SITE_WROTE =
@@ -73,7 +69,7 @@ function mergeWrites(outcomes) {
  * @returns {Promise<{site: string, tools: object[], documentId: number}>}
  */
 async function offeredTo(call) {
-  if (!Services.prefs.getBoolPref(lazy.MODEL_CONTEXT_PREF, false)) {
+  if (!Services.prefs.getBoolPref(MODEL_CONTEXT_PREF, false)) {
     throw new ToolError("page_tools_off");
   }
   const windowGlobal = call.browser.browsingContext?.currentWindowGlobal;

@@ -15,8 +15,11 @@
 
 /* exported AGENT_DIR, Subprocess, resolved, symlink, filesNamed, uploadSetup, filesIn, contentsIn, eventsIn */
 
-const { AGENT_DIR, SvalAgents } = ChromeUtils.importESModule(
+const { SvalAgents } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
+);
+const { AGENT_DIR } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentConst.sys.mjs"
 );
 const { Subprocess } = ChromeUtils.importESModule(
   "resource://gre/modules/Subprocess.sys.mjs"
