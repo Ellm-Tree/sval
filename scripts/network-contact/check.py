@@ -416,7 +416,8 @@ def ip_layer(link, frame):
 
 
 def transport(packet):
-    """(protocol, source, destination, source port, destination port, payload)."""
+    """(protocol, source, destination, source port, destination port, payload,
+    whether the packet opens a TCP connection)."""
     if not packet:
         return None
     version = packet[0] >> 4
@@ -435,10 +436,11 @@ def transport(packet):
     body = packet[start:end]
     if proto == 6 and len(body) >= 20:
         sport, dport = struct.unpack_from("!HH", body)
-        return "tcp", src, dst, sport, dport, body[(body[12] >> 4) * 4:]
+        opens = body[13] & 0x12 == 0x02  # SYN without ACK
+        return "tcp", src, dst, sport, dport, body[(body[12] >> 4) * 4:], opens
     if proto == 17 and len(body) >= 8:
         sport, dport = struct.unpack_from("!HH", body)
-        return "udp", src, dst, sport, dport, body[8:]
+        return "udp", src, dst, sport, dport, body[8:], False
     return None
 
 
@@ -544,11 +546,15 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
                    check=True, stderr=subprocess.DEVNULL)
 
     hosts, flows, streams, named, settled, hellos = {}, {}, {}, set(), set(), 0
+    # The TCP connections whose opening packet is in the capture. One that
+    # was already open when the capture began had its lookup and server
+    # name before it.
+    opened = set()
     for index, (link, frame) in enumerate(capture_packets(ours)):
         found = transport(ip_layer(link, frame))
         if not found:
             continue
-        proto, _, dst, sport, dport, payload = found
+        proto, _, dst, sport, dport, payload, opens = found
         first = f"packet {index:07d}"
         if proto == "udp" and dport == 53:
             for name in dns_message(payload)[0]:
@@ -557,6 +563,8 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
         if not remote(dst) or (proto == "udp" and dport == 5353):
             continue
         flow = (proto, sport, dst, dport)
+        if flow not in flows and opens:
+            opened.add(flow)
         flows.setdefault(flow, first)
         if proto != "tcp" or flow in settled or not payload:
             continue
@@ -587,8 +595,13 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
         for name in listed or candidates:
             hosts.setdefault(name, first)
         if not candidates:
+            if flow[0] == "tcp":
+                state = "opened in the capture" if flow in opened else "open before the capture began"
+                state = f", {state}"
+            else:
+                state = ""
             print(f"network-contact: FAIL     {flow[0]} to {flow[2]} port {flow[3]}, an address no "
-                  f"lookup or server name in the capture explains (first at {first})")
+                  f"lookup or server name in the capture explains{state} (first at {first})")
             failures.append(str(flow[2]))
     failures += judge_hosts(hosts, rules, opt_in_allowed)
     if not flows:
