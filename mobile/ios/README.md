@@ -65,6 +65,10 @@ Store Connect, signed with the Apple account signed in to Xcode. With
 App Store Connect API key instead. The build appears in App Store
 Connect's TestFlight tab once Apple has processed it.
 
+Release builds come from CI instead: CI builds the app unsigned with
+`archive-unsigned.sh`, and the owner's release repository signs and
+uploads it.
+
 ## Read the app's log
 
 The app writes its own log to `Library/Caches/diagnostics.log` in its
