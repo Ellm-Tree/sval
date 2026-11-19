@@ -2126,8 +2126,9 @@ a time:
   already examine downloaded programs.
 - **The iPhone's fraudulent website warning**, WebKit's own, on by default.
   The app's WebKit processes contact `token.safebrowsing.apple`,
-  `safebrowsing.g.aaplimg.com`, `configuration.apple.com` and
-  `safebrowsing.googleapis.com` for it. Apple's Safari privacy notice says the
+  `proxy.safebrowsing.apple`, `safebrowsing.g.aaplimg.com`,
+  `configuration.apple.com`, `safebrowsing.googleapis.com` and
+  `proxy-safebrowsing.googleapis.com` for it. Apple's Safari privacy notice says the
   check sends Google Safe Browsing and Apple information calculated from the
   address, and never the address itself.
 - **Updates** (`download.sval.app`, §8.6, decision 0110): once a day, a
