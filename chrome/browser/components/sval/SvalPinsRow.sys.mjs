@@ -1838,7 +1838,7 @@ export class SvalPinsRow {
 
   /**
    * Ends a drag over the row: a pin's, from its tile's `dragend`, or a tab's,
-   * which the panel ends from the dragged row itself (`_endDrag`), since a
+   * which the panel ends from the dragged row itself (`SvalPanelDrag.end`), since a
    * redraw can take that row out of the panel before its `dragend`.
    */
   dragEnded() {

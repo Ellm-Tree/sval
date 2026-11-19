@@ -129,7 +129,7 @@ add_task(async function a_tab_dragged_onto_a_collapsed_group_joins_it() {
     const children = await childrenOf(engine, ids.groupB);
     return children.join() === [ids.tab4, ids.loose].join();
   }, "the tab joined the group, at its end");
-  Assert.equal(SvalPanel._drag, null, "and the drag is over");
+  Assert.equal(SvalPanel.draggedId, undefined, "and the drag is over");
   Assert.ok(
     !SvalPanel._els.tree.querySelector(".sval-drop-into, .sval-row-dragging"),
     "with nothing of it left drawn"
@@ -355,7 +355,17 @@ add_task(async function a_tab_dropped_on_a_tab_makes_a_group_of_both() {
  */
 add_task(async function cancelling_the_name_leaves_everything_where_it_was() {
   const { engine, ids } = await withFreshPanel();
-  const before = JSON.stringify((await engine.tree()).nodes);
+  // Where every node is. What a tab says is left out: the page of the tab on
+  // screen can give its title while the name is asked.
+  const places = async () =>
+    JSON.stringify(
+      Object.entries((await engine.tree()).nodes).map(([id, node]) => [
+        id,
+        node.kind,
+        node.placement,
+      ])
+    );
+  const before = await places();
 
   {
     const drag = new DispatchedDrag(ids.tab4);
@@ -377,11 +387,7 @@ add_task(async function cancelling_the_name_leaves_everything_where_it_was() {
       "the outlines are cleared"
     );
 
-    Assert.equal(
-      JSON.stringify((await engine.tree()).nodes),
-      before,
-      "and the document is byte for byte what it was"
-    );
+    Assert.equal(await places(), before, "and no node was made or moved");
   }
 });
 

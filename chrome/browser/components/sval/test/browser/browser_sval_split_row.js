@@ -919,7 +919,7 @@ add_task(async function the_split_icon_carries_the_whole_split() {
     SvalPanel._rowElementFor(loose[0])
   );
   drag.over();
-  Assert.equal(SvalPanel._drag.id, split, "the drag carries the split");
+  Assert.equal(SvalPanel.draggedId, split, "the drag carries the split");
   drag.drop();
   await answerContainerDialog("Pair");
   await untilGrouped(split, [loose[0], split]);
@@ -1020,7 +1020,7 @@ add_task(async function a_tile_dragged_along_its_split_reorders_it() {
     tile: paneCell(ids[2]),
   });
   Assert.ok(drag.over().defaultPrevented, "the drop is taken");
-  Assert.equal(SvalPanel._drag.id, ids[0], "the tile carries its page");
+  Assert.equal(SvalPanel.draggedId, ids[0], "the tile carries its page");
   Assert.ok(!SvalPanel._els.dropBar.hidden, "with a bar where it would land");
   drag.drop();
   await untilSplits([[ids[1], ids[2], ids[0]]], "the page moved to the end");

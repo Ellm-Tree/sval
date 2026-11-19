@@ -40,7 +40,6 @@ const PANEL_CSS = "chrome://browser/content/sval/sval-panel.css";
  */
 const PANEL_SCRIPTS = [
   "chrome://browser/content/sval/sval-panel.js",
-  "chrome://browser/content/sval/sval-panel-drag.js",
   "chrome://browser/content/sval/sval-panel-input.js",
   "chrome://browser/content/sval/sval-panel-menus.js",
   "chrome://browser/content/sval/sval-panel-rows.js",

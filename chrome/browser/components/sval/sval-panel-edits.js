@@ -1116,14 +1116,12 @@ Object.assign(SvalPanel, {
   async _merge(plan) {
     const members = plan.members ?? [plan.target, plan.id];
     const focus = plan.id ?? members[0];
-    this._pendingMerge = plan;
-    this._paintDragState();
+    this.drag.holdMerge(plan);
     let made;
     try {
       made = await this._promptForNewGroup();
     } finally {
-      this._pendingMerge = null;
-      this._paintDragState();
+      this.drag.holdMerge(null);
     }
     if (made === null) {
       return false;

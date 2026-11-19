@@ -264,7 +264,7 @@
       this._leavingRows = this._leavingRows.filter(
         leaving => leaving.element.isConnected
       );
-      this._paintDragState();
+      this.drag.paint();
       const onRow = document.activeElement?.closest?.(
         ".sval-row[data-node-id]"
       );
@@ -1375,6 +1375,28 @@
         return "Workspace";
       }
       return kind === GROUP ? "group" : "tab";
+    },
+
+    /**
+     * Flashes a row that has just landed or been made, so the eye can find it:
+     * a drop or a merge can put it some distance from where it was picked up.
+     * The animation is CSS's and is not run under `prefers-reduced-motion`.
+     *
+     * @param {string} id A node id.
+     * @param {string} [kind] The animation's class: `sval-row-landed` for a
+     *   move, `sval-row-new` for a group just made.
+     */
+    _flashRow(id, kind = "sval-row-landed") {
+      const element = this._rowElementFor(id);
+      if (!element) {
+        return;
+      }
+      element.classList.add(kind);
+      element.addEventListener(
+        "animationend",
+        () => element.classList.remove(kind),
+        { once: true }
+      );
     },
 
     /**

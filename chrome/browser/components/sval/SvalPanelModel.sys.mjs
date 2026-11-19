@@ -1974,7 +1974,7 @@ function pageCount(nodes, id) {
  * own rows it is a no-op, and over a row inside one, refused.
  *
  * Kept a pure function of the pointer's place on the row, so the whole map is
- * asserted in xpcshell; `sval-panel-drag.js` measures and asks.
+ * asserted in xpcshell; `SvalPanelDrag` measures and asks.
  *
  * @param {object} nodes The document's `nodes` map.
  * @param {string} id The dragged node.

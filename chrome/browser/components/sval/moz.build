@@ -145,6 +145,7 @@ MOZ_SRC_FILES += [
     "SvalPageStyle.sys.mjs",
     "SvalPageStyleChild.sys.mjs",
     "SvalPairing.sys.mjs",
+    "SvalPanelDrag.sys.mjs",
     "SvalPanelModel.sys.mjs",
     "SvalPanelReveal.sys.mjs",
     "SvalPanelSelection.sys.mjs",

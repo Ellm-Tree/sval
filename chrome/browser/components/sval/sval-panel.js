@@ -158,6 +158,52 @@ var SvalPanel = {
   },
 
   /**
+   * This window's drags in the tree.
+   *
+   * @returns {SvalPanelDrag}
+   */
+  get drag() {
+    if (!this._dragPart) {
+      const panel = this;
+      this._dragPart = new this._modules.SvalPanelDrag(window, {
+        get nodes() {
+          return panel._nodes;
+        },
+        get rows() {
+          return panel._rows;
+        },
+        get els() {
+          return panel._els;
+        },
+        get workspace() {
+          return panel._workspace;
+        },
+        get selection() {
+          return panel.selection;
+        },
+        get engine() {
+          return panel._engine;
+        },
+        get observer() {
+          return panel._observer;
+        },
+        rowFor: id => panel._rowFor(id),
+        rowElementFor: id => panel._rowElementFor(id),
+        guard: (what, action) => panel._guard(what, action),
+        merge: plan => panel._merge(plan),
+        applyMove: (move, options) => panel._applyMove(move, options),
+        flashRow: (id, kind) => panel._flashRow(id, kind),
+        focusRow: id => panel._focusRow(id),
+        logRefusal: (id, err) => panel._logRefusal(id, err),
+        refresh: () => panel.refresh(),
+        publishSoon: () => panel._publishSoon(),
+        pinsDragEnded: () => panel._pins?.dragEnded(),
+      });
+    }
+    return this._dragPart;
+  },
+
+  /**
    * This window's Undo message, and the delete waiting on it.
    *
    * @returns {SvalPanelUndo}
@@ -226,7 +272,7 @@ var SvalPanel = {
 
   /** The id of the node a drag from this window's tree carries, if any. */
   get draggedId() {
-    return this._drag?.from ? undefined : this._drag?.id;
+    return this.drag.id;
   },
 
   /** The label of the agent whose workspace this window shows, or null. */
@@ -507,6 +553,8 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
         SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
         slide: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
+        SvalPanelDrag:
+          "moz-src:///browser/components/sval/SvalPanelDrag.sys.mjs",
         SvalPanelUndo:
           "moz-src:///browser/components/sval/SvalPanelUndo.sys.mjs",
         SvalPanelSelection:
@@ -877,9 +925,7 @@ var SvalPanel = {
     tree.addEventListener("contextmenu", this);
     switcher.addEventListener("contextmenu", this);
     switcher.addEventListener("keydown", this);
-    for (const type of ["dragstart", "dragover", "dragleave", "drop"]) {
-      tree.addEventListener(type, this);
-    }
+    this.drag.listen(tree);
     window.addEventListener("unload", this, { once: true });
 
     // A row outlives renders, so a favicon cached after its row was built
@@ -997,21 +1043,6 @@ var SvalPanel = {
         break;
       case "contextmenu":
         this._onContextMenu(event);
-        break;
-      case "dragstart":
-        this._onDragStart(event);
-        break;
-      case "dragover":
-        this._onDragOver(event);
-        break;
-      case "dragleave":
-        this._onDragLeave(event);
-        break;
-      case "drop":
-        this._onDrop(event);
-        break;
-      case "dragend":
-        this._endDrag();
         break;
       case "popupshowing":
         // Two popups, one listener object: the row menu and the switcher are

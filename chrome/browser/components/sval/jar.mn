@@ -211,7 +211,6 @@ browser.jar:
     content/browser/sval/search-icons/github.png (search-icons/github.png)
     content/browser/sval/search-icons/openstreetmap.png (search-icons/openstreetmap.png)
     content/browser/sval/sval-panel.js         (sval-panel.js)
-    content/browser/sval/sval-panel-drag.js    (sval-panel-drag.js)
     content/browser/sval/sval-panel-input.js   (sval-panel-input.js)
     content/browser/sval/sval-panel-menus.js   (sval-panel-menus.js)
     content/browser/sval/sval-page-actions.js  (sval-page-actions.js)
