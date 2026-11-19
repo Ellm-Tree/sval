@@ -56,10 +56,12 @@ enum Demo {
     }
 
     /// Fills an empty tree once: three Workspaces, one with a coloured
-    /// group and a split, and a tab in the phone's own.
+    /// group and a split, and a tab in the phone's own. A started sync
+    /// stays empty, as a new sync's tree is, so its tests load no page they
+    /// did not open.
     @MainActor
     static func fill(_ model: AppModel) async {
-        guard requested, model.workspaces.filter({ $0.device == nil }).isEmpty else { return }
+        guard requested, !starting, model.workspaces.filter({ $0.device == nil }).isEmpty else { return }
         if showroom { return await fillShowroom(model) }
         guard let reading = await model.addWorkspace(named: "Reading", emoji: "📚", color: "cyan"),
               let work = await model.addWorkspace(named: "Work", emoji: "💼", color: "green"),
