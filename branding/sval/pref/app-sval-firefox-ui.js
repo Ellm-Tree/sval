@@ -54,18 +54,17 @@ pref("toolkit.datacollection.infoURL", "");
 
 // ------------------------------------------------------------- profiler
 
-// The profiler's results open only on profiler.firefox.com, so Sval offers no
-// way to take a profile. With the feature flag false the toolbar button is
-// never registered (DevToolsStartup `hookProfilerRecordingButton`), so a
-// placement left in a profile's toolbar draws nothing; locked, because
-// profiler.firefox.com and about:logging set it to put the button back
-// (`ensureButtonInNavbar`). The devtools Performance panel is the other way
-// in, and this is its visibility switch (devtools/client/definitions.js).
+// Firefox's profiler toolbar button and devtools Performance panel open their
+// results on profiler.firefox.com, so Sval offers neither; Sval's own
+// recordings save to a file (decision 2428). With the feature flag false the
+// toolbar button is never registered (DevToolsStartup
+// `hookProfilerRecordingButton`), so a placement left in a profile's toolbar
+// draws nothing; locked, because profiler.firefox.com and about:logging set
+// it to put the button back (`ensureButtonInNavbar`). The devtools
+// Performance panel is the other way in, and this is its visibility switch
+// (devtools/client/definitions.js).
 pref("devtools.performance.popup.feature-flag", false, locked); // upstream: true in Nightly and debug builds
 pref("devtools.performance.enabled", false, locked);           // upstream: true
-// about:processes draws a profiler button on each process, which records it
-// and opens the result the same way (`SHOW_PROFILER_ICONS`, aboutProcesses.js).
-pref("toolkit.aboutProcesses.showProfilerIcons", false, locked); // upstream: true
 
 // ----------------------------------------------------------------- tabs
 

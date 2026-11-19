@@ -167,6 +167,7 @@ MOZ_SRC_FILES += [
     "SvalPrivateJars.sys.mjs",
     "SvalPrivateSession.sys.mjs",
     "SvalPrivateZoom.sys.mjs",
+    "SvalProfiler.sys.mjs",
     "SvalPromptButtons.sys.mjs",
     "SvalProtectionButton.sys.mjs",
     "SvalPush.sys.mjs",

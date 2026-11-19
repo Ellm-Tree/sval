@@ -55,39 +55,9 @@ if [[ ! -x "$stackwalk" ]]; then
   exit 1
 fi
 
-# A published file never changes (the registry refuses to overwrite one), so
-# a build's unpacked symbols are kept and reused.
-cache="${SVAL_SYMBOLS_CACHE:-$HOME/.cache/sval-symbols}/$build_id"
-if [[ ! -f "$cache/.complete" ]]; then
-  # shellcheck source=scripts/lib/registry.sh
-  source "$(dirname "${BASH_SOURCE[0]}")/lib/registry.sh"
-  registry_open sval optional
-  found=0
-  for platform in linux64 win64 macos-aarch64 macos-x86_64; do
-    file="$platform.crashreporter-symbols.zip"
-    code="$(api -o "$REGISTRY_TMP/$file" -w '%{http_code}' "$REGISTRY/sval-symbols/$build_id/$file")"
-    case "$code" in
-      200)
-        echo "==> Unpacking sval-symbols $build_id $file" >&2
-        unzip -q -o "$REGISTRY_TMP/$file" -d "$REGISTRY_TMP/symbols"
-        found=1
-        ;;
-      404) ;;
-      *)
-        echo "error: fetching sval-symbols $build_id $file returned $code" >&2
-        exit 1
-        ;;
-    esac
-  done
-  if [[ "$found" == 0 ]]; then
-    echo "error: sval-symbols has no version $build_id; only a release compile publishes symbols" >&2
-    exit 1
-  fi
-  mkdir -p "$(dirname "$cache")"
-  rm -rf "$cache"
-  mv "$REGISTRY_TMP/symbols" "$cache"
-  touch "$cache/.complete"
-fi
+# shellcheck source=scripts/lib/sval-symbols.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/sval-symbols.sh"
+cache="$(sval_symbols "$build_id")"
 
 # The symbols directory is passed as mozcrash passes it (mozcrash.py).
 "$stackwalk" "$DUMP" "$cache"

@@ -697,6 +697,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_private_writes_nothing.js"]
 
+["browser_sval_profiler.js"]
+
 ["browser_sval_protection_access.js"]
 
 ["browser_sval_protection_button.js"]

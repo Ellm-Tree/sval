@@ -102,6 +102,30 @@ Sval keeps its own warnings and errors, and the browser's, in
 group, or tab name, a web address, a file path, or a secret. When the file
 is full, Sval moves it to `sval-log-old.txt` and starts a new one.
 
+<Since v="0.1.0-rc.10">
+
+## Performance recordings
+
+A performance recording shows where Sval spent time while Sval was slow.
+Sval saves each recording as a file in your download folder and never
+sends the file anywhere.
+
+- **Help › Record Performance.** Sval starts recording. While Sval
+  records, the menu item reads **Save Performance Recording**.
+- **Help › Save Performance Recording.** Sval saves the last minute as a
+  file named `sval-performance-` followed by the date and time. Then Sval
+  shows the file in Finder on macOS, File Explorer on Windows, or Files on
+  Linux.
+- **Record Performance in `about:support`.** This button starts and saves
+  a recording the same way as the Help menu.
+- **The profile button next to a process in `about:processes`.** The
+  button records only that process for five seconds, then saves the file.
+
+The file lists the web addresses of the pages you had open while Sval
+recorded. Anyone you give the file to can see those addresses.
+
+</Since>
+
 ## About Sval in Settings › Advanced
 
 - **Diagnostics log level.** This sets how much Sval writes to the browser

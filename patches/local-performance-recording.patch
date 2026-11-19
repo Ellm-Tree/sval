@@ -1,0 +1,96 @@
+Sval: record performance profiles to a file from about:support and about:processes
+
+Firefox's profiler opens its results on profiler.firefox.com, which Sval
+never contacts. SvalProfiler records with the same profiler and saves the
+result in the download folder, so about:support gets a button that starts
+and saves a recording, and about:processes' per-process button saves
+through it instead of opening the profiler's site. Both are disabled while
+a private window is open, since a profile would hold its pages.
+
+diff --git a/toolkit/components/aboutprocesses/content/aboutProcesses.js b/toolkit/components/aboutprocesses/content/aboutProcesses.js
+index a008a22f15..017eee73ef 100644
+--- a/toolkit/components/aboutprocesses/content/aboutProcesses.js
++++ b/toolkit/components/aboutprocesses/content/aboutProcesses.js
+@@ -37,12 +37,7 @@ const { AppConstants } = ChromeUtils.importESModule(
+ ChromeUtils.defineESModuleGetters(this, {
+   ContextualIdentityService:
+     "resource://gre/modules/ContextualIdentityService.sys.mjs",
+-});
+-
+-ChromeUtils.defineLazyGetter(this, "ProfilerPopupBackground", function () {
+-  return ChromeUtils.importESModule(
+-    "resource://devtools/client/performance-new/shared/background.sys.mjs"
+-  );
++  SvalProfiler: "moz-src:///browser/components/sval/SvalProfiler.sys.mjs",
+ });
+ 
+ const { WebExtensionPolicy } = Cu.getGlobalForObject(Services);
+@@ -602,6 +597,10 @@ var View = {
+       } else {
+         processNameElement = nameCell.firstChild;
+       }
++      nameCell.querySelector(".profiler-icon").setAttribute(
++        "aria-disabled",
++        String(!SvalProfiler.canRecord)
++      );
+     }
+     document.l10n.setAttributes(processNameElement, fluentName, fluentArgs);
+     nameCell.className = ["type", "favicon", ...classNames].join(" ");
+@@ -1634,19 +1633,14 @@ var Control = {
+ 
+   // Handle profiling of a process.
+   _handleProfiling(target) {
+-    if (Services.profiler.IsActive()) {
++    if (Services.profiler.IsActive() || !SvalProfiler.canRecord) {
+       return;
+     }
+-    Services.profiler.StartProfiler(
+-      10000000,
+-      1,
+-      ["default", "ipcmessages", "power"],
+-      ["pid:" + target.parentNode.parentNode.process.pid]
+-    );
++    SvalProfiler.startProcess(target.parentNode.parentNode.process.pid);
+     target.classList.add("profiler-active");
+     target.setAttribute("aria-pressed", "true");
+     setTimeout(() => {
+-      ProfilerPopupBackground.captureProfile("aboutprofiling");
++      SvalProfiler.saveAndReveal();
+       target.classList.remove("profiler-active");
+       target.setAttribute("aria-pressed", "false");
+     }, PROFILE_DURATION * 1000);
+diff --git a/toolkit/content/aboutSupport.js b/toolkit/content/aboutSupport.js
+index 7d4427561d..d6bbbf39d0 100644
+--- a/toolkit/content/aboutSupport.js
++++ b/toolkit/content/aboutSupport.js
+@@ -18,6 +18,7 @@ ChromeUtils.defineESModuleGetters(this, {
+   DownloadUtils: "resource://gre/modules/DownloadUtils.sys.mjs",
+   PlacesDBUtils: "resource://gre/modules/PlacesDBUtils.sys.mjs",
+   ProcessType: "resource://gre/modules/ProcessType.sys.mjs",
++  SvalProfiler: "moz-src:///browser/components/sval/SvalProfiler.sys.mjs",
+ });
+ 
+ window.addEventListener("load", function onload() {
+@@ -2076,6 +2077,7 @@ function safeModeRestart() {
+  * Set up event listeners for buttons.
+  */
+ function setupEventListeners() {
++  SvalProfiler.mountButton($("sval-record-performance-button"));
+   let button = $("reset-box-button");
+   if (button) {
+     button.addEventListener("click", function () {
+diff --git a/toolkit/content/aboutSupport.xhtml b/toolkit/content/aboutSupport.xhtml
+index 7b69d4ce8b..827ed5bd28 100644
+--- a/toolkit/content/aboutSupport.xhtml
++++ b/toolkit/content/aboutSupport.xhtml
+@@ -57,6 +57,10 @@
+           <h3 data-l10n-id="clear-startup-cache-title"/>
+           <button id="clear-startup-cache-button" data-l10n-id="clear-startup-cache-label"/>
+         </div>
++        <div id="sval-record-performance-box">
++          <h3>Record performance to a file</h3>
++          <button id="sval-record-performance-button"/>
++        </div>
+       </div>
+ #endif
+     </div>

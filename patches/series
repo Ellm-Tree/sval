@@ -345,3 +345,4 @@ private-browsing-no-crash-dump.patch
 client-auth-choice-cleared-with-jar.patch
 qps-observe-prefs-before-reading.patch
 page-thumbs-closed-page-quiet.patch
+local-performance-recording.patch

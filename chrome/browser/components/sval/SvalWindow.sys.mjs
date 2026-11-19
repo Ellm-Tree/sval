@@ -25,6 +25,7 @@ import { SvalPanelReveal } from "moz-src:///browser/components/sval/SvalPanelRev
 import { SvalQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs";
 import { SvalRestore } from "moz-src:///browser/components/sval/SvalRestore.sys.mjs";
 import { SvalPeek } from "moz-src:///browser/components/sval/SvalPeek.sys.mjs";
+import { SvalProfiler } from "moz-src:///browser/components/sval/SvalProfiler.sys.mjs";
 import { SvalShortcuts } from "moz-src:///browser/components/sval/SvalShortcuts.sys.mjs";
 import { SvalMenuBar } from "moz-src:///browser/components/sval/SvalMenuBar.sys.mjs";
 import { SvalTabs } from "moz-src:///browser/components/sval/SvalTabs.sys.mjs";
@@ -412,6 +413,7 @@ export const SvalWindow = {
     SvalTabSwitcher.mount(win);
     SvalShortcuts.startWindow(win);
     SvalFeedbackForm.mountWindow(win);
+    SvalProfiler.mountWindow(win);
     if (!quick) {
       SvalMenuBar.mount(win);
       addPanelToF6(win);

@@ -128,3 +128,11 @@ td.integer {
     color: var(--sval-accent);
   }
 }
+
+/* about:processes' profile button on a process, while a private window is
+   open (decision 2428): shown on the row's hover as the others are, dimmed,
+   and inert. */
+.profiler-icon[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}

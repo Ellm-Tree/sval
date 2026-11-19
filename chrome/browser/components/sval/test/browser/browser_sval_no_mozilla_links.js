@@ -6,8 +6,8 @@
 /**
  * Firefox's pages that linked or sent to Mozilla's sites with no pref to
  * change them: about:logging's profiler output, about:policies'
- * documentation links, about:processes' profiler buttons and the
- * Translations panel's gear-menu help (`docs/outbound-links.md`).
+ * documentation links and the Translations panel's gear-menu help
+ * (`docs/outbound-links.md`).
  */
 
 add_task(async function about_logging_logs_to_a_file_only() {
@@ -60,20 +60,6 @@ add_task(async function about_policies_links_no_documentation() {
     [],
     "about:policies links to no website"
   );
-  BrowserTestUtils.removeTab(tab);
-});
-
-add_task(async function about_processes_draws_no_profiler_buttons() {
-  const tab = await openPage("about:processes");
-  const buttons = await SpecialPowers.spawn(tab.linkedBrowser, [], async () => {
-    const doc = content.document;
-    await ContentTaskUtils.waitForCondition(
-      () => doc.querySelector("#process-tbody tr"),
-      "the page lists the processes"
-    );
-    return doc.querySelectorAll(".profiler-icon").length;
-  });
-  Assert.equal(buttons, 0, "no process has a profiler button");
   BrowserTestUtils.removeTab(tab);
 });
 

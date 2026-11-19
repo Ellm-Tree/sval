@@ -38,7 +38,7 @@ export const SEND_REPORT_LABEL = "Send Report…";
 export const REPORT_SENT_LABEL = "Report Sent";
 
 const POPOVER_CLASS = "sval-feedback";
-const HELP_MENU_ITEM_ID = "sval-help-send-feedback";
+export const HELP_MENU_ITEM_ID = "sval-help-send-feedback";
 const HELP_COMMAND_ID = "Sval:SendFeedback";
 
 /** How far the tab reaches past the button on its outer side (to-code). */

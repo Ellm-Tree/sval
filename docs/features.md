@@ -922,6 +922,14 @@ so a terminal in a web page can use it.
   to open a form. It lists everything the
   report would include, and you can view or uncheck each part. Nothing in it
   identifies you unless you choose to add your email.
+- **Record Performance.** When Sval is slow, select Help › Record
+  Performance or the Record Performance button in `about:support`. Keep
+  using Sval until the slowness shows. Select Save Performance Recording,
+  and Sval saves the last minute as a file in your download folder. The
+  button next to each process in `about:processes` records only that
+  process for five seconds. Sval never sends the file anywhere. The file
+  lists the web addresses of the pages you had open, so share the file
+  only with someone you trust.
 - **Crash reports.** Sval sends a crash report only if you check a box to
   send it. Sval doesn't add the address of the page you were on to a crash
   report. When a tab showing a website crashes in a private window, Sval

@@ -57,7 +57,7 @@ starting with the base (`aboutNetError.mjs`, `net-error-card.mjs`).
 | Profiler results (profiler.firefox.com) | toolbar button and devtools Performance panel | Removed: `devtools.performance.popup.feature-flag` and `devtools.performance.enabled`, locked off |
 | about:profiling | its profiles open on profiler.firefox.com | Removed: Sval does not build about:profiling (`no-closed-about-pages.patch`) |
 | about:logging profiler output | opens profiler.firefox.com or uploads to api.profiler.firefox.com | Removed: the page logs to a file only (`logging-file-output-only.patch`) |
-| about:processes profiler buttons | open profiler.firefox.com | Removed: `toolkit.aboutProcesses.showProfilerIcons`, locked off |
+| about:processes profiler buttons | open profiler.firefox.com | Changed: each button saves its recording to the download folder through `SvalProfiler` (`local-performance-recording.patch`, decision 2428) |
 | about:crashes, about:support crash links | `breakpad.reportURL` | Kept: an empty value hides the local crash list, which spec §10.6 keeps; nothing is submitted |
 | DevTools error "Learn more" | hardcoded MDN | Kept: MDN documents the web platform, not Firefox |
 | about:debugging Setup page's "Troubleshoot" links | hardcoded firefox-source-docs.mozilla.org | Kept: they document DevTools, which Sval ships as Firefox does. The page's Enable USB Devices button is a contact, not a link: it downloads Mozilla's ADB extension from ftp.mozilla.org (spec §10.9) |
