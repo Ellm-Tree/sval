@@ -47,7 +47,7 @@ SVAL_ENGINE_TREE="$TREE" cargo build --lib --release
 # Only what this script makes: XcodeGen writes Info.plist here too.
 rm -rf "$OUT/swift" "$OUT/headers" "$OUT/SvalEngine.xcframework"
 mkdir -p "$OUT/headers"
-cargo run --quiet --release \
+cargo run --release \
   --manifest-path "$REPO_ROOT/mobile/uniffi-bindgen/Cargo.toml" \
   --target-dir "$ENGINE/target" -- \
   generate --library "$ENGINE/target/release/libsval_mobile.dylib" \
