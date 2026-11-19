@@ -154,6 +154,36 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertFalse(allow.exists, "allowed for the visit, the offer goes")
     }
 
+    /// A page WebKit's fraudulent website warning covers shows its own
+    /// address in the bar, as Safari's does.
+    func testDeceptiveSiteWarningAddress() {
+        waitForBar()
+        let address = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Address' OR label == 'Search or enter address'")).firstMatch
+        address.tap()
+        sleep(1)
+        // Google's page for testing Safe Browsing, on every list as phishing.
+        app.typeText("https://testsafebrowsing.appspot.com/s/phishing.html\n")
+        let warning = app.staticTexts["Deceptive Website Warning"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 30), "WebKit warns about the page")
+        sleep(2)
+        shot("deceptive-site")
+        XCTAssertTrue(address.label.contains("testsafebrowsing.appspot.com"),
+                      "the bar shows the page the warning is for: \(address.label)")
+    }
+
+    /// A page served over plain HTTP loads, as in every browser.
+    func testPlainHTTPPage() {
+        waitForBar()
+        let address = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Address' OR label == 'Search or enter address'")).firstMatch
+        address.tap()
+        sleep(1)
+        // neverssl.com serves plain HTTP only, for testing exactly this.
+        app.typeText("http://neverssl.com/\n")
+        sleep(10)
+        shot("plain-http")
+        XCTAssertTrue(address.label.contains("neverssl.com"), "the page loads: \(address.label)")
+    }
+
     /// Favorites from the sheet's bottom bar: the system's bar, with back
     /// and Done.
     func testFavoritesPage() {

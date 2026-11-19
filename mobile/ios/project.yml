@@ -65,6 +65,12 @@ targets:
         # standard encryption there while the app isn't sold in France, and
         # without the key every upload waits on them.
         ITSAppUsesNonExemptEncryption: false
+        # App Transport Security refuses plain HTTP, and a browser opens the
+        # sites that still serve it. The exception covers the web views
+        # alone, so the app's own connections (the shared folder, the
+        # blocking lists, site icons) keep App Transport Security.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoadsInWebContent: true
         # A row dragged in the Workspace tree (`TreeDrop.swift`).
         # iPad multitasking needs every orientation, and App Store Connect
         # refuses an iPad build without them.

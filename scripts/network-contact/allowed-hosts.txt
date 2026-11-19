@@ -25,7 +25,7 @@ content-signature-2.cdn.mozilla.net       allowed  Remote Settings signature cha
 ciscobinary.openh264.org                  allowed  OpenH264, once per release; Cisco must distribute it
 versioncheck.addons.mozilla.org           allowed  extension update checks
 versioncheck-bg.addons.mozilla.org        allowed  extension update checks
-safebrowsing.googleapis.com               allowed  Safe Browsing lists, under Sval's own key
+safebrowsing.googleapis.com               allowed  Safe Browsing lists: on the desktop under Sval's own key; on the iPhone, for the fraudulent website warning WebKit gives the app, on by default (spec §10.9)
 token.safebrowsing.apple                  allowed  iPhone: the fraudulent website warning WebKit gives the app, on by default (spec §10.9)
 safebrowsing.g.aaplimg.com                allowed  iPhone: the fraudulent website warning WebKit gives the app, on by default (spec §10.9)
 configuration.apple.com                   allowed  iPhone: the fraudulent website warning WebKit gives the app, on by default (spec §10.9)

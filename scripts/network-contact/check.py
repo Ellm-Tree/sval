@@ -279,6 +279,27 @@ def read_rules(allowed_file):
     return rules
 
 
+def listed_addresses(rules):
+    """{address: {listed host}} for every listed host, as this Mac resolves it
+    now.
+
+    A run that follows another can reach a listed host with neither a
+    lookup nor a TLS server name in its own capture: the Mac's resolver
+    answers from its cache, and a connection the earlier run opened carries
+    its server name before the capture began. The same resolver, asked
+    straight after the run, gives the addresses the run was given.
+    """
+    found = {}
+    for host in rules:
+        try:
+            infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+        except OSError:
+            continue
+        for info in infos:
+            found.setdefault(ipaddress.ip_address(info[4][0].split("%")[0]), set()).add(host)
+    return found
+
+
 def judge_hosts(hosts, rules, opt_in_allowed):
     """Prints each host's verdict, in the order `hosts`' values sort, and
     returns the hosts that fail."""
@@ -585,10 +606,15 @@ def judge_capture(capture, processes_file, launchd_pid, allowed_file, opt_in_all
 
     rules = read_rules(allowed_file)
     failures = []
+    resolved = None
     for flow, first in sorted(flows.items(), key=lambda kv: kv[1]):
         if flow in named:
             continue
         candidates = answered.get(flow[2], set())
+        if not candidates:
+            if resolved is None:
+                resolved = listed_addresses(rules)
+            candidates = resolved.get(flow[2], set())
         # An address several names share, as a CDN's are, counts as the
         # listed ones: the session's own lookups are among them.
         listed = {n for n in candidates if n in rules}
