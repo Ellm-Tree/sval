@@ -1491,7 +1491,7 @@ add_task(async function the_header_offers_a_new_tab() {
 });
 
 /**
- * Favorites sit directly under the workspace switcher, list the favorites
+ * Favorites sit in the panel's footer, list the favorites
  * document, and choosing one opens a new tab (import spec §6).
  */
 add_task(async function favorites_open_a_new_tab() {
@@ -1515,9 +1515,9 @@ add_task(async function favorites_open_a_new_tab() {
   const button = SvalPanel._els.favorites;
   const bar = button.parentElement;
   Assert.equal(
-    bar.previousElementSibling,
-    SvalPanel._els.switcher.parentElement,
-    "the Favorites row sits directly under the workspace switcher"
+    bar.parentElement,
+    SvalPanel._els.footer,
+    "the Favorites row sits in the panel's footer"
   );
   Assert.ok(!bar.hidden, "and shows");
 

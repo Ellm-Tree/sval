@@ -98,12 +98,6 @@
       after: 'setting-group[groupid="homepage"]',
     },
     {
-      // The Workspace switcher, before idle tabs and pins.
-      id: "svalSwitcher",
-      category: "paneHome",
-      before: 'setting-group[groupid="importBrowserData"]',
-    },
-    {
       id: "svalTabArchive",
       category: "paneHome",
       before: 'setting-group[groupid="importBrowserData"]',

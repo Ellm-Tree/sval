@@ -3,8 +3,8 @@
 
 /**
  * Sval's cards for how Sval looks and lists: Appearance's panel side and
- * address bar, Search and Launcher's Launcher sections (launcher spec §5),
- * and Workspaces' switcher and pins row line limit.
+ * address bar and Workspace switcher, Search and Launcher's Launcher
+ * sections (launcher spec §5), and Workspaces' pins row line limit.
  *
  * `SvalPreferences` loads this as a classic script after `settings.js`; it
  * adds its methods to `SvalSettings`.
@@ -25,6 +25,9 @@
     PINS_LINES_PREF: "moz-src:///browser/components/sval/SvalPinsModel.sys.mjs",
     STRIP_NAMES: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
     STRIP_NAMES_PREF:
+      "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+    STRIP_NAMES_AT: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
+    STRIP_NAMES_AT_PREF:
       "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
     STRIP_WHEELS: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
     STRIP_WHEEL_PREF:
@@ -59,8 +62,18 @@
     "#F97316",
   ];
 
-  /** The preview's width, and its strip's tiles, named and not, and gap. */
-  const PREVIEW = { width: 104, named: 34, icon: 13, gap: 2, rows: 5 };
+  /**
+   * The preview's width, and its strip's tiles: named beside, named below,
+   * and not named; the gap between them; and the menu's rows.
+   */
+  const PREVIEW = {
+    width: 104,
+    named: 34,
+    below: 22,
+    icon: 13,
+    gap: 2,
+    rows: 5,
+  };
 
   /** The page the address bar card shows an example of. */
   const EXAMPLE_ADDRESS =
@@ -142,9 +155,10 @@
 
     /**
      * Wires the Workspace switcher card: which switcher the panel shows, and
-     * for the strip what it shows and what the wheel does over it. The
-     * strip's two groups show only while Strip is chosen. Each choice applies
-     * as it is checked, and every window follows the pref.
+     * for the strip what it shows, where names sit and what the wheel does
+     * over it. The strip's groups show only while Strip is chosen, and where
+     * names sit only while the strip shows names. Each choice applies as it
+     * is checked, and every window follows the pref.
      *
      * @param {SvalScope} lifetime Ends as the page goes.
      */
@@ -152,15 +166,19 @@
       const groups = [
         ["sval-switcher", lazy.SWITCHER_PREF, lazy.SWITCHER_KINDS],
         ["sval-strip-names", lazy.STRIP_NAMES_PREF, lazy.STRIP_NAMES],
+        ["sval-strip-at", lazy.STRIP_NAMES_AT_PREF, lazy.STRIP_NAMES_AT],
         ["sval-strip-wheel", lazy.STRIP_WHEEL_PREF, lazy.STRIP_WHEELS],
       ];
       const options = document.getElementById("sval-strip-options");
+      const atOptions = document.getElementById("sval-strip-at-options");
       for (const [name, pref, values] of groups) {
         const show = () => {
           const value = Services.prefs.getStringPref(pref, values[0]);
           this._selectRadio(name, values.includes(value) ? value : values[0]);
           if (pref === lazy.SWITCHER_PREF) {
             options.hidden = value !== "strip";
+          } else if (pref === lazy.STRIP_NAMES_PREF) {
+            atOptions.hidden = value === "none";
           }
         };
         for (const radio of document.querySelectorAll(
@@ -248,6 +266,10 @@
       }
       const names = { current: "current", none: "none" }[kind] ?? "all";
       const strip = make("sval-pv-strip", box);
+      // Where names sit: under each tile, in an item the width of one beside
+      // its tile.
+      const below = kind === "below";
+      strip.toggleAttribute("data-below", below);
       const tiles = PREVIEW_COLORS.map(color => {
         const tile = make("sval-pv-tile", strip);
         paint(make("sval-pv-square", tile), color);
@@ -265,6 +287,8 @@
         all: step => ({ current: (step + 2) % 7 }),
         current: step => ({ current: (step + 4) % 7 }),
         none: step => ({ current: (step + 1) % 7 }),
+        below: step => ({ current: (step + 3) % 7 }),
+        beside: step => ({ current: (step + 5) % 7 }),
         slide: step => ({
           current: 2,
           offset: [0, -36, -72, 0][step % 4],
@@ -282,7 +306,10 @@
         tiles.forEach((tile, i) => {
           const named =
             names === "all" || (names === "current" && i === current);
-          const width = named ? PREVIEW.named : PREVIEW.icon;
+          let width = named ? PREVIEW.named : PREVIEW.icon;
+          if (below) {
+            width = PREVIEW.below;
+          }
           tile.style.width = `${width}px`;
           tile.toggleAttribute("data-named", named);
           tile.toggleAttribute("data-current", i === current);

@@ -538,20 +538,16 @@
   display: none;
 }
 
-/* Under its open panel's stem the button is the face the stem grows from
-   (`sval-header.css`, panels), in the panel's fill. The stem's edge runs
-   over the face's top corner, where the count and the breach dot stand, so
-   they give way while the panel that names them is open, and the shield
-   is whole. The `:dir` outranks the count's and the dot's cuts in either
-   direction. */
+/* Under its open panel's stem the button is the face the stem grows from,
+   in the panel's fill (`sval-stem.css`). The stem's edge runs over the
+   face's top corner, where the count and the breach dot stand, so they give
+   way while the panel that names them is open, and the shield is whole, in
+   the panel's text colour. The `:dir` outranks the count's and the dot's
+   cuts in either direction. */
 @media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
-  #sval-protection-button[sval-stem] {
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
-
+  #sval-protection-button[sval-stem-anchor] {
     &,
     &:hover {
-      background-color: var(--panel-background-color);
       color: var(--sval-text);
     }
 

@@ -7,14 +7,34 @@ import Screenshot from "../../../../../components/Screenshot.astro";
 import Since from "../../../../../components/docs/Since.astro";
 import Until from "../../../../../components/docs/Until.astro";
 
+<Until v="0.1.0-rc.10">
+
 Favorites are the pages you keep. You'll find them in the Favorites menu at
 the top of the Workspace panel. Favorites don't belong to any Workspace, so you can
 open one from any Workspace.
 
+</Until>
+<Since v="0.1.0-rc.10">
+
+Favorites are the pages you keep. You'll find them in the Favorites menu at
+the bottom of the Workspace panel. Favorites don't belong to any Workspace, so you can
+open one from any Workspace.
+
+</Since>
+
 You found a Codeberg page on release notes you'll come back to, but you
 don't need it open.
 
+<Until v="0.1.0-rc.10">
+
 <Screenshot name="docs-favorites-menu" frame="rounded" maxWidth={360} alt="The Favorites menu at the top of the Workspace panel, with the Reading and Tools folders and two Favorites" />
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+<Screenshot name="docs-favorites-menu" frame="rounded" maxWidth={360} alt="The Favorites menu open above the Favorites button at the bottom of the Workspace panel, with the Reading and Tools folders and two Favorites" />
+
+</Since>
 
 ## Steps
 
@@ -27,7 +47,17 @@ To take a page out of Favorites, right-click its tab and choose
 
 ## Pin a Favorite
 
+<Until v="0.1.0-rc.10">
+
 1. At the top of the Workspace panel, select **Favorites**.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+1. At the bottom of the Workspace panel, select **Favorites**.
+
+</Since>
+
 2. Right-click the Favorite, then choose **Pin**.
 
 <Until v="0.1.0-rc.10">

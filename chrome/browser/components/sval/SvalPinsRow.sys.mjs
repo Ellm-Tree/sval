@@ -1273,6 +1273,7 @@ export class SvalPinsRow {
       panel.id = POPOVER_ID;
       panel.className = "sval-pins-popover";
       panel.setAttribute("noautofocus", "true");
+      panel.setAttribute("sval-stem-host", "");
       panel.setAttribute("role", "dialog");
       // The popover's window reaches past what it draws, over the row, so a
       // pin dragged out of it would never reach the row. It closes once the
@@ -1311,15 +1312,14 @@ export class SvalPinsRow {
     this.#drawPopover(panel);
     anchor?.closest(".sval-pin-slot")?.setAttribute("data-open", "true");
     const narrow = this.#block.hasAttribute("data-narrow");
-    // Beside the 48px panel's column the popover opens to the side, where
-    // no stem can join it to its tile (`SvalHeader`'s stemRootOf).
-    panel.toggleAttribute("sval-beside", narrow);
-    panel.openPopup(
-      anchor,
-      narrow ? "end_before" : "after_start",
-      narrow ? 6 : 0,
-      0
-    );
+    // Beside the 48px panel's column the popover opens at the tile's end,
+    // and its stem grows from that side (`SvalStem`).
+    const end =
+      this.#window.getComputedStyle(anchor).direction === "rtl"
+        ? "left"
+        : "right";
+    panel.setAttribute("sval-stem-side", narrow ? end : "bottom");
+    panel.openPopup(anchor, narrow ? "end_before" : "after_start", 0, 0);
     panel.addEventListener(
       "popupshown",
       () => panel.querySelector("button[data-guid]")?.focus(),

@@ -8,16 +8,16 @@
  * it and keep the draft (the message, the email, the ticks and the context)
  * in this process until Sval quits; Cancel drops the draft.
  *
- * The popover is drawn in the window's own document, over the page, so the
- * tab that covers the button, the concave corner above the tab and the box
- * are one painted shape, and one filter (`sval-header.css`, the popovers'
- * edge and shadow) gives them one outline and one shadow.
+ * The popover is drawn in the window's own document, over the page. The tab
+ * that covers the button, the stem from it and the box are the header
+ * popovers' one shape (`SvalStem`), growing sideways from the tab.
  *
  * The report is `SvalFeedback`'s: built once as the form opens, viewed and
  * posted as built (spec §4).
  */
 
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
+import { SvalStem } from "moz-src:///browser/components/sval/SvalStem.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -208,15 +208,15 @@ class FeedbackForm {
     const { doc } = this;
     const root = htmlElement(doc, "div", { className: POPOVER_CLASS });
     root.hidden = true;
+    // The tab over the button, its stem and the box are one shape
+    // (`SvalStem`), which `place` draws.
+    root.setAttribute("sval-stem-doc", "");
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-labelledby", "sval-feedback-title");
 
+    // The button's icon, drawn again over the tab that covers it.
     const tab = htmlElement(doc, "div", { className: "sval-feedback-tab" });
     tab.setAttribute("aria-hidden", "true");
-    const corner = htmlElement(doc, "div", {
-      className: "sval-feedback-corner",
-    });
-    corner.setAttribute("aria-hidden", "true");
 
     const box = htmlElement(doc, "div", { className: "sval-feedback-box" });
     const title = htmlElement(
@@ -361,7 +361,7 @@ class FeedbackForm {
     );
 
     box.append(head, grid, sent, failure, actions);
-    root.append(tab, corner, box);
+    root.append(tab, box);
     root.addEventListener("keydown", event => this.onKey(event));
     doc.body.append(root);
 
@@ -967,12 +967,15 @@ class FeedbackForm {
       { capture: true, signal }
     );
     win.addEventListener("resize", () => this.place(), { signal });
+    // The panel moves the button and the box's edge, and the box's own size
+    // moves the shape's.
+    const observer = new win.ResizeObserver(() => this.place());
     const container = this.doc.getElementById("sval-panel-container");
     if (container) {
-      const observer = new win.ResizeObserver(() => this.place());
       observer.observe(container);
-      signal.addEventListener("abort", () => observer.disconnect());
     }
+    observer.observe(this.els.box);
+    signal.addEventListener("abort", () => observer.disconnect());
   }
 
   unlisten() {
@@ -1021,6 +1024,23 @@ class FeedbackForm {
       );
     }
     this.root.dataset.side = right ? "right" : "left";
+    // The tab: a pill over the button, from 4px past its outer side, whose
+    // stem grows sideways to the box.
+    const end = right ? b.right + TAB_REACH : b.left - TAB_REACH;
+    const half = TAB_HEIGHT / 2;
+    SvalStem.drawIn(this.root, {
+      face: {
+        left: right ? end - TAB_HEIGHT : end,
+        right: right ? end : end + TAB_HEIGHT,
+        top: tabBottom - TAB_HEIGHT,
+        bottom: tabBottom,
+      },
+      faceRadii: right
+        ? { tl: 0, tr: half, br: half, bl: 0 }
+        : { tl: half, tr: 0, br: 0, bl: half },
+      content: this.els.box,
+      side: right ? "left" : "right",
+    });
   }
 }
 

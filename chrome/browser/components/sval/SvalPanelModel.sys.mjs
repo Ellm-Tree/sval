@@ -646,15 +646,19 @@ export function moveWorkspaceOp(order, id, target, side) {
 
 /**
  * Which Workspace switcher the panel shows (`app-sval-prefs.js`): one of
- * {@link SWITCHER_KINDS}. The strip's two options are read only while it
+ * {@link SWITCHER_KINDS}. The strip's options are read only while it
  * shows.
  */
 export const SWITCHER_PREF = "browser.sval.panel.switcher";
 export const SWITCHER_KINDS = Object.freeze(["menu", "strip"]);
 export const STRIP_NAMES_PREF = "browser.sval.panel.stripNames";
 export const STRIP_NAMES = Object.freeze(["all", "current", "none"]);
+export const STRIP_NAMES_AT_PREF = "browser.sval.panel.stripNamesAt";
+export const STRIP_NAMES_AT = Object.freeze(["below", "beside"]);
 export const STRIP_WHEEL_PREF = "browser.sval.panel.stripWheel";
 export const STRIP_WHEELS = Object.freeze(["slide", "switch"]);
+/** Whether the strip is folded away under its label row. */
+export const STRIP_FOLDED_PREF = "browser.sval.panel.stripFolded";
 
 /**
  * Reads one `wheel` event of a trackpad swipe, or of a smooth-scrolling

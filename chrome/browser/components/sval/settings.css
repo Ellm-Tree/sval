@@ -759,7 +759,7 @@ html|* {
   flex-direction: column;
   gap: 12px;
 
-  > h3 {
+  > h4 {
     margin-block-start: 8px;
     font-size: 14px;
   }
@@ -895,6 +895,24 @@ html|* {
 
     > .sval-pv-text {
       background: var(--sval-ink);
+    }
+  }
+}
+
+/* A name under its tile: each item a column, the tile on top. */
+.sval-pv-strip[data-below] {
+  top: 8px;
+
+  > .sval-pv-tile {
+    height: 24px;
+    padding: 3px 2px 0;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 3px;
+
+    > .sval-pv-text {
+      flex: none;
+      width: 14px;
     }
   }
 }

@@ -5,7 +5,7 @@
 
 /**
  * The popovers that grow from the button that opened them (messages spec
- * §9.4, `SvalHeader`'s stem listeners and `sval-header.css`): the header's
+ * §9.4, `SvalStem` and `sval-stem.css`): the header's
  * notices, extensions, downloads and site-settings panels, the workspace
  * panel's Favorites menu, the refused-install doorhanger on the extensions
  * button, and the media prompt on the media button. The Workspace menu
@@ -36,7 +36,7 @@ add_setup(async function () {
   });
 });
 
-/** Where `sval-header.css` draws no stem inside the popup. */
+/** Where `sval-stem.css` draws no stem inside the popup. */
 const OPAQUE_POPUPS = window.matchMedia(
   "(-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available))"
 ).matches;
@@ -187,11 +187,24 @@ function checkGrows(popup, root) {
   const face = onScreen(faceOf(root));
   const box = popup.getOuterScreenRect();
   const content = contentOf(popup);
-  Assert.greaterOrEqual(
-    content.top,
-    face.bottom - TOLERANCE,
-    "the popover hangs below its button"
-  );
+  // A popover grows down from its button, or up from it where it names
+  // that side (`sval-stem-side`).
+  const up = popup.getAttribute("sval-stem-side") === "top";
+  const part = popup.shadowRoot.querySelector('[part~="content"]');
+  const contentFoot = content.top + px(getComputedStyle(part).height);
+  if (up) {
+    Assert.lessOrEqual(
+      contentFoot,
+      face.top + TOLERANCE,
+      "the popover stands above its button"
+    );
+  } else {
+    Assert.greaterOrEqual(
+      content.top,
+      face.bottom - TOLERANCE,
+      "the popover hangs below its button"
+    );
+  }
   const drawn = outlineOf(popup);
   if (OPAQUE_POPUPS) {
     Assert.ok(
@@ -227,7 +240,6 @@ function checkGrows(popup, root) {
     "stroked 1px wide"
   );
   Assert.notEqual(getComputedStyle(drawn.edge).stroke, "none");
-  const part = popup.shadowRoot.querySelector('[part~="content"]');
   Assert.equal(
     getComputedStyle(part).backgroundColor,
     "rgba(0, 0, 0, 0)",
@@ -237,11 +249,15 @@ function checkGrows(popup, root) {
 
   // The edge runs half its width outside the shape.
   const bbox = drawn.edge.getBBox();
-  near(box.top + bbox.y, face.top - 0.5, "the edge runs over the button's top");
+  // The shape's far ends: the button's and the content's.
+  const [shapeTop, shapeFoot] = up
+    ? [content.top, face.bottom]
+    : [face.top, contentFoot];
+  near(box.top + bbox.y, shapeTop - 0.5, "the edge runs over the shape's top");
   near(
     box.top + bbox.y + bbox.height,
-    content.top + px(getComputedStyle(part).height) + 0.5,
-    "down to the content's foot"
+    shapeFoot + 0.5,
+    "down to the shape's foot"
   );
   Assert.lessOrEqual(
     Math.abs(box.left + bbox.x - (Math.min(face.left, content.left) - 0.5)),
@@ -260,14 +276,16 @@ function checkGrows(popup, root) {
   );
 
   const prop = name => px(popup.style.getPropertyValue(name));
+  const tabTop = box.top + prop("--sval-stem-tab-top");
+  const tabFoot = tabTop + prop("--sval-stem-tab-height");
   near(
-    box.top + prop("--sval-stem-tab-top"),
-    face.top,
-    "the stem's shadow box starts at the button's top"
+    up ? tabFoot : tabTop,
+    up ? face.bottom : face.top,
+    "the stem's shadow box starts at the button's far edge"
   );
   near(
-    box.top + prop("--sval-stem-tab-top") + prop("--sval-stem-tab-height"),
-    content.top,
+    up ? tabTop : tabFoot,
+    up ? contentFoot : content.top,
     "and reaches the content"
   );
 
@@ -287,7 +305,7 @@ function checkGrows(popup, root) {
     );
   }
   Assert.greaterOrEqual(
-    content.top - face.bottom,
+    up ? face.top - contentFoot : content.top - face.bottom,
     12 - TOLERANCE,
     "the stem is tall enough for its fillets"
   );
@@ -388,14 +406,18 @@ async function whileOpen(id, open, check, close = popup => popup.hidePopup()) {
         return true;
       }
       const bbox = drawn.edge.getBBox();
+      const top = popup.getOuterScreenRect().top;
+      // The content's far edge from the button: its foot, or its top for a
+      // popover above its button.
+      if (popup.getAttribute("sval-stem-side") === "top") {
+        return (
+          Math.abs(top + bbox.y - (contentOf(popup).top - 0.5)) <= TOLERANCE
+        );
+      }
       const foot =
         contentOf(popup).top + px(getComputedStyle(part).height) + 0.5;
-      return (
-        Math.abs(
-          popup.getOuterScreenRect().top + bbox.y + bbox.height - foot
-        ) <= TOLERANCE
-      );
-    }, `${id}'s stem at its content's foot`),
+      return Math.abs(top + bbox.y + bbox.height - foot) <= TOLERANCE;
+    }, `${id}'s stem at its content's far edge`),
     10_000,
     `${id}'s stem following its content`
   );
@@ -651,12 +673,14 @@ add_task(async function the_favorites_menu_grows_from_its_button() {
   );
 });
 
-add_task(async function a_menu_above_its_button_lets_go() {
+add_task(async function a_menu_on_the_other_side_lets_go() {
   const button = SvalPanel._els.favorites;
   const popup = SvalPanel._els.favoritesMenu;
   // Gecko flips a popup only where it has no room, which a test cannot
-  // count on; a menu asked to open above its button lands where a flipped
-  // one would.
+  // count on. The menu asked to grow down from its button and opened above
+  // it lands where a flipped one would.
+  popup.setAttribute("sval-stem-side", "bottom");
+  atTaskEnd(() => popup.setAttribute("sval-stem-side", "top"));
   await whileOpen(
     popup.id,
     () => popup.openPopup(button, "before_start"),
@@ -1036,15 +1060,19 @@ add_task(async function a_press_on_a_popovers_shadow_closes_it() {
           }
           const face = onScreen(faceOf(root));
           info(`pressing the stem: ${geometryOf(popup)}`);
+          // Between the content and the button, on whichever side it grows.
+          const up = popup.getAttribute("sval-stem-side") === "top";
           pressPopover(
             popup,
             Math.round((face.left + face.right) / 2),
-            Math.round(content.top) - 4
+            up
+              ? Math.round(content.top + drawn.height) + 4
+              : Math.round(content.top) - 4
           );
           Assert.equal(popup.state, "open", "and so does one on its stem");
           const shadow = { x: Math.ceil(content.right) + 8, y: middle };
           // The window's room around its content is the margin the input
-          // region leaves out (`--sval-stem-shadow-room`, `sval-header.css`).
+          // region leaves out (`--sval-stem-shadow-room`, `sval-stem.css`).
           const margin = px(
             getComputedStyle(
               popup.shadowRoot.querySelector('[part~="content"]')
@@ -1255,19 +1283,34 @@ function checkEdgeColumn(popup, root) {
   const content = contentOf(popup);
   const part = popup.shadowRoot.querySelector('[part~="content"]');
   const prop = name => px(popup.style.getPropertyValue(name));
-  const faceRadius = px(popup.style.getPropertyValue("--sval-stem-tab-radius"));
+  // The tab's radii, top left first: a popover above its button rounds the
+  // face's foot, and the side runs from the content's foot down to it.
+  const tabRadii = popup.style
+    .getPropertyValue("--sval-stem-tab-radius")
+    .split(" ")
+    .map(px);
+  const up = popup.getAttribute("sval-stem-side") === "top";
   const x = face.left - box.left;
-  const from = face.top - box.top + faceRadius + 1;
-  let to = content.top - box.top - 1;
-  if (prop("--sval-fillet-left")) {
-    to -= 12;
-  } else if (Math.abs(content.left - face.left) < FLUSH) {
-    to =
-      content.top -
-      box.top +
-      px(getComputedStyle(part).height) -
-      px(getComputedStyle(part).borderBottomLeftRadius) -
-      1;
+  const contentTop = content.top - box.top;
+  const contentFoot = contentTop + px(getComputedStyle(part).height);
+  let from;
+  let to;
+  if (up) {
+    from = contentFoot + 1;
+    to = face.bottom - box.top - tabRadii[3] - 1;
+    if (prop("--sval-fillet-left")) {
+      from += 12;
+    } else if (Math.abs(content.left - face.left) < FLUSH) {
+      from = contentTop + px(getComputedStyle(part).borderTopLeftRadius) + 1;
+    }
+  } else {
+    from = face.top - box.top + tabRadii[0] + 1;
+    to = contentTop - 1;
+    if (prop("--sval-fillet-left")) {
+      to -= 12;
+    } else if (Math.abs(content.left - face.left) < FLUSH) {
+      to = contentFoot - px(getComputedStyle(part).borderBottomLeftRadius) - 1;
+    }
   }
   Assert.greater(to - from, 4, "the side runs straight for some length");
   const canvas = document.createElementNS(

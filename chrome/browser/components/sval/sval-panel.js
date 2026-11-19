@@ -632,10 +632,16 @@ var SvalPanel = {
     switcherBar.append(switcher, strip);
     root.append(switcherBar);
 
-    // Favorites sit directly under the workspace as a place of their own: a
-    // favorite opens from any workspace (import spec §2), so it belongs to
-    // none. A private window's panel has no Favorites, because nothing it
-    // does may be kept.
+    // The pins sit under the workspace, which decides which of them show
+    // (pins spec §4), and above the tabs. `SvalPinsRow` fills it.
+    const pins = make("div");
+    pins.hidden = true;
+    root.append(pins);
+
+    // Favorites sit in the panel's footer, fixed while the tabs scroll, as a
+    // place of their own: a favorite opens from any workspace (import spec §2), so it
+    // belongs to none. A private window's panel has no Favorites, because
+    // nothing it does may be kept.
     const favorites = make("button", {
       class: "sval-favorites",
       "data-command": "openFavorites",
@@ -648,13 +654,6 @@ var SvalPanel = {
     const favoritesBar = make("div", { class: "sval-favorites-bar" });
     favoritesBar.append(favorites);
     favoritesBar.hidden = this._inMemory;
-    root.append(favoritesBar);
-
-    // The pins sit under the workspace, which decides which of them show
-    // (pins spec §4), and above the tabs. `SvalPinsRow` fills it.
-    const pins = make("div");
-    pins.hidden = true;
-    root.append(pins);
 
     const header = make("div", { class: "sval-panel-header sval-edge-above" });
     const addTab = make("button", {
@@ -753,7 +752,7 @@ var SvalPanel = {
         make("button", { class: "sval-media-control", "data-command": command })
       );
     }
-    footer.append(syncRow, mediaBar, feedback);
+    footer.append(favoritesBar, syncRow, mediaBar, feedback);
 
     const undoRegion = this._buildUndoRegion(make);
     root.append(header, tree, undoRegion, footer);
@@ -882,11 +881,23 @@ var SvalPanel = {
     this._els.switcherMenu = this._buildSwitcherMenu();
     this._els.favoritesMenu = this._buildFavoritesMenu(favoritesBar);
 
-    // Settings › Workspaces picks the switcher and what the strip shows, and
-    // every window follows as the choice is made.
-    const { SWITCHER_PREF, STRIP_NAMES_PREF } = this._modules.SvalPanelModel;
+    // Settings › Appearance picks the switcher and what the strip shows, the
+    // strip's label row folds it, and every window follows as the choice is
+    // made.
+    const {
+      SWITCHER_PREF,
+      STRIP_NAMES_PREF,
+      STRIP_NAMES_AT_PREF,
+      STRIP_FOLDED_PREF,
+    } = this._modules.SvalPanelModel;
     listening.pref(SWITCHER_PREF, () => this._applySwitcherKind());
-    listening.pref(STRIP_NAMES_PREF, () => this._renderStrip());
+    for (const pref of [
+      STRIP_NAMES_PREF,
+      STRIP_NAMES_AT_PREF,
+      STRIP_FOLDED_PREF,
+    ]) {
+      listening.pref(pref, () => this._renderStrip());
+    }
     this._applySwitcherKind();
   },
 

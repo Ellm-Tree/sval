@@ -937,14 +937,110 @@
       </section>
     </section>
 
-    <!-- Joins Firefox's Home category, Workspaces, before idle tabs: the
-         Workspace switcher at the top of the panel, and how the strip shows
-         and scrolls (`SvalPanelModel.SWITCHER_PREF` and the strip's prefs).
-         Each choice applies as it is checked, and each preview is drawn by
-         `SvalAppearanceSettings._initSwitcher`. -->
-    <section data-sval-pane="svalSwitcher" class="sval-settings">
-      <section class="sval-card" aria-labelledby="sval-switcher-heading">
-        <h2 id="sval-switcher-heading">Workspace switcher</h2>
+    <!-- Joins Firefox's Home category, Workspaces, before pins: archiving
+         idle tabs, drawn by Firefox's `setting-group` from the
+         config `settings-archive.js` registers. -->
+    <section data-sval-pane="svalTabArchive" class="sval-settings">
+      <setting-group groupid="svalTabArchive"></setting-group>
+    </section>
+
+    <!-- Joins Firefox's General category after its default-browser group,
+         drawn by Firefox's `setting-group` from the config
+         `settings-warnings.js` registers. -->
+    <section data-sval-pane="svalWarnings" class="sval-settings">
+      <setting-group groupid="svalWarnings"></setting-group>
+    </section>
+
+    <!-- Joins Firefox's Home category, Workspaces, before its import and
+         export group: pins belong to a workspace. -->
+    <section data-sval-pane="svalPins" class="sval-settings">
+      <!-- Pins (pins spec §4): how many lines of them the panel shows,
+           `SvalPinsModel`'s pref. -->
+      <section class="sval-card" aria-labelledby="sval-pins-heading">
+        <h2 id="sval-pins-heading">Pins</h2>
+        <label class="sval-switch-row">
+          <span class="sval-lead">Rows of pins to show</span>
+          <select id="sval-pins-lines" class="sval-agent-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+      </section>
+    </section>
+
+    <!-- Joins Firefox's own Appearance category, at its top: one card for
+         how the Workspace panel looks and behaves. Where it sits, its tab
+         previews, the hidden panel's edge, and the Workspace switcher at its
+         top (`SvalPanelModel.SWITCHER_PREF` and the strip's prefs, whose
+         previews `SvalAppearanceSettings._initSwitcher` draws). Each choice
+         applies as it is made. -->
+    <section data-sval-pane="svalPanelSide" class="sval-settings">
+      <section class="sval-card" aria-labelledby="sval-workspace-look-heading">
+        <h2 id="sval-workspace-look-heading">Workspace appearance</h2>
+        <h3 id="sval-side-heading">Workspace panel side</h3>
+        <div
+          class="sval-segments"
+          role="radiogroup"
+          aria-labelledby="sval-side-heading"
+        >
+          <label class="sval-segment">
+            <input type="radio" name="sval-side" value="left" />
+            <span>Left</span>
+          </label>
+          <label class="sval-segment">
+            <input type="radio" name="sval-side" value="right" />
+            <span>Right</span>
+          </label>
+        </div>
+        <p
+          id="sval-side-status"
+          class="sval-status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <h3 id="sval-panel-more-heading">
+          Tab previews and the hidden Workspace panel
+        </h3>
+        <!-- Firefox's tab hover preview, beside a tab's row
+             (`SvalTabHoverPreview`). -->
+        <label class="sval-switch-row">
+          <span class="sval-fp-words">
+            <span id="sval-hover-preview-label" class="sval-links-label"
+              >Show a preview when you point at a tab</span
+            >
+            <span id="sval-hover-preview-note" class="sval-agents-note"
+              >When you point at a tab, or move to it with the keyboard, Sval
+              shows the tab's title, its site, and a picture of its page next to
+              the Workspace panel.</span
+            >
+          </span>
+          <input
+            id="sval-hover-preview"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+            aria-labelledby="sval-hover-preview-label"
+            aria-describedby="sval-hover-preview-note"
+          />
+        </label>
+        <!-- `SvalPanelReveal.REVEAL_PREF`. -->
+        <label class="sval-switch-row">
+          <span class="sval-lead"
+            >Show the hidden Workspace panel when you hold the pointer at the
+            edge of the window</span
+          >
+          <input
+            id="sval-panel-reveal"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+        <h3 id="sval-switcher-heading">Workspace switcher</h3>
         <div
           class="sval-pick-cards"
           role="radiogroup"
@@ -992,7 +1088,7 @@
           </label>
         </div>
         <div id="sval-strip-options" class="sval-strip-options" hidden="">
-          <h3 id="sval-strip-names-heading">The strip shows</h3>
+          <h4 id="sval-strip-names-heading">The strip shows</h4>
           <div
             class="sval-pick-cards"
             role="radiogroup"
@@ -1042,7 +1138,56 @@
               ></span>
             </label>
           </div>
-          <h3 id="sval-strip-wheel-heading">Scrolling over the strip</h3>
+          <div id="sval-strip-at-options" class="sval-strip-options">
+            <h4 id="sval-strip-at-heading">Where names show</h4>
+            <div
+              class="sval-pick-cards"
+              role="radiogroup"
+              aria-labelledby="sval-strip-at-heading"
+            >
+              <label class="sval-pick-card">
+                <input
+                  type="radio"
+                  name="sval-strip-at"
+                  value="below"
+                  aria-describedby="sval-strip-at-below-note"
+                />
+                <span class="sval-pick-words">
+                  <span class="sval-pick-label">Under the icon</span>
+                  <span id="sval-strip-at-below-note" class="sval-pick-note"
+                    >The strip is taller, and each name gets the same
+                    width.</span
+                  >
+                </span>
+                <span
+                  class="sval-pick-preview"
+                  data-preview="below"
+                  aria-hidden="true"
+                ></span>
+              </label>
+              <label class="sval-pick-card">
+                <input
+                  type="radio"
+                  name="sval-strip-at"
+                  value="beside"
+                  aria-describedby="sval-strip-at-beside-note"
+                />
+                <span class="sval-pick-words">
+                  <span class="sval-pick-label">Next to the icon</span>
+                  <span id="sval-strip-at-beside-note" class="sval-pick-note"
+                    >The strip is shorter, and a short name takes less
+                    room.</span
+                  >
+                </span>
+                <span
+                  class="sval-pick-preview"
+                  data-preview="beside"
+                  aria-hidden="true"
+                ></span>
+              </label>
+            </div>
+          </div>
+          <h4 id="sval-strip-wheel-heading">Scrolling over the strip</h4>
           <div
             class="sval-pick-cards"
             role="radiogroup"
@@ -1090,109 +1235,6 @@
             </label>
           </div>
         </div>
-      </section>
-    </section>
-
-    <!-- Joins Firefox's Home category, Workspaces, before pins: archiving
-         idle tabs, drawn by Firefox's `setting-group` from the
-         config `settings-archive.js` registers. -->
-    <section data-sval-pane="svalTabArchive" class="sval-settings">
-      <setting-group groupid="svalTabArchive"></setting-group>
-    </section>
-
-    <!-- Joins Firefox's General category after its default-browser group,
-         drawn by Firefox's `setting-group` from the config
-         `settings-warnings.js` registers. -->
-    <section data-sval-pane="svalWarnings" class="sval-settings">
-      <setting-group groupid="svalWarnings"></setting-group>
-    </section>
-
-    <!-- Joins Firefox's Home category, Workspaces, before its import and
-         export group: pins belong to a workspace. -->
-    <section data-sval-pane="svalPins" class="sval-settings">
-      <!-- Pins (pins spec §4): how many lines of them the panel shows,
-           `SvalPinsModel`'s pref. -->
-      <section class="sval-card" aria-labelledby="sval-pins-heading">
-        <h2 id="sval-pins-heading">Pins</h2>
-        <label class="sval-switch-row">
-          <span class="sval-lead">Rows of pins to show</span>
-          <select id="sval-pins-lines" class="sval-agent-select">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="6">6</option>
-            <option value="8">8</option>
-          </select>
-        </label>
-      </section>
-    </section>
-
-    <!-- Joins Firefox's own Appearance category, at its top: where the
-         panel sits is how sval looks. -->
-    <section data-sval-pane="svalPanelSide" class="sval-settings">
-      <section class="sval-card" aria-labelledby="sval-side-heading">
-        <h2 id="sval-side-heading">Workspace panel side</h2>
-        <div
-          class="sval-segments"
-          role="radiogroup"
-          aria-labelledby="sval-side-heading"
-        >
-          <label class="sval-segment">
-            <input type="radio" name="sval-side" value="left" />
-            <span>Left</span>
-          </label>
-          <label class="sval-segment">
-            <input type="radio" name="sval-side" value="right" />
-            <span>Right</span>
-          </label>
-        </div>
-        <p
-          id="sval-side-status"
-          class="sval-status-line"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </section>
-      <section class="sval-card" aria-labelledby="sval-hover-preview-label">
-        <!-- Firefox's tab hover preview, beside a tab's row
-             (`SvalTabHoverPreview`). -->
-        <label class="sval-switch-row">
-          <span class="sval-fp-words">
-            <span id="sval-hover-preview-label" class="sval-links-label"
-              >Show a preview when you point at a tab</span
-            >
-            <span id="sval-hover-preview-note" class="sval-agents-note"
-              >When you point at a tab, or move to it with the keyboard, Sval
-              shows the tab's title, its site, and a picture of its page next to
-              the Workspace panel.</span
-            >
-          </span>
-          <input
-            id="sval-hover-preview"
-            class="sval-switch"
-            type="checkbox"
-            role="switch"
-            aria-labelledby="sval-hover-preview-label"
-            aria-describedby="sval-hover-preview-note"
-          />
-        </label>
-      </section>
-      <section class="sval-card" aria-labelledby="sval-edge-heading">
-        <h2 id="sval-edge-heading">Hidden Workspace panel</h2>
-        <!-- `SvalPanelReveal.REVEAL_PREF`. -->
-        <label class="sval-switch-row">
-          <span class="sval-lead"
-            >Show the Workspace panel when you hold the pointer at the edge of
-            the window</span
-          >
-          <input
-            id="sval-panel-reveal"
-            class="sval-switch"
-            type="checkbox"
-            role="switch"
-          />
-        </label>
       </section>
     </section>
 

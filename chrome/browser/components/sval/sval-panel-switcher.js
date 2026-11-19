@@ -489,6 +489,9 @@
       const popup = document.createXULElement("menupopup");
       popup.id = "sval-favorites-menu";
       popup.setAttribute("nonnative", "");
+      // Grows up from its button in the panel's footer (`SvalStem`).
+      popup.setAttribute("sval-stem-host", "");
+      popup.setAttribute("sval-stem-side", "top");
       popup.classList.add("toolbar-menupopup");
       popup.addEventListener("popupshowing", event => {
         if (event.target === popup) {
@@ -516,11 +519,11 @@
       return popup;
     },
 
-    /** Opens the Favorites menu under its button. */
+    /** Opens the Favorites menu over its button, in the panel's footer. */
     openFavorites() {
       this._els.favoritesMenu.openPopup(
         this._els.favorites,
-        "after_start",
+        "before_start",
         0,
         0,
         false,

@@ -341,20 +341,12 @@
   background: var(--sval-pin-well-selected-hover);
 }
 
-/* The folder popover grows from its tile as the header's popovers do
- * (`sval-header.css`, panels, which also gives the conditions the stem is
- * drawn under): while it is open, the tile wears the popover's fill. */
+/* The folder popover grows from its tile (`sval-stem.css`, which also gives
+ * the conditions the stem is drawn under, and gives the tile the popover's
+ * fill): the tile's plate gives way to that fill. */
 @media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
-  /* As specific as the selected, open and hovered tile's own fills, and
-     after them. */
-  .sval-pin-slot[data-open] > .sval-pin[sval-stem] {
-    background: var(--panel-background-color);
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
-
-    > .sval-pin-plate {
-      background: transparent;
-    }
+  .sval-pin[sval-stem-anchor] > .sval-pin-plate {
+    background: transparent;
   }
 }
 

@@ -3,7 +3,7 @@
 
 /**
  * The strip: the Workspace switcher that shows every Workspace in a row, in
- * place of the switcher button, when Settings › Workspaces picks it
+ * place of the switcher button, when Settings › Appearance picks it
  * (`SvalPanelModel.SWITCHER_PREF`). It lists what the switcher's menu lists,
  * in the same order ({@link SvalPanel.switcherList}), and goes to a
  * Workspace through the same switch ({@link SvalPanel.pickWorkspace}).
@@ -18,18 +18,24 @@
 {
   /**
    * Each item's size along the strip, in CSS pixels, as `sval-panel.css`
-   * (strip) draws it: an item's inline padding, its tile, and the gap between
-   * the tile and its name; an icon's width; the gap between items. The
-   * strip's place along its track is worked out from these and from each
-   * name's width, so it slides to where the items end up while their widths
-   * are still animating there.
+   * (strip) draws it, for each way the strip shows names. `icon` is an item
+   * that shows no name, and New Workspace…'s; `gap` is the room between
+   * items. A name below its tile makes the item `below` wide. A name beside
+   * its tile makes the item its inline padding, the tile, the gap after the
+   * tile and the name, up to `max`. The strip's place along its track is
+   * worked out from these and from each name's width, so it slides to where
+   * the items end up while their widths are still animating there.
    */
-  const NAMED = { padding: 20, tile: 28, gap: 6 };
-  const WIDENED = { padding: 13, tile: 28, gap: 6 };
-  const ICON_WIDTH = 34;
+  const SIZES = {
+    narrow: { icon: 34, gap: 3 },
+    none: { icon: 42, gap: 3 },
+    "below-all": { icon: 44, gap: 2, below: 92 },
+    "below-current": { icon: 44, gap: 2, below: 92 },
+    "beside-all": { icon: 42, gap: 4, padding: 20, tile: 30, after: 8 },
+    "beside-current": { icon: 42, gap: 3, padding: 14, tile: 30, after: 8 },
+  };
+  const BESIDE_MAX = 160;
   const DIVIDER_WIDTH = 1;
-  const NAMED_GAP = 4;
-  const ICON_GAP = 3;
 
   /**
    * The Workspace panel's widths the strip changes layout at
@@ -129,7 +135,14 @@
       dots.setAttribute("aria-hidden", "true");
       const hairline = this._html("div");
       hairline.className = "sval-strip-hairline";
-      strip.append(track, caption, dots, line, hairline);
+      strip.append(
+        this._buildStripLabel(),
+        track,
+        caption,
+        dots,
+        line,
+        hairline
+      );
 
       tabs.addEventListener("keydown", event => this._onStripKeyDown(event));
       strip.addEventListener("click", event => this._onStripClick(event));
@@ -162,14 +175,54 @@
         tabs.addEventListener(type, event => this._onSwitcherDrag(event));
       }
       this._stripResize?.disconnect();
+      // The view has no size while the strip is folded, and the strip's own
+      // width still crosses the widths its layout changes at.
       this._stripResize = new ResizeObserver(() => this._placeStrip());
       this._stripResize.observe(view);
+      this._stripResize.observe(strip);
       Object.assign(this._strip, {
         offset: 0,
         sliding: false,
         pending: null,
       });
       return strip;
+    },
+
+    /**
+     * The row over the strip: its name, the Workspace you're in while the
+     * strip is folded, and the button that folds and unfolds it
+     * (`SvalPanelModel.STRIP_FOLDED_PREF`).
+     *
+     * @returns {Element}
+     */
+    _buildStripLabel() {
+      const label = this._html("div");
+      label.className = "sval-strip-label";
+      const heading = this._html("span");
+      heading.className = "sval-strip-heading";
+      heading.textContent = "Workspaces";
+      const peek = this._html("span");
+      peek.className = "sval-strip-peek";
+      const tile = this._html("span");
+      tile.className = "sval-strip-peek-tile";
+      const face = this._html("span");
+      face.className = "sval-strip-face";
+      face.setAttribute("aria-hidden", "true");
+      tile.append(face);
+      const name = this._html("span");
+      name.className = "sval-strip-peek-name";
+      peek.append(tile, name);
+      const fold = this._html("button");
+      fold.className = "sval-strip-fold";
+      fold.addEventListener("click", () => {
+        const { STRIP_FOLDED_PREF } = this._modules.SvalPanelModel;
+        Services.prefs.setBoolPref(
+          STRIP_FOLDED_PREF,
+          !Services.prefs.getBoolPref(STRIP_FOLDED_PREF, false)
+        );
+      });
+      label.append(heading, peek, fold);
+      return label;
     },
 
     /**
@@ -204,6 +257,30 @@
       const { STRIP_NAMES, STRIP_NAMES_PREF } = this._modules.SvalPanelModel;
       const names = Services.prefs.getStringPref(STRIP_NAMES_PREF, "all");
       return STRIP_NAMES.includes(names) ? names : "all";
+    },
+
+    /**
+     * @returns {string} where the strip puts a shown name: one of
+     *   `SvalPanelModel.STRIP_NAMES_AT`.
+     */
+    _stripNamesAt() {
+      const { STRIP_NAMES_AT, STRIP_NAMES_AT_PREF } =
+        this._modules.SvalPanelModel;
+      const at = Services.prefs.getStringPref(STRIP_NAMES_AT_PREF, "below");
+      return STRIP_NAMES_AT.includes(at) ? at : "below";
+    },
+
+    /**
+     * The strip's sizes for how it shows names now ({@link SIZES}).
+     *
+     * @returns {object}
+     */
+    _stripSizes() {
+      const { layout, names, at } = this._els.strip.dataset;
+      if (layout !== "wide") {
+        return SIZES.narrow;
+      }
+      return names === "none" ? SIZES.none : SIZES[`${at}-${names}`];
     },
 
     /**
@@ -284,6 +361,7 @@
         tabs.append(...wanted);
       }
       strip.dataset.names = names;
+      strip.dataset.at = this._stripNamesAt();
       strip.dataset.layout = layout;
       tabs.setAttribute(
         "aria-orientation",
@@ -301,6 +379,7 @@
       const caption = strip.querySelector(".sval-strip-caption");
       caption.hidden = layout !== "icons" || chosen === "none" || !current;
       caption.textContent = current ? this.workspaceName(current) : "";
+      this._paintStripLabel(current, layout);
       // A slide is a look along the strip from the Workspace shown. Once the
       // window shows another, the strip goes straight from where it was slid
       // to the new one, with the slide's own ease.
@@ -313,6 +392,66 @@
         this._strip.pending = null;
       }
       this._placeStrip();
+    },
+
+    /**
+     * Folds or unfolds the strip as its pref says, and names the Workspace
+     * you're in on the label row while it is folded. The column at 72px and
+     * below has no room for the row, and always shows the strip.
+     *
+     * @param {?object} current The current Workspace's `switcherItems` entry.
+     * @param {string} layout {@link _stripLayout}.
+     */
+    _paintStripLabel(current, layout) {
+      const strip = this._els.strip;
+      const { STRIP_FOLDED_PREF } = this._modules.SvalPanelModel;
+      const folded =
+        layout !== "column" &&
+        Services.prefs.getBoolPref(STRIP_FOLDED_PREF, false);
+      strip.toggleAttribute("data-folded", folded);
+      const fold = strip.querySelector(".sval-strip-fold");
+      const action = folded ? "Show the strip" : "Hide the strip";
+      fold.setAttribute("aria-expanded", String(!folded));
+      fold.setAttribute("aria-label", action);
+      fold.title = action;
+      const tile = strip.querySelector(".sval-strip-peek-tile");
+      strip.querySelector(".sval-strip-peek-name").textContent = current
+        ? this.workspaceName(current)
+        : "";
+      if (current) {
+        this._paintStripFace(tile, current);
+      }
+    },
+
+    /**
+     * Fills a Workspace's tile: its emoji, or the Workspace glyph or its
+     * agent's or device's mark, on its colour.
+     *
+     * @param {Element} tile Holds a `.sval-strip-face`.
+     * @param {object} item A `switcherItems` entry.
+     */
+    _paintStripFace(tile, item) {
+      const face = tile.querySelector(".sval-strip-face");
+      const marked = !!(item.agent || item.device);
+      face.textContent = marked ? "" : (item.emoji ?? "");
+      face.classList.toggle("sval-strip-agent", marked);
+      if (marked) {
+        face.style.setProperty(
+          "--sval-agent-mark",
+          `url("${item.agent ? this._agentMarkURL(item.brand) : this._deviceMarkURL(item.id)}")`
+        );
+      } else {
+        face.style.removeProperty("--sval-agent-mark");
+      }
+      const color = this.workspaceColor(item.id);
+      if (color) {
+        tile.style.setProperty(
+          "--sval-strip-fill",
+          this.workspaceSwatch(color)
+        );
+      } else {
+        tile.style.removeProperty("--sval-strip-fill");
+      }
     },
 
     /**
@@ -492,28 +631,7 @@
         el.removeAttribute("title");
       }
 
-      const face = el.querySelector(".sval-strip-face");
-      const emoji = item.agent || item.device ? null : item.emoji;
-      face.textContent = emoji ?? "";
-      face.classList.toggle("sval-strip-agent", !!(item.agent || item.device));
-      if (item.agent || item.device) {
-        face.style.setProperty(
-          "--sval-agent-mark",
-          `url("${item.agent ? this._agentMarkURL(item.brand) : this._deviceMarkURL(item.id)}")`
-        );
-      } else {
-        face.style.removeProperty("--sval-agent-mark");
-      }
-      const color = this.workspaceColor(item.id);
-      const tile = el.querySelector(".sval-strip-tile");
-      if (color) {
-        tile.style.setProperty(
-          "--sval-strip-fill",
-          this.workspaceSwatch(color)
-        );
-      } else {
-        tile.style.removeProperty("--sval-strip-fill");
-      }
+      this._paintStripFace(el.querySelector(".sval-strip-tile"), item);
       el.querySelector(".sval-strip-name").textContent = name;
       this._paintStripSound(el);
     },
@@ -562,12 +680,14 @@
         this._renderStrip();
         return;
       }
+      if (strip.hasAttribute("data-folded")) {
+        return;
+      }
       const view = strip.querySelector(".sval-strip-view");
       const row = strip.querySelector(".sval-strip-row");
       const tabs = row.querySelector(".sval-strip-tabs");
-      const { names, layout } = strip.dataset;
-      const column = layout === "column";
-      const gap = names === "all" ? NAMED_GAP : ICON_GAP;
+      const column = strip.dataset.layout === "column";
+      const sizes = this._stripSizes();
       const width = column ? view.clientHeight : view.clientWidth;
       let x = 0;
       let current = null;
@@ -575,7 +695,7 @@
       for (const el of tabs.children) {
         let size = DIVIDER_WIDTH;
         if (el.classList.contains("sval-strip-item")) {
-          size = this._stripItemWidth(el, names, width);
+          size = this._stripItemWidth(el, sizes, width);
           // A column's items take its width, and their height is the icon's.
           el.style.width = column ? "" : `${size}px`;
           workspaces.push(el);
@@ -583,9 +703,9 @@
             current = { x, w: size };
           }
         }
-        x += size + gap;
+        x += size + sizes.gap;
       }
-      const total = x + ICON_WIDTH;
+      const total = x + sizes.icon;
       const overflows = total > width;
       strip.toggleAttribute("data-overflow", overflows);
       strip.toggleAttribute("data-sliding", this._strip.sliding);
@@ -612,20 +732,23 @@
     },
 
     /**
-     * An item's size along the strip: an icon's, or its tile and name with
-     * its padding, up to the track less two icons, where the name is cut
-     * short. The cap grows with the panel and leaves a whole icon each side.
+     * An item's size along the strip: an icon's; a fixed width with its name
+     * below its tile; or its tile and name beside it with its padding, up to
+     * {@link BESIDE_MAX} and the track less two icons, where the name is cut
+     * short. The track's cap leaves a whole icon each side.
      *
      * @param {Element} el A strip item.
-     * @param {string} names What the strip shows of names.
+     * @param {object} sizes {@link _stripSizes}.
      * @param {number} track The track's inner width.
      * @returns {number}
      */
-    _stripItemWidth(el, names, track) {
+    _stripItemWidth(el, sizes, track) {
       if (!el.hasAttribute("data-shows-name")) {
-        return ICON_WIDTH;
+        return sizes.icon;
       }
-      const size = names === "all" ? NAMED : WIDENED;
+      if (sizes.below) {
+        return sizes.below;
+      }
       // The text's own width, in fractions of a pixel. `scrollWidth` rounds
       // to the nearest whole one (`Element::ScrollWidth`), and a name a
       // fraction wider than its box is cut by the ellipsis.
@@ -633,8 +756,9 @@
       range.selectNodeContents(el.querySelector(".sval-strip-name"));
       const text = range.getBoundingClientRect().width;
       return Math.min(
-        track - 2 * ICON_WIDTH,
-        Math.ceil(size.padding + size.tile + size.gap + text)
+        BESIDE_MAX,
+        track - 2 * sizes.icon,
+        Math.ceil(sizes.padding + sizes.tile + sizes.after + text)
       );
     },
 
@@ -822,11 +946,13 @@
       this._stripAppMenu?.hidePopup();
       document.getElementById("sval-strip-app-menu")?.remove();
       const menu = document.createXULElement("menupopup");
-      // Grows from the app's tile as the Favorites menu does from its button
-      // (`SvalHeader`'s attached popups, `sval-header.css`).
+      // Grows from the app's tile, reaching past it as the header's
+      // popovers do (`SvalStem`).
       menu.id = "sval-strip-app-menu";
       menu.setAttribute("nonnative", "");
       menu.setAttribute("consumeoutsideclicks", "true");
+      menu.setAttribute("sval-stem-host", "");
+      menu.setAttribute("sval-stem-hang", "");
       menu.classList.add("toolbar-menupopup", "sval-agent-app-popup");
       menu.dataset.agentApp = label;
       this._appendAgentAppEntries(menu, items, item => {

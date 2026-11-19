@@ -195,6 +195,7 @@ MOZ_SRC_FILES += [
     "SvalSiteStyles.sys.mjs",
     "SvalSplits.sys.mjs",
     "SvalStartup.sys.mjs",
+    "SvalStem.sys.mjs",
     "SvalSyncableAddress.sys.mjs",
     "SvalSyncState.sys.mjs",
     "SvalTabActions.sys.mjs",

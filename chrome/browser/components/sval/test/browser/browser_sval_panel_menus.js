@@ -527,10 +527,11 @@ add_task(async function a_press_on_its_button_closes_the_favorites_menu() {
       })
     );
 
-  pressAt(rect.left + rect.width / 2, rect.bottom + rect.height);
+  // The menu grows upward from the button in the panel's footer.
+  pressAt(rect.left + rect.width / 2, rect.top - rect.height);
   Assert.equal(popup.state, "open", "a press on an item keeps it");
 
   const hidden = BrowserTestUtils.waitForPopupEvent(popup, "hidden");
-  pressAt(rect.left + rect.width / 2, rect.bottom - 2);
+  pressAt(rect.left + rect.width / 2, rect.top + 2);
   await within(hidden, 10_000, "the press on the button closing it");
 });

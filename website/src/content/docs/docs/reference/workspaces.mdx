@@ -43,10 +43,28 @@ window's title starts with the Workspace's emoji and name.
 
 ## The strip
 
+<Until v="0.1.0-rc.10">
+
 If you choose Strip in Settings › Workspaces › Workspace switcher, the strip
 takes the place of the switcher's button. It shows all your Workspaces in a
 row, in the list's order. The Workspace you're in is marked as the selected
 tab is, with a bar at its start.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+If you choose Strip in Settings › Appearance › Workspace appearance, the
+strip takes the place of the switcher's button. It shows all your
+Workspaces in a row, in the list's order. The Workspace you're in is marked
+as the selected tab is, with a bar at its start.
+
+- **The Workspaces row.** This row sits above the strip and ends in a
+  button. **Hide the strip** hides the strip, and the row then shows the
+  icon and name of the Workspace you're in. **Show the strip** brings the
+  strip back. Sval keeps the strip hidden or shown in every window, and
+  after you restart.
+
+</Since>
 
 - **A Workspace.** Clicking a Workspace switches the window to it.
   Shift-clicking it opens it in a new window.
@@ -55,8 +73,20 @@ tab is, with a bar at its start.
 - **The keys.** When the strip has focus, Left and Right switch the window
   to the Workspace before or after the current one. Home and End switch to
   the first and the last. Enter or Space opens the list of Workspaces.
+<Until v="0.1.0-rc.10">
+
 - **The mouse wheel.** The wheel slides the strip, or switches Workspaces,
   as Settings › Workspaces › Workspace switcher says.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- **The mouse wheel.** The wheel slides the strip, or switches Workspaces,
+  as Scrolling over the strip, in Settings › Appearance › Workspace
+  appearance, says.
+
+</Since>
+
 - **The dots.** These show under the strip when your Workspaces don't fit
   in it. The long dot is the Workspace you're in. When the dots don't fit, a line takes their place, with a mark where the Workspace you're in is.
 - **A box on a Workspace's icon.** The Workspace is isolated.
@@ -103,6 +133,13 @@ Workspace you're in shows under the strip. When the Workspace panel is
 narrower still, the strip turns into a column three Workspaces tall, with no
 name, dots or line under it. Up and Down also switch Workspaces in the
 column.
+
+<Since v="0.1.0-rc.10">
+
+The column has no Workspaces row, and the column shows even when you've
+hidden the strip.
+
+</Since>
 
 ## The list of Workspaces
 
@@ -185,7 +222,16 @@ emoji, and color.
 
 Agent Workspaces have no Archive idle tabs choice.
 
+<Until v="0.1.0-rc.10">
+
 ## Settings › Workspaces › Workspace switcher
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+## Settings › Appearance › Workspace appearance › Workspace switcher
+
+</Since>
 
 - **Menu.** The switcher is a button that names the Workspace you're in.
   Selecting it opens the list of Workspaces. Menu is the default.
@@ -193,6 +239,16 @@ Agent Workspaces have no Archive idle tabs choice.
 - **The strip shows.** This sets what the strip shows: icons and names,
   icons and the current Workspace's name, or icons only. Settings shows
   this choice only while Strip is chosen.
+
+<Since v="0.1.0-rc.10">
+
+- **Where names show.** With Under the icon, the strip is taller, and each
+  name gets the same width. With Next to the icon, the strip is shorter,
+  and a short name takes less room. Settings shows this choice only while the strip
+  shows names.
+
+</Since>
+
 - **Scrolling over the strip.** This sets what the mouse wheel does over
   the strip. With Slides the strip, the wheel moves the strip without
   switching Workspaces. The strip slides back when you move the pointer

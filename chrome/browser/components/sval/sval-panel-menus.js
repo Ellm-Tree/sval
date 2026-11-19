@@ -219,7 +219,7 @@ Object.assign(SvalPanel, {
   /**
    * The strip's names controls, which the Workspace menu shows under its
    * commands when it opens on the strip ({@link _syncStripNamesItems}).
-   * Each sets what Settings › Workspaces sets, "The strip shows"
+   * Each sets what Settings › Appearance sets, "The strip shows"
    * (`SvalPanelModel.STRIP_NAMES_PREF`).
    *
    * @returns {Element[]}

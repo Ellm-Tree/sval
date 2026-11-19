@@ -92,14 +92,19 @@ control of what you see and what is sent to websites.
   The tab joins that window's Workspace where you drop it. A tab you move
   to another window in any other way, for example with an extension, also
   joins that window's Workspace.
-- **Choose your Workspace switcher.** In Settings › Workspaces › Workspace
-  switcher, choose Menu or Strip. The menu opens over the switcher's button.
+- **Choose your Workspace switcher.** In Settings › Appearance › Workspace
+  appearance, under Workspace switcher, choose Menu or Strip. The menu opens over the switcher's button.
   It lists every Workspace in your order and marks the one you're in. The
   strip shows all your Workspaces in a row above your tabs, so you can click
   one to go there. Click the Workspace you're in to see the full list. You
-  also choose which names the strip shows, and whether the mouse wheel
-  slides the strip or switches Workspaces. Right-click a Workspace on the
-  strip to show or hide the strip's names. In a narrow Workspace panel, the
+  also choose which names the strip shows, whether the names show under or
+  next to the icons, and whether the mouse wheel slides the strip or switches
+  Workspaces. Right-click a Workspace on the strip to show or hide the
+  strip's names. Above the strip, the Workspaces row ends in a
+  button that hides the strip. While the strip is hidden, the row shows the
+  icon and name of the Workspace you're in.
+  Sval keeps the strip hidden in every window until you show it again.
+  In a narrow Workspace panel, the
   strip shows icons only. If you chose to see names, the current Workspace's
   name shows under the strip.
 - **Put Workspaces in order.** Drag a Workspace up or down in the switcher's
@@ -154,8 +159,9 @@ control of what you see and what is sent to websites.
   Workspace panel is hidden, hold the pointer at the edge of the window on
   the Workspace panel's side. The Workspace panel slides in over the page.
   It slides away when you select a tab or move the pointer off the
-  Workspace panel. To stop the Workspace panel sliding in at the edge, turn
-  off the switch in Settings › Appearance › Hidden Workspace panel.
+  Workspace panel. To stop the Workspace panel sliding in at the edge, go
+  to Settings › Appearance › Workspace appearance. Turn off Show the hidden
+  Workspace panel when you hold the pointer at the edge of the window.
 - **Select several rows.** ⌘-click (Ctrl-click on Windows and Linux) rows to
   select them, or Shift-click to select every row in between. You can then
   close the selected tabs, move them to a group or a Workspace, make a new
@@ -184,7 +190,8 @@ control of what you see and what is sent to websites.
   page again. When you click a link
   in a pin that goes to another site, the link opens in a Quick Peek. You can preview the page there
   before deciding to open it.
-- **Favorites.** Your bookmarks are in the Favorites menu. Pins are kept
+- **Favorites.** Your bookmarks are in the Favorites menu, which opens
+  from the Favorites button at the bottom of the Workspace panel. Pins are kept
   apart from Favorites, so a site can be a pin, a Favorite, both, or
   neither. Your pins also appear as tiles on the home page. To pin a
   Favorite, choose Pin in its menu. The pin is a copy, and the Favorite

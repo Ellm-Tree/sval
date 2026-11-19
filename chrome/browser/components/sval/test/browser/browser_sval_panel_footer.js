@@ -126,8 +126,8 @@ function indicatorParts(win = window) {
 
 /**
  * Spec §3: with no sync folder chosen there is nothing to say about syncing,
- * so the indicator's row is absent, and the footer holds the feedback button
- * alone (feedback spec §2).
+ * so the indicator's row is absent, and the footer holds the Favorites row
+ * and the feedback button (feedback spec §2).
  */
 add_task(async function no_folder_leaves_the_feedback_button_alone() {
   await withFreshPanel();
@@ -150,7 +150,11 @@ add_task(async function no_folder_leaves_the_feedback_button_alone() {
   const visible = [...footer.children].filter(child =>
     BrowserTestUtils.isVisible(child)
   );
-  Assert.deepEqual(visible, [feedback], "alone in the footer");
+  Assert.deepEqual(
+    visible,
+    [SvalPanel._els.favorites.parentElement, feedback],
+    "the Favorites row and the feedback button are all the footer shows"
+  );
 });
 
 /**
@@ -667,8 +671,8 @@ add_task(async function placement_puts_the_panel_on_either_side() {
 });
 
 /**
- * The footer holds the sync indicator and the feedback button, and no
- * settings button, which the app menu is.
+ * The footer holds Favorites, the sync indicator and the feedback button,
+ * and no settings button, which the app menu is.
  */
 add_task(
   async function the_footer_holds_the_indicator_and_no_settings_button() {
@@ -678,11 +682,12 @@ add_task(
     Assert.deepEqual(
       [...footer.children],
       [
+        SvalPanel._els.favorites.parentElement,
         syncRow,
         SvalPanel._els.mediaBar,
         footer.querySelector(".sval-feedback-button"),
       ],
-      "the footer holds the sync indicator, the media controls and the " +
+      "the footer holds Favorites, the sync indicator, the media controls " +
         "feedback button"
     );
     Assert.equal(

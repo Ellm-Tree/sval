@@ -67,6 +67,7 @@ browser.jar:
     content/browser/sval/default-bookmarks.html (default-bookmarks.html)
     content/browser/sval/ext-bookmarks.js      (ext-bookmarks.js)
     content/browser/sval/sval-header.css       (sval-header.css)
+    content/browser/sval/sval-stem.css         (sval-stem.css)
     content/browser/sval/sval-launcher.css     (sval-launcher.css)
     content/browser/sval/sval-launcher-rows.css (sval-launcher-rows.css)
     content/browser/sval/sval-protection.css   (sval-protection.css)

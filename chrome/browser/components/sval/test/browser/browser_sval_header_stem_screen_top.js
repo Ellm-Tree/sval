@@ -12,7 +12,7 @@
  * the screen.
  */
 
-/** Where `sval-header.css` draws no stem inside the popup. */
+/** Where `sval-stem.css` draws no stem inside the popup. */
 const OPAQUE_POPUPS = window.matchMedia(
   "(-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available))"
 ).matches;

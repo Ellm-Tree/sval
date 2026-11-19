@@ -3,12 +3,10 @@
 
 /*
  * The Send Feedback popover (`SvalFeedbackForm`, feedback spec §2, §4, §5):
- * a tab over the footer's feedback button, a 12px concave corner above the
- * tab, and the box, which grows upward from the tab's foot. The three are
- * one painted shape on a root that paints nothing itself, so the popovers'
- * edge and shadow filter (`sval-header.css`) traces them as one. The tab
- * and the corner take no pointer, so the button under the tab still closes
- * the popover.
+ * a tab over the footer's feedback button, a stem from it to the box, and
+ * the box, which grows upward from the tab's foot. `SvalStem` draws the
+ * three as one shape (`sval-stem.css`). The tab and the shape take no
+ * pointer, so the button under the tab still closes the popover.
  *
  * `SvalFeedbackForm.place` sets, in px: `--sval-feedback-start` from the
  * window's edge on the panel's side to the tab's outer end,
@@ -63,22 +61,14 @@
     --sval-feedback-ok: CanvasText;
     --sval-feedback-warn: CanvasText;
   }
-
-  .sval-feedback-box {
-    border: 1px solid CanvasText;
-  }
 }
 
 .sval-feedback-tab {
   position: absolute;
   bottom: 0;
   left: 0;
-  /* One px into the box, so no seam shows where they meet. */
-  width: calc(var(--sval-feedback-reach) + 1px);
+  width: 36px;
   height: 36px;
-  border-top-left-radius: 18px;
-  border-bottom-left-radius: 18px;
-  background: var(--sval-feedback-surface);
 
   /* The button's icon, drawn again over the tab that covers it. */
   &::before {
@@ -96,27 +86,11 @@
   [data-side="right"] > & {
     left: auto;
     right: 0;
-    border-radius: 0 18px 18px 0;
 
     &::before {
       left: auto;
       right: 9px;
     }
-  }
-}
-
-.sval-feedback-corner {
-  position: absolute;
-  bottom: 36px;
-  left: calc(var(--sval-feedback-reach) - 12px);
-  width: 12px;
-  height: 12px;
-  background: radial-gradient(circle at 0 0, transparent 11.5px, var(--sval-feedback-surface) 12px);
-
-  [data-side="right"] > & {
-    left: auto;
-    right: calc(var(--sval-feedback-reach) - 12px);
-    background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--sval-feedback-surface) 12px);
   }
 }
 

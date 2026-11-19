@@ -9,10 +9,10 @@
 
 /**
  * The strip: every Workspace in a row in the switcher's place, when
- * Settings › Workspaces picks it. Choosing it keeps the window's Workspace.
+ * Settings › Appearance picks it. Choosing it keeps the window's Workspace.
  * A click or the arrow keys go to a Workspace, the wheel slides the strip
- * or steps along it as the setting says, and its right-click menu changes
- * what the strip shows of names.
+ * or steps along it as the setting says, its right-click menu changes what
+ * the strip shows of names, and its label row folds it away.
  */
 
 Services.scriptloader.loadSubScript(
@@ -20,7 +20,13 @@ Services.scriptloader.loadSubScript(
   this
 );
 
-const { SWITCHER_PREF, STRIP_NAMES_PREF, STRIP_WHEEL_PREF } = SvalPanelModel;
+const {
+  SWITCHER_PREF,
+  STRIP_NAMES_PREF,
+  STRIP_NAMES_AT_PREF,
+  STRIP_WHEEL_PREF,
+  STRIP_FOLDED_PREF,
+} = SvalPanelModel;
 
 /** Shows the strip for the running task, and the menu again after it. */
 async function useStrip() {
@@ -418,13 +424,15 @@ function nameFits(el) {
   );
 }
 
-add_task(async function names_show_whole_up_to_the_track_less_two_icons() {
+add_task(async function names_beside_show_whole_up_to_a_cap() {
   const long = "A Workspace whose name runs far past the strip's track";
   const { ids } = await withSwitcherPanel({
     names: ["Development", "3D Printing", long],
   });
   const [development, printing, overlong] = ids.workspaces;
   const strip = await useStrip();
+  await SpecialPowers.pushPrefEnv({ set: [[STRIP_NAMES_AT_PREF, "beside"]] });
+  atTaskEnd(() => SpecialPowers.popPrefEnv());
 
   await SpecialPowers.pushPrefEnv({ set: [[STRIP_NAMES_PREF, "current"]] });
   await settled(strip);
@@ -446,12 +454,85 @@ add_task(async function names_show_whole_up_to_the_track_less_two_icons() {
   const view = strip.querySelector(".sval-strip-view").clientWidth;
   Assert.lessOrEqual(
     itemOf(overlong).getBoundingClientRect().width,
-    view - 2 * 34 + 0.5,
-    "a longer name stops at the track less two icons"
+    Math.min(160, view - 2 * 42) + 0.5,
+    "a longer name stops at the cap"
   );
   Assert.ok(!nameFits(itemOf(overlong)), "and is cut short there");
   await SpecialPowers.popPrefEnv();
   await SpecialPowers.popPrefEnv();
+});
+
+add_task(async function names_below_sit_under_tiles_of_one_width() {
+  const { ids } = await withSwitcherPanel({
+    names: ["Ceramics", "A Workspace with a long name", "Reading"],
+  });
+  const [first, long, third] = ids.workspaces;
+  const strip = await useStrip();
+  await settled(strip);
+  Assert.equal(strip.dataset.at, "below", "names under their icons first");
+  const width = id => itemOf(id).getBoundingClientRect().width;
+  Assert.equal(width(first), 92, "each item one width");
+  Assert.equal(width(long), 92, "however long its name");
+  const tile = id =>
+    itemOf(id).querySelector(".sval-strip-tile").getBoundingClientRect();
+  const name = itemOf(first)
+    .querySelector(".sval-strip-name")
+    .getBoundingClientRect();
+  Assert.greaterOrEqual(name.top, tile(first).bottom, "the name under it");
+
+  await SpecialPowers.pushPrefEnv({ set: [[STRIP_NAMES_PREF, "current"]] });
+  atTaskEnd(() => SpecialPowers.popPrefEnv());
+  await settled(strip);
+  Assert.equal(width(first), 92, "the current Workspace named");
+  Assert.equal(width(third), 44, "the others icons");
+  Assert.equal(tile(third).top, tile(first).top, "their tiles in one line");
+});
+
+add_task(async function the_label_row_folds_the_strip() {
+  const { ids } = await withSwitcherPanel({
+    names: ["Ceramics", "Garden", "Reading"],
+  });
+  const [, second] = ids.workspaces;
+  const strip = await useStrip();
+  atTaskEnd(() => Services.prefs.clearUserPref(STRIP_FOLDED_PREF));
+  const fold = strip.querySelector(".sval-strip-fold");
+  const track = strip.querySelector(".sval-strip-track");
+  const peek = strip.querySelector(".sval-strip-peek");
+  Assert.equal(fold.getAttribute("aria-expanded"), "true", "open at first");
+  Assert.ok(!peek.checkVisibility(), "naming no Workspace on the row");
+
+  fold.click();
+  await TestUtils.waitForCondition(
+    () => !track.checkVisibility(),
+    "the strip folded"
+  );
+  Assert.ok(Services.prefs.getBoolPref(STRIP_FOLDED_PREF), "and kept so");
+  Assert.equal(fold.getAttribute("aria-expanded"), "false");
+  Assert.ok(peek.checkVisibility(), "the row names the Workspace you're in");
+  Assert.equal(
+    strip.querySelector(".sval-strip-peek-name").textContent,
+    "Ceramics"
+  );
+
+  await within(
+    SvalWindowWorkspace.of(window).switchTo(second),
+    10_000,
+    "the switch"
+  );
+  await TestUtils.waitForCondition(
+    () => strip.querySelector(".sval-strip-peek-name").textContent === "Garden",
+    "the row following the switch"
+  );
+
+  await panelAt(48);
+  await TestUtils.waitForCondition(
+    () => strip.dataset.layout === "column" && track.checkVisibility(),
+    "the column shows the strip, folded or not"
+  );
+  Assert.ok(
+    !strip.querySelector(".sval-strip-label").checkVisibility(),
+    "with no label row"
+  );
 });
 
 add_task(async function a_narrow_panel_shows_icons_and_a_caption() {

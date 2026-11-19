@@ -342,12 +342,15 @@
 
 /*
  * The strip of Workspaces (`sval-panel-strip.js`), in the switcher's place
- * when Settings › Workspaces picks it: an outlined track, a hairline under it
- * so its framed tiles never read as the pins under the line, and dots while
- * it overflows. `sval-panel-strip.js` sizes each item and slides the row
- * from the sizes below, so the two change together.
+ * when Settings › Appearance picks it: a label row that folds it away, an
+ * outlined track, a hairline under it so its framed tiles never read as the
+ * pins under the line, and dots while it overflows. `sval-panel-strip.js`
+ * sizes each item and slides the row from the sizes below, so the two change
+ * together. From 222px the strip's tiles are larger, and a name shows below
+ * its tile or beside it as Settings says (`data-at`).
  *
- * DOM: .sval-strip > .sval-strip-track > .sval-strip-view > .sval-strip-row >
+ * DOM: .sval-strip > .sval-strip-label (.sval-strip-heading +
+ * .sval-strip-peek + button.sval-strip-fold), .sval-strip-track > .sval-strip-view > .sval-strip-row >
  * (.sval-strip-tabs[role=tablist] > .sval-strip-item[role=tab] >
  * .sval-strip-tile > .sval-strip-face + .sval-strip-isolated +
  * button.sval-strip-audio, then .sval-strip-name; .sval-strip-divider before
@@ -357,6 +360,8 @@
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 .sval-strip {
   --sval-strip-tile: 28px;
+  --sval-strip-height: 36px;
+  --sval-strip-icon: 34px;
   --sval-strip-gap: 4px;
   /* The column's view: three items and the gaps between them. */
   --sval-strip-column: 108px;
@@ -375,6 +380,123 @@
   &:not([data-names="all"]) {
     --sval-strip-gap: 3px;
   }
+
+  &[data-layout="wide"] {
+    --sval-strip-tile: 30px;
+    --sval-strip-height: 44px;
+    --sval-strip-icon: 42px;
+  }
+
+  &[data-layout="wide"][data-at="below"]:not([data-names="none"]) {
+    --sval-strip-height: 58px;
+    --sval-strip-icon: 44px;
+    --sval-strip-gap: 2px;
+  }
+
+  /* Folded under its label row: the hairline before the pins stays. */
+  &[data-folded] > :is(.sval-strip-track, .sval-strip-caption, .sval-strip-dots, .sval-strip-line) {
+    display: none;
+  }
+}
+
+/* The strip's name, the Workspace you're in while it is folded, and the
+   button that folds it. The column at 72px and below has no room for it. */
+.sval-strip-label {
+  height: 24px;
+  margin: 0 0 -2px;
+  padding-inline-start: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .sval-strip[data-layout="column"] > & {
+    display: none;
+  }
+}
+
+.sval-strip-heading {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-color-deemphasized);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-strip-peek {
+  display: none;
+  min-width: 0;
+  max-width: 65%;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+
+  .sval-strip[data-folded] & {
+    display: flex;
+  }
+}
+
+.sval-strip-peek-tile {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 20px;
+
+  > .sval-strip-face {
+    border-radius: 5px;
+    font-size: 12px;
+    opacity: 1;
+
+    &:empty::before {
+      width: 13px;
+      height: 13px;
+    }
+  }
+}
+
+.sval-strip-peek-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-strip-fold {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--text-color-deemphasized);
+
+  &::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    background: currentColor;
+    mask: var(--sval-i-chev) center / 11px no-repeat;
+    rotate: 90deg;
+    transition: rotate 200ms var(--ease-orbit);
+  }
+
+  &[aria-expanded="false"]::before {
+    rotate: 0deg;
+  }
+
+  &:hover {
+    background: var(--sval-hover);
+    color: var(--sidebar-text-color);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: calc(-1 * var(--focus-outline-width));
+  }
 }
 
 .sval-strip-track {
@@ -385,7 +507,7 @@
 
 .sval-strip-view {
   position: relative;
-  height: 36px;
+  height: var(--sval-strip-height);
   overflow: hidden;
 
   .sval-strip[data-overflow] & {
@@ -428,7 +550,7 @@
   position: relative;
   flex: none;
   box-sizing: border-box;
-  height: 36px;
+  height: var(--sval-strip-height);
   padding: 0 3px;
   display: flex;
   align-items: center;
@@ -449,6 +571,24 @@
 
   .sval-strip[data-names="all"] & {
     padding: 0 10px;
+  }
+
+  .sval-strip[data-layout="wide"] & {
+    gap: 8px;
+  }
+
+  .sval-strip[data-layout="wide"][data-at="beside"][data-names="current"] &[data-shows-name] {
+    padding: 0 10px 0 4px;
+  }
+
+  /* A name under its tile: the tile at the top of a fixed-width column, and
+     every tile on the strip at that height. */
+  .sval-strip[data-layout="wide"][data-at="below"]:not([data-names="none"]) & {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 5px 4px 0;
   }
 
   &:hover {
@@ -603,6 +743,11 @@
   display: grid;
   place-items: center;
   border-radius: 4px;
+
+  .sval-strip[data-layout="wide"] .sval-strip-tile > & {
+    border-radius: 7px;
+  }
+
   background: var(--sval-strip-fill, var(--background-color-dimmed));
   font-size: 20px;
   line-height: 1;
@@ -685,7 +830,7 @@
 
   /* The list's window covers the tile's foot while it is open, and the list
      shows each Workspace the count counts. */
-  [data-agent-app] > .sval-strip-tile > .sval-strip-face[sval-stem] ~ & {
+  [data-agent-app] > .sval-strip-tile > .sval-strip-face[sval-stem-anchor] ~ & {
     display: none;
   }
 
@@ -744,6 +889,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 
+  .sval-strip[data-layout="wide"][data-at="below"] & {
+    max-width: 100%;
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: center;
+  }
+
   [data-shows-name] > & {
     display: block;
   }
@@ -752,7 +904,7 @@
 .sval-strip-divider {
   flex: none;
   width: 1px;
-  height: 36px;
+  height: var(--sval-strip-height);
   display: flex;
   align-items: center;
 
@@ -761,14 +913,22 @@
     width: 1px;
     height: 20px;
     background: var(--sval-strip-frame);
+
+    .sval-strip[data-layout="wide"] & {
+      height: 24px;
+    }
+
+    .sval-strip[data-layout="wide"][data-at="below"]:not([data-names="none"]) & {
+      height: 30px;
+    }
   }
 }
 
 /* New Workspace…: a dashed tile the size of the others, with a plus. */
 .sval-strip-add {
   flex: none;
-  width: 34px;
-  height: 36px;
+  width: var(--sval-strip-icon);
+  height: var(--sval-strip-height);
   display: grid;
   place-items: center;
   border-radius: 8px;
@@ -786,6 +946,10 @@
     height: var(--sval-strip-tile);
     border: 1.5px dashed var(--sval-strip-frame);
     border-radius: 4px;
+
+    .sval-strip[data-layout="wide"] & {
+      border-radius: 7px;
+    }
   }
 
   &::after {
@@ -798,6 +962,13 @@
   &:hover {
     background: var(--sval-strip-well);
     color: var(--sidebar-text-color);
+  }
+
+  /* Its tile in line with the Workspaces' tiles, at the top of the item. */
+  .sval-strip[data-layout="wide"][data-at="below"]:not([data-names="none"]) & {
+    align-content: start;
+    padding-top: 5px;
+    box-sizing: border-box;
   }
 }
 
@@ -840,6 +1011,7 @@
    slide back is instant. */
 @media (prefers-reduced-motion) {
   .sval-strip-row,
+  .sval-strip-fold::before,
   .sval-strip-item,
   .sval-strip-dots > span,
   .sval-strip-line > span {
@@ -866,7 +1038,7 @@
   display: flex;
   align-items: center;
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  padding: 0 var(--sval-bar-inline) var(--space-xsmall);
+  padding: var(--space-xsmall) var(--sval-bar-inline);
 }
 
 .sval-favorites-bar[hidden] {
@@ -890,7 +1062,8 @@
   background: var(--sval-hover);
 }
 
-/* The switcher's chevron: the menu opens below, as the switcher's does. */
+/* The chevron points up: the menu opens above the button, in the panel's
+   footer. */
 .sval-favorites::after {
   content: "";
   flex: none;
@@ -899,13 +1072,17 @@
   background: currentColor;
   opacity: var(--opacity-deemphasized);
   mask: var(--sval-i-chev) center / 12px no-repeat;
-  rotate: 90deg;
+  rotate: -90deg;
 }
 
-/* Each chevron points up while its menu is open, which `aria-expanded`
+/* Each chevron turns over while its menu is open, which `aria-expanded`
    carries. */
-:is(.sval-switcher, .sval-favorites)[aria-expanded="true"]::after {
+.sval-switcher[aria-expanded="true"]::after {
   rotate: -90deg;
+}
+
+.sval-favorites[aria-expanded="true"]::after {
+  rotate: 90deg;
 }
 
 /* Holds the Favorites menu, which takes no room of its own. */
@@ -928,7 +1105,7 @@
  * the window server's faint one. The margin is the popup window's room for
  * `--sval-menu-shadow`: three deviations of its far layer and its drop. A menu attached to
  * its button by the stem (`[sval-stem]`) takes the stem's margin, edge and
- * shadow instead (`sval-header.css`, spec §9.4). */
+ * shadow instead (`sval-stem.css`, spec §9.4). */
 menupopup:not([sval-stem]) {
   --panel-box-shadow: var(--sval-menu-shadow);
   --panel-box-shadow-margin: 14px;
@@ -1033,28 +1210,6 @@ menupopup:not([sval-stem]) {
       --focus-outline-color: MenuText;
     }
   }
-}
-
-/* The Favorites menu grows from its button as the header's popovers do
- * (`sval-header.css`, panels, where the menu's window draws the edge and
- * shadow of both, and the conditions they are drawn under): while it is
- * open, the button wears the menu's fill and nothing else. */
-@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
-  /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
-  .sval-favorites[sval-stem] {
-    background: var(--panel-background-color);
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
-  }
-
-  /* The strip's list of an agent app's Workspaces grows from the app's tile
-     the same way. */
-  .sval-strip-face[sval-stem] {
-    background: var(--panel-background-color);
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
-  }
-  /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
 }
 
 /* -------------------------------------------------------------- header */
@@ -2885,10 +3040,17 @@ browser[sval-agent-layer] {
 .sval-panel-footer {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-small);
   padding: var(--space-small);
   border-top: var(--border-width) solid var(--sval-hairline);
+
+  /* Favorites take the footer's first line, the rest the line under it. */
+  > .sval-favorites-bar {
+    flex: 1 0 100%;
+    padding: 0;
+  }
 }
 
 /* While media plays, the footer is three columns, so the media controls sit
@@ -2896,6 +3058,10 @@ browser[sval-agent-layer] {
 .sval-panel-footer:has(> .sval-media-bar:not([hidden])) {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
+
+  > .sval-favorites-bar {
+    grid-column: 1 / -1;
+  }
 
   > .sval-sync-row {
     grid-column: 1;

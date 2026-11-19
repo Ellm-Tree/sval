@@ -103,7 +103,10 @@ pref("media.videocontrols.picture-in-picture.video-toggle.has-used", true); // u
 // window, which closes when they come back to the tab (PictureInPicture's
 // VideoTabHidden and unpipAutoPipBrowser). Hiding the tab is what starts it,
 // so a switch of Workspace does it as a switch of tab does.
-pref("media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled", true); // upstream: false
+pref(
+  "media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled",
+  true
+); // upstream: false
 
 // The media gate (protections spec §4.1): video and audio, Web Audio included,
 // play only on a site whose autoplay-media permission is ALLOW. The
@@ -521,14 +524,17 @@ pref("browser.sval.pins.quickPeekLinks", true);
 // beside it in Settings › Keyboard shortcuts is.
 pref("browser.sval.panel.swipeWorkspaces", true);
 // The Workspace switcher at the top of the panel: "menu", a button whose
-// list unfolds from it, or "strip", every Workspace in a row. The strip shows
+// list opens over it, or "strip", every Workspace in a row. The strip shows
 // every Workspace's name ("all"), only the current one's ("current") or none
-// ("none"), and the wheel over it slides the strip ("slide") or moves the
-// window one Workspace a notch ("switch"). Each is this device's own, as the
-// panel's side is.
+// ("none"), each name under its icon ("below") or beside it ("beside"), and
+// the wheel over it slides the strip ("slide") or moves the window one
+// Workspace a notch ("switch"). The strip can be folded away under its
+// label. Each is this device's own, as the panel's side is.
 pref("browser.sval.panel.switcher", "menu");
 pref("browser.sval.panel.stripNames", "all");
+pref("browser.sval.panel.stripNamesAt", "below");
 pref("browser.sval.panel.stripWheel", "slide");
+pref("browser.sval.panel.stripFolded", false);
 // A link from another app opens in a Peek of its own, in no
 // workspace (link routing spec §4), which closes once it has gone this many
 // minutes without focus: one of 60, 360, 1440, 10080, or 0 for never. Both

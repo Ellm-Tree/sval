@@ -3,6 +3,9 @@ title: Hide the Workspace panel
 description: Hide the Workspace panel to give the page the whole window, and show it again.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 You can hide the Workspace panel and give the page the whole width of the window.
 
 You're reading a long Codeberg diff and want every column of it on screen.
@@ -39,8 +42,19 @@ To keep the Workspace panel showing, press <kbd>⌃Z</kbd>
   while you rename something in the Workspace.
 - In a full-screen window, move the pointer all the way to the edge of the
   screen.
+<Until v="0.1.0-rc.10">
+
 - To stop the Workspace panel sliding in at the edge, turn off the switch in
   Settings › Appearance › Hidden Workspace panel.
+
+</Until>
+<Since v="0.1.0-rc.10">
+
+- To stop the Workspace panel sliding in at the edge, go to
+  Settings › Appearance › Workspace appearance. Turn off **Show the hidden
+  Workspace panel when you hold the pointer at the edge of the window**.
+
+</Since>
 
 ## Related pages
 

@@ -1,0 +1,352 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The stem (`SvalStem`, messages spec §9.4): every rule that draws a popover
+ * joined to the button it grows from, from any side of the button. A popup
+ * opts in with `sval-stem-host`, and an element in the window's document
+ * with `sval-stem-doc`; no component draws any part of a stem itself.
+ *
+ * The popover and its button are two native windows, and the popover's
+ * window draws the whole of the joined shape: one SVG path in its shadow
+ * tree (`sval-stem-outline`, which `SvalStem` traces from what it measures)
+ * runs around the button's face, along the stem, around the 12px concave
+ * fillets and the content, and is filled in the popover's fill and stroked
+ * once in its edge. Two windows' shares of one edge meet on different device
+ * pixels wherever the display's scale is fractional, because Gecko places a
+ * popup's window on whole device pixels (`nsMenuPopupFrame::GetRects`) and
+ * the button need not stand on them; one path in one window has no such
+ * seam. The button keeps only its fill, in the popover's colour, under the
+ * window's transparent face: the path's fill leaves out the face's inside
+ * and overlaps its rim, so the button's label shows and no gap opens between
+ * the two fills. The content's own fill and edge give way to the path, so
+ * the content's edge is not drawn twice.
+ *
+ * A popover marked `sval-stem-hang` reaches 32px past the button on each
+ * side, which keeps the fillets clear of its 20px corners. Any other keeps
+ * the place Gecko gives it and is at least as long as its button along the
+ * side it grows from, so one as long as its button meets it flush. Where
+ * the room on a side is short, `SvalStem` narrows that side's fillet and
+ * corner, down to a square corner under a stem as long as the content's
+ * edge. `--sval-corner-left` and `--sval-corner-right` are the content's
+ * corners at the start and the end of the stem: left to right along a top
+ * or bottom edge, top to bottom along a side.
+ *
+ * The shadow is drawn as box shadows of two boxes behind the path, the
+ * content's (`::before`) and the face and stem's (`::after`), because a
+ * filter in a popover is painted again over its whole window whenever
+ * anything in it repaints, as a menu does each time its active item moves,
+ * and macOS paints a popup's window on the main thread
+ * (`nsCocoaWindow::ShouldUseOffMainThreadCompositing`). A box shadow is
+ * drawn outside its box alone, so none falls on the face. An element in the
+ * window's document repaints with the window, so a filter casts its shadow.
+ *
+ * The popover's window stands as far outside its content on every side as
+ * the content stands from the window's edge on the button's side, the room
+ * beyond the face and the face and fillet, and
+ * `-moz-window-input-region-margin`, one length for every side, leaves that
+ * room out of the input region. A press on the button, its neighbours or
+ * the shadow reaches the window below on Windows and GTK as it would with
+ * the popover elsewhere; macOS ignores the margin (`nsCocoaWindow.mm`), and
+ * there `SvalStem` closes the popover on a press outside what it draws.
+ * Gecko adds the margin on the side a popup is aligned by to its place
+ * (`nsMenuPopupFrame::AdjustPositionForAnchorAlign`), so the margin on the
+ * button's side starts the window that room past the face, and Gecko lets
+ * the room run off the screen (`nsMenuPopupFrame::GetConstraintRect`).
+ *
+ * The attachment holds only while the stem is drawn. Under increased
+ * contrast the edge is the text colour. Under forced colours the system's
+ * popup and its edge stand, and a Linux desktop without transparency gets
+ * square, opaque popups (`popup.css`), which leave no room around a stem.
+ */
+
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:root {
+  /* Each drop shadow shadows what the one before it drew, so the near one
+     also shadows the far one. */
+  --sval-stem-shadow: drop-shadow(0 2px 4px var(--sval-float-far)) drop-shadow(0 1px 1px var(--sval-float-near));
+  /* `--sval-stem-shadow` as box shadows, cast by a box with its 1px edge.
+     The third is the near shadow of the far one: offsets add, and
+     deviations add in quadrature. */
+  --sval-stem-box-shadow:
+    0 2px 8px 1px var(--sval-float-far), 0 1px 2px 1px var(--sval-float-near),
+    0 3px 8.25px 1px rgb(var(--sval-float-shade) / calc(var(--sval-float-far-alpha) * var(--sval-float-near-alpha)));
+  /* A submenu inherits the custom properties of the menu it opens from, and
+     has no stem to take its edge: it wears the window's popup edge, which
+     the root holds here. */
+  --sval-popup-edge: var(--panel-border-color);
+}
+
+/* Every popup can be a stem host, and Firefox makes some of its popups only
+   as they first open, so each popup has both shadow boxes always, positioned
+   against it and sized only while its stem is placed: a pseudo-element that
+   comes or goes rebuilds its element's frame
+   (`nsStyleContent::CalcDifference`), which closes an opening popup or takes
+   its anchor from under it. The outline stays in the shadow tree once made,
+   out of flow and hidden while no stem is placed. */
+:is(panel, menupopup) {
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+
+  &::part(sval-stem-outline) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    z-index: -1;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+/* An element in the window's document: its outline lies under its
+   children, from its own top left, and shows while placed. */
+[sval-stem-doc] > .sval-stem-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  fill: var(--panel-background-color);
+  stroke: var(--sval-stem-edge, transparent);
+  stroke-width: 1px;
+}
+
+[sval-stem-doc]:not([sval-stem="placed"]) > .sval-stem-outline {
+  display: none;
+}
+
+[sval-stem-doc][sval-stem="placed"] [sval-stem-content] {
+  background: transparent;
+}
+
+@media (forced-colors) {
+  [sval-stem-doc] > .sval-stem-outline {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+}
+
+@media not ((forced-colors) or ((-moz-platform: linux) and (not (-moz-gtk-csd-transparency-available)))) {
+  :is(panel, menupopup),
+  [sval-stem-doc] {
+    /* The pill's edge laid over the popover's fill, opaque whether or not
+       the fill is: the stroke's inner half lies over the fill and its outer
+       half over the window's transparent margin, and a translucent colour
+       would differ between the two. */
+    --sval-stem-edge: rgb(
+      from color-mix(in srgb, rgb(from var(--sval-pill-border) r g b / 1) calc(var(--sval-pill-border-alpha) * 100%), var(--panel-background-color)) r g b / 1
+    );
+
+    @media (prefers-contrast) {
+      --sval-stem-edge: currentColor;
+    }
+  }
+
+  [sval-stem-doc] {
+    filter: var(--sval-stem-shadow);
+  }
+
+  /* The button's face under its popover's stem wears the popover's fill,
+     whatever its own state draws, and is square on the side the stem
+     leaves from. Every popover that grows a stem takes the root's
+     `--panel-background-color`, which the button inherits too, so the two
+     follow the window's colours together, through a Workspace's tint
+     arriving or changing while the popover is open. */
+  [sval-stem-anchor] {
+    background-color: var(--panel-background-color) !important;
+  }
+
+  [sval-stem-anchor="bottom"] {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+
+  [sval-stem-anchor="top"] {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+  }
+
+  [sval-stem-anchor="right"] {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+
+  [sval-stem-anchor="left"] {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+  }
+
+  /* `:not(#sval-stem-weight)` weighs each host rule as an id does, so it
+     outranks Firefox's own rules for the popups it makes (`popup.css`,
+     `panelUI-shared.css`), which name them by id. */
+  [sval-stem-host][sval-stem]:not(#sval-stem-weight) {
+    --sval-fillet: 12px;
+    --panel-box-shadow:
+      1px 0 0 var(--sval-stem-edge), -1px 0 0 var(--sval-stem-edge), 0 1px 0 var(--sval-stem-edge), 0 -1px 0 var(--sval-stem-edge), var(--sval-stem-box-shadow);
+    /* The room beyond the face for its shadow. The window's room on each
+       other side is the depth from that edge to the content
+       (`--sval-stem-shadow-room`), deeper than `--sval-stem-box-shadow`
+       reaches at three deviations of its largest layer. */
+    --panel-box-shadow-margin: 24px;
+    --sval-stem-shadow-room: calc(var(--panel-box-shadow-margin) + var(--sval-stem-face-h, 0px) + var(--sval-fillet));
+    /* The margin on the button's side. */
+    --sval-stem-near: calc(var(--sval-stem-drop, 0px) + var(--sval-fillet) - var(--sval-stem-shadow-room));
+    --sval-stem-corner-start: min(var(--panel-border-radius), var(--sval-corner-left, var(--panel-border-radius)));
+    --sval-stem-corner-end: min(var(--panel-border-radius), var(--sval-corner-right, var(--panel-border-radius)));
+    /* How far the popover's shadow reaches past its content, which it
+       stands inside its window by (`SvalStem`'s `keepInWindow`). */
+    --sval-stem-shadow-reach: 0px;
+    --sval-stem-hang: 0px;
+    margin: calc(-1 * var(--sval-stem-shadow-room));
+    -moz-window-input-region-margin: var(--sval-stem-shadow-room);
+    --panel-border-color: transparent;
+    -moz-window-shadow: none;
+    /* `popup.css` slides an arrow panel in from 70px above its place, away
+       from the button it grows from. */
+    transition: none;
+
+    &::part(content) {
+      margin: var(--sval-stem-shadow-room);
+      border-radius: var(--panel-border-radius);
+    }
+
+    /* The content's corners on the button's side follow the stem. */
+    &:not([sval-stem-side]),
+    &[sval-stem-side="bottom"] {
+      margin-top: calc(var(--sval-stem-near) + var(--sval-stem-top-trim, 0px));
+      margin-inline: calc(-1 * var(--sval-stem-shadow-room) - var(--sval-stem-hang));
+
+      &::part(content) {
+        margin-top: calc(var(--sval-stem-shadow-room) - var(--sval-stem-top-trim, 0px));
+        border-top-left-radius: var(--sval-stem-corner-start);
+        border-top-right-radius: var(--sval-stem-corner-end);
+      }
+    }
+
+    &[sval-stem-side="top"] {
+      margin-bottom: var(--sval-stem-near);
+      margin-inline: calc(-1 * var(--sval-stem-shadow-room) - var(--sval-stem-hang));
+
+      &::part(content) {
+        border-bottom-left-radius: var(--sval-stem-corner-start);
+        border-bottom-right-radius: var(--sval-stem-corner-end);
+      }
+    }
+
+    &[sval-stem-side="right"] {
+      margin-left: var(--sval-stem-near);
+      margin-block: calc(-1 * var(--sval-stem-shadow-room) - var(--sval-stem-hang));
+
+      &::part(content) {
+        border-top-left-radius: var(--sval-stem-corner-start);
+        border-bottom-left-radius: var(--sval-stem-corner-end);
+      }
+    }
+
+    &[sval-stem-side="left"] {
+      margin-right: var(--sval-stem-near);
+      margin-block: calc(-1 * var(--sval-stem-shadow-room) - var(--sval-stem-hang));
+
+      &::part(content) {
+        border-top-right-radius: var(--sval-stem-corner-start);
+        border-bottom-right-radius: var(--sval-stem-corner-end);
+      }
+    }
+
+    /* The room left in the window, which `SvalStem` measures, for a popover
+       above or below its button. The content keeps `popup.css`'s clip, so
+       its corners stay whole; a popover with more to show scrolls what it
+       holds. */
+    &:is(:not([sval-stem-side]), [sval-stem-side="bottom"], [sval-stem-side="top"])::part(content) {
+      max-height: var(--sval-stem-room);
+      min-width: calc(var(--sval-stem-w) + 2 * var(--sval-stem-hang));
+    }
+
+    &:is([sval-stem-side="left"], [sval-stem-side="right"])::part(content) {
+      min-height: calc(var(--sval-stem-w) + 2 * var(--sval-stem-hang));
+    }
+  }
+
+  [sval-stem-host][sval-stem-hang][sval-stem]:not(#sval-stem-weight) {
+    --sval-stem-hang: 32px;
+    /* Three deviations of `--sval-stem-box-shadow`'s far layer, under 0.2%
+       of its peak, its drop and its 1px spread. */
+    --sval-stem-shadow-reach: 15px;
+  }
+
+  /* What a panel holds scrolls when it has more to show than its room,
+     inside its rounded content, its corners in step with the content's. A
+     menu the panel holds, as the site menu holds a permission's values,
+     keeps its own. */
+  panel[sval-stem-host][sval-stem]:not(#sval-stem-weight) > :not(menupopup) {
+    min-height: 0;
+    overflow-y: auto;
+    border-radius: max(0px, calc(var(--panel-border-radius) - var(--panel-padding)));
+    scrollbar-width: thin;
+    scrollbar-color: var(--sval-scrollbar-thumb) transparent;
+  }
+
+  @media not (prefers-contrast) {
+    menupopup[sval-stem-host][sval-stem]:not(#sval-stem-weight) menupopup {
+      --panel-border-color: var(--sval-popup-edge);
+    }
+  }
+
+  [sval-stem-host][sval-stem="placed"]:not(#sval-stem-weight) {
+    &::part(content) {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    &::part(sval-stem-outline) {
+      visibility: visible;
+    }
+
+    &::part(sval-stem-fill) {
+      fill: var(--panel-background-color);
+      fill-rule: evenodd;
+      stroke: none;
+    }
+
+    &::part(sval-stem-edge) {
+      fill: none;
+      stroke: var(--sval-stem-edge);
+      stroke-width: 1px;
+    }
+
+    /* Behind the outline, whose fill hides each box's shadow where the
+       other box is. */
+    &::before,
+    &::after {
+      z-index: -2;
+      box-shadow: var(--sval-stem-box-shadow);
+    }
+
+    &::before {
+      left: var(--sval-stem-body-left);
+      top: var(--sval-stem-body-top);
+      width: var(--sval-stem-body-width);
+      height: var(--sval-stem-body-height);
+      border-radius: var(--sval-stem-body-radius);
+    }
+
+    &::after {
+      left: var(--sval-stem-tab-left);
+      top: var(--sval-stem-tab-top);
+      width: var(--sval-stem-tab-width);
+      height: var(--sval-stem-tab-height);
+      border-radius: var(--sval-stem-tab-radius);
+    }
+  }
+}
+/* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
