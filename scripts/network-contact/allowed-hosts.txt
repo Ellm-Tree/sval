@@ -26,6 +26,9 @@ ciscobinary.openh264.org                  allowed  OpenH264, once per release; C
 versioncheck.addons.mozilla.org           allowed  extension update checks
 versioncheck-bg.addons.mozilla.org        allowed  extension update checks
 safebrowsing.googleapis.com               allowed  Safe Browsing lists, under Sval's own key
+token.safebrowsing.apple                  allowed  iPhone: the fraudulent website warning WebKit gives the app, on by default (spec §10.9)
+safebrowsing.g.aaplimg.com                allowed  iPhone: the fraudulent website warning WebKit gives the app, on by default (spec §10.9)
+configuration.apple.com                   allowed  iPhone: the fraudulent website warning WebKit gives the app, on by default (spec §10.9)
 push.services.mozilla.com                 allowed  Web Push, only while some site holds the notification permission
 download.sval.app                         allowed  update checks, once a day: the channel and platform only (decision 0110)
 duckduckgo.com                            allowed  search suggestions, from the default engine, as the user types

@@ -2124,6 +2124,12 @@ a time:
   URLs against 12,433 and 3,861; 74% of self-hosted phishing caught at a median
   51 minutes). The remote download check stays off — Gatekeeper and SmartScreen
   already examine downloaded programs.
+- **The iPhone's fraudulent website warning**, WebKit's own, on by default.
+  The app's WebKit processes contact `token.safebrowsing.apple`,
+  `safebrowsing.g.aaplimg.com`, `configuration.apple.com` and
+  `safebrowsing.googleapis.com` for it. Apple's Safari privacy notice says the
+  check sends Google Safe Browsing and Apple information calculated from the
+  address, and never the address itself.
 - **Updates** (`download.sval.app`, §8.6, decision 0110): once a day, a
   request for a static `update.xml` per channel and platform, so the check
   reveals the channel and platform only, never the version, build, OS or
