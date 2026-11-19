@@ -89,12 +89,13 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
   const home = SvalWindowWorkspace.of(window).id;
   const homeRows = rowIdsIn(window);
 
+  // Opened as a Shift-release on a switcher entry opens them. Opening the
+  // switcher waits for its window to have the focus, which a window manager
+  // may refuse a script once another window has taken it.
   const windows = [
-    await tearOffVia(window, first.id),
-    // Opened as a Shift-release on its switcher entry opens it. A second
-    // trip through this window's switcher waits for the focus to come back
-    // from the window just opened, which a window manager may refuse a
-    // script.
+    await windowShowing(first.id, () =>
+      SvalPanel.pickWorkspace(first.id, true)
+    ),
     await windowShowing(second.id, () =>
       SvalPanel.pickWorkspace(second.id, true)
     ),
@@ -133,9 +134,12 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
     "this window stayed where it was"
   );
   Assert.deepEqual(rowIdsIn(window), homeRows, "drawing what it drew");
-  const { listed, free: offered } = await switcherIdsIn(window);
+  // The entries the switcher draws when opened, read without the focus
+  // opening it needs.
+  const entries = SvalPanel.switcherList();
+  const listed = entries.map(item => item.id);
   Assert.ok(
-    listed.includes(free.id) && !offered.includes(free.id),
+    entries.find(item => item.id === free.id)?.elsewhere,
     "and its switcher lists the free workspace as one a window shows"
   );
   Assert.ok(
