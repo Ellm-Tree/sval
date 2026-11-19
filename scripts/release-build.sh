@@ -15,6 +15,9 @@
 #   SVAL_PACKAGES_TOKEN  write:package on the Sval organisation, which
 #                        publishes each platform's symbols
 #   SVAL_RELEASE_TAG     the tag being built, which the checkout holds
+#   SVAL_PGO_PROFRAW     for win64, the tag's release run's artifact
+#                        pgo-win64-profile, unzipped: its raw PGO profiles
+#                        as one .tar.gz, in a directory mounted where it is
 #
 # OUT gets PLATFORM/, as release-compile.sh fills it, and linux64/ also gets
 # source-mpl.tar.xz, the source of the MPL 2.0 files (scripts/mpl-source.py).
@@ -32,6 +35,7 @@ cd "$REPO_ROOT"
 mkdir -p "$OUT" "$PARENT/mozbuild"
 OUT="$(cd "$OUT" && pwd)"
 image="sval-release-build:$$"
+TREE=/builds/sval
 # One build id for every step: each `mach build` otherwise writes a new one
 # into buildid.h (build/variables.py), which relinks libxul after the package
 # is made, so the .ini files' BuildID and the symbols would describe a build
@@ -46,11 +50,14 @@ docker build --pull \
   --build-context repo=. \
   -t "$image" .forgejo/docker
 
-# The checkout's parent is mounted in the container at its host path, and
-# the key file and OUT are mounted where the environment names
-# them. A host path is one clang-cl reads as a file: it parses an argument
-# starting with "/" as an option where it can, so a tree under, say, /w is
-# taken for the /w flag when midl.py preprocesses an IDL file from it.
+# The checkout is mounted in the container at /builds/sval, and the key file
+# and OUT are mounted where the environment names them. win64's compile reads
+# a profile its instrumented build wrote in Sval/sval's release workflow, and
+# a profile names each file-local function by its source's path, so both
+# compile at that one path. clang-cl parses an argument starting with "/" as
+# an option where it can, so a tree under, say, /w is taken for the /w flag
+# when midl.py preprocesses an IDL file from it; Mozilla's own win64
+# compiles build under /builds.
 #
 # Every step shares one mozbuild state directory, beside the checkout, for the
 # toolchains configure downloads: signing rebuilds the installer and
@@ -63,11 +70,13 @@ run() {
   local script="$1"
   shift
   docker run --rm \
-    -v "$PARENT:$PARENT" -w "$REPO_ROOT" \
+    -v "$REPO_ROOT:$TREE" -w "$TREE" \
     -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
     -v "$OUT:$OUT" \
     -v "$SVAL_SAFEBROWSING_KEYFILE:$SVAL_SAFEBROWSING_KEYFILE:ro" \
+    ${SVAL_PGO_PROFRAW:+-v "$SVAL_PGO_PROFRAW:$SVAL_PGO_PROFRAW:ro"} \
     -e SVAL_RELEASE_VERSION -e SVAL_BUILD_NUMBER -e SVAL_SAFEBROWSING_KEYFILE -e MOZ_BUILD_DATE \
+    -e SVAL_PGO_PROFRAW \
     -v "$PARENT/mozbuild:/mozbuild" \
     -e SVAL_GECKO_JOBS=14 \
     "$@" "$image" bash -c "$script"

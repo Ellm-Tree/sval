@@ -24,6 +24,8 @@
 #   SVAL_RELEASE_VERSION       the version a tag names, or 0.0.0
 #   SVAL_BUILD_NUMBER          tells apart two .deb/.rpm builds of one version
 #   SVAL_SAFEBROWSING_KEYFILE  Sval's Safe Browsing key, built in
+#   SVAL_PGO_PROFRAW           win64's raw PGO profiles, as
+#                              scripts/release-build.sh is given them
 #
 # OUT gets target.tar.xz, sval.deb, sval.rpm and target.complete.mar for
 # linux64; target.zip, target.installer.exe and target.complete.mar for win64.
@@ -56,7 +58,38 @@ build() {
   # Mozilla's build has install races at high parallelism; a second,
   # incremental `mach build` finishes what the first left (gecko.yml).
   echo "==> Compiling $PLATFORM"
-  ./scripts/build.sh || (cd build/firefox && ./mach --no-interactive build)
+  # Both compile with profile-guided optimisation (mozconfig.gecko).
+  # linux64's profiling run needs a display, which Xvfb gives it. win64 is a
+  # cross-compile, so its profile comes from Windows (gecko.yml's
+  # profile-win64) and is merged with the llvm-profdata configure
+  # bootstraps, the compile's own, before the compile's configure checks it
+  # is there.
+  local display=()
+  if [[ "$PLATFORM" == linux64 ]]; then
+    export SVAL_PGO=1
+    display=(xvfb-run -a -s "-screen 0 1600x1200x24")
+  else
+    [[ -s "${SVAL_PGO_PROFRAW:-}" ]] ||
+      { echo "error: SVAL_PGO_PROFRAW names no win64 profile" >&2; exit 1; }
+    SVAL_CONFIGURE_ONLY=1 ./scripts/build.sh
+    local raw
+    raw="$(mktemp -d)"
+    # The archive comes from a Windows runner branch jobs reach, so only
+    # regular .profraw files at its top level are unpacked.
+    local listing
+    listing="$(tar -tvzf "$SVAL_PGO_PROFRAW")"
+    if grep -qv '^-.* [^/]*\.profraw$' <<<"$listing"; then
+      echo "error: the win64 profile holds more than .profraw files" >&2
+      exit 1
+    fi
+    tar -xzf "$SVAL_PGO_PROFRAW" -C "$raw" --no-same-owner
+    "${MOZBUILD_STATE_PATH:?}/clang/bin/llvm-profdata" merge \
+      -o "$REPO_ROOT/win64.profdata" "$raw"/*.profraw
+    rm -rf "$raw"
+    export SVAL_PGO=use SVAL_PGO_PROFILE="$REPO_ROOT/win64.profdata"
+  fi
+  "${display[@]}" ./scripts/build.sh ||
+    (cd build/firefox && "${display[@]}" ./mach --no-interactive build)
 
   local f="$DIST/bin/modules/AppConstants.sys.mjs"
   if [[ ! -f "$f" ]] || grep -q no-google-safebrowsing-api-key "$f"; then

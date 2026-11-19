@@ -131,6 +131,13 @@ else
   ./mach configure
 fi
 
+# SVAL_CONFIGURE_ONLY=1 stops here, once configure has bootstrapped the
+# toolchains, for a step that needs one of them before the compile.
+if [[ "${SVAL_CONFIGURE_ONLY:-0}" == "1" ]]; then
+  echo "==> Configured"
+  exit 0
+fi
+
 echo "==> Building"
 if [[ "${SVAL_FASTER:-0}" == "1" ]]; then
   ./mach build faster
