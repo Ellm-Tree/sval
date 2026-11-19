@@ -34,6 +34,13 @@ Every package carries it beside the browser binary: `scripts/check-package.sh`
 browser's build id (`sval-mcp --version` prints it) and puts it in `dist/bin`,
 where the package manifest names it.
 
+Only the shim speaks MCP's versions (`src/mcp.rs`). It answers `initialize`,
+`server/discover` and `ping` itself, sends Sval tool lists and tool calls
+alone, each with who the agent's client is, and gives Sval's bare result the
+shape the agent's version wants. `scripts/check-agent-wire.py` checks that
+the two sides state the handshake version, the port file and the frame limit
+alike.
+
 The handshake's `hello` is the wire protocol's version; Sval accepts its own
 and the one before, and refuses an older shim as `outdated`. Bump it only for
 a change an older shim cannot speak, on both sides at once.

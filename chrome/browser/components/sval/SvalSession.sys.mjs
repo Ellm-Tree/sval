@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -88,7 +86,6 @@ export const SvalSession = {
       profileDir: PathUtils.profileDir,
       engine,
       askToPair: lazy.askToPair,
-      version: AppConstants.MOZ_APP_VERSION_DISPLAY,
     });
 
     try {

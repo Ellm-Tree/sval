@@ -190,7 +190,7 @@ add_task(
 /** One call sends at most `MAX_UPLOAD_BYTES` in all. */
 add_task(async function too_much_at_once_is_file_too_large() {
   const { MAX_UPLOAD_BYTES } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs"
+    "moz-src:///browser/components/sval/SvalAgentUploads.sys.mjs"
   );
   Assert.equal(MAX_UPLOAD_BYTES, 100 * 1024 * 1024, "the cap is 100 MiB");
   const { call, store, agent, alerts, tab, many } = await uploadSetup();

@@ -3,9 +3,13 @@
 
 /**
  * One agent connection, after the handshake (agent-control spec §3.2, §4,
- * §5.1). It speaks MCP: frames carrying `{mcp}` are JSON-RPC. It answers
- * `{ctl}` frames toward `sval-mcp` only, so the pairing secret goes to the
- * bridge, which stores it, and never into the agent's model context.
+ * §5.1). A frame carrying `{mcp}` is a JSON-RPC request for the agent's
+ * tools or a call of one, with `client` saying who the agent's client is.
+ * `sval-mcp` speaks MCP's versions with the agent: it answers `initialize`,
+ * `server/discover` and `ping` itself, sends on only a request whose
+ * version it has checked, and gives a result the shape that version wants.
+ * `{ctl}` frames go toward `sval-mcp` only, so the pairing secret goes to
+ * the bridge, which stores it, and never into the agent's model context.
  *
  * No sockets here. `SvalAgents` owns the connection and hands each decoded
  * frame to `handle`.
@@ -15,10 +19,7 @@
  * notification gets none, and runs nothing.
  */
 
-import {
-  printable,
-  validateArgs,
-} from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { printable } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
 import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import {
   codeOf,
@@ -37,6 +38,11 @@ import {
   describeError,
 } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { politeRules } from "moz-src:///browser/components/sval/SvalAgentPolite.sys.mjs";
+import { createToolRunner } from "moz-src:///browser/components/sval/SvalAgentToolRunner.sys.mjs";
+import {
+  MAX_MODEL_CHARS,
+  MAX_TASK_CHARS,
+} from "moz-src:///browser/components/sval/SvalAgentToolsWorkspace.sys.mjs";
 import {
   GROUP,
   SPLIT,
@@ -44,239 +50,18 @@ import {
   childrenByParent,
 } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
-/**
- * The MCP versions Sval speaks. A legacy version opens with `initialize`, and
- * a modern one carries its version and the client's capabilities in every
- * request's `_meta` (MCP 2026-07-28, "Versioning and Compatibility").
- * `sval-mcp`'s `build.rs` takes both lists and
- * `LATEST_LEGACY_PROTOCOL_VERSION` from this source, so each stays a list of
- * plain string literals, oldest first.
- */
-const LEGACY_PROTOCOL_VERSIONS = ["2025-06-18", "2025-11-25"];
-const MODERN_PROTOCOL_VERSIONS = ["2026-07-28"];
-/** What `initialize` answers a version Sval does not speak with. */
-const LATEST_LEGACY_PROTOCOL_VERSION = "2025-11-25";
-/** Every version Sval speaks, newest first, as an unsupported one is told. */
-const SUPPORTED_PROTOCOL_VERSIONS = [
-  ...LEGACY_PROTOCOL_VERSIONS,
-  ...MODERN_PROTOCOL_VERSIONS,
-].reverse();
-/** The `_meta` keys of a modern request and result (MCP 2026-07-28, "_meta"). */
-const VERSION_KEY = "io.modelcontextprotocol/protocolVersion";
-const CLIENT_INFO_KEY = "io.modelcontextprotocol/clientInfo";
-const CAPABILITIES_KEY = "io.modelcontextprotocol/clientCapabilities";
-const SERVER_INFO_KEY = "io.modelcontextprotocol/serverInfo";
-/** MCP's `UNSUPPORTED_PROTOCOL_VERSION` error code. */
-const UNSUPPORTED_PROTOCOL_VERSION = -32022;
 const MAX_LABEL_CHARS = 64;
-/** The most characters of the task an agent states that Sval keeps. */
-const MAX_TASK_CHARS = 48;
-/** The most characters of the model an agent states that Sval keeps. */
-const MAX_MODEL_CHARS = 32;
 /** The most characters of a launch directory Sval keeps. */
 const MAX_DIR_CHARS = 1024;
 /** A build id as `sval-mcp` reports one: Sval's build id, or a dev version. */
 const BUILD_PATTERN = /^[0-9A-Za-z._+-]{1,64}$/;
 
 /**
- * What `initialize` and `server/discover` tell the agent's model about Sval as
- * a whole: the model no single tool description holds, and the recovery map
- * across tools. Every rule it states is enforced in Sval's own code; the text
- * only explains them. `sval-mcp` answers both itself with the same text, which
- * its `build.rs` takes from this constant's source, so it stays a template
- * literal with no substitutions or escapes.
- */
-export const SERVER_INSTRUCTIONS = `Sval is the user's own web browser, and you are signed in as them: your tabs
-share their cookies and logins. Do only what the user asked, and ask them
-before anything that spends money, sends messages, posts, deletes, or accepts
-terms.
-
-You work in a workspace of your own, in a window the user can watch. set_task
-names it for your task, in a few words the user would recognise, and gives you
-its id. Keep the id: in a later session, call use_workspace with it to get your
-tabs back. When you finish a task, close the tabs you no longer need and call
-close_window.
-
-Act on elements by ref from your latest get_snapshot. Refs expire when the
-page changes.
-
-Unless the user has already decided, Sval asks them before you open a new
-site, send what you typed, upload, or download. A failed call returns an error
-code and a message that says what to do next: follow it. Never try to solve a
-CAPTCHA or other check that a person is there, and never look for another way
-into a site the user blocked. If you can't reach the user, stop and tell
-whoever started you what Sval is waiting for. Don't add random delays or try to
-look human.
-
-Sval's documentation is at https://sval.app/docs/, in Markdown if you ask for
-it.`;
-
-const EMPTY_INPUT = {
-  type: "object",
-  properties: {},
-  additionalProperties: false,
-};
-
-/**
- * What an agent says it is working on, which names its workspace, and the
- * model it runs on, which names it beside its client.
- */
-const TASK_INPUT = {
-  type: "object",
-  properties: {
-    task: {
-      type: "string",
-      maxLength: 200,
-      description: `What you are doing, in a few words the user would recognise, such as "Fix login redirect" or "Compare laptop prices". It names your workspace, which is how the user tells you from their other agents. At most ${MAX_TASK_CHARS} characters are kept.`,
-    },
-    model: {
-      type: "string",
-      maxLength: 200,
-      description: `Optional. The model you run on, such as "Opus 5.5" or "GPT-5". At most ${MAX_MODEL_CHARS} characters are kept.`,
-    },
-  },
-  required: ["task"],
-  additionalProperties: false,
-};
-
-/**
- * The pairing tools, one for each kind of workspace (isolated workspaces spec
- * §7). The user's answer decides the kind; the tool says which the agent asked
- * for.
- *
- * @param {string} name
- * @param {string} title
- * @param {string} kind What the description says of the workspace.
- * @returns {object}
- */
-const pairingTool = (name, title, kind) => ({
-  name,
-  title,
-  description: `${kind} Tell the user to answer the Pair/Deny alert in Sval. The call waits for their answer. Once paired, the result gives your workspace id: keep it.`,
-  inputSchema: TASK_INPUT,
-  annotations: {
-    readOnlyHint: false,
-    destructiveHint: false,
-    idempotentHint: true,
-    openWorldHint: false,
-  },
-});
-
-const UNPAIRED_TOOLS = [
-  pairingTool(
-    "request_isolated_pairing",
-    "Pair with Sval, isolated",
-    "Ask the user to pair this agent with Sval in an isolated workspace: one with its own cookies, so sites there see none of the user's sign-ins, and you sign in yourself where a task needs it."
-  ),
-  pairingTool(
-    "request_shared_pairing",
-    "Pair with Sval, shared",
-    "Ask the user to pair this agent with Sval in a shared workspace: sites there see the accounts the user is signed in to elsewhere in Sval."
-  ),
-];
-
-/** @type {Set<string>} */
-const PAIRING_TOOLS = new Set(UNPAIRED_TOOLS.map(t => t.name));
-
-const PAIRED_TOOLS = [
-  {
-    name: "list_tabs",
-    title: "List tabs",
-    description:
-      "List the tabs in your workspace, each with its tab id, title and URL. user_in_control: true means the user has taken over your workspace. human_verification: true means a tab is waiting for the user to complete a check.",
-    inputSchema: EMPTY_INPUT,
-    annotations: { readOnlyHint: true },
-  },
-  {
-    name: "set_task",
-    title: "Set your task",
-    description:
-      "Name your workspace for the task you are doing now, so the user can tell it from their other agents. With no workspace yet, it makes one and gives its id: keep it.",
-    inputSchema: TASK_INPUT,
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  {
-    name: "use_workspace",
-    title: "Go back to a workspace",
-    description:
-      "Go back to the workspace with this id, from an earlier session, and its tabs. Call it first when a conversation resumes.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        workspace: {
-          type: "string",
-          maxLength: 64,
-          description: "The workspace id Sval gave you.",
-        },
-      },
-      required: ["workspace"],
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  {
-    name: "close_window",
-    title: "Close your window",
-    description:
-      "Close your workspace's window when you have finished. Your workspace keeps its tabs, and opening or acting in a tab opens the window again.",
-    inputSchema: EMPTY_INPUT,
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  {
-    name: "delete_workspace",
-    title: "Delete your workspace",
-    description:
-      "Delete your workspace and close every tab in it. Call it only when the user asks or agrees.",
-    inputSchema: EMPTY_INPUT,
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-  },
-];
-
-/**
- * The rules Be polite holds an agent to, as a sentence of a tool's
- * description.
- *
- * @param {{on: boolean, actions_per_second: number, interval_ms: number,
- *   max_queued: number}} rules `politeRules`.
- * @returns {string}
- */
-export function politeSentence(rules) {
-  if (!rules.on) {
-    return "Be polite is off for you: Sval does not space out your actions.";
-  }
-  const rate =
-    rules.actions_per_second === 1
-      ? "1 action"
-      : `${rules.actions_per_second} actions`;
-  return `Be polite is on for you: at most ${rate} a second on each site, so Sval starts your actions on a site at least ${rules.interval_ms} ms apart. Up to ${rules.max_queued} wait their turn; one more fails with rate_limited.`;
-}
-
-/**
  * The agent's client as people know it, made safe to draw: its MCP display
  * name (`title`), or its programmatic `name` when it gives none.
  *
- * @param {unknown} clientInfo What the client says it is: `initialize`'s
- *   `params.clientInfo`, or a modern request's `_meta` one.
+ * @param {unknown} clientInfo What the client says it is, in MCP's
+ *   `clientInfo`.
  * @returns {string}
  */
 export function labelFrom(clientInfo) {
@@ -421,56 +206,6 @@ const failure = (id, code, message, data) => ({
   error: { code, message, ...(data !== undefined && { data }) },
 });
 
-/**
- * How one request is served. One whose `_meta` names no version, or a legacy
- * one, is served as the `initialize` before it set up. One that names a
- * modern version is served from what it carries alone, and is refused when it
- * lacks the client's capabilities, which a modern request must carry
- * (MCP 2026-07-28, "_meta"). A version Sval does not speak is refused with
- * the ones it does, from which the client picks one and asks again.
- *
- * @param {object} msg A JSON-RPC request.
- * @returns {{modern: boolean, clientInfo?: unknown, refusal?: object}}
- */
-export function eraOf(msg) {
-  const meta = msg.params?._meta;
-  if (!meta || typeof meta !== "object" || !Object.hasOwn(meta, VERSION_KEY)) {
-    return { modern: false };
-  }
-  const version = meta[VERSION_KEY];
-  if (typeof version !== "string") {
-    return {
-      modern: false,
-      refusal: failure(msg.id, -32602, `invalid params: ${VERSION_KEY}`),
-    };
-  }
-  if (!SUPPORTED_PROTOCOL_VERSIONS.includes(version)) {
-    return {
-      modern: false,
-      refusal: failure(
-        msg.id,
-        UNSUPPORTED_PROTOCOL_VERSION,
-        "Unsupported protocol version",
-        { supported: SUPPORTED_PROTOCOL_VERSIONS, requested: version }
-      ),
-    };
-  }
-  if (!MODERN_PROTOCOL_VERSIONS.includes(version)) {
-    return { modern: false };
-  }
-  const capabilities = meta[CAPABILITIES_KEY];
-  if (
-    !capabilities ||
-    typeof capabilities !== "object" ||
-    Array.isArray(capabilities)
-  ) {
-    return {
-      modern: true,
-      refusal: failure(msg.id, -32602, `invalid params: ${CAPABILITIES_KEY}`),
-    };
-  }
-  return { modern: true, clientInfo: meta[CLIENT_INFO_KEY] ?? null };
-}
 const noTask = () =>
   refusal(
     "invalid_arguments",
@@ -520,7 +255,6 @@ export class SvalAgentSession {
   #agent;
   #send;
   #deps;
-  #clientInfo = null;
   /** What `sval-mcp` said of its launch (`launchFrom`), or null. */
   #launch;
   #closed = false;
@@ -532,6 +266,17 @@ export class SvalAgentSession {
   #calls = new Map();
   /** The pairing in flight, which every pairing request meanwhile shares. */
   #pairing = null;
+  /**
+   * What runs the agent's tools (`SvalAgentToolRunner`): the listen's, or
+   * one for the session's own tools alone when it is given none.
+   */
+  #tools;
+  /**
+   * What the session lends a tool call of itself (`call.session`): its
+   * agent, whether it has a workspace, and the operations the tools of
+   * `SvalAgentToolsWorkspace` name.
+   */
+  #lent;
   /** The check that the session's workspace exists, which concurrent calls share. */
   #housing = null;
   /**
@@ -560,6 +305,21 @@ export class SvalAgentSession {
     this.#resume = workspace;
     this.#send = send;
     this.#deps = deps;
+    this.#tools = deps.tools ?? createToolRunner();
+    const session = this;
+    this.#lent = {
+      get agent() {
+        return session.#agent;
+      },
+      ensureHoused: () => this.#ensureHoused(),
+      requestPairing: (args, isolated, call) =>
+        this.#requestPairing(args, isolated, call),
+      setTask: args => this.#setTask(args),
+      useWorkspace: id => this.#useWorkspace(id),
+      listTabs: () => this.#listTabs(),
+      closeWindow: () => this.#closeWindow(),
+      deleteWorkspace: () => this.#deleteWorkspace(),
+    };
   }
 
   /** The paired agent, or null until pairing completes. */
@@ -576,40 +336,9 @@ export class SvalAgentSession {
   /** @returns {string} What `#listed` compares against. */
   #listing() {
     return JSON.stringify([
-      this.#definitions().map(t => t.name),
+      this.#tools.definitions(this.#agent).map(t => t.name),
       politeRules(this.#agent.agentId),
     ]);
-  }
-
-  /**
-   * The paired agent's own tools, `list_tabs` saying the rules Be polite
-   * holds it to as they stand, since a tool list is what an agent reads again
-   * when it is told its tools changed.
-   *
-   * @returns {object[]}
-   */
-  #pairedTools() {
-    return PAIRED_TOOLS.map(tool =>
-      tool.name === "list_tabs"
-        ? {
-            ...tool,
-            description: `${tool.description} ${politeSentence(politeRules(this.#agent.agentId))}`,
-          }
-        : tool
-    );
-  }
-
-  /**
-   * The paired agent's tools: Sval's own, and those `extraTools` gives it as
-   * things stand, such as sites' tools (site-tools spec §5.1).
-   *
-   * @returns {object[]}
-   */
-  #definitions() {
-    return [
-      ...(this.#deps.toolDefinitions ?? []),
-      ...(this.#agent ? (this.#deps.extraTools?.(this.#agent) ?? []) : []),
-    ];
   }
 
   /**
@@ -670,11 +399,6 @@ export class SvalAgentSession {
       }
       return;
     }
-    const era = eraOf(msg);
-    if (era.refusal) {
-      this.#emit({ mcp: era.refusal });
-      return;
-    }
     const wait =
       msg.method === "tools/call"
         ? this.#waitFor(msg.params?._meta?.progressToken, onWaiting)
@@ -684,48 +408,15 @@ export class SvalAgentSession {
     }
     let reply;
     try {
-      reply = await this.#dispatch(msg, wait, era);
+      reply = await this.#dispatch(msg, wait, frame.client ?? null);
     } finally {
       if (wait && this.#calls.get(msg.id) === wait) {
         this.#calls.delete(msg.id);
       }
     }
     if (!wait?.cancelled) {
-      this.#emit({
-        mcp: era.modern ? this.#dressed(msg.method, reply) : reply,
-      });
+      this.#emit({ mcp: reply });
     }
-  }
-
-  /**
-   * A modern request's reply, with the fields a modern result carries: its
-   * `resultType`, the server's name and version, and on a tool list the
-   * caching hints MCP 2026-07-28 requires there ("Caching"). A list is this
-   * agent's own, by its pairing and its Be polite rules, so it is private,
-   * and it is stale at once: it changes when the agent pairs or the user
-   * changes its rules, and a client that has not subscribed hears of
-   * neither.
-   *
-   * @param {string} method
-   * @param {object} reply
-   * @returns {object}
-   */
-  #dressed(method, reply) {
-    if (!reply.result) {
-      return reply;
-    }
-    const dressed = {
-      ...reply.result,
-      resultType: "complete",
-      _meta: {
-        ...reply.result._meta,
-        [SERVER_INFO_KEY]: { name: "sval", version: this.#deps.version },
-      },
-    };
-    if (method === "tools/list") {
-      Object.assign(dressed, { ttlMs: 0, cacheScope: "private" });
-    }
-    return { ...reply, result: dressed };
   }
 
   /**
@@ -735,12 +426,13 @@ export class SvalAgentSession {
    *
    * @param {object} msg A JSON-RPC request.
    * @param {ApprovalWait|null} wait How a tool call waits for the user.
-   * @param {object} era How the request is served (`eraOf`).
+   * @param {unknown} client Who the agent's client says it is, as the
+   *   bridge read it from the agent's MCP session.
    * @returns {Promise<object>}
    */
-  async #dispatch(msg, wait, era) {
+  async #dispatch(msg, wait, client) {
     try {
-      return await this.#answer(msg, wait, era);
+      return await this.#answer(msg, wait, client);
     } catch (err) {
       SvalLog.error(`agent request failed: ${describeError(err)}`);
       const errorName = typeof err?.name === "string" ? err.name : "Error";
@@ -758,29 +450,14 @@ export class SvalAgentSession {
     }
   }
 
-  async #answer(msg, wait, era) {
+  async #answer(msg, wait, client) {
     switch (msg.method) {
-      case "initialize":
-        this.#clientInfo = msg.params?.clientInfo ?? null;
-        return result(msg.id, {
-          protocolVersion: LEGACY_PROTOCOL_VERSIONS.includes(
-            msg.params?.protocolVersion
-          )
-            ? msg.params.protocolVersion
-            : LATEST_LEGACY_PROTOCOL_VERSION,
-          capabilities: { tools: { listChanged: true } },
-          serverInfo: { name: "sval", version: this.#deps.version },
-          instructions: SERVER_INSTRUCTIONS,
-        });
-      case "ping":
-        return result(msg.id, {});
       case "tools/list": {
-        if (!this.#agent) {
-          return result(msg.id, { tools: UNPAIRED_TOOLS });
+        if (this.#agent) {
+          this.#listed = this.#listing();
         }
-        this.#listed = this.#listing();
         return result(msg.id, {
-          tools: [...this.#pairedTools(), ...this.#definitions()],
+          tools: this.#tools.definitions(this.#agent),
         });
       }
       case "tools/call":
@@ -791,7 +468,7 @@ export class SvalAgentSession {
               msg.params?.name,
               msg.params?.arguments,
               wait,
-              era.modern ? era.clientInfo : this.#clientInfo
+              client
             )
           )
         );
@@ -822,46 +499,14 @@ export class SvalAgentSession {
    * @param {string} name
    * @param {unknown} rawArgs
    * @param {ApprovalWait} wait How this call waits for the user.
-   * @param {unknown} clientInfo Who the agent's client says it is: the
-   *   call's own `_meta` says on a modern request, `initialize` on a legacy one.
+   * @param {unknown} clientInfo Who the agent's client says it is.
    * @returns {Promise<object>} The tool result.
    */
   async #call(name, rawArgs, wait, clientInfo) {
+    const run = () =>
+      this.#tools.call(this.#lent, name, rawArgs, { wait, clientInfo });
     if (!this.#agent) {
-      if (!PAIRING_TOOLS.has(name)) {
-        return refusal(
-          "not_paired",
-          "This agent is not paired with Sval. Call request_isolated_pairing or request_shared_pairing first."
-        );
-      }
-      let args;
-      try {
-        args = validateArgs(
-          UNPAIRED_TOOLS.find(t => t.name === name).inputSchema,
-          rawArgs
-        );
-      } catch (err) {
-        if (err instanceof ToolError) {
-          return refusalOf(err);
-        }
-        throw err;
-      }
-      const task = taskFrom(args.task);
-      if (!task) {
-        return noTask();
-      }
-      if (wait.full) {
-        return awaitingPairing();
-      }
-      this.#pairing ??= this.#pair(
-        task,
-        modelFrom(args.model),
-        name === "request_isolated_pairing",
-        clientInfo
-      ).finally(() => {
-        this.#pairing = null;
-      });
-      return this.#awaitApproval(this.#pairing, wait);
+      return run();
     }
     // The user's Stop refuses every call of the paired agent, and answers
     // one already running at once, whatever it waits on (agent-control spec
@@ -871,7 +516,7 @@ export class SvalAgentSession {
     const held = this.#agent.workspaceId ?? this.#resume;
     const stop = held && this.#deps.untilStopped?.(held);
     if (!stop) {
-      return this.#callPaired(name, rawArgs, wait);
+      return run();
     }
     if (stop.stopped) {
       const err = await stop.promise.catch(e => e);
@@ -882,8 +527,7 @@ export class SvalAgentSession {
     // Resume starts once those have ended, as every step of it would be
     // refused until then.
     let answered = false;
-    const start = () =>
-      answered ? null : this.#callPaired(name, rawArgs, wait);
+    const start = () => (answered ? null : run());
     const running = stop.drained ? stop.drained.then(start) : start();
     const stopped = stop.promise.catch(err => {
       answered = true;
@@ -899,60 +543,50 @@ export class SvalAgentSession {
   }
 
   /**
-   * @param {string} name
-   * @param {unknown} rawArgs
-   * @param {ApprovalWait} wait
-   * @returns {Promise<object>} The tool result of the paired agent's call.
+   * Asks the user to pair, for an unpaired agent. Every pairing request
+   * that arrives while the alert is open shares it. A pairing tool called
+   * once paired names the session's task, as `set_task` does.
+   *
+   * @param {{task: string, model?: string}} args
+   * @param {boolean} isolated Whether the agent asked for an isolated
+   *   workspace.
+   * @param {{wait: ApprovalWait, clientInfo: unknown}} call How the call
+   *   waits for the user, and who the agent's client says it is.
+   * @returns {Promise<object>}
    */
-  async #callPaired(name, rawArgs, wait) {
-    switch (name) {
-      case "request_isolated_pairing":
-      case "request_shared_pairing":
-      case "set_task":
-        return this.#setTask(name, rawArgs);
-      case "use_workspace":
-        return this.#useWorkspace(rawArgs);
+  #requestPairing(args, isolated, { wait, clientInfo }) {
+    if (this.#agent) {
+      return this.#setTask(args);
     }
-    const definition = this.#definitions().find(t => t.name === name);
-    if (!definition && !PAIRED_TOOLS.some(t => t.name === name)) {
-      return refusal("unknown_tool");
+    const task = taskFrom(args.task);
+    if (!task) {
+      return noTask();
     }
-    const housed = await this.#ensureHoused();
-    if (housed !== true) {
-      return housed;
+    if (wait.full) {
+      return awaitingPairing();
     }
-    if (definition && this.#deps.tools?.[name]) {
-      let args;
-      try {
-        args = validateArgs(definition.inputSchema, rawArgs);
-        return await this.#deps.tools[name](this.#agent, args, { wait });
-      } catch (err) {
-        if (err instanceof ToolError) {
-          // The tab is named only once the arguments are checked: an
-          // unchecked one is whatever the agent sent.
-          return refusalOf(
-            err,
-            typeof args?.tab === "string" ? { tab: args.tab } : {}
-          );
-        }
-        throw err;
-      }
-    }
-    switch (name) {
-      case "close_window":
-        return this.#closeWindow();
-      case "delete_workspace":
-        return this.#deleteWorkspace();
-      case "list_tabs":
-        return json({
-          workspace: this.#agent.task,
-          workspace_id: this.#agent.workspaceId,
-          tabs: await this.#deps.listTabs(this.#agent),
-          polite: politeRules(this.#agent.agentId),
-        });
-      default:
-        return refusal("unknown_tool");
-    }
+    this.#pairing ??= this.#pair(
+      task,
+      modelFrom(args.model),
+      isolated,
+      clientInfo
+    ).finally(() => {
+      this.#pairing = null;
+    });
+    return this.#awaitApproval(this.#pairing, wait);
+  }
+
+  /**
+   * @returns {Promise<object>} What `list_tabs` answers: the session's
+   *   workspace, its tabs and the rules Be polite holds the agent to.
+   */
+  async #listTabs() {
+    return json({
+      workspace: this.#agent.task,
+      workspace_id: this.#agent.workspaceId,
+      tabs: await this.#deps.listTabs(this.#agent),
+      polite: politeRules(this.#agent.agentId),
+    });
   }
 
   /**
@@ -975,24 +609,10 @@ export class SvalAgentSession {
    * paired does the same, so a new session of a paired agent names its own
    * task the way an unpaired one would.
    *
-   * @param {string} name The tool called.
-   * @param {unknown} rawArgs
+   * @param {{task: string, model?: string}} args
    * @returns {Promise<object>}
    */
-  async #setTask(name, rawArgs) {
-    let args;
-    try {
-      args = validateArgs(
-        [...UNPAIRED_TOOLS, ...PAIRED_TOOLS].find(t => t.name === name)
-          .inputSchema,
-        rawArgs
-      );
-    } catch (err) {
-      if (err instanceof ToolError) {
-        return refusalOf(err);
-      }
-      throw err;
-    }
+  async #setTask(args) {
     const task = taskFrom(args.task);
     if (!task) {
       return noTask();
@@ -1025,26 +645,13 @@ export class SvalAgentSession {
    * Takes the session to one of its agent's workspaces, unless another
    * connection holds it.
    *
-   * @param {unknown} rawArgs
+   * @param {string} id The workspace's id.
    * @returns {Promise<object>}
    */
-  async #useWorkspace(rawArgs) {
-    let args;
-    try {
-      args = validateArgs(
-        PAIRED_TOOLS.find(t => t.name === "use_workspace").inputSchema,
-        rawArgs
-      );
-    } catch (err) {
-      if (err instanceof ToolError) {
-        return refusalOf(err);
-      }
-      throw err;
-    }
+  async #useWorkspace(id) {
     if (!this.#paired()) {
       return noLongerPaired();
     }
-    const id = args.workspace;
     if (id === this.#agent.workspaceId) {
       return this.#usingResult();
     }
@@ -1071,15 +678,7 @@ export class SvalAgentSession {
    * @returns {Promise<object>}
    */
   async #closeWindow() {
-    let closed;
-    try {
-      closed = await this.#deps.closeWindows(this.#agent.workspaceId);
-    } catch (err) {
-      if (err instanceof ToolError) {
-        return refusalOf(err);
-      }
-      throw err;
-    }
+    const closed = await this.#deps.closeWindows(this.#agent.workspaceId);
     return text(
       closed
         ? "Your window is closed, and your workspace keeps its tabs."
@@ -1097,14 +696,7 @@ export class SvalAgentSession {
     const { workspaceId } = this.#agent;
     // A workspace the user has taken control of, or whose agent they
     // stopped, is theirs until they give it back, as for every other tool.
-    try {
-      this.#deps.refuseIfWorkspaceHeld?.(workspaceId);
-    } catch (err) {
-      if (err instanceof ToolError) {
-        return refusalOf(err);
-      }
-      throw err;
-    }
+    this.#deps.refuseIfWorkspaceHeld?.(workspaceId);
     if (!(await this.#deps.deleteWorkspace(workspaceId))) {
       return refusal(
         "not_deleted",

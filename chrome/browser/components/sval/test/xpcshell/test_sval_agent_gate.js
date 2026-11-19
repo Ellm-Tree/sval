@@ -9,15 +9,12 @@
  * behind them.
  */
 
-const {
-  ActionWindow,
-  CAP_MS,
-  createAgentGate,
-  decideLoad,
-  inUploadFolders,
-  QUIET_MS,
-} = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentGate.sys.mjs"
+const { ActionWindow, CAP_MS, createAgentGate, decideLoad, QUIET_MS } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalAgentGate.sys.mjs"
+  );
+const { inUploadFolders } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentUploads.sys.mjs"
 );
 const { ToolError } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
@@ -1158,7 +1155,7 @@ add_task(async function a_page_on_an_unanswered_site_is_refused() {
  */
 add_task(async function an_upload_folder_covers_what_its_scope_says() {
   const temp = SvalTestTemp;
-  // The gate is given resolved paths (`resolvedFile` in `SvalAgentTools`).
+  // The gate is given resolved paths (`resolvedFile` in `SvalAgentUploads`).
   const made = new FileUtils.File(await temp.makeTempDir("sval-upload-scope"));
   made.normalize();
   const dir = made.path;

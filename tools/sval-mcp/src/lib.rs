@@ -2,15 +2,17 @@
 // Copyright 2026 Ellm Tree, Inc.
 
 //! Connects a local MCP agent to Sval (agent-control spec §3.1): finds Sval,
-//! authenticates with this agent's secret, and relays MCP messages. The
-//! bridge answers `initialize` itself, and while Sval is away it answers
-//! `ping`, `tools/list` from the list Sval last sent, and every other request
-//! with an error (`bridge`).
+//! authenticates with this agent's secret, and relays the agent's tool lists
+//! and tool calls. The bridge speaks MCP's versions itself: it answers
+//! `initialize`, `server/discover` and `ping`, and while Sval is away it
+//! answers `tools/list` from the list Sval last sent and every call with an
+//! error (`bridge`).
 
 pub mod bridge;
 pub mod frame;
 pub mod install;
 pub mod launch;
+pub mod mcp;
 pub mod proof;
 pub mod secrets;
 #[cfg(test)]

@@ -402,7 +402,7 @@ export class SvalAgentPageParent extends JSWindowActorParent {
   /**
    * Gives the file input `ref` names `files`, as a person picking them
    * would, and fires its `input` and `change` events. The files are made in
-   * the parent from bytes it read (`SvalAgentTools.checkedFiles`) and cross
+   * the parent from bytes it read (`SvalAgentUploads`, `checkedFiles`) and cross
    * to the page's process with the query, which structured-clones a `File`
    * (JSWindowActor messages carry blobs). The page's process never opens a
    * path: it may not unless `dom.file.createInChild` lets every content

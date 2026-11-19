@@ -72,22 +72,13 @@ add_task(function an_activity_line_names_the_tool_and_the_site() {
   const { activityText } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs"
   );
-  const typing = activityText("type_text", "127.0.0.1:8384");
+  const typing = activityText("Typing", "127.0.0.1:8384");
   Assert.ok(
     typing.length > " · 127.0.0.1:8384".length &&
       typing.endsWith(" · 127.0.0.1:8384"),
     `the site follows what the tool does: ${typing}`
   );
-  Assert.ok(
-    activityText("click_element", "") &&
-      !activityText("click_element", "").includes("·"),
-    "no site, no dot"
-  );
-  Assert.equal(
-    activityText("list_tabs", "example.com"),
-    "",
-    "unnamed tools say nothing"
-  );
+  Assert.equal(activityText("Clicking", ""), "Clicking", "no site, no dot");
 });
 
 /**

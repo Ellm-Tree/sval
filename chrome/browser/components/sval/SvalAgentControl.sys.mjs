@@ -378,39 +378,16 @@ export function isAgentLoadDispatch() {
  */
 export const AGENT_ACTIVITY_TOPIC = "sval-agent-activity";
 
-const ACTIVITY = {
-  open_tab: "Opening a tab",
-  close_tab: "Closing a tab",
-  navigate_tab: "Going to a page",
-  get_snapshot: "Reading the page",
-  get_screenshot: "Looking at the page",
-  get_page_source: "Reading the page",
-  get_page_text: "Reading the page",
-  get_console_messages: "Reading the console",
-  click_element: "Clicking",
-  type_text: "Typing",
-  fill_form: "Filling in a form",
-  select_option: "Choosing an option",
-  press_keys: "Pressing keys",
-  scroll_page: "Scrolling",
-  wait_for_text: "Waiting for the page",
-  answer_dialog: "Answering the page",
-  upload_file: "Uploading a file",
-};
-
 /**
  * The overlay's line for a tool acting on a page: what it is doing, and the
  * site, so the user sees where as well as what.
  *
- * @param {string} tool A tool's name.
+ * @param {string} doing What the tool is doing (its `activity`,
+ *   `SvalAgentToolTable`).
  * @param {string} [site] The page's host and port, if it has one.
- * @returns {string} The line, or "" for a tool the overlay does not name.
+ * @returns {string}
  */
-export function activityText(tool, site) {
-  const doing = ACTIVITY[tool];
-  if (!doing) {
-    return "";
-  }
+export function activityText(doing, site) {
   return site ? `${doing} · ${site}` : doing;
 }
 
@@ -418,11 +395,11 @@ export function activityText(tool, site) {
  * Tells `browser`'s window what an agent's tool is doing in it.
  *
  * @param {Element} browser
- * @param {string} tool
+ * @param {string} doing The tool's `activity`.
  * @param {string} [site] The site it acts on, when that is not the page's
  *   own, as for a load.
  */
-export function reportActivity(browser, tool, site) {
+export function reportActivity(browser, doing, site) {
   let host = site;
   if (host === undefined) {
     try {
@@ -431,10 +408,11 @@ export function reportActivity(browser, tool, site) {
       host = "";
     }
   }
-  const text = activityText(tool, host);
-  if (text) {
-    Services.obs.notifyObservers(browser, AGENT_ACTIVITY_TOPIC, text);
-  }
+  Services.obs.notifyObservers(
+    browser,
+    AGENT_ACTIVITY_TOPIC,
+    activityText(doing, host)
+  );
 }
 
 /**

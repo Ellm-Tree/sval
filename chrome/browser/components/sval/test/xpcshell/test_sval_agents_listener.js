@@ -13,8 +13,12 @@ const { AGENT_DIR, MAX_UNPROVEN_CONNECTIONS, SvalAgents } =
   ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
   );
-const { TOOL_DEFINITIONS } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs"
+const { SESSION_TOOLS, TOOLS } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentToolTable.sys.mjs"
+);
+/** The tools every paired agent has for its tabs. */
+const OWN_TOOLS = TOOLS.filter(
+  tool => !tool.when && !SESSION_TOOLS.includes(tool)
 );
 const { WAITING_MESSAGE } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentAlerts.sys.mjs"
@@ -170,7 +174,6 @@ async function freshListener({ on = true, prepare, hello } = {}) {
     profileDir: PathUtils.profileDir,
     engine: fakeEngine,
     askToPair,
-    version: "test",
     shutdownClient: barrier.client,
     hello,
   });
@@ -493,15 +496,15 @@ add_task(
     await freshListener();
     const askedBefore = asked.length;
     const handshakes = [
-      ["no proof", () => ({ hello: 1, pair: true })],
+      ["no proof", () => ({ hello: 3, pair: true })],
       [
         "a wrong proof",
-        () => ({ hello: 1, pair: true, proof: "0".repeat(64) }),
+        () => ({ hello: 3, pair: true, proof: "0".repeat(64) }),
       ],
       [
         "sval's own proof for the challenge, reflected",
         async c => ({
-          hello: 1,
+          hello: 3,
           pair: true,
           proof: await mac(c.token, `sval:${c.challenge}`),
         }),
@@ -509,26 +512,26 @@ add_task(
       [
         "an unprefixed proof",
         async c => ({
-          hello: 1,
+          hello: 3,
           pair: true,
           proof: await mac(c.token, c.challenge),
         }),
       ],
       [
         "the right proof in uppercase",
-        c => ({ hello: 1, pair: true, proof: c.proof.toUpperCase() }),
+        c => ({ hello: 3, pair: true, proof: c.proof.toUpperCase() }),
       ],
       [
         "a proof for another connection's challenge",
         async c => ({
-          hello: 1,
+          hello: 3,
           pair: true,
           proof: await mac(c.token, `agent:${freshNonce()}`),
         }),
       ],
       [
         "a proof that is not a string",
-        () => ({ hello: 1, pair: true, proof: 7 }),
+        () => ({ hello: 3, pair: true, proof: 7 }),
       ],
     ];
     for (const [what, make] of handshakes) {
@@ -538,9 +541,6 @@ add_task(
       c.send(
         new Uint8Array([
           ...encodeFrame(await make(c)),
-          ...encodeFrame({
-            mcp: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
-          }),
           ...encodeFrame({
             mcp: {
               jsonrpc: "2.0",
@@ -566,7 +566,7 @@ add_task(
     await freshListener();
     const upper = "A".repeat(64);
     const openings = [
-      { hello: 1, pair: true },
+      { hello: 3, pair: true },
       { mcp: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
       { challenge: "short" },
       { challenge: upper },
@@ -614,7 +614,7 @@ add_task(async function a_large_handshake_is_closed_silently() {
   await freshListener();
   const c = await connect(SvalAgents.port);
   c.send(
-    encodeFrame({ hello: 1, pair: true, proof: c.proof, pad: "x".repeat(5000) })
+    encodeFrame({ hello: 3, pair: true, proof: c.proof, pad: "x".repeat(5000) })
   );
   await c.closed;
   Assert.equal(c.unread(), 0, "nothing is sent");
@@ -623,19 +623,21 @@ add_task(async function a_large_handshake_is_closed_silently() {
 add_task(async function a_large_frame_after_the_handshake_is_fine() {
   await freshListener();
   const c = await connect(SvalAgents.port);
-  c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+  c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
   Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
   c.send(
     encodeFrame({
       mcp: {
         jsonrpc: "2.0",
         id: 1,
-        method: "ping",
+        method: "tools/list",
         params: { pad: "x".repeat(5000) },
       },
     })
   );
-  Assert.deepEqual((await c.next()).mcp, { jsonrpc: "2.0", id: 1, result: {} });
+  const listed = (await c.next()).mcp;
+  Assert.equal(listed.id, 1);
+  Assert.ok(Array.isArray(listed.result.tools), "the request is answered");
   c.close();
 });
 
@@ -643,21 +645,11 @@ add_task(
   async function pairing_end_to_end_then_list_tabs_on_a_new_connection() {
     await freshListener();
     const c = await connect(SvalAgents.port);
-    c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+    c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
     Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
     c.send(
       encodeFrame({
-        mcp: {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: { clientInfo: { name: "Test Agent" } },
-        },
-      })
-    );
-    await c.next();
-    c.send(
-      encodeFrame({
+        client: { name: "Test Agent" },
         mcp: {
           jsonrpc: "2.0",
           id: 2,
@@ -684,7 +676,7 @@ add_task(
     // The engine fake always reports ws-fake's tab; what matters is that a second
     // connection authenticates with the secret and reaches list_tabs.
     const d = await connect(SvalAgents.port);
-    d.send(encodeFrame({ hello: 1, agent_id, secret, proof: d.proof }));
+    d.send(encodeFrame({ hello: 3, agent_id, secret, proof: d.proof }));
     Assert.deepEqual(await d.next(), { ctl: { ready: "paired" } });
     d.send(
       encodeFrame({ mcp: { jsonrpc: "2.0", id: 3, method: "tools/list" } })
@@ -697,7 +689,7 @@ add_task(
         "use_workspace",
         "close_window",
         "delete_workspace",
-        ...TOOL_DEFINITIONS.map(t => t.name),
+        ...OWN_TOOLS.map(t => t.name),
       ]
     );
     d.close();
@@ -714,7 +706,7 @@ add_task(
 add_task(async function connections_without_a_handshake_are_capped() {
   await freshListener();
   const ready = async c => {
-    c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+    c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
     Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
   };
   const opened = [];
@@ -747,7 +739,7 @@ add_task(async function a_paired_agent_lists_every_tool_with_a_description() {
   const pairing = await pairNew("Listing Agent");
   pairing.close();
   const c = await connect(SvalAgents.port);
-  c.send(encodeFrame({ hello: 1, ...pairing.credentials, proof: c.proof }));
+  c.send(encodeFrame({ hello: 3, ...pairing.credentials, proof: c.proof }));
   Assert.deepEqual(await c.next(), { ctl: { ready: "paired" } });
   c.send(encodeFrame({ mcp: { jsonrpc: "2.0", id: 4, method: "tools/list" } }));
   const { tools } = (await c.next()).mcp.result;
@@ -759,7 +751,7 @@ add_task(async function a_paired_agent_lists_every_tool_with_a_description() {
       "use_workspace",
       "close_window",
       "delete_workspace",
-      ...TOOL_DEFINITIONS.map(t => t.name),
+      ...OWN_TOOLS.map(t => t.name),
     ],
     "every tool is listed"
   );
@@ -776,7 +768,7 @@ add_task(async function a_wrong_secret_is_refused_and_closed() {
   const c = await connect(SvalAgents.port);
   c.send(
     encodeFrame({
-      hello: 1,
+      hello: 3,
       agent_id: "nope",
       secret: "0".repeat(64),
       proof: c.proof,
@@ -798,7 +790,7 @@ add_task(async function an_unproven_peer_cannot_probe_agent_ids() {
     { agent_id: "nope", secret: "0".repeat(64) },
   ]) {
     const c = await connect(SvalAgents.port);
-    c.send(encodeFrame({ hello: 1, ...credentials, proof: "0".repeat(64) }));
+    c.send(encodeFrame({ hello: 3, ...credentials, proof: "0".repeat(64) }));
     await c.closed;
     Assert.equal(c.unread(), 0, "nothing is sent");
   }
@@ -820,8 +812,8 @@ add_task(async function two_agents_can_be_connected_at_once() {
   await freshListener();
   const a = await connect(SvalAgents.port);
   const b = await connect(SvalAgents.port);
-  a.send(encodeFrame({ hello: 1, pair: true, proof: a.proof }));
-  b.send(encodeFrame({ hello: 1, pair: true, proof: b.proof }));
+  a.send(encodeFrame({ hello: 3, pair: true, proof: a.proof }));
+  b.send(encodeFrame({ hello: 3, pair: true, proof: b.proof }));
   Assert.deepEqual(await a.next(), { ctl: { ready: "unpaired" } });
   Assert.deepEqual(await b.next(), { ctl: { ready: "unpaired" } });
   a.close();
@@ -838,21 +830,11 @@ add_task(async function a_waiting_call_reports_progress_over_the_wire() {
   let release;
   pairingHeld = new Promise(resolve => (release = resolve));
   const c = await connect(SvalAgents.port);
-  c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+  c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
   Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
   c.send(
     encodeFrame({
-      mcp: {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: { clientInfo: { name: "Waiting Agent" } },
-      },
-    })
-  );
-  await c.next();
-  c.send(
-    encodeFrame({
+      client: { name: "Waiting Agent" },
       mcp: {
         jsonrpc: "2.0",
         id: 2,
@@ -902,7 +884,7 @@ add_task(async function a_waiting_call_does_not_hold_up_the_next_request() {
   let release;
   pairingHeld = new Promise(resolve => (release = resolve));
   const c = await connect(SvalAgents.port);
-  c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+  c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
   Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
   const frames = [];
   const read = (async () => {
@@ -965,7 +947,7 @@ add_task(async function one_pairing_runs_one_sync_pass() {
   );
   const passesBefore = fakeEngine.passes.length;
   const c = await connect(SvalAgents.port);
-  c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+  c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
   Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
   c.send(
     encodeFrame({
@@ -1008,21 +990,11 @@ add_task(async function one_pairing_runs_one_sync_pass() {
  */
 async function pairNew(name) {
   const c = await connect(SvalAgents.port);
-  c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+  c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
   Assert.deepEqual(await c.next(), { ctl: { ready: "unpaired" } });
   c.send(
     encodeFrame({
-      mcp: {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: { clientInfo: { name } },
-      },
-    })
-  );
-  await c.next();
-  c.send(
-    encodeFrame({
+      client: { name },
       mcp: {
         jsonrpc: "2.0",
         id: 2,
@@ -1058,7 +1030,7 @@ async function connectAs(credentials, workspace) {
   const c = await connect(SvalAgents.port);
   c.send(
     encodeFrame({
-      hello: 1,
+      hello: 3,
       ...credentials,
       ...(workspace && { workspace }),
       proof: c.proof,
@@ -1351,25 +1323,23 @@ add_task(async function unpairing_closes_the_agents_connections() {
   pairing.close();
   const paired = pairing.credentials;
   const own = await connect(SvalAgents.port);
-  own.send(encodeFrame({ hello: 1, ...paired, proof: own.proof }));
+  own.send(encodeFrame({ hello: 3, ...paired, proof: own.proof }));
   Assert.deepEqual(await own.next(), { ctl: { ready: "paired" } });
   const other = await connect(SvalAgents.port);
-  other.send(encodeFrame({ hello: 1, pair: true, proof: other.proof }));
+  other.send(encodeFrame({ hello: 3, pair: true, proof: other.proof }));
   Assert.deepEqual(await other.next(), { ctl: { ready: "unpaired" } });
 
   Assert.ok(await SvalAgents.unpair(paired.agent_id), "it was paired");
   await own.closed;
 
-  other.send(encodeFrame({ mcp: { jsonrpc: "2.0", id: 1, method: "ping" } }));
-  Assert.deepEqual((await other.next()).mcp, {
-    jsonrpc: "2.0",
-    id: 1,
-    result: {},
-  });
+  other.send(
+    encodeFrame({ mcp: { jsonrpc: "2.0", id: 1, method: "tools/list" } })
+  );
+  Assert.ok((await other.next()).mcp.result.tools, "it is still answered");
   other.close();
 
   const again = await connect(SvalAgents.port);
-  again.send(encodeFrame({ hello: 1, ...paired, proof: again.proof }));
+  again.send(encodeFrame({ hello: 3, ...paired, proof: again.proof }));
   Assert.deepEqual(await again.next(), { ctl: { refused: "unknown_agent" } });
   await again.closed;
   Assert.ok(!(await SvalAgents.unpair(paired.agent_id)), "nothing left to do");
@@ -1479,7 +1449,7 @@ add_task(
   async function turning_the_pref_off_closes_connections_and_removes_the_port_file() {
     await freshListener();
     const c = await connect(SvalAgents.port);
-    c.send(encodeFrame({ hello: 1, pair: true, proof: c.proof }));
+    c.send(encodeFrame({ hello: 3, pair: true, proof: c.proof }));
     await c.next();
     Services.prefs.setBoolPref(SvalAgents.PREF, false);
     await c.closed;

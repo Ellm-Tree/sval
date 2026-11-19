@@ -39,6 +39,11 @@ fi
 mask_status=0
 python3 "$REPO_ROOT/scripts/check-mask-icons.py" || mask_status=$?
 
+# What Sval's listener and sval-mcp must state alike, each in its own
+# language (scripts/check-agent-wire.py says why).
+wire_status=0
+python3 "$REPO_ROOT/scripts/check-agent-wire.py" || wire_status=$?
+
 # docs/writing-style.md's mechanical rules on the docs, with Vale.
 prose_status=0
 "$REPO_ROOT/scripts/check-prose.sh" || prose_status=$?
@@ -52,6 +57,7 @@ python3 "$REPO_ROOT/scripts/check-decisions-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-commit-msg-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-mask-icons-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-css-tokens-test.py" || checker_status=$?
+python3 "$REPO_ROOT/scripts/check-agent-wire-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-ui-labels-test.py" || checker_status=$?
 
 # The self-tests of any scripts/ci-*.py present.
@@ -202,6 +208,10 @@ fi
 if [[ "$mask_status" -ne 0 ]]; then
   echo "error: scripts/check-mask-icons.py found a mask on an icon it cannot draw" >&2
   exit "$mask_status"
+fi
+if [[ "$wire_status" -ne 0 ]]; then
+  echo "error: scripts/check-agent-wire.py found Sval and sval-mcp stating their wire differently" >&2
+  exit "$wire_status"
 fi
 if [[ "$checker_status" -ne 0 ]]; then
   echo "error: a checker's self-test above failed; the check no longer finds what it is for" >&2

@@ -11,10 +11,17 @@
  * Sval's listener, on the stack the product builds.
  */
 
-const { createAgentTools, PAGE_TOOL_DEFINITIONS, TOOL_DEFINITIONS } =
-  ChromeUtils.importESModule(
-    "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs"
-  );
+const { createToolRunner } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentToolRunner.sys.mjs"
+);
+const { SESSION_TOOLS, TOOLS } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentToolTable.sys.mjs"
+);
+/** The tools every paired agent has for its tabs. */
+const OWN_TOOLS = TOOLS.filter(
+  tool => !tool.when && !SESSION_TOOLS.includes(tool)
+);
+const SITE_TOOLS = TOOLS.filter(tool => tool.when === "siteTools");
 const { SvalAgents } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
 );
@@ -87,7 +94,7 @@ function parameterNames(schema) {
 add_task(function no_description_names_a_parameter_its_tool_does_not_take() {
   const everyday = new Set(["to", "text", "input", "name", "tab", "url"]);
   const returns = { get_snapshot: ["ref"] };
-  const definitions = [...TOOL_DEFINITIONS, ...PAGE_TOOL_DEFINITIONS];
+  const definitions = [...OWN_TOOLS, ...SITE_TOOLS];
   const all = new Set(
     definitions.flatMap(d => [...parameterNames(d.inputSchema)])
   );
@@ -124,10 +131,10 @@ add_task(async function every_tool_is_defined_for_an_agent() {
           ].includes(name)
       )
       .sort(),
-    TOOL_DEFINITIONS.map(t => t.name).sort(),
+    OWN_TOOLS.map(t => t.name).sort(),
     "the agent is offered every tool there is a definition for"
   );
-  for (const definition of TOOL_DEFINITIONS) {
+  for (const definition of OWN_TOOLS) {
     Assert.ok(definition.title && definition.description, definition.name);
     Assert.equal(definition.inputSchema.type, "object");
     Assert.equal(definition.inputSchema.additionalProperties, false);
@@ -272,9 +279,7 @@ add_task(async function page_source_comes_in_small_contiguous_chunks() {
   Assert.equal(html, whole.html, "the chunks join into the whole source");
   Assert.equal(html.length, whole.total);
 
-  const { inputSchema } = TOOL_DEFINITIONS.find(
-    d => d.name === "get_page_source"
-  );
+  const { inputSchema } = OWN_TOOLS.find(d => d.name === "get_page_source");
   Assert.deepEqual(validateArgs(inputSchema, { tab, max_chars: 100_000 }), {
     tab,
     max_chars: 100_000,
@@ -448,21 +453,20 @@ add_task(async function a_failed_input_still_reports_its_writes() {
 add_task(async function the_tools_need_every_part() {
   const { tabs } = await agentTools();
   const parts = {
-    engine: SvalPanel.engine,
-    store: SvalAgents.store,
     tabs,
     gate: SvalAgents.gate,
     sites: SvalAgents.gate,
     dialogs: SvalAgents.dialogs,
+    siteToolsVisibleTo: () => true,
   };
-  createAgentTools(parts);
+  createToolRunner(parts);
   for (const missing of ["gate", "sites", "dialogs"]) {
     const deps = { ...parts };
     delete deps[missing];
     Assert.throws(
-      () => createAgentTools(deps),
+      () => createToolRunner(deps),
       /gate|sites|dialogs/,
-      `createAgentTools without ${missing} throws`
+      `createToolRunner without ${missing} throws`
     );
   }
 });

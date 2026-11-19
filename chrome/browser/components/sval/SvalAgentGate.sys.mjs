@@ -182,8 +182,11 @@
  * those loads through to it.
  */
 
-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
+import {
+  inUploadFolders,
+  markProfile,
+} from "moz-src:///browser/components/sval/SvalAgentUploads.sys.mjs";
 import {
   CONTROL_TOPIC,
   forgetControl,
@@ -196,25 +199,13 @@ import {
   Ending,
 } from "moz-src:///browser/components/sval/SvalAgentAlerts.sys.mjs";
 import {
-  appPermissionFor,
   decideLoad,
-  DEFAULT_LEVEL,
-  defaultLevelOf,
-  filePermissionFor,
-  levelFor,
   hostOf,
   hostOfDocument,
   hostOfPrincipal,
   localPlaceOf,
-  markProfile,
   uploadFoldersFor,
 } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
-import {
-  decideCall,
-  grantMatches,
-  pageToolSiteOf,
-  pageToolsSettingOf,
-} from "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs";
 import {
   endPdfSave,
   pdfSavers,
@@ -241,20 +232,24 @@ import {
   QUIET_MS,
   topContextOf,
 } from "moz-src:///browser/components/sval/SvalAgentWrites.sys.mjs";
+import { awaitAnswer } from "moz-src:///browser/components/sval/SvalAgentAsk.sys.mjs";
 import {
-  alertOnce,
-  answerOf,
-  awaitAnswer,
-  CHOICES,
-  scopeMenuOf,
-} from "moz-src:///browser/components/sval/SvalAgentAsk.sys.mjs";
+  APP,
+  CONSOLE,
+  createAsker,
+  decideSiteToolCall,
+  DOWNLOADS,
+  SITE,
+  SITE_TOOL_CALL,
+  SITE_TOOLS,
+  UPLOADS,
+} from "moz-src:///browser/components/sval/SvalAgentPermissions.sys.mjs";
 
 export { ActionWindow, CAP_MS, decideLoad, OPEN_MAX_MS, QUIET_MS };
 export { releaseAgentTab } from "moz-src:///browser/components/sval/SvalAgentTabRegistry.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   recordResponse:
@@ -275,50 +270,8 @@ const DISCARDED_TOPIC = "browsing-context-discarded";
 const BEFORE_SHOW_TOPIC = "browser-window-before-show";
 const GLOBAL_CREATED_TOPIC = "window-global-created";
 
-/**
- * The default "Allow all sites" sets: the least a site can get and still
- * open without asking (spec §5.2). A site where the agent should write keeps
- * its own rule, set in Settings.
- */
-const ALL_SITES_LEVEL = "read-only";
-
-/**
- * The upload alert's choice of what "Always allow" covers (decision 0129),
- * "This folder only" first and by default.
- */
-const UPLOAD_SCOPES = Object.freeze({
-  label: "Always allow covers",
-  value: "folder",
-  choices: Object.freeze([
-    Object.freeze({ id: "folder", label: "This folder only" }),
-    Object.freeze({
-      id: "subfolders",
-      label: "This folder and the folders inside it",
-    }),
-  ]),
-});
-
-const SITE_CHOICES = Object.freeze([
-  CHOICES[0],
-  Object.freeze({ id: "allow_all", label: "Allow all sites, read only" }),
-  CHOICES[1],
-]);
-
-/**
- * How the alert about a local site names where it is (`localPlaceOf`). It
- * offers no "Allow all sites": a local site with no rule asks whatever the
- * default (spec §5.2), so only a rule for the site answers it.
- */
-const PLACE_WORDS = Object.freeze({
-  computer: "a service on this computer",
-  network: "a device on your local network",
-});
-
 /** How many of an agent's downloads `list_downloads` keeps. */
 const MAX_DOWNLOADS_LISTED = 100;
-
-/** The most tool names a site alert names (site-tools spec §4.2). */
-const MAX_TOOLS_SHOWN = 10;
 
 /**
  * The most characters of a call's arguments, as formatted JSON, a call alert
@@ -326,75 +279,6 @@ const MAX_TOOLS_SHOWN = 10;
  * must cover only what the user was shown.
  */
 const MAX_INPUT_SHOWN = 2000;
-
-/**
- * @param {nsIFile} entry
- * @returns {boolean} Whether `entry` is hidden: its name starts with a dot,
- *   or Gecko's `nsIFile.isHidden` says so. A dot counts on Windows too,
- *   where `isHidden` reads only the hidden attribute (nsLocalFileWin.cpp,
- *   `IsHidden`), because cross-platform tools keep the same dotfiles in a
- *   Windows home folder without setting it. On Windows a name holding a
- *   tilde and a digit counts too: an 8.3 short name (`GIT-CR~1`) names a
- *   dotfile with no dot, and Gecko gives JS no way to read the long name
- *   (`Normalize` in nsLocalFileWin.cpp is lexical). An entry Gecko cannot
- *   read counts as hidden.
- */
-function isHiddenEntry(entry) {
-  if (
-    entry.leafName.startsWith(".") ||
-    (AppConstants.platform == "win" && /~\d/.test(entry.leafName))
-  ) {
-    return true;
-  }
-  try {
-    return entry.isHidden();
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Whether every file lies in one of the folders an upload grant names
- * (decision 0129): directly in a folder, or, for a folder whose grant covers
- * the folders inside it, anywhere under it as Gecko's `nsIFile.contains`
- * judges it. A grant never covers a hidden file, or a file in a hidden
- * folder below the granted one, because the home folder keeps its keys and
- * tokens there. Each folder is normalized as the files were (`resolvedFile`
- * in `SvalAgentTools`), so a link on its way is followed. A folder Gecko
- * cannot read as a path holds nothing.
- *
- * @param {string[]} paths Resolved full paths of files.
- * @param {Array<{path: string, subfolders: boolean}>} folders From
- *   `uploadFoldersFor`.
- * @returns {boolean}
- */
-export function inUploadFolders(paths, folders) {
-  const dirs = folders.flatMap(({ path, subfolders }) => {
-    try {
-      const dir = new lazy.FileUtils.File(path);
-      dir.normalize();
-      return [{ dir, subfolders }];
-    } catch {
-      return [];
-    }
-  });
-  return paths.every(path => {
-    const file = new lazy.FileUtils.File(path);
-    const parent = file.parent;
-    return dirs.some(({ dir, subfolders }) => {
-      if (subfolders ? !dir.contains(file) : !parent?.equals(dir)) {
-        return false;
-      }
-      for (let entry = file; entry && !entry.equals(dir); ) {
-        if (isHiddenEntry(entry)) {
-          return false;
-        }
-        entry = entry.parent;
-      }
-      return true;
-    });
-  });
-}
 
 /**
  * @param {nsIURI} uri
@@ -588,7 +472,7 @@ export function createAgentGate({
     lazy.windowForWorkspace(workspaceId, { open: true }),
 }) {
   // Before any upload can be asked for, so Sval's own profile is known by
-  // what it holds (`SvalAgentTools.inAProfile`).
+  // what it holds (`SvalAgentUploads`, `inAProfile`).
   markProfile();
   let closed = false;
   /** Each agent workspace's agent, by workspace id, as `pairedWith` answers it. */
@@ -619,27 +503,8 @@ export function createAgentGate({
   const filing = new Set();
   /** Where the loads in the agents' tabs started, for their downloads. */
   const starts = createLoadStarts();
-  /**
-   * The site alerts in flight, by agent id and site. A tool call that gave
-   * up waiting, a retry, and a page's load of the same site all wait on one
-   * alert.
-   *
-   * @type {Map<string, {answer: Promise<string>}>}
-   */
-  const asking = new Map();
-  /**
-   * The download and upload alerts in flight, by agent id, kind, site and
-   * the action asked about: one download, or one upload's files. A retry of
-   * the same upload waits on its alert; anything else is asked about on its
-   * own.
-   *
-   * @type {Map<string, {answer: Promise<string>}>}
-   */
-  const fileAsking = new Map();
   /** The downloads asked about so far, which names each one's alert. */
   let downloadsAsked = 0;
-  /** Open site alerts about sites' tools, by agent and site. */
-  const pageToolAsking = new Map();
   /** The tabs with a call alert open, by browser id. */
   const callAsking = new Set();
   /**
@@ -696,92 +561,13 @@ export function createAgentGate({
     checkPage,
     onIdle: () => stopObserving(),
   });
-
-  /**
-   * The alert about `site`, opening one if none is open. Allow keeps a rule the
-   * user set for the site while the alert was open, and the load gets it.
-   * Otherwise Allow records the site at the policy's default level, or at
-   * `DEFAULT_LEVEL` when the default asks or blocks: the user allowed this
-   * site. Allow all sites first sets the policy's default to `ALL_SITES_LEVEL`,
-   * so no site asks again, and this one, with no rule of its own, follows the
-   * default with the rest. Deny, or any answer the alert did not offer, records
-   * it as blocked. The answer is recorded whether or not the load or call that
-   * asked still waits for it, since a page can supersede its own load and the
-   * agent's next navigation stops it: the answer is the user's decision about
-   * the site the alert named (spec §5.2), and serves its next load.
-   *
-   * @param {object} agent
-   * @param {string} site As `hostOf` names it. The answer is saved for it, or
-   *   for its site where the alert's menu picks that.
-   * @param {Window|Promise<Window|null>|null} win Where to ask.
-   * @param {"computer"|"network"|null} place Where a local site is, which
-   *   the alert names.
-   * @returns {{answer: Promise<"allow"|"deny"|"no_window">}}
-   */
-  function alertFor(agent, site, win, place) {
-    return alertOnce(
-      asking,
-      JSON.stringify([agent.agentId, site]),
-      async () => {
-        const { choice, name } = answerOf(
-          await ask(await win, {
-            kind: place ? `site-${place}` : "site",
-            question: place
-              ? `${agent.label} wants to open ${site}, ${PLACE_WORDS[place]}.`
-              : `${agent.label} wants to open ${site}.`,
-            choices: (place ? CHOICES : SITE_CHOICES).map(c => ({ ...c })),
-            defaultChoice: "deny",
-            scope: scopeMenuOf(site),
-          }),
-          site
-        );
-        if (choice === "no_window") {
-          return "no_window";
-        }
-        if (closed) {
-          return "deny";
-        }
-        if (choice === "allow" || choice === "allow_all") {
-          // Read again: the policy can have changed while the alert was open,
-          // and the agent can have been unpaired.
-          let current = store.policyOf(agent.agentId);
-          if (!current) {
-            return "deny";
-          }
-          if (choice === "allow_all") {
-            await store.setDefault(agent.agentId, ALL_SITES_LEVEL);
-            SvalLog.info(`agent ${agent.agentId}: every site was allowed`);
-            current = store.policyOf(agent.agentId);
-            if (!current) {
-              return "deny";
-            }
-          }
-          // A rule the user set for the site while the alert was open is their
-          // later decision, and stands.
-          const meanwhile = levelFor(current, site);
-          if (meanwhile.known) {
-            return meanwhile.level === "blocked" ? "deny" : "allow";
-          }
-          // Allowing every site makes the site one of them: it follows the
-          // default, wherever the user sets it later.
-          if (choice === "allow_all") {
-            return "allow";
-          }
-          const level = defaultLevelOf(current);
-          await store.setSiteLevel(
-            agent.agentId,
-            name,
-            level === "blocked" ? DEFAULT_LEVEL : level
-          );
-          SvalLog.info(`agent ${agent.agentId}: a new site was allowed`);
-          return "allow";
-        }
-        await store.setSiteLevel(agent.agentId, name, "blocked");
-        SvalLog.info(`agent ${agent.agentId}: a new site was blocked`);
-        return "deny";
-      }
-    );
-  }
+  const asker = createAsker({
+    store,
+    ask,
+    whereToAsk,
+    isClosed: () => closed,
+    closing,
+  });
 
   /**
    * @param {nsIURI} uri
@@ -967,7 +753,8 @@ export function createAgentGate({
    * @param {object} agent
    * @param {string} site
    * @param {CanonicalBrowsingContext} bc
-   * @param {"computer"|"network"|null} place As `alertFor`'s.
+   * @param {"computer"|"network"|null} place Where a local site is
+   *   (`SITE`).
    */
   function hold(channel, agent, site, bc, place) {
     const id = bc.browserId;
@@ -976,7 +763,7 @@ export function createAgentGate({
       channel.cancel(Cr.NS_ERROR_ABORT);
       return;
     }
-    const alert = alertFor(agent, site, whereToAsk(agent), place);
+    const alert = asker.alert(SITE, agent, { site, place });
     // Whose load this is, told now, while it is known: one the agent started
     // carries a null principal (`SvalAgentTabs.freshLoad`), and so does a
     // redirect of one; one under way while a navigation of the agent's is
@@ -1489,15 +1276,10 @@ export function createAgentGate({
       site,
       agentId: agent.agentId,
       decide: () =>
-        site === null ? "deny" : fileDecision(agent, "downloads", site),
+        site === null ? "deny" : asker.decision(DOWNLOADS, agent, { site }),
       ask: () =>
-        fileAlertFor(
-          agent,
-          "downloads",
-          site,
-          { question: `${agent.label} wants to download files from ${site}.` },
-          ++downloadsAsked
-        ).answer,
+        asker.alert(DOWNLOADS, agent, { site, action: ++downloadsAsked })
+          .answer,
       track(entry) {
         entry.site = site;
         let list = downloads.get(agent.agentId);
@@ -1660,178 +1442,6 @@ export function createAgentGate({
   }
 
   /**
-   * What the agent may do with files on `site`: download them from it, or
-   * upload them to it (spec §5.2). A Blocked site does neither, whatever its
-   * entry, and an entry Sval cannot read asks again.
-   *
-   * @param {object} agent
-   * @param {"downloads"|"uploads"|"console"} kind
-   * @param {string} site
-   * @returns {"allow"|"deny"|"ask"}
-   */
-  function fileDecision(agent, kind, site) {
-    const agentPolicy = store.policyOf(agent.agentId);
-    if (!agentPolicy || decideLoad(agentPolicy, site) === "deny") {
-      return "deny";
-    }
-    return filePermissionFor(agentPolicy, kind, site) ?? "ask";
-  }
-
-  /**
-   * The download or upload alert about `site`, opening one if none is open.
-   * Allow and Deny answer for what is asked about now; "Always allow" and
-   * "Always deny" are recorded for the site. A window that closed under the
-   * alert records nothing.
-   *
-   * @param {object} agent
-   * @param {"downloads"|"uploads"} kind
-   * @param {string} site
-   * @param {{question: string, detail?: string, items?: string[]}} text
-   * @param {unknown} action What the alert is about: callers asking about the
-   *   same action share one alert, and a one-time answer covers that action
-   *   alone.
-   * @param {string[]} [folders] For uploads, the folders "Always allow"
-   *   lets the agent send files from without asking. The alert asks whether
-   *   the folders inside them are allowed too.
-   * @returns {{answer: Promise<"allow"|"deny"|"no_window">}}
-   */
-  function fileAlertFor(agent, kind, site, text, action, folders = []) {
-    const key = JSON.stringify([agent.agentId, kind, site, action]);
-    return alertOnce(fileAsking, key, async () => {
-      const what = kind === "downloads" ? "downloads from" : "uploads to";
-      const scope = scopeMenuOf(site);
-      // With a "Remember for" menu, the menu names where Always is saved.
-      const where = scope ? "" : ` ${what} ${site}`;
-      const things = kind === "downloads" ? "downloads" : "uploads";
-      const answered = await ask(await whereToAsk(agent), {
-        kind,
-        ...text,
-        choices: [
-          ...CHOICES.map(c => ({ ...c })),
-          {
-            id: "allow_always",
-            label: scope ? `Always allow ${things}` : `Always allow${where}`,
-          },
-          {
-            id: "deny_always",
-            label: scope ? `Always deny ${things}` : `Always deny${where}`,
-          },
-        ],
-        defaultChoice: "deny",
-        ...(kind === "uploads" ? { options: UPLOAD_SCOPES } : {}),
-        scope,
-      });
-      const { choice, name } = answerOf(answered, site);
-      if (choice === "no_window") {
-        return "no_window";
-      }
-      if (closed) {
-        return "deny";
-      }
-      const allowing = choice === "allow" || choice === "allow_always";
-      // Read again: the user can have blocked the site while the alert was
-      // open, and an Allow given then must not open it.
-      if (allowing && fileDecision(agent, kind, site) === "deny") {
-        SvalLog.info(`agent ${agent.agentId}: ${kind} on a site now blocked`);
-        return "deny";
-      }
-      const value = allowing ? "allow" : "deny";
-      if (choice === "allow_always" && kind === "uploads") {
-        await store.allowUploadFolders(
-          agent.agentId,
-          name,
-          folders,
-          answered.option === "subfolders"
-        );
-        SvalLog.info(
-          `agent ${agent.agentId}: uploads on a site allowed from ${folders.length} folders`
-        );
-      } else if (choice === "allow_always" || choice === "deny_always") {
-        await store.setFilePermission(agent.agentId, kind, name, value);
-        SvalLog.info(
-          `agent ${agent.agentId}: ${kind} on a site set to ${value}`
-        );
-      }
-      return value;
-    });
-  }
-
-  /**
-   * The alert asking whether the agent may read `site`'s console, opening
-   * one if none is open. Either answer is recorded for the site, as a site
-   * alert's is: an alert closed any other way is Deny (`ask`). A window
-   * that closed under the alert records nothing.
-   *
-   * @param {object} agent
-   * @param {string} site
-   * @returns {{answer: Promise<"allow"|"deny"|"no_window">}}
-   */
-  function consoleAlertFor(agent, site) {
-    const key = JSON.stringify([agent.agentId, "console", site]);
-    return alertOnce(fileAsking, key, async () => {
-      const scope = scopeMenuOf(site);
-      const { choice, name } = answerOf(
-        await ask(await whereToAsk(agent), {
-          kind: "console",
-          question: `${agent.label} wants to read the messages ${site} writes to its developer console.`,
-          detail: scope
-            ? "Sites sometimes write account details, sign-in codes, or what you type there. Sval remembers your answer. You can change it in Settings › Agents."
-            : `Sites sometimes write account details, sign-in codes, or what you type there. Sval remembers your answer for ${site}. You can change it in Settings › Agents.`,
-          choices: CHOICES.map(c => ({ ...c })),
-          defaultChoice: "deny",
-          scope,
-        }),
-        site
-      );
-      if (choice === "no_window") {
-        return "no_window";
-      }
-      if (closed) {
-        return "deny";
-      }
-      // Read again: the user can have blocked the site while the alert was
-      // open, and an Allow given then must not open it.
-      if (
-        choice === "allow" &&
-        fileDecision(agent, "console", site) === "deny"
-      ) {
-        return "deny";
-      }
-      const value = choice === "allow" ? "allow" : "deny";
-      await store.setFilePermission(agent.agentId, "console", name, value);
-      SvalLog.info(`agent ${agent.agentId}: console on a site set to ${value}`);
-      return value;
-    });
-  }
-
-  /**
-   * What the agent's page may do about opening `scheme` addresses in other
-   * applications (spec §5.2): the launching document's site's answer, unless
-   * that site or the tab's top-level page's site is Blocked or Read only,
-   * which opens nothing.
-   *
-   * @param {object} agent
-   * @param {string} site The site of the document that asked.
-   * @param {string|null} topSite The top-level page's site, null for a blank
-   *   page with none.
-   * @param {string} scheme
-   * @returns {"allow"|"deny"|"ask"}
-   */
-  function appDecision(agent, site, topSite, scheme) {
-    const agentPolicy = store.policyOf(agent.agentId);
-    if (!agentPolicy) {
-      return "deny";
-    }
-    for (const each of topSite === null ? [site] : [site, topSite]) {
-      const { level } = levelFor(agentPolicy, each);
-      if (level === "blocked" || level === "read-only") {
-        return "deny";
-      }
-    }
-    return appPermissionFor(agentPolicy, site, scheme) ?? "ask";
-  }
-
-  /**
    * The site of the document that hands an address to another application:
    * its principal's, as `hostOfPrincipal` reads a document's. The document's
    * own address is passed when `bc` holds the document with that principal,
@@ -1869,10 +1479,14 @@ export function createAgentGate({
    * @returns {Promise<boolean>}
    */
   async function decideApp(agent, uri, principal, bc, appName) {
-    const site = launcherSiteOf(principal, bc);
-    const topSite = hostOfDocument(bc.top.currentWindowGlobal);
-    const scheme = uri.scheme;
-    const decision = appDecision(agent, site, topSite, scheme);
+    const subject = {
+      site: launcherSiteOf(principal, bc),
+      topSite: hostOfDocument(bc.top.currentWindowGlobal),
+      scheme: uri.scheme,
+      uri,
+      appName,
+    };
+    const decision = asker.decision(APP, agent, subject);
     if (decision !== "ask") {
       SvalLog.info(
         `agent ${agent.agentId}: an app launch was ${decision === "allow" ? "allowed" : "refused"} by policy`
@@ -1886,56 +1500,7 @@ export function createAgentGate({
     }
     appAsking.add(id);
     try {
-      const scope = scopeMenuOf(site);
-      const from = scope ? "" : ` from ${site}`;
-      const { choice, name } = answerOf(
-        await ask(await whereToAsk(agent), {
-          kind: "app",
-          question: `${agent.label} wants to open an app from ${site}.`,
-          detail: appName
-            ? `${site} asks to open a ${scheme} link with ${appName}. Allow opens this link only:`
-            : `${site} asks to open a ${scheme} link in another app. Allow opens this link only:`,
-          items: [uri.spec],
-          choices: [
-            ...CHOICES.map(c => ({ ...c })),
-            {
-              id: "allow_always",
-              label: `Always allow ${scheme} links${from}`,
-            },
-            {
-              id: "deny_always",
-              label: `Always deny ${scheme} links${from}`,
-            },
-          ],
-          defaultChoice: "deny",
-          scope,
-        }),
-        site
-      );
-      if (choice === "no_window" || closed) {
-        return false;
-      }
-      const allowing = choice === "allow" || choice === "allow_always";
-      // Read again: the user can have blocked the site while the alert was
-      // open, and an Allow given then must not open it.
-      if (allowing && appDecision(agent, site, topSite, scheme) === "deny") {
-        SvalLog.info(
-          `agent ${agent.agentId}: an app launch on a site now blocked`
-        );
-        return false;
-      }
-      if (choice === "allow_always" || choice === "deny_always") {
-        await store.setAppPermission(
-          agent.agentId,
-          name,
-          scheme,
-          allowing ? "allow" : "deny"
-        );
-        SvalLog.info(
-          `agent ${agent.agentId}: an app on a site set to ${allowing ? "allow" : "deny"}`
-        );
-      }
-      return allowing;
+      return (await asker.alert(APP, agent, subject).answer) === "allow";
     } finally {
       appAsking.delete(id);
     }
@@ -1990,92 +1555,6 @@ export function createAgentGate({
     }
   }
 
-  /**
-   * Whether `site` may offer its tools to the agent: layer B, then layer C
-   * (site-tools spec §4.1). A Blocked site never may.
-   *
-   * @param {object} agent
-   * @param {string} site
-   * @returns {"allow"|"deny"|"ask"}
-   */
-  function pageToolDecision(agent, site) {
-    const agentPolicy = store.policyOf(agent.agentId);
-    if (
-      !agentPolicy ||
-      decideLoad(agentPolicy, site) === "deny" ||
-      pageToolsSettingOf(agentPolicy) === "off"
-    ) {
-      return "deny";
-    }
-    return pageToolSiteOf(agentPolicy, site) ?? "ask";
-  }
-
-  /**
-   * @param {object} agent
-   * @param {string} site
-   * @param {{name: string, read_only: boolean}} tool
-   * @param {string} hash The tool's definition hash.
-   * @returns {{action: string, always?: boolean}} As `decideCall`.
-   */
-  function decidePageToolCallFor(agent, site, tool, hash) {
-    const agentPolicy = store.policyOf(agent.agentId);
-    return decideCall({
-      setting: pageToolsSettingOf(agentPolicy),
-      level: levelFor(agentPolicy, site).level,
-      hinted: tool.read_only === true,
-      granted: grantMatches(agentPolicy, site, tool.name, hash),
-    });
-  }
-
-  /**
-   * The site alert about `site`'s tools, opening one if none is open. Allow
-   * and Deny are recorded for the site.
-   *
-   * @param {object} agent
-   * @param {string} site
-   * @param {string[]} names The tools the page offers.
-   * @returns {{answer: Promise<"allow"|"deny"|"no_window">}}
-   */
-  function pageToolAlertFor(agent, site, names) {
-    const key = JSON.stringify([agent.agentId, site]);
-    const shown = names.slice(0, MAX_TOOLS_SHOWN).join(", ");
-    const more =
-      names.length > MAX_TOOLS_SHOWN
-        ? ` and ${names.length - MAX_TOOLS_SHOWN} more`
-        : "";
-    const count = names.length === 1 ? "1 tool" : `${names.length} tools`;
-    return alertOnce(pageToolAsking, key, async () => {
-      const { choice, name } = answerOf(
-        await ask(await whereToAsk(agent), {
-          kind: "page-tools",
-          question: `${site} offers ${count} to ${agent.label}: ${shown}${more}. Let ${agent.label} see and use them?`,
-          detail: `${site} wrote these tools and their descriptions. Sval still asks before a tool sends anything your settings for ${site} ask about.`,
-          choices: CHOICES.map(c => ({ ...c })),
-          defaultChoice: "deny",
-          scope: scopeMenuOf(site),
-        }),
-        site
-      );
-      if (choice === "no_window") {
-        return "no_window";
-      }
-      if (closed) {
-        return "deny";
-      }
-      // Read again: the user can have blocked the site, or turned site tools
-      // off, while the alert was open.
-      if (choice === "allow" && pageToolDecision(agent, site) === "deny") {
-        return "deny";
-      }
-      const value = choice === "allow" ? "allow" : "deny";
-      await store.setPageToolSite(agent.agentId, name, value);
-      SvalLog.info(
-        `agent ${agent.agentId}: site tools on a site set to ${value}`
-      );
-      return value;
-    });
-  }
-
   return {
     /**
      * Whether the agent may see `site`'s tools, asking the user about a site
@@ -2090,28 +1569,7 @@ export function createAgentGate({
      *   `ToolError`.
      */
     async allowPageTools(agent, site, names, task) {
-      const refused = () =>
-        new ToolError(
-          "policy_denied",
-          `The user has not allowed this agent to use ${site}'s tools.`
-        );
-      const decision = pageToolDecision(agent, site);
-      if (decision === "allow") {
-        return;
-      }
-      if (decision === "deny") {
-        throw refused();
-      }
-      const answer = await awaitAnswer({
-        wait: waitOf(task),
-        answer: () => pageToolAlertFor(agent, site, names).answer,
-        awaiting: `Sval is asking the user whether this agent may use ${site}'s tools. Ask them to answer in Sval, then call again.`,
-        closing,
-      });
-      if (answer === "allow") {
-        return;
-      }
-      throw refused();
+      await asker.permit(SITE_TOOLS, agent, { site, names }, waitOf(task));
     },
 
     /**
@@ -2125,7 +1583,11 @@ export function createAgentGate({
      * @returns {{action: string, always?: boolean}} As `decideCall`.
      */
     decidePageToolCall(agent, site, tool, hash) {
-      return decidePageToolCallFor(agent, site, tool, hash);
+      return decideSiteToolCall(store.policyOf(agent.agentId), {
+        site,
+        tool,
+        hash,
+      });
     },
 
     /**
@@ -2135,7 +1597,7 @@ export function createAgentGate({
      *   read again just before a call runs.
      */
     pageToolsAllowed(agent, site) {
-      return pageToolDecision(agent, site) === "allow";
+      return asker.decision(SITE_TOOLS, agent, { site }) === "allow";
     },
 
     /**
@@ -2194,63 +1656,21 @@ export function createAgentGate({
           `This call needs the user's approval, and its input is too long for Sval to show them in full: ${sent.length} characters as formatted JSON, over ${MAX_INPUT_SHOWN}. Nothing ran. Send a shorter input.`
         );
       }
-      const scope = scopeMenuOf(site);
-      const choices = CHOICES.map(c => ({ ...c }));
-      if (always) {
-        choices.push({
-          id: "allow_always",
-          label: scope
-            ? `Always allow "${tool.name}"`
-            : `Always allow "${tool.name}" on ${site}`,
-        });
-      }
-      choices.push({
-        id: "deny_always",
-        label: scope
-          ? "Always deny this site's tools"
-          : `Always deny ${site}'s tools`,
-      });
       let gaveUp = false;
       const asked = async () => {
         callAsking.add(id);
         try {
-          const { choice, name } = answerOf(
-            await ask(await whereToAsk(agent), {
-              kind: "page-tool-call",
-              question: `${agent.label} wants to use ${site}'s tool "${tool.name}".`,
-              detail: `${site}'s own code runs this tool, and it can do anything your account on ${site} can do. ${site} describes it as: ${tool.description || "(no description)"}`,
-              items: [`It would send: ${sent}`],
-              choices,
-              defaultChoice: "deny",
-              scope,
-            }),
-            site
-          );
-          if (choice === "no_window" || closed) {
-            return choice === "no_window" ? "no_window" : "deny";
-          }
-          // Read again: the user can have blocked the site, turned its tools
-          // off, or made it Read-only while the alert was open.
-          if (
-            (choice === "allow" || choice === "allow_always") &&
-            (pageToolDecision(agent, site) !== "allow" ||
-              decidePageToolCallFor(agent, site, tool, hash).action ===
-                "refused")
-          ) {
-            return "deny";
-          }
-          if (choice === "allow_always" && always) {
-            await store.grantPageTool(agent.agentId, name, tool.name, hash);
-            SvalLog.info(`agent ${agent.agentId}: a site tool always allowed`);
-          } else if (choice === "deny_always") {
-            await store.setPageToolSite(agent.agentId, name, "deny");
-            SvalLog.info(
-              `agent ${agent.agentId}: site tools on a site set to deny`
-            );
-          } else if (choice === "allow" && gaveUp) {
+          const given = await asker.alert(SITE_TOOL_CALL, agent, {
+            site,
+            tool,
+            hash,
+            sent,
+            always,
+          }).answer;
+          if (given === "allow" && gaveUp) {
             lateAllows.add(lateKey);
           }
-          return choice;
+          return given;
         } finally {
           callAsking.delete(id);
         }
@@ -2281,7 +1701,7 @@ export function createAgentGate({
      *   block the site, or deny its uploads, while the agent works.
      */
     uploadAllowed(agent, site) {
-      return fileDecision(agent, "uploads", site) !== "deny";
+      return asker.decision(UPLOADS, agent, { site }) !== "deny";
     },
 
     /**
@@ -2296,27 +1716,7 @@ export function createAgentGate({
      * @returns {Promise<void>} Every refusal throws a `ToolError`.
      */
     async allowConsole(agent, site, task) {
-      const refused = () =>
-        new ToolError(
-          "console_denied",
-          `The user has not allowed this agent to read ${site}'s console.`
-        );
-      const decision = fileDecision(agent, "console", site);
-      if (decision === "allow") {
-        return;
-      }
-      if (decision === "deny") {
-        throw refused();
-      }
-      const answer = await awaitAnswer({
-        wait: waitOf(task),
-        answer: () => consoleAlertFor(agent, site).answer,
-        awaiting: `Sval is asking the user whether this agent may read ${site}'s console. Ask them to answer in Sval, then call again.`,
-        closing,
-      });
-      if (answer !== "allow") {
-        throw refused();
-      }
+      await asker.permit(CONSOLE, agent, { site }, waitOf(task));
     },
 
     /**
@@ -2327,7 +1727,7 @@ export function createAgentGate({
      *   deny it, or block the site, while the agent works.
      */
     consoleAllowed(agent, site) {
-      return fileDecision(agent, "console", site) === "allow";
+      return asker.decision(CONSOLE, agent, { site }) === "allow";
     },
 
     /**
@@ -2397,18 +1797,14 @@ export function createAgentGate({
           "This page has no site for the user to allow uploads to."
         );
       }
-      const refused = () =>
-        new ToolError(
-          "policy_denied",
-          `The user has not allowed this agent to upload files to ${site}.`
-        );
+      const refused = () => UPLOADS.refused({ site });
       const lateKey = JSON.stringify([
         "upload",
         agent.agentId,
         site,
         filePaths,
       ]);
-      const decision = fileDecision(agent, "uploads", site);
+      const decision = asker.decision(UPLOADS, agent, { site });
       if (decision === "deny") {
         throw refused();
       }
@@ -2436,24 +1832,15 @@ export function createAgentGate({
       const answer = await awaitAnswer({
         wait: waitOf(task),
         answer: () =>
-          fileAlertFor(
-            agent,
-            "uploads",
-            site,
-            {
-              question: `${agent.label} wants to upload files from your computer to ${site}.`,
-              detail: `Allow sends these files only. Always allow also lets ${agent.label} send ${site} files from ${folders.join(", ")} without asking again, as chosen below. Hidden files still ask. Now it asks to send:`,
-              items: filePaths,
-            },
-            filePaths,
-            folders
-          ).answer.then(given => {
-            if (given === "allow" && gaveUp) {
-              lateAllows.add(lateKey);
-            }
-            return given;
-          }),
-        awaiting: `Sval is asking the user whether this agent may upload files to ${site}. Ask them to answer in Sval, then call again.`,
+          asker
+            .alert(UPLOADS, agent, { site, filePaths, folders })
+            .answer.then(given => {
+              if (given === "allow" && gaveUp) {
+                lateAllows.add(lateKey);
+              }
+              return given;
+            }),
+        awaiting: UPLOADS.awaiting({ site }),
         closing,
         onGiveUp: () => {
           gaveUp = true;
@@ -2493,8 +1880,9 @@ export function createAgentGate({
         const answer = await awaitAnswer({
           wait: waitOf(task),
           answer: () =>
-            alertFor(agent, site, whereToAsk(agent), localPlaceOf(site)).answer,
-          awaiting: `Sval is asking the user whether this agent may open ${site}. Ask them to answer in Sval, then call again.`,
+            asker.alert(SITE, agent, { site, place: localPlaceOf(site) })
+              .answer,
+          awaiting: SITE.awaiting({ site }),
           closing,
         });
         if (answer === "allow") {

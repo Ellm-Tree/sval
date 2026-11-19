@@ -32,7 +32,6 @@ pub const RESUME_ENV: &str = "SVAL_MCP_RESUME";
 #[serde(default)]
 pub struct Resume {
     pub initialize: Option<Value>,
-    pub initialized: bool,
     pub account: Option<String>,
     pub started: u64,
     pub tools: Option<Value>,

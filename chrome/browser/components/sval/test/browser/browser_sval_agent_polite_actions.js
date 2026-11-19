@@ -15,9 +15,14 @@
 const { SvalAgents } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
 );
-const { PAGE_TOOL_DEFINITIONS, TOOL_DEFINITIONS } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs"
+const { SESSION_TOOLS, TOOLS } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentToolTable.sys.mjs"
 );
+/** The tools every paired agent has for its tabs. */
+const OWN_TOOLS = TOOLS.filter(
+  tool => !tool.when && !SESSION_TOOLS.includes(tool)
+);
+const SITE_TOOLS = TOOLS.filter(tool => tool.when === "siteTools");
 const { validateArgs } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs"
 );
@@ -181,7 +186,7 @@ add_task(async function unticking_be_polite_lifts_the_limit() {
  */
 add_task(async function an_agent_cannot_change_be_polite() {
   const { agent, call, toolNames } = await agentTools();
-  const definitions = [...TOOL_DEFINITIONS, ...PAGE_TOOL_DEFINITIONS];
+  const definitions = [...OWN_TOOLS, ...SITE_TOOLS];
   for (const definition of definitions) {
     for (const name of parameterNames(definition.inputSchema)) {
       Assert.ok(

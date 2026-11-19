@@ -6,7 +6,7 @@
  * human" page, a challenge a site puts in front of a visitor it suspects is
  * a bot (agent-control spec §6). An agent never attempts one. While a check
  * shows in a tab, the tools refuse every input and read on that tab with
- * `human_verification_required` (`SvalAgentTools`), the overlay's card tells
+ * `human_verification_required` (`SvalAgentToolCall`), the overlay's card tells
  * the user (`SvalAgentMarking`), and the user takes control, completes it and
  * gives the tab back.
  *

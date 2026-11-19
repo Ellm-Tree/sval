@@ -37,8 +37,8 @@
  * The challenge and the handshake must both complete within
  * `HANDSHAKE_TIMEOUT_MS`, in at most `PRE_AUTH_MAX_BYTES`, so a peer that
  * cannot prove itself cannot make Sval buffer more. The handshake frame is
- * `{hello: 1, pair: true, proof}` for an agent with no secret, or
- * `{hello: 1, agent_id, secret, proof}`, each with `launch`, where
+ * `{hello, pair: true, proof}` for an agent with no secret, or
+ * `{hello, agent_id, secret, proof}`, each with `launch`, where
  * and when the agent's `sval-mcp` started (`launchFrom`), and `workspace`, the
  * workspace it held on its last connection, once it has held one. Anything
  * else closes the connection. After the handshake, frames go to a `SvalAgentSession`.
@@ -72,7 +72,7 @@ import {
 } from "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs";
 import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { PAGE_ACTOR } from "moz-src:///browser/components/sval/SvalAgentPageParent.sys.mjs";
-import { markProfile } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+import { markProfile } from "moz-src:///browser/components/sval/SvalAgentUploads.sys.mjs";
 import {
   POLITE_RATE_PREF,
   POLITE_TOPIC,
@@ -88,9 +88,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sval/SvalAgentPageDialogs.sys.mjs",
   createAgentGate: "moz-src:///browser/components/sval/SvalAgentGate.sys.mjs",
   createAgentTabs: "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs",
-  createAgentTools: "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs",
+  createToolRunner:
+    "moz-src:///browser/components/sval/SvalAgentToolRunner.sys.mjs",
   SYNC_DOCUMENT: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
-  TOOL_DEFINITIONS: "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs",
   untilStopped: "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs",
   refuseIfWorkspaceHeld:
     "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs",
@@ -98,8 +98,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs",
   setInterval: "resource://gre/modules/Timer.sys.mjs",
   clearInterval: "resource://gre/modules/Timer.sys.mjs",
-  PAGE_TOOL_DEFINITIONS:
-    "moz-src:///browser/components/sval/SvalAgentTools.sys.mjs",
   pageToolsSettingOf:
     "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
   workspaceIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
@@ -137,9 +135,11 @@ export function workspaceRetentionDays() {
 /**
  * The handshake version Sval speaks. Sval also accepts the one before it, so
  * the `sval-mcp` an agent started before an update keeps working until the
- * agent restarts it (sval-mcp-ships-with-sval spec §6).
+ * agent restarts it (sval-mcp-ships-with-sval spec §6). No `sval-mcp` speaks
+ * 2: at 1 Sval read each request's MCP version itself, and one that still
+ * expects it to is refused as outdated.
  */
-const HELLO = 1;
+const HELLO = 3;
 /** "Let sites offer tools to agents" (site-tools spec §4.1, layer A). */
 const PAGE_TOOLS_PREF = "browser.sval.agents.pageTools.enabled";
 /** Gecko's own switch for WebMCP, which Sval derives from the two above. */
@@ -618,10 +618,9 @@ function workspaceFrom(raw) {
  * @returns {object}
  */
 function sessionDeps() {
-  const { engine, askToPair, version } = config;
+  const { engine, askToPair } = config;
   const tabs = lazy.createAgentTabs({ engine, gate: open.gate });
   return {
-    version,
     store: open.store,
     pairings: open.pairings,
     holders: open.holders,
@@ -659,17 +658,13 @@ function sessionDeps() {
     listTabs: agent => tabs.listTabsFor(agent),
     closeWindows: id => tabs.closeWindows(id),
     // Site policy, writes and page dialogs are the listen's.
-    tools: lazy.createAgentTools({
-      engine,
-      store: open.store,
+    tools: lazy.createToolRunner({
       tabs,
       gate: open.gate,
       sites: open.gate,
       dialogs: open.dialogs,
+      siteToolsVisibleTo: agent => pageToolsVisibleTo(open.store, agent),
     }),
-    toolDefinitions: lazy.TOOL_DEFINITIONS,
-    extraTools: agent =>
-      pageToolsVisibleTo(open.store, agent) ? lazy.PAGE_TOOL_DEFINITIONS : [],
   };
 }
 
@@ -1131,7 +1126,6 @@ export const SvalAgents = {
    * @param {(label: string, facts: string[], isolated: boolean) =>
    *   Promise<{action: string, isolated?: boolean}>} options.askToPair Asks
    *   the user whether to pair an agent, and in which kind of workspace.
-   * @param {string} options.version What Sval reports as its version to MCP.
    * @param {object} [options.shutdownClient] Where the shutdown blocker is
    *   registered: an `nsIAsyncShutdownClient`, which a test supplies from its
    *   own barrier. Defaults to `IOUtils.profileBeforeChange`.

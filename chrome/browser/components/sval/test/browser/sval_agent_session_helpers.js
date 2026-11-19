@@ -44,7 +44,9 @@ function freshLaunch(fields = {}) {
  *
  * @param {object} [options]
  * @param {object|null} [options.launch] What sval-mcp says of its launch.
- * @returns {Promise<object>} `client`; `send(method, params)`, which sends a
+ * @returns {Promise<object>} `client`; `identify(info)`, which says who the
+ *   agent's client is on every request after, as sval-mcp does from the
+ *   agent's MCP session; `send(method, params)`, which sends a
  *   request and returns its id; `reply(id)`; `request(method, params)`,
  *   which sends one and waits for its reply; `notify(method, params)`;
  *   `pairing(args, tool)`, which sends a pairing call and returns its id;
@@ -84,15 +86,22 @@ async function connectAgent({ launch = freshLaunch() } = {}) {
   });
   await client.waitFor(f => f.ctl?.ready === "unpaired");
   let nextId = 1;
+  let clientInfo = null;
   const send = (method, params) => {
     const id = nextId++;
-    client.sendFrame({ mcp: { jsonrpc: "2.0", id, method, params } });
+    client.sendFrame({
+      mcp: { jsonrpc: "2.0", id, method, params },
+      ...(clientInfo && { client: clientInfo }),
+    });
     return id;
   };
   const reply = async id =>
     (await client.waitFor(f => f.mcp?.id === id && !f.mcp.method, 60_000)).mcp;
   return {
     client,
+    identify(info) {
+      clientInfo = info;
+    },
     send,
     reply,
     request: (method, params) => reply(send(method, params)),

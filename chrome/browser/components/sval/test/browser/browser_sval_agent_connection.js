@@ -59,7 +59,8 @@ add_setup(async function () {
  * that is kept, and waited for as it arrives.
  *
  * @param {object} [launch] What the handshake says of sval-mcp's launch.
- * @returns {Promise<object>} `call(id, method, params)`, `replyTo(id)`,
+ * @returns {Promise<object>} `identify(info)`, `call(id, method, params)`,
+ *   `replyTo(id)`,
  *   `reply(id)`, `progressed(token)` and `close()`.
  */
 async function connectUnpaired(launch = undefined) {
@@ -76,16 +77,23 @@ async function connectUnpaired(launch = undefined) {
     await SvalTestAgentClient.mac(token, `sval:${c.nonce}`),
     "sval proves itself"
   );
-  c.sendFrame({ hello: 1, pair: true, proof: c.proof, launch });
+  c.sendFrame({ hello: AGENT_HELLO, pair: true, proof: c.proof, launch });
   Assert.deepEqual(await within(c.next(), 10_000, "sval's ready"), {
     ctl: { ready: "unpaired" },
   });
 
   const isReplyTo = id => f => f.mcp?.id === id;
+  let clientInfo = null;
   return {
     replyTo: id => c.frames.find(isReplyTo(id))?.mcp,
+    identify(info) {
+      clientInfo = info;
+    },
     call(id, method, params) {
-      c.sendFrame({ mcp: { jsonrpc: "2.0", id, method, params } });
+      c.sendFrame({
+        mcp: { jsonrpc: "2.0", id, method, params },
+        ...(clientInfo && { client: clientInfo }),
+      });
     },
     async reply(id) {
       return (await within(c.waitFor(isReplyTo(id)), 10_000, `reply ${id}`))
@@ -155,11 +163,7 @@ add_task(async function waiting_calls_leave_the_connection_free() {
   const before = await workspaceIds();
   const c = await connectUnpaired();
   takeDownAtTaskEnd(c, before);
-  c.call(1, "initialize", {
-    protocolVersion: "2025-11-25",
-    clientInfo: { name: "Wire Agent" },
-  });
-  await c.reply(1);
+  c.identify({ name: "Wire Agent" });
 
   c.call(2, "tools/call", {
     name: "request_shared_pairing",
@@ -228,11 +232,7 @@ add_task(async function a_busy_page_leaves_the_connection_free() {
   const before = await workspaceIds();
   const c = await connectUnpaired();
   takeDownAtTaskEnd(c, before);
-  c.call(1, "initialize", {
-    protocolVersion: "2025-11-25",
-    clientInfo: { name: "Busy Agent" },
-  });
-  await c.reply(1);
+  c.identify({ name: "Busy Agent" });
   c.call(2, "tools/call", {
     name: "request_shared_pairing",
     arguments: { task: "Test task" },
@@ -300,11 +300,7 @@ add_task(async function an_agents_task_names_its_workspace() {
     id: "7f3a0123456789ab",
   });
   takeDownAtTaskEnd(c, before);
-  c.call(1, "initialize", {
-    protocolVersion: "2025-11-25",
-    clientInfo: { name: "claude-code" },
-  });
-  await c.reply(1);
+  c.identify({ name: "claude-code" });
   c.call(2, "tools/call", {
     name: "request_shared_pairing",
     arguments: { task: "Fix login redirect", model: "Opus 5.5" },
@@ -387,11 +383,7 @@ add_task(async function a_burst_of_actions_on_one_site_queues_then_refuses() {
   const before = await workspaceIds();
   const c = await connectUnpaired();
   takeDownAtTaskEnd(c, before);
-  c.call(1, "initialize", {
-    protocolVersion: "2025-11-25",
-    clientInfo: { name: "Burst Agent" },
-  });
-  await c.reply(1);
+  c.identify({ name: "Burst Agent" });
   c.call(2, "tools/call", {
     name: "request_shared_pairing",
     arguments: { task: "Test task" },

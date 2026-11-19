@@ -26,7 +26,7 @@
  * `confirm` or `prompt` is reported while it is open (`openDialog`). The
  * message is the page's own text, so it reaches the agent as page content
  * does, cut to `MAX_MESSAGE` characters, and only when the agent may read
- * both sites (`SvalAgentTools`): a frame from a site the agent may not read
+ * both sites (`SvalAgentToolCall`, `dialogFor`): a frame from a site the agent may not read
  * must not speak through a page it may.
  * A user's own tab, and a tab the user took from an agent, keep their
  * dialogs: whether a tab is an agent's is the gate's answer (`agentOf`).

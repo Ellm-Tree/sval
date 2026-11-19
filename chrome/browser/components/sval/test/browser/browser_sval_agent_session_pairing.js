@@ -25,7 +25,7 @@ const { POLITE_RATE_PREF, politeRules } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentPolite.sys.mjs"
 );
 const { politeSentence } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentSession.sys.mjs"
+  "moz-src:///browser/components/sval/SvalAgentToolsWorkspace.sys.mjs"
 );
 
 add_setup(async function () {
@@ -42,7 +42,7 @@ const errorOf = result => bodyOf(result).error;
  * @param {object} agent What `connectAgent` returned.
  * @param {object} [options]
  * @param {object} [options.args] request_shared_pairing's arguments.
- * @param {object} [options.clientInfo] What `initialize` says of the client.
+ * @param {object} [options.clientInfo] Who the agent's client says it is.
  * @returns {Promise<{result: object, agentId: string, secret: string,
  *   record: object}>}
  */
@@ -50,7 +50,7 @@ async function pairAgent(
   agent,
   { args = { task: AGENT_LABEL }, clientInfo = { name: AGENT_LABEL } } = {}
 ) {
-  await agent.request("initialize", { clientInfo });
+  agent.identify(clientInfo);
   const id = agent.pairing(args);
   await pair(await pairingAlert());
   const { result } = await agent.reply(id);
@@ -66,7 +66,7 @@ async function pairAgent(
  */
 async function pairTogether(agents) {
   for (const agent of agents) {
-    await agent.request("initialize", { clientInfo: { name: AGENT_LABEL } });
+    agent.identify({ name: AGENT_LABEL });
   }
   const ids = agents.map(agent => agent.pairing());
   return { ids, doc: await pairingAlert() };
@@ -88,7 +88,7 @@ add_task(
     const frames = agent.client.frames;
     Assert.less(
       frames.findIndex(f => f.ctl?.paired),
-      frames.findIndex(f => f.mcp?.id === 2),
+      frames.findIndex(f => f.mcp?.id === 1),
       "secret before result"
     );
     Assert.ok(
@@ -444,7 +444,7 @@ add_task(async function the_polite_rules_are_told_and_a_change_is_announced() {
  */
 add_task(async function a_ninth_waiting_call_answers_awaiting_approval() {
   const agent = await connectAgent();
-  await agent.request("initialize", { clientInfo: { name: AGENT_LABEL } });
+  agent.identify({ name: AGENT_LABEL });
   const waiting = [];
   for (let i = 0; i < MAX_WAITING_CALLS; i++) {
     waiting.push(
@@ -474,7 +474,10 @@ add_task(async function a_ninth_waiting_call_answers_awaiting_approval() {
     "awaiting_approval",
     "one more answers at once"
   );
-  Assert.ok((await agent.request("ping")).result, "a call that does not wait");
+  Assert.ok(
+    (await agent.request("tools/list")).result,
+    "a request that does not wait"
+  );
   await pair(doc);
   for (const id of waiting) {
     Assert.ok(!(await agent.reply(id)).result.isError, "those waiting pair");

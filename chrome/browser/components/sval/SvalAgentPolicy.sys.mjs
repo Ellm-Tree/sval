@@ -13,7 +13,6 @@
  */
 
 import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
-import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import {
   mostSpecificRule,
   scopeChain,
@@ -275,7 +274,7 @@ export const FILE_PERMISSIONS = ["allow", "deny"];
  * folders of the files the user approved with "Always allow", each
  * `{path, subfolders}` (spec §5.2, decision 0129). A folder Sval cannot read
  * is left out, and an entry left with none is no decision. A path that is
- * not absolute holds no file (`SvalAgentGate`, `inUploadFolders`).
+ * not absolute holds no file (`SvalAgentUploads`, `inUploadFolders`).
  *
  * @param {unknown} entry An `uploads` value.
  * @returns {Array<{path: string, subfolders: boolean}>|null}
@@ -674,36 +673,6 @@ export function uploadFoldersFor(policy, host) {
     filePermissionOf("uploads", value) ? value : null
   );
   return uploadFoldersOf(entry) ?? [];
-}
-
-/**
- * The file Sval keeps in each of its own profile directories, so a file
- * inside one is known by what its directories hold, however its path is
- * spelled (`SvalAgentTools`, `inAProfile`). Gecko marks the profile itself
- * (`compatibility.ini`, `times.json`), but not the local one (`ProfLD`,
- * which holds the cache), so Sval marks both.
- */
-export const PROFILE_MARK = ".sval-profile";
-
-/**
- * Puts `PROFILE_MARK` in this profile's directory and its local directory
- * if it is not there. Called as the profile's first window starts
- * (`SvalAgents.start`) and again as a gate opens, before any upload can be
- * asked for. A directory that cannot be marked is logged and left: the
- * path and Gecko's own marks still cover it.
- */
-export function markProfile() {
-  for (const key of ["ProfD", "ProfLD"]) {
-    try {
-      const mark = Services.dirsvc.get(key, Ci.nsIFile);
-      mark.append(PROFILE_MARK);
-      if (!mark.exists()) {
-        mark.create(Ci.nsIFile.NORMAL_FILE_TYPE, 0o600);
-      }
-    } catch (err) {
-      SvalLog.warn(`could not mark the profile: ${SvalLog.errorName(err)}`);
-    }
-  }
 }
 
 /**

@@ -152,8 +152,10 @@ fn write_line(out: &mut impl Write, message: &Value) -> std::io::Result<()> {
 
 /// The wire protocol this shim speaks, the handshake's `hello`. Sval accepts
 /// the one it speaks and the one before it, so a shim from the previous build
-/// keeps working (sval-mcp-ships-with-sval spec §6).
-const HELLO: u64 = 1;
+/// keeps working (sval-mcp-ships-with-sval spec §6). No shim speaks 2: at 1
+/// Sval read each request's MCP version itself, and a shim that still
+/// expects it to is refused as outdated.
+const HELLO: u64 = 3;
 
 /// The build of Sval this shim was packaged with. The release build sets
 /// `SVAL_BUILD_ID` to Sval's build id, and any other build reports the crate
@@ -325,15 +327,15 @@ fn client_name_of(first: &Value) -> String {
         .to_owned()
 }
 
-// The MCP versions Sval speaks, which `build.rs` takes from
-// `SvalAgentSession.sys.mjs`. The bridge answers `initialize` and
-// `server/discover` itself, and Sval checks each modern request's version as
-// the bridge does, so the two agree.
-include!(concat!(env!("OUT_DIR"), "/protocol_versions.rs"));
+use crate::mcp::{
+    LATEST_LEGACY_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSIONS, MODERN_PROTOCOL_VERSIONS,
+    SERVER_INSTRUCTIONS,
+};
 
 /// The `_meta` keys of a modern request, result and notification (MCP
 /// 2026-07-28, "_meta").
 const VERSION_KEY: &str = "io.modelcontextprotocol/protocolVersion";
+const CLIENT_INFO_KEY: &str = "io.modelcontextprotocol/clientInfo";
 const CAPABILITIES_KEY: &str = "io.modelcontextprotocol/clientCapabilities";
 const SERVER_INFO_KEY: &str = "io.modelcontextprotocol/serverInfo";
 const SUBSCRIPTION_KEY: &str = "io.modelcontextprotocol/subscriptionId";
@@ -407,14 +409,6 @@ fn era_of(message: &Value) -> Result<Era, Value> {
 /// Sval is back.
 const PORT_FILE_POLL: Duration = Duration::from_secs(1);
 
-/// What `initialize` and `server/discover` tell the agent's model about Sval:
-/// Sval's own `SERVER_INSTRUCTIONS` from `SvalAgentSession.sys.mjs`, which
-/// `build.rs` takes from its source. The bridge answers both before Sval is
-/// reached, and Sval's answer to a replayed `initialize` is dropped, so this is
-/// the text the agent keeps.
-pub const SERVER_INSTRUCTIONS: &str =
-    include_str!(concat!(env!("OUT_DIR"), "/server_instructions.txt"));
-
 /// A tool error the bridge makes itself, each a code and its message.
 const NOT_RUNNING: (&str, &str) = (
     "sval_not_running",
@@ -452,14 +446,6 @@ struct Asked {
     modern: bool,
 }
 
-/// What Sval owes an answer to on one connection.
-enum Owed {
-    /// A request of the agent's.
-    Agent(Asked),
-    /// The replayed `initialize`, which the agent already had answered.
-    Replay,
-}
-
 /// One authenticated connection to Sval.
 struct Connection {
     /// Tells this connection's events from those of one already closed.
@@ -467,7 +453,7 @@ struct Connection {
     stream: TcpStream,
     /// Requests sent on this connection and not yet answered, keyed by the
     /// JSON of their id, with the id itself.
-    owed: HashMap<String, (Value, Owed)>,
+    owed: HashMap<String, (Value, Asked)>,
 }
 
 /// A Sval this shim started and has not yet seen listen, with the requests
@@ -516,8 +502,8 @@ fn list_changed() -> Value {
     json!({ "jsonrpc": "2.0", "method": "notifications/tools/list_changed" })
 }
 
-/// A result the bridge gives a modern request, with the fields a modern result
-/// carries, as Sval's `#dressed` gives them: its `resultType`, the server's
+/// A modern request's result, with the fields a modern result carries, Sval's
+/// results included: its `resultType`, the server's
 /// name and version, and on a tool list the caching hints, which say a list is
 /// the agent's own and stale at once.
 fn dressed(method: &str, mut value: Value) -> Value {
@@ -557,13 +543,13 @@ fn discover_result() -> Value {
 }
 
 /// The version `serverInfo` reports: Sval's display version, which a packaged
-/// shim is built with, as Sval's own `initialize` answer reports it.
+/// shim is built with.
 const SERVER_VERSION: &str = match option_env!("SVAL_APP_VERSION") {
     Some(version) => version,
     None => BUILD,
 };
 
-/// The bridge's own answer to `initialize`, the same Sval gives.
+/// The answer to `initialize`.
 fn initialize_result(message: &Value) -> Value {
     let version = message["params"]["protocolVersion"]
         .as_str()
@@ -608,14 +594,11 @@ struct Bridge<W> {
     /// names on every connection after, so a session gets its workspace back
     /// once Sval restarts.
     workspace: Option<String>,
-    /// The agent's `initialize`, replayed to Sval on every connection, since
-    /// Sval names an agent from it when pairing.
+    /// The agent's `initialize`, which opens a legacy session and says who
+    /// its client is.
     initialize: Option<Value>,
-    /// Whether the agent has sent `notifications/initialized`, which is
-    /// replayed after it.
-    initialized: bool,
-    /// Whether the agent has sent a modern request, which carries all Sval
-    /// needs of it, so there is nothing to replay.
+    /// Whether the agent has sent a modern request, which opens a session as
+    /// `initialize` does and says who its client is itself.
     modern: bool,
     /// The client name `account` was claimed for.
     client: Option<String>,
@@ -679,28 +662,25 @@ impl<W: Write> Bridge<W> {
                 Ok(())
             }
             (Some(method), Some(id)) => self.request(method, id, &message),
-            (Some(method), None) => {
-                if method == "notifications/initialized" {
-                    self.initialized = true;
-                }
-                // Sval does not answer a cancelled call, and neither does the
-                // bridge when the connection closes (MCP, "Cancellation").
-                // A cancelled subscription hears no more.
-                if method == "notifications/cancelled" {
-                    if let Some(id) = message["params"].get("requestId") {
-                        self.subscriptions.retain(|listening| listening != id);
-                        if let Some(connection) = self.connection.as_mut() {
-                            connection.owed.remove(&id.to_string());
-                        }
-                        if let Some(starting) = self.starting.as_mut() {
-                            starting.waiting.retain(|(_, waiting, _)| waiting != id);
-                        }
+            // The one notification Sval heeds is a cancelled call. Sval does
+            // not answer one, and neither does the bridge when the connection
+            // closes (MCP, "Cancellation"). A cancelled subscription hears no
+            // more.
+            (Some("notifications/cancelled"), None) => {
+                if let Some(id) = message["params"].get("requestId") {
+                    self.subscriptions.retain(|listening| listening != id);
+                    if let Some(connection) = self.connection.as_mut() {
+                        connection.owed.remove(&id.to_string());
+                    }
+                    if let Some(starting) = self.starting.as_mut() {
+                        starting.waiting.retain(|(_, waiting, _)| waiting != id);
                     }
                 }
                 self.forward(&message)
             }
-            // An answer to a request of Sval's: only Sval can use it.
-            (None, _) => self.forward(&message),
+            // Sval asks the agent nothing, so no other notification and no
+            // answer is its to read.
+            (_, _) => Ok(()),
         }
     }
 
@@ -741,7 +721,6 @@ impl<W: Write> Bridge<W> {
         self.claim(&client);
         self.workspace = resume.workspace;
         self.initialize = resume.initialize;
-        self.initialized = resume.initialized;
         self.modern = resume.modern;
         self.subscriptions = resume.subscriptions;
         self.tools = resume.tools;
@@ -774,7 +753,6 @@ impl<W: Write> Bridge<W> {
         }
         let resume = crate::update::Resume {
             initialize: self.initialize.clone(),
-            initialized: self.initialized,
             account: self.account.clone(),
             started: self.launch.started,
             tools: self.tools.clone(),
@@ -808,7 +786,7 @@ impl<W: Write> Bridge<W> {
         self.initialize.is_some() || self.modern
     }
 
-    /// Sends a result the bridge makes itself, as `asked` expects it.
+    /// Sends a result, the bridge's own or Sval's, as `asked` expects it.
     fn answer(&mut self, asked: &Asked, id: Value, value: Value) -> Result<(), BridgeError> {
         let value = if asked.modern {
             dressed(&asked.method, value)
@@ -844,10 +822,19 @@ impl<W: Write> Bridge<W> {
             method: method.to_owned(),
             modern: era == Era::Modern,
         };
-        if method == "ping" && self.connection.is_none() {
-            return self.answer(&asked, id, json!({}));
+        match method {
+            "ping" => return self.answer(&asked, id, json!({})),
+            "tools/list" | "tools/call" => {}
+            _ => return self.send(&failure(id, -32601, "method not found")),
         }
-        let Ok(frame) = encode_frame(&json!({ "mcp": message })) else {
+        // Sval names a new pairing for the agent's client, which only the
+        // agent's MCP session says: `initialize` on a legacy one, each
+        // request's `_meta` on a modern one.
+        let client = match era {
+            Era::Modern => &message["params"]["_meta"][CLIENT_INFO_KEY],
+            _ => &self.initialize.as_ref().unwrap_or(&Value::Null)["params"]["clientInfo"],
+        };
+        let Ok(frame) = encode_frame(&json!({ "mcp": message, "client": client })) else {
             return match method {
                 "tools/call" => self.answer(&asked, id, tool_error(TOO_LARGE)),
                 _ => self.send(&failure(
@@ -914,9 +901,7 @@ impl<W: Write> Bridge<W> {
             }
             let connection = self.connection.as_mut().expect("just connected");
             if connection.stream.write_all(frame).is_ok() {
-                connection
-                    .owed
-                    .insert(id.to_string(), (id, Owed::Agent(asked)));
+                connection.owed.insert(id.to_string(), (id, asked));
                 return Ok(());
             }
             self.disconnected()?;
@@ -1028,11 +1013,7 @@ impl<W: Write> Bridge<W> {
     ///
     /// Every connection reads the port file afresh and goes through the whole
     /// handshake in `connect`, so a restarted Sval is proved with its new token
-    /// and a stale file is refused as at startup. The agent's `initialize`, if
-    /// it sent one, is then replayed, and Sval's answer to it dropped, since the
-    /// agent has one. A modern request carries all Sval needs of the agent.
-    /// Its id cannot meet another request's: MCP forbids a client to reuse an
-    /// id within a session.
+    /// and a stale file is refused as at startup.
     ///
     /// A Sval that holds the profile and has written no port file has agent
     /// access off.
@@ -1057,7 +1038,7 @@ impl<W: Write> Bridge<W> {
             return Ok(false);
         };
         self.last_token = Some(listener.token.clone());
-        let mut stream = match connect(
+        let stream = match connect(
             &listener,
             self.store.as_ref(),
             account,
@@ -1076,22 +1057,7 @@ impl<W: Write> Bridge<W> {
                 return Ok(false);
             }
         };
-        let mut owed = HashMap::new();
-        let initialize = self.initialize.as_ref();
-        let started = (|| -> std::io::Result<TcpStream> {
-            let Some(initialize) = initialize else {
-                return stream.try_clone();
-            };
-            write_frame(&mut stream, &json!({ "mcp": initialize }))?;
-            if self.initialized {
-                write_frame(
-                    &mut stream,
-                    &json!({ "mcp": { "jsonrpc": "2.0", "method": "notifications/initialized" } }),
-                )?;
-            }
-            stream.try_clone()
-        })();
-        let reader = match started {
+        let reader = match stream.try_clone() {
             Ok(reader) => reader,
             Err(err) => {
                 eprintln!("sval-mcp: Sval closed the connection on arrival: {err}");
@@ -1099,16 +1065,13 @@ impl<W: Write> Bridge<W> {
                 return Ok(false);
             }
         };
-        if let Some(id) = initialize.and_then(|i| i.get("id")) {
-            owed.insert(id.to_string(), (id.clone(), Owed::Replay));
-        }
         self.serial += 1;
         let (serial, events) = (self.serial, self.events.clone());
         thread::spawn(move || read_sval(reader, serial, events));
         self.connection = Some(Connection {
             serial,
             stream,
-            owed,
+            owed: HashMap::new(),
         });
         if std::mem::take(&mut self.listed_without_sval) {
             self.tools_changed()?;
@@ -1128,16 +1091,15 @@ impl<W: Write> Bridge<W> {
                 (None, Some(id)) => connection.owed.remove(&id.to_string()),
                 _ => None,
             };
-            match answered {
-                Some((_, Owed::Replay)) => return Ok(()),
-                Some((_, Owed::Agent(asked))) if asked.method == "tools/list" => {
-                    if let Some(tools) = message.get("result") {
-                        self.tools = Some(tools.clone());
-                    }
-                }
-                _ => {}
+            // Sval's own notifications, a call's progress among them, and an
+            // error go to the agent as they are.
+            let (Some((id, asked)), Some(value)) = (answered, message.get("result")) else {
+                return self.send(message);
+            };
+            if asked.method == "tools/list" {
+                self.tools = Some(value.clone());
             }
-            self.send(message)?;
+            self.answer(&asked, id, value.clone())?;
         } else if let Some(paired) = frame["ctl"].get("paired") {
             match serde_json::from_value::<Credentials>(paired.clone()) {
                 Ok(credentials) => {
@@ -1183,12 +1145,10 @@ impl<W: Write> Bridge<W> {
         };
         let _ = connection.stream.shutdown(Shutdown::Both);
         for (id, owed) in connection.owed.into_values() {
-            match owed {
-                Owed::Replay => {}
-                Owed::Agent(asked) if asked.method == "tools/call" => {
-                    self.answer(&asked, id, tool_error(DISCONNECTED))?;
-                }
-                Owed::Agent(asked) => self.answer_without_sval(&asked, id)?,
+            if owed.method == "tools/call" {
+                self.answer(&owed, id, tool_error(DISCONNECTED))?;
+            } else {
+                self.answer_without_sval(&owed, id)?;
             }
         }
         Ok(())
@@ -1370,7 +1330,6 @@ impl<W: Write> Bridge<W> {
             launch_frame: Value::Null,
             workspace: None,
             initialize: None,
-            initialized: false,
             modern: false,
             client: None,
             subscriptions: Vec::new(),

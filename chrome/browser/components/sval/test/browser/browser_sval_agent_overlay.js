@@ -28,6 +28,10 @@ Services.scriptloader.loadSubScript(
 const { activityText } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs"
 );
+const { TOOLS } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentToolTable.sys.mjs"
+);
+const doing = name => TOOLS.find(tool => tool.name === name).activity;
 const { SvalAgents } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgents.sys.mjs"
 );
@@ -55,19 +59,19 @@ add_task(async function the_overlay_says_what_the_agent_is_doing() {
   const host = browser.currentURI.hostPort;
   Assert.equal(
     status(),
-    activityText("get_snapshot", host),
+    activityText(doing("get_snapshot"), host),
     "a read names the page's site"
   );
   Assert.ok(status().includes(host), "the line names the site");
   await call("scroll_page", { tab, direction: "down" });
-  Assert.equal(status(), activityText("scroll_page", host));
+  Assert.equal(status(), activityText(doing("scroll_page"), host));
 
   const { tab: other } = await call("open_tab", { url: PAGE });
   Assert.ok(other, "the agent opened another tab");
   await showTab(win, win.gBrowser.getTabForBrowser(browser));
   Assert.equal(
     status(),
-    activityText("scroll_page", host),
+    activityText(doing("scroll_page"), host),
     "each tab keeps its own line, shown when it is selected"
   );
   Assert.equal(

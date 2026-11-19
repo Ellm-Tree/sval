@@ -1496,7 +1496,7 @@ function settledFlag(promise) {
 }
 
 /** The client's handshake version, the one `SvalAgents` speaks. */
-const AGENT_HELLO = 1;
+const AGENT_HELLO = 3;
 
 /** How long a tool call's reply may take: past a load's own limit. */
 const AGENT_REPLY_MS = 180_000;
@@ -1699,7 +1699,10 @@ async function agentSetup({
   await client.waitFor(f => f.ctl?.ready === "unpaired");
   let nextId = 1;
   const request = async (method, params, { id = nextId++, stop } = {}) => {
-    client.sendFrame({ mcp: { jsonrpc: "2.0", id, method, params } });
+    client.sendFrame({
+      mcp: { jsonrpc: "2.0", id, method, params },
+      client: { name: AGENT_LABEL },
+    });
     // A call can wait for the user, or for its turn on a site, for longer
     // than the harness lets a test go without output before it calls the
     // test stalled (`Tester` in browser-test.js).
@@ -1723,11 +1726,6 @@ async function agentSetup({
     }
     return mcp.result;
   };
-  await request("initialize", {
-    protocolVersion: "2025-11-25",
-    capabilities: {},
-    clientInfo: { name: AGENT_LABEL },
-  });
   const raw = (name, args, meta, options) =>
     request(
       "tools/call",

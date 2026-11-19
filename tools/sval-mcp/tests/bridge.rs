@@ -173,7 +173,7 @@ fn pairs_when_no_secret_is_stored_and_saves_the_secret_sval_issues() {
 
     assert_eq!(
         handshakes.lock().unwrap()[0],
-        json!({ "hello": 1, "pair": true })
+        json!({ "hello": 3, "pair": true })
     );
     let account = account(&profile, "Test Agent");
     assert_eq!(
@@ -212,7 +212,7 @@ fn a_server_discover_probe_names_the_account_for_the_secret_sval_issues() {
 
     assert_eq!(
         handshakes.lock().unwrap()[0],
-        json!({ "hello": 1, "pair": true })
+        json!({ "hello": 3, "pair": true })
     );
     let saved = Some(Credentials {
         agent_id: "a1".into(),
@@ -246,7 +246,7 @@ fn uses_the_stored_secret_and_relays_both_directions() {
 
     assert_eq!(
         handshakes.lock().unwrap()[0],
-        json!({ "hello": 1, "agent_id": "a1", "secret": "s1" })
+        json!({ "hello": 3, "agent_id": "a1", "secret": "s1" })
     );
     let lines = out.lines();
     assert_eq!(lines[0]["id"], 1);
@@ -371,7 +371,7 @@ fn falls_back_to_pairing_when_sval_refuses_the_stored_secret() {
     let hs = handshakes.lock().unwrap();
     assert_eq!(
         hs[1],
-        json!({ "hello": 1, "pair": true }),
+        json!({ "hello": 3, "pair": true }),
         "second connection pairs"
     );
     assert_eq!(store.load(&account), None, "the stale secret is forgotten");
@@ -638,7 +638,7 @@ fn assert_initialized(reply: &Value) {
     );
     assert_eq!(
         reply["result"]["instructions"],
-        sval_mcp::bridge::SERVER_INSTRUCTIONS
+        sval_mcp::mcp::SERVER_INSTRUCTIONS
     );
 }
 
@@ -735,7 +735,7 @@ fn answers_svals_challenge_with_an_agent_prefixed_proof() {
     ));
     assert_eq!(
         proven(&hello, &server_nonce),
-        Some(json!({ "hello": 1, "agent_id": "a1", "secret": "s1" }))
+        Some(json!({ "hello": 3, "agent_id": "a1", "secret": "s1" }))
     );
 }
 
@@ -752,7 +752,7 @@ fn proves_itself_when_pairing_too() {
     .unwrap();
     assert_eq!(
         handshakes.lock().unwrap().as_slice(),
-        [json!({ "hello": 1, "pair": true })],
+        [json!({ "hello": 3, "pair": true })],
         "the fake sval accepted the proof"
     );
 }
@@ -923,7 +923,7 @@ fn the_retry_after_a_refusal_pairs_even_when_the_store_cannot_forget() {
 
     let hs = handshakes.lock().unwrap();
     assert_eq!(hs[0]["secret"], "s1");
-    assert_eq!(hs[1], json!({ "hello": 1, "pair": true }));
+    assert_eq!(hs[1], json!({ "hello": 3, "pair": true }));
 }
 
 /// A second Sval's token, as a restarted Sval writes a new one.
@@ -1065,11 +1065,10 @@ fn connects_when_sval_starts_after_the_agent() {
     let reply = wait_for(&out, &mut seen, |l| l["id"] == 2);
     assert_eq!(reply["result"]["echo"], "tools/call");
     let received = sval.received.lock().unwrap().clone();
-    assert_eq!(received[0], json!({ "hello": 1, "pair": true }));
+    assert_eq!(received[0], json!({ "hello": 3, "pair": true }));
     assert_eq!(
-        received[1],
-        serde_json::from_str::<Value>(INIT).unwrap(),
-        "sval is given the agent's initialize first"
+        received[1]["method"], "tools/call",
+        "sval is sent the call alone: the agent's initialize is the bridge's to answer"
     );
     drop(agent);
     finished.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -1141,12 +1140,13 @@ fn survives_a_sval_restart_and_reconnects_to_the_new_port_file_without_pairing_a
     let received = second.received.lock().unwrap().clone();
     assert_eq!(
         received[0],
-        json!({ "hello": 1, "agent_id": "a1", "secret": "s1", "workspace": "w-1" }),
+        json!({ "hello": 3, "agent_id": "a1", "secret": "s1", "workspace": "w-1" }),
         "the agent stays paired, and asks for the workspace it held"
     );
-    assert_eq!(received[1], serde_json::from_str::<Value>(INIT).unwrap());
-    assert_eq!(received[2]["method"], "notifications/initialized");
-    assert_eq!(received[3]["id"], 5);
+    assert_eq!(
+        received[1]["id"], 5,
+        "sval is sent the call, and nothing before it"
+    );
     assert!(
         out.complete_lines()
             .iter()
@@ -1168,8 +1168,7 @@ fn a_call_in_flight_when_sval_quits_is_answered() {
         write_frame(&mut stream, &proof_frame(&nonce, &"d".repeat(64))).unwrap();
         read_frame(&mut stream).unwrap().unwrap();
         write_frame(&mut stream, &json!({ "ctl": { "ready": "paired" } })).unwrap();
-        // The replayed initialize, then the call, which Sval never answers.
-        read_frame(&mut stream).unwrap().unwrap();
+        // The call, which Sval never answers.
         read_frame(&mut stream).unwrap().unwrap();
     });
     let (mut agent, out, finished) =
@@ -1188,6 +1187,80 @@ fn a_call_in_flight_when_sval_quits_is_answered() {
     );
     drop(agent);
     finished.recv_timeout(Duration::from_secs(5)).unwrap();
+}
+
+/// Only the bridge reads the agent's MCP session, so it tells Sval who the
+/// agent's client is with each request, asks Sval for tool lists and calls
+/// alone, and gives a modern client Sval's result in the shape a modern
+/// result has.
+#[test]
+fn sval_is_sent_the_client_with_each_request_and_nothing_of_the_protocol() {
+    let profile = closed_profile("client-info");
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    write_port_file(&profile, listener.local_addr().unwrap().port(), TOKEN);
+    let frames: Shared<Value> = Arc::default();
+    let seen = frames.clone();
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let nonce = read_challenge(&mut stream);
+        write_frame(&mut stream, &proof_frame(&nonce, &"d".repeat(64))).unwrap();
+        read_frame(&mut stream).unwrap().unwrap();
+        write_frame(&mut stream, &json!({ "ctl": { "ready": "paired" } })).unwrap();
+        while let Ok(Some(frame)) = read_frame(&mut stream) {
+            let reply = json!({ "mcp": {
+                "jsonrpc": "2.0", "id": frame["mcp"]["id"], "result": { "content": [] }
+            } });
+            seen.lock().unwrap().push(frame);
+            if write_frame(&mut stream, &reply).is_err() {
+                break;
+            }
+        }
+    });
+    let (mut agent, out, finished) =
+        start_bridge(profile.to_path_buf(), Arc::new(MemoryStore::default()));
+    let mut seen = 0;
+    writeln!(agent, "{INIT}").unwrap();
+    writeln!(agent, "{CALL}").unwrap();
+    assert_eq!(
+        wait_for(&out, &mut seen, |l| l["id"] == 2)["result"],
+        json!({ "content": [] }),
+        "a legacy client gets Sval's result as it is"
+    );
+    writeln!(agent, r#"{{"jsonrpc":"2.0","id":7,"method":"ping"}}"#).unwrap();
+    assert_eq!(
+        wait_for(&out, &mut seen, |l| l["id"] == 7)["result"],
+        json!({})
+    );
+    writeln!(
+        agent,
+        r#"{{"jsonrpc":"2.0","id":8,"method":"resources/list"}}"#
+    )
+    .unwrap();
+    assert_eq!(
+        wait_for(&out, &mut seen, |l| l["id"] == 8)["error"]["code"],
+        -32601
+    );
+    let call = modern(
+        json!(5),
+        "tools/call",
+        json!({ "name": "list_tabs", "arguments": {} }),
+    );
+    writeln!(agent, "{call}").unwrap();
+    assert_modern_result(&wait_for(&out, &mut seen, |l| l["id"] == 5));
+    drop(agent);
+    finished.recv_timeout(Duration::from_secs(5)).unwrap();
+
+    let frames = frames.lock().unwrap();
+    assert_eq!(frames.len(), 2, "sval is asked for the two calls alone");
+    let init: Value = serde_json::from_str(INIT).unwrap();
+    assert_eq!(
+        frames[0]["client"], init["params"]["clientInfo"],
+        "a legacy client is who its initialize said"
+    );
+    assert_eq!(
+        frames[1]["client"]["name"], "Modern Agent",
+        "a modern client is who the request says"
+    );
 }
 
 /// Sval never sees the large call, and a call already in flight is answered
@@ -1260,11 +1333,7 @@ fn a_call_too_large_for_sval_fails_alone_and_the_connection_carries_on() {
         .iter()
         .map(|m| m["id"].clone())
         .collect();
-    assert_eq!(
-        ids,
-        [json!(1), json!(2), json!(3)],
-        "sval never saw the large call"
-    );
+    assert_eq!(ids, [json!(2), json!(3)], "sval never saw the large call");
     assert_eq!(*connections.lock().unwrap(), 1, "one connection throughout");
 }
 
@@ -1787,7 +1856,7 @@ fn an_updated_shim_takes_over_between_requests_without_the_agent_seeing_a_restar
     wait_until(
         Duration::from_secs(10),
         || "the updated shim never reached sval".into(),
-        || (second.received.lock().unwrap().len() >= 3).then_some(()),
+        || (!second.received.lock().unwrap().is_empty()).then_some(()),
     );
     assert_eq!(
         std::fs::read_to_string(&args).unwrap().trim(),
@@ -1797,11 +1866,9 @@ fn an_updated_shim_takes_over_between_requests_without_the_agent_seeing_a_restar
     let received = second.received.lock().unwrap().clone();
     assert_eq!(
         received[0],
-        json!({ "hello": 1, "agent_id": "a1", "secret": "s1" }),
+        json!({ "hello": 3, "agent_id": "a1", "secret": "s1" }),
         "the same account, still paired"
     );
-    assert_eq!(received[1], serde_json::from_str::<Value>(INIT).unwrap());
-    assert_eq!(received[2]["method"], "notifications/initialized");
 
     writeln!(
         shim.agent,
@@ -1965,7 +2032,7 @@ fn serves_a_modern_client_with_no_initialize_while_sval_is_away() {
     assert_eq!(lines[0]["id"], "d");
     assert_eq!(
         lines[0]["result"]["instructions"],
-        sval_mcp::bridge::SERVER_INSTRUCTIONS
+        sval_mcp::mcp::SERVER_INSTRUCTIONS
     );
     assert_eq!(
         lines[0]["result"]["supportedVersions"],
