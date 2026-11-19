@@ -69,6 +69,49 @@ Release builds come from CI instead: CI builds the app unsigned with
 `archive-unsigned.sh`, and the owner's release repository signs and
 uploads it.
 
+## Release the iPhone app
+
+The iPhone app has version numbers of its own, starting at 0.1.0. A desktop
+`v*` tag never releases the iPhone app. An `ios-v<version>` tag does, and
+only maintainers can push one.
+
+1. For every version after the first on the App Store, add the version's
+   "What's New" text as `mobile/ios/whats-new/<version>.txt`. Write plain
+   text, at most 4,000 characters, following `docs/writing-style.md`'s
+   release notes rules, and merge the file. Without the file, type the text
+   in App Store Connect before you submit.
+2. Push the tag on a commit on `main`, such as `ios-v0.1.1`.
+3. Once the release's text says the build is ready to submit, select **Add
+   for Review** in App Store Connect, then **Submit to App Review**.
+4. Once Apple approves the version, select **Release This Version**.
+
+Between steps 2 and 3, CI's `ios-build.yml` builds the tag's commit,
+unsigned, in about twenty minutes once the Mac runner is free. Within five
+minutes of the build finishing, the release repository signs the build with
+the tag's version and the next build number. The release repository then
+uploads the build to App Store Connect and waits for Apple to accept the
+build into TestFlight. Then the release repository creates App Store
+version `<version>`, or renames the version being prepared. It attaches the
+build and sets "What's New" from the file. A release named "Sval for iPhone
+`<version>`" on this repository records the upload, and the release's text
+says how the upload ended.
+
+If something fails:
+
+- **The build fails in CI.** Re-run the `ios-build.yml` job, or delete the
+  tag and push it again on a commit with the fix. No newer `ios-v*` tag
+  uploads until then. A tag on a commit off `main` always fails, so delete
+  that tag.
+- **The upload fails.** The release's text says so, and the release
+  repository doesn't try the upload again. Delete the release, and the
+  release repository uploads the tag again within five minutes.
+- **The version is already in review or on the App Store.** That version
+  can't take a new build, so tag a new version.
+
+`MARKETING_VERSION` in `project.yml` is the version of builds made from
+`main` without a tag, which the release repository can upload to TestFlight
+for testing.
+
 ## Read the app's log
 
 The app writes its own log to `Library/Caches/diagnostics.log` in its
