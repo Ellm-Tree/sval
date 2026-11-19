@@ -53,11 +53,12 @@
  * waits on it. The downloads panel does not open for an agent's download in
  * the user's window.
  *
- * Who a download is for is the gates' answer (`addDownloadHolder`). Working
+ * Who a download is for is the gates' answer (`SvalAgentHooks`). Working
  * that out is allowed to fail open, as it is for loads, so a bug in Sval
  * cannot break the user's own downloads.
  */
 
+import { openGates } from "moz-src:///browser/components/sval/SvalAgentHooks.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import {
   hostOf,
@@ -80,20 +81,10 @@ const DIALOG_CONTRACT = "@mozilla.org/helperapplauncherdialog;1";
 const TRANSFER_CONTRACT = "@mozilla.org/transfer;1";
 
 /**
- * One function per open gate, each answering for a browsing context whether
- * it is in a tab an agent works in, and how to decide its downloads, with
- * that gate's record of where its agents' loads started
- * (`createLoadStarts`).
+ * The agents' downloads that wait for the user, each with the gate that
+ * decides it (`SvalAgentHooks`), by the function that refuses it.
  *
- * @type {Map<(bc: BrowsingContext) => object|null, (id: number) => object|null>}
- */
-const holders = new Map();
-
-/**
- * The agents' downloads that wait for the user, each with the holder whose
- * gate decides it, by the function that refuses it.
- *
- * @type {Map<Function, Function>}
+ * @type {Map<Function, object>}
  */
 const heldDownloads = new Map();
 
@@ -110,7 +101,7 @@ const decided = new WeakMap();
  * @param {BrowsingContext|null} bc
  * @param {string|null} [startSite] The site the download started on, when
  *   it was recorded.
- * @returns {{handler: object, holder: Function}|null} The download handler
+ * @returns {{handler: object, gate: object}|null} The download handler
  *   of the gate whose agent works in the tab `bc` is in.
  */
 function handlerFor(bc, startSite) {
@@ -118,10 +109,10 @@ function handlerFor(bc, startSite) {
     if (!bc) {
       return null;
     }
-    for (const holder of holders.keys()) {
-      const handler = holder(bc, startSite);
+    for (const gate of openGates()) {
+      const handler = gate.downloadHandler(bc, startSite);
       if (handler) {
-        return { handler, holder };
+        return { handler, gate };
       }
     }
   } catch (err) {
@@ -134,7 +125,7 @@ function handlerFor(bc, startSite) {
 
 /**
  * @param {nsIHelperAppLauncher} launcher
- * @returns {{handler: object, holder: Function, unsure: boolean}|null} The
+ * @returns {{handler: object, gate: object, unsure: boolean}|null} The
  *   handler for the tab the download started in, deciding for the site of
  *   the page that started it. When that cannot be told, it decides for the
  *   site the file itself comes from, and is `unsure`; a file with no site of
@@ -154,15 +145,15 @@ function foundForLauncher(launcher) {
     return null;
   }
   try {
-    for (const [holder, startOf] of holders) {
-      const started = startOf(id);
+    for (const gate of openGates()) {
+      const started = gate.startOf(id);
       const known = started?.spec === spec && !!started.site;
-      const handler = holder(
+      const handler = gate.downloadHandler(
         bc,
         known ? started.site : sourceSiteOf(launcher.source)
       );
       if (handler) {
-        return { handler, holder, unsure: !known };
+        return { handler, gate, unsure: !known };
       }
     }
   } catch (err) {
@@ -395,8 +386,8 @@ export async function saveToDownloads(
  * answers with its path only once it is allowed.
  *
  * @param {nsIHelperAppLauncher} launcher
- * @param {{handler: object, holder: Function}} found The gate's handler for
- *   the tab, and its holder.
+ * @param {{handler: object, gate: object}} found The gate's handler for
+ *   the tab, and the gate.
  * @param {string} defaultName
  * @param {string} extension
  */
@@ -504,13 +495,13 @@ async function removeHandlersFile(path) {
 /**
  * Holds an agent's download for the user's answer.
  *
- * @param {{handler: object, holder: Function}} found The gate's handler for
- *   the tab, and its holder.
+ * @param {{handler: object, gate: object}} found The gate's handler for
+ *   the tab, and the gate.
  * @param {Function} refuse Refuses the download, with the state to list.
  * @param {Function} answered Told the user's answer, unless the download was
  *   refused first.
  */
-function hold({ handler, holder }, refuse, answered) {
+function hold({ handler, gate }, refuse, answered) {
   let settled = false;
   const refuseHeld = () => {
     if (!settled) {
@@ -519,7 +510,7 @@ function hold({ handler, holder }, refuse, answered) {
       refuse("cancelled");
     }
   };
-  heldDownloads.set(refuseHeld, holder);
+  heldDownloads.set(refuseHeld, gate);
   handler
     .ask()
     .catch(err => {
@@ -883,29 +874,14 @@ export function downloadTransferFor(bc) {
 }
 
 /**
- * Starts deciding the downloads in the tabs `holder` answers for.
+ * Cancels the downloads a closing gate still holds for the user: with the
+ * gate gone, nobody can allow them.
  *
- * @param {(bc: BrowsingContext, startSite?: string|null) => object|null} holder
- *   Answers, for a browsing context, the download handler of the agent
- *   working in its tab, deciding for `startSite` when it is given:
- *   `{site, decide(): "allow"|"deny"|"ask", ask(): Promise<string>, track(entry)}`.
- * @param {(id: number) => object|null} startOf The latest load the gate
- *   recorded in a browsing context (`createLoadStarts`).
+ * @param {object} gate The gate's answers (`SvalAgentHooks`).
  */
-export function addDownloadHolder(holder, startOf) {
-  holders.set(holder, startOf);
-}
-
-/**
- * Stops deciding the downloads `holder` answered for. The ones it still holds
- * for the user are cancelled: with no gate left, nobody can allow them.
- *
- * @param {Function} holder What `addDownloadHolder` was given.
- */
-export function removeDownloadHolder(holder) {
-  holders.delete(holder);
+export function cancelHeldDownloads(gate) {
   for (const [refuse, heldBy] of [...heldDownloads]) {
-    if (heldBy === holder) {
+    if (heldBy === gate) {
       refuse();
     }
   }

@@ -206,15 +206,15 @@ import {
   uploadFoldersFor,
 } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
 import {
-  endPdfSave,
-  pdfSavers,
-  tabRouters,
-} from "moz-src:///browser/components/sval/SvalAgentRouting.sys.mjs";
+  addGate,
+  NO_ANSWERS,
+  openGates,
+} from "moz-src:///browser/components/sval/SvalAgentHooks.sys.mjs";
+import { endPdfSave } from "moz-src:///browser/components/sval/SvalAgentRouting.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import {
-  addDownloadHolder,
+  cancelHeldDownloads,
   createLoadStarts,
-  removeDownloadHolder,
   saveToDownloads,
 } from "moz-src:///browser/components/sval/SvalAgentDownloads.sys.mjs";
 import {
@@ -311,16 +311,8 @@ function isTopLevelDocument(loadInfo) {
  * @returns {Function} Removes it.
  */
 export function addPdfSaverForTests(saver) {
-  pdfSavers.add(saver);
-  return () => pdfSavers.delete(saver);
+  return addGate({ ...NO_ANSWERS, pdfSaver: saver });
 }
-
-/**
- * Whether each open gate holds a browsing context: one function per gate.
- *
- * @type {Set<(bc: BrowsingContext) => boolean>}
- */
-const tabHolders = new Set();
 
 /**
  * Whether an open gate holds the tab of `bc`: its agent controls it, and the
@@ -339,8 +331,8 @@ function heldByAgent(bc, what) {
     if (!top?.isContent) {
       return false;
     }
-    for (const holds of tabHolders) {
-      if (holds(top)) {
+    for (const gate of openGates()) {
+      if (gate.holdsTab(top)) {
         SvalLog.info(`${what} in an agent's tab was refused`);
         return true;
       }
@@ -397,15 +389,6 @@ export function refusesClipboardWrite(bc) {
 }
 
 /**
- * One function per open gate, each answering whether a page may hand an
- * address to another application, or null when its agent works in no tab
- * the address is for.
- *
- * @type {Set<(uri: nsIURI, principal: nsIPrincipal|null, bc: BrowsingContext, appName: string|null) => Promise<boolean>|null>}
- */
-const appDeciders = new Set();
-
-/**
  * Whether Gecko's dispatcher may go on with an address a page in `bc` hands
  * to another application (agent-control spec §5.2). In a tab an agent
  * controls the apps permission decides, asking the user about a scheme the
@@ -431,8 +414,8 @@ export async function mayOpenApp(uri, principal, bc, appName) {
   if (!bc) {
     return true;
   }
-  for (const decide of appDeciders) {
-    const answer = decide(uri, principal, bc, appName);
+  for (const gate of openGates()) {
+    const answer = gate.decideApp(uri, principal, bc, appName);
     if (answer) {
       return answer;
     }
@@ -1279,7 +1262,6 @@ export function createAgentGate({
       },
     };
   }
-  addDownloadHolder(downloadHandler, starts.startOf);
 
   /**
    * Saves, or refuses, a PDF the viewer in an agent's tab asks to save, by
@@ -1346,7 +1328,6 @@ export function createAgentGate({
       }
     };
   }
-  pdfSavers.add(pdfSaver);
 
   /**
    * Where a tab a page in `opener` asks for opens: in the agent's workspace
@@ -1371,7 +1352,6 @@ export function createAgentGate({
         }
       : null;
   }
-  tabRouters.add(routeTab);
 
   // A tab waiting for its filing is no one's to open a picker in or write
   // the clipboard from, as nothing is decided there before it is filed.
@@ -1380,8 +1360,16 @@ export function createAgentGate({
     ((!!registry.agentWatching(bc.browserId) &&
       !isUserInControl(bc.browserId)) ||
       (!!bc.embedderElement && awaitsFiling(bc.embedderElement)));
-  tabHolders.add(holdsTab);
-  appDeciders.add(appDecider);
+  /** @type {import("./SvalAgentHooks.sys.mjs").GateAnswers} */
+  const answers = {
+    holdsTab,
+    decideApp: appDecider,
+    downloadHandler,
+    startOf: starts.startOf,
+    pdfSaver,
+    routeTab,
+  };
+  const leave = addGate(answers);
 
   /**
    * Refuses to let the agent read what a page on `site` shows, unless it may
@@ -1926,11 +1914,8 @@ export function createAgentGate({
       }
       closed = true;
       closing.end();
-      tabHolders.delete(holdsTab);
-      appDeciders.delete(appDecider);
-      removeDownloadHolder(downloadHandler);
-      pdfSavers.delete(pdfSaver);
-      tabRouters.delete(routeTab);
+      leave();
+      cancelHeldDownloads(answers);
       writes.refuseAll();
       stopObserving();
       stopContextGone();

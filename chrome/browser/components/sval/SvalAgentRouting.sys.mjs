@@ -5,33 +5,17 @@
  * Where a tab a page in an agent's tab opens goes, and what PDF.js's Save
  * does there (spec §4.1, §5.2). Firefox's `BrowserDOMWindow`,
  * `URILoadingHelper` and `PdfjsParent` ask here first
- * (`sval-agent-routing.patch`), and each open gate (`SvalAgentGate`) adds
- * the functions that answer for its agents.
+ * (`sval-agent-routing.patch`), and each open gate answers for its agents
+ * (`SvalAgentHooks`).
  */
+
+import { openGates } from "moz-src:///browser/components/sval/SvalAgentHooks.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
 });
-
-/**
- * One function per open gate, each answering, for the `<browser>` of a page
- * that asks for a new tab, null when no agent works in that tab, and
- * otherwise the agent's full window, null while it has none, and how to
- * open one.
- *
- * @type {Set<(opener: Element) => {window: Window|null, open: () => Promise<Window>}|null>}
- */
-export const tabRouters = new Set();
-
-/**
- * One function per open gate, each answering, for a `<browser>` whose PDF.js
- * viewer asks to save its PDF, the save handler of the agent working in it.
- *
- * @type {Set<(browser: Element) => Function|null>}
- */
-export const pdfSavers = new Set();
 
 /**
  * The ways a page's request for a new tab or window reaches
@@ -59,8 +43,8 @@ const ROUTED = Symbol("routed");
  * @returns {{window: Window|null, open: () => Promise<Window>}|null}
  */
 function routeOf(opener) {
-  for (const router of tabRouters) {
-    const route = router(opener);
+  for (const gate of openGates()) {
+    const route = gate.routeTab(opener);
     if (route) {
       return route;
     }
@@ -209,7 +193,7 @@ export function routeLinkOpen(window, url, where, params) {
  * (`SvalAgentDownloads`) never learns whose save it is. In an agent's tab the
  * save is the agent's saver's, a download like any other.
  *
- * Every saver is asked, and PDF.js saves only when each answered that the tab
+ * Every gate is asked, and PDF.js saves only when each answered that the tab
  * is no agent's. A saver that throws may have been an agent's, so the save is
  * dropped, and the viewer is told it is over.
  *
@@ -220,8 +204,8 @@ export function routeLinkOpen(window, url, where, params) {
 export function takePdfSave(actor, message) {
   let save = null;
   try {
-    for (const saver of pdfSavers) {
-      save = saver(actor.browser) ?? save;
+    for (const gate of openGates()) {
+      save = gate.pdfSaver(actor.browser) ?? save;
     }
   } catch (err) {
     lazy.SvalLog.warn(`a PDF save was dropped: ${lazy.SvalLog.errorName(err)}`);
