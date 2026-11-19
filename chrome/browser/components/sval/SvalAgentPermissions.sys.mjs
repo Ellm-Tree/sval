@@ -58,14 +58,12 @@ import {
   DEFAULT_LEVEL,
   defaultLevelOf,
   filePermissionFor,
-  levelFor,
-} from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
-import {
-  decideCall,
   grantMatches,
+  levelFor,
   pageToolSiteOf,
   pageToolsSettingOf,
-} from "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs";
+} from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
+import { decideCall } from "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 
 /**

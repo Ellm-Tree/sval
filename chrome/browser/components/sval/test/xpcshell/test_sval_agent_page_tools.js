@@ -13,19 +13,20 @@ const {
   clean,
   decideCall,
   definitionHash,
-  grantMatches,
   invoke,
   MAX_DESCRIPTION_CHARS,
   MAX_NAME_CHARS,
   MAX_RESULT_BYTES,
   MAX_SCHEMA_BYTES,
-  pageToolSiteOf,
-  pageToolsSettingOf,
   toolsOf,
   withinTimeout,
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs"
 );
+const { grantMatches, pageToolSiteOf, pageToolsSettingOf } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs"
+  );
 const { ToolError } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
 );

@@ -99,7 +99,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   setInterval: "resource://gre/modules/Timer.sys.mjs",
   clearInterval: "resource://gre/modules/Timer.sys.mjs",
   pageToolsSettingOf:
-    "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
+    "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
   workspaceIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
 });
 

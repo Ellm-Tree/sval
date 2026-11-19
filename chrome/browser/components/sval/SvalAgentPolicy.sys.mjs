@@ -18,12 +18,18 @@ import {
   scopeChain,
   scopeOfHost,
 } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
-import {
-  cleanPageToolFields,
-  mapOf,
-} from "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs";
 
 export const LEVELS = ["blocked", "read-only", "ask-before-writes", "full"];
+
+/**
+ * @param {unknown} value
+ * @returns {object|null} `value` when it is a plain map of entries.
+ */
+export function mapOf(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : null;
+}
 
 const REFUSED = () =>
   new ToolError(
@@ -395,11 +401,120 @@ export function appPermissionFor(policy, host, scheme) {
  */
 export const FILE_KINDS = ["downloads", "uploads", "console"];
 
+/** Whether an agent may use sites' tools (site-tools spec §4.1, layer B). */
+export const PAGE_TOOLS_SETTINGS = Object.freeze(["off", "ask", "on"]);
+
+/** The answers a site can hold for its tools (site-tools spec §4.1, layer C). */
+export const PAGE_TOOL_SITE_ANSWERS = Object.freeze(["allow", "deny"]);
+
+/** A grant is the hex SHA-256 of a tool's definition. */
+export const GRANT_HASH = /^[0-9a-f]{64}$/;
+
 /**
- * The policy's maps keyed by site, each read on its own: a site's level and
- * its file permissions.
+ * @param {unknown} entry A `pageToolGrants` value.
+ * @returns {{[name: string]: string}|null} The tools the entry remembers,
+ *   each with its definition's hash. A hash Sval cannot read is left out,
+ *   and an entry left with none is no entry.
  */
-const SITE_MAPS = ["sites", ...FILE_KINDS, "apps"];
+function grantsOf(entry) {
+  const kept = Object.entries(mapOf(entry) ?? {}).filter(
+    ([, hash]) => typeof hash === "string" && GRANT_HASH.test(hash)
+  );
+  return kept.length ? Object.fromEntries(kept) : null;
+}
+
+/**
+ * One of the policy's maps keyed by site.
+ *
+ * @typedef {object} PolicyMap
+ * @property {string} name The policy's field.
+ * @property {string} rule What the map's entry is called in one site's rule
+ *   (`ruleOf`).
+ * @property {boolean} tools Whether the map is one of site tools'. A policy
+ *   that never held one holds none, and Settings hides them while site tools
+ *   are off.
+ * @property {boolean} row Whether an entry alone gives its site a row in
+ *   Settings.
+ * @property {(value: unknown) => unknown} clean A site's value as Sval reads
+ *   it: the part Sval can read, or null when there is none.
+ */
+
+/**
+ * The policy's maps keyed by site, each read on its own (spec §5.2,
+ * site-tools spec §4.1). Everything that walks the maps walks this list.
+ *
+ * @type {ReadonlyArray<PolicyMap>}
+ */
+export const POLICY_MAPS = Object.freeze([
+  {
+    name: "sites",
+    rule: "level",
+    tools: false,
+    row: true,
+    clean: value => (LEVELS.includes(value) ? value : null),
+  },
+  ...FILE_KINDS.map(kind => ({
+    name: kind,
+    rule: kind,
+    tools: false,
+    row: true,
+    clean: value => {
+      if (kind !== "uploads" || value === "deny") {
+        return filePermissionOf(kind, value) ? value : null;
+      }
+      const folders = uploadFoldersOf(value);
+      return folders ? { ...value, folders } : null;
+    },
+  })),
+  { name: "apps", rule: "apps", tools: false, row: true, clean: appsOf },
+  {
+    name: "pageToolSites",
+    rule: "toolSite",
+    tools: true,
+    row: true,
+    clean: value => (PAGE_TOOL_SITE_ANSWERS.includes(value) ? value : null),
+  },
+  {
+    name: "pageToolGrants",
+    rule: "grants",
+    tools: true,
+    row: false,
+    clean: grantsOf,
+  },
+]);
+
+/**
+ * @param {object|null|undefined} policy
+ * @param {(map: PolicyMap) => boolean} [wanted] The maps to read.
+ * @returns {string[]} Every name the policy holds an entry for.
+ */
+export function ruledNames(policy, wanted = () => true) {
+  return [
+    ...new Set(
+      POLICY_MAPS.filter(wanted).flatMap(map =>
+        Object.keys(mapOf(policy?.[map.name]) ?? {})
+      )
+    ),
+  ];
+}
+
+/**
+ * @param {object|null|undefined} policy
+ * @param {string} name A site, or a host under its site.
+ * @param {(map: PolicyMap) => boolean} [wanted] The maps to read.
+ * @returns {object} The rule saved under `name` itself: each map's entry, by
+ *   the map's `rule`, where it has one.
+ */
+export function ruleOf(policy, name, wanted = () => true) {
+  const rule = {};
+  for (const map of POLICY_MAPS.filter(wanted)) {
+    const entries = mapOf(policy?.[map.name]);
+    if (entries && Object.hasOwn(entries, name)) {
+      rule[map.rule] = structuredClone(entries[name]);
+    }
+  }
+  return rule;
+}
 
 export const POLICY_VERSION = 3;
 
@@ -413,32 +528,6 @@ export const DEFAULT_POLICY = Object.freeze({
   console: Object.freeze({}),
   apps: Object.freeze({}),
 });
-
-/**
- * A site's value in one of the policy's per-site maps, as Sval reads it: the
- * part Sval can read, or null when there is none.
- *
- * @param {string} map One of `SITE_MAPS`.
- * @param {unknown} value
- * @returns {unknown}
- */
-function cleanSiteValue(map, value) {
-  switch (map) {
-    case "sites":
-      return LEVELS.includes(value) ? value : null;
-    case "apps":
-      return appsOf(value);
-    case "uploads": {
-      if (value === "deny") {
-        return value;
-      }
-      const folders = uploadFoldersOf(value);
-      return folders ? { ...value, folders } : null;
-    }
-    default:
-      return filePermissionOf(map, value) ? value : null;
-  }
-}
 
 /**
  * @param {string} name A key of one of the policy's per-site maps.
@@ -464,8 +553,10 @@ function isRuleName(name) {
  *   or the agent's default, and Sval asks again about what none of them
  *   decides. An upload folder or an app scheme Sval cannot read is deleted
  *   from its entry.
- * - Sites' tools are read as `cleanPageToolFields` says: an answer or grant
- *   Sval cannot read is deleted, so it asks again, its own default.
+ * - An answer about a site's tools, or a remembered tool, that Sval cannot
+ *   read is deleted, so Sval asks again. A setting for sites' tools it
+ *   cannot read is `"ask"` (site-tools spec §4.1). A site-tools field the
+ *   policy does not hold stays absent.
  * - A per-site map that is not a map is replaced by an empty one. For
  *   `sites`, the default becomes `"ask"` as for a default Sval cannot read.
  *
@@ -488,9 +579,11 @@ export function cleanPolicy(stored) {
     return { policy: raw, changed: false };
   }
   const policy = { ...raw, version: POLICY_VERSION };
-  for (const map of SITE_MAPS) {
+  for (const { name: map, tools, clean } of POLICY_MAPS) {
     if (policy[map] === undefined) {
-      policy[map] = {};
+      if (!tools) {
+        policy[map] = {};
+      }
       continue;
     }
     const entries = mapOf(policy[map]);
@@ -502,20 +595,18 @@ export function cleanPolicy(stored) {
       continue;
     }
     const kept = Object.entries(entries).flatMap(([name, value]) => {
-      const clean = isRuleName(name) ? cleanSiteValue(map, value) : null;
-      return clean === null ? [] : [[name, clean]];
+      const read = isRuleName(name) ? clean(value) : null;
+      return read === null ? [] : [[name, read]];
     });
     if (JSON.stringify(kept) !== JSON.stringify(Object.entries(entries))) {
       policy[map] = Object.fromEntries(kept);
     }
   }
-  Object.assign(policy, cleanPageToolFields(policy));
-  for (const map of ["pageToolSites", "pageToolGrants"]) {
-    if (policy[map] !== undefined) {
-      policy[map] = Object.fromEntries(
-        Object.entries(policy[map]).filter(([name]) => isRuleName(name))
-      );
-    }
+  if (
+    policy.pageTools !== undefined &&
+    !PAGE_TOOLS_SETTINGS.includes(policy.pageTools)
+  ) {
+    policy.pageTools = "ask";
   }
   if (!DEFAULTS.includes(policy.default)) {
     policy.default = "ask";
@@ -692,4 +783,45 @@ export function decideLoad(policy, host) {
     return "ask";
   }
   return level === "blocked" ? "deny" : "allow";
+}
+
+/**
+ * @param {object|null|undefined} policy
+ * @returns {"off"|"ask"|"on"} Whether the agent may use sites' tools
+ *   (site-tools spec §4.1, layer B). A value Sval cannot read is `"ask"`.
+ */
+export function pageToolsSettingOf(policy) {
+  return PAGE_TOOLS_SETTINGS.includes(policy?.pageTools)
+    ? policy.pageTools
+    : "ask";
+}
+
+/**
+ * @param {object|null|undefined} policy
+ * @param {string} host A host or a site.
+ * @returns {"allow"|"deny"|null} Whether `host` may offer its tools to the
+ *   agent (site-tools spec §4.1, layer C), by the most specific name along
+ *   its scope chain with an answer Sval can read, or null when none has.
+ */
+export function pageToolSiteOf(policy, host) {
+  return ruleFor(policy, "pageToolSites", host, value =>
+    PAGE_TOOL_SITE_ANSWERS.includes(value) ? value : null
+  );
+}
+
+/**
+ * @param {object|null|undefined} policy
+ * @param {string} host A host or a site.
+ * @param {string} name A tool's name.
+ * @param {string} hash The hash of the tool's definition (`definitionHash`).
+ * @returns {boolean} Whether "Always allow" was answered about this
+ *   definition of the tool on `host` (site-tools spec §4.3), by the most
+ *   specific name along its scope chain that remembers the tool.
+ */
+export function grantMatches(policy, host, name, hash) {
+  const granted = ruleFor(policy, "pageToolGrants", host, value => {
+    const tools = mapOf(value);
+    return tools && Object.hasOwn(tools, name) ? tools[name] : null;
+  });
+  return granted === hash;
 }

@@ -24,8 +24,13 @@ import {
   FILE_KINDS,
   FILE_PERMISSIONS,
   filePermissionOf,
+  GRANT_HASH,
   isAppScheme,
   LEVELS,
+  PAGE_TOOL_SITE_ANSWERS,
+  PAGE_TOOLS_SETTINGS,
+  POLICY_MAPS,
+  ruledNames,
   uploadFoldersOf,
 } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
@@ -37,11 +42,6 @@ import {
   toHex,
 } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
 import { forgetPolite } from "moz-src:///browser/components/sval/SvalAgentPolite.sys.mjs";
-import {
-  GRANT_HASH,
-  PAGE_TOOL_SITE_ANSWERS,
-  PAGE_TOOLS_SETTINGS,
-} from "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -102,9 +102,6 @@ function sameInConstantTime(a, b) {
   }
   return diff === 0;
 }
-
-/** The policy's maps of a site's answer about its tools and its tools. */
-const TOOL_MAPS = ["pageToolSites", "pageToolGrants"];
 
 /**
  * @param {object} policy
@@ -916,11 +913,7 @@ export class SvalAgentStore {
    *   for, of any kind `removeSite` takes.
    */
   ruledSites(agentId) {
-    const policy = this.#agents.get(String(agentId))?.policy ?? {};
-    const maps = ["sites", ...FILE_KINDS, "apps", ...TOOL_MAPS];
-    return [
-      ...new Set(maps.flatMap(map => Object.keys(entriesOf(policy, map)))),
-    ];
+    return ruledNames(this.#agents.get(String(agentId))?.policy);
   }
 
   /**
@@ -934,74 +927,44 @@ export class SvalAgentStore {
    * @param {boolean} [options.keepTools] Leaves the site's tools rules.
    */
   async removeSite(agentId, site, { keepTools = false } = {}) {
-    const maps = ["sites", ...FILE_KINDS, "apps"];
-    if (!keepTools) {
-      maps.push(...TOOL_MAPS);
-    }
+    const maps = POLICY_MAPS.filter(map => !keepTools || !map.tools);
     await this.#editPolicy(agentId, policy =>
-      maps.reduce((edited, map) => withoutEntry(edited, map, site), policy)
+      maps.reduce((edited, map) => withoutEntry(edited, map.name, site), policy)
     );
   }
 
   /**
    * Puts back, in one write, what {@link removeSite} took from one site: its
    * level, its file and app permissions, its answer about site tools and the tools
-   * remembered on it. Every part is checked as its own setter checks it
-   * before anything is written, so a rule with any part Sval cannot read is
+   * remembered on it. Every part is read as `cleanPolicy` reads it before
+   * anything is written, so a rule with any part Sval cannot read whole is
    * refused whole.
    *
    * @param {string} agentId
    * @param {string} site
-   * @param {object} rule Only the parts given are put back.
-   * @param {string} [rule.level] One of `LEVELS`.
-   * @param {string} [rule.downloads] One of `FILE_PERMISSIONS`.
-   * @param {string|object} [rule.uploads] `"deny"`, or the folders entry
-   *   `allowUploadFolders` writes.
-   * @param {string} [rule.console] One of `FILE_PERMISSIONS`.
-   * @param {string|object} [rule.apps] `"deny"`, or each scheme's answer.
-   * @param {string} [rule.toolSite] One of `PAGE_TOOL_SITE_ANSWERS`.
-   * @param {{[name: string]: string}} [rule.grants] Each remembered tool's
-   *   definition hash, by the tool's name.
+   * @param {object} rule The site's entries by each map's `rule`
+   *   (`POLICY_MAPS`), as `ruleOf` gives them. Only the parts given are put
+   *   back.
    */
   async restoreSite(agentId, site, rule) {
-    const { level, toolSite, grants = {} } = rule;
-    const tools = Object.entries(grants);
+    const parts = POLICY_MAPS.flatMap(map => {
+      const value = rule[map.rule];
+      return value === undefined || value === null ? [] : [{ map, value }];
+    });
     if (
-      (level && !LEVELS.includes(level)) ||
-      FILE_KINDS.some(
-        kind => rule[kind] && !filePermissionOf(kind, rule[kind])
-      ) ||
-      (rule.apps && !appsOf(rule.apps)) ||
-      (toolSite && !PAGE_TOOL_SITE_ANSWERS.includes(toolSite)) ||
-      tools.some(
-        ([, hash]) => typeof hash !== "string" || !GRANT_HASH.test(hash)
+      parts.some(
+        ({ map, value }) =>
+          JSON.stringify(map.clean(value)) !== JSON.stringify(value)
       )
     ) {
       throw new Error("unreadable rule to restore");
     }
-    await this.#editPolicy(agentId, policy => {
-      let edited = level ? withEntry(policy, "sites", site, level) : policy;
-      for (const kind of FILE_KINDS) {
-        if (rule[kind]) {
-          edited = withEntry(edited, kind, site, rule[kind]);
-        }
-      }
-      if (rule.apps) {
-        edited = withEntry(edited, "apps", site, appsOf(rule.apps));
-      }
-      if (toolSite) {
-        edited = withEntry(edited, "pageToolSites", site, toolSite);
-      }
-      if (tools.length) {
-        edited = withEntry(
-          edited,
-          "pageToolGrants",
-          site,
-          Object.fromEntries(tools)
-        );
-      }
-      return edited;
-    });
+    await this.#editPolicy(agentId, policy =>
+      parts.reduce(
+        (edited, { map, value }) => withEntry(edited, map.name, site, value),
+        policy
+      )
+    );
   }
 
   /**

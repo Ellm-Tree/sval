@@ -17,6 +17,9 @@ const {
   siteOfPrincipal,
   levelFor,
   localPlaceOf,
+  POLICY_MAPS,
+  ruledNames,
+  ruleOf,
   uploadFoldersFor,
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs"
@@ -818,4 +821,87 @@ add_task(function a_page_with_no_site_has_none() {
   ]) {
     Assert.strictEqual(siteOf(url), null, url);
   }
+});
+
+/** A value fit for each of the policy's maps keyed by site. */
+const ENTRIES = {
+  sites: "full",
+  downloads: "allow",
+  uploads: { folders: [{ path: "/a", subfolders: false }] },
+  console: "deny",
+  apps: { mailto: "allow" },
+  pageToolSites: "allow",
+  pageToolGrants: { search: "a".repeat(64) },
+};
+
+/**
+ * A map the table does not list is cleaned, removed and restored by
+ * nothing, so the list and the policy's fields are checked against each
+ * other.
+ */
+add_task(function every_per_site_map_is_in_the_table() {
+  Assert.deepEqual(
+    POLICY_MAPS.map(map => map.name),
+    Object.keys(ENTRIES)
+  );
+  for (const map of POLICY_MAPS) {
+    Assert.deepEqual(map.clean(ENTRIES[map.name]), ENTRIES[map.name], map.name);
+    Assert.strictEqual(map.clean(7), null, `${map.name} reads no number`);
+    if (!map.tools) {
+      Assert.ok(Object.hasOwn(DEFAULT_POLICY, map.name), map.name);
+    }
+  }
+});
+
+add_task(function a_site_s_rule_is_its_own_entry_in_each_map() {
+  const policy = Object.fromEntries(
+    Object.entries(ENTRIES).map(([map, value]) => [
+      map,
+      { "a.example": value, "b.example": value },
+    ])
+  );
+  policy.default = "ask";
+  const rule = ruleOf(policy, "a.example");
+  Assert.deepEqual(rule, {
+    level: "full",
+    downloads: "allow",
+    uploads: ENTRIES.uploads,
+    console: "deny",
+    apps: ENTRIES.apps,
+    toolSite: "allow",
+    grants: ENTRIES.pageToolGrants,
+  });
+  Assert.notEqual(rule.uploads, policy.uploads["a.example"], "a copy");
+  Assert.deepEqual(
+    Object.keys(ruleOf(policy, "a.example", map => !map.tools)),
+    ["level", "downloads", "uploads", "console", "apps"]
+  );
+  Assert.deepEqual(ruleOf(policy, "c.example"), {}, "no rule of its own");
+  Assert.deepEqual(ruleOf(null, "a.example"), {});
+});
+
+add_task(function ruled_names_are_those_with_an_entry_in_a_wanted_map() {
+  const policy = {
+    sites: { "a.example": "full" },
+    console: { "b.example": "deny", "a.example": "allow" },
+    pageToolSites: { "c.example": "allow" },
+    pageToolGrants: { "d.example": ENTRIES.pageToolGrants },
+    downloads: "not a map",
+  };
+  Assert.deepEqual(ruledNames(policy), [
+    "a.example",
+    "b.example",
+    "c.example",
+    "d.example",
+  ]);
+  Assert.deepEqual(
+    ruledNames(policy, map => !map.tools),
+    ["a.example", "b.example"]
+  );
+  Assert.deepEqual(
+    ruledNames(policy, map => map.row),
+    ["a.example", "b.example", "c.example"],
+    "a remembered tool alone gives its site no row"
+  );
+  Assert.deepEqual(ruledNames(null), []);
 });

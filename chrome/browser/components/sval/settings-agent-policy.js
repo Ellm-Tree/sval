@@ -26,9 +26,11 @@
       "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     levelFor: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     PAGE_TOOL_SITE_ANSWERS:
-      "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
+      "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     pageToolsSettingOf:
-      "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs",
+      "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    ruledNames: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    ruleOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     scopeOfHost: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
     uploadFoldersOf:
@@ -272,17 +274,8 @@
      *   setting for its tools while those show.
      */
     _ruleSites(policy) {
-      const maps = ["sites", ...AGENT_FILE_AND_APP_MAPS];
-      if (this._showsSiteTools(policy)) {
-        maps.push("pageToolSites");
-      }
-      const keys = new Set();
-      for (const map of maps) {
-        for (const site of Object.keys(policy?.[map] ?? {})) {
-          keys.add(site);
-        }
-      }
-      return [...keys];
+      const tools = this._showsSiteTools(policy);
+      return lazy.ruledNames(policy, map => map.row && (tools || !map.tools));
     },
 
     /**
@@ -1553,13 +1546,7 @@
       const tools = this._showsSiteTools(policy);
       const undo = {
         site,
-        level: policy.sites?.[site],
-        downloads: policy.downloads?.[site],
-        uploads: policy.uploads?.[site],
-        console: policy.console?.[site],
-        apps: policy.apps?.[site],
-        toolSite: tools ? ownToolSite(policy, site) : null,
-        grants: tools ? { ...policy.pageToolGrants?.[site] } : {},
+        rule: lazy.ruleOf(policy, site, map => tools || !map.tools),
       };
       const recent = this._agentView.recent;
       recent.set(
@@ -1593,7 +1580,7 @@
       if (!undo) {
         return;
       }
-      this._changePolicy(store => store.restoreSite(id, undo.site, undo));
+      this._changePolicy(store => store.restoreSite(id, undo.site, undo.rule));
     },
   };
 

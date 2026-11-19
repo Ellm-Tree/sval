@@ -14,7 +14,6 @@
 
 import { printable } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
 import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
-import { mostSpecificRule } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { sha256Hex } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
 import {
   raceTimeout,
@@ -29,12 +28,6 @@ export const MAX_NAME_CHARS = 64;
 export const MAX_DESCRIPTION_CHARS = 2048;
 export const MAX_SCHEMA_BYTES = 16 * 1024;
 export const MAX_RESULT_BYTES = 256 * 1024;
-
-/** The values of the per-agent setting, layer B (§4.1). */
-export const PAGE_TOOLS_SETTINGS = Object.freeze(["off", "ask", "on"]);
-
-/** The answers a site can hold for its tools, layer C (§4.1). */
-export const PAGE_TOOL_SITE_ANSWERS = Object.freeze(["allow", "deny"]);
 
 /**
  * @param {unknown} text
@@ -205,116 +198,6 @@ export async function invoke(innerWindowId, name, input) {
     );
   }
   return data;
-}
-
-/** A grant is the hex SHA-256 of a tool's definition. */
-export const GRANT_HASH = /^[0-9a-f]{64}$/;
-
-/**
- * @param {unknown} value
- * @returns {object|null} `value` when it is a plain map of entries.
- */
-export function mapOf(value) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value
-    : null;
-}
-
-/**
- * The site-tools fields of `policy` as Sval reads them, for `cleanPolicy`:
- * what Sval cannot read is dropped, so the site asks again, and an unreadable
- * layer B is `"ask"` (§4.1). A field the policy does not hold stays absent.
- *
- * @param {object} policy
- * @returns {object} A copy of `policy`, every other field kept.
- */
-export function cleanPageToolFields(policy) {
-  const out = { ...policy };
-  if (
-    out.pageTools !== undefined &&
-    !PAGE_TOOLS_SETTINGS.includes(out.pageTools)
-  ) {
-    out.pageTools = "ask";
-  }
-  if (out.pageToolSites !== undefined) {
-    out.pageToolSites = Object.fromEntries(
-      Object.entries(mapOf(out.pageToolSites) ?? {}).filter(([, answer]) =>
-        PAGE_TOOL_SITE_ANSWERS.includes(answer)
-      )
-    );
-  }
-  if (out.pageToolGrants !== undefined) {
-    out.pageToolGrants = Object.fromEntries(
-      Object.entries(mapOf(out.pageToolGrants) ?? {})
-        .map(([site, tools]) => [
-          site,
-          Object.fromEntries(
-            Object.entries(mapOf(tools) ?? {}).filter(
-              ([, hash]) => typeof hash === "string" && GRANT_HASH.test(hash)
-            )
-          ),
-        ])
-        .filter(([, tools]) => Object.keys(tools).length)
-    );
-  }
-  return out;
-}
-
-/**
- * Layer B for an agent's policy (§4.1). A value Sval cannot read is `ask`.
- *
- * @param {object} policy
- * @returns {"off"|"ask"|"on"}
- */
-export function pageToolsSettingOf(policy) {
-  return PAGE_TOOLS_SETTINGS.includes(policy?.pageTools)
-    ? policy.pageTools
-    : "ask";
-}
-
-/**
- * Layer C for `host` (§4.1): the answer of the most specific name along its
- * scope chain that has one (`mostSpecificRule`). A value Sval cannot read is
- * no entry.
- *
- * @param {object} policy
- * @param {string} host A host or a site.
- * @returns {"allow"|"deny"|null}
- */
-export function pageToolSiteOf(policy, host) {
-  const sites = mapOf(policy?.pageToolSites);
-  if (!sites) {
-    return null;
-  }
-  const found = mostSpecificRule(host, name =>
-    Object.hasOwn(sites, name) && PAGE_TOOL_SITE_ANSWERS.includes(sites[name])
-      ? sites[name]
-      : undefined
-  );
-  return found ? found.rule : null;
-}
-
-/**
- * Whether "Always allow" was answered about this definition of `name` on
- * `host` (§4.3), by the most specific name along its scope chain that
- * remembers the tool (`mostSpecificRule`).
- *
- * @param {object} policy
- * @param {string} host A host or a site.
- * @param {string} name
- * @param {string} hash From {@link definitionHash}.
- * @returns {boolean}
- */
-export function grantMatches(policy, host, name, hash) {
-  const grants = mapOf(policy?.pageToolGrants);
-  if (!grants) {
-    return false;
-  }
-  const found = mostSpecificRule(host, scope => {
-    const tools = Object.hasOwn(grants, scope) ? mapOf(grants[scope]) : null;
-    return tools && Object.hasOwn(tools, name) ? tools[name] : undefined;
-  });
-  return found?.rule === hash;
 }
 
 /**
