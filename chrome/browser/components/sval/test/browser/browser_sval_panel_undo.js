@@ -76,7 +76,7 @@ function messageLasts(win = window) {
     if (!win.closed) {
       pointerOffTheMessage(win);
       await within(
-        win.SvalPanel.commitPendingDelete(),
+        win.SvalPanel.undo.commit(),
         10_000,
         "a delete still held back being made"
       );
@@ -301,7 +301,7 @@ add_task(async function a_hidden_tab_is_unloaded_and_its_audio_stops() {
 });
 
 /**
- * The one task that waits out the message's own timer (`_undoMessageMs`).
+ * The one task that waits out the message's own timer (`SvalPanelUndo.messageMs`).
  * The pointer is moved off the message first, since resting on it is what
  * holds the message up.
  */
@@ -314,7 +314,7 @@ add_task(async function the_delete_is_made_when_the_message_times_out() {
     () => !message(),
     "the message goes when its time is up",
     100,
-    Math.ceil((2 * SvalPanel._undoMessageMs) / 100)
+    Math.ceil((2 * SvalPanel.undo.messageMs) / 100)
   );
   await TestUtils.waitForCondition(async () => {
     const all = await nodes(SvalPanel.engine);
@@ -367,7 +367,7 @@ add_task(async function a_group_deleted_with_its_tabs_goes_on_commit() {
   const { tabs, ids } = await openTabs(2);
   const group = await aGroupOf(tabs);
   await deleteGroup(group, "ok");
-  await within(SvalPanel.commitPendingDelete(), 10_000, "the commit");
+  await within(SvalPanel.undo.commit(), 10_000, "the commit");
   const all = await nodes(SvalPanel.engine);
   Assert.ok(!(group in all), "the group went");
   Assert.ok(
@@ -407,7 +407,7 @@ add_task(async function a_group_whose_tabs_move_out_shows_them_meanwhile() {
     "the document keeps the tab in the group"
   );
 
-  await within(SvalPanel.commitPendingDelete(), 10_000, "the commit");
+  await within(SvalPanel.undo.commit(), 10_000, "the commit");
   const all = await nodes(SvalPanel.engine);
   Assert.ok(!(group in all), "the group went");
   Assert.equal(
@@ -464,7 +464,7 @@ add_task(async function a_workspace_waits_on_the_message_then_goes() {
   Assert.ok(other in SvalPanel.nodes, "Undo brings it back");
 
   await deleteWorkspace(other);
-  await within(SvalPanel.commitPendingDelete(), 10_000, "the commit");
+  await within(SvalPanel.undo.commit(), 10_000, "the commit");
   Assert.ok(
     !(other in (await nodes(SvalPanel.engine))),
     "the commit deletes it"
@@ -753,7 +753,7 @@ add_task(async function one_pane_of_a_split_waits_on_the_message() {
   Assert.ok(SvalPanel._rowFor(split), "the split's row is back");
 
   await closeRows([ids[0], ids[2]]);
-  await within(SvalPanel.commitPendingDelete(), 10_000, "the commit");
+  await within(SvalPanel.undo.commit(), 10_000, "the commit");
   const all = await nodes(SvalPanel.engine);
   Assert.ok(!(ids[0] in all), "the pane is deleted");
   Assert.ok(!(split in all), "with the split it left one page in");

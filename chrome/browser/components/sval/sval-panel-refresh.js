@@ -113,9 +113,9 @@ Object.assign(SvalPanel, {
       return;
     }
     // Without what waits on an Undo message, so every row, count and menu
-    // treats it as gone (`_viewOf`).
-    this._nodes = this._viewOf(this._treeNodes);
-    this._showStrandedDeleteHides();
+    // treats it as gone (`SvalPanelUndo.viewOf`).
+    this._nodes = this.undo.viewOf(this._treeNodes);
+    this.undo.showStrandedHides();
     this._dropOrphanTabs();
     // Before drawing: a pass can have taken away the workspace this window
     // was showing, and `render` draws whatever workspace the window shows.

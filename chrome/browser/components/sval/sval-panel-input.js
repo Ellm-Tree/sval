@@ -32,7 +32,7 @@ Object.assign(SvalPanel, {
       selecting: this.selection.several,
     });
     if (!command) {
-      if (event.key === "Escape" && this.dismissUndo()) {
+      if (event.key === "Escape" && this.undo.dismiss()) {
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -169,8 +169,8 @@ Object.assign(SvalPanel, {
     // The panel's own controls, which act on no row: the Undo message's and
     // the footer's media controls.
     const offRow = {
-      undo: () => this._takeUndo(),
-      dismissUndo: () => this.dismissUndo({ refocus: true }),
+      undo: () => this.undo.take(),
+      dismissUndo: () => this.undo.dismiss({ refocus: true }),
       mediaPrevious: () => this._runMediaBar(command),
       mediaBack: () => this._runMediaBar(command),
       mediaToggle: () => this._runMediaBar(command),

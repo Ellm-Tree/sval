@@ -926,7 +926,7 @@ Object.assign(SvalPanel, {
     const popup = parent.querySelector("menupopup");
     popup.textContent = "";
     const choices = moveToGroupChoices(this._nodes, ids, this._workspace.id, {
-      transparent: this._transparentIds(),
+      transparent: this.undo.transparentIds(),
     });
     for (const choice of choices) {
       const entry = document.createXULElement("menuitem");

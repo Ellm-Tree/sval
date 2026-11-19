@@ -140,7 +140,7 @@
         root: this._workspace.id,
         selected: this.selection.viewedId(),
         hidden: this._hiddenTabIds(),
-        transparent: this._transparentIds(),
+        transparent: this.undo.transparentIds(),
         pendingName: id => this._observer?.pendingName(id),
       });
 

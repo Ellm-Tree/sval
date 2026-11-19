@@ -300,8 +300,8 @@ async function shareFolder(path) {
 
 /**
  * Dismisses the panel's Undo message as its ✕ does, which makes the delete
- * the message held back (`SvalPanel.dismissUndo`), and waits for the delete
- * to have been made or refused. `dismissUndo` does not wait for it, and the
+ * the message held back (`SvalPanelUndo.dismiss`), and waits for the delete
+ * to have been made or refused. `dismiss` does not wait for it, and the
  * panel redraws once it ends.
  */
 async function dismissUndoMessage() {
@@ -312,7 +312,7 @@ async function dismissUndoMessage() {
   );
   dismiss.click();
   await TestUtils.waitForCondition(
-    () => !region.querySelector(".sval-undo") && !SvalPanel._pendingDelete,
+    () => !region.querySelector(".sval-undo") && !SvalPanel.undo.held,
     "the delete the message held is made"
   );
 }

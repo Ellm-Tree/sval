@@ -289,7 +289,7 @@ add_task(async function delete_removes_the_favorite_and_undo_brings_both() {
   await choose(await pinMenuOn(tileOf(guid)), "delete");
   await TestUtils.waitForCondition(() => !tileOf(guid), "the pin goes");
   Assert.ok(store.get(guid), "its Favorite waits on the panel's message");
-  await within(SvalPanel.commitPendingDelete(), 10_000, "the delete");
+  await within(SvalPanel.undo.commit(), 10_000, "the delete");
   Assert.equal(store.get(guid), null, "and goes with it");
   Assert.ok(SvalFavorites.canUndo(), "Undo is offered");
   await SvalFavorites.undo();

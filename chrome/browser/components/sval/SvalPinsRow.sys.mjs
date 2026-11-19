@@ -590,8 +590,8 @@ export class SvalPinsRow {
       Object.keys(nodes).filter(id => nodes[id]?.kind === WORKSPACE)
     );
     // A pin whose delete waits on any window's Undo message is left out
-    // (`SvalPanel.pendingPinGuids`).
-    const deleting = this.#panel.pendingPinGuids?.() ?? new Set();
+    // (`SvalPanelUndo.pinGuids`).
+    const deleting = this.#panel.undo.pinGuids();
     return slotsIn(
       this.#tiles,
       lazy.SvalWindowWorkspace.of(this.#window).id,
@@ -1671,7 +1671,7 @@ export class SvalPinsRow {
 
   /**
    * Deletes a pin or a pin folder once the panel's Undo message goes
-   * (`SvalPanel.deferDelete`). Its tile leaves every window's row at once,
+   * (`SvalPanelUndo.defer`). Its tile leaves every window's row at once,
    * and its pages in this window close at once, as closing a pin's page
    * does: a page holds nothing a pin keeps.
    *
@@ -1679,7 +1679,7 @@ export class SvalPinsRow {
    */
   async #deleteHeld(pin) {
     const { guid } = pin;
-    await this.#panel.deferDelete(
+    await this.#panel.undo.defer(
       `Deleted the “${pin.name}” pin`,
       {
         pins: [guid],
@@ -1743,7 +1743,7 @@ export class SvalPinsRow {
     }
     const name =
       pin.name ?? lazy.SvalFavoritesStore.readyInstance?.get(pin.guid)?.name;
-    await this.#panel.deferDelete(
+    await this.#panel.undo.defer(
       `Moved “${name}” to Favorites`,
       {
         undo: () => this.#undoMoveToFavorites(pin.guid, entry, released),

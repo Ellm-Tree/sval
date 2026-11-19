@@ -726,7 +726,7 @@ Object.assign(SvalPanel, {
    *   its parent, at its place, and remove `id` alone.
    */
   async _removeSubtree(id, { keepContents = false } = {}) {
-    await this.commitPendingDelete();
+    await this.undo.commit();
     const { rowIndexIn } = this._modules.SvalPanelModel;
     const { descendantIds } = this._modules.SvalTree;
     const ids = [id].flat();

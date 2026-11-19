@@ -61,7 +61,7 @@ var SvalPanel = {
 
   /**
    * The document's `nodes` map as last read, without what waits on an Undo
-   * message (`_viewOf`), and the rows drawn from it.
+   * message (`SvalPanelUndo.viewOf`), and the rows drawn from it.
    */
   _nodes: {},
   _rows: [],
@@ -155,6 +155,38 @@ var SvalPanel = {
       });
     }
     return this._selection;
+  },
+
+  /**
+   * This window's Undo message, and the delete waiting on it.
+   *
+   * @returns {SvalPanelUndo}
+   */
+  get undo() {
+    if (!this._undo) {
+      const panel = this;
+      this._undo = new this._modules.SvalPanelUndo(window, {
+        get region() {
+          return panel._els?.undoRegion ?? null;
+        },
+        get engine() {
+          return panel._engine;
+        },
+        refocus: () =>
+          panel._focusRow(panel._focusedId ?? panel.selection.selectedId()),
+        async committed(held) {
+          await panel.refresh();
+          if (held.tree?.workspace) {
+            panel._refreshOtherWindows();
+          }
+          if (held.pins) {
+            panel.renderPinsEverywhere();
+          }
+          panel._publishSoon();
+        },
+      });
+    }
+    return this._undo;
   },
 
   /** The document's `nodes` map as last read. */
@@ -475,6 +507,8 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
         SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
         slide: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
+        SvalPanelUndo:
+          "moz-src:///browser/components/sval/SvalPanelUndo.sys.mjs",
         SvalPanelSelection:
           "moz-src:///browser/components/sval/SvalPanelSelection.sys.mjs",
         SvalPanelReveal:
@@ -604,7 +638,7 @@ var SvalPanel = {
       return el;
     };
 
-    this.dismissUndo();
+    this.undo.dismiss();
     container.textContent = "";
 
     const root = make("div", { class: "sval-panel" });

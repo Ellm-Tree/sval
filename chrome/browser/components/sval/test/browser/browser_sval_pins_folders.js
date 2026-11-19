@@ -312,7 +312,7 @@ add_task(async function a_folders_menu_and_move_to_folder() {
     [a, b],
     "with its contents"
   );
-  await within(SvalPanel.commitPendingDelete(), 10_000, "the message going");
+  await within(SvalPanel.undo.commit(), 10_000, "the message going");
   atTaskEnd(() => store.get(folder) && store.delete(folder));
 });
 
