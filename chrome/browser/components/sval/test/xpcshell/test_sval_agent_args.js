@@ -2,8 +2,11 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 "use strict";
-const { validateArgs, ToolError } = ChromeUtils.importESModule(
+const { validateArgs } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs"
+);
+const { ToolError } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
 );
 
 const SCHEMA = {

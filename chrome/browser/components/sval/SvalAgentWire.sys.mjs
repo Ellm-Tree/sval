@@ -21,6 +21,11 @@
  * half, and both test suites pin the same independently computed vectors.
  */
 
+import { ERRORS } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
+import {
+  refusal,
+  toMcp,
+} from "moz-src:///browser/components/sval/SvalAgentResult.sys.mjs";
 import { toHex } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
 
 export const MAX_FRAME_BYTES = 1024 * 1024;
@@ -105,22 +110,12 @@ export class SvalAgentWireError extends Error {
  * @returns {object} A frame.
  */
 function tooLarge(mcp) {
-  const message =
-    "result_too_large: The result was too large to send. Ask for less of the page.";
   if (Array.isArray(mcp.result?.content)) {
     return {
       mcp: {
         jsonrpc: "2.0",
         id: mcp.id,
-        result: {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ error: "result_too_large", message }),
-            },
-          ],
-          isError: true,
-        },
+        result: toMcp(refusal("result_too_large")),
       },
     };
   }
@@ -128,7 +123,11 @@ function tooLarge(mcp) {
     mcp: {
       jsonrpc: "2.0",
       id: mcp.id,
-      error: { code: -32603, message, data: { error: "result_too_large" } },
+      error: {
+        code: -32603,
+        message: `result_too_large: ${ERRORS.result_too_large}`,
+        data: { error: "result_too_large" },
+      },
     },
   };
 }

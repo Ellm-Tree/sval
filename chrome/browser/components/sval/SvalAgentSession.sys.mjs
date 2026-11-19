@@ -17,9 +17,17 @@
 
 import {
   printable,
-  ToolError,
   validateArgs,
 } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
+import {
+  codeOf,
+  json,
+  refusal,
+  refusalOf,
+  text,
+  toMcp,
+} from "moz-src:///browser/components/sval/SvalAgentResult.sys.mjs";
 import {
   ApprovalWait,
   Ending,
@@ -463,65 +471,26 @@ export function eraOf(msg) {
   }
   return { modern: true, clientInfo: meta[CLIENT_INFO_KEY] ?? null };
 }
-const toolText = text => ({ content: [{ type: "text", text }] });
-/**
- * A failed tool call's result. Every tool error has this one shape, JSON
- * text carrying `error` (the code), `message` (which starts with the code,
- * so a reader that only shows text still sees it) and, where there is one,
- * `tab`, plus whatever else the error says (`ToolError.details`).
- *
- * @param {string} code
- * @param {string} text
- * @param {object} [extra]
- * @returns {object}
- */
-export const toolError = (code, text, extra = {}) => ({
-  content: [
-    {
-      type: "text",
-      text: JSON.stringify({
-        ...extra,
-        error: code,
-        message: `${code}: ${text}`,
-      }),
-    },
-  ],
-  isError: true,
-});
 const noTask = () =>
-  toolError(
+  refusal(
     "invalid_arguments",
     "task has nothing Sval can show. Say what you are doing in a few words, in letters and digits."
   );
 const noLongerPaired = () =>
-  toolError(
+  refusal(
     "not_paired",
     "This agent is no longer paired with Sval. Call request_isolated_pairing or request_shared_pairing to pair again."
   );
-const noWorkspace = () =>
-  toolError(
-    "no_workspace",
-    "This session has no workspace in Sval. Call set_task with what you are doing to make one, or use_workspace with the id of the workspace you used before."
-  );
-const workspaceInUse = () =>
-  toolError(
-    "workspace_in_use",
-    "Another session holds that workspace now. Call set_task to make a workspace of your own."
-  );
+const noWorkspace = () => refusal("no_workspace");
+const workspaceInUse = () => refusal("workspace_in_use");
 const workspaceNotFound = () =>
-  toolError(
+  refusal(
     "not_found",
     "No workspace of yours has that id. The user may have deleted it. Call set_task to make a new one."
   );
 
 /** The codes of a workspace the user holds, by take or by Stop. */
 const USER_HOLDS = new Set(["user_in_control", "stopped_by_user"]);
-
-/**
- * @param {object} refusal A tool error, as `toolError` makes it.
- * @returns {string} Its code.
- */
-const codeOf = refusal => JSON.parse(refusal.content[0].text).error;
 
 /**
  * What every answer that gives a session its workspace says of it.
@@ -533,7 +502,7 @@ const keepId = workspaceId =>
   `Your workspace id is "${workspaceId}". Keep it for as long as this conversation may go on: it is the only way back to this workspace. When the conversation resumes in a later session, call use_workspace with it before anything else. If you lose it, you cannot reconnect to this workspace.`;
 
 const awaitingPairing = () =>
-  toolError(
+  refusal(
     "awaiting_approval",
     "Sval is showing a Pair/Deny alert. Ask the user to approve the request in Sval, then call the same pairing tool again."
   );
@@ -778,9 +747,11 @@ export class SvalAgentSession {
       return msg.method === "tools/call"
         ? result(
             msg.id,
-            toolError(
-              "internal_error",
-              `${errorName}: Sval hit a fault. Try once more, then tell the user.`
+            toMcp(
+              refusal(
+                "internal_error",
+                `${errorName}: Sval hit a fault. Try once more, then tell the user.`
+              )
             )
           )
         : failure(msg.id, -32603, `internal_error: ${errorName}`);
@@ -815,11 +786,13 @@ export class SvalAgentSession {
       case "tools/call":
         return result(
           msg.id,
-          await this.#call(
-            msg.params?.name,
-            msg.params?.arguments,
-            wait,
-            era.modern ? era.clientInfo : this.#clientInfo
+          toMcp(
+            await this.#call(
+              msg.params?.name,
+              msg.params?.arguments,
+              wait,
+              era.modern ? era.clientInfo : this.#clientInfo
+            )
           )
         );
       default:
@@ -856,7 +829,7 @@ export class SvalAgentSession {
   async #call(name, rawArgs, wait, clientInfo) {
     if (!this.#agent) {
       if (!PAIRING_TOOLS.has(name)) {
-        return toolError(
+        return refusal(
           "not_paired",
           "This agent is not paired with Sval. Call request_isolated_pairing or request_shared_pairing first."
         );
@@ -869,7 +842,7 @@ export class SvalAgentSession {
         );
       } catch (err) {
         if (err instanceof ToolError) {
-          return toolError(err.code, err.message, err.details);
+          return refusalOf(err);
         }
         throw err;
       }
@@ -902,7 +875,7 @@ export class SvalAgentSession {
     }
     if (stop.stopped) {
       const err = await stop.promise.catch(e => e);
-      return toolError(err.code, err.message, err.details);
+      return refusalOf(err);
     }
     // A call Stop answers has had its reply, and its tool acts no more, a
     // Resume included, until it ends (`keepStopped`). A call after the
@@ -916,7 +889,7 @@ export class SvalAgentSession {
       answered = true;
       wait.answeredElsewhere();
       stop.keepStopped(running);
-      return toolError(err.code, err.message, err.details);
+      return refusalOf(err);
     });
     try {
       return await Promise.race([stopped, running]);
@@ -942,7 +915,7 @@ export class SvalAgentSession {
     }
     const definition = this.#definitions().find(t => t.name === name);
     if (!definition && !PAIRED_TOOLS.some(t => t.name === name)) {
-      return toolError("unknown_tool", "Sval has no tool by that name.");
+      return refusal("unknown_tool");
     }
     const housed = await this.#ensureHoused();
     if (housed !== true) {
@@ -957,10 +930,10 @@ export class SvalAgentSession {
         if (err instanceof ToolError) {
           // The tab is named only once the arguments are checked: an
           // unchecked one is whatever the agent sent.
-          return toolError(err.code, err.message, {
-            ...(typeof args?.tab === "string" && { tab: args.tab }),
-            ...err.details,
-          });
+          return refusalOf(
+            err,
+            typeof args?.tab === "string" ? { tab: args.tab } : {}
+          );
         }
         throw err;
       }
@@ -971,16 +944,14 @@ export class SvalAgentSession {
       case "delete_workspace":
         return this.#deleteWorkspace();
       case "list_tabs":
-        return toolText(
-          JSON.stringify({
-            workspace: this.#agent.task,
-            workspace_id: this.#agent.workspaceId,
-            tabs: await this.#deps.listTabs(this.#agent),
-            polite: politeRules(this.#agent.agentId),
-          })
-        );
+        return json({
+          workspace: this.#agent.task,
+          workspace_id: this.#agent.workspaceId,
+          tabs: await this.#deps.listTabs(this.#agent),
+          polite: politeRules(this.#agent.agentId),
+        });
       default:
-        return toolError("unknown_tool", "Sval has no tool by that name.");
+        return refusal("unknown_tool");
     }
   }
 
@@ -1018,7 +989,7 @@ export class SvalAgentSession {
       );
     } catch (err) {
       if (err instanceof ToolError) {
-        return toolError(err.code, err.message, err.details);
+        return refusalOf(err);
       }
       throw err;
     }
@@ -1032,10 +1003,10 @@ export class SvalAgentSession {
         return housed;
       }
       const id = await this.#makeWorkspace(task, modelFrom(args.model));
-      return toolText(`Your workspace is named "${task}". ${keepId(id)}`);
+      return text(`Your workspace is named "${task}". ${keepId(id)}`);
     }
     const { agentId, workspaceId } = this.#agent;
-    const named = toolText(
+    const named = text(
       `Your workspace is named "${task}". Its id is "${workspaceId}".`
     );
     if (task === this.#agent.task) {
@@ -1066,7 +1037,7 @@ export class SvalAgentSession {
       );
     } catch (err) {
       if (err instanceof ToolError) {
-        return toolError(err.code, err.message, err.details);
+        return refusalOf(err);
       }
       throw err;
     }
@@ -1089,7 +1060,7 @@ export class SvalAgentSession {
    *   its workspace.
    */
   #usingResult() {
-    return toolText(
+    return text(
       `You are working in your workspace "${this.#agent.task}" again. Its id is "${this.#agent.workspaceId}". list_tabs shows its tabs.`
     );
   }
@@ -1105,11 +1076,11 @@ export class SvalAgentSession {
       closed = await this.#deps.closeWindows(this.#agent.workspaceId);
     } catch (err) {
       if (err instanceof ToolError) {
-        return toolError(err.code, err.message, err.details);
+        return refusalOf(err);
       }
       throw err;
     }
-    return toolText(
+    return text(
       closed
         ? "Your window is closed, and your workspace keeps its tabs."
         : "Your window is Sval's only window, so it stays open."
@@ -1130,19 +1101,19 @@ export class SvalAgentSession {
       this.#deps.refuseIfWorkspaceHeld?.(workspaceId);
     } catch (err) {
       if (err instanceof ToolError) {
-        return toolError(err.code, err.message, err.details);
+        return refusalOf(err);
       }
       throw err;
     }
     if (!(await this.#deps.deleteWorkspace(workspaceId))) {
-      return toolError(
+      return refusal(
         "not_deleted",
         "Sval keeps at least one workspace, so it cannot delete this one now."
       );
     }
     await this.#deps.store.workspaceDeleted(workspaceId);
     this.#leave();
-    return toolText(
+    return text(
       "Your workspace and its tabs are deleted. Call set_task to make a new one if you need the browser again."
     );
   }
@@ -1199,7 +1170,7 @@ export class SvalAgentSession {
     const answer = await shared.answer;
     // No one is left to hand a secret to, so nothing is created.
     if (this.#closed) {
-      return toolError(
+      return refusal(
         "disconnected",
         "The agent disconnected before the user answered."
       );
@@ -1208,13 +1179,13 @@ export class SvalAgentSession {
       return this.#pairedResult();
     }
     if (answer?.action === "no_window") {
-      return toolError(
+      return refusal(
         "no_window",
         "Sval has no open window to ask the user in. Open a Sval window and try again."
       );
     }
     if (answer?.action !== "allow") {
-      return toolError(
+      return refusal(
         "pairing_denied",
         "The user declined to pair this agent with Sval. Don't ask again unless they tell you to."
       );
@@ -1365,7 +1336,7 @@ export class SvalAgentSession {
       this.#deps.refuseIfWorkspaceHeld?.(id);
     } catch (err) {
       if (err instanceof ToolError) {
-        return toolError(err.code, err.message, err.details);
+        return refusalOf(err);
       }
       throw err;
     }
@@ -1441,7 +1412,7 @@ export class SvalAgentSession {
     const where = this.#agent.workspaceId
       ? ` ${keepId(this.#agent.workspaceId)}`
       : "";
-    return toolText(
+    return text(
       `Paired with Sval as "${this.#agent.label}", in a workspace named "${this.#agent.task}".${kind}${where} Sval's tools are now available.`
     );
   }

@@ -27,7 +27,7 @@ const {
   "moz-src:///browser/components/sval/SvalAgentPageTools.sys.mjs"
 );
 const { ToolError } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs"
+  "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
 );
 
 /**

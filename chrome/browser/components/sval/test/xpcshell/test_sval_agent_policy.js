@@ -32,7 +32,7 @@ const {
   "moz-src:///browser/components/sval/SvalSite.sys.mjs"
 );
 const { ToolError } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs"
+  "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
 );
 
 add_task(function a_site_is_its_registrable_domain() {

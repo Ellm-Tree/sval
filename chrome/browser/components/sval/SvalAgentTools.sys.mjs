@@ -83,7 +83,13 @@
  * given, so the gate still settles that input's writes and reports them.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
+import {
+  image,
+  json,
+  refusal,
+  withFields,
+} from "moz-src:///browser/components/sval/SvalAgentResult.sys.mjs";
 import { noDialog } from "moz-src:///browser/components/sval/SvalAgentPageDialogs.sys.mjs";
 import {
   SvalLog,
@@ -603,14 +609,6 @@ function mergeWrites(outcomes) {
   }
   return "none";
 }
-
-/**
- * @param {object} value
- * @returns {object} An MCP tool result carrying `value` as JSON text.
- */
-const json = value => ({
-  content: [{ type: "text", text: JSON.stringify(value) }],
-});
 
 const badFile = () =>
   new ToolError(
@@ -1143,31 +1141,6 @@ const ACTING_TOOLS = new Set([
 ]);
 
 /**
- * @param {object} result A tool result.
- * @param {number} throttledMs
- * @returns {object} `result` with `throttled_ms` in its JSON text.
- */
-function withThrottled(result, throttledMs) {
-  const first = result?.content?.[0];
-  if (first?.type !== "text") {
-    return result;
-  }
-  return {
-    ...result,
-    content: [
-      {
-        ...first,
-        text: JSON.stringify({
-          ...JSON.parse(first.text),
-          throttled_ms: throttledMs,
-        }),
-      },
-      ...result.content.slice(1),
-    ],
-  };
-}
-
-/**
  * The tool handlers, keyed by tool name.
  *
  * @param {object} deps
@@ -1289,10 +1262,7 @@ export function createAgentTools({
         site = undefined;
       }
       if (!mayRead(agent, site)) {
-        throw new ToolError(
-          "frame_not_readable",
-          "The page holds a frame from a site you may not read, in a way Sval cannot leave out of a screenshot. Use get_snapshot instead."
-        );
+        throw new ToolError("frame_not_readable");
       }
     }
   }
@@ -1310,16 +1280,12 @@ export function createAgentTools({
     if (!report) {
       return;
     }
-    throw new DialogOpenError({
-      ...json({
-        error: "dialog_open",
-        message:
-          "dialog_open: A dialog is open in that tab and the page waits for it. Answer it with answer_dialog first.",
+    throw new DialogOpenError(
+      refusal("dialog_open", undefined, {
         tab,
         dialog: dialogFor(agent, report),
-      }),
-      isError: true,
-    });
+      })
+    );
   }
 
   /**
@@ -1438,10 +1404,7 @@ export function createAgentTools({
    */
   async function pageTools(agent, tab, task) {
     if (!Services.prefs.getBoolPref(lazy.MODEL_CONTEXT_PREF, false)) {
-      throw new ToolError(
-        "page_tools_off",
-        "The user has not let sites offer tools to agents. They can turn it on in Sval's Agents settings."
-      );
+      throw new ToolError("page_tools_off");
     }
     const { browser } = await pageIn(agent, tab, { task });
     const windowGlobal = browser.browsingContext?.currentWindowGlobal;
@@ -1516,47 +1479,70 @@ export function createAgentTools({
   /**
    * @param {object} agent
    * @param {object} browser
-   * @param {object} result
-   * @returns {object} `result` as a tool result, with any page dialog the
-   *   tab saw. In a tab the user has taken since the tool began, the result
-   *   fails as every tool there does, and keeps only what the agent's own
-   *   input did before the take: the tab, the fields it filled and what
-   *   became of the writes it set off. The page and its dialogs are the
-   *   user's (decision 0107).
+   * @param {object} body
+   * @returns {object} `body` with any page dialog the tab saw.
    */
-  function reply(agent, browser, result) {
+  function withDialog(agent, browser, body) {
+    const open = dialogs.openDialog(browser);
+    if (open) {
+      return { ...body, dialog: dialogFor(agent, open), dialog_open: true };
+    }
+    const report = dialogs.takeReport(browser);
+    return report ? { ...body, dialog: dialogFor(agent, report) } : body;
+  }
+
+  /**
+   * What an input did before the user took its tab, which is all a result
+   * there keeps: the tab, the fields it filled and what became of the writes
+   * it set off. The page and its dialogs are the user's (decision 0107).
+   *
+   * @param {object} body
+   * @returns {object}
+   */
+  const ownDoing = body => ({
+    tab: body.tab,
+    filled: body.filled,
+    writes: body.writes,
+    held: body.held,
+  });
+
+  /**
+   * @param {object} agent
+   * @param {object} browser
+   * @param {object} body
+   * @returns {object} The result of a tool that worked, with any page
+   *   dialog the tab saw. In a tab the user has taken since the tool began,
+   *   the result fails as every tool there does.
+   */
+  function reply(agent, browser, body) {
     try {
       refuseIfUserHolds(browser);
     } catch (err) {
-      const { tab, filled, writes, held } = result;
-      return {
-        ...json({
-          error: err.code,
-          message:
-            result.error === err.code
-              ? result.message
-              : `${err.code}: ${err.message}`,
-          tab,
-          filled,
-          writes,
-          held,
-        }),
-        isError: true,
-      };
+      return refusal(err.code, err.message, ownDoing(body));
     }
-    const open = dialogs.openDialog(browser);
-    if (open) {
-      return json({
-        ...result,
-        dialog: dialogFor(agent, open),
-        dialog_open: true,
-      });
+    return json(withDialog(agent, browser, body));
+  }
+
+  /**
+   * @param {object} agent
+   * @param {object} browser
+   * @param {string} code
+   * @param {string} message
+   * @param {object} body What the failure says besides.
+   * @returns {object} The result of a tool that failed in its page, as
+   *   `reply` answers one that worked.
+   */
+  function replyFailed(agent, browser, code, message, body) {
+    try {
+      refuseIfUserHolds(browser);
+    } catch (err) {
+      return refusal(
+        err.code,
+        err.code === code ? message : err.message,
+        ownDoing(body)
+      );
     }
-    const report = dialogs.takeReport(browser);
-    if (!report) {
-      return json(result);
-    }
-    return json({ ...result, dialog: dialogFor(agent, report) });
+    return refusal(code, message, withDialog(agent, browser, body));
   }
 
   /**
@@ -1587,22 +1573,21 @@ export function createAgentTools({
       if (err?.writes === undefined) {
         throw err;
       }
-      let error = "internal_error";
-      let message = `internal_error: ${err?.name ?? "Error"}: Sval hit a fault. Try once more, then tell the user.`;
+      let code = "internal_error";
+      let message = `${err?.name ?? "Error"}: Sval hit a fault. Try once more, then tell the user.`;
       if (err instanceof ToolError) {
-        error = err.code;
-        message = `${err.code}: ${err.message}`;
+        ({ code, message } = err);
       } else {
         SvalLog.error(`an agent input failed: ${describeError(err)}`);
       }
-      const result = reply(agent, browser, {
-        error,
-        message,
-        ...context(err),
-        writes: err.writes,
-        held: err.held,
-      });
-      return { failed: { ...result, isError: true } };
+      const { message: said = message, ...rest } = context(err);
+      return {
+        failed: replyFailed(agent, browser, code, said, {
+          ...rest,
+          writes: err.writes,
+          held: err.held,
+        }),
+      };
     }
   }
 
@@ -1696,7 +1681,7 @@ export function createAgentTools({
       const data = await screenshot(browser, {
         checkFrames: frames => refuseUnreadableFrames(agent, frames),
       });
-      return { content: [{ type: "image", data, mimeType: "image/png" }] };
+      return image(data);
     },
 
     async get_page_source(agent, { tab, ref, offset = 0, max_chars }) {
@@ -1803,7 +1788,7 @@ export function createAgentTools({
         },
         err => ({
           ...(err instanceof ToolError && {
-            message: `${err.code}: fields[${filled}] failed: ${err.message} The ${filled} fields before it were filled.`,
+            message: `fields[${filled}] failed: ${err.message} The ${filled} fields before it were filled.`,
           }),
           tab,
           filled,
@@ -2058,11 +2043,7 @@ export function createAgentTools({
       );
       const tool = tools.find(t => t.name === name);
       if (!tool) {
-        throw new ToolError(
-          "unknown_page_tool",
-          "The page has no tool by that name now. Call list_page_tools again.",
-          { tab }
-        );
+        throw new ToolError("unknown_page_tool", undefined, { tab });
       }
       const hash = await definitionHash(tool);
       const decision = sites.decidePageToolCall(agent, site, tool, hash);
@@ -2112,15 +2093,11 @@ export function createAgentTools({
       // eslint-disable-next-line no-inner-declarations
       async function callInWindows() {
         const outcomes = [];
-        const failure = (code, message) => ({
-          ...reply(agent, browser, {
+        const failure = (code, message) =>
+          replyFailed(agent, browser, code, message, {
             tab,
-            error: code,
-            message: `${code}: ${message}`,
             writes: mergeWrites(outcomes),
-          }),
-          isError: true,
-        });
+          });
         for (;;) {
           const held = Promise.withResolvers();
           const { done, failed } = await act(
@@ -2180,12 +2157,9 @@ export function createAgentTools({
           );
           if (failed) {
             // What the earlier windows did with the tool's writes still counts.
-            const body = JSON.parse(failed.content[0].text);
-            body.writes = mergeWrites([...outcomes, body.writes]);
-            return {
-              ...failed,
-              content: [{ type: "text", text: JSON.stringify(body) }],
-            };
+            return withFields(failed, {
+              writes: mergeWrites([...outcomes, failed.body.writes]),
+            });
           }
           outcomes.push(done.writes);
           if (done.writes === "awaiting_approval") {
@@ -2414,16 +2388,18 @@ export function createAgentTools({
         // An action the agent cancelled while it waited its turn is not
         // taken; the session sends no reply to a cancelled call.
         if (rest[0]?.wait?.cancelled) {
-          throw new ToolError("cancelled", "The agent cancelled the call.");
+          throw new ToolError("cancelled");
         }
         acting = name;
         try {
           const result = await handler(agent, args, ...rest);
-          return throttledMs ? withThrottled(result, throttledMs) : result;
+          return throttledMs
+            ? withFields(result, { throttled_ms: throttledMs })
+            : result;
         } catch (err) {
           if (err instanceof DialogOpenError) {
             return throttledMs
-              ? withThrottled(err.result, throttledMs)
+              ? withFields(err.result, { throttled_ms: throttledMs })
               : err.result;
           }
           if (throttledMs && err instanceof ToolError) {

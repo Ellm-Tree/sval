@@ -9,7 +9,7 @@
  * sites' tools still running.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import {
   answerOf,
   CHOICES,
@@ -1186,7 +1186,7 @@ export function createWriteGate({
     }
     const id = browserIdOf(browser);
     if (!id) {
-      throw new ToolError("no_document", "The tab has no page yet.");
+      throw new ToolError("no_document");
     }
     // An input may hold writes, and asking about them waits for the user.
     if (waitOf(task).full) {

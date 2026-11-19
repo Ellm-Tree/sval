@@ -20,7 +20,7 @@ const {
   "moz-src:///browser/components/sval/SvalAgentGate.sys.mjs"
 );
 const { ToolError } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs"
+  "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
 );
 const { SvalAgentStore } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentStore.sys.mjs"

@@ -12,7 +12,7 @@
  * reach privileged pages such as `about:config`.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import {
   mostSpecificRule,

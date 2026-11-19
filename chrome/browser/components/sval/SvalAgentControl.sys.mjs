@@ -58,7 +58,7 @@
  * held for a site alert when the user takes control goes on as theirs.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { WORKSPACE } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
@@ -68,14 +68,6 @@ import { WORKSPACE } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
  * with "0" when a workspace does, for what has no content.
  */
 export const CONTROL_TOPIC = "sval-agent-control-changed";
-
-/** What a tool in a workspace the user has taken says (spec §6). */
-export const USER_IN_CONTROL_MESSAGE =
-  "The user has taken control of your workspace, and you cannot act in it until they give it back. Wait until list_tabs no longer shows user_in_control.";
-
-/** What every call of an agent the user has stopped says (spec §6, §7.3). */
-export const STOPPED_BY_USER_MESSAGE =
-  "Stopped by the user. They pressed Stop in Sval, and every call you make fails until they press Resume. Tell the user you have stopped, and wait for them.";
 
 const lazy = {};
 
@@ -721,7 +713,7 @@ export function forgetControl(browserId) {
  *   taken answers.
  */
 export function userInControl() {
-  return new ToolError("user_in_control", USER_IN_CONTROL_MESSAGE);
+  return new ToolError("user_in_control");
 }
 
 /**
@@ -729,7 +721,7 @@ export function userInControl() {
  *   stopped answers.
  */
 export function stoppedByUser() {
-  return new ToolError("stopped_by_user", STOPPED_BY_USER_MESSAGE);
+  return new ToolError("stopped_by_user");
 }
 
 /**

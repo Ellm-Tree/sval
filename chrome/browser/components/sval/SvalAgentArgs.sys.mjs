@@ -8,24 +8,7 @@
  * value can be anything the agent sent.
  */
 
-/**
- * A tool failure, which the agent sees as JSON carrying `error: code` and
- * `message` (`SvalAgentSession`'s `toolError`).
- */
-export class ToolError extends Error {
-  /**
-   * @param {string} code A stable snake_case code, e.g. `not_controlled`.
-   * @param {string} message A sentence for the agent.
-   * @param {object} [details] More fields for the result, each one the
-   *   agent may see.
-   */
-  constructor(code, message, details = undefined) {
-    super(message);
-    this.name = "ToolError";
-    this.code = code;
-    this.details = details;
-  }
-}
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 
 /**
  * `text` without control and format characters (bidi overrides, zero-width

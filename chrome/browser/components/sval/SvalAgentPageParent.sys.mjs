@@ -10,7 +10,7 @@
  * `SvalAgents` registers the actor while agent access is on.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import {
   CONTROL_TOPIC,
   isAgentStopped,
@@ -18,7 +18,6 @@ import {
   isUserInControl,
   stoppedByUser,
   untilTaken,
-  USER_IN_CONTROL_MESSAGE,
 } from "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs";
 import {
   SvalLog,
@@ -30,46 +29,46 @@ import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
 export const PAGE_ACTOR = "SvalAgentPage";
 
-const MESSAGES = {
-  stale_ref: "That ref is from an older snapshot or page. Take a new snapshot.",
-  no_document: "The tab has no page yet.",
-  page_changed:
-    "The page changed while Sval was reading it. Take a new snapshot.",
-  not_visible:
-    "That element takes up no space on the page, so it cannot be clicked. Take a new snapshot.",
-  click_intercepted:
-    "Something else covers that element where it would be clicked. Take a new snapshot.",
-  press_intercepted:
-    "Sval pressed the element, but something moved over it before release. Sval released elsewhere. Take a new snapshot before acting again.",
-  not_clickable:
-    "That element holds another page, so Sval does not click into it. Take a new snapshot.",
-  opens_file_picker:
-    "That element opens a file chooser, which Sval does not open for agents. Give the file input its files with upload_file.",
-  not_file_input: "That element is not a file input.",
-  dialog_open:
-    "A dialog is open in that tab and the page waits for it. Answer it with answer_dialog first.",
-  bad_file:
-    "That input takes one file at a time, or a file could not be read. Check the paths and try again.",
-  not_editable: "That element cannot be typed into or changed.",
-  not_focusable:
-    "That field cannot take the keyboard focus, or the page moved focus away from it, so nothing more was typed. Take a new snapshot.",
-  not_a_select: "That element is not a list of options.",
-  one_option: "That list takes one option at a time.",
-  no_such_option: "That list has no option with that value or label.",
-  user_in_control: USER_IN_CONTROL_MESSAGE,
-  page_unresponsive: "The page did not respond. Take a new snapshot.",
-  unknown_key:
-    "Each key must be one character or one of Enter, Tab, Escape, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown or Space.",
-};
+/**
+ * The codes a page's child may answer with, each one the agent sees under
+ * that name with the code's own sentence (`ERRORS`). Any other answer is
+ * `page_failed`: the child runs beside the page, and what it says reaches an
+ * agent's model.
+ */
+const CHILD_CODES = new Set([
+  "stale_ref",
+  "no_document",
+  "page_changed",
+  "not_visible",
+  "click_intercepted",
+  "not_clickable",
+  "not_file_input",
+  "dialog_open",
+  "bad_file",
+  "not_editable",
+  "not_focusable",
+  "not_a_select",
+  "one_option",
+  "no_such_option",
+  "user_in_control",
+  "page_unresponsive",
+  "unknown_key",
+]);
 
 /**
  * Child answers the agent sees under another code, each with its own
  * explanation: a click refused after the press is still an intercepted
  * click, and an element that opens a file picker is not clickable.
  */
-const CODES = {
-  press_intercepted: "click_intercepted",
-  opens_file_picker: "not_clickable",
+const RENAMED = {
+  press_intercepted: [
+    "click_intercepted",
+    "Sval pressed the element, but something moved over it before release. Sval released elsewhere. Take a new snapshot before acting again.",
+  ],
+  opens_file_picker: [
+    "not_clickable",
+    "That element opens a file chooser, which Sval does not open for agents. Give the file input its files with upload_file.",
+  ],
 };
 
 /**
@@ -136,7 +135,7 @@ export function forgetRefs(browserId) {
   nextRefs.delete(browserId);
 }
 
-const noDocument = () => new ToolError("no_document", MESSAGES.no_document);
+const noDocument = () => new ToolError("no_document");
 
 /**
  * The page actor for what `browser` shows now. Ask again after a navigation:
@@ -234,7 +233,7 @@ export class SvalAgentPageParent extends JSWindowActorParent {
     // starts, a call's that Stop answered included after a Resume.
     const id = this.browsingContext.top.browserId;
     if (isUserInControl(id)) {
-      throw new ToolError("user_in_control", USER_IN_CONTROL_MESSAGE);
+      throw new ToolError("user_in_control");
     }
     if (isAgentStopped(id) || isStopAnswered(id)) {
       throw stoppedByUser();
@@ -242,10 +241,7 @@ export class SvalAgentPageParent extends JSWindowActorParent {
     const taken = untilTaken(id);
     const late = Promise.withResolvers();
     const timer = setTimeout(
-      () =>
-        late.reject(
-          new ToolError("page_unresponsive", MESSAGES.page_unresponsive)
-        ),
+      () => late.reject(new ToolError("page_unresponsive")),
       Math.max(Math.min(pageTimeoutMs + waitMs, until - Date.now()), 0)
     );
     let answer;
@@ -255,7 +251,7 @@ export class SvalAgentPageParent extends JSWindowActorParent {
       answer = await Promise.race([query, taken.promise, late.promise]);
     } catch (err) {
       if (PAGE_GONE.has(err?.name)) {
-        throw new ToolError("page_changed", MESSAGES.page_changed);
+        throw new ToolError("page_changed");
       }
       throw err;
     } finally {
@@ -264,13 +260,10 @@ export class SvalAgentPageParent extends JSWindowActorParent {
     }
     const code = answer?.error;
     if (code !== undefined) {
-      if (!Object.hasOwn(MESSAGES, code)) {
-        throw new ToolError("page_failed", "Sval could not read the page.");
+      if (Object.hasOwn(RENAMED, code)) {
+        throw new ToolError(...RENAMED[code]);
       }
-      throw new ToolError(
-        Object.hasOwn(CODES, code) ? CODES[code] : code,
-        MESSAGES[code]
-      );
+      throw new ToolError(CHILD_CODES.has(code) ? code : "page_failed");
     }
     return answer;
   }

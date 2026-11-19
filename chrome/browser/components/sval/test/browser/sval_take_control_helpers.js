@@ -17,9 +17,12 @@
             takeControlOf, giveBackFrom, pressTakeControl, showTab,
             ORG_PAGE, pageActor, noLoadStarts */
 
-const { isUserInControl, USER_IN_CONTROL_MESSAGE } = ChromeUtils.importESModule(
+const { isUserInControl } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs"
 );
+const USER_IN_CONTROL_MESSAGE = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
+).ERRORS.user_in_control;
 
 const INPUT = ROOT + "sval_agent_input.html";
 

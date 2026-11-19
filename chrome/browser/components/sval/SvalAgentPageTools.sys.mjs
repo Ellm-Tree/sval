@@ -12,10 +12,8 @@
  * §4.1 and the site's level.
  */
 
-import {
-  printable,
-  ToolError,
-} from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { printable } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import { mostSpecificRule } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { sha256Hex } from "moz-src:///browser/components/sval/SvalBytes.sys.mjs";
 import {

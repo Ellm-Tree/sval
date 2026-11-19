@@ -8,7 +8,7 @@
  */
 
 import { MAX_WAITING_CALLS } from "moz-src:///browser/components/sval/SvalAgentAlerts.sys.mjs";
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import { scopeOfHost } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 
 export const CHOICES = Object.freeze([

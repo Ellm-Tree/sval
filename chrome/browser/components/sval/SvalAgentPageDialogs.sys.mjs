@@ -49,7 +49,7 @@
  * element in the parent.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import {
   SvalLog,
   describeError,
@@ -84,11 +84,7 @@ const HANDLING = {
 };
 
 /** What answering a dialog says when the tab has none open. */
-export const noDialog = () =>
-  new ToolError(
-    "no_dialog",
-    "No confirm or prompt dialog is open in that tab."
-  );
+export const noDialog = () => new ToolError("no_dialog");
 
 /**
  * @param {string} text

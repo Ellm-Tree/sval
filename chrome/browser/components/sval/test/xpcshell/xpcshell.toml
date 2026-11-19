@@ -42,6 +42,8 @@ skip-if = ["os == 'win'"]
 
 ["test_sval_agent_polite.js"]
 
+["test_sval_agent_result.js"]
+
 ["test_sval_agent_session.js"]
 
 ["test_sval_agent_store.js"]

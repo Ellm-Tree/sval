@@ -183,7 +183,7 @@
  */
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import {
   CONTROL_TOPIC,
   forgetControl,
@@ -1654,7 +1654,7 @@ export function createAgentGate({
   function checkPage(agent, browser) {
     const windowGlobal = browser.browsingContext?.currentWindowGlobal;
     if (!windowGlobal) {
-      throw new ToolError("no_document", "The tab has no page yet.");
+      throw new ToolError("no_document");
     }
     return checkSite(agent, hostOfDocument(windowGlobal));
   }

@@ -29,7 +29,7 @@
  * as a closed tab does, so no tab has two ids.
  */
 
-import { ToolError } from "moz-src:///browser/components/sval/SvalAgentArgs.sys.mjs";
+import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
 import {
   asAgentLoad,
   beginAgentNavigation,

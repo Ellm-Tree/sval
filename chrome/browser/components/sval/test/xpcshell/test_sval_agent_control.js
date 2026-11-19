@@ -3,6 +3,10 @@
 
 "use strict";
 
+const { ERRORS } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs"
+);
+
 const {
   asAgentLoad,
   beginAgentNavigation,
@@ -95,7 +99,6 @@ add_task(function an_activity_line_names_the_tool_and_the_site() {
 add_task(function a_take_holds_the_whole_workspace() {
   const {
     CONTROL_TOPIC,
-    USER_IN_CONTROL_MESSAGE,
     holdWorkspace,
     isWorkspaceHeld,
     refuseIfWorkspaceHeld,
@@ -124,8 +127,7 @@ add_task(function a_take_holds_the_whole_workspace() {
     Assert.ok(!isWorkspaceHeld("other"), "another workspace is not");
     Assert.throws(
       () => refuseIfWorkspaceHeld("ws"),
-      e =>
-        e.code === "user_in_control" && e.message === USER_IN_CONTROL_MESSAGE,
+      e => e.code === "user_in_control" && e.message === ERRORS.user_in_control,
       "every tool in it is refused"
     );
     Assert.deepEqual(heard, ["0"], "and every window hears of it");
@@ -155,7 +157,6 @@ add_task(function a_take_holds_the_whole_workspace() {
 add_task(async function stop_refuses_the_agent_until_resume() {
   const {
     CONTROL_TOPIC,
-    STOPPED_BY_USER_MESSAGE,
     isWorkspaceStopped,
     refuseIfWorkspaceHeld,
     stopWorkspace,
@@ -185,8 +186,7 @@ add_task(async function stop_refuses_the_agent_until_resume() {
     Assert.ok(stopped.has("ws"), "and kept");
     await Assert.rejects(
       running.promise,
-      e =>
-        e.code === "stopped_by_user" && e.message === STOPPED_BY_USER_MESSAGE,
+      e => e.code === "stopped_by_user" && e.message === ERRORS.stopped_by_user,
       "a call already running is answered at once"
     );
     Assert.throws(
