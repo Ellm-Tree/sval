@@ -23,6 +23,7 @@
  */
 
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { onTabGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { isQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeekTab.sys.mjs";
 import {
   CONTROL_TOPIC,
@@ -530,28 +531,24 @@ Services.obs.addObserver((subject, topic, data) => {
 }, CONTROL_TOPIC);
 
 const contexts = {
-  observe(bc, topic, why) {
+  observe(bc) {
     try {
       if (bc.parent || !bc.isContent || !bc.browserId) {
         return;
       }
-      if (topic === "browsing-context-attached") {
-        // New content in a tab the tree already holds, as a lazy or
-        // discarded tab's browser goes in. Gecko attaches a browser's new
-        // context before it gives the context its embedder
-        // (`nsFrameLoader::MaybeCreateDocShell`, `ContentParent::CreateBrowser`),
-        // so a context with no embedder yet is marked on the next turn.
-        if (bc.embedderElement) {
-          mark(bc.embedderElement);
-        } else {
-          Services.tm.dispatchToMainThread(() => {
-            if (!bc.isDiscarded) {
-              mark(bc.embedderElement);
-            }
-          });
-        }
-      } else if (why !== "replace") {
-        marked.delete(bc.browserId);
+      // New content in a tab the tree already holds, as a lazy or
+      // discarded tab's browser goes in. Gecko attaches a browser's new
+      // context before it gives the context its embedder
+      // (`nsFrameLoader::MaybeCreateDocShell`, `ContentParent::CreateBrowser`),
+      // so a context with no embedder yet is marked on the next turn.
+      if (bc.embedderElement) {
+        mark(bc.embedderElement);
+      } else {
+        Services.tm.dispatchToMainThread(() => {
+          if (!bc.isDiscarded) {
+            mark(bc.embedderElement);
+          }
+        });
       }
     } catch (err) {
       SvalLog.warn(
@@ -561,7 +558,7 @@ const contexts = {
   },
 };
 Services.obs.addObserver(contexts, "browsing-context-attached");
-Services.obs.addObserver(contexts, "browsing-context-discarded");
+onTabGone(browserId => marked.delete(browserId));
 
 /**
  * @param {object} browser A `<browser>`.

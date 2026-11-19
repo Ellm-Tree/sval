@@ -59,6 +59,7 @@
  */
 
 import { ToolError } from "moz-src:///browser/components/sval/SvalAgentErrors.sys.mjs";
+import { onTabGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { WORKSPACE } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
@@ -685,6 +686,7 @@ export function forgetControl(browserId) {
     changed(browserId);
   }
 }
+onTabGone(forgetControl);
 
 /**
  * @returns {ToolError} The refusal every tool in a workspace the user has

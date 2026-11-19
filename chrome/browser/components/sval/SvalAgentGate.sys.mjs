@@ -189,7 +189,6 @@ import {
 } from "moz-src:///browser/components/sval/SvalAgentUploads.sys.mjs";
 import {
   CONTROL_TOPIC,
-  forgetControl,
   isAgentNavigating,
   isAgentStopped,
   isUserInControl,
@@ -232,6 +231,7 @@ import {
   QUIET_MS,
   topContextOf,
 } from "moz-src:///browser/components/sval/SvalAgentWrites.sys.mjs";
+import { onContextGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { awaitAnswer } from "moz-src:///browser/components/sval/SvalAgentAsk.sys.mjs";
 import {
   APP,
@@ -254,9 +254,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
   recordResponse:
     "moz-src:///browser/components/sval/SvalAgentChallenge.sys.mjs",
-  forgetChallenges:
-    "moz-src:///browser/components/sval/SvalAgentChallenge.sys.mjs",
-  forgetRefs: "moz-src:///browser/components/sval/SvalAgentPageParent.sys.mjs",
   watchConsole:
     "moz-src:///browser/components/sval/SvalAgentPageParent.sys.mjs",
   fullWindowShowing: "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs",
@@ -266,7 +263,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 const MODIFY_REQUEST_TOPIC = "http-on-modify-request";
 const STOP_REQUEST_TOPIC = "http-on-stop-request";
-const DISCARDED_TOPIC = "browsing-context-discarded";
 const BEFORE_SHOW_TOPIC = "browser-window-before-show";
 const GLOBAL_CREATED_TOPIC = "window-global-created";
 
@@ -1155,9 +1151,8 @@ export function createAgentGate({
   };
 
   const contexts = {
-    observe(subject, topic, why) {
+    observe(subject, topic) {
       try {
-        const bc = subject;
         if (topic === BEFORE_SHOW_TOPIC) {
           registry.onWindowBeforeShow(subject);
         } else if (topic === GLOBAL_CREATED_TOPIC) {
@@ -1170,17 +1165,6 @@ export function createAgentGate({
             registry.agentForLoad(windowGlobal.browsingContext)
           ) {
             lazy.watchConsole(windowGlobal);
-          }
-        } else if (why !== "replace") {
-          // A replaced context hands its `browserId` to the next one, and
-          // its load can still be under way; a discarded one is gone, and a
-          // discarded top-level one is a tab that is gone.
-          starts.forget(bc.id);
-          if (!bc.parent && bc.browserId) {
-            writes.forget(bc.browserId);
-            forgetControl(bc.browserId);
-            lazy.forgetChallenges(bc.browserId);
-            lazy.forgetRefs(bc.browserId);
           }
         }
       } catch (err) {
@@ -1204,7 +1188,7 @@ export function createAgentGate({
   }
   Services.obs.addObserver(requests, MODIFY_REQUEST_TOPIC);
   Services.obs.addObserver(stops, STOP_REQUEST_TOPIC);
-  Services.obs.addObserver(contexts, DISCARDED_TOPIC);
+  const stopContextGone = onContextGone(id => starts.forget(id));
   Services.obs.addObserver(contexts, BEFORE_SHOW_TOPIC);
   Services.obs.addObserver(contexts, GLOBAL_CREATED_TOPIC);
   for (const win of Services.wm.getEnumerator("navigator:browser")) {
@@ -1949,7 +1933,7 @@ export function createAgentGate({
       tabRouters.delete(routeTab);
       writes.refuseAll();
       stopObserving();
-      Services.obs.removeObserver(contexts, DISCARDED_TOPIC);
+      stopContextGone();
       Services.obs.removeObserver(contexts, BEFORE_SHOW_TOPIC);
       Services.obs.removeObserver(contexts, GLOBAL_CREATED_TOPIC);
       Services.obs.removeObserver(takes, CONTROL_TOPIC);

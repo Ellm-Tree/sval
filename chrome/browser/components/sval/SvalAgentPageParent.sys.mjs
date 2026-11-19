@@ -23,6 +23,7 @@ import {
   SvalLog,
   describeError,
 } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { onTabGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { MAX_NEW_REFS } from "moz-src:///browser/components/sval/SvalAgentSnapshot.sys.mjs";
 import { MAX_FRAME_BYTES } from "moz-src:///browser/components/sval/SvalAgentWire.sys.mjs";
 import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
@@ -126,14 +127,7 @@ export function pageDeadline() {
   return Date.now() + pageTimeoutMs;
 }
 
-/**
- * Forgets where a tab that is gone had its ref numbers up to.
- *
- * @param {number} browserId
- */
-export function forgetRefs(browserId) {
-  nextRefs.delete(browserId);
-}
+onTabGone(browserId => nextRefs.delete(browserId));
 
 const noDocument = () => new ToolError("no_document");
 

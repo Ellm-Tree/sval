@@ -54,6 +54,7 @@ import {
   SvalLog,
   describeError,
 } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
+import { onTabGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { hostOfDocument } from "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs";
 
 const lazy = {};
@@ -63,7 +64,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 const LOADED_TOPIC = "common-dialog-loaded";
-const DISCARDED_TOPIC = "browsing-context-discarded";
 
 /** The longest dialog message a tool result carries, in characters. */
 export const MAX_MESSAGE = 500;
@@ -238,20 +238,11 @@ export function createAgentDialogs({ gate }) {
   };
   Services.obs.addObserver(observer, LOADED_TOPIC);
 
-  // A tab's reports go when the tab does: its top context is discarded.
-  // One replaced by a process switch keeps its `browserId` and its tab.
-  const discarded = {
-    observe(context, topic, why) {
-      if (why === "replace" || context.parent || !context.isContent) {
-        return;
-      }
-      const id = context.browserId;
-      reports.delete(id);
-      open.delete(id);
-      waiters.delete(id);
-    },
-  };
-  Services.obs.addObserver(discarded, DISCARDED_TOPIC);
+  const stopTabGone = onTabGone(id => {
+    reports.delete(id);
+    open.delete(id);
+    waiters.delete(id);
+  });
 
   return {
     /**
@@ -357,7 +348,7 @@ export function createAgentDialogs({ gate }) {
       }
       closed = true;
       Services.obs.removeObserver(observer, LOADED_TOPIC);
-      Services.obs.removeObserver(discarded, DISCARDED_TOPIC);
+      stopTabGone();
       reports.clear();
       open.clear();
       waiters.clear();

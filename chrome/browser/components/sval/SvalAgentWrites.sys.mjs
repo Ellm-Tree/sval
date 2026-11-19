@@ -32,6 +32,7 @@ import {
   isUsersTab,
   MAX_OPENER_DEPTH,
 } from "moz-src:///browser/components/sval/SvalAgentTabRegistry.sys.mjs";
+import { onTabGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
@@ -630,6 +631,7 @@ export function createWriteGate({
    * @type {Map<number, Map<number, {agent: object, siteOrigins: Set<string>}>>}
    */
   const actedOn = new Map();
+  const stopTabGone = onTabGone(browserId => actedOn.delete(browserId));
 
   /**
    * The window collecting late writes on each tab, by the `browserId` of
@@ -1422,15 +1424,6 @@ export function createWriteGate({
     },
 
     /**
-     * Forgets the documents an input reached in a tab that is gone.
-     *
-     * @param {number} browserId
-     */
-    forget(browserId) {
-      actedOn.delete(browserId);
-    },
-
-    /**
      * Agent access went off: every window still open goes on refusing its
      * tab's writes until it ends, so switching access off never lets one
      * through unasked.
@@ -1443,11 +1436,15 @@ export function createWriteGate({
       }
     },
 
-    /** Cancels every write held for the user, whom nothing is left to ask. */
+    /**
+     * Cancels every write held for the user, whom nothing is left to ask.
+     * The gate's last call.
+     */
     cancelHeld() {
       for (const channel of [...heldWrites]) {
         releaseWrite(channel, false);
       }
+      stopTabGone();
     },
   };
 }

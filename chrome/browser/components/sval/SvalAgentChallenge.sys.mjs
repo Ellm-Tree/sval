@@ -45,6 +45,7 @@ import {
   isUserInControl,
 } from "moz-src:///browser/components/sval/SvalAgentControl.sys.mjs";
 import { pageActor } from "moz-src:///browser/components/sval/SvalAgentPageParent.sys.mjs";
+import { onTabGone } from "moz-src:///browser/components/sval/SvalAgentTabLife.sys.mjs";
 import { setTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
 /** Notified with the `browserId` as data when a tab's check comes or goes. */
@@ -474,16 +475,11 @@ function observeControl() {
   }, CONTROL_TOPIC);
 }
 
-/**
- * Forgets what was seen in a tab that is gone.
- *
- * @param {number} browserId
- */
-export function forgetChallenges(browserId) {
+onTabGone(browserId => {
   responses.delete(browserId);
   found.delete(browserId);
   widgetSeen.delete(browserId);
-}
+});
 
 export function resetForTests() {
   responses.clear();
