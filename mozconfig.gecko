@@ -46,7 +46,15 @@ ac_add_options --enable-lto=thin
 #   use       compiles with the merged profile at SVAL_PGO_PROFILE that such a
 #             run wrote
 case "${SVAL_PGO:-}" in
-  1) ac_add_options MOZ_PGO=1 ;;
+  1)
+    ac_add_options MOZ_PGO=1
+    # mach configures the instrumented pass with MOZ_PROFILE_GENERATE set.
+    # That pass builds no SIMPLE_PROGRAMS (config/rules.mk), and the update
+    # tests' Makefile.in installs one on macOS, so the pass builds no tests.
+    if [ -n "${MOZ_PROFILE_GENERATE:-}" ]; then
+      ac_add_options --disable-tests
+    fi
+    ;;
   generate) ac_add_options --enable-profile-generate=cross ;;
   use)
     ac_add_options --enable-profile-use=cross
