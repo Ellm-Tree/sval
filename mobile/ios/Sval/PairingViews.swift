@@ -56,7 +56,7 @@ struct PairingSheet: View {
             .foregroundStyle(theme.text)
             .sheetGround()
             .navigationTitle("Sync with Another Device")
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode("Sync with Another Device")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .close) { dismiss() }

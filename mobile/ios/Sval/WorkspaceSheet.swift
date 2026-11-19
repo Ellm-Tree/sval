@@ -14,6 +14,7 @@ struct WorkspaceSheet: View {
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var typeSize
 
     let onNewTab: () -> Void
     /// Closes the panel the sheet is drawn in while the phone is sideways,
@@ -92,6 +93,15 @@ struct WorkspaceSheet: View {
         NavigationStack(path: $path) {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
+                    // A bar holds what is in it to a few sizes past the
+                    // standard one, so at the accessibility sizes the
+                    // Workspace's name heads the sheet's content.
+                    if typeSize.isAccessibilitySize, !editing {
+                        title(inBar: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 10)
+                    }
                     if isPrivateSession {
                         privateNotice
                     } else if !panel {
@@ -138,7 +148,7 @@ struct WorkspaceSheet: View {
             .toolbar { topBar }
             .toolbar { bottomBar }
             .navigationTitle(editing ? (selected.isEmpty ? "Select Tabs" : "\(selected.count) Selected") : "")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(editing && typeSize.isAccessibilitySize ? .large : .inline)
             .sheetTint(model.tint(of: workspace))
             .navigationDestination(for: SheetPage.self) { page in
                 switch page {
@@ -258,25 +268,26 @@ struct WorkspaceSheet: View {
     /// The Workspace's name, which opens its editor: name, emoji, colour
     /// and Delete. An agent's and the private session's aren't the user's
     /// to change.
-    private var title: some View {
+    private func title(inBar: Bool) -> some View {
         Button {
             if let workspace, workspace.agent == nil, !isPrivateSession { look = .edit(workspace) }
         } label: {
             HStack(spacing: 10) {
-                WorkspaceTile(workspace: workspace, size: 34, fill: theme.cell)
+                WorkspaceTile(workspace: workspace, size: inBar ? 34 : 56, fill: theme.cell)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(workspace.map(WorkspaceTile.name) ?? "")
                         .font(SvalFont.outfit(17, .bold, relativeTo: .headline))
-                        .lineLimit(1)
+                        .lineLimit(inBar ? 1 : 2)
                     Text(summary)
                         .font(.system(.caption))
                         .foregroundStyle(theme.muted)
-                        .lineLimit(1)
+                        .lineLimit(inBar ? 1 : 2)
                 }
+                .multilineTextAlignment(.leading)
             }
             .contentShape(.rect)
             // A leading bar item gets only the room it asks for.
-            .fixedSize()
+            .fixedSize(horizontal: inBar, vertical: inBar)
         }
         .buttonStyle(.plain)
     }
@@ -286,8 +297,10 @@ struct WorkspaceSheet: View {
     /// and Done.
     @ToolbarContentBuilder private var topBar: some ToolbarContent {
         if !editing {
-            ToolbarItem(placement: .topBarLeading) { title }
-                .sharedBackgroundVisibility(.hidden)
+            if !typeSize.isAccessibilitySize {
+                ToolbarItem(placement: .topBarLeading) { title(inBar: true) }
+                    .sharedBackgroundVisibility(.hidden)
+            }
             if let workspace {
                 // How the tabs are drawn, then the Workspace's own changes.
                 // An agent's Workspace is the agent's to arrange.
@@ -940,7 +953,7 @@ struct WorkspaceSheet: View {
                     Text(name(row))
                         .font(.system(.body, weight: front ? .semibold : .regular))
                         .foregroundStyle(elsewhere ? rowInk.muted : rowInk.text)
-                        .lineLimit(1)
+                        .titleLines()
                     if let site = site(of: row) {
                         Text(site)
                             .font(.system(.footnote))
@@ -965,7 +978,7 @@ struct WorkspaceSheet: View {
         }
         .padding(.leading, 12 + indent)
         .padding(.trailing, 2 + cardInset(block))
-        .frame(minHeight: RowMetrics.tab)
+        .rowHeight(RowMetrics.tab)
         .background { frontCard(block, front: front) }
         .contentShape(.rect)
         // A tap gesture, since a Button's label can't hold the rename
@@ -1122,7 +1135,7 @@ struct WorkspaceSheet: View {
                 Text(name(row))
                     .font(.system(.body, weight: .semibold))
                     .foregroundStyle(rowInk.text)
-                    .lineLimit(1)
+                    .titleLines()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("\(count)")
                     .font(.system(.subheadline))
@@ -1133,7 +1146,7 @@ struct WorkspaceSheet: View {
         }
         .padding(.leading, 12 + indent)
         .padding(.trailing, cardInset(block))
-        .frame(minHeight: RowMetrics.group)
+        .rowHeight(RowMetrics.group)
         .background { blockBackground(block, front: false) }
         .contentShape(.rect)
         // A tap gesture, since a Button's label can't hold the rename field.
@@ -1685,11 +1698,11 @@ struct HeaderMenu: View, Equatable {
 
     var body: some View {
         Menu {
-            ControlGroup {
-                ForEach(TabLayout.allCases, id: \.self) { choice in
-                    Toggle(isOn: Binding(get: { layout == choice }, set: { if $0 { layout = choice } })) { choice.label }
-                }
+            Picker("Show Tabs As", selection: $layout) {
+                ForEach(TabLayout.allCases, id: \.self) { choice in choice.label.tag(choice) }
             }
+            .pickerStyle(.palette)
+            .menuActionDismissBehavior(.enabled)
             if editable {
                 Section {
                     Button(groups ? "Edit Tabs and Groups…" : "Edit Tabs…", systemImage: "checkmark.circle",

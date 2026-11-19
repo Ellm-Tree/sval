@@ -810,7 +810,7 @@ struct SiteMenuView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(SvalFont.outfit(20, .bold, relativeTo: .title3))
-                    .lineLimit(1)
+                    .titleLines()
                 Text(protections == nil ? "Not a website. Protections don't apply."
                      : (protections! ? "Protections on" : "Protections off for this site"))
                     .font(.system(.subheadline))

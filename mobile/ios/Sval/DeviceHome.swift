@@ -88,14 +88,18 @@ struct BarMarker: View {
 /// The intro's markers just above each of the open bar's capsules, at
 /// their places in `GlassFold`'s layout.
 struct BarMarkers: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = 20
     let width: CGFloat
 
     var body: some View {
-        let capsules = GlassFold<EmptyView>.rest(width: width)
+        let capsules = GlassFold<EmptyView>.rest(width: width, shape: BarShape(typeSize, line: line))
         ZStack(alignment: .topLeading) {
             ForEach(capsules.indices, id: \.self) { index in
                 BarMarker(number: index + 1)
-                    .offset(x: capsules[index].midX - 11)
+                    // A capsule in the two-row bar's second row wears its
+                    // marker on its top edge, 6pt under this line's foot.
+                    .offset(x: capsules[index].midX - 11, y: capsules[index].minY > 0 ? capsules[index].minY + 17 : 0)
             }
         }
         .frame(width: width, height: 22, alignment: .topLeading)

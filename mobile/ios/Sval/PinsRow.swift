@@ -418,7 +418,7 @@ private struct PinFolderList: View {
             }
             .sheetGround()
             .navigationTitle(folder.name.isEmpty ? PinsRow.newPinFolderName : folder.name)
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode(folder.name.isEmpty ? PinsRow.newPinFolderName : folder.name)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .close) { dismiss() }

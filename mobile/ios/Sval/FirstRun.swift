@@ -21,13 +21,21 @@ struct FirstRunView: View {
     var body: some View {
         ZStack {
             NightSky()
-            Group {
-                switch model.stage {
-                case .chooseFolder: FolderSteps()
-                case .start: StartStep()
-                case .join: CodeStep()
-                case .ready: ArrivalStep()
+            // A step fills the screen, its button at the foot, and scrolls
+            // once large text or the keyboard leaves it too little room.
+            GeometryReader { geometry in
+                ScrollView {
+                    Group {
+                        switch model.stage {
+                        case .chooseFolder: FolderSteps()
+                        case .start: StartStep()
+                        case .join: CodeStep()
+                        case .ready: ArrivalStep()
+                        }
+                    }
+                    .frame(minHeight: geometry.size.height)
                 }
+                .scrollBounceBehavior(.basedOnSize)
             }
             .frame(maxWidth: horizontalSize == .regular && verticalSize == .regular ? Self.sheetWidth : nil)
         }
@@ -90,9 +98,12 @@ enum FirstRunStyle {
 private struct StepBar: View {
     let step: Int
     let onBack: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        ZStack {
+        // At the accessibility sizes Back reaches the dots at the centre,
+        // so they go to the trailing edge.
+        ZStack(alignment: typeSize.isAccessibilitySize && onBack != nil ? .trailing : .center) {
             PageDots(count: 3, current: step, on: FirstRunStyle.cyan, off: Color(hex: 0xA6E8FF, opacity: 0.3),
                      height: 6, wide: 20, through: true)
             .accessibilityElement()
@@ -683,7 +694,7 @@ private struct CodeStep: View {
             .font(.system(.subheadline, weight: .semibold))
             .foregroundStyle(FirstRunStyle.cyan)
             .padding(.horizontal, 4)
-            .padding(.top, 4)
+            .frame(minHeight: 44)
             Spacer()
             FirstRunStyle.primary("Join", action: join)
                 .disabled(!ready)

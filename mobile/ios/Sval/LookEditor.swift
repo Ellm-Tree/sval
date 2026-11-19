@@ -176,7 +176,7 @@ struct LookEditor: View {
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode(title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(role: .close, action: onClose)

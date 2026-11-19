@@ -86,8 +86,8 @@ struct BrowserBar: View {
             if verticalSize == .compact {
                 sideways
             } else {
-                GlassFold(progress: browser.barFold) { at, t in
-                    capsules(at, t)
+                GlassFold(progress: browser.barFold) { at, t, shape in
+                    capsules(at, t, shape)
                 }
                 // Above the full bar and the folded pill alike, and above
                 // another tab's now-playing capsule while that shows.
@@ -119,7 +119,8 @@ struct BrowserBar: View {
     /// Workspace colour (14i5). The shield and the address stay as they
     /// are; the rest fade over the first third of the fold, and the dot
     /// over the last.
-    private func capsules(_ at: [CGRect], _ t: Double) -> some View {
+    private func capsules(_ at: [CGRect], _ t: Double, _ shape: BarShape) -> some View {
+        let k = shape.scale
         let buttons = 1 - foldStep(0, 0.35, t)
         let dot = foldStep(0.65, 1, t)
         let address = at[1]
@@ -136,8 +137,8 @@ struct BrowserBar: View {
                     if t < 1 {
                         capsule(at[0], interactive: t == 0) {
                             HStack(spacing: 0) {
-                                navButton("Back", "back", size: 24, frame: 40, enabled: browser.canGoBack) { browser.goBack() }
-                                navButton("Forward", "forward", size: 24, frame: 40, enabled: browser.canGoForward) {
+                                navButton("Back", "back", size: 24 * k, frame: 40 * k, enabled: browser.canGoBack) { browser.goBack() }
+                                navButton("Forward", "forward", size: 24 * k, frame: 40 * k, enabled: browser.canGoForward) {
                                     browser.goForward()
                                 }
                             }
@@ -146,16 +147,16 @@ struct BrowserBar: View {
                             .accessibilityHidden(t > 0)
                         }
                     }
-                    capsule(address) { addressCapsule(address, t: t, buttons: buttons, dot: dot) }
+                    capsule(address) { addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k) }
                     if t < 1 {
                         capsule(at[2], interactive: t == 0) {
-                            newTabButton(size: 24, frame: 48)
+                            newTabButton(size: 24 * k, frame: shape.control)
                                 .opacity(buttons)
                                 .allowsHitTesting(t == 0)
                                 .accessibilityHidden(t > 0)
                         }
                         capsule(at[3], interactive: t == 0) {
-                            workspaceButton(size: 48)
+                            workspaceButton(size: shape.control, scale: k)
                                 .opacity(buttons)
                                 .allowsHitTesting(t == 0)
                                 .accessibilityHidden(t > 0)
@@ -205,20 +206,21 @@ struct BrowserBar: View {
     /// place, 36pt tall on the capsule's midline, as it shrinks to the pill;
     /// Reload fades at its end, where the Workspace's dot fades in. Partway
     /// or folded, a tap anywhere on it brings the full bar back.
-    private func addressCapsule(_ address: CGRect, t: Double, buttons: Double, dot: Double) -> some View {
+    private func addressCapsule(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
+        let row = address.height - 12
         let inset = 4 * (1 - t)
         // With no page there is nothing to reload, and the address takes
         // Reload's room.
         let reloads = browser.currentURL != nil
-        let room = address.width - inset - ((reloads ? 40 : 8) * (1 - t) + (frontMedia != nil ? 60 : 30) * t)
+        let room = address.width - inset - ((reloads ? 40 * k : 8) * (1 - t) + (frontMedia != nil ? 60 : 30) * t)
         return ZStack(alignment: .leading) {
-            addressRow(height: 36)
-                .frame(width: max(0, room), height: 36, alignment: .leading)
+            addressRow(height: row, scale: k)
+                .frame(width: max(0, room), height: row, alignment: .leading)
                 .padding(.leading, inset)
                 // Partway or folded, the pill is one button.
                 .allowsHitTesting(t == 0)
                 .accessibilityHidden(t > 0)
-            reload.frame(width: 36, height: 44)
+            reload(scale: k).frame(width: 36 * k, height: 44)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.trailing, 4)
                 .opacity(reloads ? buttons : 0)
@@ -248,9 +250,9 @@ struct BrowserBar: View {
 
     /// The shield, the pane mark of a split in front, the JavaScript-off
     /// mark and the address, left-aligned, which stay put as the bar folds.
-    private func addressRow(height: Double) -> some View {
+    private func addressRow(height: Double, scale k: Double = 1) -> some View {
         HStack(spacing: 0) {
-            shield(size: 21, frame: CGSize(width: 36, height: height))
+            shield(size: 21 * k, frame: CGSize(width: 36 * k, height: height))
             if let split = browser.splitInFront {
                 splitMenu(split)
             }
@@ -296,7 +298,7 @@ struct BrowserBar: View {
                 HStack(spacing: 0) {
                     addressRow(height: 36)
                     if let media = frontMedia { speaker(media) }
-                    reload.frame(width: 36, height: 44)
+                    reload().frame(width: 36, height: 44)
                 }
                 .padding(.horizontal, 4)
                 .overlay(alignment: .bottom) { progressLine }
@@ -421,7 +423,7 @@ struct BrowserBar: View {
     /// Reload, which turns while the page loads, as the desktop's does
     /// (`sval-busy-turn`); a tap then stops the load. Under Reduce Motion
     /// the stop glyph shows for the whole load instead.
-    private var reload: some View {
+    private func reload(scale k: Double = 1) -> some View {
         Button {
             browser.loading ? browser.stopLoading() : browser.reload()
         } label: {
@@ -438,7 +440,7 @@ struct BrowserBar: View {
                     Image("reload").resizable()
                 }
             }
-            .frame(width: 19, height: 19)
+            .frame(width: 19 * k, height: 19 * k)
             .frame(width: 46, height: 44)
             .contentShape(.rect)
         }
@@ -498,10 +500,10 @@ struct BrowserBar: View {
     /// The Workspace button: its emoji, or the private mask, with the tab
     /// count at its corner, and sideways its name beside. It opens the
     /// Workspace sheet, or the private one.
-    private func workspaceButton(size: CGFloat, named: Bool = false) -> some View {
+    private func workspaceButton(size: CGFloat, named: Bool = false, scale k: Double = 1) -> some View {
         Button(action: onWorkspace) {
             HStack(spacing: 6) {
-                workspaceMark(size: 22)
+                workspaceMark(size: 22 * k)
                     .overlay(alignment: .bottomTrailing) {
                         Text(countText)
                             .font(.system(.caption2, weight: .bold))
@@ -510,6 +512,9 @@ struct BrowserBar: View {
                             .padding(.horizontal, 4)
                             .frame(minWidth: 16, minHeight: 16)
                             .background(colors.ink, in: .capsule)
+                            // A badge is a mark on its button, which holds
+                            // it to the first accessibility size.
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .offset(x: 9, y: 7)
                     }
                 if named && !typeSize.isAccessibilitySize {
@@ -799,7 +804,7 @@ struct BarPreview: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
             } else {
-                GlassFold(progress: fold) { at, t in
+                GlassFold(progress: fold) { at, t, shape in
                     ZStack(alignment: .topLeading) {
                         GlassEffectContainer(spacing: 3) {
                             ZStack(alignment: .topLeading) {
@@ -811,7 +816,7 @@ struct BarPreview: View {
                                 }
                             }
                         }
-                        mark(size: 22)
+                        mark(size: 22 * shape.scale)
                             .frame(width: 48, height: 48)
                             .offset(x: at[3].midX - 24, y: at[3].midY - 24)
                             .opacity(1 - foldStep(0, 0.35, t))

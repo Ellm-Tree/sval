@@ -76,7 +76,7 @@ struct Theme {
     var body: Color { isPrivate ? Color(hex: 0xE2DCFF) : window.map { Color(hex: $0.body) } ?? pick(0xD6DDF0, 0x1C2A6B) }
     var muted: Color {
         isPrivate ? Color(hex: 0xA79FD0) : window.map { Color(hex: $0.muted) }
-            ?? (more ? pick(0xB4BEE0, 0x444F80) : pick(0x8F9BC7, 0x5A6699))
+            ?? (more ? pick(0xB4BEE0, 0x444F80) : pick(0x8F9BC7, 0x4F5B8C))
     }
     /// A rule or a control's edge on the surface, 3:1 on the sheet and its
     /// cells, and stronger under Increase Contrast, as a Workspace colour's
@@ -245,6 +245,73 @@ enum RowMetrics {
     static let tab: CGFloat = 56
     /// A group in the Workspace tree.
     static let group: CGFloat = 48
+}
+
+/// A row's title: one line at the standard text sizes, and up to three at
+/// the accessibility sizes, where one line holds a word or two.
+private struct TitleLines: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    func body(content: Content) -> some View {
+        content.lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+    }
+}
+
+/// A row's least height. At the accessibility sizes its text is taller
+/// than that, so the row keeps room above and below it.
+private struct RowHeight: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let least: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, typeSize.isAccessibilitySize ? 12 : 0)
+            .frame(minHeight: least)
+    }
+}
+
+/// A sheet's title: in the bar at the standard text sizes. A bar holds its
+/// title to a few sizes past the standard one, so at the accessibility
+/// sizes the title heads the sheet's content, where it grows with the
+/// text, and the bar keeps its buttons.
+private struct SheetTitleMode: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let title: String
+    let subtitle: String?
+
+    func body(content: Content) -> some View {
+        if typeSize.isAccessibilitySize {
+            content
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) { Color.clear.accessibilityHidden(true) }
+                }
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.system(.title3, weight: .bold))
+                            .accessibilityAddTraits(.isHeader)
+                        if let subtitle {
+                            Text(subtitle).font(.system(.footnote)).opacity(0.7)
+                        }
+                    }
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                }
+        } else {
+            content.navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+extension View {
+    func sheetTitleMode(_ title: String, subtitle: String? = nil) -> some View {
+        modifier(SheetTitleMode(title: title, subtitle: subtitle))
+    }
+    func titleLines() -> some View { modifier(TitleLines()) }
+    func rowHeight(_ least: CGFloat) -> some View { modifier(RowHeight(least: least)) }
 }
 
 /// The animations Sval's controls share. Under Reduce Motion each is a

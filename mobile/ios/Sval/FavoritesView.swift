@@ -130,11 +130,11 @@ struct FavoritesView: View {
             HStack(spacing: 10) {
                 SiteTile(url: item.url, name: item.name, size: 22)
                 Text(Self.name(item))
-                    .lineLimit(1)
+                    .titleLines()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 12)
-            .frame(minHeight: 48)
+            .rowHeight(48)
             .contentShape(.rect)
         }
         .foregroundStyle(theme.text)
@@ -168,7 +168,7 @@ struct FavoritesView: View {
                     .frame(width: 22)
                 Text(Self.name(item))
                     .font(.system(.body, weight: .semibold))
-                    .lineLimit(1)
+                    .titleLines()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("\(model.favoriteCount(in: item.id))")
                     .font(.system(.subheadline))
@@ -176,7 +176,7 @@ struct FavoritesView: View {
                     .foregroundStyle(theme.muted)
             }
             .padding(.leading, 12)
-            .frame(minHeight: 48)
+            .rowHeight(48)
         }
         .contextMenu {
             Button("Open All", systemImage: "arrow.up.right.square") { askOpenAll(item) }
@@ -363,7 +363,7 @@ struct FavoriteEditor: View {
             .foregroundStyle(theme.text)
             .sheetGround()
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode(title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(role: .close, action: onClose)
@@ -439,7 +439,7 @@ struct FavoritesMoveSheet: View {
             .sheetGround()
             .navigationTitle("Move to…")
             .navigationSubtitle(item.kind == "separator" ? "Separator" : FavoritesView.name(item))
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode("Move to…", subtitle: item.kind == "separator" ? "Separator" : FavoritesView.name(item))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .close) { dismiss() }

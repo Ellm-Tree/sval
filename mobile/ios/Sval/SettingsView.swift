@@ -242,7 +242,7 @@ private struct SheetPageBar: ViewModifier {
     func body(content: Content) -> some View {
         content
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode(title)
             .toolbar {
                 if let onDone {
                     ToolbarItem(placement: .topBarTrailing) {

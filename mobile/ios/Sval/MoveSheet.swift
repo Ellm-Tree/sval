@@ -72,7 +72,7 @@ struct MoveSheet: View {
             .sheetGround()
             .navigationTitle("Move to…")
             .navigationSubtitle(subject)
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode("Move to…", subtitle: subject)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .close) { dismiss() }

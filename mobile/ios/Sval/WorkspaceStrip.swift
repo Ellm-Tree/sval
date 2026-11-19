@@ -22,7 +22,22 @@ struct WorkspaceStrip: View {
     /// The current Workspace's name is in the panel's header (12f3).
     var compact = false
 
-    private var tileSize: CGFloat { compact ? 40 : 46 }
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// A group's heading line, which grows with its text.
+    @ScaledMetric(relativeTo: .caption2) private var heading: CGFloat = 16
+
+    private var large: Bool { typeSize.isAccessibilitySize }
+
+    /// Tiles without names: the panel's strip, and any strip at the
+    /// accessibility text sizes, where a name under a tile has room for a
+    /// letter or two. A long press shows a tile's name enlarged, as it
+    /// does a tab bar's.
+    private var tight: Bool { compact || large }
+
+    /// At the accessibility sizes the tiles are larger in place of names.
+    private var tileSize: CGFloat { large ? 64 : compact ? 40 : 46 }
+    private var radius: CGFloat { large ? 18 : compact ? 12 : 14 }
 
     private var theme: Theme { Theme(scheme, tint: sheetTint) }
     private var browser: Browser { model.browser }
@@ -35,7 +50,7 @@ struct WorkspaceStrip: View {
         HStack(alignment: .bottom, spacing: 0) {
         ScrollViewReader { reader in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .bottom, spacing: compact ? 10 : 2) {
+                HStack(alignment: .bottom, spacing: tight ? 10 : 2) {
                     if let own {
                         group(label: nil, [own], reorders: false)
                         divider
@@ -65,7 +80,7 @@ struct WorkspaceStrip: View {
                 // tile's ring and the corner badges inside the scroll view,
                 // which clips.
                 .padding(.horizontal, 8)
-                .padding(.vertical, compact ? 6 : 0)
+                .padding(.vertical, tight ? 6 : 0)
             }
             .scrollEdgeFade(.horizontal)
             .onAppear {
@@ -74,13 +89,13 @@ struct WorkspaceStrip: View {
         }
             // Held outside the scrolling run, so it shows however many
             // Workspaces there are (13a1).
-            theme.divider.frame(width: 1, height: tileSize).padding(.bottom, compact ? 6 : 26)
+            theme.divider.frame(width: 1, height: tileSize).padding(.bottom, tight ? 6 : 26)
             privateTile
                 .padding(.horizontal, 8)
-                .padding(.vertical, compact ? 6 : 0)
+                .padding(.vertical, tight ? 6 : 0)
         }
-        .padding(.top, compact ? 0 : 8)
-        .padding(.bottom, compact ? 0 : 6)
+        .padding(.top, tight ? 0 : 8)
+        .padding(.bottom, tight ? 0 : 6)
         .overlay(alignment: .top) { theme.divider.frame(height: 1) }
     }
 
@@ -95,7 +110,7 @@ struct WorkspaceStrip: View {
         theme.divider
             .frame(width: 1, height: tileSize)
             .padding(.horizontal, 8)
-            .padding(.bottom, compact ? 0 : 20)
+            .padding(.bottom, tight ? 0 : 20)
     }
 
     /// `glyph` is the heading's mark, the one its tiles wear, as the
@@ -117,13 +132,16 @@ struct WorkspaceStrip: View {
                             .fixedSize()
                     }
                     .padding(.horizontal, 10)
+                    // A heading wider than its tiles runs under the next
+                    // group's, so it stops growing at this size.
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                     .accessibilityAddTraits(.isHeader)
                 } else {
                     Color.clear
                 }
             }
-            .frame(height: 16)
-            HStack(spacing: compact ? 10 : 2) {
+            .frame(height: min(heading, 28))
+            HStack(spacing: tight ? 10 : 2) {
                 ForEach(workspaces, id: \.id) { workspace in
                     tile(workspace)
                         .id(workspace.id)
@@ -143,11 +161,11 @@ struct WorkspaceStrip: View {
             }
         } label: {
             VStack(spacing: 5) {
-                WorkspaceTile(workspace: workspace, size: tileSize, radius: compact ? 12 : 14)
+                WorkspaceTile(workspace: workspace, size: tileSize, radius: radius)
                     .padding(2)
                     .overlay {
                         if current {
-                            RoundedRectangle(cornerRadius: compact ? 14 : 16).strokeBorder(theme.accent, lineWidth: 2)
+                            RoundedRectangle(cornerRadius: radius + 2).strokeBorder(theme.accent, lineWidth: 2)
                         }
                     }
                     .padding(-2)
@@ -172,7 +190,7 @@ struct WorkspaceStrip: View {
                             .offset(x: 5, y: 5)
                         }
                     }
-                if !compact {
+                if !tight {
                     Text(WorkspaceTile.name(workspace))
                         .font(.system(.caption2, weight: current ? .bold : .medium))
                         .foregroundStyle(current ? theme.text : theme.muted)
@@ -180,10 +198,13 @@ struct WorkspaceStrip: View {
                         .frame(maxWidth: 62)
                 }
             }
-            .frame(width: compact ? tileSize + 4 : 62)
+            .frame(width: tight ? tileSize + 4 : 62)
             .contentShape(.rect)
         }
         .accessibilityLabel(WorkspaceTile.name(workspace))
+        .accessibilityShowsLargeContentViewer {
+            Label { Text(WorkspaceTile.name(workspace)) } icon: { WorkspaceTile(workspace: workspace, size: 46, radius: 14) }
+        }
         .accessibilityValue([playing ? "Playing" : nil, workspace.isolated ? "Isolated" : nil].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(current ? .isSelected : [])
     }
@@ -202,7 +223,7 @@ struct WorkspaceStrip: View {
         let open = model.privateWorkspace != nil
         return Button { onPrivate(.open) } label: {
             VStack(spacing: 5) {
-                PrivateTile(size: tileSize, radius: compact ? 12 : 14)
+                PrivateTile(size: tileSize, radius: radius)
                     .overlay(alignment: .topTrailing) {
                         if open {
                             Text("\(count)")
@@ -211,18 +232,20 @@ struct WorkspaceStrip: View {
                                 .foregroundStyle(Theme.privateViolet)
                                 .frame(minWidth: 20, minHeight: 20)
                                 .background(.white, in: .circle)
+                                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                                 .offset(x: 6, y: -6)
                         }
                     }
-                if !compact {
+                if !tight {
                     Text("Private")
                         .font(.system(.caption2, weight: .semibold))
                         // The desktop's label colour reads on the dark sheet;
-                        // on the light one it takes Private Violet itself.
-                        .foregroundStyle(theme.dark ? Theme.privateLabel : Theme.privateViolet)
+                        // on the light one it takes Private Violet itself. A
+                        // Workspace's colour has ink of its own solved on it.
+                        .foregroundStyle(theme.tint != nil ? theme.muted : theme.dark ? Theme.privateLabel : Theme.privateViolet)
                 }
             }
-            .frame(width: compact ? tileSize + 4 : 62)
+            .frame(width: tight ? tileSize + 4 : 62)
             .contentShape(.rect)
         }
         .contextMenu {
@@ -232,25 +255,27 @@ struct WorkspaceStrip: View {
             }
         }
         .accessibilityLabel(open ? (count == 1 ? "Private, 1 tab" : "Private, \(count) tabs") : "Private")
+        .accessibilityShowsLargeContentViewer { Label("Private", image: "private") }
     }
 
     private var newTile: some View {
         Button(action: onNew) {
             VStack(spacing: 5) {
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(theme.tileRing, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                     .overlay { Image(systemName: "plus").font(.system(size: 18, weight: .medium)) }
                     .frame(width: tileSize, height: tileSize)
-                if !compact {
+                if !tight {
                     Text("New")
                         .font(.system(.caption2, weight: .medium))
                 }
             }
             .foregroundStyle(theme.muted)
-            .frame(width: compact ? tileSize + 4 : 62)
+            .frame(width: tight ? tileSize + 4 : 62)
             .contentShape(.rect)
         }
         .accessibilityLabel("New Workspace")
+        .accessibilityShowsLargeContentViewer { Label("New Workspace", systemImage: "plus") }
     }
 }
 

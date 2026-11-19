@@ -746,7 +746,7 @@ struct SplitWithSheet: View {
             .sheetGround()
             .navigationTitle("Split With…")
             .navigationSubtitle(name(target))
-            .navigationBarTitleDisplayMode(.inline)
+            .sheetTitleMode("Split With…", subtitle: name(target))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .close) { dismiss() }

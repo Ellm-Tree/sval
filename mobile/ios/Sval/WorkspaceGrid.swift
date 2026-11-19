@@ -49,8 +49,14 @@ enum GridMetrics {
     static let edge: CGFloat = 12
     static let nest: CGFloat = 8
     /// A group's header, and the box's room above it and below its cards.
-    static let header: CGFloat = 44
-    static let nestedHeader: CGFloat = 40
+    /// The header grows with its name's text.
+    static var header: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .body).lineHeight) + 22 }
+    static var nestedHeader: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .subheadline).lineHeight) + 20 }
+    /// A card's line under its picture, which grows with its title's text.
+    static var line: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .subheadline).lineHeight) + 8 }
+    /// Cards across: two, or one at the accessibility text sizes, where
+    /// half the sheet's width holds a few letters of a title.
+    static var columns: Int { UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory ? 1 : 2 }
     static let boxTop: CGFloat = 2
     static let boxBottom: CGFloat = 10
     /// The part of a card's picture at each side that drops before or
@@ -64,10 +70,10 @@ enum GridMetrics {
         return max(140 - CGFloat(depth) * 8, 80)
     }
 
-    /// A cell's height: the picture, the 7pt gap, the 28pt line, and the
+    /// A cell's height: the picture, the 7pt gap, the line, and the
     /// ring's room above and below.
     static func cell(depth: Int, sideways: Bool) -> CGFloat {
-        picture(depth: depth, sideways: sideways) + 35 + 2 * ring
+        picture(depth: depth, sideways: sideways) + 7 + line + 2 * ring
     }
 }
 
@@ -393,11 +399,12 @@ struct TabGridView: UIViewRepresentable {
             guard sections.indices.contains(index) else { return nil }
             let section = sections[index]
             let height = GridMetrics.cell(depth: section.depth, sideways: parent.sideways)
-            let item = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .fractionalWidth(0.5),
+            let columns = GridMetrics.columns
+            let item = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .fractionalWidth(1 / CGFloat(columns)),
                                                                 heightDimension: .absolute(height)))
             let row = NSCollectionLayoutGroup.horizontal(
                 layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)),
-                repeatingSubitem: item, count: 2)
+                repeatingSubitem: item, count: columns)
             row.interItemSpacing = .fixed(GridMetrics.columnGap)
             let layout = NSCollectionLayoutSection(group: row)
             layout.interGroupSpacing = GridMetrics.rowGap
@@ -927,14 +934,11 @@ struct GridCard: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 RowAccessory(playing: playing, muted: browser.mutedTabs.contains(row.id), editing: editing,
-                             title: row.displayTitle, ink: theme.muted, accent: theme.accent, height: 28,
+                             title: row.displayTitle, ink: theme.muted, accent: theme.accent, height: GridMetrics.line,
                              onMute: { browser.toggleMute(row.id) }, onClose: onClose)
             }
             .padding(.leading, 2)
-            .frame(height: 28)
-            // The card's line has the grid's fixed height; past this size
-            // its text would be clipped.
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .frame(height: GridMetrics.line)
         }
         .padding(GridMetrics.ring)
         // VoiceOver reads the title, the site, then any state; the tab in
@@ -1002,10 +1006,7 @@ struct GridSplitCard: View {
                 }
             }
             .padding(.leading, 2)
-            .frame(height: 28)
-            // The card's line has the grid's fixed height; past this size
-            // its text would be clipped.
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .frame(height: GridMetrics.line)
         }
         .padding(GridMetrics.ring)
         .accessibilityElement(children: .ignore)

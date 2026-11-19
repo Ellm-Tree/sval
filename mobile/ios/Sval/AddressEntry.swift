@@ -419,25 +419,30 @@ private struct LauncherRow<Tile: View, Trailing: View>: View {
     let colors: BarColors
     @ViewBuilder let tile: () -> Tile
     @ViewBuilder var trailing: () -> Trailing
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
+        // At the accessibility sizes the row's action goes under its site,
+        // so the title has the row's width.
+        let stacked = typeSize.isAccessibilitySize
         HStack(spacing: 12) {
             tile()
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(.body, weight: .medium))
                     .foregroundStyle(colors.ink)
-                    .lineLimit(1)
+                    .titleLines()
                 Text(subtitle)
                     .font(.system(.footnote))
                     .foregroundStyle(colors.muted)
                     .lineLimit(1)
+                if stacked { trailing() }
             }
             Spacer(minLength: 4)
-            trailing()
+            if !stacked { trailing() }
         }
         .padding(.horizontal, 12)
-        .frame(minHeight: RowMetrics.suggestion)
+        .rowHeight(RowMetrics.suggestion)
         .contentShape(.rect)
     }
 
