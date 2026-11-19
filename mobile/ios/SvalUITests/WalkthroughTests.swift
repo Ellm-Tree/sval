@@ -483,6 +483,41 @@ final class WalkthroughTests: XCTestCase {
         shot("work-bar")
     }
 
+    /// Picking a Workspace in the sheet, then Edit Workspace…, edits that
+    /// Workspace: a custom colour saved there is its colour after Save,
+    /// and the editor opens on it again.
+    func testEditPickedWorkspaceColour() {
+        waitForBar()
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch.tap()
+        sleep(2)
+        app.buttons["Work"].firstMatch.tap()
+        sleep(2)
+        app.buttons["Workspace options"].firstMatch.tap()
+        sleep(1)
+        app.buttons["Edit Workspace…"].firstMatch.tap()
+        sleep(1)
+        XCTAssertEqual(app.textFields["Name"].value as? String, "Work", "the editor opens on the Workspace picked")
+        if !app.buttons["Custom color"].firstMatch.exists { app.swipeUp(); sleep(1) }
+        app.buttons["Custom color"].firstMatch.tap()
+        sleep(1)
+        app.swipeUp()
+        sleep(1)
+        app.sliders["Intensity"].firstMatch.adjust(toNormalizedSliderPosition: 0.9)
+        sleep(1)
+        app.buttons["Save"].firstMatch.tap()
+        sleep(3)
+        shot("picked-saved")
+        app.buttons["Workspace options"].firstMatch.tap()
+        sleep(1)
+        app.buttons["Edit Workspace…"].firstMatch.tap()
+        sleep(1)
+        XCTAssertEqual(app.textFields["Name"].value as? String, "Work", "the editor opens on the same Workspace again")
+        app.swipeUp()
+        sleep(1)
+        shot("picked-reopened")
+        XCTAssertTrue(app.sliders["Hue"].exists, "the Workspace holds the custom colour saved")
+    }
+
     /// Setup's folder choice and server form, on an app with no folder:
     /// the demo's fresh start empties it, then a plain launch shows setup.
     func testFirstRunSteps() {

@@ -36,6 +36,13 @@ struct WorkspaceSheet: View {
     @State private var pendingNames: [String: String] = [:]
     /// The Workspace or group dialog, when it's open.
     @State var look: LookTarget?
+
+    /// Opens the editor on the row as the tree holds it now. A menu keeps
+    /// the row it was built with, and the header's menu is rebuilt only
+    /// when its own inputs change, so its copy can predate a save.
+    func editLook(of id: String) {
+        if let row = model.row(id) { look = .edit(row) }
+    }
     /// The name the rename field opened with.
     @State private var renameOriginal = ""
     @FocusState private var renameFocused: Bool
@@ -285,11 +292,11 @@ struct WorkspaceSheet: View {
                 // How the tabs are drawn, then the Workspace's own changes.
                 // An agent's Workspace is the agent's to arrange.
                 ToolbarItem(placement: .topBarTrailing) {
-                    HeaderMenu(layout: $layout, editable: workspace.agent == nil,
+                    HeaderMenu(layout: $layout, workspaceId: workspace.id, editable: workspace.agent == nil,
                                groups: model.makesGroups(in: workspace.id),
                                editsWorkspace: !isPrivateSession,
                                onEditTabs: { editing = true },
-                               onEditWorkspace: { look = .edit(workspace) },
+                               onEditWorkspace: { editLook(of: workspace.id) },
                                onNewGroup: { look = .newGroup(parent: workspace.id) })
                         .equatable()
                 }
@@ -1185,7 +1192,7 @@ struct WorkspaceSheet: View {
     /// A group's long-press menu, in the list and the grid.
     func groupMenu(_ row: OutlineRow) -> [[MenuItem]] {
         let edit = row.kind == "group"
-            ? MenuItem(title: "Edit Group…", symbol: "pencil") { look = .edit(row) }
+            ? MenuItem(title: "Edit Group…", symbol: "pencil") { editLook(of: row.id) }
             : MenuItem(title: "Rename…", symbol: "pencil") { startRename(row) }
         return [[edit, MenuItem(title: "Move to…", symbol: "folder") { moving = row }],
                 orderItems(row),
@@ -1662,6 +1669,9 @@ struct DragSessionPhases: ViewModifier {
 /// what it shows changes: rebuilt with the sheet, the open menu flashed.
 struct HeaderMenu: View, Equatable {
     @Binding var layout: TabLayout
+    /// The Workspace the actions act on: a menu kept for another one would
+    /// edit that one.
+    let workspaceId: String
     let editable: Bool
     let groups: Bool
     let editsWorkspace: Bool
@@ -1670,7 +1680,7 @@ struct HeaderMenu: View, Equatable {
     let onNewGroup: () -> Void
 
     static func == (a: HeaderMenu, b: HeaderMenu) -> Bool {
-        a.layout == b.layout && a.editable == b.editable && a.groups == b.groups && a.editsWorkspace == b.editsWorkspace
+        a.layout == b.layout && a.workspaceId == b.workspaceId && a.editable == b.editable && a.groups == b.groups && a.editsWorkspace == b.editsWorkspace
     }
 
     var body: some View {
