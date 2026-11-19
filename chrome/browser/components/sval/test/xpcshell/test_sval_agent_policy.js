@@ -898,10 +898,5 @@ add_task(function ruled_names_are_those_with_an_entry_in_a_wanted_map() {
     ruledNames(policy, map => !map.tools),
     ["a.example", "b.example"]
   );
-  Assert.deepEqual(
-    ruledNames(policy, map => map.row),
-    ["a.example", "b.example", "c.example"],
-    "a remembered tool alone gives its site no row"
-  );
   Assert.deepEqual(ruledNames(null), []);
 });

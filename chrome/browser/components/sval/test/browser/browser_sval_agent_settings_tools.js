@@ -328,6 +328,44 @@ add_task(async function remembered_tools_are_listed_and_removed() {
   );
 });
 
+/**
+ * An alert's answer is saved under the name picked in it, so a tool can be
+ * remembered for a host whose tools its site allows (site-tools spec §4.3).
+ * The host has a row for it, where the tool can be removed.
+ */
+add_task(async function a_tool_remembered_for_a_host_alone_is_listed() {
+  const { store, id } = await pairWithTools();
+  await store.grantPageTool(id, "gist.github.com", "new_gist", HASH_A);
+  const ui = await openEditor(id);
+  Assert.ok(
+    ui.sites().includes("gist.github.com"),
+    "the host has a row of its own"
+  );
+  Assert.equal(
+    ui.control("page-tool-site", "gist.github.com").value,
+    "",
+    "with no tools setting of its own"
+  );
+  Assert.deepEqual(
+    [
+      ...ui
+        .remembered("gist.github.com")
+        .querySelectorAll(".sval-agent-chip-name"),
+    ].map(n => n.textContent),
+    ["new_gist"]
+  );
+
+  ui.control("revoke", "gist.github.com:new_gist").click();
+  await TestUtils.waitForCondition(
+    () => !("gist.github.com" in store.policyOf(id).pageToolGrants),
+    "the tool is forgotten"
+  );
+  await TestUtils.waitForCondition(
+    () => !ui.sites().includes("gist.github.com"),
+    "and the row goes with its only rule"
+  );
+});
+
 add_task(async function undo_restores_the_remembered_tools() {
   const { store, id } = await pairWithTools();
   const ui = await openEditor(id);

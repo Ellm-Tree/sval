@@ -270,12 +270,12 @@
     /**
      * @param {object|null} policy
      * @returns {string[]} Every site the policy has a rule for that the
-     *   editor shows: a level, a download or an upload permission, or a
-     *   setting for its tools while those show.
+     *   editor shows: a level, a file or an app permission, or a setting for
+     *   its tools or a remembered tool while those show.
      */
     _ruleSites(policy) {
       const tools = this._showsSiteTools(policy);
-      return lazy.ruledNames(policy, map => map.row && (tools || !map.tools));
+      return lazy.ruledNames(policy, map => tools || !map.tools);
     },
 
     /**
@@ -607,7 +607,10 @@
           case "files":
             return AGENT_FILE_AND_APP_MAPS.some(map => has(map, site));
           case "tools":
-            return ownToolSite(policy, site) === "allow";
+            return (
+              ownToolSite(policy, site) === "allow" ||
+              !!this._grantsOn(policy, site).length
+            );
           default:
             return policy.sites?.[site] === view.filt;
         }
@@ -670,7 +673,13 @@
         if (apps && apps !== "deny") {
           table.append(this._siteApps(id, site, apps));
         }
-        if (tools && ownToolSite(policy, site) === "allow") {
+        // A tool is remembered under the name its alert was answered for,
+        // which can be a host whose site holds the Allowed.
+        if (
+          tools &&
+          (ownToolSite(policy, site) === "allow" ||
+            this._grantsOn(policy, site).length)
+        ) {
           table.append(this._rememberedTools(id, policy, site));
         }
       }

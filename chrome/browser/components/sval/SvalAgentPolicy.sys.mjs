@@ -433,8 +433,6 @@ function grantsOf(entry) {
  * @property {boolean} tools Whether the map is one of site tools'. A policy
  *   that never held one holds none, and Settings hides them while site tools
  *   are off.
- * @property {boolean} row Whether an entry alone gives its site a row in
- *   Settings.
  * @property {(value: unknown) => unknown} clean A site's value as Sval reads
  *   it: the part Sval can read, or null when there is none.
  */
@@ -450,14 +448,12 @@ export const POLICY_MAPS = Object.freeze([
     name: "sites",
     rule: "level",
     tools: false,
-    row: true,
     clean: value => (LEVELS.includes(value) ? value : null),
   },
   ...FILE_KINDS.map(kind => ({
     name: kind,
     rule: kind,
     tools: false,
-    row: true,
     clean: value => {
       if (kind !== "uploads" || value === "deny") {
         return filePermissionOf(kind, value) ? value : null;
@@ -466,19 +462,17 @@ export const POLICY_MAPS = Object.freeze([
       return folders ? { ...value, folders } : null;
     },
   })),
-  { name: "apps", rule: "apps", tools: false, row: true, clean: appsOf },
+  { name: "apps", rule: "apps", tools: false, clean: appsOf },
   {
     name: "pageToolSites",
     rule: "toolSite",
     tools: true,
-    row: true,
     clean: value => (PAGE_TOOL_SITE_ANSWERS.includes(value) ? value : null),
   },
   {
     name: "pageToolGrants",
     rule: "grants",
     tools: true,
-    row: false,
     clean: grantsOf,
   },
 ]);
