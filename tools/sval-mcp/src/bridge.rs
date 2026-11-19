@@ -16,6 +16,7 @@
 use crate::frame::{encode_frame, read_frame, write_frame};
 use crate::proof;
 use crate::secrets::{digest_of, Credentials, SecretStore};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fmt;
@@ -456,6 +457,40 @@ struct Connection {
     owed: HashMap<String, (Value, Asked)>,
 }
 
+/// The agent's session as the bridge holds it. A shim an update replaces
+/// hands it to the build executed in its place (`update`), as JSON: a field
+/// a build does not know is ignored, and one it lacks is empty, so any build
+/// can take up any other's.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct Session {
+    /// The agent's `initialize`, which opens a legacy session and says who
+    /// its client is.
+    pub initialize: Option<Value>,
+    /// The secret store's account this session's pairing is kept under.
+    pub account: Option<String>,
+    /// When the shim the agent started began, in milliseconds since the Unix
+    /// epoch: every handshake names it, across updates of the shim.
+    pub started: u64,
+    /// The last `tools/list` result Sval gave.
+    pub tools: Option<Value>,
+    /// Whether the agent was given a tool list Sval did not just give.
+    pub listed_without_sval: bool,
+    /// Whether the agent has sent a modern request (MCP 2026-07-28), which
+    /// opens a session as `initialize` does and says who its client is
+    /// itself.
+    pub modern: bool,
+    /// The client name `account` was claimed for.
+    pub client: Option<String>,
+    /// The ids of the agent's `subscriptions/listen` requests that asked to
+    /// hear of tool list changes.
+    pub subscriptions: Vec<Value>,
+    /// The workspace Sval last said this session holds, which the handshake
+    /// names on every connection after, so a session gets its workspace back
+    /// once Sval restarts.
+    pub workspace: Option<String>,
+}
+
 /// A Sval this shim started and has not yet seen listen, with the requests
 /// that wait for it. The bridge keeps serving meanwhile, so the agent's
 /// `ping` is answered while Sval starts.
@@ -586,33 +621,14 @@ struct Bridge<W> {
     launch: Launch,
     store: Arc<dyn SecretStore>,
     events: mpsc::Sender<Event>,
-    account: Option<String>,
+    /// The agent's session, which outlives any one connection to Sval.
+    session: Session,
     /// What every handshake tells Sval of this launch: the directory, the start
     /// time and the account's `launch_id`.
     launch_frame: Value,
-    /// The workspace Sval last said this session holds, which the handshake
-    /// names on every connection after, so a session gets its workspace back
-    /// once Sval restarts.
-    workspace: Option<String>,
-    /// The agent's `initialize`, which opens a legacy session and says who
-    /// its client is.
-    initialize: Option<Value>,
-    /// Whether the agent has sent a modern request, which opens a session as
-    /// `initialize` does and says who its client is itself.
-    modern: bool,
-    /// The client name `account` was claimed for.
-    client: Option<String>,
-    /// The ids of the agent's `subscriptions/listen` requests that asked to
-    /// hear of tool list changes. The bridge holds them, since they outlive
-    /// any one connection to Sval.
-    subscriptions: Vec<Value>,
     connection: Option<Connection>,
     serial: u64,
     remembered: Option<Credentials>,
-    /// The last `tools/list` result Sval gave.
-    tools: Option<Value>,
-    /// Whether the agent was given a tool list Sval did not just give.
-    listed_without_sval: bool,
     /// Starts the Sval beside this shim on a profile (`launch::start`).
     starter: Starter,
     /// When this shim last started Sval.
@@ -648,15 +664,15 @@ impl<W: Write> Bridge<W> {
         let Ok(message) = serde_json::from_str::<Value>(line) else {
             return self.send(&failure(Value::Null, -32700, "parse error"));
         };
-        if self.account.is_none() {
+        if self.session.account.is_none() {
             self.claim(&client_name_of(&message));
         }
         let method = message["method"].as_str().map(str::to_owned);
         match (method.as_deref(), message.get("id").cloned()) {
             (Some("initialize"), Some(id)) => {
                 self.send(&result(id, initialize_result(&message)))?;
-                if self.initialize.is_none() {
-                    self.initialize = Some(message);
+                if self.session.initialize.is_none() {
+                    self.session.initialize = Some(message);
                     self.ensure_connected()?;
                 }
                 Ok(())
@@ -668,7 +684,9 @@ impl<W: Write> Bridge<W> {
             // more.
             (Some("notifications/cancelled"), None) => {
                 if let Some(id) = message["params"].get("requestId") {
-                    self.subscriptions.retain(|listening| listening != id);
+                    self.session
+                        .subscriptions
+                        .retain(|listening| listening != id);
                     if let Some(connection) = self.connection.as_mut() {
                         connection.owed.remove(&id.to_string());
                     }
@@ -687,7 +705,7 @@ impl<W: Write> Bridge<W> {
     /// What every handshake says of this session: its launch, and the
     /// workspace Sval last said it holds, once it has held one.
     fn session_frame(&self) -> Value {
-        match &self.workspace {
+        match &self.session.workspace {
             Some(workspace) => json!({ "launch": self.launch_frame, "workspace": workspace }),
             None => json!({ "launch": self.launch_frame }),
         }
@@ -698,33 +716,29 @@ impl<W: Write> Bridge<W> {
         let account = account_for(&self.profile, client_name);
         self.launch_frame = json!({
             "dir": dir_for_handshake(&self.launch.dir),
-            "started": self.launch.started,
+            "started": self.session.started,
             "id": launch_id(&account),
             "build": BUILD,
         });
-        self.account = Some(account);
-        self.client = Some(client_name.to_owned());
+        self.session.account = Some(account);
+        self.session.client = Some(client_name.to_owned());
     }
 
     /// Takes up the session a replaced shim handed this one, and connects
     /// as that shim was, so Sval meets this build at once.
     #[cfg(unix)]
-    fn resume(&mut self, resume: crate::update::Resume) -> Result<(), BridgeError> {
-        if resume.initialize.is_none() && !resume.modern {
+    fn resume(&mut self, session: Session) -> Result<(), BridgeError> {
+        self.session.started = session.started;
+        if session.initialize.is_none() && !session.modern {
             return Ok(());
         }
-        let client = match (&resume.client, &resume.initialize) {
+        let client = match (&session.client, &session.initialize) {
             (Some(client), _) => client.clone(),
             (None, Some(initialize)) => client_name_of(initialize),
             (None, None) => client_name_of(&Value::Null),
         };
+        self.session = session;
         self.claim(&client);
-        self.workspace = resume.workspace;
-        self.initialize = resume.initialize;
-        self.modern = resume.modern;
-        self.subscriptions = resume.subscriptions;
-        self.tools = resume.tools;
-        self.listed_without_sval = resume.listed_without_sval;
         self.ensure_connected()?;
         Ok(())
     }
@@ -751,18 +765,7 @@ impl<W: Write> Bridge<W> {
             update.retry();
             return Some(event);
         }
-        let resume = crate::update::Resume {
-            initialize: self.initialize.clone(),
-            account: self.account.clone(),
-            started: self.launch.started,
-            tools: self.tools.clone(),
-            listed_without_sval: self.listed_without_sval,
-            modern: self.modern,
-            client: self.client.clone(),
-            subscriptions: self.subscriptions.clone(),
-            workspace: self.workspace.clone(),
-        };
-        let err = update.exec(&resume);
+        let err = update.exec(&self.session);
         eprintln!("sval-mcp: could not execute the updated sval-mcp: {err}");
         None
     }
@@ -783,7 +786,7 @@ impl<W: Write> Bridge<W> {
     /// Whether the agent has opened its session, with `initialize` or a
     /// modern request.
     fn opened(&self) -> bool {
-        self.initialize.is_some() || self.modern
+        self.session.initialize.is_some() || self.session.modern
     }
 
     /// Sends a result, the bridge's own or Sval's, as `asked` expects it.
@@ -811,9 +814,9 @@ impl<W: Write> Bridge<W> {
             }
             ("server/discover", _) => return self.send(&result(id, discover_result())),
             ("subscriptions/listen", Era::Modern) => return self.listen(id, message),
-            (_, Era::Modern) => self.modern = true,
+            (_, Era::Modern) => self.session.modern = true,
             // Sval answers no legacy request before `initialize`.
-            _ if self.initialize.is_none() => {
+            _ if self.session.initialize.is_none() => {
                 return self.send(&failure(id, -32601, "method not found"));
             }
             _ => {}
@@ -832,7 +835,7 @@ impl<W: Write> Bridge<W> {
         // request's `_meta` on a modern one.
         let client = match era {
             Era::Modern => &message["params"]["_meta"][CLIENT_INFO_KEY],
-            _ => &self.initialize.as_ref().unwrap_or(&Value::Null)["params"]["clientInfo"],
+            _ => &self.session.initialize.as_ref().unwrap_or(&Value::Null)["params"]["clientInfo"],
         };
         let Ok(frame) = encode_frame(&json!({ "mcp": message, "client": client })) else {
             return match method {
@@ -861,7 +864,7 @@ impl<W: Write> Bridge<W> {
     fn listen(&mut self, id: Value, message: &Value) -> Result<(), BridgeError> {
         let tools = message["params"]["notifications"]["toolsListChanged"] == true;
         if tools {
-            self.subscriptions.push(id.clone());
+            self.session.subscriptions.push(id.clone());
         }
         let agreed = if tools {
             json!({ "toolsListChanged": true })
@@ -879,10 +882,10 @@ impl<W: Write> Bridge<W> {
     /// modern stream that asked, by its id. A modern client that opened no
     /// stream asked to hear of nothing.
     fn tools_changed(&mut self) -> Result<(), BridgeError> {
-        if self.initialize.is_some() {
+        if self.session.initialize.is_some() {
             self.send(&list_changed())?;
         }
-        for id in self.subscriptions.clone() {
+        for id in self.session.subscriptions.clone() {
             let mut notice = list_changed();
             notice["params"] = json!({ "_meta": { SUBSCRIPTION_KEY: id } });
             self.send(&notice)?;
@@ -920,7 +923,7 @@ impl<W: Write> Bridge<W> {
         if self.connection.is_some()
             || self.starting.is_some()
             || !self.opened()
-            || self.account.is_none()
+            || self.session.account.is_none()
             || crate::launch::profile_in_use(&self.profile)
             || self.started.is_some_and(|at| at.elapsed() < START_WAIT)
         {
@@ -999,8 +1002,12 @@ impl<W: Write> Bridge<W> {
         };
         match asked.method.as_str() {
             "tools/list" => {
-                self.listed_without_sval = true;
-                let tools = self.tools.clone().unwrap_or_else(|| json!({ "tools": [] }));
+                self.session.listed_without_sval = true;
+                let tools = self
+                    .session
+                    .tools
+                    .clone()
+                    .unwrap_or_else(|| json!({ "tools": [] }));
                 self.answer(asked, id, tools)
             }
             "tools/call" => self.answer(asked, id, tool_error(why)),
@@ -1027,7 +1034,7 @@ impl<W: Write> Bridge<W> {
         let listener = read_listener(&self.profile);
         let held = crate::launch::profile_in_use(&self.profile);
         self.access_off = held && listener.is_none();
-        let Some(account) = &self.account else {
+        let Some(account) = &self.session.account else {
             return Ok(false);
         };
         let Some(listener) = listener else {
@@ -1073,7 +1080,7 @@ impl<W: Write> Bridge<W> {
             stream,
             owed: HashMap::new(),
         });
-        if std::mem::take(&mut self.listed_without_sval) {
+        if std::mem::take(&mut self.session.listed_without_sval) {
             self.tools_changed()?;
         }
         Ok(true)
@@ -1097,13 +1104,13 @@ impl<W: Write> Bridge<W> {
                 return self.send(message);
             };
             if asked.method == "tools/list" {
-                self.tools = Some(value.clone());
+                self.session.tools = Some(value.clone());
             }
             self.answer(&asked, id, value.clone())?;
         } else if let Some(paired) = frame["ctl"].get("paired") {
             match serde_json::from_value::<Credentials>(paired.clone()) {
                 Ok(credentials) => {
-                    let account = self.account.as_deref().unwrap_or_default();
+                    let account = self.session.account.as_deref().unwrap_or_default();
                     // Losing the secret from the store means pairing again
                     // after sval-mcp restarts. Reconnects use `remembered`.
                     if let Err(reason) = self.store.save(account, &credentials) {
@@ -1114,7 +1121,7 @@ impl<W: Write> Bridge<W> {
                 Err(_) => eprintln!("sval-mcp: Sval sent a malformed pairing frame"),
             }
         } else if let Some(workspace) = frame["ctl"].get("workspace") {
-            self.workspace = workspace.as_str().map(str::to_owned);
+            self.session.workspace = workspace.as_str().map(str::to_owned);
         }
         Ok(())
     }
@@ -1271,11 +1278,8 @@ where
 pub fn run_stdio(profile: &Path, store: Arc<dyn SecretStore>) -> Result<(), BridgeError> {
     #[cfg(unix)]
     {
-        let resume = crate::update::take_resume();
-        let mut launch = Launch::current();
-        if let Some(resume) = &resume {
-            launch.started = resume.started;
-        }
+        let session = crate::update::take_session();
+        let launch = Launch::current();
         let (events, incoming) = mpsc::channel();
         let gate = Arc::new(crate::update::Gate::default());
         let (agent, ended, reading) = (events.clone(), events.clone(), gate.clone());
@@ -1297,8 +1301,8 @@ pub fn run_stdio(profile: &Path, store: Arc<dyn SecretStore>) -> Result<(), Brid
             events,
         );
         bridge.update = crate::update::SelfUpdate::new(gate);
-        if let Some(resume) = resume {
-            bridge.resume(resume)?;
+        if let Some(session) = session {
+            bridge.resume(session)?;
         }
         serve(bridge, &incoming)
     }
@@ -1320,24 +1324,21 @@ impl<W: Write> Bridge<W> {
         starter: Starter,
         events: mpsc::Sender<Event>,
     ) -> Self {
+        let session = Session {
+            started: launch.started,
+            ..Session::default()
+        };
         Bridge {
             output,
             profile: profile.to_owned(),
             launch,
             store,
             events,
-            account: None,
+            session,
             launch_frame: Value::Null,
-            workspace: None,
-            initialize: None,
-            modern: false,
-            client: None,
-            subscriptions: Vec::new(),
             connection: None,
             serial: 0,
             remembered: None,
-            tools: None,
-            listed_without_sval: false,
             outdated: false,
             access_off: false,
             starter,
@@ -1430,9 +1431,47 @@ fn serve<W: Write>(
 mod tests {
     use super::{
         client_name_of, dir_for_handshake, discover_result, dressed, era_of, initialize_result,
-        Era, MAX_DIR_JSON_BYTES, SERVER_INSTRUCTIONS, SERVER_VERSION,
+        Era, Session, MAX_DIR_JSON_BYTES, SERVER_INSTRUCTIONS, SERVER_VERSION,
     };
     use serde_json::{json, Value};
+
+    /// A build takes up the session of any other, so the names a session
+    /// is handed over under never change, a name this build does not know
+    /// is passed over, and a missing one is empty.
+    #[test]
+    fn a_session_is_handed_over_under_fixed_names() {
+        let session = Session {
+            initialize: Some(json!({ "id": 1 })),
+            account: Some("account".into()),
+            started: 7,
+            tools: Some(json!({ "tools": [] })),
+            listed_without_sval: true,
+            modern: true,
+            client: Some("client".into()),
+            subscriptions: vec![json!(3)],
+            workspace: Some("w1".into()),
+        };
+        let handed = serde_json::to_value(&session).unwrap();
+        assert_eq!(
+            handed,
+            json!({
+                "initialize": { "id": 1 },
+                "account": "account",
+                "started": 7,
+                "tools": { "tools": [] },
+                "listed_without_sval": true,
+                "modern": true,
+                "client": "client",
+                "subscriptions": [3],
+                "workspace": "w1",
+            })
+        );
+        let taken: Session =
+            serde_json::from_value(json!({ "workspace": "w2", "later": true })).unwrap();
+        assert_eq!(taken.workspace.as_deref(), Some("w2"));
+        assert_eq!(taken.started, 0);
+        assert!(taken.initialize.is_none() && taken.subscriptions.is_empty());
+    }
 
     #[test]
     fn initialize_carries_the_instructions() {

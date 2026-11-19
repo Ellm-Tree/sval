@@ -8,7 +8,7 @@
 //! running shim keeps its old image. Between requests the shim looks at the
 //! file at its path, asks one that has changed for its build, and executes a
 //! different build in its own place. `exec` keeps the agent's pipes, and the
-//! new process is handed the agent's session (`Resume`), so the agent sees no
+//! new process is handed the agent's session (`bridge::Session`), so the agent sees no
 //! restart. Windows has no `exec`, so there the shim runs until the agent
 //! restarts it.
 //!
@@ -17,45 +17,21 @@
 //! shim executes only while holding it with every line read already handled,
 //! so whatever the agent wrote since is still in the pipe for the new process.
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use crate::bridge::Session;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-/// The variable that carries a `Resume` to the process executed in place.
+/// The variable that carries a `Session` to the process executed in place.
 pub const RESUME_ENV: &str = "SVAL_MCP_RESUME";
 
-/// The agent's session as the bridge holds it, which the new process takes
-/// up. A field a build does not know is ignored, and one it lacks is empty,
-/// so any build can take up any other's.
-#[derive(Serialize, Deserialize, Default)]
-#[serde(default)]
-pub struct Resume {
-    pub initialize: Option<Value>,
-    pub account: Option<String>,
-    pub started: u64,
-    pub tools: Option<Value>,
-    pub listed_without_sval: bool,
-    /// Whether the agent has sent a modern request (MCP 2026-07-28), which
-    /// opens the session as `initialize` does.
-    pub modern: bool,
-    /// The client name the account was claimed for.
-    pub client: Option<String>,
-    /// The ids of the agent's `subscriptions/listen` requests that asked to
-    /// hear of tool list changes.
-    pub subscriptions: Vec<Value>,
-    /// The workspace Sval said the session holds.
-    pub workspace: Option<String>,
-}
-
-/// The `Resume` this process was executed with, taken out of the environment
+/// The `Session` this process was executed with, taken out of the environment
 /// so nothing this process starts inherits it. Call it before any thread
 /// starts, as setting the environment requires.
-pub fn take_resume() -> Option<Resume> {
+pub fn take_session() -> Option<Session> {
     let text = std::env::var(RESUME_ENV).ok()?;
     std::env::remove_var(RESUME_ENV);
     match serde_json::from_str(&text) {
-        Ok(resume) => Some(resume),
+        Ok(session) => Some(session),
         Err(err) => {
             eprintln!("sval-mcp: could not take up the session it was handed: {err}");
             None
@@ -215,10 +191,10 @@ impl SelfUpdate {
     }
 
     /// Executes the file at the shim's path in this process's place, with its
-    /// arguments, handing it `resume`. It returns only if that fails.
-    pub fn exec(&self, resume: &Resume) -> std::io::Error {
+    /// arguments, handing it `session`. It returns only if that fails.
+    pub fn exec(&self, session: &Session) -> std::io::Error {
         use std::os::unix::process::CommandExt;
-        let text = match serde_json::to_string(resume) {
+        let text = match serde_json::to_string(session) {
             Ok(text) => text,
             Err(err) => return std::io::Error::other(err),
         };
