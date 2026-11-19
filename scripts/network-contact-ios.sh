@@ -61,7 +61,7 @@ SITE_PID=$!
 CAPTURE_PID=""
 WATCH_PID=""
 cleanup() {
-  [[ -n "$CAPTURE_PID" ]] && kill -INT "$CAPTURE_PID" 2>/dev/null || true
+  [[ -n "$CAPTURE_PID" ]] && kill -TERM "$CAPTURE_PID" 2>/dev/null || true
   [[ -n "$WATCH_PID" ]] && kill "$WATCH_PID" 2>/dev/null || true
   kill "$SITE_PID" 2>/dev/null || true
   if [[ "${SVAL_NETWORK_KEEP:-}" == "1" ]]; then
@@ -82,7 +82,8 @@ xcodebuild build-for-testing -project "$IOS/Sval.xcodeproj" -scheme Sval \
 xcrun simctl uninstall "$UDID" app.sval.ios 2>/dev/null || true
 
 # The capture file is made first, so it stays this user's when root writes
-# it. sudo relays to tcpdump the SIGINT that ends the capture.
+# it. The capture ends on SIGTERM, which sudo relays to tcpdump. A sudo
+# started in the background never relays SIGINT.
 : > "$WORK/capture.pcapng"
 # shellcheck disable=SC2024
 sudo -n /usr/sbin/tcpdump -i pktap,all -k -U -w "$WORK/capture.pcapng" >"$WORK/tcpdump.log" 2>&1 &
@@ -111,7 +112,7 @@ TEST_RUNNER_SVAL_NETWORK_STRICT="${SVAL_NETWORK_STRICT:-}" \
 sleep 3
 kill "$WATCH_PID" 2>/dev/null || true
 WATCH_PID=""
-kill -INT "$CAPTURE_PID" 2>/dev/null || true
+kill -TERM "$CAPTURE_PID" 2>/dev/null || true
 wait "$CAPTURE_PID" 2>/dev/null || true
 CAPTURE_PID=""
 xcrun simctl terminate "$UDID" app.sval.ios 2>/dev/null || true
