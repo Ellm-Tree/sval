@@ -508,6 +508,11 @@ export class SvalPinPages {
       .map(page => page.tab);
   }
 
+  /** @returns {object[]} the tabs of the shown workspace's pin pages. */
+  tabsOfShownWorkspace() {
+    return this.tabsOfWorkspace(this.#workspaceId());
+  }
+
   /**
    * The address the pin's page shows, or null.
    *

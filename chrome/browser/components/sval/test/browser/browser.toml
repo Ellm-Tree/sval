@@ -326,6 +326,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_chrome_deprecations.js"]
 
+["browser_sval_close_returns_to_last_seen.js"]
+
 ["browser_sval_coexistence.js"]
 
 ["browser_sval_color_picker.js"]

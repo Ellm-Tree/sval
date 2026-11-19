@@ -86,13 +86,13 @@ add_task(async function closing_tabs_in_a_second_window_stays_in_it() {
   };
   Assert.equal(
     await shownAfterClose(),
-    order[2],
-    "closing it shows the next tab of the workspace"
+    order[0],
+    "closing it shows the tab the window showed before it"
   );
   Assert.equal(
     await shownAfterClose(),
-    order[0],
-    "and closing that shows the one before"
+    order[2],
+    "and closing that the workspace's last tab"
   );
   Assert.equal(
     SvalWindowWorkspace.of(win).id,

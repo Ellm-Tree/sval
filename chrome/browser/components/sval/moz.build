@@ -205,6 +205,7 @@ MOZ_SRC_FILES += [
     "SvalSyncableAddress.sys.mjs",
     "SvalSyncState.sys.mjs",
     "SvalTabActions.sys.mjs",
+    "SvalTabAfterClose.sys.mjs",
     "SvalTabHoverPreview.sys.mjs",
     "SvalTabs.sys.mjs",
     "SvalTabSwitcher.sys.mjs",

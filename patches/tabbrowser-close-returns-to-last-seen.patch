@@ -1,0 +1,57 @@
+Sval: closing the selected tab returns to the tab the user saw last
+
+Firefox returns to the closed tab's opener while it is visible, and
+otherwise to its neighbour in the tab strip. Sval's tab strip is hidden
+and its order is not the panel's, so the neighbour is any tab of the
+Workspace, often one inside a group the user never opened. A pin's page
+is hidden whenever another tab is selected, so it is never a visible
+opener either. SvalTabAfterClose picks the tab the user saw last among
+the Workspace's tabs and its pins' pages.
+browser_tabSuccessors.js asserts Firefox's neighbour rule, so its
+expected tab follows Sval's.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -6315,12 +6315,12 @@
+         return aTab.successor;
+       }
+
+-      if (
+-        aTab.owner?.visible &&
+-        !excludeTabs.has(aTab.owner) &&
+-        Services.prefs.getBoolPref("browser.tabs.selectOwnerOnClose")
+-      ) {
+-        return aTab.owner;
++      // Sval: the tab the user saw last in the Workspace (SvalTabAfterClose).
++      let lastSeen = ChromeUtils.importESModule(
++        "moz-src:///browser/components/sval/SvalTabAfterClose.sys.mjs"
++      ).tabAfterClose(aTab, excludeTabs);
++      if (lastSeen) {
++        return lastSeen;
+       }
+
+       // Try to find a remaining tab that comes after the given tab
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_tabSuccessors.js b/browser/components/tabbrowser/test/browser/tabs/browser_tabSuccessors.js
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_tabSuccessors.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_tabSuccessors.js
+@@ -47,7 +47,7 @@ add_task(async function test() {
+   ok(tabs[2].predecessors.has(tabs[3]));
+ 
+   // Check that clearing a successor makes the browser fall back to selecting
+-  // the owner or next tab.
++  // the tab seen last.
+   await BrowserTestUtils.switchTab(gBrowser, tabs[3]);
+   gBrowser.setSuccessor(tabs[3], null);
+   is(tabs[3].successor, null, "setSuccessor(..., null) should clear successor");
+@@ -59,8 +59,8 @@ add_task(async function test() {
+   BrowserTestUtils.removeTab(tabs[3]);
+   is(
+     gBrowser.selectedTab,
+-    tabs[4],
+-    "When the active tab is closed and its successor has been cleared, select the next tab"
++    tabs[2],
++    "When the active tab is closed and its successor has been cleared, select the tab seen last"
+   );
+ 
+   // Like closing or hiding a tab, moving a tab to another window should also

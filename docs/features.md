@@ -166,6 +166,10 @@ control of what you see and what is sent to websites.
   select them, or Shift-click to select every row in between. You can then
   close the selected tabs, move them to a group or a Workspace, make a new
   group from them, or drag them all at once.
+- **Closing a tab goes back.** When you close the tab you're looking at,
+  Sval shows the tab or pin in the same Workspace that you looked at
+  before. Close that tab too, and Sval goes back one more step through the
+  tabs and pins you've looked at in that Workspace.
 - **Undo.** The bottom of the Workspace panel offers Undo for 8 seconds
   when you close several tabs or move a pin to Favorites. It does the same
   when you delete a group, a pin, or a Workspace. Undo puts back what you

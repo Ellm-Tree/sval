@@ -2455,9 +2455,6 @@ class SvalTabObserver {
     if (parent) {
       this.#adapter.setFormerParent?.(tab, parent);
     }
-    // Closing it goes back to the tab it was reopened over, as for a tab
-    // opened in front of it (`_findTabToBlurTo`).
-    tab.owner = window.gBrowser.selectedTab;
     window.gBrowser.selectedTab = tab;
     return tab;
   }

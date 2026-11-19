@@ -120,7 +120,7 @@ update-release-candidates.patch
 update-target-rosetta.patch
 eslint-sval-rules.patch
 tabbrowser-blur-past-modal.patch
-tabbrowser-close-returns-to-pin.patch
+tabbrowser-close-returns-to-last-seen.patch
 macos-default-browser-nsworkspace.patch
 downloads-per-workspace.patch
 downloads-from-links.patch
@@ -193,7 +193,6 @@ no-profile-reset.patch
 refresh-tip-needs-reset-support.patch
 safe-mode-refresh-string.patch
 undo-close-tab-key-workspace.patch
-undo-close-tab-owner.patch
 sval-agent-apps.patch
 tests-without-closed-pages.patch
 license-no-source-pointer.patch

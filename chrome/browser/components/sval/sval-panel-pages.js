@@ -150,9 +150,7 @@
      * forward, at the category that holds `section`. The tab is filed in the
      * workspace like any other (spec §10.4), by the `TabOpen` that follows, and
      * opens at the end of the strip, as Firefox's `openPreferences` opens it,
-     * so it is filed last in the workspace, outside every group. The tab it was
-     * opened from is its owner, which `_findTabToBlurTo` goes back to when it
-     * closes; `addTab` sets none for a tab it opens in the background.
+     * so it is filed last in the workspace, outside every group.
      *
      * One tab, not one per press: a pairing offer is a file in the shared folder
      * and a second page would make a second one, leaving the user with two codes
@@ -189,12 +187,7 @@
         section === "offer" || section === "claim" || section === "storage"
           ? `svalSync-${section}`
           : "svalSync";
-      const tab = window.gBrowser.addTrustedTab(
-        `${SVAL_SETTINGS_URL}#${pane}`,
-        {
-          ownerTab: window.gBrowser.selectedTab,
-        }
-      );
+      const tab = window.gBrowser.addTrustedTab(`${SVAL_SETTINGS_URL}#${pane}`);
       window.gBrowser.selectedTab = tab;
       return tab;
     },

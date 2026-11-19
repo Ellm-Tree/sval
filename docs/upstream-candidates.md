@@ -1768,24 +1768,6 @@ Each entry gives:
 - **Upstream**: file a bug against Core :: Disability Access APIs with the
   patch and the test, as an accessible/tests/browser test. Not submitted.
 
-### Closing a reopened tab selects its neighbour instead of the tab it was reopened over
-
-- **Patch**: `patches/undo-close-tab-owner.patch`
-- **Mozilla bug**: none filed.
-- **Defect**: `SessionStoreInternal.undoCloseTab` opens the closed tab with
-  `addTrustedTab`, whose `inBackground` defaults to true, so the tab gets no
-  `owner`, and then selects it. Every other tab opened in front of the
-  selected one has that tab as its owner (`addTab`'s `ownerTab` default).
-  `_findTabToBlurTo` returns to the owner on close, so closing a reopened
-  tab selects whichever visible tab sits next to it.
-- **Evidence**: from a pinned site's page, Cmd+T, close, Cmd+Shift+T and
-  close again left the user on another tab of the Workspace.
-  `closing_a_tab_reopened_over_a_pin_returns_to_the_pin` in
-  `browser_sval_pins.js` fails without the patch.
-- **Upstream**: file a bug against Firefox :: Session Restore with the
-  one-line patch and a browser test that closes a tab, reopens it and
-  closes it again. Not submitted.
-
 ### Each tab close counts every visible tab, whatever the window
 
 - **Patch**: `patches/tab-bar-visibility-count.patch`
