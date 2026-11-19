@@ -28,6 +28,8 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  switcherItemLabel:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
@@ -641,7 +643,7 @@ export class SvalTabSwitcher {
 
   /**
    * "Recent tabs in" the window's Workspace, named as the Workspace panel's
-   * switcher names it (`SvalPanel.switcherItemLabel`), or "Recent tabs" in
+   * switcher names it (`switcherItemLabel`), or "Recent tabs" in
    * a window that shows no Workspace, as a Peek.
    *
    * @returns {string}
@@ -651,7 +653,7 @@ export class SvalTabSwitcher {
     const id = lazy.SvalWindowWorkspace.of(this.#win).id;
     const item = id ? lazy.switcherItemOf(panel.nodes, id, id) : null;
     return item
-      ? `Recent tabs in ${panel.switcherItemLabel(item)}`
+      ? `Recent tabs in ${lazy.switcherItemLabel(item)}`
       : "Recent tabs";
   }
 

@@ -138,7 +138,7 @@ Object.assign(SvalPanel, {
   workspaceColor(id) {
     const { agentLabelOf } = this._modules.SvalPanelModel;
     const { appearanceOf } = this._modules.SvalTree;
-    if (!id || agentLabelOf(this._nodes, id, this.devices())) {
+    if (!id || agentLabelOf(this._nodes, id, this.switcher.devices())) {
       return null;
     }
     return this._modules.SvalColor.colorOf(
@@ -158,7 +158,7 @@ Object.assign(SvalPanel, {
   workspaceTransparency(id) {
     const { agentLabelOf } = this._modules.SvalPanelModel;
     const { appearanceOf } = this._modules.SvalTree;
-    if (!id || agentLabelOf(this._nodes, id, this.devices())) {
+    if (!id || agentLabelOf(this._nodes, id, this.switcher.devices())) {
       return 0;
     }
     return appearanceOf(this._nodes, id).transparency ?? 0;
@@ -410,7 +410,7 @@ Object.assign(SvalPanel, {
    * Every window does this, not only a torn-off one. A window that was torn off
    * is deliberately indistinguishable from any other afterwards: the hand-off
    * is consumed at startup and the workspace is kept where a restart reads it
-   * (`_openWorkspaceInNewWindow`), so there is no flag to branch on, and a title
+   * (`SvalPanelSwitcher.openInNewWindow`), so there is no flag to branch on, and a title
    * that named the workspace in some windows and not others would be the odd
    * behaviour.
    *

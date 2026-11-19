@@ -24,8 +24,8 @@ async function closeContextMenu(menu) {
 /**
  * The commands a row's menu shows while nothing plays, on a tab nobody
  * renamed: the media entry shows only for a row with sound
- * (`_syncMediaItem`), and Remove Name only on a tab with a name of the
- * user's (`_syncRowMenu`).
+ * (`SvalPanelRowMenu`), and Remove Name only on a tab with a name of the
+ * user's.
  *
  * @param {string} kind A `NodeKind`.
  * @returns {string[]}
@@ -662,7 +662,7 @@ add_task(async function the_context_menus_open_from_the_keyboard() {
     EventUtils.synthesizeKey(key, modifiers);
     await within(shown, 10_000, `${key} showing the row's menu`);
     Assert.equal(
-      SvalPanel._contextRowId,
+      SvalPanel.rowMenu.rowId,
       ids.groupB,
       `${key} opened the menu for the focused row`
     );

@@ -125,7 +125,7 @@ add_task(async function an_agent_workspace_wears_the_robot_face() {
     "a tab handed to the agent wears the robot too"
   );
 
-  win.SvalPanel._fillSwitcherMenu();
+  win.SvalPanel.switcher.fill();
   const listed = win.SvalPanel._els.switcherMenu.querySelectorAll(
     `[data-workspace-id="${ws}"]`
   );
@@ -147,7 +147,7 @@ add_task(async function an_agent_workspace_wears_the_robot_face() {
     !document.querySelector(".sval-row-agent"),
     "nor do the user's tab rows"
   );
-  SvalPanel._fillSwitcherMenu();
+  SvalPanel.switcher.fill();
   const app = SvalPanel._els.switcherMenu.querySelector("menu[data-agent-app]");
   Assert.equal(
     app.getAttribute("image"),

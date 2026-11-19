@@ -399,7 +399,7 @@ add_task(
 add_task(async function the_switcher_list_marks_an_isolated_workspace() {
   const shared = await workspace();
   const isolated = await workspace({ isolated: true });
-  SvalPanel._fillSwitcherMenu();
+  SvalPanel.switcher.fill();
   const item = id =>
     SvalPanel._els.switcherMenu.querySelector(`[data-workspace-id="${id}"]`);
   Assert.ok(

@@ -341,10 +341,10 @@
 /* ---------------------------------------------------------------- strip */
 
 /*
- * The strip of Workspaces (`sval-panel-strip.js`), in the switcher's place
+ * The strip of Workspaces (`SvalPanelStrip`), in the switcher's place
  * when Settings › Appearance picks it: a label row that folds it away, an
  * outlined track, a hairline under it so its framed tiles never read as the
- * pins under the line, and dots while it overflows. `sval-panel-strip.js`
+ * pins under the line, and dots while it overflows. `SvalPanelStrip`
  * sizes each item and slides the row from the sizes below, so the two change
  * together. From 222px the strip's tiles are larger, and a name shows below
  * its tile or beside it as Settings says (`data-at`).
@@ -1139,7 +1139,7 @@ menupopup:not([sval-stem]) {
   }
 }
 
-/* The Workspace menu opens over the switcher (`SvalPanel._openSwitcher`), at
+/* The Workspace menu opens over the switcher (`SvalPanelSwitcher.open`), at
  * least as wide as it, and shows at most twelve rows
  * (`SvalPanel._scrollSwitcherMenu`). */
 #sval-workspace-menu {
@@ -1265,7 +1265,7 @@ menupopup:not([sval-stem]) {
   min-height: 0;
   overflow-y: auto;
   /* A sideways scroll over the panel switches workspaces
-     (`SvalPanel._onPanelWheel`), so the tree never takes it. */
+     (`SvalPanelSwitcher`), so the tree never takes it. */
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--sval-scrollbar-thumb) transparent;

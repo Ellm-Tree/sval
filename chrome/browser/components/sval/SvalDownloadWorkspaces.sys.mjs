@@ -22,6 +22,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  workspaceName:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   isPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
@@ -356,7 +358,7 @@ export function labelOf(win, download) {
     };
   }
   return {
-    name: panel.workspaceName(item),
+    name: lazy.workspaceName(item),
     emoji: item.agent ? null : item.emoji,
     color: item.color,
     agent: !!item.agent,

@@ -57,6 +57,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  workspaceName:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   copyAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
@@ -323,15 +325,15 @@ export const COMMANDS = [
     // forward (`SvalWindowWorkspace.show`).
     each: win =>
       userPanel(win)
-        .switcherList()
+        .switcher.list()
         .filter(item => !item.agent && !item.current)
         .map(item => ({
           id: item.id,
-          label: win.SvalPanel.workspaceName(item),
+          label: lazy.workspaceName(item),
         })),
     shiftWindow: true,
     run: (win, choice, _text, { shift }) =>
-      win.SvalPanel.pickWorkspace(choice.id, shift),
+      win.SvalPanel.switcher.pick(choice.id, shift),
   },
   {
     id: "new-workspace",
@@ -365,11 +367,11 @@ export const COMMANDS = [
     // named with what was typed (launcher design, "A command that picks").
     choices: win => [
       ...userPanel(win)
-        .switcherList()
+        .switcher.list()
         .filter(item => !item.agent)
         .map(item => ({
           id: item.id,
-          label: win.SvalPanel.workspaceName(item),
+          label: lazy.workspaceName(item),
           current: item.current,
           color: item.color,
         })),

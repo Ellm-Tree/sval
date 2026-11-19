@@ -204,6 +204,155 @@ var SvalPanel = {
   },
 
   /**
+   * This window's row menu, whose entries also fill the menu bar's Tab menu.
+   *
+   * @returns {SvalPanelRowMenu}
+   */
+  get rowMenu() {
+    if (!this._rowMenu) {
+      const panel = this;
+      this._rowMenu = new this._modules.SvalPanelRowMenu(window, {
+        get nodes() {
+          return panel._nodes;
+        },
+        get workspace() {
+          return panel._workspace;
+        },
+        get selection() {
+          return panel.selection;
+        },
+        get pins() {
+          return panel._pins;
+        },
+        get observer() {
+          return panel._observer;
+        },
+        get inMemory() {
+          return !!panel._inMemory;
+        },
+        get built() {
+          return panel.built;
+        },
+        rowFor: id => panel._rowFor(id),
+        rowElementFor: id => panel._rowElementFor(id),
+        focusRow: id => panel._focusRow(id),
+        movingId: row => panel._movingId(row),
+        tabsUnder: row => panel._tabsUnder(row),
+        mediaLabel: action => panel._mediaLabel(action),
+        untitled: kind => panel._untitled(kind),
+        closesSelection: ids => panel._closesSelection(ids),
+        transparentIds: () => panel.undo.transparentIds(),
+        fillMoveToWorkspace: (popup, ids) =>
+          panel.switcher.fillMoveToWorkspace(popup, ids),
+        guard: (what, action) => panel._guard(what, action),
+        run: (command, row) => panel.run(command, row),
+        moveInto: (...args) => panel._moveInto(...args),
+        newGroupWith: ids => panel._newGroupWith(ids),
+        joinSplit: (split, id) => panel._joinSplit(split, id),
+        moveToWorkspace: (moving, workspace) =>
+          panel.moveToWorkspace(moving, workspace),
+      });
+    }
+    return this._rowMenu;
+  },
+
+  /**
+   * This window's strip of Workspaces, shown in place of the switcher's
+   * button when the setting picks it.
+   *
+   * @returns {SvalPanelStrip}
+   */
+  get strip() {
+    if (!this._stripPart) {
+      const panel = this;
+      this._stripPart = new this._modules.SvalPanelStrip(window, {
+        get nodes() {
+          return panel._nodes;
+        },
+        get workspace() {
+          return panel._workspace;
+        },
+        get inMemory() {
+          return !!panel._inMemory;
+        },
+        get els() {
+          return panel._els;
+        },
+        get wheelRestMs() {
+          return panel.switcher.wheelRestMs;
+        },
+        get wheelGesturePx() {
+          return panel.switcher.wheelGesturePx;
+        },
+        switcherList: () => panel.switcher.list(),
+        pickWorkspace: (...args) => panel.switcher.pick(...args),
+        openSwitcher: (...args) => panel.switcher.open(...args),
+        openWorkspaceMenu: (...args) =>
+          panel.switcher.openWorkspaceMenu(...args),
+        onSwitcherDrag: event => panel.switcher.onDrag(event),
+        workspaceMedia: id => panel.switcher.workspaceMedia(id),
+        workspaceTabs: id => panel.switcher.workspaceTabs(id),
+        mediaTooltip: tabs => panel._mediaTooltip(tabs),
+        workspaceColor: (...args) => panel.workspaceColor(...args),
+        workspaceSwatch: (...args) => panel.workspaceSwatch(...args),
+      });
+    }
+    return this._stripPart;
+  },
+
+  /**
+   * This window's Workspace switcher: its menus, and going from one
+   * Workspace to another.
+   *
+   * @returns {SvalPanelSwitcher}
+   */
+  get switcher() {
+    if (!this._switcherPart) {
+      const panel = this;
+      this._switcherPart = new this._modules.SvalPanelSwitcher(window, {
+        get nodes() {
+          return panel._nodes;
+        },
+        get workspace() {
+          return panel._workspace;
+        },
+        get engine() {
+          return panel._engine;
+        },
+        get settings() {
+          return panel._settings;
+        },
+        get pins() {
+          return panel._pins;
+        },
+        get agentMarking() {
+          return panel._agentMarking;
+        },
+        get inMemory() {
+          return !!panel._inMemory;
+        },
+        get built() {
+          return panel.built;
+        },
+        get els() {
+          return panel._els;
+        },
+        get strip() {
+          return panel.strip;
+        },
+        guard: (what, action) => panel._guard(what, action),
+        run: (command, row) => panel.run(command, row),
+        refresh: () => panel.refresh(),
+        render: () => panel.render(),
+        mediaLabel: action => panel._mediaLabel(action),
+        mediaTooltip: tabs => panel._mediaTooltip(tabs),
+        tabsOfNodes: ids => panel._tabsOfNodes(ids),
+      });
+    }
+    return this._switcherPart;
+  },
+
+  /**
    * This window's Undo message, and the delete waiting on it.
    *
    * @returns {SvalPanelUndo}
@@ -553,6 +702,14 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
         SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
         slide: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
+        SvalPanelRowMenu:
+          "moz-src:///browser/components/sval/SvalPanelRowMenu.sys.mjs",
+        openContextMenu:
+          "moz-src:///browser/components/sval/SvalPanelRowMenu.sys.mjs",
+        SvalPanelSwitcher:
+          "moz-src:///browser/components/sval/SvalPanelSwitcher.sys.mjs",
+        SvalPanelStrip:
+          "moz-src:///browser/components/sval/SvalPanelStrip.sys.mjs",
         SvalPanelDrag:
           "moz-src:///browser/components/sval/SvalPanelDrag.sys.mjs",
         SvalPanelUndo:
@@ -649,6 +806,11 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
         )
       );
+      ChromeUtils.defineLazyGetter(this.__modules, "SvalWorkspaceEntries", () =>
+        ChromeUtils.importESModule(
+          "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs"
+        )
+      );
       ChromeUtils.defineLazyGetter(this.__modules, "SvalTree", () =>
         ChromeUtils.importESModule(
           "moz-src:///browser/components/sval/SvalTree.sys.mjs"
@@ -709,8 +871,8 @@ var SvalPanel = {
     });
     const switcherBar = make("div", { class: "sval-switcher-bar" });
     // The strip of Workspaces stands in for the button when Settings ›
-    // Workspaces picks it (`_applySwitcherKind`).
-    const strip = this._buildStrip();
+    // Workspaces picks it (`SvalPanelStrip.applyKind`).
+    const strip = this.strip.build();
     switcherBar.append(switcher, strip);
     root.append(switcherBar);
 
@@ -747,7 +909,7 @@ var SvalPanel = {
     addTab.append(addTabLabel);
     this._modules.keepKeyDescribed(addTab, "key_newNavigatorTab", "New tab");
     // "New workspace" is not here: a workspace is made where workspaces are
-    // chosen, the switcher (`_fillSwitcherMenu`).
+    // chosen, the switcher (`SvalPanelSwitcher.fill`).
     // Named in its tooltip as New tab is, which is all the 48px panel shows
     // of either name.
     const addGroup = make("button", {
@@ -918,13 +1080,9 @@ var SvalPanel = {
 
     tree.addEventListener("keydown", this);
     root.addEventListener("click", this);
-    // Not passive: a gesture locked sideways holds the tree still
-    // (`_onPanelWheel`).
-    root.addEventListener("wheel", this, { passive: false });
     tree.addEventListener("dblclick", this);
     tree.addEventListener("contextmenu", this);
-    switcher.addEventListener("contextmenu", this);
-    switcher.addEventListener("keydown", this);
+    this.switcher.listen(root, switcher);
     this.drag.listen(tree);
     window.addEventListener("unload", this, { once: true });
 
@@ -956,9 +1114,9 @@ var SvalPanel = {
     // The menus are parked in `#mainPopupSet`, outside the container this
     // empties, so each builder removes the one an earlier build parked: a
     // window keeps one of each, and an id names one element.
-    this._els.contextMenu = this._buildContextMenu();
-    this._els.workspaceMenu = this._buildWorkspaceMenu();
-    this._els.switcherMenu = this._buildSwitcherMenu();
+    this._els.contextMenu = this.rowMenu.build();
+    this._els.workspaceMenu = this.switcher.buildWorkspaceMenu();
+    this._els.switcherMenu = this.switcher.buildMenu();
     this._els.favoritesMenu = this._buildFavoritesMenu(favoritesBar);
 
     // Settings › Appearance picks the switcher and what the strip shows, the
@@ -970,15 +1128,15 @@ var SvalPanel = {
       STRIP_NAMES_AT_PREF,
       STRIP_FOLDED_PREF,
     } = this._modules.SvalPanelModel;
-    listening.pref(SWITCHER_PREF, () => this._applySwitcherKind());
+    listening.pref(SWITCHER_PREF, () => this.strip.applyKind());
     for (const pref of [
       STRIP_NAMES_PREF,
       STRIP_NAMES_AT_PREF,
       STRIP_FOLDED_PREF,
     ]) {
-      listening.pref(pref, () => this._renderStrip());
+      listening.pref(pref, () => this.strip.render());
     }
-    this._applySwitcherKind();
+    this.strip.applyKind();
   },
 
   /**
@@ -1021,62 +1179,16 @@ var SvalPanel = {
         this._agentMarking?.destroy();
         break;
       case "keydown":
-        if (event.currentTarget === window) {
-          this._onSwitcherMenuKeyDown(event);
-        } else if (event.currentTarget === this._els.switcher) {
-          this._onSwitcherKeyDown(event);
-        } else {
-          this._onKeyDown(event);
-        }
-        break;
-      case "mouseup":
-        this._onSwitcherMouseUp(event);
+        this._onKeyDown(event);
         break;
       case "click":
         this._onClick(event);
-        break;
-      case "wheel":
-        this._onPanelWheel(event);
         break;
       case "dblclick":
         this._onDoubleClick(event);
         break;
       case "contextmenu":
         this._onContextMenu(event);
-        break;
-      case "popupshowing":
-        // Two popups, one listener object: the row menu and the switcher are
-        // told apart by which of them the event came from, so neither ends up
-        // reacting to the other's.
-        if (event.target === this._els.switcherMenu) {
-          this._onSwitcherShowing(event);
-        } else if (event.target === this._els.workspaceMenu) {
-          this._onWorkspaceMenuShowing();
-        } else {
-          this._onContextMenuShowing(event);
-        }
-        break;
-      case "popuphidden":
-        if (event.target === this._els.switcherMenu) {
-          (this._switcherOpener ?? this._els.switcher).setAttribute(
-            "aria-expanded",
-            "false"
-          );
-          this._switcherOpener = null;
-          this._els.switcherMenu.removeAttribute("sval-keys");
-        }
-        break;
-      case "command":
-        // `contains`, not a parent check: each switcher entry's submenu puts
-        // "Open in New Window" one level down, and a parent check would send
-        // its `command` to the row menu's handler.
-        if (this._els.switcherMenu.contains(event.target)) {
-          this._onSwitcherCommand(event);
-        } else if (this._els.workspaceMenu.contains(event.target)) {
-          this._onWorkspaceMenuCommand(event);
-        } else {
-          this._onContextMenuCommand(event);
-        }
         break;
     }
   },

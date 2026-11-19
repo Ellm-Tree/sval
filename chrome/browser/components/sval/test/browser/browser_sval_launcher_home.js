@@ -35,6 +35,9 @@ const { PlacesTestUtils } = ChromeUtils.importESModule(
 const { switcherItems } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
 );
+const { workspaceName } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs"
+);
 
 /**
  * What `sval/launcher.ftl` says for `id`, so a row is matched by the message
@@ -364,7 +367,7 @@ add_task(async function move_this_tab_lists_its_choices_in_the_field() {
   // the first that can be chosen is selected.
   const theirs = switcherItems(SvalPanel.nodes, home)
     .filter(item => !item.agent && ![home, work].includes(item.id))
-    .map(item => SvalPanel.workspaceName(item));
+    .map(item => workspaceName(item));
   const choice = (name, selected) =>
     `${selected ? ">" : " "} | command | ${name} |  | move-tab | `;
   const choices = [

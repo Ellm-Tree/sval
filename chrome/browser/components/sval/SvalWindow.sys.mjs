@@ -41,11 +41,9 @@ const PANEL_CSS = "chrome://browser/content/sval/sval-panel.css";
 const PANEL_SCRIPTS = [
   "chrome://browser/content/sval/sval-panel.js",
   "chrome://browser/content/sval/sval-panel-input.js",
-  "chrome://browser/content/sval/sval-panel-menus.js",
   "chrome://browser/content/sval/sval-panel-rows.js",
   "chrome://browser/content/sval/sval-panel-refresh.js",
   "chrome://browser/content/sval/sval-panel-switcher.js",
-  "chrome://browser/content/sval/sval-panel-strip.js",
   "chrome://browser/content/sval/sval-panel-appearance.js",
   "chrome://browser/content/sval/sval-panel-workspace.js",
   "chrome://browser/content/sval/sval-panel-activation.js",

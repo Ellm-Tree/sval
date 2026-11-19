@@ -534,7 +534,7 @@
             this._paintRowSound(el, row);
           }
         }
-        this._paintSwitcherSound();
+        this.switcher.paintSound();
         this._paintMediaBar();
       });
     },
@@ -1397,6 +1397,27 @@
         () => element.classList.remove(kind),
         { once: true }
       );
+    },
+
+    /**
+     * The live tabs this window holds for `row` and every tab inside it, as
+     * Unload acts on them.
+     *
+     * @param {object} row
+     * @returns {object[]} Firefox tabs.
+     */
+    _tabsUnder(row) {
+      const { descendantIds, TAB } = this._modules.SvalTree;
+      // The engine refuses a tab as a parent (`childrenByParent`), so a tab's
+      // row stands for its own tab alone.
+      const under =
+        this._nodes[row.id]?.kind === TAB
+          ? []
+          : descendantIds(this._nodes, row.id, this._childrenByParent());
+      return [row.id, ...under]
+        .filter(id => this._nodes[id]?.kind === TAB)
+        .map(id => this._observer?.tabFor(id))
+        .filter(Boolean);
     },
 
     /**

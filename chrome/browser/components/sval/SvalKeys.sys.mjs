@@ -18,7 +18,7 @@ export const LAUNCHER_KEY = "focusURLBar";
 
 /**
  * Whether a sideways scroll over the panel moves the window to the next or
- * previous workspace (`SvalPanel._onPanelWheel`). Settings' Keyboard
+ * previous workspace (`SvalPanelSwitcher`). Settings' Keyboard
  * shortcuts pane holds its switch.
  */
 export const SWIPE_WORKSPACES_PREF = "browser.sval.panel.swipeWorkspaces";

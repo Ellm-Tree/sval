@@ -194,7 +194,7 @@ Object.assign(SvalPanel, {
     // meanwhile, which takes the tab and its mark with it.
     this._settings.setLastActive(id, this._modules.SvalClock.now());
     if (newWindow || agentLabelOf(nodes, workspace) !== null) {
-      return this._openWorkspaceInNewWindow(workspace) !== null;
+      return this.switcher.openInNewWindow(workspace) !== null;
     }
     if (!(await this._workspace.switchTo(workspace))) {
       return false;

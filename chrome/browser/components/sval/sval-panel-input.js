@@ -209,7 +209,7 @@ Object.assign(SvalPanel, {
       case "edit":
         return this.edit(row);
       case "contextMenu":
-        return this._openRowMenu(row);
+        return this.rowMenu.open(row);
       case "close":
         return this._closeRows(row);
       case "groupSelection":
@@ -251,7 +251,7 @@ Object.assign(SvalPanel, {
       case "addGroup":
         return this._addGroup();
       case "switchWorkspace":
-        return this._openSwitcher();
+        return this.switcher.open();
       case "openFavorites":
         return this.openFavorites();
       case "openStorageSettings":
@@ -474,5 +474,31 @@ Object.assign(SvalPanel, {
     this._focusedId = id;
     element.setAttribute("tabindex", "0");
     element.focus();
+  },
+
+  /**
+   * Opens the row menu on a right-click, or on the `contextmenu` event the
+   * Windows and GTK widgets make of the context-menu key and Shift+F10.
+   * Those keys reach `keyCommand` first, which opens the menu itself on
+   * every platform (`SvalPanelRowMenu.open`), so a `contextmenu` arriving
+   * while the menu is up is that same key and is left alone.
+   *
+   * @param {Event} event A `contextmenu` event on the tree.
+   */
+  _onContextMenu(event) {
+    const { state } = this._els.contextMenu;
+    if (state === "showing" || state === "open") {
+      return;
+    }
+    const rowElement = this._rowElementAt(event.target);
+    let row = rowElement ? this._rowFor(rowElement.dataset.nodeId) : null;
+    // A split's own menu is its panes': the tray between them stands for the
+    // active one.
+    if (row?.panes) {
+      row = this._activePane(row);
+    }
+    if (row) {
+      this.rowMenu.open(row, event);
+    }
   },
 });

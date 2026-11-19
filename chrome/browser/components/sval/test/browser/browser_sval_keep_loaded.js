@@ -51,7 +51,7 @@ function sweepPastTheTime(observer) {
  */
 function keepLoadedItem(id) {
   const menu = SvalPanel._els.contextMenu;
-  SvalPanel._syncRowMenu(menu, SvalPanel._rowFor(id));
+  SvalPanel.rowMenu.sync(menu, SvalPanel._rowFor(id));
   return menu.querySelector('[data-command="keepLoaded"]');
 }
 

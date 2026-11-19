@@ -236,7 +236,7 @@ add_task(async function go_to_a_workspace_is_the_switchers() {
   await win.SvalPanel.refresh();
   await takeControlOf(win, browser);
   Assert.ok(
-    win.SvalPanel.switcherList().some(item => item.id === trips),
+    win.SvalPanel.switcher.list().some(item => item.id === trips),
     "the switcher lists Trips"
   );
   const rows = await rowsIn(win, "go to trips");

@@ -44,6 +44,8 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  workspaceName:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -370,7 +372,7 @@ export function workspaceLabel(win, id) {
     id,
     lazy.SvalWindowWorkspace.of(win).id
   );
-  return item ? panel.workspaceName(item) : "Deleted Workspace";
+  return item ? lazy.workspaceName(item) : "Deleted Workspace";
 }
 
 /**

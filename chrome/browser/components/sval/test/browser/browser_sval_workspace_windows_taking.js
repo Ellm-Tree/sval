@@ -330,12 +330,12 @@ add_task(async function an_open_workspace_is_not_offered_a_second_window() {
     Services.obs.addObserver(watcher, "domwindowopened");
     watching = true;
     Assert.equal(
-      SvalPanel._openWorkspaceInNewWindow(first),
+      SvalPanel.switcher.openInNewWindow(first),
       null,
       "the workspace this window shows gets no second window"
     );
     Assert.equal(
-      SvalPanel._openWorkspaceInNewWindow(second),
+      SvalPanel.switcher.openInNewWindow(second),
       null,
       "nor does one another window shows"
     );
@@ -1065,7 +1065,7 @@ add_task(async function tearing_off_a_vanished_workspace_opens_nothing() {
     // Emptied so the redraw is observable.
     SvalPanel._els.tree.textContent = "";
     Assert.equal(
-      SvalPanel._openWorkspaceInNewWindow(second),
+      SvalPanel.switcher.openInNewWindow(second),
       null,
       "nothing is opened for a workspace the document no longer holds"
     );

@@ -94,10 +94,10 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
   // may refuse a script once another window has taken it.
   const windows = [
     await windowShowing(first.id, () =>
-      SvalPanel.pickWorkspace(first.id, true)
+      SvalPanel.switcher.pick(first.id, true)
     ),
     await windowShowing(second.id, () =>
-      SvalPanel.pickWorkspace(second.id, true)
+      SvalPanel.switcher.pick(second.id, true)
     ),
   ];
   const peer = await anotherDevice();
@@ -136,7 +136,7 @@ add_task(async function two_windows_losing_their_workspaces_share_one_free() {
   Assert.deepEqual(rowIdsIn(window), homeRows, "drawing what it drew");
   // The entries the switcher draws when opened, read without the focus
   // opening it needs.
-  const entries = SvalPanel.switcherList();
+  const entries = SvalPanel.switcher.list();
   const listed = entries.map(item => item.id);
   Assert.ok(
     entries.find(item => item.id === free.id)?.elsewhere,

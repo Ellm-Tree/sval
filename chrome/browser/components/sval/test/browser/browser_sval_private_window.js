@@ -251,7 +251,7 @@ add_task(async function a_private_window_offers_no_workspace_actions() {
     );
     Assert.ok(!win.gDialogBox.isOpen, "New Workspace asks nothing");
     Assert.equal(
-      panel._openWorkspaceInNewWindow(SvalWindowWorkspace.of(win).id),
+      panel.switcher.openInNewWindow(SvalWindowWorkspace.of(win).id),
       null,
       "no workspace opens in a new window"
     );

@@ -233,7 +233,7 @@ function inMenuBar(popup) {
 /**
  * A workspace in the menu bar's Workspaces menu. It goes through the overlay
  * because the panel opens it in a window of its own while the agent holds
- * this one (`SvalPanel.runMenuBarWorkspacesCommand`), so the user always has
+ * this one (`SvalPanelSwitcher.runMenuBarCommand`), so the user always has
  * a way out of the agent's window.
  *
  * @param {Element} target

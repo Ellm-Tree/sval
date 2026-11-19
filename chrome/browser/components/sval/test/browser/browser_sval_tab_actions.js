@@ -90,7 +90,7 @@ async function unloaded(tab, id) {
  */
 function unloadDisabled(row) {
   const menu = SvalPanel._els.contextMenu;
-  SvalPanel._syncRowMenu(menu, row);
+  SvalPanel.rowMenu.sync(menu, row);
   return menu.querySelector('[data-command="unload"]').hasAttribute("disabled");
 }
 

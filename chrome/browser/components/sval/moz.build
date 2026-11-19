@@ -148,7 +148,10 @@ MOZ_SRC_FILES += [
     "SvalPanelDrag.sys.mjs",
     "SvalPanelModel.sys.mjs",
     "SvalPanelReveal.sys.mjs",
+    "SvalPanelRowMenu.sys.mjs",
     "SvalPanelSelection.sys.mjs",
+    "SvalPanelStrip.sys.mjs",
+    "SvalPanelSwitcher.sys.mjs",
     "SvalPanelUndo.sys.mjs",
     "SvalPasswordManager.sys.mjs",
     "SvalPeek.sys.mjs",
@@ -218,6 +221,7 @@ MOZ_SRC_FILES += [
     "SvalWindowsAcl.sys.mjs",
     "SvalWindowWorkspace.sys.mjs",
     "SvalWorkerClient.sys.mjs",
+    "SvalWorkspaceEntries.sys.mjs",
     "SvalWorkspaceJar.sys.mjs",
 ]
 

@@ -54,6 +54,8 @@ import { colorOf } from "moz-src:///browser/components/sval/SvalColor.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  workspaceName:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   LAUNCHER_PREFS:
@@ -283,7 +285,7 @@ function lookUp(queryContext, query, win) {
     .map(t => t.value)
     .join(" ");
   const all = text ? matchTabs(nodes, text, options) : [];
-  const devices = panel.devices?.() ?? null;
+  const devices = panel.switcher.devices();
   // A private window's tabs are its own, in no workspace of the user's.
   const workspaceOfRow = workspaceId => {
     if (panel.inMemory) {
@@ -292,7 +294,7 @@ function lookUp(queryContext, query, win) {
     const agent = agentLabelOf(nodes, workspaceId, devices);
     const appearance = appearanceOf(nodes, workspaceId);
     return {
-      workspaceName: panel.workspaceName({
+      workspaceName: lazy.workspaceName({
         agent,
         name: nodes[workspaceId]?.content?.name ?? "",
       }),

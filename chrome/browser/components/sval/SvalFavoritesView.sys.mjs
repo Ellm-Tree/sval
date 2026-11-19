@@ -53,7 +53,7 @@ const TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
  * Which side of `el` a drop at `clientY` lands on: before it over its top
  * half, after it over the rest, as `places-popup`'s `_getDropPoint` puts an
  * item it is not dropped into. The switcher reorders workspaces by the same
- * rule (`SvalPanel._onSwitcherDrag`), and the strip of them by its halves
+ * rule (`SvalPanelSwitcher.onDrag`), and the strip of them by its halves
  * along the row, given `clientX`.
  *
  * @param {Element} el

@@ -744,10 +744,10 @@ add_task(async function an_agent_apps_workspaces_share_one_item() {
   // name runs on past the track's end.
   EventUtils.synthesizeMouseAtCenter(app.querySelector(".sval-strip-tile"), {});
   await TestUtils.waitForCondition(
-    () => SvalPanel._stripAppMenu?.state === "open",
+    () => SvalPanel.strip.appMenu?.state === "open",
     "the app's list"
   );
-  const list = SvalPanel._stripAppMenu;
+  const list = SvalPanel.strip.appMenu;
   Assert.equal(app.getAttribute("aria-expanded"), "true");
   Assert.deepEqual(
     Array.from(list.children, el => el.dataset.workspaceId).toSorted(),

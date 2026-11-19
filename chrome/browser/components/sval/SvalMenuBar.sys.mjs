@@ -86,7 +86,7 @@ function menuItem(doc, label, key) {
 
 /**
  * New Workspace, the panel's toggle, then every workspace and the workspace
- * menu's commands (`SvalPanel.fillMenuBarWorkspaces`).
+ * menu's commands (`SvalPanelSwitcher.fillMenuBar`).
  *
  * @param {Window} win
  * @param {Element} popup
@@ -120,12 +120,12 @@ function mountWorkspaces(win, popup) {
     while (fixedEnd.nextSibling) {
       fixedEnd.nextSibling.remove();
     }
-    win.SvalPanel?.fillMenuBarWorkspaces(popup);
+    win.SvalPanel?.switcher.fillMenuBar(popup);
     fixedEnd.hidden = !fixedEnd.nextSibling;
   });
   popup.addEventListener("command", event => {
     if (event.target !== fresh && event.target !== toggle) {
-      win.SvalPanel?.runMenuBarWorkspacesCommand(event);
+      win.SvalPanel?.switcher.runMenuBarCommand(event);
     }
   });
 }
@@ -184,7 +184,7 @@ function mountFavorites(win, popup) {
  * Copy Address, which copies the selected page's address whether or not a
  * row stands for it, so it shows for a pin's page too, then the row menu's
  * entries for the selected tab
- * (`SvalPanel.menuBarTabItems`), then the element picker's modes and the
+ * (`SvalPanelRowMenu.barItems`), then the element picker's modes and the
  * site style editor, each disabled where the selected tab does not offer
  * it, then Firefox's
  * screenshot tool, shown where its context menu item shows
@@ -199,7 +199,7 @@ function mountTab(win, popup) {
   const copyAddress = menuItem(doc, "Copy Address", COPY_ADDRESS_KEY);
   copyAddress.id = COPY_ADDRESS_MENU_ITEM_ID;
   copyAddress.addEventListener("command", () => lazy.copyAddress(win));
-  const items = panel.menuBarTabItems();
+  const items = panel.rowMenu.barItems();
   const modesStart = doc.createXULElement("menuseparator");
   const modes = MODE_MENU_ITEMS.map(({ mode, id }) => {
     const el = menuItem(doc, `${MODE_NAMES[mode]}…`, MODE_KEYS[mode]);
@@ -230,7 +230,7 @@ function mountTab(win, popup) {
       return;
     }
     // Hides every entry it does not name, the modes among them.
-    panel.syncMenuBarTab(popup);
+    panel.rowMenu.syncBar(popup);
     copyAddress.hidden = false;
     copyAddress.toggleAttribute("disabled", !win.gBrowser.currentURI?.spec);
     MODE_MENU_ITEMS.forEach(({ mode }, i) => {
@@ -252,7 +252,7 @@ function mountTab(win, popup) {
       event.target !== screenshot &&
       event.target !== copyAddress
     ) {
-      panel.runMenuBarTabCommand(event);
+      panel.rowMenu.runBarCommand(event);
     }
   });
 }

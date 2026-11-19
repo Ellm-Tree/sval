@@ -10,7 +10,7 @@
 /**
  * A sideways scroll or two-finger swipe over the Workspace panel moves the
  * window to the next or previous Workspace in the switcher's order, one per
- * gesture (`SvalPanel._onPanelWheel`). The same scroll over the page is the
+ * gesture (`SvalPanelSwitcher`). The same scroll over the page is the
  * page's, and the switch in Settings › Keyboard shortcuts turns it off.
  */
 
