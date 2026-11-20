@@ -1,0 +1,27 @@
+Sval: Keep the reading position when the viewport changes width
+
+Gecko adjusts a scroll anchor only after a reflow that starts inside the
+anchor's chain. A viewport resize reflows from the root frame, which is in
+no chain, so a page narrowed by a Split, a resized window or the Workspace
+panel rewraps its text and the reader's place slides down the screen. The
+root scroller's anchor is adjusted after a root reflow too, as Chrome
+adjusts its anchor after every layout.
+
+diff --git a/layout/base/PresShell.cpp b/layout/base/PresShell.cpp
+index 8785ada557..84362ead36 100644
+--- a/layout/base/PresShell.cpp
++++ b/layout/base/PresShell.cpp
+@@ -10723,6 +10723,13 @@ bool PresShell::DoReflow(nsIFrame* target, bool aInterruptible,
+   if (target->IsInScrollAnchorChain()) {
+     ScrollAnchorContainer* container = ScrollAnchorContainer::FindFor(target);
+     PostPendingScrollAnchorAdjustment(container);
++  } else if (isRoot) {
++    // A reflow from the root, as a viewport resize starts, is never in an
++    // anchor chain, so the root scroller's anchor is adjusted here: text
++    // that rewraps at a new width keeps the reader's place.
++    if (ScrollContainerFrame* rootScroll = GetRootScrollContainerFrame()) {
++      PostPendingScrollAnchorAdjustment(rootScroll->Anchor());
++    }
+   }
+   if (MOZ_UNLIKELY(isBSizeLimitReflow)) {
+     mPresContext->SetVisibleArea(boundsRelativeToTarget);

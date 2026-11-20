@@ -355,3 +355,4 @@ backport-bug-2090212-swapchain-pool-cspace.patch
 backport-bug-2093090-remote-texture-gone-owner.patch
 backport-bug-2093091-image-bridge-ready-check.patch
 backport-bug-2085382-wr-error-after-overlay-failure.patch
+scroll-anchor-on-resize.patch

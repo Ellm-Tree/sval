@@ -21,6 +21,23 @@ Each entry gives:
 
 ## Sval's own fixes
 
+### A page that gets narrower loses the reader's place
+
+- **Patch**: `patches/scroll-anchor-on-resize.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `PresShell::DoReflow` posts a scroll anchor adjustment only for
+  a reflow whose target is in an anchor chain (`IsInScrollAnchorChain`). A
+  viewport resize reflows from the root frame, which is in no chain, so
+  `ScrollAnchorContainer::ApplyAdjustments` never runs for it. Text above
+  the view rewraps taller and the content the reader was on slides down,
+  where Chrome keeps it in place. The fix posts the root scroller's anchor
+  after a root reflow.
+- **Evidence**: `browser_sval_scroll_anchor_resize.js` halves a page's
+  width. Without the patch the paragraph at the top of the view moves from
+  100 px to 220 px.
+- **Upstream**: file a bug in Core :: Layout: Scrolling and Overflow with
+  the patch and the test as a mochitest. Not submitted.
+
 ### A tab moved mid-load files its session state under the wrong key
 
 - **Patch**: `patches/tab-move-keeps-session-key.patch`
