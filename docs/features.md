@@ -153,7 +153,9 @@ control of what you see and what is sent to websites.
   keyboard, and a preview shows next to the Workspace panel. The preview shows
   the tab's title, the site, and a picture of the page. The picture is the
   same one Recent tabs shows. A tab whose page hasn't loaded since Sval
-  started has none. You can turn previews off in Settings › Appearance.
+  started has none. You can turn previews off in Settings › Appearance. With
+  previews off, pointing at a tab shows the tab's title and address in a
+  tooltip.
 - **Hide the Workspace panel.** Press ⌃Z (Ctrl+Alt+Z on Windows and Linux)
   to hide the Workspace panel and give the page the whole window. While the
   Workspace panel is hidden, hold the pointer at the edge of the window on

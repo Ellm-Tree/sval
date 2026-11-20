@@ -276,6 +276,64 @@ add_task(async function a_group_row_and_a_switched_off_preview_show_nothing() {
   await pointAway();
 });
 
+/**
+ * Rests the pointer on `row`'s name and waits for the tooltip Gecko gives
+ * it to start showing. An HTML element's tooltip is the document's default
+ * one, native anonymous content, so only `originalTarget` names it.
+ *
+ * @param {Element} row
+ * @returns {Promise<Event>} the tooltip's `popupshowing`, once every
+ *   listener has had it.
+ */
+async function tooltipOf(row) {
+  const win = row.documentGlobal;
+  const showing = new Promise(resolve => {
+    const listener = event => {
+      if (event.originalTarget.localName === "tooltip") {
+        win.removeEventListener("popupshowing", listener, true);
+        resolve(event);
+      }
+    };
+    // Added after `SvalTabHoverPreview`'s own listener, so it runs after it.
+    win.addEventListener("popupshowing", listener, true);
+  });
+  EventUtils.synthesizeMouseAtCenter(
+    row.querySelector(".sval-row-name"),
+    { type: "mousemove" },
+    win
+  );
+  return within(showing, 10_000, "the row's tooltip");
+}
+
+add_task(async function the_row_tooltip_shows_only_with_previews_off() {
+  const tab = await openPage(titledPage("Tipped"));
+  await openPage(titledPage("On screen"));
+  const row = await rowOf(tab);
+
+  await pointAway();
+  const withPreviews = await tooltipOf(row);
+  Assert.ok(withPreviews.defaultPrevented, "previews on: no tooltip");
+  await pointAway();
+
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.tabs.hoverPreview.enabled", false]],
+  });
+  const withoutPreviews = await tooltipOf(row);
+  Assert.ok(!withoutPreviews.defaultPrevented, "previews off: the tooltip");
+  const tooltip = withoutPreviews.originalTarget;
+  if (tooltip.state !== "open") {
+    await within(
+      BrowserTestUtils.waitForPopupEvent(tooltip, "shown"),
+      10_000,
+      "the tooltip showing"
+    );
+  }
+  const hidden = BrowserTestUtils.waitForPopupEvent(tooltip, "hidden");
+  tooltip.hidePopup();
+  await within(hidden, 10_000, "the tooltip hiding");
+  await SpecialPowers.popPrefEnv();
+});
+
 add_task(async function a_tab_loaded_behind_shows_its_picture() {
   const url = titledPage("Loaded behind");
   const tab = BrowserTestUtils.addTab(gBrowser, url);

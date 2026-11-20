@@ -18,7 +18,7 @@
  * - **It goes as Firefox's does:** when the pointer or focus leaves the row,
  *   on a click, as the panel scrolls, and on Escape. While it shows, Escape
  *   hides it and does nothing else.
- * - **The row's own tooltip stays away** while previews are on, as Firefox
+ * - **The row's own tooltip shows only while previews are off**, as Firefox
  *   keeps its tab tooltip away (`tabbrowser`'s `_showTabCardPreview`).
  *
  * Only tab rows have a preview: groups, Splits, pins and Favorites do not.
@@ -193,11 +193,16 @@ export const SvalTabHoverPreview = {
     );
 
     // A tab row's name carries its title and address as a tooltip, which the
-    // preview shows itself.
+    // preview shows itself. The name is HTML, so Gecko shows that tooltip in
+    // the document's default tooltip (`nsXULTooltipListener::FindTooltip`),
+    // native anonymous content whose events reach the window retargeted to
+    // the root element: only `originalTarget` is the tooltip. The `title`
+    // stays on the name either way, so assistive technology reads the same
+    // row whichever is shown.
     win.addEventListener(
       "popupshowing",
       event => {
-        const tooltip = event.target;
+        const tooltip = event.originalTarget;
         if (
           tooltip.localName === "tooltip" &&
           enabled() &&
