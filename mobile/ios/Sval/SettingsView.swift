@@ -103,12 +103,19 @@ struct SettingsView: View {
         .sheetPage("Settings", onDone: onDone ?? { dismiss() })
         .sheet(isPresented: $pairing) { PairingSheet().tintedSheet(sheetTint) }
         .confirmationDialog("Leave This Folder?", isPresented: $leaving, titleVisibility: .visible) {
-            Button("Leave This Folder", role: .destructive) {
-                model.forgetFolder()
+            Button("Keep Workspaces on This \(UIDevice.current.model)") {
+                model.leaveFolder(startOver: false)
+                (onDone ?? { dismiss() })()
+            }
+            Button("Start Over", role: .destructive) {
+                model.leaveFolder(startOver: true)
+                // First run opens as on a first launch, once the sheet
+                // Settings is in has gone.
+                model.setUpRequested = true
                 (onDone ?? { dismiss() })()
             }
         } message: {
-            Text("This \(UIDevice.current.model) forgets your Workspaces. The folder and your other devices keep them.")
+            Text("This \(UIDevice.current.model) stops syncing with the folder, and your other devices keep syncing through the folder. Start Over also removes your Workspaces and sync key from this \(UIDevice.current.model).")
         }
         .confirmationDialog("Clear Browsing Data?", isPresented: $clearing, titleVisibility: .visible) {
             Button("Clear Browsing Data", role: .destructive) {

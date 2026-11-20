@@ -579,7 +579,7 @@ private struct StartStep: View {
 
     private var start: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StepBar(step: 2) { model.forgetFolder() }
+            StepBar(step: 2) { model.leaveFolder(startOver: false) }
             FirstRunStyle.headline("Start syncing here")
                 .padding(.horizontal, 4)
                 .padding(.top, 24)
@@ -663,7 +663,7 @@ private struct CodeStep: View {
 
     private var entry: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StepBar(step: 2) { model.forgetFolder() }
+            StepBar(step: 2) { model.leaveFolder(startOver: false) }
             FirstRunStyle.headline(backup ? "Enter the backup key" : "Enter the pairing code")
                 .padding(.horizontal, 4)
                 .padding(.top, 24)

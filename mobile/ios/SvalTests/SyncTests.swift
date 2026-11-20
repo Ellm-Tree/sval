@@ -251,4 +251,9 @@ final class KeptKeyTests: XCTestCase {
         XCTAssertEqual(AppModel.stage(hasKey: false, keyUnconfirmed: false, holdsSval: true), .join)
         XCTAssertEqual(AppModel.stage(hasKey: false, keyUnconfirmed: false, holdsSval: false), .start)
     }
+
+    func testAKeptKeyStartsAnEmptyFolder() {
+        XCTAssertEqual(AppModel.stage(hasKey: true, keyUnconfirmed: false, holdsSval: false), .start)
+        XCTAssertEqual(AppModel.stage(hasKey: true, keyUnconfirmed: true, holdsSval: false), .start)
+    }
 }

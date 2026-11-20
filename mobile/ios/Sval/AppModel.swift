@@ -646,10 +646,6 @@ final class AppModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let holdsSval = Folder(root: url).exists(topDir)
         let opens = Self.keyOpens(Folder(root: url), key: Secrets.syncKey())
-        guard holdsSval || Secrets.syncKey() == nil else {
-            message = SyncError.notASvalFolder.localizedDescription
-            return
-        }
         do {
             let bookmark = try url.bookmarkData()
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
@@ -659,8 +655,7 @@ final class AppModel {
         }
         source = .files(url)
         message = nil
-        noteKey(opens: opens)
-        stage = stage(holdsSval: holdsSval)
+        settle(holdsSval: holdsSval, opens: opens)
     }
 
     /// Connects to a folder on an SMB share, and keeps it as the shared
@@ -673,12 +668,10 @@ final class AppModel {
                 let folder = try SmbShared(folder: SmbFolder.connect(location: location))
                 return (folder, try folder.exists(topDir), Self.keyOpens(folder, key: Secrets.syncKey()))
             }.value
-            guard holdsSval || Secrets.syncKey() == nil else { throw SyncError.notASvalFolder }
             try SmbSettings.save(location)
             source = .smb(location)
             connected = folder
-            noteKey(opens: opens)
-            stage = stage(holdsSval: holdsSval)
+            settle(holdsSval: holdsSval, opens: opens)
             Diagnostics.log("smb: connected")
             return nil
         } catch {
@@ -698,12 +691,10 @@ final class AppModel {
                 let folder = try DropboxShared(folder: DropboxFolder.connect(appKey: DropboxApp.key, refreshToken: token, root: root))
                 return (folder, try folder.exists(topDir), Self.keyOpens(folder, key: Secrets.syncKey()))
             }.value
-            guard holdsSval || Secrets.syncKey() == nil else { throw SyncError.notASvalFolder }
             try DropboxSettings.save(root: root, token: token)
             source = .dropbox(root)
             connected = folder
-            noteKey(opens: opens)
-            stage = stage(holdsSval: holdsSval)
+            settle(holdsSval: holdsSval, opens: opens)
             Diagnostics.log("dropbox: connected")
             return nil
         } catch {
@@ -733,6 +724,13 @@ final class AppModel {
     }
     private static let keyUnconfirmedKey = "syncKeyUnconfirmed"
 
+    /// Moves setup on once a folder is chosen.
+    private func settle(holdsSval: Bool, opens: Bool) {
+        noteKey(opens: opens)
+        stage = stage(holdsSval: holdsSval)
+        if stage == .ready { Task { await sync() } }
+    }
+
     private func noteKey(opens: Bool) {
         guard Secrets.syncKey() != nil else { return }
         keyUnconfirmed = !opens
@@ -744,11 +742,14 @@ final class AppModel {
     }
 
     /// Where setup goes once a folder is chosen: a folder with Sval's data
-    /// is joined, and an empty one can be started. A kept key the folder
-    /// didn't confirm joins it.
+    /// is joined, and an empty one can be started, with a kept key too, as
+    /// the desktop moves sync to another folder. The user confirms a start,
+    /// since a cloud folder still downloading can look empty. A kept key the
+    /// folder didn't confirm joins it.
     nonisolated static func stage(hasKey: Bool, keyUnconfirmed: Bool, holdsSval: Bool) -> Stage {
+        guard holdsSval else { return .start }
         if hasKey { return keyUnconfirmed ? .join : .ready }
-        return holdsSval ? .join : .start
+        return .join
     }
 
     /// The sync key this phone makes when it's the first device in a
@@ -765,7 +766,17 @@ final class AppModel {
 
     /// Starts syncing in the chosen folder, which holds no Sval data: this
     /// phone makes the sync key, and its first pass writes the folder's.
+    /// A phone that kept its sync key starts with that key: its backup
+    /// still holds, and setup goes straight to the browser.
     func startSync() {
+        if Secrets.syncKey() != nil {
+            keyUnconfirmed = false
+            starting = true
+            stage = .ready
+            Diagnostics.log("start: the kept sync key used")
+            Task { await sync() }
+            return
+        }
         var key = Data(count: 32)
         let made = key.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
         guard made == errSecSuccess else {
@@ -818,25 +829,22 @@ final class AppModel {
         Diagnostics.log("pair: offer withdrawn")
     }
 
-    /// Leaves the folder. Once the phone has synced with it, everything it
-    /// took from the folder goes too, so a later join can't publish that
-    /// into another folder.
-    func forgetFolder() {
-        guard !syncing else { return }
+    /// Leaves the folder. The phone keeps browsing on its own copy, and
+    /// keeps the sync key, so choosing the folder again syncs on with it.
+    /// `startOver` also removes the key and everything the phone took from
+    /// the folder, so a later join can't publish that into another folder.
+    /// A pass still running goes on against the folder alone: once the
+    /// syncer has left, nothing it holds reaches the own copy
+    /// (`Syncer.leave`), and `sync` drops the pass's result.
+    func leaveFolder(startOver: Bool) {
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
         SmbSettings.forget()
         DropboxSettings.forget()
         source = nil
         stage = .chooseFolder
-        // Without a sync key the phone never synced with this folder, so its
-        // own copy holds only what was browsed here, and stays.
-        guard Secrets.syncKey() != nil else { return }
-        // A kept key this folder didn't confirm belongs to another folder,
-        // and so does the own copy beside it: leaving the folder chosen by
-        // mistake keeps both, for the folder the key opens.
-        guard !keyUnconfirmed else { return }
-        Secrets.forgetSyncKey()
         starting = false
+        guard startOver else { return }
+        Secrets.forgetSyncKey()
         // The old syncer removes its copy itself, so no change it is still
         // applying writes after. One still loading from launch is left by
         // the same route once it is ready.
@@ -974,8 +982,12 @@ final class AppModel {
                 Task { await sync() }
             }
         }
+        // A pass that ends after the phone left the folder reports on a
+        // folder it no longer uses.
+        let from = source
         do {
             let report = try await syncer.sync(shared: sharedFolder(), syncKey: key, starting: starting)
+            guard source == from else { return }
             if starting { starting = false }
             Diagnostics.log("sync: merged \(report.merged), errors \(report.errors.count), unreadable \(report.unreadable.count), wrote \(report.wrote)")
             lastSynced = .now
@@ -986,6 +998,7 @@ final class AppModel {
             lastProblems = report.problems
             message = lasting.isEmpty ? nil : "\(lasting.count) file(s) in the folder couldn't be read."
         } catch {
+            guard source == from else { return }
             Diagnostics.log("sync: failed \(Diagnostics.name(error))")
             // A lost connection is made again on the next pass.
             if error is ConnectorError {
