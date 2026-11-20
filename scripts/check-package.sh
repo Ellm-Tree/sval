@@ -103,27 +103,32 @@ fi
 # can tell which build it came from.
 platform_ini="$(cd "$work" && find . -name platform.ini | head -1)"
 build_id="$(sed -n 's/^BuildID=//p' "$work/$platform_ini" | head -1)"
-for program in sval-mcp sval-folder; do
-  found="$(cd "$work" && find . -type f \( -name "$program" -o -name "$program.exe" \) | head -1)"
-  if [[ -z "$found" ]]; then
-    echo "error: $pkg lacks $program" >&2
-    failed=1
-    continue
-  fi
-  case "$pkg" in
-    *.dmg) beside="*.app/Contents/MacOS/$program" ;;
-    *) beside="$(dirname "$platform_ini")/$program*" ;;
-  esac
-  # shellcheck disable=SC2053 # $beside is a glob on purpose.
-  if [[ "$found" != $beside ]]; then
-    echo "error: $program is at $found, away from the browser binary" >&2
-    failed=1
-  fi
-  if [[ -z "$build_id" ]] || ! LC_ALL=C grep -aqF "$build_id" "$work/$found"; then
-    echo "error: $found does not carry the package's build id ${build_id:-(none)}" >&2
-    failed=1
-  fi
-done
+# An instrumented build's package leaves them out: its manifest names them
+# only outside MOZ_PROFILE_GENERATE, and nothing ships that package.
+profile_generate="$(./mach python -c 'import buildconfig; print(buildconfig.substs.get("MOZ_PROFILE_GENERATE") or "")' | tail -1)"
+if [[ -z "$profile_generate" ]]; then
+  for program in sval-mcp sval-folder; do
+    found="$(cd "$work" && find . -type f \( -name "$program" -o -name "$program.exe" \) | head -1)"
+    if [[ -z "$found" ]]; then
+      echo "error: $pkg lacks $program" >&2
+      failed=1
+      continue
+    fi
+    case "$pkg" in
+      *.dmg) beside="*.app/Contents/MacOS/$program" ;;
+      *) beside="$(dirname "$platform_ini")/$program*" ;;
+    esac
+    # shellcheck disable=SC2053 # $beside is a glob on purpose.
+    if [[ "$found" != $beside ]]; then
+      echo "error: $program is at $found, away from the browser binary" >&2
+      failed=1
+    fi
+    if [[ -z "$build_id" ]] || ! LC_ALL=C grep -aqF "$build_id" "$work/$found"; then
+      echo "error: $found does not carry the package's build id ${build_id:-(none)}" >&2
+      failed=1
+    fi
+  done
+fi
 
 # A compiled Windows Gecko carries the MSVC runtime beside its own DLLs; without
 # it, nothing in the package starts on a machine lacking Microsoft's

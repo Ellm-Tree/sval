@@ -5,17 +5,23 @@ folder, so a read stuck on a hung network mount stalls it and never the
 browser. The browser runs it from beside its own binary and cannot sync a
 shared folder without it, and the manifest copies only the files it names.
 
+An instrumented build for profile-guided optimisation packages before
+anything stages the program, and its profile run never starts it, so the
+manifest names it only outside MOZ_PROFILE_GENERATE.
+
 diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
-index 17436e67ca..afbf46ed1a 100644
+index 530b0e9..33f7c49 100644
 --- a/browser/installer/package-manifest.in
 +++ b/browser/installer/package-manifest.in
-@@ -423,6 +423,10 @@ bin/libfreebl_64int_3.so
- ;
+@@ -425,6 +425,12 @@ bin/libfreebl_64int_3.so
  @BINPATH@/sval-mcp@BIN_SUFFIX@
+ #endif
  
 +; [ sval-folder, the helper that reads and writes Sval's shared folder ]
 +;
++#ifndef MOZ_PROFILE_GENERATE
 +@BINPATH@/sval-folder@BIN_SUFFIX@
++#endif
 +
  ; [ Native Messaging Host Proxy ]
  ;
