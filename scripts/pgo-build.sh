@@ -54,10 +54,12 @@ if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}" ]]; then
 fi
 # profileserver.py runs the objdir's staged package, writes the raw profiles
 # to its working directory and merges them there, as mach's own PGO build
-# runs it (python/mozbuild/mozbuild/build_commands.py).
+# runs it (python/mozbuild/mozbuild/build_commands.py). macOS's bash 3.2
+# takes an empty array for an unset variable under set -u, so the array
+# expands only when it has elements.
 (cd "$OBJDIR" &&
   LLVM_PROFDATA="$LLVM_PROFDATA" JARLOG_FILE="$PGO/en-US.log" \
-    "${display[@]}" "$SRC/mach" python "$SRC/build/pgo/profileserver.py")
+    ${display[@]+"${display[@]}"} "$SRC/mach" python "$SRC/build/pgo/profileserver.py")
 mv "$OBJDIR/merged.profdata" "$PGO/merged.profdata"
 # The packager reads the jar log only if it exists (packager.mk), so a
 # missing one would ship jars with nothing preloaded.
