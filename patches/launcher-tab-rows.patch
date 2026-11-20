@@ -48,7 +48,7 @@ diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/
 index 663f068056..f346ef33b7 100644
 --- a/browser/components/urlbar/UrlbarUtils.sys.mjs
 +++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
-@@ -2694,6 +2694,24 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
+@@ -2694,6 +2694,30 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
        lastVisit: {
          type: "number",
        },
@@ -62,7 +62,13 @@ index 663f068056..f346ef33b7 100644
 +        type: "string",
 +      },
 +      svalWorkspaceColor: {
-+        type: "string",
++        type: ["string", "object"],
++        properties: {
++          h: { type: "number" },
++          c: { type: "number" },
++          l: { type: "number" },
++          mode: { type: "string" },
++        },
 +      },
 +      svalWorkspaceEmoji: {
 +        type: "string",

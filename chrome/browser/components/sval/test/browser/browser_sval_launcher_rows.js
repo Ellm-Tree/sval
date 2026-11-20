@@ -324,6 +324,29 @@ add_task(async function an_open_tab_names_its_workspace() {
 });
 
 /** A tab of the window's own workspace shows no chip and switches to it. */
+/**
+ * A tab of a workspace with a custom colour is listed too, its chip in that
+ * colour: the colour is an object, where a preset's is its name.
+ */
+add_task(async function a_tab_of_a_custom_coloured_workspace_is_listed() {
+  const { engine, home, calendar } = await workAndHome();
+  await engine.mutate({
+    kind: "setAppearance",
+    id: home,
+    color: { h: 259.6, c: 0.101, l: 0.505, mode: "dark" },
+    emoji: "🏠",
+  });
+  await SvalPanel.refresh();
+  const rows = await shownRows("cal");
+  const tab = rows.find(r => r.result.payload.svalNodeId === calendar);
+  Assert.ok(tab, "Calendar is listed");
+  Assert.equal(
+    tab.querySelector(".sval-chip")?.dataset.color,
+    "custom",
+    "its chip takes the workspace's own colour"
+  );
+});
+
 add_task(async function a_tab_here_has_no_chip() {
   const { cartography } = await workAndHome();
   const rows = await shownRows("cart");
