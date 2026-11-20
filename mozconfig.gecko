@@ -36,29 +36,24 @@ ac_add_options --enable-lto=thin
 
 # A release compiles with profile-guided optimisation. On linux64 it made
 # Speedometer 3 16% faster than thin LTO alone, for two and a half times the
-# compile. SVAL_PGO picks how:
-#   1         on a machine that can run what it builds: mach compiles an
-#             instrumented browser in the objdir's instrumented/, runs
-#             build/pgo/profileserver.py with it, and compiles again with the
-#             profile that run wrote
-#   generate  the instrumented browser alone, for a cross-compile's target
-#             machine to run profileserver.py with
-#   use       compiles with the merged profile at SVAL_PGO_PROFILE that such a
-#             run wrote
+# compile. Each step is cross-language, so the profile covers Gecko's Rust
+# as well as its C++. SVAL_PGO picks the step:
+#   generate  an instrumented browser, for build/pgo/profileserver.py to run;
+#             that run writes the profile and the jar log
+#   use       compiles with the profile at SVAL_PGO_PROFILE, and packages
+#             each jar with the entries the jar log at SVAL_PGO_JARLOG names
+#             first, preloaded
 case "${SVAL_PGO:-}" in
-  1)
-    ac_add_options MOZ_PGO=1
-    # mach configures the instrumented pass with MOZ_PROFILE_GENERATE set.
-    # That pass builds no SIMPLE_PROGRAMS (config/rules.mk), and the update
-    # tests' Makefile.in installs one on macOS, so the pass builds no tests.
-    if [ -n "${MOZ_PROFILE_GENERATE:-}" ]; then
-      ac_add_options --disable-tests
-    fi
+  generate)
+    ac_add_options --enable-profile-generate=cross
+    # An instrumented compile builds no SIMPLE_PROGRAMS (config/rules.mk),
+    # and the update tests' Makefile.in installs one on macOS.
+    ac_add_options --disable-tests
     ;;
-  generate) ac_add_options --enable-profile-generate=cross ;;
   use)
     ac_add_options --enable-profile-use=cross
     ac_add_options --with-pgo-profile-path="$SVAL_PGO_PROFILE"
+    ac_add_options --with-pgo-jarlog="$SVAL_PGO_JARLOG"
     ;;
 esac
 

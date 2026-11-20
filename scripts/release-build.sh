@@ -17,7 +17,7 @@
 #   SVAL_RELEASE_TAG     the tag being built, which the checkout holds
 #   SVAL_PGO_PROFRAW     for win64, the tag's release run's artifact
 #                        pgo-win64-profile, unzipped: its raw PGO profiles
-#                        as one .tar.gz, in a directory mounted where it is
+#                        and jar log as one .tar.gz, in a directory mounted where it is
 #
 # OUT gets PLATFORM/, as release-compile.sh fills it, and linux64/ also gets
 # source-mpl.tar.xz, the source of the MPL 2.0 files (scripts/mpl-source.py).
@@ -114,7 +114,7 @@ size="$(python3 -I -c '
 import sys
 sys.path.insert(0, sys.argv[1])
 from mozpack.mozjar import JarReader
-entry = JarReader(sys.argv[2]).entries.get("content/browser/sval/sval_core_bg.wasm")
+entry = JarReader(sys.argv[2]).entries.get("chrome/browser/content/browser/sval/sval_core_bg.wasm")
 print(entry["uncompressed_size"] if entry else "")
 ' "$REPO_ROOT/build/firefox/python/mozbuild" "$work/omni.ja")"
 echo "sval_core_bg.wasm: ${size:-missing} bytes"

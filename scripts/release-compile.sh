@@ -24,7 +24,7 @@
 #   SVAL_RELEASE_VERSION       the version a tag names, or 0.0.0
 #   SVAL_BUILD_NUMBER          tells apart two .deb/.rpm builds of one version
 #   SVAL_SAFEBROWSING_KEYFILE  Sval's Safe Browsing key, built in
-#   SVAL_PGO_PROFRAW           win64's raw PGO profiles, as
+#   SVAL_PGO_PROFRAW           win64's raw PGO profiles and jar log, as
 #                              scripts/release-build.sh is given them
 #
 # OUT gets target.tar.xz, sval.deb, sval.rpm and target.complete.mar for
@@ -55,41 +55,46 @@ DIST="build/firefox/$objdir/dist"
 mkdir -p "$OUT"
 
 build() {
-  # Mozilla's build has install races at high parallelism; a second,
-  # incremental `mach build` finishes what the first left (gecko.yml).
   echo "==> Compiling $PLATFORM"
   # Both compile with profile-guided optimisation (mozconfig.gecko).
-  # linux64's profiling run needs a display, which Xvfb gives it. win64 is a
+  # linux64 makes its own profile (scripts/pgo-build.sh). win64 is a
   # cross-compile, so its profile comes from Windows (gecko.yml's
-  # profile-win64) and is merged with the llvm-profdata configure
-  # bootstraps, the compile's own, before the compile's configure checks it
-  # is there.
-  local display=()
+  # profile-win64), whose raw profiles are merged with the llvm-profdata
+  # configure bootstraps, the compile's own, before the compile's configure
+  # checks the profile is there.
   if [[ "$PLATFORM" == linux64 ]]; then
-    export SVAL_PGO=1
-    display=(xvfb-run -a -s "-screen 0 1600x1200x24")
+    ./scripts/pgo-build.sh
   else
     [[ -s "${SVAL_PGO_PROFRAW:-}" ]] ||
       { echo "error: SVAL_PGO_PROFRAW names no win64 profile" >&2; exit 1; }
     SVAL_CONFIGURE_ONLY=1 ./scripts/build.sh
-    local raw
+    local raw pgo="$REPO_ROOT/build/pgo"
     raw="$(mktemp -d)"
     # The archive comes from a Windows runner branch jobs reach, so only
-    # regular .profraw files at its top level are unpacked.
+    # regular .profraw files and the jar log, at its top level, are
+    # unpacked.
     local listing
     listing="$(tar -tvzf "$SVAL_PGO_PROFRAW")"
-    if grep -qv '^-.* [^/]*\.profraw$' <<<"$listing"; then
-      echo "error: the win64 profile holds more than .profraw files" >&2
+    if grep -qv -e '^-.* [^/]*\.profraw$' -e '^-.* en-US\.log$' <<<"$listing"; then
+      echo "error: the win64 profile holds more than .profraw files and en-US.log" >&2
       exit 1
     fi
     tar -xzf "$SVAL_PGO_PROFRAW" -C "$raw" --no-same-owner
+    # The packager reads the jar log only if it exists (packager.mk), so a
+    # missing one would ship jars with nothing preloaded.
+    [[ -s "$raw/en-US.log" ]] ||
+      { echo "error: the win64 profile holds no jar log" >&2; exit 1; }
+    rm -rf "$pgo"
+    mkdir -p "$pgo"
+    mv "$raw/en-US.log" "$pgo/en-US.log"
     "${MOZBUILD_STATE_PATH:?}/clang/bin/llvm-profdata" merge \
-      -o "$REPO_ROOT/win64.profdata" "$raw"/*.profraw
+      -o "$pgo/merged.profdata" "$raw"/*.profraw
     rm -rf "$raw"
-    export SVAL_PGO=use SVAL_PGO_PROFILE="$REPO_ROOT/win64.profdata"
+    export SVAL_PGO=use SVAL_PGO_PROFILE="$pgo/merged.profdata" SVAL_PGO_JARLOG="$pgo/en-US.log"
+    # Mozilla's build has install races at high parallelism; a second,
+    # incremental `mach build` finishes what the first left (gecko.yml).
+    ./scripts/build.sh || (cd build/firefox && ./mach --no-interactive build)
   fi
-  "${display[@]}" ./scripts/build.sh ||
-    (cd build/firefox && "${display[@]}" ./mach --no-interactive build)
 
   local f="$DIST/bin/modules/AppConstants.sys.mjs"
   if [[ ! -f "$f" ]] || grep -q no-google-safebrowsing-api-key "$f"; then

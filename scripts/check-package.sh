@@ -78,6 +78,20 @@ fi
 entries="$(./mach python -c 'import sys; from mozpack.mozjar import JarReader; print("\n".join(JarReader(sys.argv[1]).entries))' "$omni")"
 files="$(cd "$work" && find . -type f)"
 
+# A PGO compile packages each jar with the entries its profile run read first,
+# preloaded, from the jar log (mozconfig.gecko). The packager skips a jar log
+# it cannot find (packager.mk), so a jar that preloads nothing means the jar
+# log never reached the packager.
+profile_use="$(./mach python -c 'import buildconfig; print(buildconfig.substs.get("MOZ_PROFILE_USE") or "")' | tail -1)"
+if [[ -n "$profile_use" ]]; then
+  for jar in "$omni" "$(dirname "$(dirname "$omni")")/omni.ja"; do
+    if ! ./mach python -c 'import sys; from mozpack.mozjar import JarReader; sys.exit(0 if JarReader(sys.argv[1]).last_preloaded else 1)' "$jar"; then
+      echo "error: ${jar#"$work"/} preloads nothing: the compile had no jar log" >&2
+      failed=1
+    fi
+  done
+fi
+
 require_entry() {
   if ! grep -qx "$1" <<<"$entries"; then
     echo "error: browser/omni.ja lacks $1" >&2
