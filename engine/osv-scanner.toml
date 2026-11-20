@@ -18,16 +18,20 @@ reason = "Marvin timing attack on RSA private-key operations. The engine perform
 id = "GHSA-9c48-w39g-hm26"
 reason = "rsa 0.8 is linked through blind-rsa-signatures and never called; the fix is in rsa 0.9, which privacypass does not yet accept."
 
-# block-buffer 0.10 and crypto-bigint 0.5 come in through the RustCrypto 0.10
-# stack that privacypass, voprf, p384 and blind-rsa-signatures are built on;
-# their fixes are in the next major versions, which none of them accept at the
-# revision Cargo.toml pins. Both entries go when privacypass moves to that
-# stack.
-
-[[IgnoredVulns]]
-id = "GHSA-qwgh-2vcv-g2f7"
-reason = "block-buffer's position corrupts only when a caught panic interrupts it. The engine ships as wasm32-unknown-unknown, whose panics abort, and catches none."
+# crypto-bigint 0.5 comes in through the RustCrypto 0.10 stack that
+# privacypass, voprf, p384 and blind-rsa-signatures are built on; its fix is in
+# the next major version, which none of them accept at the revision Cargo.toml
+# pins. The entry goes when privacypass moves to that stack.
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0387"
 reason = "crypto-bigint 0.5 is the arithmetic of elliptic-curve's NIST curves. The engine runs privacypass's VOPRF over ristretto255 alone (src/privacy_pass.rs), whose arithmetic is curve25519-dalek's; from elliptic-curve it takes only the hash-based expand_message_xmd."
+
+# basic-toml is locked as askama's optional config parser, which uniffi's cli
+# feature asks for. The engine never enables that feature, so cargo resolves
+# basic-toml into this lockfile and compiles it under none of the engine's
+# features or targets. The entry goes when uniffi's askama drops basic-toml.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0374"
+reason = "basic-toml is unmaintained. The lockfile holds it as askama's optional parser for uniffi's cli feature, which no engine feature enables, so it is never compiled."
