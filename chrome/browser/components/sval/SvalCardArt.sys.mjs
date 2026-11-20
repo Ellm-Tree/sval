@@ -26,7 +26,7 @@ const GOLD = "#FFC22A";
 const NEON = "#5CF2FF";
 const CREAM = "#FFF3C4";
 const MUTED = "#8F9BC7";
-const MONO = "ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
 /** Each Arc palette as nine colours, its gradient sampled on a 3×3 grid. */
 const ARC_PALETTES = {

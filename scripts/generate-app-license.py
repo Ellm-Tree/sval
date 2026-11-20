@@ -110,6 +110,37 @@ DATA = [
         "Reduced to each company's registrable domains and stored as a module.",
     ),
 ]
+JETBRAINS_MONO = (
+    "JetBrains Mono",
+    "the JetBrains Mono Project Authors",
+    "https://github.com/JetBrains/JetBrainsMono",
+    "OFL-1.1",
+    "Copyright 2020 The JetBrains Mono Project Authors "
+    "(https://github.com/JetBrains/JetBrainsMono)",
+    "Sval uses it unmodified.",
+)
+OUTFIT = (
+    "Outfit",
+    "the Outfit Project Authors",
+    "https://github.com/Outfitio/Outfit-Fonts",
+    "OFL-1.1",
+    "Copyright 2021 The Outfit Project Authors "
+    "(https://github.com/Outfitio/Outfit-Fonts)",
+    "Sval uses it unmodified.",
+)
+FONTS = [
+    (
+        "Audiowide",
+        "Brian J. Bonislawsky DBA Astigmatic (AOETI)",
+        "https://github.com/google/fonts/tree/main/ofl/audiowide",
+        "OFL-1.1",
+        "Copyright (c) 2012 by Brian J. Bonislawsky DBA Astigmatic (AOETI) "
+        "(astigma@astigmatic.com), with ReservedFont Name \"Audiowide\"",
+        "Sval uses it unmodified.",
+    ),
+    JETBRAINS_MONO,
+    OUTFIT,
+]
 IOS_DATA = [
     (
         "The Public Suffix List",
@@ -122,24 +153,8 @@ IOS_DATA = [
         "that says whether the rule is a suffix, an exception, or a wildcard. "
         "The psl component builds a second copy into its code.",
     ),
-    (
-        "JetBrains Mono",
-        "the JetBrains Mono Project Authors",
-        "https://github.com/JetBrains/JetBrainsMono",
-        "OFL-1.1",
-        "Copyright 2020 The JetBrains Mono Project Authors "
-        "(https://github.com/JetBrains/JetBrainsMono)",
-        "Sval uses it unmodified.",
-    ),
-    (
-        "Outfit",
-        "the Outfit Project Authors",
-        "https://github.com/Outfitio/Outfit-Fonts",
-        "OFL-1.1",
-        "Copyright 2021 The Outfit Project Authors "
-        "(https://github.com/Outfitio/Outfit-Fonts)",
-        "Sval uses it unmodified.",
-    ),
+    JETBRAINS_MONO,
+    OUTFIT,
 ]
 
 
@@ -215,8 +230,9 @@ def components(crates):
     return f"<ul>\n{listing}\n</ul>\n{texts}"
 
 
-def data_notices(data):
-    """The list of data and its license texts, as HTML."""
+def data_notices(data, anchor="sval-data"):
+    """The list of data and its license texts, as HTML, each text's id
+    starting `anchor`."""
     listing = "\n".join(
         f"  <li>{esc(name)}, by {esc(holder)}, from "
         f'<a href="{esc(url)}">{esc(url)}</a>, under {esc(spdx)}. '
@@ -225,7 +241,7 @@ def data_notices(data):
         for name, holder, url, spdx, copyright, change in data
     )
     texts = "\n".join(
-        f'<h3 id="sval-data-{esc(spdx.lower())}">{esc(spdx)}</h3>\n'
+        f'<h3 id="{anchor}-{esc(spdx.lower())}">{esc(spdx)}</h3>\n'
         f'<pre>{esc((REPO / "LICENSES" / f"{spdx}.txt").read_text(encoding="utf-8"))}</pre>'
         for spdx in sorted({d[3] for d in data})
     )
@@ -285,6 +301,12 @@ def render(crates):
   each follows the list.
 </p>
 {data_notices(DATA)}
+<h2 id="sval-fonts">Fonts built into Sval</h2>
+<p>
+  Sval shows some of its text in these typefaces. The license for each follows the
+  list.
+</p>
+{data_notices(FONTS, "sval-fonts")}
 """
 
 

@@ -681,7 +681,7 @@ body {
 .sval-fr-folder {
   display: block;
   color: var(--text-body);
-  font: 13px/1.4 monospace;
+  font: 13px/1.4 var(--sval-mono);
   overflow-wrap: anywhere;
 }
 
@@ -953,7 +953,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
   background: var(--surface-glass);
   color: var(--text-strong);
   caret-color: var(--sval-neon);
-  font: 600 22px monospace;
+  font: 600 22px var(--sval-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 

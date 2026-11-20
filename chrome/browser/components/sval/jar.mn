@@ -406,6 +406,7 @@ browser.jar:
     content/browser/sval/home/workspace.js    (home/workspace.js)
     content/browser/sval/home/glow.js         (home/glow.js)
     content/browser/sval/home/Outfit.ttf      (home/Outfit.ttf)
+    content/browser/sval/home/JetBrainsMono.ttf (home/JetBrainsMono.ttf)
     content/browser/sval/home/starfield-stars-only-1920x1080.svg (home/starfield-stars-only-1920x1080.svg)
     content/browser/sval/home/app-icon.svg    (/browser/branding/sval/src/masters/01-app-icon.svg)
     content/browser/sval/home/mark.svg        (/browser/branding/sval/content/app-icon-unplated.svg)

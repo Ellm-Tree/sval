@@ -17,6 +17,13 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("chrome://browser/content/sval/home/JetBrainsMono.ttf") format("truetype");
+  font-weight: 100 800;
+  font-style: normal;
+}
+
 :root {
   /* Sval Blue, the one action colour, and its hover and press shades. */
   --sval-palette-blue: #1f6bff;
@@ -50,7 +57,7 @@
      a glyph Outfit lacks. */
   --sval-font: "Outfit", system-ui, sans-serif;
   /* For text read a character at a time: codes, keys and fingerprints. */
-  --sval-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sval-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 /* Words only a screen reader needs: in the accessibility tree, out of sight
