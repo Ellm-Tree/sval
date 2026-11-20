@@ -207,9 +207,15 @@ final class WalkthroughTests: XCTestCase {
         sleep(2)
         app.buttons["Settings"].firstMatch.tap()
         sleep(2)
-        swipeUp(app.collectionViews.firstMatch)
-        sleep(1)
-        app.buttons["Licenses"].firstMatch.tap()
+        // A tap on a row still below the sheet's edge lands on the page
+        // behind and closes the sheet, and the rows are taller on some
+        // simulators than others.
+        let licenses = app.buttons["Licenses"].firstMatch
+        for _ in 0..<3 where !licenses.isHittable {
+            swipeUp(app.collectionViews.firstMatch)
+            sleep(1)
+        }
+        licenses.tap()
         let notice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Sval is made by Ellm Tree'")).firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 10), "the list opens with Sval's notice")
         sleep(1)

@@ -61,11 +61,19 @@ struct SettingsView: View {
                             .font(.system(.body))
                     }
                     .tint(theme.action)
+                    let sites = SiteRules(settings: model.settings).namesWithMediaChoice.count
+                    if sites > 0 {
+                        NavigationLink {
+                            SitesView(onDone: onDone ?? { dismiss() })
+                        } label: {
+                            LabeledContent("Sites", value: "\(sites)")
+                        }
+                        .font(.system(.body))
+                    }
                 } header: {
                     caption("Video and Audio")
                 }
                 .listRowBackground(theme.cell)
-                mediaSites
                 Section {
                     Button("Clear Browsing Data…") { clearing = true }
                 }
@@ -123,41 +131,6 @@ struct SettingsView: View {
             }
         } message: {
             Text("Sval deletes cookies, site data, cached files, site icons, and tab pictures from this \(UIDevice.current.model). Sval keeps your tabs, history, and settings.")
-        }
-    }
-
-    /// Every site with a video and audio choice of its own, as the
-    /// desktop's Settings › Sites lists them (17d). Use Default takes the
-    /// choice away, and the site off the list.
-    @ViewBuilder private var mediaSites: some View {
-        let rules = SiteRules(settings: model.settings)
-        let names = rules.namesWithMediaChoice
-        if !names.isEmpty {
-            Section {
-                ForEach(names, id: \.self) { name in
-                    Picker(selection: Binding(get: { rules.media(for: name) }, set: { choice in
-                        let change = rules.mediaChange(for: name, to: choice)
-                        Task { await model.setSetting(change.key, to: change.value) }
-                    })) {
-                        ForEach(SiteRules.Media.allCases) { Text($0.words).tag($0) }
-                    } label: {
-                        Label {
-                            Text(name).lineLimit(1).truncationMode(.middle)
-                        } icon: {
-                            SiteTile(url: nil, name: name, size: 28)
-                        }
-                    }
-                    .swipeActions {
-                        Button("Use Default") {
-                            let change = rules.mediaClear(for: name)
-                            Task { await model.setSetting(change.key, to: change.value) }
-                        }
-                    }
-                }
-            } header: {
-                caption("Sites")
-            }
-            .listRowBackground(theme.cell)
         }
     }
 
