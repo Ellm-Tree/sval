@@ -70,6 +70,15 @@ Sval takes changes as merge requests on GitLab.
 covers the rules every change follows, and how to test your change before
 you send it.
 
+A merge request's title starts with a type that says what kind of change
+the merge request makes, then says what the change does:
+`fix(sync): Keep pinned tabs in their group`. Sval uses the types from
+[Conventional Commits](https://www.conventionalcommits.org/), plus
+`improve` and `security`. A title starts with `feat` for something new,
+`improve` for a better version of something Sval already does, and `fix`
+for a bug fix. CONTRIBUTING.md lists every type. Each release's notes are
+drafted from these titles, grouped by type.
+
 You don't sign a contributor license agreement. Your change comes in under
 the license of the files it touches, and you keep the copyright in what you
 wrote. Because every contributor keeps their copyright, nobody can take

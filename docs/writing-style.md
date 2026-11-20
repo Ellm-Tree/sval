@@ -225,9 +225,10 @@ Each version's notes are one file,
 `website/src/content/releases/<version>.md`, written before the release is
 tagged. The notes are a list of entries and nothing else. The website takes
 the release's date and Firefox ESR version from the release itself, so the
-file holds neither. `scripts/release-notes-draft.py` lists every pull request
-merged since the last release and the change to `docs/features.md`. Pick
-from it the changes most people using Sval will notice.
+file holds neither. `scripts/release-notes-draft.py` lists the change to
+`docs/features.md` and every pull request merged since the last release,
+grouped by the type each title starts with. Pick from it the changes most
+people using Sval will notice.
 
 - **One entry per change, and each change in one entry.** A headline or a
   summary above the list repeats the entries, so the notes have neither.

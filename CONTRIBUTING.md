@@ -148,16 +148,39 @@ intensifiers) and runs first in CI.
 
 ### Commit messages
 
-The subject is an imperative verb and its object, naming the change ("Fix the
-sync row's label"), never the state it leaves ("Pins are left out of the
-menus"). An area prefix is optional (`ci-image.sh: prune ...`). One change per
-commit: a subject that needs "and" is two. The body says what was wrong and why
+A subject follows [Conventional Commits](https://www.conventionalcommits.org/):
+a type, an optional scope in parentheses, a colon, then an imperative verb and
+its object. The verb and its object name the change, as in "fix(sync): Keep
+pinned tabs in their group". Never write a subject that describes the state
+the change leaves, like "Pins are left out of the menus". The type says what
+kind of change it is:
+
+- `feat`: something Sval couldn't do before.
+- `improve`: a better version of something Sval already does.
+- `fix`: a bug fix.
+- `perf`: the same behavior, faster or using less memory.
+- `security`: a fix for a security problem, Firefox ESR point releases
+  included.
+- `docs`: docs, the website and the README.
+- `refactor`: a change to code that leaves its behavior alone.
+- `test`: tests alone.
+- `build`: the build, packaging and dependencies.
+- `ci`: CI and its runners.
+- `chore`: anything else no user sees.
+
+The scope names the area the change is in: a component, a file or a tool
+(`fix(sync): ...`, `ci(ci-image.sh): ...`). One change per commit: a subject
+that needs "and", or two types, is two. The body says what was wrong and why
 this is the fix, wrapped at 72, never restating the diff, and is left out when
-the subject says it all. A merge request's title follows the same rules: it
-becomes the merge commit's subject. `scripts/check-commit-msg.py` checks the
-verb, the 72-character limit and the trailing period, as the `commit-msg` hook
-and in CI. A real imperative verb missing from its `VERBS` list belongs
-there.
+the subject says it all.
+
+A merge request's title must carry a type: the title becomes the merge
+commit's subject, and `scripts/release-notes-draft.py` groups each release's
+changes by that type. A commit inside a merge request may leave the type out, or name only
+its area (`ci-image.sh: prune ...`). `scripts/check-commit-msg.py` checks the
+type, the verb, the 72-character limit and the trailing period, as the
+`commit-msg` hook and in CI. A real imperative verb missing from its `VERBS`
+list belongs there.
 
 ### License notices
 

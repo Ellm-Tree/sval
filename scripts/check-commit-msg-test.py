@@ -63,6 +63,37 @@ class Subjects(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assertEqual(check.problems(subject), [])
 
+    def test_title_flags(self):
+        for subject in [
+            "Fix the sync row's label",
+            "Settings: show the sync row's state",
+            "feature: Add the sync row",
+            "Fix(sync): keep the row",
+            "fix (sync): keep the row",
+            "fix(sync): The sync row shows its state",
+            "WIP: Add the sync row",
+        ]:
+            with self.subTest(subject=subject):
+                self.assertTrue(check.problems(subject, title=True))
+
+    def test_title_passes(self):
+        for subject in [
+            "fix: Keep pinned tabs in their group",
+            "fix(sync): Keep pinned tabs in their group",
+            "ci(ci-image.sh): prune only the registry's own tags",
+            "feat(Settings): Add the sync row",
+            "WIP: feat: Add the sync row",
+            "build(deps): update dependency serde to v1.0.300",
+            "security(deps): update dependency mozilla-firefox/firefox",
+            'Revert "fix: Keep pinned tabs in their group"',
+        ]:
+            with self.subTest(subject=subject):
+                self.assertEqual(check.problems(subject, title=True), [])
+
+    def test_commit_takes_a_type(self):
+        self.assertEqual(check.problems("fix(sync): Keep pinned tabs"), [])
+        self.assertTrue(check.problems("fix(sync): Pinned tabs stay"))
+
     def test_file_skips_comments(self):
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
             f.write("# Please enter the commit message\n\nFix the sync row\n")

@@ -4,10 +4,13 @@
 """Fails on a commit subject or pull request title CONTRIBUTING.md's "Commit
 messages" section rules out.
 
-A subject is an optional area prefix ("ci:", "Settings:"), then an imperative
-verb from VERBS, at most MAX_LENGTH characters, with no trailing period and no
-em dash. A subject that opens on a noun ("The installer keeps...", "Pins are
-left out...") fails on its first word. Whether the body says why is for review.
+A subject is an optional prefix, then an imperative verb from VERBS, at most
+MAX_LENGTH characters, with no trailing period and no em dash. The prefix is a
+type from TYPES with an optional scope ("fix(sync): ", "ci: "), or an area
+("Settings: "). A pull request title must carry a type, because its merge
+commit's type sorts the change in scripts/release-notes-draft.py. A subject
+that opens on a noun ("The installer keeps...", "Pins are left out...") fails
+on its first word. Whether the body says why is for review.
 
     python3 scripts/check-commit-msg.py                 # the branch's commits
     python3 scripts/check-commit-msg.py --base <rev>    # against another base
@@ -39,6 +42,16 @@ WIP = re.compile(r"^WIP:\s*")
 # One token naming the area a change is in: a component, a file or a tool.
 AREA = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/+-]*: ")
 
+# A Conventional Commits prefix: a type, then an area as its scope.
+TYPED = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[A-Za-z0-9][A-Za-z0-9._/+-]*)\))?: ")
+
+# The types a prefix may carry, in the order the release notes draft lists
+# them. CONTRIBUTING.md's "Commit messages" section says which to use.
+TYPES = (
+    "security", "feat", "improve", "perf", "fix",
+    "docs", "refactor", "test", "build", "ci", "chore",
+)
+
 # Imperative verbs a subject may open with. A real verb the list lacks goes in
 # it; a noun or a third-person form ("Keeps", "Pins") never does.
 VERBS = frozenset("""
@@ -67,8 +80,9 @@ VERBS = frozenset("""
 """.split())
 
 
-def problems(subject):
-    """The rules subject breaks, as messages; empty when it passes."""
+def problems(subject, title=False):
+    """The rules subject breaks, as messages; empty when it passes. A pull
+    request's title passes title=True, which requires a type."""
     subject = WIP.sub("", subject.strip())
     if not subject:
         return ["the subject is empty"]
@@ -81,7 +95,16 @@ def problems(subject):
         found.append("it ends with a period")
     if "—" in subject:
         found.append("it has an em dash")
-    rest = AREA.sub("", subject, count=1)
+    typed = TYPED.match(subject)
+    if typed and typed["type"] in TYPES:
+        rest = subject[typed.end():]
+    else:
+        if title:
+            found.append(
+                "it has no type; start it with one of " + ", ".join(TYPES)
+                + ", as in \"fix(sync): Keep pinned tabs in their group\""
+            )
+        rest = AREA.sub("", subject, count=1)
     word = re.split(r"[\s,:;]", rest, maxsplit=1)[0]
     if word.lower() not in VERBS:
         found.append(
@@ -115,8 +138,8 @@ def branch_commits(base):
     return [tuple(line.split("\0", 1)) for line in out.splitlines() if line]
 
 
-def report(label, subject):
-    found = problems(subject)
+def report(label, subject, title=False):
+    found = problems(subject, title)
     for problem in found:
         print(f"{label}: {subject!r}: {problem}", file=sys.stderr)
     return bool(found)
@@ -133,7 +156,7 @@ def main():
     if args.file:
         failed = report("commit message", subject_of_file(args.file))
     elif args.title is not None:
-        failed = report("pull request title", args.title)
+        failed = report("pull request title", args.title, title=True)
     else:
         for sha, subject in branch_commits(args.base):
             failed |= report(f"commit {sha}", subject)

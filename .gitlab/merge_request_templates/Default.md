@@ -1,7 +1,9 @@
 <!--
-Your title becomes the merge commit's subject, so start it with an imperative
-verb that names the change, as CONTRIBUTING.md's "Commit messages" section
-describes.
+Your title becomes the merge commit's subject. Start it with a type, then an
+imperative verb that names the change: "fix(sync): Keep pinned tabs in their
+group". The types are feat, improve, fix, perf, security, docs, refactor,
+test, build, ci and chore. CONTRIBUTING.md's "Commit messages" section says
+which to use.
 -->
 
 ## What was wrong, and why your change fixes it

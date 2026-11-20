@@ -5,6 +5,9 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "build",
+  "semanticCommitScope": "deps",
   "packageRules": [
     {
       "description": "privacypass and voprf are built on rand_core 0.6, tls_codec 0.4 and blind-rsa-signatures 0.15, with getrandom 0.2 and 0.3 behind them. Moving one of these alone breaks the engine's build (see the comments in engine/Cargo.toml), so they move together with privacypass.",
@@ -45,6 +48,7 @@
         "at any time"
       ],
       "minimumReleaseAge": "0 days",
+      "semanticCommitType": "security",
       "addLabels": [
         "security",
         "full-ci"
