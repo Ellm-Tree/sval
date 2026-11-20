@@ -13,7 +13,7 @@
 # this file, so a new compiler is a new Gecko.
 
 [toolchain]
-channel = "1.99.1"
+channel = "1.94.1"
 profile = "minimal"
 components = ["clippy", "rustfmt"]
 targets = ["x86_64-pc-windows-msvc", "x86_64-apple-darwin"]

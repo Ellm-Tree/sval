@@ -4,5 +4,5 @@
 # The engine's compiler (`engine/rust-toolchain.toml`), so one toolchain builds
 # both the library and the bindings read from it.
 [toolchain]
-channel = "1.99.1"
+channel = "1.94.1"
 profile = "minimal"

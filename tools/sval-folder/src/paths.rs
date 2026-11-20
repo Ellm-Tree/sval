@@ -23,10 +23,10 @@ pub fn is_contained(relative: &str) -> bool {
 /// NUL. On Windows a `/` in it is refused: the browser passes the path the
 /// folder picker returned, which is backslash-separated.
 pub fn is_root(root: &str) -> bool {
-    !root.is_empty()
-        && !root.contains('\0')
-        && !(cfg!(windows) && root.contains('/'))
-        && Path::new(root).is_absolute()
+    if root.is_empty() || root.contains('\0') || (cfg!(windows) && root.contains('/')) {
+        return false;
+    }
+    Path::new(root).is_absolute()
 }
 
 /// `root` with each of `parts` joined on, one segment at a time.

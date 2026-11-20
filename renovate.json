@@ -10,6 +10,24 @@
   "semanticCommitScope": "deps",
   "packageRules": [
     {
+      "description": "Rust is pinned to the release Mozilla builds the ESR base with, so rustc and the clang configure bootstraps share an LLVM version, which cross-language LTO and PGO need. Every rust-toolchain.toml moves by hand with the ESR base.",
+      "matchFileNames": [
+        "rust-toolchain.toml",
+        "**/rust-toolchain.toml"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "The CI image's base is the Gecko compile's build environment, and scripts/gecko-key.sh hashes its Dockerfile, so it moves by hand.",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchFileNames": [
+        ".forgejo/docker/Dockerfile"
+      ],
+      "enabled": false
+    },
+    {
       "description": "privacypass and voprf are built on rand_core 0.6, tls_codec 0.4 and blind-rsa-signatures 0.15, with getrandom 0.2 and 0.3 behind them. Moving one of these alone breaks the engine's build (see the comments in engine/Cargo.toml), so they move together with privacypass.",
       "matchManagers": [
         "cargo"
