@@ -41,7 +41,7 @@ struct LookEditor: View {
     @State private var emoji: String
     @State private var color: String?
     @State private var saving = false
-    @State private var confirmingDelete = false
+    @State private var deleting: OutlineRow?
     /// The one custom colour, kept while a preset is chosen (16a).
     @State private var custom: DesktopColor.Custom?
     @FocusState private var nameFocused: Bool
@@ -142,25 +142,11 @@ struct LookEditor: View {
                 if let editing, isWorkspace {
                     Section {
                         Button("Delete This Workspace…", systemImage: "trash", role: .destructive) {
-                            confirmingDelete = true
+                            deleting = editing
                         }
                         .foregroundStyle(look.danger)
-                        // This phone would only make its own Workspace again
-                        // (decision 2254), so it can't delete it; another device can.
-                        .disabled(model.workspaces.count < 2 || ownDevices)
-                        .confirmationDialog(
-                            "Delete the “\(WorkspaceTile.name(editing))” Workspace?", isPresented: $confirmingDelete,
-                            titleVisibility: .visible
-                        ) {
-                            Button("Delete Workspace", role: .destructive) {
-                                onClose()
-                                Task { await model.deleteWorkspace(editing.id) }
-                            }
-                        } message: {
-                            if let what = model.contents(of: editing) {
-                                Text("The \(what) inside it will close too.")
-                            }
-                        }
+                        .disabled(!model.canDelete(workspace: editing))
+                        .confirmsWorkspaceDelete($deleting, onDelete: onClose)
                     } footer: {
                         if ownDevices {
                             Text("This \(UIDevice.current.model) can't delete its own Workspace.")

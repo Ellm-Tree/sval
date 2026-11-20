@@ -39,6 +39,9 @@ struct WorkspaceStrip: View {
     private var tileSize: CGFloat { large ? 64 : compact ? 40 : 46 }
     private var radius: CGFloat { large ? 18 : compact ? 12 : 14 }
 
+    /// The Workspace whose delete the strip is asking about.
+    @State private var deleting: OutlineRow?
+
     private var theme: Theme { Theme(scheme, tint: sheetTint) }
     private var browser: Browser { model.browser }
 
@@ -89,7 +92,11 @@ struct WorkspaceStrip: View {
         }
             // Held outside the scrolling run, so it shows however many
             // Workspaces there are (13a1).
-            theme.divider.frame(width: 1, height: tileSize).padding(.bottom, tight ? 6 : 26)
+            VStack(spacing: 5) {
+                theme.divider.frame(width: 1, height: tileSize)
+                if !tight { nameRoom }
+            }
+            .padding(.bottom, 6)
             privateTile
                 .padding(.horizontal, 8)
                 .padding(.vertical, tight ? 6 : 0)
@@ -97,6 +104,44 @@ struct WorkspaceStrip: View {
         .padding(.top, tight ? 0 : 8)
         .padding(.bottom, tight ? 0 : 6)
         .overlay(alignment: .top) { theme.divider.frame(height: 1) }
+        .confirmsWorkspaceDelete($deleting)
+    }
+
+    /// A tile's long-press menu: the drag's moves for the user's own
+    /// Workspaces, for a person who can't drag (decision 14), then Delete.
+    /// This phone's own Workspace has neither, so it has no menu.
+    @ViewBuilder
+    private func menu(_ workspace: OutlineRow, among: [OutlineRow], reorders: Bool) -> some View {
+        let deletes = workspace.id != model.ownWorkspace?.id
+        if reorders || deletes {
+            // Titled with the whole name, which the tile's label cuts short.
+            Section(WorkspaceTile.name(workspace)) {
+                if reorders {
+                    let at = among.firstIndex { $0.id == workspace.id } ?? 0
+                    Button("Move Left", systemImage: "arrow.left") { step(workspace, among: among, from: at, by: -1) }
+                        .disabled(at == 0)
+                    Button("Move Right", systemImage: "arrow.right") { step(workspace, among: among, from: at, by: 1) }
+                        .disabled(at == among.count - 1)
+                    Divider()
+                }
+                if deletes {
+                    Button("Delete Workspace…", systemImage: "trash", role: .destructive) { deleting = workspace }
+                        .disabled(!model.canDelete(workspace: workspace))
+                }
+            }
+        }
+    }
+
+    /// Moves `workspace`, at `at` in `among`, one place along the strip.
+    private func step(_ workspace: OutlineRow, among: [OutlineRow], from at: Int, by step: Int) {
+        let others = among.filter { $0.id != workspace.id }
+        let to = at + step
+        guard among.indices.contains(to) else { return }
+        // `before` names the Workspace it goes after, `after` the one it
+        // goes before, as `moveWorkspace` takes them.
+        let before = to > 0 ? others[to - 1].id : nil
+        let after = to < others.count ? others[to].id : nil
+        Task { await model.moveWorkspace(workspace.id, before: before, after: after) }
     }
 
     /// Each agent once, in the order its first Workspace comes. One agent
@@ -107,10 +152,22 @@ struct WorkspaceStrip: View {
     }
 
     private var divider: some View {
-        theme.divider
-            .frame(width: 1, height: tileSize)
-            .padding(.horizontal, 8)
-            .padding(.bottom, tight ? 0 : 20)
+        VStack(spacing: 5) {
+            theme.divider.frame(width: 1, height: tileSize)
+            if !tight { nameRoom }
+        }
+        .padding(.horizontal, 8)
+    }
+
+    /// The room a tile's name takes under it: two lines, held whatever
+    /// the name's length, so every tile and divider in the strip lines up
+    /// at any text size.
+    private var nameRoom: some View {
+        Text(verbatim: " ")
+            .font(.system(.caption2, weight: .bold))
+            .lineLimit(2, reservesSpace: true)
+            .hidden()
+            .accessibilityHidden(true)
     }
 
     /// `glyph` is the heading's mark, the one its tiles wear, as the
@@ -146,6 +203,7 @@ struct WorkspaceStrip: View {
                     tile(workspace)
                         .id(workspace.id)
                         .modifier(Reorder(workspace: workspace, among: workspaces, enabled: reorders))
+                        .contextMenu { menu(workspace, among: workspaces, reorders: reorders) }
                 }
             }
         }
@@ -194,7 +252,8 @@ struct WorkspaceStrip: View {
                     Text(WorkspaceTile.name(workspace))
                         .font(.system(.caption2, weight: current ? .bold : .medium))
                         .foregroundStyle(current ? theme.text : theme.muted)
-                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2, reservesSpace: true)
                         .frame(maxWidth: 62)
                 }
             }
@@ -243,6 +302,7 @@ struct WorkspaceStrip: View {
                 if !tight {
                     Text("Private")
                         .font(.system(.caption2, weight: .semibold))
+                        .lineLimit(2, reservesSpace: true)
                         // The desktop's label colour reads on the dark sheet;
                         // on the light one it takes Private Violet itself. A
                         // Workspace's colour has ink of its own solved on it.
@@ -272,6 +332,7 @@ struct WorkspaceStrip: View {
                 if !tight {
                     Text("New")
                         .font(.system(.caption2, weight: .medium))
+                        .lineLimit(2, reservesSpace: true)
                 }
             }
             .foregroundStyle(theme.muted)
@@ -313,31 +374,9 @@ private struct Reorder: ViewModifier {
                     Task { await model.moveWorkspace(moved, before: before, after: after) }
                     return true
                 }
-                // The drag's moves, for a person who can't drag (decision 14).
-                .contextMenu {
-                    let at = among.firstIndex { $0.id == workspace.id } ?? 0
-                    Button("Move Left", systemImage: "arrow.left") { step(at, by: -1) }
-                        .disabled(at == 0)
-                    Button("Move Right", systemImage: "arrow.right") { step(at, by: 1) }
-                        .disabled(at == among.count - 1)
-                }
         } else {
             content
         }
-    }
-}
-
-extension Reorder {
-    /// Moves the Workspace at `at` one place along the strip.
-    private func step(_ at: Int, by step: Int) {
-        let others = among.filter { $0.id != workspace.id }
-        let to = at + step
-        guard among.indices.contains(to) else { return }
-        // `before` names the Workspace it goes after, `after` the one it
-        // goes before, as `moveWorkspace` takes them.
-        let before = to > 0 ? others[to - 1].id : nil
-        let after = to < others.count ? others[to].id : nil
-        Task { await model.moveWorkspace(workspace.id, before: before, after: after) }
     }
 }
 

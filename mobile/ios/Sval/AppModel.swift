@@ -1697,14 +1697,11 @@ final class AppModel {
         tree.workspace(of: id)
     }
 
-    /// "3 tabs", "1 group", or nil for nothing, as the desktop counts what a
-    /// group or workspace holds (`contentsPhrase`).
-    func contents(of container: OutlineRow?) -> String? {
-        guard let container else { return nil }
-        let (tabs, groups) = tree.inside(container.id)
-        let (count, noun) = tabs > 0 ? (tabs, "tab") : (groups, "group")
-        guard count > 0 else { return nil }
-        return count == 1 ? "1 \(noun)" : "\(count) \(noun)s"
+    /// Whether `workspace` can be deleted from this phone: never the last
+    /// one, and never the phone's own, which it would only make again
+    /// (decision 2254). Another device can delete that one.
+    func canDelete(workspace: OutlineRow) -> Bool {
+        workspaces.count > 1 && workspace.id != ownWorkspace?.id
     }
 
     /// The tabs in `workspace`, in tree order.
