@@ -29,6 +29,9 @@ struct BrowserView: View {
     @State private var barHeight: CGFloat = 100
     @State private var barWidth: CGFloat = 393
     @State private var barFrame: CGRect = .zero
+    @AppStorage(Walkthrough.doneKey) private var walkthroughDone = false
+    /// The walkthrough's page, which the page and the bar's light share.
+    @State private var walkthroughPage = 0
     /// Set by the Workspace sheet's New Tab, done once the sheet is gone.
     @State private var newTabAfterSheet = false
     /// What iOS keeps clear round the screen, as the browser's own
@@ -119,11 +122,12 @@ struct BrowserView: View {
                         barFrame = $0
                     }
             }
-            // The intro's numbers over the capsules they name (14l).
-            if browser.currentTabId == nil, workspace?.id == model.ownWorkspace?.id, entering == nil,
+            // The walkthrough's light on the capsule its page names.
+            if !walkthroughDone, let capsule = Walkthrough.capsule(on: walkthroughPage),
+               browser.currentTabId == nil, workspace?.id == model.ownWorkspace?.id, entering == nil,
                verticalSize != .compact, browser.barFold == 0, barFrame.width > 0 {
-                BarMarkers(width: barFrame.width)
-                    .padding(.bottom, barHeight + 6)
+                BarSpotlight(size: CGSize(width: barFrame.width, height: barHeight), capsule: capsule)
+                    .transition(.opacity)
             }
             if let target = swipeTarget, abs(swipe) > 12 {
                 let order = model.workspaces
@@ -457,7 +461,7 @@ struct BrowserView: View {
                       browser.currentURL == nil {
                 elsewhere(row, address: address, theme: theme)
             } else if browser.currentTabId == nil, workspace != nil, workspace?.id == model.ownWorkspace?.id {
-                DeviceHome(workspace: workspace) { enter(.newTab) }
+                DeviceHome(workspace: workspace, done: $walkthroughDone, page: $walkthroughPage) { enter(.newTab) }
             } else if browser.currentTabId == nil {
                 EmptyHome(workspace: workspace) { enter(.newTab) }
             }

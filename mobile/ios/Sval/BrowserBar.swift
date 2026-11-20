@@ -16,6 +16,7 @@ struct WorkspaceButtonBounds: PreferenceKey {
 }
 
 struct BrowserBar: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSize
     @Environment(AppModel.self) private var model
     @Environment(\.appearance) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -573,12 +574,18 @@ struct BrowserBar: View {
         }
     }
 
+    /// The empty address's words. An iPhone's address capsule fits only
+    /// "Search" at the standard text size; VoiceOver reads the whole phrase.
+    private var placeholder: String {
+        horizontalSize == .compact ? "Search" : "Search or enter address"
+    }
+
     private var address: (text: String, placeholder: Bool) {
         if let id = browser.currentTabId, model.row(id)?.awaitsPick == true {
             return ("Choose a page", true)
         }
         if browser.onPrivateHome {
-            return ("Search or enter address", true)
+            return (placeholder, true)
         }
         // A pin's page reads as the pin, and once off its saved page, where
         // it is now (pins spec §4).
@@ -597,7 +604,7 @@ struct BrowserBar: View {
             }
             return (url?.lastPathComponent ?? address, false)
         }
-        return ("Search or enter address", true)
+        return (placeholder, true)
     }
 }
 

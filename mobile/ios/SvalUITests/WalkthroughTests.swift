@@ -450,10 +450,17 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "the Workspace lists its tab")
         row.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5)).tap()
         sleep(1)
-        app.swipeDown()
+        app.buttons["Close"].firstMatch.tap()
         sleep(2)
         shot("intro")
-        XCTAssertTrue(app.staticTexts["Where things are"].exists, "the empty phone Workspace shows its intro")
+        XCTAssertTrue(app.buttons["Skip"].waitForExistence(timeout: 5), "the empty phone Workspace shows its walkthrough")
+        for page in ["launcher", "new-tab", "workspace", "last"] {
+            app.buttons["Next"].tap()
+            sleep(1)
+            shot("intro-\(page)")
+        }
+        XCTAssertFalse(app.buttons["Skip"].exists, "the last page has no Skip")
+        XCTAssertTrue(app.staticTexts["You're All Set"].exists, "Next reaches the last page")
     }
 
     /// Work's sheet: the options menu, then its tab dragged onto a tab in
