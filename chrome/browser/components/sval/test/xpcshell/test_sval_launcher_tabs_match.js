@@ -223,3 +223,16 @@ add_task(function nothing_typed_lists_the_most_recent_tabs_everywhere() {
     "by use across workspaces, within the limit"
   );
 });
+
+add_task(function nothing_typed_leaves_out_tabs_never_used_here() {
+  const when = { music: 100 };
+  Assert.deepEqual(
+    recentTabs(twoWorkspaces(), {
+      lastActive: id => when[id] ?? null,
+      limit: 6,
+      onlyUsed: true,
+    }).map(f => f.nodeId),
+    ["music"],
+    "a tab this device never showed is no recent tab"
+  );
+});

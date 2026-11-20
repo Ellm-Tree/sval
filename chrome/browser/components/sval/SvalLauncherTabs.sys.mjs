@@ -194,6 +194,8 @@ export function matchTabs(
  * @param {string|null} [options.currentWorkspaceId]
  * @param {boolean} [options.onlyCurrent]
  * @param {string|null} [options.exclude]
+ * @param {boolean} [options.onlyUsed] Leaves out the tabs `lastActive` has
+ *   no time for.
  * @returns {Array<{nodeId: string, workspaceId: string, title: string,
  *   url: string, strong: boolean}>} `strong` is always false.
  */
@@ -205,11 +207,14 @@ export function recentTabs(
     currentWorkspaceId = null,
     onlyCurrent = false,
     exclude = null,
+    onlyUsed = false,
   }
 ) {
   const tabs = candidates(nodes, { currentWorkspaceId, onlyCurrent, exclude });
   return ranked(
-    tabs.map(tab => ({ ...tab, strong: false })),
+    tabs
+      .filter(tab => !onlyUsed || lastActive(tab.nodeId) != null)
+      .map(tab => ({ ...tab, strong: false })),
     { currentWorkspaceId: null, lastActive }
   ).slice(0, limit);
 }
@@ -321,6 +326,8 @@ function lookUp(queryContext, query, win) {
     rows = recentTabs(nodes, {
       ...options,
       limit: recent ? RECENT_TABS : Infinity,
+      // A tab this device never showed is no recent tab of the user's.
+      onlyUsed: recent,
     });
   }
   const pages = new Set();

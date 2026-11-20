@@ -368,23 +368,20 @@ final class Browser {
     /// When tab `id` was last brought to the front on this phone.
     func lastUsed(_ id: String) -> Double? { usedAt[id] }
 
-    /// The tabs most recently brought to the front, newest first, across
-    /// every Workspace, then the tabs never brought to the front here in
-    /// the tree's order: the empty Launcher's list (`recentTabs`,
-    /// `RECENT_TABS`).
+    /// The tabs most recently brought to the front on this phone, newest
+    /// first, across every Workspace: the empty Launcher's list
+    /// (`recentTabs`, `RECENT_TABS`). A tab never brought to the front here
+    /// was never used here, so it is no recent tab.
     func recentTabs(limit: Int = 6) -> [OutlineRow] {
         model.rows
             .filter { $0.kind == "tab" && $0.id != currentTabId && Self.openable($0) != nil }
             // The private session and the user's Workspaces never see each
             // other's tabs.
             .filter { model.isPrivate($0.id) == inPrivate }
-            .enumerated()
-            .sorted { a, b in
-                let (used, other) = (usedAt[a.element.id] ?? -1, usedAt[b.element.id] ?? -1)
-                return used != other ? used > other : a.offset < b.offset
-            }
+            .compactMap { row in usedAt[row.id].map { (row, $0) } }
+            .sorted { $0.1 > $1.1 }
             .prefix(limit)
-            .map(\.element)
+            .map(\.0)
     }
     private static let frontKey = "frontTabs"
 

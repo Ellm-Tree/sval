@@ -263,7 +263,14 @@ add_task(async function the_field_lists_the_address_bars_rows() {
  */
 add_task(async function an_empty_field_lists_the_same_recent_tabs() {
   const { work } = pinsFixture;
-  await treeTab(work, "Monday plan", "https://example.org/sval-monday");
+  const monday = await treeTab(
+    work,
+    "Monday plan",
+    "https://example.org/sval-monday"
+  );
+  // Recent tabs lists only the tabs this device has used.
+  SvalPanel.settings.setLastActive(monday, Date.now());
+  atTaskEnd(() => SvalPanel.settings.forgetLastActive(monday));
   const { tab } = await homeTab();
   const browser = tab.linkedBrowser;
 

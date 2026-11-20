@@ -95,12 +95,15 @@ async function pageTab() {
   gBrowser.selectedBrowser.focus();
 }
 
-/** Floats the Launcher with its key and waits for its list. */
+/**
+ * Floats the Launcher with its key and waits for its field's focus. The
+ * list may stay closed: with nothing typed it lists only tabs used on this
+ * device, and a task's tabs may have none.
+ */
 async function openLauncher() {
-  const shown = UrlbarTestUtils.promisePopupOpen(window, () =>
-    EventUtils.synthesizeKey("l", { accelKey: true })
-  );
-  await within(shown, 10_000, "the Launcher's list");
+  const focused = BrowserTestUtils.waitForEvent(gURLBar.inputField, "focus");
+  EventUtils.synthesizeKey("l", { accelKey: true });
+  await within(focused, 10_000, "the Launcher's field");
 }
 
 /**
