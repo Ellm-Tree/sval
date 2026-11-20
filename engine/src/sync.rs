@@ -82,6 +82,9 @@ pub struct FileProblem {
     pub path: String,
     /// Whether it is this device's own file.
     pub own: bool,
+    /// The device the path names, so a host can say which device it cannot
+    /// sync with.
+    pub device: DeviceId,
     /// What went wrong, worded for a person.
     pub reason: String,
 }
@@ -101,6 +104,7 @@ impl Source<'_> {
         FileProblem {
             path: self.path.to_string(),
             own: self.own,
+            device: self.device,
             reason: reason.to_string(),
         }
     }

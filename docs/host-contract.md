@@ -577,8 +577,9 @@ host reading the old name:
 | `ownWatermark` | `number` | this device's own watermark once the pass is done (`seen[device]`, `0` for none): a host keeps its next stamps above it, unless it is more than a minute past its corrected time (decision 1714) |
 | `harmedByClock` | `string[]` | hex ids of the devices whose file was written more than ten minutes after `now` and whose merge replaced a value this device held with a fact stamped after `now`, or brought back a node this device's own file holds and its document had closed, so a host can warn that the device's clock is set ahead. Everything in such a file is merged (decision 1714) |
 
-A `FileProblem` is `{ path, own, reason }`: the file's engine-relative path,
-whether it is this device's own file, and a reason worded for a person. Branch
+A `FileProblem` is `{ path, own, device, reason }`: the file's
+engine-relative path, whether it is this device's own file, the hex id of the
+device the path names, and a reason worded for a person. Branch
 on `own` and the list an entry is in, never on `reason`'s text.
 
 A file is accounted for in exactly one of `merged`, `errors`, or

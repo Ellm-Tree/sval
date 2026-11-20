@@ -85,6 +85,7 @@ pub(crate) struct JsSyncReport {
 pub(crate) struct JsFileProblem {
     path: String,
     own: bool,
+    device: String,
     reason: String,
 }
 
@@ -93,6 +94,7 @@ impl From<FileProblem> for JsFileProblem {
         JsFileProblem {
             path: problem.path,
             own: problem.own,
+            device: problem.device.to_string(),
             reason: problem.reason,
         }
     }
@@ -540,6 +542,7 @@ mod tests {
             errors: vec![FileProblem {
                 path: "sval/ws/x/a.json".into(),
                 own: true,
+                device: crate::store::DeviceId::from_bytes([0xcd; 16]),
                 reason: "r".into(),
             }],
             schema_too_new: vec![],
@@ -566,7 +569,12 @@ mod tests {
         }
         assert_eq!(
             json["errors"][0],
-            serde_json::json!({ "path": "sval/ws/x/a.json", "own": true, "reason": "r" })
+            serde_json::json!({
+                "path": "sval/ws/x/a.json",
+                "own": true,
+                "device": "cd".repeat(16),
+                "reason": "r",
+            })
         );
         assert_eq!(json["harmedByClock"][0], "ab".repeat(16));
     }

@@ -64,7 +64,6 @@ function indicatorFor(overrides = {}) {
     keyState: "present",
     platform: "macosx",
     unpairedDevice: false,
-    newerSchema: false,
     critical: null,
     now: NOW,
     formatTime,
@@ -235,7 +234,7 @@ add_task(function unpaired_device() {
 });
 
 add_task(function newer_schema() {
-  const got = indicatorFor({ newerSchema: true });
+  const got = indicatorFor({ newerSchema: ["iPhone"] });
   Assert.deepEqual(shape(got), {
     state: "newer-schema",
     severity: "warning",
@@ -244,6 +243,22 @@ add_task(function newer_schema() {
     commands: ["checkForUpdate"],
   });
   Assert.equal(got.detail, got.tooltip);
+  Assert.ok(got.detail.includes("iPhone"), "the detail names the device");
+  Assert.ok(got.detailShown, "the footer shows its detail");
+  Assert.ok(
+    !indicatorFor({ newerSchema: [null] }).detail.includes("null"),
+    "a device with no name yet is described"
+  );
+  const several = indicatorFor({ newerSchema: ["iPhone", "Work Laptop"] });
+  Assert.ok(
+    several.detail.includes("iPhone") && several.detail.includes("Work Laptop"),
+    "and several devices are each named"
+  );
+  Assert.equal(
+    indicatorFor({ newerSchemaOwn: true }).state,
+    "newer-schema",
+    "this device's own file from a newer build warns too"
+  );
 });
 
 /**

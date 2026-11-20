@@ -416,7 +416,14 @@ Object.assign(SvalPanel, {
         shared !== null &&
         sync.otherWorkspacesIn === shared &&
         !!sync.otherWorkspaces.length,
-      newerSchema: !!sync.lastPass?.schemaTooNew?.length,
+      newerSchema: [
+        ...new Set(
+          (sync.lastPass?.schemaTooNew ?? [])
+            .filter(file => !file.own)
+            .map(file => file.device)
+        ),
+      ].map(device => this._modules.SvalDeviceNames.nameOf(device)),
+      newerSchemaOwn: !!sync.lastPass?.schemaTooNew?.some(file => file.own),
       harmedByClock: [...new Set(sync.lastPass?.harmedByClock ?? [])].map(
         device => this._modules.SvalDeviceNames.nameOf(device)
       ),

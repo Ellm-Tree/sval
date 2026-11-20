@@ -3450,6 +3450,29 @@ function clockHarmDetail(names) {
   return `${who} have their clocks set ahead, so their changes ${cost} each of them to fix this.`;
 }
 
+/**
+ * Which devices this one can't sync with because they write a schema newer
+ * than this build reads (spec §5.5), and what fixes it.
+ *
+ * @param {Array<string|null>} names As `syncIndicator`'s `newerSchema`.
+ * @returns {string}
+ */
+function newerSchemaDetail(names) {
+  const fix = "Update Sval on this computer to sync with";
+  if (names.length === 1) {
+    return names[0]
+      ? `${names[0]} is running a newer version of Sval, so this computer can't read what ${names[0]} syncs. ${fix} ${names[0]}.`
+      : `One of your devices is running a newer version of Sval, so this computer can't read what that device syncs. ${fix} that device.`;
+  }
+  if (names.every(Boolean)) {
+    const who = new Intl.ListFormat("en-US", { type: "conjunction" }).format(
+      names
+    );
+    return `${who} are running a newer version of Sval, so this computer can't read what those devices sync. ${fix} those devices.`;
+  }
+  return `Some of your devices are running a newer version of Sval, so this computer can't read what those devices sync. ${fix} those devices.`;
+}
+
 function indicator(
   state,
   severity,
@@ -3498,7 +3521,11 @@ function indicator(
  *   `SvalIdentity`'s lazy getters cannot load there.
  * @param {string} state.platform `AppConstants.platform`.
  * @param {boolean} state.unpairedDevice And not dismissed.
- * @param {boolean} state.newerSchema
+ * @param {Array<string|null>} [state.newerSchema] The names of the other
+ *   devices whose files this build skipped as too new, one entry each, null
+ *   for one whose name has not arrived.
+ * @param {boolean} [state.newerSchemaOwn] This device's own stored file is
+ *   too new for this build.
  * @param {Array<string|null>} [state.harmedByClock] The names of the
  *   devices whose clocks set ahead cost this device something, one entry
  *   each, null for one whose name has not arrived (decision 1714).
@@ -3521,7 +3548,8 @@ export function syncIndicator({
   keyState,
   platform,
   unpairedDevice,
-  newerSchema,
+  newerSchema = [],
+  newerSchemaOwn = false,
   harmedByClock = [],
   hasReading = true,
   critical,
@@ -3624,18 +3652,26 @@ export function syncIndicator({
     shown.detailShown = true;
     return shown;
   }
-  if (newerSchema) {
-    const detail =
-      "A newer version of Sval is available. Update to keep syncing.";
-    return indicator(
+  if (newerSchema.length || newerSchemaOwn) {
+    const detail = newerSchema.length
+      ? newerSchemaDetail(newerSchema)
+      : "A newer version of Sval saved this computer's Workspaces. Update " +
+        "Sval on this computer to keep syncing.";
+    // The detail names the devices, which the footer's one-line label has no
+    // room for.
+    const shown = indicator(
       "newer-schema",
       "warning",
       "moon-warning",
-      "Update Sval",
+      newerSchema.length
+        ? "Can't sync with another device"
+        : "Can't sync this computer",
       detail,
       detail,
-      [{ label: "Update", command: "checkForUpdate" }]
+      [{ label: "Check for Updates…", command: "checkForUpdate" }]
     );
+    shown.detailShown = true;
+    return shown;
   }
   if (hasReading && harmedByClock.length) {
     const shown = indicator(
