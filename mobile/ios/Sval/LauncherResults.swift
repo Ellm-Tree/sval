@@ -70,8 +70,8 @@ struct LauncherResults {
     }
 
     init(query: String, input: Input) {
-        let words = LauncherMatch.words(query)
-        guard !words.isEmpty else { return }
+        let typed = LauncherMatch.Query(query)
+        guard !typed.isEmpty else { return }
         let settings = input.settings
         func limit(_ section: Section) -> Int {
             let offered = switch section {
@@ -93,7 +93,7 @@ struct LauncherResults {
         let candidates = input.rows.filter { row in
             row.kind == "tab" && row.id != input.currentTabId && !row.awaitsPick && Browser.openable(row) != nil
                 && input.isPrivate(row.id) == inPrivate
-                && LauncherMatch.onBoundary(words, title: row.title, url: row.url ?? "")
+                && LauncherMatch.onBoundary(typed, .init(title: row.title, url: row.url ?? ""))
         }
         let here = input.workspaceId
         let keyed: [(tab: OutlineRow, here: Bool, used: Double, at: Int)] = candidates.enumerated().map { at, tab in
@@ -103,7 +103,7 @@ struct LauncherResults {
             if a.here != b.here { return a.here }
             return a.used != b.used ? a.used > b.used : a.at < b.at
         }.map { $0.tab }
-        let strong = ranked.filter { LauncherMatch.strong(words, title: $0.title, url: $0.url ?? "") }
+        let strong = ranked.filter { LauncherMatch.strong(typed.words, title: $0.title, url: $0.url ?? "") }
         tabs = Array((strong + ranked.filter { tab in !strong.contains { $0.id == tab.id } }).prefix(limit(.tabs)))
 
         // Pins and Favorites: on a boundary only, pins first, each by its
@@ -115,7 +115,7 @@ struct LauncherResults {
         let pinRows = inPrivate ? [] : input.pins.filter { $0.kind == "favorite" && $0.guid != input.currentPin }
         var options: [(kept: Kept, pin: Bool, score: Double)] = []
         for pin in pinRows {
-            guard let url = pin.url, LauncherMatch.onBoundary(words, title: pin.name, url: url) else { continue }
+            guard let url = pin.url, LauncherMatch.onBoundary(typed, .init(title: pin.name, url: url)) else { continue }
             let favorite = input.favorites.first { $0.guid == pin.guid }
             options.append((Kept(id: pin.id, name: pin.name, url: url, pin: pin), true,
                             score(url, added: favorite?.added ?? favorite?.contentAt)))
@@ -126,7 +126,7 @@ struct LauncherResults {
         for favorite in input.favorites where !inPrivate && favorite.kind == "favorite"
             && !(favorite.guid.map(ownPins.contains) ?? false) {
             guard let url = favorite.url, AppModel.opensHere(url),
-                  LauncherMatch.onBoundary(words, title: favorite.name, url: url) else { continue }
+                  LauncherMatch.onBoundary(typed, .init(title: favorite.name, url: url)) else { continue }
             options.append((Kept(id: favorite.id, name: favorite.name, url: url, pin: nil), false,
                             score(url, added: favorite.added ?? favorite.contentAt)))
         }
@@ -142,9 +142,9 @@ struct LauncherResults {
         // open as a tab, or offered as a pin or Favorite, is left out.
         let shown = Set(input.rows.filter { $0.kind == "tab" }.compactMap(\.url) + kept.map(\.url))
         let pages = inPrivate ? [] : input.historyPages.filter { !shown.contains($0.url) }
-        let boundary = pages.filter { LauncherMatch.onBoundary(words, title: $0.title, url: $0.url) }
+        let boundary = pages.filter { LauncherMatch.onBoundary(typed, $0.match) }
         let found = Set(boundary.map(\.url))
-        let rest = pages.filter { !found.contains($0.url) && LauncherMatch.anywhere(words, title: $0.title, url: $0.url) }
+        let rest = pages.filter { !found.contains($0.url) && LauncherMatch.anywhere(typed, $0.match) }
         history = Array((boundary + rest).prefix(limit(.history)))
 
         let names = (settings["browser.sval.launcher.order"] as? String ?? Self.defaultOrder)

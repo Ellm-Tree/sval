@@ -71,6 +71,17 @@ struct HistoryPage: Equatable, Sendable {
     let title: String
     let lastVisit: Double
     let frecency: Double
+    /// Its title and address prepared for the Launcher on the background
+    /// task that lists the pages, so typing never prepares the history.
+    let match: LauncherMatch.Fields
+
+    init(url: String, title: String, lastVisit: Double, frecency: Double) {
+        self.url = url
+        self.title = title
+        self.lastVisit = lastVisit
+        self.frecency = frecency
+        match = LauncherMatch.Fields(title: title, url: url)
+    }
 
     /// Places' transition for an address the user typed
     /// (`nsINavHistoryService.TRANSITION_TYPED`).
