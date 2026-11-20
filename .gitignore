@@ -31,6 +31,6 @@ __pycache__/
 # The iOS app's engine build and generated bindings (mobile/ios/build-engine.sh),
 # its generated Xcode project and its build output.
 mobile/ios/Generated/
-mobile/ios/build/
+mobile/ios/build*/
 mobile/ios/*.xcodeproj/
 mobile/uniffi-bindgen/target/

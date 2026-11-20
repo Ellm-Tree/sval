@@ -12,11 +12,51 @@ import Foundation
 /// after it is written.
 struct Folder {
     let root: URL
+    /// Where `topDir` and the paths under it live.
+    private let svalDir: URL
+
+    init(root: URL) {
+        self.init(root: root, svalDir: root.appending(path: topDir, directoryHint: .isDirectory))
+    }
+
+    private init(root: URL, svalDir: URL) {
+        self.root = root
+        self.svalDir = svalDir
+    }
+
+    /// The shared folder the user picked. Sval's own directory inside it,
+    /// picked in its place, serves as that directory: every path Sval reads
+    /// and writes there is under `topDir`, and the picker grants nothing
+    /// above the folder picked.
+    init(shared url: URL) {
+        if Self.isSvalDir(url) {
+            self.init(root: url.deletingLastPathComponent(), svalDir: url)
+        } else {
+            self.init(root: url)
+        }
+    }
+
+    /// Whether `url` is Sval's own directory in a shared folder, which
+    /// holds the Workspaces, the pairing offers or the key backups, and no
+    /// Sval directory of its own with Workspaces in it.
+    static func isSvalDir(_ url: URL) -> Bool {
+        guard url.lastPathComponent == topDir else { return false }
+        let has = { (path: String) in
+            FileManager.default.fileExists(atPath: url.appending(path: path).path(percentEncoded: false))
+        }
+        return !has("\(topDir)/ws") && (has("ws") || has("pair") || has("keys"))
+    }
+
+    private func fileURL(_ path: String) -> URL {
+        if path == topDir { return svalDir }
+        if path.hasPrefix("\(topDir)/") { return svalDir.appending(path: String(path.dropFirst(topDir.count + 1))) }
+        return root.appending(path: path)
+    }
 
     /// The files directly in `directory`, by path relative to the root. A
     /// directory that does not exist holds none.
     func list(_ directory: String) throws -> [String] {
-        let url = root.appending(path: directory, directoryHint: .isDirectory)
+        let url = fileURL(directory)
         var names: [String] = []
         var failure: Error?
         coordinate(reading: url) { url in
@@ -45,7 +85,7 @@ struct Folder {
     /// and times. One iCloud has yet to download is left out until it is.
     func files(_ directory: String) throws -> [FileEntry] {
         try list(directory).compactMap { path in
-            let url = root.appending(path: path)
+            let url = fileURL(path)
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]),
                   values.isRegularFile == true, let size = values.fileSize else { return nil }
             let modified = values.contentModificationDate.map { Int64($0.timeIntervalSince1970 * 1000) } ?? 0
@@ -54,11 +94,11 @@ struct Folder {
     }
 
     func exists(_ path: String) -> Bool {
-        FileManager.default.fileExists(atPath: root.appending(path: path).path(percentEncoded: false))
+        FileManager.default.fileExists(atPath: fileURL(path).path(percentEncoded: false))
     }
 
     func read(_ path: String) throws -> Data {
-        let url = root.appending(path: path)
+        let url = fileURL(path)
         var data: Data?
         var failure: Error?
         coordinate(reading: url) { url in
@@ -77,7 +117,7 @@ struct Folder {
     /// Writes `data` at `path` so that no reader sees half of it: a
     /// temporary file renamed over the old one (spec §6.3).
     func write(_ path: String, _ data: Data) throws {
-        let url = root.appending(path: path)
+        let url = fileURL(path)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         var failure: Error?
@@ -97,7 +137,7 @@ struct Folder {
     }
 
     func delete(_ path: String) throws {
-        let url = root.appending(path: path)
+        let url = fileURL(path)
         var failure: Error?
         var coordinationError: NSError?
         NSFileCoordinator().coordinate(
@@ -117,8 +157,8 @@ struct Folder {
     /// Renames the file at `from` to `to`. `FileManager.moveItem` stops
     /// when an item is at `to`, so nothing there is ever replaced.
     func move(_ from: String, to: String) throws {
-        let source = root.appending(path: from)
-        let target = root.appending(path: to)
+        let source = fileURL(from)
+        let target = fileURL(to)
         var failure: Error?
         var coordinationError: NSError?
         // The pairing `NSFileCoordinator.h` gives as the safe way to

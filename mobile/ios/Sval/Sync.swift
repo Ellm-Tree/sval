@@ -48,10 +48,11 @@ actor Syncer {
     init() throws {
         local = Folder(root: URL.applicationSupportDirectory)
         // No own copy yet, as on first run, after leaving the folder or after
-        // the app is deleted and installed again: a new device id.
+        // the app is deleted and installed again. The Keychain's id outlives
+        // the copy, and the phone keeps it (decision 2232).
         let fresh = !local.exists(topDir)
-        deviceId = try fresh ? Secrets.newDeviceId() : Secrets.deviceId()
-        if fresh { Diagnostics.log("sync: no own copy yet, so a new device id") }
+        deviceId = try Secrets.deviceId()
+        if fresh { Diagnostics.log("sync: no own copy yet") }
         // What this device knows of the weeks goes with its own copy: a
         // fresh copy holds no week, and must load every one again.
         if fresh {
@@ -98,8 +99,8 @@ actor Syncer {
     /// not open would refuse every later write to it, so changes made here
     /// would be lost at the next launch. The whole copy is set aside under
     /// `sval.damaged-<time>`, renamed and never deleted, and a fresh copy
-    /// starts under a new device id (decision 2232) and takes everything
-    /// back from the shared folder.
+    /// starts and takes everything back from the shared folder (decision
+    /// 2232).
     static func make() throws -> Syncer {
         do {
             return try Syncer()

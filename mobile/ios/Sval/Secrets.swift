@@ -10,21 +10,11 @@ import Security
 enum Secrets {
     private static let service = "app.sval.ios"
 
-    /// The 16 bytes this device writes its file under, the same for as
-    /// long as its own copy of the document lasts (`docs/host-contract.md`
-    /// §5).
+    /// The 16 bytes this device writes its file under. The item is this
+    /// device's alone, so it outlasts the app's own copy and never reaches
+    /// another device (`docs/host-contract.md` §5).
     static func deviceId() throws -> Data {
         try existingOrNew(account: "device-id", count: 16)
-    }
-
-    /// A new device id, for an own copy that starts empty. The Keychain
-    /// outlives the copy: it survives deleting the app, and leaving the
-    /// folder deletes the copy alone. An empty document written under the
-    /// old id would vouch for everything that id wrote, so the nodes it made
-    /// would read as deleted here and the deletion would reach every device.
-    static func newDeviceId() throws -> Data {
-        SecItemDelete(query(account: "device-id") as CFDictionary)
-        return try deviceId()
     }
 
     /// The key this device's own copy of the document is sealed under.

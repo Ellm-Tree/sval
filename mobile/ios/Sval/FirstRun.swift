@@ -652,7 +652,7 @@ private struct CodeStep: View {
 
     var body: some View {
         if working {
-            JoiningView(waiting: model.waitingForOffer) {
+            JoiningView(waiting: model.waitingForOffer, folder: model.folderPlace?.short) {
                 model.cancelJoin()
                 working = false
             }
@@ -805,6 +805,9 @@ private struct CodeStep: View {
 private struct JoiningView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let waiting: Bool
+    /// The folder the code is looked for in: a code shown into another
+    /// folder never arrives, and only the name tells the two apart.
+    let folder: String?
     let onCancel: () -> Void
 
     var body: some View {
@@ -828,12 +831,12 @@ private struct JoiningView: View {
             FirstRunStyle.headline("Joining your folder", size: 28)
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 2) {
-                line("Folder found", done: true)
-                line(waiting ? "Waiting for your computer's code to reach the folder" : "Checking the code", done: false)
+                line(folder.map { "Folder found: \($0)" } ?? "Folder found", done: true)
+                line(waiting ? "Waiting for your computer's code to reach this folder" : "Checking the code", done: false)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if waiting {
-                Text("Keep Sval open. Your computer's code reaches this \(UIDevice.current.model) through your folder.")
+                Text("Keep Sval open. Your computer's code reaches this \(UIDevice.current.model) through the folder you chose. If your computer syncs to a different folder, cancel and choose that folder.")
                     .font(.system(.subheadline))
                     .foregroundStyle(FirstRunStyle.muted)
                     .multilineTextAlignment(.center)
@@ -875,12 +878,15 @@ private struct ArrivalStep: View {
 
     var body: some View {
         let workspaces = model.workspaces.filter { $0.agent == nil }
+        // Until the first pass ends, the list holds only what this device
+        // had before it joined.
+        let reading = model.lastSynced == nil
         VStack(alignment: .leading, spacing: 10) {
             FirstRunStyle.headline("You're in.", size: 40)
                 .padding(.horizontal, 4)
                 .padding(.top, 60)
                 .accessibilityAddTraits(.isHeader)
-            Text(workspaces.isEmpty ? "Reading your Workspaces from the folder…" : "Your Workspaces are arriving from the folder.")
+            Text(reading ? "Reading your Workspaces from the folder…" : "Your Workspaces are arriving from the folder.")
                 .font(.system(.body))
                 .foregroundStyle(FirstRunStyle.lead)
                 .padding(.horizontal, 4)
@@ -892,6 +898,15 @@ private struct ArrivalStep: View {
                     Section {
                         ForEach(workspaces, id: \.id) { workspace in
                             row(workspace)
+                        }
+                        if reading {
+                            HStack(spacing: 12) {
+                                ProgressView().tint(FirstRunStyle.cyan).frame(width: 36)
+                                Text("Reading the folder…")
+                                    .font(.system(.body))
+                                    .foregroundStyle(FirstRunStyle.lead)
+                            }
+                            .frame(minHeight: 50)
                         }
                     }
                     .listRowBackground(FirstRunStyle.field)
@@ -916,10 +931,17 @@ private struct ArrivalStep: View {
         let count = model.tabs(in: workspace.id).count
         return HStack(spacing: 12) {
             WorkspaceTile(workspace: workspace, size: 36, radius: 10)
-            Text(WorkspaceTile.name(workspace))
-                .font(.system(.body, weight: .medium))
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(WorkspaceTile.name(workspace))
+                    .font(.system(.body, weight: .medium))
+                    .lineLimit(1)
+                if workspace.id == model.ownWorkspace?.id {
+                    Text("This device")
+                        .font(.system(.footnote))
+                        .foregroundStyle(FirstRunStyle.muted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(count == 1 ? "1 tab" : "\(count) tabs")
                 .font(.system(.subheadline))
                 .monospacedDigit()

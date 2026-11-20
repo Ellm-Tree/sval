@@ -109,7 +109,7 @@ final class AppModel {
             ?? SmbSettings.load().map(Source.smb)
             ?? DropboxSettings.load().map(Source.dropbox)
         if case .files(let url) = source, Secrets.syncKey() == nil || keyUnconfirmed {
-            stage = stage(holdsSval: Folder(root: url).exists(topDir))
+            stage = stage(holdsSval: Folder(shared: url).exists(topDir))
         } else {
             stage = source == nil ? .chooseFolder : (Secrets.syncKey() == nil || keyUnconfirmed ? .join : .ready)
         }
@@ -306,7 +306,7 @@ final class AppModel {
     /// need be.
     private func sharedFolder() async throws -> SharedFolder {
         if case .files(let url) = source {
-            return Folder(root: url)
+            return Folder(shared: url)
         }
         if let connected {
             return connected
@@ -467,6 +467,7 @@ final class AppModel {
     /// after another device deleted it, when it comes back empty under a
     /// new id (decision 2254).
     private func keepOwnWorkspace() async {
+        await foldOwnWorkspaces()
         guard browsing, syncer != nil, ownWorkspace == nil, !makingOwnWorkspace else { return }
         makingOwnWorkspace = true
         defer { makingOwnWorkspace = false }
@@ -474,6 +475,40 @@ final class AppModel {
         if await edit([["kind": "addDeviceWorkspace", "name": UIDevice.current.name, "id": id]]) {
             Diagnostics.log("workspaces: made this device's own Workspace")
         }
+    }
+
+    /// Folds every Workspace of this phone's own into the first. A phone
+    /// that starts over makes a fresh one before it joins again, and the
+    /// folder then brings back the one its device id made before
+    /// (decision 2232), where each phone keeps one (decision 2254).
+    private func foldOwnWorkspaces() async {
+        guard let me = syncer?.device else { return }
+        let mine = workspaces.filter { $0.device == me }
+        guard let keep = mine.first, mine.count > 1 else { return }
+        if await edit(Self.foldOps(mine, in: tree)) {
+            Diagnostics.log("workspaces: folded \(mine.count - 1) more of this device's own into one")
+            if let shown = browser.workspaceId, mine.dropFirst().contains(where: { $0.id == shown }) {
+                browser.showWorkspace(keep.id)
+            }
+        }
+    }
+
+    /// The edits that move what every Workspace after the first in `mine`
+    /// holds to the end of the first, in order, and remove the others.
+    nonisolated static func foldOps(_ mine: [OutlineRow], in tree: OutlineIndex) -> [[String: Any]] {
+        guard let keep = mine.first else { return [] }
+        var ops: [[String: Any]] = []
+        var last = tree.children(of: keep.id).last?.id
+        for extra in mine.dropFirst() {
+            for child in tree.children(of: extra.id) {
+                var move: [String: Any] = ["kind": "moveNode", "id": child.id, "newParent": keep.id]
+                move["before"] = last
+                ops.append(move)
+                last = child.id
+            }
+            ops.append(["kind": "remove", "id": extra.id])
+        }
+        return ops
     }
 
     // MARK: Private session
@@ -616,7 +651,10 @@ final class AppModel {
     /// address, and the user name an SMB server is signed in with.
     var folderPlace: (short: String, full: String, user: String?)? {
         switch source {
-        case .files(let url):
+        case .files(let picked):
+            // The folder the user knows, when Sval's own directory in it
+            // was picked (`Folder(shared:)`).
+            let url = Folder.isSvalDir(picked) ? picked.deletingLastPathComponent() : picked
             let parts = url.standardizedFileURL.pathComponents
             // iCloud Drive's folders live under this container on disk.
             if let cloud = parts.firstIndex(of: "com~apple~CloudDocs") {
@@ -644,8 +682,9 @@ final class AppModel {
     func chooseFolder(_ url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let holdsSval = Folder(root: url).exists(topDir)
-        let opens = Self.keyOpens(Folder(root: url), key: Secrets.syncKey())
+        let folder = Folder(shared: url)
+        let holdsSval = folder.exists(topDir)
+        let opens = Self.keyOpens(folder, key: Secrets.syncKey())
         do {
             let bookmark = try url.bookmarkData()
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)

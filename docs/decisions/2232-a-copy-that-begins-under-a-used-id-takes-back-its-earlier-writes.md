@@ -34,6 +34,13 @@ every host to it.
   a new id afterwards would have to move the copy's own stamps to that id, and
   on the desktop a device id also names its key files. The data is safe either
   way. This way needs no host change.
+- **A host keeps its id when its copy starts empty again**, wherever the id
+  outlives the copy, as in the iOS Keychain after leaving the folder or
+  installing the app again. A new id leaves the device's own Workspace
+  (decision 2254) behind under the old one: a second Workspace of the same
+  name that no device writes. Under this decision the old id costs nothing.
+  The id never leaves the device that made it, so two devices never share
+  one.
 - **The two fields are the copy's own bookkeeping.** They are kept in the
   copy's file so a restart keeps them, stay out of the write decision, and are
   ignored by `merge`. Neither is written to the shared folder: when a copy
@@ -44,6 +51,6 @@ every host to it.
 A copy begun again under a used id brings back what that id made. A file
 that shows earlier writes the copy has not yet taken can bring back a node
 the copy deleted, which is the direction §5.4 already accepts: keeping a node
-some device discarded costs a delete, and the other way loses data. Hosts
-still take a new id whenever their copy starts empty (host contract §5); the
-engine covers the host that does not.
+some device discarded costs a delete, and the other way loses data. A phone
+that leaves the folder and joins again, or is installed again, comes back to
+its own Workspace.

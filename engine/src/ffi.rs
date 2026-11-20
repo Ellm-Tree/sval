@@ -800,9 +800,8 @@ mod tests {
         );
     }
 
-    /// A phone whose own copy starts empty, after leaving the folder or a
-    /// reinstall, takes a new device id (`Secrets.newDeviceId` on iOS,
-    /// `docs/host-contract.md` §5), and gets back what it made.
+    /// A device whose own copy starts empty under a new device id gets back
+    /// what it made from the folder.
     #[test]
     fn a_phone_that_starts_again_under_a_new_id_keeps_what_it_made() {
         use std::collections::BTreeMap;
