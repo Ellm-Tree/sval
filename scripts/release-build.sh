@@ -107,7 +107,16 @@ if [[ "$PLATFORM" == linux64 ]]; then
 else
   unzip -p "$OUT/win64/target.zip" '*/browser/omni.ja' > "$work/omni.ja"
 fi
-size="$(unzip -l "$work/omni.ja" | awk '/content\/browser\/sval\/sval_core_bg\.wasm$/ {print $1}')"
+# A PGO build preloads the entries its profile run read, ahead of the jar's
+# central directory, which unzip reports as a damaged zip. The tree's mozpack
+# reads it.
+size="$(python3 -I -c '
+import sys
+sys.path.insert(0, sys.argv[1])
+from mozpack.mozjar import JarReader
+entry = JarReader(sys.argv[2]).entries.get("content/browser/sval/sval_core_bg.wasm")
+print(entry["uncompressed_size"] if entry else "")
+' "$REPO_ROOT/build/firefox/python/mozbuild" "$work/omni.ja")"
 echo "sval_core_bg.wasm: ${size:-missing} bytes"
 if [[ "${size:-0}" -le 100000 ]]; then
   echo "error: the package carries no real engine" >&2

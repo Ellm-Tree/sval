@@ -73,7 +73,9 @@ if [[ -z "$omni" ]]; then
   echo "error: no browser/omni.ja in $pkg" >&2
   exit 1
 fi
-entries="$(unzip -Z1 "$omni")"
+# A PGO build preloads the entries its profile run read, ahead of the jar's
+# central directory, which unzip reports as a damaged zip. mozpack reads it.
+entries="$(./mach python -c 'import sys; from mozpack.mozjar import JarReader; print("\n".join(JarReader(sys.argv[1]).entries))' "$omni")"
 files="$(cd "$work" && find . -type f)"
 
 require_entry() {
