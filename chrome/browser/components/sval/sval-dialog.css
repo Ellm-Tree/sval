@@ -44,6 +44,8 @@
   --sval-dialog-secondary: rgb(var(--sval-palette-wash-dark) / 0.1);
   --sval-dialog-secondary-hover: rgb(var(--sval-palette-wash-dark) / 0.16);
   --sval-dialog-secondary-ink: #ffffff;
+  --sval-dialog-disabled: #4a4a4a;
+  --sval-dialog-disabled-ink: #a3a3a3;
   --sval-dialog-primary: var(--sval-palette-blue);
   --sval-dialog-primary-hover: var(--sval-palette-blue-600);
   --sval-dialog-danger: var(--sval-palette-red);
@@ -80,6 +82,8 @@
       --sval-dialog-secondary: rgb(var(--sval-palette-wash-light) / 0.07);
       --sval-dialog-secondary-hover: rgb(var(--sval-palette-wash-light) / 0.12);
       --sval-dialog-secondary-ink: var(--sval-palette-ink-950);
+      --sval-dialog-disabled: #d6d6d6;
+      --sval-dialog-disabled-ink: #858585;
       --sval-dialog-danger: #d93a45;
       --sval-dialog-danger-hover: var(--sval-palette-red);
       --sval-dialog-error: #b0262f;
@@ -132,6 +136,8 @@
     --sval-dialog-danger-icon-bg: rgba(217, 58, 69, 0.12);
     --sval-dialog-danger-icon-ink: #a5212a;
     --sval-dialog-critical-warning: #7a1820;
+    --sval-dialog-disabled: #d6d6d6;
+    --sval-dialog-disabled-ink: #858585;
   }
 
   /* A private window's violet, from `sval-header.css`. */
@@ -716,8 +722,11 @@ fieldset.sval-dialog-well {
     }
   }
 
+  /* Opaque and neutral: a translucent fill takes on the card's blue. */
   &:disabled {
-    opacity: 0.45;
+    background: var(--sval-dialog-disabled);
+    color: var(--sval-dialog-disabled-ink);
+    box-shadow: none;
     cursor: default;
   }
 
@@ -736,12 +745,30 @@ fieldset.sval-dialog-well {
   }
 }
 
-/* A line under the buttons, such as why Allow is not yet enabled. */
-.sval-dialog-note {
-  margin: -8px 0 0;
-  font-size: 12px;
-  color: var(--sval-dialog-muted);
-  text-align: end;
+/* A grant held through the dialog delay (`sval-dialog-hold.js`): its own
+ * fill sweeps across the disabled grey over the delay. */
+@property --sval-dialog-hold {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+@keyframes sval-dialog-hold {
+  from {
+    --sval-dialog-hold: 0%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (not (forced-colors: active)) {
+  .sval-dialog-btn[data-hold] {
+    --sval-dialog-hold-fill: var(--sval-dialog-secondary);
+    background: linear-gradient(to right, var(--sval-dialog-hold-fill) var(--sval-dialog-hold), var(--sval-dialog-disabled) var(--sval-dialog-hold));
+    animation: sval-dialog-hold var(--sval-dialog-hold-time) linear;
+
+    &.primary {
+      --sval-dialog-hold-fill: var(--sval-dialog-primary);
+    }
+  }
 }
 
 /* ------------------------------------------------------------ the scope menu */
@@ -959,7 +986,6 @@ fieldset.sval-dialog-well {
    * `controlColor`), which leaves the label invisible. */
   .sval-dialog .sval-dialog-btn.primary:disabled,
   .sval-dialog-btn:disabled {
-    opacity: 1;
     border-color: GrayText;
     background: Canvas;
     color: GrayText;

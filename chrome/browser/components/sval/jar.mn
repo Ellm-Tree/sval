@@ -256,6 +256,7 @@ browser.jar:
     content/browser/sval/agent-pair.js        (agent-pair.js)
     content/browser/sval/agent-alert.xhtml    (agent-alert.xhtml)
     content/browser/sval/agent-alert.js       (agent-alert.js)
+    content/browser/sval/sval-dialog-hold.js  (sval-dialog-hold.js)
     content/browser/sval/sval-dialog.xhtml     (sval-dialog.xhtml)
     content/browser/sval/sval-dialog.css       (sval-dialog.css)
     content/browser/sval/about-dialog.css      (about-dialog.css)

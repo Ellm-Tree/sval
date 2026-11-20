@@ -11,15 +11,11 @@
  * focus and no key reaches Pair, so a stray Enter never pairs an agent.
  *
  * Pairing grants an agent control of a workspace, and a shared one the user's
- * signed-in sessions, so Pair stays disabled until the alert has been shown
- * and focused for `security.dialog_enable_delay`, as in `agent-alert.js`.
+ * signed-in sessions, so `sval-dialog-hold.js` holds Pair through the dialog
+ * delay.
  */
 
 "use strict";
-
-const { EnableDelayHelper } = ChromeUtils.importESModule(
-  "resource://gre/modules/PromptUtils.sys.mjs"
-);
 
 const SvalAgentPair = {
   start() {
@@ -72,36 +68,24 @@ const SvalAgentPair = {
 
     const deny = document.querySelector(".sval-ap-deny");
     deny.addEventListener("click", () => finish("deny"));
-    // As in `agent-alert.js`: the line keeps its space when it goes, so
-    // Pair never moves under a click aimed at it.
     const allow = document.querySelector(".sval-ap-allow");
-    const delayLine = document.getElementById("sval-ap-delay");
-    delayLine.textContent =
-      "The Pair button turns on a moment after this window comes to the front.";
     // The description is what the user decides on: what pairing gives, who
-    // is asking, what kind of workspace it asked for, and, while Pair waits
-    // out the delay, why it cannot be pressed.
+    // is asking and what kind of workspace it asked for.
     const form = document.querySelector(".sval-ap");
-    const describe = delaying => {
-      form.ariaDescribedByElements = [
-        document.getElementById("sval-ap-detail"),
-        list,
-        document.getElementById("sval-ap-request"),
-        ...(delaying ? [delayLine] : []),
-      ].filter(el => !el.hidden);
-    };
+    form.ariaDescribedByElements = [
+      document.getElementById("sval-ap-detail"),
+      list,
+      document.getElementById("sval-ap-request"),
+    ].filter(el => !el.hidden);
     // Until Pair can take focus the alert itself holds it, so a screen
     // reader reads the alert.
     const placeFocus = () => (allow.disabled ? form : allow).focus();
-    const setAllowDisabled = disabled => {
-      allow.disabled = disabled;
-      delayLine.style.visibility = disabled ? "visible" : "hidden";
-      describe(disabled);
+    const onHold = held => {
       // Pair takes focus as it enables, unless the user has moved to another
       // control meanwhile.
       const focused = document.activeElement;
       if (
-        !disabled &&
+        !held &&
         (!focused || focused === document.body || focused === form)
       ) {
         allow.focus();
@@ -124,11 +108,7 @@ const SvalAgentPair = {
         finish("allow");
       }
     });
-    this._delay = new EnableDelayHelper({
-      disableDialog: () => setAllowDisabled(true),
-      enableDialog: () => setAllowDisabled(false),
-      focusTarget: window,
-    });
+    this._hold = window.svalHoldGrants([allow], onHold);
     // `SubDialog.focus` calls this when the dialog opens, in place of its own
     // move to the first focusable element.
     document.subDialogSetDefaultFocus = placeFocus;

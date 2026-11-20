@@ -16,18 +16,11 @@
  * do not fit a row, so they stack, the grants from the top and the safe
  * answer last.
  *
- * Every other choice grants something, and stays disabled until the alert
- * has been shown and focused for `security.dialog_enable_delay`, as
- * Firefox's own prompts are (`EnableDelayHelper`, PromptUtils.sys.mjs). An
- * alert can open under a click the user meant for the page, and that click
- * must not land on a grant.
+ * Every other choice grants something, and `sval-dialog-hold.js` holds it
+ * through the dialog delay.
  */
 
 "use strict";
-
-const { EnableDelayHelper } = ChromeUtils.importESModule(
-  "resource://gre/modules/PromptUtils.sys.mjs"
-);
 
 const SvalAgentAlert = {
   start() {
@@ -111,35 +104,15 @@ const SvalAgentAlert = {
     actions.classList.toggle("sval-dialog-actions-stacked", stacked);
     const safe = fallback ? [fallback] : [];
     actions.append(...(stacked ? [...grants, ...safe] : [...safe, ...grants]));
-    // A click on a disabled grant does nothing, so while the delay holds
-    // them this line says why. It keeps its space when it goes, so no button
-    // moves as it enables: a click aimed at Allow lands on Allow. An alert
-    // with nothing to grant has no line at all.
-    const delayLine = document.getElementById("sval-aa-delay");
-    delayLine.textContent =
-      "The Allow button turns on a moment after this window comes to the front.";
-    delayLine.hidden = !grants.length;
     // The alert's description is what it asks the user to decide on: what
-    // the agent would send, the sites or files, and, while the delay holds
-    // the grants, why they cannot be pressed. Focus opens on the default
-    // choice, so this is what a screen reader reads with the question.
+    // the agent would send, and the sites or files. Focus opens on the
+    // default choice, so this is what a screen reader reads with the
+    // question.
     const form = document.querySelector(".sval-aa");
-    const detailLine = document.getElementById("sval-aa-detail");
-    const describe = delaying => {
-      form.ariaDescribedByElements = [
-        detailLine,
-        list,
-        ...(delaying ? [delayLine] : []),
-      ].filter(el => !el.hidden);
-    };
-    describe(false);
-    const setGrantsDisabled = disabled => {
-      for (const button of grants) {
-        button.disabled = disabled;
-      }
-      delayLine.style.visibility = disabled ? "visible" : "hidden";
-      describe(disabled);
-    };
+    form.ariaDescribedByElements = [
+      document.getElementById("sval-aa-detail"),
+      list,
+    ].filter(el => !el.hidden);
     // Escape dismisses, which answers the default, at any time. The delay
     // below swallows keys while it runs, to stop a held key from reaching a
     // grant as it is enabled, and Escape is answered before that.
@@ -158,11 +131,7 @@ const SvalAgentAlert = {
       },
       true
     );
-    this._delay = new EnableDelayHelper({
-      disableDialog: () => setGrantsDisabled(true),
-      enableDialog: () => setGrantsDisabled(false),
-      focusTarget: window,
-    });
+    this._hold = window.svalHoldGrants(grants);
     // Enter in the form submits it; only a click on a choice answers.
     form.addEventListener("submit", event => event.preventDefault());
     if (fallback) {

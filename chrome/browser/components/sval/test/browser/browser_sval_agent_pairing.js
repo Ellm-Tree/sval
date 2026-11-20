@@ -164,8 +164,8 @@ add_task(async function the_alert_follows_its_card_as_it_resizes() {
 /**
  * Pairing grants an agent the user's signed-in sessions, so Pair waits out
  * Firefox's dialog delay as Sval's other agent alerts do, and a click meant
- * for something else cannot land on it. Deny can be chosen at once, and a
- * line says why Pair cannot be yet.
+ * for something else cannot land on it. Deny can be chosen at once. Pair is
+ * marked held meanwhile, which sweeps its fill across it.
  */
 add_task(async function allow_waits_out_the_dialog_delay() {
   await SpecialPowers.pushPrefEnv({
@@ -175,14 +175,16 @@ add_task(async function allow_waits_out_the_dialog_delay() {
   const answer = askToPair("Test Agent");
   const doc = await dialogDocument();
   const allow = doc.querySelector(".sval-ap-allow");
-  const line = doc.getElementById("sval-ap-delay");
   Assert.ok(allow.disabled, "Pair starts disabled");
   Assert.ok(!doc.querySelector(".sval-ap-deny").disabled, "Deny does not");
-  Assert.ok(BrowserTestUtils.isVisible(line), "a line says why");
+  await TestUtils.waitForCondition(
+    () => allow.hasAttribute("data-hold"),
+    "Pair is held once the alert is in front"
+  );
   allow.click();
   Assert.ok(gDialogBox.isOpen, "a click on Pair does nothing yet");
   await TestUtils.waitForCondition(() => !allow.disabled, "Pair enables");
-  Assert.ok(BrowserTestUtils.isHidden(line), "and the line goes");
+  Assert.ok(!allow.hasAttribute("data-hold"), "and no longer held");
   allow.click();
   Assert.deepEqual(await answerOf(answer), {
     action: "allow",
@@ -271,7 +273,7 @@ add_task(async function enter_on_the_focused_pair_allows() {
  * Pair takes focus only once it can be pressed, so an Enter held down as the
  * alert opens never lands on it: Pair is disabled, and the alert itself holds
  * focus, so a screen reader reads the alert: what pairing gives, who asks,
- * the workspace it asked for, and why Pair cannot be pressed yet.
+ * and the workspace it asked for.
  */
 add_task(async function enter_during_the_delay_does_not_pair() {
   await SpecialPowers.pushPrefEnv({
@@ -302,13 +304,10 @@ add_task(async function enter_during_the_delay_does_not_pair() {
   Assert.ok(acc.name.includes("Test Agent"), "which names the agent");
   const text = id =>
     doc.getElementById(id).textContent.replace(/\s+/g, " ").trim();
-  const delay = text("sval-ap-delay");
-  Assert.notEqual(delay, "", "the delay has its line");
   for (const part of [
     text("sval-ap-detail"),
     "Client: claude-code",
     text("sval-ap-request"),
-    delay,
   ]) {
     Assert.stringContains(acc.description, part, "the description says it");
   }
@@ -317,10 +316,6 @@ add_task(async function enter_during_the_delay_does_not_pair() {
   await TestUtils.waitForCondition(
     () => !allow.disabled && doc.activeElement === allow,
     "Pair enables and takes focus"
-  );
-  Assert.ok(
-    !acc.description.includes(delay),
-    "and the delay leaves the description"
   );
   allow.click();
   Assert.deepEqual(await answerOf(answer), {

@@ -163,11 +163,11 @@ add_task(async function allow_waits_out_the_dialog_delay() {
 });
 
 /**
- * While the dialog delay keeps the grants disabled, a line says why, so a
- * click that lands on a disabled Allow is not a mystery. It goes once they
- * can be clicked.
+ * While the dialog delay holds Allow, Allow is marked held, which sweeps its
+ * fill across it, and the mark goes once it can be clicked. The safe choice
+ * is never held.
  */
-add_task(async function a_line_says_why_allow_cannot_be_clicked_yet() {
+add_task(async function a_held_allow_is_marked_until_it_enables() {
   await SpecialPowers.pushPrefEnv({
     set: [["security.dialog_enable_delay", 1000]],
   });
@@ -184,12 +184,15 @@ add_task(async function a_line_says_why_allow_cannot_be_clicked_yet() {
   const allow = doc.querySelector(
     '.sval-aa-actions button[data-choice="allow"]'
   );
-  const line = doc.getElementById("sval-aa-delay");
+  const deny = doc.querySelector('.sval-aa-actions button[data-choice="deny"]');
   Assert.ok(allow.disabled, "Allow starts disabled");
-  Assert.ok(BrowserTestUtils.isVisible(line), "the line shows meanwhile");
-  Assert.notEqual(line.textContent, "", "and says why");
+  await TestUtils.waitForCondition(
+    () => allow.hasAttribute("data-hold"),
+    "and held once the alert is in front"
+  );
+  Assert.ok(!deny.hasAttribute("data-hold"), "Deny is not held");
   await TestUtils.waitForCondition(() => !allow.disabled, "Allow enables");
-  Assert.ok(BrowserTestUtils.isHidden(line), "and the line goes");
+  Assert.ok(!allow.hasAttribute("data-hold"), "and is no longer held");
   await choose(doc, "deny");
   Assert.equal(await answer, "deny");
 });
@@ -197,8 +200,7 @@ add_task(async function a_line_says_why_allow_cannot_be_clicked_yet() {
 /**
  * A screen reader hears what the alert asks the user to decide: the alert's
  * description carries its detail and every item, what would be sent and
- * where, and, while the grants wait out the delay, why they cannot be
- * pressed. Focus is on the safe choice, inside the alert.
+ * where. Focus is on the safe choice, inside the alert.
  */
 add_task(async function a_screen_reader_hears_what_the_alert_asks() {
   await SpecialPowers.pushPrefEnv({
@@ -219,37 +221,24 @@ add_task(async function a_screen_reader_hears_what_the_alert_asks() {
   const form = doc.querySelector(".sval-aa");
   const acc = await accessibleOf(form);
   Assert.equal(acc.name, "Agent is about to send:", "named by its question");
-  const allow = doc.querySelector(
-    '.sval-aa-actions button[data-choice="allow"]'
-  );
-  Assert.ok(allow.disabled, "Allow starts disabled");
-  const delay = doc.getElementById("sval-aa-delay").textContent;
-  Assert.notEqual(delay, "", "the delay has its line");
   for (const part of [
     "These go to example.com.",
     "Form on example.com: name=Ada",
     "Upload: notes.txt",
-    delay,
   ]) {
     Assert.stringContains(acc.description, part, "the description says it");
   }
   Assert.ok(form.contains(doc.activeElement), "focus is in the alert");
   Assert.equal(doc.activeElement.dataset.choice, "deny", "on the safe choice");
-  await TestUtils.waitForCondition(() => !allow.disabled, "Allow enables");
-  await TestUtils.waitForCondition(
-    () => !acc.description.includes(delay),
-    "the delay leaves the description once Allow can be pressed"
-  );
-  Assert.stringContains(acc.description, "Upload: notes.txt");
   await choose(doc, "deny");
   Assert.equal(await answer, "deny");
 });
 
 /**
- * The delay line shows while Allow is locked: before it enables, and when a
- * blur disables it again until a refocus enables it.
+ * A blur disables Allow again, with the plain disabled look while the alert's
+ * window is behind, and a refocus holds it afresh until it enables.
  */
-add_task(async function the_line_shows_while_allow_is_locked() {
+add_task(async function a_refocus_holds_allow_afresh() {
   await SpecialPowers.pushPrefEnv({
     set: [["security.dialog_enable_delay", 1000]],
   });
@@ -278,24 +267,25 @@ add_task(async function the_line_shows_while_allow_is_locked() {
   const allow = doc.querySelector(
     '.sval-aa-actions button[data-choice="allow"]'
   );
-  const line = doc.getElementById("sval-aa-delay");
   Assert.ok(allow.disabled, "Allow starts disabled");
-  Assert.ok(BrowserTestUtils.isVisible(line), "with the line showing");
   await TestUtils.waitForCondition(() => !allow.disabled, "Allow enables");
-  Assert.ok(BrowserTestUtils.isHidden(line), "the line goes");
 
   await within(SimpleTest.promiseFocus(window), 10_000, "the window's focus");
   await TestUtils.waitForCondition(() => allow.disabled, "a blur disables");
-  Assert.ok(BrowserTestUtils.isVisible(line), "the line is back");
+  Assert.ok(!allow.hasAttribute("data-hold"), "unheld while behind");
   await within(SimpleTest.promiseFocus(own), 10_000, "the window's focus");
+  await TestUtils.waitForCondition(
+    () => allow.hasAttribute("data-hold"),
+    "a refocus holds it"
+  );
   await TestUtils.waitForCondition(() => !allow.disabled, "refocused");
-  Assert.ok(BrowserTestUtils.isHidden(line), "the line goes again");
+  Assert.ok(!allow.hasAttribute("data-hold"), "and it enables");
   await choose(doc, "deny");
   Assert.equal(await answer, "deny");
 });
 
-/** An alert whose only choice is its default has nothing to unlock. */
-add_task(async function an_alert_with_nothing_to_grant_says_nothing_of_it() {
+/** An alert whose only choice is its default has nothing to hold. */
+add_task(async function an_alert_with_nothing_to_grant_holds_nothing() {
   await SpecialPowers.pushPrefEnv({
     set: [["security.dialog_enable_delay", 1000]],
   });
@@ -306,7 +296,8 @@ add_task(async function an_alert_with_nothing_to_grant_says_nothing_of_it() {
     defaultChoice: "ok",
   });
   const doc = await alertIn(window);
-  Assert.ok(BrowserTestUtils.isHidden(doc.getElementById("sval-aa-delay")));
+  const ok = doc.querySelector('.sval-aa-actions button[data-choice="ok"]');
+  Assert.ok(!ok.disabled && !ok.hasAttribute("data-hold"), "OK is not held");
   await choose(doc, "ok");
   Assert.equal(await answer, "ok");
 });
