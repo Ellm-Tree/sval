@@ -203,7 +203,11 @@ struct WorkspaceStrip: View {
         }
         .accessibilityLabel(WorkspaceTile.name(workspace))
         .accessibilityShowsLargeContentViewer {
-            Label { Text(WorkspaceTile.name(workspace)) } icon: { WorkspaceTile(workspace: workspace, size: 46, radius: 14) }
+            Label { Text(WorkspaceTile.name(workspace)) } icon: {
+                // The viewer draws outside the strip's environment, and the
+                // tile reads the model from it.
+                WorkspaceTile(workspace: workspace, size: 46, radius: 14).environment(model)
+            }
         }
         .accessibilityValue([playing ? "Playing" : nil, workspace.isolated ? "Isolated" : nil].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(current ? .isSelected : [])
@@ -292,7 +296,10 @@ private struct Reorder: ViewModifier {
         if enabled {
             content
                 .draggable(workspace.id) {
+                    // The lift draws its preview outside the strip's
+                    // environment, and the tile reads the model from it.
                     WorkspaceTile(workspace: workspace, size: 46, radius: 14)
+                        .environment(model)
                 }
                 .dropDestination(for: String.self) { ids, _ in
                     guard let moved = ids.first, moved != workspace.id,
