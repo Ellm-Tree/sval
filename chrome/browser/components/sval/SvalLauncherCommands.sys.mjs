@@ -307,7 +307,7 @@ async function ordinaryWindowFor(win) {
  * - `shiftWindow`, for a command listed once per workspace whose Shift opens
  *   that workspace in a new window, as Shift does in the workspace switcher.
  * - `choices(win, text)`, for a command that picks: `[{id, label, current,
- *   color}]`, `color` a workspace's colour token.
+ *   color, url}]`, `color` a workspace's colour token, `url` a tab's address.
  * - `each(win)`, for a command listed once per item: `[{id, label}]`, run
  *   with the item as its choice.
  *
@@ -591,6 +591,7 @@ export const COMMANDS = [
               out.push({
                 id,
                 label: displayName(nodes[id]) || nodes[id].content?.url || "",
+                url: nodes[id].content?.url ?? null,
               });
             }
           } else {
@@ -1187,6 +1188,8 @@ function resultFor(queryContext, row, { win, inChoices }) {
       isNew: !!choice?.isNew,
       // A workspace's colour, its swatch's (`SvalLauncherRows`).
       color: choice?.color ?? null,
+      // A tab's address, for its favicon (`SvalLauncherRows`).
+      choiceUrl: choice?.url ?? null,
       title,
       highlights: UrlbarUtils.getTokenMatches(
         tokens,

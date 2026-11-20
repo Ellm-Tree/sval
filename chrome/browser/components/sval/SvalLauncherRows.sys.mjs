@@ -511,6 +511,14 @@ function drawRow(item, win) {
       paintColor(item, described.swatch);
     }
   }
+  if (described.kind === "split-choice") {
+    // The tab's favicon, found as its row in the panel finds it.
+    win.SvalPanel?.fillTabIcon(
+      item.querySelector(".urlbarView-favicon"),
+      result.payload.choiceId,
+      result.payload.choiceUrl
+    );
+  }
 
   const end = htmlElement(doc, "span", { className: "sval-launcher-end" });
   end.setAttribute("aria-hidden", "true");

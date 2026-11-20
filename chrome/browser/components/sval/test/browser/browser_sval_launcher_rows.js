@@ -579,3 +579,54 @@ add_task(async function a_choice_list_says_escape_steps_back() {
     "Close again"
   );
 });
+
+/**
+ * A tab among Split with…'s choices shows its favicon, found as the panel
+ * finds its row's: here the one Firefox has cached for its address, since the
+ * tab was never loaded.
+ */
+add_task(async function a_split_choice_shows_the_tabs_favicon() {
+  const { engine, work } = await workAndHome();
+  const url = "https://example.com/Atlas";
+  const pageURI = Services.io.newURI(url);
+  await PlacesTestUtils.addVisits(pageURI);
+  await PlacesUtils.favicons.setFaviconForPage(
+    pageURI,
+    Services.io.newURI("https://example.com/favicon.svg"),
+    Services.io.newURI(
+      "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'/>"
+    )
+  );
+  const atlas = await engine.mutate({
+    kind: "addTab",
+    parent: work,
+    name: "Atlas",
+    url,
+    id: crypto.randomUUID(),
+    now: Date.now(),
+  });
+  await SvalPanel.refresh();
+
+  const rows = await shownRows("split with");
+  const at = rows.findIndex(r => r.result.payload.commandId === "split-with");
+  UrlbarTestUtils.setSelectedRowIndex(window, at);
+  EventUtils.synthesizeKey("KEY_Enter");
+  await TestUtils.waitForCondition(
+    () => document.getElementById("sval-launcher-chip"),
+    "the choices show"
+  );
+  await UrlbarTestUtils.promiseSearchComplete(window);
+  const icon = () =>
+    [...gURLBar.querySelectorAll(".urlbarView-row")]
+      .find(row => row.result?.payload.choiceId === atlas)
+      ?.querySelector(".urlbarView-favicon");
+  await TestUtils.waitForCondition(
+    () => icon()?.hasAttribute("src"),
+    "Atlas's row takes its cached favicon"
+  );
+  EventUtils.synthesizeKey("KEY_Escape");
+  await TestUtils.waitForCondition(
+    () => !document.getElementById("sval-launcher-chip"),
+    "Escape steps back"
+  );
+});
