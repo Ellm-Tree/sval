@@ -450,6 +450,10 @@ pref("urlclassifier.features.antifraud.annotate.allowlistTables", "");
 // under browser.sval.javascript.site.: "allow" or "block", each an exception
 // to javascript.enabled. Each syncs between devices.
 
+// Keep links in this tab (`SvalKeepLinks`) is a pref per site or host, with no
+// default, under browser.sval.keepLinks.site.: "on" or "off". Each syncs
+// between devices.
+
 // First run (first-run spec §3): shown once, on a fresh profile. The test
 // suites turn it off, because every harness profile is a fresh one.
 pref("browser.sval.firstRun.enabled", true);

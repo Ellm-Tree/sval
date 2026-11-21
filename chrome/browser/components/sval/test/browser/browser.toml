@@ -87,6 +87,9 @@ support-files = [
   "sval_javascript_sandbox.html",
   "sval_javascript_sw.html",
   "sval_javascript_sw.js",
+  "sval_keep_links_frame.html",
+  "sval_keep_links_page.html",
+  "sval_keep_links_target.html",
   "sval_media_gate_frame.html",
   "sval_media_gate_loop.html",
   "sval_media_gate_page.html",
@@ -519,6 +522,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_kagi_engine_watch.js"]
 
 ["browser_sval_kagi_response.js"]
+
+["browser_sval_keep_links.js"]
 
 ["browser_sval_keep_loaded.js"]
 

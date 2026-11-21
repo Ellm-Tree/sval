@@ -215,6 +215,10 @@ final class Browser {
     /// sign-in window can hand its result back.
     func openWindow(from opener: String, configuration: WKWebViewConfiguration,
                     for action: WKNavigationAction) -> WKWebView? {
+        if keepsInTab(action, opener: opener), let page = pages[opener] {
+            page.view.load(action.request)
+            return nil
+        }
         guard let workspace = model.workspace(of: opener) ?? Self.pinParts(opener)?.workspace,
               let parent = model.newTabWorkspace(from: workspace) else { return nil }
         let id = UUID().uuidString.lowercased()
@@ -229,6 +233,26 @@ final class Browser {
             addWindowTab(id, url: url)
         }
         return page.view
+    }
+
+    /// Whether a page's link that asks for a new tab loads in its own tab,
+    /// under Keep links in this tab (`SvalKeepLinks.sys.mjs`): the tab's
+    /// page has the rule on, the link is in the page itself, and the page
+    /// and the address are of one site. A frame's link opens its tab, as on
+    /// the desktop, since loading here would navigate the page from a frame. A link or a form, without a modifier key,
+    /// as the desktop keeps one. WebKit doesn't say whether a script's
+    /// `window.open` keeps its window, so the app keeps none.
+    private func keepsInTab(_ action: WKNavigationAction, opener: String) -> Bool {
+        guard action.navigationType == .linkActivated || action.navigationType == .formSubmitted,
+              action.sourceFrame.isMainFrame,
+              action.modifierFlags.isEmpty,
+              let top = pages[opener]?.view.url?.host(),
+              let url = action.request.url, let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              let site = SiteRules.site(of: top),
+              SiteRules.site(of: url.host() ?? "") == site
+        else { return false }
+        return model.siteRules(private: model.isPrivate(opener)).keepLinks(on: top)
     }
 
     private func addWindowTab(_ id: String, url: URL) {

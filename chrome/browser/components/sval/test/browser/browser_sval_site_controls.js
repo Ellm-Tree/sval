@@ -17,6 +17,9 @@ const { SvalSiteProtections, SITE_BRANCH } = ChromeUtils.importESModule(
 const { SvalJavascript } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalJavascript.sys.mjs"
 );
+const { SvalKeepLinks } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs"
+);
 const { mediaOf, mediaNameOf } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs"
 );
@@ -87,6 +90,7 @@ function reset() {
   clearPrefBranches(SITE_BRANCH);
   SvalSiteProtections.setMediaDefault("ask");
   SvalJavascript.removeRule(SITE);
+  SvalKeepLinks.removeRule(SITE);
   Services.perms.removeAll();
 }
 
@@ -492,6 +496,32 @@ add_task(async function the_site_menu_turns_javascript_off_for_the_site() {
         byId("sval-javascript-button").getAttribute("sval-js"),
         "off",
         "and the toolbar's button agrees"
+      );
+    } finally {
+      await closeMenu();
+    }
+  });
+  reset();
+});
+
+add_task(async function the_site_menu_keeps_the_sites_links_in_the_tab() {
+  reset();
+  await BrowserTestUtils.withNewTab(SC_PAGE, async browser => {
+    await openMenu();
+    try {
+      const toggle = byId("sval-site-keep-links");
+      Assert.equal(toggle.getAttribute("aria-checked"), "false");
+      toggle.click();
+      Assert.ok(SvalKeepLinks.onFor(SITE), "saved for the site");
+      Assert.equal(
+        browser.browsingContext.svalKeepLinksSite,
+        SITE,
+        "and the open tab keeps its links without a reload"
+      );
+      Assert.equal(
+        byId("sval-site-keep-links").getAttribute("aria-checked"),
+        "true",
+        "the switch shows it on"
       );
     } finally {
       await closeMenu();

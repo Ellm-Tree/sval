@@ -31,6 +31,10 @@ const { SvalSiteData } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalSiteData.sys.mjs"
 );
 
+const { SvalKeepLinks } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs"
+);
+
 const SITE = "example.com";
 // Other files load pages from the harness's hosts, which keep stored data
 // for the session; no page is ever served from this one.
@@ -39,7 +43,7 @@ const PICKER_PAGE =
   "https://example.net/browser/browser/components/sval/test/browser/sval_element_picker.html";
 
 function reset() {
-  clearPrefBranches(SITE_BRANCH, JS_BRANCH);
+  clearPrefBranches(SITE_BRANCH, JS_BRANCH, "browser.sval.keepLinks.site.");
   SvalBlocking.setMyFilters("");
 }
 
@@ -180,6 +184,18 @@ add_task(async function the_cards_write_the_stores() {
   await until(
     () => !SvalJavascript.rules().has(SITE),
     "Default removing the JavaScript rule"
+  );
+
+  ok(!ui.byKey("site-keep-links").checked, "Keep links in this tab reads off");
+  ui.byKey("site-keep-links").click();
+  await until(
+    () => SvalKeepLinks.ruleFor(SITE) === "on",
+    "the Keep links in this tab choice reaching its rules"
+  );
+  ui.byKey("site-keep-links").click();
+  await until(
+    () => !SvalKeepLinks.hasRule(SITE),
+    "turning it back off removing the rule"
   );
 
   ui.byKey("site-exceptions").click();

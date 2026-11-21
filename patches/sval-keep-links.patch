@@ -1,0 +1,103 @@
+Sval: open a site's links in their own tab under Keep links in this tab
+
+A site whose links ask for a new tab, with target=_blank or window.open,
+opens a tab on every click. A user who turns on Keep links in this tab for
+the site wants those links to load in the tab they are in. Gecko decides
+where such a request opens in the content process, in
+BrowserChild::ProvideWindow, which already loads it in the current tab under
+browser.link.open_newwindow 1. That pref is global, so this adds a
+parent-only BrowsingContext field, SvalKeepLinksSite, which Sval's chrome
+sets on a tab to the site whose rule is on, and asks Sval's SvalKeepLinks.cpp
+whether a request for a new tab takes the current-tab path.
+
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+index 340a8f3961..4c48036a33 100644
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -163,6 +163,11 @@ struct EmbedderColorSchemes {
+   /* Sval: whether this tab belongs to an agent's workspace. Set by the parent \
+    * on top level browsing contexts only. */                                   \
+   FIELD(SvalAgentTab, bool, {.mTopOnly = true, .mCanSet = CanSet::ParentOnly}) \
++  /* Sval: the site whose links that ask for a new tab load in this tab,       \
++   * empty for none (SvalKeepLinks.cpp). Set by the parent on top level        \
++   * browsing contexts only. */                                                \
++  FIELD(SvalKeepLinksSite, nsCString,                                          \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
+   /* Sval: whether this tab's pages have focus, as in the focused tab of a     \
+    * focused window, without the window's. Set by the parent on top level      \
+    * browsing contexts only (SvalFocusEmulation.cpp). */                       \
+@@ -1247,6 +1252,9 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
+ 
+   bool IsAppTab() { return GetIsAppTab(); }
+   bool SvalAgentTab() { return GetSvalAgentTab(); }
++  void GetSvalKeepLinksSite(nsACString& aSite) const {
++    aSite = GetSvalKeepLinksSite();
++  }
+   bool SvalFocusEmulated() { return GetSvalFocusEmulated(); }
+   bool SvalAgentInControl() { return GetSvalAgentInControl(); }
+   // Sval: whether an agent controls the tab aWindow's page is in.
+diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
+index e3ecd89e9f..46d310f53a 100644
+--- a/docshell/base/CanonicalBrowsingContext.cpp
++++ b/docshell/base/CanonicalBrowsingContext.cpp
+@@ -311,6 +311,7 @@ void CanonicalBrowsingContext::ReplacedBy(
+   txn.SetBrowserId(GetBrowserId());
+   txn.SetIsAppTab(GetIsAppTab());
+   txn.SetSvalAgentTab(GetSvalAgentTab());
++  txn.SetSvalKeepLinksSite(GetSvalKeepLinksSite());
+   txn.SetSvalFocusEmulated(GetSvalFocusEmulated());
+   txn.SetSvalAgentInControl(GetSvalAgentInControl());
+   txn.SetIsCaptivePortalTab(GetIsCaptivePortalTab());
+diff --git a/dom/chrome-webidl/BrowsingContext.webidl b/dom/chrome-webidl/BrowsingContext.webidl
+index 8ce23d35c9..d77bd58be7 100644
+--- a/dom/chrome-webidl/BrowsingContext.webidl
++++ b/dom/chrome-webidl/BrowsingContext.webidl
+@@ -168,6 +168,10 @@ interface BrowsingContext {
+   // the WebMCP API to its pages (ModelContext::IsExposed).
+   [SetterThrows] attribute boolean svalAgentTab;
+ 
++  // Sval: the site whose links that ask for a new tab load in this tab,
++  // empty for none (SvalKeepLinks.cpp).
++  [SetterThrows] attribute UTF8String svalKeepLinksSite;
++
+   // Sval: whether this tab's pages have focus, as in the focused tab of a
+   // focused window, without the window's (SvalFocusEmulation.cpp).
+   [SetterThrows] attribute boolean svalFocusEmulated;
+diff --git a/dom/ipc/BrowserChild.cpp b/dom/ipc/BrowserChild.cpp
+index e618cb109a..fccdd568b7 100644
+--- a/dom/ipc/BrowserChild.cpp
++++ b/dom/ipc/BrowserChild.cpp
+@@ -119,6 +119,7 @@
+ #include "nsVariant.h"
+ #include "nsWebBrowser.h"
+ #include "nsWindowWatcher.h"
++#include "SvalKeepLinks.h"
+ 
+ #ifdef MOZ_WAYLAND
+ #  include "nsAppRunner.h"
+@@ -726,6 +727,13 @@ BrowserChild::ProvideWindow(nsIOpenWindowInfo* aOpenWindowInfo,
+       parent->GetDOMWindow(), aChromeFlags, aModifiers, aCalledFromJS,
+       aOpenWindowInfo->GetIsForPrinting());
+ 
++  // Sval: a link the site's Keep links in this tab rule keeps opens here.
++  if (openLocation == nsIBrowserDOMWindow::OPEN_NEWTAB &&
++      SvalKeepsLinkInTab(parent, aURI, aModifiers, aCalledFromJS,
++                         aForceNoOpener)) {
++    openLocation = nsIBrowserDOMWindow::OPEN_CURRENTWINDOW;
++  }
++
+   // If it turns out we're opening in the current browser, just hand over the
+   // current browser's docshell.
+   if (openLocation == nsIBrowserDOMWindow::OPEN_CURRENTWINDOW) {
+diff --git a/dom/ipc/moz.build b/dom/ipc/moz.build
+index 080db59f65..f3d1477dc1 100644
+--- a/dom/ipc/moz.build
++++ b/dom/ipc/moz.build
+@@ -153,6 +153,7 @@ UNIFIED_SOURCES += [
+     "SharedMessageBody.cpp",
+     "SharedStringMap.cpp",
+     "StructuredCloneData.cpp",
++    "SvalKeepLinks.cpp",
+     "TabContext.cpp",
+     "UniqueContentParentKeepAlive.cpp",
+     "URLClassifierParent.cpp",

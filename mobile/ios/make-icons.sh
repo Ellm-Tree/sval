@@ -18,7 +18,7 @@ sync="$here/../../chrome/browser/components/sval/sync-icons"
 # catalog doesn't know: the glyphs are drawn in black and tinted as
 # templates instead.
 for path in "$icons/pr-shield.svg" "$icons/pr-shield-fill.svg" "$icons/pr-shield-off.svg" \
-    "$icons/sc-shield-plain.svg" "$icons/pr-ads.svg" \
+    "$icons/sc-shield-plain.svg" "$icons/pr-ads.svg" "$icons/sc-external.svg" \
     "$header/back.svg" "$header/forward.svg" "$header/reload.svg" "$header/stop.svg" \
     "$sync/satellite.svg" "$sync/badge-bang.svg" "$sync/badge-x.svg" "$sync/badge-pause.svg" \
     "$header/javascript.svg" "$header/javascript-off.svg" "$header/media.svg" "$header/split.svg" "$header/private.svg" \

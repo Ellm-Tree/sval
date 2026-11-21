@@ -37,6 +37,7 @@
     PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
     SvalForgetSite: "moz-src:///browser/components/sval/SvalForgetSite.sys.mjs",
     SvalJavascript: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
+    SvalKeepLinks: "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs",
     APPLIED_TOPIC: "moz-src:///browser/components/sval/SvalJavascript.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     SvalSiteChoices:
@@ -104,6 +105,7 @@
   const SITE_CARDS = [
     "_siteCardProtections",
     "_siteCardJavascript",
+    "_siteCardKeepLinks",
     "_siteCardHidden",
     "_siteCardStyle",
     "_siteCardExtensions",
@@ -358,6 +360,7 @@
         lazy.SITE_BRANCH,
         lazy.MEDIA_DEFAULT_PREF,
         ...lazy.SvalJavascript.PREFS,
+        ...lazy.SvalKeepLinks.PREFS,
       ]) {
         lifetime.pref(name, redraw);
       }
@@ -1579,6 +1582,63 @@
             : `Default for all sites: ${js.defaultEnabled() ? "allowed" : "blocked"}`,
           control
         )
+      );
+    },
+
+    /**
+     * Keep links in this tab, the rule the site menu's switch writes, for the
+     * site or the host in view. A host without a rule shows what it
+     * inherits, marked as a default is. Plain text in a private window.
+     *
+     * @param {string} site
+     * @returns {Element}
+     */
+    _siteCardKeepLinks(site) {
+      const store = lazy.SvalKeepLinks;
+      const scope = this._sitePage.scope;
+      const name = scope ?? site;
+      const own = store.ruleFor(name);
+      const on = own === undefined ? store.inheritedFor(name) : own === "on";
+      const key = "keep-links";
+      let control;
+      if (this._privateWindow) {
+        control = this._sitePageValue(
+          key,
+          on ? "On" : "Off",
+          on ? "on" : "off"
+        );
+      } else {
+        control = this._el("input", {
+          type: "checkbox",
+          className: "sval-switch",
+          role: "switch",
+          checked: on,
+          dataset: { svalKey: `site-${key}` },
+        });
+        control.setAttribute("aria-labelledby", `sval-site-${key}-label`);
+        control.addEventListener("change", () =>
+          store.setOn(name, control.checked)
+        );
+      }
+      const row = this._sitePageRow(
+        key,
+        this._siteName("external-link", "Keep links in this tab", {
+          heading: true,
+        }),
+        `Links between ${name} pages can't open a new tab or window.`,
+        control
+      );
+      if (scope && own === undefined) {
+        row.dataset.default = "";
+      }
+      return this._el(
+        "section",
+        {
+          className: "sval-card sval-site-card",
+          ariaLabelledby: `sval-site-${key}-label`,
+          dataset: { siteCard: "keepLinks" },
+        },
+        row
       );
     },
 

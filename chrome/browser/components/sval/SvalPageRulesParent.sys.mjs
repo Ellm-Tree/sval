@@ -6,6 +6,7 @@ import {
   SvalPageRules,
   MAX_GENERIC_NAMES as MAX_NAMES,
 } from "moz-src:///browser/components/sval/SvalPageRules.sys.mjs";
+import { SvalKeepLinks } from "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs";
 import {
   lookShownIn,
   paintWith,
@@ -115,6 +116,12 @@ export class SvalPageRulesParent extends JSWindowActorParent {
   }
 
   #document() {
+    // A top document sets its tab's Keep links in this tab site before its
+    // page can ask for a tab: the answer and the field travel the one
+    // channel to its process, in order.
+    if (!this.browsingContext.parent) {
+      SvalKeepLinks.applyTo(this.browsingContext, this.manager.documentURI);
+    }
     const rules = this.#rules();
     const style = this.#style();
     return rules || style ? { rules, style } : null;

@@ -28,6 +28,9 @@ const { SITE_BRANCH: EXTENSION_SITE_BRANCH } = ChromeUtils.importESModule(
 const { SITE_BRANCH: JAVASCRIPT_BRANCH } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalJavascript.sys.mjs"
 );
+const { SITE_BRANCH: KEEP_LINKS_BRANCH } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs"
+);
 const {
   ALLOWED_DOMAIN_BRANCH,
   CUSTOM_LIST_BRANCH,
@@ -1057,6 +1060,10 @@ const ENTRY_CHOICES = [
   [
     [JAVASCRIPT_BRANCH + "example.net", "block"],
     [JAVASCRIPT_BRANCH + "example.org", "allow"],
+  ],
+  [
+    [KEEP_LINKS_BRANCH + "example.net", "on"],
+    [KEEP_LINKS_BRANCH + "shop.example.org", "off"],
   ],
   [
     [ALLOWED_DOMAIN_BRANCH + "shop.example.net", true],

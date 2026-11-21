@@ -68,6 +68,30 @@ struct SiteRules {
         return enabled == javaScriptInherited(for: name) ? (key, nil) : (key, enabled ? "allow" : "block")
     }
 
+    // MARK: Keep links in this tab (`SvalKeepLinks.sys.mjs`)
+
+    static let keepLinksBranch = "browser.sval.keepLinks.site."
+
+    /// Whether the rule is on for a page of `host`: the rule of the most
+    /// specific name holding one, or off where none does (`onFor`).
+    func keepLinks(on host: String?) -> Bool {
+        guard let host else { return false }
+        for name in Self.names(of: host) {
+            if let rule = settings[Self.keepLinksBranch + name] as? String, rule == "on" || rule == "off" {
+                return rule == "on"
+            }
+        }
+        return false
+    }
+
+    /// The setting to write so `name` gets `on`: a choice that matches what
+    /// the name inherits takes its rule away (`setOn`).
+    func keepLinksChange(for name: String, on: Bool) -> (key: String, value: Any?) {
+        let key = Self.keepLinksBranch + name
+        let inherited = keepLinks(on: Self.names(of: name).dropFirst().first)
+        return on == inherited ? (key, nil) : (key, on ? "on" : "off")
+    }
+
     // MARK: Protections (`SvalSiteProtections.sys.mjs`)
 
     static let protectionBranch = "browser.sval.protection.site."

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Keep links page</title>
+</head>
+<body>
+<p><a id="same" target="_blank" href="https://www.example.com/browser/browser/components/sval/test/browser/sval_keep_links_target.html">Same site</a></p>
+<p><a id="other" target="_blank" href="https://example.org/browser/browser/components/sval/test/browser/sval_keep_links_target.html">Other site</a></p>
+<p><button id="open-noopener">window.open with noopener</button></p>
+<p><button id="open-opener">window.open keeping its window</button></p>
+<p><button id="open-features">window.open with features</button></p>
+<iframe id="frame" src="https://example.com/browser/browser/components/sval/test/browser/sval_keep_links_frame.html"></iframe>
+<script>
+  const TARGET =
+    "https://www.example.com/browser/browser/components/sval/test/browser/sval_keep_links_target.html";
+  document.getElementById("open-noopener").addEventListener("click", () => {
+    window.open(TARGET, "_blank", "noopener");
+  });
+  document.getElementById("open-opener").addEventListener("click", () => {
+    window.open(TARGET, "_blank");
+  });
+  document.getElementById("open-features").addEventListener("click", () => {
+    window.open(TARGET, "_blank", "width=400,height=300");
+  });
+</script>
+</body>
+</html>

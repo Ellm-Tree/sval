@@ -717,6 +717,15 @@ struct SiteMenuView: View {
                             // The desktop's private window can't change it
                             // either (`SvalSiteControls`).
                             .disabled(inPrivate)
+                        // Takes effect at the next link, so nothing reloads.
+                        toggleRow(
+                            icon: "sc-external", title: "Keep Links in This Tab",
+                            detail: "Links between \(scope) pages can't open a new tab or window.",
+                            isOn: Binding(get: { rules.keepLinks(on: host) }, set: { on in
+                                let change = rules.keepLinksChange(for: scope, on: on)
+                                Task { await model.setSetting(change.key, to: change.value) }
+                            }))
+                            .disabled(inPrivate)
                         // The site's video and audio choice, as the desktop's
                         // site menu sets it. The page is made again for it.
                         Picker(selection: Binding(get: { rules.media(for: host) }, set: { choice in

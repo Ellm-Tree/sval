@@ -555,6 +555,10 @@ control of what you see and what is sent to websites.
   thumbnail, doesn't allow media.
 - **JavaScript per site.** Turn JavaScript on or off for individual sites, or
   turn it off everywhere and make exceptions.
+- **Keep links in this tab.** In the site settings menu, stop a site from
+  opening its own pages in new tabs or windows. A link to another site still
+  opens a new tab, and so does a Command-click or Ctrl-click. The choice
+  syncs, the iPhone app included.
 - **Zoom per site.** The site settings menu shows the site's zoom level. A
   slider sets it one step at a time, and Reset puts it back.
 - **Location.** When a site asks for your location, a location button

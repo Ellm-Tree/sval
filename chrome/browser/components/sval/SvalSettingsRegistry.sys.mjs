@@ -16,6 +16,7 @@ import {
 import { SITE_BRANCH as JAVASCRIPT_BRANCH } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
 import { SITE_BRANCH as PROTECTION_BRANCH } from "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs";
 import { SITE_BRANCH as EXTENSION_SITE_BRANCH } from "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs";
+import { SITE_BRANCH as KEEP_LINKS_BRANCH } from "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs";
 import { SYNC_RULES as TRACKING_RULES } from "moz-src:///browser/components/sval/SvalTrackingSettings.sys.mjs";
 import { SYNC_RULES as ARCHIVE_RULES } from "moz-src:///browser/components/sval/SvalArchive.sys.mjs";
 import { SYNC_RULES as PEEK_RULES } from "moz-src:///browser/components/sval/SvalPeek.sys.mjs";
@@ -152,6 +153,7 @@ export const SvalSettingsRegistry = Object.freeze({
     JAVASCRIPT_BRANCH,
     PROTECTION_BRANCH,
     EXTENSION_SITE_BRANCH,
+    KEEP_LINKS_BRANCH,
     MY_FILTER_BRANCH,
   ]),
 

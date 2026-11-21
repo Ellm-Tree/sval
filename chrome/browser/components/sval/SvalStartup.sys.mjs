@@ -20,6 +20,7 @@ import { SvalFavoritesProvider } from "moz-src:///browser/components/sval/SvalFa
 import { SvalHistorySync } from "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs";
 import { SvalHomePage } from "moz-src:///browser/components/sval/SvalHomePage.sys.mjs";
 import { SvalJavascript } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
+import { SvalKeepLinks } from "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs";
 import { SvalLauncherCommands } from "moz-src:///browser/components/sval/SvalLauncherCommands.sys.mjs";
 import { SvalLauncherTabs } from "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs";
 import { SvalPageStyle } from "moz-src:///browser/components/sval/SvalPageStyle.sys.mjs";
@@ -53,6 +54,7 @@ export const SvalStartup = {
     SvalLauncherTabs.register();
     SvalLauncherCommands.register();
     SvalJavascript.start();
+    SvalKeepLinks.start();
     startFingerprinting();
     SvalSiteProtections.start();
     SvalReleaseCandidates.start();

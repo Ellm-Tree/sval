@@ -62,6 +62,10 @@ import {
 } from "moz-src:///browser/components/sval/SvalKeys.sys.mjs";
 import { SvalJavascript } from "moz-src:///browser/components/sval/SvalJavascript.sys.mjs";
 import {
+  SvalKeepLinks,
+  SITE_BRANCH as KEEP_LINKS_BRANCH,
+} from "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs";
+import {
   scopeChain,
   scopeForURI,
   siteForURI,
@@ -935,6 +939,7 @@ class SiteControls {
     lifetime.pref(MEDIA_DEFAULT_PREF, update);
     lifetime.pref(PINS_PREF, update);
     lifetime.pref(STYLES_PREF, update);
+    lifetime.pref(KEEP_LINKS_BRANCH, update);
     this.update();
   }
 
@@ -1783,6 +1788,9 @@ class SiteControls {
       if (SvalJavascript.hasRule(media.host)) {
         kinds.push("JavaScript");
       }
+      if (SvalKeepLinks.hasRule(media.host)) {
+        kinds.push("links");
+      }
       if (
         SvalSiteProtections.ruleFor(media.host, media.session).media !==
         undefined
@@ -1818,6 +1826,7 @@ class SiteControls {
       this.styleSection(media),
       this.mediaSection(media),
       this.javascriptSection(media),
+      this.keepLinksSection(media),
       this.permissionsSection(media),
       this.confirmingClear ? this.clearConfirm(media) : this.clearRow(),
       this.footer(media)
@@ -2672,6 +2681,71 @@ class SiteControls {
         media.isPrivate
           ? "A private window can't change it."
           : "Turning it off breaks some sites."
+      )
+    );
+  }
+
+  /**
+   * Keep links in this tab, saved at the scope in view. It takes effect on
+   * the page in view as it changes (`SvalKeepLinks.start`), so it reloads
+   * nothing.
+   *
+   * @param {object} media From `mediaOf`.
+   */
+  keepLinksSection(media) {
+    const { doc } = this;
+    const at = this.scopeAt(media);
+    const on = SvalKeepLinks.onFor(at);
+    const toggle = htmlElement(doc, "button", {
+      type: "button",
+      className: "sval-prot-switch",
+      id: "sval-site-keep-links",
+      attrs: {
+        role: "switch",
+        "aria-checked": String(on),
+        "aria-label": "Keep links in this tab",
+        ...(media.isPrivate ? { "aria-disabled": "true" } : {}),
+      },
+    });
+    toggle.addEventListener("click", () => {
+      if (media.isPrivate) {
+        return;
+      }
+      SvalKeepLinks.setOn(at, !on);
+      this.update();
+    });
+    return htmlElement(
+      doc,
+      "div",
+      { className: "sval-site-section", attrs: { role: "group" } },
+      this.heading("Links"),
+      htmlElement(
+        doc,
+        "div",
+        {
+          className: "sval-prot-switch-row",
+          dataset: { disabled: media.isPrivate ? "true" : "" },
+        },
+        htmlElement(
+          doc,
+          "div",
+          { className: "sval-prot-switch-words" },
+          htmlElement(
+            doc,
+            "span",
+            { className: "sval-prot-switch-label" },
+            "Keep links in this tab"
+          )
+        ),
+        toggle
+      ),
+      htmlElement(
+        doc,
+        "span",
+        { className: "sval-prot-sub sval-site-note" },
+        media.isPrivate
+          ? "A private window can't change this setting."
+          : `Links between ${at} pages can't open a new tab or window.`
       )
     );
   }

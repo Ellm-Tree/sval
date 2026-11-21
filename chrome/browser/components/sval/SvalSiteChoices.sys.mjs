@@ -28,6 +28,11 @@ import {
   SITE_BRANCH as EXTENSION_SITE_BRANCH,
 } from "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs";
 import {
+  SvalKeepLinks,
+  PREFS as KEEP_LINKS_PREFS,
+  SITE_BRANCH as KEEP_LINKS_BRANCH,
+} from "moz-src:///browser/components/sval/SvalKeepLinks.sys.mjs";
+import {
   STYLES_PREF,
   removeStyles,
   setStyle,
@@ -139,6 +144,18 @@ const CHOICES = Object.freeze([
     count: () => 1,
     clear: name => SvalJavascript.removeRule(name),
     restore: (name, rule) => SvalJavascript.setEnabled(name, rule === "allow"),
+  },
+  {
+    id: "keepLinks",
+    scoped: true,
+    private: "stored",
+    siteBranch: KEEP_LINKS_BRANCH,
+    forget: "choices",
+    prefs: KEEP_LINKS_PREFS,
+    read: () => SvalKeepLinks.rules(),
+    count: () => 1,
+    clear: name => SvalKeepLinks.removeRule(name),
+    restore: (name, rule) => SvalKeepLinks.setOn(name, rule === "on"),
   },
   {
     id: "style",
