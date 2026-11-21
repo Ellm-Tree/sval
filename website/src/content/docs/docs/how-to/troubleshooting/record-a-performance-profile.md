@@ -1,7 +1,6 @@
 ---
 title: Record what makes Sval slow
 description: Save the last minute of Sval's work as a file you can share when pages, video, or scrolling feel slow.
-since: 0.1.0-rc.10
 ---
 
 A performance recording shows where Sval spent time while Sval was slow.

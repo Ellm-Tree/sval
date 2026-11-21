@@ -4,8 +4,6 @@ description: Type part of a command's name to make a Workspace, move a tab, spli
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
 
 Besides opening pages, the Launcher runs Sval's commands. Type a few
 letters of what you want to do, then pick the command from the list.
@@ -41,19 +39,9 @@ name, then select
   Favorites, "unload" finds Put this tab to sleep, and "preferences" finds
   the Settings pages.
 
-<Until v="0.1.0-rc.10">
-
-- A command shows only when it applies. For example, Unpin this tab shows
-  only for a pin. Close Split shows only for a tab in a Split.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - A command shows only when it applies. For example, Move this pin to
   Favorites shows only for a pin. Close Split shows only for a tab in a
   Split.
-
-</Since>
 
 - A command with its own shortcut shows the shortcut in the line under the
   list, next to **Runs it from anywhere**.

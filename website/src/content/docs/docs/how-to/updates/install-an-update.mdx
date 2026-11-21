@@ -3,9 +3,6 @@ title: Install an update
 description: Restart Sval to finish an update, or check for one yourself.
 ---
 
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
-
 Sval downloads updates by itself. When an update is ready, a message opens under
 the **Notices** button in the header, asking you to restart.
 
@@ -41,16 +38,6 @@ button restarts Sval to finish.
 
 ## If something goes wrong
 
-<Until v="0.1.0-rc.10">
-
-- **Close the other copy of Sval to finish updating.** Another copy of
-  Sval is running from the same place. Quit the other copy, or
-  select **Update Anyway**. If you update anyway, the other copy might not
-  work as it should until you restart it.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - **Close the other copy of Sval to finish updating.** Another copy of
   Sval is running from the same place. Quit the other copy, and within 10
   seconds the message changes to the usual one, with **Update and
@@ -58,7 +45,6 @@ button restarts Sval to finish.
   update anyway, the other copy might not work as it should until you
   restart it.
 
-</Since>
 - **Sval couldn't update automatically.** Select **Download**, then
   install the new version yourself. You don't lose your saved information
   or settings.

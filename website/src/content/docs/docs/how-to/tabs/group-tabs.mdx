@@ -4,8 +4,6 @@ description: Make a group in the Workspace, put tabs in it, and put groups insid
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
 
 A group keeps tabs, and other groups, together under one name in the Workspace.
 You can give a group a color and an emoji. You can also fold the group away
@@ -28,20 +26,9 @@ groups already there and before the tabs.
 
 ## Make a group from two tabs
 
-<Until v="0.1.0-rc.10">
-
-1. Drag one tab's row onto the middle of another tab's row.
-2. When the row reads **New group**, drop the tab.
-3. In the New group dialog, type a name, then select **Create**.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 1. Drag one tab's row onto the left half of another tab's row.
 2. When the **New group** half fills with color, drop the tab.
 3. In the New group dialog, type a name, then select **Create**.
-
-</Since>
 
 The new group takes the place of the tab you dropped on, with both tabs
 inside.

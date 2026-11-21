@@ -4,8 +4,6 @@ description: Find a tab by typing part of its name or address, in this Workspace
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
 
 As you type, the Launcher lists your open tabs from every Workspace. Pick
 a tab to go to it. If the tab is in another Workspace, Sval takes you to
@@ -32,20 +30,11 @@ switches to that Workspace first.
 - When a tab is in another Workspace, its row shows that Workspace's emoji
   and name, in the Workspace's color. The selected row reads Switch to and
   the Workspace's name.
-<Until v="0.1.0-rc.10">
-
-- A strong match for what you typed becomes the first row, so pressing
-  Enter goes straight to it.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - The first row is always a search for what you typed, or the site when
   you type an address. When what you typed starts a word in a tab's title,
   or starts the tab's domain, Open tabs comes right after the first row.
   Press <kbd>↓</kbd>, then Enter, to go to the tab.
-
-</Since>
 
 - <kbd>Shift+Enter</kbd> and <kbd>⇧⌘Enter</kbd> (<kbd>Ctrl+Shift+Enter</kbd>) also switch to the tab. They
   never open a second copy of the tab.

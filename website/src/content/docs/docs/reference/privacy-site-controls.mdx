@@ -4,8 +4,6 @@ description: What the Privacy and Security button, the site controls, and the si
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
 
 For the site you're on, the address bar has two kinds of controls. The
 Privacy and Security button shows how Sval protects you on the site. The
@@ -84,16 +82,6 @@ From the start of the row:
   button starts Remove from this site, and shows only once you pin it.
   Each button shows how much it removed on the page.
 
-<Until v="0.1.0-rc.10">
-
-- **Site settings.** This button opens the site settings menu. When the
-  scissors or eraser button isn't pinned, its count shows on the Site
-  settings button. When the button shows no count, a dot on it shows that
-  the site has a saved [Colorshift](#colorshift).
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - **Colorshift.** This palette button opens [Colorshift](#colorshift),
   and shows only once you pin it. A dot on it shows that the site has a
   saved Colorshift.
@@ -102,8 +90,6 @@ From the start of the row:
   settings button. When the Site settings button shows no count and the
   Colorshift button isn't pinned, a dot on the Site settings button shows
   that the site has a saved Colorshift.
-
-</Since>
 
 The page's own buttons follow, after a divider:
 
@@ -127,19 +113,6 @@ or All of example.com.
 - **Zoom.** A slider shows the page's zoom and moves one step at a time.
   **Reset** puts the zoom back.
 
-<Until v="0.1.0-rc.10">
-
-- **Colorshift.** **Colorshift This Site…** opens
-  [Colorshift](#colorshift), where you change how the site looks. With
-  nothing saved, the line under **Colorshift This Site…** reads "Change
-  this site's colors, theme, and font". When the site has a saved
-  Colorshift, the row has the same dot as the Site settings arrow. The line
-  then lists what the Colorshift changes, such as "Blue tint, dark theme,
-  serif font".
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - **Colorshift.** **Colorshift This Site…** opens
   [Colorshift](#colorshift), where you change how the site looks. With
   nothing saved, the line under **Colorshift This Site…** reads "Change
@@ -149,8 +122,6 @@ or All of example.com.
   Colorshift changes, such as "Blue tint, dark theme, serif font". The pin
   next to **Colorshift This Site…** puts the Colorshift button in
   the address bar.
-
-</Since>
 
 - **Elements.** **Remove from this site…** saves a rule that applies on
   every visit. **Snip…** removes something until you reload. The pin next
@@ -199,42 +170,19 @@ changes sync to all your devices. See
   closer together.
 - **Brightness.** This makes every color on the page lighter or darker.
 - **Saturation.** This makes the page's colors more vivid, or grayer.
-<Until v="0.1.0-rc.10">
-
-- **Theme.** This picks **Automatic**, **Light**, or **Dark**, under
-  **Prefers the site's own light or dark theme**. Automatic lets the site
-  follow Sval's own light or dark theme. Light and Dark ask the site for
-  that theme. When the site has none, Sval turns the page's colors light or
-  dark and leaves pictures and videos as they are.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - **Theme.** This picks **Automatic**, **Light**, or **Dark**. Automatic
   lets the site follow Sval's own light or dark theme. Light and Dark ask
   the site for that theme. When the site has none, Sval turns the page's
   colors light or dark and leaves pictures and videos as they are.
 
-</Since>
-
 - **Font.** This picks Original, System, Serif, Monospace, or Readable.
   Original keeps the site's own font.
-<Until v="0.1.0-rc.10">
-
-- **Reset style.** This shows only when the site has a saved Colorshift.
-  It sets every control to leave the site as it is, and the page shows the
-  site's own look at once.
-  **Save** then removes the saved Colorshift, and **Cancel** keeps it.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - **Reset.** This sets every control to leave the site as it is, and the
   page shows the site's own look at once. Colorshift stays open.
   When the site has a saved Colorshift, **Save** then removes it, and
   **Cancel** keeps it.
-
-</Since>
 
 - **Cancel.** The page goes back to how it looked when Colorshift opened,
   and Colorshift closes. Escape does the same, and so does switching tabs.

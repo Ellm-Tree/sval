@@ -4,8 +4,6 @@ description: What each agent control does, from Settings › Agents to the card 
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
 
 An agent is an AI app on your computer that browses in Sval. Each session
 of the app works in a Workspace of its own. The session follows the rules
@@ -129,16 +127,6 @@ folder the app started in, and when.
 
 ## The agent's window
 
-<Until v="0.1.0-rc.10">
-
-Each session's Workspace shows in a window of its own. The window opens
-behind the window you're using. The Workspace's name is the app's
-name, with a robot in place of an emoji. The window's title is the
-same.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 Each session's Workspace shows in a window of its own. The window opens
 behind the window you're using. The Workspace's name is the app's
 name, with the app's icon in place of an emoji. An app Sval doesn't know
@@ -148,8 +136,6 @@ In the switcher, the Workspaces menu, Move to Workspace, and the strip's
 list of an app's Workspaces, each Workspace shows the icon of the model its
 agent named. The icons include Claude, GPT, Qwen, DeepSeek, and Llama. A
 Workspace whose agent named no model Sval knows shows no model icon.
-
-</Since>
 
 While the agent works, the window is dimmed. A card in the middle names the
 agent and says what it's doing.

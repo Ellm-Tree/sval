@@ -4,8 +4,6 @@ description: What each Workspace control does, from the switcher above your tabs
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
 
 Each Workspace keeps its own tabs and groups. A window shows one Workspace
 at a time. You make, change, and remove Workspaces with the controls below.
@@ -23,35 +21,13 @@ window's title starts with the Workspace's emoji and name.
 - When you select the switcher, the list of Workspaces opens.
 - When you right-click the switcher, the Workspace menu opens for the
   Workspace you're in.
-<Until v="0.1.0-rc.10">
-
-- When you swipe sideways over the Workspace panel, the window goes to the
-  Workspace before or after the current one, in the list's order. A swipe
-  skips Agent Workspaces. Settings › Keyboard shortcuts has a switch that
-  turns swiping off.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - When you swipe sideways over the Workspace panel, the window goes to the
   Workspace before or after the current one, in the list's order. A swipe
   skips device Workspaces and Agent Workspaces. Settings › Keyboard shortcuts has a switch that
   turns swiping off.
 
-</Since>
-
-
 ## The strip
-
-<Until v="0.1.0-rc.10">
-
-If you choose Strip in Settings › Workspaces › Workspace switcher, the strip
-takes the place of the switcher's button. It shows all your Workspaces in a
-row, in the list's order. The Workspace you're in is marked as the selected
-tab is, with a bar at its start.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 If you choose Strip in Settings › Appearance › Workspace appearance, the
 strip takes the place of the switcher's button. It shows all your
@@ -64,8 +40,6 @@ as the selected tab is, with a bar at its start.
   strip back. Sval keeps the strip hidden or shown in every window, and
   after you restart.
 
-</Since>
-
 - **A Workspace.** Clicking a Workspace switches the window to it.
   Shift-clicking it opens it in a new window.
 - **The Workspace you're in.** Clicking it opens the list of Workspaces over
@@ -73,19 +47,10 @@ as the selected tab is, with a bar at its start.
 - **The keys.** When the strip has focus, Left and Right switch the window
   to the Workspace before or after the current one. Home and End switch to
   the first and the last. Enter or Space opens the list of Workspaces.
-<Until v="0.1.0-rc.10">
-
-- **The mouse wheel.** The wheel slides the strip, or switches Workspaces,
-  as Settings › Workspaces › Workspace switcher says.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - **The mouse wheel.** The wheel slides the strip, or switches Workspaces,
   as Scrolling over the strip, in Settings › Appearance › Workspace
   appearance, says.
-
-</Since>
 
 - **The dots.** These show under the strip when your Workspaces don't fit
   in it. The long dot is the Workspace you're in. When the dots don't fit, a line takes their place, with a mark where the Workspace you're in is.
@@ -93,20 +58,10 @@ as the selected tab is, with a bar at its start.
 - **A media button on a Workspace's icon.** This shows while a tab in that
   Workspace has sound or media. Clicking it does what the media entry in
   the Workspace menu says.
-<Since v="0.1.0-rc.10">
 
 - **Device Workspaces.** After a line, the strip shows the Workspace each
   of your phones and tablets keeps for the tabs you open on it, each with a
   phone icon.
-
-</Since>
-<Until v="0.1.0-rc.10">
-
-- **Agent Workspaces.** After a line, the strip shows the Workspaces that
-  agents work in.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - **Agent Workspaces.** After a line, the strip shows the Workspaces that
   agents work in, each with its app's icon. An app with more than one
@@ -115,7 +70,6 @@ as the selected tab is, with a bar at its start.
   shows the icon of the model its agent named, when Sval knows that model.
   Choosing one switches to that Workspace.
 
-</Since>
 - **New Workspace…** The plus at the end of the strip opens the New
   Workspace dialog.
 - **Dragging a Workspace.** A Workspace you drag along the strip moves to
@@ -134,12 +88,8 @@ narrower still, the strip turns into a column three Workspaces tall, with no
 name, dots or line under it. Up and Down also switch Workspaces in the
 column.
 
-<Since v="0.1.0-rc.10">
-
 The column has no Workspaces row, and the column shows even when you've
 hidden the strip.
-
-</Since>
 
 ## The list of Workspaces
 
@@ -154,13 +104,11 @@ Workspace you're in is in bold.
 - **A media button next to a name.** This shows while a tab in that
   Workspace has sound or media. Clicking the button does what the media
   entry in the Workspace menu says.
-<Since v="0.1.0-rc.10">
 
 - **Devices.** After your own Workspaces, the list shows the Workspace each
   of your phones and tablets keeps, with a phone icon and the number of tabs
   in it. You can't drag a device Workspace.
 
-</Since>
 - **Agent Workspaces.** After your own Workspaces, the list shows the
   Workspaces that agents work in.
 - **New Workspace…** The New Workspace dialog opens.
@@ -222,16 +170,7 @@ emoji, and color.
 
 Agent Workspaces have no Archive idle tabs choice.
 
-<Until v="0.1.0-rc.10">
-
-## Settings › Workspaces › Workspace switcher
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 ## Settings › Appearance › Workspace appearance › Workspace switcher
-
-</Since>
 
 - **Menu.** The switcher is a button that names the Workspace you're in.
   Selecting it opens the list of Workspaces. Menu is the default.
@@ -240,14 +179,10 @@ Agent Workspaces have no Archive idle tabs choice.
   icons and the current Workspace's name, or icons only. Settings shows
   this choice only while Strip is chosen.
 
-<Since v="0.1.0-rc.10">
-
 - **Where names show.** With Under the icon, the strip is taller, and each
   name gets the same width. With Next to the icon, the strip is shorter,
   and a short name takes less room. Settings shows this choice only while the strip
   shows names.
-
-</Since>
 
 - **Scrolling over the strip.** This sets what the mouse wheel does over
   the strip. With Slides the strip, the wheel moves the strip without

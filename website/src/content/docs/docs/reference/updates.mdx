@@ -3,9 +3,6 @@ title: Updates
 description: What each update control does, from the Notices button to the update settings in About Sval.
 ---
 
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
-
 Sval checks for updates and downloads them on its own. The controls below
 tell you when an update is ready. They also choose how Sval installs
 updates.
@@ -29,20 +26,11 @@ buttons.
   message.
 - **Unable to update.** Your operating system isn't compatible with the
   latest version. **Learn more** opens a page about the problem.
-<Until v="0.1.0-rc.10">
-
-- **Another copy running.** "Close the other copy of Sval to finish
-  updating." **Update Anyway** updates now, and **Not Now** waits.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - **Another copy running.** "Close the other copy of Sval to finish
   updating." **Update and Restart Anyway** restarts Sval on the new
   version now, and **Not Now** waits. Once the other copy quits, the
   message changes to the **Update available, restart** message.
-
-</Since>
 
 Some messages also have a **Learn more** link to the release notes.
 

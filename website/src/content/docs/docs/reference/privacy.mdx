@@ -3,9 +3,6 @@ title: Privacy and protection
 description: What each setting in Settings › Privacy and protection does, from ad and tracker blocking to Secure DNS.
 ---
 
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
-
 Settings › Privacy and protection holds the settings that apply to every
 site. You make choices for a single site with the controls in the address
 bar. Settings › Sites lists those choices.
@@ -20,21 +17,6 @@ bar. Settings › Sites lists those choices.
 Sval blocks ads and trackers with filter lists. Your changes apply the next
 time a page loads.
 
-<Until v="0.1.0-rc.10">
-
-- **Level.** The level decides which lists Sval uses.
-  - **No Blocking.** Sval blocks nothing.
-  - **Balanced Blocking.** Sval blocks ads and trackers with lists that
-    rarely break sites. A new install starts on this level.
-  - **Strict Blocking.** Sval adds lists that block more, including
-    trackers in links, social widgets, and scam sites. Some sites might break.
-    Sval also strips tracking parameters from the addresses you open.
-  - **Custom.** You can switch on any of the lists Sval knows, and add
-    your own lists by address. Custom starts from the lists of the level you were on.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - **Level.** The level decides which lists Sval uses. At every level except
   No Blocking, Sval also strips tracking parameters from the addresses you
   open. Sval takes the parameters from Mozilla's list and from the
@@ -46,8 +28,6 @@ time a page loads.
     trackers in links, social widgets, and scam sites. Some sites might break.
   - **Custom.** You can switch on any of the lists Sval knows, and add
     your own lists by address. Custom starts from the lists of the level you were on.
-
-</Since>
 
 - **Lists.** You see the lists in use, grouped by what they block: Ads,
   Trackers, Annoyances, Scams and malware, Site fixes, and Other. Each list
@@ -164,19 +144,6 @@ following a list Mozilla publishes.
 
 ## HTTPS-Only Mode
 
-<Until v="0.1.0-rc.10">
-
-Sval opens the secure version of every site that has one. HTTPS-Only Mode
-decides what happens when a site has no secure version. With it on, Sval
-shows a warning first, and you choose whether to open the site. The choices
-are **Enable HTTPS-Only Mode in all windows**, **Enable HTTPS-Only Mode in
-private windows only**, and **Don't enable HTTPS-Only Mode**. The last one
-is the default. **Manage Exceptions…** lists the sites you let open
-without a secure connection.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 Sval opens the secure version of every site that has one. HTTPS-Only Mode
 decides what happens when a site has no secure version. With it on, Sval
 shows a warning first, and you choose whether to open the site. The choices
@@ -193,8 +160,6 @@ without a secure connection.
   all your devices, and the site shows in Settings › Sites.
 - Sval never shows the warning for your own computer, like localhost, or
   for a local network address written as numbers, like 192.168.1.1.
-
-</Since>
 
 ## Secure DNS
 
@@ -237,26 +202,12 @@ The choices are **Remember history**,
 
 ## Advanced
 
-<Until v="0.1.0-rc.10">
-
-- Under More tracking protection:
-  - **Strip tracking parameters from the addresses you open** is on with
-    Strict Blocking. At other levels, it's off.
-  - **Block redirect tracking** is off by default.
-  - **Never send a page's full address to the next site you go to** is off
-    by default.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - Under More tracking protection:
   - **Strip tracking parameters from the addresses you open** is on at
     every level except No Blocking.
   - **Block redirect tracking** is off by default.
   - **Never send a page's full address to the next site you go to** is off
     by default.
-
-</Since>
 
 - Under Bookmarklets, **Run bookmarklets from Favorites** is on by default.
 - **Certificates.** You choose the certificates Sval uses to check secure

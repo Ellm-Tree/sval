@@ -3,9 +3,6 @@ title: How pins differ from tabs and Favorites
 description: Why a pin has a page of its own, and why a pin goes back to its saved page only when you ask.
 ---
 
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
-
 Sval has three ways to keep a site, each for a different kind of use.
 
 - **Tabs.** Tabs hold what you're doing now. A tab belongs to one
@@ -18,19 +15,6 @@ Sval has three ways to keep a site, each for a different kind of use.
 
 ## Pins and Favorites
 
-<Until v="0.1.0-rc.10">
-
-Pinning doesn't make a new kind of thing. A pin is a Favorite marked to show
-in the pins row. That's why pins sync, rename, sit in folders, and export
-the same way Favorites do. When you unpin a site, the Favorite stays where
-it was.
-
-While a Favorite is pinned, it's not in the Favorites menu, so each site
-shows in one place.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 Your pins and your Favorites are two separate lists. A site can be a pin, a
 Favorite, both, or neither. Changing a pin never changes a Favorite, and
 changing a Favorite never changes a pin. So on a pin's page, the
@@ -39,8 +23,6 @@ the page out of Favorites leaves the pin where it is.
 
 Pins sync, and you can rename them and keep them in pin folders. When you
 export your Favorites, your pins go in a folder named "Pins" at the end.
-
-</Since>
 
 ## Its icon is its page
 

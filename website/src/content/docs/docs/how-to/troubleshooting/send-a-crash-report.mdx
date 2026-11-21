@@ -3,9 +3,6 @@ title: Send a crash report
 description: Send Sval a report when Sval or a tab crashes, or later from the feedback form.
 ---
 
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
-
 Sval sends a crash report only when you choose to. Each crash dialog has a
 box for sending the report. The box starts unchecked.
 
@@ -14,21 +11,9 @@ developers to have what they need to fix the crash.
 
 ## When Sval crashes
 
-<Until v="0.1.0-rc.10">
-
-1. In the Sval Crash Reporter dialog, check the box that tells Sval about
-   the crash.
-2. Optional: check **Include the address of the page I was on.**
-3. Select the button that restarts Sval, or the one that quits it.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 1. In the Sval Crash Reporter dialog, check the box that tells Sval about
    the crash.
 2. Select the button that restarts Sval, or the one that quits it.
-
-</Since>
 
 ## When a tab crashes
 
@@ -45,14 +30,6 @@ developers to have what they need to fix the crash.
 
 ## Details
 
-<Until v="0.1.0-rc.10">
-
-- The crash dialog remembers which boxes you checked, and checks the same
-  ones next time.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - The crash dialog remembers whether you checked its box. Next time, the
   box starts as you left it.
 - Sval doesn't add the address of the page you were on to a crash report.
@@ -66,7 +43,6 @@ developers to have what they need to fix the crash.
   while a private window is open, Sval closes without opening the Sval
   Crash Reporter dialog and doesn't restart.
 
-</Since>
 - The feedback form lists the crashes of the last three days. If you
   already sent a crash from the crash dialog, the crash shows as **Sent**.
 - A crash snapshot is a copy of the crashed process's memory. A snapshot

@@ -4,8 +4,6 @@ description: What each part of the Workspace panel does, from the Favorites butt
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
 
 Each Workspace keeps your tabs, groups, Splits, and pins. The Workspace
 panel shows them down one side of the window. This page goes through the
@@ -16,23 +14,6 @@ the top, which changes the Workspace, is described on
 <Screenshot name="features-panel" alt="Three Wikipedia articles in a Split, next to a Workspace of nested, color-coded tab groups" />
 
 ## Favorites
-
-<Until v="0.1.0-rc.10">
-
-The **Favorites** button opens the Favorites menu. The menu holds your
-Favorites and their folders, and it's the same in every Workspace. Pinned
-Favorites aren't in the menu. A private window has no Favorites button.
-
-When you right-click a Favorite or a folder in the menu, you get **Undo**,
-**Open**, **Open in New Window**, **Open in Private Window**, and
-**Open All** for a folder. The menu also has **Pin** or **Unpin**,
-**Pin to This Workspace**, **Show in** for a pinned Favorite,
-**Rename…**, **Edit Address…**, and **Delete**. The rest are **Move to**,
-**Move Up**, **Move Down**, **New Folder…**, **New Separator**, and
-**Export…**.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 The **Favorites** button, at the bottom of the Workspace panel, opens the
 Favorites menu. The menu holds all your Favorites and their folders, and
@@ -50,8 +31,6 @@ The rest are **Move to**, **Move Up**, **Move Down**, **New Folder…**,
   whose address a pin already has.
 - **Pin to This Workspace.** The copy shows in this Workspace and no other.
 
-</Since>
-
 ## The pins row
 
 The pins row shows a tile for each pin in this Workspace, in an order you
@@ -66,13 +45,6 @@ set by dragging. The row shows only when there are pins.
   its saved page. The button is named "Back to" and the pin's name. It
   shows when you've moved away from the saved page and you point to the
   tile or focus it.
-<Until v="0.1.0-rc.10">
-
-- A pinned folder is one tile that shows its first few icons. Selecting the
-  tile opens the folder's pins.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - A pin folder is one tile that shows its first few icons. Selecting the
   tile opens the pin folder's pins.
@@ -87,8 +59,6 @@ set by dragging. The row shows only when there are pins.
   takes the pin out of the pin folder.
 - Right-clicking the row next to the pins shows **New Pin Folder…**. It
   asks for a name, then adds an empty pin folder at the end of the row.
-
-</Since>
 
 - Settings › Workspaces › Pins sets how many lines of tiles show. When
   there are more pins than fit, the last tile reads "+" and the number of
@@ -137,23 +107,6 @@ Each tab, group, and Split is a row.
 
 ## Dragging rows
 
-<Until v="0.1.0-rc.10">
-
-What happens depends on where you drop a row on another row. While a drop
-would do more than move the row, a label shows.
-
-- **Near the top or bottom edge.** The row you drag goes before or after
-  that row.
-- **The middle of a tab's row.** Sval makes a new group of the two tabs.
-  The label reads **New group**.
-- **The right end of a tab's row.** Sval makes a Split, and the label
-  reads **Create Split**. On a Split's row, the label reads **Join Split**.
-  When you drag a Split, it reads **Merge Splits**. A full Split reads
-  "4 pages max". A narrow Workspace panel has no spot for making a Split.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 What happens depends on where you drop a row on another row.
 
 - **Near the top or bottom edge.** The row you drag goes before or after
@@ -167,8 +120,6 @@ What happens depends on where you drop a row on another row.
     this half reads **Merge Splits**. On a full Split, this half reads
     "4 pages max" and is drawn faint. A drop on it does nothing.
   - A narrow Workspace panel shows only **New group**.
-
-</Since>
 
 - **A folded group's row.** The row you drag goes inside the group, last.
   On an open group's row, the top half puts your row before the group. The
@@ -244,14 +195,6 @@ are dimmed.
   The group moves with everything in it.
 - **Put to Sleep.** Every tab in the group goes to sleep.
 - **Pause Media.** This acts on every tab in the group.
-<Until v="0.1.0-rc.10">
-
-- **Delete group…** Sval asks what happens to the group's tabs.
-  **Move out of group** moves them out, and **Delete all** deletes them
-  with the group. An empty group is deleted without asking.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - **Delete group…** Sval asks what happens to what's inside the group. A
   group of tabs offers **Keep tabs** and **Close tabs**, and a group of
@@ -259,8 +202,6 @@ are dimmed.
   offers **Keep all** and **Delete all**. A Keep button moves what's inside
   out of the group. The other button closes the tabs and deletes the groups
   with it. An empty group is deleted without asking.
-
-</Since>
 
 ## A Split pane's menu
 
@@ -290,19 +231,6 @@ moves with it.
 - **Show in.** This picks the Workspaces that show the pin. **Select all** and
   **Deselect all** are there too.
 
-<Until v="0.1.0-rc.10">
-
-- **Rename…** This changes the pin's name.
-- **Edit address…** This changes the address the pin goes back to.
-- **Unpin.** The pin leaves the pins row. Its Favorite stays.
-- **Delete.** Sval deletes the pin and its Favorite. You can undo this from
-  the Undo message.
-
-A pin inside a pinned folder has no Show in or Unpin.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - **Move to Folder.** The submenu lists the folders in the pins row. Move to
   Folder shows only when the row has a folder.
 - **Rename…** This changes the pin's name.
@@ -327,8 +255,6 @@ When you right-click a pinned folder's tile, you get these:
 - **Delete.** Sval deletes the folder and its pins. You can undo this from
   the Undo message.
 
-</Since>
-
 ## The Quick Peek bar
 
 The bar at the top of a Quick Peek shows the page's address. It also shows these:
@@ -338,28 +264,6 @@ The bar at the top of a Quick Peek shows the page's address. It also shows these
   from.
 - **Open as tab.** The page stays as a tab, next to the tab it came from.
 - The close button closes the Quick Peek, as Escape does.
-
-<Until v="0.1.0-rc.10">
-
-## Settings › Appearance › Workspace panel side
-
-- **Left** and **Right**. The Workspace panel goes on that side of every window. Each
-  device keeps its own choice.
-
-## Settings › Appearance
-
-- **Show a preview when you point at a tab.** While this is on, a tab's
-  preview shows next to the Workspace panel. It's on at first.
-
-## Settings › Appearance › Hidden Workspace panel
-
-- **Show the Workspace panel when you hold the pointer at the edge of the
-  window.** While the Workspace panel is hidden, it slides in over the page
-  when you hold the pointer at the edge of the window on the Workspace
-  panel's side. This is on by default. Each device keeps its own choice.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 ## Settings › Appearance › Workspace appearance
 
@@ -375,8 +279,6 @@ The bar at the top of a Quick Peek shows the page's address. It also shows these
 - **Workspace switcher.** Choose whether you switch Workspaces from a menu
   or from a strip. [Workspaces](/docs/reference/workspaces/) lists each
   choice.
-
-</Since>
 
 ## Settings › Workspaces › Pins
 
@@ -395,12 +297,10 @@ The bar at the top of a Quick Peek shows the page's address. It also shows these
 
 ## History and Downloads
 
-
 - **This Workspace** and **All Workspaces.** These sit at the top of the
   History sidebar and the Downloads list. They choose whether you see the
   pages or files of this Workspace or of every Workspace.
 - Under All Workspaces, each row shows its Workspace.
-
 
 - **Remove from list.** This sits next to a download. The download leaves
   the list.

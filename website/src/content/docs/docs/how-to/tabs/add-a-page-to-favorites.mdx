@@ -4,37 +4,15 @@ description: Keep a page in the Favorites menu, take it out again, and pin a Fav
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
-
-<Until v="0.1.0-rc.10">
-
-Favorites are the pages you keep. You'll find them in the Favorites menu at
-the top of the Workspace panel. Favorites don't belong to any Workspace, so you can
-open one from any Workspace.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 Favorites are the pages you keep. You'll find them in the Favorites menu at
 the bottom of the Workspace panel. Favorites don't belong to any Workspace, so you can
 open one from any Workspace.
 
-</Since>
-
 You found a Codeberg page on release notes you'll come back to, but you
 don't need it open.
 
-<Until v="0.1.0-rc.10">
-
-<Screenshot name="docs-favorites-menu" frame="rounded" maxWidth={360} alt="The Favorites menu at the top of the Workspace panel, with the Reading and Tools folders and two Favorites" />
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 <Screenshot name="docs-favorites-menu" frame="rounded" maxWidth={360} alt="The Favorites menu open above the Favorites button at the bottom of the Workspace panel, with the Reading and Tools folders and two Favorites" />
-
-</Since>
 
 ## Steps
 
@@ -47,33 +25,14 @@ To take a page out of Favorites, right-click its tab and choose
 
 ## Pin a Favorite
 
-<Until v="0.1.0-rc.10">
-
-1. At the top of the Workspace panel, select **Favorites**.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 1. At the bottom of the Workspace panel, select **Favorites**.
 
-</Since>
-
 2. Right-click the Favorite, then choose **Pin**.
-
-<Until v="0.1.0-rc.10">
-
-The Favorite moves from the Favorites menu to the pins row. When you unpin
-the Favorite, Sval puts it back where it was in your Favorites.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 A copy of the Favorite shows at the end of the pins row. The Favorite stays
 in the Favorites menu. Pin works on a folder too, and the folder's copy
 shows in the pins row as one tile. If a pin already has the Favorite's
 address, the menu doesn't offer Pin.
-
-</Since>
 
 ## Details
 
@@ -83,24 +42,14 @@ address, the menu doesn't offer Pin.
 - The **Favorite** button in the toolbar adds the page you're viewing. If
   the page is already a Favorite, the button removes it.
 
-<Since v="0.1.0-rc.10">
-
 - On a pin's page, the **Favorite** button shows whether the page is in
   Favorites. Adding or removing the Favorite leaves the pin as it is.
-
-</Since>
 
 - <kbd>⇧⌘O</kbd> (<kbd>Ctrl+Shift+O</kbd> on Windows and Linux) shows the Favorites menu.
 - In the Favorites menu, right-click a Favorite or a folder to find
   **Rename…**, **Edit Address…**, **Delete**, **Move to**, and
   **New Folder…**, among others. **Pin to This Workspace** pins the Favorite
   or folder only in the Workspace you're in.
-
-<Until v="0.1.0-rc.10">
-
-- Pinned Favorites also show as tiles on the home page.
-
-</Until>
 
 - Favorites sync to your other devices, along with your Workspaces and
   groups.

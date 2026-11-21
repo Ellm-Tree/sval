@@ -4,8 +4,6 @@ description: What the address bar and the Launcher show, the keys they answer, a
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
-import Since from "../../../../components/docs/Since.astro";
-import Until from "../../../../components/docs/Until.astro";
 
 The Launcher is the address bar, opened over the page. What you type in
 the Launcher can go to a page, search the web, switch to an open tab in
@@ -42,24 +40,12 @@ Windows and Linux. In the menu bar, **File › Launcher…** opens it too.
 
 ## Sections
 
-<Until v="0.1.0-rc.10">
-
-As you type, the Launcher lists what matches, in sections. The first row
-is what Enter opens. It's the best match among your open tabs, an address
-Sval completes for you, or a search. The sections come after that first
-row. Until you change it, the order is:
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 As you type, the Launcher lists what matches, in sections. The first row
 is what Enter opens: a search for what you typed, or the site when you
 type an address or Sval completes one. An open tab is never the first row.
 When what you typed starts a word in an open tab's title, or starts the
 tab's domain, Open tabs comes right after the first row. Otherwise the
 sections come in this order until you change it:
-
-</Since>
 
 - **Open tabs.** This section lists up to 4 open tabs from every
   Workspace. A tab in another Workspace shows that Workspace's emoji and
@@ -112,24 +98,11 @@ apply to the tab you're on are left out. The commands are:
 - **Workspaces:** Go to a Workspace by name, New Workspace, Rename
   Workspace, and Move this tab to….
 
-<Until v="0.1.0-rc.10">
-
-- **Tabs:** Pin this tab, Pin this tab to this Workspace, Unpin this tab,
-  Add to Favorites, Copy address, Copy Markdown link, and Put this tab to
-  sleep. This group also has Keep this tab awake, Let this tab sleep,
-  Duplicate tab, Archive this tab, Reopen closed tab, Mute tab, Unmute tab,
-  and Reader view.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 - **Tabs:** Pin this tab, Pin this tab to this Workspace, Move this pin to
   Favorites, Add to Favorites, Copy address, Copy Markdown link, and Put
   this tab to sleep. This group also has Keep this tab awake, Let this tab sleep,
   Duplicate tab, Archive this tab, Reopen closed tab, Mute tab, Unmute tab,
   and Reader view.
-
-</Since>
 
 - **Splits:** Split with…, Close Split, and Swap panes.
 - **The window:** Show or hide the Workspace panel.

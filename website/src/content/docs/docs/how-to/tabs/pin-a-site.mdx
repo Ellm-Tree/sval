@@ -4,8 +4,6 @@ description: Keep a site you use all day as an icon at the top of the Workspace 
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
 
 A pin keeps a site as an icon in the row at the top of the Workspace
 panel. The pin's page stays where you left it while you work in other
@@ -36,17 +34,6 @@ When you have no pins yet, the space under the Favorites button reads
 
 ## Keep pins in a folder
 
-<Until v="0.1.0-rc.10">
-
-1. At the top of the Workspace panel, select **Favorites**.
-2. Right-click a folder of Favorites, then choose **Pin**.
-
-The folder shows in the pins row as one tile. Selecting the tile opens the
-folder's pins.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 1. In the pins row, drag a pin onto the middle of another pin.
 2. In the Create Pin Folder dialog, type a name for the pin folder.
 3. Select **Create**.
@@ -70,8 +57,6 @@ folder.
 When you move a pin out of a pin folder and one pin or none is left, Sval
 removes the pin folder. If one pin is left, that pin takes the pin folder's
 place in the row.
-
-</Since>
 
 ## Go back to the saved page
 
@@ -102,19 +87,10 @@ You can also right-click the pin and choose **Back to saved page**.
   pin when you come back to that Workspace or restart.
 - <kbd>⌘1</kbd> to <kbd>⌘9</kbd> (<kbd>Ctrl+1</kbd> to <kbd>Ctrl+9</kbd> on Windows, <kbd>Alt+1</kbd> to <kbd>Alt+9</kbd> on Linux) select
   the first nine pins. Hold <kbd>⌘</kbd> to see their numbers.
-<Until v="0.1.0-rc.10">
-
-- A pin is a Favorite. Like any Favorite, a pin syncs. You can rename a
-  pin, move it into a folder, and export it. While a Favorite is pinned, it
-  shows in the pins row and leaves the Favorites menu.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - Pins sync to your other devices. You can rename a pin, and export it with
   your Favorites. Pinning a tab doesn't add its page to Favorites.
 
-</Since>
 - You can pin only a web page or a file. You can't pin a tab in a Split
   until you separate the Split.
 - Private windows and agent Workspaces show no pins.

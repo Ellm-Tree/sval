@@ -4,8 +4,6 @@ description: Show a pin in every Workspace, or only in the ones you pick.
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
 
 A pin shows in every Workspace until you pick the Workspaces it should show
 in.
@@ -29,18 +27,10 @@ The pin leaves the pins row in every Workspace you unchecked.
 - With every Workspace checked, the pin also shows in Workspaces you make
   later.
 - If you close the menu with nothing checked, the pin stays where it was.
-<Until v="0.1.0-rc.10">
-
-- What you choose for a pinned folder applies to every pin inside the
-  folder. A pin inside a pinned folder has no Show in of its own.
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - What you choose for a pin folder applies to every pin inside the pin
   folder. A pin inside a pin folder has no Show in of its own.
 
-</Since>
 - To pin a tab only in the Workspace you're in, right-click the tab and
   choose **Pin to This Workspace**.
 - Your choice of Workspaces for a pin syncs to your other devices.

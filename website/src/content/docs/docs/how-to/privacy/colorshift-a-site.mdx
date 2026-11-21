@@ -4,8 +4,6 @@ description: Tint a site or change its contrast, brightness, saturation, theme, 
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
-import Since from "../../../../../components/docs/Since.astro";
-import Until from "../../../../../components/docs/Until.astro";
 
 Colorshift changes how a site looks for you. Sval shows your changes every
 time you visit the site, and syncs them to your other devices.
@@ -23,14 +21,10 @@ or a tab in the Workspace, or choose Colorshift this site in the Launcher.
 To open Colorshift with a key, give Colorshift this site a key in
 Settings › Keyboard shortcuts.
 
-<Since v="0.1.0-rc.10">
-
 To keep a Colorshift button in the address bar, open the site settings
 menu and select the pin on the Colorshift row. The button opens
 Colorshift, and it stays lit while Colorshift is open. To take the
 button away, select the pin again.
-
-</Since>
 
 Colorshift opens over the page. The page shows each
 change as you make it, and nothing is kept until you select **Save**.
@@ -87,21 +81,10 @@ Select the menu next to **Font**, then pick one.
 
 ## Start over
 
-<Until v="0.1.0-rc.10">
-
-When the site has a saved Colorshift, select **Reset style**. The page
-shows the site's own look. Select **Save** to remove the saved Colorshift,
-or **Cancel** to keep it.
-
-</Until>
-<Since v="0.1.0-rc.10">
-
 Select **Reset**. Every control goes back to the setting that leaves the
 site as it is, and the page shows the site's own look. Colorshift stays open, so you can
 make new changes. When the site has a saved Colorshift, select **Save** to
 remove it, or **Cancel** to keep it.
-
-</Since>
 
 ## Details
 
@@ -118,23 +101,12 @@ remove it, or **Cancel** to keep it.
 - On an address like `nas.example.com`, the site's name in the title is a
   menu. Use the menu to pick whether the changes cover that address or all
   of `example.com`. The menu starts on that address.
-<Until v="0.1.0-rc.10">
-
-- When the site has a saved Colorshift, a dot shows on the Site settings
-  button, unless the button shows a count. The Colorshift row in the site
-  settings menu carries the same dot and lists what the Colorshift changes,
-  such as "Blue tint, dark theme, serif font".
-
-</Until>
-<Since v="0.1.0-rc.10">
 
 - When the site has a saved Colorshift, a dot shows on the Colorshift
   button if you pinned it. Otherwise the dot shows on the Site settings
   button, unless that button shows a count. The Colorshift row in the
   site settings menu carries the same dot and lists what the Colorshift
   changes, such as "Blue tint, dark theme, serif font".
-
-</Since>
 
 - Colorshift is off in private windows, because it saves your changes.
 - Forget this site removes the site's Colorshift changes.
