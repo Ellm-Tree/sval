@@ -51,6 +51,7 @@ async function clickElsewhere(page, modifiers = {}) {
 }
 
 add_task(async function a_link_to_another_host_opens_in_quick_peek() {
+  const { workspace } = await viewingAGroupedTab();
   const guid = await pinFavorite(LINKS_PAGE, "Links");
   const page = await clickTile(guid, LINKS_PAGE);
   await clickElsewhere(page);
@@ -80,18 +81,19 @@ add_task(async function a_link_to_another_host_opens_in_quick_peek() {
   );
   Assert.equal(split.dataset.split, "pin", "and the button says why");
 
-  // Open as tab: where Sval puts a new tab.
+  // Open as tab: where the user's own new tab goes, whatever group the
+  // panel last had selected.
   document
     .getElementById(quickPeek.linkedPanel)
     .querySelector(".sval-quick-peek-tab")
     .click();
-  await TestUtils.waitForCondition(
-    async () =>
-      (await tabNodes()).some(node => node.content?.url === ELSEWHERE),
-    "kept, the page is a tab"
-  );
   atTaskEnd(() => BrowserTestUtils.removeTab(quickPeek));
   expectOpened(quickPeek);
+  Assert.deepEqual(
+    await filedAt(quickPeek),
+    { parent: workspace, last: true },
+    "kept, the page is a tab at the end of the workspace, outside the group"
+  );
 });
 
 add_task(async function a_link_to_another_host_on_the_site_stays_in_the_pin() {

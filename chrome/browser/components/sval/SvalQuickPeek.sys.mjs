@@ -689,7 +689,7 @@ class QuickPeek {
     this.teardown();
     gBrowser.showTab(tab);
     // A pin's page is in no place in the tree, so a page kept from it goes
-    // where Sval puts a new tab from a link (pins spec §5).
+    // where the user's own new tab goes, outside every group (pins spec §5).
     const fromPin = isPin(owner);
     if (!fromPin) {
       gBrowser.moveTabAfter(tab, owner);
@@ -698,7 +698,10 @@ class QuickPeek {
     if (!split) {
       gBrowser.selectedTab = tab;
     }
-    const id = await observer.fileTab(tab, { beside: fromPin ? null : owner });
+    const id = await observer.fileTab(
+      tab,
+      fromPin ? { atTop: true } : { beside: owner }
+    );
     // The tab it came from may have closed, or gone to another window, in
     // the meantime; the page is then kept as a tab.
     const ownerId =
