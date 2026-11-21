@@ -38,6 +38,9 @@ struct BrowserBar: View {
     var onStar: (StarAction) -> Void = { _ in }
     /// What the split menu asks for.
     var onSplit: (SplitAction) -> Void = { _ in }
+    /// A hold on the address and the slide after it, which move through
+    /// the Workspace's tabs.
+    var onScrub: (ScrubPhase) -> Void = { _ in }
     /// Opens a tab in the private session, or ends the session (false).
     var onPrivate: (Bool) -> Void = { _ in }
 
@@ -45,6 +48,11 @@ struct BrowserBar: View {
     /// and runs to the end before it fades once the load is done.
     @State private var line = 0.0
     @State private var lineShown = false
+    /// Whether the address is held for a scrub.
+    @GestureState private var scrubbing = false
+    /// Whether the touch on the address became a scrub, which then opens
+    /// no Launcher as it lifts.
+    @State private var heldForScrub = false
 
     private var browser: Browser { model.browser }
     private var theme: Theme { Theme(scheme) }
@@ -106,6 +114,9 @@ struct BrowserBar: View {
             }
             withAnimation(.easeOut(duration: 0.3)) { line = max(line, progress) }
         }
+        .onChange(of: scrubbing) { _, held in
+            if !held { onScrub(.ended) }
+        }
         .onChange(of: browser.loading) { _, loading in
             guard !loading, lineShown else { return }
             withAnimation(.easeOut(duration: 0.2)) { line = 1 } completion: {
@@ -165,6 +176,10 @@ struct BrowserBar: View {
                     }
                 }
             }
+            if scrubbing && t == 0 {
+                liftedAddress(address, t: t, buttons: buttons, dot: dot, scale: k)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
+            }
             // Media playing, in this tab or another, rides above the bar in
             // its own capsule (14k4, 17c). Folded, the page in front's is the
             // speaker in the pill, and another tab's is its icon beside it.
@@ -190,6 +205,7 @@ struct BrowserBar: View {
             }
         }
         .foregroundStyle(colors.ink)
+        .animation(.spring(duration: 0.35, bounce: 0.2), value: scrubbing)
     }
 
     /// One capsule: its content centred in its frame, on glass of the
@@ -201,6 +217,23 @@ struct BrowserBar: View {
             .glassEffect(workspaceGlass(layer, interactive: interactive), in: .capsule)
             .glassEffectTransition(.identity)
             .offset(x: frame.minX, y: frame.minY)
+    }
+
+    /// The address lifted over the bar while it is held for a scrub, grown
+    /// past the buttons beside it. It is drawn outside the bar's glass
+    /// container, which would merge its glass with theirs where they
+    /// overlap, and it takes no touches, so the hold under it carries on.
+    private func liftedAddress(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
+        let grown: CGFloat = 1.15
+        let lifted = address.insetBy(dx: -address.width * (grown - 1) / 2, dy: -address.height * (grown - 1) / 2)
+        return addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k)
+            .scaleEffect(grown)
+            .frame(width: lifted.width, height: lifted.height)
+            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            .offset(x: lifted.minX, y: lifted.minY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     /// The address capsule's content. The shield and the address hold their
@@ -257,7 +290,9 @@ struct BrowserBar: View {
             if let split = browser.splitInFront {
                 splitMenu(split)
             }
-            Button(action: onAddress) {
+            Button {
+                if !heldForScrub { onAddress() }
+            } label: {
                 HStack(spacing: 6) {
                     if javaScriptOff {
                         Image("javascript-off").resizable().frame(width: 15, height: 15).foregroundStyle(colors.muted)
@@ -281,9 +316,37 @@ struct BrowserBar: View {
             // Voice Control takes the words on screen first.
             .accessibilityInputLabels(address.placeholder ? [address.text] : [address.text, "Address"])
             // The bar keeps its height at every text size, so its controls
-            // show enlarged on a long press, as a tab bar's do.
+            // show enlarged on a long press, as a tab bar's do. That long
+            // press is the large content viewer's at those sizes.
             .accessibilityShowsLargeContentViewer()
+            // Beside the button's tap, which a priority gesture would stop
+            // firing at all: the tap skips a touch the hold took instead.
+            .simultaneousGesture(scrubGesture, isEnabled: !typeSize.isAccessibilitySize)
         }
+    }
+
+    /// Hold the address, then slide sideways through the Workspace's tabs.
+    /// SwiftUI has no press-and-slide gesture of its own, so this is a hold
+    /// followed by a drag that starts where the hold left the finger.
+    private var scrubGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+            // The state resets when the gesture ends or the system cancels
+            // it, and either ends the scrub.
+            .updating($scrubbing) { value, held, _ in
+                if case .second(true, _) = value { held = true }
+            }
+            .onChanged { value in
+                // A new touch starts as a press, which may yet be a tap.
+                if case .first(true) = value { heldForScrub = false }
+                guard case .second(true, let drag) = value else { return }
+                heldForScrub = true
+                if let drag {
+                    onScrub(.moved(drag.location))
+                } else {
+                    onScrub(.began)
+                }
+            }
     }
 
     /// The sideways bar (12f1): the same capsules in one row, with the

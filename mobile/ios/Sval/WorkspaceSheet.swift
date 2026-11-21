@@ -160,6 +160,8 @@ struct WorkspaceSheet: View {
                 }
             }
         }
+        // The grid draws from the same groups as the list.
+        .onAppear { revealFront() }
         .sheet(item: $moving) { row in
             MoveSheet(row: row) { toast in self.toast = toast }
                 .tintedSheet(model.tint(of: workspace))
@@ -233,10 +235,14 @@ struct WorkspaceSheet: View {
             .scrollEdgeFade()
             .contentMargins(.top, 7, for: .scrollContent)
             .onAppear {
-                if let id = browser.currentTabId {
-                    reader.scrollTo(rows.first { $0.holds(id) }?.id ?? id, anchor: .center)
-                }
+                revealFront()
                 logDrawn(rows)
+                // After the opened groups' rows are drawn.
+                Task { @MainActor in
+                    if let id = browser.currentTabId {
+                        reader.scrollTo(rows.first { $0.holds(id) }?.id ?? id, anchor: .center)
+                    }
+                }
             }
             .onChange(of: rows.map(\.id)) { logDrawn(rows) }
                 // Rows are dragged as the system drags anything, from a
@@ -1158,6 +1164,20 @@ struct WorkspaceSheet: View {
         .accessibilityValue(open ? "Expanded" : "Collapsed")
         .accessibilityAddTraits(.isButton)
         .contextMenu { MenuItems(sections: groupMenu(row)) }
+    }
+
+    /// Opens the groups that hold the tab in front, however it came to the
+    /// front, so the sheet shows it.
+    func revealFront() {
+        guard let id = browser.currentTabId else { return }
+        var opened = false
+        var parent = model.row(id)?.parentId.flatMap(model.row)
+        while let at = parent, at.kind != "workspace" {
+            if collapsed.remove(at.id) != nil { opened = true }
+            parent = at.parentId.flatMap(model.row)
+        }
+        guard opened else { return }
+        UserDefaults.standard.set(Array(collapsed.filter { !model.isPrivate($0) }), forKey: Self.collapsedKey)
     }
 
     /// Opens or closes a group, and keeps which are closed.

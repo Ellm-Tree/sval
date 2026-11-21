@@ -41,6 +41,15 @@ struct BrowserView: View {
     @State private var swipingTo: OutlineRow?
     /// How many swipes have switched Workspace, which taps as each does.
     @State private var swipes = 0
+    /// The scrub through the Workspace's tabs while the address is held.
+    @State private var scrub: TabScrub?
+    /// Runs the strip on while the finger rests near the screen's edge.
+    @State private var scrubRun: Task<Void, Never>?
+    /// Where the finger is during a scrub, which the edge run reads.
+    @State private var scrubFinger: CGPoint?
+    /// The strip's frame on screen, and whether the finger has been on it.
+    @State private var stripFrame: CGRect = .zero
+    @State private var scrubEntered = false
     /// Whether the Workspace shows as the upright sheet; sideways it is
     /// the panel.
     @State private var sheetShown = false
@@ -77,6 +86,12 @@ struct BrowserView: View {
             // The page runs to the screen's foot, under the bar's glass.
             page(theme)
                 .ignoresSafeArea(.container, edges: .bottom)
+                .overlay {
+                    // The page steps back while the strip is up.
+                    Color.black.opacity(scrub == nil ? 0 : 0.25)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
             VStack(spacing: 0) {
                 BrowserBar(
                     workspace: workspace, colors: BarColors(token: model.tint(of: workspace), dark: scheme == .dark),
@@ -88,6 +103,7 @@ struct BrowserView: View {
                     onMedia: { id in withAnimation(Motion.overlay) { mediaCard = mediaCard == id ? nil : id } },
                     onStar: star,
                     onSplit: splitAction,
+                    onScrub: scrubbed,
                     onPrivate: { open in
                         Task {
                             if open {
@@ -114,8 +130,9 @@ struct BrowserView: View {
                     // Anywhere on the bar: a drag that moves sideways
                     // switches Workspace, and a touch that doesn't move
                     // stays a tap on the button under it.
-                    .modifier(BarSwipe(gesture: workspaceSwipe, yields: trayInBar))
+                    .modifier(BarSwipe(gesture: workspaceSwipe, yields: trayInBar, isEnabled: scrub == nil))
                     .sensoryFeedback(.selection, trigger: swipes)
+                    .modifier(ScrubFeedback(index: scrub?.index))
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
                         barHeight = $0.height
                         barWidth = $0.width
@@ -128,6 +145,14 @@ struct BrowserView: View {
                verticalSize != .compact, browser.barFold == 0, barFrame.width > 0 {
                 BarSpotlight(size: CGSize(width: barFrame.width, height: barHeight), capsule: capsule)
                     .transition(.opacity)
+            }
+            if let scrub {
+                TabScrubStrip(scrub: scrub, theme: theme, colors: BarColors(token: token, dark: scheme == .dark))
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stripFrame = $0 }
+                    .padding(.horizontal, 12 + sideInset)
+                    .padding(.bottom, barHeight + 8)
+                    .transition(reduceMotion ? .opacity
+                        : .opacity.combined(with: .scale(scale: 0.4, anchor: .bottom)))
             }
             if let target = swipeTarget, abs(swipe) > 12 {
                 let order = model.workspaces
@@ -532,6 +557,78 @@ struct BrowserView: View {
     /// Workspace swipe must not take (12d).
     private var trayInBar: Bool {
         verticalSize == .compact && (browser.splitInFront?.run.count ?? 0) > 2
+    }
+
+    // MARK: Scrubbing through tabs
+
+    private func scrubbed(_ phase: ScrubPhase) {
+        switch phase {
+        case .began:
+            guard scrub == nil, let workspace = browser.workspaceId else { return }
+            let items = TabScrub.items(in: workspace, model: model)
+            guard items.count > 1 || (items.count == 1 && items[0].id != browser.currentTabId) else { return }
+            let start = items.firstIndex { $0.id == browser.currentTabId } ?? 0
+            scrubEntered = false
+            withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .spring(duration: 0.3, bounce: 0.2)) {
+                scrub = TabScrub(items: items, start: start)
+            }
+            runAtEdges()
+        case .moved(let point):
+            guard scrub != nil else { return }
+            scrubFinger = point
+            // A finger that has been on the strip and leaves it above or
+            // below, or one that drags down off the address, lets go
+            // without switching. Its sides meet the screen's edges, where
+            // the strip runs on.
+            if stripFrame.contains(point) { scrubEntered = true }
+            let left = scrubEntered && (point.y < stripFrame.minY - 4 || point.y > stripFrame.maxY + 4)
+            let down = scrub?.origin.map { point.y > $0.y + 36 } ?? false
+            if left || down {
+                endScrub(switching: false)
+                return
+            }
+            scrub?.move(to: point)
+        case .ended:
+            endScrub(switching: true)
+        }
+    }
+
+    /// Takes the strip away, going to the page under the finger unless
+    /// the scrub was let go.
+    private func endScrub(switching: Bool) {
+        scrubRun?.cancel()
+        scrubRun = nil
+        scrubFinger = nil
+        guard let ended = scrub else { return }
+        let item = ended.items[ended.index]
+        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .smooth(duration: 0.22)) {
+            scrub = nil
+            guard switching, item.id != browser.currentTabId else { return }
+            switch item {
+            case .pin(let pin, _): browser.selectPin(pin)
+            case .tab(let row, _): browser.select(row.id)
+            }
+        }
+    }
+
+    /// While the finger rests near either edge of the screen, the strip runs
+    /// on toward that end, faster the nearer the finger is to the edge, since
+    /// the screen is narrower than a long Workspace's slide.
+    private func runAtEdges() {
+        scrubRun?.cancel()
+        scrubRun = Task { @MainActor in
+            let tick = 1.0 / 60
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(tick))
+                guard !Task.isCancelled, scrub != nil, let finger = scrubFinger else { continue }
+                let inLeft = (barFrame.minX + TabScrub.edge - finger.x) / TabScrub.edge
+                let inRight = (finger.x - (barFrame.maxX - TabScrub.edge)) / TabScrub.edge
+                let depth = min(max(inLeft, inRight, 0), 1)
+                guard depth > 0 else { continue }
+                let rate = TabScrub.slowest + (TabScrub.fastest - TabScrub.slowest) * Double(depth * depth)
+                scrub?.run((inRight > 0 ? 1 : -1) * rate * tick)
+            }
+        }
     }
 
     private var workspaceSwipe: some Gesture {
@@ -1028,12 +1125,14 @@ struct SiteMenuView: View {
 private struct BarSwipe<G: Gesture>: ViewModifier {
     let gesture: G
     let yields: Bool
+    /// Off while the address is held for a scrub, whose slide is its own.
+    let isEnabled: Bool
 
     func body(content: Content) -> some View {
         if yields {
-            content.gesture(gesture)
+            content.gesture(gesture, isEnabled: isEnabled)
         } else {
-            content.highPriorityGesture(gesture)
+            content.highPriorityGesture(gesture, isEnabled: isEnabled)
         }
     }
 }

@@ -71,6 +71,43 @@ final class WalkthroughTests: XCTestCase {
         app.buttons["Cancel"].firstMatch.tap()
     }
 
+    /// Holding the address and sliding sideways goes to another tab; a
+    /// hold lifted where it started leaves the tab in front and opens no
+    /// Launcher.
+    func testTabScrub() {
+        waitForBar()
+        let address = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Address' OR label == 'Search or enter address'")).firstMatch
+        XCTAssertTrue(address.exists, "the address shows")
+        app.buttons["New Tab"].firstMatch.tap()
+        XCTAssertTrue(keyboardShown, "New Tab's Launcher takes the keyboard")
+        app.typeText("example.com\n")
+        XCTAssertTrue(app.buttons["Address, example.com"].waitForExistence(timeout: 20), "the second tab shows")
+        let before = address.label
+        let start = address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.8, thenDragTo: start, withVelocity: .slow, thenHoldForDuration: 0.3)
+        sleep(1)
+        shot("scrub-lifted-in-place")
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "a hold opens no Launcher")
+        XCTAssertEqual(address.label, before, "a hold lifted in place keeps the tab in front")
+        start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: -100, dy: 45)),
+                    withVelocity: .slow, thenHoldForDuration: 0.3)
+        sleep(1)
+        XCTAssertEqual(address.label, before, "a hold dragged down lets go without switching")
+        // The new tab sits at one end of the Workspace, so one way or the
+        // other has a tab to go to.
+        for dx in [-100.0, 100.0] where address.label == before {
+            start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: dx, dy: 0)),
+                        withVelocity: .slow, thenHoldForDuration: 0.3)
+            sleep(2)
+        }
+        shot("scrub-moved")
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "a scrub opens no Launcher")
+        XCTAssertNotEqual(address.label, before, "a slide goes to another tab")
+        address.tap()
+        XCTAssertTrue(keyboardShown, "a tap on the address still opens the Launcher")
+        app.buttons["Cancel"].firstMatch.tap()
+    }
+
     /// The site menu's video and audio choice: the desktop's three, saved
     /// for the site, and the page made again for it.
     /// On an iPad the Workspace opens as a popover over its button, which
