@@ -61,6 +61,19 @@ enum Secrets {
         SecItemDelete(query(account: "dropbox-token") as CFDictionary)
     }
 
+    /// Kagi's Privacy Pass tokens and their state (`KagiPrivacyPass`).
+    static func kagiPrivacyPass() -> Data? {
+        read(account: "kagi-privacy-pass")
+    }
+
+    static func storeKagiPrivacyPass(_ stock: Data) throws {
+        try store(stock, account: "kagi-privacy-pass")
+    }
+
+    static func forgetKagiPrivacyPass() {
+        SecItemDelete(query(account: "kagi-privacy-pass") as CFDictionary)
+    }
+
     /// The item, or a new random one when the Keychain has none. Only a
     /// missing item makes a new one: a read that fails for another reason
     /// throws, since a new device id over a live own copy, or a new local

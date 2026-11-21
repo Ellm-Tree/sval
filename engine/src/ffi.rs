@@ -511,6 +511,35 @@ pub fn pairing_expires_at(bytes: Vec<u8>) -> Result<f64, EngineError> {
     Ok(expires_at as f64)
 }
 
+/// A Kagi Privacy Pass token request: the issuance POST body and the client
+/// state [`kagi_token_finalize`] needs (`crate::privacy_pass`).
+#[derive(uniffi::Record)]
+pub struct KagiTokenRequest {
+    pub body: String,
+    pub state: String,
+}
+
+/// A request for `count` Kagi Privacy Pass tokens under the challenge in
+/// `www_authenticate` ([`crate::privacy_pass::token_request`]).
+#[uniffi::export]
+pub fn kagi_token_request(
+    www_authenticate: String,
+    count: u16,
+) -> Result<KagiTokenRequest, EngineError> {
+    let request = crate::privacy_pass::token_request(&www_authenticate, count).map_err(refused)?;
+    Ok(KagiTokenRequest {
+        body: request.body,
+        state: request.state,
+    })
+}
+
+/// The tokens in Kagi's answer to a [`kagi_token_request`]
+/// ([`crate::privacy_pass::finalize`]).
+#[uniffi::export]
+pub fn kagi_token_finalize(state: String, response: String) -> Result<Vec<String>, EngineError> {
+    crate::privacy_pass::finalize(&state, &response).map_err(refused)
+}
+
 /// What [`crate::ENGINE_VERSION`] reports (`docs/host-contract.md` §11).
 #[uniffi::export]
 pub fn engine_version() -> String {
@@ -527,6 +556,25 @@ mod tests {
     const WORKSPACE: &str = "11111111-1111-4111-8111-111111111111";
     const GROUP: &str = "22222222-2222-4222-8222-222222222222";
     const TAB: &str = "33333333-3333-4333-8333-333333333333";
+
+    #[test]
+    fn kagi_tokens_are_issued_through_the_bindings() {
+        let issuer = crate::privacy_pass::tests::Issuer::new(
+            privacypass::TokenType::BatchedTokenRistretto255,
+        );
+        let request = kagi_token_request(issuer.header.clone(), 2).unwrap();
+        let tokens = kagi_token_finalize(request.state, issuer.answer(&request.body)).unwrap();
+        assert_eq!(tokens.len(), 2);
+    }
+
+    #[test]
+    fn a_bad_kagi_challenge_is_refused_with_its_code() {
+        let Err(EngineError::Refused { code, .. }) = kagi_token_request("Basic".to_owned(), 1)
+        else {
+            panic!("a non-Privacy Pass challenge was accepted");
+        };
+        assert_eq!(code, "invalid_challenge");
+    }
 
     fn desktop_publish() -> PeerFile {
         let desktop = SvalDocument::new();

@@ -655,7 +655,9 @@ control of what you see and what is sent to websites.
   Qwant, Google, Bing, and others. No search engine pays to be Sval's default.
 - **Kagi support.** Sign in during setup or in Settings › Search and
   Launcher. Private windows search with Kagi's Privacy Pass, which proves
-  you're a subscriber without revealing who you are.
+  you're a subscriber without revealing who you are. The iPhone app's
+  private tabs search with Privacy Pass too, once you've signed in to Kagi
+  in a normal tab on the iPhone.
 - **Add your own.** Add your own search engine if the one you want isn't
   listed.
 

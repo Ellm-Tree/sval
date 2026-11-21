@@ -2008,6 +2008,15 @@ final class Page: NSObject, WKNavigationDelegate {
         configuration.userContentController.addUserScript(WKUserScript(
             source: BackgroundAudio.visibilityGuard, injectionTime: .atDocumentStart,
             forMainFrameOnly: true, in: .page))
+        // A private tab signs in to Kagi with Privacy Pass (`KagiSpend`).
+        if isPrivate {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: KagiSpend.pageScript, injectionTime: .atDocumentStart,
+                forMainFrameOnly: false, in: .page))
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: KagiSpend.bridgeScript, injectionTime: .atDocumentStart,
+                forMainFrameOnly: false, in: .defaultClient))
+        }
         if Self.pageDiagnostics {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: Self.reportMedia, injectionTime: .atDocumentStart,
@@ -2031,6 +2040,10 @@ final class Page: NSObject, WKNavigationDelegate {
         if !isPrivate {
             configuration.userContentController.add(
                 IconReport(), contentWorld: .defaultClient, name: SiteIcons.message)
+        }
+        if isPrivate {
+            configuration.userContentController.addScriptMessageHandler(
+                KagiSpend.TokenReply(.shared), contentWorld: .defaultClient, name: KagiSpend.message)
         }
         if reportsTouch {
             configuration.userContentController.add(
@@ -2134,6 +2147,11 @@ final class Page: NSObject, WKNavigationDelegate {
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
     ) {
         preferences.allowsContentJavaScript = scriptAllowed(navigationAction, webView)
+        if let signedIn = signInToKagi(navigationAction) {
+            decisionHandler(.cancel, preferences)
+            signedIn()
+            return
+        }
         // `<a download>` and a blob or data link marked to save.
         if navigationAction.shouldPerformDownload {
             if appLoading, navigationAction.targetFrame?.isMainFrame == true, navigationAction.navigationType == .other,
@@ -2185,6 +2203,79 @@ final class Page: NSObject, WKNavigationDelegate {
             guardDocuments(guarding)
         }
         decisionHandler(.allow, preferences)
+    }
+
+    /// The token of the Kagi load Sval last started, and that load's
+    /// address, so its answer can be followed (`kagiTokenRefused`).
+    private var kagiToken: String?
+    private var kagiAddress: URL?
+    /// When this page last loaded again after Kagi refused a token.
+    private var kagiRetried: Date?
+
+    /// Signs a private tab's top-level load of one of Kagi's own pages in
+    /// with a token, when the user or Kagi started it (`KagiSpend`): the
+    /// load is cancelled, and started again with the token or, when this
+    /// month's are used, with a local page in its place. Returns what
+    /// starts that, run once the load is cancelled, or nil to let the load
+    /// go on. A load already carrying the token Sval gave it
+    /// goes on, and so do Back and Forward, which WebKit takes from its
+    /// history. A POST goes signed out, since it can't be sent again
+    /// unasked.
+    private func signInToKagi(_ action: WKNavigationAction) -> (@MainActor () -> Void)? {
+        guard isPrivate, action.targetFrame?.isMainFrame == true, let url = action.request.url,
+              KagiSpend.isKagiPage(url), action.request.httpMethod ?? "GET" == "GET",
+              action.navigationType != .backForward else { return nil }
+        if KagiSpend.carries(action.request, token: kagiToken) {
+            kagiToken = nil
+            return nil
+        }
+        let byUser = appLoading && action.navigationType == .other
+        // WebKit gives some loads no source frame, though Swift sees the
+        // property as never nil.
+        let source: WKFrameInfo? = action.sourceFrame
+        guard byUser || source.map({ KagiSpend.isKagi($0.securityOrigin) }) == true else { return nil }
+        let tokens = KagiPrivacyPass.shared
+        switch tokens.state {
+        case .ready:
+            guard let token = tokens.take() else { return nil }
+            Diagnostics.log("kagi: a private load signed in with Privacy Pass, \(tokens.count) left")
+            let asked = byUser || action.navigationType == .linkActivated
+            return { [weak self] in
+                guard let self else { return }
+                kagiToken = token
+                kagiAddress = url
+                appLoading = asked
+                view.load(KagiSpend.request(url, token: token))
+            }
+        case .out:
+            Diagnostics.log("kagi: a private load stopped, this month's tokens are used")
+            let page = KagiSpend.outOfTokensPage(until: tokens.outUntil)
+            return { [weak self] in self?.view.loadHTMLString(page, baseURL: nil) }
+        case .unsupported, .signedOut:
+            return nil
+        }
+    }
+
+    /// Kagi answered a load that spent a token with 401, a token already
+    /// spent: the load goes again with a fresh one, at most once a minute.
+    /// Any other answer, a 403 included, is Kagi's page to show, as in
+    /// Kagi's own extension (Kagi Privacy Pass spec).
+    private func kagiTokenRefused(_ response: WKNavigationResponse) -> (@MainActor () -> Void)? {
+        guard isPrivate, response.isForMainFrame, let url = kagiAddress,
+              (response.response as? HTTPURLResponse)?.statusCode == 401,
+              response.response.url == url else { return nil }
+        kagiAddress = nil
+        if let kagiRetried, Date.now.timeIntervalSince(kagiRetried) < 60 { return nil }
+        let tokens = KagiPrivacyPass.shared
+        guard tokens.state == .ready, let token = tokens.take() else { return nil }
+        kagiRetried = .now
+        Diagnostics.log("kagi: a spent token was refused, loading again with another")
+        return { [weak self] in
+            guard let self else { return }
+            kagiToken = token
+            kagiAddress = url
+            view.load(KagiSpend.request(url, token: token))
+        }
     }
 
     /// What a top-level load does with the page, whose video and audio
@@ -2735,6 +2826,11 @@ final class Page: NSObject, WKNavigationDelegate {
     /// is downloaded. A PDF, which WebKit shows, stays in the tab.
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
                  decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
+        if let again = kagiTokenRefused(navigationResponse) {
+            decisionHandler(.cancel)
+            again()
+            return
+        }
         let disposition = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased() ?? ""
         let attachment = disposition.hasPrefix("attachment")

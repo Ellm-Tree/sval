@@ -133,6 +133,7 @@ final class AppModel {
         }
         settingUp = stage == .chooseFolder && !UserDefaults.standard.bool(forKey: Self.offeredSetupKey)
         browser = Browser(model: self)
+        KagiPrivacyPass.shared.start()
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
         ) { [weak self] _ in
