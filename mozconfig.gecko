@@ -54,6 +54,14 @@ case "${SVAL_PGO:-}" in
     ac_add_options --enable-profile-use=cross
     ac_add_options --with-pgo-profile-path="$SVAL_PGO_PROFILE"
     ac_add_options --with-pgo-jarlog="$SVAL_PGO_JARLOG"
+    # The compile links as Mozilla's shippable builds do (lto in
+    # build/moz.configure/lto-pgo.configure): across Rust and C++, and
+    # whole-program on x86_64 Linux and Windows, where Mozilla measured full
+    # LTO with PGO faster on Speedometer 3. The last --enable-lto wins.
+    case "${SVAL_TARGET:-host}:$(uname -s)" in
+      win64:* | host:Linux) ac_add_options --enable-lto=cross,full ;;
+      *) ac_add_options --enable-lto=cross,thin ;;
+    esac
     ;;
 esac
 
