@@ -260,7 +260,7 @@ add_task(async function a_click_and_the_arrow_keys_switch() {
   await switched(second);
 });
 
-add_task(async function the_wheel_slides_either_end_to_the_centre() {
+add_task(async function the_wheel_slides_either_end_tile_to_the_centre() {
   const { ids, strip } = await overflowingStrip();
   const view = strip.querySelector(".sval-strip-view").getBoundingClientRect();
   const centre = view.left + view.width / 2;
@@ -270,14 +270,15 @@ add_task(async function the_wheel_slides_either_end_to_the_centre() {
   const start = () => items[0].getBoundingClientRect();
   await settled(strip);
   const before = end().right;
+  const middle = rect => (rect.left + rect.right) / 2;
 
   turnWheel(100_000, WheelEvent.DOM_DELTA_PIXEL);
   await settled(strip);
   Assert.less(end().right, before, "the wheel slides the strip");
   Assert.lessOrEqual(
-    Math.abs(end().right - centre),
+    Math.abs(middle(end()) - centre),
     1,
-    "until its end meets the track's centre, and no further"
+    "until its last tile's centre meets the track's centre, and no further"
   );
   Assert.equal(
     SvalWindowWorkspace.of(window).id,
@@ -288,9 +289,9 @@ add_task(async function the_wheel_slides_either_end_to_the_centre() {
   turnWheel(-100_000, WheelEvent.DOM_DELTA_PIXEL);
   await settled(strip);
   Assert.lessOrEqual(
-    Math.abs(start().left - centre),
+    Math.abs(middle(start()) - centre),
     1,
-    "and back until its start meets the track's centre"
+    "and back until its first tile's centre meets the track's centre"
   );
 });
 

@@ -325,6 +325,9 @@
             : lazy.stripTranslate({
                 width: PREVIEW.width,
                 total,
+                first: parseFloat(tiles[0].style.width) / 2,
+                last: total - parseFloat(tiles.at(-1).style.width) / 2,
+                items: { start: 0, end: total },
                 ...place,
                 offset,
               });

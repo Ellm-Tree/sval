@@ -155,7 +155,7 @@ export class SvalPanelStrip {
 
   /**
    * The strip's state between renders: where it was last placed
-   * (`{ width, total, x, w }`, as `SvalPanelModel.stripTranslate` takes
+   * (`{ width, total, first, last, items, x, w }`, as `stripTranslate` takes
    * them), the room each Workspace takes along it on average, the wheel's
    * slide, whether the wheel is sliding it now, the
    * slide-back timer, the Workspace the strip was last drawn for, the
@@ -764,6 +764,8 @@ export class SvalPanelStrip {
     const sizes = this.#sizes();
     const width = column ? view.clientHeight : view.clientWidth;
     let x = 0;
+    let first = null;
+    const items = { start: null, end: null };
     let current = null;
     const workspaces = [];
     for (const el of tabs.children) {
@@ -773,6 +775,9 @@ export class SvalPanelStrip {
         // A column's items take its width, and their height is the icon's.
         el.style.width = column ? "" : `${size}px`;
         workspaces.push(el);
+        first ??= x + size / 2;
+        items.start ??= x;
+        items.end = x + size;
         if (el.hasAttribute("data-current")) {
           current = { x, w: size };
         }
@@ -786,7 +791,17 @@ export class SvalPanelStrip {
     if (!overflows) {
       this.#state.offset = 0;
     }
-    this.#state.geometry = current ? { width, total, ...current } : null;
+    this.#state.geometry = current
+      ? {
+          width,
+          total,
+          first,
+          // The add button closes the row.
+          last: total - sizes.icon / 2,
+          items,
+          ...current,
+        }
+      : null;
     this.#state.pitch = workspaces.length ? x / workspaces.length : 0;
     // On whole device pixels, where the window draws a translation, so a
     // popover traced from a tile's layout box (`SvalHeader`'s

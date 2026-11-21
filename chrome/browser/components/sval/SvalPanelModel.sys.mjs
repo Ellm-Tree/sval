@@ -724,46 +724,61 @@ export function spentWheelTurn(at, dir) {
 }
 
 /**
- * Where the strip of Workspaces rests along its track: the `translateX` that
- * puts the current item's centre at the track's centre, clamped so the
- * strip's start never passes the centre and its end never comes short of
- * it. The first and last items can still be centred, with empty track
- * beside them. A strip that fits does not move.
+ * The least and greatest `translateX` of the strip of Workspaces: those that
+ * put its last or its first tile's centre at the track's centre. A tile at
+ * either end goes no further than where it rests when it is the current one.
  *
  * @param {object} geometry
  * @param {number} geometry.width The track's inner width.
+ * @param {number} geometry.first The first tile's centre, along the strip.
+ * @param {number} geometry.last The last tile's centre, along the strip.
+ * @returns {{min: number, max: number}}
+ */
+function stripEnds({ width, first, last }) {
+  return { min: width / 2 - last, max: width / 2 - first };
+}
+
+/**
+ * Where the strip of Workspaces rests along its track: the `translateX` that
+ * puts the current item's centre at the track's centre, within
+ * {@link stripEnds}. A strip that fits centres its Workspaces in the track,
+ * as far as its last tile stays inside it.
+ *
+ * @param {object} geometry As {@link stripEnds} takes it.
  * @param {number} geometry.total The strip's whole width.
  * @param {number} geometry.x The current item's start, along the strip.
  * @param {number} geometry.w The current item's width.
+ * @param {{start: number, end: number}} geometry.items Where the Workspaces
+ *   start and end, along the strip.
  * @returns {number}
  */
-function stripRest({ width, total, x, w }) {
+function stripRest(geometry) {
+  const { width, total, x, w, items } = geometry;
   if (total <= width) {
-    return 0;
+    const centred = width / 2 - (items.start + items.end) / 2;
+    return Math.max(0, Math.min(width - total, centred));
   }
-  const centred = width / 2 - (x + w / 2);
-  return Math.max(width / 2 - total, Math.min(width / 2, centred));
+  const { min, max } = stripEnds(geometry);
+  return Math.max(min, Math.min(max, width / 2 - (x + w / 2)));
 }
 
 /**
  * How far the wheel can slide the strip from where it rests
- * ({@link stripRest}): as far as the resting place can go, until its start
- * or its end reaches the track's centre, so the wheel can bring any item to
- * the centre, clear of the edges' fade.
+ * ({@link stripRest}): until the first or the last tile's centre reaches
+ * the track's centre ({@link stripEnds}), so the wheel can bring any item
+ * to the centre, clear of the edges' fade.
  *
  * @param {object} geometry As {@link stripRest} takes it.
  * @returns {{min: number, max: number}} The slide's least and greatest
  *   offset.
  */
 export function stripSlideReach(geometry) {
-  const rest = stripRest(geometry);
   if (geometry.total <= geometry.width) {
     return { min: 0, max: 0 };
   }
-  return {
-    min: geometry.width / 2 - geometry.total - rest,
-    max: geometry.width / 2 - rest,
-  };
+  const rest = stripRest(geometry);
+  const { min, max } = stripEnds(geometry);
+  return { min: min - rest, max: max - rest };
 }
 
 /**
