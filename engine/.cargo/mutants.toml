@@ -52,6 +52,9 @@ exclude_re = [
   'replace > with >= in check_shares$',
   # A stamp equal to `now` is set to `now`, the value it holds.
   'replace > with >= in Document::pull_back_own_stamps$',
+  # Each turns off what passes remember of their own file, and a pass that
+  # remembers nothing opens the same bytes to the same document.
+  ': replace OwnCopies::(slot|take|put) ',
   # These build or need a JsValue, which only a wasm host can: the panic
   # hook, the error a refusal throws, and the sync binding, which takes its
   # files as a JS array. `run_sync_to` is what `sync` runs, and it is tested.

@@ -230,12 +230,20 @@ fn merge_mark<T: Clone + serde::Serialize>(local: &mut Option<T>, remote: &Optio
 
 /// Replaces one local fact group, with its timestamp and writer, by the
 /// remote one when [`remote_group_wins`] says so.
-pub(crate) fn merge_fact<T: Clone + serde::Serialize>(
+///
+/// Sides that are equal outright are left alone before the tie-break: equal
+/// values serialise to equal canonical bytes, so the tie-break could only
+/// keep the local side, and serialising both is most of the cost of merging
+/// a file into a document that already holds it.
+pub(crate) fn merge_fact<T: Clone + PartialEq + serde::Serialize>(
     local: (&mut T, &mut Timestamp, &mut Option<DeviceId>),
     remote: (&T, Timestamp, Option<DeviceId>),
 ) {
     let (value, at, by) = local;
     let (remote_value, remote_at, remote_by) = remote;
+    if remote_at == *at && remote_by == *by && remote_value == &*value {
+        return;
+    }
     if remote_group_wins(remote_at, &(remote_value, remote_by), *at, &(&*value, *by)) {
         *value = remote_value.clone();
         *at = remote_at;

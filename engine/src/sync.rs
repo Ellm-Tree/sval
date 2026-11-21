@@ -351,6 +351,49 @@ pub(crate) fn sync_expiring<S: StorageProvider>(
     )
 }
 
+/// What the passes over one document last read or wrote of this device's
+/// own file, one for each [`Target`].
+///
+/// Every pass reads its own file back before any peer's ([`sync_to`] says
+/// why), and that file is usually the one the last pass wrote or read. The
+/// same bytes always open and parse to the same document, so a pass that
+/// finds them takes what is kept here and still merges it as it would have.
+/// The path is derived from the key, so a file under another key never
+/// matches.
+#[derive(Debug, Default)]
+pub struct OwnCopies {
+    profile: Option<OwnCopy>,
+    shared: Option<OwnCopy>,
+}
+
+impl OwnCopies {
+    fn slot(&mut self, target: Target) -> &mut Option<OwnCopy> {
+        match target {
+            Target::Profile => &mut self.profile,
+            Target::Shared => &mut self.shared,
+        }
+    }
+
+    fn take(&mut self, target: Target) -> Option<OwnCopy> {
+        self.slot(target).take()
+    }
+
+    fn put(&mut self, target: Target, copy: Option<OwnCopy>) {
+        *self.slot(target) = copy;
+    }
+}
+
+/// One own file: its sealed bytes and the JSON they open to, and, once a
+/// pass has read it without a clamp, the document it parses to with its
+/// foreign marks dropped and that document's shared state.
+#[derive(Debug)]
+struct OwnCopy {
+    path: String,
+    sealed: Vec<u8>,
+    json: String,
+    read: Option<(Document, String)>,
+}
+
 /// Which copy a pass reads and writes, which decides what happens to the
 /// nodes marked [`crate::types::Content::local`] (decision 1372).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -469,6 +512,39 @@ pub fn sync_to<S: StorageProvider>(
     target: Target,
     clamp_from: Option<Timestamp>,
 ) -> Result<SyncReport, Error> {
+    sync_remembering(
+        store,
+        key,
+        device,
+        workspace,
+        doc,
+        now,
+        retention,
+        target,
+        clamp_from,
+        &mut OwnCopies::default(),
+    )
+}
+
+/// [`sync_to`], taking what `own_copies` remembers of this device's own file
+/// from the last pass over `doc` in place of decrypting and parsing the same
+/// bytes again, and leaving there what this pass read or wrote.
+///
+/// A host keeps one [`OwnCopies`] beside each document it holds, for as long
+/// as it holds that document.
+#[expect(clippy::too_many_arguments)]
+pub fn sync_remembering<S: StorageProvider>(
+    store: &S,
+    key: &Key,
+    device: DeviceId,
+    workspace: &str,
+    doc: &mut Document,
+    now: Timestamp,
+    retention: Option<Timestamp>,
+    target: Target,
+    clamp_from: Option<Timestamp>,
+    own_copies: &mut OwnCopies,
+) -> Result<SyncReport, Error> {
     let mut report = SyncReport::default();
     let before = doc.nodes.clone();
     let mut known = tree::KnownPlaces::default();
@@ -495,35 +571,71 @@ pub fn sync_to<S: StorageProvider>(
     // writing loses nothing; the pass only loses the unchanged-state check.
     let mut refuse_write = false;
     let mut own_ids = std::collections::BTreeSet::new();
+    let remembered = own_copies.take(target).filter(|copy| copy.path == own_path);
+    let mut kept = None;
     match store.read(&own_path) {
-        Ok(sealed) => match open_and_decode(&sealed, key, own, &mut report) {
-            Some(json) => match read_document(&json, own, &mut report) {
-                // Nothing of ours is in a file naming another writer, so
-                // it is passed over and our write replaces it.
-                Some(stored) if !written_by_its_path(&stored, own, &mut report) => {}
-                Some(mut stored) => {
-                    drop_foreign_marks(&mut stored, own, target);
-                    // Taken before any clamp, so a clamp that changes the
-                    // file's stamps rewrites it.
-                    match stored.shared_state_json() {
-                        Ok(snapshot) => own_snapshot = Some(snapshot),
-                        Err(err) => report.errors.push(own.problem(err)),
+        Ok(sealed) => {
+            let (json, read) = match remembered.filter(|copy| copy.sealed == sealed) {
+                Some(copy) => (
+                    Some(copy.json),
+                    copy.read.map(|(stored, snapshot)| (stored, Some(snapshot))),
+                ),
+                None => (open_and_decode(&sealed, key, own, &mut report), None),
+            };
+            match json {
+                Some(json) => {
+                    let read = match read {
+                        Some(read) => Some(read),
+                        None => match read_document(&json, own, &mut report) {
+                            // Nothing of ours is in a file naming another
+                            // writer, so it is passed over and our write
+                            // replaces it.
+                            Some(stored) if !written_by_its_path(&stored, own, &mut report) => None,
+                            Some(mut stored) => {
+                                drop_foreign_marks(&mut stored, own, target);
+                                // Taken before any clamp, so a clamp that
+                                // changes the file's stamps rewrites it.
+                                let snapshot = match stored.shared_state_json() {
+                                    Ok(snapshot) => Some(snapshot),
+                                    Err(err) => {
+                                        report.errors.push(own.problem(err));
+                                        None
+                                    }
+                                };
+                                Some((stored, snapshot))
+                            }
+                            None => {
+                                refuse_write = true;
+                                None
+                            }
+                        },
+                    };
+                    if let Some((mut stored, snapshot)) = read {
+                        own_snapshot.clone_from(&snapshot);
+                        let clamped = clamp_from.is_some();
+                        if let Some(at) = clamp_from {
+                            stored.pull_back_own_stamps(device, at);
+                        }
+                        own_ids.extend(stored.nodes.keys().copied());
+                        if doc.began_at == 0 {
+                            doc.began_at = stored.began_at;
+                            doc.earlier_to = stored.earlier_to;
+                        }
+                        let unheld = take_unheld(doc, &stored, device);
+                        merge_in(doc, &stored, &mut report, &mut known, unheld);
+                        kept = Some(OwnCopy {
+                            path: own_path.clone(),
+                            sealed,
+                            json,
+                            read: snapshot
+                                .filter(|_| !clamped)
+                                .map(|snapshot| (stored, snapshot)),
+                        });
                     }
-                    if let Some(at) = clamp_from {
-                        stored.pull_back_own_stamps(device, at);
-                    }
-                    own_ids.extend(stored.nodes.keys().copied());
-                    if doc.began_at == 0 {
-                        doc.began_at = stored.began_at;
-                        doc.earlier_to = stored.earlier_to;
-                    }
-                    let unheld = take_unheld(doc, &stored, device);
-                    merge_in(doc, &stored, &mut report, &mut known, unheld);
                 }
                 None => refuse_write = true,
-            },
-            None => refuse_write = true,
-        },
+            }
+        }
         // A copy that has never written under this id begins here, holding
         // none of the id's earlier writes (decision 2232).
         Err(Error::NotFound(_)) if doc.began_at == 0 && !doc.seen.contains_key(&device) => {
@@ -631,8 +743,16 @@ pub fn sync_to<S: StorageProvider>(
         // local was last written here, and a watermark that covers that write
         // is what lets each peer read its absence as a delete (spec §5.4).
         doc.stamp_write(device, now);
-        store::save_document(store, key, device, workspace, &published(doc))?;
+        let (json, sealed) = store::seal_document(key, &own_path, &published(doc))?;
+        store.write(&own_path, &sealed)?;
+        kept = Some(OwnCopy {
+            path: own_path,
+            sealed,
+            json,
+            read: None,
+        });
     }
+    own_copies.put(target, kept);
     report.own_watermark = doc.seen.get(&device).copied().unwrap_or(0);
 
     Ok(report)
@@ -3343,5 +3463,169 @@ mod tests {
         copy_file(&folder, &later, &key, dev_c);
         pass_on(&later, &key, dev_a, &mut again, 330, Target::Shared);
         assert!(again.node(theirs).is_none(), "B's tab stays deleted");
+    }
+}
+
+#[cfg(test)]
+mod own_copy_tests {
+    use super::*;
+    use crate::store::MemoryStore;
+    use crate::types::test_support::{base_doc, test_key, ws_of};
+    use uuid::Uuid;
+
+    /// One pass over `doc`, remembering this device's own file in `own`, and
+    /// what an observer can see of it: the whole document and the report.
+    #[expect(clippy::too_many_arguments)]
+    fn pass(
+        store: &MemoryStore,
+        key: &Key,
+        device: DeviceId,
+        workspace: &str,
+        doc: &mut Document,
+        now: Timestamp,
+        clamp_from: Option<Timestamp>,
+        own: &mut OwnCopies,
+    ) -> (String, String) {
+        let report = sync_remembering(
+            store,
+            key,
+            device,
+            workspace,
+            doc,
+            now,
+            None,
+            Target::Profile,
+            clamp_from,
+            own,
+        )
+        .unwrap();
+        (doc.to_json().unwrap(), format!("{report:?}"))
+    }
+
+    /// Every step of a run: a first write, an unchanged pass, a clamp over a
+    /// stamp from a clock that ran ahead, the pass after it, a peer's file,
+    /// a local edit and a last unchanged pass.
+    fn run(remember: bool) -> Vec<(String, String)> {
+        let store = MemoryStore::new();
+        let key = test_key();
+        let (me, peer) = (DeviceId::from_bytes([1; 16]), DeviceId::from_bytes([2; 16]));
+        let mut doc = base_doc();
+        let tab = doc.add_tab(
+            ws_of(&doc),
+            "T",
+            "https://t.example",
+            Uuid::from_u128(1_000),
+            me,
+            100,
+        );
+        let mut kept = OwnCopies::default();
+        let mut steps = Vec::new();
+        let mut step = |doc: &mut Document, now, clamp_from| {
+            let mut fresh = OwnCopies::default();
+            let own = if remember { &mut kept } else { &mut fresh };
+            steps.push(pass(&store, &key, me, "ws-1", doc, now, clamp_from, own));
+        };
+        step(&mut doc, 110, None);
+        step(&mut doc, 120, None);
+        doc.rename(tab, "Ahead", me, 500);
+        step(&mut doc, 130, None);
+        step(&mut doc, 140, Some(135));
+        step(&mut doc, 150, None);
+        let mut theirs = base_doc();
+        theirs.add_tab(
+            ws_of(&theirs),
+            "Theirs",
+            "https://theirs.example",
+            Uuid::from_u128(2_000),
+            peer,
+            155,
+        );
+        theirs.stamp_write(peer, 158);
+        store::save_document(&store, &key, peer, "ws-1", &theirs).unwrap();
+        step(&mut doc, 160, None);
+        doc.rename(tab, "Edited", me, 170);
+        step(&mut doc, 180, None);
+        step(&mut doc, 190, None);
+        // A clamp that leaves the document as its file held it writes
+        // nothing, and the file keeps the stamp the clamp pulled back. An
+        // edit stamped between the two loses to the file on the next pass.
+        doc.rename(tab, "Ahead again", me, 900);
+        step(&mut doc, 1_000, None);
+        step(&mut doc, 1_010, Some(800));
+        doc.rename(tab, "Between", me, 850);
+        step(&mut doc, 1_020, None);
+        steps
+    }
+
+    #[test]
+    fn a_remembered_own_file_changes_no_pass() {
+        assert_eq!(run(true), run(false));
+    }
+
+    #[test]
+    fn an_own_file_replaced_since_the_last_pass_is_read() {
+        let store = MemoryStore::new();
+        let key = test_key();
+        let me = DeviceId::from_bytes([1; 16]);
+        let mut doc = base_doc();
+        let tab = doc.add_tab(
+            ws_of(&doc),
+            "T",
+            "https://t.example",
+            Uuid::from_u128(1_000),
+            me,
+            100,
+        );
+        let mut own = OwnCopies::default();
+        pass(&store, &key, me, "ws-1", &mut doc, 110, None, &mut own);
+        pass(&store, &key, me, "ws-1", &mut doc, 120, None, &mut own);
+
+        let mut restored = doc.clone();
+        restored.rename(tab, "Restored", me, 130);
+        restored.stamp_write(me, 130);
+        store::save_document(&store, &key, me, "ws-1", &restored).unwrap();
+        pass(&store, &key, me, "ws-1", &mut doc, 140, None, &mut own);
+
+        assert_eq!(doc.node(tab).unwrap().content.name, "Restored");
+    }
+
+    #[test]
+    fn an_own_files_bytes_under_another_path_are_opened_there() {
+        let store = MemoryStore::new();
+        let key = test_key();
+        let me = DeviceId::from_bytes([1; 16]);
+        let mut own = OwnCopies::default();
+        pass(
+            &store,
+            &key,
+            me,
+            "ws-1",
+            &mut base_doc(),
+            110,
+            None,
+            &mut own,
+        );
+        let first = store::device_path(&key, "ws-1", me);
+        let second = store::device_path(&key, "ws-2", me);
+        store.write(&second, &store.read(&first).unwrap()).unwrap();
+
+        let report = sync_remembering(
+            &store,
+            &key,
+            me,
+            "ws-2",
+            &mut base_doc(),
+            120,
+            None,
+            Target::Profile,
+            None,
+            &mut own,
+        )
+        .unwrap();
+
+        assert!(
+            report.refused_write,
+            "a file sealed for another path does not open here"
+        );
     }
 }

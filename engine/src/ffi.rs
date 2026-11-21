@@ -176,11 +176,16 @@ fn pins_inside(
 }
 
 /// The document a device holds, behind a lock because UniFFI objects are
-/// shared across threads.
+/// shared across threads, and what its passes remember of this device's own
+/// file ([`crate::sync::OwnCopies`]).
 #[derive(uniffi::Object)]
-pub struct SvalDocument(Mutex<Document>);
+pub struct SvalDocument(Mutex<Document>, Mutex<crate::sync::OwnCopies>);
 
 impl SvalDocument {
+    fn holding(doc: Document) -> Self {
+        SvalDocument(Mutex::new(doc), Mutex::default())
+    }
+
     fn doc(&self) -> MutexGuard<'_, Document> {
         // A panic while the lock is held is a bug already reported by the
         // panic itself; the document is still the last one written.
@@ -194,13 +199,13 @@ impl SvalDocument {
 impl SvalDocument {
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
-        Arc::new(SvalDocument(Mutex::new(Document::new())))
+        Arc::new(SvalDocument::holding(Document::new()))
     }
 
     #[uniffi::constructor]
     pub fn load_json(json: String) -> Result<Arc<Self>, EngineError> {
         let doc = Document::from_json(&json).map_err(refused)?;
-        Ok(Arc::new(SvalDocument(Mutex::new(doc))))
+        Ok(Arc::new(SvalDocument::holding(doc)))
     }
 
     pub fn to_json(&self) -> Result<String, EngineError> {
@@ -338,6 +343,10 @@ impl SvalDocument {
             .collect();
         let (report, write) = run_sync_to(
             &mut self.doc(),
+            &mut self
+                .1
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
             &key,
             &device_id,
             &workspace,
@@ -1062,7 +1071,7 @@ mod tests {
             by,
             6,
         );
-        let pins = SvalDocument(Mutex::new(doc));
+        let pins = SvalDocument::holding(doc);
         let names = |workspace: &str| -> Vec<(String, Option<String>)> {
             pins.pins(workspace.into(), vec!["work".into(), "home".into()])
                 .into_iter()
@@ -1144,7 +1153,7 @@ mod tests {
                 1,
             );
         }
-        let pins = SvalDocument(Mutex::new(doc));
+        let pins = SvalDocument::holding(doc);
         let names: Vec<_> = pins
             .pins("home".into(), vec![])
             .into_iter()

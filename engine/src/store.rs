@@ -115,10 +115,16 @@ pub fn save_document<S: StorageProvider>(
     workspace: &str,
     doc: &Document,
 ) -> Result<(), Error> {
-    let json = doc.to_json()?;
     let path = device_path(key, workspace, device);
-    let sealed = crypto::seal(key, path.as_bytes(), json.as_bytes())?;
+    let (_, sealed) = seal_document(key, &path, doc)?;
     store.write(&path, &sealed)
+}
+
+/// `doc` as JSON, and that JSON sealed for `path`.
+pub fn seal_document(key: &Key, path: &str, doc: &Document) -> Result<(String, Vec<u8>), Error> {
+    let json = doc.to_json()?;
+    let sealed = crypto::seal(key, path.as_bytes(), json.as_bytes())?;
+    Ok((json, sealed))
 }
 
 /// Reads back and opens this device's own file for `workspace`.
