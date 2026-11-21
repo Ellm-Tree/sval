@@ -38,6 +38,15 @@ thiserror = "2"
 # Must match the engine's, or the generated bindings disagree with the library.
 uniffi = "=0.32.2"
 
+[profile.release]
+# Cargo reads profiles from the root crate alone, so the engine's own release
+# profile never reaches this build. One codegen unit with fat LTO lets the
+# engine, adblock and the connectors inline across crates in the library the
+# app links. Symbols stay: uniffi-bindgen reads the bindings' metadata from
+# them, and Xcode strips the app when it links.
+lto = true
+codegen-units = 1
+
 [dev-dependencies]
 # Reads the rules' WebKit patterns in tests, as a check on what they match.
 regex = "1"
