@@ -114,7 +114,7 @@ struct FavoritesView: View {
         .environment(\.defaultMinListRowHeight, 17)
         .scrollEdgeFade()
         .contentMargins(.top, 4, for: .scrollContent)
-        .toast($toast)
+        .toast($toast, top: true)
     }
 
     @ViewBuilder private func row(_ item: Favorite) -> some View {

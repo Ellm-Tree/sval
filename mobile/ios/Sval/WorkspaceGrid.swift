@@ -52,8 +52,9 @@ enum GridMetrics {
     /// The header grows with its name's text.
     static var header: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .body).lineHeight) + 22 }
     static var nestedHeader: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .subheadline).lineHeight) + 20 }
-    /// A card's line under its picture, which grows with its title's text.
-    static var line: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .subheadline).lineHeight) + 8 }
+    /// The bar over the top of a card's picture, which grows with its
+    /// title's text.
+    static var bar: CGFloat { ceil(UIFont.preferredFont(forTextStyle: .subheadline).lineHeight) + 12 }
     /// Cards across: two, or one at the accessibility text sizes, where
     /// half the sheet's width holds a few letters of a title.
     static var columns: Int { UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory ? 1 : 2 }
@@ -70,10 +71,10 @@ enum GridMetrics {
         return max(140 - CGFloat(depth) * 8, 80)
     }
 
-    /// A cell's height: the picture, the 7pt gap, the line, and the
+    /// A cell's height: the picture, which carries the bar, and the
     /// ring's room above and below.
     static func cell(depth: Int, sideways: Bool) -> CGFloat {
-        picture(depth: depth, sideways: sideways) + 7 + line + 2 * ring
+        picture(depth: depth, sideways: sideways) + 2 * ring
     }
 }
 
@@ -121,7 +122,7 @@ extension WorkspaceSheet {
                 Task { await model.rename(row, to: cardName.trimmingCharacters(in: .whitespacesAndNewlines)) }
             }
         }
-        .toast($toast)
+        .toast($toast, top: true)
     }
 
     private var gridActions: GridActions {
@@ -254,7 +255,7 @@ struct TabGridView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate,
-        UICollectionViewDropDelegate {
+        UICollectionViewDropDelegate, UIGestureRecognizerDelegate {
         private var parent: TabGridView!
         private var sections: [GridSection] = []
         private var dataSource: UICollectionViewDiffableDataSource<String, String>!
@@ -272,6 +273,10 @@ struct TabGridView: UIViewRepresentable {
         /// Where the card lands with the finger off every card: the end
         /// of the group or Workspace around the finger.
         private var placed: (DropOver, DropKind)?
+        /// The card a sideways swipe holds, and the card flying off as it
+        /// closes, which stays off until the tree drops it.
+        private var swiped: (id: String, cell: UICollectionViewCell)?
+        private var closing: String?
 
         func make(_ parent: TabGridView) -> UICollectionView {
             self.parent = parent
@@ -286,6 +291,12 @@ struct TabGridView: UIViewRepresentable {
             view.dragInteractionEnabled = true
             view.contentInset.top = 6
             self.view = view
+            // A sideways swipe closes a card. The scroll waits on it, which
+            // fails at once on an upright drag.
+            let swipe = UIPanGestureRecognizer(target: self, action: #selector(swipe(_:)))
+            swipe.delegate = self
+            view.addGestureRecognizer(swipe)
+            view.panGestureRecognizer.require(toFail: swipe)
 
             let card = UICollectionView.CellRegistration<UICollectionViewCell, String> { [weak self] cell, _, id in
                 self?.configure(cell, id: id)
@@ -317,6 +328,7 @@ struct TabGridView: UIViewRepresentable {
             // Every card redraws its ticks, ring and colours; the pictures
             // and media state update themselves.
             snapshot.reconfigureItems(snapshot.itemIdentifiers)
+            if let closing, !snapshot.itemIdentifiers.contains(closing) { self.closing = nil }
             dataSource.apply(snapshot, animatingDifferences: false)
             // The headers and boxes follow the sections, which the
             // snapshot doesn't carry.
@@ -446,6 +458,10 @@ struct TabGridView: UIViewRepresentable {
 
         private func configure(_ cell: UICollectionViewCell, id: String) {
             guard let row = parent.model.row(id) else { return }
+            if id != closing, id != swiped?.id {
+                cell.transform = .identity
+                cell.alpha = 1
+            }
             let depth = sections.first { $0.items.contains(id) }?.depth ?? 0
             let height = GridMetrics.picture(depth: depth, sideways: parent.sideways)
             let parent = self.parent!
@@ -482,6 +498,55 @@ struct TabGridView: UIViewRepresentable {
                     .contextMenu { MenuItems(sections: parent.actions.groupMenu(group)) }
             }
             .margins(.all, 0)
+        }
+
+        // MARK: Swipe to close
+
+        func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+            guard let pan = gesture as? UIPanGestureRecognizer, let view else { return false }
+            let velocity = pan.velocity(in: view)
+            guard abs(velocity.x) > abs(velocity.y) * 1.5,
+                  let path = view.indexPathForItem(at: pan.location(in: view)),
+                  let id = dataSource.itemIdentifier(for: path), let cell = view.cellForItem(at: path) else { return false }
+            swiped = (id, cell)
+            return true
+        }
+
+        @objc private func swipe(_ pan: UIPanGestureRecognizer) {
+            guard let view, let (id, cell) = swiped else { return }
+            let dx = pan.translation(in: view).x
+            let width = cell.bounds.width
+            switch pan.state {
+            case .changed:
+                cell.transform = CGAffineTransform(translationX: dx, y: 0)
+                cell.alpha = 1 - min(abs(dx) / width, 1) * 0.7
+            case .ended, .cancelled, .failed:
+                swiped = nil
+                let vx = pan.velocity(in: view).x
+                let flung = abs(vx) > 800 && (vx > 0) == (dx > 0)
+                guard pan.state == .ended, abs(dx) > width * 0.4 || flung, let row = parent.model.row(id) else {
+                    UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0) {
+                        cell.transform = .identity
+                        cell.alpha = 1
+                    }
+                    return
+                }
+                closing = id
+                let off = (dx > 0 ? 1 : -1) * (view.bounds.width)
+                UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+                    cell.transform = CGAffineTransform(translationX: off, y: 0)
+                    cell.alpha = 0
+                } completion: { [weak self] _ in
+                    guard let self else { return }
+                    if row.kind == "split" {
+                        parent.actions.closeSplit(row, parent.model.children(of: row.id).filter { $0.kind == "tab" })
+                    } else {
+                        parent.actions.close(row)
+                    }
+                }
+            default:
+                break
+            }
         }
 
         // MARK: Taps and menus
@@ -896,9 +961,10 @@ extension GridBox {
 
 // MARK: Cards
 
-/// A tab's card (15b, 15c): its picture, and a line with the site's icon,
-/// the title and × or the speaker. The collection view's cell is the
-/// button: its tap, menu and drag are the system's.
+/// A tab's card (15b, 15c): its picture, under a bar with the site's icon,
+/// the title and ×, and the speaker in the corner while it plays. The
+/// collection view's cell is the button: its tap, menu and drag are the
+/// system's.
 struct GridCard: View {
     let model: AppModel
     let row: OutlineRow
@@ -914,45 +980,67 @@ struct GridCard: View {
         let front = row.id == browser.currentTabId
         let elsewhere = Browser.openable(row) == nil && row.url != nil
         let playing = browser.playingTabs.contains(row.id)
-        VStack(spacing: 7) {
-            CardPicture(row: row, height: height, elsewhere: elsewhere, theme: theme, loading: browser.hasPage(row.id))
-                .overlay { GridHalves(id: row.id, dropState: dropState, theme: theme) }
-                .overlay(alignment: .topLeading) {
-                    if editing {
-                        // Over a picture of any colour, the tick sits on a
-                        // white disc.
-                        SelectionTick(ticked: ticked, tick: theme.action, off: theme.muted, onPicture: true)
-                            .padding(8)
-                    }
+        let muted = browser.mutedTabs.contains(row.id)
+        CardPicture(row: row, height: height, elsewhere: elsewhere, theme: theme, loading: browser.hasPage(row.id),
+                    top: GridMetrics.bar)
+            .overlay { GridHalves(id: row.id, dropState: dropState, theme: theme) }
+            .overlay(alignment: .top) {
+                CardBar(theme: theme, title: row.displayTitle, bold: front, dim: elsewhere,
+                        closeLabel: "Close \(row.displayTitle)", onClose: onClose) {
+                    SiteTile(row: row, size: 16).opacity(elsewhere ? 0.4 : 1)
                 }
-                .modifier(FrontRing(front: front, color: theme.accent, radius: 14))
-            HStack(spacing: 7) {
-                SiteTile(row: row, size: 18).opacity(elsewhere ? 0.4 : 1)
-                Text(row.displayTitle)
-                    .font(.system(.subheadline, weight: front ? .semibold : .medium))
-                    .foregroundStyle(elsewhere ? theme.muted : theme.text)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                RowAccessory(playing: playing, muted: browser.mutedTabs.contains(row.id), editing: editing,
-                             title: row.displayTitle, ink: theme.muted, accent: theme.accent, height: GridMetrics.line,
-                             onMute: { browser.toggleMute(row.id) }, onClose: onClose)
             }
-            .padding(.leading, 2)
-            .frame(height: GridMetrics.line)
-        }
-        .padding(GridMetrics.ring)
-        // VoiceOver reads the title, the site, then any state; the tab in
-        // front says so through the selected trait, and × is an action.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label(elsewhere: elsewhere, playing: playing))
-        .accessibilityAddTraits(front || (editing && ticked) ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction(named: "Close", onClose)
-        .accessibilityActions {
-            if playing {
-                let browser: Browser = model.browser
-                Button(browser.mutedTabs.contains(row.id) ? "Unmute" : "Mute") { browser.toggleMute(row.id) }
+            .overlay(alignment: .bottomLeading) {
+                if editing {
+                    // Over a picture of any colour, the tick sits on a
+                    // white disc.
+                    SelectionTick(ticked: ticked, tick: theme.action, off: theme.muted, onPicture: true)
+                        .padding(8)
+                }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if playing {
+                    HStack(spacing: 6) {
+                        mediaButton("stop.fill", label: "Stop") { Task { await browser.stopMedia(row.id) } }
+                        mediaButton(muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: muted ? "Unmute" : "Mute") {
+                            browser.toggleMute(row.id)
+                        }
+                    }
+                    .padding(6)
+                    .environment(\.colorScheme, theme.dark ? .dark : .light)
+                }
+            }
+            .clipShape(.rect(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
+            .modifier(FrontRing(front: front, color: theme.accent, radius: 14))
+            .padding(GridMetrics.ring)
+            // VoiceOver reads the title, the site, then any state; the tab in
+            // front says so through the selected trait, and × is an action.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label(elsewhere: elsewhere, playing: playing))
+            .accessibilityAddTraits(front || (editing && ticked) ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction(named: "Close", onClose)
+            .accessibilityActions {
+                if playing {
+                    Button("Stop") { Task { await browser.stopMedia(row.id) } }
+                    Button(muted ? "Unmute" : "Mute") { browser.toggleMute(row.id) }
+                }
+            }
+    }
+
+    /// A media control in the picture's corner, on a disc of the sheet's
+    /// material so it reads over any page.
+    private func mediaButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.accent)
+                .frame(width: 38, height: 38)
+                .background(.regularMaterial, in: .circle)
+                .contentShape(.circle)
         }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(label)
     }
 
     private func label(elsewhere: Bool, playing: Bool) -> String {
@@ -961,6 +1049,42 @@ struct GridCard: View {
         if playing { parts.append("playing") }
         if elsewhere { parts.append("can't open on \(UIDevice.current.model)") }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// The bar over the top of a card's picture: icons, the title cut to fit,
+/// and ×, on the sheet's material so the page shows through.
+struct CardBar<Icon: View>: View {
+    let theme: Theme
+    let title: String
+    let bold: Bool
+    var dim = false
+    let closeLabel: String
+    let onClose: () -> Void
+    @ViewBuilder let icon: Icon
+
+    var body: some View {
+        HStack(spacing: 7) {
+            icon
+            Text(title)
+                .font(.system(.subheadline, weight: bold ? .semibold : .medium))
+                .foregroundStyle(dim ? theme.muted : theme.text)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.muted)
+                    .frame(width: 36, height: GridMetrics.bar)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(closeLabel)
+        }
+        .padding(.leading, 9)
+        .frame(height: GridMetrics.bar)
+        .background(.regularMaterial)
+        .environment(\.colorScheme, theme.dark ? .dark : .light)
     }
 }
 
@@ -980,39 +1104,28 @@ struct GridSplitCard: View {
         let front = panes.contains { $0.id == (model.browser as Browser).currentTabId }
         let first = panes[0]
         let title = split.name.isEmpty ? first.displayTitle : split.name
-        VStack(spacing: 7) {
-            SplitPicture(panes: panes, height: height, theme: theme)
-                .overlay { GridHalves(id: split.id, dropState: dropState, theme: theme) }
-                .modifier(FrontRing(front: front, color: theme.accent, radius: 14))
-            HStack(spacing: 7) {
-                HStack(spacing: -5) {
-                    ForEach(panes, id: \.id) { pane in
-                        SiteTile(row: pane, size: 18)
-                            .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(theme.sheet, lineWidth: 1.5) }
+        let closeName = panes.count == 2 ? "Close Both" : "Close All"
+        SplitPicture(panes: panes, height: height, theme: theme)
+            .overlay { GridHalves(id: split.id, dropState: dropState, theme: theme) }
+            .overlay(alignment: .top) {
+                CardBar(theme: theme, title: title, bold: front, closeLabel: closeName, onClose: onClose) {
+                    HStack(spacing: -5) {
+                        ForEach(panes, id: \.id) { pane in
+                            SiteTile(row: pane, size: 16)
+                                .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(theme.sheet, lineWidth: 1.5) }
+                        }
                     }
-                }
-                .padding(.trailing, 4)
-                Text(title)
-                    .font(.system(.subheadline, weight: front ? .semibold : .medium))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if !editing {
-                    Button(panes.count == 2 ? "Close Both" : "Close All", systemImage: "xmark", action: onClose)
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.muted)
-                        .buttonStyle(.borderless)
+                    .padding(.trailing, 2)
                 }
             }
-            .padding(.leading, 2)
-            .frame(height: GridMetrics.line)
-        }
-        .padding(GridMetrics.ring)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Split, \(title)")
-        .accessibilityAddTraits(front ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction(named: panes.count == 2 ? "Close Both" : "Close All", onClose)
+            .clipShape(.rect(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
+            .modifier(FrontRing(front: front, color: theme.accent, radius: 14))
+            .padding(GridMetrics.ring)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Split, \(title)")
+            .accessibilityAddTraits(front ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction(named: closeName, onClose)
     }
 }
 
@@ -1098,6 +1211,9 @@ struct CardPicture: View {
     /// Whether the page is open on this phone, so its picture is on its
     /// way (15c, "picture loading").
     var loading = false
+    /// The bar over the picture's top, which the icon in its place sits
+    /// below.
+    var top: CGFloat = 0
     @State private var sweep = false
 
     var body: some View {
@@ -1115,6 +1231,7 @@ struct CardPicture: View {
                     SiteTile(row: row, size: 28)
                         .opacity(0.45)
                         .frame(maxHeight: .infinity)
+                        .padding(.top, top)
                         .overlay {
                             if !reduceMotion {
                                 LinearGradient(colors: [.clear, theme.text.opacity(0.08), .clear],
@@ -1146,15 +1263,12 @@ struct CardPicture: View {
                     }
                     .padding(.horizontal, 12)
                     .frame(maxHeight: .infinity)
+                    .padding(.top, top)
                 }
-            }
-            .clipShape(.rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14).strokeBorder(Self.ring(theme), lineWidth: 1)
             }
     }
 
-    /// The card's 1pt ring (`cellRing`).
+    /// The card's 1pt ring (`cellRing`), drawn around the picture and bar.
     static func ring(_ theme: Theme) -> Color {
         theme.divider
     }
@@ -1185,8 +1299,6 @@ struct SplitPicture: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .background(theme.cell)
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
     }
 
     private func cell(_ pane: OutlineRow) -> some View {

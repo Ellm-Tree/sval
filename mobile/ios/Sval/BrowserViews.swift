@@ -154,7 +154,7 @@ struct BrowserView: View {
                     .environment(\.colorScheme, browser.privateInFront ? .dark : scheme)
             }
         }
-        .toast($notice, lift: barHeight)
+        .toast($notice, lift: barHeight, top: showingTabs)
         .renameFavoriteAlert($renamingFavorite)
         .renameSplitAlert($renamingSplit)
         // What went wrong says so as every notice over the page does,

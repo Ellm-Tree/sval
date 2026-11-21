@@ -260,7 +260,7 @@ struct WorkspaceSheet: View {
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frames.tree = $0 }
             .sensoryFeedback(.selection, trigger: hover.map { "\($0.entry) \($0.kind)" })
         }
-        .toast($toast)
+        .toast($toast, top: true)
     }
 
     // MARK: Header and footer
@@ -1390,28 +1390,120 @@ struct ToastView: View {
 }
 
 /// Shows a toast at the foot of a view, `lift` above whatever covers
-/// its foot, sliding up as it comes.
+/// its foot, sliding up as it comes. With `top`, it shows at the top of
+/// the screen over every sheet instead, where the Workspace sheet or
+/// panel leaves the page showing.
 struct ToastPlace: ViewModifier {
+    @Environment(AppModel.self) private var model
+    @Environment(\.appearance) private var scheme
+    @Environment(\.sheetTint) private var sheetTint
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var toast: Toast?
     let lift: CGFloat
+    let top: Bool
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottom) {
-                if let toast {
+                if let toast, !top {
                     ToastView(toast: toast) { self.toast = nil }
                         .padding(.bottom, lift + 12)
                         .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .animation(Motion.overlay, value: toast?.id)
+            .onChange(of: top ? toast?.id : nil, initial: true) {
+                if top, let toast {
+                    TopToast.show(toast, model: model, scheme: scheme, tint: sheetTint) {
+                        if self.toast?.id == toast.id { self.toast = nil }
+                    }
+                } else if let shown = TopToast.shown, shown == toast?.id || toast == nil {
+                    TopToast.hide(shown)
+                }
+            }
     }
 }
 
 extension View {
-    func toast(_ toast: Binding<Toast?>, lift: CGFloat = 0) -> some View {
-        modifier(ToastPlace(toast: toast, lift: lift))
+    func toast(_ toast: Binding<Toast?>, lift: CGFloat = 0, top: Bool = false) -> some View {
+        modifier(ToastPlace(toast: toast, lift: lift, top: top))
+    }
+}
+
+/// A toast at the top of the screen over every sheet, in a window of its
+/// own that takes only the toast's touches.
+@MainActor
+enum TopToast {
+    private static var window: UIWindow?
+    private static let state = TopToastState()
+    /// The toast showing.
+    static var shown: UUID? { state.toast?.id }
+
+    static func show(_ toast: Toast, model: AppModel, scheme: ColorScheme, tint: String?, onDone: @escaping () -> Void) {
+        if window == nil {
+            guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+            let window = PassThroughWindow(windowScene: scene)
+            window.windowLevel = .alert
+            let host = UIHostingController(rootView: AnyView(EmptyView()))
+            host.view.backgroundColor = .clear
+            window.rootViewController = host
+            self.window = window
+        }
+        (window?.rootViewController as? UIHostingController<AnyView>)?.rootView = AnyView(
+            TopToastView(state: state)
+                .environment(model)
+                .environment(\.appearance, scheme)
+                .environment(\.sheetTint, tint))
+        window?.isHidden = false
+        state.onDone = onDone
+        state.toast = toast
+    }
+
+    /// Puts `id` away, if it is still the toast showing.
+    static func hide(_ id: UUID) {
+        guard state.toast?.id == id else { return }
+        state.toast = nil
+        Task {
+            try? await Task.sleep(for: .seconds(0.4))
+            if state.toast == nil { window?.isHidden = true }
+        }
+    }
+}
+
+@MainActor
+@Observable
+private final class TopToastState {
+    var toast: Toast?
+    var onDone: () -> Void = {}
+}
+
+/// A window whose own background lets touches through to the windows
+/// under it.
+private final class PassThroughWindow: UIWindow {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === rootViewController?.view ? nil : hit
+    }
+}
+
+private struct TopToastView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let state: TopToastState
+
+    var body: some View {
+        VStack {
+            if let toast = state.toast {
+                ToastView(toast: toast) {
+                    state.onDone()
+                    TopToast.hide(toast.id)
+                }
+                .id(toast.id)
+                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 8)
+        .animation(Motion.overlay, value: state.toast?.id)
     }
 }
 
