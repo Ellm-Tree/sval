@@ -21,6 +21,9 @@ struct AddressEntry: View {
     /// The site the field completed what was typed to, with the completed
     /// part selected, as Firefox's autofill does.
     @State private var autofill: (typed: String, text: String, url: URL)?
+    /// The suggestions for what was typed, searched off the main thread.
+    /// They stay on screen until the next key's are ready.
+    @State private var found = LauncherResults()
     @FocusState private var focused: Bool
 
     /// In the private palette while a private tab is in front (13g).
@@ -59,6 +62,11 @@ struct AddressEntry: View {
             focused = true
         }
         .onChange(of: text) { old, new in complete(old, new) }
+        .task(id: Search(query: query, generation: model.launcherIndex.generation, inPrivate: browser.inPrivate,
+                         currentTabId: browser.currentTabId, workspaceId: browser.workspaceId,
+                         currentPin: browser.currentPin?.guid)) {
+            await search()
+        }
         .onChange(of: focused) { _, now in
             // Selected once the field has focus: a selection set before
             // that is replaced by the caret focus puts at the end.
@@ -75,6 +83,44 @@ struct AddressEntry: View {
         text == original ? "" : (autofill?.typed ?? text).trimmingCharacters(in: .whitespaces)
     }
 
+    /// What a search for suggestions depends on: a change to any of it
+    /// cancels the search under way and starts another.
+    private struct Search: Equatable {
+        let query: String
+        let generation: Int
+        let inPrivate: Bool
+        let currentTabId: String?
+        let workspaceId: String?
+        let currentPin: String?
+    }
+
+    /// Searches the Launcher's index for what was typed. The search runs off
+    /// the main thread, so typing never waits for it, and each key cancels
+    /// the search before it. A key that types on searches only what the
+    /// last key's search matched.
+    private func search() async {
+        let query = query
+        guard !query.isEmpty else {
+            found = LauncherResults()
+            return
+        }
+        let index = model.launcherIndex
+        let context = LauncherResults.Context(
+            inPrivate: browser.inPrivate, currentTabId: browser.currentTabId, workspaceId: browser.workspaceId,
+            currentPin: browser.currentPin?.guid, usedAt: browser.usedAtSnapshot)
+        let previous = found.matched
+        let task = Task.detached(priority: .userInitiated) {
+            try LauncherResults(query: query, index: index, context: context, after: previous)
+        }
+        let results = await withTaskCancellationHandler {
+            try? await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        guard let results, !Task.isCancelled else { return }
+        found = results
+    }
+
     /// Completes a site from history as the user types forward; deleting,
     /// or typing past the completion, takes it away.
     private func complete(_ old: String, _ new: String) {
@@ -83,7 +129,7 @@ struct AddressEntry: View {
         autofill = nil
         guard focused, new != original, new.count > typed.count,
               !browser.inPrivate,
-              let found = LauncherResults.autofill(new, model: model), found.text != new else { return }
+              let found = model.launcherIndex.autofill(new), found.text != new else { return }
         autofill = (new, found.text, found.url)
         text = found.text
         let start = found.text.index(found.text.startIndex, offsetBy: new.count)
@@ -150,7 +196,7 @@ struct AddressEntry: View {
         if query.isEmpty {
             emptySuggestions
         } else {
-            let results = LauncherResults(query: query, model: model)
+            let results = found
             list {
                 // The list grows up from the field, so it runs in the
                 // desktop's order read from the bottom: the row Enter takes

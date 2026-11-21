@@ -54,19 +54,54 @@ final class LauncherResultsTests: XCTestCase {
         page("Wish list", "https://wish.example/", frecency: 10),
     ]
 
-    private func input(inPrivate: Bool = false, currentPin: String? = nil,
-                       settings: [String: Any] = [:]) -> LauncherResults.Input {
-        let workspace: [String: String] = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.parentId!) })
-        let used = used
-        return LauncherResults.Input(
-            rows: rows, isPrivate: { workspace[$0] == "p" }, workspaceOf: { workspace[$0] },
-            inPrivate: inPrivate, currentTabId: inPrivate ? nil : "front", workspaceId: inPrivate ? "p" : "w1",
-            currentPin: currentPin, lastUsed: { used[$0] }, pins: inPrivate ? [] : pins, favorites: favorites,
-            historyPages: history, settings: settings)
+    private struct Input {
+        var index: LauncherIndex
+        var context: LauncherResults.Context
     }
 
-    private func results(_ query: String, _ input: LauncherResults.Input? = nil) -> LauncherResults {
-        LauncherResults(query: query, input: input ?? self.input())
+    private func input(inPrivate: Bool = false, currentPin: String? = nil,
+                       settings: [String: Any] = [:]) -> Input {
+        let index = LauncherIndex(
+            generation: 1, tabs: rows.map { (row: $0, title: $0.title, workspace: $0.parentId, isPrivate: $0.parentId == "p") },
+            pins: ["w1": pins], favorites: favorites, history: .init(history), settings: .init(settings))
+        let context = LauncherResults.Context(
+            inPrivate: inPrivate, currentTabId: inPrivate ? nil : "front", workspaceId: inPrivate ? "p" : "w1",
+            currentPin: currentPin, usedAt: used)
+        return Input(index: index, context: context)
+    }
+
+    private func results(_ query: String, _ input: Input? = nil) -> LauncherResults {
+        let input = input ?? self.input()
+        return try! LauncherResults(query: query, index: input.index, context: input.context)
+    }
+
+    /// A search narrowed from the last key's matches finds what a search of
+    /// everything finds.
+    func testTypingOnFindsWhatAFreshSearchFinds() throws {
+        let input = input()
+        var previous: LauncherResults.Matched?
+        for end in 1..."reading list".count {
+            let query = String("reading list".prefix(end))
+            let narrowed = try LauncherResults(query: query, index: input.index, context: input.context, after: previous)
+            let fresh = results(query, input)
+            XCTAssertEqual(narrowed.tabs.map(\.id), fresh.tabs.map(\.id), query)
+            XCTAssertEqual(narrowed.kept.map(\.url), fresh.kept.map(\.url), query)
+            XCTAssertEqual(narrowed.history.map(\.url), fresh.history.map(\.url), query)
+            XCTAssertEqual(narrowed.order, fresh.order, query)
+            previous = narrowed.matched
+        }
+    }
+
+    /// A word typed before that no word typed now starts searches everything
+    /// again.
+    func testEditingWhatWasTypedSearchesEverything() throws {
+        let input = input()
+        let before = try XCTUnwrap(results("wish", input).matched)
+        XCTAssertFalse(before.narrows(to: ["wis"], in: input.index))
+        XCTAssertTrue(before.narrows(to: ["wishes", "x"], in: input.index))
+        let found = try LauncherResults(query: "list", index: input.index, context: input.context, after: before)
+        XCTAssertEqual(found.history.map(\.url), ["https://wish.example/"])
+        XCTAssertEqual(found.kept.map(\.url), ["https://shop.example/"])
     }
 
     func testNothingTypedOffersNothing() {
@@ -152,8 +187,9 @@ final class LauncherResultsTests: XCTestCase {
 final class LauncherAutofillTests: XCTestCase {
     private func autofill(_ typed: String, settings: [String: Any] = [:], history: [String] = [],
                           favorites: [Favorite] = []) -> String? {
-        LauncherResults.autofill(typed, settings: settings,
-                                 historyPages: history.map { page("", $0, frecency: 1) }, favorites: favorites)
+        LauncherIndex(generation: 1, tabs: [], pins: [:], favorites: favorites,
+                      history: .init(history.map { page("", $0, frecency: 1) }), settings: .init(settings))
+            .autofill(typed)
             .map { "\($0.text) \($0.url.absoluteString)" }
     }
 

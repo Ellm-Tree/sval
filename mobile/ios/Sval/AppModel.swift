@@ -48,19 +48,37 @@ final class AppModel {
         welcoming || stage == .start || stage == .join || (settingUp && stage == .chooseFolder)
     }
     private(set) var rows: [OutlineRow] = [] {
-        didSet { tree = OutlineIndex(rows) }
+        didSet {
+            tree = OutlineIndex(rows)
+            reindexLauncher()
+        }
     }
     /// `rows`' lookups, built once per change. Views read it on every
     /// frame the bar folds, where a walk of `rows` per lookup adds up.
     private(set) var tree = OutlineIndex()
     /// The synced settings, as of the last pass or change.
-    private(set) var settings: [String: Any] = [:]
+    private(set) var settings: [String: Any] = [:] {
+        didSet { reindexLauncher() }
+    }
     /// The pages history holds, from every device, best first by frecency.
-    private(set) var historyPages: [HistoryPage] = []
+    private(set) var historyPages: [HistoryPage] = [] {
+        didSet { reindexLauncher() }
+    }
     /// Every favorite, folder and separator, from the favorites document.
-    private(set) var favorites: [Favorite] = []
+    private(set) var favorites: [Favorite] = [] {
+        didSet { if favorites != oldValue { reindexLauncher() } }
+    }
     /// Each Workspace's pins, in the row's order (pins spec §4, §7).
-    private(set) var pinsByWorkspace: [String: [PinRow]] = [:]
+    private(set) var pinsByWorkspace: [String: [PinRow]] = [:] {
+        didSet { if pinsByWorkspace != oldValue { reindexLauncher() } }
+    }
+    /// What the Launcher searches, built from the rows, pins, Favorites,
+    /// history and settings after each change to them.
+    private(set) var launcherIndex = LauncherIndex.empty
+    /// History's share of `launcherIndex`, prepared with `historyPages`.
+    @ObservationIgnored private var launcherHistory = LauncherIndex.History.empty
+    @ObservationIgnored private var indexing: Task<Void, Never>?
+    @ObservationIgnored private var indexBuilds = 0
     private(set) var lastSynced: Date?
     private(set) var syncing = false
     var message: String?
@@ -178,14 +196,47 @@ final class AppModel {
         return syncer
     }
 
+    // MARK: Launcher
+
+    /// Builds `launcherIndex` again off the main thread. A pass sets several
+    /// of its inputs in turn, and only the build after the last one lands.
+    private func reindexLauncher() {
+        indexing?.cancel()
+        indexing = Task { [weak self] in
+            await Task.yield()
+            guard let self, !Task.isCancelled else { return }
+            indexBuilds += 1
+            let generation = indexBuilds
+            let tabs = rows.filter { $0.kind == "tab" }.map { row in
+                (row: row, title: row.title, workspace: tree.workspace(of: row.id), isPrivate: isPrivate(row.id))
+            }
+            let pins = pinsByWorkspace
+            let favorites = favorites
+            let history = launcherHistory
+            let settings = LauncherIndex.Settings(settings)
+            let index = await Task.detached(priority: .userInitiated) {
+                LauncherIndex(generation: generation, tabs: tabs, pins: pins, favorites: favorites, history: history,
+                              settings: settings)
+            }.value
+            guard !Task.isCancelled else { return }
+            launcherIndex = index
+        }
+    }
+
     // MARK: History
 
     /// Reads history's pages again, after a pass or a visit made here.
     func refreshHistory() async {
         guard let syncer else { return }
         let visits = await syncer.visits()
-        let pages = await Task.detached(priority: .userInitiated) { HistoryPage.pages(visits) }.value
-        if pages != historyPages { historyPages = pages }
+        let (pages, prepared) = await Task.detached(priority: .userInitiated) {
+            let pages = HistoryPage.pages(visits)
+            return (pages, LauncherIndex.History(pages))
+        }.value
+        if pages != historyPages {
+            launcherHistory = prepared
+            historyPages = pages
+        }
         Diagnostics.log("history: \(visits.count) visits, \(historyPages.count) pages")
     }
 
@@ -527,7 +578,9 @@ final class AppModel {
     /// The private session's Workspace.
     private(set) var privateWorkspace: String?
     /// Every node of the private session, which nothing may save.
-    private(set) var privateIds: Set<String> = []
+    private(set) var privateIds: Set<String> = [] {
+        didSet { if privateIds != oldValue { reindexLauncher() } }
+    }
     /// The video and audio choices made in the private session, which
     /// apply to its tabs alone and go with it.
     private(set) var privateMedia: [String: SiteRules.Media] = [:]
@@ -1743,7 +1796,7 @@ final class AppModel {
     }
 
     /// Whether the phone can open `url`: a web address.
-    static func opensHere(_ url: String) -> Bool {
+    nonisolated static func opensHere(_ url: String) -> Bool {
         guard let scheme = URL(string: url)?.scheme?.lowercased() else { return false }
         return scheme == "http" || scheme == "https"
     }

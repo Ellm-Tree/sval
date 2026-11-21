@@ -389,8 +389,8 @@ final class Browser {
         withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .smooth(duration: 0.4)) { barFold = end }
     }
 
-    /// When tab `id` was last brought to the front on this phone.
-    func lastUsed(_ id: String) -> Double? { usedAt[id] }
+    /// When each tab was last brought to the front on this phone.
+    var usedAtSnapshot: [String: Double] { usedAt }
 
     /// The tabs most recently brought to the front on this phone, newest
     /// first, across every Workspace: the empty Launcher's list
@@ -1577,7 +1577,7 @@ final class Browser {
     /// wrote is opened only when it is a web page: the desktop refuses
     /// addresses that may not leave a device (decision 1372), and an iPhone
     /// opens nothing but the web.
-    static func openable(_ row: OutlineRow) -> URL? {
+    nonisolated static func openable(_ row: OutlineRow) -> URL? {
         guard let address = row.url, let url = URL(string: address),
               let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme)
         else { return nil }

@@ -85,7 +85,7 @@ enum LauncherMatch {
     }
 
     /// What was typed, word by word, folded.
-    struct Query {
+    struct Query: Sendable {
         let words: [String]
         fileprivate let needles: [[UInt8]]
 
@@ -159,10 +159,10 @@ enum LauncherMatch {
 
     /// Whether a tab matches strongly: what was typed starts a word of its
     /// title, or starts its host (`matchTabs` in `SvalLauncherTabs`).
-    static func strong(_ words: [String], title: String, url: String) -> Bool {
-        let whole = words.joined(separator: " ")
-        let host = (URL(string: url)?.host() ?? "").lowercased()
-        return onBoundary(whole, title) || host.hasPrefix(whole)
+    /// `host` is in lower case.
+    static func strong(_ query: Query, title: Text, host: String) -> Bool {
+        let whole = query.words.joined(separator: " ")
+        return find(Array(whole.utf8), in: title.lower, startsOnly: title.starts) || host.hasPrefix(whole)
             || (host.hasPrefix("www.") && host.dropFirst(4).hasPrefix(whole))
     }
 }
