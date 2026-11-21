@@ -84,7 +84,35 @@ run() {
 
 echo "==> Engine, upstream and patches"
 run './scripts/build-core-wasm.sh && ./scripts/fetch-upstream.sh && ./scripts/apply-patches.sh'
-run "./scripts/release-compile.sh build $PLATFORM $OUT/$PLATFORM"
+# The machine's memory, swap and disk in use through the compile, sampled
+# every 5 seconds, printed every 5 minutes and as peaks at the end: a full-LTO
+# link holds the most memory of any step, and the machine is sized by it.
+watch_resources() {
+  local peak_ram=0 peak_swap=0 peak_disk=0 ram swap disk i=0
+  trap 'echo "==> Peak while compiling: $peak_ram MB of RAM, $peak_swap MB of swap, $peak_disk MB of disk"; exit 0' TERM
+  while true; do
+    read -r ram swap < <(awk '/^MemTotal:/ {t = $2} /^MemAvailable:/ {a = $2}
+      /^SwapTotal:/ {st = $2} /^SwapFree:/ {sf = $2}
+      END {print int((t - a) / 1024), int((st - sf) / 1024)}' /proc/meminfo)
+    disk="$(df -Pm "$REPO_ROOT" | awk 'NR == 2 {print $3}')"
+    ((ram > peak_ram)) && peak_ram=$ram
+    ((swap > peak_swap)) && peak_swap=$swap
+    ((disk > peak_disk)) && peak_disk=$disk
+    if ((i % 60 == 0)); then
+      echo "resources: $ram MB of RAM, $swap MB of swap, $disk MB of disk in use"
+    fi
+    i=$((i + 1))
+    sleep 5 &
+    wait $!
+  done
+}
+watch_resources &
+watcher=$!
+status=0
+run "./scripts/release-compile.sh build $PLATFORM $OUT/$PLATFORM" || status=$?
+kill -TERM "$watcher"
+wait "$watcher" || true
+((status == 0)) || exit "$status"
 run "./scripts/release-compile.sh symbols $PLATFORM $OUT/$PLATFORM" -e SVAL_PACKAGES_TOKEN
 run "./scripts/release-compile.sh sign $PLATFORM $OUT/$PLATFORM" \
   -e AZURE_TENANT_ID -e AZURE_CLIENT_ID -e AZURE_CLIENT_SECRET \
