@@ -150,14 +150,21 @@
   --sval-strip-well: rgb(var(--sval-palette-wash-light) / 0.06);
 }
 
+/* Firefox's space tokens are rem, and a chrome rem is the menu font's size,
+ * which is rarely a whole number of pixels. The rows stack these spaces, so
+ * every gap between coloured groups has to be the same number of device
+ * pixels at any display scale. A space on the 4px grid is a whole number of
+ * device pixels at 1.25, 1.5 and 1.75 as well as 1 and 2; a 3px one lands on
+ * a fraction there and snaps to alternating sizes. Text keeps the font's
+ * size. */
+#sval-panel-container,
 .sval-panel {
-  /* Firefox's space tokens are rem, and a chrome rem is the menu font's size,
-     which is rarely a whole number of pixels. The rows stack these spaces, so
-     unrounded they put each row on a fraction and the gaps between coloured
-     groups snap to unequal pixels. */
-  --space-xxsmall: round(var(--dimension-relative-0125), 1px);
-  --space-xsmall: round(var(--dimension-relative-025), 1px);
-  --space-small: round(var(--dimension-relative-050), 1px);
+  --space-xxsmall: var(--dimension-2);
+  --space-xsmall: var(--dimension-4);
+  --space-small: var(--dimension-8);
+}
+
+.sval-panel {
   /* Accent slots, set per row/switcher by _applyAccent. */
   --sval-border: var(--border-color, color-mix(in srgb, currentColor 30%, transparent));
   --sval-hairline: var(--border-color-deemphasized, color-mix(in srgb, currentColor 16%, transparent));
@@ -1221,9 +1228,7 @@ menupopup:not([sval-stem]) {
   align-items: center;
   gap: var(--space-xxsmall);
   margin-inline: var(--space-small);
-  /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
-  padding-block-end: calc(var(--space-xsmall) + 5px);
-  /* stylelint-enable stylelint-plugin-mozilla/use-design-tokens */
+  padding-block-end: var(--space-small);
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
   border-block-end: 1px solid var(--sval-section-hairline);
 }
@@ -1271,8 +1276,7 @@ menupopup:not([sval-stem]) {
   scrollbar-color: var(--sval-scrollbar-thumb) transparent;
   /* The space under the hairline is the tree's own, so rows scroll up to
    * the hairline and under its shadow. */
-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  padding: calc(var(--space-xsmall) + 5px) 0 var(--space-small);
+  padding: var(--space-small) 0;
   position: relative;
 }
 
