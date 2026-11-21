@@ -423,6 +423,23 @@ export class SvalFavoritesStore {
   }
 
   /**
+   * The scope the pin `row` shows with: its own in the row, or that of the
+   * pinned folder in the row that holds it (pins spec §7).
+   *
+   * @param {object} row
+   * @returns {string[]|null}
+   */
+  #shownScope(row) {
+    for (let at = row, d = 0; at && d < 64; d++) {
+      if (at.parentGuid === PINS_ROOT) {
+        return at.pinScope ?? null;
+      }
+      at = this.get(at.parentGuid);
+    }
+    return null;
+  }
+
+  /**
    * The pins (pins spec §4) and the home page's row (home-favorites spec
    * §3), which are one list: the pins root's children in its order, a
    * folder with its contents, as `{ guid, kind, name, url, local, scope,
@@ -889,7 +906,9 @@ export class SvalFavoritesStore {
    * Makes a pin folder named `name` of the pins `targetGuid` and
    * `draggedGuid`, where `targetGuid` stands, holding them in that order
    * (pins-root spec §5), as one change. A pin folder `draggedGuid` leaves
-   * holding one pin or none goes, as {@link movePin} has it.
+   * holding one pin or none goes, as {@link movePin} has it. A folder made
+   * in the row shows in every workspace either pin showed in, so neither
+   * pin reaches a workspace it was kept out of.
    *
    * @param {string} targetGuid
    * @param {string} draggedGuid
@@ -914,6 +933,11 @@ export class SvalFavoritesStore {
       const folder = await this.#idOf(guid);
       const siblings = this.children(target.parentGuid);
       const at = siblings.findIndex(row => row.guid === targetGuid);
+      // Read before the moves: a pin in a folder shows where its folder does.
+      const scope =
+        target.parentGuid === PINS_ROOT
+          ? unionScope(this.#shownScope(target), this.#shownScope(dragged))
+          : null;
       const left = await this.#pinFolderLeftOps(dragged, target.parentGuid);
       return {
         ops: [
@@ -926,6 +950,7 @@ export class SvalFavoritesStore {
             after: target.id,
             name,
           },
+          ...(scope ? [{ kind: "setPinScope", id: folder, scope }] : []),
           { kind: "moveNode", id: target.id, newParent: folder },
           {
             kind: "moveNode",
@@ -1551,6 +1576,21 @@ export class SvalFavoritesStore {
   static startFor(engine, options = {}) {
     return shared.startFor(engine, options);
   }
+}
+
+/**
+ * The scope that shows everywhere `a` or `b` does: null, every workspace,
+ * when either is.
+ *
+ * @param {string[]|null} a
+ * @param {string[]|null} b
+ * @returns {string[]|null}
+ */
+function unionScope(a, b) {
+  if (!a?.length || !b?.length) {
+    return null;
+  }
+  return [...new Set([...a, ...b])].sort();
 }
 
 /** A new favorite's key: Places' random guid, used only as a generator. */

@@ -429,6 +429,34 @@ add_task(async function move_to_favorites_and_back() {
 });
 
 /**
+ * A folder made of two pins shows in every workspace either pin showed in,
+ * and in every workspace when either showed in all (pins spec §7).
+ */
+add_task(async function a_folder_of_two_pins_shows_where_they_showed() {
+  const { make } = await twoDevices();
+  const { store } = await make();
+  const [x, y, z, w] = await store.insertTree([], {
+    pins: ["x", "y", "z", "w"].map(n => ({
+      title: n,
+      url: `https://${n}.example/`,
+    })),
+  });
+  await store.setPinScope(x, ["ws-2"]);
+  await store.setPinScope(w, ["ws-1"]);
+  await store.setPinScope(y, ["ws-1", "ws-2"]);
+
+  const both = await store.folderOf(x, y, "Both");
+  Assert.deepEqual(
+    store.pinScopeOf(both),
+    ["ws-1", "ws-2"],
+    "the folder shows where either pin did"
+  );
+
+  const all = await store.folderOf(z, w, "All");
+  Assert.equal(store.pinScopeOf(all), null, "z showed in every workspace");
+});
+
+/**
  * A pin dropped on another makes a folder of the two where the other stood,
  * Move Contents to Row puts them back where the folder stood, and Undo takes
  * each back (pins-root spec §5).

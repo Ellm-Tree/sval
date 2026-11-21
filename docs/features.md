@@ -187,7 +187,8 @@ control of what you see and what is sent to websites.
   which Workspaces show a pin. Pin to This Workspace pins a tab to the
   Workspace you're in alone. To keep pins together, drag one pin onto
   another to make a pin folder, or right-click the pins row and choose New
-  Pin Folder. When you move a pin out of a pin folder and one pin or none
+  Pin Folder. A pin folder made from two pins shows in every Workspace
+  either pin showed in. When you move a pin out of a pin folder and one pin or none
   is left, Sval removes the pin folder. A pin left over takes the pin
   folder's place. Move to Favorites in a pin's menu turns the pin into a
   Favorite.
