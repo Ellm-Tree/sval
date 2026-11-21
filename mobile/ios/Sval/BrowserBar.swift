@@ -38,8 +38,8 @@ struct BrowserBar: View {
     var onStar: (StarAction) -> Void = { _ in }
     /// What the split menu asks for.
     var onSplit: (SplitAction) -> Void = { _ in }
-    /// A hold on the address and the slide after it, which move through
-    /// the Workspace's tabs.
+    /// A hold on the address or the Workspace button and the slide after
+    /// it, which move through the Workspace's tabs or the Workspaces.
     var onScrub: (ScrubPhase) -> Void = { _ in }
     /// Opens a tab in the private session, or ends the session (false).
     var onPrivate: (Bool) -> Void = { _ in }
@@ -48,10 +48,10 @@ struct BrowserBar: View {
     /// and runs to the end before it fades once the load is done.
     @State private var line = 0.0
     @State private var lineShown = false
-    /// Whether the address is held for a scrub.
-    @GestureState private var scrubbing = false
-    /// Whether the touch on the address became a scrub, which then opens
-    /// no Launcher as it lifts.
+    /// What is held for a scrub: the address or the Workspace button.
+    @GestureState private var scrubbing: ScrubKind?
+    /// Whether the touch on the address or the Workspace button became a
+    /// scrub, which then opens no Launcher or sheet as it lifts.
     @State private var heldForScrub = false
 
     private var browser: Browser { model.browser }
@@ -115,7 +115,7 @@ struct BrowserBar: View {
             withAnimation(.easeOut(duration: 0.3)) { line = max(line, progress) }
         }
         .onChange(of: scrubbing) { _, held in
-            if !held { onScrub(.ended) }
+            if held == nil { onScrub(.ended) }
         }
         .onChange(of: browser.loading) { _, loading in
             guard !loading, lineShown else { return }
@@ -167,7 +167,10 @@ struct BrowserBar: View {
                                 .allowsHitTesting(t == 0)
                                 .accessibilityHidden(t > 0)
                         }
-                        capsule(at[3], interactive: t == 0) {
+                        // Held for a scrub, its glass stays still under the
+                        // lifted button, which would show it swelling and
+                        // following the finger past its edge.
+                        capsule(at[3], interactive: t == 0 && scrubbing != .workspaces) {
                             workspaceButton(size: shape.control, scale: k)
                                 .opacity(buttons)
                                 .allowsHitTesting(t == 0)
@@ -176,8 +179,12 @@ struct BrowserBar: View {
                     }
                 }
             }
-            if scrubbing && t == 0 {
+            if scrubbing == .tabs && t == 0 {
                 liftedAddress(address, t: t, buttons: buttons, dot: dot, scale: k)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
+            }
+            if scrubbing == .workspaces && t == 0 {
+                liftedWorkspaceButton(at[3], scale: k)
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
             }
             // Media playing, in this tab or another, rides above the bar in
@@ -227,6 +234,21 @@ struct BrowserBar: View {
         let grown: CGFloat = 1.15
         let lifted = address.insetBy(dx: -address.width * (grown - 1) / 2, dy: -address.height * (grown - 1) / 2)
         return addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k)
+            .scaleEffect(grown)
+            .frame(width: lifted.width, height: lifted.height)
+            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            .offset(x: lifted.minX, y: lifted.minY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// The Workspace button lifted over the bar while it is held for a
+    /// scrub, drawn as `liftedAddress` is.
+    private func liftedWorkspaceButton(_ frame: CGRect, scale k: Double) -> some View {
+        let grown: CGFloat = 1.15
+        let lifted = frame.insetBy(dx: -frame.width * (grown - 1) / 2, dy: -frame.height * (grown - 1) / 2)
+        return workspaceLabel(size: frame.height, named: false, scale: k)
             .scaleEffect(grown)
             .frame(width: lifted.width, height: lifted.height)
             .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
@@ -321,20 +343,21 @@ struct BrowserBar: View {
             .accessibilityShowsLargeContentViewer()
             // Beside the button's tap, which a priority gesture would stop
             // firing at all: the tap skips a touch the hold took instead.
-            .simultaneousGesture(scrubGesture, isEnabled: !typeSize.isAccessibilitySize)
+            .simultaneousGesture(scrubGesture(.tabs), isEnabled: !typeSize.isAccessibilitySize)
         }
     }
 
-    /// Hold the address, then slide sideways through the Workspace's tabs.
-    /// SwiftUI has no press-and-slide gesture of its own, so this is a hold
-    /// followed by a drag that starts where the hold left the finger.
-    private var scrubGesture: some Gesture {
+    /// Hold the address, then slide sideways through the Workspace's tabs;
+    /// or the Workspace button, through the Workspaces. SwiftUI has no
+    /// press-and-slide gesture of its own, so this is a hold followed by a
+    /// drag that starts where the hold left the finger.
+    private func scrubGesture(_ kind: ScrubKind) -> some Gesture {
         LongPressGesture(minimumDuration: 0.3)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
             // The state resets when the gesture ends or the system cancels
             // it, and either ends the scrub.
             .updating($scrubbing) { value, held, _ in
-                if case .second(true, _) = value { held = true }
+                if case .second(true, _) = value { held = kind }
             }
             .onChanged { value in
                 // A new touch starts as a press, which may yet be a tap.
@@ -344,7 +367,7 @@ struct BrowserBar: View {
                 if let drag {
                     onScrub(.moved(drag.location))
                 } else {
-                    onScrub(.began)
+                    onScrub(.began(kind))
                 }
             }
     }
@@ -565,33 +588,10 @@ struct BrowserBar: View {
     /// count at its corner, and sideways its name beside. It opens the
     /// Workspace sheet, or the private one.
     private func workspaceButton(size: CGFloat, named: Bool = false, scale k: Double = 1) -> some View {
-        Button(action: onWorkspace) {
-            HStack(spacing: 6) {
-                workspaceMark(size: 22 * k)
-                    .overlay(alignment: .bottomTrailing) {
-                        Text(countText)
-                            .font(.system(.caption2, weight: .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(colors.badge)
-                            .padding(.horizontal, 4)
-                            .frame(minWidth: 16, minHeight: 16)
-                            .background(colors.ink, in: .capsule)
-                            // A badge is a mark on its button, which holds
-                            // it to the first accessibility size.
-                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                            .offset(x: 9, y: 7)
-                    }
-                if named && !typeSize.isAccessibilitySize {
-                    Text(isPrivateSession ? "Private" : workspace.map(WorkspaceTile.name) ?? "Sval")
-                        .font(.system(.body, weight: .semibold))
-                        .lineLimit(1)
-                        .padding(.leading, 6)
-                }
-            }
-            .padding(.horizontal, named ? 12 : 0)
-            .frame(minWidth: size, minHeight: size)
-            .frame(maxWidth: named ? 190 : size)
-            .contentShape(.capsule)
+        Button {
+            if !heldForScrub { onWorkspace() }
+        } label: {
+            workspaceLabel(size: size, named: named, scale: k)
         }
         .contextMenu {
             if isPrivateSession { privateMenu }
@@ -603,6 +603,38 @@ struct BrowserBar: View {
             : "\(workspace.map(WorkspaceTile.name) ?? "Workspace"), \(tabCount) tabs")
         .accessibilityInputLabels(isPrivateSession ? ["Private"] : [workspace.map(WorkspaceTile.name) ?? "Workspace", "Workspace"])
         .accessibilityShowsLargeContentViewer()
+        // The private session is one Workspace, and its button's long
+        // press is the session's menu.
+        .simultaneousGesture(scrubGesture(.workspaces), isEnabled: !typeSize.isAccessibilitySize && !isPrivateSession)
+    }
+
+    private func workspaceLabel(size: CGFloat, named: Bool, scale k: Double) -> some View {
+        HStack(spacing: 6) {
+            workspaceMark(size: 22 * k)
+                .overlay(alignment: .bottomTrailing) {
+                    Text(countText)
+                        .font(.system(.caption2, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(colors.badge)
+                        .padding(.horizontal, 4)
+                        .frame(minWidth: 16, minHeight: 16)
+                        .background(colors.ink, in: .capsule)
+                        // A badge is a mark on its button, which holds
+                        // it to the first accessibility size.
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                        .offset(x: 9, y: 7)
+                }
+            if named && !typeSize.isAccessibilitySize {
+                Text(isPrivateSession ? "Private" : workspace.map(WorkspaceTile.name) ?? "Sval")
+                    .font(.system(.body, weight: .semibold))
+                    .lineLimit(1)
+                    .padding(.leading, 6)
+            }
+        }
+        .padding(.horizontal, named ? 12 : 0)
+        .frame(minWidth: size, minHeight: size)
+        .frame(maxWidth: named ? 190 : size)
+        .contentShape(.capsule)
     }
 
     private func workspaceMark(size: CGFloat) -> some View {

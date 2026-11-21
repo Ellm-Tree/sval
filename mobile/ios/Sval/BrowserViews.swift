@@ -41,7 +41,8 @@ struct BrowserView: View {
     @State private var swipingTo: OutlineRow?
     /// How many swipes have switched Workspace, which taps as each does.
     @State private var swipes = 0
-    /// The scrub through the Workspace's tabs while the address is held.
+    /// The scrub through the Workspace's tabs while the address is held,
+    /// or through the Workspaces while the Workspace button is.
     @State private var scrub: TabScrub?
     /// Runs the strip on while the finger rests near the screen's edge.
     @State private var scrubRun: Task<Void, Never>?
@@ -563,14 +564,25 @@ struct BrowserView: View {
 
     private func scrubbed(_ phase: ScrubPhase) {
         switch phase {
-        case .began:
+        case .began(let kind):
             guard scrub == nil, let workspace = browser.workspaceId else { return }
-            let items = TabScrub.items(in: workspace, model: model)
-            guard items.count > 1 || (items.count == 1 && items[0].id != browser.currentTabId) else { return }
-            let start = items.firstIndex { $0.id == browser.currentTabId } ?? 0
+            let opened: TabScrub
+            switch kind {
+            case .tabs:
+                let items = TabScrub.items(in: workspace, model: model)
+                guard items.count > 1 || (items.count == 1 && items[0].id != browser.currentTabId) else { return }
+                opened = TabScrub(kind: kind, items: items,
+                                  start: items.firstIndex { $0.id == browser.currentTabId } ?? 0)
+            case .workspaces:
+                // The private session is one Workspace, and the bar's swipe
+                // passes it by (13b).
+                let items = TabScrub.workspaces(model: model)
+                guard !browser.privateInFront, items.count > 1 else { return }
+                opened = TabScrub(kind: kind, items: items, start: items.firstIndex { $0.id == workspace } ?? 0)
+            }
             scrubEntered = false
             withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .spring(duration: 0.3, bounce: 0.2)) {
-                scrub = TabScrub(items: items, start: start)
+                scrub = opened
             }
             runAtEdges()
         case .moved(let point):
@@ -593,8 +605,8 @@ struct BrowserView: View {
         }
     }
 
-    /// Takes the strip away, going to the page under the finger unless
-    /// the scrub was let go.
+    /// Takes the strip away, going to the page or Workspace under the
+    /// finger unless the scrub was let go.
     private func endScrub(switching: Bool) {
         scrubRun?.cancel()
         scrubRun = nil
@@ -607,6 +619,7 @@ struct BrowserView: View {
             switch item {
             case .pin(let pin, _): browser.selectPin(pin)
             case .tab(let row, _): browser.select(row.id)
+            case .workspace(let row): browser.showWorkspace(row.id)
             }
         }
     }

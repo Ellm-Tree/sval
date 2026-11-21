@@ -3,25 +3,35 @@
 
 import SwiftUI
 
-/// What a hold on the address does as the finger moves: the hold opens the
-/// strip, a slide moves through it, and lifting goes to the tab under it.
+/// What a scrub moves through: the Workspace's tabs, from a hold on the
+/// address, or the Workspaces, from a hold on the Workspace button.
+enum ScrubKind {
+    case tabs, workspaces
+}
+
+/// What a hold does as the finger moves: the hold opens the strip, a slide
+/// moves through it, and lifting goes to the tab or Workspace under it.
 enum ScrubPhase {
-    case began
+    case began(ScrubKind)
     case moved(CGPoint)
     case ended
 }
 
-/// One page the strip can go to: a pin's page or a tab, with the group
-/// at the Workspace's top level that holds the tab, if one does.
+/// One place the strip can go to: a pin's page or a tab, with the group
+/// at the Workspace's top level that holds the tab, if one does; or a
+/// Workspace.
 enum ScrubItem: Identifiable {
     case pin(PinRow, key: String)
     case tab(OutlineRow, group: OutlineRow?)
+    case workspace(OutlineRow)
 
-    /// The page's key in `Browser`, which its picture is kept under too.
+    /// The page's key in `Browser`, which its picture is kept under too,
+    /// or the Workspace's id.
     var id: String {
         switch self {
         case .pin(_, let key): key
         case .tab(let row, _): row.id
+        case .workspace(let row): row.id
         }
     }
 
@@ -34,16 +44,19 @@ enum ScrubItem: Identifiable {
         switch self {
         case .pin(let pin, _): pin.name
         case .tab(let row, _): row.displayTitle
+        case .workspace(let row): WorkspaceTile.name(row)
         }
     }
 }
 
 /// A scrub under way: the Workspace's pages, pins first and then its tabs
-/// in tree order, so each stays at the same place from one scrub to the
-/// next.
+/// in tree order, or the Workspaces in their order, so each stays at the
+/// same place from one scrub to the next.
 struct TabScrub {
+    let kind: ScrubKind
     let items: [ScrubItem]
-    /// Where the page in front sits, which lifting there leaves in front.
+    /// Where the page or Workspace in front sits, which lifting there
+    /// leaves in front.
     let start: Int
     private(set) var index: Int
     /// Where the finger was as the strip opened, which the slide is
@@ -56,7 +69,8 @@ struct TabScrub {
     /// end, so turning back moves at once.
     private var carried = 0.0
 
-    init(items: [ScrubItem], start: Int) {
+    init(kind: ScrubKind, items: [ScrubItem], start: Int) {
+        self.kind = kind
         self.items = items
         self.start = start
         index = start
@@ -82,6 +96,12 @@ struct TabScrub {
             .filter { Browser.openable($0) != nil || $0.url == nil }
             .map { ScrubItem.tab($0, group: topGroup(of: $0, model: model)) }
         return pins + tabs
+    }
+
+    /// The Workspaces, in the Workspace sheet's strip's order.
+    @MainActor
+    static func workspaces(model: AppModel) -> [ScrubItem] {
+        model.workspaceSections.ordered.map(ScrubItem.workspace)
     }
 
     /// The group directly under the Workspace that holds `row`. The tree
@@ -125,10 +145,12 @@ struct TabScrub {
 /// The strip of pages that rises over the bar while the address is held: a
 /// carousel with the page under the finger in front, and its neighbours
 /// stacked behind it, smaller and turned away the further they sit. The
-/// strip takes the front card's group's colour and name, or the
-/// Workspace's colour when the card is in no group.
+/// strip takes the front card's group's colour and name. Through the
+/// Workspaces, the cards are their tiles, shorter, and the strip takes the
+/// front one's colour and name.
 struct TabScrubStrip: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppModel.self) private var model
     let scrub: TabScrub
     let theme: Theme
     let colors: BarColors
@@ -143,6 +165,9 @@ struct TabScrubStrip: View {
     /// whole.
     private var many: Bool { scrub.items.count > 7 }
     private var card: CGSize {
+        if scrub.kind == .workspaces {
+            return CGSize(width: many ? 84 : 104, height: many ? 84 : 104)
+        }
         let width: CGFloat = many ? 116 : 150
         return CGSize(width: width, height: width / PagePreviews.aspect)
     }
@@ -164,7 +189,7 @@ struct TabScrubStrip: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            groupName
+            header
                 .padding(.top, 14)
                 .padding(.bottom, 10)
                 .frame(maxWidth: .infinity)
@@ -197,7 +222,7 @@ struct TabScrubStrip: View {
             .frame(maxWidth: .infinity)
             .background { band }
             VStack(spacing: 10) {
-                Text(scrub.items[scrub.index].title)
+                Text(footerText)
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(theme.text)
                     .lineLimit(1)
@@ -227,11 +252,34 @@ struct TabScrubStrip: View {
     /// Behind the cards, the front card's group's colour, muted, edged
     /// above and below in the colour itself.
     @ViewBuilder private var band: some View {
-        if let groupTint {
-            groupTint.opacity(0.28)
-                .overlay(alignment: .top) { groupTint.opacity(0.7).frame(height: 1.5) }
-                .overlay(alignment: .bottom) { groupTint.opacity(0.7).frame(height: 1.5) }
+        if let bandTint {
+            bandTint.opacity(0.28)
+                .overlay(alignment: .top) { bandTint.opacity(0.7).frame(height: 1.5) }
+                .overlay(alignment: .bottom) { bandTint.opacity(0.7).frame(height: 1.5) }
         }
+    }
+
+    /// Over the cards, the front card's group or Workspace.
+    @ViewBuilder private var header: some View {
+        if case .workspace(let row) = scrub.items[scrub.index] {
+            Text(WorkspaceTile.name(row))
+                .font(.system(.title2, weight: .semibold))
+                .foregroundStyle(theme.text)
+                .lineLimit(1)
+                .frame(height: 30)
+                .padding(.horizontal, 24)
+        } else {
+            groupName
+        }
+    }
+
+    /// Under the cards, the front tab's title, or the front Workspace's
+    /// tab count.
+    private var footerText: String {
+        let item = scrub.items[scrub.index]
+        guard case .workspace(let row) = item else { return item.title }
+        let count = model.tabs(in: row.id).count
+        return count == 1 ? "1 tab" : "\(count) tabs"
     }
 
     /// The front card's group, as the grid's group header shows it. The
@@ -245,7 +293,7 @@ struct TabScrubStrip: View {
                     Text(emoji).accessibilityIgnoresInvertColors()
                 } else {
                     Image(systemName: "folder.fill")
-                        .foregroundStyle(groupTint ?? theme.text)
+                        .foregroundStyle(bandTint ?? theme.text)
                 }
                 Text(group.displayTitle)
                     .foregroundStyle(theme.text)
@@ -257,13 +305,16 @@ struct TabScrubStrip: View {
         .padding(.horizontal, 24)
     }
 
-    /// The front card's group's colour, if it is in a group that has one.
-    private var groupTint: Color? {
-        scrub.items[scrub.index].group.flatMap(tint)
+    /// The front Workspace's colour, or the front card's group's, if it
+    /// has one.
+    private var bandTint: Color? {
+        let item = scrub.items[scrub.index]
+        if case .workspace(let row) = item { return tint(row) }
+        return item.group.flatMap(tint)
     }
 
-    private func tint(_ group: OutlineRow) -> Color? {
-        group.color.flatMap(WorkspaceTint.init(rawValue:))?.swatch(dark: theme.dark)
+    private func tint(_ row: OutlineRow) -> Color? {
+        row.color.flatMap(WorkspaceTint.init(rawValue:))?.swatch(dark: theme.dark)
     }
 
     @ViewBuilder private func cardView(_ item: ScrubItem) -> some View {
@@ -274,6 +325,8 @@ struct TabScrubStrip: View {
                             loading: false)
             case .pin(let pin, let key):
                 pinPicture(pin, key: key)
+            case .workspace(let row):
+                WorkspaceTile(workspace: row, size: card.width)
             }
         }
         .frame(width: card.width, height: card.height)

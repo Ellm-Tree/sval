@@ -108,6 +108,31 @@ final class WalkthroughTests: XCTestCase {
         app.buttons["Cancel"].firstMatch.tap()
     }
 
+    /// Holding the Workspace button and sliding sideways goes to another
+    /// Workspace; a hold lifted where it started stays, and opens no
+    /// Workspace sheet.
+    func testWorkspaceScrub() {
+        waitForBar()
+        let button = app.buttons.matching(NSPredicate(format: "label ENDSWITH ' tabs' OR label ENDSWITH ' tab'")).firstMatch
+        XCTAssertTrue(button.exists, "the Workspace button shows")
+        let before = button.label
+        let start = button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.8, thenDragTo: start, withVelocity: .slow, thenHoldForDuration: 0.3)
+        sleep(1)
+        shot("workspace-scrub-lifted-in-place")
+        XCTAssertFalse(app.buttons["Workspace options"].exists, "a hold opens no Workspace sheet")
+        XCTAssertEqual(button.label, before, "a hold lifted in place keeps the Workspace")
+        // The button sits at the screen's right, so the slide goes left; the
+        // Workspace in front may be the first, so right is tried after.
+        for dx in [-100.0, 100.0] where button.label == before {
+            start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: dx, dy: 0)),
+                        withVelocity: .slow, thenHoldForDuration: 0.3)
+            sleep(2)
+        }
+        shot("workspace-scrub-moved")
+        XCTAssertNotEqual(button.label, before, "a slide goes to another Workspace")
+    }
+
     /// The site menu's video and audio choice: the desktop's three, saved
     /// for the site, and the page made again for it.
     /// On an iPad the Workspace opens as a popover over its button, which

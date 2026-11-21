@@ -46,10 +46,8 @@ struct WorkspaceStrip: View {
     private var browser: Browser { model.browser }
 
     var body: some View {
-        let own = model.ownWorkspace
-        let people = model.workspaces.filter { $0.agent == nil && $0.device == nil }
-        let devices = model.workspaces.filter { $0.agent == nil && model.isOtherDevices($0) }
-        let agents = model.workspaces.filter { $0.agent != nil }
+        let sections = model.workspaceSections
+        let own = sections.own, people = sections.people, devices = sections.devices, agents = sections.agents
         HStack(alignment: .bottom, spacing: 0) {
         ScrollViewReader { reader in
             ScrollView(.horizontal, showsIndicators: false) {
@@ -65,10 +63,9 @@ struct WorkspaceStrip: View {
                     }
                     if !agents.isEmpty {
                         divider
-                        ForEach(agentNames(agents), id: \.self) { name in
-                            let own = agents.filter { model.agentName($0) == name }
-                            group(label: name, glyph: own.first.flatMap(model.markImage) ?? "agent-robot",
-                                  own, reorders: false)
+                        ForEach(agents, id: \.name) { agent in
+                            group(label: agent.name, glyph: agent.rows.first.flatMap(model.markImage) ?? "agent-robot",
+                                  agent.rows, reorders: false)
                         }
                     }
                     // New is the user's own: a line sets it apart from the
@@ -146,11 +143,6 @@ struct WorkspaceStrip: View {
 
     /// Each agent once, in the order its first Workspace comes. One agent
     /// app paired on two devices is two agents.
-    private func agentNames(_ agents: [OutlineRow]) -> [String] {
-        var seen = Set<String>()
-        return agents.compactMap(model.agentName).filter { seen.insert($0).inserted }
-    }
-
     private var divider: some View {
         VStack(spacing: 5) {
             theme.divider.frame(width: 1, height: tileSize)

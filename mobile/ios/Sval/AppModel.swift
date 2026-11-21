@@ -432,6 +432,19 @@ final class AppModel {
         rows.filter { $0.depth == 0 && !privateIds.contains($0.id) }
     }
 
+    /// The Workspaces as the Workspace sheet's strip shows them: this
+    /// phone's own, the user's, other devices', then each agent's.
+    var workspaceSections: WorkspaceSections {
+        let agents = workspaces.filter { $0.agent != nil }
+        var seen = Set<String>()
+        let names = agents.compactMap(agentName).filter { seen.insert($0).inserted }
+        return WorkspaceSections(
+            own: ownWorkspace,
+            people: workspaces.filter { $0.agent == nil && $0.device == nil },
+            devices: workspaces.filter { $0.agent == nil && isOtherDevices($0) },
+            agents: names.map { name in (name, agents.filter { agentName($0) == name }) })
+    }
+
     // MARK: This device's Workspace
 
     /// This phone's own Workspace (decision 2254): where it opens, and
@@ -2299,5 +2312,18 @@ final class AppModel {
             UserDefaults.standard.set(fresh, forKey: bookmarkKey)
         }
         return url
+    }
+}
+
+/// The Workspace sheet's strip's runs of Workspaces (`AppModel.workspaceSections`).
+struct WorkspaceSections {
+    let own: OutlineRow?
+    let people: [OutlineRow]
+    let devices: [OutlineRow]
+    let agents: [(name: String, rows: [OutlineRow])]
+
+    /// Every Workspace, in the strip's order.
+    var ordered: [OutlineRow] {
+        (own.map { [$0] } ?? []) + people + devices + agents.flatMap(\.rows)
     }
 }
