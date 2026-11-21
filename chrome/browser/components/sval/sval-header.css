@@ -1093,44 +1093,61 @@
   bottom: calc(50% - var(--sval-control-h) / 2 + 1px);
 }
 
-/* The line spans its whole track, and a clip shows as much of it as the
-   load has got (`--sval-load`, 0 to 1), from the start edge. */
+/* The line's track clips a bar that slides in from the start edge as far as
+   the load has got (`--sval-load`, 0 to 1). The bar moves by `translate`
+   because Gecko runs only transform and opacity animations on the
+   compositor (`nsCSSPropertyIDSet::CompositorAnimatables`): an animated
+   clip restyles and repaints the whole window's chrome on every frame. */
 .sval-load-line {
   position: absolute;
   height: 2px;
   border-radius: 1px;
-  background: var(--sval-accent);
+  overflow: clip;
   pointer-events: none;
   opacity: 0;
-  clip-path: inset(0 round 1px);
   /* A finished load runs to the end, then fades. */
-  transition:
-    clip-path 200ms var(--sval-ease),
-    opacity 200ms var(--sval-ease) 200ms;
+  transition: opacity 200ms var(--sval-ease) 200ms;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 1px;
+    background: var(--sval-accent);
+    transition: translate 200ms var(--sval-ease);
+  }
 
   &[loading] {
     opacity: 1;
-    clip-path: inset(0 calc((1 - var(--sval-load)) * 100%) 0 0 round 1px);
-    transition: clip-path 300ms var(--sval-ease);
+    transition: none;
+
+    &::before {
+      translate: calc((var(--sval-load) - 1) * 100%);
+      transition: translate 300ms var(--sval-ease);
+    }
   }
 
-  &[loading]:dir(rtl) {
-    clip-path: inset(0 0 0 calc((1 - var(--sval-load)) * 100%) round 1px);
+  &[loading]:dir(rtl)::before {
+    translate: calc((1 - var(--sval-load)) * 100%);
   }
 
-  &[instant] {
+  &[instant],
+  &[instant]::before {
     transition: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
     &,
-    &[loading] {
+    &::before,
+    &[loading]::before {
       transition: none;
     }
   }
 
   @media (forced-colors) {
-    background: Highlight;
+    &::before {
+      background: Highlight;
+    }
   }
 }
 
