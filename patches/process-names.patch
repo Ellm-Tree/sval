@@ -1,0 +1,178 @@
+Sval: child processes take names that say what each one does
+
+Activity Monitor listed every website as "SvalCP Isolated Web Content",
+which tells a user nothing. The child bundle takes the app's own name, and
+each process type a plain label: "Sval Website Renderer" for a site's
+process, "Sval Helper (Network)" and the like for the others. The site
+itself stays out of the name, because any process of the user's can read
+process names and macOS copies them into its diagnostic reports.
+
+diff --git a/browser/base/content/test/performance/browser_startup_content_mainthreadio.js b/browser/base/content/test/performance/browser_startup_content_mainthreadio.js
+index e77972ce34..645d9d615d 100644
+--- a/browser/base/content/test/performance/browser_startup_content_mainthreadio.js
++++ b/browser/base/content/test/performance/browser_startup_content_mainthreadio.js
+@@ -71,7 +71,7 @@ const FORK_SERVER = Services.prefs.getBoolPref(
+  * interposer inconsistencies across platforms documented above.
+  */
+ const processes = {
+-  "Web Content": [
++  "Website Renderer": [
+     {
+       path: "GreD:omni.ja",
+       // Visible on Windows with an open marker.
+@@ -100,7 +100,7 @@ const processes = {
+       stat: 3,
+     },
+   ],
+-  "Privileged Content": [
++  "Helper (Built-in Pages)": [
+     {
+       path: "GreD:omni.ja",
+       // Visible on Windows with an open marker.
+@@ -294,7 +294,7 @@ add_task(async function () {
+         break;
+       }
+     }
+-    if (procName == "Privileged Content" && !profile) {
++    if (procName == "Helper (Built-in Pages)" && !profile) {
+       // The Privileged Content is started from an idle task that may not have
+       // been executed yet at the time we captured the startup profile in
+       // startupRecorder.
+diff --git a/dom/ipc/ContentChild.cpp b/dom/ipc/ContentChild.cpp
+index a05c7c6345..ed3624ec0a 100644
+--- a/dom/ipc/ContentChild.cpp
++++ b/dom/ipc/ContentChild.cpp
+@@ -801,7 +801,7 @@ void ContentChild::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
+ 
+   mIsForBrowser = aIsForBrowser;
+ 
+-  SetProcessName("Web Content"_ns);
++  SetProcessName("Website Renderer"_ns);
+ 
+ #ifdef NIGHTLY_BUILD
+   // NOTE: We have to register the annotator on the main thread, as annotators
+@@ -2727,38 +2727,33 @@ mozilla::ipc::IPCResult ContentChild::RecvRemoteType(
+ 
+   // Update the process name so about:memory's process names are more obvious.
+   if (aRemoteType == FILE_REMOTE_TYPE) {
+-    SetProcessName("file:// Content"_ns, nullptr, &aProfile);
++    SetProcessName("Local File Renderer"_ns, nullptr, &aProfile);
+   } else if (aRemoteType == EXTENSION_REMOTE_TYPE) {
+-    SetProcessName("WebExtensions"_ns, nullptr, &aProfile);
++    SetProcessName("Helper (Extensions)"_ns, nullptr, &aProfile);
+   } else if (aRemoteType == PRIVILEGEDABOUT_REMOTE_TYPE) {
+-    SetProcessName("Privileged Content"_ns, nullptr, &aProfile);
++    SetProcessName("Helper (Built-in Pages)"_ns, nullptr, &aProfile);
+   } else if (aRemoteType == PRIVILEGEDMOZILLA_REMOTE_TYPE) {
+-    SetProcessName("Privileged Mozilla"_ns, nullptr, &aProfile);
++    SetProcessName("Helper (Built-in Pages)"_ns, nullptr, &aProfile);
+   } else if (aRemoteType == INFERENCE_REMOTE_TYPE) {
+-    SetProcessName("Inference"_ns, nullptr, &aProfile);
++    SetProcessName("Helper (Inference)"_ns, nullptr, &aProfile);
+   } else if (remoteTypePrefix == WITH_COOP_COEP_REMOTE_TYPE) {
+     // The profiler can sanitize out the eTLD+1
+     nsDependentCSubstring etld =
+         Substring(aRemoteType, WITH_COOP_COEP_REMOTE_TYPE.Length() + 1);
+-#ifdef NIGHTLY_BUILD
+-    SetProcessName("WebCOOP+COEP Content"_ns, &etld, &aProfile);
+-#else
+-    SetProcessName("Isolated Web Content"_ns, &etld,
+-                   &aProfile);  // to avoid confusing people
+-#endif
++    SetProcessName("Website Renderer"_ns, &etld, &aProfile);
+   } else if (remoteTypePrefix == FISSION_WEB_REMOTE_TYPE) {
+     // The profiler can sanitize out the eTLD+1
+     nsDependentCSubstring etld =
+         Substring(aRemoteType, FISSION_WEB_REMOTE_TYPE.Length() + 1);
+-    SetProcessName("Isolated Web Content"_ns, &etld, &aProfile);
++    SetProcessName("Website Renderer"_ns, &etld, &aProfile);
+   } else if (remoteTypePrefix == SERVICEWORKER_REMOTE_TYPE) {
+     // The profiler can sanitize out the eTLD+1
+     nsDependentCSubstring etld =
+         Substring(aRemoteType, SERVICEWORKER_REMOTE_TYPE.Length() + 1);
+-    SetProcessName("Isolated Service Worker"_ns, &etld, &aProfile);
++    SetProcessName("Website Service Worker"_ns, &etld, &aProfile);
+   } else {
+     // else "prealloc" or "web" type -> "Web Content"
+-    SetProcessName("Web Content"_ns, nullptr, &aProfile);
++    SetProcessName("Website Renderer"_ns, nullptr, &aProfile);
+   }
+ 
+   // Turn off Spectre mitigations in isolated web content processes.
+diff --git a/dom/media/ipc/RDDParent.cpp b/dom/media/ipc/RDDParent.cpp
+index 4ee42d8d98..addd4ada40 100644
+--- a/dom/media/ipc/RDDParent.cpp
++++ b/dom/media/ipc/RDDParent.cpp
+@@ -123,7 +123,7 @@ bool RDDParent::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
+   }
+ #endif
+ 
+-  mozilla::ipc::SetThisProcessName("RDD Process");
++  mozilla::ipc::SetThisProcessName("Helper (Media Decoder)");
+ 
+   return true;
+ }
+diff --git a/gfx/ipc/GPUParent.cpp b/gfx/ipc/GPUParent.cpp
+index 65469300a4..be231f7896 100644
+--- a/gfx/ipc/GPUParent.cpp
++++ b/gfx/ipc/GPUParent.cpp
+@@ -211,18 +211,14 @@ bool GPUParent::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
+   CompositorBridgeParent::InitializeStatics();
+ 
+ #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)
+-  // On macOS, we pass the empty string for the process name because
+-  // the bundle name (CFBundleName) is the complete name already.
+   // If the sandbox is enabled, setting the executable name will fail
+   // so don't attempt it. The executable name will be shown in
+   // Activity Monitor as the process name.
+   if (!IsGPUSandboxEnabled()) {
+-    mozilla::ipc::SetThisProcessName("");
++    mozilla::ipc::SetThisProcessName("Helper (GPU)");
+   }
+-#elif defined(XP_MACOSX)
+-  mozilla::ipc::SetThisProcessName("");
+ #else
+-  mozilla::ipc::SetThisProcessName("GPU Process");
++  mozilla::ipc::SetThisProcessName("Helper (GPU)");
+ #endif  // XP_MACOSX && MOZ_SANDBOX
+ 
+   return true;
+diff --git a/ipc/glue/UtilityProcessChild.cpp b/ipc/glue/UtilityProcessChild.cpp
+index 050e3a1e51..4c80f94fdf 100644
+--- a/ipc/glue/UtilityProcessChild.cpp
++++ b/ipc/glue/UtilityProcessChild.cpp
+@@ -168,7 +168,7 @@ mozilla::ipc::IPCResult UtilityProcessChild::RecvInit(
+     const bool& aIsReadyForBackgroundProcessing) {
+   // Do this now (before closing WindowServer on macOS) to avoid risking
+   // blocking in GetCurrentProcess() called on that platform
+-  mozilla::ipc::SetThisProcessName("Utility Process");
++  mozilla::ipc::SetThisProcessName("Helper (Utility)");
+ 
+ #if defined(MOZ_SANDBOX)
+ #  if defined(XP_MACOSX)
+diff --git a/netwerk/ipc/SocketProcessChild.cpp b/netwerk/ipc/SocketProcessChild.cpp
+index 7d75bedc74..3e7edd88c9 100644
+--- a/netwerk/ipc/SocketProcessChild.cpp
++++ b/netwerk/ipc/SocketProcessChild.cpp
+@@ -177,7 +177,7 @@ bool SocketProcessChild::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
+ 
+   InitSocketBackground();
+ 
+-  SetThisProcessName("Socket Process");
++  SetThisProcessName("Helper (Network)");
+ #if defined(XP_MACOSX)
+   // Close all current connections to the WindowServer. This ensures that the
+   // Activity Monitor will not label the socket process as "Not responding"
+diff --git a/toolkit/moz.configure b/toolkit/moz.configure
+index 9728c76662..04afa42a87 100644
+--- a/toolkit/moz.configure
++++ b/toolkit/moz.configure
+@@ -3421,7 +3421,7 @@ set_config("MOZ_CHILD_PROCESS_NAME", moz_child_process_name)
+ 
+ set_config(
+     "MOZ_CHILD_PROCESS_APPNAME",
+-    depends_if(moz_app_displayname)(lambda v: f"{v}CP"),
++    depends_if(moz_app_displayname)(lambda v: v),
+ )
+ 
+ with only_when(target_is_osx):
