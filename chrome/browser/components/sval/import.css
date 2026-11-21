@@ -490,6 +490,14 @@ html[data-sized] {
   text-align: center;
 }
 
+.sval-im-mark {
+  flex: none;
+  width: 20px;
+  height: 16px;
+  background: currentColor;
+  mask: var(--sval-im-mark) center / contain no-repeat;
+}
+
 .sval-im-window-name,
 .sval-im-bookmarks-name {
   appearance: none;

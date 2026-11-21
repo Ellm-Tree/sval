@@ -54,6 +54,8 @@ import { colorOf } from "moz-src:///browser/components/sval/SvalColor.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  workspaceIcon:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   workspaceName:
     "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
@@ -294,10 +296,15 @@ function lookUp(queryContext, query, win) {
   // A private window's tabs are its own, in no workspace of the user's.
   const workspaceOfRow = workspaceId => {
     if (panel.inMemory) {
-      return { workspaceName: null, agent: false, color: null, emoji: null };
+      return {
+        workspaceName: null,
+        agent: false,
+        color: null,
+        mark: null,
+        emoji: null,
+      };
     }
     const agent = agentLabelOf(nodes, workspaceId, devices);
-    const appearance = appearanceOf(nodes, workspaceId);
     return {
       workspaceName: lazy.workspaceName({
         agent,
@@ -306,8 +313,10 @@ function lookUp(queryContext, query, win) {
       agent: !!agent,
       // An agent's workspace wears the agent's look, never a colour of its
       // own (`SvalPanel.workspaceColor`).
-      color: agent ? null : colorOf(appearance.color, "workspace"),
-      emoji: agent ? null : appearance.emoji,
+      color: agent
+        ? null
+        : colorOf(appearanceOf(nodes, workspaceId).color, "workspace"),
+      ...lazy.workspaceIcon(nodes, workspaceId),
     };
   };
   const inMode = !!queryContext.searchMode || !!queryContext.restrictSource;
@@ -371,6 +380,7 @@ function resultFor(queryContext, row, extra) {
       svalNodeId: row.nodeId,
       svalWorkspaceName: row.workspaceName,
       svalWorkspaceColor: row.color ?? "",
+      svalWorkspaceMark: row.mark ?? "",
       svalWorkspaceEmoji: row.emoji ?? "",
       svalAgent: row.agent,
       svalHere: row.workspaceId === here,

@@ -642,8 +642,6 @@ var SvalPanel = {
         AgentWindowMarking:
           "moz-src:///browser/components/sval/SvalAgentMarking.sys.mjs",
         SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
-        agentBrandOf:
-          "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs",
         brandURL: "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs",
         modelBrandOf:
           "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs",

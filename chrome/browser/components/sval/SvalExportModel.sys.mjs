@@ -32,6 +32,7 @@ import {
   workspaceIds,
 } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 import { importableUrl } from "moz-src:///browser/components/sval/SvalImportModel.sys.mjs";
+import { workspaceIcon } from "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs";
 
 /** The folder every workspace folder sits in (export spec §3). */
 export const WORKSPACES_FOLDER = "Sval Workspaces";
@@ -204,7 +205,8 @@ export function exportFileName(key, date) {
  * §3).
  *
  * @param {object} nodes The tree's `nodes`.
- * @returns {Array<{id: string, name: string, emoji: string|null}>}
+ * @returns {Array<{id: string, name: string, mark: string|null,
+ *   emoji: string|null}>} `mark` and `emoji` as `workspaceIcon` gives them.
  */
 export function exportableWorkspaces(nodes) {
   return workspaceIds(nodes)
@@ -212,7 +214,7 @@ export function exportableWorkspaces(nodes) {
     .map(id => ({
       id,
       name: nodes[id].content?.name || UNTITLED.workspace,
-      emoji: nodes[id].appearance?.emoji ?? null,
+      ...workspaceIcon(nodes, id),
     }));
 }
 

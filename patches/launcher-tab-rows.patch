@@ -6,8 +6,8 @@ them (`SvalLauncherTabs`). Two changes no API offers:
 
 - A switch-to-tab result's payload is validated against a closed schema, so
   the fields Sval's rows carry are added to it: the node, its workspace's
-  name, colour and emoji, whether that is an agent's, and whether it is the
-  window's own.
+  name, colour, mark and emoji, whether that is an agent's, and whether it
+  is the window's own.
 - Firefox's own switch-to-tab row for a page the tree holds as a tab would
   list the tab a second time, and picking it would bypass the panel's
   workspace switch. The muxer drops it, asking Sval which pages those are.
@@ -48,7 +48,7 @@ diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/
 index 663f068056..f346ef33b7 100644
 --- a/browser/components/urlbar/UrlbarUtils.sys.mjs
 +++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
-@@ -2694,6 +2694,30 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
+@@ -2694,6 +2694,33 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
        lastVisit: {
          type: "number",
        },
@@ -71,6 +71,9 @@ index 663f068056..f346ef33b7 100644
 +        },
 +      },
 +      svalWorkspaceEmoji: {
++        type: "string",
++      },
++      svalWorkspaceMark: {
 +        type: "string",
 +      },
 +      svalWorkspaceName: {

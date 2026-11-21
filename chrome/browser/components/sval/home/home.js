@@ -521,11 +521,12 @@ function paintColor(el, tint) {
 }
 
 /**
- * A tab's workspace or agent, as a chip: a dot in the workspace's colour, or
- * the agent's glyph, the workspace's emoji, and its name.
+ * A tab's workspace or agent, as a chip: the workspace's mark, or a dot in
+ * its colour, then its emoji, and its name, as `SvalLauncherRows` draws it.
  *
- * @param {{name: string, tint: object|null, emoji: string|null,
- *   agent: boolean}} chip `tint` as {@link paintColor} takes it.
+ * @param {{name: string, tint: object|null, mark?: string|null,
+ *   emoji: string|null, agent: boolean}} chip `tint` as {@link paintColor}
+ *   takes it.
  * @returns {Element}
  */
 function chipElement(chip) {
@@ -539,6 +540,10 @@ function chipElement(chip) {
   }
   const glyph = document.createElement("span");
   glyph.className = "sval-chip-glyph";
+  if (chip.mark) {
+    el.dataset.mark = "";
+    glyph.style.setProperty("--sval-chip-mark", `url("${chip.mark}")`);
+  }
   el.append(glyph);
   if (chip.emoji) {
     const emoji = document.createElement("span");

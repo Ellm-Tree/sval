@@ -27,13 +27,12 @@ import {
 import {
   AGENT_TEXT,
   ISOLATED_TEXT,
-  agentMarkURL,
   agentWorkspaceEntry,
   appendAgentAppEntries,
-  deviceMarkURL,
   labelAgentEntry,
   switcherItemLabel,
   usersOwn,
+  workspaceIcon,
   workspaceName,
 } from "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs";
 
@@ -504,22 +503,19 @@ export class SvalPanelStrip {
   }
 
   /**
-   * Fills a Workspace's tile: its emoji, or the Workspace glyph or its
-   * agent's or device's mark, on its colour.
+   * Fills a Workspace's tile: its icon (`workspaceIcon`), or the Workspace
+   * glyph, on its colour.
    *
    * @param {Element} tile Holds a `.sval-strip-face`.
    * @param {object} item A `switcherItems` entry.
    */
   #paintFace(tile, item) {
     const face = tile.querySelector(".sval-strip-face");
-    const marked = !!(item.agent || item.device);
-    face.textContent = marked ? "" : (item.emoji ?? "");
-    face.classList.toggle("sval-strip-agent", marked);
-    if (marked) {
-      face.style.setProperty(
-        "--sval-agent-mark",
-        `url("${item.agent ? agentMarkURL(item.brand) : deviceMarkURL(this.#view.nodes, item.id)}")`
-      );
+    const { mark, emoji } = workspaceIcon(this.#view.nodes, item.id);
+    face.textContent = emoji ?? "";
+    face.classList.toggle("sval-strip-agent", !!mark);
+    if (mark) {
+      face.style.setProperty("--sval-agent-mark", `url("${mark}")`);
     } else {
       face.style.removeProperty("--sval-agent-mark");
     }

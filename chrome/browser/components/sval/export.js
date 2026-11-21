@@ -31,6 +31,17 @@ const SvalExportPage = {
       el.append(...children);
       return el;
     };
+    // A workspace's icon (`SvalWorkspaceEntries.workspaceIcon`).
+    const icon = workspace => {
+      if (workspace.mark) {
+        const mark = make("span", { className: "sval-im-mark" });
+        mark.style.setProperty("--sval-im-mark", `url("${workspace.mark}")`);
+        return mark;
+      }
+      return workspace.emoji
+        ? make("span", { className: "sval-im-emoji" }, workspace.emoji)
+        : "";
+    };
     const state = { target: args.target };
     const exportButton = $(".sval-ex-export");
     const cancelButton = $(".sval-ex-cancel");
@@ -116,9 +127,7 @@ const SvalExportPage = {
             "label",
             { className: "sval-im-check" },
             box,
-            workspace.emoji
-              ? make("span", { className: "sval-im-emoji" }, workspace.emoji)
-              : "",
+            icon(workspace),
             workspace.name
           )
         )

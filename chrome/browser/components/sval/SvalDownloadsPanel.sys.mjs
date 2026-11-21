@@ -309,9 +309,14 @@ export function decorate(win, item) {
     description = `From ${from.name} (agent Workspace)`;
   } else {
     label.dataset.kind = "workspace";
-    disc.textContent = from.emoji ?? "";
     name = from.name;
     description = `From ${from.name}`;
+  }
+  if (from.mark) {
+    disc.dataset.mark = "";
+    disc.style.setProperty("--sval-dl-mark", `url("${from.mark}")`);
+  } else {
+    disc.textContent = from.emoji ?? "";
   }
   if (from.color) {
     label.dataset.color = "";

@@ -50,13 +50,9 @@ Object.assign(SvalPanel, {
     // An agent's workspace wears the robot face and the agent's hue, never an
     // emoji of its own (`workspaceColor` says the same of its colour).
     const agent = agentLabelOf(this._nodes, current, this.switcher.devices());
-    // A phone's or tablet's workspace wears its device's mark in place of
-    // an emoji, as it does in the strip and the menus.
-    const agentMark = agent
-      ? this._modules.SvalWorkspaceEntries.agentMarkURL(
-          this._modules.agentBrandOf(this._nodes[current]?.agent?.label)
-        )
-      : this._modules.SvalWorkspaceEntries.deviceMarkURL(this._nodes, current);
+    const { mark, emoji } = current
+      ? this._modules.SvalWorkspaceEntries.workspaceIcon(this._nodes, current)
+      : { mark: null, emoji: stored.emoji };
     this._agentLabel = agent;
     const color = current
       ? this.workspaceColor(current)
@@ -69,19 +65,18 @@ Object.assign(SvalPanel, {
       transparency: agent ? 0 : (stored.transparency ?? 0),
     };
     this._shownLook = shownLook;
-    const emoji = agentMark ? null : stored.emoji;
 
     switcher.textContent = "";
     // Always present: the stylesheet draws a workspace icon in an empty tile,
     // so a workspace with no emoji still has a tile to carry its colour.
     const tile = this._html("span");
     tile.className = "sval-switcher-emoji";
-    if (agentMark) {
+    if (mark) {
       // The mark is drawn by the stylesheet, and the accessible name below
       // says whose workspace it is.
       tile.classList.add("sval-agent-glyph");
       tile.setAttribute("aria-hidden", "true");
-      tile.style.setProperty("--sval-agent-mark", `url("${agentMark}")`);
+      tile.style.setProperty("--sval-agent-mark", `url("${mark}")`);
     } else if (emoji) {
       tile.textContent = emoji;
     }
@@ -127,7 +122,7 @@ Object.assign(SvalPanel, {
     } else {
       switcher.removeAttribute("data-sval-color");
     }
-    this._applyAgentMarking(agent, agentMark);
+    this._applyAgentMarking(agent, mark);
     // The home page takes the colour of the workspace its tab is in
     // (pins spec §9), so it hears whenever this window's changes.
     const shown = `${current}|${SvalColor.colorKey(shownLook.color)}|${shownLook.transparency}|${this._blockSurfaceKey()}`;

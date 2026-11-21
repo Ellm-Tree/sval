@@ -230,12 +230,14 @@
     background: color-mix(in srgb, var(--sval-dl-from-color) var(--sval-dl-disc-mix), transparent);
   }
 
-  .sval-downloads-from:is([data-kind="agent"], [data-kind="deleted"]) > &::before {
+  /* The Workspace's mark (`SvalWorkspaceEntries.workspaceIcon`). */
+  &[data-mark]::before,
+  .sval-downloads-from[data-kind="deleted"] > &::before {
     content: "";
     width: 10px;
     height: 10px;
     background-color: var(--sval-dl-label);
-    mask: url("chrome://browser/content/sval/agent-robot.svg") center / contain no-repeat;
+    mask: var(--sval-dl-mark) center / contain no-repeat;
   }
 
   .sval-downloads-from[data-kind="deleted"] > &::before {

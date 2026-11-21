@@ -11,10 +11,16 @@
  */
 
 import {
+  agentBrandOf,
   brandURL,
   modelBrandOf,
 } from "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs";
-import { descendantTabCount } from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import {
+  agentLabelOf,
+  descendantTabCount,
+  isDeviceWorkspace,
+} from "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs";
+import { appearanceOf } from "moz-src:///browser/components/sval/SvalTree.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -88,7 +94,7 @@ export function appendDevicesCaption(popup, { native = false } = {}) {
   caption.setAttribute("data-devices-caption", "true");
   if (native) {
     caption.setAttribute("disabled", "true");
-    caption.classList.add("menuitem-iconic", "sval-device-menuitem");
+    caption.classList.add("menuitem-iconic", "sval-workspace-menuitem");
     caption.setAttribute("image", DEVICE_PHONE_URL);
   } else {
     caption.className = "sval-devices-caption";
@@ -149,14 +155,14 @@ export function appendAgentsMenuCaption(popup) {
   caption.setAttribute("label", AGENTS_CAPTION);
   caption.setAttribute("disabled", "true");
   caption.setAttribute("data-agents-caption", "true");
-  caption.classList.add("menuitem-iconic", "sval-agent-menuitem");
+  caption.classList.add("menuitem-iconic", "sval-workspace-menuitem");
   caption.setAttribute("image", AGENT_ROBOT_URL);
   popup.append(popup.ownerDocument.createXULElement("menuseparator"), caption);
 }
 
 /**
  * Appends the agents' workspaces to `popup`: one menu for each app, the
- * agent's name and its app's mark (`markAgentItem`), holding its
+ * agent's name and its app's mark (`markAgentApp`), holding its
  * workspaces (`appendAgentAppEntries`). Every menu that lists the
  * agents' workspaces draws them this way, because every workspace of an
  * app carries the app's name, and only the task tells them apart.
@@ -172,7 +178,7 @@ export function appendAgentApps(popup, items, entryFor) {
     const el = popup.ownerDocument.createXULElement("menu");
     el.setAttribute("data-agent-app", app);
     labelMenuEntry(el, app);
-    markAgentItem(el, { agent: app, brand: entries[0].brand });
+    markAgentApp(el, entries[0].brand);
     const appPopup = popup.ownerDocument.createXULElement("menupopup");
     appendAgentAppEntries(appPopup, entries, entryFor);
     el.append(appPopup);
@@ -225,12 +231,40 @@ export function agentWorkspaceEntry(id) {
 export function markAgentModel(el, id) {
   const url = brandURL(modelBrandOf(agentWorkspaceEntry(id)?.model));
   if (url) {
-    el.classList.add(iconicClass(el), "sval-agent-menuitem");
+    el.removeAttribute("type");
+    el.classList.add(iconicClass(el), "sval-workspace-menuitem");
     el.setAttribute("image", url);
   } else {
     el.removeAttribute("image");
-    el.classList.remove(iconicClass(el), "sval-agent-menuitem");
+    el.classList.remove(iconicClass(el), "sval-workspace-menuitem");
   }
+}
+
+/**
+ * A Workspace's icon. Every surface that draws one takes it from here, so
+ * a Workspace wears the same icon in the strip, the switcher, every menu,
+ * a Peek, the Launcher and the Downloads panel.
+ *
+ * An agent's Workspace wears its app's mark or the robot, and a phone's or
+ * tablet's its device's mark, in place of an emoji of its own. Any other
+ * Workspace wears the emoji the user chose, or none.
+ *
+ * @param {object} nodes The document's `nodes` map.
+ * @param {string} id A workspace's id.
+ * @returns {{mark: string|null, emoji: string|null}} `mark` is an image's
+ *   URL, drawn as a mask in the text's colour or as a menu item's image.
+ */
+export function workspaceIcon(nodes, id) {
+  if (agentLabelOf(nodes, id) !== null) {
+    return {
+      mark: agentMarkURL(agentBrandOf(nodes[id].agent.label)),
+      emoji: null,
+    };
+  }
+  if (isDeviceWorkspace(nodes, id)) {
+    return { mark: deviceMarkURL(nodes, id), emoji: null };
+  }
+  return { mark: null, emoji: appearanceOf(nodes, id).emoji };
 }
 
 /**
@@ -239,7 +273,7 @@ export function markAgentModel(el, id) {
  * @param {string|null} brand `SvalAgentBrands.agentBrandOf`'s answer.
  * @returns {string}
  */
-export function agentMarkURL(brand) {
+function agentMarkURL(brand) {
   return brandURL(brand) ?? AGENT_ROBOT_URL;
 }
 
@@ -248,14 +282,11 @@ export function agentMarkURL(brand) {
  * device that says it is one (`SvalDeviceNames.kindOf`), else the phone.
  *
  * @param {object} nodes The document's `nodes` map.
- * @param {string} id A workspace's id.
- * @returns {string|null} null for a workspace that is no device's.
+ * @param {string} id A device's workspace's id.
+ * @returns {string}
  */
-export function deviceMarkURL(nodes, id) {
-  const device = nodes[id]?.device_home?.device;
-  if (!device) {
-    return null;
-  }
+function deviceMarkURL(nodes, id) {
+  const device = nodes[id].device_home.device;
   return lazy.SvalDeviceNames.kindOf(device) === "tablet"
     ? DEVICE_TABLET_URL
     : DEVICE_PHONE_URL;
@@ -373,37 +404,43 @@ export function labelMenuEntry(el, label, name = label) {
 }
 
 /**
- * Gives an agent's workspace entry its app's mark (`agentMarkURL`),
- * as the item's image, and
- * says what it means (`describeMenuEntry`), so the mark does not
- * rest on the image alone (agent-control spec §6).
+ * Gives a workspace's entry its mark (`workspaceIcon`) as its image, and
+ * says what an agent's means (`describeMenuEntry`), so the mark does not
+ * rest on the image alone (agent-control spec §6). The user's own
+ * Workspaces wear their emoji in their label (`switcherItemLabel`).
  *
- * @param {Element} el A workspace `menu` or `menuitem`.
- * @param {object} item Its `switcherItems` entry.
- */
-export function markAgentItem(el, item) {
-  if (!item.agent) {
-    return;
-  }
-  el.classList.add(iconicClass(el), "sval-agent-menuitem");
-  el.setAttribute("image", agentMarkURL(item.brand));
-  describeMenuEntry(el, AGENT_TEXT);
-}
-
-/**
- * Gives a phone's or tablet's workspace entry its device's mark, as its
- * image, as `markAgentItem` gives an agent's the robot.
+ * A native macOS menu draws no image on a checkbox or radio item
+ * (`nsMenuItemX::SetupIcon`), so an entry with a mark is a plain item,
+ * which shows `checked` all the same (`nsMenuItemX::SetChecked`).
  *
  * @param {Element} el A workspace `menu` or `menuitem`.
  * @param {object} item Its `switcherItems` entry.
  * @param {object} nodes The document's `nodes` map.
  */
-export function markDeviceItem(el, item, nodes) {
-  if (!item.device) {
+export function markWorkspaceItem(el, item, nodes) {
+  const { mark } = workspaceIcon(nodes, item.id);
+  if (!mark) {
     return;
   }
-  el.classList.add(iconicClass(el), "sval-device-menuitem");
-  el.setAttribute("image", deviceMarkURL(nodes, item.id));
+  el.removeAttribute("type");
+  el.classList.add(iconicClass(el), "sval-workspace-menuitem");
+  el.setAttribute("image", mark);
+  if (item.agent) {
+    describeMenuEntry(el, AGENT_TEXT);
+  }
+}
+
+/**
+ * Gives an agent app's menu its app's mark, as `markWorkspaceItem` gives
+ * each of its Workspaces theirs.
+ *
+ * @param {Element} el The app's `menu`.
+ * @param {string|null} brand `SvalAgentBrands.agentBrandOf`'s answer.
+ */
+function markAgentApp(el, brand) {
+  el.classList.add(iconicClass(el), "sval-workspace-menuitem");
+  el.setAttribute("image", agentMarkURL(brand));
+  describeMenuEntry(el, AGENT_TEXT);
 }
 
 /**
@@ -433,9 +470,9 @@ function describeMenuEntry(el, text) {
 
 /**
  * Gives an isolated workspace's entry the box (isolated workspaces spec
- * §10), as its image, as `markAgentItem` does. An agent's entry
- * keeps its robot and a device's its phone, the one image an item has,
- * and its description says it is isolated.
+ * §10), as its image, as `markWorkspaceItem` does. An agent's entry
+ * and a device's keep their mark (`workspaceIcon`), the one image an item
+ * has, and the description says the Workspace is isolated.
  *
  * @param {Element} el A workspace `menu` or `menuitem`.
  * @param {object} item The entry it draws.
@@ -449,8 +486,8 @@ export function markIsolatedItem(el, item, nodes) {
     el,
     item.agent ? `${AGENT_TEXT}. ${ISOLATED_TEXT}` : ISOLATED_TEXT
   );
-  if (!item.agent && !item.device) {
-    el.classList.add(iconicClass(el), "sval-isolated-menuitem");
+  if (!workspaceIcon(nodes, item.id).mark) {
+    el.classList.add(iconicClass(el), "sval-workspace-menuitem");
     el.setAttribute("image", ISOLATED_BOX_URL);
   }
 }

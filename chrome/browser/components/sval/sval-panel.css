@@ -2166,9 +2166,7 @@ menupopup:not([sval-stem]) {
   mask: var(--sval-agent-mark, url("chrome://browser/content/sval/agent-robot.svg")) center / contain no-repeat;
 }
 
-.sval-agent-menuitem,
-.sval-device-menuitem,
-.sval-isolated-menuitem {
+.sval-workspace-menuitem {
   -moz-context-properties: fill;
   fill: currentColor;
 }

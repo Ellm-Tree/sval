@@ -22,6 +22,8 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  workspaceIcon:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   workspaceName:
     "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
@@ -334,8 +336,9 @@ export function windowToTell(download, isPrivate) {
  *
  * @param {Window} win
  * @param {object} download
- * @returns {{name: string, emoji: string|null, color: string|null, agent: boolean, deleted: boolean, unknown?: boolean}|null}
- *   null for a download Sval has no workspace for.
+ * @returns {{name: string, mark: string|null, emoji: string|null, color: string|null, agent: boolean, deleted: boolean, unknown?: boolean}|null}
+ *   null for a download Sval has no workspace for. `mark` and `emoji` are
+ *   the workspace's icon (`SvalWorkspaceEntries.workspaceIcon`).
  */
 export function labelOf(win, download) {
   const id = workspaceOfDownload(download);
@@ -343,13 +346,14 @@ export function labelOf(win, download) {
     return null;
   }
   const panel = win.SvalPanel;
-  const item = switcherItems(
-    panel?.nodes ?? {},
-    lazy.SvalWindowWorkspace.of(win).id
-  ).find(entry => entry.id === id);
+  const nodes = panel?.nodes ?? {};
+  const item = switcherItems(nodes, lazy.SvalWindowWorkspace.of(win).id).find(
+    entry => entry.id === id
+  );
   if (!item) {
     return {
       name: "",
+      mark: null,
       emoji: null,
       color: null,
       agent: false,
@@ -359,7 +363,7 @@ export function labelOf(win, download) {
   }
   return {
     name: lazy.workspaceName(item),
-    emoji: item.agent ? null : item.emoji,
+    ...lazy.workspaceIcon(nodes, id),
     color: item.color,
     agent: !!item.agent,
     deleted: false,

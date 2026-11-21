@@ -254,6 +254,44 @@ add_task(async function a_tablets_workspace_wears_the_tablet() {
 });
 
 /**
+ * A device's Workspace wears its mark wherever a list offers it: the menu
+ * bar's Workspaces menu, as an item macOS draws an image on, and a Peek's
+ * choices of where to open a page.
+ */
+add_task(async function every_list_draws_a_devices_mark() {
+  const { engine } = await withSwitcherPanel();
+  const device = await addDeviceWorkspace(engine, 1);
+  await SvalPanel.refresh();
+  // The phone, or the tablet once the device says it is one.
+  const MARK =
+    /^chrome:\/\/browser\/content\/sval\/device-(phone|tablet)\.svg$/;
+
+  const popup = document.createXULElement("menupopup");
+  SvalPanel.switcher.fillMenuBar(popup);
+  const entry = popup.querySelector(
+    `[data-workspace-id="${CSS.escape(device)}"]`
+  );
+  Assert.stringMatches(
+    entry.getAttribute("image"),
+    MARK,
+    "the menu bar's entry"
+  );
+  // `nsMenuItemX::SetupIcon` draws no image on a checkbox item.
+  Assert.ok(!entry.hasAttribute("type"), "as a plain item");
+  const own = popup.querySelector(
+    `[data-workspace-id="${CSS.escape(SvalWindowWorkspace.of(window).id)}"]`
+  );
+  Assert.equal(own.getAttribute("checked"), "true", "this window's is checked");
+
+  const { destinationChoices } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalPeek.sys.mjs"
+  );
+  const choice = destinationChoices(SvalPanel.nodes).find(c => c.id === device);
+  Assert.equal(choice.mark, entry.getAttribute("image"), "a Peek's choice");
+  Assert.equal(choice.emoji, null, "in place of an emoji");
+});
+
+/**
  * A new window with every one of the user's Workspaces open never takes a
  * device's Workspace that has no window: it gets a new, nameless one of the
  * user's own, as it does beside an agent's.

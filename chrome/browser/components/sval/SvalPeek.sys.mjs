@@ -52,6 +52,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalMacWindowOrder:
     "moz-src:///browser/components/sval/SvalMacWindowOrder.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
+  workspaceIcon:
+    "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWorkspaceJar:
     "moz-src:///browser/components/sval/SvalWorkspaceJar.sys.mjs",
   clickText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
@@ -483,17 +485,19 @@ function openPeek({
  * button and menu offer these, and link routing's rules name them.
  *
  * @param {object} nodes The document's nodes, by id.
- * @returns {object[]} `{ id, name, color, emoji, isolated }`.
+ * @returns {object[]} `{ id, name, color, mark, emoji, isolated }`, its
+ *   icon's `mark` and `emoji` as `SvalWorkspaceEntries.workspaceIcon` gives
+ *   them.
  */
 export function destinationChoices(nodes) {
   return lazy.model
     .switcherItems(nodes, null)
     .filter(item => item.agent === null)
-    .map(({ id, name, color, emoji }) => ({
+    .map(({ id, name, color }) => ({
       id,
       name: name || "Untitled Workspace",
       color,
-      emoji,
+      ...lazy.workspaceIcon(nodes, id),
       isolated: lazy.SvalWorkspaceJar.isIsolated(nodes, id),
     }));
 }
@@ -844,7 +848,7 @@ async function openInWorkspace(win, workspaceId, { newWindow = false } = {}) {
 }
 
 /**
- * A workspace's tile, as the panel's switcher draws it: its emoji, or the
+ * A workspace's tile, as the panel's switcher draws it: its icon, or the
  * workspace glyph, on its colour.
  *
  * @param {Document} doc
@@ -854,7 +858,9 @@ async function openInWorkspace(win, workspaceId, { newWindow = false } = {}) {
 function tile(doc, choice) {
   const el = htmlElement(doc, "span", { className: "sval-peek-tile" });
   el.setAttribute("aria-hidden", "true");
-  if (choice.emoji) {
+  if (choice.mark) {
+    el.style.setProperty("--sval-tile-mark", `url("${choice.mark}")`);
+  } else if (choice.emoji) {
     el.textContent = choice.emoji;
   }
   if (choice.color) {

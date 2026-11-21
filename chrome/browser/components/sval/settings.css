@@ -3027,14 +3027,17 @@ html|* {
   font-weight: 700;
   line-height: 1;
 
-  /* The workspace glyph, as the panel's switcher draws a tile with no
-     emoji. */
+  /* The workspace's mark, or the workspace glyph, as the panel's switcher
+     draws a tile with no emoji. */
   &:empty::before {
     content: "";
     width: 12px;
     height: 12px;
     background: currentColor;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='5' width='9' height='9' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Cpath d='M5 2.5h6.5a2 2 0 0 1 2 2V11' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E")
+    mask: var(
+        --sval-tile-mark,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='5' width='9' height='9' rx='2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Cpath d='M5 2.5h6.5a2 2 0 0 1 2 2V11' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E")
+      )
       center / contain no-repeat;
   }
 }

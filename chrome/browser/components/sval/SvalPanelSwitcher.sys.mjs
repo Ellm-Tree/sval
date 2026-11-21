@@ -549,8 +549,7 @@ export class SvalPanelSwitcher {
     // The emoji leads the label as it leads the switcher's own name, so an
     // entry reads, and is announced, as the button does once chosen.
     SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
-    SvalWorkspaceEntries.markAgentItem(el, item);
-    SvalWorkspaceEntries.markDeviceItem(el, item, this.#view.nodes);
+    SvalWorkspaceEntries.markWorkspaceItem(el, item, this.#view.nodes);
     SvalWorkspaceEntries.markIsolatedItem(el, item, this.#view.nodes);
     if (item.current) {
       el.setAttribute("aria-current", "true");
@@ -1516,7 +1515,7 @@ export class SvalPanelSwitcher {
       const entry = this.#window.document.createXULElement("menuitem");
       entry.setAttribute("data-move-workspace", item.id);
       SvalWorkspaceEntries.labelWorkspaceEntry(entry, item);
-      SvalWorkspaceEntries.markDeviceItem(entry, item, this.#view.nodes);
+      SvalWorkspaceEntries.markWorkspaceItem(entry, item, this.#view.nodes);
       popup.append(entry);
     }
     const agents = others.filter(item => item.agent);
@@ -1540,7 +1539,8 @@ export class SvalPanelSwitcher {
    * A native menu bar draws no submenu style, so the devices' workspaces
    * follow `appendDevicesCaption`'s caption, and the agents'
    * `appendAgentsMenuCaption`'s, grouped by app
-   * (`appendAgentApps`), and entries carry no mark.
+   * (`appendAgentApps`). Each entry wears its mark (`markWorkspaceItem`),
+   * or the user's emoji in its label.
    *
    * @param {Element} popup
    */
@@ -1572,7 +1572,7 @@ export class SvalPanelSwitcher {
     for (const item of devices) {
       const el = entry(item);
       SvalWorkspaceEntries.labelWorkspaceEntry(el, item);
-      SvalWorkspaceEntries.markDeviceItem(el, item, this.#view.nodes);
+      SvalWorkspaceEntries.markWorkspaceItem(el, item, this.#view.nodes);
       popup.append(el);
     }
     const agents = items.filter(i => i.agent);

@@ -259,6 +259,7 @@ export function describeRow(result, win) {
         row.chip = {
           name: workspace,
           color: payload.svalWorkspaceColor || null,
+          mark: payload.svalWorkspaceMark || null,
           emoji: payload.svalWorkspaceEmoji || null,
           agent: !!payload.svalAgent,
         };
@@ -615,12 +616,13 @@ export function paintColor(el, color) {
 }
 
 /**
- * A workspace's or agent's chip: a dot in the workspace's colour, or the
- * agent's glyph, the workspace's emoji, and the name.
+ * A workspace's or agent's chip: the workspace's mark, or a dot in its
+ * colour, then its emoji (`SvalWorkspaceEntries.workspaceIcon`), and the
+ * name.
  *
  * @param {Document} doc
- * @param {{name: string, color: string|null, emoji: string|null,
- *   agent: boolean}} chip
+ * @param {{name: string, color: string|null, mark?: string|null,
+ *   emoji: string|null, agent: boolean}} chip
  * @returns {Element}
  */
 export function chipElement(doc, chip) {
@@ -632,7 +634,12 @@ export function chipElement(doc, chip) {
   }
   const name = htmlElement(doc, "span", { className: "sval-chip-name" });
   name.textContent = chip.name;
-  el.append(htmlElement(doc, "span", { className: "sval-chip-glyph" }));
+  const glyph = htmlElement(doc, "span", { className: "sval-chip-glyph" });
+  if (chip.mark) {
+    el.dataset.mark = "";
+    glyph.style.setProperty("--sval-chip-mark", `url("${chip.mark}")`);
+  }
+  el.append(glyph);
   if (chip.emoji) {
     const emoji = htmlElement(doc, "span", { className: "sval-chip-emoji" });
     emoji.textContent = chip.emoji;

@@ -258,7 +258,7 @@
     },
 
     /**
-     * A workspace's tile, as the Peek draws it: its emoji, or the
+     * A workspace's tile, as the Peek draws it: its icon, or the
      * workspace glyph, on its colour, read from a browser window, where the
      * colours are defined.
      *
@@ -270,7 +270,9 @@
         className: "sval-links-tile",
         ariaHidden: "true",
       });
-      if (choice.emoji) {
+      if (choice.mark) {
+        tile.style.setProperty("--sval-tile-mark", `url("${choice.mark}")`);
+      } else if (choice.emoji) {
         tile.textContent = choice.emoji;
       }
       if (choice.color) {

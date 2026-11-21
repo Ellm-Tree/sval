@@ -108,13 +108,15 @@
   --sval-chip-fill: var(--sval-launcher-agent-fill);
   --sval-chip-ink: var(--sval-launcher-agent-ink);
   box-shadow: inset 0 0 0 1px var(--sval-launcher-agent-ring);
+}
 
-  > .sval-chip-glyph {
-    width: 13px;
-    height: 13px;
-    border-radius: 0;
-    mask: url("chrome://browser/content/sval/agent-robot.svg") center / contain no-repeat;
-  }
+/* A Workspace's mark (`SvalWorkspaceEntries.workspaceIcon`) in place of its
+   colour's dot. */
+.sval-chip[data-mark] > .sval-chip-glyph {
+  width: 13px;
+  height: 13px;
+  border-radius: 0;
+  mask: var(--sval-chip-mark) center / contain no-repeat;
 }
 
 /* A workspace's colour, for its chip and its swatch among a command's
