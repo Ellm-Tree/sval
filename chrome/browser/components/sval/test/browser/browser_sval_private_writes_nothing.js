@@ -26,7 +26,81 @@ Services.scriptloader.loadSubScript(
   this
 );
 
+const { SvalEngine } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalEngine.sys.mjs"
+);
+
 add_setup(privateSetup);
+
+/**
+ * Every document the profile's engine holds, as its plaintext export. The
+ * engine's files are sealed under hashed names, so these say which document
+ * a changed file holds.
+ *
+ * @returns {Promise<Map<string, object>>}
+ */
+async function engineExports() {
+  const engine = SvalEngine.sharedInstance;
+  const out = new Map([["tree", JSON.parse(await engine.exportJson())]]);
+  for (const name of engine.extraDocumentNames()) {
+    out.set(name, JSON.parse(await engine.exportJson(name)));
+  }
+  return out;
+}
+
+/**
+ * What differs between two {@link engineExports}, as names and counts: per
+ * document, each changed top-level field, and for `nodes` how many were
+ * added, removed and changed and which node fields changed. A value, and a
+ * node's id, can carry what the session browsed, so none is reported.
+ *
+ * @param {Map<string, object>} before
+ * @param {Map<string, object>} after
+ * @returns {object}
+ */
+function exportChanges(before, after) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const changes = {};
+  for (const name of new Set([...before.keys(), ...after.keys()])) {
+    const was = before.get(name) ?? {};
+    const is = after.get(name) ?? {};
+    const fields = {};
+    for (const key of new Set([...Object.keys(was), ...Object.keys(is)])) {
+      if (same(was[key], is[key])) {
+        continue;
+      }
+      if (key != "nodes") {
+        fields[key] = "changed";
+        continue;
+      }
+      const nodes = { added: 0, removed: 0, changed: 0, fields: new Set() };
+      const a = was.nodes ?? {};
+      const b = is.nodes ?? {};
+      for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        if (!(id in a)) {
+          nodes.added++;
+        } else if (!(id in b)) {
+          nodes.removed++;
+        } else if (!same(a[id], b[id])) {
+          nodes.changed++;
+          for (const field of new Set([
+            ...Object.keys(a[id]),
+            ...Object.keys(b[id]),
+          ])) {
+            if (!same(a[id][field], b[id][field])) {
+              nodes.fields.add(field);
+            }
+          }
+        }
+      }
+      fields.nodes = { ...nodes, fields: [...nodes.fields].sort() };
+    }
+    if (Object.keys(fields).length) {
+      changes[name] = fields;
+    }
+  }
+  return changes;
+}
 
 /**
  * A whole private session leaves Sval's files and the shared folder exactly as
@@ -35,6 +109,7 @@ add_setup(privateSetup);
 add_task(async function a_private_session_writes_nothing() {
   await flushEverything();
   const before = await snapshot(svalPaths());
+  const exportsBefore = await engineExports();
   const win = await openPrivate();
   let marks;
   try {
@@ -53,10 +128,16 @@ add_task(async function a_private_session_writes_nothing() {
   await flushEverything();
 
   const after = await snapshot(svalPaths());
+  const exportsAfter = await engineExports();
   Assert.deepEqual(
     [...after.entries()].sort(),
     [...before.entries()].sort(),
     "sval's own files are byte-identical"
+  );
+  Assert.deepEqual(
+    exportChanges(exportsBefore, exportsAfter),
+    {},
+    "and so are the engine's documents"
   );
   Assert.deepEqual(
     await findMarkers([PathUtils.profileDir], marks),
