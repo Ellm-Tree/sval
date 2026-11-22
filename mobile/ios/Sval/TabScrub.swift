@@ -287,13 +287,20 @@ struct TabScrubStrip: View {
         return count == 1 ? "1 tab" : "\(count) tabs"
     }
 
-    /// The front card's group, as the grid's group header shows it. The
-    /// line keeps its height when the card is in no group, so the strip
-    /// doesn't jump.
+    /// The front card's group, as the grid's group header shows it, or
+    /// "Pinned" over a pin. The line keeps its height when the card is in
+    /// no group, so the strip doesn't jump.
     private var groupName: some View {
-        let group = scrub.items[scrub.index].group
+        let item = scrub.items[scrub.index]
+        let group = item.group
         return HStack(spacing: 8) {
-            if let group {
+            if case .pin = item {
+                Image(systemName: "pin.fill")
+                    .foregroundStyle(theme.text)
+                Text("Pinned")
+                    .foregroundStyle(theme.text)
+                    .lineLimit(1)
+            } else if let group {
                 if let emoji = group.emoji, !emoji.isEmpty {
                     Text(emoji).accessibilityIgnoresInvertColors()
                 } else {
