@@ -333,6 +333,21 @@ Each entry gives:
   the patch and passes with it.
 - **Upstream**: one bug, with the patch as it is. Not submitted.
 
+### DevTools logs a slow content process as an error
+
+- **Patch**: `patches/devtools-slow-process-warns.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `DevToolsProcessParent.sendQuery` logs `console.error` when a
+  content process takes over a second to answer a query, and again when it
+  answers. DevTools carries on either way, so neither is an error. On a
+  loaded machine, opening the Multiprocess Browser Console logs both for
+  every process.
+- **Evidence**: `browser_sval_devtools_close.js`, which fails on any console
+  error, failed with both lines for all nine content processes on a loaded
+  Windows runner.
+- **Upstream**: file a bug in DevTools :: General with the patch. Not
+  submitted.
+
 ### A process that starts as DevTools closes reports targets for a gone watcher
 
 - **Patch**: `patches/devtools-targets-for-a-gone-watcher.patch`

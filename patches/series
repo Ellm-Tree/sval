@@ -165,6 +165,7 @@ devtools-console-origin.patch
 devtools-console-skip-devtools-requests.patch
 devtools-targets-for-a-gone-watcher.patch
 devtools-console-batch-after-closing.patch
+devtools-slow-process-warns.patch
 mochitest-window-keeps-console.patch
 hidden-history-menu-closes.patch
 launcher-tab-rows.patch
@@ -256,6 +257,7 @@ hsts-test-per-jar.patch
 download-spam-test-workspace-lists.patch
 allowlist-principal-test-private-jars.patch
 sessionstore-test-windows-without-leftovers.patch
+url-classifier-test-windows-without-leftovers.patch
 agent-in-control.patch
 agent-pip-player-refused.patch
 pip-tab-hidden-after-close.patch

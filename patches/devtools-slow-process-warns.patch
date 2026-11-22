@@ -1,0 +1,30 @@
+Sval: DevTools warns about a slow content process
+
+DevToolsProcessParent.sendQuery gives a content process one second to
+answer, then carries on without it and logs console.error, and logs
+console.error again when the process answers. A busy process or a loaded
+machine is slow without anything having gone wrong, so both are warnings:
+the Browser Console still shows that a process was slow.
+
+diff --git a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+index 981bfa5a26..95a925f253 100644
+--- a/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
++++ b/devtools/server/connectors/js-process-actor/DevToolsProcessParent.sys.mjs
+@@ -337,7 +337,7 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+     // Use a timeout to detect when it happens.
+     const timeout = setTimeout(() => {
+       this.#frozen = true;
+-      console.error(
++      console.warn(
+         `Content process ${osPid} isn't responsive while sending "${msg}" request. DevTools will ignore this process for now.`
+       );
+       // Do not consider timeout as an error as it may easily break the frontend.
+@@ -357,7 +357,7 @@ export class DevToolsProcessParent extends JSProcessActorParent {
+       // Ignore frozen processes when the JS Process Actor is destroyed.
+       // Either the process was shut down or DevTools unregistered the Actor.
+       if (this.#frozen && !this.#destroyed) {
+-        console.error(
++        console.warn(
+           `Content process ${osPid} is responsive again. DevTools resumes operations against it.`
+         );
+       }

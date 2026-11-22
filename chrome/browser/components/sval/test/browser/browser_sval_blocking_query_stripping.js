@@ -200,6 +200,16 @@ add_task(async function the_levels_lists_add_their_parameters() {
   const defaults = Services.prefs.getDefaultBranch("");
 
   SvalBlocking.setLevel("balanced");
+  // Turning stripping on hands Firefox's stripper its list asynchronously,
+  // and a load before then strips nothing.
+  Assert.ok(
+    await within(
+      listService.testWaitForInit(),
+      10_000,
+      "the list service following the level"
+    ),
+    "the list service runs while stripping is on"
+  );
   const followed = TestUtils.waitForPrefChange(
     STRIP_LIST,
     value => value == "listparam"

@@ -1,0 +1,66 @@
+Sval: test_trackingprotection_bug1157081.html opens its second window without the first one's workspace
+
+A window takes a workspace no other window shows and opens that
+workspace's tabs (spec §10.7), and closing a window keeps its workspace
+once a page was browsed in it (decision 0101). The test's first window
+browses its page, so the second window shows that workspace and restores
+its tab while the test loads its own. The test hangs its load listener on
+whichever page the window shows when a DOMContentLoaded arrives, so the
+restore can take that page away and the load never comes. Only
+browser-chrome files get SvalTestLeftovers between files, so the test
+calls it before its first window, to record the workspaces it starts
+with, and again once that window has closed.
+
+diff --git a/toolkit/components/url-classifier/tests/mochitest/test_trackingprotection_bug1157081.html b/toolkit/components/url-classifier/tests/mochitest/test_trackingprotection_bug1157081.html
+index 098d6098d9..a5a8164fa2 100644
+--- a/toolkit/components/url-classifier/tests/mochitest/test_trackingprotection_bug1157081.html
++++ b/toolkit/components/url-classifier/tests/mochitest/test_trackingprotection_bug1157081.html
+@@ -25,6 +25,14 @@ const {UrlClassifierTestUtils} = ChromeUtils.importESModule(
+ const {TestUtils} = ChromeUtils.importESModule(
+   "resource://testing-common/TestUtils.sys.mjs"
+ );
++// Sval: the second window would show the workspace the first browsed in,
++// and restore its tab.
++const {BrowserTestUtils} = ChromeUtils.importESModule(
++  "resource://testing-common/BrowserTestUtils.sys.mjs"
++);
++const {SvalTestLeftovers} = ChromeUtils.importESModule(
++  "resource://testing-common/SvalTestLeftovers.sys.mjs"
++);
+ 
+ function testOnWindow(aCallback) {
+   var win = mainWindow.OpenBrowserWindow();
+@@ -73,19 +81,23 @@ SpecialPowers.pushPrefEnv(
+ 
+ function test() {
+   SimpleTest.registerCleanupFunction(UrlClassifierTestUtils.cleanupTestTrackers);
+-  UrlClassifierTestUtils.addTestTrackers().then(() => {
++  SvalTestLeftovers.beforeFile(mainWindow).then(() =>
++    UrlClassifierTestUtils.addTestTrackers()
++  ).then(() => {
+     // Safe Browsing turned OFF, tracking protection should work nevertheless
+     testOnWindow(function(aWindow) {
+       checkLoads(aWindow, true);
+-      aWindow.close();
+-
+-      // Safe Browsing turned ON, tracking protection should still work
+-      SpecialPowers.setBoolPref("browser.safebrowsing.phishing.enabled", true);
+-      testOnWindow(function(aWindow1) {
+-        checkLoads(aWindow1, true);
+-        aWindow1.close();
+-        SimpleTest.finish();
+-      });
++      BrowserTestUtils.closeWindow(aWindow)
++        .then(() => SvalTestLeftovers.beforeFile(mainWindow))
++        .then(() => {
++          // Safe Browsing turned ON, tracking protection should still work
++          SpecialPowers.setBoolPref("browser.safebrowsing.phishing.enabled", true);
++          testOnWindow(function(aWindow1) {
++            checkLoads(aWindow1, true);
++            aWindow1.close();
++            SimpleTest.finish();
++          });
++        });
+     });
+   });
+ }

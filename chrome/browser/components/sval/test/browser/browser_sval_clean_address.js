@@ -22,13 +22,6 @@ const CLEAN = `https://example.com${PAGE_PATH}?id=7`;
 
 add_setup(failOnConsoleErrors);
 add_setup(async function () {
-  // Query stripping on load would take `utm_source` off before the copy.
-  await SpecialPowers.pushPrefEnv({
-    set: [
-      ["privacy.query_stripping.enabled", false],
-      ["privacy.query_stripping.enabled.pbmode", false],
-    ],
-  });
   registerCleanupFunction(() => Services.prefs.clearUserPref(PINS_PREF));
 });
 
@@ -52,6 +45,30 @@ function pinned() {
  */
 function until(check, what) {
   return within(TestUtils.waitForCondition(check, what), 10_000, what);
+}
+
+/**
+ * Runs `task` in a new tab showing `TRACKED`, reached by a link within the
+ * site. Firefox strips a load's tracking parameters only when the load is
+ * cross-site or the system's own
+ * (`nsDocShellLoadState::MaybeStripTrackingQueryParams`).
+ *
+ * @param {Function} task
+ * @returns {Promise<void>}
+ */
+function withTrackedTab(task) {
+  return BrowserTestUtils.withNewTab(CLEAN, async browser => {
+    await pageReady(browser, CLEAN);
+    browser.loadURI(Services.io.newURI(TRACKED), {
+      triggeringPrincipal:
+        Services.scriptSecurityManager.createContentPrincipal(
+          Services.io.newURI(CLEAN),
+          {}
+        ),
+    });
+    await pageReady(browser, TRACKED);
+    await task(browser);
+  });
 }
 
 function menuReady() {
@@ -109,7 +126,7 @@ async function copied(action, expected) {
 
 add_task(async function the_address_row_pins_and_unpins_the_button() {
   atTaskEnd(() => Services.prefs.clearUserPref(PINS_PREF));
-  await BrowserTestUtils.withNewTab(TRACKED, async () => {
+  await withTrackedTab(async () => {
     await menuReady();
     ok(button().hidden, "the button starts unpinned");
     await openMenu();
@@ -129,7 +146,7 @@ add_task(async function the_address_row_pins_and_unpins_the_button() {
 });
 
 add_task(async function the_row_copies_the_address_without_trackers() {
-  await BrowserTestUtils.withNewTab(TRACKED, async () => {
+  await withTrackedTab(async () => {
     await menuReady();
     await openMenu();
     is(
@@ -152,7 +169,7 @@ add_task(async function the_pinned_button_copies_the_clean_address() {
     PINS_PREF,
     JSON.stringify([...pinned(), "clean-address"])
   );
-  await BrowserTestUtils.withNewTab(TRACKED, async () => {
+  await withTrackedTab(async () => {
     await menuReady();
     await until(() => !button().hidden, "the button showing");
     const id = await copied(() => button().click(), CLEAN);

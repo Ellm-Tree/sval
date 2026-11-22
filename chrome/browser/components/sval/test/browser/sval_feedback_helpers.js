@@ -57,10 +57,17 @@ function feedbackButton(win = window) {
  * @returns {Promise<Element>} the popover.
  */
 async function feedbackShown(win = window) {
-  await TestUtils.waitForCondition(() => {
-    const form = feedbackForm(win);
-    return form && !form.hidden && form.querySelector(".sval-feedback-row");
-  }, "the feedback form shows its report");
+  // The rows wait for `Troubleshoot.snapshot`, which reads every process
+  // and runs long on a loaded machine.
+  await TestUtils.waitForCondition(
+    () => {
+      const form = feedbackForm(win);
+      return form && !form.hidden && form.querySelector(".sval-feedback-row");
+    },
+    "the feedback form shows its report",
+    100,
+    150
+  );
   return feedbackForm(win);
 }
 

@@ -1557,7 +1557,13 @@ fn the_agent_is_served_while_sval_starts() {
         out.complete_lines().iter().all(|l| l["id"] != 2),
         "the call waits for sval"
     );
-    assert_eq!(calls.lock().unwrap().len(), 1, "sval was started");
+    // The starter runs on the thread serving the call, which may not have
+    // reached it when the ping is answered.
+    wait_until(
+        Duration::from_secs(5),
+        || "sval was not started".to_owned(),
+        || (calls.lock().unwrap().len() == 1).then_some(()),
+    );
     go.send(()).unwrap();
     let mut seen = 0;
     assert_eq!(
