@@ -67,17 +67,34 @@ enum MyFilters {
     /// a site's removals (`SvalElementRules`). An exception, a scriptlet,
     /// an HTML filter and a `~` entry remove nothing there.
     static func removals(on host: String, settings: [String: Any]) -> [Removal] {
-        let host = host.lowercased()
-        return entries(settings: settings).reversed().compactMap { key, entry in
-            guard let parsed = parse(entry.line) else { return nil }
-            // The most specific of the line's names that covers the host.
-            let scope = parsed.domains
-                .map { $0.lowercased() }
-                .filter { !$0.isEmpty && !$0.hasPrefix("~") && (host == $0 || host.hasSuffix("." + $0)) }
-                .max { $0.count < $1.count }
-            guard let scope else { return nil }
-            return Removal(key: key, line: entry.line, kind: parsed.kind, shown: parsed.shown, scope: scope,
-                           order: entry.order, domains: parsed.domains, rebuild: parsed.rebuild)
+        Lines(settings: settings).removals(on: host)
+    }
+
+    /// The lines that can name a site, newest first, read and parsed once
+    /// from a set of settings, so asking for a host's removals decodes
+    /// nothing.
+    struct Lines {
+        private let lines: [(key: String, order: String, line: String, parsed: Parsed)]
+
+        init(settings: [String: Any]) {
+            lines = MyFilters.entries(settings: settings).reversed().compactMap { key, entry in
+                MyFilters.parse(entry.line).map { (key, entry.order, entry.line, $0) }
+            }
+        }
+
+        /// `MyFilters.removals(on:settings:)` for these lines.
+        func removals(on host: String) -> [Removal] {
+            let host = host.lowercased()
+            return lines.compactMap { key, order, line, parsed in
+                // The most specific of the line's names that covers the host.
+                let scope = parsed.domains
+                    .map { $0.lowercased() }
+                    .filter { !$0.isEmpty && !$0.hasPrefix("~") && (host == $0 || host.hasSuffix("." + $0)) }
+                    .max { $0.count < $1.count }
+                guard let scope else { return nil }
+                return Removal(key: key, line: line, kind: parsed.kind, shown: parsed.shown, scope: scope,
+                               order: order, domains: parsed.domains, rebuild: parsed.rebuild)
+            }
         }
     }
 

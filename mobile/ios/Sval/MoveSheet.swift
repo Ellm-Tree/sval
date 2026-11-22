@@ -8,22 +8,23 @@ import SwiftUI
 /// groups.
 struct MoveSheet: View {
     @Environment(AppModel.self) private var model
+    @Environment(Toasts.self) private var toasts
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let rows: [OutlineRow]
-    /// Told what moved where, with a way to put it back.
-    let onMoved: (Toast) -> Void
+    /// Told once the rows have moved.
+    let onMoved: () -> Void
 
-    init(rows: [OutlineRow], onMoved: @escaping (Toast) -> Void) {
+    init(rows: [OutlineRow], onMoved: @escaping () -> Void = {}) {
         self.rows = rows
         self.onMoved = onMoved
     }
 
-    init(row: OutlineRow, onMoved: @escaping (Toast) -> Void) {
-        self.init(rows: [row], onMoved: onMoved)
+    init(row: OutlineRow) {
+        self.init(rows: [row])
     }
 
     @State private var openWorkspaces: Set<String> = []
@@ -89,9 +90,10 @@ struct MoveSheet: View {
                 guard let group = model.row(id) else { return }
                 let undo = putBack
                 dismiss()
-                onMoved(Toast(text: "Moved to \(describe(group))") {
+                toasts.show(Toast(text: "Moved to \(describe(group))") {
                     Task { await model.moveBack(undo) }
                 })
+                onMoved()
             }
         }
     }
@@ -169,9 +171,10 @@ struct MoveSheet: View {
     private func move(to target: OutlineRow) async {
         guard let undo = await model.move(rows, to: target.id) else { return }
         dismiss()
-        onMoved(Toast(text: "Moved to \(describe(target))") {
+        toasts.show(Toast(text: "Moved to \(describe(target))") {
             Task { await model.moveBack(undo) }
         })
+        onMoved()
     }
 
     /// New Group…: the group is named first, as the desktop's is, and

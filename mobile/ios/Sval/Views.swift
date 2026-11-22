@@ -21,6 +21,7 @@ struct SvalApp: App {
             if let model {
                 RootView()
                     .environment(model)
+                    .environment(model.toasts)
             }
         }
     }
@@ -72,7 +73,7 @@ extension OutlineRow {
     /// name the user gave it, stands in for its page's title
     /// (`displayName` on the desktop, spec §5.1), and a title held back
     /// from the tree (`TitleHold`) stands in for the one written.
-    @MainActor var title: String { label ?? TitleHold.shared.pending[id] ?? name }
+    @MainActor var title: String { label ?? TitleHold.shared.held(id) ?? name }
 
     /// What a row reads as: its title, or for a row without one what the
     /// desktop's panel calls it (`_untitled`, `tabPlaceholder`). A tab

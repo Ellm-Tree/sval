@@ -474,6 +474,85 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertTrue(row("Wikipedia").waitForNonExistence(timeout: 5), "a row tapped after the rename opens its tab and closes the sheet")
     }
 
+    /// Opens the Workspace sheet on Work.
+    private func openWork() {
+        waitForBar()
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch.tap()
+        sleep(2)
+        app.buttons["Work"].firstMatch.tap()
+        XCTAssertTrue(row("Wikipedia").waitForExistence(timeout: 5), "Work's tree shows")
+    }
+
+    /// A list element whose label starts with `text`.
+    private func labelled(_ text: String) -> XCUIElement {
+        app.collectionViews.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", text)).firstMatch
+    }
+
+    /// A tab renamed from the list in the Rename Tab alert, its name
+    /// selected so typing replaces it; then a rename cancelled, which
+    /// leaves the name as it was.
+    func testListRenameAlert() {
+        openWork()
+        row("Wikipedia").press(forDuration: 1.2)
+        app.buttons["Rename…"].firstMatch.tap()
+        let alert = app.alerts["Rename Tab"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Rename… in the list opens the Rename Tab alert")
+        XCTAssertTrue(keyboardShown, "the alert's field takes the keyboard")
+        app.typeText("Zq")
+        alert.buttons["Rename"].tap()
+        XCTAssertTrue(labelled("Zq").waitForExistence(timeout: 5), "the tab takes the name typed in place of its old one")
+        shot("list-renamed")
+        labelled("Zq").press(forDuration: 1.2)
+        app.buttons["Rename…"].firstMatch.tap()
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "the renamed tab's Rename… opens the alert")
+        app.typeText("Other")
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Cancel closes the alert")
+        XCTAssertTrue(labelled("Zq").exists, "Cancel keeps the name")
+        XCTAssertFalse(labelled("Other").exists, "Cancel saves nothing")
+    }
+
+    /// A toast shown while the Workspace sheet is open sits over the sheet
+    /// at the top of the screen, where its Undo takes a tap.
+    func testToastOverSheet() {
+        openWork()
+        row("Wikipedia").press(forDuration: 1.2)
+        // The menu's Close Tab: the rows' × buttons carry the same label.
+        let close = app.buttons.matching(identifier: "Close Tab").allElementsBoundByIndex.last { $0.isHittable }
+        XCTAssertNotNil(close, "the row's menu offers Close Tab")
+        close?.tap()
+        let toast = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Closed'")).firstMatch
+        XCTAssertTrue(toast.waitForExistence(timeout: 5), "closing a tab shows a toast")
+        shot("toast-over-sheet")
+        let screen = app.windows.firstMatch.frame
+        XCTAssertTrue(screen.contains(toast.frame), "the toast is on the screen")
+        XCTAssertLessThan(toast.frame.maxY, screen.midY, "the toast is at the top")
+        XCTAssertTrue(toast.isHittable, "the sheet doesn't cover the toast")
+        let undo = app.buttons["Undo"].firstMatch
+        XCTAssertTrue(undo.isHittable, "the toast's Undo takes a tap over the sheet")
+        undo.tap()
+        XCTAssertTrue(row("Wikipedia").waitForExistence(timeout: 5), "Undo brings the tab back")
+    }
+
+    /// A toast shown with nothing open sits above the bar.
+    func testToastAboveBar() {
+        waitForBar()
+        app.buttons["Site settings"].firstMatch.tap()
+        let add = app.buttons["Add to Favorites"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5), "the site menu offers Add to Favorites")
+        add.tap()
+        let toast = app.staticTexts["Added to Favorites"].firstMatch
+        XCTAssertTrue(toast.waitForExistence(timeout: 5), "adding a favorite shows a toast once the menu has closed")
+        shot("toast-above-bar")
+        let screen = app.windows.firstMatch.frame
+        XCTAssertTrue(screen.contains(toast.frame), "the toast is on the screen")
+        let bar = app.buttons["New Tab"].firstMatch.frame
+        XCTAssertLessThan(toast.frame.maxY, bar.minY, "the toast sits above the bar")
+        XCTAssertGreaterThan(toast.frame.minY, screen.midY, "the toast is at the foot of the screen")
+        XCTAssertTrue(toast.isHittable, "nothing covers the toast")
+        XCTAssertTrue(app.buttons["Move to…"].firstMatch.isHittable, "the toast's button takes a tap")
+    }
+
     /// A split made by a drag in Work's tree, opened, then separated: the
     /// tab in front keeps its page on screen.
     func testSplitSeparate() {

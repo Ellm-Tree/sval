@@ -22,10 +22,13 @@ import WebKit
 @MainActor
 @Observable
 final class Browser {
-    private(set) var currentTabId: String?
+    private(set) var currentTabId: String? {
+        didSet { refreshBar() }
+    }
     /// The workspace the tab list shows. It follows the tab in front.
     private(set) var workspaceId: String? {
         didSet {
+            refreshBar()
             if (oldValue.map(model.isPrivate) ?? false) != inPrivate { pauseOtherSide() }
             // The private session's Workspace is never saved.
             guard !(workspaceId.map(model.isPrivate) ?? false) else { return }
@@ -291,7 +294,7 @@ final class Browser {
     /// Pins a tab: its page becomes the pin's, and it leaves the tree
     /// (pins spec §8.1). A tab in front stays in front as the pin.
     func pin(_ row: OutlineRow, url: URL) async {
-        let page = currentTabId == row.id ? currentURL ?? url : url
+        let page = currentTabId == row.id ? currentPage()?.url ?? url : url
         guard let guid = await model.pinTab(url: page, title: row.title) else { return }
         handOver(row, toPin: guid)
         let front = currentTabId == row.id
@@ -467,10 +470,6 @@ final class Browser {
         }
     }
 
-    /// A message for the browser's toast from a view without one of its
-    /// own, such as a pane's pick page.
-    var toast: Toast?
-
     /// The two panes each split shows, by split id: this phone's own view,
     /// never synced, so any two panes can show together (12d). They're
     /// drawn in the split's order (`splitInFront`).
@@ -611,6 +610,7 @@ final class Browser {
                 Task { await self.offload(self.pages.keys.filter { $0 != self.currentTabId }, why: "memory warning") }
             }
         }
+        refreshBar()
     }
 
     /// Lets go of the pages of the workspaces the user left three hours ago
@@ -978,9 +978,25 @@ final class Browser {
     /// after a change that rebuilds them.
     @ObservationIgnored var reloadWhenRulesChange = false
 
-    /// The address of the page in front.
-    var currentURL: URL? {
-        pages[currentTabId ?? ""]?.view.url
+    /// The address of the page in front, as of the last `refreshState`,
+    /// which every change of the page's address reaches.
+    private(set) var currentURL: URL?
+
+    /// What the bar shows, set only when it changes, so the bar redraws for
+    /// what it shows alone. Every change of what it is worked out from
+    /// calls `refreshBar` in the same turn: this type's own state as it is
+    /// set, or by `select`, which places a split's panes; the page's in
+    /// `refreshState`; and the model's settings, tree, pins and private
+    /// session as they are set. An observation of those inputs would tell
+    /// of a change before the new value is in place, and the facts would
+    /// land a turn after the views that read the model directly.
+    private(set) var bar = BarFacts()
+
+    func refreshBar() {
+        let facts = BarFacts(self, model)
+        guard facts != bar else { return }
+        bar = facts
+        Signposts.bar.emitEvent("facts")
     }
 
     /// The title of the page in front, kept as it changes so the bar
@@ -1060,7 +1076,9 @@ final class Browser {
     }
 
     /// Each tab's media, for tabs that have played.
-    private(set) var media: [String: TabMedia] = [:]
+    private(set) var media: [String: TabMedia] = [:] {
+        didSet { refreshBar() }
+    }
     /// Tabs whose media the user stopped. Their pages load again, and a
     /// player can start itself on the new page, as YouTube's does, so
     /// their reports are set aside until the user plays it with a tap or
@@ -1072,7 +1090,9 @@ final class Browser {
     @ObservationIgnored private var held: [String: Date] = [:]
     /// Moves on as each media deadline passes, so what depends on time
     /// redraws.
-    private(set) var mediaClock = 0
+    private(set) var mediaClock = 0 {
+        didSet { refreshBar() }
+    }
     @ObservationIgnored private var mediaLoop: Task<Void, Never>?
 
     /// Whether media keeps playing after the user leaves its tab or the app.
@@ -1082,6 +1102,7 @@ final class Browser {
     var keepPlaying: Bool = UserDefaults.standard.object(forKey: keepPlayingKey) as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(keepPlaying, forKey: Self.keepPlayingKey)
+            refreshBar()
             mediaLog("Keep playing turned \(keepPlaying ? "on" : "off")")
         }
     }
@@ -1416,9 +1437,13 @@ final class Browser {
     /// The tabs whose page refused media, by the choice that refused it,
     /// until the tab's next load: Ask first's for the bar's ask, Always
     /// deny's for the shield's mark.
-    private(set) var mediaRefused: [String: SiteRules.Media] = [:]
+    private(set) var mediaRefused: [String: SiteRules.Media] = [:] {
+        didSet { refreshBar() }
+    }
     /// The tabs whose ask the user closed, until the tab's next load.
-    private(set) var askClosed: Set<String> = []
+    private(set) var askClosed: Set<String> = [] {
+        didSet { refreshBar() }
+    }
 
     /// Whether the bar asks to allow the page in front's media.
     var frontAsks: Bool {
@@ -1559,7 +1584,7 @@ final class Browser {
         page.onFailure = { [weak self] in self?.refreshState() }
         page.onFailedOverPage = { [weak self] reason in
             guard let self, currentTabId == id else { return }
-            toast = Toast(text: reason, symbol: "exclamationmark.triangle.fill")
+            model.toasts.show(Toast(text: reason, symbol: "exclamationmark.triangle.fill"))
         }
         page.onLoad = { [weak self, weak page] in
             guard let self else { return }
@@ -1687,6 +1712,8 @@ final class Browser {
         if failure != loadFailure { loadFailure = failure }
         currentTitle = view?.title
         pinOffSaved = currentTabId.flatMap { pin(for: $0) == nil ? nil : pages[$0] }?.offSaved ?? false
+        currentURL = view?.url
+        refreshBar()
     }
 
     // MARK: Pins

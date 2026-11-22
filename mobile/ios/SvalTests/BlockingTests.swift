@@ -108,6 +108,7 @@ final class PageRuleListsTests: XCTestCase {
             return try XCTUnwrap(compiled)
         }
         rules.lists = [try await list("level-1"), try await list("level-2")]
+        rules.last = [try await list("last")]
         rules.mine = [try await list("mine")]
         rules.own = [try await list("own")]
         rules.scripts = try await list("scripts")
@@ -118,7 +119,13 @@ final class PageRuleListsTests: XCTestCase {
     }
 
     func testAProtectedPageBlocksWithTheLevelsListsAndMyFilters() {
-        XCTAssertEqual(installed(protected: true), ["level-1", "level-2", "mine", "scripts"])
+        XCTAssertEqual(installed(protected: true), ["level-1", "level-2", "last", "mine", "scripts"])
+    }
+
+    /// The last lists alone are lists that run.
+    func testAProtectedPageBlocksWithTheLastListsAlone() {
+        rules.lists = []
+        XCTAssertEqual(installed(protected: true), ["last", "mine", "scripts"])
     }
 
     /// My filters' page rules apply where the lists don't (decision 1993).
@@ -128,13 +135,15 @@ final class PageRuleListsTests: XCTestCase {
 
     func testWithBlockingOffAProtectedPageKeepsMyFiltersPageRules() {
         rules.lists = []
+        rules.last = []
         XCTAssertEqual(installed(protected: true), ["own", "scripts"])
     }
 
     func testAPageTakesItsSitesProtections() {
         let rules = SiteRules(settings: protections(["example.com": #"{"protections":"off"}"#]))
         XCTAssertEqual(installed(protected: rules.protectionsOn(for: "www.example.com")), ["own", "scripts"])
-        XCTAssertEqual(installed(protected: rules.protectionsOn(for: "example.org")), ["level-1", "level-2", "mine", "scripts"])
+        XCTAssertEqual(installed(protected: rules.protectionsOn(for: "example.org")),
+                       ["level-1", "level-2", "last", "mine", "scripts"])
     }
 }
 

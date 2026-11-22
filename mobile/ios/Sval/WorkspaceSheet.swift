@@ -29,11 +29,6 @@ struct WorkspaceSheet: View {
     }
 
     @State var collapsed: Set<String> = Set(UserDefaults.standard.stringArray(forKey: collapsedKey) ?? [])
-    @State var renaming: String?
-    @State private var renameText = ""
-    /// Names saved but not yet back from the tree, shown meanwhile so the
-    /// row never flashes its old name.
-    @State private var pendingNames: [String: String] = [:]
     /// The Workspace or group dialog, when it's open.
     @State var look: LookTarget?
 
@@ -43,16 +38,13 @@ struct WorkspaceSheet: View {
     func editLook(of id: String) {
         if let row = model.row(id) { look = .edit(row) }
     }
-    /// The name the rename field opened with.
-    @State private var renameOriginal = ""
-    @FocusState private var renameFocused: Bool
     @State var moving: OutlineRow?
     @State var deletingGroup: OutlineRow?
     /// The tab or split Split With… makes a split of.
     @State var splittingWith: OutlineRow?
     /// The split whose Rename Split card is open.
     @State var renamingSplit: OutlineRow?
-    @State var toast: Toast?
+    @Environment(Toasts.self) var toasts
     @State private var path: [SheetPage] = []
     /// Edit mode (14d1): tabs are ticked to move, group or close together.
     @State var editing = false
@@ -72,9 +64,8 @@ struct WorkspaceSheet: View {
     @State var dragging: String?
     /// The row under a drag in the tree, and what a drop there would do.
     @State private var hover: DropHover?
-    /// The tab being renamed in the system's alert, and its name.
+    /// The row being renamed in the Rename Tab alert.
     @State var renamingCard: OutlineRow?
-    @State var cardName = ""
     /// The halves a card in the grid shows while a card is held over it.
     @State var gridDrop = GridDropState()
     /// How the tree is drawn: a list, or the grid of cards (15a).
@@ -104,7 +95,7 @@ struct WorkspaceSheet: View {
                     if isPrivateSession {
                         privateNotice
                     } else if !panel {
-                        PinsRow(onOpened: { close() }, onToast: { toast = $0 })
+                        PinsRow(onOpened: { close() })
                         theme.divider.frame(height: 1).padding(.horizontal, 16)
                     }
                     Group {
@@ -124,14 +115,8 @@ struct WorkspaceSheet: View {
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: layout)
             }
             .renameSplitAlert($renamingSplit)
-            .focusesAlertField(when: renamingCard != nil)
-            .alert("Rename Tab", isPresented: Binding(get: { renamingCard != nil }, set: { if !$0 { renamingCard = nil } })) {
-                TextField("Name", text: $cardName)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") {
-                    guard let row = renamingCard else { return }
-                    Task { await model.rename(row, to: cardName.trimmingCharacters(in: .whitespacesAndNewlines)) }
-                }
+            .textPrompt("Rename Tab", item: $renamingCard, initial: { name($0) }, value: PromptValue.tabName) { row, name in
+                Task { await model.rename(row, to: name) }
             }
             .sheet(item: $look) { target in
                 LookEditor(target: target, onClose: { self.look = nil }) { id in
@@ -171,7 +156,7 @@ struct WorkspaceSheet: View {
         // The grid draws from the same groups as the list.
         .onAppear { revealFront() }
         .sheet(item: $moving) { row in
-            MoveSheet(row: row) { toast in self.toast = toast }
+            MoveSheet(row: row)
                 .tintedSheet(model.tint(of: workspace))
                 .presentationDetents([.large])
         }
@@ -182,10 +167,7 @@ struct WorkspaceSheet: View {
         }
         .sheet(isPresented: Binding(get: { movingMany != nil }, set: { if !$0 { movingMany = nil } })) {
             if let rows = movingMany {
-                MoveSheet(rows: rows) { toast in
-                    self.toast = toast
-                    endEditing()
-                }
+                MoveSheet(rows: rows) { endEditing() }
                 .tintedSheet(model.tint(of: workspace))
                 .presentationDetents([.large])
             }
@@ -214,7 +196,7 @@ struct WorkspaceSheet: View {
             List {
                 // In the sideways panel the pins scroll away with the tree.
                 if panel {
-                    PinsRow(onOpened: { close() }, onToast: { toast = $0 }, tileSize: 48)
+                    PinsRow(onOpened: { close() }, tileSize: 48)
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -272,7 +254,6 @@ struct WorkspaceSheet: View {
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frames.tree = $0 }
             .sensoryFeedback(.selection, trigger: hover.map { "\($0.entry) \($0.kind)" })
         }
-        .toast($toast, top: true)
     }
 
     // MARK: Header and footer
@@ -427,12 +408,12 @@ struct WorkspaceSheet: View {
                 if let entry = await browser.close(row), Browser.openable(row) != nil { entries.append(entry) }
             }
             guard !model.isPrivate(rows.first?.id ?? "") else {
-                toast = .closed(rows.count)
+                toasts.show(.closed(rows.count))
                 return
             }
-            toast = .closed(rows.count) {
+            toasts.show(.closed(rows.count) {
                 Task { for entry in entries.reversed() { await browser.reopen(entry) } }
-            }
+            })
         }
     }
 
@@ -470,7 +451,7 @@ struct WorkspaceSheet: View {
     private func exitPrivate() {
         Task {
             await model.endPrivateSession()
-            TopNotice.show(.privateClosed, token: model.tint(of: model.browser.workspaceId.flatMap(model.row)), scheme: scheme)
+            toasts.show(.privateClosed)
         }
     }
 
@@ -783,8 +764,7 @@ struct WorkspaceSheet: View {
     }
 
     func name(_ row: OutlineRow) -> String {
-        if let pending = pendingNames[row.id] { return pending }
-        return row.displayTitle
+        row.displayTitle
     }
 
     @ViewBuilder private func item(_ entry: TreeEntry, block: RowBlock?) -> some View {
@@ -943,26 +923,22 @@ struct WorkspaceSheet: View {
             }
             SiteTile(row: row, size: 28)
                 .opacity(elsewhere ? 0.55 : 1)
-            if renaming == row.id {
-                renameField(row)
-            } else {
-                // The title, and under it the page's site as the bar shows
-                // it: a title alone can be the same on many pages, and the
-                // site tells them apart (Teevan et al., CHI 2009).
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name(row))
-                        .font(.system(.body, weight: front ? .semibold : .regular))
-                        .foregroundStyle(elsewhere ? rowInk.muted : rowInk.text)
-                        .titleLines()
-                    if let site = site(of: row) {
-                        Text(site)
-                            .font(.system(.footnote))
-                            .foregroundStyle(rowInk.muted)
-                            .lineLimit(1)
-                    }
+            // The title, and under it the page's site as the bar shows
+            // it: a title alone can be the same on many pages, and the
+            // site tells them apart (Teevan et al., CHI 2009).
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name(row))
+                    .font(.system(.body, weight: front ? .semibold : .regular))
+                    .foregroundStyle(elsewhere ? rowInk.muted : rowInk.text)
+                    .titleLines()
+                if let site = site(of: row) {
+                    Text(site)
+                        .font(.system(.footnote))
+                        .foregroundStyle(rowInk.muted)
+                        .lineLimit(1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             if elsewhere {
                 Image(systemName: "laptopcomputer")
                     .font(.system(size: 14))
@@ -981,10 +957,9 @@ struct WorkspaceSheet: View {
         .rowHeight(RowMetrics.tab)
         .background { frontCard(block, front: front) }
         .contentShape(.rect)
-        // A tap gesture, since a Button's label can't hold the rename
-        // field or the row's own buttons.
+        // A tap gesture, since a Button's label can't hold the row's own
+        // buttons.
         .onTapGesture {
-            guard renaming == nil else { return }
             if editing {
                 if ticked { selected.remove(row.id) } else { selected.insert(row.id) }
                 return
@@ -992,17 +967,16 @@ struct WorkspaceSheet: View {
             // A tab the phone can't open never takes the screen: it stays
             // in the tree, where it can be closed (decision 1372).
             if elsewhere {
-                toast = Toast(text: "Sval on \(UIDevice.current.model) can't open this tab", undo: { close(row) }, action: "Close Tab")
+                toasts.show(Toast(text: "Sval on \(UIDevice.current.model) can't open this tab", undo: { close(row) }, action: "Close Tab"))
                 return
             }
             browser.select(row.id)
             close()
         }
         // One element, as a grid card is: the title, the site, then any
-        // state, with × and the speaker as actions. A row being renamed
-        // keeps its field.
-        .accessibilityElement(children: renaming == row.id ? .contain : .ignore)
-        .accessibilityLabel(renaming == row.id ? "" : rowLabel(row, elsewhere: elsewhere, playing: playing))
+        // state, with × and the speaker as actions.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(rowLabel(row, elsewhere: elsewhere, playing: playing))
         .accessibilityAddTraits(front || (editing && ticked) ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction(named: "Close") { close(row) }
         .accessibilityActions {
@@ -1015,11 +989,11 @@ struct WorkspaceSheet: View {
             Button { moving = row } label: { Label("Move to…", systemImage: "folder") }
                 .tint(theme.action)
         }
-        .contextMenu { MenuItems(sections: tabMenu(row, rename: { startRename(row) })) }
+        .contextMenu { MenuItems(sections: tabMenu(row, rename: { renameCard(row) })) }
     }
 
-    /// A tab's long-press menu, in the list and the grid. `rename` starts
-    /// the rename the view draws.
+    /// A tab's long-press menu, in the list and the grid. `rename` opens
+    /// its Rename Tab alert.
     func tabMenu(_ row: OutlineRow, rename: @escaping () -> Void) -> [[MenuItem]] {
         var items = [MenuItem(title: "Rename…", symbol: "pencil", action: rename)]
         // Pins and Favorites sync, so a private tab offers neither.
@@ -1129,32 +1103,24 @@ struct WorkspaceSheet: View {
             Chevron(open: open, color: rowInk.muted)
                 .frame(width: 14)
             groupMark(row, open: open)
-            if renaming == row.id {
-                renameField(row)
-            } else {
-                Text(name(row))
-                    .font(.system(.body, weight: .semibold))
-                    .foregroundStyle(rowInk.text)
-                    .titleLines()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("\(count)")
-                    .font(.system(.subheadline))
-                    .monospacedDigit()
-                    .foregroundStyle(rowInk.muted)
-                    .padding(.trailing, 10)
-            }
+            Text(name(row))
+                .font(.system(.body, weight: .semibold))
+                .foregroundStyle(rowInk.text)
+                .titleLines()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(count)")
+                .font(.system(.subheadline))
+                .monospacedDigit()
+                .foregroundStyle(rowInk.muted)
+                .padding(.trailing, 10)
         }
         .padding(.leading, 12 + indent)
         .padding(.trailing, cardInset(block))
         .rowHeight(RowMetrics.group)
         .background { blockBackground(block) }
         .contentShape(.rect)
-        // A tap gesture, since a Button's label can't hold the rename field.
-        .onTapGesture {
-            guard renaming == nil else { return }
-            toggle(row)
-        }
-        .accessibilityElement(children: renaming == row.id ? .contain : .combine)
+        .onTapGesture { toggle(row) }
+        .accessibilityElement(children: .combine)
         .accessibilityValue(open ? "Expanded" : "Collapsed")
         .accessibilityAddTraits(.isButton)
         .contextMenu { MenuItems(sections: groupMenu(row)) }
@@ -1193,10 +1159,10 @@ struct WorkspaceSheet: View {
         let place = model.place(of: row)
         Task {
             await model.deleteGroup(row, keepingContents: false)
-            toast = Toast(text: "Deleted the “\(name(row))” group") {
+            toasts.show(Toast(text: "Deleted the “\(name(row))” group") {
                 guard let place else { return }
                 Task { await model.reopenGroup(row, at: place) }
-            }
+            })
         }
     }
 
@@ -1220,7 +1186,7 @@ struct WorkspaceSheet: View {
     func groupMenu(_ row: OutlineRow) -> [[MenuItem]] {
         let edit = row.kind == .group
             ? MenuItem(title: "Edit Group…", symbol: "pencil") { editLook(of: row.id) }
-            : MenuItem(title: "Rename…", symbol: "pencil") { startRename(row) }
+            : MenuItem(title: "Rename…", symbol: "pencil") { renameCard(row) }
         return [[edit, MenuItem(title: "Move to…", symbol: "folder") { moving = row }],
                 orderItems(row),
                 row.kind == .group
@@ -1242,23 +1208,6 @@ struct WorkspaceSheet: View {
         }
     }
 
-    private func renameField(_ row: OutlineRow) -> some View {
-        TextField("Name", text: $renameText)
-            .font(.system(.body, weight: .semibold))
-            .focused($renameFocused)
-            .submitLabel(.done)
-            .onSubmit { finishRename(row) }
-            .onChange(of: renameFocused) { _, focused in
-                if !focused { finishRename(row) }
-            }
-            .selectsAllWhenEditing(renameOriginal)
-            .padding(.horizontal, 10)
-            .frame(minHeight: 36)
-            .background(theme.cell, in: .rect(cornerRadius: 10))
-            .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(theme.accent, lineWidth: 2) }
-            .padding(.trailing, 6)
-    }
-
     func tabCount(in id: String) -> Int {
         model.rows.filter { $0.kind == .tab && isInside($0, id) }.count
     }
@@ -1274,26 +1223,7 @@ struct WorkspaceSheet: View {
     func unfavorite(_ url: URL) {
         Task {
             guard let undo = await model.removeFavorites(of: url) else { return }
-            toast = Toast(text: "Removed from Favorites") { Task { await model.editFavorites(undo) } }
-        }
-    }
-
-    func startRename(_ row: OutlineRow) {
-        renameText = name(row)
-        renameOriginal = renameText
-        renaming = row.id
-        renameFocused = true
-    }
-
-    /// Saves the name typed in place. An empty name keeps the old one.
-    private func finishRename(_ row: OutlineRow) {
-        guard renaming == row.id else { return }
-        renaming = nil
-        let text = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty { pendingNames[row.id] = text }
-        Task {
-            await model.rename(row, to: text)
-            pendingNames[row.id] = nil
+            toasts.show(Toast(text: "Removed from Favorites") { Task { await model.editFavorites(undo) } })
         }
     }
 
@@ -1302,7 +1232,7 @@ struct WorkspaceSheet: View {
     func closeSplit(_ split: OutlineRow, panes: [OutlineRow]) {
         Task {
             guard let undo = await browser.closeSplit(split) else { return }
-            toast = .closed(panes.count) { Task { await browser.reopenSplit(undo) } }
+            toasts.show(.closed(panes.count) { Task { await browser.reopenSplit(undo) } })
         }
     }
 
@@ -1312,276 +1242,13 @@ struct WorkspaceSheet: View {
         if model.isPrivate(row.id) {
             Task {
                 guard await browser.close(row) != nil else { return }
-                if model.privateWorkspace != nil { toast = .closed(1) }
+                if model.privateWorkspace != nil { toasts.show(.closed(1)) }
             }
             return
         }
         Task {
             guard let entry = await browser.close(row), Browser.openable(row) != nil else { return }
-            toast = .closed(1, title: name(row)) { Task { await browser.reopen(entry) } }
-        }
-    }
-}
-
-/// A notice on glass at the foot of a sheet, which may offer Undo for a
-/// few seconds.
-struct Toast: Identifiable {
-    let id = UUID()
-    let text: String
-    /// A glyph before the text, from the app's icons.
-    var icon: String?
-    var undo: (() -> Void)?
-    /// The button's label, when it does something other than undo.
-    var action = "Undo"
-    /// A system glyph before the text, in place of `icon`.
-    var symbol: String?
-    /// How long it shows.
-    var seconds: Double = 5
-}
-
-extension Toast {
-    /// What closing tabs says: the tab's title for one, else how many.
-    /// A private tab's title stays out of it, and its close has no Undo,
-    /// which would mean keeping the tab (13d).
-    static func closed(_ count: Int, title: String? = nil, undo: (() -> Void)? = nil) -> Toast {
-        let text = if count == 1, let title { "Closed “\(title)”" }
-            else if count == 1 { "Closed 1 tab" } else { "Closed \(count) tabs" }
-        return Toast(text: text, undo: undo)
-    }
-}
-
-struct ToastView: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.appearance) private var scheme
-    @Environment(\.sheetTint) private var sheetTint
-    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
-    @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
-    let toast: Toast
-    let onDone: () -> Void
-
-    var body: some View {
-        // The bar's glass in the Workspace's colour, as the notices at the
-        // top of the screen are.
-        let colors = BarColors(token: sheetTint ?? model.tint(of: model.browser.workspaceId.flatMap(model.row)),
-                               dark: scheme == .dark)
-        let ink = colors.ink
-        HStack(spacing: 12) {
-            if let icon = toast.icon {
-                Image(icon).resizable().frame(width: 18, height: 18).foregroundStyle(ink)
-            } else if let symbol = toast.symbol {
-                Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(ink)
-            }
-            Text(toast.text)
-                .font(.system(.subheadline, weight: .medium))
-                .foregroundStyle(ink)
-                .lineLimit(2)
-            Spacer(minLength: 4)
-            if let undo = toast.undo {
-                Button(toast.action) {
-                    undo()
-                    onDone()
-                }
-                .font(.system(.subheadline, weight: .bold))
-                .foregroundStyle(ink)
-            }
-        }
-        .frame(minHeight: 48)
-        .padding(.horizontal, 18)
-        .glassEffect(workspaceGlass(colors.layer), in: .capsule)
-        .padding(.horizontal, 16)
-        // A toast says what just happened, which VoiceOver reads out as
-        // it shows. One offering Undo stays while VoiceOver or Switch
-        // Control runs, since reaching its button takes longer than it
-        // shows for; the escape gesture puts it away.
-        .accessibilityAction(.escape, onDone)
-        .task(id: toast.id) {
-            AccessibilityNotification.Announcement(toast.text).post()
-            if toast.undo != nil, voiceOver || switchControl { return }
-            try? await Task.sleep(for: .seconds(toast.seconds))
-            onDone()
-        }
-    }
-}
-
-/// Shows a toast at the foot of a view, `lift` above whatever covers
-/// its foot, sliding up as it comes. With `top`, it shows at the top of
-/// the screen over every sheet instead, where the Workspace sheet or
-/// panel leaves the page showing.
-struct ToastPlace: ViewModifier {
-    @Environment(AppModel.self) private var model
-    @Environment(\.appearance) private var scheme
-    @Environment(\.sheetTint) private var sheetTint
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Binding var toast: Toast?
-    let lift: CGFloat
-    let top: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .bottom) {
-                if let toast, !top {
-                    ToastView(toast: toast) { self.toast = nil }
-                        .padding(.bottom, lift + 12)
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .animation(Motion.overlay, value: toast?.id)
-            .onChange(of: top ? toast?.id : nil, initial: true) {
-                if top, let toast {
-                    TopToast.show(toast, model: model, scheme: scheme, tint: sheetTint) {
-                        if self.toast?.id == toast.id { self.toast = nil }
-                    }
-                } else if let shown = TopToast.shown, shown == toast?.id || toast == nil {
-                    TopToast.hide(shown)
-                }
-            }
-    }
-}
-
-extension View {
-    func toast(_ toast: Binding<Toast?>, lift: CGFloat = 0, top: Bool = false) -> some View {
-        modifier(ToastPlace(toast: toast, lift: lift, top: top))
-    }
-}
-
-/// A toast at the top of the screen over every sheet, in a window of its
-/// own that takes only the toast's touches.
-@MainActor
-enum TopToast {
-    private static var window: UIWindow?
-    private static let state = TopToastState()
-    /// The toast showing.
-    static var shown: UUID? { state.toast?.id }
-
-    static func show(_ toast: Toast, model: AppModel, scheme: ColorScheme, tint: String?, onDone: @escaping () -> Void) {
-        if window == nil {
-            guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
-            let window = PassThroughWindow(windowScene: scene)
-            window.windowLevel = .alert
-            let host = UIHostingController(rootView: AnyView(EmptyView()))
-            host.view.backgroundColor = .clear
-            window.rootViewController = host
-            self.window = window
-        }
-        (window?.rootViewController as? UIHostingController<AnyView>)?.rootView = AnyView(
-            TopToastView(state: state)
-                .environment(model)
-                .environment(\.appearance, scheme)
-                .environment(\.sheetTint, tint))
-        window?.isHidden = false
-        state.onDone = onDone
-        state.toast = toast
-    }
-
-    /// Puts `id` away, if it is still the toast showing.
-    static func hide(_ id: UUID) {
-        guard state.toast?.id == id else { return }
-        state.toast = nil
-        Task {
-            try? await Task.sleep(for: .seconds(0.4))
-            if state.toast == nil { window?.isHidden = true }
-        }
-    }
-}
-
-@MainActor
-@Observable
-private final class TopToastState {
-    var toast: Toast?
-    var onDone: () -> Void = {}
-}
-
-/// A window whose own background lets touches through to the windows
-/// under it.
-private final class PassThroughWindow: UIWindow {
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        let hit = super.hitTest(point, with: event)
-        return hit === rootViewController?.view ? nil : hit
-    }
-}
-
-private struct TopToastView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let state: TopToastState
-
-    var body: some View {
-        VStack {
-            if let toast = state.toast {
-                ToastView(toast: toast) {
-                    state.onDone()
-                    TopToast.hide(toast.id)
-                }
-                .id(toast.id)
-                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 8)
-        .animation(Motion.overlay, value: state.toast?.id)
-    }
-}
-
-/// A notice with nothing to undo, at the top of the screen over every
-/// sheet, on the bar's glass in the Workspace's colour. It takes no
-/// touches, in a window of its own, as `PrivacyCover`'s is.
-@MainActor
-enum TopNotice {
-    private static var window: UIWindow?
-
-    static func show(_ toast: Toast, token: String?, scheme: ColorScheme) {
-        hide()
-        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
-        let window = UIWindow(windowScene: scene)
-        window.windowLevel = .alert
-        window.isUserInteractionEnabled = false
-        let host = UIHostingController(rootView: TopNoticeView(toast: toast, colors: BarColors(token: token, dark: scheme == .dark)))
-        host.view.backgroundColor = .clear
-        window.rootViewController = host
-        window.isHidden = false
-        self.window = window
-        // Its window takes no touches, so VoiceOver never lands on it.
-        UIAccessibility.post(notification: .announcement, argument: toast.text)
-    }
-
-    static func hide() {
-        window?.isHidden = true
-        window = nil
-    }
-}
-
-private struct TopNoticeView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let toast: Toast
-    let colors: BarColors
-    @State private var shown = false
-
-    var body: some View {
-        VStack {
-            if shown {
-                HStack(spacing: 12) {
-                    if let symbol = toast.symbol {
-                        Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
-                    }
-                    Text(toast.text)
-                        .font(.system(.subheadline, weight: .medium))
-                        .lineLimit(2)
-                }
-                .foregroundStyle(colors.ink)
-                .frame(minHeight: 48)
-                .padding(.horizontal, 18)
-                .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .capsule)
-                .padding(.horizontal, 16)
-                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 8)
-        .task {
-            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.35)) { shown = true }
-            try? await Task.sleep(for: .seconds(toast.seconds))
-            withAnimation(.easeIn(duration: 0.25)) { shown = false }
-            try? await Task.sleep(for: .seconds(0.3))
-            TopNotice.hide()
+            toasts.show(.closed(1, title: name(row)) { Task { await browser.reopen(entry) } })
         }
     }
 }

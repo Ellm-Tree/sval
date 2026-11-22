@@ -150,6 +150,7 @@ extension Toast {
         var toast = Toast(text: "Private Workspace and data deleted")
         toast.symbol = "checkmark"
         toast.seconds = 3
+        toast.notice = true
         return toast
     }
 }

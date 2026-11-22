@@ -28,7 +28,7 @@ struct FavoritesView: View {
     @State private var moving: Favorite?
     @State private var deletingFolder: Favorite?
     @State private var openingAll: Favorite?
-    @State private var toast: Toast?
+    @Environment(Toasts.self) private var toasts
 
     /// How many tabs Open All opens before it asks, Firefox's default
     /// (`browser.tabs.maxOpenBeforeWarn`).
@@ -70,7 +70,7 @@ struct FavoritesView: View {
             }
         }
         .sheet(item: $moving) { item in
-            FavoritesMoveSheet(item: item) { toast = $0 }
+            FavoritesMoveSheet(item: item)
                 .tintedSheet(sheetTint)
                 .presentationDetents([.large])
         }
@@ -113,7 +113,6 @@ struct FavoritesView: View {
         .environment(\.defaultMinListRowHeight, 17)
         .scrollEdgeFade()
         .contentMargins(.top, 4, for: .scrollContent)
-        .toast($toast, top: true)
     }
 
     @ViewBuilder private func row(_ item: Favorite) -> some View {
@@ -263,7 +262,7 @@ struct FavoritesView: View {
         Task {
             guard let undo = await model.deleteFavorites([item]) else { return }
             let what = item.kind == "separator" ? "Deleted the separator" : "Deleted “\(Self.name(item))”"
-            toast = Toast(text: what) { Task { await model.editFavorites(undo) } }
+            toasts.show(Toast(text: what) { Task { await model.editFavorites(undo) } })
         }
     }
 }
@@ -403,13 +402,12 @@ struct FavoriteEditor: View {
 /// there is no Workspace to pick.
 struct FavoritesMoveSheet: View {
     @Environment(AppModel.self) private var model
+    @Environment(Toasts.self) private var toasts
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
 
     let item: Favorite
-    /// Told where it moved, with a way to put it back.
-    let onMoved: (Toast) -> Void
     /// New Folder…'s editor, open over the sheet.
     @State private var naming: FavoriteEdit?
 
@@ -480,7 +478,7 @@ struct FavoritesMoveSheet: View {
         guard let back = await model.moveFavorite(item, to: folder) else { return }
         dismiss()
         let name = folder == model.favoritesRootId ? "Favorites" : model.favorite(folder).map(FavoritesView.name) ?? "Favorites"
-        onMoved(Toast(text: "Moved to \(name)") {
+        toasts.show(Toast(text: "Moved to \(name)") {
             Task { await model.moveFavorite(id, back: back) }
         })
     }
@@ -493,23 +491,12 @@ struct FavoritesMoveSheet: View {
 struct RenameFavoriteAlert: ViewModifier {
     @Environment(AppModel.self) private var model
     @Binding var item: Favorite?
-    @State private var text = ""
 
     func body(content: Content) -> some View {
-        content
-            .alert(item?.kind == "folder" ? "Rename Folder" : "Rename Favorite",
-                   isPresented: Binding(get: { item != nil }, set: { if !$0 { item = nil } })) {
-                TextField("Name", text: $text)
-                    .submitLabel(.done)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") {
-                    let name = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard let item, !name.isEmpty else { return }
-                    Task { await model.renameFavorite(item, to: name) }
-                }
-            }
-            .onChange(of: item?.id, initial: true) { text = item?.name ?? "" }
-            .focusesAlertField(when: item != nil)
+        content.textPrompt(item?.kind == "folder" ? "Rename Folder" : "Rename Favorite", item: $item, submit: .done,
+                           initial: \.name, value: PromptValue.favoriteName) {
+            item, name in Task { await model.renameFavorite(item, to: name) }
+        }
     }
 }
 

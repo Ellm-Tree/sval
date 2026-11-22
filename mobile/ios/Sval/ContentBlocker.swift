@@ -15,8 +15,10 @@ final class ContentBlocker {
     /// The compiled rule lists a page chooses from by its site's protections
     /// (`Page.useRules`).
     struct Rules {
-        /// The level's lists, with My filters' exceptions.
+        /// The level's lists but `lastLists`, with My filters' exceptions.
         var lists: [WKContentRuleList] = []
+        /// `lastLists`, with My filters' exceptions.
+        var last: [WKContentRuleList] = []
         /// My filters, with the level's exceptions, compiled apart so that a
         /// line added to them compiles this small list alone
         /// (`exceptionLines`).
@@ -33,8 +35,43 @@ final class ContentBlocker {
         /// rules alone where it hasn't or no list runs (decision 1993), and
         /// the scripts' everywhere.
         func installed(protected: Bool) -> [WKContentRuleList] {
-            (protected && !lists.isEmpty ? lists + mine : own) + (scripts.map { [$0] } ?? [])
+            let level = lists + last
+            return (protected && !level.isEmpty ? level + mine : own) + (scripts.map { [$0] } ?? [])
         }
+
+        /// The lists of each part, named apart so that each part is
+        /// compiled, kept and looked up on its own.
+        enum Part: CaseIterable, Sendable {
+            case lists, last, mine, own
+
+            var field: WritableKeyPath<Rules, [WKContentRuleList]> {
+                switch self {
+                case .lists: \.lists
+                case .last: \.last
+                case .mine: \.mine
+                case .own: \.own
+                }
+            }
+
+            /// The identifiers' prefix. Each list is kept in a store of its
+            /// own, named by its identifier (`ContentBlocker.store(for:)`).
+            var prefix: String {
+                switch self {
+                case .lists: "sval-lists-"
+                case .last: "sval-last-"
+                case .mine: "sval-mine-"
+                case .own: "sval-own-"
+                }
+            }
+        }
+    }
+
+    /// What one part's rules are made from: `key` names the inputs and
+    /// `convert` makes the rules.
+    struct PartInputs: Sendable {
+        let part: Rules.Part
+        let key: String
+        let convert: @Sendable () -> ContentRules
     }
 
     @ObservationIgnored private(set) var rules = Rules()
@@ -67,8 +104,13 @@ final class ContentBlocker {
     /// Whether the script rules were set from a compile this launch, which
     /// the lists looked up at launch never replace.
     @ObservationIgnored private var scriptsSet = false
-    /// Where the compiled rule lists are kept across launches.
-    private let store: WKContentRuleListStore
+    /// Where the compiled rule lists are kept across launches, one store
+    /// to a list. WebKit compiles the lists of one store one at a time, on
+    /// a queue it keeps for the store's path
+    /// (`API::ContentRuleListStore`), so lists in stores of their own
+    /// compile at once.
+    private let stores: URL
+    @ObservationIgnored private var opened: [String: WKContentRuleListStore] = [:]
     /// Where each part's key and count, and what was last applied, are kept.
     private let defaults: UserDefaults
     /// Whether the launch's lookup of the lists last applied has ended,
@@ -109,10 +151,12 @@ final class ContentBlocker {
     nonisolated static let listLifetime: TimeInterval = 24 * 60 * 60
     /// How long a list whose download failed waits before the next try.
     nonisolated static let retryAfter: TimeInterval = 60 * 60
-    private static let idPrefix = "sval-rules-"
-    private static let minePrefix = "sval-mine-"
-    private static let ownPrefix = "sval-own-"
     private static let scriptsId = "sval-scripts"
+
+    /// The level's lists that compile in a part of their own, after the
+    /// others are applied: malware-filter's, the largest lists, which their
+    /// publisher rewrites every 12 hours (`! Expires:` in each).
+    nonisolated static let lastLists: Set<String> = ["sval-curben-urlhaus", "sval-curben-phishing"]
 
     /// Each part's prefix and its rule count as last applied, which a
     /// launch looks up before the check reads any list.
@@ -120,14 +164,48 @@ final class ContentBlocker {
     /// Whether the script rules were last applied with a list.
     private static let scriptsAppliedKey = "contentRules.scripts.applied"
 
+    /// `formerStore` is a store that may hold lists an earlier build
+    /// compiled, which are removed.
     init(directory: URL = URL.cachesDirectory.appending(path: "blocklists", directoryHint: .isDirectory),
          download: @escaping Download = { await ContentBlocker.fetch($0) },
-         store: WKContentRuleListStore? = nil, defaults: UserDefaults = .standard) {
+         stores: URL = URL.applicationSupportDirectory.appending(path: "ContentRuleLists", directoryHint: .isDirectory),
+         defaults: UserDefaults = .standard, formerStore: WKContentRuleListStore? = nil) {
         self.directory = directory
         self.download = download
-        self.store = store ?? .default()
+        self.stores = stores
         self.defaults = defaults
         Task { [weak self] in await self?.restoreApplied() }
+        if let formerStore {
+            Task { await Self.removeLists(from: formerStore) }
+        }
+    }
+
+    /// Removes the lists Sval compiled into `store`.
+    static func removeLists(from store: WKContentRuleListStore) async {
+        for id in await store.availableIdentifiers() ?? [] where id.hasPrefix("sval-") {
+            try? await store.removeContentRuleList(forIdentifier: id)
+        }
+    }
+
+    /// The store that keeps the list `id`, in a folder of its own under
+    /// `stores`. The lists are made again from the downloads, so `stores`
+    /// is left out of the backup.
+    private func store(for id: String) -> WKContentRuleListStore? {
+        if let store = opened[id] { return store }
+        let folder = stores.appending(path: id, directoryHint: .isDirectory)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            var root = stores
+            try root.setResourceValues(values)
+        } catch {
+            Diagnostics.log("blocking: a rule list's folder was not made: \(Diagnostics.name(error))")
+            return nil
+        }
+        let store = WKContentRuleListStore(url: folder)
+        opened[id] = store
+        return store
     }
 
     /// The body of `url`'s answer when it is a 200.
@@ -151,32 +229,32 @@ final class ContentBlocker {
         for waiter in waiters { waiter.resume() }
     }
 
-    /// Applies the lists the last launch applied, by identifier from the
-    /// store. The check that follows finds the same key and keeps them, or
-    /// replaces them as it would any rules. With no record, or a list gone
-    /// from the store, pages load at once, and the first check's rules
-    /// apply when it ends.
+    /// Applies the lists the last launch applied, by identifier from their
+    /// stores. The check that follows finds the same keys and keeps them,
+    /// or replaces them as it would any rules. A part with no record, or
+    /// with a list gone from its store, is left out, and the first check's
+    /// rules for it apply when it ends. With nothing found, pages load at
+    /// once.
     private func restoreApplied() async {
         defer { becomeReady() }
-        guard !LaunchOption.given("-svalNoBlocking"),
-              let counts = defaults.dictionary(forKey: Self.appliedKey) as? [String: Int] else { return }
+        guard !LaunchOption.given("-svalNoBlocking") else { return }
+        let counts = defaults.dictionary(forKey: Self.appliedKey) as? [String: Int] ?? [:]
         var next = Rules()
-        let parts: [(WritableKeyPath<Rules, [WKContentRuleList]>, String)] =
-            [(\Rules.lists, Self.idPrefix), (\Rules.mine, Self.minePrefix), (\Rules.own, Self.ownPrefix)]
-        for (part, prefix) in parts {
-            guard let count = counts[prefix] else { continue }
-            guard let lists = await Self.storedLists(prefix, count: count, in: store) else { return }
-            next[keyPath: part] = lists
+        var found = 0
+        for part in Rules.Part.allCases {
+            guard let count = counts[part.prefix],
+                  let lists = await storedLists(part.prefix, count: count) else { continue }
+            next[keyPath: part.field] = lists
+            found += 1
         }
         var scripts: WKContentRuleList?
         if defaults.bool(forKey: Self.scriptsAppliedKey) {
-            guard let list = try? await store.contentRuleList(forIdentifier: Self.scriptsId) else { return }
-            scripts = list
+            scripts = try? await store(for: Self.scriptsId)?.contentRuleList(forIdentifier: Self.scriptsId)
         }
-        guard !ready else { return }
+        guard !ready, found > 0 || scripts != nil else { return }
         if !scriptsSet { rules.scripts = scripts }
         apply(next)
-        Diagnostics.log("blocking: \(next.lists.count + next.mine.count + next.own.count) list(s) from the last launch applied")
+        Diagnostics.log("blocking: \(Rules.Part.allCases.map { next[keyPath: $0.field].count }.reduce(0, +)) list(s) from the last launch applied")
     }
 
     /// Brings the rules in line with `inputs`: compiles the script rules at
@@ -265,6 +343,7 @@ final class ContentBlocker {
             requests = nil
             apply(Rules())
             defaults.set([String: Int](), forKey: Self.appliedKey)
+            removeUnused()
             Diagnostics.log("blocking: off")
             return
         }
@@ -281,15 +360,25 @@ final class ContentBlocker {
         let failedAt = failedAt
         let download = download
         let (texts, failed) = await Task.detached(priority: .userInitiated) {
-            var texts: [String] = []
-            var failed: [String] = []
-            for (id, address) in lists.sorted(by: { $0.key < $1.key }) {
-                let list = await Self.list(id: id, address: address, in: directory, failedAt: failedAt,
-                                           download: download)
-                if let text = list.text { texts.append(text) }
-                if list.failed { failed.append(id) }
+            await withTaskGroup(of: (id: String, text: String?, failed: Bool).self) { group in
+                for (id, address) in lists {
+                    group.addTask {
+                        let part = Self.lastLists.contains(id) ? "last" : "lists"
+                        let fetching = Signposts.blocker.beginInterval("download", "\(part, privacy: .public)")
+                        defer { Signposts.blocker.endInterval("download", fetching) }
+                        let list = await Self.list(id: id, address: address, in: directory, failedAt: failedAt,
+                                                   download: download)
+                        return (id, list.text, list.failed)
+                    }
+                }
+                var texts: [(id: String, text: String)] = []
+                var failed: [String] = []
+                for await list in group {
+                    if let text = list.text { texts.append((list.id, text)) }
+                    if list.failed { failed.append(list.id) }
+                }
+                return (texts.sorted { $0.id < $1.id }, failed)
             }
-            return (texts, failed)
         }.value
         let now = Date.now
         for id in failed { self.failedAt[id] = now }
@@ -297,96 +386,165 @@ final class ContentBlocker {
         // other.
         Task {
             let made = await Task.detached(priority: .utility) {
-                texts.isEmpty ? nil : RequestBlocker(lists: texts + [myFilters], allowedDomains: allowed)
+                texts.isEmpty ? nil : RequestBlocker(lists: texts.map(\.text) + [myFilters], allowedDomains: allowed)
             }.value
             if generation == requestsGeneration { requests = made }
         }
+        let parts = await Task.detached(priority: .utility) {
+            Self.parts(texts: texts, pageRules: pageRules, myFilters: myFilters, allowed: allowed)
+        }.value
+        // The last lists compile once the other parts are applied, so their
+        // compile takes no time from the others'. A part that fails to
+        // compile keeps the lists it had.
+        let absent = Set(Rules.Part.allCases).subtracting(parts.map(\.part))
+        let stages = [(parts.filter { $0.part != .last }, absent), (parts.filter { $0.part == .last }, [])]
+        var converted = 0
+        for (stage, cleared) in stages where !stage.isEmpty || !cleared.isEmpty {
+            let made = await withTaskGroup(of: (Rules.Part, (lists: [WKContentRuleList], rules: Int)?).self) { group in
+                for part in stage {
+                    group.addTask { @MainActor in (part.part, await self.made(part)) }
+                }
+                var made: [(Rules.Part, (lists: [WKContentRuleList], rules: Int)?)] = []
+                for await result in group { made.append(result) }
+                return made
+            }
+            var next = rules
+            for part in cleared {
+                next[keyPath: part.field] = []
+                recordApplied(part, count: nil)
+            }
+            for (part, result) in made {
+                guard let result else { continue }
+                next[keyPath: part.field] = result.lists
+                recordApplied(part, count: result.lists.count)
+                converted += result.rules
+            }
+            apply(next)
+        }
+        removeUnused()
+        let count = Rules.Part.allCases.map { rules[keyPath: $0.field].count }.reduce(0, +)
+        Diagnostics.log("blocking: \(converted) rule(s) converted in \(count) list(s) from \(texts.count) source(s), \(Int(Date.now.timeIntervalSince(started))) s")
+    }
+
+    /// The parts the rules are made in, from each list's text by id.
+    ///
+    /// A lift reaches only the rules before it in its own list
+    /// (`content_rules`), and a `$badfilter` only the rules converted with
+    /// it. So each part made from the level's lists takes the shared lines
+    /// (`sharedLines`) of the lists in the other part, and My filters'
+    /// exceptions, and its rules come out as they would from all the lists
+    /// converted together. My filters take the lists' exceptions.
+    nonisolated static func parts(texts: [(id: String, text: String)], pageRules: Bool, myFilters: String,
+                                  allowed: [String]) -> [PartInputs] {
         // Each key names what its rules are made from, the converter
         // included, so compiled rules are reused across launches until one
         // changes.
         let common = [converterVersion(), String(pageRules), allowed.joined(separator: ",")]
-        let level = await Task.detached(priority: .utility) { () -> (key: String, convert: @Sendable () -> ContentRules)? in
-            guard !texts.isEmpty else { return nil }
-            let theirs = exceptionLines(list: myFilters)
-            let inputs = texts + (theirs.isEmpty ? [] : [theirs])
-            return (Self.digest(common + inputs.map { Self.digest([$0]) }),
-                    { contentRules(lists: inputs, pageRules: pageRules, allowedDomains: allowed) })
-        }.value
-        let mine = await Task.detached(priority: .utility) { () -> (key: String, convert: @Sendable () -> ContentRules)? in
-            guard !texts.isEmpty, !myFilters.isEmpty else { return nil }
-            let inputs = [texts.map(exceptionLines).joined(), myFilters]
-            return (Self.digest(common + inputs),
-                    { contentRules(lists: inputs, pageRules: pageRules, allowedDomains: allowed) })
-        }.value
-        typealias Part = (part: WritableKeyPath<Rules, [WKContentRuleList]>, prefix: String,
-                          key: String?, convert: (@Sendable () -> ContentRules)?)
-        var next = Rules()
-        var counts: [Int] = []
-        var applied: [String: Int] = [:]
-        let parts: [Part] = [
-            (\Rules.lists, Self.idPrefix, level?.key, level?.convert),
-            (\Rules.mine, Self.minePrefix, mine?.key, mine?.convert),
-            (\Rules.own, Self.ownPrefix, own.isEmpty ? nil : Self.digest(common + [own]),
-             own.isEmpty ? nil : { @Sendable in ownPageRules(myFilters: own) }),
-        ]
-        for (part, prefix, key, convert) in parts {
-            guard let key, let convert else { continue }
-            guard let compiled = await made(prefix: prefix, key: key, convert: convert) else { return }
-            next[keyPath: part] = compiled.lists
-            counts.append(compiled.rules)
-            applied[prefix] = compiled.lists.count
+        let shared = texts.map { sharedLines(list: $0.text) }
+        let theirs = exceptionLines(list: myFilters)
+        var parts: [PartInputs] = []
+        for part in [Rules.Part.lists, .last] {
+            let inPart = texts.indices.filter { lastLists.contains(texts[$0].id) == (part == .last) }
+            guard !inPart.isEmpty else { continue }
+            let others = texts.indices.filter { !inPart.contains($0) }.map { shared[$0] }.joined()
+            let lists = inPart.map { texts[$0].text } + [others, theirs].filter { !$0.isEmpty }
+            parts.append(PartInputs(part: part, key: digest(common + lists.map { digest([$0]) }),
+                                    convert: { contentRules(lists: lists, pageRules: pageRules, allowedDomains: allowed) }))
         }
-        apply(next)
-        defaults.set(applied, forKey: Self.appliedKey)
-        Diagnostics.log("blocking: \(counts.reduce(0, +)) rule(s) converted in \(next.lists.count + next.mine.count + next.own.count) list(s) from \(texts.count) source(s), \(Int(Date.now.timeIntervalSince(started))) s")
+        if !texts.isEmpty, !myFilters.isEmpty {
+            let lists = [shared.map { exceptionLines(list: $0) }.joined(), myFilters]
+            parts.append(PartInputs(part: .mine, key: digest(common + lists),
+                                    convert: { contentRules(lists: lists, pageRules: pageRules, allowedDomains: allowed) }))
+        }
+        let own = pageRules ? myFilters : ""
+        if !own.isEmpty {
+            parts.append(PartInputs(part: .own, key: digest(common + [own]),
+                                    convert: { ownPageRules(myFilters: own) }))
+        }
+        return parts
     }
 
-    /// The rules `convert` makes, compiled under `prefix`, or those compiled
-    /// earlier when `key` names the same inputs. Returns how many rules it
-    /// converted, 0 for rules reused, or nil when a list fails to compile.
-    private func made(prefix: String, key: String,
-                      convert: @escaping @Sendable () -> ContentRules) async -> (lists: [WKContentRuleList], rules: Int)? {
+    /// The rules `inputs` makes, compiled under its part's prefix, or those
+    /// compiled earlier when its key names the same inputs. Returns how
+    /// many rules it converted, 0 for rules reused, or nil when a list
+    /// fails to compile.
+    private func made(_ inputs: PartInputs) async -> (lists: [WKContentRuleList], rules: Int)? {
+        let prefix = inputs.part.prefix
         let keyName = "contentRules.\(prefix).key"
         let countName = "contentRules.\(prefix).count"
-        if key == defaults.string(forKey: keyName),
-           let stored = await Self.storedLists(prefix, count: defaults.integer(forKey: countName), in: store) {
+        if inputs.key == defaults.string(forKey: keyName),
+           let stored = await storedLists(prefix, count: defaults.integer(forKey: countName)) {
             return (stored, 0)
         }
-        // The compile writes over this prefix's lists in the store, so a
-        // launch may no longer take them as last applied.
-        defaults.removeObject(forKey: Self.appliedKey)
+        // The compile writes over this part's lists, so neither a launch nor
+        // a later check may take them as they were.
+        recordApplied(inputs.part, count: nil)
+        defaults.removeObject(forKey: keyName)
         applying = true
-        let converted = await Task.detached(priority: .utility) { convert() }.value
-        guard let compiled = await Self.compile(converted.lists, prefix: prefix, in: store) else { return nil }
-        defaults.set(key, forKey: keyName)
+        let converting = Signposts.blocker.beginInterval("convert", "\(prefix, privacy: .public)")
+        let converted = await Task.detached(priority: .utility) { inputs.convert() }.value
+        Signposts.blocker.endInterval("convert", converting)
+        let compiling = Signposts.blocker.beginInterval("compile", "\(prefix, privacy: .public)")
+        let compiled = await compile(converted.lists, prefix: prefix)
+        Signposts.blocker.endInterval("compile", compiling)
+        guard let compiled else { return nil }
+        defaults.set(inputs.key, forKey: keyName)
         defaults.set(compiled.count, forKey: countName)
         return (compiled, Int(converted.rules))
     }
 
-    /// `lists` compiled, each under `prefix` and its place, or none when one
-    /// fails to compile.
-    private static func compile(_ lists: [String], prefix: String,
-                                in store: WKContentRuleListStore) async -> [WKContentRuleList]? {
-        var compiled: [WKContentRuleList] = []
-        for (index, json) in lists.enumerated() {
-            do {
-                if let list = try await store
-                    .compileContentRuleList(forIdentifier: prefix + String(index), encodedContentRuleList: json) {
-                    compiled.append(list)
+    /// `lists` compiled at once, each under `prefix` and its place in its
+    /// own store, or none when one fails to compile.
+    private func compile(_ lists: [String], prefix: String) async -> [WKContentRuleList]? {
+        let compiled = await withTaskGroup(of: (Int, WKContentRuleList?).self) { group in
+            for (index, json) in lists.enumerated() {
+                let id = prefix + String(index)
+                group.addTask { @MainActor in
+                    guard let store = self.store(for: id) else { return (index, nil) }
+                    do {
+                        return (index, try await store.compileContentRuleList(forIdentifier: id,
+                                                                              encodedContentRuleList: json))
+                    } catch {
+                        Diagnostics.log("blocking: a rule list failed to compile: \(Diagnostics.name(error))")
+                        return (index, nil)
+                    }
                 }
-            } catch {
-                Diagnostics.log("blocking: a rule list failed to compile: \(Diagnostics.name(error))")
             }
+            var compiled: [Int: WKContentRuleList] = [:]
+            for await (index, list) in group {
+                if let list { compiled[index] = list }
+            }
+            return compiled
         }
-        return compiled.count == lists.count ? compiled : nil
+        return compiled.count == lists.count ? lists.indices.compactMap { compiled[$0] } : nil
+    }
+
+    /// Records the count of `part`'s lists as applied, or that none are
+    /// for a launch to look up.
+    private func recordApplied(_ part: Rules.Part, count: Int?) {
+        var counts = defaults.dictionary(forKey: Self.appliedKey) as? [String: Int] ?? [:]
+        counts[part.prefix] = count
+        defaults.set(counts, forKey: Self.appliedKey)
+    }
+
+    /// Removes the stores of the lists no part has applied: those past the
+    /// count a part compiled, and those of a part that no longer runs.
+    private func removeUnused() {
+        let kept = Set(Rules.Part.allCases.flatMap { rules[keyPath: $0.field].map(\.identifier) })
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: stores.path(percentEncoded: false))) ?? []
+        for name in names where !kept.contains(name)
+            && Rules.Part.allCases.contains(where: { name.hasPrefix($0.prefix) }) {
+            opened[name] = nil
+            try? FileManager.default.removeItem(at: stores.appending(path: name, directoryHint: .isDirectory))
+        }
     }
 
     /// Takes the lists `made` holds, leaving the scripts', which change
     /// apart (`updateScripts`).
     private func apply(_ made: Rules) {
-        rules.lists = made.lists
-        rules.mine = made.mine
-        rules.own = made.own
+        for part in Rules.Part.allCases {
+            rules[keyPath: part.field] = made[keyPath: part.field]
+        }
         becomeReady()
         onChange?()
     }
@@ -402,7 +560,6 @@ final class ContentBlocker {
         guard key != scriptsKey else { return }
         scriptsKey = key
         let previous = scriptsWork
-        let store = store
         scriptsWork = Task {
             await previous?.value
             guard key == scriptsKey else { return }
@@ -411,7 +568,7 @@ final class ContentBlocker {
                 // The compile writes over the stored list.
                 defaults.set(false, forKey: Self.scriptsAppliedKey)
                 do {
-                    list = try await store
+                    list = try await store(for: Self.scriptsId)?
                         .compileContentRuleList(forIdentifier: Self.scriptsId, encodedContentRuleList: json)
                 } catch {
                     Diagnostics.log("blocking: the script rules failed to compile: \(Diagnostics.name(error))")
@@ -459,13 +616,11 @@ final class ContentBlocker {
         return (try? String(contentsOf: file, encoding: .utf8), true)
     }
 
-    private static func storedLists(_ prefix: String, count: Int,
-                                    in store: WKContentRuleListStore) async -> [WKContentRuleList]? {
+    private func storedLists(_ prefix: String, count: Int) async -> [WKContentRuleList]? {
         var lists: [WKContentRuleList] = []
         for index in 0..<count {
-            guard let list = try? await store
-                .contentRuleList(forIdentifier: prefix + String(index))
-            else { return nil }
+            let id = prefix + String(index)
+            guard let list = try? await store(for: id)?.contentRuleList(forIdentifier: id) else { return nil }
             lists.append(list)
         }
         return lists

@@ -8,21 +8,19 @@ import SwiftUI
 /// pin folder holding more. With more than fit, the row scrolls sideways.
 struct PinsRow: View {
     @Environment(AppModel.self) private var model
+    @Environment(Toasts.self) private var toasts
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Closes the sheet once a pin is in front.
     let onOpened: () -> Void
-    /// Shows the sheet's toast, which offers Undo.
-    let onToast: (Toast) -> Void
     /// A tile's size: 56pt, or 48pt in the sideways panel (12f3).
     var tileSize: CGFloat = 56
 
     @State private var openPinFolder: PinRow?
     @State private var renaming: PinRow?
     @State private var addressing: PinRow?
-    @State private var text = ""
     /// The pin whose tile shows the refresh glyph, after a first tap on the
     /// pin in front while it is off its saved page.
     @State private var revealed: String?
@@ -65,46 +63,23 @@ struct PinsRow: View {
                 .scrollEdgeFade(.horizontal)
                 if overflows { dots.padding(.bottom, 6) }
             }
-            .alert(renaming?.kind == "folder" ? "Rename Pin Folder" : "Rename Pin", isPresented: present($renaming)) {
-                TextField("Name", text: $text)
-                    .selectsAllWhenEditing(renaming?.name ?? "")
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") {
-                    if let pin = renaming { Task { await model.renamePin(pin, to: text) } }
+            .textPrompt(renaming?.kind == "folder" ? "Rename Pin Folder" : "Rename Pin", item: $renaming,
+                        initial: \.name, value: PromptValue.asTyped) { pin, name in
+                Task { await model.renamePin(pin, to: name) }
+            }
+            .textPrompt("Create Pin Folder", item: $folding, confirm: "Create", initial: { _ in Self.newPinFolderName },
+                        value: PromptValue.pinFolderName) { folding, name in
+                Task {
+                    await model.makePinFolder(of: folding.target, and: folding.dragged, named: name)
+                    Diagnostics.log("pins: a pin dropped on a pin made a pin folder")
                 }
             }
-            .alert("Create Pin Folder", isPresented: Binding(get: { folding != nil }, set: { if !$0 { folding = nil } })) {
-                TextField("Name", text: $text)
-                    .selectsAllWhenEditing(Self.newPinFolderName)
-                Button("Cancel", role: .cancel) {}
-                Button("Create") {
-                    guard let folding else { return }
-                    let name = text.trimmingCharacters(in: .whitespaces)
-                    Task {
-                        await model.makePinFolder(of: folding.target, and: folding.dragged,
-                                              named: name.isEmpty ? Self.newPinFolderName : name)
-                        Diagnostics.log("pins: a pin dropped on a pin made a pin folder")
-                    }
-                }
+            .textPrompt("Edit Address", item: $addressing, placeholder: "Address", confirm: "Save", keyboard: .URL,
+                        initial: { $0.url ?? "" }, value: PromptValue.address) { pin, url in
+                Task { await model.setPinAddress(pin, to: url) }
             }
-            .alert("Edit Address", isPresented: present($addressing)) {
-                TextField("Address", text: $text)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .selectsAllWhenEditing(addressing?.url ?? "")
-                Button("Cancel", role: .cancel) {}
-                Button("Save") {
-                    if let pin = addressing, let url = Address.typed(text) {
-                        Task { await model.setPinAddress(pin, to: url) }
-                    }
-                }
-            }
-            .focusesAlertField(when: renaming != nil)
             // A pin held over another, as a row held over a row in the tree.
             .sensoryFeedback(.selection, trigger: dropTarget) { _, now in now != nil }
-            .focusesAlertField(when: folding != nil)
-            .focusesAlertField(when: addressing != nil)
             .sheet(item: $openPinFolder) { folder in
                 PinFolderList(folder: folder, pins: pins.filter { $0.folder == folder.id }, onPick: { pin in
                     openPinFolder = nil
@@ -134,10 +109,6 @@ struct PinsRow: View {
             .accessibilityHidden(true)
     }
 
-    private func present(_ item: Binding<PinRow?>) -> Binding<Bool> {
-        Binding(get: { item.wrappedValue != nil }, set: { if !$0 { item.wrappedValue = nil } })
-    }
-
     private func open(_ pin: PinRow) {
         browser.selectPin(pin)
         onOpened()
@@ -156,7 +127,6 @@ struct PinsRow: View {
                 Diagnostics.log("pins: a pin was dropped into a pin folder")
             }
         } else {
-            text = Self.newPinFolderName
             folding = (target.id, dragged)
         }
         return true
@@ -236,7 +206,7 @@ struct PinsRow: View {
         .contextMenu {
             showIn(folder)
             Divider()
-            Button("Rename…", systemImage: "pencil") { text = folder.name; renaming = folder }
+            Button("Rename…", systemImage: "pencil") { renaming = folder }
             Divider()
             Button("Move Contents to Row", systemImage: "rectangle.portrait.and.arrow.right") {
                 Task { await model.moveContentsToRow(folder) }
@@ -253,7 +223,7 @@ struct PinsRow: View {
         Task {
             guard let undo = await model.deletePinFolder(folder) else { return }
             Diagnostics.log("pins: deleted a pin folder, Undo offered")
-            onToast(Toast(text: "Deleted “\(title(folder))”") {
+            toasts.show(Toast(text: "Deleted “\(title(folder))”") {
                 Task { await model.editFavorites(undo) }
             })
         }
@@ -286,7 +256,6 @@ struct PinsRow: View {
             Menu("New Pin Folder With…", systemImage: "folder.badge.plus") {
                 ForEach(others, id: \.id) { other in
                     Button(title(other)) {
-                        text = Self.newPinFolderName
                         folding = (pin.id, other.id)
                     }
                 }
@@ -300,7 +269,7 @@ struct PinsRow: View {
     }
 
     private func moveToFavorites(_ slot: PinRow) {
-        Task { onToast(await model.moveToFavoritesKeepingPage(slot, title: title(slot))) }
+        Task { toasts.show(await model.moveToFavoritesKeepingPage(slot, title: title(slot))) }
     }
 
     /// Deletes the pin, and offers Undo, which puts it back where it was.
@@ -309,7 +278,7 @@ struct PinsRow: View {
         Task {
             await model.deletePin(pin)
             Diagnostics.log("pins: deleted, Undo offered")
-            onToast(Toast(text: "Deleted the “\(title(pin))” pin") {
+            toasts.show(Toast(text: "Deleted the “\(title(pin))” pin") {
                 Task {
                     await model.restore(pin, at: place)
                     Diagnostics.log("pins: a delete was undone")
@@ -344,8 +313,8 @@ struct PinsRow: View {
         moveToPinFolder(pin)
         newPinFolder(with: pin)
         Divider()
-        Button("Rename…", systemImage: "pencil") { text = pin.name; renaming = pin }
-        Button("Edit Address…", systemImage: "link") { text = pin.url ?? ""; addressing = pin }
+        Button("Rename…", systemImage: "pencil") { renaming = pin }
+        Button("Edit Address…", systemImage: "link") { addressing = pin }
         Divider()
         Button("Move to Favorites", systemImage: "star") { moveToFavorites(pin) }
         Button("Delete", systemImage: "trash", role: .destructive) { delete(pin) }

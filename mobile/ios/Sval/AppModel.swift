@@ -49,6 +49,8 @@ final class AppModel {
     }
     /// The tree as of the last refresh, with a box for each row.
     let treeStore = TreeStore()
+    /// Every toast and notice the app shows.
+    let toasts = Toasts()
     var rows: [OutlineRow] { treeStore.index.rows }
     /// `rows`' lookups, built once per change. Views read it on every
     /// frame the bar folds, where a walk of `rows` per lookup adds up.
@@ -57,10 +59,14 @@ final class AppModel {
     private(set) var settings: [String: Any] = [:] {
         didSet {
             launcherSettings = LauncherIndex.Settings(settings)
+            myFilters = MyFilters.Lines(settings: settings)
             reindexLauncher()
             updateBlocker()
+            browser?.refreshBar()
         }
     }
+    /// My filters' lines, parsed once per change of `settings`.
+    @ObservationIgnored private(set) var myFilters = MyFilters.Lines(settings: [:])
     /// The pages history holds, from every device, best first by frecency.
     private(set) var historyPages: [HistoryPage] = [] {
         didSet { reindexLauncher() }
@@ -71,7 +77,10 @@ final class AppModel {
     }
     /// Each Workspace's pins, in the row's order (pins spec §4, §7).
     private(set) var pinsByWorkspace: [String: [PinRow]] = [:] {
-        didSet { if pinsByWorkspace != oldValue { reindexLauncher() } }
+        didSet {
+            if pinsByWorkspace != oldValue { reindexLauncher() }
+            browser?.refreshBar()
+        }
     }
     /// What the Launcher searches, built from the rows, pins, Favorites,
     /// history and settings after each change to them.
@@ -159,7 +168,7 @@ final class AppModel {
                         ?? DropboxSettings.load().map(Source.dropbox)
                 },
                 files: { Folder(shared: $0) },
-                blocker: { ContentBlocker() })
+                blocker: { ContentBlocker(formerStore: .default()) })
         }
     }
 
@@ -700,14 +709,19 @@ final class AppModel {
     private(set) var privateWorkspace: String?
     /// Every node of the private session, which nothing may save.
     private(set) var privateIds: Set<String> = [] {
-        didSet { if privateIds != oldValue { reindexLauncher() } }
+        didSet {
+            if privateIds != oldValue { reindexLauncher() }
+            browser?.refreshBar()
+        }
     }
     /// The video and audio choices made in the private session, which
     /// apply to its tabs alone and go with it.
     private(set) var privateMedia: [String: SiteRules.Media] = [:]
     /// The protections choices made in the private session, kept as
     /// `privateMedia` is.
-    private(set) var privateProtections: [String: String] = [:]
+    private(set) var privateProtections: [String: String] = [:] {
+        didSet { browser?.refreshBar() }
+    }
 
     /// The site rules a tab's pages take: a private tab's carry the
     /// session's own choices.
@@ -1077,6 +1091,7 @@ final class AppModel {
         loadingSyncer = nil
         treeStore.reset()
         reindexLauncher()
+        browser.refreshBar()
         // The folder's tabs and pins go with it, and so do their pages and
         // the pictures of them kept on disk.
         pinsByWorkspace = [:]
@@ -2437,7 +2452,10 @@ final class AppModel {
         if ownIds != privateIds { privateIds = ownIds }
         var treeChange = TreeStore.Change.none
         if current(), let tree { treeChange = treeStore.install(tree, own: own) }
-        if treeChange != .none { reindexLauncher() }
+        if treeChange != .none {
+            reindexLauncher()
+            browser.refreshBar()
+        }
         Signposts.outline.endInterval("rows", assigning, "\(self.rows.count) rows")
         let reading = Signposts.refresh.beginInterval("settings")
         if marks.settingsDue(revisions) {

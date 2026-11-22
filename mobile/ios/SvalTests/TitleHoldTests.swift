@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
+import Observation
 import XCTest
 @testable import Sval
 
@@ -33,6 +34,11 @@ private final class HoldEnd {
         ended.forEach { $0.resume() }
         for _ in 0..<20 { await Task.yield() }
     }
+}
+
+/// Whether an observer was told of a change.
+private final class Told: @unchecked Sendable {
+    var value = false
 }
 
 /// A page's title set soon after the last one written waits for its hold
@@ -131,6 +137,20 @@ final class TitleHoldTests: XCTestCase {
         _ = hold.admit("u", name: "Newer")
         hold.putBack(taken)
         XCTAssertEqual(hold.pending, ["t": "Two", "u": "Newer"])
+    }
+
+    /// A view that shows one tab's title redraws for that tab's held title
+    /// alone, and sees it change.
+    func testAHeldTitleRedrawsOnlyItsTabsReaders() {
+        _ = hold.admit("t", name: "One")
+        _ = hold.admit("u", name: "One")
+        let told = Told()
+        withObservationTracking { _ = hold.held("t") } onChange: { told.value = true }
+        _ = hold.admit("u", name: "Two")
+        XCTAssertFalse(told.value, "another tab's held title redrew the reader")
+        _ = hold.admit("t", name: "Two")
+        XCTAssertTrue(told.value, "the tab's own held title didn't redraw the reader")
+        XCTAssertEqual(hold.held("t"), "Two")
     }
 }
 

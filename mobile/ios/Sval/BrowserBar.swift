@@ -23,27 +23,16 @@ struct BrowserBar: View {
     @Environment(\.verticalSizeClass) private var verticalSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    let workspace: OutlineRow?
+    let facts: BarFacts
     let colors: BarColors
-    let onSite: () -> Void
-    let onAddress: () -> Void
-    /// Opens the Workspace sheet.
-    let onWorkspace: () -> Void
-    let onNewTab: () -> Void
+    let actions: BarActions
     /// The tab whose media card is open, if one is.
     var mediaCard: String?
-    /// Opens the media card for a tab.
-    var onMedia: (String) -> Void = { _ in }
-    /// What the split menu asks for.
-    var onSplit: (SplitAction) -> Void = { _ in }
-    /// A hold on the address or the Workspace button and the slide after
-    /// it, which move through the Workspace's tabs or the Workspaces.
-    var onScrub: (ScrubPhase) -> Void = { _ in }
-    /// Opens a tab in the private session, or ends the session (false).
-    var onPrivate: (Bool) -> Void = { _ in }
 
     /// The progress line's length, which eases toward the page's progress
-    /// and runs to the end before it fades once the load is done.
+    /// and runs to the end before it fades once the load is done. Only
+    /// `ProgressLine` and `ProgressFollower` read them, so the load's
+    /// progress redraws them alone.
     @State private var line = 0.0
     @State private var lineShown = false
     /// What is held for a scrub: the address or the Workspace button.
@@ -53,17 +42,9 @@ struct BrowserBar: View {
     @State private var heldForScrub = false
 
     private var browser: Browser { model.browser }
-
-    /// Another tab whose media the bar shows: playing, or paused a moment
-    /// ago.
-    private var otherMedia: String? {
-        guard let id = browser.mediaTab, id != browser.currentTabId, browser.mediaShown(id) else { return nil }
-        return id
-    }
-
-    /// Whether the bar asks to allow the page in front's media: Ask first
-    /// refused it, and nothing of its plays.
-    private var asks: Bool { browser.frontAsks && frontMedia == nil }
+    private var workspace: OutlineRow? { facts.workspace }
+    private var otherMedia: String? { facts.otherMedia }
+    private var frontMedia: String? { facts.frontMedia }
 
     /// The capsules above the bar: the download under way, then the ask for
     /// video and audio, which stays nearest the bar. Each rises by its own
@@ -71,15 +52,9 @@ struct BrowserBar: View {
     @ViewBuilder private var notices: some View {
         VStack(spacing: 8) {
             DownloadCapsule(colors: colors)
-            if asks { MediaAsk(colors: colors) }
+            if facts.asks { MediaAsk(colors: colors) }
         }
         .alignmentGuide(.top) { $0[.bottom] - 44 }
-    }
-
-    /// Whether the page in front has media to show in the address capsule.
-    private var frontMedia: String? {
-        guard let id = browser.currentTabId, browser.mediaShown(id) else { return nil }
-        return id
     }
 
     /// The Workspace colour the capsules' glass is tinted with.
@@ -103,22 +78,9 @@ struct BrowserBar: View {
                 .padding(.bottom, 24)
             }
         }
-        .onChange(of: browser.progress, initial: true) { _, progress in
-            guard browser.loading else { return }
-            if !lineShown {
-                line = 0
-                lineShown = true
-            }
-            withAnimation(.easeOut(duration: 0.3)) { line = max(line, progress) }
-        }
+        .background { ProgressFollower(line: $line, shown: $lineShown) }
         .onChange(of: scrubbing) { _, held in
-            if held == nil { onScrub(.ended) }
-        }
-        .onChange(of: browser.loading) { _, loading in
-            guard !loading, lineShown else { return }
-            withAnimation(.easeOut(duration: 0.2)) { line = 1 } completion: {
-                withAnimation(.easeOut(duration: 0.2)) { lineShown = false }
-            }
+            if held == nil { actions.scrub(.ended) }
         }
     }
 
@@ -146,8 +108,8 @@ struct BrowserBar: View {
                     if t < 1 {
                         capsule(at[0], interactive: t == 0) {
                             HStack(spacing: 0) {
-                                navButton("Back", "back", size: 24 * k, frame: 40 * k, enabled: browser.canGoBack) { browser.goBack() }
-                                navButton("Forward", "forward", size: 24 * k, frame: 40 * k, enabled: browser.canGoForward) {
+                                navButton("Back", "back", size: 24 * k, frame: 40 * k, enabled: facts.canGoBack) { browser.goBack() }
+                                navButton("Forward", "forward", size: 24 * k, frame: 40 * k, enabled: facts.canGoForward) {
                                     browser.goForward()
                                 }
                             }
@@ -188,7 +150,7 @@ struct BrowserBar: View {
             // its own capsule (14k4, 17c). Folded, the page in front's is the
             // speaker in the pill, and another tab's is its icon beside it.
             if let media = frontMedia ?? otherMedia {
-                NowPlayingCapsule(tabId: media, colors: colors) { onMedia(media) }
+                NowPlayingCapsule(tabId: media, colors: colors) { actions.media(media) }
                     .frame(width: at[3].maxX - 8)
                     .offset(x: 8, y: -60)
                     .opacity(buttons)
@@ -196,8 +158,8 @@ struct BrowserBar: View {
                     .accessibilityHidden(t > 0)
             }
             if frontMedia == nil, let media = otherMedia {
-                Button { onMedia(media) } label: {
-                    Group { if let row = model.row(media) { SiteTile(row: row, size: 26) } }
+                Button { actions.media(media) } label: {
+                    Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: 26) } }
                         .frame(width: 48, height: 48)
                 }
                 .glassEffect(workspaceGlass(layer), in: .circle)
@@ -264,7 +226,7 @@ struct BrowserBar: View {
         let inset = 4 * (1 - t)
         // With no page there is nothing to reload, and the address takes
         // Reload's room.
-        let reloads = browser.currentURL != nil
+        let reloads = facts.reloads
         let room = address.width - inset - ((reloads ? 40 * k : 8) * (1 - t) + (frontMedia != nil ? 60 : 30) * t)
         return ZStack(alignment: .leading) {
             addressRow(height: row, scale: k)
@@ -273,7 +235,7 @@ struct BrowserBar: View {
                 // Partway or folded, the pill is one button.
                 .allowsHitTesting(t == 0)
                 .accessibilityHidden(t > 0)
-            reload(scale: k).frame(width: 36 * k, height: 44)
+            ReloadButton(reloads: reloads, scale: k).frame(width: 36 * k, height: 44)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.trailing, 4)
                 .opacity(reloads ? buttons : 0)
@@ -298,7 +260,7 @@ struct BrowserBar: View {
             }
         }
         .frame(width: address.width, height: address.height)
-        .overlay(alignment: .bottom) { progressLine.padding(.bottom, 1) }
+        .overlay(alignment: .bottom) { ProgressLine(line: $line, shown: $lineShown, colors: colors).padding(.bottom, 1) }
     }
 
     /// The shield, the pane mark of a split in front, the JavaScript-off
@@ -306,14 +268,14 @@ struct BrowserBar: View {
     private func addressRow(height: Double, scale k: Double = 1) -> some View {
         HStack(spacing: 0) {
             shield(size: 21 * k, frame: CGSize(width: 36 * k, height: height))
-            if let split = browser.splitInFront {
+            if let split = facts.split {
                 splitMenu(split)
             }
             Button {
-                if !heldForScrub { onAddress() }
+                if !heldForScrub { actions.address() }
             } label: {
                 HStack(spacing: 6) {
-                    if javaScriptOff {
+                    if facts.javaScriptOff {
                         Image("javascript-off").resizable().frame(width: 15, height: 15).foregroundStyle(colors.muted)
                             .accessibilityLabel("JavaScript off")
                     }
@@ -331,7 +293,7 @@ struct BrowserBar: View {
                 .contentShape(.rect)
             }
             .accessibilityLabel(address.placeholder ? "Search or enter address"
-                : "Address, \(address.text)\(javaScriptOff ? ", JavaScript off" : "")")
+                : "Address, \(address.text)\(facts.javaScriptOff ? ", JavaScript off" : "")")
             // Voice Control takes the words on screen first.
             .accessibilityInputLabels(address.placeholder ? [address.text] : [address.text, "Address"])
             // The bar keeps its height at every text size, so its controls
@@ -362,9 +324,9 @@ struct BrowserBar: View {
                 guard case .second(true, let drag) = value else { return }
                 heldForScrub = true
                 if let drag {
-                    onScrub(.moved(drag.location))
+                    actions.scrub(.moved(drag.location))
                 } else {
-                    onScrub(.began(kind))
+                    actions.scrub(.began(kind))
                 }
             }
     }
@@ -375,23 +337,23 @@ struct BrowserBar: View {
         GlassEffectContainer(spacing: 3) {
             HStack(spacing: 6) {
                 HStack(spacing: 0) {
-                    navButton("Back", "back", size: 22, frame: 40, enabled: browser.canGoBack) { browser.goBack() }
-                    navButton("Forward", "forward", size: 22, frame: 40, enabled: browser.canGoForward) { browser.goForward() }
+                    navButton("Back", "back", size: 22, frame: 40, enabled: facts.canGoBack) { browser.goBack() }
+                    navButton("Forward", "forward", size: 22, frame: 40, enabled: facts.canGoForward) { browser.goForward() }
                 }
                 .glassCapsule(layer)
                 HStack(spacing: 0) {
                     addressRow(height: 36)
                     if let media = frontMedia { speaker(media) }
-                    reload().frame(width: 36, height: 44)
+                    ReloadButton(reloads: facts.reloads).frame(width: 36, height: 44)
                 }
                 .padding(.horizontal, 4)
-                .overlay(alignment: .bottom) { progressLine }
+                .overlay(alignment: .bottom) { ProgressLine(line: $line, shown: $lineShown, colors: colors) }
                 .glassCapsule(layer)
-                if let split = browser.splitInFront, split.run.count > 2 {
+                if let split = facts.split, split.run.count > 2 {
                     PaneTray(split: split, tile: 34, inBar: true)
                 }
                 if frontMedia == nil, let media = otherMedia {
-                    CompactMediaButton(tabId: media, colors: colors) { onMedia(media) }
+                    CompactMediaButton(tabId: media, colors: colors) { actions.media(media) }
                         .frame(width: 44, height: 44)
                         .glassEffect(workspaceGlass(layer), in: .circle)
                 }
@@ -416,7 +378,7 @@ struct BrowserBar: View {
     /// sideways (6f): the speaker on an accent wash.
     private func speaker(_ media: String) -> some View {
         PillSpeaker(colors: colors, frame: CGSize(width: 30, height: 36), disc: 28, glyph: 13,
-                    open: mediaCard == media) { onMedia(media) }
+                    open: mediaCard == media) { actions.media(media) }
     }
 
     /// The pane mark: the split drawn as its panes sit, the focused one
@@ -429,17 +391,17 @@ struct BrowserBar: View {
         return Menu {
             Section(split.split.name.isEmpty ? titles.joined(separator: " and ") : split.split.name) {
                 let moves = PaneMove.labels(sideways: sideways)
-                Button(moves.back.title, systemImage: moves.back.symbol) { onSplit(.move(-1)) }
+                Button(moves.back.title, systemImage: moves.back.symbol) { actions.split(.move(-1)) }
                     .disabled(at == 0)
-                Button(moves.ahead.title, systemImage: moves.ahead.symbol) { onSplit(.move(1)) }
+                Button(moves.ahead.title, systemImage: moves.ahead.symbol) { actions.split(.move(1)) }
                     .disabled(at == all.count - 1)
-                Button("Separate", systemImage: "rectangle.split.2x1.slash") { onSplit(.separate) }
-                Button("Rename Split…", systemImage: "character.cursor.ibeam") { onSplit(.rename) }
+                Button("Separate", systemImage: "rectangle.split.2x1.slash") { actions.split(.separate) }
+                Button("Rename Split…", systemImage: "character.cursor.ibeam") { actions.split(.rename) }
             }
             Section {
-                Button("Close Tab", systemImage: "xmark", role: .destructive) { onSplit(.closeTab) }
+                Button("Close Tab", systemImage: "xmark", role: .destructive) { actions.split(.closeTab) }
                 Button(all.count == 2 ? "Close Both" : "Close All", systemImage: "xmark.square", role: .destructive) {
-                    onSplit(.closeAll)
+                    actions.split(.closeAll)
                 }
             }
         } label: {
@@ -452,12 +414,9 @@ struct BrowserBar: View {
     }
 
     private func shield(size: CGFloat, frame: CGSize) -> some View {
-        let state = ShieldState(url: browser.currentURL, rules: model.siteRules(private: browser.privateInFront))
-        // My filters' lines that remove something on this site, which
-        // apply at every level and with protections off (decision 1993).
-        let removals = state == .plain ? 0
-            : browser.currentURL?.host().map { MyFilters.removals(on: $0, settings: model.settings).count } ?? 0
-        return Button(action: onSite) {
+        let state = facts.shield
+        let removals = facts.removals
+        return Button(action: actions.site) {
             Image(state.image)
                 .resizable()
                 .scaledToFit()
@@ -467,7 +426,7 @@ struct BrowserBar: View {
                 // sits on a symbol in a bar button, so the mark is drawn: a
                 // badge inside the shield's slot.
                 .overlay(alignment: .bottomTrailing) {
-                    if browser.frontDenied {
+                    if facts.denied {
                         Badge(diameter: 13, fill: colors.badge, ring: colors.badge, ringWidth: 1) {
                             Image(systemName: "speaker.slash")
                                 .font(.system(size: 10, weight: .semibold))
@@ -499,50 +458,9 @@ struct BrowserBar: View {
         .accessibilityLabel("Site settings")
         .accessibilityShowsLargeContentViewer()
         .accessibilityValue([state == .off ? "Protections off" : nil,
-                             browser.frontDenied ? "Video and audio blocked" : nil,
+                             facts.denied ? "Video and audio blocked" : nil,
                              removals == 0 ? nil : removals == 1 ? "1 removal rule" : "\(removals) removal rules"]
             .compactMap { $0 }.joined(separator: ", "))
-    }
-
-    /// Reload, which turns while the page loads, as the desktop's does
-    /// (`sval-busy-turn`); a tap then stops the load. Under Reduce Motion
-    /// the stop glyph shows for the whole load instead.
-    private func reload(scale k: Double = 1) -> some View {
-        Button {
-            browser.loading ? browser.stopLoading() : browser.reload()
-        } label: {
-            Group {
-                if browser.loading && reduceMotion {
-                    Image("stop").resizable()
-                } else if browser.loading {
-                    TimelineView(.animation) { context in
-                        Image("reload").resizable()
-                            .rotationEffect(.degrees(context.date.timeIntervalSinceReferenceDate
-                                .truncatingRemainder(dividingBy: 1) * 360))
-                    }
-                } else {
-                    Image("reload").resizable()
-                }
-            }
-            .frame(width: 19 * k, height: 19 * k)
-            .frame(width: 46, height: 44)
-            .contentShape(.rect)
-        }
-        .disabled(browser.currentURL == nil)
-        .accessibilityLabel(browser.loading ? "Stop" : "Reload")
-        .accessibilityShowsLargeContentViewer()
-    }
-
-    private var progressLine: some View {
-        GeometryReader { geometry in
-            Capsule()
-                .fill(colors.accent)
-                .frame(width: geometry.size.width * line, height: 3)
-        }
-        .frame(height: 3)
-        .padding(.horizontal, 20)
-        .opacity(lineShown ? 1 : 0)
-        .accessibilityHidden(true)
     }
 
     private func navButton(
@@ -563,30 +481,23 @@ struct BrowserBar: View {
         .accessibilityShowsLargeContentViewer()
     }
 
-    /// Whether the page in front runs without JavaScript, by its site's
-    /// rule, which the full bar marks before the address.
-    private var javaScriptOff: Bool {
-        guard let host = browser.currentURL?.host() else { return false }
-        return !SiteRules(settings: model.settings).javaScriptEnabled(on: host)
-    }
-
-    private var tabCount: Int { model.tabs(in: browser.workspaceId).count }
+    private var tabCount: Int { facts.tabCount }
 
     private var countText: String { tabCount > 99 ? "∞" : "\(tabCount)" }
 
     @ViewBuilder private var privateMenu: some View {
-        NewPrivateTabButton { onPrivate(true) }
-        Button("Exit Private Workspace", systemImage: "xmark", role: .destructive) { onPrivate(false) }
+        NewPrivateTabButton { actions.privateSession(true) }
+        Button("Exit Private Workspace", systemImage: "xmark", role: .destructive) { actions.privateSession(false) }
     }
 
-    private var isPrivateSession: Bool { workspace.map { model.isPrivate($0.id) } ?? false }
+    private var isPrivateSession: Bool { facts.isPrivateSession }
 
     /// The Workspace button: its emoji, or the private mask, with the tab
     /// count at its corner, and sideways its name beside. It opens the
     /// Workspace sheet, or the private one.
     private func workspaceButton(size: CGFloat, named: Bool = false, scale k: Double = 1) -> some View {
         Button {
-            if !heldForScrub { onWorkspace() }
+            if !heldForScrub { actions.workspace() }
         } label: {
             workspaceLabel(size: size, named: named, scale: k)
         }
@@ -651,7 +562,7 @@ struct BrowserBar: View {
     }
 
     private func newTabButton(size: CGFloat, frame: CGFloat) -> some View {
-        Button(action: onNewTab) {
+        Button(action: actions.newTab) {
             Image(systemName: "plus")
                 .font(.system(size: size - 2, weight: .medium))
                 .frame(width: frame, height: frame)
@@ -661,8 +572,8 @@ struct BrowserBar: View {
         .accessibilityShowsLargeContentViewer()
         // A long press offers a new tab of either kind (13a2).
         .contextMenu {
-            Button("New Tab", systemImage: "plus", action: onNewTab)
-            NewPrivateTabButton { onPrivate(true) }
+            Button("New Tab", systemImage: "plus", action: actions.newTab)
+            NewPrivateTabButton { actions.privateSession(true) }
         }
     }
 
@@ -673,30 +584,96 @@ struct BrowserBar: View {
     }
 
     private var address: (text: String, placeholder: Bool) {
-        if let id = browser.currentTabId, model.row(id)?.awaitsPick == true {
-            return ("Choose a page", true)
+        switch facts.address {
+        case .search: (placeholder, true)
+        case .text(let text, let placeholder): (text, placeholder)
         }
-        if browser.onPrivateHome {
-            return (placeholder, true)
-        }
-        // A pin's page reads as the pin, and once off its saved page, where
-        // it is now (pins spec §4).
-        if let pin = browser.currentPin {
-            let name = pin.name.isEmpty ? (pin.url ?? "") : pin.name
-            guard browser.pinOffSaved, let title = browser.currentTitle, !title.isEmpty else { return (name, false) }
-            return ("\(name) / \(title)", false)
-        }
-        if let url = browser.currentURL, let host = url.host() {
-            return (SiteRules.site(of: host) ?? host, false)
-        }
-        if let id = browser.currentTabId, let row = model.row(id), let address = row.url {
-            let url = URL(string: address)
-            if let host = url?.host(), Browser.openable(row) != nil {
-                return (SiteRules.site(of: host) ?? host, false)
+    }
+}
+
+/// Reload, which turns while the page loads, as the desktop's does
+/// (`sval-busy-turn`); a tap then stops the load. Under Reduce Motion the
+/// stop glyph shows for the whole load instead.
+private struct ReloadButton: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Whether the page in front has an address to reload.
+    let reloads: Bool
+    var scale: Double = 1
+
+    var body: some View {
+        let browser = model.browser!
+        let k = scale
+        Button {
+            browser.loading ? browser.stopLoading() : browser.reload()
+        } label: {
+            Group {
+                if browser.loading && reduceMotion {
+                    Image("stop").resizable()
+                } else if browser.loading {
+                    TimelineView(.animation) { context in
+                        Image("reload").resizable()
+                            .rotationEffect(.degrees(context.date.timeIntervalSinceReferenceDate
+                                .truncatingRemainder(dividingBy: 1) * 360))
+                    }
+                } else {
+                    Image("reload").resizable()
+                }
             }
-            return (url?.lastPathComponent ?? address, false)
+            .frame(width: 19 * k, height: 19 * k)
+            .frame(width: 46, height: 44)
+            .contentShape(.rect)
         }
-        return (placeholder, true)
+        .disabled(!reloads)
+        .accessibilityLabel(browser.loading ? "Stop" : "Reload")
+        .accessibilityShowsLargeContentViewer()
+    }
+}
+
+/// The page's load under the address: a line in the Workspace's accent.
+private struct ProgressLine: View {
+    @Binding var line: Double
+    @Binding var shown: Bool
+    let colors: BarColors
+
+    var body: some View {
+        GeometryReader { geometry in
+            Capsule()
+                .fill(colors.accent)
+                .frame(width: geometry.size.width * line, height: 3)
+        }
+        .frame(height: 3)
+        .padding(.horizontal, 20)
+        .opacity(shown ? 1 : 0)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Moves the progress line with the page in front's load: it eases toward
+/// the load's progress, then runs to the end and fades once the load is
+/// done. It draws nothing.
+private struct ProgressFollower: View {
+    @Environment(AppModel.self) private var model
+    @Binding var line: Double
+    @Binding var shown: Bool
+
+    var body: some View {
+        let browser = model.browser!
+        Color.clear
+            .onChange(of: browser.progress, initial: true) { _, progress in
+                guard browser.loading else { return }
+                if !shown {
+                    line = 0
+                    shown = true
+                }
+                withAnimation(.easeOut(duration: 0.3)) { line = max(line, progress) }
+            }
+            .onChange(of: browser.loading) { _, loading in
+                guard !loading, shown else { return }
+                withAnimation(.easeOut(duration: 0.2)) { line = 1 } completion: {
+                    withAnimation(.easeOut(duration: 0.2)) { shown = false }
+                }
+            }
     }
 }
 

@@ -422,51 +422,6 @@ struct SelectsAllWhenEditing: ViewModifier {
     }
 }
 
-/// Puts the keyboard up in an alert's text field with all its text
-/// selected, so typing replaces it at once, as every action that asks for
-/// text does. SwiftUI draws an alert as a `UIAlertController`, whose field
-/// doesn't always take focus, as when the alert opens from a drop, and a
-/// modifier on the field in the alert reaches no `UITextField`. So once
-/// the alert is up, this finds its field and asks UIKit.
-struct FocusesAlertField: ViewModifier {
-    let presented: Bool
-
-    func body(content: Content) -> some View {
-        content.onChange(of: presented) { _, now in
-            guard now else { return }
-            Task { @MainActor in
-                // The alert is presented a moment after the state that
-                // asks for it; a second is far longer than that takes.
-                for _ in 0..<40 {
-                    if let field = Self.field() {
-                        field.becomeFirstResponder()
-                        DispatchQueue.main.async { field.selectAll(nil) }
-                        Diagnostics.log("alert: the field took focus")
-                        return
-                    }
-                    try? await Task.sleep(for: .milliseconds(25))
-                }
-                Diagnostics.log("alert: no field to focus")
-            }
-        }
-    }
-
-    /// The first text field of the alert in front, if one is up.
-    @MainActor private static func field() -> UITextField? {
-        let windows = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-        for window in windows {
-            var controller = window.rootViewController
-            while let next = controller?.presentedViewController { controller = next }
-            if let alert = controller as? UIAlertController, let field = alert.textFields?.first {
-                return field
-            }
-        }
-        return nil
-    }
-}
-
 extension View {
     /// Puts a sheet in a Workspace's colour ([`SheetTint`]).
     func sheetTint(_ token: String?) -> some View {
@@ -486,12 +441,6 @@ extension View {
 
     func selectsAllWhenEditing(_ text: String) -> some View {
         modifier(SelectsAllWhenEditing(text: text))
-    }
-
-    /// Focuses the text field of the alert `presented` shows, its text
-    /// selected ([`FocusesAlertField`]).
-    func focusesAlertField(when presented: Bool) -> some View {
-        modifier(FocusesAlertField(presented: presented))
     }
 }
 

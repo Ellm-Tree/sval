@@ -187,21 +187,11 @@ func splitRuns(_ panes: [OutlineRow]) -> [[OutlineRow]] {
 struct RenameSplitAlert: ViewModifier {
     @Environment(AppModel.self) private var model
     @Binding var split: OutlineRow?
-    @State private var text = ""
 
     func body(content: Content) -> some View {
-        content
-            .alert("Rename Split", isPresented: Binding(get: { split != nil }, set: { if !$0 { split = nil } })) {
-                TextField("Name", text: $text)
-                    .submitLabel(.done)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") {
-                    guard let split else { return }
-                    Task { await model.renameSplit(split, to: text) }
-                }
-            }
-            .onChange(of: split?.id, initial: true) { text = split?.name ?? "" }
-            .focusesAlertField(when: split != nil)
+        content.textPrompt("Rename Split", item: $split, submit: .done, initial: \.name, value: PromptValue.asTyped) {
+            split, name in Task { await model.renameSplit(split, to: name) }
+        }
     }
 }
 
@@ -534,7 +524,7 @@ struct PickPage: View {
         Task {
             guard let undo = await model.pick(tab, for: pane) else { return }
             model.browser.select(tab.id)
-            model.browser.toast = Toast(text: "Moved the tab into the Split") { Task { await model.editTree(undo) } }
+            model.toasts.show(Toast(text: "Moved the tab into the Split") { Task { await model.editTree(undo) } })
         }
     }
 }

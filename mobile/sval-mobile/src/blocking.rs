@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use adblock::Engine;
 use adblock::content_blocking::{CbRule, CbType};
-use adblock::lists::{FilterSet, ParseOptions, RuleTypes};
+use adblock::lists::{FilterSet, ParseOptions, ParsedLine, RuleTypes, parse_filter};
 use adblock::request::Request;
 use serde_json::{Value, json};
 
@@ -167,15 +167,46 @@ pub fn own_page_rules(my_filters: String) -> ContentRules {
 /// small list alone.
 #[uniffi::export]
 pub fn exception_lines(list: String) -> String {
+    kept_lines(&list, |_| false)
+}
+
+/// The lines of `list` that act on rules from other lists: its exception
+/// lines (`exception_lines`) and its `$badfilter` lines, which adblock-rust
+/// applies across every list converted together
+/// (`FilterSet::into_content_blocking`).
+///
+/// The app converts its lists in groups, each compiled apart, and adds each
+/// group's shared lines to the others', so a group's rules come out as
+/// they would from all the lists converted at once. `exception_lines` of
+/// the result is `exception_lines` of `list`.
+#[uniffi::export]
+pub fn shared_lines(list: String) -> String {
+    kept_lines(&list, is_badfilter)
+}
+
+/// The exception lines of `list`, its `!#if` blocks resolved, with the
+/// lines `also` keeps.
+fn kept_lines(list: &str, also: impl Fn(&str) -> bool) -> String {
     let mut kept = String::new();
-    for line in resolve_directives(&list).lines() {
+    for line in resolve_directives(list).lines() {
         let trimmed = line.trim();
-        if !trimmed.starts_with('!') && (trimmed.starts_with("@@") || trimmed.contains("#@")) {
+        if !trimmed.starts_with('!')
+            && (trimmed.starts_with("@@") || trimmed.contains("#@") || also(trimmed))
+        {
             kept.push_str(trimmed);
             kept.push('\n');
         }
     }
     kept
+}
+
+/// Whether `line` is a network filter with the `badfilter` option.
+fn is_badfilter(line: &str) -> bool {
+    line.contains("badfilter")
+        && matches!(
+            parse_filter(line, false, ParseOptions::default()),
+            Ok(ParsedLine::Network(filter)) if filter.is_badfilter()
+        )
 }
 
 /// The lists' request blocking, for a request the app makes itself, which
@@ -997,6 +1028,41 @@ mod tests {
                 .iter()
                 .any(|rule| rule["action"]["type"] == "ignore-previous-rules"),
             "the lists' exception follows My filters' block"
+        );
+    }
+
+    #[test]
+    fn shared_lines_keep_the_exceptions_and_badfilters_alone() {
+        let list = "! a note\n||ads.example.com^\n||bad.example^$badfilter\n@@||ads.example.com/ok^\nexample.com##.promo\nexample.com#@#.promo\nexample.com##.badfilter\n!#if false\n||hidden.test^$badfilter\n!#endif\n";
+        let shared = shared_lines(list.into());
+        assert_eq!(
+            shared,
+            "||bad.example^$badfilter\n@@||ads.example.com/ok^\nexample.com#@#.promo\n"
+        );
+        assert_eq!(exception_lines(shared), exception_lines(list.into()));
+    }
+
+    /// A `$badfilter` in one list drops another list's rule when the lists
+    /// are converted apart, each with the other's shared lines.
+    #[test]
+    fn a_badfilter_carried_across_drops_the_other_lists_rule() {
+        let malware = "||evil.example^$all\n||worse.example^$all\n";
+        let fixes = "||evil.example^$all,badfilter\n";
+        let blocked: Vec<String> = content_rules(
+            vec![malware.into(), shared_lines(fixes.into())],
+            true,
+            vec![],
+        )
+        .lists
+        .iter()
+        .flat_map(|list| rules(list))
+        .filter(|rule| rule["action"]["type"] == "block")
+        .map(|rule| rule["trigger"]["url-filter"].as_str().unwrap().to_owned())
+        .collect();
+        assert!(blocked.iter().any(|filter| filter.contains("worse")));
+        assert!(
+            !blocked.iter().any(|filter| filter.contains("evil")),
+            "the badfilter reaches the other list's rule"
         );
     }
 

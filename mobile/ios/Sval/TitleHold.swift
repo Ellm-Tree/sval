@@ -17,7 +17,6 @@ import Observation
 /// as the desktop's panel shows `pendingName`, since what a page's title
 /// says is what the user watches its row for.
 @MainActor
-@Observable
 final class TitleHold {
     /// The tabs' hold. History holds its own, by address, as
     /// `SvalHistorySync` does.
@@ -28,18 +27,35 @@ final class TitleHold {
     nonisolated static let length: Duration = .seconds(30)
 
     /// Waits out one hold: `length`, or what a test sets.
-    @ObservationIgnored private let wait: @Sendable () async -> Void
+    private let wait: @Sendable () async -> Void
 
     init(wait: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: TitleHold.length) }) {
         self.wait = wait
     }
 
-    /// The latest title held back for each tab, by tab id.
-    private(set) var pending: [String: String] = [:]
+    /// The latest title held back for each tab, by tab id. A view reads a
+    /// tab's through `held`, observed for that tab alone, so a title held
+    /// for one tab redraws no view of another.
+    private(set) var pending: [String: String] = [:] {
+        didSet {
+            for (id, title) in titles where title.name != pending[id] { title.name = pending[id] }
+        }
+    }
+    /// The held title of each tab a view has read. One is never dropped:
+    /// the views that read it observe that one.
+    private var titles: [String: HeldTitle] = [:]
     /// Each tab's running hold, and whether a title came during it.
-    @ObservationIgnored private var holds: [String: (timer: Task<Void, Never>, due: Bool)] = [:]
+    private var holds: [String: (timer: Task<Void, Never>, due: Bool)] = [:]
     /// Called with a tab whose hold ended with a title held, to write it.
-    @ObservationIgnored var onDue: (@MainActor (String) -> Void)?
+    var onDue: (@MainActor (String) -> Void)?
+
+    /// The title held back for tab `id`, if one is.
+    func held(_ id: String) -> String? {
+        if let title = titles[id] { return title.name }
+        let title = HeldTitle(pending[id])
+        titles[id] = title
+        return title.name
+    }
 
     /// Notes a new title for tab `id`. True when it is to be written now,
     /// which starts a hold; false when it waits, `name` held as its
@@ -93,5 +109,16 @@ final class TitleHold {
     /// Puts back titles taken for a write that failed.
     func putBack(_ taken: [String: String]) {
         for (id, name) in taken where pending[id] == nil { pending[id] = name }
+    }
+}
+
+/// One tab's held title, observed on its own.
+@MainActor
+@Observable
+private final class HeldTitle {
+    var name: String?
+
+    init(_ name: String?) {
+        self.name = name
     }
 }

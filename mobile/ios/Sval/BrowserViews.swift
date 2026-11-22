@@ -7,6 +7,7 @@ import WebKit
 /// The page in front, with the bar under it.
 struct BrowserView: View {
     @Environment(AppModel.self) private var model
+    @Environment(Toasts.self) private var toasts
     @Environment(\.appearance) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSize
@@ -19,7 +20,6 @@ struct BrowserView: View {
     @State private var pendingPage: PageAction?
     /// The tab the site menu's Move to Workspace… is moving.
     @State private var movingTab: OutlineRow?
-    @State private var notice: Toast?
     /// The tab whose media card is open.
     @State private var mediaCard: String?
     /// What the address field is open for: the tab in front or a new tab.
@@ -76,8 +76,21 @@ struct BrowserView: View {
 
     private enum Entry { case current, newTab }
 
+    /// What the bar's controls do. One instance for the view's life, so the
+    /// bar's inputs compare equal across this view's redraws.
+    @State private var barActions = BarActions()
+
     private var browser: Browser { model.browser }
     private var workspace: OutlineRow? { browser.workspaceId.flatMap(model.row) }
+
+    /// What covers the main screen: the Workspace as sheet, panel or
+    /// popover, or another sheet, setup's cover or a download's Quick Look.
+    private var covering: ToastCover {
+        if showingTabs { return .workspace }
+        if movingTab != nil || movingFavorite != nil || showingSite || model.showsSetup
+            || browser.downloads.preview != nil { return .other }
+        return .none
+    }
 
     var body: some View {
         let token = model.tint(of: workspace)
@@ -94,27 +107,8 @@ struct BrowserView: View {
                         .allowsHitTesting(false)
                 }
             VStack(spacing: 0) {
-                BrowserBar(
-                    workspace: workspace, colors: BarColors(token: model.tint(of: workspace), dark: scheme == .dark),
-                    onSite: { showingSite = true },
-                    onAddress: { enter(.current) },
-                    onWorkspace: { showingTabs = true },
-                    onNewTab: { enter(.newTab) },
-                    mediaCard: mediaCard,
-                    onMedia: { id in withAnimation(Motion.overlay) { mediaCard = mediaCard == id ? nil : id } },
-                    onSplit: splitAction,
-                    onScrub: scrubbed,
-                    onPrivate: { open in
-                        Task {
-                            if open {
-                                if await model.showPrivateSession() { enter(.newTab) }
-                            } else {
-                                await model.endPrivateSession()
-                                TopNotice.show(.privateClosed, token: model.tint(of: browser.workspaceId.flatMap(model.row)),
-                                               scheme: scheme)
-                            }
-                        }
-                    })
+                BrowserBar(facts: browser.bar, colors: BarColors(token: model.tint(of: workspace), dark: scheme == .dark),
+                           actions: bindBarActions(), mediaCard: mediaCard)
                     .padding(.horizontal, -sideInset)
                     // The Launcher's field grows out of the bar, which
                     // steps aside while it's open.
@@ -135,6 +129,7 @@ struct BrowserView: View {
                     .modifier(ScrubFeedback(index: scrub?.index))
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
                         barHeight = $0.height
+                        toasts.barHeight = $0.height
                         barWidth = $0.width
                         barFrame = $0
                     }
@@ -179,32 +174,30 @@ struct BrowserView: View {
                     .environment(\.colorScheme, browser.privateInFront ? .dark : scheme)
             }
         }
-        .toast($notice, lift: barHeight, top: showingTabs)
+        // What covers the main screen decides where toasts show.
+        .onChange(of: covering, initial: true) { toasts.covered(by: covering) }
+        .onChange(of: token, initial: true) { toasts.tint = token }
+        .onChange(of: scheme, initial: true) { toasts.dark = scheme == .dark }
         .renameFavoriteAlert($renamingFavorite)
         .renameSplitAlert($renamingSplit)
         // What went wrong says so as every notice over the page does,
         // which VoiceOver reads out as it shows.
         .onChange(of: model.message, initial: true) { _, message in
             guard let message else { return }
-            notice = Toast(text: message, symbol: "exclamationmark.triangle.fill")
+            toasts.show(Toast(text: message, symbol: "exclamationmark.triangle.fill"))
         }
         .onAppear {
-            browser.downloads.onFailure = { [weak browser] name in
-                browser?.toast = Toast(text: "Couldn’t download “\(name)”", symbol: "exclamationmark.triangle.fill")
+            browser.downloads.onFailure = { [toasts] name in
+                toasts.show(Toast(text: "Couldn’t download “\(name)”", symbol: "exclamationmark.triangle.fill"))
             }
         }
-        .onChange(of: browser.toast?.id) {
-            guard let toast = browser.toast else { return }
-            notice = toast
-            browser.toast = nil
-        }
         .sheet(item: $movingTab) { tab in
-            MoveSheet(row: tab) { notice = $0 }
+            MoveSheet(row: tab)
                 .tintedSheet(token)
                 .presentationDetents([.large])
         }
         .sheet(item: $movingFavorite) { item in
-            FavoritesMoveSheet(item: item) { notice = $0 }
+            FavoritesMoveSheet(item: item)
                 .tintedSheet(token)
                 .presentationDetents([.large])
         }
@@ -291,7 +284,7 @@ struct BrowserView: View {
         }
         .sheet(isPresented: $showingSite, onDismiss: {
             if let text = pendingNotice {
-                notice = Toast(text: text, icon: "pr-shield-off")
+                toasts.show(Toast(text: text, icon: "pr-shield-off"))
                 pendingNotice = nil
             }
             if let action = pendingPage {
@@ -311,6 +304,30 @@ struct BrowserView: View {
         .environment(\.sheetTint, token)
     }
 
+    /// Sets the bar's actions from this draw of the view, whose environment
+    /// and state they read, and returns them.
+    private func bindBarActions() -> BarActions {
+        let actions = barActions
+        actions.site = { showingSite = true }
+        actions.address = { enter(.current) }
+        actions.workspace = { showingTabs = true }
+        actions.newTab = { enter(.newTab) }
+        actions.media = { id in withAnimation(Motion.overlay) { mediaCard = mediaCard == id ? nil : id } }
+        actions.split = splitAction
+        actions.scrub = scrubbed
+        actions.privateSession = { open in
+            Task {
+                if open {
+                    if await model.showPrivateSession() { enter(.newTab) }
+                } else {
+                    await model.endPrivateSession()
+                    toasts.show(.privateClosed)
+                }
+            }
+        }
+        return actions
+    }
+
     /// What the site menu's page group asked for.
     private func page(_ action: PageAction) {
         switch action {
@@ -319,7 +336,7 @@ struct BrowserView: View {
         case .pin(let tab, let url):
             Task { await browser.pin(tab, url: url) }
         case .moveToFavorites(let pin):
-            Task { notice = await model.moveToFavoritesKeepingPage(pin, title: pin.name.isEmpty ? pin.url ?? "" : pin.name) }
+            Task { toasts.show(await model.moveToFavoritesKeepingPage(pin, title: pin.name.isEmpty ? pin.url ?? "" : pin.name)) }
         case .star(let star):
             self.star(star)
         case .removeElement:
@@ -347,12 +364,12 @@ struct BrowserView: View {
             await model.setSetting(key, to: value)
             let sheet = await pick.hide(stop.selector)
             Diagnostics.log("picker: saved a line at depth \(pick.depth), \(stop.count) match(es), hidden at once: \(sheet != nil)")
-            notice = Toast(text: "Removed from \(place)", undo: {
+            toasts.show(Toast(text: "Removed from \(place)", undo: {
                 Task {
                     await model.setSetting(key, to: nil)
                     if let sheet { await pick.unhide(sheet) }
                 }
-            }, seconds: 8)
+            }, seconds: 8))
         }
     }
 
@@ -363,7 +380,7 @@ struct BrowserView: View {
         case .add(let url, let title):
             Task {
                 guard let item = await model.addFavorite(url, title: title) else { return }
-                notice = Toast(text: "Added to Favorites", undo: { movingFavorite = item }, action: "Move to…")
+                toasts.show(Toast(text: "Added to Favorites", undo: { movingFavorite = item }, action: "Move to…"))
             }
         case .rename(let item):
             renamingFavorite = item
@@ -373,7 +390,7 @@ struct BrowserView: View {
             guard let url = item.url.flatMap(URL.init(string:)) else { return }
             Task {
                 guard let undo = await model.removeFavorites(of: url) else { return }
-                notice = Toast(text: "Removed from Favorites") { Task { await model.editFavorites(undo) } }
+                toasts.show(Toast(text: "Removed from Favorites") { Task { await model.editFavorites(undo) } })
             }
         }
     }
@@ -392,13 +409,13 @@ struct BrowserView: View {
         case .closeTab:
             Task {
                 guard let entry = await browser.close(pane) else { return }
-                notice = .closed(1, title: pane.displayTitle) { Task { await browser.reopen(entry) } }
+                toasts.show(.closed(1, title: pane.displayTitle) { Task { await browser.reopen(entry) } })
             }
         case .closeAll:
             let count = model.children(of: split.split.id).filter { $0.kind == .tab }.count
             Task {
                 guard let entry = await browser.closeSplit(split.split) else { return }
-                notice = .closed(count) { Task { await browser.reopenSplit(entry) } }
+                toasts.show(.closed(count) { Task { await browser.reopenSplit(entry) } })
             }
         }
     }
@@ -457,7 +474,7 @@ struct BrowserView: View {
         let isPrivate = model.isPrivate(row.id)
         Task {
             guard let entry = await browser.close(row), !isPrivate else { return }
-            notice = .closed(1, title: row.displayTitle) { Task { await browser.reopen(entry) } }
+            toasts.show(.closed(1, title: row.displayTitle) { Task { await browser.reopen(entry) } })
         }
     }
 

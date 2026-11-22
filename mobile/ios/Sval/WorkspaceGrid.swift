@@ -110,7 +110,7 @@ extension WorkspaceSheet {
     var grid: some View {
         VStack(spacing: 0) {
             if panel {
-                PinsRow(onOpened: { close() }, onToast: { toast = $0 }, tileSize: 48)
+                PinsRow(onOpened: { close() }, tileSize: 48)
             }
             if let workspace {
                 TabGridView(
@@ -126,7 +126,6 @@ extension WorkspaceSheet {
         }
         // A card held over a card, as a row held over a row in the list.
         .sensoryFeedback(.selection, trigger: gridDrop.hover.map { "\($0.id) \($0.kind)" })
-        .toast($toast, top: true)
     }
 
     private var gridActions: GridActions {
@@ -146,7 +145,7 @@ extension WorkspaceSheet {
                     return
                 }
                 if Browser.openable(row) == nil, row.url != nil {
-                    toast = Toast(text: "Sval on \(UIDevice.current.model) can't open this tab", undo: { close(row) }, action: "Close Tab")
+                    toasts.show(Toast(text: "Sval on \(UIDevice.current.model) can't open this tab", undo: { close(row) }, action: "Close Tab"))
                     return
                 }
                 browser.select(row.id)
@@ -182,10 +181,8 @@ extension WorkspaceSheet {
         return UIMenu(sections: paneMenu(pane, split: split, panes: panes, rename: { renameCard(pane) }))
     }
 
-    /// A card's or a split pane's rename, in the system's alert. A pane's
-    /// tile in the list has no field to rename in place.
+    /// A row's, a card's or a split pane's rename, in the system's alert.
     func renameCard(_ row: OutlineRow) {
-        cardName = name(row)
         renamingCard = row
     }
 

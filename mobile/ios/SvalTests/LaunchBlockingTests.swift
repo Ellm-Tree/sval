@@ -11,13 +11,13 @@ import XCTest
 @MainActor
 final class LaunchBlockingTests: XCTestCase {
     private var directory: URL!
-    private var store: WKContentRuleListStore!
+    private var stores: URL!
     private var defaults: UserDefaults!
     private let inputs = BlockerInputs(settings: [:])
 
     override func setUp() async throws {
         directory = try temporaryDirectory(self)
-        store = try XCTUnwrap(WKContentRuleListStore(url: try temporaryDirectory(self)))
+        stores = try temporaryDirectory(self)
         let suite = "launch-blocking-\(UUID().uuidString)"
         defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         addTeardownBlock { UserDefaults().removePersistentDomain(forName: suite) }
@@ -29,7 +29,7 @@ final class LaunchBlockingTests: XCTestCase {
     }
 
     private func blocker() -> ContentBlocker {
-        ContentBlocker(directory: directory, store: store, defaults: defaults)
+        ContentBlocker(directory: directory, stores: stores, defaults: defaults)
     }
 
     private func makePage() -> Page {
@@ -62,7 +62,7 @@ final class LaunchBlockingTests: XCTestCase {
         await earlier.settled()
         let applied = earlier.rules.installed(protected: true).map(\.identifier)
         XCTAssertFalse(applied.isEmpty)
-        // A second launch over the same store, with no check run.
+        // A second launch over the same stores, with no check run.
         let installed = await firstLoad(under: blocker())
         XCTAssertEqual(installed, applied)
     }

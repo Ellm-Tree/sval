@@ -68,7 +68,7 @@ VERBS = frozenset("""
     migrate mirror move mute name narrow note number offer omit open order
     package parse pass patch pause pick pin place point poll port prefer
     prepare preserve prevent print profile prune publish pull push put raise
-    read rebase rebuild record recover reduce refactor refresh refuse register
+    read rebase rebuild record recover redraw reduce refactor refresh refuse register
     reject release reload remove rename render reorder repair replace report
     request require rerun re-run reroute reset resize resolve restore restrict restyle
     retry return reuse revert review rewrite route run save say scale scope scroll
