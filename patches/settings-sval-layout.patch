@@ -95,7 +95,14 @@ diff --git a/browser/components/preferences/preferences.js b/browser/components/
 index e6f6cdc..725a251 100644
 --- a/browser/components/preferences/preferences.js
 +++ b/browser/components/preferences/preferences.js
-@@ -231,20 +231,25 @@ const CONFIG_PANES = Object.freeze({
+@@ -107,5 +107,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   FirefoxRelay: "resource://gre/modules/FirefoxRelay.sys.mjs",
+   HomePage: "resource:///modules/HomePage.sys.mjs",
++  iconURL: "moz-src:///browser/components/sval/SvalIcons.sys.mjs",
+   LangPackMatcher: "resource://gre/modules/LangPackMatcher.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+@@ -231,20 +232,25 @@ const CONFIG_PANES = Object.freeze({
    },
    accessibility: {
      l10nId: "preferences-accessibility-header",
@@ -128,7 +135,7 @@ index e6f6cdc..725a251 100644
      module: "chrome://browser/content/preferences/config/appearance.mjs",
      iconSrc: "chrome://global/skin/icons/eye.svg",
      visible: () => srdSectionPrefs.all,
-@@ -260,7 +265,8 @@ const CONFIG_PANES = Object.freeze({
+@@ -260,7 +266,8 @@ const CONFIG_PANES = Object.freeze({
    downloads: {
      l10nId: "pane-downloads3",
      iconSrc: "chrome://browser/skin/downloads/downloads.svg",
@@ -138,7 +145,7 @@ index e6f6cdc..725a251 100644
      module: "chrome://browser/content/preferences/config/downloads.mjs",
      visible: () =>
        Services.prefs.getBoolPref("browser.settings-redesign.enabled", false),
-@@ -268,31 +274,16 @@ const CONFIG_PANES = Object.freeze({
+@@ -268,31 +275,16 @@ const CONFIG_PANES = Object.freeze({
    connectionSecurity: {
      parent: "privacy",
      l10nId: "preferences-connection-header",
@@ -175,7 +182,7 @@ index e6f6cdc..725a251 100644
      replaces: "privacy",
    },
    experimental: {
-@@ -314,21 +305,20 @@ const CONFIG_PANES = Object.freeze({
+@@ -314,21 +306,20 @@ const CONFIG_PANES = Object.freeze({
    },
    home: {
      l10nId: "home-section",
@@ -187,7 +194,7 @@ index e6f6cdc..725a251 100644
 +    // default browser (favorites-native spec §15.5), and Sval's home page
 +    // reads none of Firefox Home's switches.
 +    groupIds: ["homepage", "importBrowserData"],
-+    iconSrc: "chrome://browser/content/sval/icons/panel-left.svg",
++    iconSrc: iconURL("workspaces"),
      module: "chrome://browser/content/preferences/config/home-startup.mjs",
      replaces: "home",
    },
@@ -205,7 +212,7 @@ index e6f6cdc..725a251 100644
      module: "chrome://browser/content/preferences/config/languages.mjs",
      visible: () => srdSectionEnabled("languages"),
    },
-@@ -363,7 +353,10 @@ const CONFIG_PANES = Object.freeze({
+@@ -363,7 +354,10 @@ const CONFIG_PANES = Object.freeze({
    permissionsData: {
      l10nId: "permissions-data-section",
      iconSrc: "chrome://browser/skin/permissions.svg",
@@ -217,7 +224,7 @@ index e6f6cdc..725a251 100644
      module: "chrome://browser/content/preferences/config/permissions-data.mjs",
      visible: () => srdSectionEnabled("permissionsData"),
    },
-@@ -386,16 +379,18 @@ const CONFIG_PANES = Object.freeze({
+@@ -386,16 +380,18 @@ const CONFIG_PANES = Object.freeze({
    privacy: {
      l10nId: "pane-privacy-section",
      iconSrc: "chrome://browser/skin/preferences/category-privacy-security.svg",
@@ -242,7 +249,7 @@ index e6f6cdc..725a251 100644
      ],
      module: "chrome://browser/content/preferences/config/privacy.mjs",
      replaces: "privacy",
-@@ -417,10 +412,19 @@ const CONFIG_PANES = Object.freeze({
+@@ -417,10 +413,19 @@ const CONFIG_PANES = Object.freeze({
      iconSrc: "chrome://browser/skin/fxa/avatar-empty.svg",
      groupIds: [
        "defaultBrowserSync",
@@ -266,7 +273,7 @@ index e6f6cdc..725a251 100644
        "profiles",
        "backup",
      ],
-@@ -437,20 +441,18 @@ const CONFIG_PANES = Object.freeze({
+@@ -437,20 +442,18 @@ const CONFIG_PANES = Object.freeze({
    },
    tabsBrowsing: {
      l10nId: "tabs-browsing-section",
@@ -294,7 +301,7 @@ index e6f6cdc..725a251 100644
      l10nId: "settings-translations-subpage-header",
      groupIds: [
        "translationsAutomaticTranslation",
-@@ -461,7 +463,9 @@ const CONFIG_PANES = Object.freeze({
+@@ -461,7 +464,9 @@ const CONFIG_PANES = Object.freeze({
      visible: () => srdSectionEnabled("translations"),
    },
    containers: {

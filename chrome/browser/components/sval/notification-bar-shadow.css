@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * Sval's notification bar, inside the bar's shadow root: what
  * `notification-bar.css` cannot reach from the window. `NotificationMessage`
@@ -64,15 +66,15 @@
  * has no icon in Firefox (`messageTypeToIconData`), so its tile is drawn
  * before the content. */
 :host(.infobar[type="info"]) .icon {
-  content: url("chrome://browser/content/sval/notification-icons/info.svg");
+  content: var(--sval-icon-notice-info);
 }
 
 :host(.infobar:is([type="warning"], [value="process-hang"])) .icon {
-  content: url("chrome://browser/content/sval/notification-icons/warning.svg");
+  content: var(--sval-icon-notice-warning);
 }
 
 :host(.infobar:is([type="critical"], [value="subframe-crashed"])) .icon {
-  content: url("chrome://browser/content/sval/notification-icons/critical.svg");
+  content: var(--sval-icon-notice-critical);
 }
 
 :host(.infobar[type="system"]) .container::before {
@@ -82,14 +84,14 @@
   height: 28px;
   margin-block-start: 2px;
   border-radius: 8px;
-  background: url("chrome://browser/content/sval/notification-icons/info.svg") center / 16px no-repeat var(--message-bar-icon-background-color);
+  background: var(--sval-icon-notice-info) center / 16px no-repeat var(--message-bar-icon-background-color);
   -moz-context-properties: fill;
   fill: var(--message-bar-icon-color);
 }
 
 /* The close: a 32px circle with a 16px cross, last on the first line. */
 :host(.infobar) .close {
-  --message-bar-icon-close-url: url("chrome://browser/content/sval/notification-icons/close.svg");
+  --message-bar-icon-close-url: var(--sval-icon-notice-close);
   --button-size-icon-small: 32px;
   --button-border-radius: 999px;
   --button-icon-fill: var(--sval-bar-close-ink, currentColor);

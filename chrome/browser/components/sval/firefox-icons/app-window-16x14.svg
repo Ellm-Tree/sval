@@ -1,0 +1,20 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="16"
+  height="14"
+  viewBox="-1.714 0 27.429 24"
+  fill="none"
+  stroke="context-fill"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <style>
+    :root { stroke: context-fill #060a2e; }
+    @media (prefers-color-scheme: dark) { :root { stroke: context-fill #ffffff; } }
+  </style>
+  <rect x="2" y="4" width="20" height="16" rx="2" />
+  <path d="M10 4v4" />
+  <path d="M2 8h20" />
+  <path d="M6 4v4" />
+</svg>

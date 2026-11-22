@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * The Launcher's rows as its three hosts draw them alike: the float and the
  * address bar in place (`sval-launcher.css`) and Home's field (`home.css`).
@@ -133,12 +135,12 @@
   mask: center / contain no-repeat;
 
   &[data-mark="pin"] {
-    mask-image: url("chrome://browser/content/sval/icons/pin.svg");
+    mask-image: var(--sval-icon-pin);
   }
 
   &[data-mark="favorite"] {
     mask: none;
-    background: url("chrome://browser/content/sval/header-icons/star-filled.svg") center / contain no-repeat;
+    background: var(--sval-icon-favorited) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: var(--sval-launcher-accent);
   }

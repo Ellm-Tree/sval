@@ -16,8 +16,10 @@ with a fallback paint (`context-fill black`) is safe as a mask.
 
 The check reads each `mask` and `mask-image` declaration in chrome/'s CSS
 and maps a `chrome://browser/content/sval/` URL it names to its file through
-Sval's jar.mn. A mask through `var()` is left to its author: one custom
-property can hold either kind of icon on different elements.
+Sval's jar.mn. A mask through `var(--sval-icon-<name>)` is read through
+`sval-icons.css`, the inventory's sheet. A mask through any other `var()` is
+left to its author: one custom property can hold either kind of icon on
+different elements.
 
 scripts/lint.sh runs it, and scripts/check-mask-icons-test.py tests it.
 """
@@ -32,6 +34,8 @@ PREFIX = "chrome://browser/content/sval/"
 
 MASK_RE = re.compile(r"(?<![\w-])mask(?:-image)?\s*:([^;{}]*)")
 URL_RE = re.compile(r"""url\(\s*["']?([^"')]+)["']?\s*\)""")
+ICON_VAR_RE = re.compile(r"var\(\s*(--sval-icon-[a-z0-9-]+)\s*\)")
+ICON_DEF_RE = re.compile(r"""(--sval-icon-[a-z0-9-]+):\s*url\("([^"]+)"\)""")
 JAR_RE = re.compile(r"^\s*content/browser/sval/(\S+)\s+\((\S+)\)", re.M)
 BARE_PAINT_RE = re.compile(
     r"""(?<![\w-])(?:fill|stroke)\s*(?:=\s*["']\s*context-(?:fill|stroke)\s*["']"""
@@ -74,10 +78,16 @@ def find_problems(root):
             bare[url] = bool(source and source.exists() and bare_paint(source.read_text()))
         return bare[url]
 
+    icons_sheet = root / SVAL_DIR / "sval-icons.css"
+    icon_urls = dict(ICON_DEF_RE.findall(icons_sheet.read_text())) if icons_sheet.exists() else {}
+
     problems = []
     for path, css in sheets.items():
         for match in MASK_RE.finditer(css):
-            urls = URL_RE.findall(match.group(1))
+            value = match.group(1)
+            urls = URL_RE.findall(value) + [
+                icon_urls[name] for name in ICON_VAR_RE.findall(value) if name in icon_urls
+            ]
             line = css.count("\n", 0, match.start()) + 1
             for url in dict.fromkeys(urls):
                 if is_bare(url):

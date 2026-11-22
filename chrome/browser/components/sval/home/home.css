@@ -10,6 +10,7 @@
 @import url("chrome://browser/content/sval/sval-tokens.css");
 @import url("chrome://browser/content/sval/sval-palette.css");
 @import url("chrome://browser/content/sval/sval-launcher-rows.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   --sval-blue: var(--sval-palette-blue);
@@ -552,17 +553,10 @@ main {
   stroke: currentColor;
 }
 
-/* The left slot of a row with no favicon of its own. */
-.suggestions .result[data-glyph="command"] .icon {
-  content: url("chrome://browser/content/sval/icons/square-terminal.svg");
-}
-
-.suggestions .result[data-glyph="plus"] .icon {
-  content: url("chrome://browser/content/sval/icons/plus.svg");
-}
-
-.suggestions .result[data-glyph="check"] .icon {
-  content: url("chrome://browser/content/sval/icons/check.svg");
+/* The left slot of a row with no favicon of its own: the icon its
+   `data-glyph` names, which `home.js` sets as `--sval-row-icon`. */
+.suggestions .result[data-glyph] .icon {
+  content: var(--sval-row-icon);
 }
 
 /* A workspace among a command's choices: its tint, ringed in its ink. */

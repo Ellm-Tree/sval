@@ -11,6 +11,7 @@
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 @import url("chrome://browser/content/sval/pages/error-pages.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 @media not ((forced-colors) or (prefers-contrast)) {
   :root {
@@ -24,7 +25,7 @@
 
   #errorPageContainer .title {
     padding-top: 48px;
-    background-image: url("chrome://browser/content/sval/icons/shield-ban.svg");
+    background-image: var(--sval-icon-blocked);
     fill: var(--sval-problem);
   }
 

@@ -30,6 +30,7 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+  iconURL: "moz-src:///browser/components/sval/SvalIcons.sys.mjs",
 });
 
 /**
@@ -137,7 +138,7 @@ function noticeRefused(install) {
     null,
     {
       refusal: install.type === "theme" ? "theme" : "containers",
-      popupIconURL: "chrome://browser/content/sval/icons/ban.svg",
+      popupIconURL: lazy.iconURL("refused"),
       removeOnDismissal: true,
       popupOptions: { position: "bottomright topright" },
     }

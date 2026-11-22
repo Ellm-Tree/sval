@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * Sval's workspace and group dialog, on `sval-dialog.css`'s frame, with the
  * colour section's look in `sval-color-picker.css`. The card's colour while
@@ -53,7 +55,7 @@
     width: 16px;
     height: 16px;
     margin-block-start: 2px;
-    background: center / contain no-repeat url("chrome://browser/content/sval/icons/circle-alert.svg");
+    background: center / contain no-repeat var(--sval-icon-error);
     -moz-context-properties: fill;
     fill: var(--sval-dialog-error);
   }

@@ -29,6 +29,7 @@ checks:
     - python3 scripts/check-comments.py
     - python3 scripts/check-decisions.py
     - python3 scripts/check-mask-icons.py
+    - python3 scripts/check-icons.py
     - python3 scripts/check-commit-msg.py
     - |
       if [ -n "${CI_MERGE_REQUEST_TITLE:-}" ]; then
@@ -39,6 +40,7 @@ checks:
     - python3 scripts/check-decisions-test.py
     - python3 scripts/check-commit-msg-test.py
     - python3 scripts/check-mask-icons-test.py
+    - python3 scripts/check-icons-test.py
 
 # Each crate's rust-toolchain.toml, or the repository's, pins the compiler,
 # and rustup installs it at the first cargo run. Tests that remove a file's

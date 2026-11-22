@@ -10,6 +10,7 @@
 
 @import url("chrome://browser/content/sval/sval-tokens.css");
 @import url("chrome://browser/content/sval/sval-scope.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   --sval-prot-accent: var(--sval-palette-neon);
@@ -212,151 +213,151 @@
 }
 
 .sval-prot-glyph[data-icon="pr-shield"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-shield.svg");
+  --sval-glyph: var(--sval-icon-protection);
 }
 
 .sval-prot-glyph[data-icon="pr-shield-fill"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-shield-fill.svg");
+  --sval-glyph: var(--sval-icon-protection-on);
 }
 
 .sval-prot-glyph[data-icon="pr-shield-off"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-shield-off.svg");
+  --sval-glyph: var(--sval-icon-protection-off);
 }
 
 .sval-prot-glyph[data-icon="pr-media-off"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-media-off.svg");
+  --sval-glyph: var(--sval-icon-autoplay-blocked);
 }
 
 .sval-prot-glyph[data-icon="pr-info"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-info.svg");
+  --sval-glyph: var(--sval-icon-protection-info);
 }
 
 .sval-prot-glyph[data-icon="pr-tracker"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-tracker.svg");
+  --sval-glyph: var(--sval-icon-trackers);
 }
 
 .sval-prot-glyph[data-icon="pr-fingerprint"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-fingerprint.svg");
+  --sval-glyph: var(--sval-icon-fingerprinting);
 }
 
 .sval-prot-glyph[data-icon="pr-ads"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/pr-ads.svg");
+  --sval-glyph: var(--sval-icon-ads);
 }
 
 .sval-prot-glyph[data-icon="sc-alert"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-alert.svg");
+  --sval-glyph: var(--sval-icon-site-alert);
 }
 
 .sval-prot-glyph[data-icon="sc-back"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-back.svg");
+  --sval-glyph: var(--sval-icon-site-back);
 }
 
 .sval-prot-glyph[data-icon="sc-cert"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-cert.svg");
+  --sval-glyph: var(--sval-icon-certificate);
 }
 
 .sval-prot-glyph[data-icon="sc-cookie"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-cookie.svg");
+  --sval-glyph: var(--sval-icon-cookies);
 }
 
 .sval-prot-glyph[data-icon="sc-external"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-external.svg");
+  --sval-glyph: var(--sval-icon-external);
 }
 
 .sval-prot-glyph[data-icon="sc-key"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-key.svg");
+  --sval-glyph: var(--sval-icon-site-key);
 }
 
 .sval-prot-glyph[data-icon="sc-next"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-next.svg");
+  --sval-glyph: var(--sval-icon-site-next);
 }
 
 .sval-prot-glyph[data-icon="sc-shield-alert"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-shield-alert.svg");
+  --sval-glyph: var(--sval-icon-site-warning);
 }
 
 .sval-prot-glyph[data-icon="sc-shield-plain"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-shield-plain.svg");
+  --sval-glyph: var(--sval-icon-site-shield);
 }
 
 .sval-prot-glyph[data-icon="sc-x"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-x.svg");
+  --sval-glyph: var(--sval-icon-site-close);
 }
 
 .sval-prot-glyph[data-icon="sc-bell"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-bell.svg");
+  --sval-glyph: var(--sval-icon-site-notifications);
 }
 
 .sval-prot-glyph[data-icon="sc-camera"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-camera.svg");
+  --sval-glyph: var(--sval-icon-site-camera);
 }
 
 .sval-prot-glyph[data-icon="sc-chevron-down"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg");
+  --sval-glyph: var(--sval-icon-site-expand);
 }
 
 .sval-prot-glyph[data-icon="ep-scissors"] {
-  --sval-glyph: url("chrome://browser/content/sval/icons/scissors.svg");
+  --sval-glyph: var(--sval-icon-snip);
 }
 
 .sval-prot-glyph[data-icon="ep-eraser"] {
-  --sval-glyph: url("chrome://browser/content/sval/icons/eraser.svg");
+  --sval-glyph: var(--sval-icon-remove-element);
 }
 
 .sval-prot-glyph[data-icon="ep-palette"] {
-  --sval-glyph: url("chrome://browser/content/sval/icons/palette.svg");
+  --sval-glyph: var(--sval-icon-colorshift);
 }
 
 .sval-prot-glyph[data-icon="ep-broom"] {
-  --sval-glyph: url("chrome://browser/content/sval/icons/broom.svg");
+  --sval-glyph: var(--sval-icon-clean-address);
 }
 
 .sval-prot-glyph[data-icon="ep-pin"] {
-  --sval-glyph: url("chrome://browser/content/sval/icons/pin.svg");
+  --sval-glyph: var(--sval-icon-pin);
 }
 
 .sval-prot-glyph[data-icon="sc-location"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-location.svg");
+  --sval-glyph: var(--sval-icon-site-location);
 }
 
 .sval-prot-glyph[data-icon="sc-mic"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-mic.svg");
+  --sval-glyph: var(--sval-icon-site-mic);
 }
 
 .sval-prot-glyph[data-icon="sc-popup"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-popup.svg");
+  --sval-glyph: var(--sval-icon-site-popups);
 }
 
 .sval-prot-glyph[data-icon="sc-screen"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-screen.svg");
+  --sval-glyph: var(--sval-icon-site-screen);
 }
 
 .sval-prot-glyph[data-icon="sc-camera-off"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-camera-off.svg");
+  --sval-glyph: var(--sval-icon-site-camera-off);
 }
 
 .sval-prot-glyph[data-icon="sc-mic-off"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-mic-off.svg");
+  --sval-glyph: var(--sval-icon-site-mic-off);
 }
 
 .sval-prot-glyph[data-icon="sc-screen-off"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-screen-off.svg");
+  --sval-glyph: var(--sval-icon-site-screen-off);
 }
 
 .sval-prot-glyph[data-icon="sc-storage"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-storage.svg");
+  --sval-glyph: var(--sval-icon-site-storage);
 }
 
 .sval-prot-glyph[data-icon="sc-network"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-network.svg");
+  --sval-glyph: var(--sval-icon-site-network);
 }
 
 .sval-prot-glyph[data-icon="sc-laptop"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-laptop.svg");
+  --sval-glyph: var(--sval-icon-site-devices);
 }
 
 .sval-prot-glyph[data-icon="sc-glasses"] {
-  --sval-glyph: url("chrome://browser/content/sval/protection-icons/sc-glasses.svg");
+  --sval-glyph: var(--sval-icon-site-vr);
 }
 
 /* ---------------------------------------------------------------- button */
@@ -1715,7 +1716,7 @@
     color: var(--sval-prot-popup);
 
     & > .sval-prot-glyph {
-      --sval-glyph: url("chrome://browser/content/sval/icons/pin-fill.svg");
+      --sval-glyph: var(--sval-icon-pinned);
     }
 
     &:hover {
@@ -1796,7 +1797,7 @@
 }
 
 .sval-site-hidden-toggle[aria-expanded="true"] .sval-site-hidden-chevron {
-  mask-image: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg");
+  mask-image: var(--sval-icon-site-expand);
 }
 
 .sval-site-hidden-body {

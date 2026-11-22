@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * The pins row (`SvalPinsRow`) and its popover, in the values of pins spec
  * §12. The tile fills are the row's own; the accent, muted ink and focus are
@@ -220,7 +222,7 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: transparent url("chrome://browser/content/sval/header-icons/reload.svg") center / 16px no-repeat;
+  background: transparent var(--sval-icon-reload) center / 16px no-repeat;
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
   color: inherit;

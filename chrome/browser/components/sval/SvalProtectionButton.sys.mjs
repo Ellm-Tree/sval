@@ -40,6 +40,7 @@ import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs"
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   SvalBlocking: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
+  iconURL: "moz-src:///browser/components/sval/SvalIcons.sys.mjs",
   BreachAlertStorage: "resource://gre/modules/BreachAlertStore.sys.mjs",
   SvalPreferences: "moz-src:///browser/components/sval/SvalPreferences.sys.mjs",
   ContentBlockingAllowList:
@@ -1249,8 +1250,7 @@ export class ProtectionButton {
       },
       [{ label: "Not now", accessKey: "N", callback() {} }],
       {
-        popupIconURL:
-          "chrome://browser/content/sval/protection-icons/pr-shield.svg",
+        popupIconURL: lazy.iconURL("protection"),
         removeOnDismissal: true,
       }
     );

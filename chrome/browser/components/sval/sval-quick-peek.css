@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * Quick Peek (`SvalQuickPeek`): the Quick Peek tab's own panel, drawn as a card over the
  * dimmed content area, with its bar above the page. The values are the Peek
@@ -214,7 +216,7 @@
 .sval-quick-peek-split-icon {
   width: 15px;
   height: 15px;
-  background-image: url("chrome://browser/content/sval/header-icons/split.svg");
+  background-image: var(--sval-icon-split);
 }
 
 .sval-quick-peek-bar > .sval-quick-peek-tab {
@@ -249,13 +251,13 @@
 .sval-quick-peek-copy-icon {
   width: 15px;
   height: 15px;
-  background-image: url("chrome://browser/content/sval/icons/copy.svg");
+  background-image: var(--sval-icon-copy);
 }
 
 .sval-quick-peek-close-icon {
   width: 16px;
   height: 16px;
-  background-image: url("chrome://browser/content/sval/icons/x.svg");
+  background-image: var(--sval-icon-close);
 }
 
 /* The loading line (`sval-header.css`) along the bar's foot. */

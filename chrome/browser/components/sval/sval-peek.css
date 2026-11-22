@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * A Peek (`SvalPeek`): one row over one page.
  *
@@ -244,7 +246,7 @@
   width: 12px;
   height: 12px;
   background: currentColor;
-  mask: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg") center / contain no-repeat;
+  mask: var(--sval-icon-site-expand) center / contain no-repeat;
 
   #sval-peek-tag[several] > & {
     display: block;
@@ -373,7 +375,7 @@
     width: 14px;
     height: 14px;
     background: currentColor;
-    mask: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg") center / contain no-repeat;
+    mask: var(--sval-icon-site-expand) center / contain no-repeat;
   }
 }
 
@@ -657,7 +659,7 @@
     width: 13px;
     height: 13px;
     background: currentColor;
-    mask: url("chrome://browser/content/sval/protection-icons/sc-x.svg") center / contain no-repeat;
+    mask: var(--sval-icon-site-close) center / contain no-repeat;
   }
 
   &:hover,

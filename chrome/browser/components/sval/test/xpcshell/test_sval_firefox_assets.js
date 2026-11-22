@@ -27,7 +27,7 @@ const OVERRIDES = {
   "chrome://global/content/megalist/icons/cpm-fox-illustration.svg": `${SVAL}illustrations/key-round.svg`,
   "chrome://browser/content/logos/lockwise.svg": `${SVAL}illustrations/key-round.svg`,
   "chrome://browser/skin/preferences/fox-ai.svg": `${SVAL}illustrations/sparkles.svg`,
-  "chrome://mozapps/skin/extensions/line.svg": `${SVAL}icons/badge-check.svg`,
+  "chrome://mozapps/skin/extensions/line.svg": `${SVAL}firefox-icons/badge-check-16x16.svg`,
   "chrome://browser/content/firefoxview/history-empty.svg": `${SVAL}illustrations/history.svg`,
   "chrome://browser/content/firefoxview/synced-tabs-empty.svg": `${SVAL}illustrations/monitor-smartphone.svg`,
   "chrome://browser/content/firefoxview/synced-tabs-error.svg": `${SVAL}illustrations/monitor-smartphone.svg`,
@@ -36,8 +36,7 @@ const OVERRIDES = {
   "chrome://global/skin/illustrations/kit-in-circle.svg": APP_ICON,
   "chrome://browser/skin/sidebar/firefox.svg": `${SVAL}sval-glyph.svg`,
   "chrome://browser/skin/firefox-view.svg": `${SVAL}sval-glyph.svg`,
-  "chrome://browser/skin/window-firefox.svg":
-    "chrome://browser/skin/window.svg",
+  "chrome://browser/skin/window-firefox.svg": `${SVAL}firefox-icons/app-window-16x14.svg`,
   "chrome://devtools/skin/images/fox-smiling.svg": APP_ICON,
   "chrome://devtools/skin/images/aboutdebugging-firefox-logo.svg": `${SVAL}sval-glyph.svg`,
   "chrome://devtools/skin/images/aboutdebugging-firefox-release.svg": APP_ICON,

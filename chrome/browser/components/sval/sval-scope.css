@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * The scope dropdown (`SvalScopeMenu`), at host-scoped rules spec §4's
  * metrics. Its colours are the chrome's popup tokens (`sval-header.css`,
@@ -104,7 +106,7 @@
 .sval-scope-chevron {
   flex: none;
   background-color: currentColor;
-  mask-image: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg");
+  mask-image: var(--sval-icon-site-expand);
   mask-position: center;
   mask-repeat: no-repeat;
 }
@@ -171,7 +173,7 @@
   width: 16px;
   height: 16px;
   background-color: currentColor;
-  mask: url("chrome://browser/content/sval/icons/check.svg") center / 16px no-repeat;
+  mask: var(--sval-icon-check) center / 16px no-repeat;
   visibility: hidden;
 
   [aria-selected="true"] > & {

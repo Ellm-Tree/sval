@@ -11,6 +11,7 @@
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 @import url("chrome://browser/content/sval/sval-launcher-rows.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   /* The card is a popup of the window, on the surface the header's popups
@@ -192,7 +193,7 @@
      the icon and whose shrink would clip the chiclet before the title. */
   flex: none !important;
   padding-inline-start: 24px !important;
-  background: url("chrome://browser/content/sval/header-icons/switch-tab.svg") no-repeat 4px center / 16px;
+  background: var(--sval-icon-switch-tab) no-repeat 4px center / 16px;
 }
 
 #urlbar .sval-launcher-end {
@@ -224,17 +225,10 @@
   display: none !important;
 }
 
-/* The left slot of a row with no favicon of its own. */
-#urlbar .urlbarView-row[sval-icon="command"] .urlbarView-favicon {
-  content: url("chrome://browser/content/sval/icons/square-terminal.svg");
-}
-
-#urlbar .urlbarView-row[sval-icon="plus"] .urlbarView-favicon {
-  content: url("chrome://browser/content/sval/icons/plus.svg");
-}
-
-#urlbar .urlbarView-row[sval-icon="check"] .urlbarView-favicon {
-  content: url("chrome://browser/content/sval/icons/check.svg");
+/* The left slot of a row with no favicon of its own: the icon its
+   `sval-icon` names, which `SvalLauncherRows` sets as `--sval-row-icon`. */
+#urlbar .urlbarView-row[sval-icon] .urlbarView-favicon {
+  content: var(--sval-row-icon);
 }
 
 /* A workspace among a command's choices: its tint, ringed in its ink. */
@@ -498,7 +492,7 @@
     width: 14px;
     height: 14px;
     background-color: currentColor;
-    mask: url("chrome://browser/content/sval/protection-icons/sc-back.svg") center / contain no-repeat;
+    mask: var(--sval-icon-site-back) center / contain no-repeat;
   }
 
   &:hover {

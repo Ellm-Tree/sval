@@ -60,6 +60,7 @@ support-files = [
   "sval_capture_page.html",
   "sval_call_page.html",
   "sval_ctrl_tab_helpers.js",
+  "sval_icon_audit_collect.js",
   "sval_pip_video_page.html",
   "sval_reload_cacheable.sjs",
   "sval_restore_counter.sjs",
@@ -504,6 +505,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_home_workspace.js"]
 
 ["browser_sval_https_only.js"]
+
+["browser_sval_icon_audit.js"]
 
 ["browser_sval_identity_moved.js"]
 

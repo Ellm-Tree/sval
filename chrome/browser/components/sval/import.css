@@ -13,6 +13,7 @@
 
 @import url("chrome://browser/content/sval/sval-tokens.css");
 @import url("chrome://browser/content/sval/sval-type.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   --surface-raised: light-dark(#ffffff, var(--sval-palette-ink-850));
@@ -899,7 +900,7 @@ html[data-sized] {
   fill: currentColor;
 
   [data-state="running"] > & {
-    background-image: url("chrome://browser/content/sval/icons/loader-circle.svg");
+    background-image: var(--sval-icon-loading);
     color: var(--text-accent);
     animation: sval-im-spin 1s linear infinite;
 
@@ -909,12 +910,12 @@ html[data-sized] {
   }
 
   [data-state="done"] > & {
-    background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+    background-image: var(--sval-icon-success);
     color: var(--result-success);
   }
 
   [data-state="failed"] > & {
-    background-image: url("chrome://browser/content/sval/icons/circle-alert.svg");
+    background-image: var(--sval-icon-error);
     color: var(--result-error);
   }
 }
@@ -1016,12 +1017,12 @@ html[data-sized] {
   }
 
   [data-status="success"] > &::before {
-    background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+    background-image: var(--sval-icon-success);
     color: var(--result-success);
   }
 
   [data-status="error"] > &::before {
-    background-image: url("chrome://browser/content/sval/icons/circle-alert.svg");
+    background-image: var(--sval-icon-error);
     color: var(--result-error);
   }
 }

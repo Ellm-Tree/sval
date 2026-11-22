@@ -36,6 +36,7 @@
 @import url("chrome://browser/content/sval/sval-color-picker.css");
 @import url("chrome://browser/content/sval/sval-iso-pill.css");
 @import url("chrome://browser/content/sval/sval-feedback.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 #sval-panel-container {
   /* `SvalPanel._applyPanelWidth` sets this device's width inline; the
@@ -1662,7 +1663,7 @@ menupopup:not([sval-stem]) {
  * reduced motion the favicon stays, as the header's stop button says it. */
 @media (prefers-reduced-motion: no-preference) {
   [data-busy] > .sval-row-icon {
-    content: url("chrome://browser/content/sval/header-icons/reload.svg");
+    content: var(--sval-icon-reload);
     background: none;
     mask: none;
     opacity: 1;
@@ -2523,7 +2524,7 @@ browser[sval-agent-layer] {
     width: 18px;
     height: 18px;
     background: currentColor;
-    mask: url("chrome://browser/content/sval/icons/mouse-pointer-2.svg") center / contain no-repeat;
+    mask: var(--sval-icon-agent-pointer) center / contain no-repeat;
   }
 
   &:hover {
@@ -2862,7 +2863,7 @@ browser[sval-agent-layer] {
   mask: var(--sval-i-folder) center / contain no-repeat;
 
   [data-half="split"] > & {
-    background: url("chrome://browser/content/sval/header-icons/split.svg") center / contain no-repeat;
+    background: var(--sval-icon-split) center / contain no-repeat;
     mask: none;
     -moz-context-properties: fill;
     fill: currentColor;
@@ -3189,7 +3190,7 @@ browser[sval-agent-layer] {
     content: "";
     width: 18px;
     height: 18px;
-    background: url("chrome://browser/content/sval/icons/message-circle.svg") center / contain no-repeat;
+    background: var(--sval-icon-feedback) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: currentColor;
   }
@@ -3342,11 +3343,11 @@ browser[sval-agent-layer] {
   &::before {
     inset: 0;
     fill: currentColor;
-    background-image: url("chrome://browser/content/sval/sync-icons/moon.svg");
+    background-image: var(--sval-icon-sync-moon);
   }
 
   [data-icon="moon-off"] > &::before {
-    background-image: url("chrome://browser/content/sval/sync-icons/moon-off.svg");
+    background-image: var(--sval-icon-sync-moon-off);
   }
 
   [data-icon="moon-offline"] > &::before {
@@ -3357,7 +3358,7 @@ browser[sval-agent-layer] {
   [data-icon="moon-syncing"] > &::after {
     inset: 0;
     fill: currentColor;
-    background-image: url("chrome://browser/content/sval/sync-icons/satellite.svg");
+    background-image: var(--sval-icon-sync-moon-syncing);
     animation: sval-sync-orbit 2.4s linear infinite;
 
     @media (prefers-reduced-motion: reduce) {
@@ -3379,19 +3380,19 @@ browser[sval-agent-layer] {
 
   [data-icon="moon-offline"] > &::after {
     background-color: var(--text-color-deemphasized);
-    background-image: url("chrome://browser/content/sval/sync-icons/badge-pause.svg");
+    background-image: var(--sval-icon-sync-offline);
     fill: var(--sval-sync-ring);
   }
 
   [data-icon="moon-warning"] > &::after {
     background-color: var(--sval-sync-warning);
-    background-image: url("chrome://browser/content/sval/sync-icons/badge-bang.svg");
+    background-image: var(--sval-icon-sync-warning);
     fill: var(--sval-sync-warning-mark);
   }
 
   [data-icon="moon-error"] > &::after {
     background-color: var(--sval-sync-error);
-    background-image: url("chrome://browser/content/sval/sync-icons/badge-x.svg");
+    background-image: var(--sval-icon-sync-error);
     fill: var(--sval-sync-error-mark);
   }
 }
@@ -3544,7 +3545,7 @@ browser[sval-agent-layer] {
 
 .sval-undo-icon {
   color: var(--sval-undo-done);
-  mask-image: url("chrome://browser/content/sval/icons/check.svg");
+  mask-image: var(--sval-icon-check);
 }
 
 .sval-undo-text {
@@ -3585,7 +3586,7 @@ browser[sval-agent-layer] {
 }
 
 .sval-undo-glyph {
-  mask-image: url("chrome://browser/content/sval/icons/undo-2.svg");
+  mask-image: var(--sval-icon-undo);
 }
 
 .sval-undo-dismiss {
@@ -3594,7 +3595,7 @@ browser[sval-agent-layer] {
 
   &::before {
     content: "";
-    mask-image: url("chrome://browser/content/sval/icons/x.svg");
+    mask-image: var(--sval-icon-close);
   }
 }
 

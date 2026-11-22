@@ -25,6 +25,7 @@
 
 @import url("chrome://browser/content/sval/sval-tokens.css");
 @import url("chrome://browser/content/sval/sval-type.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   --sval-header-h: 52px;
@@ -490,6 +491,29 @@
    (`sval-downloads.css`) share. */
 :root {
   --sval-dl-accent: light-dark(var(--sval-palette-blue), var(--sval-palette-neon));
+}
+
+/* Firefox's finish animation slides a strip of its own frames across the
+   button (`indicator.css`). Sval's glyph fades in and out in their place,
+   under the animation name `DownloadsIndicatorView._showNotification` waits
+   for before it clears the button's state. */
+#downloads-indicator-finish-image,
+#downloads-button[animate][notification="finish"] > .toolbarbutton-badge-stack > #downloads-indicator-finish-box > #downloads-indicator-finish-image {
+  list-style-image: var(--sval-icon-download-finished);
+  width: 20px;
+  transform: none;
+}
+
+@keyframes downloadsButtonFinishedNotification {
+  from,
+  to {
+    opacity: 0;
+  }
+
+  20%,
+  80% {
+    opacity: 1;
+  }
 }
 
 /* The downloads button follows the workspace the window shows
@@ -1192,7 +1216,7 @@
 }
 
 #urlbar .urlbar-go-button {
-  content: url("chrome://browser/content/sval/header-icons/forward.svg");
+  content: var(--sval-icon-go);
   box-sizing: border-box;
   width: 28px;
   height: 28px;
@@ -1265,19 +1289,19 @@
 /* ---------------------------------------------------------------- icons */
 
 #back-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/back.svg") !important;
+  list-style-image: var(--sval-icon-back) !important;
 }
 
 #forward-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/forward.svg") !important;
+  list-style-image: var(--sval-icon-forward) !important;
 }
 
 #reload-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/reload.svg") !important;
+  list-style-image: var(--sval-icon-reload) !important;
 }
 
 #stop-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/stop.svg") !important;
+  list-style-image: var(--sval-icon-stop) !important;
 }
 
 /* While the selected tab loads, Firefox shows the stop button in reload's
@@ -1300,7 +1324,7 @@
 
   #nav-bar #stop-reload-button > #reload-button[displaystop] + #stop-button {
     &:not(:hover, :focus-visible) {
-      list-style-image: url("chrome://browser/content/sval/header-icons/reload.svg") !important;
+      list-style-image: var(--sval-icon-reload) !important;
 
       > .toolbarbutton-icon {
         animation: sval-busy-turn 1s linear infinite;
@@ -1316,15 +1340,15 @@
 }
 
 #home-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/home.svg") !important;
+  list-style-image: var(--sval-icon-home) !important;
 }
 
 #sval-panel-button {
-  list-style-image: url("chrome://browser/content/sval/icons/panel-left.svg");
+  list-style-image: var(--sval-icon-panel);
 }
 
 #sval-javascript-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/javascript.svg");
+  list-style-image: var(--sval-icon-javascript);
 }
 
 /* The media button shows whether media plays on the page: plain, or crossed
@@ -1332,11 +1356,11 @@
    first, it takes the dot (header signals spec §2). */
 #sval-media-button {
   position: relative;
-  list-style-image: url("chrome://browser/content/sval/header-icons/media.svg");
+  list-style-image: var(--sval-icon-media);
 }
 
 #sval-media-button:is([sval-media="blocked"], [sval-media="refused"]) {
-  list-style-image: url("chrome://browser/content/sval/header-icons/media-off.svg");
+  list-style-image: var(--sval-icon-media-off);
 }
 
 /* Media playing on the page takes the live fill, the 26px chip the live
@@ -1432,7 +1456,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  list-style-image: url("chrome://browser/content/sval/header-icons/languages.svg");
+  list-style-image: var(--sval-icon-translate);
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
   fill-opacity: 1;
@@ -1459,23 +1483,23 @@
 /* The element picker's buttons, which `SvalSiteControls` shows while they are
    pinned. One takes the pressed look while its mode is on. */
 #sval-remove-button {
-  list-style-image: url("chrome://browser/content/sval/icons/eraser.svg");
+  list-style-image: var(--sval-icon-remove-element);
 }
 
 #sval-snip-button {
-  list-style-image: url("chrome://browser/content/sval/icons/scissors.svg");
+  list-style-image: var(--sval-icon-snip);
 }
 
 /* Colorshift's button, which `SvalSiteControls` shows while it is pinned,
    pressed while Colorshift is open. */
 #sval-colorshift-button {
-  list-style-image: url("chrome://browser/content/sval/icons/palette.svg");
+  list-style-image: var(--sval-icon-colorshift);
 }
 
 /* The clean address button, which `SvalSiteControls` shows while it is
    pinned. */
 #sval-clean-address-button {
-  list-style-image: url("chrome://browser/content/sval/icons/broom.svg");
+  list-style-image: var(--sval-icon-clean-address);
 }
 
 #nav-bar
@@ -1502,7 +1526,7 @@
 }
 
 #sval-site-menu-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/sliders-horizontal.svg");
+  list-style-image: var(--sval-icon-site-settings);
 }
 
 /* A camera, microphone or screen in use: one 26px cell each, solid, then a
@@ -1612,43 +1636,43 @@
 }
 
 .sval-header-glyph[data-icon="camera"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/camera.svg");
+  list-style-image: var(--sval-icon-camera);
 }
 
 .sval-header-glyph[data-icon="camera-off"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/camera-off.svg");
+  list-style-image: var(--sval-icon-camera-off);
 }
 
 .sval-header-glyph[data-icon="mic"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/mic.svg");
+  list-style-image: var(--sval-icon-mic);
 }
 
 .sval-header-glyph[data-icon="mic-off"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/mic-off.svg");
+  list-style-image: var(--sval-icon-mic-off);
 }
 
 .sval-header-glyph[data-icon="screen"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/screen.svg");
+  list-style-image: var(--sval-icon-screen);
 }
 
 .sval-header-glyph[data-icon="screen-off"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/screen-off.svg");
+  list-style-image: var(--sval-icon-screen-off);
 }
 
 .sval-header-glyph[data-icon="location"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/location.svg");
+  list-style-image: var(--sval-icon-location);
 }
 
 .sval-header-glyph[data-icon="location-off"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/location-off.svg");
+  list-style-image: var(--sval-icon-location-off);
 }
 
 .sval-header-glyph[data-icon="bell"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/bell.svg");
+  list-style-image: var(--sval-icon-notifications);
 }
 
 .sval-header-glyph[data-icon="storage"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/storage.svg");
+  list-style-image: var(--sval-icon-storage);
 }
 
 .sval-live-asks:hover .sval-live-ask {
@@ -1656,32 +1680,32 @@
 }
 
 #sval-javascript-button[sval-js="off"] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/javascript-off.svg");
+  list-style-image: var(--sval-icon-javascript-off);
 }
 
 #unified-extensions-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/extensions.svg") !important;
+  list-style-image: var(--sval-icon-extensions) !important;
 }
 
 #reader-mode-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/book-open.svg");
+  list-style-image: var(--sval-icon-reader);
 }
 
 #sval-favorite-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/star.svg");
+  list-style-image: var(--sval-icon-favorite);
 }
 
 #sval-favorite-button[starred] {
-  list-style-image: url("chrome://browser/content/sval/header-icons/star-filled.svg");
+  list-style-image: var(--sval-icon-favorited);
 }
 
 #sval-history-button {
-  list-style-image: url("chrome://browser/content/sval/header-icons/history.svg");
+  list-style-image: var(--sval-icon-history);
 }
 
 /* The notices button (`SvalNoticesButton`). */
 #sval-notices-button {
-  list-style-image: url("chrome://browser/content/sval/icons/bell.svg");
+  list-style-image: var(--sval-icon-notices);
 }
 
 /* The header's one dot: look at me (header signals spec §1, §7). An 8px
@@ -1849,7 +1873,7 @@
 }
 
 .sval-private-badge-icon {
-  list-style-image: url("chrome://browser/content/sval/header-icons/private.svg");
+  list-style-image: var(--sval-icon-private);
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
   fill-opacity: 1;
@@ -1916,7 +1940,7 @@ panel[type="arrow"] {
     margin: 8px;
     /* The icon strokes in `context-fill`, which a mask image is not given:
        drawn as a mask, it draws nothing. */
-    background: url("chrome://browser/content/sval/icons/circle-arrow-up.svg") center / contain no-repeat;
+    background: var(--sval-icon-update) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: var(--sval-accent);
   }
@@ -2556,7 +2580,7 @@ split-view-footer {
   margin: 0;
   margin-inline-start: 8px !important;
 
-  list-style-image: url("chrome://browser/content/sval/header-icons/split.svg");
+  list-style-image: var(--sval-icon-split);
 }
 
 /* ---------------------------------------------------------------- status panel */
@@ -3095,7 +3119,7 @@ toolbar .unified-extensions-item > .sval-site-line {
     color: var(--panel-background-color);
 
     & > .sval-extension-pin-glyph {
-      mask-image: url("chrome://browser/content/sval/icons/pin-fill.svg");
+      mask-image: var(--sval-icon-pinned);
     }
 
     &:hover {
@@ -3120,7 +3144,7 @@ toolbar .unified-extensions-item > .sval-site-line {
   width: 16px;
   height: 16px;
   background-color: currentColor;
-  mask-image: url("chrome://browser/content/sval/icons/pin.svg");
+  mask-image: var(--sval-icon-pin);
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: 16px;

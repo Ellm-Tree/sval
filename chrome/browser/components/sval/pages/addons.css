@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /* The add-ons page in Settings' look, over `sval-page.css`'s tokens. */
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
@@ -74,7 +76,7 @@ button.sval-addons-back {
   width: 16px;
   height: 16px;
   background-color: currentColor;
-  mask: url("chrome://browser/content/sval/protection-icons/sc-back.svg") center / contain no-repeat;
+  mask: var(--sval-icon-site-back) center / contain no-repeat;
 }
 
 /* Why finding an add-on leaves Sval for Mozilla's site, under the crumb. */

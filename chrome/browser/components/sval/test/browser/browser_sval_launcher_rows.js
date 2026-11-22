@@ -653,3 +653,28 @@ add_task(async function a_split_choice_shows_the_tabs_favicon() {
     "Escape steps back"
   );
 });
+
+add_task(async function a_command_shows_its_own_icon() {
+  const { iconURL } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalIcons.sys.mjs"
+  );
+  await workAndHome();
+  const drawn = (rows, id) =>
+    getComputedStyle(
+      rows
+        .find(r => r.result.payload.commandId === id)
+        .querySelector(".urlbarView-favicon")
+    ).content;
+
+  Assert.equal(
+    drawn(await shownRows("split with"), "split-with"),
+    `url("${iconURL("split")}")`,
+    "Split With shows the split icon the header's button shows"
+  );
+  Assert.equal(
+    drawn(await shownRows("go to workspace"), "go-to-workspace"),
+    `url("${iconURL("command")}")`,
+    "a command with no icon of its own shows the command icon"
+  );
+  await UrlbarTestUtils.promisePopupClose(window);
+});

@@ -13,6 +13,7 @@
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 @import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   --sval-blue: var(--sval-palette-blue);
@@ -914,7 +915,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
 
   &:checked {
     border-color: var(--sval-neon);
-    background: var(--sval-neon) center / 12px no-repeat url("chrome://browser/content/sval/icons/check.svg");
+    background: var(--sval-neon) center / 12px no-repeat var(--sval-icon-check);
     -moz-context-properties: fill;
     fill: var(--ink-950);
   }
@@ -1026,7 +1027,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
     background: rgba(92, 242, 255, 0.06);
 
     &::before {
-      background-image: url("chrome://browser/content/sval/icons/badge-info.svg");
+      background-image: var(--sval-icon-info);
       fill: var(--sval-neon);
     }
   }
@@ -1036,7 +1037,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
     background: rgba(79, 207, 106, 0.08);
 
     &::before {
-      background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+      background-image: var(--sval-icon-success);
       fill: var(--ok);
     }
   }
@@ -1046,7 +1047,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
     background: rgba(255, 194, 42, 0.08);
 
     &::before {
-      background-image: url("chrome://browser/content/sval/icons/badge-alert.svg");
+      background-image: var(--sval-icon-attention);
       fill: var(--warn);
     }
   }
@@ -1056,13 +1057,13 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
     background: rgba(92, 242, 255, 0.06);
 
     &::before {
-      background-image: url("chrome://browser/content/sval/icons/id-card.svg");
+      background-image: var(--sval-icon-card);
       fill: var(--sval-neon);
     }
   }
 
   &[data-tone="neutral"]::before {
-    background-image: url("chrome://browser/content/sval/icons/clock-3.svg");
+    background-image: var(--sval-icon-waiting);
     fill: var(--text-label);
   }
 }
@@ -1142,7 +1143,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
     flex: none;
     width: 22px;
     height: 22px;
-    background: center / contain no-repeat url("chrome://browser/content/sval/icons/loader-circle.svg");
+    background: center / contain no-repeat var(--sval-icon-loading);
     -moz-context-properties: fill;
     fill: var(--sval-neon);
     animation: sval-fr-spin 1s linear infinite;
@@ -1155,13 +1156,13 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
 
 section[data-join="failed"] .sval-fr-join::before,
 section[data-join="unchanged"] .sval-fr-join::before {
-  background-image: url("chrome://browser/content/sval/icons/badge-x.svg");
+  background-image: var(--sval-icon-failed);
   fill: var(--problem);
   animation: none;
 }
 
 section[data-join="landed"] .sval-fr-join::before {
-  background-image: url("chrome://browser/content/sval/icons/circle-check.svg");
+  background-image: var(--sval-icon-success);
   fill: var(--ok);
   animation: none;
 }

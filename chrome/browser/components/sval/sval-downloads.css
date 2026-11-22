@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /* The Downloads panel in Sval's popup style, with the workspace views
    (`SvalDownloadsPanel`). Loaded into a window when its panel is first set
    up. Its sizes and colours are Sval's design system's own values
@@ -244,7 +246,7 @@
     width: 9px;
     height: 9px;
     mask: none;
-    background: url("chrome://browser/content/sval/dialog-icons/trash-2.svg") center / contain no-repeat;
+    background: var(--sval-icon-delete) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: var(--sval-dl-label);
   }

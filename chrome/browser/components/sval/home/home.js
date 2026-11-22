@@ -382,6 +382,10 @@ function rowElement(row, i) {
   }
   if (row.glyph) {
     option.dataset.glyph = row.glyph;
+    option.style.setProperty(
+      "--sval-row-icon",
+      `var(--sval-icon-${row.glyph})`
+    );
   }
   if (row.swatch) {
     option.dataset.swatch = "";

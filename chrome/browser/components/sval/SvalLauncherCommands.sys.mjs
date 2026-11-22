@@ -300,6 +300,8 @@ async function ordinaryWindowFor(win) {
  *
  * - `id`, and `l10nId`/`synonymsL10nId`, its name and the other words it is
  *   found by, comma-separated, in `launcher.ftl`.
+ * - `icon`, its icon's name in `SvalIcons`, where one stands for it; a
+ *   command without one shows the command icon.
  * - `keyId`, the `<key>` that runs it too, or null.
  * - `available(win)`, whether it applies now; a command that does not is
  *   not listed, and picked from a stale list it does nothing.
@@ -347,6 +349,7 @@ export const COMMANDS = [
   {
     id: "rename-workspace",
     l10nId: "launcher-command-rename-workspace",
+    icon: "edit",
     synonymsL10nId: "launcher-command-rename-workspace-synonyms",
     keyId: null,
     available: win => !!userPanel(win) && !agentWorkspace(win),
@@ -390,6 +393,7 @@ export const COMMANDS = [
   {
     id: "rename-tab",
     l10nId: "launcher-command-rename-tab",
+    icon: "edit",
     synonymsL10nId: "launcher-command-rename-tab-synonyms",
     keyId: null,
     // Not in an agent's window, as Move is not.
@@ -411,6 +415,7 @@ export const COMMANDS = [
   {
     id: "pin",
     l10nId: "launcher-command-pin",
+    icon: "pin",
     synonymsL10nId: "launcher-command-pin-synonyms",
     keyId: null,
     available: win => !!win.SvalPanel?.pins?.canPin(selectedNode(win)),
@@ -419,6 +424,7 @@ export const COMMANDS = [
   {
     id: "pinHere",
     l10nId: "launcher-command-pin-here",
+    icon: "pin",
     synonymsL10nId: "launcher-command-pin-here-synonyms",
     keyId: null,
     available: win => !!win.SvalPanel?.pins?.canPin(selectedNode(win)),
@@ -428,6 +434,7 @@ export const COMMANDS = [
   {
     id: "unpin",
     l10nId: "launcher-command-unpin",
+    icon: "pin",
     synonymsL10nId: "launcher-command-unpin-synonyms",
     keyId: null,
     available: win => !!win.SvalPanel?.pins?.selectedPin,
@@ -439,6 +446,7 @@ export const COMMANDS = [
   {
     id: "add-favorite",
     l10nId: "launcher-command-add-favorite",
+    icon: "favorite",
     synonymsL10nId: "launcher-command-add-favorite-synonyms",
     keyId: "addBookmarkAsKb",
     available: win => !lazy.PrivateBrowsingUtils.isWindowPrivate(win),
@@ -447,6 +455,7 @@ export const COMMANDS = [
   {
     id: "copy-address",
     l10nId: "launcher-command-copy-address",
+    icon: "copy",
     synonymsL10nId: "launcher-command-copy-address-synonyms",
     keyId: COPY_ADDRESS_KEY,
     available: win => !!win.gBrowser.currentURI?.spec,
@@ -455,6 +464,7 @@ export const COMMANDS = [
   {
     id: "copy-clean-address",
     l10nId: "launcher-command-copy-clean-address",
+    icon: "clean-address",
     synonymsL10nId: "launcher-command-copy-clean-address-synonyms",
     keyId: null,
     available: win => !!win.gBrowser.currentURI?.spec,
@@ -463,6 +473,7 @@ export const COMMANDS = [
   {
     id: "copy-markdown-link",
     l10nId: "launcher-command-copy-markdown-link",
+    icon: "copy",
     synonymsL10nId: "launcher-command-copy-markdown-link-synonyms",
     keyId: null,
     available: win => !!win.gBrowser.currentURI?.spec,
@@ -548,6 +559,7 @@ export const COMMANDS = [
   {
     id: "mute",
     l10nId: "launcher-command-mute",
+    icon: "media-off",
     synonymsL10nId: "launcher-command-mute-synonyms",
     keyId: "key_toggleMute",
     available: win => !win.gBrowser.selectedTab.muted,
@@ -556,6 +568,7 @@ export const COMMANDS = [
   {
     id: "unmute",
     l10nId: "launcher-command-unmute",
+    icon: "media",
     synonymsL10nId: "launcher-command-unmute-synonyms",
     keyId: "key_toggleMute",
     available: win => !!win.gBrowser.selectedTab.muted,
@@ -564,6 +577,7 @@ export const COMMANDS = [
   {
     id: "reader-view",
     l10nId: "launcher-command-reader-view",
+    icon: "reader",
     synonymsL10nId: "launcher-command-reader-view-synonyms",
     keyId: "key_toggleReaderMode",
     // Where the reader view button shows (`AboutReaderParent`).
@@ -580,6 +594,7 @@ export const COMMANDS = [
   {
     id: "split-with",
     l10nId: "launcher-command-split-with",
+    icon: "split",
     synonymsL10nId: "launcher-command-split-with-synonyms",
     keyId: null,
     chooseL10nId: "launcher-choose-tab",
@@ -617,6 +632,7 @@ export const COMMANDS = [
   {
     id: "close-split",
     l10nId: "launcher-command-close-split",
+    icon: "split",
     synonymsL10nId: "launcher-command-close-split-synonyms",
     keyId: null,
     available: win => !!selectedSplit(win),
@@ -625,6 +641,7 @@ export const COMMANDS = [
   {
     id: "swap-panes",
     l10nId: "launcher-command-swap-panes",
+    icon: "split",
     synonymsL10nId: "launcher-command-swap-panes-synonyms",
     keyId: null,
     // Firefox's Reverse swaps the first two panes only (split-view spec
@@ -637,6 +654,7 @@ export const COMMANDS = [
   {
     id: "toggle-panel",
     l10nId: "launcher-command-toggle-panel",
+    icon: "panel",
     synonymsL10nId: "launcher-command-toggle-panel-synonyms",
     keyId: PANEL_TOGGLE_KEY,
     available: win => !!win.SvalPanel,
@@ -647,6 +665,7 @@ export const COMMANDS = [
   {
     id: "site-privacy",
     l10nId: "launcher-command-site-privacy",
+    icon: "protection",
     synonymsL10nId: "launcher-command-site-privacy-synonyms",
     keyId: null,
     available: win =>
@@ -656,6 +675,7 @@ export const COMMANDS = [
   {
     id: "site-settings",
     l10nId: "launcher-command-site-settings",
+    icon: "site-settings",
     synonymsL10nId: "launcher-command-site-settings-synonyms",
     keyId: null,
     // Where the menu opens (`SiteControls.openMenu`): a page with a site.
@@ -666,6 +686,7 @@ export const COMMANDS = [
   {
     id: "style-site",
     l10nId: "launcher-command-style-site",
+    icon: "colorshift",
     synonymsL10nId: "launcher-command-style-site-synonyms",
     keyId: STYLE_KEY,
     // Where the editor opens: a page with a site, outside private windows.
@@ -677,6 +698,7 @@ export const COMMANDS = [
   {
     id: "clear-site-data",
     l10nId: "launcher-command-clear-site-data",
+    icon: "delete",
     synonymsL10nId: "launcher-command-clear-site-data-synonyms",
     keyId: null,
     // Where the site menu offers it, and through its own confirmation.
@@ -688,6 +710,7 @@ export const COMMANDS = [
   {
     id: "block-javascript",
     l10nId: "launcher-command-block-javascript",
+    icon: "javascript-off",
     synonymsL10nId: "launcher-command-javascript-synonyms",
     keyId: null,
     available: win => javascriptOf(win)?.on === true,
@@ -696,6 +719,7 @@ export const COMMANDS = [
   {
     id: "allow-javascript",
     l10nId: "launcher-command-allow-javascript",
+    icon: "javascript",
     synonymsL10nId: "launcher-command-javascript-synonyms",
     keyId: null,
     available: win => javascriptOf(win)?.on === false,
@@ -720,6 +744,7 @@ export const COMMANDS = [
   {
     id: "agent-settings",
     l10nId: "launcher-command-agent-settings",
+    icon: "agents",
     synonymsL10nId: "launcher-command-agent-settings-synonyms",
     keyId: null,
     available: win => !!userPanel(win),
@@ -767,6 +792,7 @@ export const COMMANDS = [
   {
     id: "history",
     l10nId: "launcher-command-history",
+    icon: "history",
     synonymsL10nId: "launcher-command-history-synonyms",
     keyId: "key_gotoHistory",
     available: () => true,
@@ -1189,6 +1215,7 @@ function resultFor(queryContext, row, { win, inChoices }) {
     payload: {
       dynamicType: DYNAMIC_TYPE,
       commandId: command.id,
+      icon: command.icon ?? null,
       choiceId: choice?.id ?? null,
       choiceText: choice?.isNew ? queryContext.searchString.trim() : null,
       inChoices,

@@ -295,7 +295,7 @@ export function describeRow(result, win) {
       row.foot = placesFor(win, result, { split: false });
       break;
     case "command":
-      row.icon = "command";
+      row.icon = payload.icon ?? "command";
       row.foot = payload.shortcut
         ? [{ keys: [payload.shortcut], l10nId: "launcher-foot-runs-anywhere" }]
         : [{ note: "launcher-foot-no-shortcut" }];
@@ -304,14 +304,14 @@ export function describeRow(result, win) {
       }
       break;
     case "picks":
-      row.icon = "command";
+      row.icon = payload.icon ?? "command";
       row.foot = [{ note: "launcher-foot-opens-list" }];
       break;
     case "choice":
     case "split-choice":
     case "new":
       if (kind === "new") {
-        row.icon = "plus";
+        row.icon = "add";
       } else if (payload.current) {
         row.icon = "check";
       }
@@ -486,6 +486,7 @@ function drawRow(item, win) {
   for (const name of ["sval-kind", "sval-icon", "sval-swatch"]) {
     item.removeAttribute(name);
   }
+  item.style.removeProperty("--sval-row-icon");
   paintColor(item, null);
   if (result.type !== UrlbarUtils.RESULT_TYPE.DYNAMIC) {
     for (const name of [
@@ -505,6 +506,10 @@ function drawRow(item, win) {
   item.setAttribute("sval-kind", described.kind);
   if (described.icon) {
     item.setAttribute("sval-icon", described.icon);
+    item.style.setProperty(
+      "--sval-row-icon",
+      `var(--sval-icon-${described.icon})`
+    );
   }
   if (described.swatch !== null) {
     item.setAttribute("sval-swatch", "");

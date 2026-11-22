@@ -7,7 +7,11 @@ a user can reach it. Mozilla's generic illustrations stay: they are MPL 2.0
 files like the rest of Firefox, and carry no mark of Mozilla's.
 
 Replacements are chrome overrides in `chrome/browser/components/sval/jar.mn`,
-so no patch touches the pages that show them. A Lucide glyph stands in where
+so no patch touches the pages that show them. Firefox's UI glyphs that Sval's
+surfaces draw take Sval's art the same way, each from the entry in
+`SvalIcons.sys.mjs` for what it stands for, and an image these tables replace
+does too when the inventory has a name for it. `browser_sval_icon_audit.js`
+fails on any Firefox image a surface still draws. A Lucide glyph stands in where
 the image says what the surface is about, and Sval's mark where it said
 "Firefox". The Lucide files are in `chrome/browser/components/sval/illustrations/`
 and `icons/`, under ISC (`REUSE.toml`). `test_sval_firefox_assets.js` checks
@@ -51,7 +55,10 @@ committed.
 | `toolkit/themes/shared/illustrations/kit-*.svg` | Settings default-browser card, and the promo on about:pdf, which Sval keeps closed (Kit, Firefox's mascot) | Sval's app icon (`chrome://branding/content/about-logo.svg`) |
 | `browser/themes/shared/sidebar/firefox.svg` | Settings About and Languages icons | Sval's glyph (`sval-glyph.svg`) |
 | `browser/themes/shared/icons/firefox-view.svg` | Sval View's icon | Sval's glyph |
-| `browser/themes/shared/icons/window-firefox.svg` | Window icon in menus | Firefox's plain window icon |
+| `browser/themes/shared/icons/window-firefox.svg` | Window icon in menus, and Settings' new windows heading | Lucide `app-window` |
+| `toolkit/themes/shared/illustrations/about-license.svg` | about:license | Lucide `scale` |
+| `browser/components/preferences/spell-check-promo.svg` | Settings, spelling | Lucide `spell-check` |
+| `toolkit/themes/shared/icons/arrow-counterclockwise-16.svg` | Settings, restoring dismissed suggestions | Lucide `rotate-ccw` |
 | `devtools/client/themes/images/aboutdebugging-firefox-logo.svg` | about:debugging sidebar, "This Sval" | Sval's glyph |
 | `devtools/client/themes/images/aboutdebugging-firefox-*.svg` | about:debugging runtime page. The local runtime and a remote desktop Firefox both take it: the icon is chosen by channel alone (`getRuntimeIcon`) | Sval's app icon |
 | `devtools/client/themes/images/fox-smiling.svg` | Web console's multi-line editor onboarding | Sval's app icon |
@@ -61,7 +68,6 @@ committed.
 
 | Asset | Where it shows | Disposition |
 |---|---|---|
-| `toolkit/themes/shared/illustrations/about-license.svg` | about:license | Kept: a generic document |
 | `toolkit/themes/shared/illustrations/error-malformed-url.svg` | Certificate viewer error | Kept: a generic creature, no mark |
 | `toolkit/themes/shared/illustrations/shield-alert.svg`, `toolkit/themes/shared/illustrations/shield-check.svg` | Settings security card | Kept: generic shields |
 | `toolkit/components/aboutconfig/content/background.svg` | about:config warning | Kept: a generic warning sign |
@@ -69,10 +75,10 @@ committed.
 | `browser/themes/shared/customizableui/empty-overflow-panel*.png`, `browser/themes/shared/customizableui/whimsy.png` | Toolbar customization | Kept: generic creatures, no mark |
 | `browser/themes/shared/panic-panel/header@2x.png` | Forget button panel | Kept: a generic reset arrow |
 | `browser/themes/shared/tabbrowser/connecting*.png`, `toolkit/themes/shared/media/*.png`, `toolkit/themes/shared/icons/pendingpaint.png` | Tab and media loading | Kept: spinners |
-| `toolkit/themes/shared/icons/arrow-counterclockwise-16.svg`, `toolkit/components/pdfjs/content/web/images/cursor-editorTextHighlight.svg` | UI glyphs | Kept: glyphs |
+| `toolkit/components/pdfjs/content/web/images/cursor-editorTextHighlight.svg` | PDF viewer highlight cursor | Kept: a glyph |
 | `toolkit/themes/shared/icons/EU-trust-mark*.svg` | Site information panel, for a site with an EU qualified certificate | Kept: the EU's mark, nominative |
 | `toolkit/components/pdfjs/content/web/images/altText_disclaimer.svg` | PDF viewer alt text | Kept: generic sparkles |
-| `browser/components/preferences/etp-advanced-banner.svg`, `browser/components/preferences/etp-toggle-promo.svg`, `browser/components/preferences/spell-check-promo.svg` | Settings, privacy and languages | Kept: generic UI sketches |
+| `browser/components/preferences/etp-advanced-banner.svg`, `browser/components/preferences/etp-toggle-promo.svg` | Settings, privacy | Kept: generic UI sketches |
 | `browser/themes/addons/alpenglow/preview.svg` | about:addons themes | Kept: a colour preview |
 | `browser/themes/*/monitor-base.png`, `browser/themes/*/monitor-border.png`, `browser/themes/*/pageInfo.png` | Set as desktop background, Page Info | Kept: generic |
 | `browser/components/migration/content/brands/*.png` | Import from another browser | Kept: the other browsers' logos, nominative. Sval's import shows Chrome's, Edge's and Safari's from here, and adds Arc's and Firefox's own in `chrome/browser/components/sval/import-brands/`, also nominative: Firefox's is `browser/branding/official/default128.png`, copied unchanged, and names Firefox as the browser being imported from |

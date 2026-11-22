@@ -27,6 +27,7 @@
 /* ---------------------------------------------------------------- tokens */
 
 @import url("chrome://browser/content/sval/sval-tokens.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 notification-message {
   --sval-bar-text: light-dark(var(--sval-palette-ink-950), #ffffff);
@@ -196,7 +197,7 @@ notification-message .notification-button.footer-button[data-l10n-id="popup-warn
     width: 16px;
     height: 16px;
     margin-inline-start: 4px;
-    background: url("chrome://browser/content/sval/notification-icons/chevron-down.svg") center / 16px no-repeat;
+    background: var(--sval-icon-notice-expand) center / 16px no-repeat;
     -moz-context-properties: fill;
     fill: currentColor;
   }

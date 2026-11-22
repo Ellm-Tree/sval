@@ -39,6 +39,11 @@ fi
 mask_status=0
 python3 "$REPO_ROOT/scripts/check-mask-icons.py" || mask_status=$?
 
+# Every Sval icon is drawn through SvalIcons.sys.mjs's inventory
+# (scripts/check-icons.py says why).
+icons_status=0
+python3 "$REPO_ROOT/scripts/check-icons.py" || icons_status=$?
+
 # What Sval's listener and sval-mcp must state alike, each in its own
 # language (scripts/check-agent-wire.py says why).
 wire_status=0
@@ -56,6 +61,7 @@ python3 "$REPO_ROOT/scripts/check-comments-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-decisions-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-commit-msg-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-mask-icons-test.py" || checker_status=$?
+python3 "$REPO_ROOT/scripts/check-icons-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-rhythm-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-css-tokens-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-agent-wire-test.py" || checker_status=$?
@@ -209,6 +215,10 @@ fi
 if [[ "$mask_status" -ne 0 ]]; then
   echo "error: scripts/check-mask-icons.py found a mask on an icon it cannot draw" >&2
   exit "$mask_status"
+fi
+if [[ "$icons_status" -ne 0 ]]; then
+  echo "error: scripts/check-icons.py found an icon drawn outside SvalIcons.sys.mjs's inventory" >&2
+  exit "$icons_status"
 fi
 if [[ "$wire_status" -ne 0 ]]; then
   echo "error: scripts/check-agent-wire.py found Sval and sval-mcp stating their wire differently" >&2

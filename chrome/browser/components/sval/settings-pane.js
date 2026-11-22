@@ -20,7 +20,9 @@
 {
   const { paneName } = window.SvalSettingsHelpers;
   const PANES_URL = "chrome://browser/content/sval/settings-panes.html";
-  const ICONS = "chrome://browser/content/sval/icons";
+  const { iconURL } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalIcons.sys.mjs"
+  );
 
   /**
    * Sval's categories. `id` is the friendly name that goes in the URL's hash
@@ -28,11 +30,11 @@
    * name `paneSvalSync`. Where each sits in the nav is `NAV_ORDER`'s.
    */
   const CATEGORIES = [
-    { id: "svalSync", label: "Sync and devices", icon: "cloud" },
-    { id: "svalLinks", label: "Links", icon: "route" },
-    { id: "svalSites", label: "Sites", icon: "globe" },
-    { id: "svalExtensions", label: "Extensions", icon: "puzzle" },
-    { id: "svalAgents", label: "Agents", icon: "bot" },
+    { id: "svalSync", label: "Sync and devices", icon: "sync" },
+    { id: "svalLinks", label: "Links", icon: "links" },
+    { id: "svalSites", label: "Sites", icon: "sites" },
+    { id: "svalExtensions", label: "Extensions", icon: "extensions-settings" },
+    { id: "svalAgents", label: "Agents", icon: "agents" },
     { id: "svalKeyboard", label: "Keyboard shortcuts", icon: "keyboard" },
   ];
 
@@ -322,7 +324,7 @@
       );
       button.id = `category-${category.id}`;
       button.setAttribute("view", name);
-      button.setAttribute("iconsrc", `${ICONS}/${category.icon}.svg`);
+      button.setAttribute("iconsrc", iconURL(category.icon));
       // `title` names the button when the nav collapses to icons and hides
       // its text.
       button.setAttribute("title", category.label);
@@ -445,10 +447,10 @@
     SvalScope.forWindow(window).pref(CARD_PREF, cardChanged);
     document
       .getElementById("category-home")
-      ?.setAttribute("iconsrc", `${ICONS}/panel-left.svg`);
+      ?.setAttribute("iconsrc", iconURL("workspaces"));
     document
       .getElementById("category-privacy")
-      ?.setAttribute("iconsrc", `${ICONS}/shield-half.svg`);
+      ?.setAttribute("iconsrc", iconURL("privacy"));
 
     // Privacy and protection is Firefox's category, so Sval's sections in it
     // reach `SvalSettings` here rather than through a module of Sval's.

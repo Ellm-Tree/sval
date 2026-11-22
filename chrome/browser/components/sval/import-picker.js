@@ -35,6 +35,9 @@ const SvalImportPicker = (() => {
   const Files = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalImportFiles.sys.mjs"
   );
+  const { iconURL } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalIcons.sys.mjs"
+  );
   const { SvalLog } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalLog.sys.mjs"
   );
@@ -46,7 +49,6 @@ const SvalImportPicker = (() => {
   );
 
   const HTML_NS = "http://www.w3.org/1999/xhtml";
-  const ICONS = "chrome://browser/content/sval/icons/";
 
   const { AppConstants } = ChromeUtils.importESModule(
     "resource://gre/modules/AppConstants.sys.mjs"
@@ -75,11 +77,11 @@ const SvalImportPicker = (() => {
     orion: "chrome://browser/content/sval/import-brands/orion.png",
     firefox: "chrome://browser/content/sval/import-brands/firefox.png",
     zen: "chrome://browser/content/sval/import-brands/zen.png",
-    html: `${ICONS}folder-open.svg`,
+    html: iconURL("import-file"),
   });
 
   /** What a logo that is not shipped on this platform falls back to. */
-  const NO_LOGO = `${ICONS}globe.svg`;
+  const NO_LOGO = iconURL("unknown-browser");
 
   const SPACE_UNITS = ["Space", "Spaces"];
   const WORKSPACE_UNITS = ["Workspace", "Workspaces"];
@@ -136,14 +138,14 @@ const SvalImportPicker = (() => {
    * One of Sval's Lucide glyphs, drawn in its element's `fill`.
    *
    * @param {Document} doc
-   * @param {string} name The file name in `icons/`.
+   * @param {string} name The icon's name in `SvalIcons`.
    * @param {string} className
    * @returns {Element}
    */
   function glyph(doc, name, className) {
     return make(doc, "img", {
       className,
-      src: `${ICONS}${name}.svg`,
+      src: iconURL(name),
       alt: "",
     });
   }
@@ -235,12 +237,12 @@ const SvalImportPicker = (() => {
         }),
         looking: status(
           "sval-im-looking",
-          "loader-circle",
+          "loading",
           "Looking for other browsers…"
         ),
         none: status(
           "sval-im-none",
-          "badge-info",
+          "info",
           "No other browsers found on this device."
         ),
         sources: make(doc, "ul", {
@@ -518,7 +520,7 @@ const SvalImportPicker = (() => {
             doc,
             "div",
             { className: "sval-im-handoff-head" },
-            glyph(doc, "key-round", "sval-im-handoff-glyph"),
+            glyph(doc, "password", "sval-im-handoff-glyph"),
             make(
               doc,
               "div",
@@ -580,7 +582,7 @@ const SvalImportPicker = (() => {
         doc,
         "div",
         { className: "sval-im-handoff-head" },
-        glyph(doc, "key-round", "sval-im-handoff-glyph"),
+        glyph(doc, "password", "sval-im-handoff-glyph"),
         words
       );
       note.append(head);
@@ -1018,7 +1020,7 @@ const SvalImportPicker = (() => {
               "aria-label": `${open ? "Hide" : "Show"} ${this._rowTitle(row)} details`,
             },
           },
-          glyph(doc, "chevron-down", "sval-im-chevron")
+          glyph(doc, "expand", "sval-im-chevron")
         );
         fold.addEventListener("click", () => {
           row.folded = !row.folded;
@@ -1066,7 +1068,7 @@ const SvalImportPicker = (() => {
           this._el(
             "p",
             { className: "sval-im-note", attrs: { role: "note" } },
-            glyph(doc, "badge-info", "sval-im-note-glyph"),
+            glyph(doc, "info", "sval-im-note-glyph"),
             this._el(
               "span",
               {},
@@ -1252,7 +1254,7 @@ const SvalImportPicker = (() => {
           (c.groups
             ? `, ${plural(c.groups, folders ? "folder" : "group")}`
             : ""),
-        glyph(doc, "chevron-down", "sval-im-chevron")
+        glyph(doc, "expand", "sval-im-chevron")
       );
       const head = this._el(
         "div",
@@ -1309,7 +1311,7 @@ const SvalImportPicker = (() => {
           attrs: { "aria-pressed": String(view.group === i) },
         });
         if (folders) {
-          chip.append(glyph(doc, "folder-open", "sval-im-group-folder"));
+          chip.append(glyph(doc, "bookmark-folder", "sval-im-group-folder"));
         } else if (Color.isPreset(group.color)) {
           chip.dataset.color = group.color;
           const dot = this._el("span", { className: "sval-im-group-dot" });

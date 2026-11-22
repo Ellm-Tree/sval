@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * The pages a failed load or a crash puts in a tab, over `sval-page.css`'s
  * tokens: network and certificate errors, HTTPS-Only's, a blocked site, a
@@ -55,22 +57,22 @@
 
   /* Sval's glyphs for the titles' Firefox icons. */
   body.certerror .title {
-    background-image: url("chrome://browser/content/sval/icons/triangle-alert.svg") !important;
+    background-image: var(--sval-icon-warning) !important;
   }
 
   body.blocked .title {
-    background-image: url("chrome://browser/content/sval/icons/shield-ban.svg");
+    background-image: var(--sval-icon-blocked);
   }
 
   main.container .title {
-    background-image: url("chrome://browser/content/sval/icons/shield-off.svg");
+    background-image: var(--sval-icon-page-error);
   }
 
   /* about:restricted's title takes Sval's warning glyph, in the page's own
      warning colour (`aboutRestricted.css`). */
   :root:has(> head > link[href$="aboutRestricted.css"]) .title {
     padding-top: 48px;
-    background-image: url("chrome://browser/content/sval/icons/triangle-alert.svg");
+    background-image: var(--sval-icon-warning);
   }
 
   .title-text {
@@ -124,7 +126,7 @@
   /* A crashed frame shows a glyph alone, centred in the frame. */
   :root:has(> head > link[href$="aboutFrameCrashed.css"]) body {
     background-color: var(--sval-page);
-    background-image: url("chrome://browser/content/sval/icons/circle-alert.svg");
+    background-image: var(--sval-icon-error);
     background-size: 24px;
     -moz-context-properties: fill;
     fill: var(--sval-ink-muted);

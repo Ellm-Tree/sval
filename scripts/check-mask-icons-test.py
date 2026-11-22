@@ -31,7 +31,7 @@ ICONS = {
 }
 
 
-def problems(css):
+def problems(css, icons_sheet=""):
     with tempfile.TemporaryDirectory() as tmp:
         root = pathlib.Path(tmp)
         sval = root / check.SVAL_DIR
@@ -42,6 +42,7 @@ def problems(css):
             jar.append(f"    content/browser/sval/icons/{name} (icons/{name})")
         (sval / "jar.mn").write_text("\n".join(jar) + "\n")
         (sval / "a.css").write_text(css)
+        (sval / "sval-icons.css").write_text(icons_sheet)
         return [(line, url.rsplit("/", 1)[1]) for _, line, url in check.find_problems(root)]
 
 
@@ -57,6 +58,11 @@ class MaskIcons(unittest.TestCase):
 
     def test_flags_mask_image(self):
         self.assertEqual(problems(f".a {{ mask-image: {url('stroke.svg')}; }}"), [(1, "stroke.svg")])
+
+    def test_reads_an_inventory_icon_through_its_sheet(self):
+        sheet = f":root {{\n  --sval-icon-a: {url('stroke.svg')};\n  --sval-icon-b: {url('fallback.svg')};\n}}\n"
+        self.assertEqual(problems(".a { mask: var(--sval-icon-a); }", sheet), [(1, "stroke.svg")])
+        self.assertEqual(problems(".a { mask: var(--sval-icon-b); }", sheet), [])
 
     def test_counts_lines_through_comments(self):
         css = f"/* one\n two */\n.a {{ mask: {url('stroke.svg')}; }}"

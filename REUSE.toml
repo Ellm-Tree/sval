@@ -193,6 +193,44 @@ SPDX-FileCopyrightText = [
 ]
 SPDX-License-Identifier = "MIT"
 
+# Copies of Sval's Lucide icons at the sizes of the Firefox icons they
+# replace, which scripts/check-icons.py --write makes. Each takes its
+# source's license; check-icons.py fails where these entries say otherwise.
+[[annotations]]
+path = "chrome/browser/components/sval/firefox-icons/*.svg"
+SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
+SPDX-License-Identifier = "ISC"
+
+# The copies of the icons Lucide derives from Feather, under Feather's MIT
+# license as their sources are.
+[[annotations]]
+path = [
+  "chrome/browser/components/sval/firefox-icons/arrow-left-*.svg",
+  "chrome/browser/components/sval/firefox-icons/check-*.svg",
+  "chrome/browser/components/sval/firefox-icons/chevron-down-*.svg",
+  "chrome/browser/components/sval/firefox-icons/chevron-right-*.svg",
+  "chrome/browser/components/sval/firefox-icons/chevron-up-*.svg",
+  "chrome/browser/components/sval/firefox-icons/circle-help-*.svg",
+  "chrome/browser/components/sval/firefox-icons/download-*.svg",
+  "chrome/browser/components/sval/firefox-icons/ellipsis-*.svg",
+  "chrome/browser/components/sval/firefox-icons/external-link-*.svg",
+  "chrome/browser/components/sval/firefox-icons/link-*.svg",
+  "chrome/browser/components/sval/firefox-icons/mic-off-*.svg",
+  "chrome/browser/components/sval/firefox-icons/moon-*.svg",
+  "chrome/browser/components/sval/firefox-icons/plus-*.svg",
+  "chrome/browser/components/sval/firefox-icons/screen-16x16.svg",
+  "chrome/browser/components/sval/firefox-icons/search-*.svg",
+  "chrome/browser/components/sval/firefox-icons/star-*.svg",
+  "chrome/browser/components/sval/firefox-icons/storage-*.svg",
+  "chrome/browser/components/sval/firefox-icons/trash-2-*.svg",
+  "chrome/browser/components/sval/firefox-icons/x-*.svg",
+]
+SPDX-FileCopyrightText = [
+  "2013 Cole Bemis",
+  "2026 Lucide Icons and Contributors",
+]
+SPDX-License-Identifier = "MIT"
+
 # The dialog's Lucide icons, with each stroke set to `context-fill`. Pencil is
 # Lucide's own; check and trash-2 Lucide derives from Feather, and its license
 # puts them under Feather's MIT license.
@@ -213,16 +251,26 @@ SPDX-FileCopyrightText = [
 SPDX-License-Identifier = "MIT"
 
 # The icons that Lucide derives from Feather (arrow-left, check,
-# chevron-down, alert-circle, message-circle, sidebar, plus, search and x, as
-# Feather names them), which Lucide's license puts under Feather's MIT
-# license. Each stroke is set to `context-fill`.
+# chevron-down, chevron-right, chevron-up, alert-circle, help-circle,
+# message-circle, more-horizontal, sidebar, plus, search, download,
+# external-link, link, moon and x, as Feather names them), which Lucide's
+# license puts under Feather's MIT license. Each stroke is set to
+# `context-fill`.
 [[annotations]]
 path = [
   "chrome/browser/components/sval/icons/arrow-left.svg",
   "chrome/browser/components/sval/icons/check.svg",
   "chrome/browser/components/sval/icons/chevron-down.svg",
+  "chrome/browser/components/sval/icons/chevron-right.svg",
+  "chrome/browser/components/sval/icons/chevron-up.svg",
   "chrome/browser/components/sval/icons/circle-alert.svg",
+  "chrome/browser/components/sval/icons/circle-help.svg",
+  "chrome/browser/components/sval/icons/download.svg",
+  "chrome/browser/components/sval/icons/ellipsis.svg",
+  "chrome/browser/components/sval/icons/external-link.svg",
+  "chrome/browser/components/sval/icons/link.svg",
   "chrome/browser/components/sval/icons/message-circle.svg",
+  "chrome/browser/components/sval/icons/moon.svg",
   "chrome/browser/components/sval/icons/panel-left.svg",
   "chrome/browser/components/sval/icons/plus.svg",
   "chrome/browser/components/sval/icons/search.svg",

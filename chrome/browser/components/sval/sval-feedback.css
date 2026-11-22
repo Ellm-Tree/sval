@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
+@import url("chrome://browser/content/sval/sval-icons.css");
+
 /*
  * The Send Feedback popover (`SvalFeedbackForm`, feedback spec §2, §4, §5):
  * a tab over the footer's feedback button, a stem from it to the box, and
@@ -78,7 +80,7 @@
     left: 9px;
     width: 18px;
     height: 18px;
-    background: url("chrome://browser/content/sval/icons/message-circle.svg") center / contain no-repeat;
+    background: var(--sval-icon-feedback) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: var(--sval-text);
   }
@@ -142,7 +144,7 @@
       flex: none;
       width: 20px;
       height: 20px;
-      background: url("chrome://browser/content/sval/icons/circle-check.svg") center / contain no-repeat;
+      background: var(--sval-icon-success) center / contain no-repeat;
       -moz-context-properties: fill;
       fill: var(--sval-feedback-ok);
     }
@@ -413,7 +415,7 @@
     content: "";
     width: 16px;
     height: 16px;
-    background: url("chrome://browser/content/sval/icons/arrow-left.svg") center / contain no-repeat;
+    background: var(--sval-icon-previous) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: currentColor;
   }
@@ -535,7 +537,7 @@
   width: 16px;
   height: 16px;
   margin-top: 2px;
-  background: url("chrome://browser/content/sval/icons/triangle-alert.svg") center / contain no-repeat;
+  background: var(--sval-icon-warning) center / contain no-repeat;
   -moz-context-properties: fill;
   fill: var(--sval-feedback-warn);
 }
@@ -582,7 +584,7 @@
     content: "";
     width: 16px;
     height: 16px;
-    background: url("chrome://browser/content/sval/icons/loader-circle.svg") center / contain no-repeat;
+    background: var(--sval-icon-loading) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: currentColor;
     animation: sval-feedback-spin 1s linear infinite;

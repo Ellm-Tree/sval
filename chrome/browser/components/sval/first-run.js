@@ -41,6 +41,9 @@ const { SvalKagi } = ChromeUtils.importESModule(
 const { SvalColor } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalColor.sys.mjs"
 );
+const { iconURL } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalIcons.sys.mjs"
+);
 const { SvalLog } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalLog.sys.mjs"
 );
@@ -111,9 +114,6 @@ const FIRST_RUN_APPLY_WAIT_MS = 5000;
 const FIRST_RUN_MARK_URL = "chrome://browser/content/sval/home/app-icon.svg";
 const FIRST_RUN_WORDMARK_URL =
   "chrome://browser/content/sval/home/wordmark-light-on-dark.svg";
-
-/** Where the page's Lucide glyphs live. */
-const FIRST_RUN_ICONS = "chrome://browser/content/sval/icons/";
 
 /**
  * Every word the page shows, kept as one set. A sentence never names Sval's
@@ -449,22 +449,22 @@ const STRINGS = Object.freeze({
   tip: "launcher-tour-tip",
 });
 
-/** Each choice's glyph, a file in `FIRST_RUN_ICONS`. */
+/** Each choice's glyph, a name in `SvalIcons`. */
 const GLYPHS = Object.freeze({
-  [STEPS.question]: { new: "user-plus", join: "laptop" },
+  [STEPS.question]: { new: "new-sync", join: "device" },
   [STEPS.privacy]: {
-    off: "shield-ban",
-    balanced: "shield-half",
-    strict: "shield-check",
+    off: "privacy-off",
+    balanced: "privacy-balanced",
+    strict: "privacy-strict",
   },
-  [STEPS.passwordManager]: { [SvalPasswordManager.NONE]: "badge-minus" },
+  [STEPS.passwordManager]: { [SvalPasswordManager.NONE]: "none" },
 });
 
 /** Each card's glyph on "A few more things"; the panel's follows its side. */
 const MORE_GLYPHS = Object.freeze({
-  panelSide: { left: "panel-left", right: "panel-right" },
-  agents: "bot",
-  defaultBrowser: "app-window",
+  panelSide: { left: "panel-on-left", right: "panel-on-right" },
+  agents: "agents",
+  defaultBrowser: "default-browser",
 });
 
 /**
@@ -912,7 +912,7 @@ const SvalFirstRunPage = {
       case STEPS.joinFolder: {
         const zone = this._element("div", { class: "sval-fr-folder-zone" });
         const choose = this._button("choose-folder", "");
-        choose.append(this._glyph("folder-open"), STRINGS.chooseFolder);
+        choose.append(this._glyph("choose-folder"), STRINGS.chooseFolder);
         // The folder is said as it is shown: the native picker hands focus
         // back to the button with nothing else announced.
         const chosen = this._element("p", {
@@ -1287,7 +1287,7 @@ const SvalFirstRunPage = {
     preview.append(
       this._element("span", { class: "sval-fr-ws-tile" }),
       this._element("span", { class: "sval-fr-ws-name" }),
-      this._glyph("chevron-down", "sval-fr-ws-glyph")
+      this._glyph("expand", "sval-fr-ws-glyph")
     );
     const form = this._element("div", { class: "sval-fr-ws-form" });
     form.append(...SvalWorkspaceForm.fields(document));
@@ -1571,14 +1571,14 @@ const SvalFirstRunPage = {
   /**
    * One of the page's Lucide glyphs, drawn in its element's `fill`.
    *
-   * @param {string} name The glyph's file name in `FIRST_RUN_ICONS`.
+   * @param {string} name The glyph's name in `SvalIcons`.
    * @param {string} [className]
    * @returns {Element} the image.
    */
   _glyph(name, className = "sval-fr-glyph") {
     return this._element("img", {
       class: className,
-      src: `${FIRST_RUN_ICONS}${name}.svg`,
+      src: iconURL(name),
       alt: "",
     });
   },
@@ -1912,7 +1912,7 @@ const SvalFirstRunPage = {
     const side = MORE_GLYPHS.panelSide[this._answers.panelSide];
     section
       .querySelector('[data-setting="panelSide"] .sval-fr-glyph')
-      .setAttribute("src", `${FIRST_RUN_ICONS}${side}.svg`);
+      .setAttribute("src", iconURL(side));
     section.querySelector(".sval-fr-check").hidden =
       this._answers.agents === "off";
     section.querySelector(".sval-fr-tools").checked =

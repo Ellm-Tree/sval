@@ -16,6 +16,7 @@
 /* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
 
 @import url("chrome://browser/content/sval/sval-scope.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 .overlay {
   --remove-edge: #1f6bff;
@@ -293,27 +294,27 @@
 }
 
 .icon-scissors {
-  mask-image: url("chrome://browser/content/sval/icons/scissors.svg");
+  mask-image: var(--sval-icon-snip);
 }
 
 .icon-eraser {
-  mask-image: url("chrome://browser/content/sval/icons/eraser.svg");
+  mask-image: var(--sval-icon-remove-element);
 }
 
 .icon-eye-off {
-  mask-image: url("chrome://browser/content/sval/icons/eye-off.svg");
+  mask-image: var(--sval-icon-hide-element);
 }
 
 .icon-check {
-  mask-image: url("chrome://browser/content/sval/icons/check.svg");
+  mask-image: var(--sval-icon-check);
 }
 
 .icon-undo {
-  mask-image: url("chrome://browser/content/sval/icons/undo-2.svg");
+  mask-image: var(--sval-icon-undo);
 }
 
 .icon-x {
-  mask-image: url("chrome://browser/content/sval/icons/x.svg");
+  mask-image: var(--sval-icon-close);
 }
 
 /* Surfaces */

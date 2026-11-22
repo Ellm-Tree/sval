@@ -39,3 +39,32 @@
 #main-menubar {
   display: none;
 }
+
+/* Page Info's tabs off macOS draw their icons from Firefox's image strip
+   (`pageInfo.css`). Each takes the inventory's glyph for what its tab
+   holds, in the tab's text colour. */
+#viewGroup :is(#generalTab, #mediaTab, #permTab, #securityTab) .radio-icon {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 20px;
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+  image-rendering: auto;
+}
+
+#viewGroup #generalTab .radio-icon {
+  background-image: var(--sval-icon-info);
+}
+
+#viewGroup #mediaTab .radio-icon {
+  background-image: var(--sval-icon-images);
+}
+
+#viewGroup #permTab .radio-icon {
+  background-image: var(--sval-icon-site-settings);
+}
+
+#viewGroup #securityTab .radio-icon {
+  background-image: var(--sval-icon-privacy);
+}

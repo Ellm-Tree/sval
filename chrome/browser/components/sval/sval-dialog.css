@@ -20,6 +20,7 @@
 
 @import url("chrome://browser/content/sval/sval-tokens.css");
 @import url("chrome://browser/content/sval/sval-type.css");
+@import url("chrome://browser/content/sval/sval-icons.css");
 
 :root {
   color-scheme: dark;
@@ -236,11 +237,11 @@ body {
   }
 
   &[data-icon="pencil"] {
-    --sval-dialog-icon: url("chrome://browser/content/sval/dialog-icons/pencil.svg");
+    --sval-dialog-icon: var(--sval-icon-edit);
   }
 
   &[data-icon="trash"] {
-    --sval-dialog-icon: url("chrome://browser/content/sval/dialog-icons/trash-2.svg");
+    --sval-dialog-icon: var(--sval-icon-delete);
   }
 
   &[data-icon="agent"] {
@@ -248,7 +249,7 @@ body {
   }
 
   &[data-icon="key"] {
-    --sval-dialog-icon: url("chrome://browser/content/sval/icons/key-round.svg");
+    --sval-dialog-icon: var(--sval-icon-password);
   }
 
   &[data-icon="sval"] {
@@ -256,7 +257,7 @@ body {
   }
 
   &[data-icon="critical"] {
-    --sval-dialog-icon: url("chrome://browser/content/sval/sync-icons/critical.svg");
+    --sval-dialog-icon: var(--sval-icon-critical);
   }
 }
 
@@ -314,7 +315,7 @@ body {
     content: "";
     width: 18px;
     height: 18px;
-    background: url("chrome://browser/content/sval/icons/x.svg") center / contain no-repeat;
+    background: var(--sval-icon-close) center / contain no-repeat;
     -moz-context-properties: fill;
     fill: currentColor;
   }
@@ -551,7 +552,7 @@ body {
         content: "";
         width: 14px;
         height: 14px;
-        background: url("chrome://browser/content/sval/dialog-icons/check.svg") center / contain no-repeat;
+        background: var(--sval-icon-dialog-check) center / contain no-repeat;
         -moz-context-properties: fill;
         fill: #ffffff;
       }
@@ -834,7 +835,7 @@ fieldset.sval-dialog-well {
   width: 14px;
   height: 14px;
   background: currentColor;
-  mask: url("chrome://browser/content/sval/protection-icons/sc-chevron-down.svg") center / 14px no-repeat;
+  mask: var(--sval-icon-site-expand) center / 14px no-repeat;
 }
 
 .sval-dialog-scope-menu {
@@ -877,7 +878,7 @@ fieldset.sval-dialog-well {
   flex: none;
   width: 16px;
   height: 16px;
-  background: url("chrome://browser/content/sval/dialog-icons/check.svg") center / 16px no-repeat;
+  background: var(--sval-icon-dialog-check) center / 16px no-repeat;
   -moz-context-properties: fill;
   fill: currentColor;
   visibility: hidden;

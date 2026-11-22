@@ -115,6 +115,7 @@ MOZ_SRC_FILES += [
     "SvalHomeWorkspaceChild.sys.mjs",
     "SvalHomeWorkspaceParent.sys.mjs",
     "SvalICloudKeychain.sys.mjs",
+    "SvalIcons.sys.mjs",
     "SvalIdentity.sys.mjs",
     "SvalImport.sys.mjs",
     "SvalImportArc.sys.mjs",
