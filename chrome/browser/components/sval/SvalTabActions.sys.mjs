@@ -3,8 +3,8 @@
 
 /**
  * What a tab's menu and the Launcher do to a tab beyond the panel's own
- * document: copy its address or its page as a Markdown link, unload it, and
- * keep it loaded.
+ * document: copy its address, clean or as it is, or its page as a Markdown
+ * link, unload it, and keep it loaded.
  */
 
 const lazy = {};
@@ -48,11 +48,49 @@ export function copyMarkdownLink(tab) {
 }
 
 /**
- * Copies the address of the page `win` shows, without the credentials in it
- * (`createExposableURI`), and confirms it in Firefox's `ConfirmationHint`
- * on the address bar, as Sval confirms a favorite (`SvalFavorites`). With
- * the header hidden, the hint opens where `ConfirmationHint.show` puts it
- * with no anchor.
+ * The address `uri` without the tracking parameters Firefox's strip-on-share
+ * lists name (`nsIURLQueryStringStripper.stripForCopyOrShare`), which take in
+ * Mozilla's query-stripping lists and the blocking lists' `$removeparam`
+ * rules (`SvalBlocking`). A parameter no list names stays, and so does a
+ * nested address's, which the stripper cleans in turn.
+ *
+ * @param {nsIURI} uri
+ * @returns {?nsIURI} Null where no parameter is stripped.
+ */
+export function cleanAddressOf(uri) {
+  try {
+    return Cc["@mozilla.org/url-query-string-stripper;1"]
+      .getService(Ci.nsIURLQueryStringStripper)
+      .stripForCopyOrShare(uri);
+  } catch {
+    // An address with a query and no host, like a `data:` one, has nothing
+    // to strip: the stripper throws reading its host.
+    return null;
+  }
+}
+
+/**
+ * Copies `uri`'s address, without the credentials in it
+ * (`createExposableURI`), and confirms it with `doneId` in Firefox's
+ * `ConfirmationHint` on the address bar, as Sval confirms a favorite
+ * (`SvalFavorites`). With the header hidden, the hint opens where
+ * `ConfirmationHint.show` puts it with no anchor.
+ *
+ * @param {Window} win A browser window.
+ * @param {string} spec
+ * @param {string} doneId The hint's string in `launcher.ftl`.
+ */
+function copyAndConfirm(win, spec, doneId) {
+  Cc["@mozilla.org/widget/clipboardhelper;1"]
+    .getService(Ci.nsIClipboardHelper)
+    .copyString(spec);
+  const anchor = win.document.getElementById("urlbar-container");
+  win.MozXULElement.insertFTLIfNeeded("sval/launcher.ftl");
+  win.ConfirmationHint.show(anchor?.checkVisibility() ? anchor : null, doneId);
+}
+
+/**
+ * Copies the address of the page `win` shows (`copyAndConfirm`).
  *
  * @param {Window} win A browser window.
  */
@@ -61,14 +99,32 @@ export function copyAddress(win) {
   if (!uri?.spec) {
     return;
   }
-  Cc["@mozilla.org/widget/clipboardhelper;1"]
-    .getService(Ci.nsIClipboardHelper)
-    .copyString(Services.io.createExposableURI(uri).spec);
-  const anchor = win.document.getElementById("urlbar-container");
-  win.MozXULElement.insertFTLIfNeeded("sval/launcher.ftl");
-  win.ConfirmationHint.show(
-    anchor?.checkVisibility() ? anchor : null,
+  copyAndConfirm(
+    win,
+    Services.io.createExposableURI(uri).spec,
     "launcher-command-copy-address-done"
+  );
+}
+
+/**
+ * Copies the address of the page `win` shows without its tracking
+ * parameters (`cleanAddressOf`). The hint says whether any came off.
+ *
+ * @param {Window} win A browser window.
+ */
+export function copyCleanAddress(win) {
+  const uri = win.gBrowser.currentURI;
+  if (!uri?.spec) {
+    return;
+  }
+  const exposable = Services.io.createExposableURI(uri);
+  const clean = cleanAddressOf(exposable);
+  copyAndConfirm(
+    win,
+    (clean ?? exposable).spec,
+    clean
+      ? "launcher-command-copy-clean-address-done"
+      : "launcher-command-copy-address-done"
   );
 }
 

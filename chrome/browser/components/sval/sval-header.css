@@ -582,6 +582,7 @@
   --sval-remove-w: 0px;
   --sval-snip-w: 0px;
   --sval-colorshift-w: 0px;
+  --sval-clean-address-w: 0px;
   --sval-site-menu-w: 0px;
   --sval-page-head-w: 0px;
   --sval-reader-w: 0px;
@@ -590,8 +591,8 @@
   --sval-dock-w: calc(4px + 28px + var(--sval-forward-w) + var(--sval-reload-w) + var(--sval-home-w) + var(--sval-dock-tail));
   --sval-dock-end-w: calc(
     var(--sval-site-head-w) + var(--sval-live-w, 0px) - var(--sval-live-trim) + var(--sval-location-w) + var(--sval-translate-w) + var(--sval-media-w) +
-      var(--sval-js-w) + var(--sval-remove-w) + var(--sval-snip-w) + var(--sval-colorshift-w) + var(--sval-site-menu-w) + var(--sval-page-head-w) +
-      var(--sval-reader-w) + var(--sval-fav-w) + var(--sval-pill-end-w)
+      var(--sval-js-w) + var(--sval-remove-w) + var(--sval-snip-w) + var(--sval-colorshift-w) + var(--sval-clean-address-w) + var(--sval-site-menu-w) +
+      var(--sval-page-head-w) + var(--sval-reader-w) + var(--sval-fav-w) + var(--sval-pill-end-w)
   );
 
   &:has(> #forward-button) {
@@ -615,6 +616,7 @@
         #sval-remove-button,
         #sval-snip-button,
         #sval-colorshift-button,
+        #sval-clean-address-button,
         #sval-site-menu-button
       ):not([hidden])
   ) {
@@ -631,6 +633,7 @@
           #sval-remove-button,
           #sval-snip-button,
           #sval-colorshift-button,
+          #sval-clean-address-button,
           #sval-site-menu-button
         ):not([hidden])
     )
@@ -668,6 +671,10 @@
 
   &:has(> #sval-colorshift-button:not([hidden])) {
     --sval-colorshift-w: 28px;
+  }
+
+  &:has(> #sval-clean-address-button:not([hidden])) {
+    --sval-clean-address-w: 28px;
   }
 
   &:has(> #sval-site-menu-button:not([hidden])) {
@@ -741,6 +748,7 @@
     #sval-remove-button,
     #sval-snip-button,
     #sval-colorshift-button,
+    #sval-clean-address-button,
     #sval-site-menu-button,
     #reader-mode-button,
     #sval-favorite-button
@@ -792,6 +800,7 @@
     #sval-remove-button,
     #sval-snip-button,
     #sval-colorshift-button,
+    #sval-clean-address-button,
     #sval-site-menu-button
   ) {
   height: 30px;
@@ -809,6 +818,7 @@
     #sval-remove-button,
     #sval-snip-button,
     #sval-colorshift-button,
+    #sval-clean-address-button,
     #sval-site-menu-button
   ):not([hidden]):where(
     :not(
@@ -820,6 +830,7 @@
           #sval-remove-button,
           #sval-snip-button,
           #sval-colorshift-button,
+          #sval-clean-address-button,
           #sval-site-menu-button
         ):not([hidden])
         ~ *
@@ -841,6 +852,7 @@
     #sval-remove-button,
     #sval-snip-button,
     #sval-colorshift-button,
+    #sval-clean-address-button,
     #sval-site-menu-button
   ):not([hidden]):where(
     :not(
@@ -852,6 +864,7 @@
             #sval-remove-button,
             #sval-snip-button,
             #sval-colorshift-button,
+            #sval-clean-address-button,
             #sval-site-menu-button
           ):not([hidden])
       )
@@ -865,7 +878,15 @@
 }
 
 #nav-bar
-  :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button, #sval-site-menu-button)
+  :is(
+    #sval-media-button,
+    #sval-javascript-button,
+    #sval-remove-button,
+    #sval-snip-button,
+    #sval-colorshift-button,
+    #sval-clean-address-button,
+    #sval-site-menu-button
+  )
   > .toolbarbutton-icon {
   width: 28px;
   height: 28px;
@@ -934,6 +955,7 @@
     #sval-remove-button,
     #sval-snip-button,
     #sval-colorshift-button,
+    #sval-clean-address-button,
     #sval-site-menu-button,
     #reader-mode-button,
     #sval-favorite-button
@@ -949,6 +971,7 @@
             #sval-remove-button,
             #sval-snip-button,
             #sval-colorshift-button,
+            #sval-clean-address-button,
             #sval-site-menu-button,
             #reader-mode-button,
             #sval-favorite-button
@@ -972,6 +995,7 @@
     #sval-remove-button,
     #sval-snip-button,
     #sval-colorshift-button,
+    #sval-clean-address-button,
     #sval-site-menu-button
   )[disabled],
 #nav-bar :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-disabled="true"] {
@@ -1031,6 +1055,7 @@
       #sval-remove-button,
       #sval-snip-button,
       #sval-colorshift-button,
+      #sval-clean-address-button,
       #sval-site-menu-button,
       #reader-mode-button,
       #sval-favorite-button
@@ -1073,6 +1098,7 @@
         #sval-remove-button,
         #sval-snip-button,
         #sval-colorshift-button,
+        #sval-clean-address-button,
         #sval-site-menu-button,
         #reader-mode-button,
         #sval-favorite-button
@@ -1444,6 +1470,12 @@
    pressed while Colorshift is open. */
 #sval-colorshift-button {
   list-style-image: url("chrome://browser/content/sval/icons/palette.svg");
+}
+
+/* The clean address button, which `SvalSiteControls` shows while it is
+   pinned. */
+#sval-clean-address-button {
+  list-style-image: url("chrome://browser/content/sval/icons/broom.svg");
 }
 
 #nav-bar
@@ -2925,6 +2957,7 @@ screenshots-buttons {
         #sval-remove-button,
         #sval-snip-button,
         #sval-colorshift-button,
+        #sval-clean-address-button,
         #sval-site-menu-button,
         #reader-mode-button,
         #sval-favorite-button
@@ -2959,6 +2992,7 @@ screenshots-buttons {
       #sval-remove-button,
       #sval-snip-button,
       #sval-colorshift-button,
+      #sval-clean-address-button,
       #sval-site-menu-button,
       #reader-mode-button,
       #sval-favorite-button,

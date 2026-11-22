@@ -25,6 +25,7 @@ const LEAVE_ORDER = [
   "downloads-button",
   "reader-mode-button",
   "sval-favorite-button",
+  "sval-clean-address-button",
   "sval-colorshift-button",
   "sval-snip-button",
   "sval-remove-button",
@@ -394,7 +395,13 @@ add_task(async function every_pinned_site_control_fits_at_every_width() {
     set: [
       [
         PINS_PREF,
-        JSON.stringify(["javascript", "remove", "snip", "colorshift"]),
+        JSON.stringify([
+          "javascript",
+          "remove",
+          "snip",
+          "colorshift",
+          "clean-address",
+        ]),
       ],
     ],
   });

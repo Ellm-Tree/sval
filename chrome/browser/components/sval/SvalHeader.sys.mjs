@@ -52,6 +52,8 @@ import {
   SITE_MENU_BUTTON_ID,
   SITE_MENU_ID,
   SNIP_BUTTON_ID,
+  CLEAN_ADDRESS_BUTTON_ID,
+  CLEAN_ADDRESS_NAME,
   JAVASCRIPT_BUTTON_ID,
 } from "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs";
 import {
@@ -75,6 +77,7 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   launcherKeyText: "moz-src:///browser/components/sval/SvalLauncher.sys.mjs",
+  copyCleanAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
 });
 
 const HEADER_CSS = "chrome://browser/content/sval/sval-header.css";
@@ -126,6 +129,7 @@ export const HEADER_WIDGETS = [
   REMOVE_BUTTON_ID,
   SNIP_BUTTON_ID,
   COLORSHIFT_BUTTON_ID,
+  CLEAN_ADDRESS_BUTTON_ID,
   SITE_MENU_BUTTON_ID,
   TRANSLATE_BUTTON_ID,
   READER_BUTTON_ID,
@@ -170,6 +174,7 @@ export const OVERFLOW_ORDER = [
   "downloads-button",
   READER_BUTTON_ID,
   FAVORITE_BUTTON_ID,
+  CLEAN_ADDRESS_BUTTON_ID,
   COLORSHIFT_BUTTON_ID,
   SNIP_BUTTON_ID,
   REMOVE_BUTTON_ID,
@@ -1093,6 +1098,17 @@ export const SvalHeader = {
           win,
           event.inputSource === win.MouseEvent.MOZ_SOURCE_KEYBOARD
         );
+      },
+    });
+    CustomizableUI.createWidget({
+      id: CLEAN_ADDRESS_BUTTON_ID,
+      type: "button",
+      label: CLEAN_ADDRESS_NAME,
+      tooltiptext: CLEAN_ADDRESS_NAME,
+      removable: false,
+      defaultArea: CustomizableUI.AREA_NAVBAR,
+      onCommand(event) {
+        lazy.copyCleanAddress(event.target.documentGlobal);
       },
     });
     CustomizableUI.createWidget({

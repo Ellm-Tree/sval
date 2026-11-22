@@ -51,6 +51,12 @@ async function untilFloating(expected, what) {
  * @returns {Promise<object>} the tab.
  */
 async function pageTab() {
+  // With nothing typed the Launcher lists only tabs this device has used
+  // (`recentTabs` `onlyUsed`), and its list opens only with a row to show.
+  const first = SvalPanel.observer.nodeIdFor(gBrowser.selectedTab);
+  Assert.ok(first, "the window's first tab is in the Workspace");
+  SvalPanel.settings.setLastActive(first, Date.now());
+  atTaskEnd(() => SvalPanel.settings.forgetLastActive(first));
   const tab = await within(
     BrowserTestUtils.openNewForegroundTab(gBrowser, PAGE),
     10_000,

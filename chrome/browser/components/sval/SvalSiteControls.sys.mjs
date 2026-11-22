@@ -110,6 +110,10 @@ import {
   describeStyle,
   styleScopeOf,
 } from "moz-src:///browser/components/sval/SvalSiteStylePanel.sys.mjs";
+import {
+  cleanAddressOf,
+  copyCleanAddress,
+} from "moz-src:///browser/components/sval/SvalTabActions.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -132,16 +136,25 @@ const ZOOM_RESET_ID = "sval-site-zoom-reset";
 export const REMOVE_BUTTON_ID = "sval-remove-button";
 export const SNIP_BUTTON_ID = "sval-snip-button";
 export const JAVASCRIPT_BUTTON_ID = "sval-javascript-button";
+export const CLEAN_ADDRESS_BUTTON_ID = "sval-clean-address-button";
+/** The clean address button's name, as its tooltip and the menu's row say it. */
+export const CLEAN_ADDRESS_NAME = "Copy Clean Address";
 
 /**
  * Which buttons sit in the site controls: a JSON array of "javascript",
- * "remove", "snip" and "colorshift". Syncs, and is global. Media, the live devices and the
+ * "remove", "snip", "colorshift" and "clean-address". Syncs, and is global. Media, the live devices and the
  * site menu button always show (header signals spec §3).
  */
 export const PINS_PREF = "browser.sval.siteControls.toolbarButtons";
 
 /** The buttons a person can pin, in the cluster's order. */
-const PINNABLE = ["javascript", "remove", "snip", "colorshift"];
+const PINNABLE = [
+  "javascript",
+  "remove",
+  "snip",
+  "colorshift",
+  "clean-address",
+];
 
 /**
  * @returns {string[]} the buttons pinned, in the cluster's order; the default
@@ -696,6 +709,11 @@ class SiteControls {
     this.pendingMode = null;
     /** Whether the Style row was chosen, opened once the menu has closed. */
     this.pendingStyle = false;
+    /**
+     * Whether the clean address row was chosen, copied once the menu has
+     * closed, so the hint that confirms it shows on the address bar.
+     */
+    this.pendingCopy = false;
     /** Counts the lists asked for, so only the last answer is drawn. */
     this.countRun = 0;
     /** selector -> how many elements it last matched on the page. */
@@ -754,6 +772,10 @@ class SiteControls {
       if (this.pendingStyle) {
         this.pendingStyle = false;
         SvalSiteStylePanel.open(win, { focus: true });
+      }
+      if (this.pendingCopy) {
+        this.pendingCopy = false;
+        copyCleanAddress(win);
       }
     });
     // Esc in the clear-data confirm puts its row back; a further Esc closes
@@ -1234,6 +1256,10 @@ class SiteControls {
       javascript.hidden = !pins.includes("javascript");
     }
     this.drawColorshift(pins);
+    const clean = doc.getElementById(CLEAN_ADDRESS_BUTTON_ID);
+    if (clean) {
+      clean.hidden = !pins.includes("clean-address");
+    }
     for (const { mode, buttonId, name } of MODE_ROWS) {
       const button = doc.getElementById(buttonId);
       if (!button) {
@@ -1824,6 +1850,7 @@ class SiteControls {
       this.zoomSection(media),
       this.elementsSection(media),
       this.styleSection(media),
+      this.addressSection(media),
       this.mediaSection(media),
       this.javascriptSection(media),
       this.keepLinksSection(media),
@@ -2068,6 +2095,69 @@ class SiteControls {
   }
 
   /**
+   * The Address section: a row that copies the page's address without its
+   * tracking parameters (`copyCleanAddress`), and says whether it has any.
+   *
+   * @param {object} media From `mediaOf`.
+   */
+  addressSection(media) {
+    const { doc } = this;
+    const uri = Services.io.createExposableURI(media.browser.currentURI);
+    const tracked = !!cleanAddressOf(uri);
+    const words = htmlElement(
+      doc,
+      "span",
+      {
+        className: "sval-prot-sub",
+        id: "sval-site-clean-address-sub",
+        dataset: { tracked: String(tracked) },
+      },
+      tracked
+        ? "Without its tracking parameters"
+        : "No tracking parameters Sval knows of"
+    );
+    const main = htmlElement(
+      doc,
+      "button",
+      {
+        type: "button",
+        className: "sval-site-element-main",
+        id: "sval-site-clean-address",
+      },
+      CLEAN_ADDRESS_NAME
+    );
+    main.ariaDescribedByElements = [words];
+    main.addEventListener("click", () => {
+      this.pendingCopy = true;
+      this.panel.hidePopup();
+    });
+    return htmlElement(
+      doc,
+      "div",
+      {
+        className: "sval-site-section",
+        id: "sval-site-address-section",
+        attrs: { role: "group" },
+      },
+      this.heading("Address"),
+      htmlElement(
+        doc,
+        "div",
+        { className: "sval-site-element" },
+        glyph(doc, "ep-broom", "sval-prot-row-icon"),
+        htmlElement(
+          doc,
+          "div",
+          { className: "sval-prot-row-words" },
+          main,
+          words
+        ),
+        this.pinButton("clean-address", pinsOf().includes("clean-address"))
+      )
+    );
+  }
+
+  /**
    * The Elements section: a row to start each mode with a button to pin it
    * to the address bar, and the site's rules from My filters.
    *
@@ -2156,7 +2246,7 @@ class SiteControls {
    * A button that pins one of the site controls' buttons to the address bar,
    * or unpins it.
    *
-   * @param {"javascript"|"remove"|"snip"|"colorshift"} id
+   * @param {"javascript"|"remove"|"snip"|"colorshift"|"clean-address"} id
    * @param {boolean} pinned
    * @returns {Element}
    */
@@ -3230,7 +3320,7 @@ export const SvalSiteControls = {
   /**
    * Pins or unpins a button.
    *
-   * @param {"javascript"|"remove"|"snip"|"colorshift"} id
+   * @param {"javascript"|"remove"|"snip"|"colorshift"|"clean-address"} id
    * @param {boolean} pinned
    */
   setPinned(id, pinned) {

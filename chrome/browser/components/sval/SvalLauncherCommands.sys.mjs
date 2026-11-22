@@ -62,6 +62,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   copyAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
+  copyCleanAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   copyMarkdownLink: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   canUnload: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   unloadTabs: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
@@ -450,6 +451,14 @@ export const COMMANDS = [
     keyId: COPY_ADDRESS_KEY,
     available: win => !!win.gBrowser.currentURI?.spec,
     run: win => lazy.copyAddress(win),
+  },
+  {
+    id: "copy-clean-address",
+    l10nId: "launcher-command-copy-clean-address",
+    synonymsL10nId: "launcher-command-copy-clean-address-synonyms",
+    keyId: null,
+    available: win => !!win.gBrowser.currentURI?.spec,
+    run: win => lazy.copyCleanAddress(win),
   },
   {
     id: "copy-markdown-link",

@@ -254,8 +254,14 @@ add_task(async function by_default_javascript_and_the_snip_button_show() {
       buttonFor("colorshift"),
       "Colorshift's place follows Snip"
     );
+    ok(buttonFor("clean-address").hidden, "Copy Clean Address is not pinned");
     Assert.strictEqual(
       buttonFor("colorshift").nextElementSibling,
+      buttonFor("clean-address"),
+      "Copy Clean Address's place follows Colorshift"
+    );
+    Assert.strictEqual(
+      buttonFor("clean-address").nextElementSibling,
       byId("sval-site-menu-button"),
       "and comes before the chevron"
     );

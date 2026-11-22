@@ -365,6 +365,7 @@ browser.jar:
     content/browser/sval/icons/grip-vertical.svg (icons/grip-vertical.svg)
     content/browser/sval/icons/route.svg     (icons/route.svg)
     content/browser/sval/icons/scissors.svg (icons/scissors.svg)
+    content/browser/sval/icons/broom.svg (icons/broom.svg)
     content/browser/sval/icons/eye-off.svg (icons/eye-off.svg)
     content/browser/sval/icons/check.svg (icons/check.svg)
     content/browser/sval/icons/undo-2.svg (icons/undo-2.svg)

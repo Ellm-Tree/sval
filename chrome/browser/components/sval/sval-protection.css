@@ -307,6 +307,10 @@
   --sval-glyph: url("chrome://browser/content/sval/icons/palette.svg");
 }
 
+.sval-prot-glyph[data-icon="ep-broom"] {
+  --sval-glyph: url("chrome://browser/content/sval/icons/broom.svg");
+}
+
 .sval-prot-glyph[data-icon="ep-pin"] {
   --sval-glyph: url("chrome://browser/content/sval/icons/pin.svg");
 }

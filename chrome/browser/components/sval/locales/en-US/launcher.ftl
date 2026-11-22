@@ -62,6 +62,11 @@ launcher-command-copy-address-synonyms = url, link, copy link
 # Shown in a small confirmation next to the address bar once the address is
 # on the clipboard.
 launcher-command-copy-address-done = Address copied
+launcher-command-copy-clean-address = Copy clean address
+launcher-command-copy-clean-address-synonyms = url, link, copy link, clean link, strip, tracking, utm
+# Shown in a small confirmation next to the address bar once the address is
+# on the clipboard with its tracking parameters taken out.
+launcher-command-copy-clean-address-done = Clean address copied
 launcher-command-copy-markdown-link = Copy Markdown link
 launcher-command-copy-markdown-link-synonyms = md, link, copy link, title
 launcher-command-unload-tab = Put this tab to sleep

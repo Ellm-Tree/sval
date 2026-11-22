@@ -232,6 +232,12 @@ control of what you see and what is sent to websites.
   and Remove this tab’s name for the tab you're on.
 - **Copy a Markdown link.** Choose Copy Markdown Link from a tab's menu to
   copy its title and address as a link you can paste into notes or chat.
+- **Copy a clean address.** Choose Copy Clean Address in the site settings
+  menu to copy the page's address without the tracking parameters that
+  sites add to links, like `utm_source`. Sval takes out only the
+  parameters its tracking lists name and leaves the rest of the address
+  alone. The pin next to Copy Clean Address puts its button in the address
+  bar, and the Launcher has Copy clean address too.
 - **Put tabs to sleep.** Choose Put to Sleep from a tab's or a group's menu
   to free the memory its pages use. Sleeping tabs stay in the Workspace, dimmed,
   and wake when you select them.
