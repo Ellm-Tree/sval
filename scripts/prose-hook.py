@@ -13,8 +13,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-# The files scripts/check-prose.sh checks when it is given none.
-CHECKED = re.compile(r"^(website/src/content/.+\.mdx?|docs/features\.md|README\.md)$")
+# The files scripts/check-prose.sh checks when it is given none, and drafts
+# of posts and other text for users kept in .scratch/posts/.
+CHECKED = re.compile(
+    r"^(website/src/content/.+\.mdx?|docs/features\.md|README\.md|\.scratch/posts/.+\.md)$"
+)
 
 
 def main():

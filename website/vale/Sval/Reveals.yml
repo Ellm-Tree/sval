@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+# Copyright 2026 Ellm Tree, Inc.
+
+# nonword: Vale's word boundary after "?" never matches before a space.
+extends: existence
+message: "'%s' sets up a reveal. Say the thing itself."
+level: error
+ignorecase: true
+nonword: true
+tokens:
+  - "\\bhere's the (?:thing|catch|kicker|best part)\\b"
+  - '\bthe (?:result|catch|kicker|best part|twist|upshot)\?'
+  - '\bthe (?:best part|kicker|bottom line) is\b'

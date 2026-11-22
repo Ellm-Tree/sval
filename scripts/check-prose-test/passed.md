@@ -18,7 +18,9 @@ Select **Show or hide the Workspace panel**, or open Settings › Appearance ›
 
 The Privacy and Security panel lists what Sval blocked.
 
-Sval keeps your tabs, groups, and pins.
+Sval keeps your tabs, groups, and pins, and it syncs them to your other devices.
+
+The result of a search shows in the Launcher.
 
 Read the page and close the Peek, then open Settings › Privacy and Security.
 

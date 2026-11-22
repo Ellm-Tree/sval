@@ -52,9 +52,9 @@ friend.
 - **Say exactly what you mean.** No "this" or "them" without a clear noun
   before it, and no internal names, pref names or jargon a user wouldn't
   know.
-- **Repeat the noun.** When "it" or "its" could point to more than one
-  thing, or a sentence piles them up, name the thing again. Don't chain
-  possessives either: "the pin's saved page's address" is two sentences.
+- **Repeat the noun only when "it" is unclear.** When "it" could point to
+  two things, or a sentence piles them up, name the thing again. Don't chain possessives either: "the
+  pin's saved page's address" is two sentences.
 
   | Instead of | Write |
   |---|---|
@@ -85,15 +85,37 @@ friend.
   sentence after it says what changes for you. Don't run the name into the
   sentence as its subject.
 
-## Keep it short
+## Lead with what the reader gets
 
-- One idea per sentence, in 30 words or fewer. A sentence with two ", and"
-  joins, like a list's end and a second clause, is two sentences. So is a
-  sentence with a semicolon.
-- Cut words that add nothing: "simply", "just", "actually", "really",
+- **The first sentence is the pitch.** Before any step or setting, say what
+  the feature does for the reader in the one breath you'd use to tell a
+  friend. On a feature's page, that's the "What it is" part.
+- **Leave out what the reader will see anyway.** Sval's UI already shows what
+  Cancel and Undo do, so the text doesn't say it. Give the detail a reader needs to act, and link to the page that
+  holds the rest.
+- **Leave out the edge cases** outside a page's Details, and put a limit
+  where a reader would hit it.
+
+## Let sentences flow
+
+- **Join what belongs together.** Two facts about one thing make one
+  sentence, joined with "and", "so", "which" or "because". Readers hear a run
+  of short sentences as a list read aloud, and as generated text.
+- **Vary the length.** Mix long and short sentences, so no four in a row
+  share one length.
+- **Make every comma and period earn its place.** A pause like the one in
+  "Snip, the scissors button, removes" does no work, so write "The
+  scissors button snips". A paragraph stopped every few words
+  is tiring to read.
+- **Keep a sentence to 30 words or fewer**, with no semicolon.
+- **Cut words that add nothing:** "simply", "just", "actually", "really",
   "in order to", "please note that".
-- Say what happens, then stop. Don't end a paragraph by summing up what it
-  said.
+- **Say what happens, then stop.** Don't end a paragraph by summing up what
+  it said.
+
+| Instead of | Write |
+|---|---|
+| A cookie banner on every visit? Point at it with Sval's Remove from this site. A slider widens the choice from a link to the whole box. Sval saves a rule, so it stays gone. Undo brings it back. | Sval can wipe a cookie banner off a site for good. Choose Remove from this site, click the banner and slide to grab the whole box, and the banner stays gone on every visit and every device you sync. |
 
 ## Check before anyone reads it
 
@@ -101,6 +123,14 @@ friend.
   and the README for the rules a pattern can catch. The rules are in
   `website/vale/Sval/`. `lint.sh` and CI run the check, and a Claude Code hook
   runs it on each of those files an agent edits.
+- **Rhythm.** `scripts/check-rhythm.py` flags runs of clipped sentences,
+  paragraphs whose sentences share one length, and paragraphs heavy with
+  commas and periods. The script checks only the paragraphs a change
+  touches, because the docs written before the script don't pass. `check-prose.sh` runs it on the files it's given and in the website
+  build on a pull request.
+- **Drafts.** Write a post or other text for users in the worktree's
+  `.scratch/posts/` as a `.md` file, where the hook checks it the way it
+  checks the docs.
 - **A prose review.** Vale can't tell when "it" has no clear noun, a list is
   padded for rhythm, or a page describes the docs instead of Sval. Before you
   show new text to anyone, run the `prose-reviewer` agent on it. A UI string
@@ -122,6 +152,26 @@ lists more.
 - **Hedges and intensifiers:** "may help", "can potentially", "critically",
   "truly".
 - **Stiff transitions:** "Moreover", "Furthermore", "Additionally".
+- **Set-ups and reveals:** a question as the opening line ("A cookie banner
+  on every visit?"), and a colon or question that holds back the point
+  ("Here's the thing:", "The result?"). Say the point.
+- **One-line paragraphs** for drama, and a closing line that ties a bow on
+  the paragraph.
+- **Over-explaining:** steps for what the UI makes plain, and caveats the
+  reader didn't need.
+
+## Posts and announcements
+
+A post on Bluesky, Reddit or Mastodon sells one feature to someone
+scrolling past, and the docs page it links to does the explaining.
+
+- **One feature per post**, led by what the feature does for the reader.
+- **No steps and no settings paths.** Name where the feature lives at
+  most once, and link to its docs page.
+- **Two or three sentences** that flow, with a clip or a screenshot that
+  shows the feature working.
+- **A release post** is the one exception, and carries the release notes'
+  entries as they are.
 
 ## Docs pages
 
@@ -154,7 +204,7 @@ to the page the reader needs.
 
 | Instead of | Write |
 |---|---|
-| Start with **Get started** to set up Sval. Each feature after it has its own section in the sidebar: the tasks you can do with it, how it works, and what each of its settings and controls does. | New to Sval? Begin with [Set up Sval on two computers](/docs/tutorials/set-up-sval-on-two-computers/). |
+| Start with **Get started** to set up Sval. Each feature after it has its own section in the sidebar: the tasks you can do with it, how it works, and what each of its settings and controls does. | Begin with [Set up Sval on two computers](/docs/tutorials/set-up-sval-on-two-computers/). |
 
 ### A feature's pages
 

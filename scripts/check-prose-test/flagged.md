@@ -24,12 +24,14 @@ Right-click the tab in the panel.
 
 Your passwords stay in your password manager, not ours.
 
-Sval keeps your tabs, groups, and pins, and it syncs them to your other devices.
-
 The tab stays open; the group closes.
 
 You can utilize the Launcher to find a tab.
 
 Sync your tabs, groups, pins, and more.
+
+Here's the thing: your tabs stay put.
+
+The result? Your tabs stay put.
 
 When you open a link from another app on your computer, Sval shows the page in a small window that floats over the window you were using before you clicked the link there.

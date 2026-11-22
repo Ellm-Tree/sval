@@ -56,6 +56,7 @@ python3 "$REPO_ROOT/scripts/check-comments-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-decisions-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-commit-msg-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-mask-icons-test.py" || checker_status=$?
+python3 "$REPO_ROOT/scripts/check-rhythm-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-css-tokens-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-agent-wire-test.py" || checker_status=$?
 python3 "$REPO_ROOT/scripts/check-ui-labels-test.py" || checker_status=$?

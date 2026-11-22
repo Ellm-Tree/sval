@@ -5,7 +5,10 @@
 # Check the website's docs, docs/features.md and README.md, or the files
 # given as arguments, against docs/writing-style.md with Vale, after a
 # self-test that every rule still flags what it should and passes its near
-# misses. Vale is downloaded once per version into the user's cache by
+# misses. scripts/check-rhythm.py then checks the rhythm between sentences
+# in the paragraphs that differ from SVAL_PROSE_BASE, or from origin/main
+# when files are given as arguments: the docs written before the check fail
+# it, so an edit answers only for the text it touches. Vale is downloaded once per version into the user's cache by
 # scripts/fetch-tool.sh, checked against the release's published SHA-256. A
 # new VERSION goes in the registry with fetch-tool.sh publish, once per ASSET.
 set -euo pipefail
@@ -60,4 +63,13 @@ for path in "${paths[@]}"; do
     exit 1
   fi
 done
-"$VALE" --config "$CONFIG" "${paths[@]}"
+status=0
+"$VALE" --config "$CONFIG" "${paths[@]}" || status=$?
+base="${SVAL_PROSE_BASE:-}"
+if [[ -z "$base" ]] && (($#)) && git -C "$REPO_ROOT" rev-parse -q --verify origin/main >/dev/null; then
+  base=origin/main
+fi
+if [[ -n "$base" ]]; then
+  python3 -I "$REPO_ROOT/scripts/check-rhythm.py" --base "$base" "${paths[@]}" || status=$?
+fi
+exit "$status"
