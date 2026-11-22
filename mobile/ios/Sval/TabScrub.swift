@@ -168,8 +168,13 @@ struct TabScrubStrip: View {
         if scrub.kind == .workspaces {
             return CGSize(width: many ? 84 : 104, height: many ? 84 : 104)
         }
-        let width: CGFloat = many ? 116 : 150
-        return CGSize(width: width, height: width / PagePreviews.aspect)
+        let height: CGFloat = many ? 142 : 184
+        return CGSize(width: height / PagePreviews.aspect, height: height)
+    }
+    /// How far apart the cards sit. A tab card is wider than it is tall,
+    /// and its neighbours tuck further behind it than its width gives.
+    private var pitch: CGFloat {
+        scrub.kind == .workspaces ? card.width : card.height * PagePreviews.aspect
     }
     /// How many cards show either side of the front one.
     private var reach: Int { many ? 5 : 3 }
@@ -183,7 +188,7 @@ struct TabScrubStrip: View {
     /// either side tucked half behind it, and each further one behind that.
     private func offset(_ distance: Int) -> CGFloat {
         guard distance != 0 else { return 0 }
-        let x = card.width * (0.52 + 0.3 * CGFloat(abs(distance) - 1))
+        let x = pitch * (0.52 + 0.3 * CGFloat(abs(distance) - 1))
         return distance < 0 ? -x : x
     }
 
@@ -321,10 +326,10 @@ struct TabScrubStrip: View {
         Group {
             switch item {
             case .tab(let row, _):
-                CardPicture(row: row, height: card.height, elsewhere: false, theme: theme,
-                            loading: false)
+                rounded(CardPicture(row: row, height: card.height, elsewhere: false, theme: theme,
+                                    loading: false))
             case .pin(let pin, let key):
-                pinPicture(pin, key: key)
+                rounded(pinPicture(pin, key: key))
             case .workspace(let row):
                 WorkspaceTile(workspace: row, size: card.width)
             }
@@ -347,6 +352,12 @@ struct TabScrubStrip: View {
                         .frame(maxHeight: .infinity)
                 }
             }
+    }
+
+    /// A page's card, cut to the grid card's corners and ringed as it is.
+    /// `CardPicture` leaves both to whatever holds it.
+    private func rounded(_ picture: some View) -> some View {
+        picture
             .clipShape(.rect(cornerRadius: 14))
             .overlay {
                 RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1)
