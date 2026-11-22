@@ -36,6 +36,13 @@ html|* {
   --danger-outline-border: rgba(196, 47, 58, 0.45);
   --skeleton: rgb(var(--sval-palette-wash-light) / 0.08);
   --keep-icon: var(--sval-fixed);
+  /* The page's one type scale. Card titles, then text, labels and
+     subheadings at the size of Firefox's own control labels, then notes,
+     then small print and uppercase eyebrows. */
+  --settings-heading-size: 18px;
+  --settings-text-size: 15px;
+  --settings-note-size: 13px;
+  --settings-small-size: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +54,13 @@ html|* {
     --settings-note-border: rgba(92, 242, 255, 0.26);
     --danger-outline-border: rgba(255, 138, 144, 0.5);
     --skeleton: rgb(var(--sval-palette-wash-dark) / 0.1);
+    /* Settings' page is a step lighter than a dark window's frame, so the
+       tab stands apart from the window around it. The cards keep the shade
+       they take over the night page elsewhere: the dark card is a wash
+       over the page, so these mix that wash into the night page here. */
+    --sval-page: var(--sval-palette-ink-700);
+    --sval-card: color-mix(in srgb, rgb(var(--sval-palette-wash-light)) 28%, var(--sval-palette-ink-850));
+    --sval-card-hover: color-mix(in srgb, rgb(var(--sval-palette-wash-light)) 44%, var(--sval-palette-ink-850));
   }
 }
 
@@ -87,7 +101,7 @@ html|* {
 .sval-settings {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-xlarge);
   margin-block-end: 32px;
 }
 
@@ -103,6 +117,14 @@ html|* {
   margin-block-end: 0;
 }
 
+/* Inside one of Firefox's categories, a section is an item of the
+   category's column (`setting-pane.css`), so one showing nothing would take
+   a slot and double the column's gap. A dialog shows on its own, so a
+   section holding only dialogs shows nothing until one opens. */
+setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialog), dialog[open])) {
+  display: none;
+}
+
 .sval-pane h1,
 .sval-pane h2,
 .sval-pane h3,
@@ -110,12 +132,27 @@ html|* {
   margin: 0;
 }
 
+/* Laid out as Firefox's `moz-page-header` lays out its heading: the
+   category's icon, then the title, at least a button's height, so a pane's
+   first card starts at the same height in every category. */
 .sval-pane-title {
   color: var(--sval-ink);
   font-size: var(--sval-heading-size);
   font-weight: var(--sval-heading-weight);
   letter-spacing: var(--sval-heading-tracking);
-  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  min-height: var(--button-min-height);
+
+  &::before {
+    content: "";
+    flex: none;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    background-color: currentColor;
+    mask: var(--sval-pane-icon) center / contain no-repeat;
+  }
 }
 
 .sval-pane-title:focus {
@@ -129,7 +166,6 @@ html|* {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  margin-block-start: 12px;
 }
 
 /* A pane's title. */
@@ -148,7 +184,7 @@ html|* {
   align-items: center;
   gap: 10px;
   color: var(--sval-ink);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
   cursor: pointer;
   list-style: none;
@@ -160,7 +196,7 @@ html|* {
 
 .sval-advanced-note {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   font-weight: 400;
 }
 
@@ -179,7 +215,7 @@ html|* {
 }
 
 .sval-settings > .sval-advanced > .sval-advanced-summary {
-  padding: 16px 24px;
+  padding: 16px var(--card-padding-inline);
   border: 1px solid var(--sval-border);
   border-radius: 20px;
   background: var(--sval-card);
@@ -187,8 +223,8 @@ html|* {
 }
 
 .sval-settings > .sval-advanced > .sval-advanced-body {
-  gap: 20px;
-  margin-block-start: 20px;
+  gap: var(--space-xlarge);
+  margin-block-start: var(--space-xlarge);
 }
 
 .sval-card .sval-advanced {
@@ -216,8 +252,8 @@ html|* {
 
 .sval-pane .sval-empty-title {
   color: var(--sval-ink);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 /* The device card is the pane's own, spaced with its other cards. */
@@ -258,7 +294,7 @@ html|* {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 20px 24px;
+  padding: var(--card-padding-block) var(--card-padding-inline);
   border: 1px solid var(--sval-border);
   border-radius: 20px;
   background: var(--sval-card);
@@ -284,26 +320,29 @@ html|* {
 }
 
 .sval-card h2 {
+  /* The trim Firefox's card headings take (`.text-box-trim-start`), so a
+     card's title sits as far from its edge as theirs. */
+  margin-block-start: calc((1cap - 1lh) / 2);
   color: var(--sval-ink);
-  font-size: 18px;
+  font-size: var(--settings-heading-size);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .sval-card h3 {
   color: var(--sval-ink);
-  font-size: 16px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
 .sval-card h4 {
   color: var(--sval-ink);
-  font-size: 15px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
 .sval-lead {
-  font-size: 15px;
+  font-size: var(--settings-text-size);
   line-height: 1.5;
 }
 
@@ -329,7 +368,7 @@ html|* {
 
 .sval-meta {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.5;
 }
 
@@ -338,13 +377,13 @@ html|* {
   border-radius: 10px;
   background: var(--sval-problem-tint);
   color: var(--sval-ink-body);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.5;
 }
 
 .sval-status-line {
   color: var(--sval-ink-muted);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
   line-height: 1.5;
 }
 
@@ -469,13 +508,13 @@ html|* {
 
 .sval-folder-name {
   color: var(--sval-ink);
-  font-size: 16px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
 .sval-folder-path {
   color: var(--sval-ink-muted);
-  font-size: 12px;
+  font-size: var(--settings-small-size);
   overflow-wrap: anywhere;
 }
 
@@ -568,7 +607,7 @@ html|* {
 
 .sval-sync-label {
   color: var(--sval-ink);
-  font-size: 16px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
@@ -590,7 +629,7 @@ html|* {
 
 .sval-sync-detail {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-sync-actions {
@@ -612,7 +651,7 @@ html|* {
   gap: 10px;
   margin: 0;
   color: var(--sval-ink);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
   line-height: 20px;
 }
 
@@ -762,7 +801,7 @@ html|* {
 
   > h4 {
     margin-block-start: 8px;
-    font-size: 14px;
+    font-size: var(--settings-text-size);
   }
 }
 
@@ -819,12 +858,12 @@ html|* {
 }
 
 .sval-pick-label {
-  font-size: 14px;
+  font-size: var(--settings-text-size);
 }
 
 .sval-pick-note {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.4;
 }
 
@@ -1117,13 +1156,13 @@ html|* {
 }
 
 .sval-choice-title {
-  font-size: 16px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
 .sval-choice-detail {
   color: var(--sval-ink-muted);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
 }
 
 /* The device flow's precondition unmet: shown, and out of reach. */
@@ -1159,7 +1198,7 @@ html|* {
 
 .sval-progress {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-step {
@@ -1173,7 +1212,7 @@ html|* {
   display: block;
   margin-block-end: 8px;
   color: var(--sval-ink);
-  font-size: 16px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
@@ -1310,7 +1349,7 @@ html|* {
 
 .sval-page-tools-note {
   color: var(--sval-ink-body);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.45;
 }
 
@@ -1412,7 +1451,7 @@ html|* {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-agents-status::before {
@@ -1433,7 +1472,7 @@ html|* {
 
 .sval-agents-card {
   gap: 0;
-  padding-block-end: 12px;
+  padding-block-end: calc(var(--card-padding-block) - 8px);
 }
 
 .sval-agents-card h2 {
@@ -1442,13 +1481,13 @@ html|* {
 
 .sval-agents-note {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.45;
 }
 
 #sval-agents-off {
   margin-block-end: 10px;
-  font-size: 14px;
+  font-size: var(--settings-note-size);
   line-height: 1.5;
 }
 
@@ -1458,7 +1497,7 @@ html|* {
   gap: 10px;
   padding: 8px 0 14px;
   color: var(--sval-ink-muted);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-agents-loading::before {
@@ -1475,7 +1514,7 @@ html|* {
   align-items: center;
   gap: 10px;
   color: var(--sval-ink-body);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 #sval-agents-message {
@@ -1532,8 +1571,8 @@ html|* {
 
 .sval-agent-label {
   color: var(--sval-ink);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 .sval-agent-meta {
@@ -1542,7 +1581,7 @@ html|* {
   align-items: center;
   gap: 4px 10px;
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-agent-launch {
@@ -1626,8 +1665,8 @@ html|* {
   margin-block-end: 8px;
   padding: 0;
   color: var(--sval-ink);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 .sval-agent-defaults {
@@ -1688,7 +1727,7 @@ html|* {
   align-items: center;
   gap: 6px 10px;
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.45;
 }
 
@@ -1731,8 +1770,8 @@ html|* {
 
 .sval-card .sval-agent-rules-head h3 {
   color: var(--sval-ink);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 .sval-pane button.sval-agent-add {
@@ -1758,7 +1797,7 @@ html|* {
 
 .sval-agent-adding > .sval-step-label {
   margin-block-end: 0;
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 /* At large text the field keeps room to type, and the choices and buttons
@@ -1825,7 +1864,7 @@ html|* {
   gap: 8px;
   min-height: 20px;
   color: var(--sval-ink-body);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.4;
 }
 
@@ -2090,7 +2129,7 @@ html|* {
   gap: 10px;
   padding: 6px 10px;
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-pane button.sval-link {
@@ -2103,8 +2142,8 @@ html|* {
   background: none;
   color: var(--sval-accent);
   font: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--settings-note-size);
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -2170,14 +2209,14 @@ html|* {
 .sval-pane .sval-modal-title {
   padding: 22px 24px 0;
   color: var(--sval-ink);
-  font-size: 19px;
-  font-weight: 700;
+  font-size: var(--settings-heading-size);
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .sval-pane .sval-modal-body {
   padding: 10px 24px 0;
-  font-size: 15px;
+  font-size: var(--settings-text-size);
   line-height: 1.5;
 }
 
@@ -2268,7 +2307,7 @@ html|* {
 
 .sval-fp-card {
   gap: 14px;
-  padding-block-end: 8px;
+  padding-block-end: calc(var(--card-padding-block) - 12px);
 }
 
 .sval-fp-strict {
@@ -2288,13 +2327,13 @@ html|* {
 
 .sval-fp-strict-title {
   color: var(--sval-ink);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 .sval-fp-strict-status {
   color: var(--sval-ink-body);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.45;
 }
 
@@ -2308,7 +2347,7 @@ html|* {
   gap: 12px;
   padding-block-start: 12px;
   border-block-start: 1px solid var(--sval-border-subtle);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-fp-toolbar label {
@@ -2328,8 +2367,8 @@ html|* {
 }
 
 .sval-card .sval-fp-group h3 {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 .sval-pane button.sval-fp-group-toggle {
@@ -2358,14 +2397,14 @@ html|* {
 
 .sval-fp-group-name {
   color: var(--sval-ink);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--settings-text-size);
+  font-weight: 600;
 }
 
 .sval-fp-group-summary {
   flex: 1;
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-fp-row,
@@ -2385,7 +2424,7 @@ html|* {
 
 .sval-fp-label {
   color: var(--sval-ink-body);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
 }
 
 .sval-pane select.sval-fp-select {
@@ -2424,7 +2463,7 @@ html|* {
 
 .sval-fp-changed {
   color: var(--sval-ink-muted);
-  font-size: 12px;
+  font-size: var(--settings-small-size);
 }
 
 .sval-fp-note {
@@ -2461,7 +2500,7 @@ html|* {
 
 .sval-sites-filter-label {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 /* How many rows match, while the list is narrowed. The status line stays in
@@ -2560,13 +2599,13 @@ html|* {
   overflow: hidden;
   color: var(--sval-ink);
   font-family: var(--sval-mono);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sval-sites-hidden-sub {
-  font-size: 12.5px;
+  font-size: var(--settings-small-size);
 }
 
 .sval-pane button.sval-sites-hidden-show {
@@ -2681,7 +2720,7 @@ html|* {
 
 .sval-card .sval-blocking-head h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--settings-text-size);
 }
 
 .sval-blocking-list {
@@ -2689,12 +2728,12 @@ html|* {
   flex-direction: column;
 }
 
-.sval-blocking-category {
+.sval-card .sval-blocking-category {
   margin: 0;
   padding: 10px 0 4px;
   color: var(--sval-ink-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--settings-small-size);
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -2727,7 +2766,7 @@ html|* {
   align-items: flex-start;
   gap: 6px;
   color: var(--sval-problem);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   line-height: 1.4;
 }
 
@@ -2746,7 +2785,7 @@ html|* {
 .sval-keys-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-xlarge);
 }
 
 .sval-keys-switches:not([hidden]) {
@@ -2826,7 +2865,7 @@ html|* {
 
 .sval-links-label {
   color: var(--sval-ink-body);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
 }
 
 .sval-links-idle {
@@ -3067,7 +3106,7 @@ html|* {
 }
 
 .sval-links-none .sval-agents-note {
-  font-size: 12px;
+  font-size: var(--settings-note-size);
   line-height: 1.35;
 }
 
@@ -3131,7 +3170,7 @@ html|* {
 .sval-site-page:not([hidden]) {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-xlarge);
 }
 
 .sval-site-nav,
@@ -3219,8 +3258,8 @@ html|* {
   overflow: hidden;
   min-width: 0;
   color: var(--sval-ink);
-  font-size: 28px;
-  font-weight: 800;
+  font-size: var(--sval-heading-size);
+  font-weight: var(--sval-heading-weight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3247,7 +3286,7 @@ html|* {
 
 .sval-site-scope-label {
   color: var(--sval-ink-body);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
   font-weight: 500;
 }
 
@@ -3258,7 +3297,7 @@ html|* {
 
 .sval-site-scope-hint {
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
 }
 
 /* The rule and heading above the cards that cover the whole site. */
@@ -3274,9 +3313,9 @@ html|* {
 .sval-pane h2.sval-site-whole-title {
   margin: 8px 0 0;
   color: var(--sval-ink-muted);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: var(--settings-small-size);
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -3303,7 +3342,7 @@ html|* {
 
 .sval-site-nothing {
   color: var(--sval-ink-muted);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-site-note:not([hidden]) {
@@ -3321,14 +3360,14 @@ html|* {
 
 .sval-pane .sval-site-note-title {
   color: var(--sval-ink);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
 .sval-site-cards {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-xlarge);
 }
 
 .sval-site-card {
@@ -3360,14 +3399,14 @@ html|* {
 
 .sval-pane :is(.sval-site-row-label, h2.sval-site-card-title) {
   color: var(--sval-ink);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
   font-weight: 500;
 }
 
 .sval-site-row-sub {
   overflow: hidden;
   color: var(--sval-ink-muted);
-  font-size: 13px;
+  font-size: var(--settings-note-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3395,7 +3434,7 @@ sval-segments-default {
   flex: 1;
   min-width: 0;
   color: var(--sval-ink);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
   font-weight: 500;
 }
 
@@ -3555,7 +3594,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   gap: 8px;
   margin: 12px 0 0;
   color: var(--sval-ink);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
   font-weight: 500;
 }
 
@@ -3624,7 +3663,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   margin: 0;
   padding: 8px 0 4px;
   color: var(--sval-ink-muted);
-  font-size: 11px;
+  font-size: var(--settings-small-size);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3751,7 +3790,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
 .sval-pane .sval-site-alert-title {
   margin: 0;
   color: var(--settings-warn);
-  font-size: 14px;
+  font-size: var(--settings-text-size);
   font-weight: 600;
 }
 
@@ -3914,7 +3953,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   margin: 0;
   padding: 8px 0 4px;
   color: var(--sval-ink-muted);
-  font-size: 11px;
+  font-size: var(--settings-small-size);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4023,7 +4062,7 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   margin: 12px 0 0;
   padding-inline-start: 20px;
   color: var(--sval-ink-body);
-  font-size: 14px;
+  font-size: var(--settings-note-size);
 }
 
 .sval-keys-extensions:not([hidden]) {

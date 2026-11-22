@@ -337,6 +337,12 @@
       );
       container.className = "sval-pane";
       container.dataset.category = name;
+      // The pane's title wears the nav button's icon, as Firefox's
+      // `moz-page-header` wears its category's (`settings.css`).
+      container.style.setProperty(
+        "--sval-pane-icon",
+        `url("${iconURL(category.icon)}")`
+      );
       container.hidden = true;
       pane.append(container);
       containers.set(category.id, container);
