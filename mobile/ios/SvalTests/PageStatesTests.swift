@@ -51,6 +51,11 @@ final class PageStatesTests: XCTestCase {
         return (list.backList + [list.currentItem].compactMap { $0 } + list.forwardList).map(\.url.absoluteString)
     }
 
+    /// Waits for every write `states` was asked for to land.
+    private func written(_ states: PageStates) async {
+        await withCheckedContinuation { done in states.whenWritten { done.resume() } }
+    }
+
     private func files() -> [String] {
         (try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
     }
@@ -61,18 +66,20 @@ final class PageStatesTests: XCTestCase {
         XCTAssertEqual(before.count, 3)
         let state = try XCTUnwrap(page.view.interactionState)
         XCTAssertTrue(state is Data, "WebKit's interaction state is \(type(of: state))")
-        PageStates(directory: directory).keep("tab", state: state, address: page.view.url?.absoluteString,
-                                              isTab: true, isPrivate: false)
+        let ending = PageStates(directory: directory)
+        ending.keep("tab", state: state, address: page.view.url?.absoluteString, isTab: true, isPrivate: false)
+        await written(ending)
         page.close()
         // The app ended: another store, over the same folder.
         let restored = try XCTUnwrap(PageStates(directory: directory).take("tab"))
         XCTAssertEqual(restored.address, "sval-test://pages/two")
         let again = makePage()
-        await committing(again) { again.restore(restored.state) }
+        await committing(again) { again.restore(restored.state, at: restored.address) }
         XCTAssertEqual(entries(again), before)
         XCTAssertEqual(again.view.url?.absoluteString, "sval-test://pages/two")
         XCTAssertEqual(again.view.backForwardList.forwardList.count, 1)
-        XCTAssertTrue(files().isEmpty, "a state taken back stays on disk")
+        // The file stays until the page writes its own state over it.
+        XCTAssertEqual(files().count, 1, "a state taken back is gone from disk")
     }
 
     func testAPrivateTabWritesNothing() async throws {
@@ -81,27 +88,32 @@ final class PageStatesTests: XCTestCase {
         let state = try XCTUnwrap(page.view.interactionState)
         let states = PageStates(directory: directory)
         states.keep("tab", state: state, address: page.view.url?.absoluteString, isTab: true, isPrivate: page.isPrivate)
+        XCTAssertFalse(states.save("tab", state: state, address: nil, isTab: true, isPrivate: page.isPrivate))
+        await written(states)
         XCTAssertNotNil(states.saved("tab"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)))
         XCTAssertNil(PageStates(directory: directory).saved("tab"))
     }
 
-    func testAPinsStateStaysInMemory() {
+    func testAPinsStateStaysInMemory() async {
         let states = PageStates(directory: directory)
         states.keep(Browser.pinKey("guid", in: "workspace"), state: Data([1]), address: nil, isTab: false, isPrivate: false)
+        await written(states)
         XCTAssertTrue(files().isEmpty)
     }
 
     /// Clear Browsing Data takes every let-go page's state, tabs' and
     /// pins', from disk and memory, and leaves the private session's.
-    func testClearingBrowsingDataForgetsTheStates() {
+    func testClearingBrowsingDataForgetsTheStates() async {
         let states = PageStates(directory: directory)
         let pin = Browser.pinKey("guid", in: "workspace")
         states.keep("tab", state: Data([1]), address: nil, isTab: true, isPrivate: false)
         states.keep(pin, state: Data([1]), address: nil, isTab: false, isPrivate: false)
         states.keep("private", state: Data([1]), address: nil, isTab: true, isPrivate: true)
+        await written(states)
         XCTAssertEqual(files().count, 1)
         states.forgetAll(keeping: { $0 == "private" })
+        await written(states)
         XCTAssertTrue(files().isEmpty, "the folder holds \(files())")
         XCTAssertNil(states.take("tab"))
         XCTAssertNil(states.take(pin))
@@ -109,13 +121,42 @@ final class PageStatesTests: XCTestCase {
         XCTAssertNotNil(states.take("private"))
     }
 
-    func testAStateGoesWithItsTab() {
+    /// A live page's state is written to disk alone, and only when it
+    /// changed since its last write.
+    func testALivePagesStateIsWrittenWhenItChanges() async {
+        let states = PageStates(directory: directory)
+        XCTAssertTrue(states.save("tab", state: Data([1]), address: "a", isTab: true, isPrivate: false))
+        XCTAssertFalse(states.save("tab", state: Data([1]), address: "a", isTab: true, isPrivate: false))
+        XCTAssertTrue(states.save("tab", state: Data([2]), address: "b", isTab: true, isPrivate: false))
+        XCTAssertFalse(states.save("pin", state: Data([1]), address: "a", isTab: false, isPrivate: false))
+        await written(states)
+        XCTAssertEqual(files(), [Self.fileName("tab")])
+        XCTAssertEqual(PageStates(directory: directory).saved("tab")?.address, "b")
+        // Taken for a page, the state stays on disk for the next launch.
+        XCTAssertEqual(states.take("tab")?.address, "b")
+        await written(states)
+        XCTAssertEqual(PageStates(directory: directory).saved("tab")?.address, "b")
+    }
+
+    /// A page that has shown nothing yet, as one waiting for the blocker
+    /// at launch, keeps no state: the view's own is an empty history,
+    /// which would replace the tab's saved one.
+    func testAPageThatShowedNothingKeepsNoState() throws {
+        let page = makePage()
+        let empty = try XCTUnwrap(page.view.interactionState as? Data, "WebKit gives no state for an empty view")
+        XCTAssertFalse(empty.isEmpty)
+        XCTAssertNil(page.keptState)
+        page.close()
+    }
+
+    func testAStateGoesWithItsTab() async {
         let states = PageStates(directory: directory)
         for id in ["kept", "closed", "gone"] {
             states.keep(id, state: Data([1]), address: nil, isTab: true, isPrivate: false)
         }
         states.forget("closed")
-        states.keep(live: { $0 == "kept" }, onDisk: { $0 == "kept" })
+        states.keep(live: { $0 == "kept" }, onDisk: { $0 == "kept" }, tabs: 1)
+        await written(states)
         let later = PageStates(directory: directory)
         XCTAssertNotNil(later.saved("kept"))
         XCTAssertNil(later.saved("closed"))
@@ -123,12 +164,13 @@ final class PageStatesTests: XCTestCase {
         XCTAssertEqual(files().count, 1)
     }
 
-    func testTheOldestStatesGoPastTheBound() throws {
+    func testTheOldestStatesGoPastTheBound() async throws {
         let states = PageStates(directory: directory)
         let past = Date.now.addingTimeInterval(-3600)
         for index in 0..<PageStates.kept {
             states.keep("tab-\(index)", state: Data([1]), address: nil, isTab: true, isPrivate: false)
         }
+        await written(states)
         let urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
         XCTAssertEqual(urls.count, PageStates.kept)
         // Written in the ids' order, an hour ago, a second apart.
@@ -138,6 +180,7 @@ final class PageStatesTests: XCTestCase {
                 [.modificationDate: past.addingTimeInterval(Double(id))], ofItemAtPath: url.path(percentEncoded: false))
         }
         states.keep("newest", state: Data([1]), address: nil, isTab: true, isPrivate: false)
+        await written(states)
         let later = PageStates(directory: directory)
         XCTAssertEqual(files().count, PageStates.kept)
         XCTAssertNil(later.saved("tab-0"))
@@ -147,12 +190,14 @@ final class PageStatesTests: XCTestCase {
 
     /// The index of the `tab-<n>` id `url` is named for.
     private func idOf(_ url: URL, among count: Int) -> Int? {
-        (0..<count).first { index in
-            let name = Data("tab-\(index)".utf8).base64EncodedString()
-                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
-                .replacingOccurrences(of: "=", with: "")
-            return url.lastPathComponent == name
-        }
+        (0..<count).first { url.lastPathComponent == Self.fileName("tab-\($0)") }
+    }
+
+    /// The name of the file `id`'s state is kept in.
+    static func fileName(_ id: String) -> String {
+        Data(id.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }
 

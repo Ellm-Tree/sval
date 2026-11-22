@@ -59,6 +59,8 @@ final class AppHarness {
     let picked: URL
     /// Where the phone's blocker keeps the lists it downloaded.
     let lists: URL
+    /// Where the phone keeps its tabs' page states, across launches.
+    let pageStates: URL
     /// The other device.
     let peer: Syncer
     private(set) var model: AppModel!
@@ -67,6 +69,7 @@ final class AppHarness {
         ownCopy = try temporaryDirectory(test)
         picked = try temporaryDirectory(test)
         lists = try temporaryDirectory(test)
+        pageStates = try temporaryDirectory(test).appending(path: "PageStates", directoryHint: .isDirectory)
         try keys.store(syncKey, account: "sync-key")
         peer = try Syncer.make(ownCopy: try temporaryDirectory(test), secrets: Secrets(store: MemoryKeys()))
     }
@@ -91,12 +94,13 @@ final class AppHarness {
     @discardableResult
     func launch(_ made: (AppModel) -> Void = { _ in },
                 ready: ((AppModel) -> Bool)? = nil) async throws -> AppModel {
-        let folder = folder, lists = lists, picked = picked, keys = keys
+        let folder = folder, lists = lists, picked = picked, keys = keys, pageStates = pageStates
         let model = AppModel(edges: AppModel.Edges(
             ownCopy: ownCopy, secrets: Secrets(store: keys),
             source: { .files(picked) },
             files: { _ in folder },
-            blocker: { ContentBlocker(directory: lists, download: { _ in nil }) }))
+            blocker: { ContentBlocker(directory: lists, download: { _ in nil }) },
+            pageStates: pageStates))
         self.model = model
         made(model)
         // Read only once the syncer has made it: asking `Secrets` for it
@@ -121,6 +125,10 @@ final class AppHarness {
     /// reads or writes anything, as a pass does (`Syncer.sync`).
     func quit() async throws {
         guard let model else { return }
+        // The model lives on past its quit, so a write it had queued would
+        // land after the next launch read the folder. An app that ends
+        // lands nothing after.
+        await model.browser.statesWritten()
         folder.cutOff()
         try await until("the passes end") { !model.syncing }
         self.model = nil

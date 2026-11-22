@@ -151,6 +151,8 @@ final class AppModel {
         /// The folder a pass reads and writes for a folder picked in Files.
         let files: @Sendable (URL) -> SharedFolder
         let blocker: @MainActor () -> ContentBlocker
+        /// The directory the tabs' page states are kept in (`PageStates`).
+        let pageStates: URL
 
         /// The app's own: Application Support, the Keychain, the folder
         /// chosen at an earlier launch and the blocking lists' publishers.
@@ -168,7 +170,8 @@ final class AppModel {
                         ?? DropboxSettings.load().map(Source.dropbox)
                 },
                 files: { Folder(shared: $0) },
-                blocker: { ContentBlocker(formerStore: .default()) })
+                blocker: { ContentBlocker(formerStore: .default()) },
+                pageStates: PageStates.directory)
         }
     }
 
@@ -195,7 +198,7 @@ final class AppModel {
             stage = source == nil ? .chooseFolder : (secrets.syncKey() == nil || keyUnconfirmed ? .join : .ready)
         }
         settingUp = stage == .chooseFolder && !UserDefaults.standard.bool(forKey: Self.offeredSetupKey)
-        browser = Browser(model: self, blocker: edges.blocker())
+        browser = Browser(model: self, blocker: edges.blocker(), states: PageStates(directory: edges.pageStates))
         KagiPrivacyPass.shared.start()
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main

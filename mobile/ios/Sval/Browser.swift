@@ -64,9 +64,9 @@ final class Browser {
     /// after it last drew: the tab in front's, at launch, is made once the
     /// window has drawn without it.
     private var pagesChanged = 0
-    /// The state of each page let go, and the address it was at, by page
-    /// key.
-    @ObservationIgnored private let offloaded = PageStates()
+    /// The saved state of each tab's and pin's page, and the address it was
+    /// at, by page key.
+    @ObservationIgnored private let offloaded: PageStates
     @ObservationIgnored private let model: AppModel
     @ObservationIgnored let blocker: ContentBlocker
     /// The files the pages download.
@@ -550,9 +550,10 @@ final class Browser {
     /// Whether a tab's page is loaded on this phone.
     func hasPage(_ id: String) -> Bool { pages[id] != nil }
 
-    init(model: AppModel, blocker made: ContentBlocker) {
+    init(model: AppModel, blocker made: ContentBlocker, states: PageStates) {
         self.model = model
         blocker = made
+        offloaded = states
         currentTabId = UserDefaults.standard.string(forKey: Self.currentKey)
         workspaceId = UserDefaults.standard.string(forKey: Self.workspaceKey)
         downloads.inPrivate = { [weak self] in self?.inPrivate ?? false }
@@ -589,6 +590,7 @@ final class Browser {
         for name in [UIApplication.willResignActiveNotification, UIApplication.didEnterBackgroundNotification] {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
+                    self?.saveLiveStates(on: name == UIApplication.willResignActiveNotification ? "losing focus" : "the background")
                     if let front = self?.currentTabId { self?.takePreview(front) }
                     if self?.inPrivate == true { PrivacyCover.show() }
                     if name == UIApplication.willResignActiveNotification {
@@ -615,6 +617,9 @@ final class Browser {
             }
         }
         watchWindow()
+        #if DEBUG
+        Diagnostics.log("page states: \(offloaded.countOnDisk()) on disk at launch")
+        #endif
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -683,8 +688,8 @@ final class Browser {
         for id in ids where id != currentTabId && !shown.contains(id) {
             guard let page = pages[id], await !page.mustStay() else { continue }
             pages.removeValue(forKey: id)
-            if let state = page.view.interactionState {
-                keepOffloaded(id, state: state, address: page.view.url?.absoluteString, from: page)
+            if let kept = page.keptState {
+                keepOffloaded(id, state: kept.state, address: kept.address, from: page)
             }
             page.close()
             media[id] = nil
@@ -701,6 +706,47 @@ final class Browser {
     private func keepOffloaded(_ id: String, state: Any, address: String?, from page: Page? = nil) {
         offloaded.keep(id, state: state, address: address, isTab: model.row(id)?.kind == .tab,
                        isPrivate: model.isPrivate(id) || page?.isPrivate == true, savedPage: page?.savedPage)
+    }
+
+    /// Returns once every page state written so far is on disk.
+    func statesWritten() async {
+        await withCheckedContinuation { done in offloaded.whenWritten { done.resume() } }
+    }
+
+    /// What became of a live page's state asked to be written.
+    private enum Saving { case written, unchanged, notATab, isPrivate, empty }
+
+    /// Writes the state of tab `id`'s live page to disk, where it outlives
+    /// the app.
+    @discardableResult
+    private func saveState(_ id: String) -> Saving {
+        guard let page = pages[id], model.row(id)?.kind == .tab else { return .notATab }
+        let isPrivate = model.isPrivate(id) || page.isPrivate
+        if isPrivate { return .isPrivate }
+        guard let kept = page.keptState else { return .empty }
+        return offloaded.save(id, state: kept.state, address: kept.address, isTab: true, isPrivate: isPrivate)
+            ? .written : .unchanged
+    }
+
+    /// Writes every live tab page's state as the app loses focus and as it
+    /// goes to the background. Apple's guidance is to save user data on
+    /// deactivation ("Preparing your UI to run in the background"): an app
+    /// that runs in the background, as Sval does for audio, is generally
+    /// not told when the user quits it (`applicationWillTerminate(_:)`), and
+    /// iOS ends a suspended app without a word. The states go to disk off
+    /// the main thread, under a background task
+    /// (`beginBackgroundTask(withName:expirationHandler:)`) that keeps iOS
+    /// from suspending the app before they land.
+    private func saveLiveStates(on why: String) {
+        let application = UIApplication.shared
+        let task = BackgroundTask()
+        task.id = application.beginBackgroundTask(withName: "Save the tabs' history") { task.end() }
+        var counts: [Saving: Int] = [:]
+        for id in pages.keys { counts[saveState(id), default: 0] += 1 }
+        offloaded.whenWritten { task.end() }
+        #if DEBUG
+        Diagnostics.log("page states: on \(why), \(counts[.written] ?? 0) of \(pages.count) live pages written, \(counts[.unchanged] ?? 0) unchanged, \(counts[.isPrivate] ?? 0) private, \(counts[.empty] ?? 0) with nothing shown, \(counts[.notATab] ?? 0) pins or windows")
+        #endif
     }
 
     /// The pages whose pictures `PagePreviews` keeps, by page key: the
@@ -872,7 +918,7 @@ final class Browser {
         // session's ids, and the last tab ends the session.
         let entry = model.isPrivate(row.id) ? nil : ClosedTab(
             row: row, place: model.closedPlace(of: row), workspace: model.workspace(of: row.id),
-            state: pages[row.id]?.view.interactionState ?? offloaded.saved(row.id)?.state)
+            state: pages[row.id]?.keptState?.state ?? offloaded.saved(row.id)?.state)
         guard await model.closeTab(row) else { return nil }
         offloaded.forget(row.id)
         if let entry, Self.openable(row) != nil {
@@ -905,7 +951,7 @@ final class Browser {
         let focus = focusedPane(of: split.id, among: panes.map(\.id))
         let entry = ClosedSplit(
             split: split, panes: panes,
-            states: panes.map { pages[$0.id]?.view.interactionState ?? offloaded.saved($0.id)?.state },
+            states: panes.map { pages[$0.id]?.keptState?.state ?? offloaded.saved($0.id)?.state },
             place: model.place(of: split), workspace: model.workspace(of: split.id),
             focused: panes.firstIndex { $0.id == focus } ?? 0)
         guard await model.closeSplit(split) else { return nil }
@@ -963,7 +1009,7 @@ final class Browser {
         if askClosed.contains(where: { !live($0) }) { askClosed = askClosed.filter(live) }
         held = held.filter { live($0.key) }
         stopped = stopped.filter(live)
-        offloaded.keep(live: live, onDisk: tabs.contains)
+        offloaded.keep(live: live, onDisk: { tabs.contains($0) }, tabs: tabs.count)
         visitTransition = visitTransition.filter { live($0.key) }
         restoring = restoring.filter(live)
         lastVisit = lastVisit.filter { live($0.key) }
@@ -1037,8 +1083,10 @@ final class Browser {
     }
     /// Clear Browsing Data: every site's cookies, storage and cache in the
     /// store every tab but a private one uses, the sites' icons, the tabs'
-    /// pictures and the saved states of pages let go. The tree, history and settings stay, and so does the
-    /// private session, whose store is its own.
+    /// pictures and the tabs' saved page states. The tree, history and
+    /// settings stay, and so does the private session, whose store is its
+    /// own. A page still open keeps its history, and writes its state again
+    /// as it next settles or the app leaves the front.
     func clearBrowsingData() async {
         await WKWebsiteDataStore.default().removeData(
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
@@ -1392,8 +1440,8 @@ final class Browser {
         guard !page.playing, !page.inPictureInPicture, await !page.mustStay() else { return }
         if id == currentTabId && UIApplication.shared.applicationState != .background { return }
         pages.removeValue(forKey: id)
-        if let state = page.view.interactionState {
-            keepOffloaded(id, state: state, address: page.view.url?.absoluteString, from: page)
+        if let kept = page.keptState {
+            keepOffloaded(id, state: kept.state, address: kept.address, from: page)
         }
         page.close()
         media[id] = nil
@@ -1435,14 +1483,14 @@ final class Browser {
     /// fixes a page's playback rule when it is made.
     func remake(_ id: String, loading url: URL?, why: String) {
         guard let site = url ?? pages[id]?.view.url, let old = pages.removeValue(forKey: id) else { return }
-        let state = old.view.interactionState
+        let kept = old.keptState
         old.close()
         media[id] = nil
         // The page's own privacy, fixed when it was made: the session's
         // ids no longer hold a tab that is closing.
         let page = makePage(id, address: nil, opens: nil, pin: false, at: site, privately: old.isPrivate)
-        if let state {
-            page.restore(state)
+        if let kept {
+            page.restore(kept.state, at: kept.address)
             if url == nil { restoring.insert(id) }
         }
         if let url { page.load(url) }
@@ -1662,16 +1710,26 @@ final class Browser {
         page.onCloseWindow = { [weak self] in self?.closeWindow(id) }
         // Made while the view is drawn; the bar takes its state after.
         Task { @MainActor [weak self] in self?.refreshState() }
-        // A page let go comes back as it was, unless another device has
-        // since moved the tab to another address.
+        // A page let go comes back as it was. One whose tab is at another
+        // address loads that address over its history: another device
+        // moved the tab, or the app ended between the tree taking a new
+        // address and the state's write landing.
         guard !pin else { return page }
-        if let saved = offloaded.take(id), saved.address == address {
-            page.restore(saved.state)
+        let saved = offloaded.take(id)
+        if let saved, saved.address == address {
+            page.restore(saved.state, at: saved.address)
             // Put back as it was: no new visit (`navigated`).
             restoring.insert(id)
         } else if let opens {
+            if let saved { page.restore(saved.state, at: saved.address) }
             page.load(opens)
         }
+        #if DEBUG
+        let how = saved == nil ? "with no saved state" : saved?.address == address
+            ? "from its saved state\(page.waitsForRules ? ", once the blocker is ready" : "")"
+            : "from its saved state, then at its tab's other address"
+        Diagnostics.log("tabs: a tab's page made \(how)")
+        #endif
         return page
     }
 
@@ -1705,6 +1763,14 @@ final class Browser {
             guard !opening.adding, AppModel.opensHere(url.absoluteString) else { return }
             addWindowTab(tabId, url: url)
             return
+        }
+        // The page has held this address for `Page.settle`, as the tree
+        // takes it, so the state written matches the tab's address at the
+        // next launch. A force quit or a crash gives no later chance.
+        if saveState(tabId) == .written {
+            #if DEBUG
+            Diagnostics.log("page states: a live tab's state written after it settled")
+            #endif
         }
         Task { await model.followNavigation(tabId: tabId, url: url, title: title, isPrivate: isPrivate) }
         // A private tab's pages are never history.
@@ -1810,7 +1876,7 @@ final class Browser {
         let key = Self.pinKey(pin.guid, in: workspace)
         guard let page = pages[key], let url = page.view.url else { return nil }
         let front = currentTabId == key
-        let state = page.view.interactionState
+        let state = page.keptState?.state
         let first = model.children(of: workspace).first?.id
         guard let id = await model.addTab(to: workspace, url: url, before: first) else { return nil }
         if let state { keepOffloaded(id, state: state, address: url.absoluteString) }
@@ -1839,8 +1905,8 @@ final class Browser {
     func handOver(_ tab: OutlineRow, toPin guid: String) {
         guard let workspace = model.workspace(of: tab.id) else { return }
         let key = Self.pinKey(guid, in: workspace)
-        if let page = pages[tab.id], let state = page.view.interactionState {
-            keepOffloaded(key, state: state, address: page.view.url?.absoluteString, from: page)
+        if let page = pages[tab.id], let kept = page.keptState {
+            keepOffloaded(key, state: kept.state, address: kept.address, from: page)
         }
         frontTabs[workspace] = key
     }
@@ -1858,7 +1924,7 @@ final class Browser {
             Task { await self.openNewTab(url, in: workspace) }
         }
         if let restored = offloaded.take(key) {
-            page.restore(restored.state)
+            page.restore(restored.state, at: restored.address)
             page.startsSaved(restored.savedPage ?? restored.address.flatMap(URL.init(string:)))
         } else if let saved {
             page.load(saved)
@@ -2291,6 +2357,7 @@ final class Page: NSObject, WKNavigationDelegate {
             return
         }
         appLoading = true
+        restored = false
         failure = nil
         crashes = Crashes()
         lift([.hold])
@@ -2308,6 +2375,15 @@ final class Page: NSObject, WKNavigationDelegate {
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
     ) {
         preferences.allowsContentJavaScript = scriptAllowed(navigationAction, webView)
+        if restored {
+            restored = false
+            if navigationAction.targetFrame?.isMainFrame == true, navigationAction.navigationType == .other,
+               let step = restoredStep(to: navigationAction.request.url) {
+                decisionHandler(.cancel, preferences)
+                webView.go(to: step)
+                return
+            }
+        }
         if let signedIn = signInToKagi(navigationAction) {
             decisionHandler(.cancel, preferences)
             signedIn()
@@ -3130,13 +3206,45 @@ final class Page: NSObject, WKNavigationDelegate {
     }
 
     /// Puts back the state of a page let go (`WKWebView.interactionState`),
-    /// which loads its page.
-    func restore(_ state: Any) {
+    /// which loads its page. `address` is where that state is.
+    func restore(_ state: Any, at address: String?) {
         if waitsForRules {
-            waiting.append { [weak self] in self?.restore(state) }
+            pendingRestore = (state, address)
+            waiting.append { [weak self] in self?.restore(state, at: address) }
             return
         }
+        pendingRestore = nil
         view.interactionState = state
+        restored = true
+    }
+
+    /// Set by a restore until the page's next navigation or Sval's own
+    /// next load. A state taken while a load was under way holds that
+    /// load's address, and WebKit loads it afresh in place of going to the
+    /// restored entry (`WebPageProxy::restoreFromSessionState`). For a Back
+    /// or Forward still loading, that address is the entry it was going
+    /// to, the one restored or its neighbour, and the fresh load would put
+    /// a second copy of it where the forward history was.
+    private var restored = false
+
+    /// The restored entry at `url`, the one restored or either neighbour,
+    /// that a Back or Forward under way was going to.
+    private func restoredStep(to url: URL?) -> WKBackForwardListItem? {
+        let list = view.backForwardList
+        return [list.currentItem, list.backItem, list.forwardItem].lazy.compactMap { $0 }.first { $0.url == url }
+    }
+
+    /// The state a restore waits to put back, with its address.
+    private var pendingRestore: (state: Any, address: String?)?
+
+    /// The page's state to keep as it is let go or saved, with the address
+    /// it is at: the state it waits to restore, or nil while it has shown
+    /// nothing. The view's own state before then is an empty history,
+    /// which would replace the one the tab had.
+    var keptState: (state: Any, address: String?)? {
+        if let pendingRestore { return pendingRestore }
+        guard view.backForwardList.currentItem != nil, let state = view.interactionState else { return nil }
+        return (state, view.url?.absoluteString)
     }
 
     /// Takes `blocker`'s rules. Until the blocker is `ready`, the page's
@@ -3189,6 +3297,7 @@ final class Page: NSObject, WKNavigationDelegate {
 
     func close() {
         waiting = []
+        pendingRestore = nil
         // A private page's Picture in Picture would outlive its tab.
         if isPrivate { view.closeAllMediaPresentations(completionHandler: nil) }
         view.pauseAllMediaPlayback()
@@ -3622,5 +3731,18 @@ struct PlayingFrames {
         muted[frame] = playing ? isMuted : nil
         if playing && isUnseen { unseen.insert(frame) } else { unseen.remove(frame) }
         return (perceived, allMuted) != was
+    }
+}
+
+/// A background task begun as the app leaves the front, ended once, by
+/// whichever comes first: its work done or its time out.
+@MainActor
+private final class BackgroundTask {
+    var id = UIBackgroundTaskIdentifier.invalid
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
     }
 }

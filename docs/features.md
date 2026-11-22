@@ -380,11 +380,12 @@ control of what you see and what is sent to websites.
 ## Sval for iPhone
 
 - **Tabs keep their history.** A tab you come back to still has its
-  Back and Forward history and its place on the page, even after iOS
-  closes Sval in the background. The iPhone app keeps the pages of the
-  tabs and pins you used last loaded. To free memory, the app saves only
-  the history and place of the rest. Clear Browsing Data deletes that saved
-  history, and a private tab never saves it to your phone.
+  Back and Forward history and its place on the page, even after Sval
+  ends. That holds whether you closed Sval from the app switcher, Sval
+  crashed, or iOS closed Sval in the background. The iPhone app keeps your
+  most recently used tabs and pins loaded, and saves every tab's history
+  and place on your phone. Clear Browsing Data deletes that saved history.
+  A private tab's history and place never reach your phone.
 - **Switch tabs from the address bar.** Hold the address bar and slide to
   move through your tabs. The iPhone app shows a picture of each tab's page
   and of each pin's page you've opened.
