@@ -390,6 +390,8 @@ control of what you see and what is sent to websites.
   and of each pin's page you've opened.
 - **A page that keeps crashing.** When a page crashes three times within a
   minute, the iPhone app stops reloading it and shows Page cannot load.
+- **Private tabs.** A link you tap in a private tab opens in Sval, even when
+  another app on your iPhone could open that link.
 
 ## Sync
 

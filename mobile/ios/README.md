@@ -134,7 +134,9 @@ for testing.
 The app logs to the system's log under the subsystem `app.sval.ios`. A
 Debug build also writes the same lines to `Library/Caches/diagnostics.log`
 in its container (`Diagnostics.swift`). The log never names a page, a site,
-or a Workspace. To launch the app and follow its log:
+or a Workspace. The app logs any line that only private browsing causes at
+the debug level and leaves that line out of the file, so iOS keeps the line
+in memory only. To launch the app and follow its log:
 
     mobile/ios/watch-log.sh "$DEVICE" phone.log --launch
 

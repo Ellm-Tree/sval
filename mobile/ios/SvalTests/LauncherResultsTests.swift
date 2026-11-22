@@ -60,10 +60,10 @@ final class LauncherResultsTests: XCTestCase {
     }
 
     private func input(inPrivate: Bool = false, currentPin: String? = nil,
-                       settings: [String: Any] = [:]) -> Input {
+                       settings: [String: Any] = [:], visited: [HistoryPage] = []) -> Input {
         let index = LauncherIndex(
             generation: 1, tabs: rows.map { (row: $0, title: $0.title, workspace: $0.parentId, isPrivate: $0.parentId == "p") },
-            pins: ["w1": pins], favorites: favorites, history: .init(history), settings: .init(settings))
+            pins: ["w1": pins], favorites: favorites, history: .init(history + visited), settings: .init(settings))
         let context = LauncherResults.Context(
             inPrivate: inPrivate, currentTabId: inPrivate ? nil : "front", workspaceId: inPrivate ? "p" : "w1",
             currentPin: currentPin, usedAt: used)
@@ -142,6 +142,16 @@ final class LauncherResultsTests: XCTestCase {
     /// page open as a tab or offered as a Favorite shows once.
     func testHistoryListsBoundaryMatchesFirstAndEachPageOnce() {
         XCTAssertEqual(results("reading").history.map(\.url), ["https://blog.example/", "https://x.example/spreading"])
+    }
+
+    /// A page open in a private tab stays in the history the user's
+    /// Workspaces list, where a page open in one of their own tabs is left
+    /// out.
+    func testAPrivateTabsPageStaysInHistory() {
+        let visited = [page("Reading Secret", "https://secret.example/", frecency: 95),
+                       page("Old Reading", "https://old.example/", frecency: 94)]
+        XCTAssertEqual(results("reading", input(visited: visited)).history.map(\.url),
+                       ["https://blog.example/", "https://secret.example/", "https://x.example/spreading"])
     }
 
     func testEachSuggestionSwitchTurnsItsSectionOff() {

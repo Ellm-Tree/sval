@@ -98,6 +98,10 @@ struct CopyButton: View {
     /// code: it stays off Universal Clipboard and leaves the pasteboard
     /// after `secretLifetime`.
     var secret = false
+    /// Whether the copy stays on this device, off Universal Clipboard, for
+    /// as long as any other: what is copied while the private session is
+    /// in front.
+    var localOnly = false
     /// The address `text` spells, copied as a URL for apps that take one.
     var url: URL?
     /// Drawn as its glyph alone in a frame of this size, as in a bar.
@@ -112,6 +116,10 @@ struct CopyButton: View {
                 UIPasteboard.general.setItems(
                     [[UTType.utf8PlainText.identifier: text]],
                     options: [.localOnly: true, .expirationDate: Date.now.addingTimeInterval(Self.secretLifetime)])
+            } else if localOnly {
+                let item: [String: Any] = if let url { [UTType.url.identifier: url] }
+                    else { [UTType.utf8PlainText.identifier: text] }
+                UIPasteboard.general.setItems([item], options: [.localOnly: true])
             } else if let url {
                 UIPasteboard.general.url = url
             } else {

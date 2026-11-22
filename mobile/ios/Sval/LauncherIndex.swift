@@ -105,7 +105,9 @@ struct LauncherIndex: Sendable {
     /// Every tab the phone can open, in tree order. A split's picker is no
     /// page, and is left out.
     let tabs: [Tab]
-    /// The address of every tab, the ones left out of `tabs` included.
+    /// The address of every tab but a private one, the ones left out of
+    /// `tabs` included. History leaves these out, and leaving out a private
+    /// tab's would show which page the private session has open.
     let tabURLs: Set<String>
     /// Each Workspace's pins to web pages, in the row's order.
     let pins: [String: [Entry]]
@@ -140,7 +142,7 @@ struct LauncherIndex: Sendable {
         /// Makes an entry for each of `inputs`, taking `previous`'s where
         /// its tab's input is the same.
         init(_ inputs: [TabInput], reusing previous: Tabs? = nil) {
-            tabURLs = Set(inputs.compactMap(\.row.url))
+            tabURLs = Set(inputs.lazy.filter { !$0.isPrivate }.compactMap(\.row.url))
             var made: [String: (input: TabInput, tab: Tab?)] = [:]
             made.reserveCapacity(inputs.count)
             tabs = inputs.compactMap { input in

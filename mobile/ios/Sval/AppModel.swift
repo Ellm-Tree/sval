@@ -766,12 +766,12 @@ final class AppModel {
             try document.applyBatch(opsJson: String(decoding: json, as: UTF8.self), deviceId: privateDevice,
                                     now: privateClock.now())
         } catch {
-            Diagnostics.log("private: the session did not open: \(Diagnostics.name(error))")
+            Diagnostics.debug("private: the session did not open: \(Diagnostics.name(error))")
             return nil
         }
         privateDocument = document
         privateWorkspace = id
-        Diagnostics.log("private: a session opened")
+        Diagnostics.debug("private: a session opened")
         await refreshRows()
         return id
     }
@@ -796,7 +796,7 @@ final class AppModel {
         privateDevice = Data()
         privateMedia = [:]
         privateProtections = [:]
-        Diagnostics.log("private: the session ended")
+        Diagnostics.debug("private: the session ended")
         await refreshRows()
     }
 
@@ -820,7 +820,7 @@ final class AppModel {
             }
         }
         guard !crosses else {
-            Diagnostics.log("private: a change between the session and a Workspace was refused")
+            Diagnostics.debug("private: a change between the session and a Workspace was refused")
             return false
         }
         do {
@@ -828,7 +828,7 @@ final class AppModel {
             try privateDocument.applyBatch(opsJson: String(decoding: json, as: UTF8.self), deviceId: privateDevice,
                                            now: privateClock.now())
         } catch {
-            Diagnostics.log("private: a change was refused: \(Diagnostics.name(error))")
+            Diagnostics.debug("private: a change was refused: \(Diagnostics.name(error))")
             return false
         }
         await refreshRows()
@@ -1617,8 +1617,10 @@ final class AppModel {
     /// (engine rule 5), and the id is the one way it comes back as itself.
     /// The tab goes back under its own name, with its label. A place
     /// another device has since deleted gives way to the end of its
-    /// Workspace, or of the Workspace shown.
-    func reopen(_ row: OutlineRow, at place: Place, workspace: String?) async -> String? {
+    /// Workspace, or of the Workspace shown. A tab that was private goes
+    /// back into its own session or nowhere: the Workspace shown may be
+    /// one that syncs.
+    func reopen(_ row: OutlineRow, at place: Place, workspace: String?, wasPrivate: Bool) async -> String? {
         guard let address = row.url, let url = URL(string: address) else { return nil }
         let parent: String
         let previous: String?
@@ -1627,7 +1629,8 @@ final class AppModel {
             parent = place.parent
             previous = sibling(place.previous, in: parent)
             next = sibling(place.next, in: parent)
-        } else if let home = [workspace, browser.workspaceId].compactMap({ $0 }).first(where: { self.row($0) != nil }) {
+        } else if let home = [workspace, wasPrivate ? nil : browser.workspaceId].compactMap({ $0 })
+                    .first(where: { self.row($0) != nil }) {
             parent = home
             previous = children(of: home).last?.id
         } else {

@@ -402,13 +402,16 @@ struct WorkspaceSheet: View {
     /// Close: the ticked tabs, at once, with one Undo.
     private func closeAll(_ rows: [OutlineRow]) {
         endEditing()
+        // Asked before the close, which drops the tabs from the private
+        // session's ids.
+        let wasPrivate = model.isPrivate(rows.first?.id ?? "")
         Task {
             var entries: [Browser.ClosedTab] = []
             for row in rows where row.kind == .tab {
                 if let entry = await browser.close(row), Browser.openable(row) != nil { entries.append(entry) }
             }
-            guard !model.isPrivate(rows.first?.id ?? "") else {
-                toasts.show(.closed(rows.count))
+            guard !wasPrivate else {
+                if model.privateWorkspace != nil { toasts.show(.closed(rows.count)) }
                 return
             }
             toasts.show(.closed(rows.count) {
@@ -1072,7 +1075,10 @@ struct WorkspaceSheet: View {
         let all = model.children(of: split.id)
         let at = all.firstIndex { $0.id == pane.id } ?? 0
         var tab = [MenuItem(title: "Rename Tab…", symbol: "pencil", action: rename)]
-        if let url = Browser.openable(pane) { tab.append(favoriteItem(url, title: pane.title)) }
+        // Favorites sync, so a private pane offers none, as `tabMenu`.
+        if !model.isPrivate(pane.id), let url = Browser.openable(pane) {
+            tab.append(favoriteItem(url, title: pane.title))
+        }
         // The tree's tray lays the panes side by side.
         let moves = PaneMove.labels(sideways: true)
         let splitItems = [
@@ -1228,8 +1234,16 @@ struct WorkspaceSheet: View {
     }
 
     /// Closes every pane at once, as one write, and offers Undo, which
-    /// brings the split back with its pages.
+    /// brings the split back with its pages. A private split's close has no
+    /// Undo, as a private tab's has none.
     func closeSplit(_ split: OutlineRow, panes: [OutlineRow]) {
+        if model.isPrivate(split.id) {
+            Task {
+                _ = await browser.closeSplit(split)
+                if model.row(split.id) == nil { toasts.show(.closed(panes.count)) }
+            }
+            return
+        }
         Task {
             guard let undo = await browser.closeSplit(split) else { return }
             toasts.show(.closed(panes.count) { Task { await browser.reopenSplit(undo) } })
@@ -1241,8 +1255,8 @@ struct WorkspaceSheet: View {
         // the tab (13d).
         if model.isPrivate(row.id) {
             Task {
-                guard await browser.close(row) != nil else { return }
-                if model.privateWorkspace != nil { toasts.show(.closed(1)) }
+                await browser.close(row)
+                if model.row(row.id) == nil, model.privateWorkspace != nil { toasts.show(.closed(1)) }
             }
             return
         }

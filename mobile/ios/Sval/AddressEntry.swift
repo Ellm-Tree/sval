@@ -410,7 +410,7 @@ struct AddressEntry: View {
                                 .frame(width: 44, height: 48)
                         }
                         .accessibilityLabel("Share")
-                        CopyButton(title: "Copy Address", text: url.absoluteString, url: url,
+                        CopyButton(title: "Copy Address", text: url.absoluteString, localOnly: browser.inPrivate, url: url,
                                    glyphFrame: CGSize(width: 44, height: 48))
                             .font(.system(size: 17, weight: .medium))
                     }

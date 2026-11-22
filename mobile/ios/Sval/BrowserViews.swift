@@ -406,6 +406,7 @@ struct BrowserView: View {
             Task { await model.separate(split.split) }
         case .rename:
             renamingSplit = split.split
+        // A private pane or split closes with no entry, so with no Undo.
         case .closeTab:
             Task {
                 guard let entry = await browser.close(pane) else { return }
@@ -468,12 +469,12 @@ struct BrowserView: View {
         .frame(width: 0, height: 0)
     }
 
-    /// Closes the tab in front, with Undo, as its row's × does.
+    /// Closes the tab in front, with Undo, as its row's × does. A private
+    /// tab closes with no entry, so with no Undo.
     private func closeFront() {
         guard let row = browser.currentTabId.flatMap(model.row), row.kind == .tab else { return }
-        let isPrivate = model.isPrivate(row.id)
         Task {
-            guard let entry = await browser.close(row), !isPrivate else { return }
+            guard let entry = await browser.close(row) else { return }
             toasts.show(.closed(1, title: row.displayTitle) { Task { await browser.reopen(entry) } })
         }
     }
@@ -543,7 +544,7 @@ struct BrowserView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.well, in: .rect(cornerRadius: 12))
             HStack(spacing: 10) {
-                CopyButton(title: "Copy Address", text: address)
+                CopyButton(title: "Copy Address", text: address, localOnly: browser.inPrivate)
                     .foregroundStyle(theme.text)
                 Button("Close Tab", systemImage: "xmark", role: .destructive) {
                     Task { await browser.close(row) }

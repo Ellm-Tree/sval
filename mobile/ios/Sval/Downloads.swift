@@ -9,7 +9,9 @@ import WebKit
 /// which the Files app shows under On My iPhone › Sval
 /// (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`), and opens
 /// in Quick Look once it has arrived. A private tab's download is kept the
-/// same way, since the user asked for the file, and nothing records it.
+/// same way, since the user asked for the file, and nothing records it. It
+/// shows only while the private session is in front, and ends with the
+/// session if it is still under way.
 @MainActor
 @Observable
 final class Downloads: NSObject, WKDownloadDelegate {
@@ -18,6 +20,8 @@ final class Downloads: NSObject, WKDownloadDelegate {
         let download: WKDownload
         /// The tab that shows the download, when it had shown nothing.
         let tab: String?
+        /// Whether a private tab started it.
+        let isPrivate: Bool
         var name: String
         var fraction: Double = 0
         var destination: URL?
@@ -32,15 +36,49 @@ final class Downloads: NSObject, WKDownloadDelegate {
     private(set) var tabs: [String: URL?] = [:]
     /// The file just downloaded, which shows in Quick Look, the system's
     /// viewer with Share, Save to Files and Markup (`BrowserView`).
-    var preview: URL?
+    var preview: URL? {
+        didSet { if preview == nil { previewIsPrivate = false } }
+    }
+    @ObservationIgnored private var previewIsPrivate = false
     /// Told when a download fails, with the file's name.
     @ObservationIgnored var onFailure: ((String) -> Void)?
+    /// Whether the private session is in front.
+    @ObservationIgnored var inPrivate: () -> Bool = { false }
+
+    /// The downloads under way that show: a private tab's only while the
+    /// private session is in front.
+    var shown: [Item] {
+        let inPrivate = inPrivate()
+        return items.filter { !$0.isPrivate || inPrivate }
+    }
+
+    /// Shows `file` in Quick Look.
+    func show(_ file: URL, isPrivate: Bool) {
+        preview = file
+        previewIsPrivate = isPrivate
+    }
+
+    /// Takes a private tab's file out of Quick Look, as the private session
+    /// leaves the front.
+    func hidePrivatePreview() {
+        if previewIsPrivate { preview = nil }
+    }
+
+    /// Cancels every private tab's download still under way, as the private
+    /// session ends.
+    func endPrivateSession() {
+        for item in items where item.isPrivate {
+            item.download.cancel(nil)
+            finish(ObjectIdentifier(item.download))
+        }
+        hidePrivatePreview()
+    }
 
     static var folder: URL { URL.documentsDirectory.appending(path: "Downloads", directoryHint: .isDirectory) }
 
     /// Saves `download` when the user `asked` for it. A page's script could
     /// otherwise save file after file, each opening over the page.
-    func start(_ download: WKDownload, asked: Bool, tab: String?) {
+    func start(_ download: WKDownload, asked: Bool, tab: String?, isPrivate: Bool) {
         guard asked else {
             download.cancel(nil)
             Diagnostics.log("downloads: refused one the user didn't start")
@@ -48,7 +86,7 @@ final class Downloads: NSObject, WKDownloadDelegate {
         }
         download.delegate = self
         let name = download.originalRequest?.url?.lastPathComponent ?? ""
-        items.append(Item(download: download, tab: tab, name: name))
+        items.append(Item(download: download, tab: tab, isPrivate: isPrivate, name: name))
         if let tab { tabs[tab] = .some(nil) }
         let key = ObjectIdentifier(download)
         watches[key] = download.progress.observe(\.fractionCompleted) { [weak self] progress, _ in
@@ -93,15 +131,17 @@ final class Downloads: NSObject, WKDownloadDelegate {
         if let tab = item?.tab, tabs[tab] != nil { tabs[tab] = destination }
         finish(key)
         Diagnostics.log("downloads: finished")
-        if let destination { preview = destination }
+        if let item, let destination, !item.isPrivate || inPrivate() {
+            show(destination, isPrivate: item.isPrivate)
+        }
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
         let key = ObjectIdentifier(download)
-        let name = items.first { ObjectIdentifier($0.download) == key }?.name ?? ""
+        let item = items.first { ObjectIdentifier($0.download) == key }
         finish(key)
         Diagnostics.log("downloads: failed: \(Diagnostics.name(error))")
-        onFailure?(name)
+        if item?.isPrivate != true || inPrivate() { onFailure?(item?.name ?? "") }
     }
 
     // MARK: Parts
@@ -150,8 +190,9 @@ struct DownloadCapsule: View {
 
     var body: some View {
         let downloads = model.browser.downloads
-        if let item = downloads.items.last {
-            let title = downloads.items.count > 1 ? "\(item.name) and \(downloads.items.count - 1) more" : item.name
+        let shown = downloads.shown
+        if let item = shown.last {
+            let title = shown.count > 1 ? "\(item.name) and \(shown.count - 1) more" : item.name
             HStack(spacing: 0) {
                 HStack(spacing: 10) {
                     Gauge(value: item.fraction) { EmptyView() }
@@ -206,7 +247,9 @@ struct DownloadPage: View {
         let name = file?.lastPathComponent ?? URL(string: address)?.lastPathComponent ?? address
         TabNotice(symbol: "arrow.down.doc", title: name, address: address, row: row, workspace: workspace) {
             if let file {
-                Button("Open", systemImage: "doc.text.magnifyingglass") { model.browser.downloads.preview = file }
+                Button("Open", systemImage: "doc.text.magnifyingglass") {
+                    model.browser.downloads.show(file, isPrivate: model.isPrivate(row.id))
+                }
                     .foregroundStyle(theme.text)
             }
         }

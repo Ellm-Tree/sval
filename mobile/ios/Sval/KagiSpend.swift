@@ -190,7 +190,7 @@ enum KagiSpend {
                 case .ready:
                     let token = tokens.take()
                     if token != nil {
-                        Diagnostics.log("kagi: a private page's request signed in with Privacy Pass, \(tokens.count) left")
+                        Diagnostics.debug("kagi: a private page's request signed in with Privacy Pass, \(tokens.count) left")
                     }
                     replyHandler(token.map { ["token": $0] } ?? [:], nil)
                 case .out:

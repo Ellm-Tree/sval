@@ -29,7 +29,10 @@ final class Browser {
     private(set) var workspaceId: String? {
         didSet {
             refreshBar()
-            if (oldValue.map(model.isPrivate) ?? false) != inPrivate { pauseOtherSide() }
+            if (oldValue.map(model.isPrivate) ?? false) != inPrivate {
+                pauseOtherSide()
+                if !inPrivate { downloads.hidePrivatePreview() }
+            }
             // The private session's Workspace is never saved.
             guard !(workspaceId.map(model.isPrivate) ?? false) else { return }
             UserDefaults.standard.set(workspaceId, forKey: Self.workspaceKey)
@@ -124,14 +127,15 @@ final class Browser {
     /// share media, its controls or its sound, either way. Every page is
     /// paused, as media a page's frames don't report plays as well.
     private func pauseOtherSide() {
-        let other = pages.filter { model.isPrivate($0.key) != inPrivate }
+        let other = pages.filter { $0.value.isPrivate != inPrivate }
         for (id, page) in other {
             page.view.pauseAllMediaPlayback(completionHandler: nil)
             if page.playing || media[id] != nil {
                 page.view.evaluateJavaScript(MediaInfo.holdScript, in: nil, in: .defaultClient)
             }
         }
-        mediaLog("\(inPrivate ? "entered" : "left") the private session, \(other.count) page(s) of the other side paused")
+        mediaLog("\(inPrivate ? "entered" : "left") the private session, \(other.count) page(s) of the other side paused",
+                 privateOnly: true)
     }
 
     /// Pauses every private page's media and holds it suspended until Sval
@@ -140,22 +144,25 @@ final class Browser {
     /// (`HTMLMediaElement::isNowPlayingEligible`), whatever its script
     /// does. It is muted as well, and held as a pause from Sval's controls
     /// holds it, once Sval is back, until the user next taps in the page.
+    /// Its Picture in Picture and fullscreen end, which would show it
+    /// outside Sval.
     private func pausePrivateMedia() {
-        let held = pages.filter { model.isPrivate($0.key) }
+        let held = pages.filter { $0.value.isPrivate }
         guard !held.isEmpty else { return }
         for (id, page) in held {
+            page.view.closeAllMediaPresentations(completionHandler: nil)
             page.suspend(.privacy)
             if page.playing || media[id] != nil {
                 page.view.evaluateJavaScript(MediaInfo.holdScript, in: nil, in: .defaultClient)
             }
             page.runInMediaFrames(MediaInfo.muteForPrivacy)
         }
-        mediaLog("Sval lost focus, \(held.count) private page(s) paused, suspended and muted")
+        mediaLog("Sval lost focus, \(held.count) private page(s) paused, suspended and muted", privateOnly: true)
     }
 
     /// Unmutes what `pausePrivateMedia` muted, and lifts its suspension.
     private func unmutePrivateMedia() {
-        for (id, page) in pages where model.isPrivate(id) {
+        for page in pages.values where page.isPrivate {
             page.runInMediaFrames(MediaInfo.unmuteAfterPrivacy)
             page.lift([.privacy])
         }
@@ -166,10 +173,13 @@ final class Browser {
 
     /// Closes the private session's pages and drops its store, so nothing
     /// of the session stays, even in memory, and goes back to the user's
-    /// Workspaces.
+    /// Workspaces. Every private page closes, told by the page itself: a
+    /// window a private page opened has a page before it has a tab.
     func endPrivateSession(_ ids: Set<String>) {
-        for id in ids {
+        for id in ids.union(pages.filter { $0.value.isPrivate }.keys) {
             pages.removeValue(forKey: id)?.close()
+            windowsOpening[id] = nil
+            openers[id] = nil
             offloaded.forget(id)
             visits[id] = nil
             usedAt[id] = nil
@@ -181,6 +191,7 @@ final class Browser {
             restoring.remove(id)
         }
         frontTabs = frontTabs.filter { !ids.contains($0.value) }
+        downloads.endPrivateSession()
         sessionStore = nil
         PageZoom.endSession()
         let wasPrivate = currentTabId.map(ids.contains) ?? false || workspaceId.map(ids.contains) ?? false
@@ -544,6 +555,7 @@ final class Browser {
         blocker = made
         currentTabId = UserDefaults.standard.string(forKey: Self.currentKey)
         workspaceId = UserDefaults.standard.string(forKey: Self.workspaceKey)
+        downloads.inPrivate = { [weak self] in self?.inPrivate ?? false }
         blocker.onChange = { [weak self] in
             guard let self else { return }
             for page in pages.values { page.useRules(blocker.rules) }
@@ -566,18 +578,19 @@ final class Browser {
             guard let self, keepPlaying else { return [] }
             // Lifting WebKit's suspension in the background would lift
             // Sval's own too.
-            let shown = pages.values.filter { !model.isPrivate($0.tabId) && $0.suspensions.isEmpty }
+            let shown = pages.values.filter { !$0.isPrivate && $0.suspensions.isEmpty }
             return stagedPages().compactMap { view in
                 shown.first { $0.view === view }.map { (view: view, playing: $0.playing) }
             }
         }
-        // While a private tab is in front, the screen is covered before
-        // iOS takes the app switcher's snapshot, which it saves to disk.
+        // While the private session is in front, its home with no tab
+        // included, the screen is covered before iOS takes the app
+        // switcher's snapshot, which it saves to disk.
         for name in [UIApplication.willResignActiveNotification, UIApplication.didEnterBackgroundNotification] {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     if let front = self?.currentTabId { self?.takePreview(front) }
-                    if self?.privateInFront == true { PrivacyCover.show() }
+                    if self?.inPrivate == true { PrivacyCover.show() }
                     if name == UIApplication.willResignActiveNotification {
                         self?.pausePrivateMedia()
                         self?.mediaLog("Sval lost focus")
@@ -850,19 +863,19 @@ final class Browser {
     static let recentlyClosedLimit = 10
 
     /// Closes a tab, keeping what reopens it. Returns the entry, or nil when
-    /// the tab didn't close.
+    /// the tab didn't close or was private: nothing reopens a private tab,
+    /// which would otherwise outlive its session.
     @discardableResult
     func close(_ row: OutlineRow) async -> ClosedTab? {
         guard row.kind == .tab else { return nil }
-        let entry = ClosedTab(
-            row: row, place: model.closedPlace(of: row), workspace: model.workspace(of: row.id),
-            state: pages[row.id]?.view.interactionState ?? offloaded.saved(row.id)?.state)
         // Asked before the close: closing drops the tab from the private
         // session's ids, and the last tab ends the session.
-        let wasPrivate = model.isPrivate(row.id)
+        let entry = model.isPrivate(row.id) ? nil : ClosedTab(
+            row: row, place: model.closedPlace(of: row), workspace: model.workspace(of: row.id),
+            state: pages[row.id]?.view.interactionState ?? offloaded.saved(row.id)?.state)
         guard await model.closeTab(row) else { return nil }
         offloaded.forget(row.id)
-        if Self.openable(row) != nil, !wasPrivate {
+        if let entry, Self.openable(row) != nil {
             recentlyClosed.insert(entry, at: 0)
             recentlyClosed = Array(recentlyClosed.prefix(Self.recentlyClosedLimit))
         }
@@ -880,8 +893,14 @@ final class Browser {
         let focused: Int
     }
 
-    /// Closes a split and every pane, keeping what reopens it.
+    /// Closes a split and every pane, keeping what reopens it. Returns the
+    /// entry, or nil when the split didn't close or was private, as
+    /// `close` does.
     func closeSplit(_ split: OutlineRow) async -> ClosedSplit? {
+        guard !model.isPrivate(split.id) else {
+            _ = await model.closeSplit(split)
+            return nil
+        }
         let panes = model.children(of: split.id).filter { $0.kind == .tab }
         let focus = focusedPane(of: split.id, among: panes.map(\.id))
         let entry = ClosedSplit(
@@ -914,7 +933,9 @@ final class Browser {
     func reopen(_ entry: ClosedTab) async {
         recentlyClosed.removeAll { $0.id == entry.id }
         let place = entry.place ?? entry.workspace.map { AppModel.Place(parent: $0, previous: nil) }
-        guard let place, let id = await model.reopen(entry.row, at: place, workspace: entry.workspace) else {
+        // `close` keeps no entry for a private tab.
+        guard let place, let id = await model.reopen(entry.row, at: place, workspace: entry.workspace,
+                                                     wasPrivate: false) else {
             Diagnostics.log("tabs: a closed tab could not reopen")
             return
         }
@@ -1143,7 +1164,7 @@ final class Browser {
     var mediaTab: String? {
         guard keepPlaying else { return nil }
         return media.keys
-            .filter { $0 != currentTabId && mediaShown($0) && model.isPrivate($0) == inPrivate }
+            .filter { $0 != currentTabId && mediaShown($0) && pages[$0]?.isPrivate == inPrivate }
             .max { media[$0]!.startedAt < media[$1]!.startedAt }
     }
 
@@ -1153,18 +1174,23 @@ final class Browser {
     private static func tag(_ id: String?) -> String { id.map { String($0.prefix(6)) } ?? "none" }
 
     /// Every media fact the bar and the window act on, in one line: the tab
-    /// in front, the setting, the side, what the bar shows, the pages kept
-    /// in the window, and each tab with media or a page reporting any.
-    private func mediaSnapshot() -> String {
+    /// in front, the setting, what the bar shows, the pages kept in the
+    /// window, and each tab with media or a page reporting any. With
+    /// `tagsPrivate`, the side in front and which pages are private too,
+    /// for a line that stays in memory (`Diagnostics.debug`).
+    private func mediaSnapshot(tagsPrivate: Bool) -> String {
         let now = Date.now
-        var parts = ["front \(Self.tag(currentTabId))", "keep playing \(keepPlaying ? "on" : "off")",
-                     inPrivate ? "in private" : "out of private"]
+        var parts = ["front \(Self.tag(currentTabId))", "keep playing \(keepPlaying ? "on" : "off")"]
+        if tagsPrivate { parts.append(inPrivate ? "in private" : "out of private") }
         let front = currentTabId.flatMap { mediaShown($0) ? $0 : nil }
         parts.append("bar \(front.map { "front \(Self.tag($0))" } ?? mediaTab.map { "tab \(Self.tag($0))" } ?? "no media")"
                      + (frontAsks ? ", ask" : "") + (frontDenied ? ", denied mark" : ""))
         parts.append("window [\(stagedIds().map { Self.tag($0) }.joined(separator: " "))]")
+        // Only a private page is suspended for privacy, so the reason
+        // tags its tab.
+        let suspensions = { (page: Page) in page.suspensions.filter { tagsPrivate || $0 != .privacy } }
         let ids = Set(media.keys).union(pages.filter {
-            $0.value.playing || $0.value.inPictureInPicture || !$0.value.suspensions.isEmpty
+            $0.value.playing || $0.value.inPictureInPicture || !suspensions($0.value).isEmpty
         }.keys)
         for id in ids.sorted() {
             var bits: [String] = []
@@ -1176,13 +1202,13 @@ final class Browser {
             if let page = pages[id] {
                 if page.playing != (media[id]?.state == .playing) { bits.append("page says \(page.playing ? "playing" : "silent")") }
                 if page.inPictureInPicture { bits.append("PiP") }
-                if !page.suspensions.isEmpty {
-                    bits.append("suspended \(page.suspensions.sorted().map(\.rawValue).joined(separator: "+"))")
+                if !suspensions(page).isEmpty {
+                    bits.append("suspended \(suspensions(page).sorted().map(\.rawValue).joined(separator: "+"))")
                 }
+                if tagsPrivate, page.isPrivate { bits.append("private") }
             } else {
                 bits.append("no page")
             }
-            if model.isPrivate(id) { bits.append("private") }
             if stopped.contains(id) { bits.append("stopped") }
             if mediaShown(id) { bits.append("shown") }
             parts.append("\(Self.tag(id)) \(bits.joined(separator: " "))")
@@ -1190,9 +1216,12 @@ final class Browser {
         return parts.joined(separator: "; ")
     }
 
-    /// Logs a media event with the whole media state after it.
-    func mediaLog(_ event: String) {
-        Diagnostics.log("media: \(event) | \(mediaSnapshot())")
+    /// Logs a media event with the whole media state after it. An event
+    /// only the private session or a private page causes is `privateOnly`,
+    /// and stays in memory.
+    func mediaLog(_ event: String, privateOnly: Bool = false) {
+        let line = "media: \(event) | \(mediaSnapshot(tagsPrivate: privateOnly))"
+        if privateOnly { Diagnostics.debug(line) } else { Diagnostics.log(line) }
     }
 
     /// The pages last kept in the window, to log each change.
@@ -1203,13 +1232,14 @@ final class Browser {
     private func stagedIds() -> [String] {
         _ = mediaClock
         let now = Date.now
-        let behind = pages.keys
-            .filter { id in
+        let behind = pages
+            .filter { id, page in
                 guard id != currentTabId else { return false }
                 if inPictureInPicture(id) { return true }
-                return keepPlaying && model.isPrivate(id) == inPrivate
+                return keepPlaying && page.isPrivate == inPrivate
                     && (mediaShown(id) || (held[id].map { $0 > now } ?? false))
             }
+            .keys
             .sorted { (media[$0]?.startedAt ?? .distantPast) < (media[$1]?.startedAt ?? .distantPast) }
         // A split in front shows its panes itself (`SplitStage`).
         if let split = splitInFront {
@@ -1408,7 +1438,9 @@ final class Browser {
         let state = old.view.interactionState
         old.close()
         media[id] = nil
-        let page = makePage(id, address: nil, opens: nil, pin: false, at: site)
+        // The page's own privacy, fixed when it was made: the session's
+        // ids no longer hold a tab that is closing.
+        let page = makePage(id, address: nil, opens: nil, pin: false, at: site, privately: old.isPrivate)
         if let state {
             page.restore(state)
             if url == nil { restoring.insert(id) }
@@ -1614,7 +1646,7 @@ final class Browser {
         // leaves the tab to show the file (`DownloadPage`).
         page.onDownload = { [weak self, weak page] download, asked in
             let empty = page?.view.backForwardList.currentItem == nil
-            self?.downloads.start(download, asked: asked, tab: empty ? id : nil)
+            self?.downloads.start(download, asked: asked, tab: empty ? id : nil, isPrivate: isPrivate)
         }
         page.onMedia = { [weak self] id, playing, muted, gesture in
             self?.mediaReport(id, playing: playing, muted: muted, gesture: gesture)
@@ -2313,7 +2345,7 @@ final class Page: NSObject, WKNavigationDelegate {
         guard navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url,
               let host = url.host(), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               let choice = mediaChoice?(host) else {
-            decisionHandler(.allow, preferences)
+            decisionHandler(allowing, preferences)
             return
         }
         var covered = false
@@ -2331,7 +2363,18 @@ final class Page: NSObject, WKNavigationDelegate {
         case .keep(let guarding):
             guardDocuments(guarding)
         }
-        decisionHandler(.allow, preferences)
+        decisionHandler(allowing, preferences)
+    }
+
+    /// What lets a load go on. On a plain allow WebKit first offers the
+    /// address to an installed app that claims its link
+    /// (`tryInterceptNavigation`), which would take a private page's
+    /// address out of Sval. A private page answers with WebKit's
+    /// `_WKNavigationActionPolicyAllowWithoutTryingAppLink`, which the SDK
+    /// gives no name.
+    private var allowing: WKNavigationActionPolicy {
+        guard isPrivate else { return .allow }
+        return WKNavigationActionPolicy(rawValue: WKNavigationActionPolicy.allow.rawValue + 2) ?? .allow
     }
 
     /// The token of the Kagi load Sval last started, and that load's
@@ -2367,7 +2410,7 @@ final class Page: NSObject, WKNavigationDelegate {
         switch tokens.state {
         case .ready:
             guard let token = tokens.take() else { return nil }
-            Diagnostics.log("kagi: a private load signed in with Privacy Pass, \(tokens.count) left")
+            Diagnostics.debug("kagi: a private load signed in with Privacy Pass, \(tokens.count) left")
             let asked = byUser || action.navigationType == .linkActivated
             return { [weak self] in
                 guard let self else { return }
@@ -2377,7 +2420,7 @@ final class Page: NSObject, WKNavigationDelegate {
                 view.load(KagiSpend.request(url, token: token))
             }
         case .out:
-            Diagnostics.log("kagi: a private load stopped, this month's tokens are used")
+            Diagnostics.debug("kagi: a private load stopped, this month's tokens are used")
             let page = KagiSpend.outOfTokensPage(until: tokens.outUntil)
             return { [weak self] in self?.view.loadHTMLString(page, baseURL: nil) }
         case .unsupported, .signedOut:
@@ -2398,7 +2441,7 @@ final class Page: NSObject, WKNavigationDelegate {
         let tokens = KagiPrivacyPass.shared
         guard tokens.state == .ready, let token = tokens.take() else { return nil }
         kagiRetried = .now
-        Diagnostics.log("kagi: a spent token was refused, loading again with another")
+        Diagnostics.debug("kagi: a spent token was refused, loading again with another")
         return { [weak self] in
             guard let self else { return }
             kagiToken = token
@@ -3146,6 +3189,8 @@ final class Page: NSObject, WKNavigationDelegate {
 
     func close() {
         waiting = []
+        // A private page's Picture in Picture would outlive its tab.
+        if isPrivate { view.closeAllMediaPresentations(completionHandler: nil) }
         view.pauseAllMediaPlayback()
         pending?.cancel()
         observations.removeAll()
@@ -3513,8 +3558,8 @@ private final class PlaybackReport: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// A plain cover over the whole app while a private tab is in front and the
-/// app is leaving the screen, so the snapshot iOS keeps for the app
+/// A plain cover over the whole app while the private session is in front
+/// and the app is leaving the screen, so the snapshot iOS keeps for the app
 /// switcher shows nothing private. A window of its own above the app's,
 /// shown without becoming key, so the keyboard stays up (Firefox for iOS,
 /// `PrivacyWindowHelper`).

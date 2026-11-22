@@ -17,8 +17,16 @@ enum Diagnostics {
         #endif
     }
 
+    /// A line only the private session or a private page causes, which
+    /// tells when one ran. Logged at the debug level, which the system
+    /// keeps in memory alone (Apple, "Generating log messages from your
+    /// code"), and kept out of a Debug build's file.
+    static func debug(_ line: String) {
+        logger.debug("\(line, privacy: .public)")
+    }
+
     #if DEBUG
-    /// The same lines in a file in the app's caches, which a developer's Mac
+    /// The lines `log` takes in a file in the app's caches, which a developer's Mac
     /// copies off the device (`mobile/ios/watch-log.sh`) without relaunching
     /// the app: reading a device's system log from a Mac takes root. The
     /// file stays readable while the device is locked, and starts again at
