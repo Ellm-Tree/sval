@@ -76,6 +76,25 @@ add_task(async function the_panel_toggle_slides_the_panel_out_and_in() {
   Assert.equal(pushed(), "", "and the page sits beside it, unmoved");
 });
 
+add_task(async function a_see_through_window_slides_as_a_plain_one_does() {
+  const root = document.documentElement;
+  const boxes = ["sval-panel-container", "sidebar-box", "tabbrowser-tabbox"];
+  const transitions = () =>
+    boxes.map(id => {
+      const style = getComputedStyle(document.getElementById(id));
+      return `${id}: ${style.transitionProperty} ${style.transitionDuration}`;
+    });
+  const plain = transitions();
+  root.setAttribute("data-sval-tint", "");
+  root.setAttribute("data-sval-see-through", "");
+  try {
+    Assert.deepEqual(transitions(), plain, "each box keeps its slide");
+  } finally {
+    root.removeAttribute("data-sval-tint");
+    root.removeAttribute("data-sval-see-through");
+  }
+});
+
 add_task(async function a_toggle_that_is_on_is_heard_and_seen_as_on() {
   await checkTogglesShowTheirState(window, "a plain window");
 });

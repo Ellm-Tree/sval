@@ -2135,11 +2135,15 @@ menupopup:not([sval-stem]) {
     /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
     background: var(--sval-tint-accent);
 
-    /* Clear at once: these fade their colour as the window turns inactive
-       (`--inactive-window-transition`), and a fade from an opaque colour
-       would hold it over the window's own until it ends. */
     & :is(body, #browser, #tabbrowser-tabbox, #tabbrowser-tabpanels, #navigator-toolbox, #sval-panel-container, #sidebar-box) {
       background: transparent;
+    }
+
+    /* Clear at once: these fade their colour as the window turns inactive
+       (`--inactive-window-transition`), and a fade from an opaque colour
+       would hold it over the window's own until it ends. The boxes that
+       slide keep their transitions (`sval-header.css`, panel slide). */
+    & :is(body, #navigator-toolbox) {
       transition: none;
     }
   }
