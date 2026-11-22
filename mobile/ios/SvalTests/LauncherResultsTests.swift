@@ -185,6 +185,18 @@ final class LauncherResultsTests: XCTestCase {
         XCTAssertEqual(found.order, [.history, .favorites, .tabs])
     }
 
+    /// Search suggestions take their place in the synced order once the
+    /// engine has some, and none when the order leaves the section out.
+    func testSearchSuggestionsGoInTheirSyncedPlace() {
+        let found = results("list")
+        XCTAssertEqual(found.order(suggesting: false), [.tabs, .favorites, .history])
+        XCTAssertEqual(found.order(suggesting: true), [.tabs, .favorites, .history, .suggestions])
+        let first = results("list", input(settings: ["browser.sval.launcher.order": "suggestions,history,tabs"]))
+        XCTAssertEqual(first.order(suggesting: true), [.suggestions, .history, .tabs])
+        let left = results("list", input(settings: ["browser.sval.launcher.order": "history,tabs"]))
+        XCTAssertEqual(left.order(suggesting: true), [.history, .tabs])
+    }
+
     func testAStrongTabMatchMovesOpenTabsFirst() {
         let order = ["browser.sval.launcher.order": "history,favorites,tabs"]
         XCTAssertEqual(results("reading", input(settings: order)).order, [.tabs, .history, .favorites])

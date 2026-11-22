@@ -10,7 +10,7 @@ import Foundation
 /// A page shows once, in the first section that has it.
 struct LauncherResults: Sendable {
     enum Section: String, Sendable {
-        case tabs, favorites, history
+        case tabs, favorites, history, suggestions
     }
 
     /// A pin or Favorite the Launcher offers.
@@ -55,7 +55,11 @@ struct LauncherResults: Sendable {
     var kept: [Kept] = []
     var history: [HistoryPage] = []
     /// The sections that have rows, in the order the desktop lists them.
+    /// Search suggestions' rows arrive apart (`SearchSuggestions`), so
+    /// `order(suggesting:)` places that section.
     var order: [Section] = []
+    /// Every section, in the order the desktop lists them.
+    private var listed: [Section] = []
     /// What matched, to narrow the next keystroke's search from.
     var matched: Matched?
 
@@ -63,7 +67,8 @@ struct LauncherResults: Sendable {
 
     /// Whether the address bar's synced setting offers `kind`, one of
     /// Firefox's `browser.urlbar.suggest.*`: `openpage` for open tabs,
-    /// `bookmark` for pins and Favorites, `history` for history.
+    /// `bookmark` for pins and Favorites, `history` for history,
+    /// `searches` for search suggestions.
     static func suggests(_ kind: String, settings: [String: Any]) -> Bool {
         settings["browser.urlbar.suggest.\(kind)"] as? Bool ?? true
     }
@@ -164,8 +169,17 @@ struct LauncherResults: Sendable {
             case .tabs: !tabs.isEmpty
             case .favorites: !kept.isEmpty
             case .history: !history.isEmpty
+            case .suggestions: false
             }
         }
+        self.listed = listed
+    }
+
+    /// The sections to show, with Search suggestions in its place when the
+    /// engine has suggestions.
+    func order(suggesting: Bool) -> [Section] {
+        guard suggesting, listed.contains(.suggestions) else { return order }
+        return listed.filter { $0 == .suggestions || order.contains($0) }
     }
 
     /// A pin's or Favorite's score: its page's frecency, or an unvisited

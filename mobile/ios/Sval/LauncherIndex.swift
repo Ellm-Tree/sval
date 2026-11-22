@@ -11,7 +11,8 @@ struct LauncherIndex: Sendable {
     /// The synced settings the Launcher reads.
     struct Settings: Sendable, Equatable {
         /// Each section's synced limit; 0 for a section its address bar
-        /// switch turns off.
+        /// switch turns off. Search suggestions have theirs from
+        /// `SearchSuggestions.limit`.
         let limits: [LauncherResults.Section: Int]
         /// The sections in the synced order, each once.
         let order: [LauncherResults.Section]
@@ -21,7 +22,7 @@ struct LauncherIndex: Sendable {
         let bookmark: Bool
 
         /// The sections the phone has, from `browser.sval.launcher.order`;
-        /// commands and search suggestions are the desktop's alone.
+        /// commands are the desktop's alone.
         private static let defaultOrder = "tabs,favorites,commands,history,suggestions"
         private static let defaultLimits: [LauncherResults.Section: Int] = [.tabs: 4, .favorites: 3, .history: 5]
 

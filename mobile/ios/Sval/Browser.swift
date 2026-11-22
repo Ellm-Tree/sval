@@ -3496,28 +3496,33 @@ enum Address {
 
 /// The search engine the desktop syncs (`SvalSettingsRegistry`'s
 /// `SEARCH_ENGINE_KEY`), by its identifier in Sval's search configuration
-/// (`SvalSearchConfig.sys.mjs`). An engine the phone doesn't know, such as
-/// one the user added on a computer, searches with the default.
+/// (`SvalSearchConfig.sys.mjs`, whose engines `SearchEngines.swift`
+/// lists). An engine the phone doesn't know, such as one the user added on
+/// a computer, searches with the default.
 struct SearchEngine {
     static let key = "sval.search.engine"
     static let defaultId = "ddg"
 
-    /// Each engine's search address and the parameter that takes the terms.
-    static let engines: [String: (base: String, term: String)] = [
-        "ddg": ("https://duckduckgo.com/", "q"),
-        "startpage": ("https://www.startpage.com/sp/search", "query"),
-        "brave": ("https://search.brave.com/search", "q"),
-        "kagi": ("https://kagi.com/search", "q"),
-        "google": ("https://www.google.com/search", "q"),
-        "bing": ("https://www.bing.com/search", "q"),
-        "ecosia": ("https://www.ecosia.org/search", "q"),
-        "qwant": ("https://www.qwant.com/", "q"),
-        "perplexity": ("https://www.perplexity.ai/search", "q"),
-        "youtube": ("https://www.youtube.com/results", "search_query"),
-        "github": ("https://github.com/search", "q"),
-        "openstreetmap": ("https://www.openstreetmap.org/search", "query"),
-        "wikipedia": ("https://en.wikipedia.org/wiki/Special:Search", "search"),
-    ]
+    /// An engine's address for a search or for suggestions: its base, the
+    /// parameter that takes the terms, and the parameters it always sends.
+    struct Address: Sendable {
+        let base: String
+        let term: String
+        let params: [(String, String)]
+
+        func url(_ terms: String) -> URL? {
+            guard var url = URLComponents(string: base) else { return nil }
+            url.queryItems = params.map { URLQueryItem(name: $0.0, value: $0.1) } + [URLQueryItem(name: term, value: terms)]
+            return url.url
+        }
+    }
+
+    struct Engine: Sendable {
+        let search: Address
+        /// None for a site search, which Sval contacts only when the user
+        /// searches it (spec §10.9).
+        let suggestions: Address?
+    }
 
     let id: String
 
@@ -3527,9 +3532,12 @@ struct SearchEngine {
     }
 
     func search(_ terms: String) -> URL? {
-        guard let engine = Self.engines[id], var search = URLComponents(string: engine.base) else { return nil }
-        search.queryItems = [URLQueryItem(name: engine.term, value: terms)]
-        return search.url
+        Self.engines[id]?.search.url(terms)
+    }
+
+    /// The address that asks the engine for suggestions for `terms`.
+    func suggestions(_ terms: String) -> URL? {
+        Self.engines[id]?.suggestions?.url(terms)
     }
 }
 

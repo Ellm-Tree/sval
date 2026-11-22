@@ -205,6 +205,7 @@ export const SvalSettingsRegistry = Object.freeze({
       "browser.safebrowsing.downloads.remote.block_potentially_unwanted",
       "browser.safebrowsing.malware.enabled",
       "browser.safebrowsing.phishing.enabled",
+      "browser.search.suggest.enabled",
       "browser.startup.homepage",
       "browser.tabs.hoverPreview.enabled",
       "browser.tabs.loadInBackground",

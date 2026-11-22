@@ -24,6 +24,10 @@ struct AddressEntry: View {
     /// The suggestions for what was typed, searched off the main thread.
     /// They stay on screen until the next key's are ready.
     @State private var found = LauncherResults()
+    /// The search engine's suggestions for what was typed. They arrive
+    /// apart from `found`, which never waits for the network, and stay on
+    /// screen until the next key's are ready.
+    @State private var suggested: [String] = []
     @FocusState private var focused: Bool
 
     /// In the private palette while a private tab is in front (13g).
@@ -67,6 +71,10 @@ struct AddressEntry: View {
                          currentPin: browser.currentPin?.guid)) {
             await search()
         }
+        .task(id: SuggestionSearch(query: query, engine: SearchEngine(settings: model.settings).id,
+                                   limit: SearchSuggestions.limit(settings: model.settings, inPrivate: browser.inPrivate))) {
+            await suggest()
+        }
         .onChange(of: focused) { _, now in
             // Selected once the field has focus: a selection set before
             // that is replaced by the caret focus puts at the end.
@@ -92,6 +100,25 @@ struct AddressEntry: View {
         let currentTabId: String?
         let workspaceId: String?
         let currentPin: String?
+    }
+
+    /// What asking the engine depends on, of all the synced settings: the
+    /// engine, and the limit its switches set.
+    private struct SuggestionSearch: Equatable {
+        let query: String
+        let engine: String
+        let limit: Int
+    }
+
+    /// Asks the engine for suggestions. Each key cancels the request
+    /// before it.
+    private func suggest() async {
+        let query = query
+        let settings = model.settings
+        let limit = SearchSuggestions.limit(settings: settings, inPrivate: browser.inPrivate)
+        guard let rows = try? await SearchSuggestions.fetch(query, settings: settings, limit: limit),
+              !Task.isCancelled else { return }
+        suggested = rows
     }
 
     /// Searches the Launcher's index for what was typed. The search runs off
@@ -206,11 +233,12 @@ struct AddressEntry: View {
                 let layout = sideways
                     ? AnyLayout(HStackLayout(alignment: .bottom, spacing: 8)) : AnyLayout(VStackLayout(spacing: 0))
                 layout {
-                    if sideways && results.order.contains(.history) {
+                    let order = results.order(suggesting: !suggested.isEmpty)
+                    if sideways && order.contains(.history) {
                         section(.history, results)
                     }
                     VStack(spacing: 0) {
-                        ForEach(results.order.reversed().filter { !sideways || $0 != .history }, id: \.self) { section in
+                        ForEach(order.reversed().filter { !sideways || $0 != .history }, id: \.self) { section in
                             self.section(section, results)
                         }
                         // Sval's own command, offered when the text names
@@ -304,12 +332,17 @@ struct AddressEntry: View {
                 ForEach(Array(results.history.enumerated()).reversed(), id: \.element.url) { rank, page in
                     historyRow(page).accessibilitySortPriority(Double(-rank))
                 }
+            case .suggestions:
+                caption("Search suggestions").accessibilitySortPriority(1)
+                ForEach(Array(suggested.enumerated()).reversed(), id: \.element) { rank, suggestion in
+                    suggestionRow(suggestion).accessibilitySortPriority(Double(-rank))
+                }
             }
         }
         // The rows are drawn best last, nearest the field; VoiceOver reads
         // the heading, then the best row first, in the desktop's order.
         .accessibilityElement(children: .contain)
-        .accessibilitySortPriority(Double(-(results.order.firstIndex(of: section) ?? 0)))
+        .accessibilitySortPriority(Double(-(results.order(suggesting: !suggested.isEmpty).firstIndex(of: section) ?? 0)))
     }
 
     private var privateCommandRow: some View {
@@ -340,6 +373,30 @@ struct AddressEntry: View {
             .background(theme.accentWash, in: .rect(cornerRadius: 14))
             .contentShape(.rect)
         }
+    }
+
+    /// A suggestion searches the synced engine for its words.
+    private func suggestionRow(_ suggestion: String) -> some View {
+        Button {
+            if let url = SearchEngine(settings: model.settings).search(suggestion) { open(url) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .accessibilityHidden(true)
+                Text(suggestion)
+                    .font(.system(.body, weight: .medium))
+                    .lineLimit(1)
+                Spacer()
+            }
+            .foregroundStyle(colors.ink)
+            .padding(.horizontal, 12)
+            .rowHeight(RowMetrics.suggestion)
+            .contentShape(.rect)
+        }
+        .accessibilityLabel("Search for \(suggestion)")
+        .accessibilityInputLabels([suggestion])
     }
 
     private func caption(_ title: String) -> some View {
@@ -445,6 +502,12 @@ struct AddressEntry: View {
 
     private func go() {
         guard let url = autofill.flatMap({ $0.text == text ? $0.url : nil }) ?? Address.resolve(text, settings: model.settings) else { return }
+        open(url)
+    }
+
+    /// Loads `url` in this tab, or in the new tab the Launcher was opened
+    /// for.
+    private func open(_ url: URL) {
         onDone()
         Task {
             if newTab || browser.currentTabId == nil,

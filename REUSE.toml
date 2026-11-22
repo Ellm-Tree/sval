@@ -398,6 +398,7 @@ path = [
   "branding/sval/sval-private-browsing.VisualElementsManifest.xml",
   "branding/sval/sval.VisualElementsManifest.xml",
   "chrome/browser/components/sval/SvalSearchConfig.sys.mjs",
+  "mobile/ios/Sval/SearchEngines.swift",
   "chrome/browser/components/sval/test/xpcshell/test_sval_ext_bookmarks.js",
   "chrome/other-licenses/nsis/Plugins/ServicesHelper.dll",
   "packaging/linux/debian/*",

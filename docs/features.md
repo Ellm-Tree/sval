@@ -389,6 +389,9 @@ control of what you see and what is sent to websites.
 - **Switch tabs from the address bar.** Hold the address bar and slide to
   move through your tabs. The iPhone app shows a picture of each tab's page
   and of each pin's page you've opened.
+- **Search suggestions.** As you type in the address bar, the iPhone app
+  shows suggestions from your search engine, following the search settings
+  you chose on your computer. A private tab gets no suggestions.
 - **A page that keeps crashing.** When a page crashes three times within a
   minute, the iPhone app stops reloading it and shows Page cannot load.
 - **Private tabs.** A link you tap in a private tab opens in Sval, even when
