@@ -24,9 +24,14 @@ struct Licenses: Decodable {
     let data: [Entry]
     let texts: [String]
 
-    static let bundled: Licenses? = Bundle.main.url(forResource: "Licenses", withExtension: "json")
+    private static let bundled: Licenses? = Bundle.main.url(forResource: "Licenses", withExtension: "json")
         .flatMap { try? Data(contentsOf: $0) }
         .flatMap { try? JSONDecoder().decode(Licenses.self, from: $0) }
+
+    /// The bundled file, read and decoded off the main thread the first
+    /// time and kept after.
+    @concurrent
+    static func load() async -> Licenses? { bundled }
 }
 
 /// Sval's license and the notices of everything the app is built with and
@@ -38,7 +43,9 @@ struct LicensesView: View {
     @Environment(\.sheetTint) private var sheetTint
     let onDone: () -> Void
     @State private var query = ""
-    private let licenses = Licenses.bundled
+    /// Read when the page appears. `NavigationLink` builds this view each
+    /// time Settings draws, so a read here would run as Settings opens.
+    @State private var licenses: Licenses?
 
     private static let source = URL(string: "https://gitlab.com/sval-browser/sval")!
 
@@ -85,6 +92,7 @@ struct LicensesView: View {
             }
         }
         .foregroundStyle(theme.text)
+        .task { licenses = await Licenses.load() }
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
         .sheetGround(glass: true)
         .sheetPage("Licenses", onDone: onDone)

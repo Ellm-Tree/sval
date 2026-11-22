@@ -148,7 +148,7 @@ private struct FolderSteps: View {
         .animation(.easeOut(duration: 0.2), value: step)
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             switch result {
-            case .success(let url): model.chooseFolder(url)
+            case .success(let url): Task { await model.chooseFolder(url) }
             case .failure(let error): model.message = error.localizedDescription
             }
         }

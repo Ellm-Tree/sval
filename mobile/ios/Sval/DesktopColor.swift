@@ -250,6 +250,58 @@ enum DesktopColor {
         return (text, muted)
     }
 
+    /// A call of the picker's functions below. The maths is pure, so with
+    /// `more` an answer kept is the answer the maths gives again.
+    private enum Call: Hashable {
+        case sheet(String?, Surface?, dark: Bool)
+        case track(String, h: Double, c: Double, l: Double, Surface?)
+        case shadeTrack(h: Double, c: Double)
+        case shades(h: Double, c: Double)
+        case shade(h: Double, c: Double, l: Double)
+        case lightness(h: Double, c: Double, Shade)
+        case presetVersion(String, side: String, dark: Bool)
+        case customFrom(String?, dark: Bool)
+        case swatch(String, workspace: Bool, dark: Bool)
+    }
+
+    private struct Asked: Hashable {
+        let call: Call
+        let more: Bool
+    }
+
+    /// The picker's answers. A slider's drag asks for a new colour on each
+    /// move, so the table is emptied whole once it holds `kept`.
+    nonisolated(unsafe) private static var answers: [Asked: Any] = [:]
+    private static let kept = 2048
+    /// Set by `uncached`, so each call asks the maths.
+    nonisolated(unsafe) private static var bypass = false
+
+    /// The answer kept for `call`, or `solve`'s, kept. Called with `lock`
+    /// held.
+    private static func answer<T>(_ call: Call, _ solve: (_ more: Bool) -> T) -> T {
+        let asked = Asked(call: call, more: contrast.more)
+        if !bypass, let found = answers[asked] { return found as! T }
+        let answer = solve(asked.more)
+        if bypass { return answer }
+        if answers.count >= kept { answers.removeAll(keepingCapacity: true) }
+        answers[asked] = answer
+        return answer
+    }
+
+    /// `body`'s calls, each answered by the maths and none kept, for tests
+    /// that compare kept answers with the maths'.
+    static func uncached<T>(_ body: () -> T) -> T {
+        lock.lock()
+        bypass = true
+        lock.unlock()
+        defer {
+            lock.lock()
+            bypass = false
+            lock.unlock()
+        }
+        return body()
+    }
+
     /// The colours a sheet in a colour is drawn in (round 8, 16e), each
     /// solved on the colour, as gamma sRGB hex.
     struct Sheet: Equatable {
@@ -261,7 +313,7 @@ enum DesktopColor {
     }
 
     /// A window or group's block, as the surface group blocks step from.
-    struct Surface {
+    struct Surface: Hashable {
         let l: Double, surfaceDark: Bool, dir: Double
         var js: [String: Any] { ["l": l, "surfaceDark": surfaceDark, "dir": dir] }
     }
@@ -280,40 +332,50 @@ enum DesktopColor {
     static func sheet(_ stored: String?, group on: Surface?, dark: Bool) -> Sheet? {
         lock.lock()
         defer { lock.unlock() }
-        guard let context else { return nil }
-        let kind = on == nil ? "workspace" : "group"
-        let color: Any = stored.flatMap { filtered($0, kind: kind, in: context) } ?? NSNull()
-        guard let value = context.objectForKeyedSubscript("phoneSheet")?.call(withArguments: [
-            color, kind, dark ? "dark" : "light", on?.js ?? NSNull(), contrast.more,
-        ]), value.isObject else { return nil }
-        func role(_ name: String) -> UInt32 { hex(value.forProperty(name)) ?? 0 }
-        return Sheet(sheet: role("sheet"), title: role("title"), footer: role("footer"), cell: role("cell"),
-                     cellText: role("cellText"), cellSecondary: role("cellSecondary"), ring: role("ring"),
-                     cancel: role("cancel"), cancelInk: role("cancelInk"), danger: role("danger"),
-                     darkInk: value.forProperty("side")?.toString() == "dark")
+        return answer(.sheet(stored, on, dark: dark)) { more in
+            guard let context else { return nil }
+            let kind = on == nil ? "workspace" : "group"
+            let color: Any = stored.flatMap { filtered($0, kind: kind, in: context) } ?? NSNull()
+            guard let value = context.objectForKeyedSubscript("phoneSheet")?.call(withArguments: [
+                color, kind, dark ? "dark" : "light", on?.js ?? NSNull(), more,
+            ]), value.isObject else { return nil }
+            func role(_ name: String) -> UInt32 { hex(value.forProperty(name)) ?? 0 }
+            return Sheet(sheet: role("sheet"), title: role("title"), footer: role("footer"), cell: role("cell"),
+                         cellText: role("cellText"), cellSecondary: role("cellSecondary"), ring: role("ring"),
+                         cancel: role("cancel"), cancelInk: role("cancelInk"), danger: role("danger"),
+                         darkInk: value.forProperty("side")?.toString() == "dark")
+        }
     }
 
     /// The colours along a slider's track at the other two's values: hue
     /// round the circle, or chroma from none to `chromaMax`.
+    ///
+    /// The value a track runs along is left out of its call, since
+    /// `phoneTrack` never reads it, so moving a slider keeps its own track.
     static func track(_ which: String, h: Double, c: Double, l: Double, group on: Surface?) -> [UInt32] {
         lock.lock()
         defer { lock.unlock() }
-        guard let value = context?.objectForKeyedSubscript("phoneTrack")?.call(withArguments: [
-            which, h, c, l, on == nil ? "workspace" : "group", on?.js ?? NSNull(), contrast.more,
-        ]), value.isArray, let stops = value.toArray() as? [[NSNumber]] else { return [] }
-        return stops.map { rgbHex($0.map(\.doubleValue)) }
+        let call = Call.track(which, h: which == "hue" ? 0 : h, c: which == "chroma" ? 0 : c, l: l, on)
+        return answer(call) { more in
+            guard let value = context?.objectForKeyedSubscript("phoneTrack")?.call(withArguments: [
+                which, h, c, l, on == nil ? "workspace" : "group", on?.js ?? NSNull(), more,
+            ]), value.isArray, let stops = value.toArray() as? [[NSNumber]] else { return [] }
+            return stops.map { rgbHex($0.map(\.doubleValue)) }
+        }
     }
 
     /// Shade's track: the deep band and the pale band, dark to light.
     static func shadeTrack(h: Double, c: Double) -> (deep: [UInt32], pale: [UInt32]) {
         lock.lock()
         defer { lock.unlock() }
-        guard let value = context?.objectForKeyedSubscript("phoneTrack")?.call(withArguments: [
-            "shade", h, c, 0, "workspace", NSNull(), contrast.more,
-        ]), let object = value.toDictionary(),
-              let deep = object["deep"] as? [[NSNumber]], let pale = object["pale"] as? [[NSNumber]]
-        else { return ([], []) }
-        return (deep.map { rgbHex($0.map(\.doubleValue)) }, pale.map { rgbHex($0.map(\.doubleValue)) })
+        return answer(.shadeTrack(h: h, c: c)) { more in
+            guard let value = context?.objectForKeyedSubscript("phoneTrack")?.call(withArguments: [
+                "shade", h, c, 0, "workspace", NSNull(), more,
+            ]), let object = value.toDictionary(),
+                  let deep = object["deep"] as? [[NSNumber]], let pale = object["pale"] as? [[NSNumber]]
+            else { return ([], []) }
+            return (deep.map { rgbHex($0.map(\.doubleValue)) }, pale.map { rgbHex($0.map(\.doubleValue)) })
+        }
     }
 
     /// The lightnesses text reads on at hue `h` and chroma `c`, split into
@@ -321,17 +383,19 @@ enum DesktopColor {
     static func shades(h: Double, c: Double) -> (deep: [Double], pale: [Double]) {
         lock.lock()
         defer { lock.unlock() }
-        guard let object = context?.objectForKeyedSubscript("phoneShades")?.call(withArguments: [h, c, contrast.more]).toDictionary(),
-              let deep = object["deep"] as? [NSNumber], let pale = object["pale"] as? [NSNumber]
-        else { return ([], []) }
-        return (deep.map(\.doubleValue), pale.map(\.doubleValue))
+        return answer(.shades(h: h, c: c)) { more in
+            guard let object = context?.objectForKeyedSubscript("phoneShades")?.call(withArguments: [h, c, more]).toDictionary(),
+                  let deep = object["deep"] as? [NSNumber], let pale = object["pale"] as? [NSNumber]
+            else { return ([], []) }
+            return (deep.map(\.doubleValue), pale.map(\.doubleValue))
+        }
     }
 
     /// A Workspace custom colour's shade: its band, and its place there,
     /// 0 the band's lightest and 1 its darkest. Hue and Intensity keep it,
     /// so the text's side and the place hold wherever the colour allows
     /// (the desktop picker's `_shadeOf` and `lightnessOf`).
-    struct Shade: Equatable {
+    struct Shade: Hashable {
         let band: String
         let frac: Double
     }
@@ -340,10 +404,12 @@ enum DesktopColor {
     static func shade(h: Double, c: Double, l: Double) -> Shade? {
         lock.lock()
         defer { lock.unlock() }
-        guard let object = context?.objectForKeyedSubscript("phoneShadeOf")?.call(withArguments: [h, c, l, contrast.more]).toDictionary(),
-              let band = object["band"] as? String, let frac = (object["frac"] as? NSNumber)?.doubleValue
-        else { return nil }
-        return Shade(band: band, frac: frac)
+        return answer(.shade(h: h, c: c, l: l)) { more in
+            guard let object = context?.objectForKeyedSubscript("phoneShadeOf")?.call(withArguments: [h, c, l, more]).toDictionary(),
+                  let band = object["band"] as? String, let frac = (object["frac"] as? NSNumber)?.doubleValue
+            else { return nil }
+            return Shade(band: band, frac: frac)
+        }
     }
 
     /// The lightness `shade` gives hue `h` and chroma `c`, or nil where
@@ -351,11 +417,13 @@ enum DesktopColor {
     static func lightness(h: Double, c: Double, at shade: Shade) -> Double? {
         lock.lock()
         defer { lock.unlock() }
-        guard let value = context?.objectForKeyedSubscript("phoneLightnessOf")?
-                  .call(withArguments: [h, c, shade.band, shade.frac, contrast.more]),
-              value.isNumber
-        else { return nil }
-        return value.toDouble()
+        return answer(.lightness(h: h, c: c, shade)) { more in
+            guard let value = context?.objectForKeyedSubscript("phoneLightnessOf")?
+                      .call(withArguments: [h, c, shade.band, shade.frac, more]),
+                  value.isNumber
+            else { return nil }
+            return value.toDouble()
+        }
     }
 
     private static func rgbHex(_ channels: [Double]) -> UInt32 {
@@ -407,15 +475,17 @@ enum DesktopColor {
     static func presetVersion(_ name: String, side: String, dark: Bool) -> String? {
         lock.lock()
         defer { lock.unlock() }
-        guard let context,
-              let value = context.objectForKeyedSubscript("presetVersion")?
-                  .call(withArguments: [name, side, dark ? "dark" : "light", contrast.more])
-        else { return nil }
-        if value.isString { return value.toString() }
-        guard value.isObject, let object = value.toDictionary(),
-              let h = (object["h"] as? NSNumber)?.doubleValue, let c = (object["c"] as? NSNumber)?.doubleValue
-        else { return nil }
-        return Custom(h: h, c: c, l: (object["l"] as? NSNumber)?.doubleValue, mode: object["mode"] as? String).json
+        return answer(.presetVersion(name, side: side, dark: dark)) { more in
+            guard let context,
+                  let value = context.objectForKeyedSubscript("presetVersion")?
+                      .call(withArguments: [name, side, dark ? "dark" : "light", more])
+            else { return nil }
+            if value.isString { return value.toString() }
+            guard value.isObject, let object = value.toDictionary(),
+                  let h = (object["h"] as? NSNumber)?.doubleValue, let c = (object["c"] as? NSNumber)?.doubleValue
+            else { return nil }
+            return Custom(h: h, c: c, l: (object["l"] as? NSNumber)?.doubleValue, mode: object["mode"] as? String).json
+        }
     }
 
     /// A Workspace colour as a custom one to start editing from in this
@@ -424,16 +494,18 @@ enum DesktopColor {
     static func customFrom(_ stored: String?, dark: Bool) -> Custom? {
         lock.lock()
         defer { lock.unlock() }
-        guard let context else { return nil }
-        let color: Any = stored.flatMap { stored -> Any? in
-            stored.hasPrefix("{") ? try? JSONSerialization.jsonObject(with: Data(stored.utf8)) : stored
-        } ?? NSNull()
-        guard let value = context.objectForKeyedSubscript("customFrom")?
-                  .call(withArguments: [color, dark ? "dark" : "light", contrast.more]),
-              let object = value.toDictionary(),
-              let h = (object["h"] as? NSNumber)?.doubleValue, let c = (object["c"] as? NSNumber)?.doubleValue
-        else { return nil }
-        return Custom(h: h, c: c, l: (object["l"] as? NSNumber)?.doubleValue, mode: object["mode"] as? String)
+        return answer(.customFrom(stored, dark: dark)) { more in
+            guard let context else { return nil }
+            let color: Any = stored.flatMap { stored -> Any? in
+                stored.hasPrefix("{") ? try? JSONSerialization.jsonObject(with: Data(stored.utf8)) : stored
+            } ?? NSNull()
+            guard let value = context.objectForKeyedSubscript("customFrom")?
+                      .call(withArguments: [color, dark ? "dark" : "light", more]),
+                  let object = value.toDictionary(),
+                  let h = (object["h"] as? NSNumber)?.doubleValue, let c = (object["c"] as? NSNumber)?.doubleValue
+            else { return nil }
+            return Custom(h: h, c: c, l: (object["l"] as? NSNumber)?.doubleValue, mode: object["mode"] as? String)
+        }
     }
 
     /// A colour of the kind given as the picker's swatch shows it: a
@@ -442,13 +514,15 @@ enum DesktopColor {
     static func swatch(_ stored: String, workspace: Bool, dark: Bool) -> UInt32? {
         lock.lock()
         defer { lock.unlock() }
-        guard let context else { return nil }
-        let color: Any = stored.hasPrefix("{")
-            ? (try? JSONSerialization.jsonObject(with: Data(stored.utf8))) ?? stored : stored
-        guard let value = context.objectForKeyedSubscript("swatchOf")?.call(withArguments: [
-            color, workspace ? "workspace" : "group", ["scheme": dark ? "dark" : "light", "more": contrast.more],
-        ]) else { return nil }
-        return rgb(value.toString())
+        return answer(.swatch(stored, workspace: workspace, dark: dark)) { more in
+            guard let context else { return nil }
+            let color: Any = stored.hasPrefix("{")
+                ? (try? JSONSerialization.jsonObject(with: Data(stored.utf8))) ?? stored : stored
+            guard let value = context.objectForKeyedSubscript("swatchOf")?.call(withArguments: [
+                color, workspace ? "workspace" : "group", ["scheme": dark ? "dark" : "light", "more": more],
+            ]) else { return nil }
+            return rgb(value.toString())
+        }
     }
 
     /// The colour in `stored` as `colorOf` accepts it for `kind`, or nil for

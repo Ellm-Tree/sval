@@ -48,7 +48,7 @@ struct LauncherIndex: Sendable {
     }
 
     /// An open tab the Launcher can switch to.
-    struct Tab: Sendable {
+    struct Tab: Sendable, Equatable {
         let row: OutlineRow
         let match: LauncherMatch.Fields
         /// Its address's host, in lower case.
@@ -59,7 +59,7 @@ struct LauncherIndex: Sendable {
 
     /// A pin or Favorite, with its score (`SvalFavoritesUrlbarProvider`'s
     /// `scoreOf`).
-    struct Entry: Sendable {
+    struct Entry: Sendable, Equatable {
         let kept: LauncherResults.Kept
         let guid: String?
         let match: LauncherMatch.Fields
@@ -120,44 +120,109 @@ struct LauncherIndex: Sendable {
     static let empty = LauncherIndex(generation: 0, tabs: [], pins: [:], favorites: [], history: .empty,
                                      settings: Settings([:]))
 
-    /// `tabs` holds every tab row with the title it shows, its Workspace
-    /// and whether it is the private session's.
+    /// A tab row with the title it shows, its Workspace and whether it is
+    /// the private session's.
+    struct TabInput: Sendable, Equatable {
+        let row: OutlineRow
+        let title: String
+        let workspace: String?
+        let isPrivate: Bool
+    }
+
+    /// The tabs' share, each entry kept with the input it was made from.
+    struct Tabs: Sendable {
+        let tabs: [Tab]
+        let tabURLs: Set<String>
+        private let made: [String: (input: TabInput, tab: Tab?)]
+
+        static let empty = Tabs([])
+
+        /// Makes an entry for each of `inputs`, taking `previous`'s where
+        /// its tab's input is the same.
+        init(_ inputs: [TabInput], reusing previous: Tabs? = nil) {
+            tabURLs = Set(inputs.compactMap(\.row.url))
+            var made: [String: (input: TabInput, tab: Tab?)] = [:]
+            made.reserveCapacity(inputs.count)
+            tabs = inputs.compactMap { input in
+                let tab: Tab?
+                if let kept = previous?.made[input.row.id], kept.input == input {
+                    tab = kept.tab
+                } else if !input.row.awaitsPick, let url = Browser.openable(input.row) {
+                    tab = Tab(row: input.row, match: .init(title: input.title, url: input.row.url ?? ""),
+                              host: url.host()?.lowercased() ?? "", workspace: input.workspace,
+                              isPrivate: input.isPrivate)
+                } else {
+                    tab = nil
+                }
+                made[input.row.id] = (input, tab)
+                return tab
+            }
+            self.made = made
+        }
+    }
+
+    /// The pins' and Favorites' share, scored by history's frecency.
+    struct Kept: Sendable {
+        let pins: [String: [Entry]]
+        let pinGuids: [String: Set<String>]
+        let favorites: [Entry]
+        let favoriteSites: [Site]
+
+        static let empty = Kept(pins: [:], favorites: [], frecency: [:])
+
+        init(pins: [String: [PinRow]], favorites: [Favorite], frecency: [String: Double]) {
+            let byGuid = Dictionary(favorites.compactMap { f in f.guid.map { ($0, f) } },
+                                    uniquingKeysWith: { a, _ in a })
+            func score(_ url: String, _ favorite: Favorite?) -> Double {
+                LauncherResults.score(url, added: favorite?.added ?? favorite?.contentAt, frecency: frecency)
+            }
+            pinGuids = pins.mapValues { Set($0.map(\.guid)) }
+            self.pins = pins.mapValues { row in
+                row.compactMap { pin in
+                    guard pin.kind == "favorite", let url = pin.url else { return nil }
+                    return Entry(kept: .init(id: pin.id, name: pin.name, url: url, pin: pin), guid: pin.guid,
+                                 match: .init(title: pin.name, url: url), score: score(url, byGuid[pin.guid]))
+                }
+            }
+            self.favorites = favorites.compactMap { favorite in
+                guard favorite.kind == "favorite", let url = favorite.url, AppModel.opensHere(url) else { return nil }
+                return Entry(kept: .init(id: favorite.id, name: favorite.name, url: url, pin: nil),
+                             guid: favorite.guid, match: .init(title: favorite.name, url: url),
+                             score: score(url, favorite))
+            }
+            let ranked = self.favorites.sorted { a, b in
+                a.score != b.score
+                    ? a.score > b.score : a.kept.url.hasPrefix("https://") && !b.kept.url.hasPrefix("https://")
+            }
+            favoriteSites = LauncherIndex.distinct(ranked.lazy.compactMap { Site($0.kept.url) })
+        }
+    }
+
+    /// The index built whole. `tabs` holds every tab row with the title it
+    /// shows, its Workspace and whether it is the private session's.
     init(generation: Int, tabs: [(row: OutlineRow, title: String, workspace: String?, isPrivate: Bool)],
          pins: [String: [PinRow]],
          favorites: [Favorite], history: History, settings: Settings) {
+        self.init(generation: generation,
+                  tabs: Tabs(tabs.map { TabInput(row: $0.row, title: $0.title, workspace: $0.workspace,
+                                                 isPrivate: $0.isPrivate) }),
+                  kept: Kept(pins: pins, favorites: favorites, frecency: history.frecency),
+                  history: history, settings: settings)
+    }
+
+    init(generation: Int, tabs: Tabs, kept: Kept, history: History, settings: Settings) {
         self.generation = generation
         self.settings = settings
         self.history = history
-        tabURLs = Set(tabs.compactMap(\.row.url))
-        self.tabs = tabs.compactMap { tab in
-            guard !tab.row.awaitsPick, let url = Browser.openable(tab.row) else { return nil }
-            return Tab(row: tab.row, match: .init(title: tab.title, url: tab.row.url ?? ""),
-                       host: url.host()?.lowercased() ?? "", workspace: tab.workspace, isPrivate: tab.isPrivate)
-        }
-        let byGuid = Dictionary(favorites.compactMap { f in f.guid.map { ($0, f) } }, uniquingKeysWith: { a, _ in a })
-        func score(_ url: String, _ favorite: Favorite?) -> Double {
-            LauncherResults.score(url, added: favorite?.added ?? favorite?.contentAt, frecency: history.frecency)
-        }
-        pinGuids = pins.mapValues { Set($0.map(\.guid)) }
-        self.pins = pins.mapValues { row in
-            row.compactMap { pin in
-                guard pin.kind == "favorite", let url = pin.url else { return nil }
-                return Entry(kept: .init(id: pin.id, name: pin.name, url: url, pin: pin), guid: pin.guid,
-                             match: .init(title: pin.name, url: url), score: score(url, byGuid[pin.guid]))
-            }
-        }
-        self.favorites = favorites.compactMap { favorite in
-            guard favorite.kind == "favorite", let url = favorite.url, AppModel.opensHere(url) else { return nil }
-            return Entry(kept: .init(id: favorite.id, name: favorite.name, url: url, pin: nil), guid: favorite.guid,
-                         match: .init(title: favorite.name, url: url), score: score(url, favorite))
-        }
-        let ranked = self.favorites.sorted { a, b in
-            a.score != b.score ? a.score > b.score : a.kept.url.hasPrefix("https://") && !b.kept.url.hasPrefix("https://")
-        }
-        favoriteSites = Self.distinct(ranked.lazy.compactMap { Site($0.kept.url) })
+        tabURLs = tabs.tabURLs
+        self.tabs = tabs.tabs
+        pins = kept.pins
+        pinGuids = kept.pinGuids
+        favorites = kept.favorites
+        favoriteSites = kept.favoriteSites
     }
 
-    private static func distinct(_ sites: some Sequence<Site>) -> [Site] {
+    fileprivate static func distinct(_ sites: some Sequence<Site>) -> [Site] {
         var seen = Set<String>()
         return sites.filter { seen.insert($0.host).inserted }
     }
@@ -182,5 +247,35 @@ struct LauncherIndex: Sendable {
             if bare.hasPrefix(lower) { return (typed + bare.dropFirst(lower.count) + "/", site.origin) }
         }
         return nil
+    }
+}
+
+/// The Launcher's index built part by part: the tabs' share when a tab's
+/// input changed, making again only the entries of tabs that changed, and
+/// the pins' and Favorites' share when they or history changed, since their
+/// scores read its frecency. History's and the settings' shares come
+/// prepared. Each index equals the one built whole from the same inputs.
+struct LauncherParts: Sendable {
+    private var tabInputs: [LauncherIndex.TabInput] = []
+    private var tabs = LauncherIndex.Tabs.empty
+    private var pins: [String: [PinRow]] = [:]
+    private var favorites: [Favorite] = []
+    private var pages: [HistoryPage] = []
+    private var kept = LauncherIndex.Kept.empty
+
+    mutating func index(generation: Int, tabs inputs: [LauncherIndex.TabInput], pins: [String: [PinRow]],
+                        favorites: [Favorite], history: LauncherIndex.History,
+                        settings: LauncherIndex.Settings) -> LauncherIndex {
+        if inputs != tabInputs {
+            tabs = LauncherIndex.Tabs(inputs, reusing: tabs)
+            tabInputs = inputs
+        }
+        if pins != self.pins || favorites != self.favorites || history.pages != pages {
+            kept = LauncherIndex.Kept(pins: pins, favorites: favorites, frecency: history.frecency)
+            self.pins = pins
+            self.favorites = favorites
+            pages = history.pages
+        }
+        return LauncherIndex(generation: generation, tabs: tabs, kept: kept, history: history, settings: settings)
     }
 }

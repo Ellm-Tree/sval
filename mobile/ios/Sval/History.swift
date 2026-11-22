@@ -47,7 +47,7 @@ enum HistoryWeeks {
 }
 
 /// One visit, as the engine lists a week's (`visits_json`).
-struct Visit: Decodable, Sendable {
+struct Visit: Decodable, Equatable, Sendable {
     let id: String
     let url: String
     let title: String
@@ -104,27 +104,136 @@ struct HistoryPage: Equatable, Sendable {
     /// The phone has no bookmark visits or interaction data, so neither
     /// raises a weight.
     static func pages(_ visits: [Visit]) -> [HistoryPage] {
-        let lambda = log(2.0) / 30
-        let day = 86_400_000.0
         var byURL: [String: [Visit]] = [:]
         for visit in visits { byURL[visit.url, default: []].append(visit) }
-        return byURL.compactMap { url, visits in
-            let newest = visits.sorted { $0.visitedAt > $1.visitedAt }
-            let sampled = newest.filter { ![7, 8, 9].contains($0.transition) }.prefix(10)
-            guard let first = sampled.first else { return nil }
-            let days = { (visit: Visit) in (visit.visitedAt / day).rounded(.down) }
-            let reference = days(first)
-            let sum = sampled.reduce(0.0) { sum, visit in
-                let high = visit.transition == typed || visit.transition == bookmark
-                let weight: Double = high ? 100 : visit.transition == 4 ? 20 : 50
-                return sum + weight * exp(-lambda * (reference - days(visit)))
-            }
-            let counted = visits.filter { ![0, 4, 7, 8, 9].contains($0.transition) }.count
-            let score = reference
-                + (log(sum / Double(sampled.count) * Double(max(counted, sampled.count))) / lambda).rounded(.towardZero)
-            let title = newest.first { !$0.title.isEmpty }?.title ?? ""
-            return HistoryPage(url: url, title: title, lastVisit: newest.first?.visitedAt ?? 0, frecency: score)
+        return byURL.compactMap(page).sorted(by: precedes)
+    }
+
+    /// The page at `url` made from `visits`, its visits from every week, as
+    /// `pages` scores it.
+    static func page(_ url: String, _ visits: [Visit]) -> HistoryPage? {
+        let lambda = log(2.0) / 30
+        let day = 86_400_000.0
+        // Visits made at the same time go by id, so the title and the
+        // sample never depend on the order the visits came in.
+        let newest = visits.sorted { ($0.visitedAt, $1.id) > ($1.visitedAt, $0.id) }
+        let sampled = newest.filter { ![7, 8, 9].contains($0.transition) }.prefix(10)
+        guard let first = sampled.first else { return nil }
+        let days = { (visit: Visit) in (visit.visitedAt / day).rounded(.down) }
+        let reference = days(first)
+        let sum = sampled.reduce(0.0) { sum, visit in
+            let high = visit.transition == typed || visit.transition == bookmark
+            let weight: Double = high ? 100 : visit.transition == 4 ? 20 : 50
+            return sum + weight * exp(-lambda * (reference - days(visit)))
         }
-        .sorted { ($0.frecency, $0.lastVisit) > ($1.frecency, $1.lastVisit) }
+        let counted = visits.filter { ![0, 4, 7, 8, 9].contains($0.transition) }.count
+        let score = reference
+            + (log(sum / Double(sampled.count) * Double(max(counted, sampled.count))) / lambda).rounded(.towardZero)
+        let title = newest.first { !$0.title.isEmpty }?.title ?? ""
+        return HistoryPage(url: url, title: title, lastVisit: newest.first?.visitedAt ?? 0, frecency: score)
+    }
+
+    /// Whether `a` ranks above `b`: higher frecency, then the newer last
+    /// visit, then the address, so every list of pages has one order.
+    static func precedes(_ a: HistoryPage, _ b: HistoryPage) -> Bool {
+        if (a.frecency, a.lastVisit) != (b.frecency, b.lastVisit) {
+            return (a.frecency, a.lastVisit) > (b.frecency, b.lastVisit)
+        }
+        return a.url < b.url
+    }
+}
+
+/// One week's visits as the engine listed them, and which decode they came
+/// from: the number moves whenever the listing did.
+struct HistoryWeek: Sendable {
+    let read: Int
+    let visits: [Visit]
+}
+
+/// The weeks' visits, each decoded again only when the engine lists it
+/// differently: the listing is the key, compared whole, so a week whose
+/// listing is the same string holds the same visits.
+struct WeekReads {
+    private var weeks: [String: (listing: String, week: HistoryWeek)] = [:]
+    private var reads = 0
+
+    /// Week `name`'s visits, from `document`. A week that does not list
+    /// holds no visits.
+    mutating func visits(of name: String, in document: SvalDocument) -> HistoryWeek {
+        let listing = (try? document.visitsJson()) ?? ""
+        if let kept = weeks[name], kept.listing == listing { return kept.week }
+        reads += 1
+        let visits = (try? JSONDecoder().decode([Visit].self, from: Data(listing.utf8))) ?? []
+        let week = HistoryWeek(read: reads, visits: visits)
+        weeks[name] = (listing, week)
+        return week
+    }
+
+    /// Forgets every week but `names`, the ones still loaded.
+    mutating func keep(only names: Set<String>) {
+        weeks = weeks.filter { names.contains($0.key) }
+    }
+}
+
+/// History's pages kept by address, so a week that changes recomputes the
+/// pages of the addresses it touched alone. `pages` always equals
+/// `HistoryPage.pages` of every week's visits.
+struct HistoryStore: Sendable {
+    /// Each week's visits by address, and the read they came from.
+    private var weeks: [String: (read: Int, byURL: [String: [Visit]])] = [:]
+    private var byURL: [String: HistoryPage] = [:]
+    /// Best first (`HistoryPage.precedes`).
+    private(set) var pages: [HistoryPage] = []
+    private(set) var visitCount = 0
+
+    /// Takes the weeks loaded now, and returns whether `pages` changed.
+    @discardableResult
+    mutating func update(_ loaded: [String: HistoryWeek]) -> Bool {
+        visitCount = loaded.values.reduce(0) { $0 + $1.visits.count }
+        var touched = Set<String>()
+        for (name, week) in weeks where loaded[name] == nil {
+            touched.formUnion(week.byURL.keys)
+            weeks[name] = nil
+        }
+        for (name, week) in loaded where weeks[name]?.read != week.read {
+            let old = weeks[name]?.byURL ?? [:]
+            let new = Dictionary(grouping: week.visits, by: \.url)
+            for url in Set(old.keys).union(new.keys) where old[url] != new[url] {
+                touched.insert(url)
+            }
+            weeks[name] = (week.read, new)
+        }
+        var gone = Set<String>()
+        var made: [HistoryPage] = []
+        for url in touched {
+            let page = HistoryPage.page(url, weeks.values.flatMap { $0.byURL[url] ?? [] })
+            guard page != byURL[url] else { continue }
+            if byURL[url] != nil { gone.insert(url) }
+            byURL[url] = page
+            if let page { made.append(page) }
+        }
+        guard !gone.isEmpty || !made.isEmpty else { return false }
+        pages = Self.merge(pages.filter { !gone.contains($0.url) }, made.sorted(by: HistoryPage.precedes))
+        return true
+    }
+
+    /// Two lists, each best first, as one.
+    private static func merge(_ a: [HistoryPage], _ b: [HistoryPage]) -> [HistoryPage] {
+        var merged: [HistoryPage] = []
+        merged.reserveCapacity(a.count + b.count)
+        var i = 0
+        var j = 0
+        while i < a.count, j < b.count {
+            if HistoryPage.precedes(b[j], a[i]) {
+                merged.append(b[j])
+                j += 1
+            } else {
+                merged.append(a[i])
+                i += 1
+            }
+        }
+        merged += a[i...]
+        merged += b[j...]
+        return merged
     }
 }

@@ -46,15 +46,26 @@ final class ContentBlocker {
     /// Whether new rules are being compiled, which takes a few seconds.
     private(set) var applying = false
 
-    @ObservationIgnored private var inputsKey: String?
+    /// Names what the lists' rules were last made from
+    /// (`BlockerLists.key`).
+    @ObservationIgnored private(set) var inputsKey: String?
     @ObservationIgnored private var working: Task<Void, Never>?
+    /// The inputs given while a check runs, which it checks once done.
+    @ObservationIgnored private var pending: BlockerInputs?
+    /// The inputs last given, which a list falling due is checked with.
+    @ObservationIgnored private var given: BlockerInputs?
+    /// When each list's last download failed.
+    @ObservationIgnored private var failedAt: [String: Date] = [:]
+    @ObservationIgnored private var dueCheck: Task<Void, Never>?
+    /// Where the downloaded lists are kept.
+    private let directory: URL
     @ObservationIgnored private var scriptsKey: String?
     @ObservationIgnored private var scriptsWork: Task<Void, Never>?
 
     /// The desktop's curated levels (`SvalBlocking.sys.mjs`'s `BALANCED`
     /// and `STRICT`), with each list's address
     /// (`browser.sval.adblock.list.<id>.url`).
-    static let balanced = [
+    nonisolated static let balanced = [
         "sval-ublock-filters": "https://ublockorigin.github.io/uAssetsCDN/filters/filters.min.txt",
         "sval-ublock-badware": "https://ublockorigin.github.io/uAssetsCDN/filters/badware.min.txt",
         "sval-ublock-privacy": "https://ublockorigin.github.io/uAssetsCDN/filters/privacy.min.txt",
@@ -65,7 +76,7 @@ final class ContentBlocker {
         "sval-curben-urlhaus": "https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-ag-online.txt",
         "sval-brave-unbreak": "https://raw.githubusercontent.com/brave/adblock-lists/master/brave-unbreak.txt",
     ]
-    static let strictExtra = [
+    nonisolated static let strictExtra = [
         "sval-hagezi-pro-mini": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.mini.txt",
         "sval-curben-phishing": "https://malware-filter.gitlab.io/phishing-filter/phishing-filter.txt",
         "sval-ublock-annoyances-others": "https://ublockorigin.github.io/uAssetsCDN/filters/annoyances-others.txt",
@@ -74,26 +85,56 @@ final class ContentBlocker {
         "sval-ublock-cookies": "https://ublockorigin.github.io/uAssetsCDN/filters/annoyances-cookies.txt",
     ]
 
-    static let levelKey = "browser.sval.adblock.level"
-    static let pageRulesKey = "browser.sval.adblock.pageRules"
-    static let allowedBranch = "browser.sval.adblock.allowedDomain."
+    nonisolated static let levelKey = "browser.sval.adblock.level"
+    nonisolated static let pageRulesKey = "browser.sval.adblock.pageRules"
+    nonisolated static let allowedBranch = "browser.sval.adblock.allowedDomain."
 
     /// How long a downloaded list is used before it is fetched again.
     nonisolated static let listLifetime: TimeInterval = 24 * 60 * 60
+    /// How long a list whose download failed waits before the next try.
+    nonisolated static let retryAfter: TimeInterval = 60 * 60
     private static let idPrefix = "sval-rules-"
     private static let minePrefix = "sval-mine-"
     private static let ownPrefix = "sval-own-"
     private static let scriptsId = "sval-scripts"
 
-    nonisolated private static var cacheDirectory: URL {
-        URL.cachesDirectory.appending(path: "blocklists", directoryHint: .isDirectory)
+    init(directory: URL = URL.cachesDirectory.appending(path: "blocklists", directoryHint: .isDirectory)) {
+        self.directory = directory
     }
 
-    /// Brings the rules in line with the synced settings: rebuilds them when
-    /// the level, the page-rules switch, My filters or the allowed domains
-    /// changed, or a list is due a download.
-    func update(settings: [String: Any]) {
-        updateScripts(settings: settings)
+    /// Brings the rules in line with `inputs`: compiles the script rules at
+    /// once when the JavaScript rules changed, then checks the lists' rules
+    /// off the main actor and rebuilds them when the level, the page-rules
+    /// switch, My filters or the allowed domains changed, or a list is due a
+    /// download. Inputs given while a check runs are checked once it is
+    /// done.
+    func update(_ inputs: BlockerInputs) {
+        given = inputs
+        updateScripts(inputs)
+        guard working == nil else {
+            pending = inputs
+            return
+        }
+        working = Task {
+            var next: BlockerInputs? = inputs
+            while let inputs = next {
+                await check(inputs)
+                next = pending
+                pending = nil
+            }
+            working = nil
+        }
+    }
+
+    /// Returns once the check under way, and any asked for meanwhile, are
+    /// done.
+    func settled() async {
+        await working?.value
+    }
+
+    private func check(_ inputs: BlockerInputs) async {
+        let checking = Signposts.blocker.beginInterval("check")
+        defer { Signposts.blocker.endInterval("check", checking) }
         // A developer's launch option, to tell a page the rules break from
         // one that is broken anyway.
         if LaunchOption.given("-svalNoBlocking") {
@@ -106,35 +147,38 @@ final class ContentBlocker {
             }
             return
         }
-        let level = settings[Self.levelKey] as? String ?? "balanced"
-        // Custom's lists aren't on the phone yet, so it blocks as Balanced.
-        let lists: [String: String] = switch level {
-        case "off": [:]
-        case "strict": Self.balanced.merging(Self.strictExtra) { a, _ in a }
-        default: Self.balanced
+        let directory = directory
+        let failedAt = failedAt
+        let lists = await Task.detached(priority: .userInitiated) {
+            BlockerLists(inputs, in: directory, failedAt: failedAt, now: .now)
+        }.value
+        var next = lists.next
+        if lists.key != inputsKey || lists.due {
+            inputsKey = lists.key
+            await rebuild(inputs, due: lists.due)
+            let failedAt = self.failedAt
+            next = await Task.detached(priority: .utility) {
+                BlockerLists(inputs, in: directory, failedAt: failedAt, now: .now).next
+            }.value
         }
-        let pageRules = (settings[Self.pageRulesKey] as? Bool ?? true)
-            && !LaunchOption.given("-svalNoPageRules")
-        let myFilters = MyFilters.text(settings: settings)
-        let allowed = settings
-            .filter { $0.key.hasPrefix(Self.allowedBranch) && ($0.value as? Bool) == true }
-            .map { String($0.key.dropFirst(Self.allowedBranch.count)) }
-            .sorted()
-        let due = lists.keys.contains { Self.isDue($0) }
-        let key = Self.digest([
-            level, String(pageRules), myFilters, allowed.joined(separator: ","),
-            lists.keys.sorted().map { "\($0)@\(Self.downloadedAt($0)?.timeIntervalSince1970 ?? 0)" }
-                .joined(separator: ","),
-        ])
-        guard key != inputsKey || due, working == nil else { return }
-        inputsKey = key
-        working = Task {
-            await rebuild(lists: lists, pageRules: pageRules, myFilters: myFilters, allowed: allowed)
-            working = nil
+        checkAgain(at: next)
+    }
+
+    /// Checks the inputs last given again when the next list falls due, so
+    /// a list is fetched again while the app stays open.
+    private func checkAgain(at date: Date?) {
+        dueCheck?.cancel()
+        dueCheck = date.map { date in
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(max(date.timeIntervalSinceNow, 0)))
+                guard !Task.isCancelled, let self, let given else { return }
+                update(given)
+            }
         }
     }
 
-    private func rebuild(lists: [String: String], pageRules: Bool, myFilters: String, allowed: [String]) async {
+    private func rebuild(_ inputs: BlockerInputs, due: Bool) async {
+        let (lists, pageRules, myFilters, allowed) = (inputs.lists, inputs.pageRules, inputs.myFilters, inputs.allowed)
         // My filters' request blocking is ad blocking, and goes with the
         // lists; their page rules apply at every level (decision 1993).
         let own = pageRules ? myFilters : ""
@@ -147,21 +191,28 @@ final class ContentBlocker {
             return
         }
         let started = Date.now
+        let building = Signposts.blocker.beginInterval("rebuild")
+        defer { Signposts.blocker.endInterval("rebuild", building) }
         // Shown only while there's work the user waits on: a download or a
         // compile. Rules already compiled load at once.
-        if lists.keys.contains(where: Self.isDue) { applying = true }
+        if due { applying = true }
         defer { applying = false }
         // The lists run to megabytes each, read and hashed at every launch,
         // so they are kept off the main thread.
-        let texts = await Task.detached(priority: .userInitiated) {
+        let directory = directory
+        let failedAt = failedAt
+        let (texts, failed) = await Task.detached(priority: .userInitiated) {
             var texts: [String] = []
+            var failed: [String] = []
             for (id, address) in lists.sorted(by: { $0.key < $1.key }) {
-                if let text = await Self.list(id: id, address: address) {
-                    texts.append(text)
-                }
+                let list = await Self.list(id: id, address: address, in: directory, failedAt: failedAt)
+                if let text = list.text { texts.append(text) }
+                if list.failed { failed.append(id) }
             }
-            return texts
+            return (texts, failed)
         }.value
+        let now = Date.now
+        for id in failed { self.failedAt[id] = now }
         // Made apart from the rules, so a page waits on neither for the
         // other.
         Task {
@@ -256,14 +307,10 @@ final class ContentBlocker {
     /// Compiles the rules that stop a JavaScript-off site's scripts in its
     /// frames when the JavaScript rules changed. They are small, so they are
     /// compiled again at each launch.
-    private func updateScripts(settings: [String: Any]) {
-        let allowedDefault = settings[JavaScriptRules.enabledKey] as? Bool ?? true
-        let named = settings.compactMap { key, value -> ScriptRule? in
-            guard key.hasPrefix(JavaScriptRules.siteBranch), let rule = value as? String,
-                  rule == "allow" || rule == "block" else { return nil }
-            return ScriptRule(name: String(key.dropFirst(JavaScriptRules.siteBranch.count)), allowed: rule == "allow")
-        }
-        let json = scriptRules(allowedDefault: allowedDefault, rules: named)
+    private func updateScripts(_ inputs: BlockerInputs) {
+        let json = scriptRules(allowedDefault: inputs.scriptsByDefault,
+                               rules: inputs.scripts.sorted { $0.key < $1.key }
+                                   .map { ScriptRule(name: $0.key, allowed: $0.value) })
         let key = json ?? ""
         guard key != scriptsKey else { return }
         scriptsKey = key
@@ -293,33 +340,32 @@ final class ContentBlocker {
         await scriptsWork?.value
     }
 
-    /// A list's text: the download if it is fresh, a new download if not,
-    /// and the old download when a new one fails.
-    nonisolated private static func list(id: String, address: String) async -> String? {
-        let file = cacheDirectory.appending(path: "\(id).txt")
-        if !isDue(id), let text = try? String(contentsOf: file, encoding: .utf8) {
-            return text
+    /// A list's text: the download if it is fresh or its last download
+    /// failed within `retryAfter`, a new download if not, and the old
+    /// download when a new one fails. `failed` is set when the new download
+    /// failed or was not kept: a list left without a file stays due, and
+    /// would be fetched at every check.
+    nonisolated private static func list(id: String, address: String, in directory: URL,
+                                         failedAt: [String: Date]) async -> (text: String?, failed: Bool) {
+        let file = directory.appending(path: "\(id).txt")
+        let now = Date.now
+        if BlockerLists.waits(id, failedAt: failedAt, now: now) {
+            return (try? String(contentsOf: file, encoding: .utf8), false)
+        }
+        if !BlockerLists.isDue(id, in: directory, failedAt: failedAt, now: now),
+           let text = try? String(contentsOf: file, encoding: .utf8) {
+            return (text, false)
         }
         if let url = URL(string: address),
            let (data, response) = try? await URLSession.shared.data(from: url),
            (response as? HTTPURLResponse)?.statusCode == 200,
            let text = String(data: data, encoding: .utf8) {
-            try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
-            try? data.write(to: file, options: .atomic)
-            return text
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let kept = (try? data.write(to: file, options: .atomic)) != nil
+            return (text, !kept)
         }
         Diagnostics.log("blocking: a list download failed")
-        return try? String(contentsOf: file, encoding: .utf8)
-    }
-
-    nonisolated private static func downloadedAt(_ id: String) -> Date? {
-        let file = cacheDirectory.appending(path: "\(id).txt")
-        return (try? FileManager.default.attributesOfItem(atPath: file.path(percentEncoded: false)))?[.modificationDate] as? Date
-    }
-
-    nonisolated private static func isDue(_ id: String) -> Bool {
-        guard let at = downloadedAt(id) else { return true }
-        return Date.now.timeIntervalSince(at) > listLifetime
+        return (try? String(contentsOf: file, encoding: .utf8), true)
     }
 
     private static func storedLists(_ prefix: String, count: Int) async -> [WKContentRuleList]? {
@@ -333,8 +379,95 @@ final class ContentBlocker {
         return lists
     }
 
-    nonisolated private static func digest(_ parts: [String]) -> String {
+    nonisolated static func digest(_ parts: [String]) -> String {
         SHA256.hash(data: Data(parts.joined(separator: "\u{1F}").utf8))
             .map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// What the blocker's rules are made from, read from the synced settings
+/// once per change. It is Sendable, so the check of the downloaded lists
+/// runs off the main actor.
+struct BlockerInputs: Sendable, Equatable {
+    let level: String
+    /// The level's lists by id, each with its address.
+    let lists: [String: String]
+    let pageRules: Bool
+    let myFilters: String
+    /// The allowed domains, sorted.
+    let allowed: [String]
+    /// Whether a site with no JavaScript rule of its own runs scripts.
+    let scriptsByDefault: Bool
+    /// Each site's JavaScript rule, true where it allows scripts.
+    let scripts: [String: Bool]
+
+    init(settings: [String: Any]) {
+        level = settings[ContentBlocker.levelKey] as? String ?? "balanced"
+        // Custom's lists aren't on the phone yet, so it blocks as Balanced.
+        lists = switch level {
+        case "off": [:]
+        case "strict": ContentBlocker.balanced.merging(ContentBlocker.strictExtra) { a, _ in a }
+        default: ContentBlocker.balanced
+        }
+        pageRules = (settings[ContentBlocker.pageRulesKey] as? Bool ?? true)
+            && !LaunchOption.given("-svalNoPageRules")
+        myFilters = MyFilters.text(settings: settings)
+        allowed = settings
+            .filter { $0.key.hasPrefix(ContentBlocker.allowedBranch) && ($0.value as? Bool) == true }
+            .map { String($0.key.dropFirst(ContentBlocker.allowedBranch.count)) }
+            .sorted()
+        scriptsByDefault = settings[JavaScriptRules.enabledKey] as? Bool ?? true
+        var scripts: [String: Bool] = [:]
+        for (key, value) in settings where key.hasPrefix(JavaScriptRules.siteBranch) {
+            guard let rule = value as? String, rule == "allow" || rule == "block" else { continue }
+            scripts[String(key.dropFirst(JavaScriptRules.siteBranch.count))] = rule == "allow"
+        }
+        self.scripts = scripts
+    }
+}
+
+/// The downloaded lists' share of the blocker's check, read from the files
+/// in `directory` off the main actor.
+struct BlockerLists: Equatable, Sendable {
+    /// Names the inputs and each list's download, so the rules are made
+    /// again when either changes.
+    let key: String
+    /// Whether a list is due a download.
+    let due: Bool
+    /// When the next list falls due, or nil at a level with no lists.
+    let next: Date?
+
+    init(_ inputs: BlockerInputs, in directory: URL, failedAt: [String: Date], now: Date) {
+        let ids = inputs.lists.keys.sorted()
+        key = ContentBlocker.digest([
+            inputs.level, String(inputs.pageRules), inputs.myFilters, inputs.allowed.joined(separator: ","),
+            ids.map { "\($0)@\(Self.downloadedAt($0, in: directory)?.timeIntervalSince1970 ?? 0)" }
+                .joined(separator: ","),
+        ])
+        due = ids.contains { Self.isDue($0, in: directory, failedAt: failedAt, now: now) }
+        next = ids.map { id in
+            if Self.waits(id, failedAt: failedAt, now: now), let failed = failedAt[id] {
+                return failed.addingTimeInterval(ContentBlocker.retryAfter)
+            }
+            return Self.downloadedAt(id, in: directory)?.addingTimeInterval(ContentBlocker.listLifetime) ?? now
+        }.min()
+    }
+
+    /// Whether list `id`'s last download failed within `retryAfter`.
+    static func waits(_ id: String, failedAt: [String: Date], now: Date) -> Bool {
+        failedAt[id].map { now.timeIntervalSince($0) < ContentBlocker.retryAfter } ?? false
+    }
+
+    /// Whether list `id` is missing or older than `listLifetime`, and is not
+    /// waiting after a failed download.
+    static func isDue(_ id: String, in directory: URL, failedAt: [String: Date], now: Date) -> Bool {
+        guard !waits(id, failedAt: failedAt, now: now) else { return false }
+        guard let at = downloadedAt(id, in: directory) else { return true }
+        return now.timeIntervalSince(at) > ContentBlocker.listLifetime
+    }
+
+    static func downloadedAt(_ id: String, in directory: URL) -> Date? {
+        let file = directory.appending(path: "\(id).txt")
+        return (try? FileManager.default.attributesOfItem(atPath: file.path(percentEncoded: false)))?[.modificationDate] as? Date
     }
 }

@@ -14,7 +14,7 @@ struct LauncherResults: Sendable {
     }
 
     /// A pin or Favorite the Launcher offers.
-    struct Kept: Identifiable, Sendable {
+    struct Kept: Identifiable, Sendable, Equatable {
         let id: String
         let name: String
         let url: String

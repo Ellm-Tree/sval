@@ -90,16 +90,12 @@ final class SiteIcons {
               named != nil || !gaveNone.contains(host) else { return }
         fetching.insert(host)
         let check = IconCheck(page: page, blocker: blocking?(page))
+        let candidates = [named.flatMap { URL(string: $0, relativeTo: page)?.absoluteURL },
+                          URL(string: "/favicon.ico", relativeTo: page)?.absoluteURL].compactMap { $0 }
+        let file = file(host)
         Task {
             defer { fetching.remove(host) }
-            let candidates = [named.flatMap { URL(string: $0, relativeTo: page)?.absoluteURL },
-                              URL(string: "/favicon.ico", relativeTo: page)?.absoluteURL].compactMap { $0 }
-            for url in candidates where check.allows(url) {
-                guard let (data, response) = await fetch(url, check: check),
-                      (response as? HTTPURLResponse)?.statusCode == 200,
-                      let image = Self.decode(data), image.size.width >= 16,
-                      let png = image.pngData() else { continue }
-                try? png.write(to: file(host), options: .atomic)
+            if let image = await Self.download(candidates, check: check, session: session, to: file) {
                 onDisk.insert(fileName(host))
                 icons[host] = image
                 learned += 1
@@ -122,20 +118,39 @@ final class SiteIcons {
 
     /// The most an icon may weigh. A site's icon is a few kilobytes, and
     /// the fetch runs in the app's own process.
-    static let maxBytes = 1 << 20
+    nonisolated static let maxBytes = 1 << 20
     /// The largest side an icon is decoded at, past any size Sval draws one.
-    static let maxPixels = 256
+    nonisolated static let maxPixels = 256
+
+    /// Fetches the first of `candidates` that `check` allows and that
+    /// gives an image, and writes it to `file` as PNG. Runs off the main
+    /// actor, since a page of a new site is drawing as its icon arrives.
+    @concurrent
+    nonisolated static func download(_ candidates: [URL], check: IconCheck, session: URLSession,
+                                     to file: URL) async -> UIImage? {
+        dispatchPrecondition(condition: .notOnQueue(.main))
+        for url in candidates where check.allows(url) {
+            guard let (data, response) = await fetch(url, check: check, session: session),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let image = decode(data), image.size.width >= 16,
+                  let png = image.pngData() else { continue }
+            try? png.write(to: file, options: .atomic)
+            return image
+        }
+        return nil
+    }
 
     /// `url`'s body, or nil once it passes `maxBytes`.
-    private func fetch(_ url: URL, check: IconCheck) async -> (Data, URLResponse)? {
+    nonisolated private static func fetch(_ url: URL, check: IconCheck,
+                                          session: URLSession) async -> (Data, URLResponse)? {
         guard let (bytes, response) = try? await session.bytes(from: url, delegate: check),
               response.url.map(check.allows) == true,
-              response.expectedContentLength <= Self.maxBytes else { return nil }
+              response.expectedContentLength <= maxBytes else { return nil }
         var data = Data()
         do {
             for try await byte in bytes {
                 data.append(byte)
-                if data.count > Self.maxBytes { return nil }
+                if data.count > maxBytes { return nil }
             }
         } catch {
             return nil
@@ -145,7 +160,7 @@ final class SiteIcons {
 
     /// The icon in `data`, decoded no larger than `maxPixels` a side, so an
     /// image that claims huge dimensions is never drawn whole.
-    private static func decode(_ data: Data) -> UIImage? {
+    nonisolated private static func decode(_ data: Data) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                   kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -188,7 +203,7 @@ final class SiteIcons {
 
 /// What an icon fetch for one page may reach: a web address the page's
 /// blocking lets through, the first address and each redirect alike.
-private final class IconCheck: NSObject, URLSessionTaskDelegate, Sendable {
+final class IconCheck: NSObject, URLSessionTaskDelegate, Sendable {
     let page: URL
     let blocker: RequestBlocker?
 

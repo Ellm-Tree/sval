@@ -45,4 +45,13 @@ final class HistoryTests: XCTestCase {
         ])
         XCTAssertEqual(pages.first?.url, "https://typed.example/")
     }
+
+    func testPagesThatTieGoInTheOrderOfTheirAddresses() {
+        let visits = ["https://c.example/", "https://a.example/", "https://b.example/"].map {
+            visit($0, day: 100, 1)
+        }
+        XCTAssertEqual(HistoryPage.pages(visits).map(\.url),
+                       ["https://a.example/", "https://b.example/", "https://c.example/"])
+        XCTAssertEqual(HistoryPage.pages(visits.reversed()), HistoryPage.pages(visits))
+    }
 }

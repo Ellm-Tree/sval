@@ -395,12 +395,17 @@ actor Syncer {
         return (try? JSONDecoder().decode([HistoryShard].self, from: Data(json.utf8))) ?? []
     }
 
-    /// Every visit in the weeks loaded, from every device.
-    func visits() -> [Visit] {
-        documents.filter { HistoryWeeks.isWeek($0.key) }.values.flatMap { document -> [Visit] in
-            guard let json = try? document.visitsJson() else { return [] }
-            return (try? JSONDecoder().decode([Visit].self, from: Data(json.utf8))) ?? []
+    /// The visits of each week loaded, each decoded once per listing.
+    private var weekReads = WeekReads()
+
+    /// Every week loaded, with its visits from every device.
+    func weeks() -> [String: HistoryWeek] {
+        var weeks: [String: HistoryWeek] = [:]
+        for (name, document) in documents where HistoryWeeks.isWeek(name) {
+            weeks[name] = weekReads.visits(of: name, in: document)
         }
+        weekReads.keep(only: Set(weeks.keys))
+        return weeks
     }
 
     /// Adds the visit this device made to `url`, into its week, and keeps
@@ -415,9 +420,8 @@ actor Syncer {
         op["workspace"] = workspace
         let id = try visitId(deviceId: deviceId, url: url, visitedAt: ms)
         let own = deviceId.map { String(format: "%02x", $0) }.joined()
-        let mine = ((try? documents[week]!.visitsJson()).flatMap {
-            try? JSONDecoder().decode([Visit].self, from: Data($0.utf8))
-        } ?? []).filter { $0.url == url && $0.device == own && $0.id != id }
+        let mine = weekReads.visits(of: week, in: documents[week]!).visits
+            .filter { $0.url == url && $0.device == own && $0.id != id }
         let over = max(mine.count + 1 - HistoryWeeks.visitsPerPage, 0)
         let removals: [[String: Any]] = mine.prefix(over).map { ["kind": "remove", "id": $0.id] }
         let json = try JSONSerialization.data(withJSONObject: [op] + removals)

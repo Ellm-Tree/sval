@@ -145,4 +145,73 @@ final class ColorTests: XCTestCase {
         }
         XCTAssertTrue(moved, "more contrast changed no colour")
     }
+
+    /// The picker's answers kept between calls are the maths' own, over a
+    /// sweep of every input each takes, in both contrasts. Every call is
+    /// made once before any is checked, so two inputs kept as one would
+    /// show.
+    func testKeptPickerAnswersAreTheMaths() {
+        defer { DesktopColor.contrast.more = false }
+        let stored: [String?] = [nil] + colours + [groupCustom]
+        let surfaces = [nil, DesktopColor.surface(ofWorkspace: nil, dark: true),
+                        DesktopColor.surface(ofWorkspace: "blue", dark: false)]
+        let hues = Array(stride(from: 0.0, to: 360, by: 45))
+        let chromas = [0, 0.06, 0.12, DesktopColor.chromaMax]
+        var calls: [(String, () -> String)] = []
+        func add(_ name: String, _ call: @escaping () -> Any?) {
+            calls.append((name, { String(describing: call()) }))
+        }
+        for dark in [false, true] {
+            for colour in stored {
+                for on in surfaces {
+                    add("sheet \(colour ?? "none") on \(String(describing: on)) dark \(dark)") {
+                        DesktopColor.sheet(colour, group: on, dark: dark)
+                    }
+                }
+                add("customFrom \(colour ?? "none") dark \(dark)") { DesktopColor.customFrom(colour, dark: dark) }
+                guard let colour else { continue }
+                for workspace in [false, true] {
+                    add("swatch \(colour) workspace \(workspace) dark \(dark)") {
+                        DesktopColor.swatch(colour, workspace: workspace, dark: dark)
+                    }
+                }
+            }
+            for preset in TintPreset.allCases {
+                for (name, side) in [(preset.rawValue, "dark"), (preset == .black ? "white" : preset.rawValue, "light")] {
+                    add("presetVersion \(name) \(side) dark \(dark)") {
+                        DesktopColor.presetVersion(name, side: side, dark: dark)
+                    }
+                }
+            }
+        }
+        for h in hues {
+            for c in chromas {
+                add("shadeTrack \(h) \(c)") { DesktopColor.shadeTrack(h: h, c: c) }
+                add("shades \(h) \(c)") { DesktopColor.shades(h: h, c: c) }
+                for l in [0.3, 0.6, 0.9] {
+                    add("shade \(h) \(c) \(l)") { DesktopColor.shade(h: h, c: c, l: l) }
+                }
+                for shade in [DesktopColor.Shade(band: "deep", frac: 0.5), DesktopColor.Shade(band: "pale", frac: 1)] {
+                    add("lightness \(h) \(c) \(shade)") { DesktopColor.lightness(h: h, c: c, at: shade) }
+                }
+                for which in ["hue", "chroma"] {
+                    for l in [0.3, 0.6] {
+                        for on in surfaces {
+                            add("track \(which) \(h) \(c) \(l) on \(String(describing: on))") {
+                                DesktopColor.track(which, h: h, c: c, l: l, group: on)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for more in [false, true] {
+            DesktopColor.contrast.more = more
+            let first = calls.map { $0.1() }
+            for (index, (name, call)) in calls.enumerated() {
+                XCTAssertEqual(call(), first[index], "\(name), more \(more): kept")
+                XCTAssertEqual(DesktopColor.uncached(call), first[index], "\(name), more \(more): the maths")
+            }
+        }
+    }
 }

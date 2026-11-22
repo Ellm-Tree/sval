@@ -58,7 +58,11 @@ final class AppModel {
     private(set) var tree = OutlineIndex()
     /// The synced settings, as of the last pass or change.
     private(set) var settings: [String: Any] = [:] {
-        didSet { reindexLauncher() }
+        didSet {
+            launcherSettings = LauncherIndex.Settings(settings)
+            reindexLauncher()
+            updateBlocker()
+        }
     }
     /// The pages history holds, from every device, best first by frecency.
     private(set) var historyPages: [HistoryPage] = [] {
@@ -77,10 +81,17 @@ final class AppModel {
     private(set) var launcherIndex = LauncherIndex.empty
     /// History's share of `launcherIndex`, prepared with `historyPages`.
     @ObservationIgnored private var launcherHistory = LauncherIndex.History.empty
+    /// `historyPages` by address, as of the last read of the weeks.
+    @ObservationIgnored private var historyStore = HistoryStore()
+    /// The settings' share of `launcherIndex`, read with `settings`.
+    @ObservationIgnored private var launcherSettings = LauncherIndex.Settings([:])
+    /// The shares `launcherIndex` was last built from.
+    @ObservationIgnored private var launcherParts = LauncherParts()
     @ObservationIgnored private var indexing: Task<Void, Never>?
     @ObservationIgnored private var indexBuilds = 0
     private(set) var lastSynced: Date?
-    private(set) var syncing = false
+    /// Read by `sync` alone, so no view observes it.
+    @ObservationIgnored private(set) var syncing = false
     var message: String?
     /// The live pages. Made at the end of `init`, since it holds this model.
     @ObservationIgnored private(set) var browser: Browser!
@@ -162,7 +173,10 @@ final class AppModel {
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.startWatching() }
+            MainActor.assumeIsolated {
+                self?.startWatching()
+                self?.updateBlocker(always: true)
+            }
         }
         if LaunchOption.given("-svalPlaybackSession") {
             do {
@@ -181,6 +195,7 @@ final class AppModel {
         Task {
             _ = await loadedSyncer()
             await refreshRows()
+            updateBlocker()
             await keepOwnWorkspace()
             #if DEBUG
             await Demo.fill(self)
@@ -222,19 +237,41 @@ final class AppModel {
             indexBuilds += 1
             let generation = indexBuilds
             let tabs = rows.filter { $0.kind == "tab" }.map { row in
-                (row: row, title: row.title, workspace: tree.workspace(of: row.id), isPrivate: isPrivate(row.id))
+                LauncherIndex.TabInput(row: row, title: row.title, workspace: self.tree.workspace(of: row.id),
+                                       isPrivate: self.isPrivate(row.id))
             }
             let pins = pinsByWorkspace
             let favorites = favorites
             let history = launcherHistory
-            let settings = LauncherIndex.Settings(settings)
-            let index = await Task.detached(priority: .userInitiated) {
-                LauncherIndex(generation: generation, tabs: tabs, pins: pins, favorites: favorites, history: history,
-                              settings: settings)
+            let settings = launcherSettings
+            let before = launcherParts
+            let (index, parts) = await Task.detached(priority: .userInitiated) {
+                var parts = before
+                let index = parts.index(generation: generation, tabs: tabs, pins: pins, favorites: favorites,
+                                        history: history, settings: settings)
+                return (index, parts)
             }.value
             guard !Task.isCancelled else { return }
+            launcherParts = parts
             launcherIndex = index
         }
+    }
+
+    // MARK: Blocking
+
+    /// The blocker's inputs as of its last check, nil before the first.
+    @ObservationIgnored private var blockerInputs: BlockerInputs?
+
+    /// Has the blocker check its rules when its inputs changed, or
+    /// `always`, as on a return to the foreground, where a list may have
+    /// fallen due. The blocker takes the synced settings, so it waits for
+    /// the engine.
+    private func updateBlocker(always: Bool = false) {
+        guard syncer != nil else { return }
+        let inputs = BlockerInputs(settings: settings)
+        guard always || inputs != blockerInputs else { return }
+        blockerInputs = inputs
+        browser.blocker.update(inputs)
     }
 
     // MARK: History
@@ -242,16 +279,28 @@ final class AppModel {
     /// Reads history's pages again, after a pass or a visit made here.
     func refreshHistory() async {
         guard let syncer else { return }
-        let visits = await syncer.visits()
-        let (pages, prepared) = await Task.detached(priority: .userInitiated) {
-            let pages = HistoryPage.pages(visits)
-            return (pages, LauncherIndex.History(pages))
+        let refresh = Signposts.history.beginInterval("refreshHistory")
+        let reading = Signposts.history.beginInterval("visits")
+        let weeks = await syncer.weeks()
+        Signposts.history.endInterval("visits", reading, "\(weeks.count) weeks")
+        let ranking = Signposts.history.beginInterval("pages")
+        let before = historyStore
+        // Compared with what is shown, which a refresh that overlapped this
+        // one may have set from other weeks.
+        let shown = historyPages
+        let (store, prepared) = await Task.detached(priority: .userInitiated) {
+            var store = before
+            store.update(weeks)
+            return (store, store.pages != shown ? LauncherIndex.History(store.pages) : nil)
         }.value
-        if pages != historyPages {
+        Signposts.history.endInterval("pages", ranking, "\(store.pages.count) pages")
+        historyStore = store
+        if let prepared, store.pages != historyPages {
             launcherHistory = prepared
-            historyPages = pages
+            historyPages = store.pages
         }
-        Diagnostics.log("history: \(visits.count) visits, \(historyPages.count) pages")
+        Signposts.history.endInterval("refreshHistory", refresh)
+        Diagnostics.log("history: \(store.visitCount) visits, \(historyPages.count) pages")
     }
 
     /// Records a visit this phone made, in its week (history-sync spec
@@ -404,10 +453,10 @@ final class AppModel {
 
     /// The names this device writes in the folder: its own file in each
     /// document (`own_device_path`), and the temporary file an SMB write
-    /// renames into place.
-    /// Read each time: the id changes when the own copy starts again.
+    /// renames into place. The device id is the syncer's, read from the
+    /// Keychain as it was made: only the syncer writes the own file.
     private var ownName: String? {
-        (try? Secrets.deviceId()).map { $0.map { String(format: "%02x", $0) }.joined() + ".json" }
+        syncer.map { $0.deviceHex + ".json" }
     }
 
     private func isOwn(_ path: String) -> Bool {
@@ -761,15 +810,18 @@ final class AppModel {
         tree.children(of: id)
     }
 
-    func chooseFolder(_ url: URL) {
+    func chooseFolder(_ url: URL) async {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let folder = Folder(shared: url)
-        let holdsSval = folder.exists(topDir)
-        let opens = Self.keyOpens(folder, key: Secrets.syncKey())
+        // A file provider's folder may still be downloading, so it is read
+        // off the main actor, as `connectSmb` reads a server's.
+        let (holdsSval, opens, bookmark) = await Task.detached {
+            let folder = Folder(shared: url)
+            return (folder.exists(topDir), Self.keyOpens(folder, key: Secrets.syncKey()),
+                    Result { try url.bookmarkData() })
+        }.value
         do {
-            let bookmark = try url.bookmarkData()
-            UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
+            UserDefaults.standard.set(try bookmark.get(), forKey: Self.bookmarkKey)
         } catch {
             message = error.localizedDescription
             return
@@ -985,7 +1037,7 @@ final class AppModel {
                 var leaving = old
                 if leaving == nil { leaving = try? await loading?.value }
                 if let leaving { try await leaving.leave() } else { try Syncer.deleteLocalCopy() }
-                syncer = try Syncer.make()
+                syncer = try await Task.detached { try Syncer.make() }.value
                 // The phone browses on, in a fresh Workspace of its own.
                 await refreshRows()
                 await keepOwnWorkspace()
@@ -1083,8 +1135,10 @@ final class AppModel {
         let claimed = try await Task.detached { try Join.claim(code: code, in: folder) }.value
         try Secrets.storeSyncKey(claimed.key)
         // The offer goes only once the key is stored, so a join cut short
-        // can be retried with the same code.
-        try? folder.delete(claimed.offer)
+        // can be retried with the same code. On SMB and Dropbox the delete
+        // waits on the network.
+        let offer = claimed.offer
+        try? await Task.detached { try folder.delete(offer) }.value
     }
 
     func sync() async {
@@ -1117,7 +1171,8 @@ final class AppModel {
             // pass, so only a file that fails twice running is reported.
             let lasting = report.problems.intersection(lastProblems)
             lastProblems = report.problems
-            message = lasting.isEmpty ? nil : "\(lasting.count) file(s) in the folder couldn't be read."
+            let problem = lasting.isEmpty ? nil : "\(lasting.count) file(s) in the folder couldn't be read."
+            if problem != message { message = problem }
         } catch {
             guard source == from else { return }
             Diagnostics.log("sync: failed \(Diagnostics.name(error))")
@@ -1161,7 +1216,9 @@ final class AppModel {
     /// takes its tabs with it.
     private func keepTabsInFront() async {
         guard let syncer else { return }
+        let reading = Signposts.outline.beginInterval("keepTabsInFront")
         let after = await syncer.outline()
+        Signposts.outline.endInterval("keepTabsInFront", reading, "\(after.count) rows")
         let now = Dictionary(after.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         func within(_ id: String, _ workspace: String) -> Bool {
             var node: String? = id
@@ -2235,7 +2292,7 @@ final class AppModel {
             let json = try JSONSerialization.data(withJSONObject: ops)
             try await syncer.edit(document, opsJson: String(decoding: json, as: UTF8.self))
             Diagnostics.log("edit: \(document) \(kind) in \((ContinuousClock.now - started).components.attoseconds / 1_000_000_000_000_000 + (ContinuousClock.now - started).components.seconds * 1000) ms")
-            message = nil
+            if message != nil { message = nil }
         } catch {
             Diagnostics.log("edit: \(document) \(kind) failed \(Diagnostics.name(error))")
             message = error.localizedDescription
@@ -2249,17 +2306,29 @@ final class AppModel {
 
     private func refreshRows() async {
         guard let syncer else { return }
+        let refresh = Signposts.refresh.beginInterval("refreshRows")
+        let outlining = Signposts.outline.beginInterval("outline")
         let own = privateDocument?.outline() ?? []
-        privateIds = Set(own.map(\.id))
         // Set only when changed: every view reading them redraws on each
         // set, and a refresh often changes nothing.
+        let ownIds = Set(own.map(\.id))
+        if ownIds != privateIds { privateIds = ownIds }
         let outline = await syncer.outline() + own
+        Signposts.outline.endInterval("outline", outlining, "\(outline.count) rows")
+        let assigning = Signposts.outline.beginInterval("rows")
         if outline != rows { rows = outline }
+        Signposts.outline.endInterval("rows", assigning)
+        let reading = Signposts.refresh.beginInterval("settings")
         let synced = await syncer.settings()
         if !NSDictionary(dictionary: synced).isEqual(to: settings) { settings = synced }
         browser?.applyMediaChoices()
-        favorites = Self.markingPins(await syncer.favorites())
+        Signposts.refresh.endInterval("settings", reading, "\(synced.count) settings")
+        let favoring = Signposts.refresh.beginInterval("favorites")
+        let marked = Self.markingPins(await syncer.favorites())
+        if marked != favorites { favorites = marked }
         await keepFavoriteRoots()
+        Signposts.refresh.endInterval("favorites", favoring, "\(self.favorites.count) favorites")
+        let pinning = Signposts.refresh.beginInterval("pins")
         let ids = workspaces.map(\.id)
         var pins: [String: [PinRow]] = [:]
         for workspace in workspaces where workspace.agent == nil {
@@ -2268,11 +2337,14 @@ final class AppModel {
             pins[workspace.id] = await syncer.pins(in: workspace.id, workspaces: ids)
                 .filter { $0.kind == "folder" || $0.url.map(Self.opensHere) ?? false }
         }
-        pinsByWorkspace = pins
-        browser.blocker.update(settings: settings)
+        if pins != pinsByWorkspace { pinsByWorkspace = pins }
+        Signposts.refresh.endInterval("pins", pinning, "\(pins.count) workspaces")
+        let pages = Signposts.refresh.beginInterval("pages")
         browser.reconcile()
         PagePreviews.shared.keep(only: Set(rows.lazy.filter { $0.kind == "tab" }.map(\.id)))
         await browser.offloadHiddenWorkspaces()
+        Signposts.refresh.endInterval("pages", pages)
+        Signposts.refresh.endInterval("refreshRows", refresh, "\(self.rows.count) rows")
     }
 
     /// `rows` with each one under the pins root marked a pin.
