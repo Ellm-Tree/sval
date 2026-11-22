@@ -436,9 +436,10 @@ final class WalkthroughTests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
-    /// A split made by a drag in Work's tree, opened, then separated: the
-    /// tab in front keeps its page on screen.
-    func testSplitSeparate() {
+    /// Opens the Workspace sheet on Work and drags Swift onto Apple's
+    /// split zone, which makes a split of the two. Gives the bar's button
+    /// that opens the sheet.
+    private func makeSplitInWork() -> XCUIElement {
         waitForBar()
         let sheet = app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch
         sheet.tap()
@@ -451,6 +452,32 @@ final class WalkthroughTests: XCTestCase {
         let tree = app.collectionViews.containing(NSPredicate(format: "label == %@", "Apple")).firstMatch.frame
         let zone = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: tree.maxX - 44, dy: apple.midY))
         drag(row("Swift"), to: zone, marked: "split")
+        return sheet
+    }
+
+    /// A split's pane renamed from the list, in the system's alert, after
+    /// which the tree's rows still open their tabs.
+    func testSplitPaneRename() {
+        _ = makeSplitInWork()
+        row("Apple").press(forDuration: 1.2)
+        XCTAssertTrue(app.buttons["Rename Tab…"].firstMatch.waitForExistence(timeout: 5), "the pane's menu offers Rename Tab")
+        app.buttons["Rename Tab…"].firstMatch.tap()
+        let alert = app.alerts["Rename Tab"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Rename Tab opens its alert")
+        XCTAssertTrue(keyboardShown, "the alert's field takes the keyboard")
+        alert.textFields.firstMatch.typeText("Zq")
+        alert.buttons["Rename"].tap()
+        let renamed = app.collectionViews.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Zq'")).firstMatch
+        XCTAssertTrue(renamed.waitForExistence(timeout: 5), "the pane takes its new name")
+        shot("pane-renamed")
+        row("Wikipedia").tap()
+        XCTAssertTrue(row("Wikipedia").waitForNonExistence(timeout: 5), "a row tapped after the rename opens its tab and closes the sheet")
+    }
+
+    /// A split made by a drag in Work's tree, opened, then separated: the
+    /// tab in front keeps its page on screen.
+    func testSplitSeparate() {
+        let sheet = makeSplitInWork()
         shot("split-made")
         row("Apple").tap()
         sleep(3)

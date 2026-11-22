@@ -102,7 +102,6 @@ struct BrowserView: View {
                     onNewTab: { enter(.newTab) },
                     mediaCard: mediaCard,
                     onMedia: { id in withAnimation(Motion.overlay) { mediaCard = mediaCard == id ? nil : id } },
-                    onStar: star,
                     onSplit: splitAction,
                     onScrub: scrubbed,
                     onPrivate: { open in
@@ -480,6 +479,8 @@ struct BrowserView: View {
             } else if let id = browser.currentTabId, let file = browser.downloads.tabs[id],
                       let row = model.row(id), let address = row.url {
                 DownloadPage(row: row, address: address, file: file, workspace: workspace)
+            } else if let failure = browser.loadFailure {
+                FailedPage(failure: failure, row: browser.currentTabId.flatMap(model.row), workspace: workspace)
             } else if let id = browser.currentTabId, let row = model.row(id),
                       let address = row.url, Browser.openable(row) == nil,
                       // A page that is loading or showing something is the

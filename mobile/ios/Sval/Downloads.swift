@@ -189,9 +189,8 @@ struct DownloadCapsule: View {
     }
 }
 
-/// A tab whose load became a download, which has no page of its own,
-/// drawn on the home page's field: the file, its address, and the file in
-/// Quick Look once it has arrived.
+/// A tab whose load became a download, which has no page of its own: the
+/// file, its address, and the file in Quick Look once it has arrived.
 struct DownloadPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearance) private var scheme
@@ -202,27 +201,78 @@ struct DownloadPage: View {
     let file: URL?
     let workspace: OutlineRow?
 
-    private var isPrivate: Bool { model.isPrivate(row.id) }
+    var body: some View {
+        let theme = Theme(scheme, tint: model.tint(of: workspace))
+        let name = file?.lastPathComponent ?? URL(string: address)?.lastPathComponent ?? address
+        TabNotice(symbol: "arrow.down.doc", title: name, address: address, row: row, workspace: workspace) {
+            if let file {
+                Button("Open", systemImage: "doc.text.magnifyingglass") { model.browser.downloads.preview = file }
+                    .foregroundStyle(theme.text)
+            }
+        }
+    }
+}
+
+/// A load that failed and left its tab empty: the system's reason, the
+/// address, and the load again.
+struct FailedPage: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.appearance) private var scheme
+
+    let failure: Page.LoadFailure
+    /// The tab, which a pin's page has none of.
+    let row: OutlineRow?
+    let workspace: OutlineRow?
+
+    var body: some View {
+        let theme = Theme(scheme, tint: model.tint(of: workspace))
+        TabNotice(symbol: "exclamationmark.triangle", title: "Sval can't open this page", detail: failure.reason,
+                  address: failure.url.absoluteString, row: row, workspace: workspace) {
+            Button("Try Again", systemImage: "arrow.clockwise") { model.browser.reload() }
+                .foregroundStyle(theme.text)
+        }
+    }
+}
+
+/// What a tab with no page of its own shows, drawn on the home page's
+/// field: a glyph, a title, the address, and what can be done, which ends
+/// with Close Tab for a tab.
+struct TabNotice<Actions: View>: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.appearance) private var scheme
+
+    let symbol: String
+    let title: String
+    var detail: String?
+    let address: String
+    let row: OutlineRow?
+    let workspace: OutlineRow?
+    @ViewBuilder let actions: Actions
 
     var body: some View {
         let theme = Theme(scheme, tint: model.tint(of: workspace))
         let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: 0x13328F)
-        let name = file?.lastPathComponent ?? URL(string: address)?.lastPathComponent ?? address
         ScrollView {
             VStack(spacing: 16) {
-                Image(systemName: "arrow.down.doc")
+                Image(systemName: symbol)
                     .font(.system(size: 30, weight: .medium))
                     .foregroundStyle(theme.body)
                     .frame(width: 68, height: 68)
                     .background(theme.well, in: .rect(cornerRadius: 20))
                     .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(theme.divider, lineWidth: 1) }
                     .accessibilityHidden(true)
-                Text(name)
+                Text(title)
                     .font(SvalFont.outfit(22, .bold, relativeTo: .title2))
                     .foregroundStyle(theme.text)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .accessibilityAddTraits(.isHeader)
+                if let detail {
+                    Text(detail)
+                        .font(.system(.body))
+                        .foregroundStyle(theme.body)
+                        .multilineTextAlignment(.center)
+                }
                 Text(address)
                     .font(SvalFont.mono(13, relativeTo: .footnote))
                     .foregroundStyle(theme.body)
@@ -232,14 +282,13 @@ struct DownloadPage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(theme.well, in: .rect(cornerRadius: 12))
                 HStack(spacing: 10) {
-                    if let file {
-                        Button("Open", systemImage: "doc.text.magnifyingglass") { model.browser.downloads.preview = file }
-                            .foregroundStyle(theme.text)
+                    actions
+                    if let row {
+                        Button("Close Tab", systemImage: "xmark", role: .destructive) {
+                            Task { await model.browser.close(row) }
+                        }
+                        .foregroundStyle(theme.dangerText)
                     }
-                    Button("Close Tab", systemImage: "xmark", role: .destructive) {
-                        Task { await model.browser.close(row) }
-                    }
-                    .foregroundStyle(theme.dangerText)
                 }
                 .buttonStyle(.glass)
                 .padding(.top, 4)
@@ -252,7 +301,7 @@ struct DownloadPage: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .background {
-            if isPrivate {
+            if row.map({ model.isPrivate($0.id) }) ?? false {
                 PrivateBackdrop()
             } else {
                 HomeField(ground: theme.sheet, glow: glow, dark: theme.dark)

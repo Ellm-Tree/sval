@@ -64,6 +64,19 @@ enum GridMetrics {
     /// after it, a third of its width; the rest is the middle (15f2).
     static func side(_ width: CGFloat) -> CGFloat { width / 3 }
 
+    /// Where `point` in a cell of `size` falls in the middle of the card's
+    /// picture, clear of its sides: how far across the middle, the
+    /// middle's width and the picture's height. The picture fills the cell
+    /// inside the ring's room.
+    static func middle(_ point: CGPoint, in size: CGSize) -> (x: CGFloat, span: CGFloat, picture: CGFloat)? {
+        let width = size.width - 2 * ring
+        let picture = size.height - 2 * ring
+        let x = point.x - ring, y = point.y - ring
+        let side = side(width)
+        guard y >= 0, y < picture, x >= side, x <= width - side else { return nil }
+        return (x - side, width - 2 * side, picture)
+    }
+
     /// A card's picture height at `depth` groups in: 140, 132, 124, and on
     /// in 8pt steps, or 104, 96, 90 sideways, where the page is wide.
     static func picture(depth: Int, sideways: Bool) -> CGFloat {
@@ -111,17 +124,8 @@ extension WorkspaceSheet {
             // card shows the page as it is now.
             if let id = browser.currentTabId { browser.takePreview(id) }
         }
-        .focusesAlertField(when: renamingCard != nil)
         // A card held over a card, as a row held over a row in the list.
         .sensoryFeedback(.selection, trigger: gridDrop.hover.map { "\($0.id) \($0.kind)" })
-        .alert("Rename Tab", isPresented: Binding(get: { renamingCard != nil }, set: { if !$0 { renamingCard = nil } })) {
-            TextField("Name", text: $cardName)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") {
-                guard let row = renamingCard else { return }
-                Task { await model.rename(row, to: cardName.trimmingCharacters(in: .whitespacesAndNewlines)) }
-            }
-        }
         .toast($toast, top: true)
     }
 
@@ -178,8 +182,9 @@ extension WorkspaceSheet {
         return UIMenu(sections: paneMenu(pane, split: split, panes: panes, rename: { renameCard(pane) }))
     }
 
-    /// A card's rename, in the system's alert.
-    private func renameCard(_ row: OutlineRow) {
+    /// A card's or a split pane's rename, in the system's alert. A pane's
+    /// tile in the list has no field to rename in place.
+    func renameCard(_ row: OutlineRow) {
         cardName = name(row)
         renamingCard = row
     }
@@ -749,17 +754,11 @@ struct TabGridView: UIViewRepresentable {
         private func middle(of id: String, cell: UICollectionViewCell, at point: CGPoint, in view: UICollectionView,
                             dragged: String) -> GridHover? {
             guard let row = parent.model.row(id) else { return nil }
-            let local = cell.convert(point, from: view)
-            let ring = GridMetrics.ring
-            let width = cell.bounds.width - 2 * ring
-            let picture = cell.bounds.height - 35 - 2 * ring
-            let x = local.x - ring, y = local.y - ring
-            let side = GridMetrics.side(width)
-            guard y >= 0, y < picture, x >= side, x <= width - side else { return nil }
+            guard let (x, span, picture) = GridMetrics.middle(cell.convert(point, from: view), in: cell.bounds.size)
+            else { return nil }
             let model = parent.model
             let over = DropOver(id: id, kind: row.kind, expanded: false)
-            let span = width - 2 * side
-            let kind = model.dropIntent(dragged, over: over, x: x - side, y: picture / 2, w: span, h: picture)
+            let kind = model.dropIntent(dragged, over: over, x: x, y: picture / 2, w: span, h: picture)
             guard [DropKind.newGroup, .split, .join, .merge, .refused(full: true)].contains(kind) else { return nil }
             let split = model.dropIntent(dragged, over: over, x: span - 1, y: picture / 2, w: span, h: picture)
             var hover = GridHover(id: id, over: over, kind: kind, writes: model.dropPlan(dragged, over: over, kind) != nil)

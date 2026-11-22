@@ -73,7 +73,7 @@ struct WorkspaceSheet: View {
     @State var dragging: String?
     /// The row under a drag in the tree, and what a drop there would do.
     @State private var hover: DropHover?
-    /// The card whose tab is being renamed in the grid, and its name.
+    /// The tab being renamed in the system's alert, and its name.
     @State var renamingCard: OutlineRow?
     @State var cardName = ""
     /// The halves a card in the grid shows while a card is held over it.
@@ -125,6 +125,15 @@ struct WorkspaceSheet: View {
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: layout)
             }
             .renameSplitAlert($renamingSplit)
+            .focusesAlertField(when: renamingCard != nil)
+            .alert("Rename Tab", isPresented: Binding(get: { renamingCard != nil }, set: { if !$0 { renamingCard = nil } })) {
+                TextField("Name", text: $cardName)
+                Button("Cancel", role: .cancel) {}
+                Button("Rename") {
+                    guard let row = renamingCard else { return }
+                    Task { await model.rename(row, to: cardName.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                }
+            }
             .sheet(item: $look) { target in
                 LookEditor(target: target, onClose: { self.look = nil }) { id in
                     switch target {
@@ -1086,7 +1095,7 @@ struct WorkspaceSheet: View {
             browser.select(id)
             close()
         }) { pane in
-            MenuItems(sections: paneMenu(pane, split: split, panes: panes, rename: { startRename(pane) }))
+            MenuItems(sections: paneMenu(pane, split: split, panes: panes, rename: { renameCard(pane) }))
         }
         .background { frontCard(block, front: front) }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

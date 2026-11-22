@@ -213,7 +213,7 @@ struct FavoritesView: View {
 
     private var empty: some View {
         ContentUnavailableView("No Favorites", systemImage: "star", description: Text(
-            "Tap the star in the address bar to add the page you're on. Favorites show up on your other devices too."))
+            "To add the page you're on, tap Site settings in the address bar, then tap Add to Favorites. Favorites show up on your other devices too."))
     }
 
 

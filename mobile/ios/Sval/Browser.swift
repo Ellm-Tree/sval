@@ -37,6 +37,8 @@ final class Browser {
     private(set) var loading = false
     /// How far the page in front has loaded, from 0 to 1.
     private(set) var progress = 0.0
+    /// The failed load that left the page in front empty.
+    private(set) var loadFailure: Page.LoadFailure?
     /// How far the bar has folded into its pill, from 0 (open) to 1,
     /// following the page as it scrolls (`pageScrolled`).
     private(set) var barFold = 0.0
@@ -991,9 +993,16 @@ final class Browser {
         PageZoom.set(level, for: host, isPrivate: privateInFront)
     }
 
+    /// Loads the page in front again. An empty page left by a failed load
+    /// has nothing of its own to reload, so that load starts over.
     func reload() {
-        pages[currentTabId ?? ""]?.lift([.hold])
-        pages[currentTabId ?? ""]?.view.reload()
+        guard let page = pages[currentTabId ?? ""] else { return }
+        if let failure = page.failure {
+            page.load(failure.url)
+        } else {
+            page.lift([.hold])
+            page.view.reload()
+        }
     }
     func stopLoading() { pages[currentTabId ?? ""]?.view.stopLoading() }
 
@@ -1516,6 +1525,11 @@ final class Browser {
             askClosed.insert(id)
             if mediaRefused[id] == .ask { mediaRefused[id] = nil }
         }
+        page.onFailure = { [weak self] in self?.refreshState() }
+        page.onFailedOverPage = { [weak self] reason in
+            guard let self, currentTabId == id else { return }
+            toast = Toast(text: reason, symbol: "exclamationmark.triangle.fill")
+        }
         page.onLoad = { [weak self, weak page] in
             guard let self else { return }
             downloads.forget(tab: id)
@@ -1638,6 +1652,8 @@ final class Browser {
         canGoForward = view?.canGoForward ?? false
         loading = view?.isLoading ?? false
         progress = view?.estimatedProgress ?? 0
+        let failure = pages[currentTabId ?? ""]?.failure
+        if failure != loadFailure { loadFailure = failure }
         currentTitle = view?.title
         pinOffSaved = currentTabId.flatMap { pin(for: $0) == nil ? nil : pages[$0] }?.offSaved ?? false
     }
@@ -1916,6 +1932,19 @@ final class Page: NSObject, WKNavigationDelegate {
     var onGranted: (@MainActor () -> Void)?
     /// Told when the page commits a new document.
     var onLoad: (@MainActor () -> Void)?
+    /// A load that failed with no page to show in its place: where it was
+    /// going, and the system's reason.
+    struct LoadFailure: Equatable {
+        let url: URL
+        let reason: String
+    }
+    /// The load that failed and left this page empty, until another starts.
+    private(set) var failure: LoadFailure?
+    /// Told when a load fails and leaves this page empty.
+    var onFailure: (@MainActor () -> Void)?
+    /// Told the system's reason when a load fails and the page it left
+    /// still shows.
+    var onFailedOverPage: (@MainActor (String) -> Void)?
     /// Whether the user has typed into the page since it last navigated.
     private(set) var typedInto = false
     /// Whether a load may run JavaScript.
@@ -2132,6 +2161,7 @@ final class Page: NSObject, WKNavigationDelegate {
     /// Loads `url` for Sval: from the user's address, a tab's or a pin's.
     func load(_ url: URL) {
         appLoading = true
+        failure = nil
         lift([.hold])
         view.load(URLRequest(url: url))
     }
@@ -2754,6 +2784,23 @@ final class Page: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         appLoading = false
         Diagnostics.log("page: a load failed to start: \(Diagnostics.name(error))")
+        let error = error as NSError
+        // A load the next one replaced, and a load that became a download
+        // (WebKit's "Frame load interrupted", `WebKitErrorDomain` 102),
+        // went nowhere wrong.
+        let replaced = error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled
+        let handedOn = error.domain == "WebKitErrorDomain" && error.code == 102
+        guard !replaced, !handedOn else { return }
+        if webView.url == nil, let url = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
+            failure = LoadFailure(url: url, reason: error.localizedDescription)
+            onFailure?()
+        } else {
+            onFailedOverPage?(error.localizedDescription)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        failure = nil
     }
 
     /// iOS ends a page's web process under memory pressure, which leaves
@@ -2893,6 +2940,7 @@ final class Page: NSObject, WKNavigationDelegate {
     /// A page typed into keeps that until it goes to another page.
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         appLoading = false
+        failure = nil
         webView.pageZoom = webView.url?.host().map { PageZoom.level(for: $0, isPrivate: isPrivate) } ?? 1
         if guarding == .block { suspend(.deny) } else { lift([.deny]) }
         typedInto = false

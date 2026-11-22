@@ -34,8 +34,6 @@ struct BrowserBar: View {
     var mediaCard: String?
     /// Opens the media card for a tab.
     var onMedia: (String) -> Void = { _ in }
-    /// What the star in the address pill asks for.
-    var onStar: (StarAction) -> Void = { _ in }
     /// What the split menu asks for.
     var onSplit: (SplitAction) -> Void = { _ in }
     /// A hold on the address or the Workspace button and the slide after
@@ -737,7 +735,6 @@ struct PaneMark: View {
     }
 }
 
-/// What the address bar's star asks for.
 /// What the site menu's page group asks for (14d3).
 enum PageAction {
     case move(OutlineRow)
