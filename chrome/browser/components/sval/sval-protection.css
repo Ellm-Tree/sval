@@ -363,7 +363,7 @@
   gap: 3px;
   height: 28px;
   box-sizing: border-box;
-  padding: 0 5px;
+  padding: 0 6px;
   margin-inline-end: 6px;
   border-radius: 999px;
   color: var(--sval-prot-icon);
@@ -425,6 +425,13 @@
   position: relative;
 }
 
+/* The shield is drawn at the 16px of the header's other icons. */
+#sval-protection-button > .sval-prot-shield {
+  width: 16px;
+  height: 16px;
+  mask-size: 16px;
+}
+
 .sval-prot-prompt-anchor {
   position: absolute;
   inset: 0;
@@ -452,9 +459,9 @@
 }
 
 #sval-protection-button[sval-breach] > .sval-prot-shield {
-  mask-image: var(--sval-glyph), radial-gradient(circle at calc(100% - 1px) 1px, transparent 6px, #000 6.5px);
+  mask-image: var(--sval-glyph), radial-gradient(circle at 100% 0, transparent 6px, #000 6.5px);
   mask-size:
-    18px,
+    16px,
     100% 100%;
   mask-position:
     center,
@@ -463,14 +470,14 @@
 }
 
 #sval-protection-button[sval-breach]:dir(rtl) > .sval-prot-shield {
-  mask-image: var(--sval-glyph), radial-gradient(circle at 1px 1px, transparent 6px, #000 6.5px);
+  mask-image: var(--sval-glyph), radial-gradient(circle at 0 0, transparent 6px, #000 6.5px);
 }
 
 /* What Sval blocked on the page: the header's count (`sval-header.css`) at
    the shield's top right, as on a 28px cell around it, over the filled
    shield. It cuts a 2px gap of its own shape in the shield: the cut is the
    chip grown by 2px, `--sval-count-cut-w` wide and 17px tall, its start
-   8px into the 18px glyph and 7px above it. */
+   7px into the 16px glyph and 8px above it. */
 #sval-protection-button > .sval-prot-count {
   position: absolute;
   top: 0;
@@ -505,13 +512,13 @@
   > .sval-prot-shield {
     mask-image: var(--sval-glyph), linear-gradient(#000, #000), var(--sval-count-cut);
     mask-size:
-      18px,
+      16px,
       100% 100%,
       var(--sval-count-cut-w) 17px;
     mask-position:
       center,
       0 0,
-      8px -7px;
+      7px -8px;
     mask-repeat: no-repeat;
     mask-composite: intersect, exclude;
   }
@@ -520,7 +527,7 @@
     mask-position:
       center,
       0 0,
-      calc(10px - var(--sval-count-cut-w)) -7px;
+      calc(9px - var(--sval-count-cut-w)) -8px;
   }
 }
 
@@ -557,7 +564,7 @@
 
     &:is(:dir(ltr), :dir(rtl)) > .sval-prot-shield {
       mask-image: var(--sval-glyph);
-      mask-size: 18px;
+      mask-size: 16px;
       mask-position: center;
       mask-composite: add;
     }

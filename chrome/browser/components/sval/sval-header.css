@@ -29,9 +29,10 @@
 :root {
   --sval-header-h: 52px;
   --sval-control-h: 36px;
-  /* After the docked buttons, 6px, the 1px divider and 6px before the
-     protection button (`sval-protection.css`). */
-  --sval-dock-tail: 13px;
+  /* After the docked buttons, 6px, the 1px divider and 5px, which the
+     field's 1px transparent border (`.urlbar-input-container`) makes 6px
+     before the protection button (`sval-protection.css`). */
+  --sval-dock-tail: 12px;
   /* Between the field and the site controls. */
   --sval-dock-end-head: 8px;
   /* Half the window between 720px and 1080px: the pill's docked controls
@@ -103,8 +104,7 @@
 
   --toolbarbutton-border-radius: 999px;
   /* A 16px icon in a 32px target at every window width, where Firefox's
-     `toolbarbuttons.css` narrows it: the address pill reaches under its
-     docked buttons by their exact width. */
+     `toolbarbuttons.css` narrows it. The header row sets its own. */
   --toolbarbutton-padding-inner: 8px;
   --toolbarbutton-hover-background: var(--sval-wash);
   --toolbarbutton-active-background: var(--sval-wash-strong);
@@ -124,7 +124,7 @@
    (`SvalHeader`, overflow order): the row's 8px padding each side, the
    window's controls, which only macOS draws in the row (Firefox's
    `--window-controls-size`), the 36px panel pill, the back button docked
-   in the address pill, the 45px extensions pill, the 34px overflow button
+   in the address pill, the 44px extensions pill, the 32px overflow button
    and the private badge. The window's minimum width (Firefox's
    `--window-min-width`) holds that with the address bar at its minimum,
    and is never below the 500px Firefox gives it (`browser-shared.css`).
@@ -132,7 +132,7 @@
 :root:not([svalpeek]) {
   --sval-header-controls-w: 0px;
   --sval-header-badge-w: 0px;
-  --sval-row-kept-w: calc(2 * 8px + var(--sval-header-controls-w) + 36px + 1px + 32px + var(--sval-dock-tail) + 45px + 34px + var(--sval-header-badge-w));
+  --sval-row-kept-w: calc(2 * 8px + var(--sval-header-controls-w) + 36px + 4px + 28px + var(--sval-dock-tail) + 44px + 32px + var(--sval-header-badge-w));
   --window-min-width: max(500px, var(--sval-row-kept-w) + var(--urlbar-container-min-width));
 
   @media (-moz-platform: macos) {
@@ -160,7 +160,7 @@
   /* Once downloads and history have overflowed, the notices button is a
      pill of its own, as wide as the extensions pill alone. */
   &:has(> #sval-notices-button:not([hidden])) {
-    --sval-notices-w: 45px;
+    --sval-notices-w: 44px;
   }
 
   /* The segment, the location button, their cluster's ends and the pill's
@@ -395,6 +395,10 @@
 }
 
 #nav-bar {
+  /* A 16px icon in a 28px target for every button in the row, the address
+     pill's and the pills' beside it, at every window width: the address
+     pill reaches under its docked buttons by their exact width. */
+  --toolbarbutton-padding-inner: 6px;
   background: transparent !important;
   box-shadow: none !important;
   border-top: 0 !important;
@@ -441,7 +445,9 @@
   background-color: var(--sval-cluster-bg);
   border-block: 1px solid var(--sval-cluster-border);
   box-shadow: var(--sval-cluster-shadow);
-  padding: 1px;
+  /* With the 1px border, a 28px circle in the 36px pill shares the centre
+     of its rounded end. */
+  padding: 3px;
   margin: 0;
 }
 
@@ -454,7 +460,6 @@
 #sval-panel-button {
   border-inline: 1px solid var(--sval-cluster-border);
   border-radius: 999px;
-  padding-inline: 2px;
   position: relative;
 }
 
@@ -478,7 +483,6 @@
   border-inline-start: 1px solid var(--sval-cluster-border);
   border-start-start-radius: 999px;
   border-end-start-radius: 999px;
-  padding-inline-start: 2px;
   margin-inline-start: 8px !important;
 }
 
@@ -517,8 +521,8 @@
     &::after {
       content: "";
       position: absolute;
-      top: 4px;
-      inset-inline-end: 4px;
+      top: 2px;
+      inset-inline-end: 2px;
       width: 8px;
       height: 8px;
       box-sizing: border-box;
@@ -548,15 +552,14 @@
   border-inline-end: 1px solid var(--sval-cluster-border);
   border-start-end-radius: 999px;
   border-end-end-radius: 999px;
-  padding-inline-end: 2px;
 }
 
 /* The address pill's docked parts, each counted while it is in the row and
    shown: overflowed, it is in the overflow panel, and a private window
    hides the favorite button (`SvalHeader`). Declared on the row, which
    holds both the parts and the field that reads the widths.
-   `--sval-dock-w` is the docked start: the pill's 1px border, back and
-   each navigation button still in the row at 32px, then the tail.
+   `--sval-dock-w` is the docked start: 2px before back, back and
+   each navigation button still in the row at 28px, then the tail.
    `--sval-dock-end-w` is the docked end: while any site control shows, the
    8px head and its cluster (its 1px borders and padding, the live
    devices' segment, the 28px location button and the 28px buttons); while
@@ -584,7 +587,7 @@
   --sval-reader-w: 0px;
   --sval-fav-w: 0px;
   --sval-pill-end-w: 0px;
-  --sval-dock-w: calc(1px + 32px + var(--sval-forward-w) + var(--sval-reload-w) + var(--sval-home-w) + var(--sval-dock-tail));
+  --sval-dock-w: calc(4px + 28px + var(--sval-forward-w) + var(--sval-reload-w) + var(--sval-home-w) + var(--sval-dock-tail));
   --sval-dock-end-w: calc(
     var(--sval-site-head-w) + var(--sval-live-w, 0px) - var(--sval-live-trim) + var(--sval-location-w) + var(--sval-translate-w) + var(--sval-media-w) +
       var(--sval-js-w) + var(--sval-remove-w) + var(--sval-snip-w) + var(--sval-colorshift-w) + var(--sval-site-menu-w) + var(--sval-page-head-w) +
@@ -592,15 +595,15 @@
   );
 
   &:has(> #forward-button) {
-    --sval-forward-w: 32px;
+    --sval-forward-w: 28px;
   }
 
   &:has(> #stop-reload-button) {
-    --sval-reload-w: 32px;
+    --sval-reload-w: 28px;
   }
 
   &:has(> #home-button) {
-    --sval-home-w: 32px;
+    --sval-home-w: 28px;
   }
 
   &:has(
@@ -692,7 +695,6 @@
   border-inline-start: 1px solid var(--sval-cluster-border);
   border-start-start-radius: 999px;
   border-end-start-radius: 999px;
-  padding-inline-start: 2px;
   margin-inline-start: 8px;
 }
 
@@ -700,7 +702,6 @@
   border-inline-end: 1px solid var(--sval-cluster-border);
   border-start-end-radius: 999px;
   border-end-end-radius: 999px;
-  padding-inline-end: 2px;
 }
 
 #nav-bar:has(#nav-bar-customization-target > .unified-extensions-item) #unified-extensions-button {
@@ -755,9 +756,10 @@
 }
 
 #nav-bar #back-button {
-  /* Centres the pill in the row; 1px clears the pill's border. */
+  /* Centres the pill in the row. 4px inset the 28px circle in the 36px
+     pill's rounded start with one centre, as the end's clusters are. */
   margin-inline-start: auto !important;
-  padding-inline-start: 1px !important;
+  padding-inline-start: 4px !important;
 }
 
 /* The last navigation button in the row closes the docked part; a 1×18px
@@ -769,12 +771,12 @@
   padding-inline-end: var(--sval-dock-tail) !important;
   background-image: linear-gradient(var(--sval-pill-border), var(--sval-pill-border));
   background-size: 1px 18px;
-  background-position: 32px center;
+  background-position: 34px center;
   background-repeat: no-repeat;
   background-origin: content-box;
 
   &:-moz-locale-dir(rtl) {
-    background-position: calc(100% - 32px) center;
+    background-position: calc(100% - 34px) center;
   }
 }
 
@@ -1682,11 +1684,10 @@
   }
 }
 
-/* The bell and the extensions button draw a 32px icon 1px in from the
+/* The bell and the extensions button draw their icon 3px in from the
    button's edge, as the cluster's padding puts it. */
 :is(#sval-notices-button[badged], #unified-extensions-button:is([sval-notice], [attention], [sval-page-action])) {
-  --sval-dot-at: 8px;
-  --sval-dot-in: 1px;
+  --sval-dot-in: 3px;
 }
 
 @media (forced-colors) {
