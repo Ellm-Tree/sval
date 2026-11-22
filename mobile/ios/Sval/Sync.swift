@@ -67,7 +67,7 @@ actor Syncer {
         localKey = try Secrets.localKey()
         var refused = false
         for name in documents.keys {
-            let report = try pass(name, in: local, key: localKey, shared: false)
+            let report = try pass(name)
             refused = refused || report.refusesWrites
         }
         // The device id is a Keychain item that only a restore to another
@@ -90,7 +90,7 @@ actor Syncer {
         let listed = Set(shards().map(\.name))
         for week in HistoryWeeks.window() where listed.contains(week) || week == HistoryWeeks.name(for: .now) {
             documents[week] = SvalDocument()
-            refused = try pass(week, in: local, key: localKey, shared: false).refusesWrites || refused
+            refused = try pass(week).refusesWrites || refused
         }
         if refused { throw OwnCopyRefused() }
     }
@@ -119,7 +119,7 @@ actor Syncer {
     private func open(_ name: String) throws {
         guard documents[name] == nil else { return }
         documents[name] = SvalDocument()
-        _ = try pass(name, in: local, key: localKey, shared: false)
+        _ = try pass(name)
     }
 
     /// The documents a pass runs, in order: the three every pass takes, the
@@ -337,7 +337,7 @@ actor Syncer {
     /// on this device's disk: what the folder's files bring, and the file to
     /// write back there, if any.
     private func merge(_ name: String, read: Read, key: Data) throws -> (SyncReport, (path: String, bytes: Data)?) {
-        _ = try pass(name, in: local, key: localKey, shared: false)
+        _ = try pass(name)
         history.merging(name)
         let result = try documents[name]!.sync(
             key: key, deviceId: deviceId, workspace: name,
@@ -345,22 +345,22 @@ actor Syncer {
         var report = try JSONDecoder().decode(SyncReport.self, from: Data(result.reportJson.utf8))
         clock.atLeast(report.ownWatermark)
         report.unreadable = read.unreadable
-        _ = try pass(name, in: local, key: localKey, shared: false)
+        _ = try pass(name)
         guard let path = result.writePath, let bytes = result.writeBytes else { return (report, nil) }
         return (report, (path, bytes))
     }
 
     /// A pass against this device's own copy, on its own disk.
-    private func pass(_ name: String, in folder: Folder, key: Data, shared: Bool) throws -> SyncReport {
+    private func pass(_ name: String) throws -> SyncReport {
         guard !left else {
             return SyncReport(merged: 0, errors: [], schemaTooNew: [], ownWatermark: 0, refusedWrite: false)
         }
-        let read = try Self.read(name, in: folder, key: key, deviceId: deviceId)
+        let read = try Self.read(name, in: local, key: localKey, deviceId: deviceId)
         let result = try documents[name]!.sync(
-            key: key, deviceId: deviceId, workspace: name,
-            files: read.files, now: clock.now(), shared: shared)
+            key: localKey, deviceId: deviceId, workspace: name,
+            files: read.files, now: clock.now(), shared: false)
         if let path = result.writePath, let bytes = result.writeBytes {
-            try folder.write(path, bytes)
+            try local.write(path, bytes)
         }
         var report = try JSONDecoder().decode(SyncReport.self, from: Data(result.reportJson.utf8))
         clock.atLeast(report.ownWatermark)
@@ -376,7 +376,7 @@ actor Syncer {
         try open(name)
         try documents[name]!.applyBatch(
             opsJson: opsJson, deviceId: deviceId, now: clock.now())
-        _ = try pass(name, in: local, key: localKey, shared: false)
+        _ = try pass(name)
         if HistoryWeeks.isWeek(name) {
             if history.changed(name) {
                 remember(Array(history.unpublished), forKey: Self.unpublishedKey)
@@ -535,7 +535,6 @@ struct SyncReport: Decodable {
         var path: String
         /// Whether it is this device's own file.
         var own: Bool
-        var reason: String
     }
 
     enum CodingKeys: String, CodingKey {

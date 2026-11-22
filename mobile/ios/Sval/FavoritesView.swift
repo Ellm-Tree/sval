@@ -16,7 +16,6 @@ enum SheetPage: Hashable {
 /// Pins are left out, since the pins row shows them (pins spec §8.2).
 struct FavoritesView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
 

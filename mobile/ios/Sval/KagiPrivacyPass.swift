@@ -10,7 +10,7 @@ import WebKit
 /// subscriber, and cannot tell which subscriber.
 ///
 /// This keeps the stock and refills it, and `Page` spends it, one token per
-/// request, in private tabs (`KagiPrivacyPass.Spend`).
+/// request, in private tabs (`KagiSpend`).
 ///
 /// **Refilling uses the normal tabs' session, and nothing else does.** The
 /// `kagi_session` cookie of the default store goes only into the

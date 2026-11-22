@@ -742,9 +742,11 @@ final class PageStage: UIView {
                 || subviews.last?.isUserInteractionEnabled != showsFront else { return }
         arranging = true
         defer { arranging = false }
+        #if DEBUG
         if Page.pageDiagnostics {
             Diagnostics.log("tabs: the window shows \(pages.count) page(s), was \(subviews.count)")
         }
+        #endif
         for view in subviews where !pages.contains(where: { $0 === view }) {
             view.removeFromSuperview()
         }

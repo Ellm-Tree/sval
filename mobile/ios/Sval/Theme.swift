@@ -42,9 +42,6 @@ struct Theme {
     /// The token that puts a surface in the private palette, whatever the
     /// appearance (round 5, the desktop's private header palette).
     static let privateToken = "private"
-    /// An untinted dark surface: the desktop's untinted window and panel
-    /// (`--sval-palette-ink-850`, `sval-header.css`).
-    static let navy: UInt32 = 0x0A1140
     /// A card over an untinted dark surface, as the desktop's dialogs are
     /// (`--sval-surface` over `--sval-palette-ink-850`, `sval-dialog.css`).
     static let card: UInt32 = 0x121D4B
@@ -62,8 +59,6 @@ struct Theme {
     /// except on a dark tint too light for the panel's ink to step above.
     var blockDir: Double { window?.blockDir ?? 1 }
     var cell: Color { isPrivate ? Color(hex: 0x0E0730) : window.map { Color(hex: $0.field) } ?? pick(0x1A2758, 0xFFFFFF) }
-    var popup: Color { cell }
-    var menu: Color { isPrivate ? Color(hex: 0x1D1450) : pick(0x18225A, 0xF7F9FE) }
     /// Private Violet: the private notice, tiles and New Tab.
     static let privateViolet = Color(hex: 0x6A55D6)
     /// The private palette's edges and rules (`--sval-private-line`).
@@ -100,12 +95,8 @@ struct Theme {
     /// app's AccentColor. `accent` marks what is selected or in front.
     var action: Color { Theme.blue }
     static let blue = Color(hex: 0x1F6BFF)
-    var switchOff: Color { dark ? Color(hex: 0xA6E8FF, opacity: 0.22) : Color(hex: 0x13328F, opacity: 0.22) }
     var dangerText: Color { pick(0xFF8A90, 0xC42F3A) }
-    var dangerFill: Color { pick(0xE5484D, 0xD93A45) }
     var tileRing: Color { pick(0x5A688C, 0x929292) }
-    /// A dialog's or toast's edge (`--sval-dialog-border`).
-    var toastBorder: Color { dark ? Color(hex: 0xA6E8FF, opacity: 0.18) : Color(hex: 0x13328F, opacity: 0.14) }
     var scrim: Color { dark ? Color(hex: 0x03051A, opacity: 0.6) : Color(hex: 0x060A2E, opacity: 0.3) }
     var warning: Color { pick(0xFFB224, 0xB86E00) }
     /// A mark on a `warning` fill.
@@ -196,11 +187,6 @@ struct WorkspaceTint: Hashable, Identifiable {
 
     private func window(dark: Bool) -> DesktopColor.Window? {
         DesktopColor.window(rawValue, dark: dark)
-    }
-
-    /// Whether the colour's window takes dark text in this appearance.
-    func darkInk(dark: Bool) -> Bool {
-        window(dark: dark)?.darkInk ?? !dark
     }
 
     /// The colour as a mark on a row, as the desktop panel draws a group's:
@@ -518,7 +504,7 @@ struct ScrollEdgeFade: ViewModifier {
     @State private var moreBefore = false
     @State private var moreAfter = false
     let axis: Axis
-    var length: CGFloat = 32
+    let length: CGFloat = 32
 
     func body(content: Content) -> some View {
         content

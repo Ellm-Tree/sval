@@ -13,8 +13,8 @@ through the same shared folder. The sync engine is the Rust crate in
 - `project.yml`: XcodeGen's description of the project. `Sval.xcodeproj`
   is generated from it.
 - `build-engine.sh`: builds `mobile/sval-mobile` (the engine, the SMB
-  connector, ad blocking, and site names) for the iPhone and its simulator,
-  and writes the Swift bindings to `Generated/`.
+  connector, ad blocking, and site names) for the iPhone, its simulator, or
+  both, and writes the Swift bindings to `Generated/`.
 - `make-icons.sh`: writes `Generated/Icons.xcassets` and the app icon,
   `Generated/AppIcon.icon`, from the desktop's glyphs and brand art.
   XcodeGen runs it before it writes the project.
@@ -35,8 +35,11 @@ through the same shared folder. The sync engine is the Rust crate in
 
 From the repository's root:
 
-    mobile/ios/build-engine.sh             # after any change under engine/ or mobile/sval-mobile/
+    mobile/ios/build-engine.sh simulator   # after any change under engine/ or mobile/sval-mobile/
     (cd mobile/ios && xcodegen generate)   # after adding or removing a file
+
+`build-engine.sh` builds for the slices it's given: `simulator`, `device`
+for an iPhone, or both. The app builds only for the slices last built.
 
 To build and run from Xcode, open `mobile/ios/Sval.xcodeproj`, choose the
 iPhone or a simulator, and press Run.
@@ -46,6 +49,7 @@ iPhone or a simulator, and press Run.
 Find the iPhone's identifier with `xcrun devicectl list devices`, and set
 `DEVICE` to it. Then, in `mobile/ios`:
 
+    ./build-engine.sh device
     xcodebuild -project Sval.xcodeproj -scheme Sval -destination "id=$DEVICE" \
       -derivedDataPath build -allowProvisioningUpdates build
     xcrun devicectl device install app --device "$DEVICE" build/Build/Products/Debug-iphoneos/Sval.app
@@ -114,9 +118,10 @@ for testing.
 
 ## Read the app's log
 
-The app writes its own log to `Library/Caches/diagnostics.log` in its
-container (`Diagnostics.swift`). The log never names a page, a site, or a
-Workspace. To launch the app and follow its log:
+The app logs to the system's log under the subsystem `app.sval.ios`. A
+Debug build also writes the same lines to `Library/Caches/diagnostics.log`
+in its container (`Diagnostics.swift`). The log never names a page, a site,
+or a Workspace. To launch the app and follow its log:
 
     mobile/ios/watch-log.sh "$DEVICE" phone.log --launch
 
@@ -156,7 +161,7 @@ and iPad Pro 13-inch. On each one, set the status bar, then run the test:
     xcrun simctl status_bar <simulator> override --time 2027-01-12T17:41:00.000Z \
       --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active \
       --cellularBars 4 --batteryState charged --batteryLevel 100
-    TEST_RUNNER_SVAL_SHOTS=<folder> xcodebuild test -project Sval.xcodeproj \
+    TEST_RUNNER_SVAL_STORE_SHOTS=<folder> xcodebuild test -project Sval.xcodeproj \
       -scheme Sval -destination 'id=<simulator>' -only-testing:SvalUITests/StoreShots
 
 The time is UTC, and the status bar shows it in the Mac's time zone:
@@ -183,4 +188,3 @@ the scheme's arguments in Xcode.
 - `-svalPrivacyCheck`: runs a private session with a random marker in its
   pages and storage, ends it, then searches every file the app can reach
   for the marker. The result goes to the log.
-- `-svalGlassCheck`: opens a test bench for the bar's glass.

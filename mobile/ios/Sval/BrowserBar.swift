@@ -53,7 +53,6 @@ struct BrowserBar: View {
     @State private var heldForScrub = false
 
     private var browser: Browser { model.browser }
-    private var theme: Theme { Theme(scheme) }
 
     /// Another tab whose media the bar shows: playing, or paused a moment
     /// ago.
@@ -716,19 +715,18 @@ struct PaneMark: View {
     let split: Browser.SplitInFront
     let sideways: Bool
     let colors: BarColors
-    var scale: CGFloat = 1
 
     var body: some View {
-        let layout = sideways ? AnyLayout(HStackLayout(spacing: 2 * scale)) : AnyLayout(VStackLayout(spacing: 2 * scale))
+        let layout = sideways ? AnyLayout(HStackLayout(spacing: 2)) : AnyLayout(VStackLayout(spacing: 2))
         layout {
             ForEach(split.slots, id: \.self) { slot in
                 let focused = slot == split.focused
-                RoundedRectangle(cornerRadius: 3 * scale)
+                RoundedRectangle(cornerRadius: 3)
                     .fill(focused ? colors.accent : .clear)
                     .overlay {
-                        if !focused { RoundedRectangle(cornerRadius: 3 * scale).strokeBorder(colors.muted, lineWidth: 1.5 * max(scale, 0.7)) }
+                        if !focused { RoundedRectangle(cornerRadius: 3).strokeBorder(colors.muted, lineWidth: 1.5) }
                     }
-                    .frame(width: (sideways ? 9 : 15) * scale, height: (sideways ? 15 : 9) * scale)
+                    .frame(width: sideways ? 9 : 15, height: sideways ? 15 : 9)
             }
         }
         .accessibilityHidden(true)

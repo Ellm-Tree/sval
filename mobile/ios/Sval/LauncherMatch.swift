@@ -123,11 +123,6 @@ enum LauncherMatch {
         }
     }
 
-    /// Whether `token` occurs anywhere in `source`, folded.
-    static func anywhere(_ token: String, _ source: String) -> Bool {
-        find(Array(token.utf8), in: Text(source).folded)
-    }
-
     private static func isLowerLetter(_ c: Character) -> Bool {
         guard let ascii = c.asciiValue else { return false }
         return (97...122).contains(ascii)

@@ -1011,7 +1011,7 @@ struct GridCard: View {
             }
             .clipShape(.rect(cornerRadius: 14))
             .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
-            .modifier(FrontRing(front: front, color: theme.accent, radius: 14))
+            .modifier(FrontRing(front: front, color: theme.accent))
             .padding(GridMetrics.ring)
             // VoiceOver reads the title, the site, then any state; the tab in
             // front says so through the selected trait, and × is an action.
@@ -1119,7 +1119,7 @@ struct GridSplitCard: View {
             }
             .clipShape(.rect(cornerRadius: 14))
             .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
-            .modifier(FrontRing(front: front, color: theme.accent, radius: 14))
+            .modifier(FrontRing(front: front, color: theme.accent))
             .padding(GridMetrics.ring)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Split, \(title)")
@@ -1267,7 +1267,7 @@ struct CardPicture: View {
             }
     }
 
-    /// The card's 1pt ring (`cellRing`), drawn around the picture and bar.
+    /// The card's 1pt ring, drawn around the picture and bar.
     static func ring(_ theme: Theme) -> Color {
         theme.divider
     }
@@ -1320,7 +1320,7 @@ struct SplitPicture: View {
 struct FrontRing: ViewModifier {
     let front: Bool
     let color: Color
-    let radius: CGFloat
+    let radius: CGFloat = 14
 
     func body(content: Content) -> some View {
         content.overlay {

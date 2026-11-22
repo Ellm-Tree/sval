@@ -4,15 +4,16 @@
 import XCTest
 
 /// Stages the App Store's screenshots on the showroom tree and saves each
-/// to SVAL_SHOTS. Each test skips unless SVAL_SHOTS is set, so the suite's
-/// runs pass over them.
+/// to SVAL_STORE_SHOTS. Each test skips unless SVAL_STORE_SHOTS is set, so
+/// a run that saves the walkthrough's screenshots to SVAL_SHOTS passes
+/// over them.
 final class StoreShots: XCTestCase {
     private var app: XCUIApplication!
     private var dir: URL!
 
     override func setUpWithError() throws {
-        let shots = ProcessInfo.processInfo.environment["SVAL_SHOTS"]
-        try XCTSkipIf(shots == nil, "store screenshots are made only when SVAL_SHOTS is set")
+        let shots = ProcessInfo.processInfo.environment["SVAL_STORE_SHOTS"]
+        try XCTSkipIf(shots == nil, "store screenshots are made only when SVAL_STORE_SHOTS is set")
         dir = URL(fileURLWithPath: shots!)
         continueAfterFailure = false
         app = XCUIApplication()

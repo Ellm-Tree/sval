@@ -24,7 +24,7 @@ work="$here/build/testflight"
 rm -rf "$work"
 mkdir -p "$work"
 
-"$here/build-engine.sh"
+"$here/build-engine.sh" --ship device
 (cd "$here" && xcodegen generate)
 
 auth=(-allowProvisioningUpdates)

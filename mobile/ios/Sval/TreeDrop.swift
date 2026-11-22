@@ -49,8 +49,8 @@ enum DropPlan {
 
 /// The desktop panel's drop zones, in points (`DROP_EDGE_PX`,
 /// `SPLIT_MAX_PANES`), so a row means the same on both. The split zone is
-/// wider than the desktop's `SPLIT_ZONE_PX`: a finger covers what it
-/// drops on, where a pointer doesn't.
+/// wider than the desktop's: a finger covers what it drops on, where a
+/// pointer doesn't.
 enum TreeDrop {
     static let edge: CGFloat = 8
     /// The split zone of a row `width` wide: its right half, drawn as
@@ -120,7 +120,7 @@ extension OutlineIndex {
     }
 
     /// What the drop writes, or nil for one that writes nothing: the
-    /// desktop's `_dropPlan`.
+    /// desktop's `SvalPanelDrag.#plan`.
     func dropPlan(_ id: String, over: DropOver, _ kind: DropKind) -> DropPlan? {
         switch kind {
         case .noop, .refused:

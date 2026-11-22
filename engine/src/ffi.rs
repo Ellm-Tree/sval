@@ -202,16 +202,6 @@ impl SvalDocument {
         Arc::new(SvalDocument::holding(Document::new()))
     }
 
-    #[uniffi::constructor]
-    pub fn load_json(json: String) -> Result<Arc<Self>, EngineError> {
-        let doc = Document::from_json(&json).map_err(refused)?;
-        Ok(Arc::new(SvalDocument::holding(doc)))
-    }
-
-    pub fn to_json(&self) -> Result<String, EngineError> {
-        self.doc().to_json().map_err(refused)
-    }
-
     /// Every setting in a settings document, as a JSON object of key to
     /// value, `null` for one reset to its default (`Document::settings`).
     pub fn settings_json(&self) -> Result<String, EngineError> {
@@ -538,12 +528,6 @@ pub fn kagi_token_request(
 #[uniffi::export]
 pub fn kagi_token_finalize(state: String, response: String) -> Result<Vec<String>, EngineError> {
     crate::privacy_pass::finalize(&state, &response).map_err(refused)
-}
-
-/// What [`crate::ENGINE_VERSION`] reports (`docs/host-contract.md` §11).
-#[uniffi::export]
-pub fn engine_version() -> String {
-    crate::ENGINE_VERSION.to_owned()
 }
 
 #[cfg(test)]
@@ -1211,26 +1195,6 @@ mod tests {
         assert!(!names.contains(&"Page 32".to_string()), "{names:?}");
     }
 
-    #[test]
-    fn a_saved_copy_loads_back_as_it_was() {
-        let phone = SvalDocument::new();
-        phone
-            .sync(
-                KEY.to_vec(),
-                PHONE.to_vec(),
-                "workspaces".into(),
-                vec![desktop_publish()],
-                3_000.0,
-                true,
-            )
-            .unwrap();
-        let saved = phone.to_json().unwrap();
-        let loaded = SvalDocument::load_json(saved.clone()).unwrap();
-        assert_eq!(loaded.to_json().unwrap(), saved);
-        let names: Vec<_> = loaded.outline().into_iter().map(|row| row.name).collect();
-        assert_eq!(names, ["Work", "Docs", "Example"]);
-    }
-
     /// A phone names a visit it added by `visit_id` to give it the title its
     /// page loads later.
     #[test]
@@ -1298,10 +1262,5 @@ mod tests {
                 "{path}"
             );
         }
-    }
-
-    #[test]
-    fn the_engine_version_is_the_engines_own() {
-        assert_eq!(engine_version(), crate::ENGINE_VERSION);
     }
 }

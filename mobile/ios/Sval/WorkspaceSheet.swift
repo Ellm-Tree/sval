@@ -12,7 +12,6 @@ struct WorkspaceSheet: View {
     @Environment(AppModel.self) var model
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appearance) private var scheme
-    @Environment(\.sheetTint) private var sheetTint
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var typeSize
 
@@ -245,7 +244,6 @@ struct WorkspaceSheet: View {
             .contentMargins(.top, 7, for: .scrollContent)
             .onAppear {
                 revealFront()
-                logDrawn(rows)
                 // After the opened groups' rows are drawn.
                 Task { @MainActor in
                     if let id = browser.currentTabId {
@@ -253,7 +251,6 @@ struct WorkspaceSheet: View {
                     }
                 }
             }
-            .onChange(of: rows.map(\.id)) { logDrawn(rows) }
                 // Rows are dragged as the system drags anything, from a
                 // long press that moves, and the tree is one drop target
                 // that reads the row under the finger as the desktop's
@@ -620,7 +617,7 @@ struct WorkspaceSheet: View {
             let width = frame.width - leading - trailing
             let kind = model.dropIntent(id, over: over, x: point.x - frame.minX - leading, y: point.y - frame.minY,
                                         w: width, h: frame.height)
-            next = DropHover(entry: entry.id, over: over, kind: kind, frame: frame, depth: entry.depth,
+            next = DropHover(entry: entry.id, over: over, kind: kind, depth: entry.depth,
                              writes: model.dropPlan(id, over: over, kind) != nil)
             if kind == .newGroup || kind == .split || kind == .join || kind == .merge || kind == .refused(full: true) {
                 let split = model.dropIntent(id, over: over, x: width - 1, y: frame.height / 2,
@@ -631,7 +628,7 @@ struct WorkspaceSheet: View {
             }
         } else if let last = drawn.last, last.0.id == rows.last?.id, point.y >= last.1.maxY {
             let over = DropOver(id: workspace, kind: "workspace", expanded: true)
-            next = DropHover(entry: last.0.id, over: over, kind: .end, frame: last.1, depth: 1,
+            next = DropHover(entry: last.0.id, over: over, kind: .end, depth: 1,
                              writes: model.dropPlan(id, over: over, .end) != nil)
         } else {
             // Between two lines, the last row read still holds.
@@ -679,7 +676,7 @@ struct WorkspaceSheet: View {
     }
 
     /// A row's drop mark, as the desktop panel draws them
-    /// (`_paintDragState`): a line where the dragged row would land, an
+    /// (`SvalPanelDrag.paint`): a line where the dragged row would land, an
     /// outline on a closed group it would go into, and on a tab's middle
     /// its two halves. Two rows waiting on a new group's name keep dashed
     /// outlines. Each is drawn in its own row, so it takes the row's size
@@ -726,14 +723,6 @@ struct WorkspaceSheet: View {
                 }
             }
         }
-    }
-
-    /// What the tree draws, against the tab in front, for the device log.
-    private func logDrawn(_ rows: [TreeEntry]) {
-        let front = browser.currentTabId
-        let kind = front.map { Browser.pinParts($0) != nil ? "a pin" : (model.row($0) == nil ? "no row" : "a tab") } ?? "nothing"
-        let drawn = front.map { id in rows.contains { $0.holds(id) } } ?? false
-        Diagnostics.log("sheet: \(rows.count) rows drawn; in front \(kind), \(drawn ? "drawn" : "not drawn")")
     }
 
     /// One line of the tree: a row, or a split's run of panes.
@@ -876,16 +865,14 @@ struct WorkspaceSheet: View {
         row.parentId.map { model.isInside($0, group) } ?? false
     }
 
-    /// The block behind a row: only a group's outer corners round, and the
-    /// tab in front lifts its block further, as the desktop's selected row.
-    @ViewBuilder private func blockBackground(_ block: RowBlock?, front: Bool) -> some View {
+    /// The block behind a row: only a group's outer corners round.
+    @ViewBuilder private func blockBackground(_ block: RowBlock?) -> some View {
         let dark = theme.dark
         if let block {
             ZStack {
                 ForEach(Array(block.layers.enumerated()), id: \.offset) { index, layer in
                     shape(layer)
-                        .fill(GroupBlock.color(layer.tint, dark: dark, surface: theme.sheetLightness, blockDir: theme.blockDir,
-                                               selected: front && index == block.layers.count - 1))
+                        .fill(GroupBlock.color(layer.tint, dark: dark, surface: theme.sheetLightness, blockDir: theme.blockDir))
                         .padding(.leading, layer.inset)
                         .padding(.trailing, CGFloat(index) * 6)
                         // A nested card stands clear of what's above and
@@ -894,8 +881,6 @@ struct WorkspaceSheet: View {
                         .padding(.bottom, index > 0 && layer.bottom ? Self.cardGap : 0)
                 }
             }
-        } else if front {
-            RoundedRectangle(cornerRadius: 12).fill(theme.accentWash)
         }
     }
 
@@ -905,9 +890,9 @@ struct WorkspaceSheet: View {
     /// A row in front inside a coloured group lifts as a card of its own
     /// within the group's block, as a split does, never to the block's
     /// edges. Outside any group it takes the accent wash.
-    @ViewBuilder private func frontCard(_ block: RowBlock?, front: Bool, depth: Int? = nil) -> some View {
+    @ViewBuilder private func frontCard(_ block: RowBlock?, front: Bool) -> some View {
         ZStack {
-            blockBackground(block, front: false)
+            blockBackground(block)
             if front {
                 if let block, let last = block.layers.last {
                     RoundedRectangle(cornerRadius: 12)
@@ -1162,7 +1147,7 @@ struct WorkspaceSheet: View {
         .padding(.leading, 12 + indent)
         .padding(.trailing, cardInset(block))
         .rowHeight(RowMetrics.group)
-        .background { blockBackground(block, front: false) }
+        .background { blockBackground(block) }
         .contentShape(.rect)
         // A tap gesture, since a Button's label can't hold the rename field.
         .onTapGesture {
@@ -1250,7 +1235,7 @@ struct WorkspaceSheet: View {
         if let emoji = row.emoji, !emoji.isEmpty {
             Text(emoji).font(.system(size: 20)).accessibilityIgnoresInvertColors().frame(width: 28)
         } else {
-            Image(systemName: row.kind == "split" ? "rectangle.split.2x1" : (open ? "folder" : "folder.fill"))
+            Image(systemName: open ? "folder" : "folder.fill")
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(tint?.swatch(dark: theme.dark) ?? theme.body)
                 .frame(width: 28)
@@ -1658,7 +1643,6 @@ struct DropHover: Equatable {
     let entry: String
     let over: DropOver
     let kind: DropKind
-    let frame: CGRect
     let depth: Int
     /// Whether a drop here writes anything.
     let writes: Bool

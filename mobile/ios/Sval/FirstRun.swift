@@ -69,7 +69,6 @@ enum FirstRunStyle {
     static var cyan: Color { theme.accent }
     static let field = Color(hex: 0x0C1446)
     static let well = Color(hex: 0x03051A)
-    static var line: Color { theme.divider }
     static var warning: Color { theme.warning }
     static var danger: Color { theme.dangerText }
 

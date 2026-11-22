@@ -5,22 +5,24 @@ import Foundation
 import os
 import UIKit
 
-/// What the app did, for a developer reading the device's console. A line
-/// carries counts and error names only, never a name, address, code or key
-/// (CONTRIBUTING.md rule 10).
+/// What the app did, in the system's log. A line carries counts and error
+/// names only, never a name, address, code or key (CONTRIBUTING.md rule 10).
 enum Diagnostics {
     private static let logger = Logger(subsystem: "app.sval.ios", category: "sync")
 
     static func log(_ line: String) {
         logger.notice("\(line, privacy: .public)")
-        print(line)
+        #if DEBUG
         file.append(line)
+        #endif
     }
 
+    #if DEBUG
     /// The same lines in a file in the app's caches, which a developer's Mac
     /// copies off the device (`mobile/ios/watch-log.sh`) without relaunching
-    /// the app. It stays readable while the device is locked, and starts
-    /// again at each launch and past a megabyte.
+    /// the app: reading a device's system log from a Mac takes root. The
+    /// file stays readable while the device is locked, and starts again at
+    /// each launch and past a megabyte.
     private static let file = LogFile()
 
     private final class LogFile: @unchecked Sendable {
@@ -68,6 +70,7 @@ enum Diagnostics {
             }
         }
     }
+    #endif
 
     /// An error's type and case, without its message, which may hold a path.
     static func name(_ error: Error) -> String {

@@ -4,6 +4,7 @@
 import Foundation
 import Security
 
+#if DEBUG
 /// A set-up app with sample Workspaces, for the simulator's UI tests,
 /// opened with the `-svalDemo` launch option: a folder in the app's own
 /// container stands in for the shared folder, so no account or computer is
@@ -108,3 +109,4 @@ enum Demo {
         Diagnostics.log("demo: showroom tree filled")
     }
 }
+#endif

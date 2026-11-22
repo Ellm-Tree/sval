@@ -25,7 +25,7 @@
 # SVAL_NETWORK_IDLE_SECONDS is the idle, 150 by default.
 #
 # The engine and the Xcode project must be built first:
-# mobile/ios/build-engine.sh, then xcodegen generate in mobile/ios.
+# mobile/ios/build-engine.sh simulator, then xcodegen generate in mobile/ios.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

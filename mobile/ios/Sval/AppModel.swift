@@ -120,10 +120,17 @@ final class AppModel {
     static let interval: Duration = .seconds(30)
 
     init() {
+        #if DEBUG
         Demo.resetIfAsked()
+        #endif
         DesktopColor.warm()
         loadingSyncer = Task.detached(priority: .userInitiated) { try Syncer.make() }
-        source = Demo.source() ?? Self.resolveBookmark().map(Source.files)
+        #if DEBUG
+        let demo = Demo.source()
+        #else
+        let demo: Source? = nil
+        #endif
+        source = demo ?? Self.resolveBookmark().map(Source.files)
             ?? SmbSettings.load().map(Source.smb)
             ?? DropboxSettings.load().map(Source.dropbox)
         if case .files(let url) = source, Secrets.syncKey() == nil || keyUnconfirmed {
@@ -165,20 +172,26 @@ final class AppModel {
                 Diagnostics.log("launch: audio session refused: \(Diagnostics.name(error))")
             }
         }
+        #if DEBUG
         let options = LaunchOption.all
         Diagnostics.log("launch: developer options \(options.isEmpty ? "none" : options.joined(separator: " "))")
         let missing = ["Outfit", "JetBrains Mono"].filter { UIFont.fontNames(forFamilyName: $0).isEmpty }
         Diagnostics.log("launch: fonts \(missing.isEmpty ? "loaded" : "missing \(missing.joined(separator: ", "))")")
+        #endif
         Task {
             _ = await loadedSyncer()
             await refreshRows()
             await keepOwnWorkspace()
+            #if DEBUG
             await Demo.fill(self)
+            #endif
             // Sval opens on this phone's own Workspace (round 6).
             if let own = ownWorkspace?.id { browser.showWorkspace(own) }
             await refreshHistory()
             await nameThisDevice()
+            #if DEBUG
             if PrivacyCheck.requested { await PrivacyCheck.run(self) }
+            #endif
         }
     }
 
@@ -501,6 +514,7 @@ final class AppModel {
         return ownWorkspace?.id ?? workspaces.first?.id
     }
 
+    #if DEBUG
     /// A tab at the end of `parent`, for the demo tree.
     func demoTab(_ name: String, _ url: String, in parent: String) async -> String? {
         let id = UUID().uuidString.lowercased()
@@ -525,6 +539,7 @@ final class AppModel {
         }
         return await edit(ops) ? id : nil
     }
+    #endif
 
     @ObservationIgnored private var makingOwnWorkspace = false
 
@@ -1841,11 +1856,11 @@ final class AppModel {
         favorites.last { $0.parent == parent }?.id
     }
 
-    /// Pins `tab`'s page at the end of the row, as a pin of its own and no
+    /// Pins `url` at the end of the row, as a pin of its own and no
     /// favorite (pins-root spec §6), even where a pin of that address
     /// exists, as the desktop's `pinTab` adds one (`duplicate`). Returns
     /// the pin's guid.
-    func pinTab(_ tab: OutlineRow, url: URL, title: String) async -> String? {
+    func pinTab(url: URL, title: String) async -> String? {
         let address = url.absoluteString
         guard Self.opensHere(address), let root = pinsRootId else { return nil }
         let guid = Self.mintGuid()

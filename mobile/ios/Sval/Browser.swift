@@ -42,12 +42,6 @@ final class Browser {
     /// How far the bar has folded into its pill, from 0 (open) to 1,
     /// following the page as it scrolls (`pageScrolled`).
     private(set) var barFold = 0.0
-    /// Whether the bar is folded, or past halfway. Setting it opens or
-    /// folds the bar with the settling spring.
-    var barCollapsed: Bool {
-        get { barFold >= 0.5 }
-        set { foldBar(to: newValue ? 1 : 0) }
-    }
     /// The scroll so far toward folding or unfolding a bar at rest.
     @ObservationIgnored private var foldRun = 0.0
     /// Set when the bar is opened by a tap: the page's coasting leaves it
@@ -64,7 +58,6 @@ final class Browser {
     /// after it last drew: the tab in front's, at launch, is made once the
     /// window has drawn without it.
     private var pagesChanged = 0
-    /// The tabs the user muted from their row.
     /// The state of each page let go, and the address it was at, by tab id.
     @ObservationIgnored private var offloaded: [String: (state: Any, address: String?)] = [:]
     @ObservationIgnored private let model: AppModel
@@ -72,7 +65,6 @@ final class Browser {
     /// The files the pages download.
     let downloads = Downloads()
     @ObservationIgnored let audio = BackgroundAudio()
-    @ObservationIgnored private var memoryWarning: NSObjectProtocol?
     /// When the user left each workspace they have left, by id.
     @ObservationIgnored private var leftAt: [String: Date] = [:]
 
@@ -104,10 +96,12 @@ final class Browser {
         return store
     }
 
+    #if DEBUG
     /// Loads `html` into a tab's page, for the privacy check alone.
     func loadForCheck(_ id: String, html: String, base: URL) {
         model.row(id).map { page(for: $0) }?.view.loadHTMLString(html, baseURL: base)
     }
+    #endif
 
     /// The Workspace last shown outside the private session, as saved.
     var savedWorkspace: String? { UserDefaults.standard.string(forKey: Self.workspaceKey) }
@@ -297,7 +291,7 @@ final class Browser {
     /// (pins spec §8.1). A tab in front stays in front as the pin.
     func pin(_ row: OutlineRow, url: URL) async {
         let page = currentTabId == row.id ? currentURL ?? url : url
-        guard let guid = await model.pinTab(row, url: page, title: row.title) else { return }
+        guard let guid = await model.pinTab(url: page, title: row.title) else { return }
         handOver(row, toPin: guid)
         let front = currentTabId == row.id
         _ = await model.closeTab(row)
@@ -398,7 +392,7 @@ final class Browser {
     /// first, across every Workspace: the empty Launcher's list
     /// (`recentTabs`, `RECENT_TABS`). A tab never brought to the front here
     /// was never used here, so it is no recent tab.
-    func recentTabs(limit: Int = 6) -> [OutlineRow] {
+    func recentTabs() -> [OutlineRow] {
         model.rows
             .filter { $0.kind == "tab" && $0.id != currentTabId && Self.openable($0) != nil }
             // The private session and the user's Workspaces never see each
@@ -406,7 +400,7 @@ final class Browser {
             .filter { model.isPrivate($0.id) == inPrivate }
             .compactMap { row in usedAt[row.id].map { (row, $0) } }
             .sorted { $0.1 > $1.1 }
-            .prefix(limit)
+            .prefix(6)
             .map(\.0)
     }
     private static let frontKey = "frontTabs"
@@ -607,7 +601,7 @@ final class Browser {
             }
         }
         watchWindow()
-        memoryWarning = NotificationCenter.default.addObserver(
+        NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -726,7 +720,7 @@ final class Browser {
         let tabs = Set(model.rows.lazy.filter { $0.kind == "tab" }.map(\.id))
         usedAt = usedAt.filter { tabs.contains($0.key) }
         UserDefaults.standard.set(usedAt.filter { !model.isPrivate($0.key) }, forKey: Self.usedKey)
-        barCollapsed = false
+        foldBar(to: 0)
         if let workspace = model.workspace(of: id) ?? Self.pinParts(id)?.workspace {
             frontTabs[workspace] = id
             UserDefaults.standard.set(frontTabs.filter { !model.isPrivate($0.key) }, forKey: Self.frontKey)
@@ -766,7 +760,7 @@ final class Browser {
         currentTabId = nil
         UserDefaults.standard.removeObject(forKey: Self.currentKey)
         workspaceId = id
-        barCollapsed = false
+        foldBar(to: 0)
         refreshState()
     }
 
@@ -1807,7 +1801,7 @@ final class Page: NSObject, WKNavigationDelegate {
     let tabId: String
     /// The video and audio choice the page was made for. WebKit fixes a
     /// page's playback rule when it is made, so a load of a site with
-    /// another choice asks for a new page (`onMediaChoice`).
+    /// another choice asks for a new page (`applyMediaChoices`).
     let media: SiteRules.Media
     /// The choice a site's page needs, and what makes a page for `URL` in
     /// this one's place when it differs.
@@ -2012,9 +2006,6 @@ final class Page: NSObject, WKNavigationDelegate {
         configuration.userContentController.addUserScript(WKUserScript(
             source: Self.reportTyping + Self.reportPlayback + Self.reportPressed, injectionTime: .atDocumentStart,
             forMainFrameOnly: false, in: .defaultClient))
-        // With the developer's launch option, every frame reports what its
-        // media and scripts do, for the device's console. Never otherwise:
-        // the reports name a page's elements and quote its errors.
         // A pin's page says when the user first touches it, which fixes its
         // saved page (pins spec §5).
         if reportsTouch {
@@ -2046,6 +2037,10 @@ final class Page: NSObject, WKNavigationDelegate {
                 source: KagiSpend.bridgeScript, injectionTime: .atDocumentStart,
                 forMainFrameOnly: false, in: .defaultClient))
         }
+        // With the developer's launch option, every frame reports what its
+        // media and scripts do, for the device's console. Never otherwise:
+        // the reports name a page's elements and quote its errors.
+        #if DEBUG
         if Self.pageDiagnostics {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: Self.reportMedia, injectionTime: .atDocumentStart,
@@ -2056,6 +2051,7 @@ final class Page: NSObject, WKNavigationDelegate {
                 source: Self.reportModeCalls, injectionTime: .atDocumentStart,
                 forMainFrameOnly: false, in: .page))
         }
+        #endif
         view = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         configuration.userContentController.add(
@@ -2078,12 +2074,14 @@ final class Page: NSObject, WKNavigationDelegate {
             configuration.userContentController.add(
                 TouchReport(page: self), contentWorld: .defaultClient, name: Self.touchMessage)
         }
+        #if DEBUG
         if Self.pageDiagnostics {
             configuration.userContentController.add(
                 MediaReport(), contentWorld: .defaultClient, name: Self.mediaMessage)
             configuration.userContentController.add(
                 MediaReport(), contentWorld: .page, name: Self.mediaMessage)
         }
+        #endif
         view.navigationDelegate = self
         view.uiDelegate = panels
         view.allowsBackForwardNavigationGestures = true
@@ -2107,6 +2105,7 @@ final class Page: NSObject, WKNavigationDelegate {
         observations.append(view.observe(\.title) { _, _ in
             MainActor.assumeIsolated { changed() }
         })
+        #if DEBUG
         if Self.pageDiagnostics {
             observations.append(view.observe(\.fullscreenState) { view, _ in
                 MainActor.assumeIsolated {
@@ -2114,6 +2113,7 @@ final class Page: NSObject, WKNavigationDelegate {
                 }
             })
         }
+        #endif
         for path in [\WKWebView.canGoBack, \WKWebView.canGoForward, \WKWebView.isLoading] {
             observations.append(view.observe(path) { _, _ in
                 MainActor.assumeIsolated { onState() }
@@ -2679,16 +2679,6 @@ final class Page: NSObject, WKNavigationDelegate {
         }
     }
 
-    static func describe(_ state: WKMediaPlaybackState) -> String {
-        switch state {
-        case .none: "none"
-        case .playing: "playing"
-        case .paused: "paused"
-        case .suspended: "suspended"
-        @unknown default: "unknown"
-        }
-    }
-
     private static let reportTyping = """
         addEventListener("input", function report(event) {
           if (!event.isTrusted) return;
@@ -2697,13 +2687,16 @@ final class Page: NSObject, WKNavigationDelegate {
         }, true);
         """
 
+    #if DEBUG
     static let pageDiagnostics = LaunchOption.given("-svalPageDiagnostics")
+    #endif
 
     /// What Safari on this iOS adds after WebKit's part of its user agent.
     static let safariApplicationName: String = {
         let version = UIDevice.current.systemVersion.split(separator: ".").prefix(2).joined(separator: ".")
         return "Version/\(version) Mobile/15E148 Safari/604.1"
     }()
+    #if DEBUG
     private static let reportModeCalls = """
         (() => {
           const send = fields => window.webkit?.messageHandlers?.svalMedia?.postMessage({ world: "page", ...fields });
@@ -2776,6 +2769,7 @@ final class Page: NSObject, WKNavigationDelegate {
           });
         })();
         """
+    #endif
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         Diagnostics.log("page: a load failed: \(Diagnostics.name(error))")
@@ -2865,10 +2859,6 @@ final class Page: NSObject, WKNavigationDelegate {
                      injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
     }
 
-    /// A page that named no icon its document could show by the time it
-    /// was parsed may have added one since. A page on screen gives the
-    /// grid its picture once loaded, a second on so its images have drawn;
-    /// a page off screen has drawn nothing new to take.
     /// A response WebKit can't show, or one the site sends as an attachment,
     /// is downloaded. A PDF, which WebKit shows, stays in the tab.
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
@@ -2904,6 +2894,10 @@ final class Page: NSObject, WKNavigationDelegate {
         onDownload?(download, download.isUserInitiated || asked)
     }
 
+    /// A page that named no icon its document could show by the time it
+    /// was parsed may have added one since. A page on screen gives the
+    /// grid its picture once loaded, a second on so its images have drawn;
+    /// a page off screen has drawn nothing new to take.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !isPrivate { SiteIcons.shared.learn(page: webView.url, named: nil) }
         if Browser.pinParts(tabId) == nil {
@@ -3321,6 +3315,7 @@ private final class PressedReport: NSObject, WKScriptMessageHandler {
     }
 }
 
+#if DEBUG
 /// Writes a page's media and script reports to the device's console.
 private final class MediaReport: NSObject, WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -3329,6 +3324,7 @@ private final class MediaReport: NSObject, WKScriptMessageHandler {
         Diagnostics.log("media: \(line)")
     }
 }
+#endif
 
 /// Hands the icon address a page names to `SiteIcons`.
 private final class IconReport: NSObject, WKScriptMessageHandler {

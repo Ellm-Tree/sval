@@ -17,10 +17,10 @@ sync="$here/../../chrome/browser/components/sval/sync-icons"
 # Firefox paints its chrome icons through context-fill, which an asset
 # catalog doesn't know: the glyphs are drawn in black and tinted as
 # templates instead.
-for path in "$icons/pr-shield.svg" "$icons/pr-shield-fill.svg" "$icons/pr-shield-off.svg" \
-    "$icons/sc-shield-plain.svg" "$icons/pr-ads.svg" "$icons/sc-external.svg" \
+for path in "$icons/pr-shield.svg" "$icons/pr-shield-off.svg" \
+    "$icons/sc-shield-plain.svg" "$icons/sc-external.svg" \
     "$header/back.svg" "$header/forward.svg" "$header/reload.svg" "$header/stop.svg" \
-    "$sync/satellite.svg" "$sync/badge-bang.svg" "$sync/badge-x.svg" "$sync/badge-pause.svg" \
+    "$sync/satellite.svg" "$sync/badge-bang.svg" "$sync/badge-pause.svg" \
     "$header/javascript.svg" "$header/javascript-off.svg" "$header/media.svg" "$header/split.svg" "$header/private.svg" \
     "$here/../../chrome/browser/components/sval/workspace-isolated.svg" \
     "$here/../../chrome/browser/components/sval/agent-robot.svg" \
@@ -52,13 +52,20 @@ JSON
 done
 
 # Art drawn as it is, not tinted: the app icon as the desktop's About page
-# shows it, and the home page's starfield.
+# shows it, and the home page's starfield. A size, in points, replaces an
+# SVG's own width and height: actool rasterises an SVG at its stated size at
+# each scale, so the stated size is the largest the app draws it.
 art() {
-  name=$1 path=$2
+  name=$1 path=$2 size=${3:-}
   set="$out/$name.imageset"
   mkdir -p "$set"
   file=$(basename "$path")
-  cp "$path" "$set/$file"
+  if [ -n "$size" ]; then
+    sed -e "1s/^\(<svg[^>]*\) width=\"[^\"]*\"/\1 width=\"$size\"/" \
+      -e "1s/^\(<svg[^>]*\) height=\"[^\"]*\"/\1 height=\"$size\"/" "$path" > "$set/$file"
+  else
+    cp "$path" "$set/$file"
+  fi
   cat > "$set/Contents.json" <<JSON
 {"images":[{"filename":"$file","idiom":"universal"}],"info":{"author":"xcode","version":1},
  "properties":{"preserves-vector-representation":true,"template-rendering-intent":"original"}}
@@ -66,9 +73,11 @@ JSON
 }
 art app-icon "$here/../../branding/sval/content/about-logo@2x.png"
 art starfield "$here/../../chrome/browser/components/sval/home/starfield-stars-only-1920x1080.svg"
-art mark-private "$here/../../branding/sval/content/app-icon-private-unplated.svg"
-art mark "$here/../../branding/sval/content/app-icon-unplated.svg"
-art mark-light "$here/../../branding/sval/content/app-icon-unplated-light.svg"
+# The marks at the home page's size (DeviceHome.swift, WalkthroughMark),
+# the largest the app draws one.
+art mark-private "$here/../../branding/sval/content/app-icon-private-unplated.svg" 144
+art mark "$here/../../branding/sval/content/app-icon-unplated.svg" 144
+art mark-light "$here/../../branding/sval/content/app-icon-unplated-light.svg" 144
 
 # The home screen icon, in the layered format iOS draws Liquid Glass from:
 # the plate and its stars, then the globe and the "S" as glass, each a

@@ -134,9 +134,9 @@ struct CloseCircle: View {
     }
 }
 
-/// A tab's trailing control in the list and on a grid card: the speaker,
-/// which mutes, while its media plays, else × to close it; nothing while
-/// rows are being picked.
+/// A tab's trailing control in the list: the speaker, which mutes, while
+/// its media plays, else × to close it; nothing while rows are being
+/// picked.
 struct RowAccessory: View {
     let playing: Bool
     let muted: Bool
@@ -145,8 +145,6 @@ struct RowAccessory: View {
     let title: String
     let ink: Color
     let accent: Color
-    /// The control's height: the list row's target, or the card's line.
-    var height: CGFloat = 44
     let onMute: () -> Void
     let onClose: () -> Void
 
@@ -156,7 +154,7 @@ struct RowAccessory: View {
                 Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 15))
                     .foregroundStyle(accent)
-                    .frame(width: 44, height: height)
+                    .frame(width: 44, height: 44)
                     .contentShape(.rect)
             }
             .buttonStyle(.borderless)
@@ -166,7 +164,7 @@ struct RowAccessory: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(ink)
-                    .frame(width: 44, height: height)
+                    .frame(width: 44, height: 44)
                     .contentShape(.rect)
             }
             .buttonStyle(.borderless)

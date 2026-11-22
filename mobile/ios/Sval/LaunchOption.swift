@@ -16,12 +16,10 @@ enum LaunchOption {
         #endif
     }
 
+    #if DEBUG
     /// Every option given, for the log.
     static var all: [String] {
-        #if DEBUG
         ProcessInfo.processInfo.arguments.dropFirst().filter { $0.hasPrefix("-sval") }
-        #else
-        []
-        #endif
     }
+    #endif
 }

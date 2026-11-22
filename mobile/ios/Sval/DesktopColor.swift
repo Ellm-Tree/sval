@@ -418,17 +418,6 @@ enum DesktopColor {
         return Custom(h: h, c: c, l: (object["l"] as? NSNumber)?.doubleValue, mode: object["mode"] as? String).json
     }
 
-    /// Every lightness, dark to light, that text meets its target on at
-    /// hue `h` and chroma `c`: what Shade runs over (`allowedLs`).
-    static func allowedLightnesses(h: Double, c: Double) -> [Double] {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let value = context?.objectForKeyedSubscript("allowedLs")?.call(withArguments: [h, c, contrast.more]),
-              value.isArray
-        else { return [] }
-        return (value.toArray() as? [NSNumber])?.map(\.doubleValue) ?? []
-    }
-
     /// A Workspace colour as a custom one to start editing from in this
     /// appearance (`customFrom`): a preset, or one picked in the other
     /// appearance, as it looks now; none as Sval's own window looks.

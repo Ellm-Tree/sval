@@ -27,18 +27,14 @@ struct RootView: View {
         // No navigation stack here: the Workspace panel's own stack would
         // nest in it, and SwiftUI gives a nested stack's bars to the outer.
         Group {
-            if #available(iOS 26, *), GlassCheck.requested {
-                GlassCheckView()
-            } else {
-                // Setup covers the browser and never replaces it, so a link
-                // from another app always has a browser to open in.
-                BrowserView()
-                    .fullScreenCover(isPresented: Binding(
-                        get: { model.showsSetup },
-                        set: { if !$0 { model.settingUp = false } })) {
-                        FirstRunView()
-                    }
-            }
+            // Setup covers the browser and never replaces it, so a link
+            // from another app always has a browser to open in.
+            BrowserView()
+                .fullScreenCover(isPresented: Binding(
+                    get: { model.showsSetup },
+                    set: { if !$0 { model.settingUp = false } })) {
+                    FirstRunView()
+                }
         }
         // A finished download shows in Quick Look over everything, sheets
         // and setup included (`Downloads.preview`).
@@ -70,7 +66,7 @@ extension OutlineRow {
     @MainActor var title: String { label ?? TitleHold.shared.pending[id] ?? name }
 
     /// What a row reads as: its title, or for a row without one what the
-    /// desktop's panel calls it (`_untitled`, `_tabPlaceholder`). A tab
+    /// desktop's panel calls it (`_untitled`, `tabPlaceholder`). A tab
     /// reads as its host without `www.`, its whole address where it has no
     /// host, or New Tab for a blank page (`isBlankPageURL`).
     @MainActor var displayTitle: String {

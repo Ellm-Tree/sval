@@ -4,6 +4,7 @@
 import Foundation
 import WebKit
 
+#if DEBUG
 /// Checks, on the device, that a private session leaves nothing behind,
 /// as the desktop's "Nothing on disk" tests do (private-windows spec): a
 /// scripted session puts a random marker in a page's address, title,
@@ -88,3 +89,4 @@ enum PrivacyCheck {
         return (files, hits)
     }
 }
+#endif

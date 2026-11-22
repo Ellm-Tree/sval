@@ -139,7 +139,7 @@ struct MediaCard: View {
                 CloseCircle(diameter: 32, glass: workspaceGlass(colors.layer), action: onClose)
             }
             position
-            controls(front: front)
+            controls()
         }
         .foregroundStyle(colors.ink)
         .padding(.horizontal, 14)
@@ -194,7 +194,7 @@ struct MediaCard: View {
         }
     }
 
-    private func controls(front: Bool) -> some View {
+    private func controls() -> some View {
         let paused = info?.paused ?? !browser.playingTabs.contains(tabId)
         let live = info?.live ?? false
         let video = info?.video ?? false
