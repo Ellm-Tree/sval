@@ -58,10 +58,11 @@ final class Browser {
     /// after it last drew: the tab in front's, at launch, is made once the
     /// window has drawn without it.
     private var pagesChanged = 0
-    /// The state of each page let go, and the address it was at, by tab id.
-    @ObservationIgnored private var offloaded: [String: (state: Any, address: String?)] = [:]
+    /// The state of each page let go, and the address it was at, by page
+    /// key.
+    @ObservationIgnored private let offloaded = PageStates()
     @ObservationIgnored private let model: AppModel
-    @ObservationIgnored let blocker = ContentBlocker()
+    @ObservationIgnored let blocker: ContentBlocker
     /// The files the pages download.
     let downloads = Downloads()
     @ObservationIgnored let audio = BackgroundAudio()
@@ -166,7 +167,7 @@ final class Browser {
     func endPrivateSession(_ ids: Set<String>) {
         for id in ids {
             pages.removeValue(forKey: id)?.close()
-            offloaded[id] = nil
+            offloaded.forget(id)
             visits[id] = nil
             usedAt[id] = nil
             frontTabs[id] = nil
@@ -539,8 +540,9 @@ final class Browser {
     /// Whether a tab's page is loaded on this phone.
     func hasPage(_ id: String) -> Bool { pages[id] != nil }
 
-    init(model: AppModel) {
+    init(model: AppModel, blocker made: ContentBlocker) {
         self.model = model
+        blocker = made
         currentTabId = UserDefaults.standard.string(forKey: Self.currentKey)
         workspaceId = UserDefaults.standard.string(forKey: Self.workspaceKey)
         blocker.onChange = { [weak self] in
@@ -626,23 +628,36 @@ final class Browser {
         }
     }
 
-    /// The most tabs' pages kept loaded. Each holds its document, scripts
+    /// The most tabs' and pins' pages kept loaded. Each holds its document, scripts
     /// and pictures in memory, and iOS ends an app that holds too much.
     /// Ten covers a split's two panes, tabs playing behind, and the few a
     /// person moves between; a page let go loads again from its saved
     /// state when its tab is shown.
     static let livePages = 10
 
-    /// Lets go of the pages of the tabs least recently in front, past
-    /// `livePages`. Pins' pages are left out: one let go would come back
-    /// at its saved address, and selecting a loaded pin never moves it
-    /// (pins spec §5).
+    /// Lets go of the pages of the tabs and pins least recently in front,
+    /// past `livePages`. A pin's page comes back from its state where it
+    /// was, its saved page kept (`pinPage`), since selecting a loaded pin
+    /// never moves it (pins spec §5).
     private func trimPages() async {
-        let tabs = pages.keys.filter { model.row($0)?.kind == .tab }
-        guard tabs.count > Self.livePages else { return }
-        let oldest = tabs.sorted { (usedAt[$0] ?? 0) < (usedAt[$1] ?? 0) }
-        await offload(Array(oldest.dropLast(Self.livePages)), why: "past the limit of live pages")
+        let over = Self.pastLimit(Array(pages.keys),
+                                  counts: { self.model.row($0)?.kind == .tab || self.pin(for: $0) != nil },
+                                  usedAt: { self.usedAt[$0] ?? self.pinUsedAt[$0] ?? 0 })
+        guard !over.isEmpty else { return }
+        await offload(over, why: "past the limit of live pages")
     }
+
+    /// Of the pages `ids`, those `counts` takes that are past `livePages`,
+    /// least recently in front first.
+    static func pastLimit(_ ids: [String], counts: (String) -> Bool, usedAt: (String) -> Double) -> [String] {
+        let counted = ids.filter(counts)
+        guard counted.count > livePages else { return [] }
+        return Array(counted.sorted { usedAt($0) < usedAt($1) }.dropLast(livePages))
+    }
+
+    /// When each pin's page was last brought to the front, by page key.
+    /// `usedAt` keeps the tree's tabs alone, for the Launcher.
+    @ObservationIgnored private var pinUsedAt: [String: Double] = [:]
 
     /// Lets go of the pages of `ids`, keeping each one's state, except those
     /// that would lose something by going.
@@ -656,7 +671,7 @@ final class Browser {
             guard let page = pages[id], await !page.mustStay() else { continue }
             pages.removeValue(forKey: id)
             if let state = page.view.interactionState {
-                offloaded[id] = (state, page.view.url?.absoluteString)
+                keepOffloaded(id, state: state, address: page.view.url?.absoluteString, from: page)
             }
             page.close()
             media[id] = nil
@@ -668,10 +683,28 @@ final class Browser {
         makeShownPages()
     }
 
-    /// Takes the grid's picture of tab `id`'s page, if it's a tab of the
-    /// tree with a page here.
+    /// Keeps the state of `id`'s page let go. A private tab's page is told
+    /// by the session's ids or, once its tab has left them, by the page.
+    private func keepOffloaded(_ id: String, state: Any, address: String?, from page: Page? = nil) {
+        offloaded.keep(id, state: state, address: address, isTab: model.row(id)?.kind == .tab,
+                       isPrivate: model.isPrivate(id) || page?.isPrivate == true, savedPage: page?.savedPage)
+    }
+
+    /// The pages whose pictures `PagePreviews` keeps, by page key: the
+    /// tree's tabs, for the grid and the tab scrub, and each Workspace's
+    /// pins, for the scrub.
+    static func pictured(_ rows: [OutlineRow], pins: [String: [PinRow]]) -> Set<String> {
+        var keys = Set(rows.lazy.filter { $0.kind == .tab }.map(\.id))
+        for (workspace, rows) in pins {
+            for pin in rows where pin.kind == "favorite" { keys.insert(pinKey(pin.guid, in: workspace)) }
+        }
+        return keys
+    }
+
+    /// Takes the picture of `id`'s page, if it's a tab of the tree or a
+    /// shown pin with a page here.
     func takePreview(_ id: String) {
-        guard model.row(id)?.kind == .tab, let page = pages[id] else { return }
+        guard model.row(id)?.kind == .tab || pin(for: id) != nil, let page = pages[id] else { return }
         PagePreviews.shared.take(id, from: page.view, isPrivate: model.isPrivate(id))
     }
 
@@ -717,6 +750,7 @@ final class Browser {
             UserDefaults.standard.set(splitFocus.filter { !model.isPrivate($0.key) }, forKey: Self.splitFocusKey)
         }
         usedAt[id] = Date.now.timeIntervalSince1970
+        if pin(for: id) != nil { pinUsedAt[id] = usedAt[id] }
         let tabs = Set(model.rows.lazy.filter { $0.kind == .tab }.map(\.id))
         usedAt = usedAt.filter { tabs.contains($0.key) }
         UserDefaults.standard.set(usedAt.filter { !model.isPrivate($0.key) }, forKey: Self.usedKey)
@@ -822,11 +856,12 @@ final class Browser {
         guard row.kind == .tab else { return nil }
         let entry = ClosedTab(
             row: row, place: model.closedPlace(of: row), workspace: model.workspace(of: row.id),
-            state: pages[row.id]?.view.interactionState ?? offloaded[row.id]?.state)
+            state: pages[row.id]?.view.interactionState ?? offloaded.saved(row.id)?.state)
         // Asked before the close: closing drops the tab from the private
         // session's ids, and the last tab ends the session.
         let wasPrivate = model.isPrivate(row.id)
         guard await model.closeTab(row) else { return nil }
+        offloaded.forget(row.id)
         if Self.openable(row) != nil, !wasPrivate {
             recentlyClosed.insert(entry, at: 0)
             recentlyClosed = Array(recentlyClosed.prefix(Self.recentlyClosedLimit))
@@ -851,7 +886,7 @@ final class Browser {
         let focus = focusedPane(of: split.id, among: panes.map(\.id))
         let entry = ClosedSplit(
             split: split, panes: panes,
-            states: panes.map { pages[$0.id]?.view.interactionState ?? offloaded[$0.id]?.state },
+            states: panes.map { pages[$0.id]?.view.interactionState ?? offloaded.saved($0.id)?.state },
             place: model.place(of: split), workspace: model.workspace(of: split.id),
             focused: panes.firstIndex { $0.id == focus } ?? 0)
         guard await model.closeSplit(split) else { return nil }
@@ -868,7 +903,7 @@ final class Browser {
             return
         }
         for (index, id) in ids.enumerated() {
-            if let state = entry.states[index] { offloaded[id] = (state, entry.panes[index].url) }
+            if let state = entry.states[index] { keepOffloaded(id, state: state, address: entry.panes[index].url) }
         }
         Diagnostics.log("splits: a closed split of \(ids.count) reopened")
         select(ids[min(entry.focused, ids.count - 1)])
@@ -884,7 +919,7 @@ final class Browser {
             return
         }
         if let state = entry.state {
-            offloaded[id] = (state, entry.row.url)
+            keepOffloaded(id, state: state, address: entry.row.url)
         }
         Diagnostics.log("tabs: a closed tab reopened, history \(entry.state == nil ? "lost" : "kept")")
         select(id)
@@ -907,10 +942,11 @@ final class Browser {
         if askClosed.contains(where: { !live($0) }) { askClosed = askClosed.filter(live) }
         held = held.filter { live($0.key) }
         stopped = stopped.filter(live)
-        offloaded = offloaded.filter { live($0.key) }
+        offloaded.keep(live: live, onDisk: tabs.contains)
         visitTransition = visitTransition.filter { live($0.key) }
         restoring = restoring.filter(live)
         lastVisit = lastVisit.filter { live($0.key) }
+        pinUsedAt = pinUsedAt.filter { live($0.key) }
         // Kept by Workspace or split: each goes with its row.
         let exists = { (id: String) in self.model.row(id) != nil }
         frontTabs = frontTabs.filter { exists($0.key) }
@@ -963,14 +999,15 @@ final class Browser {
         if offset > 0, view.canGoForward { view.goForward() }
     }
     /// Clear Browsing Data: every site's cookies, storage and cache in the
-    /// store every tab but a private one uses, the sites' icons and the
-    /// tabs' pictures. The tree, history and settings stay, and so does the
+    /// store every tab but a private one uses, the sites' icons, the tabs'
+    /// pictures and the saved states of pages let go. The tree, history and settings stay, and so does the
     /// private session, whose store is its own.
     func clearBrowsingData() async {
         await WKWebsiteDataStore.default().removeData(
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         SiteIcons.shared.forgetAll()
         PagePreviews.shared.forgetSaved()
+        offloaded.forgetAll(keeping: model.isPrivate)
         Diagnostics.log("settings: browsing data cleared")
         if !privateInFront { reload() }
     }
@@ -1305,7 +1342,7 @@ final class Browser {
         if id == currentTabId && UIApplication.shared.applicationState != .background { return }
         pages.removeValue(forKey: id)
         if let state = page.view.interactionState {
-            offloaded[id] = (state, page.view.url?.absoluteString)
+            keepOffloaded(id, state: state, address: page.view.url?.absoluteString, from: page)
         }
         page.close()
         media[id] = nil
@@ -1352,7 +1389,7 @@ final class Browser {
         media[id] = nil
         let page = makePage(id, address: nil, opens: nil, pin: false, at: site)
         if let state {
-            page.view.interactionState = state
+            page.restore(state)
             if url == nil { restoring.insert(id) }
         }
         if let url { page.load(url) }
@@ -1481,7 +1518,7 @@ final class Browser {
                           privately: Bool? = nil, configuration: WKWebViewConfiguration? = nil) -> Page {
         let isPrivate = privately ?? model.isPrivate(id)
         let rules = model.siteRules(private: isPrivate)
-        let host = site?.host() ?? offloaded[id]?.address.flatMap(URL.init(string:))?.host() ?? opens?.host()
+        let host = site?.host() ?? offloaded.saved(id)?.address.flatMap(URL.init(string:))?.host() ?? opens?.host()
         // A page made at another site than its tab's visit ends the visit.
         let visit = visits[id].flatMap { visit in host.map { SiteRules.site(of: $0) ?? $0 } == visit.site ? visit : nil }
         visits[id] = visit
@@ -1561,7 +1598,7 @@ final class Browser {
             self?.model.siteRules(private: isPrivate).protectionsOn(for: host) ?? true
         }
         page.protected = rules.protectionsOn(for: host ?? "")
-        page.useRules(blocker.rules)
+        page.loadsUnder(blocker)
         page.onNewWindow = { [weak self] configuration, action in
             self?.openWindow(from: id, configuration: configuration, for: action)
         }
@@ -1571,8 +1608,8 @@ final class Browser {
         // A page let go comes back as it was, unless another device has
         // since moved the tab to another address.
         guard !pin else { return page }
-        if let saved = offloaded.removeValue(forKey: id), saved.address == address {
-            page.view.interactionState = saved.state
+        if let saved = offloaded.take(id), saved.address == address {
+            page.restore(saved.state)
             // Put back as it was: no new visit (`navigated`).
             restoring.insert(id)
         } else if let opens {
@@ -1717,7 +1754,7 @@ final class Browser {
         let state = page.view.interactionState
         let first = model.children(of: workspace).first?.id
         guard let id = await model.addTab(to: workspace, url: url, before: first) else { return nil }
-        if let state { offloaded[id] = (state, url.absoluteString) }
+        if let state { keepOffloaded(id, state: state, address: url.absoluteString) }
         // The page stays in front only if it was: unpinning a pin behind
         // files its page as a tab and leaves the front alone.
         if front { select(id) }
@@ -1744,7 +1781,7 @@ final class Browser {
         guard let workspace = model.workspace(of: tab.id) else { return }
         let key = Self.pinKey(guid, in: workspace)
         if let page = pages[tab.id], let state = page.view.interactionState {
-            offloaded[key] = (state, page.view.url?.absoluteString)
+            keepOffloaded(key, state: state, address: page.view.url?.absoluteString, from: page)
         }
         frontTabs[workspace] = key
     }
@@ -1761,9 +1798,9 @@ final class Browser {
             Diagnostics.log("pins: a link to another site opens as a tab")
             Task { await self.openNewTab(url, in: workspace) }
         }
-        if let restored = offloaded.removeValue(forKey: key) {
-            page.view.interactionState = restored.state
-            page.startsSaved(restored.address.flatMap(URL.init(string:)))
+        if let restored = offloaded.take(key) {
+            page.restore(restored.state)
+            page.startsSaved(restored.savedPage ?? restored.address.flatMap(URL.init(string:)))
         } else if let saved {
             page.load(saved)
         }
@@ -1931,7 +1968,37 @@ final class Page: NSObject, WKNavigationDelegate {
     struct LoadFailure: Equatable {
         let url: URL
         let reason: String
+        /// Set when the page's web process kept ending (`Crashes`), which
+        /// has no reason of the system's to give.
+        var keepsClosing = false
     }
+
+    /// The times the page's web process ended at one address, to stop
+    /// loading again a page that ends it each time. Firefox for iOS stops
+    /// at the third end in a row (`consecutiveCrashes` in its
+    /// `webViewWebContentProcessDidTerminate`); the span keeps a page
+    /// that ends once in a long while from counting toward it.
+    struct Crashes {
+        static let limit = 3
+        static let span: TimeInterval = 60
+        private var ends: [Date] = []
+        private var url: URL?
+
+        /// Notes an end at `url` at `now`, and returns whether the page
+        /// has ended `limit` times there within `span`, which starts the
+        /// count over.
+        mutating func ended(at url: URL?, now: Date) -> Bool {
+            if url != self.url {
+                self.url = url
+                ends = []
+            }
+            ends = ends.filter { now.timeIntervalSince($0) < Self.span } + [now]
+            guard ends.count >= Self.limit else { return false }
+            ends = []
+            return true
+        }
+    }
+    private var crashes = Crashes()
     /// The load that failed and left this page empty, until another starts.
     private(set) var failure: LoadFailure?
     /// Told when a load fails and leaves this page empty.
@@ -2160,8 +2227,13 @@ final class Page: NSObject, WKNavigationDelegate {
 
     /// Loads `url` for Sval: from the user's address, a tab's or a pin's.
     func load(_ url: URL) {
+        if waitsForRules {
+            waiting.append { [weak self] in self?.load(url) }
+            return
+        }
         appLoading = true
         failure = nil
+        crashes = Crashes()
         lift([.hold])
         view.load(URLRequest(url: url))
     }
@@ -2799,7 +2871,8 @@ final class Page: NSObject, WKNavigationDelegate {
 
     /// iOS ends a page's web process under memory pressure, which leaves
     /// the page blank. The page in front loads again at once, and any other
-    /// once it is shown (`Browser.select`), as Safari does.
+    /// once it is shown (`Browser.select`), as Safari does. A page whose
+    /// process keeps ending shows its failure, and Try Again loads it anew.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         ended = true
         // The process took the page's frames and their media with it, and
@@ -2813,6 +2886,14 @@ final class Page: NSObject, WKNavigationDelegate {
         if !playingFrames.isEmpty {
             playingFrames = PlayingFrames()
             onMedia?(tabId, false, false, false)
+        }
+        if crashes.ended(at: webView.url, now: .now), let url = webView.url {
+            // Shown again, an ended page loads again (`Browser.select`).
+            ended = false
+            failure = LoadFailure(url: url, reason: "", keepsClosing: true)
+            Diagnostics.log("page: the web content process ended \(Crashes.limit) times within \(Int(Crashes.span)) s, not loading it again")
+            onFailure?()
+            return
         }
         let shown = webView.window != nil && webView.isUserInteractionEnabled
         Diagnostics.log("page: the web content process ended\(shown ? ", loading it again" : "")")
@@ -2896,16 +2977,14 @@ final class Page: NSObject, WKNavigationDelegate {
 
     /// A page that named no icon its document could show by the time it
     /// was parsed may have added one since. A page on screen gives the
-    /// grid its picture once loaded, a second on so its images have drawn;
+    /// grid and the tab scrub its picture once loaded, a second on so its images have drawn;
     /// a page off screen has drawn nothing new to take.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !isPrivate { SiteIcons.shared.learn(page: webView.url, named: nil) }
-        if Browser.pinParts(tabId) == nil {
-            Task { [tabId, isPrivate] in
-                try? await Task.sleep(for: .seconds(1))
-                guard webView.window != nil else { return }
-                PagePreviews.shared.take(tabId, from: webView, isPrivate: isPrivate)
-            }
+        Task { [tabId, isPrivate] in
+            try? await Task.sleep(for: .seconds(1))
+            guard webView.window != nil else { return }
+            PagePreviews.shared.take(tabId, from: webView, isPrivate: isPrivate)
         }
         if pinRules != nil, !touched, !typedInto {
             savedPage = webView.url
@@ -2980,6 +3059,39 @@ final class Page: NSObject, WKNavigationDelegate {
         return playing || inPictureInPicture
     }
 
+    /// Puts back the state of a page let go (`WKWebView.interactionState`),
+    /// which loads its page.
+    func restore(_ state: Any) {
+        if waitsForRules {
+            waiting.append { [weak self] in self?.restore(state) }
+            return
+        }
+        view.interactionState = state
+    }
+
+    /// Takes `blocker`'s rules. Until the blocker is `ready`, the page's
+    /// loads and restores wait, in order: WebKit applies a rule list
+    /// to what a page loads after the list is added.
+    func loadsUnder(_ blocker: ContentBlocker) {
+        useRules(blocker.rules)
+        guard !blocker.ready else { return }
+        waitsForRules = true
+        Task { [weak self, weak blocker] in
+            await blocker?.whenReady()
+            guard let self, let blocker else { return }
+            useRules(blocker.rules)
+            waitsForRules = false
+            let starts = waiting
+            waiting = []
+            for start in starts { start() }
+        }
+    }
+
+    /// Whether the page's loads wait for the blocker (`loadsUnder`).
+    private(set) var waitsForRules = false
+    /// The loads and restores asked for while the page waits, in order.
+    private var waiting: [@MainActor () -> Void] = []
+
     /// Blocks with `rules` in place of the rules the page had. A page applies
     /// them to what it loads next.
     func useRules(_ rules: ContentBlocker.Rules) {
@@ -2987,7 +3099,7 @@ final class Page: NSObject, WKNavigationDelegate {
         installRules()
     }
 
-    private var rules = ContentBlocker.Rules()
+    private(set) var rules = ContentBlocker.Rules()
     /// Whether the site of the page's top document has protections on, and
     /// so blocks with the lists. As the desktop's allow list does, the top
     /// document's site decides for every frame (`SvalSiteProtections`).
@@ -3006,6 +3118,7 @@ final class Page: NSObject, WKNavigationDelegate {
     }
 
     func close() {
+        waiting = []
         view.pauseAllMediaPlayback()
         pending?.cancel()
         observations.removeAll()

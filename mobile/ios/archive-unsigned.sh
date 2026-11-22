@@ -8,10 +8,16 @@
 # public source because the scripts that build a binary are part of its
 # Corresponding Source (AGPL-3.0 section 1).
 #
-#   mobile/ios/archive-unsigned.sh <out.tar>
+#   mobile/ios/archive-unsigned.sh <out.tar> <dsyms.tar>
+#
+# <dsyms.tar> holds the archive's dSYMs folder: the debug symbols Xcode
+# strips from the app, which name the frames of a crash report from this
+# build and match no other.
 set -euo pipefail
 
-out="${1:?usage: $0 <out.tar>}"
+usage="usage: $0 <out.tar> <dsyms.tar>"
+out="${1:?$usage}"
+dsyms="${2:?$usage}"
 here="$(cd "$(dirname "$0")" && pwd)"
 work="$here/build/unsigned"
 rm -rf "$work"
@@ -28,3 +34,5 @@ xcodebuild archive \
 
 tar -cf "$out" -C "$work/Sval.xcarchive/Products/Applications" Sval.app
 echo "==> $out"
+tar -cf "$dsyms" -C "$work/Sval.xcarchive" dSYMs
+echo "==> $dsyms"

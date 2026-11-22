@@ -4,82 +4,92 @@
 import Foundation
 import Security
 
-/// The keys and ids this device keeps in its Keychain, readable after first
-/// unlock and never leaving the device: in neither iCloud Keychain nor a
-/// backup (key-storage spec, "Keys on mobile").
-enum Secrets {
-    private static let service = "app.sval.ios"
+/// Where the keys and ids are kept, by account.
+protocol KeyStore: Sendable {
+    /// The item, nil when there is none, and an error for any other
+    /// failure.
+    func find(account: String) throws -> Data?
+    func store(_ data: Data, account: String) throws
+    func delete(account: String)
+}
+
+/// The keys and ids this device keeps, by what each is for.
+struct Secrets: Sendable {
+    let store: KeyStore
+
+    /// This device's own, in its Keychain.
+    static let keychain = Secrets(store: Keychain())
 
     /// The 16 bytes this device writes its file under. The item is this
     /// device's alone, so it outlasts the app's own copy and never reaches
     /// another device (`docs/host-contract.md` §5).
-    static func deviceId() throws -> Data {
+    func deviceId() throws -> Data {
         try existingOrNew(account: "device-id", count: 16)
     }
 
     /// The key this device's own copy of the document is sealed under.
-    static func localKey() throws -> Data {
+    func localKey() throws -> Data {
         try existingOrNew(account: "local-key", count: 32)
     }
 
-    static func syncKey() -> Data? {
+    func syncKey() -> Data? {
         read(account: "sync-key")
     }
 
-    static func storeSyncKey(_ key: Data) throws {
-        try store(key, account: "sync-key")
+    func storeSyncKey(_ key: Data) throws {
+        try store.store(key, account: "sync-key")
     }
 
-    static func forgetSyncKey() {
-        SecItemDelete(query(account: "sync-key") as CFDictionary)
+    func forgetSyncKey() {
+        store.delete(account: "sync-key")
     }
 
     /// The password for the SMB share the shared folder is on.
-    static func smbPassword() -> Data? {
+    func smbPassword() -> Data? {
         read(account: "smb-password")
     }
 
-    static func storeSmbPassword(_ password: Data) throws {
-        try store(password, account: "smb-password")
+    func storeSmbPassword(_ password: Data) throws {
+        try store.store(password, account: "smb-password")
     }
 
-    static func forgetSmbPassword() {
-        SecItemDelete(query(account: "smb-password") as CFDictionary)
+    func forgetSmbPassword() {
+        store.delete(account: "smb-password")
     }
 
     /// Dropbox's refresh token, from signing in to the Dropbox the shared
     /// folder is in.
-    static func dropboxToken() -> String? {
+    func dropboxToken() -> String? {
         read(account: "dropbox-token").map { String(decoding: $0, as: UTF8.self) }
     }
 
-    static func storeDropboxToken(_ token: String) throws {
-        try store(Data(token.utf8), account: "dropbox-token")
+    func storeDropboxToken(_ token: String) throws {
+        try store.store(Data(token.utf8), account: "dropbox-token")
     }
 
-    static func forgetDropboxToken() {
-        SecItemDelete(query(account: "dropbox-token") as CFDictionary)
+    func forgetDropboxToken() {
+        store.delete(account: "dropbox-token")
     }
 
     /// Kagi's Privacy Pass tokens and their state (`KagiPrivacyPass`).
-    static func kagiPrivacyPass() -> Data? {
+    func kagiPrivacyPass() -> Data? {
         read(account: "kagi-privacy-pass")
     }
 
-    static func storeKagiPrivacyPass(_ stock: Data) throws {
-        try store(stock, account: "kagi-privacy-pass")
+    func storeKagiPrivacyPass(_ stock: Data) throws {
+        try store.store(stock, account: "kagi-privacy-pass")
     }
 
-    static func forgetKagiPrivacyPass() {
-        SecItemDelete(query(account: "kagi-privacy-pass") as CFDictionary)
+    func forgetKagiPrivacyPass() {
+        store.delete(account: "kagi-privacy-pass")
     }
 
     /// The item, or a new random one when the Keychain has none. Only a
     /// missing item makes a new one: a read that fails for another reason
     /// throws, since a new device id over a live own copy, or a new local
     /// key, which seals that copy, would cost what the copy holds.
-    private static func existingOrNew(account: String, count: Int) throws -> Data {
-        if let data = try find(account: account) {
+    private func existingOrNew(account: String, count: Int) throws -> Data {
+        if let data = try store.find(account: account) {
             return data
         }
         var bytes = Data(count: count)
@@ -89,25 +99,30 @@ enum Secrets {
         guard status == errSecSuccess else {
             throw SecretsError.status(status)
         }
-        try store(bytes, account: account)
+        try store.store(bytes, account: account)
         return bytes
     }
 
-    private static func query(account: String) -> [String: Any] {
+    private func read(account: String) -> Data? {
+        (try? store.find(account: account)) ?? nil
+    }
+}
+
+/// The Keychain's items under the app's service, readable after first
+/// unlock and never leaving the device: in neither iCloud Keychain nor a
+/// backup (key-storage spec, "Keys on mobile").
+struct Keychain: KeyStore {
+    private static let service = "app.sval.ios"
+
+    private func query(account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: Self.service,
             kSecAttrAccount as String: account,
         ]
     }
 
-    private static func read(account: String) -> Data? {
-        (try? find(account: account)) ?? nil
-    }
-
-    /// The item, nil when there is none, and an error for any other
-    /// failure.
-    private static func find(account: String) throws -> Data? {
+    func find(account: String) throws -> Data? {
         var request = query(account: account)
         request[kSecReturnData as String] = true
         var result: AnyObject?
@@ -119,7 +134,7 @@ enum Secrets {
         return data
     }
 
-    private static func store(_ data: Data, account: String) throws {
+    func store(_ data: Data, account: String) throws {
         SecItemDelete(query(account: account) as CFDictionary)
         var item = query(account: account)
         item[kSecValueData as String] = data
@@ -128,6 +143,10 @@ enum Secrets {
         guard status == errSecSuccess else {
             throw SecretsError.status(status)
         }
+    }
+
+    func delete(account: String) {
+        SecItemDelete(query(account: account) as CFDictionary)
     }
 }
 

@@ -5,8 +5,8 @@
 
 # `src/wasm.rs` is the desktop's boundary and `src/ffi.rs` the mobile apps'.
 # A run without their features compiles neither, so no test can catch a
-# mutant in them. `ffi` turns on `wasm`.
-features = ["ffi"]
+# mutant in them.
+features = ["wasm", "ffi"]
 
 # Optimised dependencies keep the 64 MiB Argon2id calls fast.
 additional_cargo_args = ["--config", 'profile.dev.package."*".opt-level=3']

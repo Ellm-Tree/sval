@@ -195,6 +195,10 @@ impl RequestBlocker {
     /// requests to `allowed_domains` and the names under them let through.
     #[uniffi::constructor]
     pub fn new(lists: Vec<String>, allowed_domains: Vec<String>) -> Self {
+        // adblock-rust panics on a request without a resolver to name its
+        // hosts' sites. Only the first one set counts, and every one is the
+        // same.
+        let _ = adblock::url_parser::set_domain_resolver(Box::new(crate::site::Resolver));
         let options = ParseOptions {
             rule_types: RuleTypes::NetworkOnly,
             ..ParseOptions::default()

@@ -145,6 +145,52 @@ fn base_domain(host: &str) -> Option<&str> {
     Some(&host[start..])
 }
 
+/// The registrable domain adblock-rust matches a request's and its page's
+/// hosts by, for `$domain=` and `$third-party`. It is adblock-rust's
+/// embedded resolver with Gecko's list in place of the `psl` crate's, so
+/// `addr` judges what is a domain name exactly as it does there.
+pub(crate) struct Resolver;
+
+impl adblock::url_parser::ResolvesDomain for Resolver {
+    fn get_host_domain(&self, host: &str) -> (usize, usize) {
+        use addr::parser::DomainName;
+
+        if host.is_empty() {
+            return (0, 0);
+        }
+        match Rules.parse_domain_name(host) {
+            Err(_) => (0, host.len()),
+            Ok(domain) => {
+                let domain_len = domain.root().unwrap_or_else(|| domain.suffix()).len();
+                (host.len() - domain_len, host.len())
+            }
+        }
+    }
+}
+
+/// [`RULES`] as `addr` reads a list.
+struct Rules;
+
+impl psl_types::List for Rules {
+    fn find<'a, T>(&self, labels: T) -> psl_types::Info
+    where
+        T: Iterator<Item = &'a [u8]>,
+    {
+        let mut labels: Vec<&[u8]> = labels.collect();
+        labels.reverse();
+        let name = labels.join(&b'.');
+        match std::str::from_utf8(&name).ok().and_then(public_suffix) {
+            // `generate-psl.py` keeps no rule's section of the list, and
+            // `addr` reads only the suffix's length and whether a rule gave it.
+            Some((start, known)) => psl_types::Info {
+                len: name.len() - start,
+                typ: known.then_some(psl_types::Type::Icann),
+            },
+            None => psl_types::Info { len: 0, typ: None },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,5 +269,87 @@ mod tests {
         assert!(!has_known_public_suffix("localhost".into()));
         assert!(has_known_public_suffix("www.foo".into()));
         assert!(has_known_public_suffix("a.b.ck".into()));
+    }
+
+    /// adblock-rust's embedded resolver, as `adblock::url_parser` has it,
+    /// over the `psl` crate's list.
+    fn embedded_domain(host: &str) -> &str {
+        use addr::parser::DomainName;
+
+        if host.is_empty() {
+            return host;
+        }
+        match psl::List.parse_domain_name(host) {
+            Err(_) => host,
+            Ok(domain) => {
+                &host[host.len() - domain.root().unwrap_or_else(|| domain.suffix()).len()..]
+            }
+        }
+    }
+
+    fn resolved_domain(host: &str) -> &str {
+        use adblock::url_parser::ResolvesDomain;
+
+        let (start, end) = Resolver.get_host_domain(host);
+        &host[start..end]
+    }
+
+    #[test]
+    fn resolves_the_domain_adblock_rusts_own_list_does() {
+        // Hosts as adblock-rust's parser hands them over: lowercase, IDNs
+        // in punycode, an IPv6 address in brackets.
+        let hosts = [
+            "",
+            "example.com",
+            "www.example.com",
+            "a.b.c.example.org",
+            "example.com.",
+            "www.example.com.",
+            "news.bbc.co.uk",
+            "co.uk",
+            "uk",
+            "www.city.kawasaki.jp",
+            "a.b.kawasaki.jp",
+            "foo.bar.ck",
+            "www.ck",
+            "a.www.ck",
+            "user.github.io",
+            "github.io",
+            "a.b.blogspot.com",
+            "bucket.s3.amazonaws.com",
+            "app.herokuapp.com",
+            "foo.appspot.com",
+            "node.js",
+            "example.unknowntld",
+            "localhost",
+            "intranet",
+            "192.168.1.20",
+            "10.0.0.1",
+            "[::1]",
+            "[2001:db8::1]",
+            "xn--bcher-kva.de",
+            "www.xn--bcher-kva.de",
+            "xn--85x722f.xn--55qx5d.cn",
+            "www.xn--fiqs8s",
+            "sande.xn--mre-og-romsdal-qqb.no",
+            "a_b.example.com",
+            "-a.example.com",
+            "example.123",
+            "a..example.com",
+        ];
+        for host in hosts {
+            assert_eq!(resolved_domain(host), embedded_domain(host), "{host:?}");
+        }
+    }
+
+    #[test]
+    fn resolves_a_host_to_its_site() {
+        assert_eq!(resolved_domain("news.bbc.co.uk"), "bbc.co.uk");
+        assert_eq!(resolved_domain("user.github.io"), "user.github.io");
+        assert_eq!(resolved_domain("github.io"), "github.io");
+        assert_eq!(resolved_domain("www.example.com."), "example.com.");
+        assert_eq!(resolved_domain("192.168.1.20"), "192.168.1.20");
+        assert_eq!(resolved_domain("intranet"), "intranet");
+        assert_eq!(resolved_domain(""), "");
     }
 }

@@ -1070,6 +1070,7 @@ fn apply_all(
 ///
 /// JSON that spells neither is refused as a malformed batch is, since a
 /// host builds both from the same operations.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn apply_json(
     doc: &mut Document,
     op_json: &str,

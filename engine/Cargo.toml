@@ -118,5 +118,6 @@ opt-level = 3
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:console_error_panic_hook"]
 # The mobile apps' native surface (`src/ffi.rs`). It calls the host-facing
 # checks the `wasm` surface calls, so a phone refuses exactly what the desktop
-# refuses.
-ffi = ["wasm", "dep:uniffi"]
+# refuses. Those modules compile with either feature (`lib.rs`), so the phone
+# library carries none of `wasm`'s dependencies.
+ffi = ["dep:uniffi"]

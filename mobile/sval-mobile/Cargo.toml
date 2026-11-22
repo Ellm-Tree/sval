@@ -17,12 +17,17 @@ publish = false
 # Converts the filter lists the desktop blocks with into WebKit's content
 # rules (mobile spec §4.1). MPL-2.0, as Mozilla's own files are.
 # Without its default `single-thread`, so `RequestBlocker`'s engine can be
-# shared with the threads the app calls in on.
+# shared with the threads the app calls in on. Without
+# `embedded-domain-resolver`, which compiles in a second Public Suffix List:
+# `site::Resolver` reads a host's site from Gecko's.
 adblock = { version = "0.13.5", default-features = false, features = [
     "content-blocking",
-    "embedded-domain-resolver",
     "full-regex-handling",
 ] }
+# What adblock-rust's own resolver parses a host with, over any list
+# (`site::Resolver`). Without its default `psl`, the list it would bring.
+addr = { version = "0.15.6", default-features = false }
+psl-types = "2.0.11"
 sval-core = { path = "../../engine", features = ["ffi"] }
 # `smol` brings its own reactor, so a blocking call works from any thread the
 # app calls in on, with no tokio runtime to keep alive.
@@ -51,6 +56,9 @@ lto = true
 codegen-units = 1
 
 [dev-dependencies]
+# The list adblock-rust's embedded resolver read, which `site.rs`'s tests
+# compare Gecko's against.
+psl = "2.1.250"
 # Reads the rules' WebKit patterns in tests, as a check on what they match.
 regex = "1"
 url = "2"

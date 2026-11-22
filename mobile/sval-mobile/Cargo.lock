@@ -8,7 +8,6 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a4c8558f27608dec74695c866f9a8ef897ec7a77cb826f8a5baf0b8ba461d2a"
 dependencies = [
- "addr",
  "arrayvec",
  "base64 0.22.1",
  "bitflags",
@@ -31,7 +30,6 @@ version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a93b8a41dbe230ad5087cc721f8d41611de654542180586b315d9f4cf6b72bef"
 dependencies = [
- "psl",
  "psl-types",
 ]
 
@@ -511,16 +509,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
-]
-
-[[package]]
-name = "console_error_panic_hook"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
-dependencies = [
- "cfg-if",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2131,7 +2119,6 @@ dependencies = [
  "argon2",
  "base64 0.23.1",
  "blind-rsa-signatures",
- "console_error_panic_hook",
  "fractional_index",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
@@ -2139,7 +2126,6 @@ dependencies = [
  "hkdf",
  "hmac",
  "http",
- "js-sys",
  "privacypass",
  "rand_core 0.6.4",
  "serde",
@@ -2149,7 +2135,6 @@ dependencies = [
  "tls_codec",
  "uniffi",
  "uuid",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2157,7 +2142,10 @@ name = "sval-mobile"
 version = "0.1.0"
 dependencies = [
  "adblock",
+ "addr",
  "dropbox-sdk",
+ "psl",
+ "psl-types",
  "regex",
  "serde_json",
  "smb2",

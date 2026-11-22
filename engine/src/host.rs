@@ -9,7 +9,9 @@
 
 use crate::crypto::Key;
 use crate::failure::{Failure, Invalid, Reason};
-use crate::ops::{MAX_SAFE_TIMESTAMP, parse_device_id, parse_id, parse_timestamp};
+#[cfg(any(feature = "wasm", test))]
+use crate::ops::parse_id;
+use crate::ops::{MAX_SAFE_TIMESTAMP, parse_device_id, parse_timestamp};
 use crate::store::StorageProvider;
 use crate::sync::{FileProblem, SyncReport, Target};
 use crate::types::{Document, Error, NodeId, Timestamp};
@@ -206,6 +208,7 @@ pub(crate) fn run_sync_to(
 /// What a host hands a sweep, as JSON (idle-tab archive spec §4.2).
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg(any(feature = "wasm", test))]
 struct JsSweep {
     default: String,
     #[serde(default)]
@@ -216,6 +219,7 @@ struct JsSweep {
 
 /// Runs [`crate::archive::archive_idle`] on `tree` and `archive` for the
 /// sweep `sweep_json` describes, and answers `{ tabs, entries }`.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn run_archive_idle(
     tree: &mut Document,
     archive: &mut Document,
@@ -251,6 +255,7 @@ pub(crate) fn run_archive_idle(
 }
 
 /// A sweep's answer to the host: `{ tabs, entries }`.
+#[cfg(any(feature = "wasm", test))]
 fn swept_json(swept: &crate::archive::Swept) -> String {
     serde_json::json!({ "tabs": id_strings(&swept.tabs), "entries": id_strings(&swept.entries) })
         .to_string()
@@ -258,6 +263,7 @@ fn swept_json(swept: &crate::archive::Swept) -> String {
 
 /// Runs [`crate::archive::archive_now`] on `tree` and `archive` for tab
 /// `id`, and answers `{ tabs, entries }`, as a sweep does.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn run_archive_now(
     tree: &mut Document,
     archive: &mut Document,
@@ -276,6 +282,7 @@ pub(crate) fn run_archive_now(
 /// (idle-tab archive spec §7.6).
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg(any(feature = "wasm", test))]
 struct JsImported {
     tab: String,
     title: String,
@@ -288,6 +295,7 @@ struct JsImported {
 
 /// Runs [`crate::archive::add_imported`] on `archive` for the entries
 /// `entries_json` lists, and answers their ids.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn run_import_archived(
     archive: &mut Document,
     entries_json: &str,
@@ -320,6 +328,7 @@ pub(crate) fn run_import_archived(
 }
 
 /// Runs [`crate::archive::restore`] and answers `{ tabs, split, workspace }`.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn run_restore(
     tree: &mut Document,
     archive: &mut Document,

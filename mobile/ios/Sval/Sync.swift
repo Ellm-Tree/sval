@@ -45,14 +45,19 @@ actor Syncer {
     /// §3).
     private var clock = StampClock()
     private let local: Folder
+    /// The directory this device's own copy is in.
+    private nonisolated let root: URL
 
-    init() throws {
-        local = Folder(root: URL.applicationSupportDirectory)
+    /// This device's syncer over the own copy in `root`, under the keys
+    /// `secrets` holds.
+    init(ownCopy root: URL = .applicationSupportDirectory, secrets: Secrets = .keychain) throws {
+        self.root = root
+        local = Folder(root: root)
         // No own copy yet, as on first run, after leaving the folder or after
         // the app is deleted and installed again. The Keychain's id outlives
         // the copy, and the phone keeps it (decision 2232).
         let fresh = !local.exists(topDir)
-        deviceId = try Secrets.deviceId()
+        deviceId = try secrets.deviceId()
         if fresh { Diagnostics.log("sync: no own copy yet") }
         // What this device knows of the weeks goes with its own copy: a
         // fresh copy holds no week, and must load every one again.
@@ -65,7 +70,7 @@ actor Syncer {
         history.unpublished = Set(UserDefaults.standard.stringArray(forKey: Self.unpublishedKey) ?? [])
         history.deletions = UserDefaults.standard.data(forKey: Self.deletionsKey)
             .flatMap { try? JSONDecoder().decode([HistoryLedger.Deletion].self, from: $0) } ?? []
-        localKey = try Secrets.localKey()
+        localKey = try secrets.localKey()
         var refused = false
         for name in documents.keys {
             let report = try pass(name)
@@ -81,7 +86,7 @@ actor Syncer {
         do {
             var values = URLResourceValues()
             values.isExcludedFromBackup = true
-            var copy = URL.applicationSupportDirectory.appending(path: topDir, directoryHint: .isDirectory)
+            var copy = root.appending(path: topDir, directoryHint: .isDirectory)
             try copy.setResourceValues(values)
         } catch {
             Diagnostics.log("sync: the own copy is in the backup: \(Diagnostics.name(error))")
@@ -102,17 +107,17 @@ actor Syncer {
     /// `sval.damaged-<time>`, renamed and never deleted, and a fresh copy
     /// starts and takes everything back from the shared folder (decision
     /// 2232).
-    static func make() throws -> Syncer {
+    static func make(ownCopy root: URL = .applicationSupportDirectory, secrets: Secrets = .keychain) throws -> Syncer {
         do {
-            return try Syncer()
+            return try Syncer(ownCopy: root, secrets: secrets)
         } catch is OwnCopyRefused {
-            let copy = URL.applicationSupportDirectory.appending(path: topDir, directoryHint: .isDirectory)
-            let aside = URL.applicationSupportDirectory.appending(
+            let copy = root.appending(path: topDir, directoryHint: .isDirectory)
+            let aside = root.appending(
                 path: "\(topDir).damaged-\(Int64(Date.now.timeIntervalSince1970 * 1000))", directoryHint: .isDirectory)
             // `moveItem` stops when anything is at `aside`.
             try FileManager.default.moveItem(at: copy, to: aside)
             Diagnostics.log("sync: this device's own copy was set aside")
-            return try Syncer()
+            return try Syncer(ownCopy: root, secrets: secrets)
         }
     }
 
@@ -483,7 +488,7 @@ actor Syncer {
     /// holds reaches the disk after it.
     func leave() throws {
         left = true
-        try Self.deleteLocalCopy()
+        try Self.deleteLocalCopy(at: root)
     }
 
     /// Keeps a history bookmark for the next launch, while this syncer's
@@ -493,9 +498,9 @@ actor Syncer {
         UserDefaults.standard.set(value, forKey: key)
     }
 
-    /// Removes this device's own copy of every document.
-    static func deleteLocalCopy() throws {
-        let url = URL.applicationSupportDirectory.appending(path: topDir, directoryHint: .isDirectory)
+    /// Removes this device's own copy of every document, in `root`.
+    static func deleteLocalCopy(at root: URL = .applicationSupportDirectory) throws {
+        let url = root.appending(path: topDir, directoryHint: .isDirectory)
         if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
             try FileManager.default.removeItem(at: url)
         }

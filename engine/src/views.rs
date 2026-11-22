@@ -72,6 +72,7 @@ pub(crate) fn shards_json(doc: &Document) -> Result<String, Failure> {
 }
 
 /// [`Document::settings`] as a JSON object, `null` for a reset.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn settings_json(doc: &Document) -> Result<String, Failure> {
     Ok(serde_json::to_string(&doc.settings())?)
 }
@@ -139,6 +140,7 @@ pub(crate) fn favorites_json(doc: &Document) -> Result<String, Failure> {
 /// One Archive entry, as a host reads it (idle-tab archive spec §6.2).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg(any(feature = "wasm", test))]
 struct JsArchived {
     id: String,
     url: Option<String>,
@@ -160,6 +162,7 @@ struct JsArchived {
 }
 
 /// Every entry in the Archive, newest first, a split's panes in their order.
+#[cfg(any(feature = "wasm", test))]
 pub(crate) fn archived_json(doc: &Document, now: Timestamp) -> Result<String, Failure> {
     let mut rows = Vec::new();
     for (id, n) in &doc.nodes {

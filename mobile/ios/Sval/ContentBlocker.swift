@@ -59,8 +59,24 @@ final class ContentBlocker {
     @ObservationIgnored private var dueCheck: Task<Void, Never>?
     /// Where the downloaded lists are kept.
     private let directory: URL
+    /// A list's text from its publisher, or nil when the download failed.
+    typealias Download = @Sendable (URL) async -> Data?
+    private let download: Download
     @ObservationIgnored private var scriptsKey: String?
     @ObservationIgnored private var scriptsWork: Task<Void, Never>?
+    /// Whether the script rules were set from a compile this launch, which
+    /// the lists looked up at launch never replace.
+    @ObservationIgnored private var scriptsSet = false
+    /// Where the compiled rule lists are kept across launches.
+    private let store: WKContentRuleListStore
+    /// Where each part's key and count, and what was last applied, are kept.
+    private let defaults: UserDefaults
+    /// Whether the launch's lookup of the lists last applied has ended,
+    /// with them applied or none to find, or a check has applied rules. A
+    /// page made before then waits (`Page.loadsUnder`), so no document
+    /// loads before lists compiled at an earlier launch are installed.
+    @ObservationIgnored private(set) var ready = false
+    @ObservationIgnored private var readyWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// The desktop's curated levels (`SvalBlocking.sys.mjs`'s `BALANCED`
     /// and `STRICT`), with each list's address
@@ -98,8 +114,69 @@ final class ContentBlocker {
     private static let ownPrefix = "sval-own-"
     private static let scriptsId = "sval-scripts"
 
-    init(directory: URL = URL.cachesDirectory.appending(path: "blocklists", directoryHint: .isDirectory)) {
+    /// Each part's prefix and its rule count as last applied, which a
+    /// launch looks up before the check reads any list.
+    private static let appliedKey = "contentRules.applied"
+    /// Whether the script rules were last applied with a list.
+    private static let scriptsAppliedKey = "contentRules.scripts.applied"
+
+    init(directory: URL = URL.cachesDirectory.appending(path: "blocklists", directoryHint: .isDirectory),
+         download: @escaping Download = { await ContentBlocker.fetch($0) },
+         store: WKContentRuleListStore? = nil, defaults: UserDefaults = .standard) {
         self.directory = directory
+        self.download = download
+        self.store = store ?? .default()
+        self.defaults = defaults
+        Task { [weak self] in await self?.restoreApplied() }
+    }
+
+    /// The body of `url`'s answer when it is a 200.
+    nonisolated static func fetch(_ url: URL) async -> Data? {
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return data
+    }
+
+    /// Returns once `ready`.
+    func whenReady() async {
+        guard !ready else { return }
+        await withCheckedContinuation { readyWaiters.append($0) }
+    }
+
+    private func becomeReady() {
+        guard !ready else { return }
+        ready = true
+        let waiters = readyWaiters
+        readyWaiters = []
+        for waiter in waiters { waiter.resume() }
+    }
+
+    /// Applies the lists the last launch applied, by identifier from the
+    /// store. The check that follows finds the same key and keeps them, or
+    /// replaces them as it would any rules. With no record, or a list gone
+    /// from the store, pages load at once, and the first check's rules
+    /// apply when it ends.
+    private func restoreApplied() async {
+        defer { becomeReady() }
+        guard !LaunchOption.given("-svalNoBlocking"),
+              let counts = defaults.dictionary(forKey: Self.appliedKey) as? [String: Int] else { return }
+        var next = Rules()
+        let parts: [(WritableKeyPath<Rules, [WKContentRuleList]>, String)] =
+            [(\Rules.lists, Self.idPrefix), (\Rules.mine, Self.minePrefix), (\Rules.own, Self.ownPrefix)]
+        for (part, prefix) in parts {
+            guard let count = counts[prefix] else { continue }
+            guard let lists = await Self.storedLists(prefix, count: count, in: store) else { return }
+            next[keyPath: part] = lists
+        }
+        var scripts: WKContentRuleList?
+        if defaults.bool(forKey: Self.scriptsAppliedKey) {
+            guard let list = try? await store.contentRuleList(forIdentifier: Self.scriptsId) else { return }
+            scripts = list
+        }
+        guard !ready else { return }
+        if !scriptsSet { rules.scripts = scripts }
+        apply(next)
+        Diagnostics.log("blocking: \(next.lists.count + next.mine.count + next.own.count) list(s) from the last launch applied")
     }
 
     /// Brings the rules in line with `inputs`: compiles the script rules at
@@ -187,6 +264,7 @@ final class ContentBlocker {
         if lists.isEmpty && own.isEmpty {
             requests = nil
             apply(Rules())
+            defaults.set([String: Int](), forKey: Self.appliedKey)
             Diagnostics.log("blocking: off")
             return
         }
@@ -201,11 +279,13 @@ final class ContentBlocker {
         // so they are kept off the main thread.
         let directory = directory
         let failedAt = failedAt
+        let download = download
         let (texts, failed) = await Task.detached(priority: .userInitiated) {
             var texts: [String] = []
             var failed: [String] = []
             for (id, address) in lists.sorted(by: { $0.key < $1.key }) {
-                let list = await Self.list(id: id, address: address, in: directory, failedAt: failedAt)
+                let list = await Self.list(id: id, address: address, in: directory, failedAt: failedAt,
+                                           download: download)
                 if let text = list.text { texts.append(text) }
                 if list.failed { failed.append(id) }
             }
@@ -242,6 +322,7 @@ final class ContentBlocker {
                           key: String?, convert: (@Sendable () -> ContentRules)?)
         var next = Rules()
         var counts: [Int] = []
+        var applied: [String: Int] = [:]
         let parts: [Part] = [
             (\Rules.lists, Self.idPrefix, level?.key, level?.convert),
             (\Rules.mine, Self.minePrefix, mine?.key, mine?.convert),
@@ -253,8 +334,10 @@ final class ContentBlocker {
             guard let compiled = await made(prefix: prefix, key: key, convert: convert) else { return }
             next[keyPath: part] = compiled.lists
             counts.append(compiled.rules)
+            applied[prefix] = compiled.lists.count
         }
         apply(next)
+        defaults.set(applied, forKey: Self.appliedKey)
         Diagnostics.log("blocking: \(counts.reduce(0, +)) rule(s) converted in \(next.lists.count + next.mine.count + next.own.count) list(s) from \(texts.count) source(s), \(Int(Date.now.timeIntervalSince(started))) s")
     }
 
@@ -263,16 +346,18 @@ final class ContentBlocker {
     /// converted, 0 for rules reused, or nil when a list fails to compile.
     private func made(prefix: String, key: String,
                       convert: @escaping @Sendable () -> ContentRules) async -> (lists: [WKContentRuleList], rules: Int)? {
-        let defaults = UserDefaults.standard
         let keyName = "contentRules.\(prefix).key"
         let countName = "contentRules.\(prefix).count"
         if key == defaults.string(forKey: keyName),
-           let stored = await Self.storedLists(prefix, count: defaults.integer(forKey: countName)) {
+           let stored = await Self.storedLists(prefix, count: defaults.integer(forKey: countName), in: store) {
             return (stored, 0)
         }
+        // The compile writes over this prefix's lists in the store, so a
+        // launch may no longer take them as last applied.
+        defaults.removeObject(forKey: Self.appliedKey)
         applying = true
         let converted = await Task.detached(priority: .utility) { convert() }.value
-        guard let compiled = await Self.compile(converted.lists, prefix: prefix) else { return nil }
+        guard let compiled = await Self.compile(converted.lists, prefix: prefix, in: store) else { return nil }
         defaults.set(key, forKey: keyName)
         defaults.set(compiled.count, forKey: countName)
         return (compiled, Int(converted.rules))
@@ -280,11 +365,12 @@ final class ContentBlocker {
 
     /// `lists` compiled, each under `prefix` and its place, or none when one
     /// fails to compile.
-    private static func compile(_ lists: [String], prefix: String) async -> [WKContentRuleList]? {
+    private static func compile(_ lists: [String], prefix: String,
+                                in store: WKContentRuleListStore) async -> [WKContentRuleList]? {
         var compiled: [WKContentRuleList] = []
         for (index, json) in lists.enumerated() {
             do {
-                if let list = try await WKContentRuleListStore.default()
+                if let list = try await store
                     .compileContentRuleList(forIdentifier: prefix + String(index), encodedContentRuleList: json) {
                     compiled.append(list)
                 }
@@ -301,6 +387,7 @@ final class ContentBlocker {
         rules.lists = made.lists
         rules.mine = made.mine
         rules.own = made.own
+        becomeReady()
         onChange?()
     }
 
@@ -315,13 +402,16 @@ final class ContentBlocker {
         guard key != scriptsKey else { return }
         scriptsKey = key
         let previous = scriptsWork
+        let store = store
         scriptsWork = Task {
             await previous?.value
             guard key == scriptsKey else { return }
             var list: WKContentRuleList?
             if let json {
+                // The compile writes over the stored list.
+                defaults.set(false, forKey: Self.scriptsAppliedKey)
                 do {
-                    list = try await WKContentRuleListStore.default()
+                    list = try await store
                         .compileContentRuleList(forIdentifier: Self.scriptsId, encodedContentRuleList: json)
                 } catch {
                     Diagnostics.log("blocking: the script rules failed to compile: \(Diagnostics.name(error))")
@@ -330,6 +420,8 @@ final class ContentBlocker {
             }
             guard key == scriptsKey else { return }
             rules.scripts = list
+            scriptsSet = true
+            defaults.set(list != nil, forKey: Self.scriptsAppliedKey)
             onChange?()
         }
     }
@@ -346,7 +438,8 @@ final class ContentBlocker {
     /// failed or was not kept: a list left without a file stays due, and
     /// would be fetched at every check.
     nonisolated private static func list(id: String, address: String, in directory: URL,
-                                         failedAt: [String: Date]) async -> (text: String?, failed: Bool) {
+                                         failedAt: [String: Date],
+                                         download: Download) async -> (text: String?, failed: Bool) {
         let file = directory.appending(path: "\(id).txt")
         let now = Date.now
         if BlockerLists.waits(id, failedAt: failedAt, now: now) {
@@ -356,9 +449,7 @@ final class ContentBlocker {
            let text = try? String(contentsOf: file, encoding: .utf8) {
             return (text, false)
         }
-        if let url = URL(string: address),
-           let (data, response) = try? await URLSession.shared.data(from: url),
-           (response as? HTTPURLResponse)?.statusCode == 200,
+        if let url = URL(string: address), let data = await download(url),
            let text = String(data: data, encoding: .utf8) {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let kept = (try? data.write(to: file, options: .atomic)) != nil
@@ -368,10 +459,11 @@ final class ContentBlocker {
         return (try? String(contentsOf: file, encoding: .utf8), true)
     }
 
-    private static func storedLists(_ prefix: String, count: Int) async -> [WKContentRuleList]? {
+    private static func storedLists(_ prefix: String, count: Int,
+                                    in store: WKContentRuleListStore) async -> [WKContentRuleList]? {
         var lists: [WKContentRuleList] = []
         for index in 0..<count {
-            guard let list = try? await WKContentRuleListStore.default()
+            guard let list = try? await store
                 .contentRuleList(forIdentifier: prefix + String(index))
             else { return nil }
             lists.append(list)

@@ -7,13 +7,14 @@ import Observation
 import UIKit
 import WebKit
 
-/// A picture of each tab's page, for the Workspace sheet's grid: taken here
-/// when the tab leaves the front or the app goes to the background, and
-/// never synced. A tab this phone hasn't shown has none.
+/// A picture of each tab's and pin's page, by page key, for the Workspace
+/// sheet's grid and the tab scrub: taken here when the page leaves the
+/// front or the app goes to the background, and never synced. A page this
+/// phone hasn't shown has none.
 ///
-/// A private tab's picture stays in memory and goes with the session.
+/// A private page's picture stays in memory and goes with the session.
 /// Every other picture is kept in the app's caches, which iOS may empty,
-/// and is deleted once its tab leaves the tree.
+/// and is deleted once its tab leaves the tree or its pin its Workspace.
 @MainActor
 @Observable
 final class PagePreviews {
@@ -130,8 +131,8 @@ final class PagePreviews {
         taken += 1
     }
 
-    /// Deletes the pictures of every tab not in `tabs`, the tree's tabs,
-    /// private ones included.
+    /// Deletes the pictures of every page not in `tabs`
+    /// (`Browser.pictured`), private ones included.
     func keep(only tabs: Set<String>) {
         guard tabs != kept else { return }
         kept = tabs

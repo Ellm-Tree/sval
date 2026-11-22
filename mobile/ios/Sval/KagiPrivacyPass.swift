@@ -320,9 +320,9 @@ extension KagiPrivacyPass.Host {
     /// The Keychain, the default store's cookie, Kagi itself and the
     /// engine.
     static let live = KagiPrivacyPass.Host(
-        read: { Secrets.kagiPrivacyPass() },
+        read: { Secrets.keychain.kagiPrivacyPass() },
         write: { data in
-            if let data { try? Secrets.storeKagiPrivacyPass(data) } else { Secrets.forgetKagiPrivacyPass() }
+            if let data { try? Secrets.keychain.storeKagiPrivacyPass(data) } else { Secrets.keychain.forgetKagiPrivacyPass() }
         },
         now: { Date() },
         session: { await KagiPrivacyPass.session(in: WKWebsiteDataStore.default().httpCookieStore) },

@@ -131,27 +131,62 @@ final class AppModel {
     /// the desktop).
     static let interval: Duration = .seconds(30)
 
-    init() {
+    /// What the model reaches outside the app's process through.
+    struct Edges {
+        /// The directory this device's own copy is in.
+        let ownCopy: URL
+        let secrets: Secrets
+        /// The shared folder kept from an earlier launch, read once at
+        /// launch.
+        let source: @MainActor () -> Source?
+        /// The folder a pass reads and writes for a folder picked in Files.
+        let files: @Sendable (URL) -> SharedFolder
+        let blocker: @MainActor () -> ContentBlocker
+
+        /// The app's own: Application Support, the Keychain, the folder
+        /// chosen at an earlier launch and the blocking lists' publishers.
+        static var app: Edges {
+            Edges(
+                ownCopy: .applicationSupportDirectory, secrets: .keychain,
+                source: {
+                    #if DEBUG
+                    let demo = Demo.source()
+                    #else
+                    let demo: Source? = nil
+                    #endif
+                    return demo ?? AppModel.resolveBookmark().map(Source.files)
+                        ?? SmbSettings.load().map(Source.smb)
+                        ?? DropboxSettings.load().map(Source.dropbox)
+                },
+                files: { Folder(shared: $0) },
+                blocker: { ContentBlocker() })
+        }
+    }
+
+    private let edges: Edges
+    private var secrets: Secrets { edges.secrets }
+
+    convenience init() {
         #if DEBUG
         Demo.resetIfAsked()
         #endif
+        self.init(edges: .app)
+    }
+
+    init(edges: Edges) {
+        self.edges = edges
         DesktopColor.warm()
-        loadingSyncer = Task.detached(priority: .userInitiated) { try Syncer.make() }
-        #if DEBUG
-        let demo = Demo.source()
-        #else
-        let demo: Source? = nil
-        #endif
-        source = demo ?? Self.resolveBookmark().map(Source.files)
-            ?? SmbSettings.load().map(Source.smb)
-            ?? DropboxSettings.load().map(Source.dropbox)
-        if case .files(let url) = source, Secrets.syncKey() == nil || keyUnconfirmed {
+        loadingSyncer = Task.detached(priority: .userInitiated) { [ownCopy = edges.ownCopy, secrets = edges.secrets] in
+            try Syncer.make(ownCopy: ownCopy, secrets: secrets)
+        }
+        source = edges.source()
+        if case .files(let url) = source, secrets.syncKey() == nil || keyUnconfirmed {
             stage = stage(holdsSval: Folder(shared: url).exists(topDir))
         } else {
-            stage = source == nil ? .chooseFolder : (Secrets.syncKey() == nil || keyUnconfirmed ? .join : .ready)
+            stage = source == nil ? .chooseFolder : (secrets.syncKey() == nil || keyUnconfirmed ? .join : .ready)
         }
         settingUp = stage == .chooseFolder && !UserDefaults.standard.bool(forKey: Self.offeredSetupKey)
-        browser = Browser(model: self)
+        browser = Browser(model: self, blocker: edges.blocker())
         KagiPrivacyPass.shared.start()
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
@@ -410,8 +445,8 @@ final class AppModel {
         case .dropbox(let root):
             let watcher = ChangeWatcher(
                 name: "Dropbox",
-                open: {
-                    guard let token = Secrets.dropboxToken() else { return nil }
+                open: { [secrets] in
+                    guard let token = secrets.dropboxToken() else { return nil }
                     return try DropboxWatcher.watch(appKey: DropboxApp.key, refreshToken: token, root: root)
                 }
             ) { [weak self] in
@@ -428,7 +463,7 @@ final class AppModel {
     /// need be.
     private func sharedFolder() async throws -> SharedFolder {
         if case .files(let url) = source {
-            return Folder(shared: url)
+            return edges.files(url)
         }
         if let connected {
             return connected
@@ -439,7 +474,7 @@ final class AppModel {
             connected = folder
             return folder
         case .dropbox(let root):
-            guard let token = Secrets.dropboxToken() else { throw ConnectorError.DropboxSignIn }
+            guard let token = secrets.dropboxToken() else { throw ConnectorError.DropboxSignIn }
             let folder = try await Task.detached {
                 try DropboxShared(folder: DropboxFolder.connect(appKey: DropboxApp.key, refreshToken: token, root: root))
             }.value
@@ -821,9 +856,10 @@ final class AppModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         // A file provider's folder may still be downloading, so it is read
         // off the main actor, as `connectSmb` reads a server's.
+        let secrets = secrets
         let (holdsSval, opens, bookmark) = await Task.detached {
             let folder = Folder(shared: url)
-            return (folder.exists(topDir), Self.keyOpens(folder, key: Secrets.syncKey()),
+            return (folder.exists(topDir), Self.keyOpens(folder, key: secrets.syncKey()),
                     Result { try url.bookmarkData() })
         }.value
         do {
@@ -842,6 +878,7 @@ final class AppModel {
     @discardableResult
     func connectSmb(_ picked: SmbLocation) async -> Error? {
         message = nil
+        let secrets = secrets
         // A path to Sval's own directory names the folder that holds it
         // (spec §6.4), and that folder is what is kept and shown.
         var location = picked
@@ -849,7 +886,7 @@ final class AppModel {
         do {
             let (folder, holdsSval, opens) = try await Task.detached {
                 let folder = try SmbShared(folder: SmbFolder.connect(location: location))
-                return (folder, try folder.exists(topDir), Self.keyOpens(folder, key: Secrets.syncKey()))
+                return (folder, try folder.exists(topDir), Self.keyOpens(folder, key: secrets.syncKey()))
             }.value
             try SmbSettings.save(location)
             source = .smb(location)
@@ -869,12 +906,13 @@ final class AppModel {
     @discardableResult
     func connectDropbox(root picked: String, token: String) async -> Error? {
         message = nil
+        let secrets = secrets
         // As `connectSmb` keeps its path.
         let root = sharedRootOf(path: picked)
         do {
             let (folder, holdsSval, opens) = try await Task.detached {
                 let folder = try DropboxShared(folder: DropboxFolder.connect(appKey: DropboxApp.key, refreshToken: token, root: root))
-                return (folder, try folder.exists(topDir), Self.keyOpens(folder, key: Secrets.syncKey()))
+                return (folder, try folder.exists(topDir), Self.keyOpens(folder, key: secrets.syncKey()))
             }.value
             try DropboxSettings.save(root: root, token: token)
             source = .dropbox(root)
@@ -917,13 +955,13 @@ final class AppModel {
     }
 
     private func noteKey(opens: Bool) {
-        guard Secrets.syncKey() != nil else { return }
+        guard secrets.syncKey() != nil else { return }
         keyUnconfirmed = !opens
         if !opens { Diagnostics.log("join: the kept sync key opens nothing in this folder") }
     }
 
     private func stage(holdsSval: Bool) -> Stage {
-        Self.stage(hasKey: Secrets.syncKey() != nil, keyUnconfirmed: keyUnconfirmed, holdsSval: holdsSval)
+        Self.stage(hasKey: secrets.syncKey() != nil, keyUnconfirmed: keyUnconfirmed, holdsSval: holdsSval)
     }
 
     /// Where setup goes once a folder is chosen: a folder with Sval's data
@@ -954,7 +992,7 @@ final class AppModel {
     /// A phone that kept its sync key starts with that key: its backup
     /// still holds, and setup goes straight to the browser.
     func startSync() {
-        if Secrets.syncKey() != nil {
+        if secrets.syncKey() != nil {
             keyUnconfirmed = false
             starting = true
             stage = .ready
@@ -969,7 +1007,7 @@ final class AppModel {
             return
         }
         do {
-            try Secrets.storeSyncKey(key)
+            try secrets.storeSyncKey(key)
         } catch {
             message = error.localizedDescription
             return
@@ -992,7 +1030,7 @@ final class AppModel {
 
     /// Offers this phone's sync key to another device in the shared folder.
     func offerPairing() async throws -> Join.Offer {
-        guard let key = Secrets.syncKey() else { throw SyncError.notASvalFolder }
+        guard let key = secrets.syncKey() else { throw SyncError.notASvalFolder }
         let folder = try await sharedFolder()
         let offer = try await Task.detached { try Join.offer(key: key, in: folder) }.value
         Diagnostics.log("pair: offered")
@@ -1029,7 +1067,7 @@ final class AppModel {
         stage = .chooseFolder
         starting = false
         guard startOver else { return }
-        Secrets.forgetSyncKey()
+        secrets.forgetSyncKey()
         // The old syncer removes its copy itself, so no change it is still
         // applying writes after. One still loading from launch is left by
         // the same route once it is ready.
@@ -1049,8 +1087,10 @@ final class AppModel {
             do {
                 var leaving = old
                 if leaving == nil { leaving = try? await loading?.value }
-                if let leaving { try await leaving.leave() } else { try Syncer.deleteLocalCopy() }
-                syncer = try await Task.detached { try Syncer.make() }.value
+                if let leaving { try await leaving.leave() } else { try Syncer.deleteLocalCopy(at: edges.ownCopy) }
+                syncer = try await Task.detached { [ownCopy = edges.ownCopy, secrets] in
+                    try Syncer.make(ownCopy: ownCopy, secrets: secrets)
+                }.value
                 // The phone browses on, in a fresh Workspace of its own.
                 await refreshRows()
                 await keepOwnWorkspace()
@@ -1122,7 +1162,7 @@ final class AppModel {
                 guard try await Task.detached(operation: { try Join.matches(key: key, folder: folder) }).value else {
                     throw JoinError.backupForAnotherFolder
                 }
-                try Secrets.storeSyncKey(key)
+                try secrets.storeSyncKey(key)
             } else {
                 throw JoinError.notACode
             }
@@ -1146,7 +1186,7 @@ final class AppModel {
         // Argon2id makes each try cost tens of milliseconds and 64 MiB, and an
         // SMB folder waits on the network, so it runs off the main actor.
         let claimed = try await Task.detached { try Join.claim(code: code, in: folder) }.value
-        try Secrets.storeSyncKey(claimed.key)
+        try secrets.storeSyncKey(claimed.key)
         // The offer goes only once the key is stored, so a join cut short
         // can be retried with the same code. On SMB and Dropbox the delete
         // waits on the network.
@@ -1156,7 +1196,7 @@ final class AppModel {
 
     func sync() async {
         guard stage == .ready, let syncer = await loadedSyncer(), source != nil,
-              let key = Secrets.syncKey()
+              let key = secrets.syncKey()
         else { return }
         guard !syncing else {
             syncAgain = true
@@ -2440,7 +2480,7 @@ final class AppModel {
         // Which pages live follows the tree's tabs and the pins alone.
         if treeChange == .structure || pinsChanged {
             browser.reconcile()
-            PagePreviews.shared.keep(only: Set(rows.lazy.filter { $0.kind == .tab }.map(\.id)))
+            PagePreviews.shared.keep(only: Browser.pictured(rows, pins: pinsByWorkspace))
         }
         await browser.offloadHiddenWorkspaces()
         Signposts.refresh.endInterval("pages", pages)

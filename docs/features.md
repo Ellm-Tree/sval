@@ -377,6 +377,20 @@ control of what you see and what is sent to websites.
   Settings › Links › Link Docking, and links to that site from other apps
   open as a tab in the Workspace you choose. Rules sync.
 
+## Sval for iPhone
+
+- **Tabs keep their history.** A tab you come back to still has its
+  Back and Forward history and its place on the page, even after iOS
+  closes Sval in the background. The iPhone app keeps the pages of the
+  tabs and pins you used last loaded. To free memory, the app saves only
+  the history and place of the rest. Clear Browsing Data deletes that saved
+  history, and a private tab never saves it to your phone.
+- **Switch tabs from the address bar.** Hold the address bar and slide to
+  move through your tabs. The iPhone app shows a picture of each tab's page
+  and of each pin's page you've opened.
+- **A page that keeps crashing.** When a page crashes three times within a
+  minute, the iPhone app stops reloading it and shows Page cannot load.
+
 ## Sync
 
 - **No account.** Sval syncs through any folder you choose. That can be a

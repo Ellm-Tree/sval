@@ -41,17 +41,17 @@ enum Demo {
         let url = URL.documentsDirectory.appending(path: "demo-shared", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         if joining || starting {
-            Secrets.forgetSyncKey()
+            Secrets.keychain.forgetSyncKey()
             // Joining needs a folder another device already syncs in.
             if joining {
                 try? FileManager.default.createDirectory(at: url.appending(path: topDir), withIntermediateDirectories: true)
             }
             return .files(url)
         }
-        if Secrets.syncKey() == nil {
+        if Secrets.keychain.syncKey() == nil {
             var key = Data(count: 32)
             _ = key.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
-            try? Secrets.storeSyncKey(key)
+            try? Secrets.keychain.storeSyncKey(key)
         }
         return .files(url)
     }

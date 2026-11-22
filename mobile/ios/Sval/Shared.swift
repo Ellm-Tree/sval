@@ -81,13 +81,13 @@ enum SmbSettings {
             "path": location.path, "username": location.username,
         ]
         UserDefaults.standard.set(fields, forKey: key)
-        try Secrets.storeSmbPassword(Data(location.password.utf8))
+        try Secrets.keychain.storeSmbPassword(Data(location.password.utf8))
     }
 
     static func load() -> SmbLocation? {
         guard let fields = UserDefaults.standard.dictionary(forKey: key) as? [String: String],
               let host = fields["host"], let share = fields["share"],
-              let password = Secrets.smbPassword()
+              let password = Secrets.keychain.smbPassword()
         else { return nil }
         return SmbLocation(
             host: host, share: share, path: fields["path"] ?? "",
@@ -97,7 +97,7 @@ enum SmbSettings {
 
     static func forget() {
         UserDefaults.standard.removeObject(forKey: key)
-        Secrets.forgetSmbPassword()
+        Secrets.keychain.forgetSmbPassword()
     }
 }
 
@@ -263,18 +263,18 @@ enum DropboxSettings {
     private static let key = "dropboxFolder"
 
     static func save(root: String, token: String) throws {
-        try Secrets.storeDropboxToken(token)
+        try Secrets.keychain.storeDropboxToken(token)
         UserDefaults.standard.set(root, forKey: key)
     }
 
     static func load() -> String? {
-        guard Secrets.dropboxToken() != nil else { return nil }
+        guard Secrets.keychain.dropboxToken() != nil else { return nil }
         return UserDefaults.standard.string(forKey: key)
     }
 
     static func forget() {
         UserDefaults.standard.removeObject(forKey: key)
-        Secrets.forgetDropboxToken()
+        Secrets.keychain.forgetDropboxToken()
     }
 }
 

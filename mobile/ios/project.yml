@@ -138,3 +138,8 @@ schemes:
       targets:
         - SvalTests
         - SvalUITests
+      # Reaches the unit tests' host app, which shows an empty scene
+      # (`SvalApp`). A UI test's app takes only the arguments its
+      # `XCUIApplication` gives it.
+      commandLineArguments:
+        "-svalUnitTestHost": true

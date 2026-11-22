@@ -47,7 +47,9 @@ pub(crate) enum Reason {
     SettingNotJson,
     BadFavoriteKind,
     BadFavoriteGuid,
+    #[cfg(any(feature = "wasm", test))]
     BadSweep,
+    #[cfg(any(feature = "wasm", test))]
     BadArchivedTabs,
     BadBatch,
     VisitWithoutUrl,
@@ -58,7 +60,9 @@ pub(crate) enum Reason {
     LocalWithoutUrl,
     TtlNotFinite,
     ExpiryOutOfRange,
+    #[cfg(any(feature = "wasm", test))]
     PathsFilesMismatch,
+    #[cfg(any(feature = "wasm", test))]
     FileNotBytes,
     BadAutoArchiveChoice,
     NotATab,
@@ -85,7 +89,9 @@ impl Reason {
             Reason::SettingNotJson => "setting_not_json",
             Reason::BadFavoriteKind => "bad_favorite_kind",
             Reason::BadFavoriteGuid => "bad_favorite_guid",
+            #[cfg(any(feature = "wasm", test))]
             Reason::BadSweep => "bad_sweep",
+            #[cfg(any(feature = "wasm", test))]
             Reason::BadArchivedTabs => "bad_archived_tabs",
             Reason::BadBatch => "bad_batch",
             Reason::VisitWithoutUrl => "visit_without_url",
@@ -96,7 +102,9 @@ impl Reason {
             Reason::LocalWithoutUrl => "local_without_url",
             Reason::TtlNotFinite => "ttl_not_finite",
             Reason::ExpiryOutOfRange => "expiry_out_of_range",
+            #[cfg(any(feature = "wasm", test))]
             Reason::PathsFilesMismatch => "paths_files_mismatch",
+            #[cfg(any(feature = "wasm", test))]
             Reason::FileNotBytes => "file_not_bytes",
             Reason::BadAutoArchiveChoice => "bad_auto_archive_choice",
             Reason::NotATab => "not_a_tab",

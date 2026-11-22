@@ -213,8 +213,9 @@ struct DownloadPage: View {
     }
 }
 
-/// A load that failed and left its tab empty: the system's reason, the
-/// address, and the load again.
+/// A load that failed and left its tab empty: the system's reason, or
+/// that the page's web process kept ending, the address, and the load
+/// again.
 struct FailedPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearance) private var scheme
@@ -226,7 +227,9 @@ struct FailedPage: View {
 
     var body: some View {
         let theme = Theme(scheme, tint: model.tint(of: workspace))
-        TabNotice(symbol: "exclamationmark.triangle", title: "Sval can't open this page", detail: failure.reason,
+        TabNotice(symbol: "exclamationmark.triangle",
+                  title: failure.keepsClosing ? "Page cannot load" : "Sval can't open this page",
+                  detail: failure.keepsClosing ? nil : failure.reason,
                   address: failure.url.absoluteString, row: row, workspace: workspace) {
             Button("Try Again", systemImage: "arrow.clockwise") { model.browser.reload() }
                 .foregroundStyle(theme.text)

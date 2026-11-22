@@ -7,12 +7,21 @@ import WebKit
 
 @main
 struct SvalApp: App {
-    @State private var model = AppModel()
+    #if DEBUG
+    /// Hosting the unit tests, the app shows an empty scene and runs no
+    /// model: each test builds its own over edges of its own, and the
+    /// app's would reach the network and the shared state beside them.
+    @State private var model: AppModel? = LaunchOption.given("-svalUnitTestHost") ? nil : AppModel()
+    #else
+    @State private var model: AppModel? = AppModel()
+    #endif
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(model)
+            if let model {
+                RootView()
+                    .environment(model)
+            }
         }
     }
 }

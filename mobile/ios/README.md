@@ -56,6 +56,19 @@ Find the iPhone's identifier with `xcrun devicectl list devices`, and set
 
 Installing works over Wi-Fi once the iPhone has been paired with the Mac.
 
+To judge how fast the app is, install a Release build in place of the
+Debug build above. A Release build is what users get, with the engine built
+as the App Store build is and the app's Swift code optimized.
+
+    ./build-engine.sh --ship device
+    xcodebuild -project Sval.xcodeproj -scheme Sval -configuration Release \
+      -destination "id=$DEVICE" -derivedDataPath build -allowProvisioningUpdates build
+    xcrun devicectl device install app --device "$DEVICE" build/Build/Products/Release-iphoneos/Sval.app
+
+Use Debug to read the app's log with `watch-log.sh` or to open the demo
+with the launch options, because a Release build writes no log file and
+ignores the launch options.
+
 ## Upload to TestFlight
 
 From the repository's root, with a build number higher than any uploaded
