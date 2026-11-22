@@ -43,6 +43,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   chipElement: "moz-src:///browser/components/sval/SvalLauncherRows.sys.mjs",
   colorOf: "moz-src:///browser/components/sval/SvalColor.sys.mjs",
   isPin: "moz-src:///browser/components/sval/SvalPinTab.sys.mjs",
+  SvalPinPages: "moz-src:///browser/components/sval/SvalPinPages.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
 });
 
@@ -289,6 +290,27 @@ export class SvalTabSwitcher {
   /** The tab the switcher has selected, or null. */
   get selectedTab() {
     return this.#tabs[this.#index] ?? null;
+  }
+
+  /**
+   * What Ctrl+Tab lists (`ctrlTab.tabList`): the tabs `ctrlTab` keeps, and
+   * the pages of the shown workspace's pins, which are hidden tabs it leaves
+   * out (`SvalPinPages`), most recently used first. `ctrlTab` files a tab
+   * opening in the background second, so tabs a launch restores would stand
+   * in the reverse of their restore order; sorting by `lastAccessed`, which
+   * a restored tab takes from when this device last looked at it
+   * (`SvalRestore`), puts them in order of use.
+   *
+   * @param {Element[]} used `ctrlTab`'s own list.
+   * @returns {Element[]}
+   */
+  recentTabs(used) {
+    const tabs = new Set(used);
+    const pins = lazy.SvalPinPages.of(this.#win)?.tabsOfShownWorkspace() ?? [];
+    for (const tab of pins) {
+      tabs.add(tab);
+    }
+    return [...tabs].sort((a, b) => b.lastAccessed - a.lastAccessed);
   }
 
   /**

@@ -7,7 +7,10 @@ thumbnail storage (tabPreviews), which Sval turns off
 (browser.pagethumbnails.capturing_disabled) and which would write what the
 user browses to disk, so those pages showed nothing. ctrlTab keeps its
 order and keys, and hands the list to SvalTabSwitcher.sys.mjs, which draws
-every tab and captures previews in memory. While the switcher shows, Ctrl
+every tab and captures previews in memory. The list it walks (tabList) adds
+the pages of the workspace's pins, which Sval keeps as hidden tabs that
+ctrlTab leaves out, and sorts by use, since tabs Sval restores open in the
+background, where ctrlTab files each second. While the switcher shows, Ctrl
 and the key above Tab step back through it, as Ctrl+Shift+Tab does; closed,
 that key is the page's. The panel and tabPreviews, which nothing else uses,
 go. ctrlTab.css stays: taking it out of the theme's jar.inc.mn would move
@@ -30,7 +33,7 @@ index 2959f86..eab8628 100644
    <panel id="tab-preview-panel"
           type="arrow"
 diff --git a/browser/components/tabbrowser/content/browser-ctrlTab.js b/browser/components/tabbrowser/content/browser-ctrlTab.js
-index 077c80a..e069f29 100644
+index 077c80a58..05150ddf4 100644
 --- a/browser/components/tabbrowser/content/browser-ctrlTab.js
 +++ b/browser/components/tabbrowser/content/browser-ctrlTab.js
 @@ -2,224 +2,20 @@
@@ -268,7 +271,7 @@ index 077c80a..e069f29 100644
    },
    get keys() {
      var keys = {};
-@@ -233,23 +29,15 @@ var ctrlTab = {
+@@ -233,26 +29,19 @@ var ctrlTab = {
      delete this.keys;
      return (this.keys = keys);
    },
@@ -293,8 +296,13 @@ index 077c80a..e069f29 100644
 -  },
  
    get tabList() {
-     return this._recentlyUsedTabs;
-@@ -288,137 +76,10 @@ var ctrlTab = {
+-    return this._recentlyUsedTabs;
++    // Sval: with the pages of the workspace's pins, in order of use.
++    return this.view.recentTabs(this._recentlyUsedTabs);
+   },
+ 
+   init: function ctrlTab_init() {
+@@ -288,137 +77,10 @@ var ctrlTab = {
      this.readPref();
    },
  
@@ -436,7 +444,7 @@ index 077c80a..e069f29 100644
      }
  
      if (this._timer) {
-@@ -428,18 +89,12 @@ var ctrlTab = {
+@@ -428,18 +90,12 @@ var ctrlTab = {
      }
    },
  
@@ -457,7 +465,7 @@ index 077c80a..e069f29 100644
    },
  
    showAllTabs: function ctrlTab_showAllTabs(aEntrypoint = "unknown") {
-@@ -447,9 +102,9 @@ var ctrlTab = {
+@@ -447,9 +103,9 @@ var ctrlTab = {
      gTabsPanel.showAllTabsPanel(null, aEntrypoint);
    },
  
@@ -470,7 +478,7 @@ index 077c80a..e069f29 100644
      }
    },
  
-@@ -485,13 +140,8 @@ var ctrlTab = {
+@@ -485,13 +141,8 @@ var ctrlTab = {
        return;
      }
  
@@ -486,7 +494,7 @@ index 077c80a..e069f29 100644
  
      // Add a slight delay before showing the UI, so that a quick
      // "ctrl-tab" keypress just flips back to the MRU tab.
-@@ -502,19 +152,7 @@ var ctrlTab = {
+@@ -502,19 +153,7 @@ var ctrlTab = {
    },
  
    _openPanel: function ctrlTab_openPanel() {
@@ -507,7 +515,7 @@ index 077c80a..e069f29 100644
    },
  
    /**
-@@ -541,29 +179,31 @@ var ctrlTab = {
+@@ -541,29 +180,31 @@ var ctrlTab = {
      if (this._timer) {
        clearTimeout(this._timer);
        this._timer = null;
@@ -556,7 +564,16 @@ index 077c80a..e069f29 100644
      let action = ShortcutUtils.getSystemActionForEvent(event);
      if (action != ShortcutUtils.CYCLE_TABS) {
        return;
-@@ -639,25 +279,7 @@ var ctrlTab = {
+@@ -598,7 +239,7 @@ var ctrlTab = {
+ 
+     document.addEventListener("keyup", this, { mozSystemGroup: true });
+ 
+-    let tabs = gBrowser.visibleTabs;
++    let tabs = this.tabList;
+     if (tabs.length > 2) {
+       this.open();
+     } else if (tabs.length == 2) {
+@@ -639,25 +280,7 @@ var ctrlTab = {
        return;
      }
  
@@ -583,7 +600,7 @@ index 077c80a..e069f29 100644
    },
  
    handleEvent: function ctrlTab_handleEvent(event) {
-@@ -669,19 +291,12 @@ var ctrlTab = {
+@@ -669,19 +292,12 @@ var ctrlTab = {
          // tab attribute modified (i.e. label, busy, image)
          // update preview only if tab attribute modified in the list
          if (
@@ -605,7 +622,7 @@ index 077c80a..e069f29 100644
          }
          break;
        case "TabSelect": {
-@@ -705,6 +320,11 @@ var ctrlTab = {
+@@ -705,6 +321,11 @@ var ctrlTab = {
          break;
        case "TabHide":
          this.detachTab(event.target);
@@ -617,7 +634,7 @@ index 077c80a..e069f29 100644
          break;
        case "TabShow":
          this.attachTab(event.target);
-@@ -735,44 +355,9 @@ var ctrlTab = {
+@@ -735,44 +356,9 @@ var ctrlTab = {
              !gTabsPanel.canOpen;
          }
          break;
@@ -662,7 +679,7 @@ index 077c80a..e069f29 100644
    _sortRecentlyUsedTabs() {
      this._recentlyUsedTabs.sort(
        (tab1, tab2) => tab2.lastAccessed - tab1.lastAccessed
-@@ -809,12 +394,6 @@ var ctrlTab = {
+@@ -809,12 +395,6 @@ var ctrlTab = {
      document[toggleEventListener]("keypress", this);
      gBrowser.tabbox.handleCtrlTab = !enable;
  

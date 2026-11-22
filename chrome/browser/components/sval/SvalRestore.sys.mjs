@@ -165,9 +165,13 @@ function restoreOf(node, userContextId) {
  * @param {object} node A tab node from the document.
  * @param {string} id The node's id.
  * @param {number} userContextId The jar of the node's workspace.
+ * @param {?number} [lastAccessed] When this device last looked at the node
+ *   (`SvalLocalSettings.lastActive`). Firefox's session is not what Sval
+ *   restores from, so without it the tab counts as used when it was made,
+ *   and Ctrl+Tab's order by use (`ctrlTab`) is the order tabs restored in.
  * @returns {?object}
  */
-function tabState(node, id, userContextId) {
+function tabState(node, id, userContextId, lastAccessed = null) {
   const restore = restoreOf(node, userContextId);
   if (restore.refused) {
     SvalLog.info(`a tab was not restored: ${restore.refused}`);
@@ -184,6 +188,7 @@ function tabState(node, id, userContextId) {
     ],
     index: 1,
     userContextId,
+    ...(lastAccessed ? { lastAccessed } : {}),
     extData: { [SvalTabs.NODE_ID_KEY]: id },
   };
 }
@@ -289,15 +294,16 @@ const chromeRestoreAdapter = {
    * tabbrowser walk every tab already in the strip (`#insertTabAtIndex`).
    *
    * @param {DOMWindow} window The chrome window to open in.
-   * @param {Array<{node: object, id: string}>} entries Tab nodes from the
-   *   document, with their ids.
+   * @param {Array<{node: object, id: string, lastActive: ?number}>} entries
+   *   Tab nodes from the document, with their ids and when this device last
+   *   looked at each.
    * @param {number} userContextId The jar of the nodes' workspace.
    * @returns {Array<?object>} each entry's tab, or null for one
    *   {@link openRestoredTab} would open none for.
    */
   openRestoredTabs(window, entries, userContextId) {
-    const states = entries.map(({ node, id }) =>
-      tabState(node, id, userContextId)
+    const states = entries.map(({ node, id, lastActive }) =>
+      tabState(node, id, userContextId, lastActive)
     );
     const opening = states.filter(Boolean);
     const tabs = opening.length
@@ -628,6 +634,8 @@ export const SvalRestore = {
    *   select. A launch passes the tab this device last looked at; an id that
    *   names no tab of the workspace selects nothing. Not called for a window
    *   opened on a page of its own.
+   * @param {Function} [options.lastActive] Given a node id, when this device
+   *   last looked at it, or null. Each tab this opens counts as used then.
    * @returns {Promise<object>} `{ wanted, opened, adopted, closed }`: every
    *   tab node of the workspace in the order the panel draws it, the ones this
    *   call opened a tab for, the ones that were already open, here or kept
@@ -704,7 +712,11 @@ export const SvalRestore = {
         adopted.push(id);
         adapter.matchNode?.(window, tab, nodes[id], id, userContextId);
       } else {
-        opening.push({ node: nodes[id], id });
+        opening.push({
+          node: nodes[id],
+          id,
+          lastActive: options.lastActive?.(id) ?? null,
+        });
       }
     }
     const made = adapter.openRestoredTabs(window, opening, userContextId);

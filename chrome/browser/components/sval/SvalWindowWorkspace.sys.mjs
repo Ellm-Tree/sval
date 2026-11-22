@@ -643,6 +643,7 @@ export class SvalWindowWorkspace {
       const { wanted } = await lazy.SvalRestore.restore(win, {
         engine,
         workspaceId: id,
+        lastActive: tabId => this.#host.settings.lastActive(tabId),
         // The window's own blank startup tab is not a switch's business: it
         // carries no node, so it belongs to no workspace, and the release
         // below leaves it where it is for the same reason.

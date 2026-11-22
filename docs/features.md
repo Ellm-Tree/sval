@@ -878,8 +878,9 @@ so a terminal in a web page can use it.
 - **Split View:** ⌃+ (Ctrl+Shift+Plus on Windows and Linux). When a Split's
   row in the Workspace has focus, Alt+← and Alt+→ move its pane.
 - **Recent tabs:** ⌃Tab (Ctrl+Tab) switches to the tab you used last in this
-  Workspace. With three or more tabs in the Workspace, keep holding ⌃ (Ctrl)
-  and a grid of every tab opens over the page, the most recently used first.
+  Workspace. With three or more tabs and opened pins in the Workspace, keep
+  holding ⌃ (Ctrl) and a grid opens over the page with all of them, the most
+  recently used first. Sval remembers that order when it restarts.
   The grid has a heading that names the Workspace, and a footer that shows
   some of the keys you can press and what each one does. Each tab whose page
   has loaded since Sval started shows a picture of that page, even once Sval

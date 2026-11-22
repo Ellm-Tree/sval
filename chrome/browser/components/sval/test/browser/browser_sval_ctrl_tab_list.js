@@ -33,8 +33,10 @@ const RECENT = 9;
 
 /**
  * Two workspaces, the first holding `RECENT` more tabs, made in the tree and
- * opened by a switch back to it, so they are restored and not loaded. The
- * second's tab is left loaded and hidden in the window.
+ * opened by a switch back to it, so they are restored and not loaded. This
+ * device looked at `Recent 1` last of them and `Recent ${RECENT}` first,
+ * before the tab the window shows. The second's tab is left loaded and
+ * hidden in the window.
  *
  * @returns {Promise<object>} `withSwitcherTabs`' fixture.
  */
@@ -44,14 +46,16 @@ async function workspaceOfManyTabs() {
   const [first, second] = ids.workspaces;
   const now = Date.now();
   for (let i = 1; i <= RECENT; i++) {
+    const id = crypto.randomUUID();
     await engine.mutate({
       kind: "addTab",
       parent: first,
       name: `Recent ${i}`,
       url: titledPage(`Recent ${i}`),
-      id: crypto.randomUUID(),
+      id,
       now,
     });
+    SvalPanel.settings.setLastActive(id, now - i * 60_000);
   }
   await SvalPanel.refresh();
   expectWorkspaceTabs();
@@ -148,6 +152,26 @@ add_task(async function every_tab_of_the_workspace_and_no_other() {
     selectedTitle(),
     "and the selected option is named by its tab's title"
   );
+
+  EventUtils.synthesizeKey("KEY_Escape");
+  await TestUtils.waitForCondition(
+    () => !switcherShown(),
+    "the switcher closing"
+  );
+  await releaseCtrl();
+});
+
+add_task(async function restored_tabs_in_the_order_this_device_used_them() {
+  await workspaceOfManyTabs();
+  await holdCtrlTab();
+  const titles = switcherOptions().map(optionTitle);
+  Assert.equal(titles[0], "Tab in 1", "the tab shown comes first");
+  Assert.deepEqual(
+    titles.filter(title => title.startsWith("Recent ")),
+    Array.from({ length: RECENT }, (_, i) => `Recent ${i + 1}`),
+    "and the restored tabs follow, the one looked at last first"
+  );
+  Assert.equal(selectedTitle(), "Recent 1", "which is the one selected");
 
   EventUtils.synthesizeKey("KEY_Escape");
   await TestUtils.waitForCondition(

@@ -459,6 +459,7 @@ Object.assign(SvalPanel, {
       engine: this._engine,
       workspaceId: this._workspace.id,
       show,
+      lastActive: id => this._settings.lastActive(id),
     });
     let wanted = restored?.wanted ?? null;
     // Once a session, as the tree is first restored: the settings would
