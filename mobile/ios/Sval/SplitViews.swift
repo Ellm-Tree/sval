@@ -333,7 +333,7 @@ struct SplitStage: View {
     /// The synced shares of the two panes in view, or equal ones when the
     /// split has none that fit.
     private var pairShares: (Double, Double) {
-        let all = model.children(of: split.split.id).filter { $0.kind == "tab" }.map(\.id)
+        let all = model.children(of: split.split.id).filter { $0.kind == .tab }.map(\.id)
         let shares = split.split.shares.flatMap { $0.count == all.count ? $0 : nil }
             ?? Array(repeating: 100 / Double(all.count), count: all.count)
         let at = split.slots.map { slot in all.firstIndex(of: slot) ?? 0 }
@@ -403,7 +403,7 @@ struct SplitStage: View {
     /// Writes the pair's new widths, keeping their sum, so the desktop
     /// shows the same; the other panes keep theirs.
     private func writeShares(_ share: Double) {
-        let all = model.children(of: split.split.id).filter { $0.kind == "tab" }.map(\.id)
+        let all = model.children(of: split.split.id).filter { $0.kind == .tab }.map(\.id)
         var shares = split.split.shares.flatMap { $0.count == all.count ? $0 : nil }
             ?? Array(repeating: 100 / Double(all.count), count: all.count)
         guard let a = all.firstIndex(of: split.slots[0]), let b = all.firstIndex(of: split.slots[1]) else { return }
@@ -526,7 +526,7 @@ struct PickPage: View {
     /// The Workspace's tabs in tree order that sit in no split.
     private func candidates(in workspace: String) -> [OutlineRow] {
         model.tabs(in: workspace).filter { tab in
-            !tab.awaitsPick && Browser.openable(tab) != nil && tab.parentId.flatMap(model.row)?.kind != "split"
+            !tab.awaitsPick && Browser.openable(tab) != nil && tab.parentId.flatMap(model.row)?.kind != .split
         }
     }
 
@@ -724,7 +724,7 @@ struct SplitWithSheet: View {
                         dismiss()
                     } label: {
                         HStack(spacing: 11) {
-                            if row.kind == "split" {
+                            if row.kind == .split {
                                 Image(systemName: "rectangle.split.2x1")
                                     .font(.system(size: 16))
                                     .frame(width: 22)
@@ -757,7 +757,7 @@ struct SplitWithSheet: View {
 
     /// A tab's title, or a split's name or its panes' titles.
     private func name(_ row: OutlineRow) -> String {
-        guard row.kind == "split", row.name.isEmpty else { return row.displayTitle }
-        return model.children(of: row.id).filter { $0.kind == "tab" }.map(\.displayTitle).joined(separator: " and ")
+        guard row.kind == .split, row.name.isEmpty else { return row.displayTitle }
+        return model.children(of: row.id).filter { $0.kind == .tab }.map(\.displayTitle).joined(separator: " and ")
     }
 }

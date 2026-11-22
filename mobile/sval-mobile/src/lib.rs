@@ -15,6 +15,50 @@ pub mod smb;
 
 uniffi::setup_scaffolding!();
 
+/// A watcher's stop, which every wait of the watcher's sees, whether it
+/// starts before the stop or is under way. Nothing is ever sent on the
+/// channel: closing it is the stop, and a closed channel's `recv` returns
+/// at once, for the waits under way and for every wait after.
+pub(crate) struct Stop {
+    sender: smol::channel::Sender<()>,
+    receiver: smol::channel::Receiver<()>,
+}
+
+impl Stop {
+    pub(crate) fn new() -> Self {
+        let (sender, receiver) = smol::channel::bounded(1);
+        Self { sender, receiver }
+    }
+
+    pub(crate) fn stop(&self) {
+        self.sender.close();
+    }
+
+    pub(crate) fn is_stopped(&self) -> bool {
+        self.sender.is_closed()
+    }
+
+    /// Returns once the watcher is stopped.
+    pub(crate) async fn stopped(&self) {
+        let _ = self.receiver.recv().await;
+    }
+
+    /// Sleeps for `duration`, or until the watcher is stopped, and says
+    /// whether it was.
+    pub(crate) fn sleep(&self, duration: std::time::Duration) -> bool {
+        smol::block_on(smol::future::or(
+            async {
+                self.stopped().await;
+                true
+            },
+            async {
+                smol::Timer::after(duration).await;
+                false
+            },
+        ))
+    }
+}
+
 /// A file in a shared folder, as its listing describes it, for a caller
 /// that decides what to read before reading it.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -54,4 +98,37 @@ pub enum ConnectorError {
     /// Anything else.
     #[error("{message}")]
     Other { message: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn a_stop_ends_a_sleep() {
+        let stop = Arc::new(Stop::new());
+        let (done, ended) = mpsc::channel();
+        let sleeping = Arc::clone(&stop);
+        std::thread::spawn(move || done.send(sleeping.sleep(Duration::from_secs(3600))));
+        stop.stop();
+        assert_eq!(ended.recv_timeout(Duration::from_secs(1)), Ok(true));
+    }
+
+    #[test]
+    fn a_sleep_after_the_stop_returns_at_once() {
+        let stop = Stop::new();
+        stop.stop();
+        assert!(stop.is_stopped());
+        assert!(stop.sleep(Duration::from_secs(3600)));
+    }
+
+    #[test]
+    fn a_sleep_without_a_stop_runs_its_time() {
+        let stop = Stop::new();
+        assert!(!stop.sleep(Duration::from_millis(10)));
+        assert!(!stop.is_stopped());
+    }
 }

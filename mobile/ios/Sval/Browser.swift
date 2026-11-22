@@ -394,7 +394,7 @@ final class Browser {
     /// was never used here, so it is no recent tab.
     func recentTabs() -> [OutlineRow] {
         model.rows
-            .filter { $0.kind == "tab" && $0.id != currentTabId && Self.openable($0) != nil }
+            .filter { $0.kind == .tab && $0.id != currentTabId && Self.openable($0) != nil }
             // The private session and the user's Workspaces never see each
             // other's tabs.
             .filter { model.isPrivate($0.id) == inPrivate }
@@ -502,8 +502,8 @@ final class Browser {
     /// The split tab `id` is a pane of, and its run of panes, when that run
     /// holds two or more.
     private func splitRun(of id: String) -> (OutlineRow, [OutlineRow])? {
-        guard let parent = model.row(id)?.parentId, let split = model.row(parent), split.kind == "split" else { return nil }
-        let panes = model.children(of: split.id).filter { $0.kind == "tab" }
+        guard let parent = model.row(id)?.parentId, let split = model.row(parent), split.kind == .split else { return nil }
+        let panes = model.children(of: split.id).filter { $0.kind == .tab }
         guard let run = splitRuns(panes).first(where: { $0.contains { $0.id == id } }), run.count >= 2 else { return nil }
         return (split, run)
     }
@@ -638,7 +638,7 @@ final class Browser {
     /// at its saved address, and selecting a loaded pin never moves it
     /// (pins spec §5).
     private func trimPages() async {
-        let tabs = pages.keys.filter { model.row($0)?.kind == "tab" }
+        let tabs = pages.keys.filter { model.row($0)?.kind == .tab }
         guard tabs.count > Self.livePages else { return }
         let oldest = tabs.sorted { (usedAt[$0] ?? 0) < (usedAt[$1] ?? 0) }
         await offload(Array(oldest.dropLast(Self.livePages)), why: "past the limit of live pages")
@@ -671,7 +671,7 @@ final class Browser {
     /// Takes the grid's picture of tab `id`'s page, if it's a tab of the
     /// tree with a page here.
     func takePreview(_ id: String) {
-        guard model.row(id)?.kind == "tab", let page = pages[id] else { return }
+        guard model.row(id)?.kind == .tab, let page = pages[id] else { return }
         PagePreviews.shared.take(id, from: page.view, isPrivate: model.isPrivate(id))
     }
 
@@ -712,12 +712,12 @@ final class Browser {
         // What a private tab is, or that one was in front, is never saved.
         let keeps = !model.isPrivate(id)
         if keeps { UserDefaults.standard.set(id, forKey: Self.currentKey) }
-        if let split = model.row(id)?.parentId, model.row(split)?.kind == "split" {
+        if let split = model.row(id)?.parentId, model.row(split)?.kind == .split {
             splitFocus[split] = id
             UserDefaults.standard.set(splitFocus.filter { !model.isPrivate($0.key) }, forKey: Self.splitFocusKey)
         }
         usedAt[id] = Date.now.timeIntervalSince1970
-        let tabs = Set(model.rows.lazy.filter { $0.kind == "tab" }.map(\.id))
+        let tabs = Set(model.rows.lazy.filter { $0.kind == .tab }.map(\.id))
         usedAt = usedAt.filter { tabs.contains($0.key) }
         UserDefaults.standard.set(usedAt.filter { !model.isPrivate($0.key) }, forKey: Self.usedKey)
         foldBar(to: 0)
@@ -819,7 +819,7 @@ final class Browser {
     /// the tab didn't close.
     @discardableResult
     func close(_ row: OutlineRow) async -> ClosedTab? {
-        guard row.kind == "tab" else { return nil }
+        guard row.kind == .tab else { return nil }
         let entry = ClosedTab(
             row: row, place: model.closedPlace(of: row), workspace: model.workspace(of: row.id),
             state: pages[row.id]?.view.interactionState ?? offloaded[row.id]?.state)
@@ -847,7 +847,7 @@ final class Browser {
 
     /// Closes a split and every pane, keeping what reopens it.
     func closeSplit(_ split: OutlineRow) async -> ClosedSplit? {
-        let panes = model.children(of: split.id).filter { $0.kind == "tab" }
+        let panes = model.children(of: split.id).filter { $0.kind == .tab }
         let focus = focusedPane(of: split.id, among: panes.map(\.id))
         let entry = ClosedSplit(
             split: split, panes: panes,
@@ -893,7 +893,7 @@ final class Browser {
     /// Lets go of the pages of tabs that are gone, and moves off the tab in
     /// front if it went: to the tab before it in its workspace, or the first.
     func reconcile() {
-        let tabs = Set(model.rows.filter { $0.kind == "tab" }.map(\.id))
+        let tabs = Set(model.rows.filter { $0.kind == .tab }.map(\.id))
         // A pin's page lasts while the pin shows in its Workspace; unpinned,
         // deleted or limited elsewhere, it closes (pins spec §13).
         let live = { (id: String) in tabs.contains(id) || self.pin(for: id) != nil || self.windowsOpening[id] != nil }
@@ -926,7 +926,7 @@ final class Browser {
         }
         // An empty Workspace stays shown, empty, for as long as it exists,
         // the private session's included, which `workspaces` leaves out.
-        let shown = workspaceId.flatMap { id in model.row(id)?.kind == "workspace" ? id : nil }
+        let shown = workspaceId.flatMap { id in model.row(id)?.kind == .workspace ? id : nil }
             ?? model.workspaces.first?.id
         if let next = model.tabs(in: shown).first {
             select(next.id)

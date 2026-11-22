@@ -162,7 +162,7 @@ struct MoveSheet: View {
                 excluded.insert(candidate.id)
                 return false
             }
-            return candidate.kind == "group" && !excluded.contains(candidate.id)
+            return candidate.kind == .group && !excluded.contains(candidate.id)
         }
     }
 

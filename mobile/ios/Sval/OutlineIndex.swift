@@ -5,7 +5,7 @@
 /// tables built once per change: a row by id, a row's children, the
 /// Workspace a row is in and a Workspace's tabs.
 struct OutlineIndex {
-    let rows: [OutlineRow]
+    private(set) var rows: [OutlineRow]
     /// Each id's first row: an id the tree holds twice answers as the
     /// first.
     private let byId: [String: Int]
@@ -38,19 +38,29 @@ struct OutlineIndex {
                     top = nil
                     break
                 }
-                if row.kind == "tab" { inside[parent, default: (0, 0)].tabs += 1 }
-                if row.kind == "group" { inside[parent, default: (0, 0)].groups += 1 }
+                if row.kind == .tab { inside[parent, default: (0, 0)].tabs += 1 }
+                if row.kind == .group { inside[parent, default: (0, 0)].groups += 1 }
                 top = byId[parent].map { rows[$0] }
             }
             guard let workspace = top else { continue }
             if byId[row.id] == index { workspaceOf[row.id] = workspace.id }
-            if row.kind == "tab" { tabsIn[workspace.id, default: []].append(index) }
+            if row.kind == .tab { tabsIn[workspace.id, default: []].append(index) }
         }
         self.byId = byId
         self.childrenOf = childrenOf
         self.workspaceOf = workspaceOf
         self.tabsIn = tabsIn
         self.inside = inside
+    }
+
+    /// Puts `changed` in place of the rows with their ids. Each keeps its
+    /// row's parent, depth and kind, which the tables are built from, so
+    /// they stand.
+    mutating func replace(_ changed: [OutlineRow]) {
+        for row in changed {
+            guard let at = byId[row.id] else { continue }
+            rows[at] = row
+        }
     }
 
     func row(_ id: String) -> OutlineRow? {

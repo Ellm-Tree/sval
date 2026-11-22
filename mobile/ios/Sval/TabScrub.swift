@@ -111,8 +111,8 @@ struct TabScrub {
     private static func topGroup(of row: OutlineRow, model: AppModel) -> OutlineRow? {
         var found: OutlineRow?
         var parent = row.parentId.flatMap(model.row)
-        while let at = parent, at.kind != "workspace" {
-            if at.kind == "group" { found = at }
+        while let at = parent, at.kind != .workspace {
+            if at.kind == .group { found = at }
             parent = at.parentId.flatMap(model.row)
         }
         return found

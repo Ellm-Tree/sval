@@ -26,7 +26,7 @@ enum DropKind: Equatable {
 /// stands for the split.
 struct DropOver: Equatable {
     let id: String
-    let kind: String
+    let kind: NodeKind
     let expanded: Bool
 }
 
@@ -63,24 +63,24 @@ enum TreeDrop {
 /// which `AppModel` asks with its own.
 extension OutlineIndex {
     func isPane(_ id: String) -> Bool {
-        row(id)?.kind == "tab" && row(id)?.parentId.flatMap(row)?.kind == "split"
+        row(id)?.kind == .tab && row(id)?.parentId.flatMap(row)?.kind == .split
     }
 
     func splitTabs(_ split: String) -> [String] {
-        children(of: split).filter { $0.kind == "tab" }.map(\.id)
+        children(of: split).filter { $0.kind == .tab }.map(\.id)
     }
 
     private func dragKind(_ id: String) -> String? {
         switch row(id)?.kind {
-        case "tab": isPane(id) ? "page" : "tab"
-        case "split": "split"
-        case "group": "group"
+        case .tab: isPane(id) ? "page" : "tab"
+        case .split: "split"
+        case .group: "group"
         default: nil
         }
     }
 
     func pageCount(_ id: String) -> Int {
-        row(id)?.kind == "split" ? splitTabs(id).count : 1
+        row(id)?.kind == .split ? splitTabs(id).count : 1
     }
 
     /// What dropping `id` at (`x`, `y`) on row `over`, `w` by `h`, would
@@ -101,21 +101,21 @@ extension OutlineIndex {
             return over.id == id ? .noop : .refused(full: false)
         }
         if over.id == id { return .noop }
-        if over.kind == "group" {
+        if over.kind == .group {
             if over.expanded { return top ? .before : .firstChild }
             if y < TreeDrop.edge { return .before }
             return y > h - TreeDrop.edge ? .after : .into
         }
-        if kind == "group" || (over.kind != "tab" && over.kind != "split") {
+        if kind == "group" || (over.kind != .tab && over.kind != .split) {
             return top ? .before : .after
         }
         if y < TreeDrop.edge { return .before }
         if y > h - TreeDrop.edge { return .after }
         if kind == "page", row(id)?.parentId == over.id { return .noop }
         if makesGroups, x < w - TreeDrop.splitZone(w) { return .newGroup }
-        let pages = (over.kind == "split" ? splitTabs(over.id).count : 1) + pageCount(id)
+        let pages = (over.kind == .split ? splitTabs(over.id).count : 1) + pageCount(id)
         if pages > TreeDrop.maxPanes { return .refused(full: true) }
-        if over.kind == "tab" { return .split }
+        if over.kind == .tab { return .split }
         return kind == "split" ? .merge : .join
     }
 
@@ -179,17 +179,17 @@ extension OutlineIndex {
             previous = kind == .before ? (at > 0 ? others[at - 1] : nil) : overId
             next = kind == .before ? overId : (at + 1 < others.count ? others[at + 1] : nil)
         case .firstChild:
-            guard over.kind == "group" || over.kind == "workspace" else { return nil }
+            guard over.kind == .group || over.kind == .workspace else { return nil }
             parent = overId
             previous = nil
             next = siblings(in: overId, without: id).first
         case .into:
-            guard over.kind == "group" || over.kind == "workspace", dragged.parentId != overId else { return nil }
+            guard over.kind == .group || over.kind == .workspace, dragged.parentId != overId else { return nil }
             parent = overId
             previous = siblings(in: overId, without: id).last
             next = nil
         case .end:
-            guard over.kind == "workspace" else { return nil }
+            guard over.kind == .workspace else { return nil }
             parent = overId
             previous = siblings(in: overId, without: id).last
             next = nil
@@ -208,7 +208,7 @@ extension OutlineIndex {
 
     /// The desktop's `mergeTarget`: a tab or split onto a tab or split.
     func mergeTarget(_ id: String, _ target: String) -> MergePlan? {
-        let kinds: Set<String> = ["tab", "split"]
+        let kinds: Set<NodeKind> = [.tab, .split]
         guard let dragged = row(id), kinds.contains(dragged.kind), let over = row(target), kinds.contains(over.kind),
               !isPane(target), !isInside(target, id), let parent = over.parentId else { return nil }
         let others = siblings(in: parent, without: id)
@@ -219,8 +219,8 @@ extension OutlineIndex {
     /// The desktop's `splitTogetherOps`: a new split in the tab's place,
     /// the tab first and the dropped pages after it.
     func splitTogetherOps(_ target: String, _ id: String) -> [[String: Any]]? {
-        guard let over = row(target), over.kind == "tab", !isPane(target), target != id,
-              let dragged = row(id), dragged.kind == "tab" || dragged.kind == "split",
+        guard let over = row(target), over.kind == .tab, !isPane(target), target != id,
+              let dragged = row(id), dragged.kind == .tab || dragged.kind == .split,
               1 + pageCount(id) <= TreeDrop.maxPanes, let parent = over.parentId else { return nil }
         let others = siblings(in: parent, without: id)
         let at = others.firstIndex(of: target) ?? 0
@@ -230,17 +230,17 @@ extension OutlineIndex {
         add["after"] = target
         var ops = [add, Self.moveOp(target, into: split, previous: nil, next: nil)]
         var last = target
-        for tab in dragged.kind == "split" ? splitTabs(id) : [id] {
+        for tab in dragged.kind == .split ? splitTabs(id) : [id] {
             ops.append(Self.moveOp(tab, into: split, previous: last, next: nil))
             last = tab
         }
-        return ops + (dragged.kind == "split" ? [Self.removeEmptied(id)] : splitShapeOps(leaving: dragged))
+        return ops + (dragged.kind == .split ? [Self.removeEmptied(id)] : splitShapeOps(leaving: dragged))
     }
 
     /// The desktop's `joinSplitOps`: the tab joins the split as its last
     /// pane, and the widths go back to equal.
     func joinSplitOps(_ split: String, _ id: String) -> [[String: Any]]? {
-        guard let tab = row(id), tab.kind == "tab", tab.parentId != split,
+        guard let tab = row(id), tab.kind == .tab, tab.parentId != split,
               splitTabs(split).count < TreeDrop.maxPanes else { return nil }
         return [Self.moveOp(id, into: split, previous: splitTabs(split).last, next: nil)]
             + resetWidthsOps(split) + splitShapeOps(leaving: tab)
@@ -249,7 +249,7 @@ extension OutlineIndex {
     /// The desktop's `mergeSplitsOps`: the dropped split's pages join the
     /// target's after its own, and the dropped split goes.
     func mergeSplitsOps(_ target: String, _ id: String) -> [[String: Any]]? {
-        guard row(target)?.kind == "split", row(id)?.kind == "split", target != id else { return nil }
+        guard row(target)?.kind == .split, row(id)?.kind == .split, target != id else { return nil }
         let incoming = splitTabs(id)
         guard splitTabs(target).count + incoming.count <= TreeDrop.maxPanes else { return nil }
         var ops: [[String: Any]] = []
@@ -284,9 +284,9 @@ extension OutlineIndex {
     /// writes (decision 14).
     func splitWithOps(_ target: String, _ picked: String) -> [[String: Any]]? {
         switch (row(target)?.kind, row(picked)?.kind) {
-        case ("tab", _): splitTogetherOps(target, picked)
-        case ("split", "tab"): joinSplitOps(target, picked)
-        case ("split", "split"): mergeSplitsOps(target, picked)
+        case (.tab, _): splitTogetherOps(target, picked)
+        case (.split, .tab): joinSplitOps(target, picked)
+        case (.split, .split): mergeSplitsOps(target, picked)
         default: nil
         }
     }
@@ -308,12 +308,12 @@ extension OutlineIndex {
         var splits: [String] = []
         for row in rows {
             guard let parent = row.parentId, !gone.contains(parent), !splits.contains(parent),
-                  self.row(parent)?.kind == "split", !gone.contains(where: { isInside(parent, $0) }) else { continue }
+                  self.row(parent)?.kind == .split, !gone.contains(where: { isInside(parent, $0) }) else { continue }
             splits.append(parent)
         }
         return splits.flatMap { id -> [[String: Any]] in
             guard let split = self.row(id) else { return [] }
-            let left = children(of: id).filter { !gone.contains($0.id) && $0.kind == "tab" }
+            let left = children(of: id).filter { !gone.contains($0.id) && $0.kind == .tab }
             if left.count <= 1 { return [["kind": "removeKeepingChildren", "id": id]] }
             guard split.shares != nil else { return [] }
             var reset: [String: Any] = ["kind": "setContent", "id": id, "name": split.name]
@@ -349,7 +349,7 @@ extension AppModel {
     func splitCandidates(for target: OutlineRow) -> [OutlineRow] {
         guard let home = workspace(of: target.id) else { return [] }
         return rows.filter { row in
-            (row.kind == "split" || (row.kind == "tab" && !isPane(row.id) && !row.awaitsPick))
+            (row.kind == .split || (row.kind == .tab && !isPane(row.id) && !row.awaitsPick))
                 && workspace(of: row.id) == home && tree.splitWithOps(target.id, row.id) != nil
         }
     }
@@ -357,7 +357,7 @@ extension AppModel {
     /// Whether Split With… has anything to offer `target`, by counting
     /// pages alone, so a menu can ask it for every row it draws.
     func offersSplit(for target: OutlineRow) -> Bool {
-        guard target.kind == "split" || (target.kind == "tab" && !isPane(target.id)),
+        guard target.kind == .split || (target.kind == .tab && !isPane(target.id)),
               let home = workspace(of: target.id) else { return false }
         let own = tree.pageCount(target.id)
         return tabs(in: home).contains { tab in
@@ -365,7 +365,7 @@ extension AppModel {
             let other = isPane(tab.id) ? tab.parentId ?? tab.id : tab.id
             guard other != target.id else { return false }
             // A tab joins a split, and a split joins a tab or a split.
-            if target.kind == "split", row(other)?.kind == "tab" || row(other)?.kind == "split" {
+            if target.kind == .split, row(other)?.kind == .tab || row(other)?.kind == .split {
                 return own + tree.pageCount(other) <= TreeDrop.maxPanes
             }
             return 1 + tree.pageCount(other) <= TreeDrop.maxPanes

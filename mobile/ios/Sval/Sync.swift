@@ -384,9 +384,18 @@ actor Syncer {
         }
     }
 
-    /// The pins `workspace` shows, in the row's order.
-    func pins(in workspace: String, workspaces: [String]) -> [PinRow] {
-        documents[favoritesDocument]!.pins(workspace: workspace, workspaces: workspaces)
+    /// The pins each of `workspaces` shows, by its id, in the row's order,
+    /// and the favorites' revision they were read at.
+    func pins(workspaces: [String]) -> (revision: UInt64, pins: [String: [PinRow]]) {
+        let document = documents[favoritesDocument]!
+        return (document.revision(), document.pinsAll(workspaces: workspaces))
+    }
+
+    /// The revision of each document a refresh reads.
+    func revisions() -> Revisions {
+        Revisions(workspaces: documents[workspacesDocument]!.revision(),
+                  settings: documents[settingsDocument]!.revision(),
+                  favorites: documents[favoritesDocument]!.revision())
     }
 
     /// The weeks the history index lists, newest first.
@@ -456,11 +465,11 @@ actor Syncer {
 
     nonisolated var deviceHex: String { deviceId.map { String(format: "%02x", $0) }.joined() }
 
-    /// Every favorite, folder and separator, as the desktop's store reads
-    /// them.
-    func favorites() -> [Favorite] {
-        guard let json = try? documents[favoritesDocument]!.favoritesJson() else { return [] }
-        return (try? JSONDecoder().decode([Favorite].self, from: Data(json.utf8))) ?? []
+    /// Every favorite, folder and separator, and the revision they were
+    /// read at.
+    func favorites() -> (revision: UInt64, favorites: [Favorite]) {
+        let document = documents[favoritesDocument]!
+        return (document.revision(), document.favoriteRows())
     }
 
     /// Set once this device leaves the folder. A change already waiting on
@@ -495,13 +504,15 @@ actor Syncer {
         documents[workspacesDocument]!.outline()
     }
 
-    /// The synced settings, key to value. A setting reset to its default is
-    /// left out.
-    func settings() -> [String: Any] {
-        guard let json = try? documents[settingsDocument]!.settingsJson(),
-              let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
-        else { return [:] }
-        return object.filter { !($0.value is NSNull) }
+    /// The tree's rows that changed after `revision`, or all of them.
+    func treeRead(since revision: UInt64?) -> TreeRead {
+        documents[workspacesDocument]!.treeRead(since: revision)
+    }
+
+    /// The synced settings, and the revision they were read at.
+    func settings() -> (revision: UInt64, settings: [String: Any]) {
+        let document = documents[settingsDocument]!
+        return (document.revision(), document.syncedSettings())
     }
 }
 

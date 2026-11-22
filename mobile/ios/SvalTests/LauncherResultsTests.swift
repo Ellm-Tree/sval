@@ -5,7 +5,7 @@ import XCTest
 @testable import Sval
 
 private func tab(_ id: String, in workspace: String, _ name: String, _ url: String) -> OutlineRow {
-    OutlineRow(id: id, parentId: workspace, depth: 1, kind: "tab", name: name, url: url, icon: nil, local: false,
+    OutlineRow(id: id, parentId: workspace, depth: 1, kind: .tab, name: name, url: url, icon: nil, local: false,
                emoji: nil, label: nil, color: nil, transparency: nil, pinned: false, agent: nil,
                agentDevice: nil, device: nil, isolated: false, shares: nil)
 }

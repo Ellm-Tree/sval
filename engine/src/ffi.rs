@@ -18,6 +18,7 @@ use crate::sync::Target;
 use crate::tree;
 use crate::types::{Document, NodeId, NodeKind};
 use crate::views::{favorites_json, shards_json, visits_json};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// A refusal, as `docs/host-contract.md` §8 spells it for every host.
@@ -65,11 +66,14 @@ pub struct SyncResult {
 /// One row of [`SvalDocument::outline`]: a node with its depth, in the order
 /// a tree view draws it.
 #[derive(uniffi::Record)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct OutlineRow {
     pub id: String,
     pub parent_id: Option<String>,
     pub depth: u32,
-    pub kind: String,
+    /// The node's kind, a kind a newer build wrote included: a workspace,
+    /// group or split holds whatever a merge put in it.
+    pub kind: NodeKind,
     pub name: String,
     pub url: Option<String>,
     /// The tab's icon as the content group holds it, which a host writing
@@ -107,8 +111,9 @@ pub struct OutlineRow {
     pub shares: Option<Vec<f64>>,
 }
 
-/// One pin or pinned folder of [`SvalDocument::pins`].
+/// One pin or pinned folder of [`SvalDocument::pins_all`].
 #[derive(uniffi::Record)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct PinRow {
     pub id: String,
     /// The favorite's guid, which keys its page (pins spec §13).
@@ -146,8 +151,10 @@ pub fn favorite_id(guid: String) -> String {
 /// Appends every favorite under `folder`, depth first in folder order, each
 /// naming `top`, the pinned folder: a pin in a subfolder is a pin as one in
 /// the folder is (pins spec §6).
+#[expect(clippy::too_many_arguments)]
 fn pins_inside(
     doc: &Document,
+    index: &tree::ChildIndex,
     folder: NodeId,
     top: NodeId,
     depth: usize,
@@ -158,32 +165,218 @@ fn pins_inside(
     if depth >= 32 {
         return;
     }
-    let mut children: Vec<_> = doc
-        .nodes
-        .iter()
-        .filter(|(_, n)| n.placement.parent == Some(folder) && shown(n))
-        .collect();
-    children.sort_by(|(a_id, a), (b_id, b)| {
-        (&a.placement.order, a_id).cmp(&(&b.placement.order, b_id))
-    });
-    for (id, node) in children {
+    for id in index.children(folder) {
+        let node = &doc.nodes[id];
+        if !shown(node) {
+            continue;
+        }
         if node.kind == NodeKind::Folder {
-            pins_inside(doc, *id, top, depth + 1, shown, row, out);
+            pins_inside(doc, index, *id, top, depth + 1, shown, row, out);
         } else {
             out.push(row(*id, node, Some(top)));
         }
     }
 }
 
+/// The pins Workspace `workspace` shows ([`SvalDocument::pins_all`]).
+fn pins_of(
+    doc: &Document,
+    index: &tree::ChildIndex,
+    workspace: &String,
+    workspaces: &[String],
+) -> Vec<PinRow> {
+    let shown = |node: &crate::types::Node| match node.kind {
+        NodeKind::Folder => true,
+        NodeKind::Favorite => node.content.url.as_deref().is_some_and(|url| {
+            !url.trim_start()
+                .to_ascii_lowercase()
+                .starts_with("javascript:")
+        }),
+        _ => false,
+    };
+    let row = |id: NodeId, node: &crate::types::Node, folder: Option<NodeId>| PinRow {
+        id: id.to_string(),
+        guid: node.content.guid.clone().unwrap_or_default(),
+        kind: if node.kind == NodeKind::Folder {
+            "folder"
+        } else {
+            "favorite"
+        }
+        .into(),
+        name: node.content.name.clone(),
+        url: node.content.url.clone(),
+        local: node.content.local,
+        folder: folder.map(|f| f.to_string()),
+        scope: folder
+            .is_none()
+            .then(|| {
+                node.lifecycle
+                    .pin_scope
+                    .as_ref()
+                    .map(|s| s.iter().cloned().collect())
+            })
+            .flatten(),
+    };
+    // The pins root's children, in the tree's order, are the row
+    // (pins-root spec §3).
+    let root = crate::types::favorite_id(crate::types::PINS_GUID);
+    let slots = index
+        .children(root)
+        .iter()
+        .map(|id| (id, &doc.nodes[id]))
+        .filter(|(_, n)| shown(n))
+        .filter(|(_, n)| {
+            let live: Vec<_> = n
+                .lifecycle
+                .pin_scope
+                .iter()
+                .flatten()
+                .filter(|id| workspaces.contains(id))
+                .collect();
+            live.is_empty() || live.contains(&workspace)
+        });
+    let mut out = Vec::new();
+    for (id, node) in slots {
+        out.push(row(*id, node, None));
+        if node.kind == NodeKind::Folder {
+            pins_inside(doc, index, *id, *id, 0, &shown, &row, &mut out);
+        }
+    }
+    out
+}
+
+/// What changed in a document after a revision ([`SvalDocument::changes_since`]).
+#[derive(uniffi::Record)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+pub struct DocChanges {
+    /// The revision the document is at.
+    pub revision: u64,
+    /// Nodes added or changed since, of any kind.
+    pub changed: Vec<String>,
+    /// Nodes the document no longer holds.
+    pub removed: Vec<String>,
+    /// Whether a node was added or removed, or changed its parent, its order
+    /// or its kind: the outline's rows may have moved, so the app reads it
+    /// whole. Otherwise every row stays where it was and only the rows of
+    /// `changed` differ.
+    pub structural: bool,
+}
+
+/// One change of a document's nodes, under the revision it made.
+struct Change {
+    revision: u64,
+    changed: Vec<String>,
+    removed: Vec<String>,
+    structural: bool,
+}
+
+/// How many changes a document remembers. An app that falls further
+/// behind reads everything again.
+const KEPT_CHANGES: usize = 64;
+
+/// A document's revision and its latest changes, oldest first, each one
+/// revision after the one before.
+#[derive(Default)]
+struct Revisions {
+    revision: u64,
+    log: VecDeque<Change>,
+}
+
+impl Revisions {
+    fn note(&mut self, changed: Vec<String>, removed: Vec<String>, structural: bool) {
+        self.revision += 1;
+        self.log.push_back(Change {
+            revision: self.revision,
+            changed,
+            removed,
+            structural,
+        });
+        if self.log.len() > KEPT_CHANGES {
+            self.log.pop_front();
+        }
+    }
+
+    /// Moves on to a revision whose changes are unknown, so a read at any
+    /// earlier one reads everything.
+    fn lose(&mut self) {
+        self.revision += 1;
+        self.log.clear();
+    }
+
+    fn since(&self, revision: u64) -> Option<DocChanges> {
+        let missing = match self.log.front() {
+            Some(first) => revision + 1 < first.revision,
+            None => revision != self.revision,
+        };
+        if revision > self.revision || missing {
+            return None;
+        }
+        let mut changed = BTreeSet::new();
+        let mut removed = BTreeSet::new();
+        let mut structural = false;
+        for change in self.log.iter().filter(|change| change.revision > revision) {
+            changed.extend(change.changed.iter().cloned());
+            removed.extend(change.removed.iter().cloned());
+            structural |= change.structural;
+        }
+        Some(DocChanges {
+            revision: self.revision,
+            changed: changed.into_iter().collect(),
+            removed: removed.into_iter().collect(),
+            structural,
+        })
+    }
+}
+
+/// Whether going from `before` to `doc` by `changed` and `removed` moved
+/// any row of the outline: a node added or removed, or one whose parent,
+/// order or kind differs.
+fn moves_rows(
+    before: &BTreeMap<NodeId, crate::types::Node>,
+    doc: &Document,
+    changed: &[NodeId],
+    removed: &[NodeId],
+) -> bool {
+    !removed.is_empty()
+        || changed
+            .iter()
+            .any(|id| match (before.get(id), doc.nodes.get(id)) {
+                (Some(was), Some(is)) => {
+                    was.kind != is.kind
+                        || was.placement.parent != is.placement.parent
+                        || was.placement.order != is.placement.order
+                }
+                _ => true,
+            })
+}
+
+fn id_strings(ids: &[NodeId]) -> Vec<String> {
+    ids.iter().map(NodeId::to_string).collect()
+}
+
 /// The document a device holds, behind a lock because UniFFI objects are
-/// shared across threads, and what its passes remember of this device's own
-/// file ([`crate::sync::OwnCopies`]).
+/// shared across threads, what its passes remember of this device's own
+/// file ([`crate::sync::OwnCopies`]), and its revisions. Every change to
+/// the document's nodes comes through [`SvalDocument::apply_batch`] or
+/// [`SvalDocument::sync`], each of which notes it under the document's lock,
+/// so a reader that reads the revision first never takes older nodes for a
+/// newer revision.
 #[derive(uniffi::Object)]
-pub struct SvalDocument(Mutex<Document>, Mutex<crate::sync::OwnCopies>);
+pub struct SvalDocument(
+    Mutex<Document>,
+    Mutex<crate::sync::OwnCopies>,
+    Mutex<Revisions>,
+);
 
 impl SvalDocument {
     fn holding(doc: Document) -> Self {
-        SvalDocument(Mutex::new(doc), Mutex::default())
+        SvalDocument(Mutex::new(doc), Mutex::default(), Mutex::default())
+    }
+
+    fn revisions(&self) -> MutexGuard<'_, Revisions> {
+        self.2
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     fn doc(&self) -> MutexGuard<'_, Document> {
@@ -228,74 +421,24 @@ impl SvalDocument {
         shards_json(&self.doc()).map_err(EngineError::from)
     }
 
-    /// The pins a Workspace shows, in the row's order (pins spec §4, §7): each
-    /// pinned favorite or folder whose scope holds `workspace`, or names no
-    /// Workspace in `workspaces`, every Workspace the tree holds. A pinned
-    /// folder is followed by every favorite inside it, depth first, each
-    /// naming the folder. Separators and bookmarklets are left out.
-    pub fn pins(&self, workspace: String, workspaces: Vec<String>) -> Vec<PinRow> {
+    /// The pins each Workspace in `workspaces` shows, by its id, in the
+    /// row's order (pins spec §4, §7): each pinned favorite or folder whose
+    /// scope holds the Workspace, or names no Workspace in `workspaces`,
+    /// every Workspace the tree holds. A pinned folder is followed by every
+    /// favorite inside it, depth first, each naming the folder. Separators
+    /// and bookmarklets are left out.
+    pub fn pins_all(&self, workspaces: Vec<String>) -> HashMap<String, Vec<PinRow>> {
         let doc = self.doc();
-        let shown = |node: &crate::types::Node| match node.kind {
-            NodeKind::Folder => true,
-            NodeKind::Favorite => node.content.url.as_deref().is_some_and(|url| {
-                !url.trim_start()
-                    .to_ascii_lowercase()
-                    .starts_with("javascript:")
-            }),
-            _ => false,
-        };
-        let row = |id: NodeId, node: &crate::types::Node, folder: Option<NodeId>| PinRow {
-            id: id.to_string(),
-            guid: node.content.guid.clone().unwrap_or_default(),
-            kind: if node.kind == NodeKind::Folder {
-                "folder"
-            } else {
-                "favorite"
-            }
-            .into(),
-            name: node.content.name.clone(),
-            url: node.content.url.clone(),
-            local: node.content.local,
-            folder: folder.map(|f| f.to_string()),
-            scope: folder
-                .is_none()
-                .then(|| {
-                    node.lifecycle
-                        .pin_scope
-                        .as_ref()
-                        .map(|s| s.iter().cloned().collect())
-                })
-                .flatten(),
-        };
-        // The pins root's children, in the tree's order, are the row
-        // (pins-root spec §3).
-        let root = crate::types::favorite_id(crate::types::PINS_GUID);
-        let mut slots: Vec<_> = doc
-            .nodes
+        let index = tree::ChildIndex::build(&doc);
+        workspaces
             .iter()
-            .filter(|(_, n)| n.placement.parent == Some(root) && shown(n))
-            .filter(|(_, n)| {
-                let live: Vec<_> = n
-                    .lifecycle
-                    .pin_scope
-                    .iter()
-                    .flatten()
-                    .filter(|id| workspaces.contains(id))
-                    .collect();
-                live.is_empty() || live.contains(&&workspace)
+            .map(|workspace| {
+                (
+                    workspace.clone(),
+                    pins_of(&doc, &index, workspace, &workspaces),
+                )
             })
-            .collect();
-        slots.sort_by(|(a_id, a), (b_id, b)| {
-            (&a.placement.order, a_id).cmp(&(&b.placement.order, b_id))
-        });
-        let mut out = Vec::new();
-        for (id, node) in slots {
-            out.push(row(*id, node, None));
-            if node.kind == NodeKind::Folder {
-                pins_inside(&doc, *id, *id, 0, &shown, &row, &mut out);
-            }
-        }
-        out
+            .collect()
     }
 
     /// Applies a batch of operations in `SvalDocumentOps.mjs`'s shape, all or
@@ -306,7 +449,26 @@ impl SvalDocument {
         device_id: Vec<u8>,
         now: f64,
     ) -> Result<(), EngineError> {
-        apply_batch(&mut self.doc(), &ops_json, &device_id, now).map_err(EngineError::from)
+        let mut doc = self.doc();
+        let before = doc.nodes.clone();
+        apply_batch(&mut doc, &ops_json, &device_id, now).map_err(EngineError::from)?;
+        let changed: Vec<NodeId> = doc
+            .nodes
+            .iter()
+            .filter(|(id, node)| before.get(id) != Some(node))
+            .map(|(id, _)| *id)
+            .collect();
+        let removed: Vec<NodeId> = before
+            .keys()
+            .filter(|id| !doc.nodes.contains_key(id))
+            .copied()
+            .collect();
+        if !changed.is_empty() || !removed.is_empty() {
+            let structural = moves_rows(&before, &doc, &changed, &removed);
+            self.revisions()
+                .note(id_strings(&changed), id_strings(&removed), structural);
+        }
+        Ok(())
     }
 
     /// One pass against one location: the app's own copy when `shared` is
@@ -331,8 +493,10 @@ impl SvalDocument {
             .into_iter()
             .map(|file| (file.path, file.bytes))
             .collect();
-        let (report, write) = run_sync_to(
-            &mut self.doc(),
+        let mut doc = self.doc();
+        let before = doc.nodes.clone();
+        let ran = run_sync_to(
+            &mut doc,
             &mut self
                 .1
                 .lock()
@@ -345,13 +509,82 @@ impl SvalDocument {
             None,
             target,
             None,
-        )?;
-        let report: JsSyncReport = report;
+        );
+        let (report, write): (JsSyncReport, _) = match ran {
+            Ok(ran) => ran,
+            Err(failure) => {
+                // A pass can fail after its merges changed the nodes.
+                self.revisions().lose();
+                return Err(failure.into());
+            }
+        };
+        if !report.changed_ids.is_empty() || !report.removed_ids.is_empty() {
+            let ids = |names: &[String]| -> Vec<NodeId> {
+                names.iter().filter_map(|name| name.parse().ok()).collect()
+            };
+            let structural = moves_rows(
+                &before,
+                &doc,
+                &ids(&report.changed_ids),
+                &ids(&report.removed_ids),
+            );
+            self.revisions().note(
+                report.changed_ids.clone(),
+                report.removed_ids.clone(),
+                structural,
+            );
+        }
+        drop(doc);
         Ok(SyncResult {
             report_json: serde_json::to_string(&report).map_err(refused)?,
             write_path: write.as_ref().map(|(path, _)| path.clone()),
             write_bytes: write.map(|(_, bytes)| bytes),
         })
+    }
+
+    /// The revision the document's nodes are at, which every change to them
+    /// moves on.
+    pub fn revision(&self) -> u64 {
+        let _doc = self.doc();
+        self.revisions().revision
+    }
+
+    /// What changed after `revision`, or `None` when the document no longer
+    /// remembers: read everything again.
+    pub fn changes_since(&self, revision: u64) -> Option<DocChanges> {
+        let _doc = self.doc();
+        self.revisions().since(revision)
+    }
+
+    /// The rows [`SvalDocument::outline`] holds for `ids`, in the order
+    /// given, each with the depth and parent the outline gives it. An id the
+    /// outline does not show has no row.
+    pub fn outline_rows(&self, ids: Vec<String>) -> Vec<OutlineRow> {
+        let doc = self.doc();
+        ids.iter()
+            .filter_map(|id| id.parse::<NodeId>().ok())
+            .filter_map(|id| {
+                let node = doc.node(id)?;
+                // Walked up to the root the outline starts from, through
+                // the containers its walk descends into. A walk longer than
+                // the document is a ring, which reaches no root.
+                let mut at = node;
+                for depth in 0..doc.nodes.len() {
+                    let Some(parent) = at.placement.parent else {
+                        return (at.kind == NodeKind::Workspace)
+                            .then(|| outline_row(id, node, node.placement.parent, depth as u32));
+                    };
+                    at = doc.node(parent)?;
+                    if !matches!(
+                        at.kind,
+                        NodeKind::Workspace | NodeKind::Group | NodeKind::Split
+                    ) {
+                        return None;
+                    }
+                }
+                None
+            })
+            .collect()
     }
 
     /// Every workspace and what it holds, depth first in sibling order
@@ -364,9 +597,10 @@ impl SvalDocument {
             .map(|(id, node)| (node.placement.order.clone(), *id))
             .collect();
         roots.sort();
+        let index = tree::ChildIndex::build(&doc);
         let mut rows = Vec::new();
         for (_, id) in roots {
-            push_rows(&doc, id, None, 0, &mut rows);
+            push_rows(&doc, &index, id, None, 0, &mut rows);
         }
         rows
     }
@@ -374,6 +608,7 @@ impl SvalDocument {
 
 fn push_rows(
     doc: &Document,
+    index: &tree::ChildIndex,
     id: NodeId,
     parent: Option<NodeId>,
     depth: u32,
@@ -382,14 +617,28 @@ fn push_rows(
     let Some(node) = doc.node(id) else {
         return;
     };
-    rows.push(OutlineRow {
+    rows.push(outline_row(id, node, parent, depth));
+    if matches!(
+        node.kind,
+        NodeKind::Workspace | NodeKind::Group | NodeKind::Split
+    ) {
+        for child in index.children(id) {
+            push_rows(doc, index, *child, Some(id), depth + 1, rows);
+        }
+    }
+}
+
+fn outline_row(
+    id: NodeId,
+    node: &crate::types::Node,
+    parent: Option<NodeId>,
+    depth: u32,
+) -> OutlineRow {
+    OutlineRow {
         id: id.to_string(),
         parent_id: parent.map(|parent| parent.to_string()),
         depth,
-        kind: serde_json::to_value(&node.kind)
-            .ok()
-            .and_then(|kind| kind.as_str().map(str::to_owned))
-            .unwrap_or_default(),
+        kind: node.kind.clone(),
         name: node.content.name.clone(),
         url: node.content.url.clone(),
         icon: node.content.icon.clone(),
@@ -416,14 +665,6 @@ fn push_rows(
             .map(|mark| mark.device.as_bytes().to_vec()),
         isolated: node.lifecycle.isolated,
         shares: node.content.shares.clone(),
-    });
-    if matches!(
-        node.kind,
-        NodeKind::Workspace | NodeKind::Group | NodeKind::Split
-    ) {
-        for child in tree::children(doc, id) {
-            push_rows(doc, child, Some(id), depth + 1, rows);
-        }
     }
 }
 
@@ -541,6 +782,581 @@ mod tests {
     const GROUP: &str = "22222222-2222-4222-8222-222222222222";
     const TAB: &str = "33333333-3333-4333-8333-333333333333";
 
+    /// [`SvalDocument::outline`] read through [`tree::children`], a scan of
+    /// every node for each parent: what the index's reads must equal.
+    fn outline_by_scan(doc: &Document) -> Vec<OutlineRow> {
+        fn push(
+            doc: &Document,
+            id: NodeId,
+            parent: Option<NodeId>,
+            depth: u32,
+            rows: &mut Vec<OutlineRow>,
+        ) {
+            let Some(node) = doc.node(id) else {
+                return;
+            };
+            rows.push(outline_row(id, node, parent, depth));
+            if matches!(
+                node.kind,
+                NodeKind::Workspace | NodeKind::Group | NodeKind::Split
+            ) {
+                for child in tree::children(doc, id) {
+                    push(doc, child, Some(id), depth + 1, rows);
+                }
+            }
+        }
+        let mut roots: Vec<_> = doc
+            .workspaces()
+            .filter(|(_, node)| node.placement.parent.is_none())
+            .map(|(id, node)| (node.placement.order.clone(), *id))
+            .collect();
+        roots.sort();
+        let mut rows = Vec::new();
+        for (_, id) in roots {
+            push(doc, id, None, 0, &mut rows);
+        }
+        rows
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn the_outline_reads_the_tree_as_the_scan_does(seed in proptest::num::u64::ANY, count in 1usize..60) {
+            let doc = crate::types::test_support::random_tree(seed, count);
+            let scanned = outline_by_scan(&doc);
+            proptest::prop_assert_eq!(SvalDocument::holding(doc).outline(), scanned);
+        }
+    }
+
+    /// One Workspace's pins as the app read them, a call per Workspace,
+    /// each scanning every node for each folder's children: what
+    /// [`SvalDocument::pins_all`] must equal.
+    fn pins_by_scan(doc: &Document, workspace: &String, workspaces: &[String]) -> Vec<PinRow> {
+        fn inside(
+            doc: &Document,
+            folder: NodeId,
+            top: NodeId,
+            depth: usize,
+            out: &mut Vec<PinRow>,
+        ) {
+            if depth >= 32 {
+                return;
+            }
+            let mut children: Vec<_> = doc
+                .nodes
+                .iter()
+                .filter(|(_, n)| n.placement.parent == Some(folder) && shown(n))
+                .collect();
+            children.sort_by(|(a_id, a), (b_id, b)| {
+                (&a.placement.order, a_id).cmp(&(&b.placement.order, b_id))
+            });
+            for (id, node) in children {
+                if node.kind == NodeKind::Folder {
+                    inside(doc, *id, top, depth + 1, out);
+                } else {
+                    out.push(row(*id, node, Some(top)));
+                }
+            }
+        }
+        fn shown(node: &crate::types::Node) -> bool {
+            match node.kind {
+                NodeKind::Folder => true,
+                NodeKind::Favorite => node.content.url.as_deref().is_some_and(|url| {
+                    !url.trim_start()
+                        .to_ascii_lowercase()
+                        .starts_with("javascript:")
+                }),
+                _ => false,
+            }
+        }
+        fn row(id: NodeId, node: &crate::types::Node, folder: Option<NodeId>) -> PinRow {
+            PinRow {
+                id: id.to_string(),
+                guid: node.content.guid.clone().unwrap_or_default(),
+                kind: if node.kind == NodeKind::Folder {
+                    "folder"
+                } else {
+                    "favorite"
+                }
+                .into(),
+                name: node.content.name.clone(),
+                url: node.content.url.clone(),
+                local: node.content.local,
+                folder: folder.map(|f| f.to_string()),
+                scope: folder
+                    .is_none()
+                    .then(|| {
+                        node.lifecycle
+                            .pin_scope
+                            .as_ref()
+                            .map(|s| s.iter().cloned().collect())
+                    })
+                    .flatten(),
+            }
+        }
+        let root = crate::types::favorite_id(crate::types::PINS_GUID);
+        let mut slots: Vec<_> = doc
+            .nodes
+            .iter()
+            .filter(|(_, n)| n.placement.parent == Some(root) && shown(n))
+            .filter(|(_, n)| {
+                let live: Vec<_> = n
+                    .lifecycle
+                    .pin_scope
+                    .iter()
+                    .flatten()
+                    .filter(|id| workspaces.contains(id))
+                    .collect();
+                live.is_empty() || live.contains(&workspace)
+            })
+            .collect();
+        slots.sort_by(|(a_id, a), (b_id, b)| {
+            (&a.placement.order, a_id).cmp(&(&b.placement.order, b_id))
+        });
+        let mut out = Vec::new();
+        for (id, node) in slots {
+            out.push(row(*id, node, None));
+            if node.kind == NodeKind::Folder {
+                inside(doc, *id, *id, 0, &mut out);
+            }
+        }
+        out
+    }
+
+    /// A favorites document drawn from `seed`: [`crate::types::test_support::random_tree`]'s
+    /// shapes over favorites, folders and separators, under the pins root
+    /// or elsewhere, some scoped to Workspaces in or out of `workspaces`,
+    /// some bookmarklets.
+    fn random_favorites(seed: u64, count: usize, workspaces: &[String]) -> Document {
+        let mut doc = crate::types::test_support::random_tree(seed, count);
+        let root = crate::types::favorite_id(crate::types::PINS_GUID);
+        let template = doc.nodes.values().next().unwrap().clone();
+        let mut state = seed ^ 0x5DEE_CE66;
+        let mut rand = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (state >> 33) as usize
+        };
+        for node in doc.nodes.values_mut() {
+            node.kind = match rand() % 4 {
+                0 => NodeKind::Folder,
+                1 => NodeKind::Separator,
+                _ => NodeKind::Favorite,
+            };
+            if rand() % 2 == 0 {
+                node.placement.parent = Some(root);
+            }
+            if rand() % 5 == 0 {
+                node.content.url = Some(" JavaScript:void(0)".into());
+            }
+            node.content.guid = Some(format!("guid{}", rand() % 9));
+            node.lifecycle.pin_scope = match rand() % 3 {
+                0 => None,
+                1 => Some(
+                    workspaces
+                        .iter()
+                        .filter(|_| rand() % 2 == 0)
+                        .cloned()
+                        .collect(),
+                ),
+                _ => Some(["elsewhere".to_string()].into_iter().collect()),
+            };
+        }
+        let mut pins_root = template;
+        pins_root.kind = NodeKind::Folder;
+        pins_root.placement.parent = None;
+        doc.nodes.insert(root, pins_root);
+        doc
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn pins_all_lists_what_a_call_per_workspace_lists(seed in proptest::num::u64::ANY, count in 1usize..60) {
+            let workspaces: Vec<String> = ["work", "home", "news"].map(String::from).to_vec();
+            let doc = random_favorites(seed, count, &workspaces);
+            let all = SvalDocument::holding(doc.clone()).pins_all(workspaces.clone());
+            proptest::prop_assert_eq!(all.len(), workspaces.len());
+            for workspace in &workspaces {
+                proptest::prop_assert_eq!(&all[workspace], &pins_by_scan(&doc, workspace, &workspaces));
+            }
+        }
+    }
+
+    /// Every answer each read export gives, to compare two reads of one
+    /// revision byte for byte.
+    fn every_read(doc: &SvalDocument) -> String {
+        let outline = doc.outline();
+        let ids = outline.iter().map(|row| row.id.clone()).collect();
+        let pins: BTreeMap<_, _> = doc
+            .pins_all(vec!["w1".into(), "w2".into()])
+            .into_iter()
+            .collect();
+        format!(
+            "{:?}\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+            doc.settings_json().unwrap(),
+            doc.favorites_json().unwrap(),
+            doc.visits_json().unwrap(),
+            doc.shards_json().unwrap(),
+            outline,
+            doc.outline_rows(ids),
+            pins,
+        )
+    }
+
+    /// Node `n` of the pool [`random_batch`] draws from.
+    fn pool_id(n: usize) -> String {
+        format!("00000000-0000-4000-8000-{n:012}")
+    }
+
+    /// The tree [`random_batch`] starts from: Workspaces 1 and 2, groups 3
+    /// and 4 in 1, and tabs 5 to 10 spread over them.
+    fn pool_tree() -> String {
+        let mut ops = vec![
+            format!(
+                r#"{{"kind":"addWorkspace","name":"One","id":"{}"}}"#,
+                pool_id(1)
+            ),
+            format!(
+                r#"{{"kind":"addWorkspace","name":"Two","id":"{}"}}"#,
+                pool_id(2)
+            ),
+        ];
+        for group in [3, 4] {
+            ops.push(format!(
+                r#"{{"kind":"addGroup","parent":"{}","name":"G{group}","id":"{}"}}"#,
+                pool_id(1),
+                pool_id(group)
+            ));
+        }
+        for tab in 5..=10 {
+            ops.push(format!(
+                r#"{{"kind":"addTab","parent":"{}","name":"T{tab}","url":"https://{tab}.example/","id":"{}"}}"#,
+                pool_id(1 + tab % 4),
+                pool_id(tab)
+            ));
+        }
+        format!("[{}]", ops.join(","))
+    }
+
+    /// A batch of one to three operations drawn by `rand` over the pool's
+    /// ids, so they meet each other's nodes, and are sometimes refused.
+    fn random_batch(rand: &mut impl FnMut() -> usize) -> String {
+        let id = |n: usize| pool_id(n % 14 + 1);
+        let container = |n: usize| pool_id(n % 4 + 1);
+        let ops: Vec<String> = (0..1 + rand() % 3)
+            .map(|_| {
+                let (a, b) = (rand(), rand());
+                match rand() % 14 {
+                    0 => format!(r#"{{"kind":"addWorkspace","name":"W{a}","id":"{}"}}"#, id(a)),
+                    1 => format!(
+                        r#"{{"kind":"addGroup","parent":"{}","name":"G{a}","id":"{}"}}"#,
+                        container(b),
+                        id(a)
+                    ),
+                    2 | 3 => format!(
+                        r#"{{"kind":"addTab","parent":"{}","name":"T{a}","url":"https://{a}.example/","id":"{}"}}"#,
+                        container(b),
+                        id(a)
+                    ),
+                    4..=6 => format!(r#"{{"kind":"rename","id":"{}","name":"R{}"}}"#, id(a), b % 5),
+                    7 | 8 => format!(r#"{{"kind":"setLabel","id":"{}","label":"L{}"}}"#, id(a), b % 5),
+                    9 => format!(
+                        r#"{{"kind":"setAppearance","id":"{}","color":"blue","emoji":"e{}"}}"#,
+                        id(a),
+                        b % 3
+                    ),
+                    10 => format!(r#"{{"kind":"remove","id":"{}"}}"#, id(a)),
+                    11 => format!(
+                        r#"{{"kind":"moveNode","id":"{}","newParent":"{}"}}"#,
+                        id(a),
+                        container(b)
+                    ),
+                    _ => format!(
+                        r#"{{"kind":"setSetting","key":"k{}","valueJson":"{b}"}}"#,
+                        a % 3
+                    ),
+                }
+            })
+            .collect();
+        format!("[{}]", ops.join(","))
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(32))]
+
+        /// A phone that edits, merges a desktop's edits and passes its own
+        /// copy, read the way the app reads it: whole when the document no
+        /// longer remembers or a row moved, row by row otherwise, catching
+        /// up after a random number of steps. After each catch-up the rows
+        /// equal a whole read, and a step that leaves the revision where it
+        /// was leaves every read the same.
+        #[test]
+        fn rows_kept_from_the_changes_equal_a_whole_read(seed in proptest::num::u64::ANY) {
+            use std::collections::BTreeMap;
+            let mut state = seed;
+            let mut rand = move || {
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                (state >> 33) as usize
+            };
+            let mut folder: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+            let mut own: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+            let pass = |doc: &SvalDocument, device: &[u8], store: &mut BTreeMap<String, Vec<u8>>, key: &[u8], shared: bool, now: f64| {
+                let files = store
+                    .iter()
+                    .map(|(path, bytes)| PeerFile { path: path.clone(), bytes: bytes.clone() })
+                    .collect();
+                let result = doc
+                    .sync(key.to_vec(), device.to_vec(), "workspaces".into(), files, now, shared)
+                    .unwrap();
+                if let (Some(path), Some(bytes)) = (result.write_path, result.write_bytes) {
+                    store.insert(path, bytes);
+                }
+            };
+            let (phone, desktop) = (SvalDocument::new(), SvalDocument::new());
+            desktop.apply_batch(pool_tree(), DESKTOP.to_vec(), 500.0).unwrap();
+            pass(&desktop, &DESKTOP, &mut folder, &KEY, true, 600.0);
+            let mut mirror = phone.outline();
+            let mut held = phone.revision();
+            // Catching up after every step, every few, or rarely enough
+            // that the document forgets the revision held.
+            let gap = [1, 4, 1_000][rand() % 3];
+            let mut now = 1_000.0;
+            for step in 0..500 {
+                now += 1_000.0;
+                let (revision, reads) = (phone.revision(), every_read(&phone));
+                match rand() % 6 {
+                    0 | 1 => {
+                        let _ = phone.apply_batch(random_batch(&mut rand), PHONE.to_vec(), now);
+                    }
+                    2 => {
+                        let _ = desktop.apply_batch(random_batch(&mut rand), DESKTOP.to_vec(), now);
+                        pass(&desktop, &DESKTOP, &mut folder, &KEY, true, now + 1.0);
+                    }
+                    3 => pass(&phone, &PHONE, &mut folder, &KEY, true, now),
+                    4 => pass(&phone, &PHONE, &mut own, &[9; 32], false, now),
+                    _ => pass(&desktop, &DESKTOP, &mut folder, &KEY, true, now),
+                }
+                if phone.revision() == revision {
+                    proptest::prop_assert_eq!(every_read(&phone), reads);
+                }
+                if rand() % gap != 0 && step != 499 {
+                    continue;
+                }
+                match phone.changes_since(held) {
+                    Some(changes) if !changes.structural => {
+                        proptest::prop_assert_eq!(changes.revision, phone.revision());
+                        proptest::prop_assert!(changes.removed.is_empty());
+                        let ids = |rows: &[OutlineRow]| -> Vec<String> {
+                            rows.iter().map(|row| row.id.clone()).collect()
+                        };
+                        proptest::prop_assert_eq!(ids(&mirror), ids(&phone.outline()));
+                        for row in phone.outline_rows(changes.changed) {
+                            let at = mirror.iter().position(|kept| kept.id == row.id);
+                            proptest::prop_assert!(at.is_some(), "a row a content change named was not shown");
+                            mirror[at.unwrap()] = row;
+                        }
+                    }
+                    _ => mirror = phone.outline(),
+                }
+                held = phone.revision();
+                proptest::prop_assert_eq!(&mirror, &phone.outline());
+            }
+        }
+    }
+
+    /// A peer that moves a group under a node of a kind a newer build wrote
+    /// takes the group's tab out of the outline though the tab itself is
+    /// unchanged, and the change is structural. Moved under a tab, the
+    /// group is repaired back into the Workspace, which is structural too.
+    #[test]
+    fn a_group_moved_out_of_reach_is_a_structural_change() {
+        const X: &str = "55555555-5555-4555-8555-555555555555";
+        const BOARD: &str = "66666666-6666-4666-8666-666666666666";
+        for (parent, unknown) in [(X, false), (BOARD, true)] {
+            let desktop = SvalDocument::new();
+            let ops = format!(
+                r#"[{{"kind":"addWorkspace","name":"Work","id":"{WORKSPACE}"}},
+                   {{"kind":"addGroup","parent":"{WORKSPACE}","name":"Docs","id":"{GROUP}"}},
+                   {{"kind":"addTab","parent":"{GROUP}","name":"Example","url":"https://example.com/","id":"{TAB}"}},
+                   {{"kind":"addTab","parent":"{WORKSPACE}","name":"Other","url":"https://other.example/","id":"{X}"}}]"#
+            );
+            desktop.apply_batch(ops, DESKTOP.to_vec(), 1_000.0).unwrap();
+            if unknown {
+                let mut doc = desktop.doc();
+                let ws = WORKSPACE.parse().unwrap();
+                let mut node = doc.nodes[&ws].clone();
+                node.kind = NodeKind::Unknown("board".into());
+                node.placement.parent = Some(ws);
+                doc.nodes.insert(BOARD.parse().unwrap(), node);
+            }
+            let publish = |desktop: &SvalDocument, now: f64| {
+                let result = desktop
+                    .sync(
+                        KEY.to_vec(),
+                        DESKTOP.to_vec(),
+                        "workspaces".into(),
+                        vec![],
+                        now,
+                        true,
+                    )
+                    .unwrap();
+                PeerFile {
+                    path: result.write_path.unwrap(),
+                    bytes: result.write_bytes.unwrap(),
+                }
+            };
+            let first = publish(&desktop, 2_000.0);
+            let phone = SvalDocument::new();
+            phone
+                .sync(
+                    KEY.to_vec(),
+                    PHONE.to_vec(),
+                    "workspaces".into(),
+                    vec![first],
+                    3_000.0,
+                    true,
+                )
+                .unwrap();
+            assert!(phone.outline().iter().any(|row| row.id == TAB));
+            let held = phone.revision();
+            {
+                let mut doc = desktop.doc();
+                let group = doc.node_mut(GROUP.parse().unwrap()).unwrap();
+                group.placement.parent = Some(parent.parse().unwrap());
+                group.placement_at = 4_000;
+                group.placement_by = Some(crate::store::DeviceId::from_bytes(DESKTOP));
+            }
+            let moved = publish(&desktop, 5_000.0);
+            phone
+                .sync(
+                    KEY.to_vec(),
+                    PHONE.to_vec(),
+                    "workspaces".into(),
+                    vec![moved],
+                    6_000.0,
+                    true,
+                )
+                .unwrap();
+            let changes = phone.changes_since(held).unwrap();
+            assert_eq!(changes.changed, [GROUP], "the tab itself is unchanged");
+            assert!(changes.structural);
+            let shown = phone.outline().iter().any(|row| row.id == TAB);
+            assert_eq!(shown, !unknown);
+        }
+    }
+
+    #[test]
+    fn a_document_reads_whole_once_it_forgets_a_revision() {
+        let phone = SvalDocument::new();
+        let start = phone.revision();
+        phone
+            .apply_batch(
+                format!(r#"[{{"kind":"addWorkspace","name":"Work","id":"{WORKSPACE}"}}]"#),
+                PHONE.to_vec(),
+                1_000.0,
+            )
+            .unwrap();
+        let added = phone.revision();
+        for n in 0..KEPT_CHANGES {
+            phone
+                .apply_batch(
+                    format!(r#"[{{"kind":"rename","id":"{WORKSPACE}","name":"W{n}"}}]"#),
+                    PHONE.to_vec(),
+                    2_000.0 + n as f64,
+                )
+                .unwrap();
+        }
+        assert_eq!(phone.revision(), start + 1 + KEPT_CHANGES as u64);
+        assert_eq!(phone.changes_since(start), None, "the add fell out");
+        let renames = phone.changes_since(added).unwrap();
+        assert_eq!(renames.changed, [WORKSPACE]);
+        assert!(!renames.structural);
+        assert_eq!(
+            phone.changes_since(phone.revision()).unwrap().changed,
+            Vec::<String>::new()
+        );
+        assert_eq!(phone.changes_since(phone.revision() + 1), None);
+    }
+
+    #[test]
+    fn a_rename_is_a_change_of_content_and_a_move_is_structural() {
+        let phone = SvalDocument::new();
+        let ops = format!(
+            r#"[{{"kind":"addWorkspace","name":"Work","id":"{WORKSPACE}"}},
+               {{"kind":"addGroup","parent":"{WORKSPACE}","name":"Docs","id":"{GROUP}"}},
+               {{"kind":"addTab","parent":"{WORKSPACE}","name":"Example","url":"https://example.com/","id":"{TAB}"}}]"#
+        );
+        phone.apply_batch(ops, PHONE.to_vec(), 1_000.0).unwrap();
+        let held = phone.revision();
+        assert!(phone.changes_since(held - 1).unwrap().structural);
+        phone
+            .apply_batch(
+                format!(r#"[{{"kind":"rename","id":"{TAB}","name":"Renamed"}}]"#),
+                PHONE.to_vec(),
+                2_000.0,
+            )
+            .unwrap();
+        let renamed = phone.changes_since(held).unwrap();
+        assert_eq!(
+            (renamed.changed, renamed.structural),
+            (vec![TAB.to_string()], false)
+        );
+        let row = phone.outline_rows(vec![TAB.into()]);
+        assert_eq!(row, [phone.outline().remove(2)]);
+        let held = phone.revision();
+        phone
+            .apply_batch(
+                format!(r#"[{{"kind":"moveNode","id":"{TAB}","newParent":"{GROUP}"}}]"#),
+                PHONE.to_vec(),
+                3_000.0,
+            )
+            .unwrap();
+        assert!(phone.changes_since(held).unwrap().structural);
+    }
+
+    /// A refused batch and a pass that brings nothing leave the revision
+    /// where it was; a failed pass makes the app read everything.
+    #[test]
+    fn only_a_change_to_the_nodes_moves_the_revision() {
+        let phone = SvalDocument::new();
+        let held = phone.revision();
+        assert!(
+            phone
+                .apply_batch(
+                    r#"[{"kind":"remove","id":"nope"}]"#.into(),
+                    PHONE.to_vec(),
+                    1.0
+                )
+                .is_err()
+        );
+        phone
+            .sync(
+                KEY.to_vec(),
+                PHONE.to_vec(),
+                "workspaces".into(),
+                vec![],
+                2.0,
+                true,
+            )
+            .unwrap();
+        assert_eq!(phone.revision(), held);
+        assert!(
+            phone
+                .sync(
+                    KEY.to_vec(),
+                    vec![1; 3],
+                    "workspaces".into(),
+                    vec![],
+                    3.0,
+                    true
+                )
+                .is_err()
+        );
+        assert_eq!(phone.changes_since(held), None);
+    }
+
     #[test]
     fn kagi_tokens_are_issued_through_the_bindings() {
         let issuer = crate::privacy_pass::tests::Issuer::new(
@@ -596,6 +1412,20 @@ mod tests {
         let row = &desktop.outline()[0];
         assert_eq!(row.agent.as_deref(), Some("Claude Code"));
         assert_eq!(row.agent_device.as_deref(), Some(&DESKTOP[..]));
+    }
+
+    /// A node of a kind a newer build wrote reaches the app under the name
+    /// it arrived with.
+    #[test]
+    fn a_row_of_a_kind_a_newer_build_wrote_keeps_its_name() {
+        let mut doc = crate::types::test_support::base_doc();
+        let ws = crate::types::test_support::ws_of(&doc);
+        let mut node = doc.nodes[&ws].clone();
+        node.kind = NodeKind::Unknown("board".into());
+        node.placement.parent = Some(ws);
+        doc.nodes.insert(crate::types::test_support::uid(70), node);
+        let rows = SvalDocument::holding(doc).outline();
+        assert_eq!(rows[1].kind, NodeKind::Unknown("board".into()));
     }
 
     #[test]
@@ -703,17 +1533,17 @@ mod tests {
         assert_eq!(
             rows,
             vec![
-                (0, "workspace".into(), "Work".into(), None, None),
+                (0, NodeKind::Workspace, "Work".into(), None, None),
                 (
                     1,
-                    "group".into(),
+                    NodeKind::Group,
                     "Docs".into(),
                     None,
                     Some(WORKSPACE.into())
                 ),
                 (
                     2,
-                    "tab".into(),
+                    NodeKind::Tab,
                     "Example".into(),
                     Some("https://example.com/".into()),
                     Some(GROUP.into())
@@ -1105,7 +1935,9 @@ mod tests {
         );
         let pins = SvalDocument::holding(doc);
         let names = |workspace: &str| -> Vec<(String, Option<String>)> {
-            pins.pins(workspace.into(), vec!["work".into(), "home".into()])
+            pins.pins_all(vec!["work".into(), "home".into()])
+                .remove(workspace)
+                .unwrap()
                 .into_iter()
                 .map(|pin| (pin.name, pin.folder))
                 .collect()
@@ -1124,7 +1956,9 @@ mod tests {
         );
         assert_eq!(names("work").len(), 5, "Work shows in work");
         let kinds: Vec<_> = pins
-            .pins("home".into(), vec![])
+            .pins_all(vec!["home".into()])
+            .remove("home")
+            .unwrap()
             .into_iter()
             .map(|pin| (pin.name, pin.kind))
             .collect();
@@ -1187,7 +2021,9 @@ mod tests {
         }
         let pins = SvalDocument::holding(doc);
         let names: Vec<_> = pins
-            .pins("home".into(), vec![])
+            .pins_all(vec!["home".into()])
+            .remove("home")
+            .unwrap()
             .into_iter()
             .map(|pin| pin.name)
             .collect();

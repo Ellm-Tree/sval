@@ -101,54 +101,112 @@ enum SmbSettings {
     }
 }
 
-/// Reports changes to an SMB folder while the app is open: the server holds a
-/// change-notify request until something below the folder changes.
-final class SmbChangeWatcher: @unchecked Sendable {
-    private let location: SmbLocation
+/// One watch on a shared folder, through a Rust connector's watcher.
+protocol ChangeWait: AnyObject, Sendable {
+    /// Blocks until something in the folder changes, and returns the paths
+    /// that changed, or none when the folder didn't say which. Nil once the
+    /// watch is cancelled.
+    func next() throws -> [String]?
+    /// Ends the wait under way, as soon as the connector can, and every
+    /// wait after it.
+    func cancel()
+}
+
+extension SmbWatcher: ChangeWait {
+    func next() throws -> [String]? {
+        switch try wait() {
+        case .changed(let paths): paths
+        case .cancelled: nil
+        }
+    }
+}
+
+/// Reports changes to an SMB or Dropbox folder while the app is open, from a
+/// thread of its own: the server holds a request until something below the
+/// folder changes.
+final class ChangeWatcher: @unchecked Sendable {
+    private let name: String
+    private let retry: TimeInterval
+    private let open: @Sendable () throws -> ChangeWait?
     private let onChange: @MainActor ([String]) -> Void
-    private let lock = NSLock()
+    /// Guards `stopped` and `current`, and wakes the wait between watches.
+    private let condition = NSCondition()
     private var stopped = false
+    private var current: ChangeWait?
 
-    /// How long to wait before watching again after a watch ends in an error,
-    /// such as the phone leaving the network.
-    private static let retry: TimeInterval = 30
-
-    /// `onChange` gets the paths that changed, or none when the server didn't
-    /// say which.
-    init(location: SmbLocation, onChange: @escaping @MainActor ([String]) -> Void) {
-        self.location = location
+    /// `open` makes a watch, or nil when there is nothing to watch with.
+    /// `retry` is how long to wait before watching again after a watch ends
+    /// in an error, such as the phone leaving the network. `onChange` gets
+    /// the paths that changed, or none when the folder didn't say which.
+    init(
+        name: String, retry: TimeInterval = 30,
+        open: @escaping @Sendable () throws -> ChangeWait?,
+        onChange: @escaping @MainActor ([String]) -> Void
+    ) {
+        self.name = name
+        self.retry = retry
+        self.open = open
         self.onChange = onChange
     }
 
     func start() {
         let thread = Thread { [self] in run() }
-        thread.name = "SMB watch"
+        thread.name = "\(name) watch"
         thread.start()
     }
 
+    /// Cancels the watch, which ends its wait and closes its connection, and
+    /// ends the wait between watches. A Dropbox long poll under way still
+    /// runs out before its thread ends.
     func stop() {
-        lock.withLock { stopped = true }
+        let watch = condition.withLock {
+            stopped = true
+            condition.broadcast()
+            defer { current = nil }
+            return current
+        }
+        watch?.cancel()
     }
 
     private var isStopped: Bool {
-        lock.withLock { stopped }
+        condition.withLock { stopped }
     }
 
-    private func run() {
-        while !isStopped {
+    /// Watches until `stop`. `start` runs it on a thread of its own.
+    func run() {
+        while true {
             do {
-                let watcher = try SmbWatcher.watch(location: location)
-                Diagnostics.log("watch: SMB watch started")
-                while !isStopped {
-                    let paths = try watcher.wait()
-                    guard !isStopped else { return }
+                guard let watch = try open() else { return }
+                let adopted = condition.withLock {
+                    if !stopped { current = watch }
+                    return !stopped
+                }
+                guard adopted else {
+                    watch.cancel()
+                    return
+                }
+                Diagnostics.log("watch: \(name) watch started")
+                while let paths = try watch.next(), !isStopped {
                     let onChange = onChange
                     Task { @MainActor in onChange(paths) }
                 }
+                Diagnostics.log("watch: \(name) watch stopped")
+                return
             } catch {
-                Diagnostics.log("watch: SMB watch ended: \(Diagnostics.name(error))")
-                Thread.sleep(forTimeInterval: Self.retry)
+                // A stop can end a wait with an error, which is no failure.
+                guard !isStopped else { return }
+                Diagnostics.log("watch: \(name) watch ended: \(Diagnostics.name(error))")
+                guard !rest() else { return }
             }
+        }
+    }
+
+    /// Waits `retry` seconds, or until `stop`, and says whether it stopped.
+    private func rest() -> Bool {
+        condition.withLock {
+            let until = Date(timeIntervalSinceNow: retry)
+            while !stopped, condition.wait(until: until) {}
+            return stopped
         }
     }
 }
@@ -220,52 +278,14 @@ enum DropboxSettings {
     }
 }
 
-/// Reports changes to a Dropbox folder while the app is open: Dropbox holds a
-/// long-poll request until something below the folder changes.
-final class DropboxChangeWatcher: @unchecked Sendable {
-    private let root: String
-    private let onChange: @MainActor ([String]) -> Void
-    private let lock = NSLock()
-    private var stopped = false
-
-    /// How long to wait before watching again after a watch ends in an error,
-    /// such as the phone going offline.
-    private static let retry: TimeInterval = 30
-
-    init(root: String, onChange: @escaping @MainActor ([String]) -> Void) {
-        self.root = root
-        self.onChange = onChange
-    }
-
-    func start() {
-        let thread = Thread { [self] in run() }
-        thread.name = "Dropbox watch"
-        thread.start()
-    }
-
-    func stop() {
-        lock.withLock { stopped = true }
-    }
-
-    private var isStopped: Bool {
-        lock.withLock { stopped }
-    }
-
-    private func run() {
-        while !isStopped {
-            do {
-                guard let token = Secrets.dropboxToken() else { return }
-                let watcher = try DropboxWatcher.watch(appKey: DropboxApp.key, refreshToken: token, root: root)
-                Diagnostics.log("watch: Dropbox watch started")
-                while !isStopped {
-                    guard try watcher.wait(), !isStopped else { continue }
-                    // Dropbox says that something changed, not what.
-                    let onChange = onChange
-                    Task { @MainActor in onChange([]) }
-                }
-            } catch {
-                Diagnostics.log("watch: Dropbox watch ended: \(Diagnostics.name(error))")
-                Thread.sleep(forTimeInterval: Self.retry)
+extension DropboxWatcher: ChangeWait {
+    func next() throws -> [String]? {
+        while true {
+            switch try wait() {
+            // Dropbox says that something changed, not what.
+            case .changed: return []
+            case .unchanged: continue
+            case .cancelled: return nil
             }
         }
     }

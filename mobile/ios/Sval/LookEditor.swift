@@ -78,7 +78,7 @@ struct LookEditor: View {
         switch target {
         case .newWorkspace: true
         case .newGroup, .mergeGroup: false
-        case .edit(let row): row.kind == "workspace"
+        case .edit(let row): row.kind == .workspace
         }
     }
 

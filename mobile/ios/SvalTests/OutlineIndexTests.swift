@@ -6,7 +6,7 @@ import XCTest
 
 /// The tree's index answers every lookup as a walk of the rows would.
 final class OutlineIndexTests: XCTestCase {
-    private func row(_ id: String, _ parent: String?, _ kind: String, depth: UInt32 = 0) -> OutlineRow {
+    private func row(_ id: String, _ parent: String?, _ kind: NodeKind, depth: UInt32 = 0) -> OutlineRow {
         OutlineRow(id: id, parentId: parent, depth: depth, kind: kind, name: id, url: nil, icon: nil, local: false,
                    emoji: nil, label: nil, color: nil, transparency: nil, pinned: false, agent: nil,
                    agentDevice: nil, device: nil, isolated: false, shares: nil)
@@ -16,19 +16,19 @@ final class OutlineIndexTests: XCTestCase {
     /// tree lacks.
     private var rows: [OutlineRow] {
         [
-            row("w1", nil, "workspace"),
-            row("t1", "w1", "tab", depth: 1),
-            row("g1", "w1", "group", depth: 1),
-            row("t2", "g1", "tab", depth: 2),
-            row("g2", "g1", "group", depth: 2),
-            row("t3", "g2", "tab", depth: 3),
-            row("s1", "w1", "split", depth: 1),
-            row("t4", "s1", "tab", depth: 2),
-            row("t5", "s1", "tab", depth: 2),
-            row("w2", nil, "workspace"),
-            row("t6", "w2", "tab", depth: 1),
-            row("w3", nil, "workspace"),
-            row("orphan", "gone", "tab", depth: 1),
+            row("w1", nil, .workspace),
+            row("t1", "w1", .tab, depth: 1),
+            row("g1", "w1", .group, depth: 1),
+            row("t2", "g1", .tab, depth: 2),
+            row("g2", "g1", .group, depth: 2),
+            row("t3", "g2", .tab, depth: 3),
+            row("s1", "w1", .split, depth: 1),
+            row("t4", "s1", .tab, depth: 2),
+            row("t5", "s1", .tab, depth: 2),
+            row("w2", nil, .workspace),
+            row("t6", "w2", .tab, depth: 1),
+            row("w3", nil, .workspace),
+            row("orphan", "gone", .tab, depth: 1),
         ]
     }
 
@@ -55,7 +55,7 @@ final class OutlineIndexTests: XCTestCase {
             }
             return false
         }
-        return (inside.filter { $0.kind == "tab" }.count, inside.filter { $0.kind == "group" }.count)
+        return (inside.filter { $0.kind == .tab }.count, inside.filter { $0.kind == .group }.count)
     }
 
     func testLookupsMatchTheWalks() {
@@ -67,7 +67,7 @@ final class OutlineIndexTests: XCTestCase {
             XCTAssertEqual(index.children(of: id), rows.filter { $0.parentId == id }, id)
             XCTAssertEqual(index.workspace(of: id), linearWorkspace(rows, id), id)
             XCTAssertEqual(index.tabs(in: id),
-                           rows.filter { $0.kind == "tab" && linearWorkspace(rows, $0.id) == id }, id)
+                           rows.filter { $0.kind == .tab && linearWorkspace(rows, $0.id) == id }, id)
             let inside = index.inside(id), expected = linearInside(rows, id)
             XCTAssertEqual(inside.tabs, expected.tabs, id)
             XCTAssertEqual(inside.groups, expected.groups, id)
@@ -89,8 +89,8 @@ final class OutlineIndexTests: XCTestCase {
     /// A loop of parents puts its rows in no Workspace, and the index is
     /// still built.
     func testLoopOfParents() {
-        let index = OutlineIndex(rows + [row("a", "b", "group", depth: 1), row("b", "a", "group", depth: 1),
-                                         row("t7", "a", "tab", depth: 2)])
+        let index = OutlineIndex(rows + [row("a", "b", .group, depth: 1), row("b", "a", .group, depth: 1),
+                                         row("t7", "a", .tab, depth: 2)])
         XCTAssertNil(index.workspace(of: "t7"))
         XCTAssertNil(index.workspace(of: "a"))
         XCTAssertEqual(index.inside("a").tabs, 1)

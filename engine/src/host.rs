@@ -74,8 +74,8 @@ pub(crate) struct JsSyncReport {
     schema_too_new: Vec<JsFileProblem>,
     refused_write: bool,
     repaired_ids: Vec<String>,
-    changed_ids: Vec<String>,
-    removed_ids: Vec<String>,
+    pub(crate) changed_ids: Vec<String>,
+    pub(crate) removed_ids: Vec<String>,
     harmed_by_clock: Vec<String>,
     own_watermark: Timestamp,
 }

@@ -186,6 +186,7 @@ impl Error {
 /// it. Every kind carries the same four fact groups, so an older build can
 /// still merge a node it cannot interpret.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum NodeKind {
     Workspace,
     Group,
@@ -2095,6 +2096,45 @@ pub(crate) mod test_support {
 
     pub fn uid(n: u128) -> NodeId {
         NodeId::from_u128(n)
+    }
+
+    /// A tree of `count` nodes drawn from `seed`, in shapes no local edit
+    /// leaves but a merge can: a kind a newer build wrote, a parent that is
+    /// missing, a tab or a ring as a parent, and siblings whose order keys
+    /// tie.
+    pub fn random_tree(seed: u64, count: usize) -> Document {
+        let mut state = seed;
+        let mut rand = || splitmix64(&mut state);
+        let template = base_doc().nodes.into_values().next().unwrap();
+        let first = fractional_index::FractionalIndex::default();
+        let second = fractional_index::FractionalIndex::new_after(&first);
+        let keys = [
+            fractional_index::FractionalIndex::new_before(&first),
+            first,
+            second,
+        ];
+        let mut doc = Document::new();
+        for i in 0..count {
+            let mut node = template.clone();
+            node.kind = match rand() % 6 {
+                0 => NodeKind::Workspace,
+                1 => NodeKind::Group,
+                2 | 3 => NodeKind::Tab,
+                4 => NodeKind::Split,
+                _ => NodeKind::Unknown("future".into()),
+            };
+            node.content.name = format!("n{}", rand() % 4);
+            node.content.url =
+                (rand() % 2 == 0).then(|| format!("https://{}.example/", rand() % 3));
+            node.placement.parent = match rand() % 6 {
+                0 => None,
+                1 => Some(uid(10_000 + u128::from(rand() % 4))),
+                _ => Some(uid(1 + u128::from(rand() % count as u64))),
+            };
+            node.placement.order = keys[(rand() % 3) as usize].clone();
+            doc.nodes.insert(uid(i as u128 + 1), node);
+        }
+        doc
     }
 
     /// `a` merged into `b` and `b` into `a`, each repaired, asserting both

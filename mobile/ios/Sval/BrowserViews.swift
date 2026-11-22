@@ -395,7 +395,7 @@ struct BrowserView: View {
                 notice = .closed(1, title: pane.displayTitle) { Task { await browser.reopen(entry) } }
             }
         case .closeAll:
-            let count = model.children(of: split.split.id).filter { $0.kind == "tab" }.count
+            let count = model.children(of: split.split.id).filter { $0.kind == .tab }.count
             Task {
                 guard let entry = await browser.closeSplit(split.split) else { return }
                 notice = .closed(count) { Task { await browser.reopenSplit(entry) } }
@@ -453,7 +453,7 @@ struct BrowserView: View {
 
     /// Closes the tab in front, with Undo, as its row's × does.
     private func closeFront() {
-        guard let row = browser.currentTabId.flatMap(model.row), row.kind == "tab" else { return }
+        guard let row = browser.currentTabId.flatMap(model.row), row.kind == .tab else { return }
         let isPrivate = model.isPrivate(row.id)
         Task {
             guard let entry = await browser.close(row), !isPrivate else { return }
@@ -968,7 +968,7 @@ struct SiteMenuView: View {
     /// applies to a private tab.
     @ViewBuilder private var pageGroup: some View {
         let browser: Browser = model.browser
-        let tab = browser.currentTabId.flatMap(model.row).flatMap { $0.kind == "tab" ? $0 : nil }
+        let tab = browser.currentTabId.flatMap(model.row).flatMap { $0.kind == .tab ? $0 : nil }
         let star = StarState(model)
         if !browser.privateInFront, tab != nil || browser.currentPin != nil {
             Section {

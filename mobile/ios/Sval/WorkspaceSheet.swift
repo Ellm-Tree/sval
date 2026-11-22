@@ -347,7 +347,7 @@ struct WorkspaceSheet: View {
     /// The tabs Edit can tick: every tab in this Workspace but a split's
     /// panes, which move with their split.
     private var editableTabs: [OutlineRow] {
-        visibleEntries.compactMap { $0.panes == nil && $0.row.kind == "tab" ? $0.row : nil }
+        visibleEntries.compactMap { $0.panes == nil && $0.row.kind == .tab ? $0.row : nil }
     }
 
     private func endEditing() {
@@ -423,7 +423,7 @@ struct WorkspaceSheet: View {
         endEditing()
         Task {
             var entries: [Browser.ClosedTab] = []
-            for row in rows where row.kind == "tab" {
+            for row in rows where row.kind == .tab {
                 if let entry = await browser.close(row), Browser.openable(row) != nil { entries.append(entry) }
             }
             guard !model.isPrivate(rows.first?.id ?? "") else {
@@ -439,8 +439,8 @@ struct WorkspaceSheet: View {
 
     private var summary: String {
         let inside = model.rows.filter { $0.id != workspace?.id && model.workspace(of: $0.id) == workspace?.id }
-        let tabs = inside.filter { $0.kind == "tab" }.count
-        let groups = inside.filter { $0.kind == "group" }.count
+        let tabs = inside.filter { $0.kind == .tab }.count
+        let groups = inside.filter { $0.kind == .group }.count
         let tabText = tabs == 1 ? "1 tab" : "\(tabs) tabs"
         guard groups > 0 else { return tabText }
         return "\(tabText) and \(groups == 1 ? "1 group" : "\(groups) groups")"
@@ -577,7 +577,7 @@ struct WorkspaceSheet: View {
         HStack(spacing: 8) {
             if entry.panes != nil {
                 Image(systemName: "rectangle.split.2x1").font(.system(size: 15))
-            } else if entry.row.kind == "group" {
+            } else if entry.row.kind == .group {
                 groupMark(entry.row, open: false)
             } else {
                 SiteTile(row: entry.row, size: 22)
@@ -610,8 +610,8 @@ struct WorkspaceSheet: View {
         let drawn = rows.compactMap { entry in frames.shown(entry.id).map { (entry, $0) } }
         var next: DropHover?
         if let (entry, frame) = drawn.first(where: { $0.1.minY <= point.y && point.y < $0.1.maxY }) {
-            let over = DropOver(id: entry.row.id, kind: entry.panes == nil ? entry.row.kind : "split",
-                                expanded: entry.row.kind == "group" && !collapsed.contains(entry.row.id))
+            let over = DropOver(id: entry.row.id, kind: entry.panes == nil ? entry.row.kind : .split,
+                                expanded: entry.row.kind == .group && !collapsed.contains(entry.row.id))
             // The halves split the row's own target, as they are drawn.
             let (leading, trailing) = targetInsets(entry, block: blocks[entry.id])
             let width = frame.width - leading - trailing
@@ -627,7 +627,7 @@ struct WorkspaceSheet: View {
                                           splits: model.dropPlan(id, over: over, split) != nil)
             }
         } else if let last = drawn.last, last.0.id == rows.last?.id, point.y >= last.1.maxY {
-            let over = DropOver(id: workspace, kind: "workspace", expanded: true)
+            let over = DropOver(id: workspace, kind: .workspace, expanded: true)
             next = DropHover(entry: last.0.id, over: over, kind: .end, depth: 1,
                              writes: model.dropPlan(id, over: over, .end) != nil)
         } else {
@@ -751,12 +751,12 @@ struct WorkspaceSheet: View {
                 hidden.insert(row.id)
                 continue
             }
-            guard row.kind == "split" else {
+            guard row.kind == .split else {
                 out.append(TreeEntry(id: row.id, row: row, panes: nil, depth: Int(row.depth)))
                 continue
             }
             hidden.insert(row.id)
-            let panes = all.filter { $0.parentId == row.id && $0.kind == "tab" }
+            let panes = all.filter { $0.parentId == row.id && $0.kind == .tab }
             for (index, run) in splitRuns(panes).enumerated() {
                 if run.count == 1 {
                     out.append(TreeEntry(id: run[0].id, row: run[0], panes: nil, depth: Int(row.depth)))
@@ -791,7 +791,7 @@ struct WorkspaceSheet: View {
         let indent = CGFloat(max(entry.depth - 1, 0)) * 24
         if let panes = entry.panes {
             splitRow(entry.row, panes: panes, indent: indent, block: block)
-        } else if entry.row.kind == "tab" {
+        } else if entry.row.kind == .tab {
             tabRow(entry.row, indent: indent, block: block)
         } else {
             groupRow(entry.row, indent: indent, block: block)
@@ -825,8 +825,8 @@ struct WorkspaceSheet: View {
         for (index, entry) in entries.enumerated() {
             let row = entry.row
             var chain: [OutlineRow] = []
-            var node: OutlineRow? = row.kind == "tab" ? row.parentId.flatMap(model.row) : row
-            while let group = node, group.kind != "workspace" {
+            var node: OutlineRow? = row.kind == .tab ? row.parentId.flatMap(model.row) : row
+            while let group = node, group.kind != .workspace {
                 if group.color.flatMap(WorkspaceTint.init(rawValue:)) != nil { chain.insert(group, at: 0) }
                 node = group.parentId.flatMap(model.row)
             }
@@ -1054,7 +1054,7 @@ struct WorkspaceSheet: View {
                 Task { await model.movePane(row, by: 1) }
             },
         ]
-        if row.kind != "group" {
+        if row.kind != .group {
             items.append(MenuItem(title: "Split With…", symbol: "rectangle.split.2x1", disabled: !model.offersSplit(for: row)) {
                 splittingWith = row
             })
@@ -1166,7 +1166,7 @@ struct WorkspaceSheet: View {
         guard let id = browser.currentTabId else { return }
         var opened = false
         var parent = model.row(id)?.parentId.flatMap(model.row)
-        while let at = parent, at.kind != "workspace" {
+        while let at = parent, at.kind != .workspace {
             if collapsed.remove(at.id) != nil { opened = true }
             parent = at.parentId.flatMap(model.row)
         }
@@ -1218,12 +1218,12 @@ struct WorkspaceSheet: View {
 
     /// A group's long-press menu, in the list and the grid.
     func groupMenu(_ row: OutlineRow) -> [[MenuItem]] {
-        let edit = row.kind == "group"
+        let edit = row.kind == .group
             ? MenuItem(title: "Edit Group…", symbol: "pencil") { editLook(of: row.id) }
             : MenuItem(title: "Rename…", symbol: "pencil") { startRename(row) }
         return [[edit, MenuItem(title: "Move to…", symbol: "folder") { moving = row }],
                 orderItems(row),
-                row.kind == "group"
+                row.kind == .group
                     ? [MenuItem(title: "Delete Group…", symbol: "trash", destructive: true) { deleteGroup(row) }] : []]
     }
 
@@ -1260,7 +1260,7 @@ struct WorkspaceSheet: View {
     }
 
     func tabCount(in id: String) -> Int {
-        model.rows.filter { $0.kind == "tab" && isInside($0, id) }.count
+        model.rows.filter { $0.kind == .tab && isInside($0, id) }.count
     }
 
     // MARK: Actions

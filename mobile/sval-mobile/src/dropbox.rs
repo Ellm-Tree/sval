@@ -12,12 +12,13 @@
 
 use std::io::Read;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use dropbox_sdk::default_client::{NoauthDefaultClient, UserAuthDefaultClient};
 use dropbox_sdk::files::{self, LookupError, Metadata, WriteMode};
 use dropbox_sdk::oauth2::{Authorization, AuthorizeUrlBuilder, Oauth2Type, PkceCode};
 
-use crate::{ConnectorError, FileEntry};
+use crate::{ConnectorError, FileEntry, Stop};
 
 /// A sign-in begun: the page to open, and what finishing it needs.
 #[derive(uniffi::Record)]
@@ -264,7 +265,26 @@ pub struct DropboxWatcher {
     client: UserAuthDefaultClient,
     /// Where the next wait starts from: everything up to it is seen.
     cursor: Mutex<String>,
+    stop: Stop,
 }
+
+/// What a wait ended with.
+#[derive(Debug, PartialEq, uniffi::Enum)]
+pub enum DropboxChange {
+    /// Something in the folder changed. Dropbox doesn't say what.
+    Changed,
+    /// The long poll ran its time with no change.
+    Unchanged,
+    /// The watcher was cancelled, and watches no more.
+    Cancelled,
+}
+
+/// How long a long poll waits for a change, in seconds: the least
+/// `files/list_folder/longpoll` takes (`ListFolderLongpollArg.timeout` in
+/// Dropbox's API spec, 30 to 480). ureq, the SDK's client, can't end a
+/// request under way, so a cancelled watcher's thread waits out the poll it
+/// is in, which Dropbox may hold up to 90 seconds past this.
+const LONGPOLL_SECONDS: u64 = 30;
 
 #[uniffi::export]
 impl DropboxWatcher {
@@ -282,24 +302,32 @@ impl DropboxWatcher {
         Ok(Arc::new(Self {
             client,
             cursor: Mutex::new(cursor),
+            stop: Stop::new(),
         }))
     }
 
-    /// Waits until something in the folder changes, up to about eight
-    /// minutes, and returns whether anything did. An error means the watch
-    /// is over, and the app makes a new one when it wants to go on watching.
-    pub fn wait(&self) -> Result<bool, ConnectorError> {
+    /// Waits until something in the folder changes, for one long poll, and
+    /// says whether anything did. An error means the watch is over, and the
+    /// app makes a new one when it wants to go on watching.
+    pub fn wait(&self) -> Result<DropboxChange, ConnectorError> {
+        if self.stop.is_stopped() {
+            return Ok(DropboxChange::Cancelled);
+        }
         let mut cursor = self.cursor.lock().unwrap_or_else(|e| e.into_inner());
         let answer = files::list_folder_longpoll(
             &NoauthDefaultClient::default(),
-            &files::ListFolderLongpollArg::new(cursor.clone()).with_timeout(480),
+            &files::ListFolderLongpollArg::new(cursor.clone()).with_timeout(LONGPOLL_SECONDS),
         )
         .map_err(|e| map_error(&e, |_| false))?;
-        if let Some(seconds) = answer.backoff {
-            std::thread::sleep(std::time::Duration::from_secs(seconds));
+        let stopped = match answer.backoff {
+            Some(seconds) => self.stop.sleep(Duration::from_secs(seconds)),
+            None => self.stop.is_stopped(),
+        };
+        if stopped {
+            return Ok(DropboxChange::Cancelled);
         }
         if !answer.changes {
-            return Ok(false);
+            return Ok(DropboxChange::Unchanged);
         }
         // Moves the cursor past what changed, so the next wait waits.
         loop {
@@ -310,9 +338,15 @@ impl DropboxWatcher {
             .map_err(|e| map_error(&e, |_| false))?;
             *cursor = page.cursor;
             if !page.has_more {
-                return Ok(true);
+                return Ok(DropboxChange::Changed);
             }
         }
+    }
+
+    /// Ends every wait after it, and a backoff under way, with
+    /// [`DropboxChange::Cancelled`]. A long poll under way runs out first.
+    pub fn cancel(&self) {
+        self.stop.stop();
     }
 }
 
@@ -417,5 +451,18 @@ mod tests {
         assert_eq!(query["redirect_uri"], "db-key://2/token");
         assert!(!query.contains_key("client_secret"));
         assert!(begun.verifier.len() >= 43);
+    }
+
+    #[test]
+    fn a_cancelled_watcher_waits_no_more() {
+        // Built by hand, since `watch` asks Dropbox for the cursor. A wait
+        // that polled would fail on the made-up token.
+        let watcher = DropboxWatcher {
+            client: client("key".into(), "token".into()),
+            cursor: Mutex::new("cursor".into()),
+            stop: Stop::new(),
+        };
+        watcher.cancel();
+        assert_eq!(watcher.wait().ok(), Some(DropboxChange::Cancelled));
     }
 }

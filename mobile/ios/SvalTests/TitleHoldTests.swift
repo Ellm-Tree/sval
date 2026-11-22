@@ -146,7 +146,7 @@ final class NavigationTitleTests: XCTestCase {
     private let url = URL(string: "https://example.com/a")!
 
     private func tab(name: String, url: String?) -> OutlineRow {
-        OutlineRow(id: "t", parentId: "ws", depth: 1, kind: "tab", name: name, url: url, icon: nil, local: false,
+        OutlineRow(id: "t", parentId: "ws", depth: 1, kind: .tab, name: name, url: url, icon: nil, local: false,
                    emoji: nil, label: nil, color: nil, transparency: nil, pinned: false, agent: nil,
                    agentDevice: nil, device: nil, isolated: false, shares: nil)
     }

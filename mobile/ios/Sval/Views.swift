@@ -72,8 +72,8 @@ extension OutlineRow {
     @MainActor var displayTitle: String {
         guard title.isEmpty else { return title }
         switch kind {
-        case "workspace": return "Untitled Workspace"
-        case "group": return "Untitled group"
+        case .workspace: return "Untitled Workspace"
+        case .group: return "Untitled group"
         default:
             guard let url, !["about:blank", "about:home", "about:newtab"].contains(url) else { return "New Tab" }
             guard let host = URL(string: url)?.host(), !host.isEmpty else { return url }

@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use smb2::{ClientConfig, ErrorKind, RenameOptions, SmbClient, Tree};
 
-use crate::{ConnectorError, FileEntry};
+use crate::{ConnectorError, FileEntry, Stop};
 
 /// Where a shared folder is, and the sign-in for it.
 #[derive(Clone, uniffi::Record)]
@@ -248,45 +248,112 @@ impl SmbFolder {
 /// its own, so a wait never holds up the folder's calls.
 #[derive(uniffi::Object)]
 pub struct SmbWatcher {
-    watcher: Mutex<smb2::client::Watcher>,
-    /// Kept open for as long as the watch is.
-    _client: Mutex<SmbClient>,
+    location: SmbLocation,
+    /// None until a wait signs in, and again once a wait ends in an error or
+    /// a cancel, which closes the connection.
+    watch: Mutex<Option<Watch>>,
+    stop: Stop,
+}
+
+/// The watch and the connection it is on. smb2 closes the socket once the
+/// last clone of the connection drops, and both of these hold one.
+struct Watch {
+    watcher: smb2::client::Watcher,
+    _client: SmbClient,
+}
+
+/// What a wait ended with.
+#[derive(Debug, PartialEq, uniffi::Enum)]
+pub enum SmbChange {
+    /// What changed, relative to the folder. Empty means the server didn't
+    /// say.
+    Changed { paths: Vec<String> },
+    /// The watcher was cancelled, and watches no more.
+    Cancelled,
 }
 
 #[uniffi::export]
 impl SmbWatcher {
+    /// A watcher on the folder at `location`. It signs in on its first
+    /// wait, so a cancel ends a sign-in under way too.
     #[uniffi::constructor]
-    pub fn watch(location: SmbLocation) -> Result<Arc<Self>, ConnectorError> {
-        smol::block_on(async {
-            let mut session = open(&location).await?;
-            let watcher = session
-                .client
-                .watch(&session.tree, location.path.trim_matches('/'), true)
-                .await
-                .map_err(|e| map_error(&e))?;
-            Ok(Arc::new(Self {
-                watcher: Mutex::new(watcher),
-                _client: Mutex::new(session.client),
-            }))
+    pub fn new(location: SmbLocation) -> Arc<Self> {
+        Arc::new(Self {
+            location,
+            watch: Mutex::new(None),
+            stop: Stop::new(),
         })
     }
 
-    /// Waits until something in the folder changes, and returns what changed,
-    /// relative to the folder. An empty list means the server didn't say. An
-    /// error means the watch is over, and the app makes a new one when it
-    /// wants to go on watching.
-    pub fn wait(&self) -> Result<Vec<String>, ConnectorError> {
-        let mut watcher = self.watcher.lock().unwrap_or_else(|e| e.into_inner());
-        match smol::block_on(watcher.next_events()) {
-            Ok(events) => Ok(events.into_iter().map(|event| event.filename).collect()),
-            // Too many changes to list: still a change.
-            Err(smb2::Error::Protocol { status, .. })
-                if status == smb2::types::status::NtStatus::NOTIFY_ENUM_DIR =>
-            {
-                Ok(Vec::new())
+    /// Waits until something in the folder changes, or the watcher is
+    /// cancelled. An error means this watch is over and its connection
+    /// closed, and the next wait signs in again.
+    pub fn wait(&self) -> Result<SmbChange, ConnectorError> {
+        let mut watch = self.watch.lock().unwrap_or_else(|e| e.into_inner());
+        // `or` polls the stop first, so a watcher cancelled before this wait
+        // never signs in. Dropping the other future mid-call is safe: smb2's
+        // writer task alone puts frames on the wire, so an abandoned call
+        // leaves no half frame, and a dropped CHANGE_NOTIFY deregisters.
+        let ended = smol::block_on(smol::future::or(
+            async {
+                self.stop.stopped().await;
+                None
+            },
+            async { Some(next_change(&self.location, &mut watch).await) },
+        ));
+        match ended {
+            Some(Ok(paths)) => Ok(SmbChange::Changed { paths }),
+            Some(Err(error)) => {
+                *watch = None;
+                Err(error)
             }
-            Err(e) => Err(map_error(&e)),
+            None => {
+                *watch = None;
+                Ok(SmbChange::Cancelled)
+            }
         }
+    }
+
+    /// Ends the wait under way and every wait after it with
+    /// [`SmbChange::Cancelled`], and closes the connection.
+    pub fn cancel(&self) {
+        self.stop.stop();
+        // A wait under way holds the lock, and closes the connection as it
+        // returns.
+        if let Ok(mut watch) = self.watch.try_lock() {
+            *watch = None;
+        }
+    }
+}
+
+/// Signs in when there is no watch yet, and waits for the watch's next
+/// change.
+async fn next_change(
+    location: &SmbLocation,
+    watch: &mut Option<Watch>,
+) -> Result<Vec<String>, ConnectorError> {
+    if watch.is_none() {
+        let mut session = open(location).await?;
+        let watcher = session
+            .client
+            .watch(&session.tree, location.path.trim_matches('/'), true)
+            .await
+            .map_err(|e| map_error(&e))?;
+        *watch = Some(Watch {
+            watcher,
+            _client: session.client,
+        });
+    }
+    let watch = watch.as_mut().expect("opened above");
+    match watch.watcher.next_events().await {
+        Ok(events) => Ok(events.into_iter().map(|event| event.filename).collect()),
+        // Too many changes to list: still a change.
+        Err(smb2::Error::Protocol { status, .. })
+            if status == smb2::types::status::NtStatus::NOTIFY_ENUM_DIR =>
+        {
+            Ok(Vec::new())
+        }
+        Err(e) => Err(map_error(&e)),
     }
 }
 
@@ -381,5 +448,63 @@ mod tests {
     fn lists_each_directory_to_make_outermost_first() {
         assert_eq!(ancestors("a/b/c"), vec!["a", "a/b", "a/b/c"]);
         assert!(ancestors("").is_empty());
+    }
+
+    fn location(host: String) -> SmbLocation {
+        SmbLocation {
+            host,
+            share: "share".into(),
+            path: String::new(),
+            username: "user".into(),
+            password: "password".into(),
+        }
+    }
+
+    #[test]
+    fn a_watcher_cancelled_before_its_wait_never_connects() {
+        // Nothing listens on loopback's port 9, so a connection attempt
+        // would end in an error.
+        let watcher = SmbWatcher::new(location("127.0.0.1:9".into()));
+        watcher.cancel();
+        assert_eq!(watcher.wait().ok(), Some(SmbChange::Cancelled));
+        assert_eq!(watcher.wait().ok(), Some(SmbChange::Cancelled));
+    }
+
+    #[test]
+    fn a_cancel_ends_a_sign_in_under_way_and_closes_its_connection() {
+        use std::io::Read;
+        use std::sync::mpsc;
+        // A server that takes the connection and never answers holds the
+        // wait in its sign-in until the cancel.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (accepted, connection) = mpsc::channel();
+        std::thread::spawn(move || accepted.send(listener.accept().map(|(stream, _)| stream)));
+        let watcher = SmbWatcher::new(location(addr.to_string()));
+        let waiting = Arc::clone(&watcher);
+        let (done, ended) = mpsc::channel();
+        std::thread::spawn(move || done.send(waiting.wait().ok()));
+        let mut server = connection
+            .recv_timeout(Duration::from_secs(1))
+            .expect("the wait connects")
+            .unwrap();
+        watcher.cancel();
+        assert_eq!(
+            ended.recv_timeout(Duration::from_secs(1)),
+            Ok(Some(SmbChange::Cancelled))
+        );
+        // The client's close ends the stream, after the sign-in's first
+        // request.
+        server
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
+        let mut buffer = [0; 4096];
+        loop {
+            match server.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(_) => continue,
+                Err(e) => panic!("the connection stayed open: {e}"),
+            }
+        }
     }
 }

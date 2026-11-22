@@ -423,7 +423,7 @@ struct BrowserBar: View {
     /// filled. It opens the split menu (12b, 12e2).
     private func splitMenu(_ split: Browser.SplitInFront) -> some View {
         let sideways = verticalSize == .compact
-        let all = model.children(of: split.split.id).filter { $0.kind == "tab" }
+        let all = model.children(of: split.split.id).filter { $0.kind == .tab }
         let at = all.firstIndex { $0.id == split.focused } ?? 0
         let titles = split.slots.compactMap { model.row($0)?.displayTitle }
         return Menu {

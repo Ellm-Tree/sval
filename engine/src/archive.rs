@@ -215,12 +215,17 @@ fn workspace_period(tree: &Document, ws: NodeId, default: Option<Timestamp>) -> 
 /// exemptions and the clock are applied, with the period its workspace
 /// archives after.
 fn units(tree: &Document, default: Option<Timestamp>) -> Vec<(Unit, Timestamp)> {
+    let index = crate::tree::ChildIndex::build(tree);
     let mut found = Vec::new();
     for (ws, _) in tree.workspaces() {
         let Some(period) = workspace_period(tree, *ws, default) else {
             continue;
         };
-        found.extend(units_in(tree, *ws).into_iter().map(|unit| (unit, period)));
+        found.extend(
+            units_in(tree, &index, *ws)
+                .into_iter()
+                .map(|unit| (unit, period)),
+        );
     }
     found
 }
@@ -228,16 +233,16 @@ fn units(tree: &Document, default: Option<Timestamp>) -> Vec<(Unit, Timestamp)> 
 /// The units of workspace `ws`. Only a workspace's direct children are
 /// units, so a tab in a group, at any depth, is never one. A split is a unit
 /// only when it holds tabs and nothing else.
-fn units_in(tree: &Document, ws: NodeId) -> Vec<Unit> {
+fn units_in(tree: &Document, index: &crate::tree::ChildIndex, ws: NodeId) -> Vec<Unit> {
     let mut found = Vec::new();
-    for id in &children(tree, ws) {
+    for id in index.children(ws) {
         let Some(node) = tree.node(*id) else {
             continue;
         };
         let (tabs, split) = match node.kind {
             NodeKind::Tab => (vec![*id], false),
             NodeKind::Split => {
-                let panes = children(tree, *id);
+                let panes = index.children(*id).to_vec();
                 let all_tabs = panes
                     .iter()
                     .all(|p| tree.node(*p).is_some_and(|n| n.kind == NodeKind::Tab));
@@ -324,7 +329,7 @@ pub fn archive_now(
     if tree.node(ws).is_some_and(|n| n.agent.is_some()) {
         return Err(ArchiveError::AgentWorkspace(ws));
     }
-    let unit = units_in(tree, ws)
+    let unit = units_in(tree, &crate::tree::ChildIndex::build(tree), ws)
         .into_iter()
         .find(|unit| unit.tabs.contains(&id))
         .ok_or(ArchiveError::NotArchivable(id))?;

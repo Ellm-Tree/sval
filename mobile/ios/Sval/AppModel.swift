@@ -47,15 +47,12 @@ final class AppModel {
     var showsSetup: Bool {
         welcoming || stage == .start || stage == .join || (settingUp && stage == .chooseFolder)
     }
-    private(set) var rows: [OutlineRow] = [] {
-        didSet {
-            tree = OutlineIndex(rows)
-            reindexLauncher()
-        }
-    }
+    /// The tree as of the last refresh, with a box for each row.
+    let treeStore = TreeStore()
+    var rows: [OutlineRow] { treeStore.index.rows }
     /// `rows`' lookups, built once per change. Views read it on every
     /// frame the bar folds, where a walk of `rows` per lookup adds up.
-    private(set) var tree = OutlineIndex()
+    var tree: OutlineIndex { treeStore.index }
     /// The synced settings, as of the last pass or change.
     private(set) var settings: [String: Any] = [:] {
         didSet {
@@ -96,7 +93,11 @@ final class AppModel {
     /// The live pages. Made at the end of `init`, since it holds this model.
     @ObservationIgnored private(set) var browser: Browser!
 
-    private var syncer: Syncer?
+    private var syncer: Syncer? {
+        didSet { if syncer !== oldValue { marks = ReadMarks() } }
+    }
+    /// What the refresh last read of `syncer`'s documents beside the tree.
+    @ObservationIgnored private var marks = ReadMarks()
     /// The engine's load at launch: its Keychain reads and the pass over
     /// each document's own copy run off the main thread, and what needs
     /// the engine waits for it (`loadedSyncer`).
@@ -110,8 +111,8 @@ final class AppModel {
         }
     }
     private var watcher: FolderWatcher?
-    private var smbWatcher: SmbChangeWatcher?
-    private var dropboxWatcher: DropboxChangeWatcher?
+    /// The SMB or Dropbox folder's watcher.
+    private var changeWatcher: ChangeWatcher?
     /// The connection to an SMB or Dropbox folder, made on first use and
     /// again after one fails.
     private var connected: SharedFolder?
@@ -236,7 +237,7 @@ final class AppModel {
             guard let self, !Task.isCancelled else { return }
             indexBuilds += 1
             let generation = indexBuilds
-            let tabs = rows.filter { $0.kind == "tab" }.map { row in
+            let tabs = rows.filter { $0.kind == .tab }.map { row in
                 LauncherIndex.TabInput(row: row, title: row.title, workspace: self.tree.workspace(of: row.id),
                                        isPrivate: self.isPrivate(row.id))
             }
@@ -381,18 +382,19 @@ final class AppModel {
     private func stopWatching() {
         watcher?.stop()
         watcher = nil
-        smbWatcher?.stop()
-        smbWatcher = nil
-        dropboxWatcher?.stop()
-        dropboxWatcher = nil
+        changeWatcher?.stop()
+        changeWatcher = nil
     }
 
     /// Watches the folder for changes while the app is in the foreground.
     /// In the background, a held connection or a long poll would run for
     /// as long as iOS lets the app, playing audio included, for passes
     /// nobody sees; coming back runs a pass (`RootView`) and watches again.
+    /// A cold launch into the foreground calls this from `init` and again on
+    /// `willEnterForegroundNotification`, which UIKit posts as the launching
+    /// scene comes to the foreground, so a watch already running is kept.
     private func startWatching() {
-        stopWatching()
+        guard watcher == nil, changeWatcher == nil else { return }
         guard UIApplication.shared.applicationState != .background else { return }
         switch source {
         case .files(let url):
@@ -400,17 +402,23 @@ final class AppModel {
             watcher.start()
             self.watcher = watcher
         case .smb(let location):
-            let watcher = SmbChangeWatcher(location: location) { [weak self] in
+            let watcher = ChangeWatcher(name: "SMB", open: { SmbWatcher(location: location) }) { [weak self] in
                 self?.folderChanged($0)
             }
             watcher.start()
-            smbWatcher = watcher
+            changeWatcher = watcher
         case .dropbox(let root):
-            let watcher = DropboxChangeWatcher(root: root) { [weak self] in
+            let watcher = ChangeWatcher(
+                name: "Dropbox",
+                open: {
+                    guard let token = Secrets.dropboxToken() else { return nil }
+                    return try DropboxWatcher.watch(appKey: DropboxApp.key, refreshToken: token, root: root)
+                }
+            ) { [weak self] in
                 self?.folderChanged($0)
             }
             watcher.start()
-            dropboxWatcher = watcher
+            changeWatcher = watcher
         case nil:
             break
         }
@@ -1025,7 +1033,8 @@ final class AppModel {
         let loading = loadingSyncer
         syncer = nil
         loadingSyncer = nil
-        rows = []
+        treeStore.reset()
+        reindexLauncher()
         // The folder's tabs and pins go with it, and so do their pages and
         // the pictures of them kept on disk.
         pinsByWorkspace = [:]
@@ -1187,8 +1196,15 @@ final class AppModel {
                 message = error.localizedDescription
             }
         }
-        await keepTabsInFront()
-        await refreshRows()
+        // The tree as the pass left it, from the syncer in use once it is
+        // read: leaving the folder meanwhile replaces it.
+        var read: (Syncer, TreeRead)?
+        if let current = self.syncer {
+            let tree = await current.treeRead(since: treeStore.revision)
+            if self.syncer === current { read = (current, tree) }
+        }
+        if let read { await keepTabsInFront(read.1) }
+        await refreshRows(read)
         await keepOwnWorkspace()
         await refreshHistory()
     }
@@ -1198,7 +1214,7 @@ final class AppModel {
     /// tab at most once an hour (`mark_used`), so this writes rarely, and
     /// the next pass carries it.
     func markUsed(_ id: String) async {
-        guard let syncer, row(id)?.kind == "tab", !isPrivate(id) else { return }
+        guard let syncer, row(id)?.kind == .tab, !isPrivate(id) else { return }
         do {
             try await syncer.edit(workspacesDocument, opsJson: #"[{"kind":"markUsed","id":"\#(id)"}]"#)
         } catch {
@@ -1214,11 +1230,21 @@ final class AppModel {
     /// pass returns, while `rows` still shows the tree before it, and
     /// before `reconcile` lets the page go. A Workspace the pass deleted
     /// takes its tabs with it.
-    private func keepTabsInFront() async {
-        guard let syncer else { return }
-        let reading = Signposts.outline.beginInterval("keepTabsInFront")
-        let after = await syncer.outline()
-        Signposts.outline.endInterval("keepTabsInFront", reading, "\(after.count) rows")
+    private func keepTabsInFront(_ read: TreeRead) async {
+        // A change of content alone leaves every row where it was, so no
+        // tab left the tree.
+        guard case .whole(_, let after) = read else { return }
+        let ops = Self.keptInFrontOps(tree, after: after, privateIds: privateIds, inFront: browser.isInFront)
+        guard !ops.isEmpty else { return }
+        Diagnostics.log("sync: kept \(ops.filter { $0["kind"] as? String == "addTab" }.count) tab(s) in front that another device closed")
+        await edit(ops)
+    }
+
+    /// The edits that give back each tab of `before` in front here, by
+    /// `inFront`, that `after`, the outline a pass left, no longer holds
+    /// (`keepTabsInFront`).
+    nonisolated static func keptInFrontOps(_ before: OutlineIndex, after: [OutlineRow], privateIds: Set<String>,
+                                           inFront: (String) -> Bool) -> [[String: Any]] {
         let now = Dictionary(after.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         func within(_ id: String, _ workspace: String) -> Bool {
             var node: String? = id
@@ -1230,14 +1256,14 @@ final class AppModel {
             return false
         }
         var ops: [[String: Any]] = []
-        for tab in rows where tab.kind == "tab" && now[tab.id] == nil && !privateIds.contains(tab.id) {
-            guard browser.isInFront(tab.id), let url = tab.url, let home = workspace(of: tab.id), now[home] != nil
+        for tab in before.rows where tab.kind == .tab && now[tab.id] == nil && !privateIds.contains(tab.id) {
+            guard inFront(tab.id), let url = tab.url, let home = before.workspace(of: tab.id), now[home] != nil
             else { continue }
             var former = tab.parentId
-            var place = self.place(of: tab)
-            if let parent = former, row(parent)?.kind == "split" {
-                former = row(parent)?.parentId
-                place = closedPlace(of: tab)
+            var place = place(of: tab, in: before)
+            if let parent = former, before.row(parent)?.kind == .split {
+                former = before.row(parent)?.parentId
+                place = closedPlace(of: tab, in: before)
             }
             var add: [String: Any] = ["kind": "addTab", "name": tab.name, "url": url, "id": tab.id, "local": tab.local]
             if let former, now[former] != nil, within(former, home) {
@@ -1251,16 +1277,14 @@ final class AppModel {
             ops.append(add)
             if let label = tab.label { ops.append(["kind": "setLabel", "id": tab.id, "label": label]) }
         }
-        guard !ops.isEmpty else { return }
-        Diagnostics.log("sync: kept \(ops.filter { $0["kind"] as? String == "addTab" }.count) tab(s) in front that another device closed")
-        await edit(ops)
+        return ops
     }
 
     /// Closes a tab. Only a tab closes this way: groups and Workspaces are
     /// deleted by name on the desktop (decision 0077).
     @discardableResult
     func closeTab(_ row: OutlineRow) async -> Bool {
-        guard row.kind == "tab" else { return false }
+        guard row.kind == .tab else { return false }
         let wasPrivate = isPrivate(row.id)
         // The page goes before the edit drops the tab from the session's
         // ids, so nothing it reports later can be taken for the user's.
@@ -1414,7 +1438,7 @@ final class AppModel {
     /// group keeps its name when given none.
     func rename(_ row: OutlineRow, to name: String) async {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if row.kind == "tab" {
+        if row.kind == .tab {
             let label: String? = name.isEmpty ? nil : name
             guard label != row.label else { return }
             await edit(["kind": "setLabel", "id": row.id, "label": label ?? NSNull()])
@@ -1485,8 +1509,12 @@ final class AppModel {
     /// Where `row` sits. A sibling in `skipping` moves back with it, ahead
     /// of it in tree order, so the next sibling named is one that stays.
     func place(of row: OutlineRow, skipping: Set<String> = []) -> Place? {
+        Self.place(of: row, in: tree, skipping: skipping)
+    }
+
+    nonisolated static func place(of row: OutlineRow, in tree: OutlineIndex, skipping: Set<String> = []) -> Place? {
         guard let parent = row.parentId else { return nil }
-        let (previous, next) = Self.neighbours(of: row.id, among: children(of: parent).map(\.id), skipping: skipping)
+        let (previous, next) = neighbours(of: row.id, among: tree.children(of: parent).map(\.id), skipping: skipping)
         return Place(parent: parent, previous: previous, next: next)
     }
 
@@ -1498,7 +1526,7 @@ final class AppModel {
 
     /// The siblings either side of `id` in `siblings`: the one before it,
     /// and the first after it outside `skipping`.
-    static func neighbours(of id: String, among siblings: [String], skipping: Set<String> = [])
+    nonisolated static func neighbours(of id: String, among siblings: [String], skipping: Set<String> = [])
         -> (previous: String?, next: String?) {
         guard let index = siblings.firstIndex(of: id) else { return (nil, nil) }
         return (index > 0 ? siblings[index - 1] : nil,
@@ -1508,17 +1536,21 @@ final class AppModel {
     /// Whether `row` is a split's pane, which is never pinned on its own
     /// (the desktop's `canPin`, pins spec §8.1).
     func isPane(_ row: OutlineRow) -> Bool {
-        row.parentId.flatMap(self.row)?.kind == "split"
+        row.parentId.flatMap(self.row)?.kind == .split
     }
 
     /// Where a closed tab goes back: where it was, or for a split's pane
     /// beside its split, since a tab joins a split only by the user
     /// splitting it (split-view spec §6.1, the desktop's `placeBeside`).
     func closedPlace(of row: OutlineRow) -> Place? {
-        guard let parent = row.parentId, let split = self.row(parent), split.kind == "split" else {
-            return place(of: row)
+        Self.closedPlace(of: row, in: tree)
+    }
+
+    nonisolated static func closedPlace(of row: OutlineRow, in tree: OutlineIndex) -> Place? {
+        guard let parent = row.parentId, let split = tree.row(parent), split.kind == .split else {
+            return place(of: row, in: tree)
         }
-        return place(of: split).map { Place(parent: $0.parent, previous: split.id, next: $0.next) }
+        return place(of: split, in: tree).map { Place(parent: $0.parent, previous: split.id, next: $0.next) }
     }
 
     /// Opens a closed tab again where it was, under its own id, as the
@@ -1586,7 +1618,7 @@ final class AppModel {
             slot = Self.selectionSlot(among: children(of: at).map(\.id), anchor: anchor,
                                       members: Set(members.map(\.id)))
         } else {
-            let placed = Self.moveIntoOrder(staying: children(of: parent).map { ($0.id, $0.kind == "group") },
+            let placed = Self.moveIntoOrder(staying: children(of: parent).map { ($0.id, $0.kind == .group) },
                                             moving: [(id, true)])
             slot = (placed.first?.previous, placed.first?.next)
         }
@@ -1650,7 +1682,7 @@ final class AppModel {
         let ids = Set(moving.map(\.id))
         let staying = children(of: parent).filter { !ids.contains($0.id) }
         let ops: [[String: Any]] = Self.moveIntoOrder(
-            staying: staying.map { ($0.id, $0.kind == "group") }, moving: moving.map { ($0.id, $0.kind == "group") }
+            staying: staying.map { ($0.id, $0.kind == .group) }, moving: moving.map { ($0.id, $0.kind == .group) }
         ).map { slot in
             var op: [String: Any] = ["kind": "moveNode", "id": slot.id, "newParent": parent]
             op["before"] = slot.previous
@@ -1730,7 +1762,7 @@ final class AppModel {
     /// Deletes a group, its contents with it or moved up to its parent in
     /// their order (decision 0077, spec §5.4).
     func deleteGroup(_ row: OutlineRow, keepingContents: Bool) async {
-        guard row.kind == "group" else { return }
+        guard row.kind == .group else { return }
         await edit(["kind": keepingContents ? "removeKeepingChildren" : "remove", "id": row.id])
     }
 
@@ -2304,44 +2336,108 @@ final class AppModel {
         return true
     }
 
-    private func refreshRows() async {
+    /// What a refresh began from: the syncer, its documents' revisions,
+    /// and the private session's document and revision.
+    private struct RefreshMark: Equatable {
+        let syncer: ObjectIdentifier
+        let revisions: Revisions
+        let own: ObjectIdentifier?
+        let ownRevision: UInt64?
+    }
+
+    @ObservationIgnored private let refreshes = Coalescing()
+    /// What the latest refresh began from.
+    @ObservationIgnored private var refreshedFrom: RefreshMark?
+
+    private func refreshMark(_ syncer: Syncer) async -> RefreshMark {
+        let revisions = await syncer.revisions()
+        return RefreshMark(syncer: ObjectIdentifier(syncer), revisions: revisions,
+                           own: privateDocument.map(ObjectIdentifier.init), ownRevision: privateDocument?.revision())
+    }
+
+    /// Reads the documents again and shows what changed. `read` is the
+    /// tree as a pass's end already read it, and the syncer it came from.
+    /// A refresh asked for while one runs waits for it, and runs again
+    /// only if a document moved since that one began.
+    private func refreshRows(_ read: (Syncer, TreeRead)? = nil) async {
+        var waited = false
+        await refreshes.run(isDue: {
+            waited = true
+            guard let syncer else { return false }
+            return await refreshMark(syncer) != refreshedFrom
+        }, { [weak self] in
+            // A read taken before a refresh this one waited on is older
+            // than what that refresh showed.
+            await self?.refreshOnce(waited ? nil : read)
+        })
+    }
+
+    private func refreshOnce(_ read: (Syncer, TreeRead)?) async {
         guard let syncer else { return }
         let refresh = Signposts.refresh.beginInterval("refreshRows")
+        // A read from a syncer that was replaced meanwhile counts another
+        // syncer's revisions.
+        func current() -> Bool { self.syncer === syncer }
+        let mark = await refreshMark(syncer)
+        refreshedFrom = mark
+        let revisions = mark.revisions
         let outlining = Signposts.outline.beginInterval("outline")
+        var tree = read.flatMap { $0.0 === syncer ? $0.1 : nil }
+        if tree == nil { tree = await syncer.treeRead(since: treeStore.revision) }
         let own = privateDocument?.outline() ?? []
+        Signposts.outline.endInterval("outline", outlining)
+        let assigning = Signposts.outline.beginInterval("rows")
         // Set only when changed: every view reading them redraws on each
         // set, and a refresh often changes nothing.
         let ownIds = Set(own.map(\.id))
         if ownIds != privateIds { privateIds = ownIds }
-        let outline = await syncer.outline() + own
-        Signposts.outline.endInterval("outline", outlining, "\(outline.count) rows")
-        let assigning = Signposts.outline.beginInterval("rows")
-        if outline != rows { rows = outline }
-        Signposts.outline.endInterval("rows", assigning)
+        var treeChange = TreeStore.Change.none
+        if current(), let tree { treeChange = treeStore.install(tree, own: own) }
+        if treeChange != .none { reindexLauncher() }
+        Signposts.outline.endInterval("rows", assigning, "\(self.rows.count) rows")
         let reading = Signposts.refresh.beginInterval("settings")
-        let synced = await syncer.settings()
-        if !NSDictionary(dictionary: synced).isEqual(to: settings) { settings = synced }
-        browser?.applyMediaChoices()
-        Signposts.refresh.endInterval("settings", reading, "\(synced.count) settings")
+        if marks.settingsDue(revisions) {
+            let (revision, synced) = await syncer.settings()
+            if current(), marks.keepSettings(at: revision), !NSDictionary(dictionary: synced).isEqual(to: settings) {
+                settings = synced
+                browser?.applyMediaChoices()
+            }
+        }
+        Signposts.refresh.endInterval("settings", reading, "\(self.settings.count) settings")
         let favoring = Signposts.refresh.beginInterval("favorites")
-        let marked = Self.markingPins(await syncer.favorites())
-        if marked != favorites { favorites = marked }
+        if marks.favoritesDue(revisions) {
+            let (revision, read) = await syncer.favorites()
+            let marked = Self.markingPins(read)
+            if current(), marks.keepFavorites(at: revision), marked != favorites { favorites = marked }
+        }
         await keepFavoriteRoots()
         Signposts.refresh.endInterval("favorites", favoring, "\(self.favorites.count) favorites")
         let pinning = Signposts.refresh.beginInterval("pins")
-        let ids = workspaces.map(\.id)
-        var pins: [String: [PinRow]] = [:]
-        for workspace in workspaces where workspace.agent == nil {
-            // The phone opens web addresses only, so another device's pin at
-            // any other address gets no tile (pins spec §5, decision 1372).
-            pins[workspace.id] = await syncer.pins(in: workspace.id, workspaces: ids)
-                .filter { $0.kind == "folder" || $0.url.map(Self.opensHere) ?? false }
+        var pinsChanged = false
+        let listed = workspaces
+        let shown = Dictionary(listed.map { ($0.id, $0.agent != nil) }, uniquingKeysWith: { a, _ in a })
+        if marks.pinsDue(revisions, for: shown) {
+            let (revision, all) = await syncer.pins(workspaces: listed.map(\.id))
+            var pins: [String: [PinRow]] = [:]
+            for workspace in listed where workspace.agent == nil {
+                // The phone opens web addresses only, so another device's pin
+                // at any other address gets no tile (pins spec §5, decision
+                // 1372).
+                pins[workspace.id] = all[workspace.id]?
+                    .filter { $0.kind == "folder" || $0.url.map(Self.opensHere) ?? false }
+            }
+            if current(), marks.keepPins(at: revision, for: shown), pins != pinsByWorkspace {
+                pinsByWorkspace = pins
+                pinsChanged = true
+            }
         }
-        if pins != pinsByWorkspace { pinsByWorkspace = pins }
-        Signposts.refresh.endInterval("pins", pinning, "\(pins.count) workspaces")
+        Signposts.refresh.endInterval("pins", pinning, "\(self.pinsByWorkspace.count) workspaces")
         let pages = Signposts.refresh.beginInterval("pages")
-        browser.reconcile()
-        PagePreviews.shared.keep(only: Set(rows.lazy.filter { $0.kind == "tab" }.map(\.id)))
+        // Which pages live follows the tree's tabs and the pins alone.
+        if treeChange == .structure || pinsChanged {
+            browser.reconcile()
+            PagePreviews.shared.keep(only: Set(rows.lazy.filter { $0.kind == .tab }.map(\.id)))
+        }
         await browser.offloadHiddenWorkspaces()
         Signposts.refresh.endInterval("pages", pages)
         Signposts.refresh.endInterval("refreshRows", refresh, "\(self.rows.count) rows")

@@ -88,6 +88,38 @@ pub fn children(doc: &Document, parent: NodeId) -> Vec<NodeId> {
     kids.into_iter().map(|(_, id)| id).collect()
 }
 
+/// Every parent's children, each list in [`children`]'s order, read in one
+/// pass over the document. A caller that walks many parents builds one per
+/// call: it is never kept beside the document it was read from.
+pub struct ChildIndex(std::collections::BTreeMap<NodeId, Vec<NodeId>>);
+
+impl ChildIndex {
+    pub fn build(doc: &Document) -> Self {
+        let mut kids: std::collections::BTreeMap<NodeId, Vec<(&FractionalIndex, NodeId)>> =
+            std::collections::BTreeMap::new();
+        for (id, node) in &doc.nodes {
+            if let Some(parent) = node.placement.parent {
+                kids.entry(parent)
+                    .or_default()
+                    .push((&node.placement.order, *id));
+            }
+        }
+        ChildIndex(
+            kids.into_iter()
+                .map(|(parent, mut list)| {
+                    list.sort();
+                    (parent, list.into_iter().map(|(_, id)| id).collect())
+                })
+                .collect(),
+        )
+    }
+
+    /// The ids of the children of `parent`, as [`children`] lists them.
+    pub fn children(&self, parent: NodeId) -> &[NodeId] {
+        self.0.get(&parent).map_or(&[], Vec::as_slice)
+    }
+}
+
 /// Inserts a new tab under `parent`, ordered between `before` and `after`.
 ///
 /// The key comes from [`order_between`], so an insert never fails for want
@@ -2310,6 +2342,19 @@ mod tests {
             let second_pass = repair_unreachable_ancestry(&mut doc);
             prop_assert!(second_pass.is_empty(), "a second repair pass found more to fix");
             prop_assert_eq!(before, doc.to_json().unwrap(), "a no-op repair pass changed bytes");
+        }
+
+        /// The index lists every parent's children as the scan does, for
+        /// every node and for the missing parents the tree names.
+        #[test]
+        fn the_child_index_lists_what_children_lists(seed in proptest::num::u64::ANY, count in 1usize..60) {
+            let doc = crate::types::test_support::random_tree(seed, count);
+            let index = ChildIndex::build(&doc);
+            let parents = doc.nodes.keys().copied()
+                .chain(doc.nodes.values().filter_map(|node| node.placement.parent));
+            for parent in parents {
+                prop_assert_eq!(index.children(parent).to_vec(), children(&doc, parent));
+            }
         }
 
         #[test]
