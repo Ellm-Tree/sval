@@ -16,8 +16,9 @@ let settingsDocument = "settings"
 let favoritesDocument = "favorites"
 
 /// Sval's top directory in a shared folder and its mark: nothing is written
-/// into a folder that does not hold it (`SvalEngine.TOP_DIR`).
-let topDir = "sval"
+/// into a folder that does not hold it. The engine names it, for every
+/// device alike.
+let topDir = topDirName()
 
 /// The engine's passes for this device, as the desktop runs them
 /// (local-copy spec §4.2): this device's own copy first, then the shared

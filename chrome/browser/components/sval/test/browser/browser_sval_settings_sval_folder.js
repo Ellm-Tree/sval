@@ -211,6 +211,57 @@ add_task(async function picking_sval_itself_chooses_its_folder() {
 });
 
 /**
+ * A pick is read by its name alone (spec §6.4). `sval/` picked with a stray
+ * `sval/ws` inside it, as a device that misread the pick once leaves, still
+ * chooses the folder that holds it. The user's own `Sval`, picked, is the
+ * folder chosen, with Sval's files in its `sval/`.
+ */
+add_task(async function a_pick_is_read_by_its_name_whatever_the_folder_holds() {
+  await within(SvalPanel.started, 40_000, "the panel's startup");
+  const device = await panelOnAFolder("pick-by-name");
+  const outer = PathUtils.join(await device.folder("pick-by-name-top"), "Sval");
+  const inner = PathUtils.join(outer, "sval");
+  await IOUtils.makeDirectory(PathUtils.join(inner, "keys"), {
+    createAncestors: true,
+  });
+  await IOUtils.makeDirectory(PathUtils.join(inner, "sval", "ws"), {
+    createAncestors: true,
+  });
+
+  const fromInner = await SvalPanel.chooseSharedFolder(inner);
+  Assert.ok(
+    fromInner.reached,
+    `the inner pick is reached: ${fromInner.message}`
+  );
+  Assert.equal(
+    SvalPanel.sharedRootSetting(),
+    outer,
+    "the folder holding sval/ is stored, whatever sval/ holds"
+  );
+  Assert.ok(
+    (await IOUtils.getChildren(PathUtils.join(inner, "ws"))).length,
+    "this device's document went into sval/ws"
+  );
+  Assert.deepEqual(
+    await IOUtils.getChildren(PathUtils.join(inner, "sval", "ws")),
+    [],
+    "and nothing into the stray folder"
+  );
+
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+  const fromOuter = await SvalPanel.chooseSharedFolder(outer);
+  Assert.ok(
+    fromOuter.reached,
+    `the outer pick is reached: ${fromOuter.message}`
+  );
+  Assert.equal(
+    SvalPanel.sharedRootSetting(),
+    outer,
+    "a folder named Sval is the folder chosen"
+  );
+});
+
+/**
  * Choosing a folder, and using it again, while Sval's own folder work holds
  * the helper wait their turn and reach the folder.
  */

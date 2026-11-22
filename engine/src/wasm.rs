@@ -166,6 +166,22 @@ fn to_js_err(err: impl Into<Failure>) -> JsValue {
     error.into()
 }
 
+/// The directory in the shared folder that holds every file Sval keeps there
+/// (`crate::store::TOP_DIR`).
+#[wasm_bindgen(js_name = topDirName)]
+pub fn top_dir_name() -> String {
+    crate::store::TOP_DIR.to_owned()
+}
+
+/// Whether a folder named `name`, picked as the shared folder, is Sval's own
+/// directory in it, so that the folder holding it is the shared folder
+/// (`crate::store::is_top_dir_name`). A host splits its own paths, since only
+/// it knows its platform's separators.
+#[wasm_bindgen(js_name = isTopDirName)]
+pub fn is_top_dir_name(name: &str) -> bool {
+    crate::store::is_top_dir_name(name)
+}
+
 /// The one directory, without a trailing `/`, whose files a host must read
 /// before calling [`SvalDocument::sync`]: the files directly in it, never a
 /// sibling whose name starts the same (`docs/host-contract.md`).
@@ -776,6 +792,13 @@ mod binding_tests {
         let own = device_path(&key_bytes, "ws-1", &DEVICE).unwrap();
         assert!(is_device_file(&key_bytes, "ws-1", &own).unwrap());
         assert!(!is_device_file(&key_bytes, "ws-1", &own.replace(".json", " (1).json")).unwrap());
+    }
+
+    #[test]
+    fn the_folder_layout_a_host_reads_is_the_engines() {
+        assert_eq!(top_dir_name(), crate::store::TOP_DIR);
+        assert!(is_top_dir_name("sval"));
+        assert!(!is_top_dir_name("Sval"));
     }
 
     #[test]

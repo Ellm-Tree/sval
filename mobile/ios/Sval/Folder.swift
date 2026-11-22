@@ -25,26 +25,16 @@ struct Folder {
     }
 
     /// The shared folder the user picked. Sval's own directory inside it,
-    /// picked in its place, serves as that directory: every path Sval reads
-    /// and writes there is under `topDir`, and the picker grants nothing
-    /// above the folder picked.
+    /// picked in its place (`isTopDirName`, spec §6.4), serves as that
+    /// directory: every path Sval reads and writes there is under `topDir`,
+    /// and the picker grants nothing above the folder picked. `root` is then
+    /// the folder that holds it, as the other devices store it.
     init(shared url: URL) {
-        if Self.isSvalDir(url) {
+        if isTopDirName(name: url.lastPathComponent) {
             self.init(root: url.deletingLastPathComponent(), svalDir: url)
         } else {
             self.init(root: url)
         }
-    }
-
-    /// Whether `url` is Sval's own directory in a shared folder, which
-    /// holds the Workspaces, the pairing offers or the key backups, and no
-    /// Sval directory of its own with Workspaces in it.
-    static func isSvalDir(_ url: URL) -> Bool {
-        guard url.lastPathComponent == topDir else { return false }
-        let has = { (path: String) in
-            FileManager.default.fileExists(atPath: url.appending(path: path).path(percentEncoded: false))
-        }
-        return !has("\(topDir)/ws") && (has("ws") || has("pair") || has("keys"))
     }
 
     private func fileURL(_ path: String) -> URL {

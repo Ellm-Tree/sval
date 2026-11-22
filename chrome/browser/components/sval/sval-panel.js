@@ -657,7 +657,6 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalFeedbackForm.sys.mjs",
         LEVEL_PREF: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
         SvalEngine: "moz-src:///browser/components/sval/SvalEngine.sys.mjs",
-        TOP_DIR: "moz-src:///browser/components/sval/SvalEngine.sys.mjs",
         SvalFavorites:
           "moz-src:///browser/components/sval/SvalFavorites.sys.mjs",
         SvalFavoriteIcons:

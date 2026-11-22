@@ -114,6 +114,8 @@ requesttimeoutfactor = 2
 
 ["test_sval_first_run_model.js"]
 
+["test_sval_folder_layout.js"]
+
 ["test_sval_header.js"]
 
 ["test_sval_history_failed_exchange.js"]

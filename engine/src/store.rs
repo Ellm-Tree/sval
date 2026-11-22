@@ -96,8 +96,35 @@ impl std::fmt::Display for DeviceId {
     }
 }
 
+/// The directory in the shared folder that holds every file Sval keeps
+/// there (spec §6.2).
+pub const TOP_DIR: &str = "sval";
+
+/// Whether a folder named `name`, picked as the shared folder, is Sval's own
+/// directory, so that the folder holding it is the shared folder (spec
+/// §6.4). The name alone decides: what the folder holds changes as devices
+/// write to it, and a test of its contents gives one pick two readings.
+/// The match is exact, so a folder of the user's own named `Sval` is the
+/// folder that holds `sval/`.
+pub fn is_top_dir_name(name: &str) -> bool {
+    name == TOP_DIR
+}
+
+/// The shared folder a pick of the `/`-separated `path` names: the folder
+/// that holds it when `path` is Sval's own directory (`is_top_dir_name`),
+/// and `path` otherwise. A pick of `sval` alone names the root, as empty.
+pub fn shared_root_of(path: &str) -> String {
+    let bare = path.trim_end_matches('/');
+    let (parent, name) = bare.rsplit_once('/').unwrap_or(("", bare));
+    if is_top_dir_name(name) {
+        parent.to_owned()
+    } else {
+        path.to_owned()
+    }
+}
+
 pub(crate) fn workspace_dir(key: &Key, workspace: &str) -> String {
-    format!("sval/ws/{}", crypto::hashed_name(key, workspace))
+    format!("{TOP_DIR}/ws/{}", crypto::hashed_name(key, workspace))
 }
 
 pub(crate) fn device_path(key: &Key, workspace: &str, device: DeviceId) -> String {
@@ -593,6 +620,76 @@ mod tests {
             peers_among_what_a_cloud_client_writes(&LocalFolder::new(dir.path())),
             expected
         );
+    }
+
+    #[test]
+    fn only_a_folder_named_exactly_sval_is_svals_own_directory() {
+        assert!(is_top_dir_name("sval"));
+        for name in [
+            "Sval",
+            "SVAL",
+            "sval ",
+            " sval",
+            "sval.backup",
+            "my sval",
+            "",
+            "ws",
+        ] {
+            assert!(!is_top_dir_name(name), "{name:?}");
+        }
+    }
+
+    #[test]
+    fn a_pick_of_svals_own_directory_names_the_folder_that_holds_it() {
+        for (picked, root) in [
+            // Dropbox's spelling, from the root of the user's Dropbox.
+            ("/Sval/sval", "/Sval"),
+            ("/Sval/sval/", "/Sval"),
+            ("/sval", ""),
+            ("/sval/", ""),
+            // An SMB share's, relative to the share.
+            ("Sval/sval", "Sval"),
+            ("Backups/Browsers/sval", "Backups/Browsers"),
+            ("sval", ""),
+            ("sval/", ""),
+            // A device's own absolute path.
+            (
+                "/Users/me/Library/Mobile Documents/com~apple~CloudDocs/Sval/sval",
+                "/Users/me/Library/Mobile Documents/com~apple~CloudDocs/Sval",
+            ),
+            // A user's folder named `sval` is Sval's directory whatever it
+            // holds: every device reads the pick the same way.
+            ("/Users/me/Dropbox/sval", "/Users/me/Dropbox"),
+            // A `sval` folder inside Sval's own: its parent is the pick.
+            ("/Sval/sval/sval", "/Sval/sval"),
+        ] {
+            assert_eq!(shared_root_of(picked), root, "{picked:?}");
+        }
+    }
+
+    #[test]
+    fn a_pick_of_any_other_folder_is_the_shared_folder_as_picked() {
+        for picked in [
+            "/Sval",
+            "/Sval/",
+            "Sval",
+            "",
+            "/",
+            "/Users/me/Dropbox",
+            "/Users/me/SVAL",
+            "/sval/ws",
+            "/sval/Sval",
+            "/svalbak",
+            "sval/pair",
+        ] {
+            assert_eq!(shared_root_of(picked), picked, "{picked:?}");
+        }
+    }
+
+    #[test]
+    fn workspaces_live_in_svals_own_directory() {
+        let key = crate::types::test_support::test_key();
+        assert!(workspace_dir(&key, "x").starts_with(&format!("{TOP_DIR}/ws/")));
     }
 
     #[test]

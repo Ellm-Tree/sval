@@ -791,9 +791,7 @@ final class AppModel {
     var folderPlace: (short: String, full: String, user: String?)? {
         switch source {
         case .files(let picked):
-            // The folder the user knows, when Sval's own directory in it
-            // was picked (`Folder(shared:)`).
-            let url = Folder.isSvalDir(picked) ? picked.deletingLastPathComponent() : picked
+            let url = Folder(shared: picked).root
             let parts = url.standardizedFileURL.pathComponents
             // iCloud Drive's folders live under this container on disk.
             if let cloud = parts.firstIndex(of: "com~apple~CloudDocs") {
@@ -842,8 +840,12 @@ final class AppModel {
     /// Connects to a folder on an SMB share, and keeps it as the shared
     /// folder once it holds Sval's data.
     @discardableResult
-    func connectSmb(_ location: SmbLocation) async -> Error? {
+    func connectSmb(_ picked: SmbLocation) async -> Error? {
         message = nil
+        // A path to Sval's own directory names the folder that holds it
+        // (spec §6.4), and that folder is what is kept and shown.
+        var location = picked
+        location.path = sharedRootOf(path: picked.path)
         do {
             let (folder, holdsSval, opens) = try await Task.detached {
                 let folder = try SmbShared(folder: SmbFolder.connect(location: location))
@@ -865,8 +867,10 @@ final class AppModel {
     /// Keeps `root`, a folder in the Dropbox `token` signs in to, as the
     /// shared folder once it holds Sval's data.
     @discardableResult
-    func connectDropbox(root: String, token: String) async -> Error? {
+    func connectDropbox(root picked: String, token: String) async -> Error? {
         message = nil
+        // As `connectSmb` keeps its path.
+        let root = sharedRootOf(path: picked)
         do {
             let (folder, holdsSval, opens) = try await Task.detached {
                 let folder = try DropboxShared(folder: DropboxFolder.connect(appKey: DropboxApp.key, refreshToken: token, root: root))

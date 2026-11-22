@@ -668,6 +668,27 @@ fn outline_row(
     }
 }
 
+/// The directory in the shared folder that holds every file Sval keeps there
+/// (`crate::store::TOP_DIR`).
+#[uniffi::export]
+pub fn top_dir_name() -> String {
+    crate::store::TOP_DIR.to_owned()
+}
+
+/// Whether a folder named `name`, picked as the shared folder, is Sval's own
+/// directory in it (`crate::store::is_top_dir_name`).
+#[uniffi::export]
+pub fn is_top_dir_name(name: String) -> bool {
+    crate::store::is_top_dir_name(&name)
+}
+
+/// The shared folder a pick of the `/`-separated `path` names
+/// (`crate::store::shared_root_of`).
+#[uniffi::export]
+pub fn shared_root_of(path: String) -> String {
+    crate::store::shared_root_of(&path)
+}
+
 /// The one directory whose files a pass reads (`crate::wasm::sync_prefix`).
 #[uniffi::export]
 pub fn sync_prefix(key: Vec<u8>, workspace: String) -> Result<String, EngineError> {
@@ -1558,6 +1579,15 @@ mod tests {
         let prefix = sync_prefix(KEY.to_vec(), "workspaces".into()).unwrap();
         assert!(file.path.starts_with(&format!("{prefix}/")));
         assert!(is_device_file(KEY.to_vec(), "workspaces".into(), file.path).unwrap());
+    }
+
+    #[test]
+    fn the_folder_layout_the_app_reads_is_the_engines() {
+        assert_eq!(top_dir_name(), crate::store::TOP_DIR);
+        assert!(is_top_dir_name("sval".into()));
+        assert!(!is_top_dir_name("Sval".into()));
+        assert_eq!(shared_root_of("/Sval/sval".into()), "/Sval");
+        assert_eq!(shared_root_of("/Sval".into()), "/Sval");
     }
 
     #[test]

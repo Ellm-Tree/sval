@@ -1074,6 +1074,12 @@ into the folder they can see Sval's files in, `sval/` with `ws/`, `keys/` and
 first run and in Settings alike, so both choices reach the same files. Every
 Sval file lives under `sval/`, so a folder named `sval` that a user made for
 Sval fills with Sval's files either way.
+The folder's name alone decides, matched exactly: what a folder holds changes
+as devices write to it, and a test of its contents gives one pick two readings
+on two devices. The engine holds the rule (`store::is_top_dir_name`,
+`store::shared_root_of`), and every device and every way of reaching a folder
+asks it. An iPhone given the inner folder by the Files picker, which grants
+nothing above the folder picked, uses that folder as `sval/` itself.
 
 Sval treats the chosen folder as volatile: a share that drops, a drive that is
 unplugged, a folder that is moved or deleted. Not reaching it is an expected

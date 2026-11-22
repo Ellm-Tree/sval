@@ -2798,6 +2798,26 @@ export class SvalEngine extends SvalWorkerClient {
   }
 
   /**
+   * Whether a folder named `name`, picked as the shared folder, is Sval's own
+   * directory in it, so that the folder holding it is the one chosen.
+   *
+   * @param {string} name The picked folder's own name.
+   * @returns {Promise<boolean>}
+   */
+  async isTopDirName(name) {
+    return this.post("isTopDirName", [name]);
+  }
+
+  /**
+   * The engine's name for {@link TOP_DIR}.
+   *
+   * @returns {Promise<string>}
+   */
+  async topDirName() {
+    return this.post("topDirName", []);
+  }
+
+  /**
    * The node id of setting `key`.
    *
    * @param {string} key A setting's key.

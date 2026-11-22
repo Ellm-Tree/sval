@@ -29,6 +29,8 @@ import initWasm, {
   favoriteId,
   settingId,
   visitId,
+  isTopDirName,
+  topDirName,
 } from "chrome://browser/content/sval/sval_core.mjs";
 // Read through the namespace, because a named import the module lacks fails
 // the whole worker at link time. An engine that predates `engineVersion`, as a
@@ -1330,6 +1332,29 @@ class SvalSyncWorker {
     } catch (err) {
       throw new SvalError(`sval: ${describe(err)}`, err);
     }
+  }
+
+  /**
+   * Whether a folder named `name`, picked as the shared folder, is Sval's own
+   * directory in it (spec §6.4). The engine decides, so every device reads a
+   * pick the same way.
+   *
+   * @param {string} folderName The picked folder's own name.
+   * @returns {Promise<boolean>}
+   */
+  async isTopDirName(folderName) {
+    await this.#ensureReady();
+    return isTopDirName(folderName);
+  }
+
+  /**
+   * The directory in the shared folder that holds Sval's files.
+   *
+   * @returns {Promise<string>}
+   */
+  async topDirName() {
+    await this.#ensureReady();
+    return topDirName();
   }
 
   /**

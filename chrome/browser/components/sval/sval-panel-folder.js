@@ -59,9 +59,12 @@ Object.assign(SvalPanel, {
       };
     }
     // A user who picks the folder Sval keeps its files in means the folder
-    // that holds it (spec §6.4). Every Sval file lives under `TOP_DIR`, so
-    // a folder of that name the user made fills with Sval's files either way.
-    if (path !== null && PathUtils.filename(path) === this._modules.TOP_DIR) {
+    // that holds it (spec §6.4). The engine decides by the name, as every
+    // device does, and the path is split here, where its separators are known.
+    if (
+      path !== null &&
+      (await this._engine.isTopDirName(PathUtils.filename(path)))
+    ) {
       path = PathUtils.parent(path);
     }
     let found = null;
