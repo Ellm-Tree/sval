@@ -14,9 +14,10 @@ ChromeUtils.defineESModuleGetters(this, {
   PlacesTestUtils: "resource://testing-common/PlacesTestUtils.sys.mjs",
 });
 
-const { CLEAR_BUTTON_ID, DATE_COLUMN_ID } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalHistorySidebar.sys.mjs"
-);
+const { ARCHIVED_TREE_ID, CLEAR_BUTTON_ID, DATE_COLUMN_ID } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalHistorySidebar.sys.mjs"
+  );
 const { SvalHistorySync, CLEAR_SCOPE_ID } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalHistorySync.sys.mjs"
 );
@@ -383,6 +384,18 @@ add_task(async function the_list_read_as_it_loads_is_heard_as_a_table() {
   await heardAs("byday", ["Page", "Visited"]);
   await heardAs("bylastvisited", ["Page", "Visited"]);
   await viewBy(doc, "byday");
+  await hideHistory();
+});
+
+add_task(async function both_lists_scroll_with_the_panels_scrollbar() {
+  const { doc, tree } = await showHistory();
+  for (const list of [tree, doc.getElementById(ARCHIVED_TREE_ID)]) {
+    const style = doc.defaultView.getComputedStyle(
+      list.shadowRoot.querySelector("scrollbar")
+    );
+    Assert.equal(style.scrollbarWidth, "thin", `${list.id} is thin`);
+    Assert.notEqual(style.scrollbarColor, "auto", `${list.id} is coloured`);
+  }
   await hideHistory();
 });
 

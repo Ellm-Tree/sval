@@ -157,6 +157,24 @@ export async function showRestored(win, { tabs, workspace }) {
 }
 
 /**
+ * Gives a tree the thin scrollbar every Sval scroller draws (`sval-panel.css`).
+ * The tree's scrollbar sits in its shadow root (`MozTree`'s markup), out of
+ * reach of the sidebar's sheet, and `scrollbar-width` does not inherit.
+ *
+ * @param {Element} tree A tree in the sidebar's document.
+ */
+function thinScrollbar(tree) {
+  const style = tree.ownerDocument.createElementNS(
+    "http://www.w3.org/1999/xhtml",
+    "style"
+  );
+  style.textContent =
+    "scrollbar { scrollbar-width: thin; " +
+    "scrollbar-color: var(--sval-scrollbar-thumb) transparent; }";
+  tree.shadowRoot.append(style);
+}
+
+/**
  * The archived view (idle-tab archive spec §7.3): a tree of its own beside
  * the Places tree, shown in its place while the view is chosen. It is a
  * plain `nsITreeView` over `SvalArchive.entries()`, newest first, which the
@@ -196,6 +214,7 @@ function archivedView(win, doc, places) {
   }
   tree.append(cols, doc.createXULElement("treechildren"));
   places.after(tree);
+  thinScrollbar(tree);
 
   const search = doc.getElementById("search-box");
   let entries = [];
@@ -701,6 +720,7 @@ export const SvalHistorySidebar = {
       SHEET,
       doc.defaultView.windowUtils.AUTHOR_SHEET
     );
+    thinScrollbar(tree);
 
     // Beside the title, before the date. Firefox's column and these are
     // labelled although their headers are hidden: more than one column makes
