@@ -25,7 +25,7 @@ exclude_re = [
   # remote one on a tie replaces it with the same value.
   'replace > with >= in remote_group_wins$',
   'replace > with >= in merge_untimestamped_extra$',
-  'replace > with >= in merge_agent_mark$',
+  'replace > with >= in merge_mark$',
   # The unit being archived sits at `at`, and it is leaving, so the search
   # for the next sibling that stays skips it either way.
   'replace \+ with \* in archive_units$',
