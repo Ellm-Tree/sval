@@ -612,12 +612,6 @@
     &:hover {
       background: var(--sval-current-fill-hover);
     }
-
-    /* The selected tab's bar (tree, below), at the item's start. */
-    .sval-strip &::before {
-      inset-inline-start: 0;
-      margin-inline-start: 0;
-    }
   }
 
   &:focus-visible {
@@ -1371,9 +1365,8 @@ menupopup:not([sval-stem]) {
 
 /* You are here: the rail thickens. At top level there is no rail, so the bar
  * sits at the row's start in the accent colour. A split's row wears it while
- * one of its panes is viewed, and the strip's item the Workspace you're in. */
-.sval-row:is([aria-selected="true"], [data-sval-viewed])::before,
-.sval-strip-item[data-current]::before {
+ * one of its panes is viewed. */
+.sval-row:is([aria-selected="true"], [data-sval-viewed])::before {
   content: "";
   position: absolute;
   z-index: 1;
