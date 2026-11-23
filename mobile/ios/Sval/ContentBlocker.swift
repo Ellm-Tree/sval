@@ -96,8 +96,20 @@ final class ContentBlocker {
     @ObservationIgnored private var dueCheck: Task<Void, Never>?
     /// Where the downloaded lists are kept.
     private let directory: URL
-    /// A list's text from its publisher, or nil when the download failed.
-    typealias Download = @Sendable (URL) async -> Data?
+    /// What a list's publisher answered, asked with the validators of the
+    /// copy kept, if any.
+    enum Fetched: Sendable, Equatable {
+        case changed(Data, Validators)
+        case unchanged
+        case failed
+    }
+    /// A kept copy's `ETag` and `Last-Modified`, sent back so that an
+    /// unchanged list is answered with a 304 and no body.
+    struct Validators: Codable, Sendable, Equatable {
+        var etag: String?
+        var lastModified: String?
+    }
+    typealias Download = @Sendable (URL, Validators?) async -> Fetched
     private let download: Download
     @ObservationIgnored private var scriptsKey: String?
     @ObservationIgnored private var scriptsWork: Task<Void, Never>?
@@ -147,8 +159,12 @@ final class ContentBlocker {
     nonisolated static let pageRulesKey = "browser.sval.adblock.pageRules"
     nonisolated static let allowedBranch = "browser.sval.adblock.allowedDomain."
 
-    /// How long a downloaded list is used before it is fetched again.
-    nonisolated static let listLifetime: TimeInterval = 24 * 60 * 60
+    /// How long a list is used before it is fetched again when its
+    /// `! Expires:` line names no lifetime, and the bounds a named one is
+    /// held to: the desktop's (`SvalBlockingLists.sys.mjs`'s
+    /// `DEFAULT_LIFETIME`, `MIN_LIFETIME` and `MAX_LIFETIME`).
+    nonisolated static let defaultListLifetime: TimeInterval = 4 * 24 * 60 * 60
+    nonisolated static let listLifetimes: ClosedRange<TimeInterval> = 12 * 60 * 60 ... 14 * 24 * 60 * 60
     /// How long a list whose download failed waits before the next try.
     nonisolated static let retryAfter: TimeInterval = 60 * 60
     private static let scriptsId = "sval-scripts"
@@ -167,7 +183,7 @@ final class ContentBlocker {
     /// `formerStore` is a store that may hold lists an earlier build
     /// compiled, which are removed.
     init(directory: URL = URL.cachesDirectory.appending(path: "blocklists", directoryHint: .isDirectory),
-         download: @escaping Download = { await ContentBlocker.fetch($0) },
+         download: @escaping Download = { await ContentBlocker.fetch($0, $1) },
          stores: URL = URL.applicationSupportDirectory.appending(path: "ContentRuleLists", directoryHint: .isDirectory),
          defaults: UserDefaults = .standard, formerStore: WKContentRuleListStore? = nil) {
         self.directory = directory
@@ -208,11 +224,25 @@ final class ContentBlocker {
         return store
     }
 
-    /// The body of `url`'s answer when it is a 200.
-    nonisolated static func fetch(_ url: URL) async -> Data? {
-        guard let (data, response) = try? await URLSession.shared.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return data
+    /// `url`'s list, asked for only if it changed since the copy that
+    /// `validators` came with.
+    nonisolated static func fetch(_ url: URL, _ validators: Validators?) async -> Fetched {
+        var request = URLRequest(url: url)
+        // The copy kept in `directory` is the cache: URLSession's own would
+        // answer a request itself, or revalidate it with validators other
+        // than the kept copy's.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue(validators?.etag, forHTTPHeaderField: "If-None-Match")
+        request.setValue(validators?.lastModified, forHTTPHeaderField: "If-Modified-Since")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let response = response as? HTTPURLResponse else { return .failed }
+        switch response.statusCode {
+        case 200:
+            return .changed(data, Validators(etag: response.value(forHTTPHeaderField: "ETag"),
+                                             lastModified: response.value(forHTTPHeaderField: "Last-Modified")))
+        case 304 where validators != nil: return .unchanged
+        default: return .failed
+        }
     }
 
     /// Returns once `ready`.
@@ -591,9 +621,10 @@ final class ContentBlocker {
 
     /// A list's text: the download if it is fresh or its last download
     /// failed within `retryAfter`, a new download if not, and the old
-    /// download when a new one fails. `failed` is set when the new download
-    /// failed or was not kept: a list left without a file stays due, and
-    /// would be fetched at every check.
+    /// download when a new one fails or the publisher answers that it is
+    /// unchanged. `failed` is set when the new download failed or was not
+    /// kept: a list left without a file stays due, and would be fetched at
+    /// every check.
     nonisolated private static func list(id: String, address: String, in directory: URL,
                                          failedAt: [String: Date],
                                          download: Download) async -> (text: String?, failed: Bool) {
@@ -606,11 +637,28 @@ final class ContentBlocker {
            let text = try? String(contentsOf: file, encoding: .utf8) {
             return (text, false)
         }
-        if let url = URL(string: address), let data = await download(url),
-           let text = String(data: data, encoding: .utf8) {
+        // Validators are sent only with a copy to fall back on, which a 304
+        // leaves in use.
+        let record = FileManager.default.fileExists(atPath: file.path(percentEncoded: false))
+            ? ListRecord.read(id, in: directory) : nil
+        let fetched = if let url = URL(string: address) { await download(url, record?.validators) } else { Fetched.failed }
+        switch fetched {
+        case .changed(let data, let validators):
+            guard let text = String(data: data, encoding: .utf8) else { break }
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let kept = (try? data.write(to: file, options: .atomic)) != nil
-            return (text, !kept)
+            // The record follows the copy it describes, so validators never
+            // stand for bytes that were not kept.
+            guard (try? data.write(to: file, options: .atomic)) != nil else { return (text, true) }
+            ListRecord(validators: validators, checkedAt: nil).write(id, in: directory)
+            return (text, false)
+        case .unchanged:
+            if var record, let kept = try? String(contentsOf: file, encoding: .utf8) {
+                record.checkedAt = now
+                record.write(id, in: directory)
+                return (kept, false)
+            }
+        case .failed:
+            break
         }
         Diagnostics.log("blocking: a list download failed")
         return (try? String(contentsOf: file, encoding: .utf8), true)
@@ -696,7 +744,7 @@ struct BlockerLists: Equatable, Sendable {
             if Self.waits(id, failedAt: failedAt, now: now), let failed = failedAt[id] {
                 return failed.addingTimeInterval(ContentBlocker.retryAfter)
             }
-            return Self.downloadedAt(id, in: directory)?.addingTimeInterval(ContentBlocker.listLifetime) ?? now
+            return Self.expiresAt(id, in: directory) ?? now
         }.min()
     }
 
@@ -705,16 +753,61 @@ struct BlockerLists: Equatable, Sendable {
         failedAt[id].map { now.timeIntervalSince($0) < ContentBlocker.retryAfter } ?? false
     }
 
-    /// Whether list `id` is missing or older than `listLifetime`, and is not
+    /// Whether list `id` is missing or past its lifetime, and is not
     /// waiting after a failed download.
     static func isDue(_ id: String, in directory: URL, failedAt: [String: Date], now: Date) -> Bool {
         guard !waits(id, failedAt: failedAt, now: now) else { return false }
-        guard let at = downloadedAt(id, in: directory) else { return true }
-        return now.timeIntervalSince(at) > ContentBlocker.listLifetime
+        guard let at = expiresAt(id, in: directory) else { return true }
+        return now > at
+    }
+
+    /// When list `id` is due again: its lifetime after it was last
+    /// downloaded, or last answered as unchanged.
+    static func expiresAt(_ id: String, in directory: URL) -> Date? {
+        guard let downloaded = downloadedAt(id, in: directory) else { return nil }
+        let checked = max(downloaded, ListRecord.read(id, in: directory)?.checkedAt ?? downloaded)
+        let file = directory.appending(path: "\(id).txt")
+        let head = (try? FileHandle(forReadingFrom: file)).flatMap { handle in
+            defer { try? handle.close() }
+            return try? handle.read(upToCount: 4096)
+        } ?? Data()
+        return checked.addingTimeInterval(lifetime(head: String(decoding: head, as: UTF8.self)))
+    }
+
+    /// How long a list stays fresh, from the `! Expires: 4 days` or
+    /// `! Expires: 12 hours` line in `head`, its first 4 KB, as the desktop
+    /// reads it (`SvalBlockingLists.sys.mjs`'s `listLifetime`).
+    static func lifetime(head: String) -> TimeInterval {
+        let line = /^!\s*Expires:\s*(\d+)\s*(day|hour)/.ignoresCase().anchorsMatchLineEndings()
+        guard let match = head.firstMatch(of: line), let count = Int(match.1), count > 0 else {
+            return ContentBlocker.defaultListLifetime
+        }
+        let unit: TimeInterval = match.2.lowercased() == "hour" ? 60 * 60 : 24 * 60 * 60
+        let bounds = ContentBlocker.listLifetimes
+        return min(max(Double(count) * unit, bounds.lowerBound), bounds.upperBound)
     }
 
     static func downloadedAt(_ id: String, in directory: URL) -> Date? {
         let file = directory.appending(path: "\(id).txt")
         return (try? FileManager.default.attributesOfItem(atPath: file.path(percentEncoded: false)))?[.modificationDate] as? Date
+    }
+}
+
+/// What is kept beside a downloaded list (`<id>.json`): the validators its
+/// download came with, and when its publisher last answered that it was
+/// unchanged, which restarts its lifetime without writing the list. The
+/// list's own write time stays the time it was downloaded, which
+/// `BlockerLists.key` names.
+struct ListRecord: Codable, Equatable {
+    var validators: ContentBlocker.Validators
+    var checkedAt: Date?
+
+    static func read(_ id: String, in directory: URL) -> ListRecord? {
+        (try? Data(contentsOf: directory.appending(path: "\(id).json")))
+            .flatMap { try? JSONDecoder().decode(ListRecord.self, from: $0) }
+    }
+
+    func write(_ id: String, in directory: URL) {
+        try? JSONEncoder().encode(self).write(to: directory.appending(path: "\(id).json"), options: .atomic)
     }
 }

@@ -99,7 +99,7 @@ final class AppHarness {
             ownCopy: ownCopy, secrets: Secrets(store: keys),
             source: { .files(picked) },
             files: { _ in folder },
-            blocker: { ContentBlocker(directory: lists, download: { _ in nil }) },
+            blocker: { ContentBlocker(directory: lists, download: { _, _ in .failed }) },
             pageStates: pageStates))
         self.model = model
         made(model)

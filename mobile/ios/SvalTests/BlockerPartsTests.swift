@@ -171,8 +171,8 @@ final class BlockerPartsTests: XCTestCase {
         try text.write(to: directory.appending(path: "\(id).txt"), atomically: true, encoding: .utf8)
     }
 
-    private func blocker() -> ContentBlocker {
-        ContentBlocker(directory: directory, download: { _ in nil }, stores: stores, defaults: defaults)
+    private func blocker(download: @escaping ContentBlocker.Download = { _, _ in .failed }) -> ContentBlocker {
+        ContentBlocker(directory: directory, download: download, stores: stores, defaults: defaults)
     }
 
     /// When each compiled file in the stores was written, by its store.
@@ -220,6 +220,89 @@ final class BlockerPartsTests: XCTestCase {
         let third = try written()
         for id in lists { XCTAssertNotEqual(third[id], second[id], "\(id) was not compiled again") }
         for id in last { XCTAssertEqual(third[id], second[id], "\(id) was compiled again") }
+    }
+
+    /// The requests a blocker made, and the answer each one gets.
+    private final class Publisher: @unchecked Sendable {
+        private let lock = NSLock()
+        private var asked: [(url: URL, validators: ContentBlocker.Validators?)] = []
+        var answer: ContentBlocker.Fetched = .failed
+
+        var requests: [(url: URL, validators: ContentBlocker.Validators?)] {
+            lock.withLock { asked }
+        }
+
+        func download(_ url: URL, _ validators: ContentBlocker.Validators?) -> ContentBlocker.Fetched {
+            lock.withLock {
+                asked.append((url, validators))
+                return answer
+            }
+        }
+    }
+
+    /// Ages list `id`'s download by `age`.
+    private func age(_ id: String, by age: TimeInterval) throws {
+        let file = directory.appending(path: "\(id).txt")
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-age)],
+                                              ofItemAtPath: file.path(percentEncoded: false))
+    }
+
+    /// A list is fetched only once past its own lifetime, with the kept
+    /// copy's validators. An answer that it is unchanged, or a download of
+    /// the same text, compiles nothing, and a failed download keeps the
+    /// list it had.
+    func testAListIsFetchedAtItsOwnLifetimeAndRecompilesOnlyWhenItChanges() async throws {
+        let publisher = Publisher()
+        let blocker = blocker(download: { publisher.download($0, $1) })
+        let urlhaus = "sval-curben-urlhaus"
+        let text = "! Expires: 12 hours (update frequency)\n||\(urlhaus).example^$all\n"
+        try write(urlhaus, text)
+        ListRecord(validators: .init(etag: "\"a\"", lastModified: "Mon, 23 Nov 2026 00:11:17 GMT"), checkedAt: nil)
+            .write(urlhaus, in: directory)
+        blocker.update(inputs)
+        await blocker.settled()
+        XCTAssertEqual(publisher.requests.count, 0, "a fresh list was fetched")
+        let compiled = try written()
+        XCTAssertFalse(compiled.isEmpty)
+
+        // Past a day, and short of the 4 days a list without a lifetime of
+        // its own is kept.
+        for id in inputs.lists.keys { try age(id, by: 2 * 24 * 60 * 60) }
+        try age(urlhaus, by: 13 * 60 * 60)
+        publisher.answer = .unchanged
+        blocker.update(inputs)
+        await blocker.settled()
+        XCTAssertEqual(publisher.requests.map(\.url.absoluteString), [ContentBlocker.balanced[urlhaus]])
+        XCTAssertEqual(publisher.requests.first?.validators,
+                       ContentBlocker.Validators(etag: "\"a\"", lastModified: "Mon, 23 Nov 2026 00:11:17 GMT"))
+        XCTAssertEqual(try written(), compiled, "an unchanged answer compiled a list")
+        XCTAssertEqual(try String(contentsOf: directory.appending(path: "\(urlhaus).txt"), encoding: .utf8), text)
+        XCTAssertFalse(BlockerLists(inputs, in: directory, failedAt: [:], now: .now).due,
+                       "a list answered unchanged stayed due")
+
+        // The same text downloaded again.
+        try age(urlhaus, by: 13 * 60 * 60)
+        ListRecord(validators: .init(etag: "\"a\""), checkedAt: nil).write(urlhaus, in: directory)
+        publisher.answer = .changed(Data(text.utf8), .init(etag: "\"b\""))
+        blocker.update(inputs)
+        await blocker.settled()
+        XCTAssertEqual(publisher.requests.count, 2)
+        XCTAssertEqual(try written(), compiled, "the same text compiled a list")
+        XCTAssertEqual(ListRecord.read(urlhaus, in: directory), ListRecord(validators: .init(etag: "\"b\""), checkedAt: nil))
+
+        // A failed download.
+        try age(urlhaus, by: 13 * 60 * 60)
+        publisher.answer = .failed
+        let lists = ids(blocker.rules.last)
+        blocker.update(inputs)
+        await blocker.settled()
+        XCTAssertEqual(publisher.requests.count, 3)
+        XCTAssertEqual(ids(blocker.rules.last), lists)
+        XCTAssertEqual(try written(), compiled, "a failed download compiled a list")
+        XCTAssertEqual(try String(contentsOf: directory.appending(path: "\(urlhaus).txt"), encoding: .utf8), text)
+        blocker.update(inputs)
+        await blocker.settled()
+        XCTAssertEqual(publisher.requests.count, 3, "a failed download was tried again within the hour")
     }
 
     /// The last lists apply after the others, and a page installs them

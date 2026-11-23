@@ -29,7 +29,8 @@ final class BlockerCheckTests: XCTestCase {
         }
         func isDue(_ id: String) -> Bool {
             guard let at = downloadedAt(id) else { return true }
-            return Date.now.timeIntervalSince(at) > ContentBlocker.listLifetime
+            // The lists `write` makes name no lifetime of their own.
+            return Date.now.timeIntervalSince(at) > ContentBlocker.defaultListLifetime
         }
         func digest(_ parts: [String]) -> String {
             SHA256.hash(data: Data(parts.joined(separator: "\u{1F}").utf8))
@@ -120,7 +121,7 @@ final class BlockerCheckTests: XCTestCase {
         let all = ContentBlocker.balanced.merging(ContentBlocker.strictExtra) { a, _ in a }.keys.sorted()
         var states: [() throws -> Void] = [{}]
         states.append { try self.write(all[0], in: directory, age: 60) }
-        states.append { try self.write(all[1], in: directory, age: ContentBlocker.listLifetime + 60) }
+        states.append { try self.write(all[1], in: directory, age: ContentBlocker.defaultListLifetime + 60) }
         states.append { for id in all { try self.write(id, in: directory, age: 60) } }
         var dues: Set<Bool> = []
         for state in states {
@@ -148,6 +149,85 @@ final class BlockerCheckTests: XCTestCase {
         let later = BlockerLists(inputs, in: directory, failedAt: failedAt, now: now.addingTimeInterval(2 * 60))
         XCTAssertTrue(later.due)
         XCTAssertEqual(waiting.key, later.key)
+    }
+
+    /// A list's lifetime comes from its `! Expires:` line in hours or days,
+    /// held to between 12 hours and 14 days, and is 4 days without one.
+    func testAListsLifetimeIsReadFromItsExpiresLine() {
+        let hour: TimeInterval = 60 * 60, day = 24 * hour
+        let cases: [(String, TimeInterval)] = [
+            ("[Adblock Plus 2.0]\n! Title: uBlock filters\n! Expires: 5 days\n", 5 * day),
+            ("! Expires: 4 days (update frequency)\n", 4 * day),
+            ("! Expires: 1 day\n", day),
+            ("! expires: 2 DAYS\n", 2 * day),
+            ("! Expires: 12 hours\n", 12 * hour),
+            ("! Expires: 36 hours\n", 36 * hour),
+            ("! Expires: 8 hours\n", 12 * hour),
+            ("! Expires: 30 days\n", 14 * day),
+            ("! Expires: 0 days\n", 4 * day),
+            ("! Expires: 2 weeks\n", 4 * day),
+            ("! Title: Expires: 1 day\n", 4 * day),
+            ("||ads.example^\n", 4 * day),
+            ("", 4 * day),
+        ]
+        for (head, lifetime) in cases {
+            XCTAssertEqual(BlockerLists.lifetime(head: head), lifetime, head)
+        }
+    }
+
+    private func write(_ id: String, _ text: String, in directory: URL, age: TimeInterval) throws {
+        let file = directory.appending(path: "\(id).txt")
+        try Data(text.utf8).write(to: file)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-age)],
+                                              ofItemAtPath: file.path(percentEncoded: false))
+    }
+
+    /// A list falls due at its own lifetime after its download, and the next
+    /// check is set for the first list to fall due.
+    func testAListIsDueAtItsOwnLifetime() throws {
+        let directory = try temporaryDirectory(self)
+        let hour: TimeInterval = 60 * 60
+        let inputs = BlockerInputs(settings: [:])
+        let ids = inputs.lists.keys.sorted()
+        for id in ids { try write(id, "! Expires: 5 days\n", in: directory, age: 4 * 24 * hour) }
+        let now = Date.now
+        XCTAssertFalse(BlockerLists(inputs, in: directory, failedAt: [:], now: now).due,
+                       "a 5-day list was due after 4 days")
+        try write(ids[0], "! Expires: 12 hours\n", in: directory, age: 11 * hour)
+        let fresh = BlockerLists(inputs, in: directory, failedAt: [:], now: now)
+        XCTAssertFalse(fresh.due, "a 12-hour list was due after 11 hours")
+        let downloaded = try XCTUnwrap(BlockerLists.downloadedAt(ids[0], in: directory))
+        XCTAssertEqual(fresh.next, downloaded.addingTimeInterval(12 * hour))
+        try write(ids[1], "! Expires: 12 hours\n", in: directory, age: 13 * hour)
+        XCTAssertTrue(BlockerLists(inputs, in: directory, failedAt: [:], now: now).due,
+                      "a 12-hour list was not due after 13 hours")
+    }
+
+    /// A list after its 4 KB head names no lifetime.
+    func testAnExpiresLinePastTheHeadIsNotRead() throws {
+        let directory = try temporaryDirectory(self)
+        let padding = String(repeating: "! comment\n", count: 410)
+        try write("a", padding + "! Expires: 12 hours\n", in: directory, age: 0)
+        let downloaded = try XCTUnwrap(BlockerLists.downloadedAt("a", in: directory))
+        XCTAssertEqual(BlockerLists.expiresAt("a", in: directory),
+                       downloaded.addingTimeInterval(ContentBlocker.defaultListLifetime))
+    }
+
+    /// A publisher's answer that a list is unchanged starts its lifetime
+    /// again, and leaves the key the rules are made from as it was.
+    func testAnUnchangedAnswerStartsTheLifetimeAgain() throws {
+        let directory = try temporaryDirectory(self)
+        let inputs = BlockerInputs(settings: [:])
+        let ids = inputs.lists.keys.sorted()
+        for id in ids { try write(id, "! Expires: 1 day\n", in: directory, age: 2 * 24 * 60 * 60) }
+        let stale = BlockerLists(inputs, in: directory, failedAt: [:], now: .now)
+        XCTAssertTrue(stale.due)
+        for id in ids {
+            ListRecord(validators: .init(etag: "\"1\""), checkedAt: .now.addingTimeInterval(-60)).write(id, in: directory)
+        }
+        let checked = BlockerLists(inputs, in: directory, failedAt: [:], now: .now)
+        XCTAssertFalse(checked.due, "a list answered unchanged a minute ago was due")
+        XCTAssertEqual(checked.key, stale.key)
     }
 
     /// Inputs given while a check runs are the ones the rules end up made
