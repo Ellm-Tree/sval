@@ -775,6 +775,8 @@ var SvalPanel = {
         SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
         SvalWindowWorkspace:
           "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
+        workspaceOfBrowser:
+          "moz-src:///browser/components/sval/SvalVisitWorkspaces.sys.mjs",
         takeArcCard: "moz-src:///browser/components/sval/SvalCard.sys.mjs",
         latestNodes:
           "moz-src:///browser/components/sval/SvalTreeSnapshot.sys.mjs",

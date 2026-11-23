@@ -233,7 +233,9 @@ Object.assign(SvalPanel, {
     if (this._modules.SvalPanelModel.isHandedToAgent(window)) {
       document.documentElement.setAttribute("data-sval-agent", "");
     }
-    const handed = this._modules.SvalPanelModel.takeHandedWorkspace(window);
+    const handed =
+      this._modules.SvalPanelModel.takeHandedWorkspace(window) ??
+      this._openerWorkspace();
     if (handed) {
       this._workspace.remember(handed);
     }
@@ -291,6 +293,26 @@ Object.assign(SvalPanel, {
     };
 
     await this._startFromSync(remembered);
+  },
+
+  /**
+   * The workspace a popup shows: its opener's (decision 0101). Its tab
+   * inherits the opener's jar, which is that workspace's, so a popup filed
+   * under any other workspace would have its tab reopened in that one's jar
+   * (`SvalTabs` `#keepInJar`), cut off from the page that opened it. An
+   * agent's popup is handed its workspace before this runs
+   * (`SvalAgentTabRegistry` `onWindowBeforeShow`).
+   *
+   * @returns {string|null} The workspace, or null for a full window, a
+   *   popup with no opener, and one whose opener is in no workspace.
+   */
+  _openerWorkspace() {
+    if (window.toolbar.visible) {
+      return null;
+    }
+    const bc = window.gBrowser.selectedBrowser?.browsingContext;
+    const opener = (bc?.crossGroupOpener ?? bc?.opener)?.top;
+    return this._modules.workspaceOfBrowser(opener?.embedderElement) ?? null;
   },
 
   /**

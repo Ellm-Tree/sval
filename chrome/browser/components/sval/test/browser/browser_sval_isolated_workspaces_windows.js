@@ -197,3 +197,68 @@ add_task(async function the_jar_follows_the_window_between_workspaces() {
     "as is every tab on show there"
   );
 });
+
+/**
+ * A popup takes its opener's workspace (decision 0101), so a sign-in popup
+ * from an isolated workspace keeps the jar it inherited and its opener. On
+ * any other workspace its tab would be reopened in that one's jar, with no
+ * opener to answer to.
+ */
+add_task(async function a_popup_from_an_isolated_workspace_stays_in_its_jar() {
+  const apart = await workspaceWith("Signed in apart", {
+    isolated: true,
+    pages: [page("Kept apart")],
+  });
+  await workspaceWith("Shared", { pages: [page("Common")] });
+  Assert.notEqual(
+    SvalPanel._modules.SvalPanelModel.currentWorkspace(SvalPanel.nodes, null),
+    apart.id,
+    "a window that adopts a workspace would take another one"
+  );
+  await switchVia(window, apart.id);
+  await selectedShows(window, titledRed("Kept apart"), "the workspace's page");
+  const jar = jarOf(apart.id);
+  const target = titledRed("Signing in");
+
+  const popupWin = await newWindowAfter(() =>
+    SpecialPowers.spawn(window.gBrowser.selectedBrowser, [target], url => {
+      content.document.notifyUserGestureActivation();
+      content.window.open(url, "_blank", "popup,width=300,height=300");
+    })
+  );
+  atTaskEnd(async () => {
+    if (!popupWin.closed) {
+      await within(
+        BrowserTestUtils.closeWindow(popupWin),
+        10_000,
+        "the popup closing"
+      );
+    }
+  });
+  Assert.ok(!popupWin.toolbar.visible, "the page opened a popup");
+  Assert.equal(
+    popupWin.SvalPanel._workspace.id,
+    apart.id,
+    "the popup shows its opener's workspace"
+  );
+  const popup = popupWin.gBrowser.selectedBrowser;
+  await shows(popup, target, "the popup's page");
+  await within(
+    popupWin.SvalPanel.observer.settled(),
+    10_000,
+    "the popup's observer settling"
+  );
+  Assert.equal(
+    popupWin.gBrowser.selectedTab.userContextId,
+    jar,
+    "the popup's tab stays in the workspace's jar"
+  );
+  Assert.ok(
+    await SpecialPowers.spawn(
+      popupWin.gBrowser.selectedBrowser,
+      [],
+      () => !!content.opener
+    ),
+    "the popup's page still has its opener"
+  );
+});
