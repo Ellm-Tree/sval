@@ -17,8 +17,8 @@
 #            only step given SVAL_PACKAGES_TOKEN; without it it publishes
 #            nothing, with a warning
 #   sign     Authenticode-sign win64's package and installer: the only step
-#            given the signing credentials, AZURE_* and ARTIFACT_SIGNING_*;
-#            without ARTIFACT_SIGNING_PROFILE it signs nothing, with a warning
+#            given the signing environment scripts/sign-windows.sh reads;
+#            without GOOGLE_CLOUD_ACCESS_TOKEN it signs nothing, with a warning
 #   stage    make the complete update from the package and copy what ships
 #            into OUT
 #   SVAL_RELEASE_VERSION       the version a tag names, or 0.0.0
@@ -121,8 +121,8 @@ symbols() {
 
 sign() {
   [[ "$PLATFORM" == win64 ]] || return 0
-  if [[ -z "${AZURE_CLIENT_SECRET:-}" || -z "${ARTIFACT_SIGNING_PROFILE:-}" ]]; then
-    echo "::warning::AZURE_CLIENT_SECRET or ARTIFACT_SIGNING_PROFILE is not set, so this release's Windows files are unsigned"
+  if [[ -z "${GOOGLE_CLOUD_ACCESS_TOKEN:-}" ]]; then
+    echo "::warning::GOOGLE_CLOUD_ACCESS_TOKEN is not set, so this release's Windows files are unsigned"
   else
     apt-get update -qq
     apt-get install -y -qq --no-install-recommends default-jre-headless openssl

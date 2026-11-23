@@ -18,6 +18,11 @@
 #   SVAL_PGO_PROFRAW     for win64, the tag's release run's artifact
 #                        pgo-win64-profile, unzipped: its raw PGO profiles
 #                        and jar log as one .tar.gz, in a directory mounted where it is
+#   SVAL_SIGNING_TOKEN_COMMAND
+#                        for win64, a command that prints a Google Cloud access
+#                        token for scripts/sign-windows.sh, with
+#                        WINDOWS_SIGNING_KEY and WINDOWS_SIGNING_CERTS; without
+#                        it the Windows files are unsigned
 #
 # OUT gets PLATFORM/, as release-compile.sh fills it, and linux64/ also gets
 # source-mpl.tar.xz, the source of the MPL 2.0 files (scripts/mpl-source.py).
@@ -114,9 +119,13 @@ kill -TERM "$watcher"
 wait "$watcher" || true
 ((status == 0)) || exit "$status"
 run "./scripts/release-compile.sh symbols $PLATFORM $OUT/$PLATFORM" -e SVAL_PACKAGES_TOKEN
+# The token is made after the compile, which outlasts its hour.
+if [[ "$PLATFORM" == win64 && -n "${SVAL_SIGNING_TOKEN_COMMAND:-}" ]]; then
+  GOOGLE_CLOUD_ACCESS_TOKEN="$(bash -c "$SVAL_SIGNING_TOKEN_COMMAND")"
+  export GOOGLE_CLOUD_ACCESS_TOKEN
+fi
 run "./scripts/release-compile.sh sign $PLATFORM $OUT/$PLATFORM" \
-  -e AZURE_TENANT_ID -e AZURE_CLIENT_ID -e AZURE_CLIENT_SECRET \
-  -e ARTIFACT_SIGNING_ENDPOINT -e ARTIFACT_SIGNING_ACCOUNT -e ARTIFACT_SIGNING_PROFILE
+  -e GOOGLE_CLOUD_ACCESS_TOKEN -e WINDOWS_SIGNING_KEY -e WINDOWS_SIGNING_CERTS
 run "./scripts/release-compile.sh stage $PLATFORM $OUT/$PLATFORM"
 if [[ "$PLATFORM" == linux64 ]]; then
   run "python3 scripts/mpl-source.py \"\$SVAL_RELEASE_VERSION\" $OUT/$PLATFORM/source-mpl.tar.xz"

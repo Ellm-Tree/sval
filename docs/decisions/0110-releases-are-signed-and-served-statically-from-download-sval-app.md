@@ -16,8 +16,9 @@ Releases cannot serve an APT repository, and GitHub Pages refuses files over
   It is static: no server code runs, as decision 0005 requires. R2 charges
   nothing for bandwidth. The website goes on Cloudflare Pages at
   `sval.app`, separately.
-- **Windows** is Authenticode-signed through Azure Artifact Signing, as
-  Ellm Tree, Inc., with jsign.
+- **Windows** is Authenticode-signed as Ellm Tree, Inc. with jsign, with an
+  organization-validated certificate from SSL.com whose key is held in a
+  hardware security module.
 - **macOS** is signed with Ellm Tree's Developer ID and notarised, with
   rcodesign.
 - **Linux** `.deb` and `.rpm` installs update through a signed APT and DNF
@@ -40,8 +41,8 @@ Releases cannot serve an APT repository, and GitHub Pages refuses files over
   replace Mozilla's certificates in the updater. CI signs with the primary;
   the secondary is kept offline, to ship a new updater if the primary leaks.
 - **Windows keeps the maintenance service**, so updates install silently. The
-  installer registers every known issuing CA of Microsoft ID Verified Code
-  Signing, and a release fails when the CA that signed it is not among them.
+  installer registers the certificate's issuing CA, and a release fails when
+  the CA that signed it is not registered.
 - **The service is Sval's own**, the Sval Update Service, and shares nothing
   with an installed Firefox's Mozilla Maintenance Service: its Windows service
   is `SvalUpdate`, its registry key `HKLM\Software\Sval\UpdateService`, its

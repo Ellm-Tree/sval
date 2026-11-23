@@ -49,8 +49,8 @@ index 2acc191e45..81a3df5720 100644
 +!define UpdateRootDirName           "Sval-43d64005-7132-4159-8cf9-84d0ed938db3"
 +
  !define CERTIFICATE_NAME            "Ellm Tree, Inc."
- ; Azure Artifact Signing issues Sval's short-lived certificates from whichever
- ; of Microsoft's ID Verified code-signing CAs is current, and Microsoft
+ !define CERTIFICATE_ISSUER          "SSL.com Code Signing Intermediate CA RSA R1"
+ ; Changing the name or issuer requires us to have both the old and the new
 diff --git a/browser/installer/windows/nsis/installer.nsi b/browser/installer/windows/nsis/installer.nsi
 index 785e5ccfba..5f449be8e1 100755
 --- a/browser/installer/windows/nsis/installer.nsi
@@ -199,7 +199,7 @@ index c5342f123c..a90f62dd8b 100755
 +    WriteRegDWORD HKLM "${MaintSvcKey}" "Attempted" 1
  
      ; These values associate the allowed certificates for the current
-     ; installation, one per issuing CA in defines.nsi.
+     ; installation.
 diff --git a/browser/installer/windows/nsis/uninstaller.nsi b/browser/installer/windows/nsis/uninstaller.nsi
 index becbb0f70c..437138d439 100755
 --- a/browser/installer/windows/nsis/uninstaller.nsi

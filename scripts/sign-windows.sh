@@ -13,15 +13,18 @@
 # `mach repackage installer`, the arguments makensis.mk's installer rule
 # gives it.
 #
-# The signer is Azure Artifact Signing, through jsign. jsign reads the
-# credentials from AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET,
-# and the service timestamps every signature, so a release stays valid after
-# its three-day certificate expires. A file that already carries a signature
-# is left as it is: the Visual C++ runtime ships signed by Microsoft.
+# jsign signs with Ellm Tree's certificate from SSL.com, whose key is held in
+# Google Cloud KMS and signs there. SSL.com's timestamp server countersigns
+# every signature, so a release stays valid after the certificate expires. A
+# file that already carries a signature is left as it is: the Visual C++
+# runtime ships signed by Microsoft.
 #
 # Usage: ./scripts/sign-windows.sh OBJDIR
-#   with JSIGN_JAR, ARTIFACT_SIGNING_ENDPOINT, ARTIFACT_SIGNING_ACCOUNT,
-#   ARTIFACT_SIGNING_PROFILE and the three AZURE_* variables set.
+#   JSIGN_JAR                  jsign's jar
+#   WINDOWS_SIGNING_KEY        the key version's resource name,
+#                              projects/.../cryptoKeys/<key>/cryptoKeyVersions/<n>
+#   WINDOWS_SIGNING_CERTS      the certificate and the CAs above it, PEM
+#   GOOGLE_CLOUD_ACCESS_TOKEN  a token allowed to sign with the key
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,8 +33,8 @@ OBJDIR="$(cd "$1" && pwd)"
 DIST="$OBJDIR/dist"
 SETUP="$OBJDIR/browser/installer/windows/instgen/setup.exe"
 
-for v in JSIGN_JAR ARTIFACT_SIGNING_ENDPOINT ARTIFACT_SIGNING_ACCOUNT \
-  ARTIFACT_SIGNING_PROFILE AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET; do
+for v in JSIGN_JAR WINDOWS_SIGNING_KEY WINDOWS_SIGNING_CERTS \
+  GOOGLE_CLOUD_ACCESS_TOKEN; do
   if [[ -z "${!v:-}" ]]; then
     echo "error: sign-windows.sh needs $v" >&2
     exit 1
@@ -46,6 +49,7 @@ done
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+printf '%s\n' "$WINDOWS_SIGNING_CERTS" > "$work/certs.pem"
 
 # Prints each named PE file whose security directory is empty, which is
 # where Authenticode keeps a signature.
@@ -66,11 +70,16 @@ for path in sys.argv[1:]:
 EOF
 }
 
+# jsign takes the key ring as the keystore and the rest of the key's name as
+# the alias, and the token from the environment, out of the process list.
 sign() {
   java -jar "$JSIGN_JAR" \
-    --storetype TRUSTEDSIGNING \
-    --keystore "$ARTIFACT_SIGNING_ENDPOINT" \
-    --alias "$ARTIFACT_SIGNING_ACCOUNT/$ARTIFACT_SIGNING_PROFILE" \
+    --storetype GOOGLECLOUD \
+    --keystore "${WINDOWS_SIGNING_KEY%%/cryptoKeys/*}" \
+    --alias "${WINDOWS_SIGNING_KEY#*/cryptoKeys/}" \
+    --storepass env:GOOGLE_CLOUD_ACCESS_TOKEN \
+    --certfile "$work/certs.pem" \
+    --tsaurl http://ts.ssl.com --tsmode RFC3161 \
     "$@"
 }
 
@@ -84,8 +93,7 @@ if [[ "$(wc -l <<<"$pkg_name")" -ne 1 ]]; then
 fi
 cp "$SETUP" "$work/setup.exe"
 
-# One jsign run for every file: it fetches the certificate chain once per run,
-# and every call counts against the account's monthly quota.
+# One jsign run for every file, so Java starts once.
 mapfile -t pe < <(find "$work/pkg" -type f \( -iname '*.exe' -o -iname '*.dll' \) | sort)
 unsigned "${pe[@]}" "$work/setup.exe" > "$work/to-sign"
 echo "==> Signing $(wc -l < "$work/to-sign") of $((${#pe[@]} + 1)) files"
@@ -138,9 +146,9 @@ fi
 
 # The maintenance service runs an updater only when its signer and issuing CA
 # match an entry the installer wrote (AddMaintCertKeys, from the
-# CERTIFICATE_NAME and CERTIFICATE_ISSUER_* defines). Microsoft rotates the
-# CAs Artifact Signing issues from, so a release whose CA the installer does
-# not list would ask for elevation at every update; it fails here instead.
+# CERTIFICATE_NAME and CERTIFICATE_ISSUER defines). A renewed certificate can
+# come from another CA, and a release whose CA the installer does not list
+# would ask for elevation at every update, so it fails here instead.
 echo "==> Checking the updater's signer against the installer's list"
 defines="$SRC/browser/installer/windows/nsis/defines.nsi.in"
 # MOZ_UPDATER_NAME in toolkit/moz.configure names the updater.
@@ -171,9 +179,9 @@ if [[ -z "$signer_issuer" ]]; then
   echo "$certs" >&2
   exit 1
 fi
-if ! grep -qF "\"$signer_issuer\"" <(grep '^!define CERTIFICATE_ISSUER_' "$defines"); then
+if ! grep -qF "\"$signer_issuer\"" <(grep '^!define CERTIFICATE_ISSUER' "$defines"); then
   echo "error: sval-update.exe was signed by a certificate from \"$signer_issuer\"," >&2
-  echo "which defines.nsi.in's CERTIFICATE_ISSUER_* do not list" >&2
+  echo "which defines.nsi.in's CERTIFICATE_ISSUER defines do not list" >&2
   exit 1
 fi
 echo "    signed by \"$name\", issued by \"$signer_issuer\""

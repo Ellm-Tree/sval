@@ -1506,7 +1506,7 @@ repository, which this repository's workflows cannot reach.
   candidates go to a beta feed that About's setting opts into.
 - **Packages.** macOS ships a .dmg, Windows an installer, and Linux a tarball,
   a .deb and an .rpm from signed APT and DNF repositories (decision 0094).
-- **Signing.** Windows binaries are signed with Microsoft's Artifact Signing.
+- **Signing.** Windows binaries are signed with an SSL.com certificate.
   The macOS app carries an ad-hoc signature, and Developer ID signing and
   notarisation wait on an Apple Developer team (§7.4, §15).
 - **Security cadence.** Mozilla's ESR security releases are Sval's deadline.
