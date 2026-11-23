@@ -85,8 +85,8 @@ add_task(async function a_page_confirm_wears_the_frame() {
   Assert.equal(box.borderTopWidth, "1px", "the box draws the card's edge");
   Assert.equal(box.borderTopLeftRadius, "21px", "around the card's corners");
   Assert.equal(
-    root.borderTopColor,
-    "rgba(0, 0, 0, 0)",
+    root.borderTopWidth,
+    "0px",
     "the card leaves its edge to the box"
   );
 
@@ -95,6 +95,31 @@ add_task(async function a_page_confirm_wears_the_frame() {
     10_000,
     "the confirm closing once handled"
   );
+});
+
+add_task(async function a_page_dialog_fits_its_frame() {
+  const tab = await openPage("https://example.com/");
+  // A dialog with an HTML body, which `SubDialog` sizes the frame to.
+  const box = gBrowser.getTabDialogBox(tab.linkedBrowser);
+  const { dialog, closedPromise } = box.open(
+    "chrome://browser/content/qrcode/qrcode-dialog.html",
+    { features: "resizable=no" },
+    {
+      url: "https://example.com/",
+      qrCodeDataURI:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+    }
+  );
+  await within(dialog._dialogReady, 10_000, "the QR code dialog opening");
+  const doc = dialog._frame.contentDocument;
+  const page = doc.scrollingElement;
+  Assert.deepEqual(
+    [page.scrollWidth, page.scrollHeight],
+    [page.clientWidth, page.clientHeight],
+    "the page fits its frame, so it shows no scrollbars"
+  );
+  dialog.close();
+  await within(closedPromise, 10_000, "the QR code dialog closing");
 });
 
 add_task(function a_dialog_window_takes_the_window_sheet() {

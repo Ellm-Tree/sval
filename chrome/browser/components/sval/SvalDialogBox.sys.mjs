@@ -9,7 +9,10 @@
  * would fall on the same pixels, each taking its share of the coverage, and
  * what lies behind the box would show through along the corners. So the box
  * draws the card's fill and edge, one rounded shape whose edge has a single
- * curve, and the card keeps its border's width in a clear colour. The page
+ * curve, and the card takes no room for an edge of its own. `SubDialog`
+ * sizes the frame to a page's body (`resizeHorizontally`,
+ * `resizeVertically`), so a border on a root that draws the card would
+ * overflow the frame by its width and scroll the page both ways. The page
  * the box clips lies over the box's own fill of the same colour.
  *
  * @param {Element} card The element that draws the card: its border,
@@ -23,8 +26,8 @@ export function shapeDialogBox(card, { shadow = "none" } = {}) {
   if (!box) {
     return;
   }
-  // The card's own edge, read without the clear colour an earlier call set.
-  card.style.removeProperty("border-color");
+  // The card's own edge, read without the width an earlier call cleared.
+  card.style.removeProperty("border-width");
   const style = win.getComputedStyle(card);
   const width = parseFloat(style.borderTopWidth) || 0;
   const radius = parseFloat(style.borderTopLeftRadius) || 0;
@@ -35,5 +38,5 @@ export function shapeDialogBox(card, { shadow = "none" } = {}) {
   box.style.backgroundClip = "border-box";
   box.style.outline = "none";
   box.style.boxShadow = shadow;
-  card.style.borderColor = "transparent";
+  card.style.borderWidth = "0";
 }
