@@ -42,7 +42,10 @@
   margin-bottom: 4px;
 }
 
+/* `adjustableTitle.js` fills the icon's box with the canvas colour, which
+   shows as a square on the dialog's tinted surface. */
 #titleContainer .titleIcon {
+  background-color: transparent;
   fill: var(--sval-dialog-body);
 }
 
