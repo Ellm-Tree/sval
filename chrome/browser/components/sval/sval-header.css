@@ -227,9 +227,10 @@
     }
   }
 
-  /* A tinted window's popups take the scheme of its text with it, as the
-   window does, its address pill and text the field `SvalColor` solves for
-   the tint, and its button clusters a shade between the pill and the tint.
+  /* A tinted window's popups and find bar take the scheme of its text with
+   it, as the window does, its address pill and text the field `SvalColor`
+   solves for the tint, and its button clusters a shade between the pill and
+   the tint.
    A light-text window's edges are light washes, a dark-text window's dark
    ones, as the untinted windows' are. */
   :root[data-sval-tint] {
@@ -247,7 +248,7 @@
     --sval-cluster-border: rgba(255, 255, 255, 0.1);
   }
 
-  :root[data-sval-ink="light"] :is(menupopup, panel[type="arrow"]) {
+  :root[data-sval-ink="light"] :is(menupopup, panel[type="arrow"], findbar) {
     color-scheme: dark;
   }
 
@@ -271,7 +272,7 @@
     --sval-accent: var(--sval-palette-blue);
   }
 
-  :root[data-sval-ink="dark"] :is(menupopup, panel[type="arrow"]) {
+  :root[data-sval-ink="dark"] :is(menupopup, panel[type="arrow"], findbar) {
     color-scheme: light;
   }
 
@@ -2311,10 +2312,14 @@ button.sval-notice-row {
     background-color: var(--sval-pill-bg);
     color: var(--toolbar-text-color);
 
+    /* One stroke over the pill's edge. `.findbar-container` is the field's
+       height and clips in both axes (`findbar.css`), so a ring outside the
+       pill is cut off. */
     &:focus {
-      border-color: var(--sval-focus);
-      outline: none;
-      box-shadow: 0 0 0 1px var(--sval-focus);
+      border-color: transparent;
+      outline: 2px solid var(--sval-focus);
+      outline-offset: -2px;
+      box-shadow: none;
     }
   }
 
