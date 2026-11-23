@@ -282,6 +282,10 @@ head = "panel_model_head.js"
 
 ["test_sval_private.js"]
 
+["test_sval_private_https_only_exception.js"]
+
+["test_sval_private_storage_metadata.js"]
+
 ["test_sval_push.js"]
 
 ["test_sval_region.js"]

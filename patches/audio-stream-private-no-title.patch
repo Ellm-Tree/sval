@@ -1,0 +1,21 @@
+Sval: a private page's audio stream carries no page title
+
+A MediaTrackGraph names its OS audio stream after its document's title,
+and renames it when the title changes. PulseAudio and PipeWire list each
+stream's name to every app, and volume controls show it. A private
+document's graph leaves the stream unnamed.
+
+diff --git a/dom/media/MediaTrackGraph.cpp b/dom/media/MediaTrackGraph.cpp
+index 45fbad1f6e..a46353f363 100644
+--- a/dom/media/MediaTrackGraph.cpp
++++ b/dom/media/MediaTrackGraph.cpp
+@@ -1736,7 +1736,8 @@ static nsCString GetDocumentTitle(uint64_t aWindowID) {
+     return title;
+   }
+   Document* doc = win->GetExtantDoc();
+-  if (!doc) {
++  // Sval: the title names the OS audio stream, which other apps can list.
++  if (!doc || doc->IsInPrivateBrowsing()) {
+     return title;
+   }
+   nsAutoString titleUTF16;

@@ -1,0 +1,106 @@
+Sval: a private window's HTTPS-Only exception is its session's alone
+
+The permission manager keeps "https-only-load-insecure" with every origin
+attribute stripped (kStripOAPermissions), so the exception a private
+window makes, by Continue to HTTP Site or by HTTPS-First falling back to
+HTTP, also held in every normal window and every other private window
+until Sval quit.
+
+An exception added for a private principal is kept under a type of its
+own, "https-only-load-insecure-private", which is not stripped. Its key
+has the private session's origin attributes, as permissions-private-jar
+gives every private permission, so no other session reads it and it goes
+when the session's permissions are cleared. A private principal's test
+of "https-only-load-insecure" reads the session's own exception first and
+then the stripped one, which a normal window's exception and a stored one
+still use unchanged. A private principal's removal takes the session's
+own exception, or the stripped one when the session has none. The new
+type is preloaded as the old one is, because HTTPS-Only Mode tests the
+exception in content processes too.
+
+diff --git a/extensions/permissions/PermissionManager.cpp b/extensions/permissions/PermissionManager.cpp
+index f92e2f984b..03a9975a6e 100644
+--- a/extensions/permissions/PermissionManager.cpp
++++ b/extensions/permissions/PermissionManager.cpp
+@@ -142,7 +142,9 @@ static const nsLiteralCString kPreloadPermissions[] = {
+     // interception when a user has disabled storage for a specific site.  Once
+     // service worker interception moves to the parent process this should be
+     // removed.  See bug 1428130.
+-    "cookie"_ns, "https-only-load-insecure"_ns};
++    "cookie"_ns, "https-only-load-insecure"_ns,
++    // Sval: HTTPS-Only Mode reads its exception in every process.
++    "https-only-load-insecure-private"_ns};
+ 
+ // NOTE: nullptr can be passed as aType - if it is this function will return
+ // "false" unconditionally.
+@@ -181,6 +183,24 @@ bool IsOAForceStripPermission(const nsACString& aType) {
+   return false;
+ }
+ 
++// Sval: HTTPS-Only Mode's exception is one of kStripOAPermissions, so one
++// window's exception is every window's. The exception a private window makes
++// is its own session's alone: AddInternal keeps it under the second type
++// here, which is not stripped, so its key carries the session's origin
++// attributes and it goes when the session's permissions are cleared. A
++// private principal's test reads its session's own exception first, then
++// the stripped one, which normal windows make and Sval's settings store.
++static constexpr nsLiteralCString kHttpsOnlyPermission =
++    "https-only-load-insecure"_ns;
++static constexpr nsLiteralCString kHttpsOnlyPrivatePermission =
++    "https-only-load-insecure-private"_ns;
++
++static bool IsPrivateHttpsOnly(nsIPrincipal* aPrincipal,
++                               const nsACString& aType) {
++  return aPrincipal && aType == kHttpsOnlyPermission &&
++         aPrincipal->GetIsInPrivateBrowsing();
++}
++
+ // Array of permission prefixes which should be isolated only by site.
+ // These site-scoped permissions are stored under their site's principal.
+ // GetAllForPrincipal also needs to look for these especially.
+@@ -1962,6 +1982,24 @@ nsresult PermissionManager::AddInternal(
+   // If this is a default permission, no changes should not be written to disk.
+   MOZ_ASSERT((aID != cIDPermissionIsDefault) || (aDBOperation != eWriteToDB));
+ 
++  // Sval: a private window's HTTPS-Only exception is its session's own
++  // (kHttpsOnlyPrivatePermission). A removal that finds none of the
++  // session's own goes on to the stripped one.
++  if (IsPrivateHttpsOnly(aPrincipal, aType)) {
++    uint32_t own = aPermission;
++    if (own == nsIPermissionManager::UNKNOWN_ACTION) {
++      CommonTestPermission(aPrincipal, -1, kHttpsOnlyPrivatePermission, &own,
++                           nsIPermissionManager::UNKNOWN_ACTION, true, true,
++                           true);
++    }
++    if (own != nsIPermissionManager::UNKNOWN_ACTION) {
++      return AddInternal(aPrincipal, kHttpsOnlyPrivatePermission, aPermission,
++                         aID, aExpireType, aExpireTime, aModificationTime,
++                         aNotifyOperation, aDBOperation, aOriginString,
++                         aAllowPersistInPrivateBrowsing);
++    }
++  }
++
+   EnsureReadCompleted();
+ 
+   nsresult rv = NS_OK;
+@@ -4274,6 +4312,20 @@ nsresult PermissionManager::CommonTestPermission(
+     uint32_t* aPermission, uint32_t aDefaultPermission,
+     bool aDefaultPermissionIsValid, bool aExactHostMatch,
+     bool aIncludingSession) {
++  // Sval: a private session's own HTTPS-Only exception comes before the
++  // stripped one (kHttpsOnlyPrivatePermission).
++  if (IsPrivateHttpsOnly(aPrincipal, aType)) {
++    uint32_t own = nsIPermissionManager::UNKNOWN_ACTION;
++    nsresult rv = CommonTestPermission(
++        aPrincipal, -1, kHttpsOnlyPrivatePermission, &own,
++        nsIPermissionManager::UNKNOWN_ACTION, true, aExactHostMatch,
++        aIncludingSession);
++    if (NS_SUCCEEDED(rv) && own != nsIPermissionManager::UNKNOWN_ACTION) {
++      *aPermission = own;
++      return NS_OK;
++    }
++  }
++
+   auto preparationResult = CommonPrepareToTestPermission(
+       aPrincipal, aTypeIndex, aType, aPermission, aDefaultPermission,
+       aDefaultPermissionIsValid, aExactHostMatch, aIncludingSession);

@@ -1,0 +1,56 @@
+Sval: a string a private window copies is private data
+
+nsClipboardHelper marked a copy private only when its caller passed
+Sensitive, so Copy Link, Copy Email Address and the address bar's copies
+from a private window went to the system's clipboard history and its
+shared clipboard. The helper takes the window context that is setting the
+clipboard, and marks the data private when that window's browsing context
+uses private browsing. The context menu's copies pass their page's window
+context, and the address bar's Copy Without Site Tracking passes its
+window's.
+
+diff --git a/browser/components/urlbar/content/UrlbarInput.mjs b/browser/components/urlbar/content/UrlbarInput.mjs
+index 4bcf25633b..9ecde5176f 100644
+--- a/browser/components/urlbar/content/UrlbarInput.mjs
++++ b/browser/components/urlbar/content/UrlbarInput.mjs
+@@ -4696,7 +4696,10 @@ ${
+     // to the original url if nothing can be stripped.
+     stripOnShare.addEventListener("command", () => {
+       let strippedURI = this.#stripURI();
+-      lazy.ClipboardHelper.copyString(strippedURI.displaySpec);
++      lazy.ClipboardHelper.copyString(
++        strippedURI.displaySpec,
++        this.window.browsingContext.currentWindowGlobal
++      );
+     });
+ 
+     // Register a listener that hides the menu item if there is nothing to copy.
+diff --git a/widget/nsClipboardHelper.cpp b/widget/nsClipboardHelper.cpp
+index 871ed303cd..0e31d12e07 100644
+--- a/widget/nsClipboardHelper.cpp
++++ b/widget/nsClipboardHelper.cpp
+@@ -14,7 +14,9 @@
+ 
+ // helpers
+ #include "nsIClipboard.h"
++#include "mozilla/dom/BrowsingContext.h"
+ #include "mozilla/dom/Document.h"
++#include "mozilla/dom/WindowContext.h"
+ #include "nsITransferable.h"
+ #include "nsReadableUtils.h"
+ 
+@@ -66,7 +68,13 @@ nsClipboardHelper::CopyStringToClipboard(
+   NS_ENSURE_TRUE(trans, NS_ERROR_FAILURE);
+ 
+   trans->Init(nullptr);
+-  if (aSensitive == SensitiveData::Sensitive) {
++  // Sval: what a private window copies is private data, which keeps it out
++  // of the system's clipboard history and its shared clipboard.
++  mozilla::dom::BrowsingContext* settingContext =
++      aSettingWindowContext ? aSettingWindowContext->GetBrowsingContext()
++                            : nullptr;
++  if (aSensitive == SensitiveData::Sensitive ||
++      (settingContext && settingContext->UsePrivateBrowsing())) {
+     trans->SetIsPrivateData(true);
+   }
+ 

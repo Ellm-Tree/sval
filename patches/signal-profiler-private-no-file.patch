@@ -1,0 +1,33 @@
+Sval: a profiler stopped by signal writes no file while private browsing is in use
+
+SIGUSR2 stops a running profiler and writes its profile to the downloads
+folder. A profile names the pages each process has open. While
+SvalCrashPrivacy says a process could hold a private window's pages, the
+signal stops the profiler and writes nothing.
+
+diff --git a/tools/profiler/core/platform.cpp b/tools/profiler/core/platform.cpp
+index 9839ed5751..7c199637fe 100644
+--- a/tools/profiler/core/platform.cpp
++++ b/tools/profiler/core/platform.cpp
+@@ -91,6 +91,7 @@
+ #  include "mozilla/WindowsStackWalkInitialization.h"
+ #endif
+ #include "mozilla/StaticPtr.h"
++#include "mozilla/SvalCrashPrivacy.h"
+ #include "mozilla/TimeStamp.h"
+ #include "mozilla/UniquePtr.h"
+ #include "mozilla/Vector.h"
+@@ -5909,6 +5910,13 @@ void profiler_dump_and_stop() {
+     return;
+   }
+ 
++  // Sval: a profile names the pages each process has open, a private
++  // window's among them, so none is written while one could be in it.
++  if (mozilla::SvalCrashPrivacy::Get()) {
++    profiler_stop();
++    return;
++  }
++
+   // pause the profiler until we are done dumping
+   profiler_pause();
+ 

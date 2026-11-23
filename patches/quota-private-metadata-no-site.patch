@@ -1,0 +1,44 @@
+Sval: a private origin's storage metadata names no site
+
+Each origin's storage folder holds a .metadata-v2 file. A private origin's
+folder is named by a random storage origin, but the file's two legacy
+fields held the origin's attribute suffix, which carries the site an
+origin is partitioned under, and its group, which is its site. The folder
+is removed when private browsing ends, and a killed process leaves it on
+disk until the next launch, with every private site that used IndexedDB,
+the Cache API or a service worker readable in it.
+
+LoadFullOriginMetadata reads both fields and discards them, and takes the
+origin back from the storage origin through the map QuotaManager keeps in
+memory. So a private origin's file holds an empty suffix and the storage
+origin as its group, and reads back as before.
+
+diff --git a/dom/quota/ActorsParent.cpp b/dom/quota/ActorsParent.cpp
+index 64c05b9220..906dad6905 100644
+--- a/dom/quota/ActorsParent.cpp
++++ b/dom/quota/ActorsParent.cpp
+@@ -3625,13 +3625,21 @@ nsresult QuotaManager::CreateDirectoryMetadata2(
+   // Legacy field, previously used for suffix. The value is no longer used, but
+   // we continue writing the correct suffix value to preserve compatibility
+   // with older builds that may still expect it.
+-  QM_TRY(
+-      MOZ_TO_RESULT(stream->WriteStringZ(aFullOriginMetadata.mSuffix.get())));
++  // Sval: a private origin's suffix can hold the site it is partitioned
++  // under, and its group is its site. This file outlives a killed process,
++  // and LoadFullOriginMetadata discards both fields, so a private origin's
++  // hold what its storage origin has: no suffix, and the storage origin.
++  QM_TRY(MOZ_TO_RESULT(stream->WriteStringZ(
++      aFullOriginMetadata.mIsPrivate ? ""
++                                     : aFullOriginMetadata.mSuffix.get())));
+ 
+   // Legacy field, previously used for group. The value is no longer used, but
+   // we continue writing the correct group value to preserve compatibility with
+   // older builds that may still expect it.
+-  QM_TRY(MOZ_TO_RESULT(stream->WriteStringZ(aFullOriginMetadata.mGroup.get())));
++  QM_TRY(MOZ_TO_RESULT(stream->WriteStringZ(
++      aFullOriginMetadata.mIsPrivate
++          ? aFullOriginMetadata.mStorageOrigin.get()
++          : aFullOriginMetadata.mGroup.get())));
+ 
+   QM_TRY(MOZ_TO_RESULT(
+       stream->WriteStringZ(aFullOriginMetadata.mStorageOrigin.get())));

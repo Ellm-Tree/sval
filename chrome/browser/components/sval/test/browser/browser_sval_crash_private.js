@@ -9,7 +9,9 @@
 // (private-browsing-no-crash-dump.patch): a minidump holds the memory of the
 // process that crashed, which could hold a private window's pages. A private
 // tab's process writes none, and the parent removes the one a process every
-// window shares leaves while a private window is open. A utility process and
+// window shares leaves while a private window is open, or while a private
+// tab's process is still alive
+// (private-content-process-no-crash-dump.patch). A utility process and
 // the process for local files stand for those here: a headless run has no GPU
 // process. A normal window's site keeps its report throughout. The parent's
 // own crash takes the same flag and ends the run, so nothing here drives it.
@@ -194,5 +196,78 @@ add_task(
     );
     Assert.deepEqual(extra, {}, "the crash has no report");
     Assert.deepEqual(crashFiles(), before, "and left no minidump or .extra");
+  }
+);
+
+add_task(
+  async function a_shared_process_crash_leaves_no_report_while_a_private_tabs_process_lives() {
+    // An unused content process waits this long before it shuts down, so the
+    // private tab's process outlives its window here, as it does for a
+    // moment after any private window closes.
+    await SpecialPowers.pushPrefEnv({
+      set: [["dom.ipc.processReuse.unusedGraceMs", 600_000]],
+    });
+    const before = crashFiles();
+    const win = await openPrivateWindow();
+    const browser = win.gBrowser.selectedBrowser;
+    BrowserTestUtils.startLoadingURIString(browser, CRASH_PAGE);
+    await pageReady(browser, CRASH_PAGE);
+    const { childID, osPid, remoteType } =
+      browser.browsingContext.currentWindowGlobal.domProcess;
+    Assert.ok(
+      remoteType.includes("privateBrowsingId=1"),
+      "the private tab is in a process of its own kind"
+    );
+
+    const lastPrivateContextGone = TestUtils.topicObserved(
+      "last-pb-context-exited"
+    );
+    await within(
+      BrowserTestUtils.closeWindow(win),
+      15_000,
+      "the private window closing"
+    );
+    await within(
+      lastPrivateContextGone,
+      15_000,
+      "the last private browsing context going"
+    );
+    Assert.ok(
+      ChromeUtils.getAllDOMProcesses().some(p => p.childID === childID),
+      "the private tab's process is still alive"
+    );
+    Assert.equal(
+      await crashedUtilityProcess(),
+      "",
+      "while it is, the crash has no report"
+    );
+    Assert.deepEqual(crashFiles(), before, "and left no minidump or .extra");
+
+    SimpleTest.expectChildProcessCrash();
+    const gone = TestUtils.topicObserved(
+      "ipc:content-shutdown",
+      subject =>
+        subject.QueryInterface(Ci.nsIPropertyBag2).get("childID") === childID
+    );
+    Cc["@mozilla.org/processtools-service;1"]
+      .getService(Ci.nsIProcessToolsService)
+      .kill(osPid);
+    await within(gone, 30_000, "the private tab's process ending");
+
+    const dumpID = await crashedUtilityProcess();
+    Assert.ok(dumpID, "once it has ended, the crash has a report");
+    await within(
+      Services.crashmanager.ensureCrashIsPresent(dumpID),
+      15_000,
+      "the crash manager recording the crash"
+    );
+    const dumps = Services.dirsvc.get("ProfD", Ci.nsIFile);
+    dumps.append("minidumps");
+    for (const suffix of [".dmp", ".extra"]) {
+      const file = dumps.clone();
+      file.append(dumpID + suffix);
+      Assert.ok(file.exists(), `and left its ${suffix} file`);
+      file.remove(false);
+    }
   }
 );

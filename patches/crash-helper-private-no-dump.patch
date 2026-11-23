@@ -1,0 +1,569 @@
+Sval: the crash helper writes no minidump of a shared process while private browsing is in use
+
+The crash helper process writes a child process's minidump and .extra
+file into the profile's minidumps folder as the child crashes. The parent
+process removed the files of a process that could hold a private window's
+pages only once it was handed them (TakeMinidumpForChild), so a parent
+that was killed, hung or itself crashed first left them on disk.
+
+The parent tells the helper when SvalCrashPrivacy's flag changes, with a
+SetPrivateBrowsing message, and again when the helper starts with the
+flag set. Each platform's Breakpad crash generation server asks a filter
+before it writes a minidump, and the helper's filter reads the crashed
+process's RemoteType annotation. While private browsing is in use it
+allows a content process for a normal window's sites, "webIsolated" or
+"webCOOP+COEP", and refuses every other process, which then gets no
+minidump and no .extra file and is released as if it had been dumped.
+The minidump Windows Error Reporting asks the helper for takes the same
+answer. The parent's removal stays, for a crash the helper handles before
+the message reaches it.
+
+diff --git a/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.cc b/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.cc
+index c3e1ae087a..114f6db330 100644
+--- a/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.cc
++++ b/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.cc
+@@ -274,6 +274,11 @@ CrashGenerationServer::ClientEvent(short revents)
+     return true;
+   }
+ 
++  if (dump_filter_ && !dump_filter_(crashing_pid)) {
++    close(signal_fd);
++    return true;
++  }
++
+   string minidump_filename;
+   if (!MakeMinidumpFilename(minidump_filename))
+     return true;
+diff --git a/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.h b/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.h
+index b96c3c0a3e..24e8b24cac 100644
+--- a/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.h
++++ b/toolkit/crashreporter/breakpad-client/linux/crash_generation/crash_generation_server.h
+@@ -90,6 +90,13 @@ public:
+   // Adjust the path where minidumps are placed, this is thread-safe
+   void SetPath(const char* dump_path);
+ 
++  // Sval: a client the filter refuses gets no minidump and no dump
++  // callback, and is released as one that got both. Set it before Start.
++  using DumpFilterCallback = bool (pid_t pid);
++  void SetDumpFilter(std::function<DumpFilterCallback> filter) {
++    dump_filter_ = std::move(filter);
++  }
++
+   // Create a "channel" that can be used by clients to report crashes
+   // to a CrashGenerationServer.  |*server_fd| should be passed to
+   // this class's constructor, and |*client_fd| should be passed to
+@@ -125,6 +132,7 @@ private:
+ 
+   std::function<OnClientDumpRequestCallback> dump_callback_;
+   void* dump_context_;
++  std::function<DumpFilterCallback> dump_filter_;
+ 
+   pthread_mutex_t dump_dir_mutex_;
+   string dump_dir_;
+diff --git a/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.cc b/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.cc
+index c2b7481524..3618ab727b 100644
+--- a/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.cc
++++ b/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.cc
+@@ -125,7 +125,10 @@ bool CrashGenerationServer::WaitForOneMessage() {
+ 
+         bool result;
+         std::string dump_path;
+-        if (generate_dumps_ && (!filter_ || filter_(filter_context_))) {
++        const bool wanted =
++            !dump_filter_ || dump_filter_(dump_context_, client);
++        if (wanted && generate_dumps_ &&
++            (!filter_ || filter_(filter_context_))) {
+           ScopedTaskSuspend suspend(remote_task);
+ 
+           MinidumpGenerator generator(remote_task, handler_thread);
+@@ -144,7 +147,7 @@ bool CrashGenerationServer::WaitForOneMessage() {
+           result = true;
+         }
+ 
+-        if (result && dump_callback_) {
++        if (wanted && result && dump_callback_) {
+           dump_callback_(dump_context_, client, dump_path);
+         }
+ 
+diff --git a/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.h b/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.h
+index 339ef21bda..18dfd2ea76 100644
+--- a/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.h
++++ b/toolkit/crashreporter/breakpad-client/mac/crash_generation/crash_generation_server.h
+@@ -107,6 +107,12 @@ class CrashGenerationServer {
+   // Adjust the path where minidumps are placed, this is thread-safe
+   void SetPath(const char* dump_path);
+ 
++  // Sval: a client the filter refuses gets no minidump and no dump
++  // callback, and is acknowledged as one that got both. Set it before Start.
++  typedef bool (*DumpFilterCallback)(void *context,
++                                     const ClientInfo &client_info);
++  void SetDumpFilter(DumpFilterCallback filter) { dump_filter_ = filter; }
++
+  private:
+   // Return a unique filename at which a minidump can be written.
+   bool MakeMinidumpFilename(std::string &outFilename);
+@@ -124,6 +130,7 @@ class CrashGenerationServer {
+ 
+   OnClientDumpRequestCallback dump_callback_;
+   void *dump_context_;
++  DumpFilterCallback dump_filter_ = nullptr;
+ 
+   OnClientExitingCallback exit_callback_;
+   void *exit_context_;
+diff --git a/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.cc b/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.cc
+index c178f7869b..5e0cd5123b 100644
+--- a/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.cc
++++ b/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.cc
+@@ -893,6 +893,11 @@ void CrashGenerationServer::HandleClientProcessExit(ClientInfo* client_info) {
+ }
+ 
+ void CrashGenerationServer::HandleDumpRequest(const ClientInfo& client_info) {
++  if (dump_filter_ && !dump_filter_(dump_context_, client_info)) {
++    SetEvent(client_info.dump_generated_handle());
++    return;
++  }
++
+   bool execute_callback = true;
+   // Generate the dump only if it's explicitly requested by the
+   // server application; otherwise the server might want to generate
+diff --git a/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.h b/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.h
+index f1da86389a..9b3b5dab16 100644
+--- a/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.h
++++ b/toolkit/crashreporter/breakpad-client/windows/crash_generation/crash_generation_server.h
+@@ -111,6 +111,12 @@ class CrashGenerationServer {
+   // Adjust the path where minidumps are placed, this is thread-safe.
+   void SetPath(const wchar_t* dump_path);
+ 
++  // Sval: a client the filter refuses gets no minidump and no dump
++  // callback, and is told its dump is done. Set it before Start.
++  typedef bool (*DumpFilterCallback)(void* context,
++                                     const ClientInfo& client_info);
++  void SetDumpFilter(DumpFilterCallback filter) { dump_filter_ = filter; }
++
+   // Read the current dump path, this is thread-safe.
+   std::wstring GetPath();
+ 
+@@ -267,6 +273,8 @@ class CrashGenerationServer {
+   // Context for client dump request callback.
+   void* dump_context_;
+ 
++  DumpFilterCallback dump_filter_ = nullptr;
++
+   // Callback for a client dump written.
+   OnClientDumpWrittenCallback written_callback_;
+ 
+diff --git a/toolkit/crashreporter/breakpad_wrapper/breakpad_wrapper.cpp b/toolkit/crashreporter/breakpad_wrapper/breakpad_wrapper.cpp
+index 23c8217e5a..26e5551e6f 100644
+--- a/toolkit/crashreporter/breakpad_wrapper/breakpad_wrapper.cpp
++++ b/toolkit/crashreporter/breakpad_wrapper/breakpad_wrapper.cpp
+@@ -67,9 +67,13 @@ struct BreakpadProcessId {
+ using RustDumpCallback = void (*)(const void*, BreakpadProcessId,
+                                   const ExtraCrashData*, const breakpad_char*);
+ 
++// Sval: answers whether the crash helper may write a minidump of a process.
++using RustDumpFilter = bool (*)(const void*, BreakpadProcessId);
++
+ struct BreakpadContext {
+   RustDumpCallback callback;
+   const void* generator;
++  RustDumpFilter filter;
+ };
+ 
+ #if defined(XP_LINUX)
+@@ -98,6 +102,25 @@ void onClientDumpRequestCallback(void* context, const ClientInfo& client_info,
+            file_path.c_str());
+ }
+ 
++#if defined(XP_LINUX)
++bool onClientDumpFilter(BreakpadContext* context, breakpad_pid pid) {
++  return context->filter(context->generator, {.pid = pid});
++}
++#else
++bool onClientDumpFilter(void* context, const ClientInfo& client_info) {
++  BreakpadContext* breakpad_context = static_cast<BreakpadContext*>(context);
++  BreakpadProcessId process_id = {
++      .pid = client_info.pid(),
++#  if defined(XP_MACOSX)
++      .task = client_info.task(),
++#  elif defined(XP_WIN)
++      .handle = client_info.process_handle(),
++#  endif
++  };
++  return breakpad_context->filter(breakpad_context->generator, process_id);
++}
++#endif  // defined(XP_LINUX)
++
+ #if defined(XP_LINUX)
+ bool getAuxvDumpInfo(RustAuxvCallback callback, breakpad_pid aPid,
+                      DirectAuxvDumpInfo* aAuxvInfo) {
+@@ -126,6 +149,8 @@ extern "C" void* CrashGenerationServer_init(breakpad_init_type aBreakpadData,
+       /* upload_context */ nullptr,
+       /* generate_dumps */ true, &minidumpPath);
+ 
++  server->SetDumpFilter(onClientDumpFilter);
++
+   if (!server->Start()) {
+     delete server;
+     return nullptr;
+@@ -151,6 +176,8 @@ extern "C" void* CrashGenerationServer_init(breakpad_init_type aBreakpadData,
+       /* exit_context */ nullptr,
+       /* generate_dumps */ true, minidumpPath);
+ 
++  server->SetDumpFilter(onClientDumpFilter);
++
+   if (!server->Start()) {
+     delete server;
+     return nullptr;
+@@ -179,6 +206,9 @@ extern "C" void* CrashGenerationServer_init(breakpad_init_type aBreakpadData,
+       },
+       /* dump_context */ nullptr, &minidumpPath);
+ 
++  server->SetDumpFilter(
++      [aContext](pid_t aPid) { return onClientDumpFilter(aContext, aPid); });
++
+   if (!server->Start()) {
+     delete server;
+     return nullptr;
+diff --git a/toolkit/crashreporter/crash_helper_client/src/lib.rs b/toolkit/crashreporter/crash_helper_client/src/lib.rs
+index 7a6c8df7d6..b046206313 100644
+--- a/toolkit/crashreporter/crash_helper_client/src/lib.rs
++++ b/toolkit/crashreporter/crash_helper_client/src/lib.rs
+@@ -48,6 +48,12 @@ impl CrashHelperClient {
+         Ok(())
+     }
+ 
++    fn set_private_browsing(&mut self, private: bool) -> Result<()> {
++        let message = messages::SetPrivateBrowsing::new(private);
++        self.connector.send_message(message)?;
++        Ok(())
++    }
++
+     fn register_child_process(&mut self, id: GeckoChildId) -> Result<IPCConnector> {
+         let ipc_channel = IPCClientChannel::new()?;
+         let (server_endpoint, client_endpoint) = ipc_channel.deconstruct();
+@@ -219,6 +225,22 @@ pub unsafe extern "C" fn set_crash_report_path(
+     client.set_crash_report_path(path).is_ok()
+ }
+ 
++/// Sval: tells the crash helper whether private browsing is in use.
++///
++/// # Safety
++///
++/// The `client` parameter must be a valid pointer to the crash helper client
++/// object returned by the [`crash_helper_launch()`] or
++/// [`crash_helper_connect()`] functions.
++#[no_mangle]
++pub unsafe extern "C" fn set_crash_helper_private_browsing(
++    client: *mut CrashHelperClient,
++    private: bool,
++) -> bool {
++    let client = client.as_mut().unwrap();
++    client.set_private_browsing(private).is_ok()
++}
++
+ /// Creates a new IPC channel to connect a soon-to-be-created child process
+ /// with the crash helper client. The server-side endpoint of this channel
+ /// will be sent to the crash helper, and the client-side endpoint will be
+diff --git a/toolkit/crashreporter/crash_helper_common/src/messages.rs b/toolkit/crashreporter/crash_helper_common/src/messages.rs
+index cd80bf7589..ec420f116c 100644
+--- a/toolkit/crashreporter/crash_helper_common/src/messages.rs
++++ b/toolkit/crashreporter/crash_helper_common/src/messages.rs
+@@ -77,6 +77,9 @@ pub enum Kind {
+     /// this message has been received the crash helper is capable of dumping
+     /// the sending process.
+     ProcessRendezVous = 11,
++    /// Sval: tells the crash helper whether private browsing is in use. This
++    /// is sent from the main process to the crash helper.
++    SetPrivateBrowsing = 12,
+ }
+ 
+ // Bytes helpers to serialize/deserialize values not supported directly by the
+@@ -296,6 +299,52 @@ impl Message for SetCrashReportPath {
+     }
+ }
+ 
++/* Sval: message used to tell the crash helper whether private browsing is in
++ * use, which decides the processes it writes a minidump of. */
++
++pub struct SetPrivateBrowsing {
++    pub private: bool,
++}
++
++impl SetPrivateBrowsing {
++    pub fn new(private: bool) -> SetPrivateBrowsing {
++        SetPrivateBrowsing { private }
++    }
++}
++
++impl Message for SetPrivateBrowsing {
++    fn kind() -> Kind {
++        Kind::SetPrivateBrowsing
++    }
++
++    fn payload_size(&self) -> usize {
++        size_of::<u8>()
++    }
++
++    fn ancillary_data_len(&self) -> usize {
++        0
++    }
++
++    fn encode(self) -> (Bytes, Bytes, Vec<AncillaryData>) {
++        let header = Header::encode(Self::kind(), self.payload_size());
++        let mut payload = BytesMut::with_capacity(self.payload_size());
++        payload.put_u8(self.private.into());
++
++        (header, payload.freeze(), vec![])
++    }
++
++    fn decode(data: Vec<u8>, ancillary_data: Vec<AncillaryData>) -> Result<Self, MessageError> {
++        if !ancillary_data.is_empty() {
++            return Err(MessageError::UnexpectedAncillaryData);
++        }
++
++        let mut data = Bytes::from(data);
++        let private = data.try_get_u8()? != 0;
++
++        Ok(SetPrivateBrowsing { private })
++    }
++}
++
+ /* Transfer minidump message, used to request the minidump which has been
+  * generated for the specified pid. */
+ 
+diff --git a/toolkit/crashreporter/crash_helper_server/src/breakpad_crash_generator.rs b/toolkit/crashreporter/crash_helper_server/src/breakpad_crash_generator.rs
+index 33f9ca11b5..80b1a480b5 100644
+--- a/toolkit/crashreporter/crash_helper_server/src/breakpad_crash_generator.rs
++++ b/toolkit/crashreporter/crash_helper_server/src/breakpad_crash_generator.rs
+@@ -76,6 +76,8 @@ pub struct BreakpadContext {
+         *const BreakpadChar,
+     ),
+     generator: *const Mutex<CrashGenerator>,
++    // Sval: asked before each minidump is written.
++    filter: unsafe extern "C" fn(*const c_void, BreakpadProcessId) -> bool,
+ }
+ 
+ extern "C" {
+@@ -130,12 +132,14 @@ impl BreakpadCrashGenerator {
+             Option<&ExtraCrashData>,
+             *const BreakpadChar,
+         ),
++        filter_callback: unsafe extern "C" fn(*const c_void, BreakpadProcessId) -> bool,
+     ) -> Result<BreakpadCrashGenerator> {
+         let breakpad_raw_data = breakpad_data.into_raw();
+         let path_ptr = path.into_raw();
+         let mut context = Box::new(BreakpadContext {
+             callback: finalize_callback,
+             generator: generator as *const Mutex<CrashGenerator>,
++            filter: filter_callback,
+         });
+ 
+         // SAFETY: Calling into breakpad code with parameters that have been previously validated.
+diff --git a/toolkit/crashreporter/crash_helper_server/src/crash_generation.rs b/toolkit/crashreporter/crash_helper_server/src/crash_generation.rs
+index 0b1e12c4e8..270769583c 100644
+--- a/toolkit/crashreporter/crash_helper_server/src/crash_generation.rs
++++ b/toolkit/crashreporter/crash_helper_server/src/crash_generation.rs
+@@ -70,6 +70,8 @@ where
+     minidump_path: OsString,
+     reports_by_pid: HashMap<Pid, Vec<CrashReport>>,
+     reports_by_id: HashMap<GeckoChildId, CrashReport>,
++    // Sval: whether private browsing is in use, as the main process last said.
++    private: bool,
+ }
+ 
+ impl CrashGenerator {
+@@ -78,9 +80,46 @@ impl CrashGenerator {
+             minidump_path,
+             reports_by_pid: HashMap::<Pid, Vec<CrashReport>>::new(),
+             reports_by_id: HashMap::<GeckoChildId, CrashReport>::new(),
++            private: false,
+         }
+     }
+ 
++    pub(crate) fn set_private(&mut self, private: bool) {
++        self.private = private;
++    }
++
++    /// Sval: whether a minidump of the process may be written. A minidump
++    /// holds the process's memory. While private browsing is in use, every
++    /// process but a content process for a normal window's sites could hold
++    /// a private window's pages, and such a content process is the one whose
++    /// RemoteType annotation is "webIsolated" or "webCOOP+COEP". The main
++    /// process applies the same rule to a minidump it is handed
++    /// (TakeMinidumpForChild).
++    pub(crate) fn wants_minidump(&self, process_id: &BreakpadProcessId) -> bool {
++        if !self.private {
++            return true;
++        }
++
++        let Ok(annotations) = mozannotation_server::retrieve_annotations(
++            process_id.get_native(),
++            CrashAnnotation::Count as usize,
++        ) else {
++            return false;
++        };
++
++        annotations
++            .iter()
++            .filter(|annotation| annotation.id == CrashAnnotation::RemoteType as u32)
++            .any(|annotation| {
++                let remote_type = match &annotation.data {
++                    AnnotationData::String(string) => string.as_bytes(),
++                    AnnotationData::ByteBuffer(buffer) => buffer.as_slice(),
++                    AnnotationData::Empty => return false,
++                };
++                remote_type == b"webIsolated" || remote_type == b"webCOOP+COEP"
++            })
++    }
++
+     pub(crate) fn set_path(&mut self, path: OsString) {
+         self.minidump_path = path.clone();
+     }
+@@ -240,6 +279,22 @@ pub(crate) unsafe extern "C" fn finalize_breakpad_minidump(
+     );
+ }
+ 
++/// Sval: answers the Breakpad crash generator, before it writes a minidump,
++/// whether it may.
++///
++/// # Safety
++///
++/// The caller must guarantee that the `generator` parameter points to a
++/// Mutex<CrashGenerator> object.
++pub(crate) unsafe extern "C" fn wants_breakpad_minidump(
++    generator: *const c_void,
++    process_id: BreakpadProcessId,
++) -> bool {
++    let generator = generator as *const Mutex<CrashGenerator>;
++    let generator = generator.as_ref().unwrap().lock().unwrap();
++    generator.wants_minidump(&process_id)
++}
++
+ fn retrieve_annotations(
+     process_id: &BreakpadProcessId,
+     origin: MinidumpOrigin,
+diff --git a/toolkit/crashreporter/crash_helper_server/src/crash_generation/windows.rs b/toolkit/crashreporter/crash_helper_server/src/crash_generation/windows.rs
+index 91c21800ec..fba824901a 100644
+--- a/toolkit/crashreporter/crash_helper_server/src/crash_generation/windows.rs
++++ b/toolkit/crashreporter/crash_helper_server/src/crash_generation/windows.rs
+@@ -36,6 +36,12 @@ impl CrashGenerator {
+         &mut self,
+         message: messages::WindowsErrorReportingMinidump,
+     ) -> Result<(), ()> {
++        let handle = message.process.as_raw_handle() as HANDLE;
++        let pid = get_process_id(message.process.as_handle())?;
++        if !self.wants_minidump(&BreakpadProcessId { pid, handle }) {
++            return Ok(());
++        }
++
+         let (minidump_file, path) = self.create_minidump_file()?;
+ 
+         let minidump_type: MINIDUMP_TYPE = self.get_minidump_type();
+@@ -43,8 +49,6 @@ impl CrashGenerator {
+         let mut exception_records = message.exception_records;
+         let exception_records_ptr = link_exception_records(&mut exception_records);
+ 
+-        let handle = message.process.as_raw_handle() as HANDLE;
+-        let pid = get_process_id(message.process.as_handle())?;
+         let mut exception_pointers = EXCEPTION_POINTERS {
+             ExceptionRecord: exception_records_ptr,
+             ContextRecord: &mut context as *mut _,
+diff --git a/toolkit/crashreporter/crash_helper_server/src/ipc_server.rs b/toolkit/crashreporter/crash_helper_server/src/ipc_server.rs
+index b05e20a697..a51d666aa9 100644
+--- a/toolkit/crashreporter/crash_helper_server/src/ipc_server.rs
++++ b/toolkit/crashreporter/crash_helper_server/src/ipc_server.rs
+@@ -12,7 +12,7 @@ use std::{collections::HashMap, ffi::OsString, mem, rc::Rc, sync::Mutex};
+ 
+ use crate::{
+     breakpad_crash_generator::BreakpadCrashGenerator, crash_generation::CrashGenerator,
+-    finalize_breakpad_minidump, platform, BreakpadData,
++    finalize_breakpad_minidump, platform, wants_breakpad_minidump, BreakpadData,
+ };
+ 
+ #[derive(PartialEq)]
+@@ -109,6 +109,7 @@ impl IPCServer {
+             minidump_path,
+             crash_generator_ref,
+             finalize_breakpad_minidump,
++            wants_breakpad_minidump,
+         )?;
+ 
+         let connector = Rc::new(connector);
+@@ -209,6 +210,10 @@ impl IPCServer {
+                         .set_path(message.path.clone());
+                     self.breakpad_server.set_path(message.path);
+                 }
++                messages::Kind::SetPrivateBrowsing => {
++                    let message = messages::SetPrivateBrowsing::decode(data, ancillary_data)?;
++                    self.generator.lock().unwrap().set_private(message.private);
++                }
+                 messages::Kind::TransferMinidump => {
+                     let message = messages::TransferMinidump::decode(data, ancillary_data)?;
+                     let mut generator_lock = self.generator.lock().unwrap();
+diff --git a/toolkit/crashreporter/crash_helper_server/src/lib.rs b/toolkit/crashreporter/crash_helper_server/src/lib.rs
+index 95b4086c87..a5e74a95f4 100644
+--- a/toolkit/crashreporter/crash_helper_server/src/lib.rs
++++ b/toolkit/crashreporter/crash_helper_server/src/lib.rs
+@@ -15,7 +15,7 @@ mod platform;
+ use crash_helper_common::{BreakpadData, BreakpadRawData, IPCConnector, IPCListener, Pid};
+ use std::ffi::{c_char, CStr, OsString};
+ 
+-use crash_generation::finalize_breakpad_minidump;
++use crash_generation::{finalize_breakpad_minidump, wants_breakpad_minidump};
+ use ipc_server::{IPCServer, IPCServerState};
+ 
+ /// Runs the crash generator process logic, this includes the IPC used by
+diff --git a/toolkit/crashreporter/nsDummyExceptionHandler.cpp b/toolkit/crashreporter/nsDummyExceptionHandler.cpp
+index abe615ba74..40541f068e 100644
+--- a/toolkit/crashreporter/nsDummyExceptionHandler.cpp
++++ b/toolkit/crashreporter/nsDummyExceptionHandler.cpp
+@@ -229,6 +229,8 @@ bool ChildProcessProxyRendezvous(GeckoChildID aID, DWORD aPid, HANDLE aHandle) {
+ 
+ bool SetRemoteExceptionHandler(int& aArgc, char** aArgv) { return false; }
+ 
++void SetCrashHelperPrivate(bool aPrivate) {}
++
+ bool TakeMinidumpForChild(GeckoChildID aChildId, GeckoProcessType aType,
+                           nsIFile** aDump, AnnotationTable& aAnnotations) {
+   return false;
+diff --git a/toolkit/crashreporter/nsExceptionHandler.cpp b/toolkit/crashreporter/nsExceptionHandler.cpp
+index b9a8931bf9..bcafdb0209 100644
+--- a/toolkit/crashreporter/nsExceptionHandler.cpp
++++ b/toolkit/crashreporter/nsExceptionHandler.cpp
+@@ -3458,9 +3458,20 @@ nsresult OOPInit(nsIFile* aXREDirectory) {
+ 
+   StaticMutexAutoLock lock(gCrashHelperClientMutex);
+   gCrashHelperClient = crashHelperClient;
++  // Sval: private browsing may have come into use before the helper started.
++  if (mozilla::SvalCrashPrivacy::Get()) {
++    set_crash_helper_private_browsing(gCrashHelperClient, true);
++  }
+   return NS_OK;
+ }
+ 
++void SetCrashHelperPrivate(bool aPrivate) {
++  StaticMutexAutoLock lock(gCrashHelperClientMutex);
++  if (gCrashHelperClient) {
++    set_crash_helper_private_browsing(gCrashHelperClient, aPrivate);
++  }
++}
++
+ void OOPDeinit() {
+ #if defined(XP_WIN) || defined(XP_MACOSX)
+   childCrashNotifyPipe = ""_ns;
+diff --git a/toolkit/crashreporter/nsExceptionHandler.h b/toolkit/crashreporter/nsExceptionHandler.h
+index fcbca3ccf2..ba0cb7bf84 100644
+--- a/toolkit/crashreporter/nsExceptionHandler.h
++++ b/toolkit/crashreporter/nsExceptionHandler.h
+@@ -211,6 +211,11 @@ nsresult SetSubmitReports(bool aSubmitReport);
+ 
+ // Out-of-process crash reporter API.
+ 
++// Sval: tells the crash helper whether private browsing is in use
++// (SvalCrashPrivacy). While it is, the helper writes a minidump of no child
++// process but a content process for a normal window's sites.
++void SetCrashHelperPrivate(bool aPrivate);
++
+ // Return true if a dump was found for |aChildID|, and return the
+ // path in |dump|.  The caller owns the last reference to |dump| if it
+ // is non-nullptr. The annotations for the crash will be stored in

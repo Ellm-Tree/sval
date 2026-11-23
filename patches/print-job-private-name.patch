@@ -1,0 +1,46 @@
+Sval: a private window's print job is named for the browser
+
+nsPrintJob names a print job after the page's title, or its address when
+the page has none, and the system's print queue and its job history keep
+that name. A job from a private document is named with the brand's short
+name. The title and address in the page's headers and footers are the
+user's choice in the print dialog and are unchanged.
+
+diff --git a/layout/printing/nsPrintJob.cpp b/layout/printing/nsPrintJob.cpp
+index ed37d65ea4..efb8a91b1d 100644
+--- a/layout/printing/nsPrintJob.cpp
++++ b/layout/printing/nsPrintJob.cpp
+@@ -70,6 +70,7 @@ static const char sPrintSettingsServiceContractID[] =
+ #include "mozilla/gfx/DrawEventRecorder.h"
+ #include "mozilla/layout/RemotePrintJobChild.h"
+ #include "nsComponentManagerUtils.h"
++#include "nsContentUtils.h"
+ #include "nsDeviceContextSpecProxy.h"
+ #include "nsFocusManager.h"
+ #include "nsIDeviceContextSpec.h"
+@@ -877,6 +878,16 @@ nsresult nsPrintJob::SetupToPrintContent() {
+                         DocTitleDefault::eDocURLElseFallback, docTitleStr,
+                         docURLStr);
+ 
++  // Sval: the system's print queue and its history keep a job's name, so a
++  // private window's job is named for the browser.
++  nsAutoString jobTitleStr;
++  if (mPrintObject->mDocument->IsInPrivateBrowsing()) {
++    nsContentUtils::GetLocalizedString(PropertiesFile::BRAND_PROPERTIES,
++                                       "brandShortName", jobTitleStr);
++  } else {
++    jobTitleStr = docTitleStr;
++  }
++
+   int32_t startPage = 1;
+   int32_t endPage = mNumPrintablePages;
+ 
+@@ -909,7 +920,7 @@ nsresult nsPrintJob::SetupToPrintContent() {
+     }
+ #endif
+     rv = printData->mPrintDC->BeginDocument(
+-        docTitleStr, fileNameStr, browsingContextId, startPage, endPage);
++        jobTitleStr, fileNameStr, browsingContextId, startPage, endPage);
+   }
+ 
+   if (mIsCreatingPrintPreview) {

@@ -1,0 +1,124 @@
+Sval: a private window's HWND carries IS_PRIVATE on Windows
+
+Windows keeps no Recall snapshot of a window whose input scope is
+IS_PRIVATE, set on the window with SetInputScope or SetInputScopes. Gecko
+sets IS_PRIVATE on the window only when TSF is unavailable, and then only
+while a private editor has focus. With TSF it gives the scope to the
+focused editor's text store, which says nothing about the window.
+
+A private browsing window's top-level nsWindow sets IS_PRIVATE on its
+HWND when it is created, in either mode, keeps it through every focus
+change, and resets the scope to IS_DEFAULT before the window is
+destroyed, as SetInputScope's documentation requires.
+
+diff --git a/widget/windows/WinIMEHandler.cpp b/widget/windows/WinIMEHandler.cpp
+index 80df55312a..8b9ec3cba2 100644
+--- a/widget/windows/WinIMEHandler.cpp
++++ b/widget/windows/WinIMEHandler.cpp
+@@ -66,16 +66,16 @@ void IMEHandler::Initialize() {
+   TSFUtils::Initialize();
+   sIsIMMEnabled =
+       !TSFUtils::IsAvailable() || StaticPrefs::intl_tsf_support_imm_AtStartup();
+-  if (!TSFUtils::IsAvailable()) {
+-    // When full TSFTextStore is not available, try to use SetInputScopes API
+-    // to enable at least InputScope. Use GET_MODULE_HANDLE_EX_FLAG_PIN to
+-    // ensure that msctf.dll will not be unloaded.
+-    HMODULE module = nullptr;
+-    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, L"msctf.dll",
+-                           &module)) {
+-      sSetInputScopes = reinterpret_cast<decltype(SetInputScopes)*>(
+-          GetProcAddress(module, "SetInputScopes"));
+-    }
++  // When full TSFTextStore is not available, try to use SetInputScopes API
++  // to enable at least InputScope. Use GET_MODULE_HANDLE_EX_FLAG_PIN to
++  // ensure that msctf.dll will not be unloaded.
++  // Sval: a private window's own scope is set through the same API in
++  // either mode (SetInputScopeForIMM32).
++  HMODULE module = nullptr;
++  if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, L"msctf.dll",
++                         &module)) {
++    sSetInputScopes = reinterpret_cast<decltype(SetInputScopes)*>(
++        GetProcAddress(module, "SetInputScopes"));
+   }
+ 
+   IMMHandler::Initialize();
+@@ -404,7 +404,7 @@ void IMEHandler::OnDestroyWindow(nsWindow* aWindow) {
+ 
+   // We need to do nothing here for TSF. Just restore the default context
+   // if it's been disassociated.
+-  if (!TSFUtils::IsAvailable()) {
++  if (!TSFUtils::IsAvailable() || aWindow->IsPrivateWindow()) {
+     // MSDN says we need to set IS_DEFAULT to avoid memory leak when we use
+     // SetInputScopes API. Use an empty string to do this.
+     SetInputScopeForIMM32(aWindow, u""_ns, u""_ns, InPrivateBrowsing::No,
+@@ -501,6 +501,14 @@ void IMEHandler::InitInputContext(nsWindow* aWindow,
+   // For a11y, the default enabled state should be 'enabled'.
+   aInputContext.mIMEState.mEnabled = IMEEnabled::Enabled;
+ 
++  // Sval: Microsoft documents IS_PRIVATE on a window's own input scope as
++  // what keeps Recall from saving the window. With TSF, Gecko gives that
++  // scope to the focused editor's text store alone.
++  if (aWindow->IsPrivateWindow()) {
++    SetInputScopeForIMM32(aWindow, u""_ns, u""_ns, InPrivateBrowsing::Yes,
++                          ForCleanUp::No);
++  }
++
+   if (TSFUtils::IsAvailable()) {
+     TSFTextStoreBase::SetInputContext(
+         aWindow, aInputContext,
+@@ -549,7 +557,10 @@ void IMEHandler::SetInputScopeForIMM32(nsWindow* aWindow,
+                                        const nsAString& aHTMLInputMode,
+                                        InPrivateBrowsing aInPrivateBrowsing,
+                                        ForCleanUp aForCleanUp) {
+-  if (TSFUtils::IsAvailable() || !sSetInputScopes ||
++  // Sval: a private window carries IS_PRIVATE from its creation until its
++  // clean-up, whatever has focus in it and whether or not TSF is available.
++  const bool privateWindow = aWindow->IsPrivateWindow();
++  if ((TSFUtils::IsAvailable() && !privateWindow) || !sSetInputScopes ||
+       !aWindow->GetWindowHandle() ||
+       (aForCleanUp == ForCleanUp::No && aWindow->Destroyed())) {
+     return;
+@@ -561,7 +572,8 @@ void IMEHandler::SetInputScopeForIMM32(nsWindow* aWindow,
+   AppendInputScopeFromType(aHTMLInputType, scopes);
+   AppendInputScopeFromInputMode(aHTMLInputMode, scopes);
+ 
+-  if (aInPrivateBrowsing == InPrivateBrowsing::Yes) {
++  if (aInPrivateBrowsing == InPrivateBrowsing::Yes ||
++      (privateWindow && aForCleanUp == ForCleanUp::No)) {
+     scopes.AppendElement(IS_PRIVATE);
+   }
+ 
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+index 11b54d3cc7..5b2d5b424c 100644
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -1269,6 +1269,8 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
+   NS_ASSERTION(wtsRegistered, "WTSRegisterSessionNotification failed!\n");
+ 
+   mDefaultIMC.Init(this);
++  mIsPrivateWindow =
++      aInitData.mIsPrivate && mWindowType == WindowType::TopLevel;
+   IMEHandler::InitInputContext(this, mInputContext);
+ 
+   static bool a11yPrimed = false;
+diff --git a/widget/windows/nsWindow.h b/widget/windows/nsWindow.h
+index c33787698f..eb540a4e6d 100644
+--- a/widget/windows/nsWindow.h
++++ b/widget/windows/nsWindow.h
+@@ -389,6 +389,8 @@ class nsWindow final : public nsIWidget {
+   void GetCompositorWidgetInitData(
+       mozilla::widget::CompositorWidgetInitData* aInitData) override;
+   bool IsTouchWindow() const { return mTouchWindow; }
++  // Sval: whether this is a private browsing window's own top-level window.
++  bool IsPrivateWindow() const { return mIsPrivateWindow; }
+   bool SynchronouslyRepaintOnResize() override;
+   void MaybeDispatchInitialFocusEvent() override;
+ 
+@@ -762,6 +764,7 @@ class nsWindow final : public nsIWidget {
+   bool mInDtor = false;
+   bool mIsVisible = false;
+   bool mIsCloaked = false;
++  bool mIsPrivateWindow = false;
+   bool mTouchWindow = false;
+   bool mDisplayPanFeedback = false;
+   bool mHideChrome = false;

@@ -1390,6 +1390,112 @@ Each entry gives:
 - **Upstream**: file in Toolkit :: Data Sanitization with the steps, asking
   that a failed usage read reject or report its failure. Not submitted.
 
+### A private origin's storage metadata names its site
+
+- **Patch**: `patches/quota-private-metadata-no-site.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `QuotaManager::CreateDirectoryMetadata2` writes an origin's
+  suffix and group into `.metadata-v2` as legacy fields
+  `LoadFullOriginMetadata` discards. For a private origin the folder is named
+  by a random storage origin, and the two fields still hold the site the
+  origin is partitioned under and the origin's own site. `storage/private`
+  is removed when private browsing ends, so a killed process leaves every
+  private site that used storage readable on disk until the next launch.
+- **Evidence**: `test_sval_private_storage_metadata.js` reads the file of a
+  partitioned private origin. Without the patch it holds both sites.
+- **Upstream**: file in Core :: Storage: Quota Manager with the patch and
+  the test as an xpcshell test. Not submitted.
+
+### A string copied from a private window is not private data
+
+- **Patch**: `patches/clipboard-private-window-copy.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `nsClipboardHelper::CopyStringToClipboard` marks its
+  transferable private only when the caller passes `Sensitive`. The context
+  menu's Copy Link, Copy Email Address, Copy Phone Number and Copy Media
+  Location pass the page's window context and no flag, and the address bar's
+  Copy Without Site Tracking passes neither, so a private window's copies
+  reach Windows' clipboard history and cloud clipboard and KDE's history.
+  The fix reads private browsing from the window context the helper is
+  given.
+- **Evidence**: read in the code. No test: `nsITransferable.isPrivateData`
+  is not scriptable, and a headless run has no system clipboard.
+- **Upstream**: file in Core :: Widget with the patch and a gtest of the
+  helper. Not submitted.
+
+### Web Audio names its OS audio stream after a private page's title
+
+- **Patch**: `patches/audio-stream-private-no-title.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `GetDocumentTitle` in `MediaTrackGraph.cpp` gives the graph's
+  audio driver the document's title as its stream name, at start and on each
+  `document-title-changed`, with no private browsing check. The name goes
+  to the system's audio server.
+- **Evidence**: read in the code. No test: the name reaches only the audio
+  backend.
+- **Upstream**: file in Core :: Audio/Video: MediaStreamGraph with the
+  patch. Not submitted.
+
+### A private window's print job is named after its page
+
+- **Patch**: `patches/print-job-private-name.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `nsPrintJob::SetupToPrintContent` passes the page's title, or its
+  address when it has none, to `nsDeviceContext::BeginDocument` as the job's
+  name for a private document as for any other. The system's print queue
+  and its job history keep the name.
+- **Evidence**: `browser_sval_private_print_job.js` prints a private page to
+  a PDF file, whose title is the job's name. Without the patch it is the
+  page's title.
+- **Upstream**: file in Core :: Printing: Setup with the patch, using the
+  brand's short name. Not submitted.
+
+### The OS media controls get a private tab's duration and position
+
+- **Patch**: `patches/media-controls-private-no-position.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `MediaStatusManager` gives the system's media controls default
+  metadata for a private tab (`GetCurrentMediaMetadata`), and
+  `GetCurrentPositionState` and `UpdatePositionState` still hand them the
+  media's duration and position.
+- **Evidence**: `browser_sval_private_media_position.js` counts a private
+  tab's `positionstatechange` events. Without the patch the tab reports the
+  position its page declares.
+- **Upstream**: file in Core :: Audio/Video: Playback with the patch and
+  the test. Not submitted.
+
+### A private window's HWND does not carry IS_PRIVATE when TSF is available
+
+- **Patch**: `patches/windows-private-window-input-scope.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: Microsoft's Recall guidance for browsers asks for
+  `SetInputScope(hwnd, IS_PRIVATE)` on a private window. `IMEHandler` calls
+  `SetInputScopes` on the window only when TSF is unavailable
+  (`SetInputScopeForIMM32`), and then with the focused editor's state. With
+  TSF, `TSFTextStoreBase::SetInputScope` adds `IS_PRIVATE` to the focused
+  editor's text store alone.
+- **Evidence**: read in the code and in Microsoft's Recall guidance for
+  web browsers. Not run: it needs a Recall PC.
+- **Upstream**: file in Core :: Widget: Win32 with the patch, once it is
+  checked on a Recall PC. Not submitted.
+
+### An HTTPS-Only exception made in a private window holds in every window
+
+- **Patch**: `patches/https-only-private-exception.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `https-only-load-insecure` is in `kStripOAPermissions`, so
+  the session exception `WindowGlobalParent::RecvReloadWithHttpsOnlyException`
+  and `nsHTTPSOnlyUtils::AddHTTPSFirstException` add for a private principal
+  is stored with no origin attributes. It holds in normal windows and other
+  private windows until the browser quits. The fix keeps a private
+  principal's exception under a type of its own that is not stripped.
+- **Evidence**: `test_sval_private_https_only_exception.js` adds the
+  exception for a private principal. Without the patch a normal principal
+  reads it.
+- **Upstream**: file in Core :: DOM: Security. Mozilla would want the
+  exception keyed by private browsing alone, since Sval's one session per
+  private window is its own. Not submitted.
+
 ## Mozilla's fixes Sval needs landed
 
 ### Back is disabled after a load from the address bar while the page is busy
