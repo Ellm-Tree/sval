@@ -453,7 +453,6 @@ struct ScrollEdgeFade: ViewModifier {
     @State private var moreBefore = false
     @State private var moreAfter = false
     let axis: Axis
-    let length: CGFloat = 32
 
     func body(content: Content) -> some View {
         content
@@ -464,19 +463,39 @@ struct ScrollEdgeFade: ViewModifier {
                 let size = sideways ? geometry.contentSize.width + geometry.contentInsets.leading + geometry.contentInsets.trailing
                     : geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom
                 let room = sideways ? geometry.containerSize.width : geometry.containerSize.height
-                return [offset > 1, size - room - offset > 1]
+                return EdgeFade.edges(offset: offset, size: size, room: room)
             } action: { _, edges in
                 moreBefore = edges[0]
                 moreAfter = edges[1]
             }
-            .mask {
-                let layout = axis == .horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
-                layout {
-                    edge(fades: moreBefore, before: true)
-                    Color.black
-                    edge(fades: moreAfter, before: false)
-                }
+            .edgeFade(axis, before: moreBefore, after: moreAfter)
+    }
+}
+
+/// The fade at a scrolling view's edges, for a view that reports which
+/// edges have more to scroll to itself: the grid's collection view, which
+/// `onScrollGeometryChange` doesn't see.
+struct EdgeFade: ViewModifier {
+    let axis: Axis
+    let before: Bool
+    let after: Bool
+    let length: CGFloat = 32
+
+    /// Whether there is more to scroll to before and after, for content
+    /// `size` long scrolled `offset` into `room`.
+    static func edges(offset: CGFloat, size: CGFloat, room: CGFloat) -> [Bool] {
+        [offset > 1, size - room - offset > 1]
+    }
+
+    func body(content: Content) -> some View {
+        content.mask {
+            let layout = axis == .horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+            layout {
+                edge(fades: before, before: true)
+                Color.black
+                edge(fades: after, before: false)
             }
+        }
     }
 
     @ViewBuilder private func edge(fades: Bool, before: Bool) -> some View {
@@ -493,4 +512,9 @@ struct ScrollEdgeFade: ViewModifier {
 extension View {
     /// See `ScrollEdgeFade`.
     func scrollEdgeFade(_ axis: Axis = .vertical) -> some View { modifier(ScrollEdgeFade(axis: axis)) }
+
+    /// See `EdgeFade`.
+    func edgeFade(_ axis: Axis, before: Bool, after: Bool) -> some View {
+        modifier(EdgeFade(axis: axis, before: before, after: after))
+    }
 }

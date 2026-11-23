@@ -801,7 +801,10 @@ final class WalkthroughTests: XCTestCase {
         }
         shot("grid-drag-before")
         let swift = card("Swift")
-        drag(card("Wikipedia"), to: swift.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.4)), marked: "grid-out")
+        // Swift's right side, which the straight drag from Wikipedia
+        // reaches without crossing Swift's middle: once Swift showed its
+        // halves, they would hold until the finger left Swift.
+        drag(card("Wikipedia"), to: swift.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.4)), marked: "grid-out")
         shot("grid-drag-after")
         XCTAssertEqual(card("Wikipedia").frame.midY, card("Swift").frame.midY, accuracy: 4,
                        "the card left its group for Swift's row")
@@ -819,6 +822,47 @@ final class WalkthroughTests: XCTestCase {
         shot("grid-drag-tail")
         XCTAssertGreaterThan(card("Apple").frame.midX, card("Wikipedia").frame.midX, "the card landed after Wikipedia")
         XCTAssertEqual(card("Apple").frame.midY, card("Wikipedia").frame.midY, accuracy: 4, "in the Workspace's row")
+    }
+
+    /// A card outside Edit Tabs: a long press opens its menu, and a press
+    /// that moves drags it, as a row in the list does.
+    func testGridDragOutsideEdit() {
+        waitForBar()
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch.tap()
+        sleep(2)
+        app.buttons["Work"].firstMatch.tap()
+        sleep(2)
+        app.buttons["Workspace options"].firstMatch.tap()
+        sleep(1)
+        app.buttons["Grid"].firstMatch.tap()
+        sleep(2)
+        let cards = app.collectionViews.buttons
+        let card = { (name: String) in cards.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch }
+        card("Swift").press(forDuration: 1.2)
+        XCTAssertTrue(app.buttons["Rename…"].waitForExistence(timeout: 5), "a long press opens the card's menu")
+        shot("grid-menu-outside-edit")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+        sleep(1)
+        XCTAssertFalse(app.buttons["Rename…"].exists, "the menu closes")
+        // Swift's right side, which the straight drag from Wikipedia
+        // reaches without crossing Swift's middle.
+        drag(card("Wikipedia"), to: card("Swift").coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.4)),
+             marked: "grid-outside-edit")
+        shot("grid-drag-outside-edit")
+        // A finger that slid into an open menu would have picked one of
+        // its items: a split or a group, or a sheet over the grid.
+        XCTAssertFalse(app.buttons["Rename…"].exists, "no menu is open")
+        XCTAssertFalse(app.navigationBars["New Group"].exists, "no sheet opened")
+        XCTAssertEqual(cards.matching(NSPredicate(format: "label BEGINSWITH 'Split'")).count, 0, "no split was made")
+        XCTAssertEqual(cards.matching(NSPredicate(format: "label BEGINSWITH 'Wikipedia'")).count, 1)
+        XCTAssertEqual(cards.matching(NSPredicate(format: "label BEGINSWITH 'Swift'")).count, 1)
+        XCTAssertEqual(card("Wikipedia").frame.midY, card("Swift").frame.midY, accuracy: 4,
+                       "the card left its group for Swift's row")
+        XCTAssertNotEqual(card("Wikipedia").frame.midY, card("Apple").frame.midY, "and isn't in Apple's row")
+        // A sideways swipe still closes a card.
+        card("Wikipedia").swipeLeft()
+        sleep(2)
+        XCTAssertFalse(card("Wikipedia").exists, "a swipe closes the card")
     }
 
     /// Setup's pairing code: one field that groups the code in fours as

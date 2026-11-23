@@ -396,6 +396,12 @@ control of what you see and what is sent to websites.
   minute, the iPhone app stops reloading it and shows Page cannot load.
 - **Private tabs.** A link you tap in a private tab opens in Sval, even when
   another app on your iPhone could open that link.
+- **Rearrange tabs in the grid.** You can drag a card in the Workspace
+  sheet's grid at any time: hold the card and start moving before the
+  card's menu opens. Drop the card on another card's middle to make a group
+  or a Split with that card. Rest still at a card's side, between two rows,
+  or at the screen's edge next to a card, and the cards move apart to make
+  room.
 
 ## Sync
 

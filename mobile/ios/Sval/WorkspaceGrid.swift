@@ -38,6 +38,24 @@ final class GridDropState {
     var hover: GridHover?
 }
 
+/// A finger resting on a card's side: the side, where the rest began, and
+/// since when.
+struct EdgeRest: Equatable {
+    let key: String
+    let at: CGPoint
+    let since: Date
+}
+
+/// Where a finger is in a card's cell: the room between the card and the
+/// sheet's edge, the room between it and the next card, the card's outer
+/// fifths, or its middle; and which half of each.
+enum GridZone: Equatable {
+    case edge(left: Bool)
+    case crack(left: Bool)
+    case side(left: Bool)
+    case middle(left: Bool)
+}
+
 /// The grid's measures (15b, 15d, 15h).
 enum GridMetrics {
     /// Room inside each cell for the ring of the tab in front, so the
@@ -45,6 +63,11 @@ enum GridMetrics {
     static let ring: CGFloat = 5
     static let columnGap: CGFloat = 11 - 2 * ring
     static let rowGap: CGFloat = 14 - 2 * ring
+    /// The room a cell keeps above and below its card: the ring's, and
+    /// half the gap to the next row. The rows meet with no space between
+    /// them, so a finger between two rows is over a cell, where the system
+    /// has a place to open a gap.
+    static let padY = ring + rowGap / 2
     /// The sheet's edge to a box's edge, and each level's step inward.
     static let edge: CGFloat = 12
     static let nest: CGFloat = 8
@@ -60,21 +83,81 @@ enum GridMetrics {
     static var columns: Int { UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory ? 1 : 2 }
     static let boxTop: CGFloat = 2
     static let boxBottom: CGFloat = 10
-    /// The part of a card's picture at each side that drops before or
-    /// after it, a third of its width; the rest is the middle (15f2).
-    static func side(_ width: CGFloat) -> CGFloat { width / 3 }
+    /// The part of a card at each side that drops before or after it, a
+    /// fifth of its width; the three fifths between are the middle (15f2).
+    static func side(_ width: CGFloat) -> CGFloat { width / 5 }
 
-    /// Where `point` in a cell of `size` falls in the middle of the card's
-    /// picture, clear of its sides: how far across the middle, the
-    /// middle's width and the picture's height. The picture fills the cell
-    /// inside the ring's room.
-    static func middle(_ point: CGPoint, in size: CGSize) -> (x: CGFloat, span: CGFloat, picture: CGFloat)? {
-        let width = size.width - 2 * ring
-        let picture = size.height - 2 * ring
-        let x = point.x - ring, y = point.y - ring
-        let side = side(width)
-        guard y >= 0, y < picture, x >= side, x <= width - side else { return nil }
-        return (x - side, width - 2 * side, picture)
+    /// How far a card sits in from its cell's sides in `column` of
+    /// `columns`, leading and trailing. The cells split the grid's whole
+    /// width evenly, so the margin beside a card is over its cell. Toward
+    /// the sheet's edge, a card keeps the margin to every box around it;
+    /// toward the next column, the ring's room and half the gap.
+    static func insets(layers: Int, column: Int, columns: Int) -> (leading: CGFloat, trailing: CGFloat) {
+        let outer = edge + CGFloat(layers) * nest
+        let inner = ring + columnGap / 2
+        return (column == 0 ? outer : inner, column == columns - 1 ? outer : inner)
+    }
+
+    /// The zone of a cell that `point` is in, given the cell's `card` and
+    /// which of the cell's sides face the sheet's edge.
+    static func zone(_ point: CGPoint, card: CGRect, outer: (left: Bool, right: Bool)) -> GridZone {
+        guard card.contains(point) else {
+            if point.x < card.minX, outer.left { return .edge(left: true) }
+            if point.x >= card.maxX, outer.right { return .edge(left: false) }
+            return .crack(left: point.x < card.midX)
+        }
+        let side = side(card.width)
+        if point.x < card.minX + side { return .side(left: true) }
+        if point.x >= card.maxX - side { return .side(left: false) }
+        return .middle(left: point.x < card.midX)
+    }
+
+    /// Where `point` falls in the middle of `card`, over the card's whole
+    /// height: how far across the middle, the middle's width and the
+    /// card's height. A `latched` card's middle takes the whole cell,
+    /// drawn in to the middle's nearest point.
+    static func middle(_ point: CGPoint, card: CGRect, latched: Bool = false) -> (x: CGFloat, span: CGFloat, picture: CGFloat)? {
+        let side = side(card.width)
+        let span = card.width - 2 * side
+        var x = point.x - card.minX - side
+        if latched {
+            x = min(max(x, 0), span)
+        } else {
+            guard card.contains(point), x >= 0, x < span else { return nil }
+        }
+        return (x, span, card.height)
+    }
+
+    /// The card whose halves stay up: `latched` while the finger is over
+    /// that card's cell, which keeps every part of the cell in the
+    /// halves, and none once the finger leaves it or reaches the room
+    /// toward the sheet's edge, which is off the card.
+    static func latch(_ latched: String?, over: String?, zone: GridZone) -> String? {
+        if case .edge = zone { return nil }
+        return latched == over ? latched : nil
+    }
+
+    /// How long a finger rests still in `zone` before the gap opens: off
+    /// the card, which offers nothing else, at once; a card's side, long
+    /// enough to pass through on the way to the middle.
+    static func restTime(_ zone: GridZone) -> TimeInterval {
+        switch zone {
+        case .edge, .crack: 0.1
+        case .side, .middle: 0.25
+        }
+    }
+
+    /// How far a finger may drift on a card's side and still rest there.
+    /// A finger crossing the side on its way to the middle leaves this
+    /// radius, so its rest starts over and never completes.
+    static let restDrift: CGFloat = 10
+
+    /// The rest on the card side `key` once the finger is at `point`:
+    /// `rest` while the finger stays on that side within `restDrift` of
+    /// where `rest` began, or a rest beginning `now` at `point`.
+    static func rest(_ rest: EdgeRest?, key: String, at point: CGPoint, now: Date) -> EdgeRest {
+        if let rest, rest.key == key, hypot(point.x - rest.at.x, point.y - rest.at.y) <= restDrift { return rest }
+        return EdgeRest(key: key, at: point, since: now)
     }
 
     /// A card's picture height at `depth` groups in: 140, 132, 124, and on
@@ -85,9 +168,58 @@ enum GridMetrics {
     }
 
     /// A cell's height: the picture, which carries the bar, and the
-    /// ring's room above and below.
+    /// cell's room above and below.
     static func cell(depth: Int, sideways: Bool) -> CGFloat {
-        picture(depth: depth, sideways: sideways) + 2 * ring
+        picture(depth: depth, sideways: sideways) + 2 * padY
+    }
+}
+
+/// A card's cell. The card sits in from the cell's sides by its column's
+/// insets, set from the cell's frame as each frame is applied, so a card
+/// the system moves to the other column takes that column's insets in the
+/// same animation.
+final class GridCell: UICollectionViewCell {
+    /// The groups around the card, and the columns across.
+    var layers = 0
+    var columns = 2
+    private var column = 0
+
+    private var insets: (leading: CGFloat, trailing: CGFloat) {
+        GridMetrics.insets(layers: layers, column: column, columns: columns)
+    }
+
+    /// The card in the cell's bounds.
+    var card: CGRect {
+        let insets = insets
+        return CGRect(x: insets.leading, y: GridMetrics.padY, width: bounds.width - insets.leading - insets.trailing,
+                      height: bounds.height - 2 * GridMetrics.padY)
+    }
+
+    /// Which of the cell's sides face the sheet's edge.
+    var outer: (left: Bool, right: Bool) { (column == 0, column == columns - 1) }
+
+    override func apply(_ attributes: UICollectionViewLayoutAttributes) {
+        super.apply(attributes)
+        place(attributes.frame)
+    }
+
+    /// The content ends at the card's ring, so its width is the card's
+    /// own; it starts at the first column's leading inset, moved to the
+    /// card.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let leading = GridMetrics.insets(layers: layers, column: 0, columns: columns).leading
+        let card = card
+        contentView.frame = CGRect(x: card.minX - leading, y: 0, width: leading + card.width + GridMetrics.ring,
+                                   height: bounds.height)
+    }
+
+    /// Takes the insets of the column `frame` is in. Within the system's
+    /// animation of the cell's frame, the move is part of it.
+    func place(_ frame: CGRect) {
+        column = frame.minX > 1 && columns > 1 ? 1 : 0
+        setNeedsLayout()
+        layoutIfNeeded()
     }
 }
 
@@ -113,10 +245,10 @@ extension WorkspaceSheet {
                 PinsRow(onOpened: { close() }, tileSize: 48)
             }
             if let workspace {
-                TabGridView(
+                TabGrid(grid: TabGridView(
                     model: model, workspace: workspace.id, collapsed: collapsed, editing: editing,
                     selected: selected, theme: theme, sideways: panel, dropState: gridDrop,
-                    actions: gridActions)
+                    actions: gridActions))
             }
         }
         .onAppear {
@@ -230,6 +362,25 @@ struct GridLayer {
     var bottom: Bool
 }
 
+/// Which of the grid's edges have more cards to scroll to.
+@MainActor
+@Observable
+final class GridEdges {
+    var before = false
+    var after = false
+}
+
+/// The grid, faded at an edge with more to scroll to, as the list is
+/// (`ScrollEdgeFade`).
+struct TabGrid: View {
+    let grid: TabGridView
+    @State private var edges = GridEdges()
+
+    var body: some View {
+        grid.edges(edges).edgeFade(.vertical, before: edges.before, after: edges.after)
+    }
+}
+
 /// The grid: the system's collection view, with its compositional layout,
 /// diffable data source, drag and drop and context menus. The cards and
 /// group headers are SwiftUI views in its cells; the group boxes are the
@@ -244,6 +395,14 @@ struct TabGridView: UIViewRepresentable {
     let sideways: Bool
     let dropState: GridDropState
     let actions: GridActions
+    /// Where the grid reports which edges have more to scroll to.
+    var reportsEdges: GridEdges?
+
+    func edges(_ edges: GridEdges) -> TabGridView {
+        var grid = self
+        grid.reportsEdges = edges
+        return grid
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -268,10 +427,10 @@ struct TabGridView: UIViewRepresentable {
         /// is held, the system moves it into the gap, so the finger rests
         /// over the card itself, which keeps that landing.
         private var lastLanding: (DropOver, DropKind)?
-        /// The card side the finger rests on, and since when.
-        private var edge: (key: String, since: Date)?
-        /// How long a finger rests on a card's side before the gap opens.
-        static let edgeRest: TimeInterval = 0.15
+        /// The card side the finger rests on, where and since when.
+        private var edge: EdgeRest?
+        /// The card showing its halves until the finger leaves its cell.
+        private var latched: String?
         /// Where the card lands with the finger off every card: the end
         /// of the group or Workspace around the finger.
         private var placed: (DropOver, DropKind)?
@@ -285,7 +444,10 @@ struct TabGridView: UIViewRepresentable {
             let layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
                 self?.layout(section: index)
             }
-            let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
+            let view = GridCollectionView(frame: .zero, collectionViewLayout: layout)
+            // Each layout pass, a scroll's included, says which edges have
+            // more to scroll to.
+            view.laidOut = { [weak self] view in self?.reportEdges(view) }
             view.backgroundColor = .clear
             view.delegate = self
             view.dragDelegate = self
@@ -300,7 +462,7 @@ struct TabGridView: UIViewRepresentable {
             view.addGestureRecognizer(swipe)
             view.panGestureRecognizer.require(toFail: swipe)
 
-            let card = UICollectionView.CellRegistration<UICollectionViewCell, String> { [weak self] cell, _, id in
+            let card = UICollectionView.CellRegistration<GridCell, String> { [weak self] cell, _, id in
                 self?.configure(cell, id: id)
             }
             dataSource = UICollectionViewDiffableDataSource(collectionView: view) { view, index, id in
@@ -396,6 +558,15 @@ struct TabGridView: UIViewRepresentable {
             return panes.isEmpty ? nil : row.id
         }
 
+        private func reportEdges(_ view: UICollectionView) {
+            guard let edges = parent.reportsEdges else { return }
+            let inset = view.adjustedContentInset
+            let more = EdgeFade.edges(offset: view.contentOffset.y + inset.top,
+                                      size: view.contentSize.height + inset.top + inset.bottom, room: view.bounds.height)
+            if edges.before != more[0] { edges.before = more[0] }
+            if edges.after != more[1] { edges.after = more[1] }
+        }
+
         private func indexPath(holding id: String) -> IndexPath? {
             let model = parent.model
             let split = model.row(id)?.parentId.flatMap(model.row).flatMap { $0.kind == .split ? $0.id : nil }
@@ -419,11 +590,8 @@ struct TabGridView: UIViewRepresentable {
             let row = NSCollectionLayoutGroup.horizontal(
                 layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(height)),
                 repeatingSubitem: item, count: columns)
-            row.interItemSpacing = .fixed(GridMetrics.columnGap)
             let layout = NSCollectionLayoutSection(group: row)
-            layout.interGroupSpacing = GridMetrics.rowGap
-            // Cards sit inside every box around them, less the ring's room.
-            let side = GridMetrics.edge + CGFloat(section.layers.count) * GridMetrics.nest - GridMetrics.ring
+            let gap = GridMetrics.padY - GridMetrics.ring
             let closes = section.layers.filter(\.bottom).count
             // A box holding only its header, a collapsed group's, keeps the
             // header's room above it below it too, so the header sits in
@@ -431,8 +599,8 @@ struct TabGridView: UIViewRepresentable {
             let headerOnly = section.header != nil && section.items.isEmpty && section.layers.last?.bottom == true
             let room = CGFloat(closes) * GridMetrics.boxBottom - (headerOnly ? GridMetrics.boxBottom - GridMetrics.boxTop : 0)
             layout.contentInsets = NSDirectionalEdgeInsets(
-                top: section.layers.isEmpty ? GridMetrics.rowGap : 0, leading: side,
-                bottom: room + (closes > 0 ? GridMetrics.rowGap : 0), trailing: side)
+                top: (section.layers.isEmpty ? GridMetrics.rowGap : 0) - gap, leading: 0,
+                bottom: room + (closes > 0 ? GridMetrics.rowGap : 0) - gap, trailing: 0)
             if section.header != nil {
                 let nested = section.layers.count > 1
                 let size = NSCollectionLayoutSize(
@@ -458,13 +626,17 @@ struct TabGridView: UIViewRepresentable {
 
         // MARK: Cells
 
-        private func configure(_ cell: UICollectionViewCell, id: String) {
+        private func configure(_ cell: GridCell, id: String) {
             guard let row = parent.model.row(id), let box = parent.model.treeStore.box(id) else { return }
             if id != closing, id != swiped?.id {
                 cell.transform = .identity
                 cell.alpha = 1
             }
-            let depth = sections.first { $0.items.contains(id) }?.depth ?? 0
+            let section = sections.first { $0.items.contains(id) }
+            let depth = section?.depth ?? 0
+            cell.layers = section?.layers.count ?? 0
+            cell.columns = GridMetrics.columns
+            let leading = GridMetrics.insets(layers: cell.layers, column: 0, columns: cell.columns).leading - GridMetrics.ring
             let height = GridMetrics.picture(depth: depth, sideways: parent.sideways)
             let parent = self.parent!
             if row.kind == .split {
@@ -474,15 +646,21 @@ struct TabGridView: UIViewRepresentable {
                                   editing: parent.editing, dropState: parent.dropState,
                                   onClose: { parent.actions.closeSplit(row, panes) })
                 }
-                .margins(.all, 0)
+                .margins(.leading, leading)
+                .margins(.trailing, 0)
+                .margins(.vertical, GridMetrics.padY - GridMetrics.ring)
             } else {
                 cell.contentConfiguration = UIHostingConfiguration {
                     GridCard(model: parent.model, box: box, height: height, theme: parent.theme,
                              editing: parent.editing, ticked: parent.selected.contains(row.id),
                              dropState: parent.dropState, onClose: { parent.actions.close(row) })
                 }
-                .margins(.all, 0)
+                .margins(.leading, leading)
+                .margins(.trailing, 0)
+                .margins(.vertical, GridMetrics.padY - GridMetrics.ring)
             }
+            // The configuration's content view takes the card's place.
+            cell.place(cell.frame)
         }
 
         private func configureHeader(_ cell: UICollectionViewCell, section index: Int) {
@@ -577,10 +755,12 @@ struct TabGridView: UIViewRepresentable {
 
         // MARK: Drag and drop
 
+        /// A card moves at any time, as a row in the list does. Outside
+        /// Edit Tabs a press that holds still opens the card's menu, and
+        /// moving the finger lifts the card from it.
         func collectionView(_ view: UICollectionView, itemsForBeginning session: UIDragSession,
                             at path: IndexPath) -> [UIDragItem] {
-            // Cards move in Edit Tabs; outside it a press is the card's menu.
-            guard parent.editing, let id = dataSource.itemIdentifier(for: path) else { return [] }
+            guard let id = dataSource.itemIdentifier(for: path) else { return [] }
             let provider = NSItemProvider()
             provider.registerDataRepresentation(forTypeIdentifier: UTType.svalNode.identifier, visibility: .ownProcess) { done in
                 done(Data(id.utf8), nil)
@@ -602,9 +782,10 @@ struct TabGridView: UIViewRepresentable {
         }
 
         private func preview(at path: IndexPath, in view: UICollectionView) -> UIDragPreviewParameters? {
-            guard let cell = view.cellForItem(at: path) else { return nil }
+            guard let cell = view.cellForItem(at: path) as? GridCell else { return nil }
             let parameters = UIDragPreviewParameters()
-            parameters.visiblePath = UIBezierPath(roundedRect: cell.bounds, cornerRadius: 14 + GridMetrics.ring)
+            let room = cell.card.insetBy(dx: -GridMetrics.ring, dy: -GridMetrics.ring)
+            parameters.visiblePath = UIBezierPath(roundedRect: room, cornerRadius: 14 + GridMetrics.ring)
             parameters.backgroundColor = .clear
             return parameters
         }
@@ -622,25 +803,41 @@ struct TabGridView: UIViewRepresentable {
             let point = session.location(in: view)
             let overPath = view.indexPathForItem(at: point)
             if let over = overPath, let overId = dataSource.itemIdentifier(for: over), overId != id,
-               let cell = view.cellForItem(at: over) {
-                if let hover = middle(of: overId, cell: cell, at: point, in: view, dragged: id) {
+               let cell = view.cellForItem(at: over) as? GridCell {
+                let at = cell.convert(point, from: view)
+                let zone = GridMetrics.zone(at, card: cell.card, outer: cell.outer)
+                latched = GridMetrics.latch(latched, over: overId, zone: zone)
+                if let hover = middle(of: overId, cell: cell, at: point, in: view, dragged: id, latched: latched != nil) {
+                    #if DEBUG
+                    if parent.dropState.hover?.id != hover.id { Diagnostics.log("grid drop: on a card's middle, \(hover.kind)") }
+                    #endif
+                    // Once a card shows its halves it keeps them until the
+                    // finger leaves its cell, so the card can't move from
+                    // under a finger drifting toward its side.
+                    latched = overId
                     edge = nil
                     if parent.dropState.hover != hover { parent.dropState.hover = hover }
                     return UICollectionViewDropProposal(operation: hover.writes ? .move : .forbidden,
                                                         intent: .insertIntoDestinationIndexPath)
                 }
-                // On a card's side, the gap opens only once the finger
-                // rests there: opening it at once moves the card from
-                // under a finger on its way to the card's middle.
+                // On a card's side, or in the room around it, the gap
+                // opens only once the finger rests still there: opening it
+                // at once moves the card from under a finger on its way to
+                // the card's middle.
                 if parent.dropState.hover != nil { parent.dropState.hover = nil }
-                let key = "\(overId) \(cell.convert(point, from: view).x < cell.bounds.midX)"
+                let key = "\(overId) \(at.x < cell.bounds.midX)"
                 let now = Date.now
-                if edge?.key != key { edge = (key, now) }
-                if let edge, now.timeIntervalSince(edge.since) < Self.edgeRest {
+                let rest = GridMetrics.rest(edge, key: key, at: point, now: now)
+                #if DEBUG
+                if rest.key != edge?.key { Diagnostics.log("grid drop: on a card's side") }
+                #endif
+                edge = rest
+                if now.timeIntervalSince(rest.since) < GridMetrics.restTime(zone) {
                     return UICollectionViewDropProposal(operation: .move, intent: .unspecified)
                 }
             } else {
                 edge = nil
+                latched = nil
             }
             if parent.dropState.hover != nil { parent.dropState.hover = nil }
             placed = overPath == nil ? empty(at: point, in: view, dragged: id) : nil
@@ -665,6 +862,7 @@ struct TabGridView: UIViewRepresentable {
             parent.dropState.hover = nil
             lastLanding = nil
             edge = nil
+            latched = nil
             placed = nil
         }
 
@@ -685,9 +883,10 @@ struct TabGridView: UIViewRepresentable {
             if coordinator.proposal.intent == .unspecified { return }
             if coordinator.proposal.intent == .insertIntoDestinationIndexPath {
                 guard let hover = parent.dropState.hover, let plan = model.dropPlan(id, over: hover.over, hover.kind),
-                      let cell = view.cellForItem(at: path) else { return }
+                      let cell = view.cellForItem(at: path) as? GridCell else { return }
                 Diagnostics.log("sheet: dropped in the grid, \(hover.kind)")
-                coordinator.drop(item.dragItem, intoItemAt: path, rect: cell.bounds)
+                let room = cell.card.insetBy(dx: -GridMetrics.ring, dy: -GridMetrics.ring)
+                coordinator.drop(item.dragItem, intoItemAt: path, rect: room)
                 parent.actions.drop(plan)
                 return
             }
@@ -747,12 +946,13 @@ struct TabGridView: UIViewRepresentable {
             session.localDragSession?.items.first?.localObject as? String
         }
 
-        /// The halves under the finger, when it's over a card's picture,
-        /// clear of its sides (15f2).
-        private func middle(of id: String, cell: UICollectionViewCell, at point: CGPoint, in view: UICollectionView,
-                            dragged: String) -> GridHover? {
+        /// The halves under the finger, when it's over a card's middle, or
+        /// anywhere in the cell of a `latched` card (15f2).
+        private func middle(of id: String, cell: GridCell, at point: CGPoint, in view: UICollectionView,
+                            dragged: String, latched: Bool) -> GridHover? {
             guard let row = parent.model.row(id) else { return nil }
-            guard let (x, span, picture) = GridMetrics.middle(cell.convert(point, from: view), in: cell.bounds.size)
+            guard let (x, span, picture) = GridMetrics.middle(cell.convert(point, from: view), card: cell.card,
+                                                              latched: latched)
             else { return nil }
             let model = parent.model
             let over = DropOver(id: id, kind: row.kind, expanded: false)
@@ -859,6 +1059,16 @@ struct TabGridView: UIViewRepresentable {
             }
             return model.dropPlan(id, over: landing.0, landing.1) == nil ? nil : landing
         }
+    }
+}
+
+/// The grid's collection view, which says when it lays out.
+final class GridCollectionView: UICollectionView {
+    var laidOut: ((UICollectionView) -> Void)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        laidOut?(self)
     }
 }
 
