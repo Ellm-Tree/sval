@@ -247,7 +247,8 @@ extension WorkspaceSheet {
             if let workspace {
                 TabGrid(grid: TabGridView(
                     model: model, workspace: workspace.id, collapsed: collapsed, editing: editing,
-                    selected: selected, theme: theme, sideways: panel, dropState: gridDrop,
+                    selected: selected, scheme: scheme, tint: model.tint(of: workspace), sideways: panel,
+                    dropState: gridDrop,
                     actions: gridActions))
             }
         }
@@ -317,49 +318,63 @@ extension WorkspaceSheet {
     func renameCard(_ row: OutlineRow) {
         renamingCard = row
     }
-
-    /// The children in order, as runs: each group alone, and the cards
-    /// between groups together.
-    static func runs(_ children: [OutlineRow]) -> [[OutlineRow]] {
-        var out: [[OutlineRow]] = []
-        var cards: [OutlineRow] = []
-        for row in children {
-            if row.kind == .group {
-                if !cards.isEmpty { out.append(cards); cards = [] }
-                out.append([row])
-            } else {
-                cards.append(row)
-            }
-        }
-        if !cards.isEmpty { out.append(cards) }
-        return out
-    }
 }
 
 // MARK: The collection view
 
-/// One section of the grid: a run of cards, under a group's header when it
-/// opens one, inside the boxes of the groups around it.
-struct GridSection {
-    let id: String
-    /// Where a drop into the section's empty end lands: its group, or the
-    /// Workspace.
-    let container: String
-    let depth: Int
-    /// The groups it is in, outermost first.
-    let groups: [String]
-    /// The group whose header this section starts with.
-    let header: OutlineRow?
-    var items: [String]
-    /// The groups around it, outermost first, with whether this section
-    /// opens or closes each one's box.
-    var layers: [GridLayer]
+/// What the grid draws from: its sections, the ticks, and what every card
+/// takes from the sheet.
+struct GridState: Equatable {
+    var sections: [TreeSection]
+    var editing: Bool
+    var ticked: Set<String>
+    var look: GridLook
 }
 
-struct GridLayer {
+/// What every card and box is drawn with: the sheet's colours, whether it
+/// is the sideways panel, and the text size the measures follow.
+struct GridLook: Equatable {
+    let scheme: ColorScheme
     let tint: String?
-    var top: Bool
-    var bottom: Bool
+    let sideways: Bool
+    let size: UIContentSizeCategory
+}
+
+/// What a new `GridState` asks of the collection view: a new snapshot
+/// where cards or sections came, went or moved; the cards and headers whose
+/// own facts changed; and a new layout where a section's shape changed. A
+/// change to a row's content alone asks for nothing: each card and header
+/// reads its row's `RowBox`.
+struct GridUpdate: Equatable {
+    var apply = false
+    var reconfigure: [String] = []
+    var headers: [String] = []
+    var relayout = false
+
+    static func between(_ old: GridState?, _ new: GridState) -> GridUpdate {
+        var update = GridUpdate()
+        guard let old else {
+            update.apply = true
+            return update
+        }
+        update.apply = old.sections.map(\.id) != new.sections.map(\.id)
+            || old.sections.map(\.items) != new.sections.map(\.items)
+        let looks = old.look != new.look
+        let before = Dictionary(old.sections.flatMap(\.lines).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for line in new.sections.flatMap(\.lines) {
+            guard let was = before[line.id] else { continue }
+            if looks || old.editing != new.editing || was != line
+                || old.ticked.contains(line.id) != new.ticked.contains(line.id) {
+                update.reconfigure.append(line.id)
+            }
+        }
+        update.relayout = looks || old.sections.map(\.layout) != new.sections.map(\.layout)
+        let headers = Dictionary(old.sections.map { ($0.id, $0.header) }, uniquingKeysWith: { a, _ in a })
+        for section in new.sections where section.header != nil {
+            if let was = headers[section.id], looks || was != section.header { update.headers.append(section.id) }
+        }
+        return update
+    }
 }
 
 /// Which of the grid's edges have more cards to scroll to.
@@ -391,7 +406,8 @@ struct TabGridView: UIViewRepresentable {
     let collapsed: Set<String>
     let editing: Bool
     let selected: Set<String>
-    let theme: Theme
+    let scheme: ColorScheme
+    let tint: String?
     let sideways: Bool
     let dropState: GridDropState
     let actions: GridActions
@@ -418,7 +434,10 @@ struct TabGridView: UIViewRepresentable {
     final class Coordinator: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate,
         UICollectionViewDropDelegate, UIGestureRecognizerDelegate {
         private var parent: TabGridView!
-        private var sections: [GridSection] = []
+        private var state: GridState?
+        /// Each card's line, by id, as `state` holds it.
+        private var lines: [String: TreeLine] = [:]
+        private var theme = Theme(.light)
         private var dataSource: UICollectionViewDiffableDataSource<String, String>!
         private weak var view: UICollectionView?
         private var scrolledToFront = false
@@ -438,6 +457,8 @@ struct TabGridView: UIViewRepresentable {
         /// closes, which stays off until the tree drops it.
         private var swiped: (id: String, cell: UICollectionViewCell)?
         private var closing: String?
+
+        private var sections: [TreeSection] { state?.sections ?? [] }
 
         func make(_ parent: TabGridView) -> UICollectionView {
             self.parent = parent
@@ -480,27 +501,45 @@ struct TabGridView: UIViewRepresentable {
             return view
         }
 
-        func update(_ parent: TabGridView) {
+        /// Draws the grid from the tree as it is: a card or header whose
+        /// own facts changed is configured again, and the rest are left.
+        @discardableResult
+        func update(_ parent: TabGridView) -> GridUpdate {
             self.parent = parent
-            GridBox.theme = parent.theme
-            sections = build(parent.workspace, depth: 0, chain: [])
-            var snapshot = NSDiffableDataSourceSnapshot<String, String>()
-            for section in sections {
-                snapshot.appendSections([section.id])
-                snapshot.appendItems(section.items, toSection: section.id)
+            let look = GridLook(scheme: parent.scheme, tint: parent.tint, sideways: parent.sideways,
+                                size: UIApplication.shared.preferredContentSizeCategory)
+            let new = GridState(sections: TreeLines.grid(parent.model.tree, workspace: parent.workspace,
+                                                         collapsed: parent.collapsed),
+                                editing: parent.editing, ticked: parent.selected, look: look)
+            let update = GridUpdate.between(state, new)
+            theme = Theme(parent.scheme, tint: parent.tint)
+            GridBox.theme = theme
+            state = new
+            lines = Dictionary(new.sections.flatMap(\.lines).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            if let closing, lines[closing] == nil { self.closing = nil }
+            if update.apply || !update.reconfigure.isEmpty {
+                var snapshot: NSDiffableDataSourceSnapshot<String, String>
+                if update.apply {
+                    snapshot = NSDiffableDataSourceSnapshot()
+                    for section in new.sections {
+                        snapshot.appendSections([section.id])
+                        snapshot.appendItems(section.items, toSection: section.id)
+                    }
+                } else {
+                    snapshot = dataSource.snapshot()
+                }
+                snapshot.reconfigureItems(update.reconfigure)
+                dataSource.apply(snapshot, animatingDifferences: false)
             }
-            // Every card redraws its ticks, ring and colours; the pictures
-            // and media state update themselves.
-            snapshot.reconfigureItems(snapshot.itemIdentifiers)
-            if let closing, !snapshot.itemIdentifiers.contains(closing) { self.closing = nil }
-            dataSource.apply(snapshot, animatingDifferences: false)
             // The headers and boxes follow the sections, which the
             // snapshot doesn't carry.
-            view?.collectionViewLayout.invalidateLayout()
-            for path in view?.indexPathsForVisibleSupplementaryElements(ofKind: UICollectionView.elementKindSectionHeader) ?? [] {
+            if update.relayout { view?.collectionViewLayout.invalidateLayout() }
+            for id in update.headers {
+                guard let section = new.sections.firstIndex(where: { $0.id == id }) else { continue }
+                let path = IndexPath(item: 0, section: section)
                 if let header = view?.supplementaryView(forElementKind: UICollectionView.elementKindSectionHeader, at: path)
                     as? UICollectionViewCell {
-                    configureHeader(header, section: path.section)
+                    configureHeader(header, section: section)
                 }
             }
             if !scrolledToFront, let front = parent.model.browser.currentTabId, let path = indexPath(holding: front) {
@@ -509,53 +548,7 @@ struct TabGridView: UIViewRepresentable {
                     self?.view?.scrollToItem(at: path, at: .centeredVertically, animated: false)
                 }
             }
-        }
-
-        // MARK: Sections
-
-        /// The tree under `parent` as sections: each run of cards one
-        /// section, each group its header's section and then its own.
-        private func build(_ parentId: String, depth: Int, chain: [OutlineRow]) -> [GridSection] {
-            let model = parent.model
-            var out: [GridSection] = []
-            let header = chain.last.flatMap { $0.id == parentId ? $0 : nil }
-            var index = 0
-            func section(_ items: [String]) -> GridSection {
-                defer { index += 1 }
-                return GridSection(id: "\(parentId)#\(index)", container: parentId, depth: depth, groups: chain.map(\.id),
-                                   header: index == 0 ? header : nil, items: items,
-                                   layers: chain.map { GridLayer(tint: $0.color, top: false, bottom: false) })
-            }
-            let collapsed = header.map { parent.collapsed.contains($0.id) } ?? false
-            if !collapsed {
-                for run in WorkspaceSheet.runs(model.children(of: parentId)) {
-                    if run.count == 1, run[0].kind == .group {
-                        // A group's header heads a section, so a group that
-                        // opens with a group gets an empty one first.
-                        if header != nil, index == 0 { out.append(section([])) }
-                        out += build(run[0].id, depth: depth + 1, chain: chain + [run[0]])
-                    } else {
-                        out.append(section(run.compactMap(cardId)))
-                    }
-                }
-            }
-            if header != nil, index == 0 { out.append(section([])) }
-            // The sections a group holds open and close its box.
-            if header != nil, !out.isEmpty {
-                let level = chain.count - 1
-                out[0].layers[level].top = true
-                out[out.count - 1].layers[level].bottom = true
-            }
-            return out
-        }
-
-        /// A card's id: a tab's, a split's, or for a split holding one tab,
-        /// that tab's (split-view spec §5.1).
-        private func cardId(_ row: OutlineRow) -> String? {
-            guard row.kind == .split else { return row.kind == .tab ? row.id : nil }
-            let panes = parent.model.children(of: row.id).filter { $0.kind == .tab }
-            if panes.count == 1 { return panes[0].id }
-            return panes.isEmpty ? nil : row.id
+            return update
         }
 
         private func reportEdges(_ view: UICollectionView) {
@@ -627,33 +620,32 @@ struct TabGridView: UIViewRepresentable {
         // MARK: Cells
 
         private func configure(_ cell: GridCell, id: String) {
-            guard let row = parent.model.row(id), let box = parent.model.treeStore.box(id) else { return }
+            guard let line = lines[id], let box = parent.model.treeStore.box(id), let state else { return }
             if id != closing, id != swiped?.id {
                 cell.transform = .identity
                 cell.alpha = 1
             }
-            let section = sections.first { $0.items.contains(id) }
-            let depth = section?.depth ?? 0
-            cell.layers = section?.layers.count ?? 0
+            cell.layers = line.depth
             cell.columns = GridMetrics.columns
             let leading = GridMetrics.insets(layers: cell.layers, column: 0, columns: cell.columns).leading - GridMetrics.ring
-            let height = GridMetrics.picture(depth: depth, sideways: parent.sideways)
-            let parent = self.parent!
-            if row.kind == .split {
-                let panes = parent.model.children(of: row.id).filter { $0.kind == .tab }
+            let height = GridMetrics.picture(depth: line.depth, sideways: state.look.sideways)
+            let model = parent.model, theme = theme, dropState = parent.dropState, editing = state.editing
+            if let panes = line.panes {
+                let boxes = panes.compactMap(model.treeStore.box)
                 cell.contentConfiguration = UIHostingConfiguration {
-                    GridSplitCard(model: parent.model, split: row, panes: panes, height: height, theme: parent.theme,
-                                  editing: parent.editing, dropState: parent.dropState,
-                                  onClose: { parent.actions.closeSplit(row, panes) })
+                    GridSplitCard(model: model, split: box, panes: boxes, height: height, theme: theme,
+                                  editing: editing, dropState: dropState,
+                                  onClose: { [weak self] in self?.close(id) })
                 }
                 .margins(.leading, leading)
                 .margins(.trailing, 0)
                 .margins(.vertical, GridMetrics.padY - GridMetrics.ring)
             } else {
+                let ticked = state.ticked.contains(id)
                 cell.contentConfiguration = UIHostingConfiguration {
-                    GridCard(model: parent.model, box: box, height: height, theme: parent.theme,
-                             editing: parent.editing, ticked: parent.selected.contains(row.id),
-                             dropState: parent.dropState, onClose: { parent.actions.close(row) })
+                    GridCard(model: model, box: box, height: height, theme: theme,
+                             editing: editing, ticked: ticked,
+                             dropState: dropState, onClose: { [weak self] in self?.close(id) })
                 }
                 .margins(.leading, leading)
                 .margins(.trailing, 0)
@@ -664,21 +656,37 @@ struct TabGridView: UIViewRepresentable {
         }
 
         private func configureHeader(_ cell: UICollectionViewCell, section index: Int) {
-            guard sections.indices.contains(index), let group = sections[index].header,
-                  let box = parent.model.treeStore.box(group.id) else {
+            guard sections.indices.contains(index), let header = sections[index].header,
+                  let box = parent.model.treeStore.box(header.id) else {
                 cell.contentConfiguration = nil
                 return
             }
-            let parent = self.parent!
-            let nested = sections[index].layers.count > 1
+            let theme = theme
+            let icons = header.icons.compactMap(parent.model.treeStore.box)
             cell.contentConfiguration = UIHostingConfiguration {
-                GridGroupHeader(model: parent.model, box: box, open: !parent.collapsed.contains(group.id),
-                                nested: nested, theme: parent.theme, onToggle: { parent.actions.toggle(group) })
-                    // The header is a supplementary view, which the
-                    // collection view's item menus don't cover.
-                    .contextMenu { MenuItems(sections: parent.actions.groupMenu(group)) }
+                GridGroupHeader(box: box, header: header, icons: icons, theme: theme,
+                                onToggle: { [weak self] in self?.act(on: header.id) { $0.toggle($1) } },
+                                menu: { [weak self] in self?.parent.actions.groupMenu($0) ?? [] })
             }
             .margins(.all, 0)
+        }
+
+        /// Runs `action` on the row `id` as the tree holds it now: a cell
+        /// keeps its closures while its row's content changes.
+        private func act(on id: String, _ action: (GridActions, OutlineRow) -> Void) {
+            guard let row = parent.model.row(id) else { return }
+            action(parent.actions, row)
+        }
+
+        private func close(_ id: String) {
+            let model = parent.model
+            act(on: id) { actions, row in
+                if row.kind == .split {
+                    actions.closeSplit(row, model.children(of: row.id).filter { $0.kind == .tab })
+                } else {
+                    actions.close(row)
+                }
+            }
         }
 
         // MARK: Swipe to close
@@ -705,7 +713,7 @@ struct TabGridView: UIViewRepresentable {
                 swiped = nil
                 let vx = pan.velocity(in: view).x
                 let flung = abs(vx) > 800 && (vx > 0) == (dx > 0)
-                guard pan.state == .ended, abs(dx) > width * 0.4 || flung, let row = parent.model.row(id) else {
+                guard pan.state == .ended, abs(dx) > width * 0.4 || flung, parent.model.row(id) != nil else {
                     UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0) {
                         cell.transform = .identity
                         cell.alpha = 1
@@ -718,12 +726,7 @@ struct TabGridView: UIViewRepresentable {
                     cell.transform = CGAffineTransform(translationX: off, y: 0)
                     cell.alpha = 0
                 } completion: { [weak self] _ in
-                    guard let self else { return }
-                    if row.kind == .split {
-                        parent.actions.closeSplit(row, parent.model.children(of: row.id).filter { $0.kind == .tab })
-                    } else {
-                        parent.actions.close(row)
-                    }
+                    self?.close(id)
                 }
             default:
                 break
@@ -935,8 +938,11 @@ struct TabGridView: UIViewRepresentable {
             default:
                 return nil
             }
+            // The moved sections stand as the grid's state, so the tree's
+            // edit, once it arrives, finds the grid already drawn.
             for index in sections.indices {
-                sections[index].items = snapshot.itemIdentifiers(inSection: sections[index].id)
+                let items = snapshot.itemIdentifiers(inSection: sections[index].id)
+                state?.sections[index].lines = items.compactMap { lines[$0] }
             }
             dataSource.apply(snapshot, animatingDifferences: true)
             return dataSource.indexPath(for: id)
@@ -1077,7 +1083,7 @@ final class GridCollectionView: UICollectionView {
 final class GridBox: UICollectionReusableView {
     static var theme: Theme?
 
-    static func kind(_ layers: [GridLayer]) -> String {
+    static func kind(_ layers: [GroupLayer]) -> String {
         "box|" + layers.map { "\($0.tint ?? "-"):\($0.top ? 1 : 0):\($0.bottom ? 1 : 0)" }.joined(separator: ",")
     }
 
@@ -1302,8 +1308,10 @@ struct CardBar<Icon: View>: View {
 /// shows them upright.
 struct GridSplitCard: View {
     let model: AppModel
-    let split: OutlineRow
-    let panes: [OutlineRow]
+    /// The split's row and its panes', read here so a change to any of
+    /// them redraws this card alone.
+    let split: RowBox
+    let panes: [RowBox]
     let height: CGFloat
     let theme: Theme
     let editing: Bool
@@ -1311,6 +1319,8 @@ struct GridSplitCard: View {
     let onClose: () -> Void
 
     var body: some View {
+        let panes = panes.map(\.row)
+        let split = split.row
         let front = panes.contains { $0.id == (model.browser as Browser).currentTabId }
         let first = panes[0]
         let title = split.name.isEmpty ? first.displayTitle : split.name
@@ -1357,19 +1367,21 @@ private struct GridHalves: View {
 /// A group's header in the grid (15d): its tile, name, count and chevron,
 /// and when closed, the first three icons inside it.
 struct GridGroupHeader: View {
-    let model: AppModel
     /// The group's row, read here so a change to it redraws this header.
     let box: RowBox
-    let open: Bool
-    let nested: Bool
+    let header: GroupHeader
+    /// The first three tabs inside the group, whose icons show while it's
+    /// closed.
+    let icons: [RowBox]
     let theme: Theme
     let onToggle: () -> Void
+    let menu: (OutlineRow) -> [[MenuItem]]
 
     private var group: OutlineRow { box.row }
 
     var body: some View {
         let tint = group.color.flatMap(WorkspaceTint.init(rawValue:))
-        let tabs = model.rows.filter { $0.kind == .tab && ($0.parentId.map { model.isInside($0, group.id) } ?? false) }
+        let open = header.open, nested = header.nested
         Button(action: onToggle) {
             HStack(spacing: nested ? 9 : 10) {
                 tile(tint, size: nested ? 24 : 28)
@@ -1380,11 +1392,11 @@ struct GridGroupHeader: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if !open {
                     HStack(spacing: -6) {
-                        ForEach(tabs.prefix(3), id: \.id) { tab in SiteTile(row: tab, size: 20) }
+                        ForEach(icons.map(\.row), id: \.id) { tab in SiteTile(row: tab, size: 20) }
                     }
                     .padding(.trailing, 6)
                 }
-                Text("\(tabs.count)")
+                Text("\(header.count)")
                     .font(.system(.subheadline))
                     .monospacedDigit()
                     .foregroundStyle(theme.muted)
@@ -1396,6 +1408,9 @@ struct GridGroupHeader: View {
         }
         .buttonStyle(.plain)
         .accessibilityValue(open ? "Expanded" : "Collapsed")
+        // The header is a supplementary view, which the collection view's
+        // item menus don't cover.
+        .contextMenu { MenuItems(sections: menu(group)) }
     }
 
     private func tile(_ tint: WorkspaceTint?, size: CGFloat) -> some View {

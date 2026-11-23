@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 struct WorkspaceSheet: View {
     @Environment(AppModel.self) var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.appearance) private var scheme
+    @Environment(\.appearance) var scheme
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var typeSize
 
