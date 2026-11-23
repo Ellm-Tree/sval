@@ -914,8 +914,8 @@ final class Browser {
     @discardableResult
     func close(_ row: OutlineRow) async -> ClosedTab? {
         guard row.kind == .tab else { return nil }
-        // Asked before the close: closing drops the tab from the private
-        // session's ids, and the last tab ends the session.
+        // Asked before the close, which drops the tab from the private
+        // session's ids.
         let entry = model.isPrivate(row.id) ? nil : ClosedTab(
             row: row, place: model.closedPlace(of: row), workspace: model.workspace(of: row.id),
             state: pages[row.id]?.keptState?.state ?? offloaded.saved(row.id)?.state)

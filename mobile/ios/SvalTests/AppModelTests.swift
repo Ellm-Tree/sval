@@ -218,13 +218,14 @@ final class AppModelTests: AppModelTestCase {
         try assertShowsWhole(model, "after the session ended")
     }
 
-    /// A private tab's close keeps nothing to reopen, and a tab that was
-    /// private never reopens in the Workspace shown once its session is
-    /// gone, where a tab that wasn't private does.
+    /// A private tab's close keeps nothing to reopen and leaves its session
+    /// open and empty. A tab that was private never reopens in the Workspace
+    /// shown once its session is gone, where a tab that wasn't private does.
     func testAClosedPrivateTabNeverReopensOutsideItsSession() async throws {
         let model = try await launched(with: Desk())
-        let opened = await model.openPrivateSession()
-        let session = try XCTUnwrap(opened)
+        let showing = await model.showPrivateSession()
+        XCTAssertTrue(showing)
+        let session = try XCTUnwrap(model.privateWorkspace)
         let tab = AppHarness.id()
         let added = await model.editTree([["kind": "addTab", "parent": session, "name": "Secret", "url": blank, "id": tab]])
         XCTAssertTrue(added)
@@ -234,7 +235,10 @@ final class AppModelTests: AppModelTestCase {
         let entry = await model.browser.close(row)
         XCTAssertNil(entry, "a private tab's close keeps no entry")
         XCTAssertTrue(model.browser.recentlyClosed.isEmpty)
-        XCTAssertNil(model.privateWorkspace, "closing its last tab ended the session")
+        XCTAssertEqual(model.privateWorkspace, session, "closing its last tab left the session open")
+        XCTAssertTrue(model.tabs(in: session).isEmpty)
+        XCTAssertEqual(model.browser.workspaceId, session, "and in front, on its empty state")
+        await model.endPrivateSession()
         let shown = try XCTUnwrap(model.browser.workspaceId.flatMap(model.row), "a Workspace of the user's is shown")
 
         let reopened = await model.reopen(row, at: place, workspace: session, wasPrivate: true)

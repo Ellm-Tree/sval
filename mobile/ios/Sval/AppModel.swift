@@ -1353,11 +1353,6 @@ final class AppModel {
         if wasPrivate { browser.closePage(row.id) }
         guard await edit([["kind": "remove", "id": row.id]] + splitShapeOps(leaving: row)) else { return false }
         TitleHold.shared.forget(row.id)
-        // Closing the private session's last tab ends it, as closing a
-        // private window does.
-        if wasPrivate, let privateWorkspace, tabs(in: privateWorkspace).isEmpty {
-            await endPrivateSession()
-        }
         return true
     }
 

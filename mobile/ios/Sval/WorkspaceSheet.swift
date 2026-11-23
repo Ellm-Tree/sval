@@ -411,7 +411,7 @@ struct WorkspaceSheet: View {
                 if let entry = await browser.close(row), Browser.openable(row) != nil { entries.append(entry) }
             }
             guard !wasPrivate else {
-                if model.privateWorkspace != nil { toasts.show(.closed(rows.count)) }
+                toasts.show(.closed(rows.count))
                 return
             }
             toasts.show(.closed(rows.count) {
@@ -1256,7 +1256,7 @@ struct WorkspaceSheet: View {
         if model.isPrivate(row.id) {
             Task {
                 await browser.close(row)
-                if model.row(row.id) == nil, model.privateWorkspace != nil { toasts.show(.closed(1)) }
+                if model.row(row.id) == nil { toasts.show(.closed(1)) }
             }
             return
         }
