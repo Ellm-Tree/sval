@@ -251,7 +251,7 @@ control of what you see and what is sent to websites.
   to pause the video or music, and click again to play it. Point at it to
   see what's playing. Sound that can't be paused gets a mute button instead.
 - **Media controls.** While anything plays, controls sit at the bottom of
-  the Workspace panel. They control whatever played last, in any of the
+  the Workspace panel. They control whatever played last in any of the
   window's Workspaces. The controls are back and forward 10 seconds,
   play/pause, and previous and next track on sites that have tracks.
 - **Keep watching in Picture-in-Picture.** When you switch to another tab or
@@ -276,6 +276,12 @@ control of what you see and what is sent to websites.
   closes, and Settings opened there can't change anything Sval keeps. When a
   tab showing a website crashes in a private window, Sval keeps no crash
   report of that crash.
+- **Private window titles and notifications.** A private window's title
+  never includes the page's title, so your taskbar or Dock and other apps
+  don't show what you have open. Websites can't show notifications from a
+  private window because a notification stays on your screen after the window
+  closes. To allow notifications, go to Settings › Privacy and protection and
+  turn on "Show website notifications from private windows".
 
 ## Address bar and Launcher
 
@@ -373,6 +379,10 @@ control of what you see and what is sent to websites.
   Close it when you're done, and nothing is added to your Workspaces. Its
   page stays in History. A new Peek opens where you last closed one, at the
   same size.
+- **Private Peeks.** A Peek you open from a private window is private and
+  belongs to that window, so the Peek shares the window's sign-ins and saves
+  nothing. You can open the Peek's page as a tab in that private window and
+  nowhere else. When you close the private window, its Peeks close too.
 - **Link Docking.** Dock a site's links in a Workspace. Add a rule in
   Settings › Links › Link Docking, and links to that site from other apps
   open as a tab in the Workspace you choose. Rules sync.

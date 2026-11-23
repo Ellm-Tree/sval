@@ -121,9 +121,14 @@ function startingPlace(download) {
  */
 function startingWorkspace(download, { top, browser, win }) {
   const contextId = download.source?.browsingContextId;
-  // A private popup has no toolbar to list a download in, so its download is
-  // the window's whose session it shares (`SvalPrivateJars.windowOf`).
-  if (download.source?.isPrivate && win && !win.toolbar.visible) {
+  // A private popup has no toolbar to list a download in, and a private Peek
+  // no panel, so its download is the window's whose session it shares
+  // (`SvalPrivateJars.windowOf`).
+  if (
+    download.source?.isPrivate &&
+    win &&
+    (!win.toolbar.visible || lazy.isPeek(win))
+  ) {
     const owner = lazy.SvalPrivateJars.windowOf(
       top?.originAttributes?.userContextId
     );
@@ -157,7 +162,9 @@ function startingWorkspace(download, { top, browser, win }) {
       win.gBrowser?.getTabForBrowser(browser)
     );
   }
-  const front = lazy.BrowserWindowTracker.getTopWindow();
+  // A private window's workspace is its session's own, which no download
+  // outside it is filed under.
+  const front = lazy.BrowserWindowTracker.getTopWindow({ private: false });
   return front ? lazy.SvalWindowWorkspace.of(front).id : null;
 }
 

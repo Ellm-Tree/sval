@@ -1,0 +1,88 @@
+Sval: about:logging and about:memory write no file while a private window is open
+
+Gecko's logging names the addresses it works on, and about:memory's saved
+reports and its GC and CC logs name each document by its address. A private
+window leaves nothing on disk, so about:logging cannot start logging or set
+a log file or modules while one is open, and about:memory's Measure and
+save and both Save GC & CC logs buttons are disabled. SvalProfiler holds the
+buttons and stops logging that runs when a private window opens;
+about:logging follows that stop.
+
+diff --git a/toolkit/components/aboutmemory/content/aboutMemory.js b/toolkit/components/aboutmemory/content/aboutMemory.js
+index 9daa18a030..e4b137acc6 100644
+--- a/toolkit/components/aboutmemory/content/aboutMemory.js
++++ b/toolkit/components/aboutmemory/content/aboutMemory.js
+@@ -36,6 +36,7 @@ const { NetUtil } = ChromeUtils.importESModule(
+ ChromeUtils.defineESModuleGetters(this, {
+   Downloads: "resource://gre/modules/Downloads.sys.mjs",
+   FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
++  SvalProfiler: "moz-src:///browser/components/sval/SvalProfiler.sys.mjs",
+ });
+ 
+ ChromeUtils.defineLazyGetter(this, "nsBinaryStream", () =>
+@@ -523,7 +524,12 @@ window.onload = function () {
+   );
+   labelDiv2.setAttribute("role", "heading");
+   labelDiv2.setAttribute("aria-level", "1");
+-  appendButton(row2, SvDesc, saveReportsToFile, "Measure and save…");
++  let saveButton = appendButton(
++    row2,
++    SvDesc,
++    saveReportsToFile,
++    "Measure and save…"
++  );
+ 
+   // XXX: this isn't a great place for this checkbox, but I can't think of
+   // anywhere better.
+@@ -571,6 +577,14 @@ window.onload = function () {
+     "saveLogsVerbose"
+   );
+ 
++  // Sval: a saved report and a GC or CC log name each document by its
++  // address, so none is saved while a private window is open (SvalProfiler).
++  SvalProfiler.holdWhilePrivate([
++    saveButton,
++    document.getElementById("saveLogsConcise"),
++    document.getElementById("saveLogsVerbose"),
++  ]);
++
+   // Three cases here:
+   // - DMD is disabled (i.e. not built): don't show the button.
+   // - DMD is enabled but is not running: show the button, but disable it.
+diff --git a/toolkit/content/aboutLogging/aboutLogging.mjs b/toolkit/content/aboutLogging/aboutLogging.mjs
+index 7ac1d138e9..6356594871 100644
+--- a/toolkit/content/aboutLogging/aboutLogging.mjs
++++ b/toolkit/content/aboutLogging/aboutLogging.mjs
+@@ -25,6 +25,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   RecordingUtils:
+     "resource://devtools/shared/performance-new/recording-utils.sys.mjs",
+   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
++  SvalProfiler: "moz-src:///browser/components/sval/SvalProfiler.sys.mjs",
+ });
+ 
+ const $ = document.querySelector.bind(document);
+@@ -605,6 +606,24 @@ function init() {
+     toggleLoggingButton.disabled = true;
+   }
+ 
++  // Sval: a log names the addresses of the pages that are open, so none
++  // starts while a private window is open, and one that runs stops when a
++  // private window opens (SvalProfiler). The button says so once it has.
++  lazy.SvalProfiler.holdWhilePrivate([
++    toggleLoggingButton,
++    $("#set-log-file-button"),
++    $("#set-log-modules-button"),
++  ]);
++  const unfollow = lazy.SvalProfiler.onChange(() => {
++    document.l10n.setAttributes(
++      toggleLoggingButton,
++      `about-logging-${isLogging() ? "stop" : "start"}-logging`
++    );
++    updateLogFile();
++    updateLogModules();
++  });
++  window.addEventListener("unload", unfollow, { once: true });
++
+   // Initialize the uploaded profiles manager if profile uploading is enabled
+   const shouldUpload = Services.prefs.getBoolPref(
+     "toolkit.aboutLogging.uploadProfileToCloud",

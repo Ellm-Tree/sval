@@ -265,10 +265,11 @@ function lookUp(queryContext, query, win) {
   if (known?.query === query) {
     return known;
   }
-  // A Peek has no panel, and its tab rows go to the ordinary
-  // window's tabs (`SvalLauncherTabs.pick`).
+  // A Peek has no panel, and its tab rows go to the tabs of the ordinary
+  // window, or of the private window a private Peek was opened from
+  // (`SvalLauncherTabs.pick`).
   const host =
-    win && lazy.SvalPeek.isPeek(win) ? lazy.SvalPeek.openOrdinaryWindow() : win;
+    win && lazy.SvalPeek.isPeek(win) ? lazy.SvalPeek.homeOf(win) : win;
   const panel = host?.SvalPanel;
   const nodes = panel?.engine ? lazy.latestNodes(panel.engine) : null;
   if (
@@ -485,7 +486,7 @@ export const SvalLauncherTabs = {
     const leaving =
       !inPeek && from && !from.splitview && from.isEmpty ? from : null;
     (async () => {
-      const host = inPeek ? await lazy.SvalPeek.ordinaryWindow() : win;
+      const host = inPeek ? await lazy.SvalPeek.homeFor(win) : win;
       await host.SvalPanel.goToTab(result.payload.svalNodeId, {
         leaving,
         newWindow,

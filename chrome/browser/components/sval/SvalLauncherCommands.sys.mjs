@@ -283,13 +283,14 @@ const SETTINGS_PANES = [
  * The window a command that opens one of Sval's own pages or its sidebar
  * acts in from `win`. A Peek has no sidebar, and its new tab goes on
  * to a Peek of its own (`SvalPeek.startWindow`), so from one
- * these open in the user's ordinary window instead.
+ * these open in the user's ordinary window instead, or from a private Peek
+ * in the private window it was opened from (`SvalPeek.homeFor`).
  *
  * @param {Window} win
  * @returns {Promise<Window>}
  */
 async function ordinaryWindowFor(win) {
-  return lazy.SvalPeek.isPeek(win) ? lazy.SvalPeek.ordinaryWindow() : win;
+  return lazy.SvalPeek.isPeek(win) ? lazy.SvalPeek.homeFor(win) : win;
 }
 
 // ------------------------------------------------------------ the commands

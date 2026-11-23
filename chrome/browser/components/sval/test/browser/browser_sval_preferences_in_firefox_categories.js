@@ -166,6 +166,43 @@ add_task(async function bookmarklets_are_an_advanced_setting() {
 });
 
 /**
+ * Privacy and protection has a Private windows card under History, whose
+ * switch is Gecko's pref for notifications in private windows, off as Sval
+ * ships it.
+ */
+add_task(async function private_window_notifications_are_a_setting() {
+  const PREF = "dom.webnotifications.privateBrowsing.enabled";
+  await panelWithFolder(null);
+  const ui = await openSettings();
+  await showPane(ui.page, "privacy");
+  const toggle = () => ui.byId("sval-private-notifications");
+  await TestUtils.waitForCondition(
+    () => toggle()?.checkVisibility(),
+    "Privacy and protection shows the private windows switch"
+  );
+  const pane = paneOf(ui.page, "privacy");
+  const card = toggle().closest(".sval-card");
+  const history = pane.querySelector('setting-group[groupid="history2"]');
+  Assert.ok(
+    history.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+    "the card comes after History"
+  );
+  Assert.ok(
+    card.compareDocumentPosition(ui.byId("sval-privacy-advanced")) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    "and before Advanced"
+  );
+  Assert.ok(!toggle().checked, "off by default");
+  toggle().click();
+  Assert.ok(Services.prefs.getBoolPref(PREF), "on writes the pref");
+  Services.prefs.clearUserPref(PREF);
+  await TestUtils.waitForCondition(
+    () => !toggle().checked,
+    "a change from elsewhere moves the switch"
+  );
+});
+
+/**
  * Appearance holds the address bar's display choice, after Theme, and each
  * segment is the pref.
  */

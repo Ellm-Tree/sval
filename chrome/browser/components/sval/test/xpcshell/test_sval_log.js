@@ -265,6 +265,46 @@ add_task(async function the_file_names_no_address() {
   );
 });
 
+add_task(async function the_file_names_no_ip_address() {
+  // Each line as logged, and as the file keeps it.
+  const cases = [
+    [
+      "no answer from 192.168.1.20, from [2001:db8::8a2e:370:7334] or from fe80::1",
+      "no answer from <host>, from <host> or from <host>",
+    ],
+    ["the last try was 10.0.0.7.", "the last try was <host>."],
+    ["refused by fe80::1.", "refused by <host>."],
+    ["2001:db8::2: timed out", "<host>: timed out"],
+    ["192.168.1.20: timed out", "<host>: timed out"],
+    ["link-local fe80::1%eth0 answered", "link-local <host> answered"],
+    [
+      "full form 2001:0db8:0000:0000:0000:ff00:0042:8329 answered",
+      "full form <host> answered",
+    ],
+    [
+      "loopback ::1 and prefix fe80:: answered",
+      "loopback <host> and prefix <host> answered",
+    ],
+    // The address pass reads "ffff:" as a scheme first.
+    ["mapped ::ffff:192.0.2.128 answered", "mapped <host><url> answered"],
+    [
+      "peer_10.0.0.7_up and peer-10.0.0.8-down",
+      "peer_<host>_up and peer-<host>-down",
+    ],
+    ["host10.0.0.9x answered", "host<host>x answered"],
+    ["at 12:34:56 in build 153.0.1", "at 12:34:56 in build 153.0.1"],
+    ["from http://[2001:db8::2]:8080/page", "from <url>"],
+  ];
+  for (const [logged, kept] of cases) {
+    const { text } = await keptInFile(() => SvalLog.warn(logged));
+    Assert.stringContains(
+      text,
+      `warn sval: ${kept}\n`,
+      `"${logged}" is kept with each address taken out and nothing else`
+    );
+  }
+});
+
 add_task(async function one_call_is_one_line() {
   const { text } = await keptInFile(() =>
     SvalLog.warn("first\r\n2026-01-01T00:00:00.000Z error sval: forged")

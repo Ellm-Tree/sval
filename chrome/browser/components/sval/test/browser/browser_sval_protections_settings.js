@@ -165,9 +165,10 @@ add_task(async function privacy_and_protection_holds_its_topics_in_order() {
       "sval-password-manager-heading",
       ...(ui.byId("sval-security-keys").hidden ? [] : ["sval-security-keys"]),
       "history2",
+      "sval-private-windows",
       "sval-privacy-advanced",
     ],
-    "blocking, cookies, fingerprinting, signals, HTTPS-Only and Secure DNS, breach warnings and browsing protection, passwords, history, then Advanced"
+    "blocking, cookies, fingerprinting, signals, HTTPS-Only and Secure DNS, breach warnings and browsing protection, passwords, history, private windows, then Advanced"
   );
   const advanced = ui.byId("sval-privacy-advanced");
   Assert.deepEqual(

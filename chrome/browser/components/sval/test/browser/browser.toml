@@ -695,10 +695,16 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_private_media_position.js"]
 
+["browser_sval_private_outside_the_window.js"]
+
 ["browser_sval_private_page_window.js"]
+
+["browser_sval_private_peek.js"]
 
 ["browser_sval_private_print_job.js"]
 run-if = ["os == 'mac'"]
+
+["browser_sval_private_processes.js"]
 
 ["browser_sval_private_sessions.js"]
 

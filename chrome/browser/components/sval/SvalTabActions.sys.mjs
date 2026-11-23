@@ -9,8 +9,28 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
 });
+
+/**
+ * Puts `text` on the clipboard for `win`. What a private window copies is
+ * marked sensitive, as a password is, which each platform's clipboard takes
+ * as data to keep out of its history (`nsITransferable.isPrivateData`).
+ *
+ * @param {Window} win The browser window the copy was asked for in.
+ * @param {string} text
+ */
+export function copyText(win, text) {
+  const { Sensitive, NotSensitive } = Ci.nsIClipboardHelper;
+  Cc["@mozilla.org/widget/clipboardhelper;1"]
+    .getService(Ci.nsIClipboardHelper)
+    .copyString(
+      text,
+      null,
+      lazy.PrivateBrowsingUtils.isWindowPrivate(win) ? Sensitive : NotSensitive
+    );
+}
 
 /**
  * A Markdown inline link to `url`, its text `title`.
@@ -42,9 +62,7 @@ export function markdownLink(title, url) {
  */
 export function copyMarkdownLink(tab) {
   const url = Services.io.createExposableURI(tab.linkedBrowser.currentURI).spec;
-  Cc["@mozilla.org/widget/clipboardhelper;1"]
-    .getService(Ci.nsIClipboardHelper)
-    .copyString(markdownLink(tab.label, url));
+  copyText(tab.documentGlobal, markdownLink(tab.label, url));
 }
 
 /**
@@ -81,9 +99,7 @@ export function cleanAddressOf(uri) {
  * @param {string} doneId The hint's string in `launcher.ftl`.
  */
 function copyAndConfirm(win, spec, doneId) {
-  Cc["@mozilla.org/widget/clipboardhelper;1"]
-    .getService(Ci.nsIClipboardHelper)
-    .copyString(spec);
+  copyText(win, spec);
   const anchor = win.document.getElementById("urlbar-container");
   win.MozXULElement.insertFTLIfNeeded("sval/launcher.ftl");
   win.ConfirmationHint.show(anchor?.checkVisibility() ? anchor : null, doneId);

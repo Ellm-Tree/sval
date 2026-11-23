@@ -179,3 +179,58 @@ add_task(async function nothing_private_leaves() {
 
   BrowserTestUtils.removeTab(tab);
 });
+
+/**
+ * Browser code that runs in a private window's own chrome is left out of the
+ * log whole, a warning and an error alike, where the same code in a normal
+ * window is kept.
+ */
+add_task(async function a_private_windows_browser_code_is_not_logged() {
+  /**
+   * Warns through `win`'s console and reports a script error for `win`, as
+   * its chrome code's warnings and uncaught errors arrive.
+   *
+   * @param {Window} win A browser window.
+   * @param {string} mark What both messages carry.
+   */
+  const raiseIn = (win, mark) => {
+    win.console.warn(`window-warn ${mark}`);
+    const error = Cc["@mozilla.org/scripterror;1"].createInstance(
+      Ci.nsIScriptError
+    );
+    error.initWithWindowID(
+      `window-throw ${mark}`,
+      "chrome://browser/content/browser.js",
+      1,
+      1,
+      Ci.nsIScriptError.errorFlag,
+      "chrome javascript",
+      win.windowGlobalChild.innerWindowId,
+      true
+    );
+    Services.console.logMessage(error);
+  };
+  const win = await within(
+    BrowserTestUtils.openNewBrowserWindow({ private: true }),
+    20_000,
+    "a private window opening"
+  );
+  try {
+    raiseIn(win, "private-marker");
+    // The normal window's messages are raised after the private window's, and
+    // the console hands messages over in order.
+    raiseIn(window, "normal-marker");
+    await untilInLog("window-warn normal-marker");
+    await untilInLog("window-throw normal-marker");
+    Assert.ok(
+      !(await logHolds("private-marker")),
+      "the log holds neither message a private window's chrome raised"
+    );
+  } finally {
+    await within(
+      BrowserTestUtils.closeWindow(win),
+      10_000,
+      "the private window closing"
+    );
+  }
+});

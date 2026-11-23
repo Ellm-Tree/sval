@@ -14,10 +14,12 @@
  * it through the opener's origin attributes; every other private window gets
  * a fresh one as its first tab is made (`private-window-sessions.patch`),
  * and its new tabs follow it (`gBrowser.defaultUserContextId`,
- * `workspace-jar-for-new-tabs.patch`). A tab never moves between private
- * windows, a tab opened in one is given its jar whatever jar was asked for,
- * and a popup's links open in the window whose session it shares, so a
- * window's tabs are always in its jar.
+ * `workspace-jar-for-new-tabs.patch`). A Peek opened from a private window
+ * is in that window's session too ({@link SvalPrivateJars.joinSession}). A
+ * tab never moves between private sessions, a tab opened in a private window
+ * is given its jar whatever jar was asked for, and a popup's links open in
+ * the window whose session it shares, so a window's tabs are always in its
+ * jar.
  *
  * The ids come from a counter in memory, from 2^30 up, which
  * `ContextualIdentityService` never reaches and below 2^31, which Gecko
@@ -43,6 +45,9 @@ let next = FIRST;
 
 /** Each jar not yet cleared, to the window it was made for. */
 const live = new Map();
+
+/** Each window opening into another window's session, to that session's jar. */
+const joining = new WeakMap();
 
 /** Windows that are closing, whose tabs hold no jar. */
 const closing = new WeakSet();
@@ -198,7 +203,8 @@ export const SvalPrivateJars = {
    * context (`SvalWebDriver.isClientsJar`): the caller says so with `keep`.
    * Every other window gets a fresh jar, whatever was asked for: a link
    * opened in a new private window from an isolated workspace asks for that
-   * workspace's jar.
+   * workspace's jar. A window that joined a session whose jar is not yet
+   * cleared ({@link SvalPrivateJars.joinSession}) gets that jar.
    *
    * @param {Window} win A private browser window.
    * @param {number|null|undefined} requested The jar asked for.
@@ -211,12 +217,29 @@ export const SvalPrivateJars = {
     if (keep) {
       return requested ?? 0;
     }
+    const joined = joining.get(win);
+    if (live.has(joined)) {
+      return joined;
+    }
     if (next >= END) {
       throw new Error("sval: no private jar is left");
     }
     const jar = next++;
     live.set(jar, new WeakRef(win));
     return jar;
+  },
+
+  /**
+   * Puts a window that is opening into the session of `jar`, another private
+   * window's: a Peek, which is in the session of the window it was opened
+   * from. Called before the window makes its first tab
+   * ({@link SvalPrivateJars.jarForWindow}).
+   *
+   * @param {Window} win A private browser window, not yet loaded.
+   * @param {number} jar
+   */
+  joinSession(win, jar) {
+    joining.set(win, jar);
   },
 
   /**

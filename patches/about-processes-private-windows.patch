@@ -1,0 +1,40 @@
+Sval: about:processes in a normal window shows nothing of a private window
+
+The page lists each process with the site it serves and, under it, every
+document with its address and its tab's title. A private window's sites and
+pages were listed in any window that opened the page. Nothing outside a
+private window says what it has open, so the page opened in a normal window
+names no site for a private window's process and lists none of a private
+window's documents. SvalPrivateProcesses decides both.
+
+diff --git a/toolkit/components/aboutprocesses/content/aboutProcesses.js b/toolkit/components/aboutprocesses/content/aboutProcesses.js
+index 017eee73ef..5e1dd10b99 100644
+--- a/toolkit/components/aboutprocesses/content/aboutProcesses.js
++++ b/toolkit/components/aboutprocesses/content/aboutProcesses.js
+@@ -37,6 +37,8 @@ const { AppConstants } = ChromeUtils.importESModule(
+ ChromeUtils.defineESModuleGetters(this, {
+   ContextualIdentityService:
+     "resource://gre/modules/ContextualIdentityService.sys.mjs",
++  SvalPrivateProcesses:
++    "moz-src:///browser/components/sval/SvalPrivateProcesses.sys.mjs",
+   SvalProfiler: "moz-src:///browser/components/sval/SvalProfiler.sys.mjs",
+ });
+ 
+@@ -202,7 +204,7 @@ var State = {
+     if (!process.type == "extensions") {
+       return [];
+     }
+-    let windows = process.windows.map(win => {
++    let windows = SvalPrivateProcesses.windowsFor(window, process).map(win => {
+       let tab = tabFinder.get(win.outerWindowId);
+       let addon =
+         process.type == "extension"
+@@ -271,7 +273,7 @@ var State = {
+       slopeCpu: null,
+       active: null,
+       type: cur.type,
+-      origin: cur.origin || "",
++      origin: SvalPrivateProcesses.originFor(window, cur.origin || ""),
+       threads: null,
+       displayRank: Control._getDisplayGroupRank(cur, windows),
+       windows,

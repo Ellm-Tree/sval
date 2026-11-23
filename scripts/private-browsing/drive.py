@@ -9,19 +9,55 @@ this borrows.
 """
 
 import argparse
+import http.server
 import json
 import os
 import struct
 import sys
+import threading
 import uuid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "network-contact"))
-from check import Marionette, share  # noqa: E402
+from check import Marionette, free_port, share  # noqa: E402
+
+# A private tab's page, served at /<mark>. It writes a record to IndexedDB,
+# which Gecko keeps on disk under the profile's storage folder for a private
+# window too, and takes the mark as its title once the write is committed,
+# which is how the driver knows the page's storage is in use.
+PAGE = b"""<!doctype html><meta charset="utf-8"><p id="mark"></p><script>
+const mark = location.pathname.slice(1);
+document.getElementById("mark").textContent = mark;
+const open = indexedDB.open(mark, 1);
+open.onupgradeneeded = () => open.result.createObjectStore("marks");
+open.onsuccess = () => {
+  const tx = open.result.transaction("marks", "readwrite");
+  tx.objectStore("marks").put(mark, mark);
+  tx.oncomplete = () => { document.title = mark; };
+};
+</script>
+"""
+
+
+class Site(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if not self.path.startswith("/svalmark"):
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(PAGE)))
+        self.end_headers()
+        self.wfile.write(PAGE)
+
+    def log_message(self, *args):
+        pass
+
 
 DRIVE = r"""
 let done = arguments[0];
 (async () => {
   const marks = %(marks)s;
+  const site = %(site)s;
   const permanent = %(permanent)s;
   const until = async (test, what) => {
     for (let i = 0; i < 300; i++) {
@@ -42,16 +78,19 @@ let done = arguments[0];
   await win.SvalPanel.started;
   const panel = win.SvalPanel;
   if (!panel._engine?.isPrivate) throw new Error("the window is not on a private tree");
-  for (const mark of marks.slice(0, 3)) {
-    win.gBrowser.selectedTab = win.gBrowser.addTrustedTab(
-      "data:text/html,<title>" + mark + "</title><p>" + mark + "</p>"
-    );
+  const pages = marks.slice(0, 3);
+  for (const mark of pages) {
+    win.gBrowser.selectedTab = win.gBrowser.addTrustedTab(site + mark);
   }
   await until(async () => {
     const nodes = (await panel._engine.tree()).nodes;
     return Object.values(nodes).filter(n => n.kind === "tab" &&
       marks.some(m => n.content?.url?.includes(m))).length === 3;
   }, "the private tabs to be filed");
+  // Each page takes its mark as its title once its IndexedDB write commits.
+  await until(() => pages.every(mark =>
+    win.gBrowser.tabs.some(tab => tab.linkedBrowser.contentTitle === mark)),
+    "the private pages to write to IndexedDB");
   panel._promptForNewGroup = async () => ({ name: marks[3], color: null, emoji: null });
   await panel._addGroup();
   await until(async () => Object.values((await panel._engine.tree()).nodes)
@@ -156,15 +195,23 @@ def drive(args):
     m = connect(args.port, args.profile)
     if args.shared:
         share(m, args.shared, "private-browsing")
-    result = m.js(
-        DRIVE
-        % {
-            "marks": json.dumps(marks),
-            "normal": json.dumps(normal),
-            "permanent": json.dumps(args.permanent),
-        },
-        120000,
-    )
+    # Over http from this machine, so each private page is a site with an
+    # origin, which a `data:` page is not, and Gecko keeps its storage on disk.
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", free_port()), Site)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        result = m.js(
+            DRIVE
+            % {
+                "marks": json.dumps(marks),
+                "site": json.dumps(f"http://127.0.0.1:{server.server_address[1]}/"),
+                "normal": json.dumps(normal),
+                "permanent": json.dumps(args.permanent),
+            },
+            120000,
+        )
+    finally:
+        server.shutdown()
     if result.startswith("ERR"):
         sys.exit(f"private-browsing: driving the session failed: {result}")
     ids = json.loads(result)
@@ -252,18 +299,43 @@ def scan(args):
     normal = markers["normal"].encode()
     seen_normal = False
     found = []
+    # Gecko's quota manager keeps every private site's storage here, each
+    # site's folder holding a metadata file that names the site
+    # (QuotaManager's PERSISTENCE_TYPE_PRIVATE repository). It removes the
+    # folder when the last private window closes, at shutdown and at the next
+    # start, so a killed browser leaves it until then.
+    private_storage = os.path.join(args.profile, "storage", "private") + os.sep
+    left = []
     for root in args.roots:
         for dirpath, _, names in os.walk(root):
             for name in names:
                 path = os.path.join(dirpath, name)
                 if os.path.islink(path) or not os.path.isfile(path):
                     continue
+                if path.startswith(private_storage):
+                    left.append(path)
+                    if args.killed:
+                        continue
                 opened = args.opened and path.startswith(args.opened + os.sep)
-                for text in texts_of(path):
+                try:
+                    texts = texts_of(path)
+                except OSError:
+                    # A file another program holds in the temporary folder.
+                    continue
+                for text in texts:
                     seen_normal = seen_normal or (opened and normal in text)
                     for mark in marks:
                         if mark in text:
                             found.append(f"{path}: {mark.decode()}")
+    when = "after the kill" if args.killed else "after the relaunch"
+    if args.killed:
+        if left:
+            print(
+                f"private-browsing: KNOWN {len(left)} file(s) of the private sites' "
+                f"storage are in {private_storage} until the next start, not searched"
+            )
+    else:
+        found += [f"{path}: a private site's storage" for path in left]
     if args.opened and not seen_normal:
         print(
             "private-browsing: FAIL the normal window's tab is in none of Sval's "
@@ -274,9 +346,15 @@ def scan(args):
     for line in found:
         print(f"private-browsing: FOUND {line}")
     if found:
-        print(f"private-browsing: FAIL {len(found)} trace(s) of the private session on disk")
+        print(
+            f"private-browsing: FAIL {len(found)} trace(s) of the private session "
+            f"on disk {when}"
+        )
         return 1
-    print("private-browsing: no trace of the private session anywhere")
+    print(
+        f"private-browsing: {when}, none of the private session's marks or node "
+        f"ids is in any file under: {', '.join(args.roots)}"
+    )
     return 0
 
 
@@ -298,6 +376,12 @@ def main():
     s.add_argument(
         "--opened",
         help="the plaintext of Sval's sealed files, which must hold the normal window's tab",
+    )
+    s.add_argument("--profile", required=True)
+    s.add_argument(
+        "--killed",
+        action="store_true",
+        help="the browser was killed and has not started since",
     )
     s.add_argument("roots", nargs="+")
     args = parser.parse_args()

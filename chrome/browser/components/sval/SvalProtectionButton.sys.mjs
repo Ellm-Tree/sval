@@ -1774,7 +1774,7 @@ export class ProtectionButton {
       id._isHttpsOnlyModeActive(state.isPrivate) &&
       id._getHttpsOnlyPermission() > 0
     ) {
-      body.append(this.httpsOnlySwitch());
+      body.append(this.httpsOnlySwitch(state.isPrivate));
       const host = this.httpPrincipal().host;
       if (
         !state.isPrivate &&
@@ -1843,11 +1843,6 @@ export class ProtectionButton {
   }
 
   /**
-   * The HTTPS-Only switch, shown off where the site has an exception from
-   * HTTPS-Only Mode. Turning it on removes the exception and reloads, as
-   * Firefox's site panel does (`gIdentityHandler.changeHttpsOnlyPermission`).
-   */
-  /**
    * @returns {nsIPrincipal} The http origin of the tab's page, which holds
    *   HTTPS-Only Mode's exception: HTTPS-Only checks it before it upgrades a
    *   load.
@@ -1894,29 +1889,59 @@ export class ProtectionButton {
     );
   }
 
-  httpsOnlySwitch() {
+  /**
+   * The HTTPS-Only switch, shown off where the site has an exception from
+   * HTTPS-Only Mode. Turning it on removes the exception and reloads, as
+   * Firefox's site panel does (`gIdentityHandler.changeHttpsOnlyPermission`).
+   *
+   * A stored exception is one saved for every device
+   * (`SvalSiteProtections.insecureFor`) or kept in the permission store with
+   * no end. Gecko reads the permission without the window's origin
+   * attributes (`kStripOAPermissions`, PermissionManager.cpp), so a private
+   * window's page has the normal windows' own, and a private window, which
+   * changes nothing Sval keeps, shows the switch and cannot use it.
+   *
+   * @param {boolean} isPrivate Whether the window is private.
+   * @returns {Element}
+   */
+  httpsOnlySwitch(isPrivate) {
     const { doc, win } = this;
     const saved = SvalSiteProtections.insecureFor(this.httpPrincipal().host);
+    const locked =
+      isPrivate &&
+      (saved || win.gIdentityHandler._getHttpsOnlyPermission() === 1);
+    let words =
+      "Off because you made an exception. Turn on to try HTTPS first. Reloads the tab.";
+    if (locked) {
+      words =
+        "Off because you made an exception for this site. A private window can't remove the exception.";
+    } else if (saved) {
+      words =
+        "Off for this site on every device. Turn on to see the warning again. Reloads the tab.";
+    }
     const line = htmlElement(
       doc,
       "span",
       { className: "sval-prot-sub" },
-      saved
-        ? "Off for this site on every device. Turn on to see the warning again. Reloads the tab."
-        : "Off because you made an exception. Turn on to try HTTPS first. Reloads the tab."
+      words
     );
     const toggle = htmlElement(doc, "button", {
       type: "button",
       className: "sval-prot-switch",
       id: "sval-prot-https-only",
+      dataset: { reason: locked ? "private" : "" },
       attrs: {
         role: "switch",
         "aria-checked": "false",
         "aria-label": "HTTPS-Only on this site",
+        ...(locked ? { "aria-disabled": "true" } : {}),
       },
     });
     toggle.ariaDescribedByElements = [line];
     toggle.addEventListener("click", () => {
+      if (locked) {
+        return;
+      }
       const principal = this.httpPrincipal();
       if (saved) {
         SvalSiteProtections.setInsecure(principal.host, false);
@@ -1931,7 +1956,10 @@ export class ProtectionButton {
     return htmlElement(
       doc,
       "div",
-      { className: "sval-prot-switch-row" },
+      {
+        className: "sval-prot-switch-row",
+        dataset: { disabled: locked ? "true" : "" },
+      },
       htmlElement(
         doc,
         "div",

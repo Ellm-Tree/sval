@@ -3314,3 +3314,30 @@ function lookForOtherWorkspacesAgain(panel = SvalPanel) {
   panel.syncState.setOtherWorkspaces([], null);
   SvalFolderUpkeep.of(panel.engine).lookAgain();
 }
+
+/**
+ * Keeps `win` visible to its page whatever else is on the desktop, as a peek
+ * the user has in front is. A window another covers is hidden to its page,
+ * and its refresh driver is throttled, so its panels take seconds to open and
+ * close. A test cannot raise a window over other apps' windows on every
+ * desktop: Windows raises a focused window only while its app is in the
+ * foreground (`nsWindow::SetFocus` calls `::SetFocus` alone), and on a CI
+ * desktop the runner's own terminal holds the foreground and can cover the
+ * peek. `forceAppWindowActive` is Gecko's own way to keep an app window
+ * active while it is covered, which Picture-in-Picture uses.
+ *
+ * @param {Window} win A browser window.
+ */
+async function uncovered(win) {
+  const context = win.browsingContext;
+  context.forceAppWindowActive = true;
+  atTaskEnd(() => {
+    if (!context.isDiscarded) {
+      context.forceAppWindowActive = false;
+    }
+  });
+  await TestUtils.waitForCondition(
+    () => !win.document.hidden,
+    "the window's page can see it"
+  );
+}

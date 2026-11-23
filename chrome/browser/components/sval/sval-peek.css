@@ -208,6 +208,13 @@
   }
 }
 
+/* A private Peek's tag, as a private window's badge (`sval-header.css`). */
+#sval-peek-tag[private] {
+  border: 1px solid rgba(166, 140, 255, 0.4);
+  background-color: rgba(106, 85, 214, 0.4);
+  color: #e2dcff;
+}
+
 .sval-peek-app-icon {
   width: 18px;
   height: 18px;
@@ -345,9 +352,40 @@
   }
 }
 
+/* "Private Window" alone names no action, so a private Peek's button keeps
+   "Open in" for as long as it shows the name. */
+@media (min-width: 761px) {
+  #sval-peek-open-main[data-private] > .sval-peek-open-lead {
+    display: revert;
+  }
+}
+
 @media (max-width: 760px) {
   .sval-peek-open-name {
     display: none;
+  }
+
+  /* Alone in the button, the tile sits in its middle. */
+  #sval-peek-open-main[data-private] {
+    justify-content: center;
+    padding-inline: 6px;
+  }
+}
+
+/* A private Peek's tile: a private window's badge, its colour and its mask.
+   The mask's strokes take the context fill, which a CSS mask gives none, so
+   the icon is drawn as an image. */
+#sval-peek-open-main[data-private] > .sval-peek-tile {
+  background: rgba(106, 85, 214, 0.9);
+  color: #e2dcff;
+
+  &::before {
+    width: 14px;
+    height: 14px;
+    mask: none;
+    background: var(--sval-icon-private) center / contain no-repeat;
+    -moz-context-properties: fill, fill-opacity;
+    fill: currentColor;
   }
 }
 

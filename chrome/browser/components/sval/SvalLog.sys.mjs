@@ -61,6 +61,7 @@ const SVAL_DEFAULT_LOG_LEVEL = "Warn";
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AsyncShutdown: "resource://gre/modules/AsyncShutdown.sys.mjs",
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
 });
 
 /**
@@ -318,8 +319,34 @@ function sourceOf(source, line) {
  * (`ContentParent::RecvScriptError`), so the parent's listener sees them too.
  *
  * Firefox's code is not held to this module's rule at its call sites, so
- * {@link forTheFile} is the only guard on these lines.
+ * {@link forTheFile} is the only guard on these lines, and a message raised
+ * in a private window is left out whole ({@link raisedInPrivateWindow}).
  */
+
+/**
+ * Whether the window a message was raised in is a private browser window, or
+ * inside one: a page, a frame or the window's own chrome. Gecko's own mark
+ * leaves chrome code out: `nsScriptErrorBase::ComputeIsFromPrivateWindow`
+ * answers false for a system principal's window, and a console event's
+ * `private` is read from the origin attributes of its global's principal
+ * (`Console::MethodInternal`), which the system principal has none of. So
+ * the window is found from its id, and the browser window that holds it
+ * answers.
+ *
+ * @param {*} innerWindowId The message's inner window id. A message no
+ *   window raised has 0, or a string naming its kind.
+ * @returns {boolean}
+ */
+function raisedInPrivateWindow(innerWindowId) {
+  if (typeof innerWindowId !== "number" || !innerWindowId) {
+    return false;
+  }
+  const top =
+    WindowGlobalParent.getByInnerWindowId(innerWindowId)?.browsingContext
+      .topChromeWindow;
+  return !!top && lazy.PrivateBrowsingUtils.isWindowPrivate(top);
+}
+
 const consoleCapture = {
   /** @param {nsIConsoleMessage} message */
   observe(message) {
@@ -328,6 +355,7 @@ const consoleCapture = {
         !(message instanceof Ci.nsIScriptError) ||
         !message.isFromChromeContext ||
         message.isFromPrivateWindow ||
+        raisedInPrivateWindow(message.innerWindowID) ||
         message.flags & Ci.nsIScriptError.infoFlag
       ) {
         return;
@@ -355,6 +383,7 @@ const consoleCapture = {
         (event.level !== "warn" && event.level !== "error") ||
         !event.chromeContext ||
         event.private ||
+        raisedInPrivateWindow(event.innerID) ||
         event.prefix === SVAL_LOG_PREFIX
       ) {
         return;
@@ -426,14 +455,68 @@ const PATH_IN_MESSAGE =
 /**
  * An address in a message: a URL with `//`, or one of the schemes that go
  * without it (`about:`, `moz-extension:`, `data:`, `blob:` and the like),
- * running to the next space, quote or bracket.
+ * running to the next space, quote or bracket. The brackets around an IPv6
+ * host, straight after the `//`, are part of the address.
  */
 const URL_IN_MESSAGE =
-  /\b[a-z][a-z+.-]+:(?:\/\/|(?=[^\s/\\`'"]))[^\s`'"<>()[\]{}]+/gi;
+  /\b[a-z][a-z+.-]+:(?:\/\/\[[^\]\s]*\][^\s`'"<>()[\]{}]*|(?:\/\/|(?=[^\s/\\`'"]))[^\s`'"<>()[\]{}]+)/gi;
 
 /** A dotted name that could be a host; {@link forTheFile} asks the PSL. */
 const HOST_IN_MESSAGE =
   /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+\b/gi;
+
+/**
+ * An IPv4 address written in full: four numbers around dots, with no digit
+ * and no further dotted number on either side. A letter, a hyphen or an
+ * underscore beside it hides nothing. Three numbers, such as "153.0.1", are
+ * a version in a log line and stay.
+ */
+const IPV4_IN_MESSAGE = /(?<!\d|\d\.)\d{1,3}(?:\.\d{1,3}){3}(?!\d|\.\d)/g;
+
+/**
+ * What could be an IPv6 address: a run of hex digits, colons and dots that
+ * holds a colon and starts where a word cannot, with or without its brackets
+ * and its zone id ("%eth0"). {@link withoutIPv6} decides.
+ */
+const IPV6_IN_MESSAGE =
+  /(?<![\w:.])\[?[0-9a-f:.]*:[0-9a-f:.]*(?:%[\w-]+)?\]?/gi;
+
+/**
+ * @param {string} host
+ * @returns {boolean} Whether `host` is an IP address, as the Public Suffix
+ *   List's service tells one from a name (`NS_ERROR_HOST_IS_IP_ADDRESS`).
+ */
+function isIPLiteral(host) {
+  try {
+    Services.eTLD.getBaseDomainFromHost(host);
+    return false;
+  } catch (err) {
+    return err.result === Cr.NS_ERROR_HOST_IS_IP_ADDRESS;
+  }
+}
+
+/**
+ * A candidate {@link IPV6_IN_MESSAGE} found, with its address taken out if
+ * it holds one. The run can end in the sentence's own colons and full stops,
+ * and the Public Suffix List's service reads an address with a full stop
+ * after it as an address too. So the shortest start of the run that is an
+ * address is taken, from the run without its closing colons and stops up to
+ * the whole run, which keeps an address that ends in "::", and what follows
+ * the address stays in the line.
+ *
+ * @param {string} found
+ * @returns {string}
+ */
+function withoutIPv6(found) {
+  const [, body] = found.match(/^\[?([^%\]]*)/);
+  const least = body.replace(/[:.]+$/, "").length;
+  for (let end = Math.max(least, 1); end <= body.length; end++) {
+    if (isIPLiteral(body.slice(0, end))) {
+      return `<host>${body.slice(end)}`;
+    }
+  }
+  return found;
+}
 
 /** Line breaks and other control characters, which would forge a line. */
 // Control characters are what this matches.
@@ -443,9 +526,9 @@ const CONTROL_IN_MESSAGE = /[\u0000-\u001f\u007f\u2028\u2029]/g;
 /**
  * A logged argument as `sval-log.txt` keeps it: on one line, with file paths
  * redacted as {@link describeError} redacts them, then every address, then
- * every dotted name whose ending is on the Public Suffix List. That last
- * catches a bare host and can catch a file name such as `run.sh`, which a
- * line on disk can spare.
+ * every IP address and every dotted name whose ending is on the Public Suffix
+ * List. That last catches a bare host and can catch a file name such as
+ * `run.sh`, which a line on disk can spare.
  *
  * @param {string} text
  * @returns {string}
@@ -455,6 +538,8 @@ function forTheFile(text) {
     .replace(CONTROL_IN_MESSAGE, " ")
     .replace(PATH_IN_MESSAGE, "<path>")
     .replace(URL_IN_MESSAGE, "<url>")
+    .replace(IPV6_IN_MESSAGE, withoutIPv6)
+    .replace(IPV4_IN_MESSAGE, "<host>")
     .replace(HOST_IN_MESSAGE, host => {
       try {
         return Services.eTLD.hasKnownPublicSuffixFromHost(host)

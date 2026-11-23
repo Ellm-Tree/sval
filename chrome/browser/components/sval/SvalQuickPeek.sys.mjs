@@ -53,6 +53,7 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  copyText: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
   linkLoad: "moz-src:///browser/components/sval/SvalLinkClick.sys.mjs",
   SvalFirefox: "moz-src:///browser/components/sval/SvalFirefox.sys.mjs",
@@ -433,9 +434,7 @@ class QuickPeek {
    */
   copyAddress() {
     const uri = this.uri();
-    Cc["@mozilla.org/widget/clipboardhelper;1"]
-      .getService(Ci.nsIClipboardHelper)
-      .copyString(Services.io.createExposableURI(uri).spec);
+    lazy.copyText(this.win, Services.io.createExposableURI(uri).spec);
   }
 
   /** @returns {nsIURI} the page's address, or the link's until it commits. */

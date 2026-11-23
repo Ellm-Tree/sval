@@ -5413,6 +5413,21 @@ export const SvalTabs = {
       };
       options = { ...options, adapter };
     }
+    if (isPrivateTree) {
+      // Where a closing tab sat (`FORMER_PARENT_KEY`, `FORMER_WORKSPACE_KEY`)
+      // is filed in the session store, and a private tab leaves nothing
+      // there. Neither value is missed. A private window shows one
+      // workspace, the one `reopenClosedTab` gives a closed tab with none
+      // filed. A tab handed back from the recently-closed list has a new
+      // `permanentKey`, so it carries no node id and is filed as a new tab.
+      adapter = {
+        ...adapter,
+        formerParent: undefined,
+        setFormerParent: undefined,
+        setFormerWorkspace: undefined,
+      };
+      options = { ...options, adapter };
+    }
     const observer = new SvalTabObserver(window, options);
     await observer.start();
     return observer;

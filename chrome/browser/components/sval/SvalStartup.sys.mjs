@@ -34,6 +34,12 @@ export const SvalStartup = {
   init() {
     // First, so browser code's errors from the rest of startup reach the log.
     startConsoleCapture();
+    // A private session that was killed leaves its sites' storage in the
+    // profile, in folders whose metadata names each site. Gecko removes them
+    // as its quota manager is made (`QuotaManager::GetOrCreate`), which is
+    // whenever something first uses storage. This asks for the same removal
+    // before any window opens.
+    Services.qms.clearStoragesForPrivateBrowsing();
     SvalPreferences.watch();
     // A device publishes nothing to the shared folder before its first time
     // reading (decision 1714), so it asks for one now.

@@ -16,7 +16,15 @@
  * feature that leaves private browsing out (`PROFILER_FOR_EACH_FEATURE`,
  * ProfilerState.h), so a recording cannot start while a private window is
  * open, and one that runs when a private window opens is stopped and
- * dropped unsaved.
+ * dropped unsaved. That holds for a recording Sval did not start: one from
+ * `MOZ_PROFILER_STARTUP`, or from the signal that starts the profiler
+ * (`profiler_start_from_signal`, platform.cpp).
+ *
+ * **Nor does any other diagnostic file.** Gecko's logging names the
+ * addresses it works on, and about:memory's saved reports and GC and CC logs
+ * name each document by its address. So logging to a file stops when a
+ * private window opens, and about:logging and about:memory cannot start or
+ * save either while one is open ({@link SvalProfiler.holdWhilePrivate}).
  */
 
 import { HELP_MENU_ITEM_ID as FEEDBACK_ITEM_ID } from "moz-src:///browser/components/sval/SvalFeedbackForm.sys.mjs";
@@ -75,6 +83,21 @@ export function profileFileName(date) {
 /** Called whenever {@link SvalProfiler.canRecord} may have changed. */
 const listeners = new Set();
 
+/**
+ * Gecko's logging prefs: a module's level is `logging.<module>`, and
+ * `logging.config.` holds what names no module. Of those, about:logging's
+ * Stop Logging clears the three in `LOGGING_OPTIONS` and turns
+ * `LOGGING_RUNNING_PREF` off.
+ */
+const LOGGING_BRANCH = "logging.";
+const LOGGING_CONFIG = "config.";
+const LOGGING_OPTIONS = [
+  "config.LOG_FILE",
+  "config.add_timestamp",
+  "config.sync",
+];
+const LOGGING_RUNNING_PREF = "logging.config.running";
+
 export const SvalProfiler = {
   /** Whether a recording runs, in this process's profiler. */
   get recording() {
@@ -120,7 +143,72 @@ export const SvalProfiler = {
     if (this.recording) {
       Services.profiler.StopProfiler();
     }
+    this.stopLogging();
     this.changed();
+  },
+
+  /**
+   * `profiler-started`: stops, unsaved, a recording that starts while a
+   * private window is open. Sval's own starts never get here
+   * ({@link SvalProfiler.start}); the profiler's signal and its other
+   * callers do.
+   */
+  profilerStarted() {
+    if (!this.canRecord && this.recording) {
+      Services.profiler.StopProfiler();
+    }
+  },
+
+  /**
+   * Stops Gecko's logging to a file, as about:logging's Stop Logging does
+   * (`stopLogging`, aboutLogging.mjs): the log file goes back to none, every
+   * module's level to its default, and the page's own mark that logging runs
+   * is cleared. `LogModulePrefWatcher` applies each as the pref changes.
+   * Logging set up in the environment (`MOZ_LOG`, `MOZ_LOG_FILE`) is no
+   * pref's and stays.
+   */
+  stopLogging() {
+    const branch = Services.prefs.getBranch(LOGGING_BRANCH);
+    for (const name of branch.getChildList("")) {
+      if (!name.startsWith(LOGGING_CONFIG) || LOGGING_OPTIONS.includes(name)) {
+        branch.clearUserPref(name);
+      }
+    }
+    if (Services.prefs.getBoolPref(LOGGING_RUNNING_PREF, false)) {
+      Services.prefs.setBoolPref(LOGGING_RUNNING_PREF, false);
+    }
+  },
+
+  /**
+   * Keeps each of `controls` disabled while a private window is open: the
+   * buttons of a diagnostic page that would start or save something naming
+   * the pages that are open. A control the page itself disabled stays as the
+   * page left it.
+   *
+   * @param {Array<HTMLButtonElement|null>} controls All in one document.
+   */
+  holdWhilePrivate(controls) {
+    const buttons = controls.filter(Boolean);
+    if (!buttons.length) {
+      return;
+    }
+    const held = new Set();
+    const apply = () => {
+      for (const button of buttons) {
+        if (!this.canRecord && !button.disabled) {
+          button.disabled = true;
+          held.add(button);
+        } else if (this.canRecord && held.delete(button)) {
+          button.disabled = false;
+        }
+        button.toggleAttribute("data-sval-private-hold", held.has(button));
+      }
+    };
+    apply();
+    const win = buttons[0].documentGlobal;
+    win.addEventListener("pageshow", apply);
+    const stop = this.onChange(apply);
+    win.addEventListener("unload", stop, { once: true });
   },
 
   /** Tells each {@link SvalProfiler.onChange} listener. */
@@ -321,6 +409,8 @@ const observer = {
   observe(subject, topic) {
     if (topic === "domwindowopened") {
       SvalProfiler.windowOpened(subject);
+    } else if (topic === "profiler-started") {
+      SvalProfiler.profilerStarted();
     } else {
       SvalProfiler.changed();
     }
@@ -330,3 +420,10 @@ const observer = {
 // (`SvalWindow`), so no private window opens unseen.
 Services.obs.addObserver(observer, "domwindowopened");
 Services.obs.addObserver(observer, "last-pb-context-exited");
+Services.obs.addObserver(observer, "profiler-started");
+// The window whose start loaded this module opened before it, and may be
+// private, with a recording from `MOZ_PROFILER_STARTUP` already running.
+if (!SvalProfiler.canRecord) {
+  SvalProfiler.profilerStarted();
+  SvalProfiler.stopLogging();
+}

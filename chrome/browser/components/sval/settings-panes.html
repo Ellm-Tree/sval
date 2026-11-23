@@ -356,6 +356,30 @@
       </section>
     </section>
 
+    <!-- Gecko's `dom.webnotifications.privateBrowsing.enabled`, which Sval
+         ships off: a notification is shown by the system, outside the private
+         window. -->
+    <section data-sval-pane="svalPrivateWindows" class="sval-settings">
+      <section
+        id="sval-private-windows"
+        class="sval-card"
+        aria-labelledby="sval-private-windows-heading"
+      >
+        <h2 id="sval-private-windows-heading">Private windows</h2>
+        <label class="sval-switch-row">
+          <span class="sval-lead"
+            >Show website notifications from private windows</span
+          >
+          <input
+            id="sval-private-notifications"
+            class="sval-switch"
+            type="checkbox"
+            role="switch"
+          />
+        </label>
+      </section>
+    </section>
+
     <!-- Sites (decision 1484): the defaults every site gets, then every site
          with a choice, each leading to its own page. -->
     <section data-sval-pane="svalSites" class="sval-settings">

@@ -1,0 +1,75 @@
+Sval: Notification.permission reads "default" where private windows are off
+
+With dom.webnotifications.privateBrowsing.enabled false, which is Sval's
+default, Notification.permission read "denied" on every site in a private
+window and "default" in a normal one, so a page could tell a private window
+from that one attribute. Where RFPTarget::PermissionsDefaultDenyPrompt hides
+a global default's deny, the attribute reads "default" in a private window
+too. A request is still refused, as a global default's is.
+
+diff --git a/dom/notification/NotificationUtils.cpp b/dom/notification/NotificationUtils.cpp
+index 30176ad6e3..8c80c2d313 100644
+--- a/dom/notification/NotificationUtils.cpp
++++ b/dom/notification/NotificationUtils.cpp
+@@ -69,16 +69,16 @@ bool IsNotificationAllowedFor(nsIPrincipal* aPrincipal) {
+   return aPrincipal->SchemeIs("file");
+ }
+ 
+-bool IsNotificationForbiddenFor(nsIPrincipal* aPrincipal,
+-                                nsIPrincipal* aEffectiveStoragePrincipal,
+-                                bool isSecureContext,
+-                                PermissionCheckPurpose aPurpose,
+-                                Document* aRequestorDoc) {
+-  if (aPrincipal->GetIsInPrivateBrowsing() &&
+-      !StaticPrefs::dom_webnotifications_privateBrowsing_enabled()) {
+-    return true;
+-  }
++static bool IsOffInPrivateBrowsing(nsIPrincipal* aPrincipal) {
++  return aPrincipal->GetIsInPrivateBrowsing() &&
++         !StaticPrefs::dom_webnotifications_privateBrowsing_enabled();
++}
+ 
++static bool IsForbiddenByContext(nsIPrincipal* aPrincipal,
++                                 nsIPrincipal* aEffectiveStoragePrincipal,
++                                 bool isSecureContext,
++                                 PermissionCheckPurpose aPurpose,
++                                 Document* aRequestorDoc) {
+   if (!isSecureContext) {
+     if (aRequestorDoc) {
+       glean::web_notification::insecure_context_permission_request.Add();
+@@ -123,6 +123,16 @@ bool IsNotificationForbiddenFor(nsIPrincipal* aPrincipal,
+   return !StaticPrefs::dom_webnotifications_allowcrossoriginiframe();
+ }
+ 
++bool IsNotificationForbiddenFor(nsIPrincipal* aPrincipal,
++                                nsIPrincipal* aEffectiveStoragePrincipal,
++                                bool isSecureContext,
++                                PermissionCheckPurpose aPurpose,
++                                Document* aRequestorDoc) {
++  return IsOffInPrivateBrowsing(aPrincipal) ||
++         IsForbiddenByContext(aPrincipal, aEffectiveStoragePrincipal,
++                              isSecureContext, aPurpose, aRequestorDoc);
++}
++
+ NotificationPermission GetRawNotificationPermission(nsIPrincipal* aPrincipal) {
+   AssertIsOnMainThread();
+ 
+@@ -155,10 +165,16 @@ NotificationPermission GetNotificationPermission(
+   if (IsNotificationAllowedFor(aPrincipal)) {
+     return NotificationPermission::Granted;
+   }
+-  if (IsNotificationForbiddenFor(aPrincipal, aEffectiveStoragePrincipal,
+-                                 isSecureContext, aPurpose)) {
++  if (IsForbiddenByContext(aPrincipal, aEffectiveStoragePrincipal,
++                           isSecureContext, aPurpose, nullptr)) {
+     return NotificationPermission::Denied;
+   }
++  // Sval: a page reads the same answer in a private window as in a normal
++  // one, or Notification.permission would tell it the window is private.
++  if (IsOffInPrivateBrowsing(aPrincipal)) {
++    return aHideDefaultDeny ? NotificationPermission::Default
++                            : NotificationPermission::Denied;
++  }
+ 
+   NotificationPermission permission = GetRawNotificationPermission(aPrincipal);
+   if (aHideDefaultDeny && permission == NotificationPermission::Denied) {

@@ -254,3 +254,118 @@ add_task(async function a_private_window_opening_drops_the_recording() {
   Assert.equal(await SvalProfiler.save(), null, "nothing is saved");
   Assert.deepEqual(await IOUtils.getChildren(dir), [], "no file was written");
 });
+
+add_task(async function a_recording_from_outside_stops_while_private() {
+  const { dir } = await downloadsInTemp();
+  await openPrivateWindow();
+  // As the profiler's signal and `MOZ_PROFILER_STARTUP` start it: straight
+  // through Gecko, past `SvalProfiler.start`.
+  await within(
+    Services.profiler.StartProfiler(1024, 1, ["js"], ["GeckoMain"]),
+    10_000,
+    "the profiler's own start"
+  );
+  await within(
+    TestUtils.waitForCondition(() => !Services.profiler.IsActive()),
+    10_000,
+    "the recording stopping"
+  );
+  Assert.equal(await SvalProfiler.save(), null, "nothing is saved");
+  Assert.deepEqual(await IOUtils.getChildren(dir), [], "no file was written");
+});
+
+add_task(async function a_private_window_opening_stops_logging_to_a_file() {
+  const file = PathUtils.join(await makeTempDir("sval-logging"), "log.txt");
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["logging.config.LOG_FILE", file],
+      ["logging.config.running", true],
+      ["logging.SvalTestModule", 5],
+    ],
+  });
+  await openPrivateWindow();
+  Assert.ok(
+    !Services.prefs.prefHasUserValue("logging.config.LOG_FILE"),
+    "the log file is put back to none"
+  );
+  Assert.ok(
+    !Services.prefs.prefHasUserValue("logging.SvalTestModule"),
+    "the module logs at its default level"
+  );
+  Assert.ok(
+    !Services.prefs.getBoolPref("logging.config.running"),
+    "and about:logging reads that logging has stopped"
+  );
+  await SpecialPowers.popPrefEnv();
+});
+
+add_task(async function a_private_window_holds_the_diagnostic_pages() {
+  const win = await openPrivateWindow();
+  const held = doc => doc.querySelectorAll("[data-sval-private-hold]");
+  // In this window, which stays open: with a string alone, the tab opens in
+  // the window used last, the private one.
+  const aboutPage = url => ({ gBrowser, url });
+  // about:logging writes the output it shows as it loads
+  // (`updateLoggingOutputType`).
+  atTaskEnd(() => Services.prefs.clearUserPref("logging.config.output_type"));
+
+  await BrowserTestUtils.withNewTab(
+    aboutPage("about:logging"),
+    async browser => {
+      const doc = browser.contentDocument;
+      const toggle = doc.getElementById("toggle-logging-button");
+      await within(
+        TestUtils.waitForCondition(() => toggle.disabled),
+        10_000,
+        "about:logging's start button being held"
+      );
+      toggle.click();
+      Assert.ok(
+        !Services.prefs.getBoolPref("logging.config.running", false),
+        "a press starts no logging"
+      );
+      Assert.ok(
+        doc.getElementById("set-log-file-button").disabled,
+        "no log file can be set"
+      );
+      Assert.ok(
+        doc.getElementById("set-log-modules-button").disabled,
+        "and no log modules"
+      );
+    }
+  );
+
+  await BrowserTestUtils.withNewTab(
+    aboutPage("about:memory"),
+    async browser => {
+      const doc = browser.contentDocument;
+      await within(
+        TestUtils.waitForCondition(() => held(doc).length === 3),
+        10_000,
+        "about:memory's save buttons being held"
+      );
+      for (const id of ["saveLogsConcise", "saveLogsVerbose"]) {
+        Assert.ok(doc.getElementById(id).disabled, `${id} is disabled`);
+      }
+      Assert.ok(
+        !doc.getElementById("measureButton").disabled,
+        "measuring on the page stays"
+      );
+
+      await within(
+        BrowserTestUtils.closeWindow(win),
+        10_000,
+        "the private window closing"
+      );
+      await within(
+        TestUtils.waitForCondition(() => !held(doc).length),
+        10_000,
+        "the save buttons coming back"
+      );
+      Assert.ok(
+        !doc.getElementById("saveLogsConcise").disabled,
+        "saving is offered again"
+      );
+    }
+  );
+});

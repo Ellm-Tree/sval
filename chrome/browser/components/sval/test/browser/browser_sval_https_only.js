@@ -150,3 +150,63 @@ add_task(async function a_site_opens_from_the_warning_then_always() {
   );
   BrowserTestUtils.removeTab(tab);
 });
+
+/**
+ * A private window shows a stored exception's switch and cannot use it: the
+ * exception is the normal windows' own, kept on disk and synced.
+ */
+add_task(async function a_private_window_cannot_change_a_stored_exception() {
+  SvalSiteProtections.setInsecure(HOST, true);
+  Assert.equal(
+    exception(),
+    Ci.nsIHttpsOnlyModePermission.LOAD_INSECURE_ALLOW,
+    "the site has a stored exception"
+  );
+  const win = await within(
+    BrowserTestUtils.openNewBrowserWindow({ private: true }),
+    20_000,
+    "a private window opening"
+  );
+  try {
+    await within(win.SvalPanel.started, 10_000, "the private panel's startup");
+    const tab = await within(
+      BrowserTestUtils.openNewForegroundTab(win.gBrowser, PLAIN_PAGE),
+      15_000,
+      "the site opening in the private window"
+    );
+    const doc = win.document;
+    const popup = doc.getElementById("sval-protection-panel");
+    const shown = BrowserTestUtils.waitForEvent(popup, "popupshown");
+    doc.getElementById("sval-protection-button").click();
+    await within(shown, 5_000, "the private window's panel showing");
+    doc.getElementById("sval-prot-conn").click();
+    const toggle = doc.getElementById("sval-prot-https-only");
+    Assert.ok(toggle, "the switch is shown");
+    Assert.equal(
+      toggle.getAttribute("aria-disabled"),
+      "true",
+      "and cannot be used"
+    );
+    Assert.equal(toggle.dataset.reason, "private", "because of the window");
+    toggle.click();
+    Assert.ok(
+      SvalSiteProtections.insecureFor(HOST),
+      "a press leaves the saved choice"
+    );
+    Assert.equal(
+      exception(),
+      Ci.nsIHttpsOnlyModePermission.LOAD_INSECURE_ALLOW,
+      "and the stored exception"
+    );
+    const hidden = BrowserTestUtils.waitForEvent(popup, "popuphidden");
+    popup.hidePopup();
+    await within(hidden, 5_000, "the private window's panel hiding");
+    BrowserTestUtils.removeTab(tab);
+  } finally {
+    await within(
+      BrowserTestUtils.closeWindow(win),
+      10_000,
+      "the private window closing"
+    );
+  }
+});

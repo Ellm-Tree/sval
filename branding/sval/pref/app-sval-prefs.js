@@ -46,6 +46,22 @@ pref("browser.contentblocking.category", "standard");
 // spec).
 pref("privacy.reducePageProtection.infobar.enabled.pbmode", false);
 
+// A private window's page keeps nothing outside the window (decision 0074).
+//
+// The window's title, which the system shows in its window lists and gives
+// to any app that reads window titles, carries no page title
+// (tabbrowser.js, #determineContentTitle).
+pref("privacy.exposeContentTitleInWindow.pbm", false); // upstream: true
+// The system shows a website's notification, outside the window, and keeps
+// it after the window closes (nsAlertsService). Off, a private page may not
+// show one or ask to (IsNotificationForbiddenFor, NotificationUtils.cpp).
+// Settings' "Show website notifications from private windows" turns it on.
+pref("dom.webnotifications.privateBrowsing.enabled", false); // upstream: true
+// Media too large for the memory cache goes to a temporary file otherwise
+// (MediaCache::GetMediaCache), and on Windows a process that crashes leaves
+// that file in the temporary folder (nsAnonTempFileRemover).
+pref("browser.privatebrowsing.forceMediaMemoryCache", true); // upstream: false
+
 // Fingerprinting protection (protections spec §3.2; the decision for each
 // API is in docs/fingerprinting-catalogue.md). FPP runs in every
 // window, so normal and private windows read the same and private mode has no

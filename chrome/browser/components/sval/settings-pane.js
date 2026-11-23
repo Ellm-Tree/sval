@@ -195,6 +195,12 @@
       category: "panePrivacy",
       after: 'setting-group[groupid="history2"]',
     },
+    {
+      // Under History, which holds Always use private browsing mode.
+      id: "svalPrivateWindows",
+      category: "panePrivacy",
+      after: 'setting-group[groupid="history2"]',
+    },
   ];
 
   /** The sections of Privacy and protection `SvalSettings.showPane` shows. */

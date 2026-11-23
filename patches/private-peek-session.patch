@@ -1,0 +1,28 @@
+Sval: a tab moves between the windows of one private session
+
+Each private window is a session of its own, and no tab moves between two of
+them (private-window-sessions.patch). A Peek opened from a private window is
+in that window's session and shares its jar, so its page can move into the
+window it came from as a tab, and a tab its page opens can move into a Peek
+of its own. The swap is refused only between windows whose jars differ.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index d1d6c17a06..cfc031a795 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -6288,10 +6288,13 @@
+         return false;
+       }
+ 
+-      // Sval: nor between two private windows, each a session of its own.
++      // Sval: nor between two private sessions. A private window and the
++      // Peeks opened from it are one session, with one jar (SvalPrivateJars).
+       if (
+         aOtherTab.documentGlobal != window &&
+-        PrivateBrowsingUtils.isWindowPrivate(window)
++        PrivateBrowsingUtils.isWindowPrivate(window) &&
++        aOtherTab.documentGlobal.gBrowser.defaultUserContextId !=
++          this.defaultUserContextId
+       ) {
+         return false;
+       }

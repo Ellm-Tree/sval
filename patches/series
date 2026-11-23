@@ -360,6 +360,9 @@ backport-bug-2085382-wr-error-after-overlay-failure.patch
 scroll-anchor-on-resize.patch
 sval-keep-links.patch
 process-names.patch
+about-processes-private-windows.patch
+diagnostics-off-while-private.patch
+private-peek-session.patch
 quota-private-metadata-no-site.patch
 clipboard-private-window-copy.patch
 audio-stream-private-no-title.patch
@@ -370,3 +373,4 @@ signal-profiler-private-no-file.patch
 crash-helper-private-no-dump.patch
 private-content-process-no-crash-dump.patch
 https-only-private-exception.patch
+notifications-private-off-read-default.patch

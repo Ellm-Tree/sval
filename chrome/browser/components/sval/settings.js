@@ -307,6 +307,10 @@
         ["sval-bookmarklets", lazy.BOOKMARKLETS_PREF],
         ["sval-page-rules", lazy.PAGE_RULES_PREF],
         ["sval-breach-warnings", lazy.BREACH_WARNINGS_PREF],
+        [
+          "sval-private-notifications",
+          "dom.webnotifications.privateBrowsing.enabled",
+        ],
         ["sval-peek", lazy.SvalPeek.ENABLED_PREF],
         ["sval-quick-peek", lazy.QUICK_PEEK_PREF],
         ["sval-pins-quick-peek", lazy.PINS_QUICK_PEEK_PREF],

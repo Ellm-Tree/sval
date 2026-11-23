@@ -24,6 +24,15 @@
  * - **Never the frontmost window** for Firefox's "open this in the top
  *   window" (`peek-not-top-window.patch`).
  *
+ * **A private Peek** is New Peek's from a private window. A private window's
+ * session is what a Workspace is to a normal Peek, and the Peek is inside
+ * it: a private window in that session's jar
+ * (`SvalPrivateJars.joinSession`), which opens into the window it came from
+ * and nowhere else, counts and
+ * lists only the Peeks of its session, is reopened only within it, and
+ * closes with the window it came from. A link from another app never opens
+ * one.
+ *
  * A tab that opens in it, from a link with `target=_blank`, a Ctrl/Cmd-click
  * or a page's `window.open` without features, is moved into another Peek,
  * so each holds one page. A popup with features is Firefox's own
@@ -51,6 +60,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalMacWindowOrder:
     "moz-src:///browser/components/sval/SvalMacWindowOrder.sys.mjs",
+  SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   workspaceIcon:
     "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
@@ -109,6 +119,8 @@ export const PLACE_STORE = Object.freeze({
 });
 export const PLACE_KEYS = Object.freeze(["left", "top", "width", "height"]);
 
+const PRIVATE_OPEN_TEXT = "Open in Private Window";
+
 const ISOLATED_TEXT =
   "Isolated: sites here can’t see sign-ins from other Workspaces";
 
@@ -144,13 +156,23 @@ const asked = new WeakMap();
 const idleTimers = new WeakMap();
 
 /**
- * The pages of the Peeks the user closed, newest last, each as the
- * session store describes a tab (`SessionStore.getTabState`), for Reopen
- * Closed Tab in a Peek ({@link SvalPeek.reopenClosed}). They
- * live in memory alone, since a Peek is in no saved session, and go
- * as Firefox's own closed tabs go when the user clears their history.
+ * The private session each private Peek is in, as its jar
+ * (`SvalPrivateJars`). A Peek with none here is a normal one.
  *
- * @type {object[]}
+ * @type {WeakMap<Window, number>}
+ */
+const sessions = new WeakMap();
+
+/**
+ * The pages of the Peeks the user closed, newest last, for Reopen Closed Tab
+ * in a Peek ({@link SvalPeek.reopenClosed}): each `state` as the session
+ * store describes a tab (`SessionStore.getTabState`), with the private
+ * `session` its Peek was in, or null. They live in memory alone, since a
+ * Peek is in no saved session, and go as Firefox's own closed tabs go when
+ * the user clears their history. A private Peek's goes when its session's
+ * data is cleared, which names its jar.
+ *
+ * @type {Array<{session: ?number, state: object}>}
  */
 const closedPages = [];
 
@@ -288,6 +310,53 @@ function openPeeks() {
 }
 
 /**
+ * @param {Window} win A Peek.
+ * @returns {?number} the private session `win` is in, as its jar, or null
+ *   for a normal Peek.
+ */
+function sessionOf(win) {
+  return sessions.get(win) ?? null;
+}
+
+/**
+ * The Peeks `win` counts and lists: the normal ones for a normal Peek, and
+ * for a private Peek those of its own session.
+ *
+ * @param {Window} win A Peek.
+ * @returns {Window[]} oldest first, `win` among them.
+ */
+function peersOf(win) {
+  const session = sessionOf(win);
+  return openPeeks().filter(other => sessionOf(other) === session);
+}
+
+/**
+ * @param {Window} win A private Peek.
+ * @returns {?Window} the private window `win` was opened from, whose
+ *   session it is in, while that window is open.
+ */
+function hostOf(win) {
+  const host = lazy.SvalPrivateJars.windowOf(sessionOf(win));
+  return host && !isPeek(host) ? host : null;
+}
+
+/**
+ * Closes the private Peeks of `session`, as the window they were opened
+ * from closes: the session is that window's, and ends with it. No page of
+ * theirs is kept to reopen.
+ *
+ * @param {number} session
+ */
+function closeSession(session) {
+  for (const win of openPeeks()) {
+    if (sessionOf(win) === session) {
+      handedOff.add(win);
+      win.close();
+    }
+  }
+}
+
+/**
  * @returns {Window[]} the user's ordinary windows, frontmost first: full,
  *   non-private browser windows with a workspace panel on the user's tree.
  */
@@ -395,7 +464,10 @@ function keepClosedPage(win) {
     true,
     context.sessionHistory
   );
-  closedPages.push({ ...state, entries, index });
+  closedPages.push({
+    session: sessionOf(win),
+    state: { ...state, entries, index },
+  });
   const max = Services.prefs.getIntPref("browser.sessionstore.max_tabs_undo");
   closedPages.splice(0, Math.max(0, closedPages.length - max));
 }
@@ -422,6 +494,8 @@ function filterClosedPages(keep) {
  *   one unless given.
  * @param {boolean} [what.fromExternal] Whether `uri` is a link from another
  *   app, which Firefox loads as one (`gBrowserInit._handleURIToLoad`).
+ * @param {?number} [what.session] The private session the Peek is in, as its
+ *   jar, which is then the jar `uri` loads in. None for a normal Peek.
  * @returns {Window}
  */
 function openPeek({
@@ -430,6 +504,7 @@ function openPeek({
   tab,
   userContextId = Services.scriptSecurityManager.DEFAULT_USER_CONTEXT_ID,
   fromExternal = !tab,
+  session = null,
 }) {
   const all = openPeeks();
   const newest = all.at(-1) ?? null;
@@ -471,7 +546,20 @@ function openPeek({
       triggeringPrincipal ?? Services.scriptSecurityManager.getSystemPrincipal()
     );
   }
-  const win = lazy.BrowserWindowTracker.openWindow({ args, private: false });
+  const win = lazy.BrowserWindowTracker.openWindow({
+    args,
+    private: session !== null,
+  });
+  if (session !== null) {
+    sessions.set(win, session);
+    // Before the window makes its first tab, which takes the session's jar.
+    lazy.SvalPrivateJars.joinSession(win, session);
+    lazy.SvalPrivateJars.windowOf(session)?.addEventListener(
+      "unload",
+      () => closeSession(session),
+      { once: true }
+    );
+  }
   opened.push(win);
   asked.set(win, place);
   lastFocused.set(win, SvalPeek._now());
@@ -793,6 +881,10 @@ function reopenIn(target, tab) {
  * @returns {Promise<void>}
  */
 async function openInWorkspace(win, workspaceId, { newWindow = false } = {}) {
+  if (sessionOf(win) !== null) {
+    openInHost(win);
+    return;
+  }
   const found = await destinations();
   const choice = found?.choices.find(item => item.id === workspaceId);
   if (!choice || win.closed) {
@@ -848,6 +940,59 @@ async function openInWorkspace(win, workspaceId, { newWindow = false } = {}) {
 }
 
 /**
+ * Opens a private Peek's page as a tab of the private window the Peek was
+ * opened from, the one place its page can go: the page moves as it is, in
+ * the session's jar, and the Peek closes with its last tab. A page whose
+ * load never showed it ({@link unshownAddress}) opens again there.
+ *
+ * @param {Window} win A private Peek.
+ */
+function openInHost(win) {
+  const host = hostOf(win);
+  if (!host || win.closed) {
+    renderOpenButton(win);
+    return;
+  }
+  const tab = win.gBrowser.selectedTab;
+  const unshown = unshownAddress(tab);
+  host.focus();
+  lazy.SvalMacWindowOrder.bringForward(host);
+  if (unshown) {
+    if (openAsNewTab(host, unshown)) {
+      handedOff.add(win);
+      win.close();
+    }
+    return;
+  }
+  handedOff.add(win);
+  host.gBrowser.adoptTab(tab, { selectTab: true });
+}
+
+/**
+ * Draws a private Peek's open button, for the private window the Peek was
+ * opened from, and hides it once that window has closed.
+ *
+ * @param {Window} win A private Peek.
+ */
+function renderPrivateOpenButton(win) {
+  const doc = win.document;
+  const main = doc.getElementById("sval-peek-open-main");
+  doc.getElementById("sval-peek-open").hidden = !hostOf(win);
+  doc.getElementById("sval-peek-open-more").hidden = true;
+  doc.querySelector(".sval-peek-open-divider").hidden = true;
+  main.dataset.workspace = "";
+  main.dataset.private = "true";
+  main.title = PRIVATE_OPEN_TEXT;
+  main.setAttribute("aria-label", PRIVATE_OPEN_TEXT);
+  main.textContent = "";
+  const lead = htmlElement(doc, "span", { className: "sval-peek-open-lead" });
+  lead.textContent = "Open in";
+  const name = htmlElement(doc, "span", { className: "sval-peek-open-name" });
+  name.textContent = "Private Window";
+  main.append(tile(doc, {}), lead, name);
+}
+
+/**
  * A workspace's tile, as the panel's switcher draws it: its icon, or the
  * workspace glyph, on its colour.
  *
@@ -881,6 +1026,10 @@ async function renderOpenButton(win) {
   const doc = win.document;
   const group = doc.getElementById("sval-peek-open");
   if (!group) {
+    return;
+  }
+  if (sessionOf(win) !== null) {
+    renderPrivateOpenButton(win);
     return;
   }
   let found = null;
@@ -1037,7 +1186,7 @@ function openSwitcher(win, { byKey = false } = {}) {
   const panel = doc.getElementById("sval-peek-switcher");
 
   const now = SvalPeek._now();
-  const all = openPeeks();
+  const all = peersOf(win);
   const count = panel.querySelector(".sval-peek-switcher-count");
   count.textContent = String(all.length);
   const list = panel.querySelector(".sval-peek-switcher-list");
@@ -1121,26 +1270,37 @@ function openSwitcher(win, { byKey = false } = {}) {
 }
 
 /**
- * Draws every Peek's tag with the count of Peeks open, which
- * changes as one opens or closes.
+ * Draws every Peek's tag with the count of the Peeks it lists
+ * ({@link peersOf}), which changes as one opens or closes. A private Peek's
+ * tag says so in place of "Peek".
  */
 function renderTags() {
-  const all = openPeeks();
   const minutes = Services.prefs.getIntPref(IDLE_PREF, 360);
-  const tip = minutes
-    ? `This Peek isn't in a Workspace. It closes if you don't use it for ${idleText(minutes)}.`
-    : "This Peek isn't in a Workspace.";
-  for (const win of all) {
+  const idle = minutes
+    ? ` It closes if you don't use it for ${idleText(minutes)}.`
+    : "";
+  const privateIdle = minutes
+    ? `, or if you don't use the Peek for ${idleText(minutes)}`
+    : "";
+  for (const win of openPeeks()) {
     const tag = win.document.getElementById("sval-peek-tag");
     if (!tag) {
       continue;
     }
-    tag.querySelector(".sval-peek-count").textContent = String(all.length);
-    const several = all.length > 1;
+    const isPrivate = sessionOf(win) !== null;
+    const count = peersOf(win).length;
+    tag.toggleAttribute("private", isPrivate);
+    tag.querySelector(".sval-peek-word").textContent = isPrivate
+      ? "Private"
+      : "Peek";
+    tag.querySelector(".sval-peek-count").textContent = String(count);
+    const several = count > 1;
     tag.toggleAttribute("several", several);
     tag.setAttribute("aria-disabled", String(!several));
     tag.tabIndex = several ? 0 : -1;
-    tag.title = tip;
+    tag.title = isPrivate
+      ? `This private Peek closes when you close the private window you opened it from${privateIdle}.`
+      : `This Peek isn't in a Workspace.${idle}`;
   }
 }
 
@@ -1195,7 +1355,7 @@ function buildHeader(win) {
   const icon = htmlElement(doc, "img", { className: "sval-peek-app-icon" });
   icon.alt = "";
   icon.src = APP_ICON;
-  const word = htmlElement(doc, "span");
+  const word = htmlElement(doc, "span", { className: "sval-peek-word" });
   word.textContent = "Peek";
   const count = htmlElement(doc, "span", { className: "sval-peek-count" });
   const chevron = htmlElement(doc, "span", { className: "sval-peek-chevron" });
@@ -1281,7 +1441,9 @@ function buildHeader(win) {
   closeAll.textContent = "Close all Peeks";
   closeAll.addEventListener("click", () => {
     switcher.hidePopup();
-    SvalPeek.closeAll();
+    for (const peer of peersOf(win)) {
+      peer.close();
+    }
   });
   // A panel lays its content out in a row unless it is vertical.
   switcher.setAttribute("orient", "vertical");
@@ -1333,7 +1495,10 @@ export const SvalPeek = {
       if (!isPeek(win)) {
         return;
       }
-      rememberPlace(win);
+      // Nothing about a private Peek is kept, its place included.
+      if (sessionOf(win) === null) {
+        rememberPlace(win);
+      }
       if (Services.focus.activeWindow === win) {
         lazy.SvalMacWindowOrder.passActivationBehind();
       }
@@ -1350,7 +1515,7 @@ export const SvalPeek = {
     );
     Services.obs.addObserver((subject, topic, domain) => {
       filterClosedPages(
-        state =>
+        ({ state }) =>
           !state.entries.some(entry => {
             try {
               return Services.eTLD.hasRootDomain(
@@ -1369,7 +1534,7 @@ export const SvalPeek = {
         userContextId = JSON.parse(data).userContextId ?? 0;
       } catch {}
       if (userContextId) {
-        filterClosedPages(state => state.userContextId !== userContextId);
+        filterClosedPages(({ state }) => state.userContextId !== userContextId);
       }
     }, "clear-origin-attributes-data");
   },
@@ -1383,14 +1548,20 @@ export const SvalPeek = {
    *   of another kind or with none closed.
    */
   reopenClosed(win) {
-    if (!isPeek(win) || !closedPages.length) {
+    if (!isPeek(win)) {
       return false;
     }
-    const state = closedPages.pop();
+    const session = sessionOf(win);
+    const at = closedPages.findLastIndex(closed => closed.session === session);
+    if (at < 0) {
+      return false;
+    }
+    const [{ state }] = closedPages.splice(at, 1);
     const reopened = openPeek({
       triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
       userContextId: state.userContextId ?? 0,
       fromExternal: false,
+      session,
     });
     reopening.set(reopened, state);
     return true;
@@ -1414,9 +1585,9 @@ export const SvalPeek = {
    * address bar Firefox focuses for it (`gBrowserInit._setInitialFocus`),
    * in the jar of `win`, the window it was asked for in. That is the jar
    * new tabs there take (`gBrowser.defaultUserContextId`): the workspace's,
-   * or a Peek's own. A private window's jar belongs to its private
-   * session (`SvalPrivateJars`), and a Peek is never private, so one
-   * opened from a private window takes the shared jar.
+   * or a Peek's own. Asked for in a private window, a private Peek or
+   * another window of a private session, it is a private Peek in that
+   * session, whose jar is the session.
    *
    * @param {Window} win A browser window.
    * @returns {Window}
@@ -1424,13 +1595,13 @@ export const SvalPeek = {
   openEmpty(win) {
     this.init();
     const shared = Services.scriptSecurityManager.DEFAULT_USER_CONTEXT_ID;
+    const jar = win.gBrowser.defaultUserContextId ?? shared;
     return openPeek({
       uri: Services.io.newURI(win.BROWSER_NEW_TAB_URL),
       triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
-      userContextId: lazy.PrivateBrowsingUtils.isWindowPrivate(win)
-        ? shared
-        : (win.gBrowser.defaultUserContextId ?? shared),
+      userContextId: jar,
       fromExternal: false,
+      session: lazy.PrivateBrowsingUtils.isWindowPrivate(win) ? jar : null,
     });
   },
 
@@ -1439,18 +1610,25 @@ export const SvalPeek = {
    * window the Downloads panel announces it in (`windowToTell`) comes to the
    * front, opened if there is none. Firefox opens the panel only in the
    * active window (`DownloadsDataCtor._notifyDownloadEvent`), so the
-   * announcement waits until that window is active, or gone.
+   * announcement waits until that window is active, or gone. A private
+   * Peek's download is announced in the private window the Peek was opened
+   * from, and the Peek stays when that window has closed.
    *
    * @param {Window} win A Peek.
    * @param {object} download
    * @returns {Promise<void>}
    */
   async handOver(win, download) {
+    const isPrivate = sessionOf(win) !== null;
+    if (isPrivate && !hostOf(win)) {
+      return;
+    }
     // Handed off first, so `windowToTell` passes over this Peek.
     handedOff.add(win);
-    const target =
-      lazy.SvalDownloadWorkspaces.windowToTell(download, false) ??
-      (await openNormalWindow());
+    const target = isPrivate
+      ? hostOf(win)
+      : (lazy.SvalDownloadWorkspaces.windowToTell(download, false) ??
+        (await openNormalWindow()));
     target.focus();
     lazy.SvalMacWindowOrder.bringForward(target);
     win.close();
@@ -1513,6 +1691,40 @@ export const SvalPeek = {
     target.focus();
     lazy.SvalMacWindowOrder.bringForward(target);
     return target;
+  },
+
+  /**
+   * The window a Peek's Launcher reads tabs from and opens Sval's own pages
+   * in: the user's frontmost ordinary window for a normal Peek, and for a
+   * private Peek the private window it was opened from, whose session is all
+   * it knows.
+   *
+   * @param {Window} win A Peek.
+   * @returns {Window|null} null when no such window is open.
+   */
+  homeOf(win) {
+    return sessionOf(win) !== null ? hostOf(win) : this.openOrdinaryWindow();
+  },
+
+  /**
+   * {@link SvalPeek.homeOf}, brought to the front. A normal Peek with no
+   * ordinary window open gets a new one. A private Peek whose window has
+   * closed is its own.
+   *
+   * @param {Window} win A Peek.
+   * @returns {Promise<Window>}
+   */
+  async homeFor(win) {
+    if (sessionOf(win) === null) {
+      return this.ordinaryWindow();
+    }
+    const host = hostOf(win);
+    if (!host) {
+      return win;
+    }
+    host.focus();
+    lazy.SvalMacWindowOrder.bringForward(host);
+    return host;
   },
 
   /** Closes every Peek, with no question: each page is in history. */
@@ -1627,6 +1839,12 @@ export const SvalPeek = {
     // window's default jar (`workspace-jar-for-new-tabs.patch`), and goes on
     // to a Peek of its own in that jar: the page's.
     win.gBrowser.defaultUserContextId = win.gBrowser.selectedTab.userContextId;
+    // The jar the window took: the session's it was opened into, or its own
+    // where that session had ended (`SvalPrivateJars.jarForWindow`).
+    if (sessions.has(win)) {
+      sessions.set(win, win.gBrowser.defaultUserContextId);
+    }
+    const session = sessionOf(win);
     win.gBrowser.tabContainer.addEventListener("TabOpen", event => {
       const tab = event.target;
       // After `addTab` has started its load: the move swaps the tab's
@@ -1638,7 +1856,7 @@ export const SvalPeek = {
         // A workspace's tab, such as one Reopen Closed Tab brought back from
         // another window's list, goes back to an ordinary window, where its
         // node is watched.
-        if (lazy.SvalTabs.nodeIdOf(tab)) {
+        if (session === null && lazy.SvalTabs.nodeIdOf(tab)) {
           const home = normalWindows()[0];
           if (home) {
             home.gBrowser.adoptTab(tab, { selectTab: true });
@@ -1646,7 +1864,7 @@ export const SvalPeek = {
             return;
           }
         }
-        openPeek({ tab });
+        openPeek({ tab, session });
       });
     });
     win.addEventListener("activate", () => {
