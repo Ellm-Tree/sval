@@ -364,7 +364,18 @@ final class WalkthroughTests: XCTestCase {
     /// lift it and short of opening its menu, then a slow move, held over
     /// the target before letting go.
     private func drag(_ row: XCUIElement, to target: XCUICoordinate, marked: String? = nil) {
-        let from = row.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5))
+        // Both ends are fixed on the app before the press. XCTest looks up
+        // an element's coordinate again while it synthesizes the gesture,
+        // after its wait for the app to idle, and the app answers each
+        // lookup on its main thread. A lookup that runs into the press
+        // holds back the lift until the finger has moved, and the touch
+        // scrolls instead.
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let at = { (point: CGPoint) in
+            origin.withOffset(CGVector(dx: point.x - origin.screenPoint.x, dy: point.y - origin.screenPoint.y))
+        }
+        let from = at(row.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)).screenPoint)
+        let to = at(target.screenPoint)
         // The drop's mark shows only while the finger is held, so its
         // screenshot is taken during the hold.
         if let marked, let dir = ProcessInfo.processInfo.environment["SVAL_SHOTS"] {
@@ -373,7 +384,7 @@ final class WalkthroughTests: XCTestCase {
                 try? XCUIScreen.main.screenshot().pngRepresentation.write(to: url)
             }
         }
-        from.press(forDuration: 0.6, thenDragTo: target, withVelocity: .slow, thenHoldForDuration: marked == nil ? 1.0 : 2.5)
+        from.press(forDuration: 0.6, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: marked == nil ? 1.0 : 2.5)
         sleep(2)
     }
 
