@@ -90,13 +90,12 @@ fi
 # hand. Only the files the series touches are staged: `git add -A` here would
 # stage the object directory. The identity is given here because a fresh tree,
 # a CI container especially, has none configured, and a commit that fails
-# leaves every later `make-patch.sh` diffing against the wrong base.
+# leaves every later `make-patch.sh` diffing against the wrong base. The paths
+# reach git on stdin because together they outgrow the 32767-character
+# command line Windows allows a process.
 if [[ ${#touched_files[@]} -gt 0 ]]; then
-  staged=()
-  while IFS= read -r file; do
-    staged+=("$file")
-  done < <(printf '%s\n' "${touched_files[@]}" | sort -u)
-  git -C "$SRC" add -- "${staged[@]}"
+  printf '%s\n' "${touched_files[@]}" | sort -u |
+    git -C "$SRC" add --pathspec-from-file=-
 fi
 git -C "$SRC" -c user.name=sval -c user.email=sval@localhost \
   commit -q --allow-empty -m "sval: patch series applied" >/dev/null
