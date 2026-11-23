@@ -607,7 +607,7 @@ struct TabGridView: UIViewRepresentable {
                 layout.supplementaryContentInsetsReference = .none
             }
             if !section.layers.isEmpty {
-                let kind = GridBox.kind(section.layers)
+                let kind = GridBox.kind(section.layers, theme: theme)
                 if !registered.contains(kind) {
                     registered.insert(kind)
                     view?.collectionViewLayout.register(GridBox.self, forDecorationViewOfKind: kind)
@@ -1079,12 +1079,16 @@ final class GridCollectionView: UICollectionView {
 }
 
 /// A section's group boxes, drawn behind its cards. The layers ride in the
-/// decoration's kind, the one thing a background decoration is given.
+/// decoration's kind, the one thing a background decoration is given, with
+/// the facts of the theme the box is drawn in: a decoration whose
+/// attributes are unchanged is never given them again, so a box drawn in
+/// another theme stays as it was drawn until its kind changes.
 final class GridBox: UICollectionReusableView {
     static var theme: Theme?
 
-    static func kind(_ layers: [GroupLayer]) -> String {
+    static func kind(_ layers: [GroupLayer], theme: Theme) -> String {
         "box|" + layers.map { "\($0.tint ?? "-"):\($0.top ? 1 : 0):\($0.bottom ? 1 : 0)" }.joined(separator: ",")
+            + "|\(theme.dark ? 1 : 0):\(theme.sheetLightness):\(theme.blockDir)"
     }
 
     private var layers: [(tint: String?, top: Bool, bottom: Bool)] = []
@@ -1094,7 +1098,7 @@ final class GridBox: UICollectionReusableView {
         backgroundColor = .clear
         isUserInteractionEnabled = false
         contentMode = .redraw
-        let spec = attributes.representedElementKind?.dropFirst(4) ?? ""
+        let spec = attributes.representedElementKind?.split(separator: "|").dropFirst().first ?? ""
         layers = spec.split(separator: ",").map { part in
             let bits = part.split(separator: ":")
             return (bits[0] == "-" ? nil : String(bits[0]), bits[1] == "1", bits[2] == "1")
@@ -1115,7 +1119,7 @@ final class GridBox: UICollectionReusableView {
                 bottom = GridMetrics.rowGap + CGFloat(closing.count - 1 - inside) * GridMetrics.boxBottom
             }
             let frame = CGRect(x: inset, y: 0, width: bounds.width - 2 * inset, height: bounds.height - bottom)
-            let radius: CGFloat = index == 0 ? 22 : 18
+            let radius = Self.radius(level: index, frame: frame)
             var corners: UIRectCorner = []
             if layer.top { corners.formUnion([.topLeft, .topRight]) }
             if layer.bottom { corners.formUnion([.bottomLeft, .bottomRight]) }
@@ -1142,6 +1146,14 @@ final class GridBox: UICollectionReusableView {
 }
 
 extension GridBox {
+    /// The corner of the box `level` groups in, around `frame`. A closed
+    /// group's box is shorter than two corners, so they shrink to half its
+    /// height: larger, the outline's ends cross themselves and leave the
+    /// fill's corners outside it.
+    static func radius(level: Int, frame: CGRect) -> CGFloat {
+        min(level == 0 ? 22 : 18, frame.height / 2, frame.width / 2)
+    }
+
     /// A box's outline in one section: its sides, with its rounded top or
     /// bottom only where the box starts or ends.
     static func outline(_ frame: CGRect, radius: CGFloat, top: Bool, bottom: Bool) -> UIBezierPath {
