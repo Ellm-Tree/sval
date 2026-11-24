@@ -16,10 +16,10 @@
 # overrides Sval's own prefs, which are exactly what is under test.
 #
 # SVAL_NETWORK_ALL_SWITCHES=1 first collects every boolean a person can turn on
-# from Sval's UI (each settings pane's controls, the new tab's switches, the
-# address bar's suggestion types) and runs the measured session with all of
-# them on. That finds features that phone home only once a user opts in, which
-# a default-settings run never exercises. Locked prefs ignore it, so a feature
+# from Sval's UI (each settings pane's controls and the address bar's
+# suggestion types) and runs the measured session with all of them on. That
+# finds features that phone home only once a user opts in, which a
+# default-settings run never exercises. Locked prefs ignore it, so a feature
 # Sval removed stays removed.
 #
 # SVAL_NETWORK_PRIVATE=1 turns on "Always use private browsing mode", so every

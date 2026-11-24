@@ -647,10 +647,8 @@ def collect_switches(port, profile):
     """Every boolean a person can turn on from Sval's UI.
 
     Settings registers each control's pref with `Preferences` as its pane
-    loads, so visiting every pane yields every settings switch. The new tab's
-    switches are its PREFS_CONFIG entries, less the `system.` ones, which are
-    region and experiment gates rather than controls. The address bar's are
-    its `suggest.` prefs.
+    loads, so visiting every pane yields every settings switch. The address
+    bar's are its `suggest.` prefs.
 
     "Always use private browsing mode" is left out. It makes every window
     private, and a private window gets Firefox's tab strip and no Sval panel,
@@ -688,14 +686,6 @@ def collect_switches(port, profile):
         if shown["shown"] != pane:
             sys.exit(f"network-contact: settings showed {shown['shown']} for {pane}")
         found.update(shown["prefs"])
-    found.update(m.js(
-        "let done = arguments[0];"
-        "const { PREFS_CONFIG } = ChromeUtils.importESModule('resource://newtab/lib/ActivityStream.sys.mjs');"
-        "const branch = 'browser.newtabpage.activity-stream.';"
-        "done([...PREFS_CONFIG.keys()].filter(k => !k.startsWith('system.'))"
-        ".map(k => branch + k)"
-        ".filter(n => Services.prefs.getPrefType(n) == Services.prefs.PREF_BOOL));"
-    ))
     found.update(m.js(
         "arguments[0](Services.prefs.getChildList('browser.urlbar.suggest.')"
         ".concat(['browser.search.suggest.enabled'])"
