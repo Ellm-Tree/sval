@@ -4,6 +4,7 @@
 import Foundation
 import JavaScriptCore
 import Observation
+import UIKit
 
 /// Every Workspace and group colour as the desktop draws it (decision
 /// 0057), preset or custom. The desktop's `SvalColor.sys.mjs` is the one
@@ -248,6 +249,20 @@ enum DesktopColor {
         else { return nil }
         inks[key] = (text, muted)
         return (text, muted)
+    }
+
+    /// The WCAG 2 contrast ratio of `ink` on an opaque `surface`
+    /// (`contrast`).
+    static func ratio(_ ink: UIColor, on surface: UIColor) -> Double? {
+        func channels(_ color: UIColor) -> [Double] {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return [r, g, b].map { min(1, max(0, Double($0))) }
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        return context?.objectForKeyedSubscript("contrast")?
+            .call(withArguments: [channels(ink), channels(surface)])?.forProperty("w")?.toDouble()
     }
 
     /// A call of the picker's functions below. The maths is pure, so with

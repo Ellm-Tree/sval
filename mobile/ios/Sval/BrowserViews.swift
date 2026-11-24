@@ -485,7 +485,8 @@ struct BrowserView: View {
             // front, so switching to an empty Workspace doesn't stop them.
             let split = browser.splitInFront
             WebContainer(pages: browser.stagedPages(), showsFront: split == nil,
-                         bottomCover: verticalSize == .compact ? Browser.sidewaysBarRoom : Browser.barRoom)
+                         bottomCover: verticalSize == .compact ? Browser.sidewaysBarRoom : Browser.barRoom,
+                         tint: theme.tint)
             if let picking {
                 PickSurface(pick: picking, tint: UIColor(theme.accent))
             }

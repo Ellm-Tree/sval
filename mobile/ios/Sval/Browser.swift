@@ -1021,17 +1021,8 @@ final class Browser {
         PageZoom.set(level, for: host, isPrivate: privateInFront)
     }
 
-    /// Loads the page in front again. An empty page left by a failed load
-    /// has nothing of its own to reload, so that load starts over.
-    func reload() {
-        guard let page = pages[currentTabId ?? ""] else { return }
-        if let failure = page.failure {
-            page.load(failure.url)
-        } else {
-            page.lift([.hold])
-            page.view.reload()
-        }
-    }
+    /// Loads the page in front again.
+    func reload() { pages[currentTabId ?? ""]?.reload() }
     func stopLoading() { pages[currentTabId ?? ""]?.view.stopLoading() }
 
     /// Each tab's media, for tabs that have played.

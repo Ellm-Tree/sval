@@ -16,6 +16,9 @@ struct WebContainer: UIViewRepresentable {
     var showsFront = true
     /// How much of the page's foot the bar covers.
     var bottomCover: CGFloat = Browser.barRoom
+    /// The Workspace's colour, which pull to refresh's spinner takes
+    /// where it reads on the page (`Page.spinnerColor`).
+    let tint: WorkspaceTint?
 
     func makeUIView(context: Context) -> PageStage {
         let stage = PageStage()
@@ -27,6 +30,7 @@ struct WebContainer: UIViewRepresentable {
         if showsFront, let front = pages.last, front.obscuredContentInsets.bottom != bottomCover {
             front.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottomCover, right: 0)
         }
+        for page in pages { (page.scrollView.refreshControl as? PullRefresh)?.tint = tint }
         stage.show(pages, showsFront: showsFront)
     }
 }

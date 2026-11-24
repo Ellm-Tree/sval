@@ -403,6 +403,48 @@ final class Page: NSObject, WKNavigationDelegate {
         // of it.
         view.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: Browser.barRoom, right: 0)
         view.scrollView.panGestureRecognizer.addTarget(self, action: #selector(panned(_:)))
+        let refresh = PullRefresh()
+        refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
+        view.scrollView.refreshControl = refresh
+        // The spinner turns until the load it started ends.
+        observations.append(view.observe(\.isLoading) { view, _ in
+            MainActor.assumeIsolated {
+                if !view.isLoading { view.scrollView.refreshControl?.endRefreshing() }
+            }
+        })
+    }
+
+    /// The Workspace's colour as its mark shows it on the page's
+    /// background, which the spinner draws over, where it meets 3:1 there;
+    /// otherwise, or with no colour, Sval's blue on a light page or its
+    /// cyan on a dark one. A page sets its background as it loads, so the
+    /// colour is chosen as a pull begins.
+    private func spinnerColor() -> UIColor {
+        let ground = view.underPageBackgroundColor.resolvedColor(with: view.traitCollection)
+        let light = BarColors.readsDark(Color(ground), dark: false)
+        if let tint = (view.scrollView.refreshControl as? PullRefresh)?.tint {
+            let mark = UIColor(tint.swatch(dark: !light))
+            if let ratio = DesktopColor.ratio(mark, on: ground), ratio >= 3 { return mark }
+        }
+        return light ? UIColor(Theme.blue) : UIColor(Color(hex: Palette.neon))
+    }
+
+    /// A load that never starts, as when the page has no address, never
+    /// ends the spinner through `isLoading`.
+    @objc private func pulled(_ refresh: UIRefreshControl) {
+        reload()
+        if !view.isLoading { refresh.endRefreshing() }
+    }
+
+    /// Loads the page again. An empty page left by a failed load has
+    /// nothing of its own to reload, so that load starts over.
+    func reload() {
+        if let failure {
+            load(failure.url)
+        } else {
+            lift([.hold])
+            view.reload()
+        }
     }
 
     /// A finger on the page, or lifted from it, which the bar's fold
@@ -410,7 +452,9 @@ final class Page: NSObject, WKNavigationDelegate {
     /// where it is.
     @objc private func panned(_ pan: UIPanGestureRecognizer) {
         switch pan.state {
-        case .began: onScroll?(tabId, .touched)
+        case .began:
+            onScroll?(tabId, .touched)
+            view.scrollView.refreshControl?.tintColor = spinnerColor()
         case .ended, .cancelled, .failed: onScroll?(tabId, .released)
         default: break
         }
@@ -1312,4 +1356,10 @@ struct PlayingFrames {
         if playing && isUnseen { unseen.insert(frame) } else { unseen.remove(frame) }
         return (perceived, allMuted) != was
     }
+}
+
+/// Pull to refresh's control, which keeps the Workspace's colour apart
+/// from the colour its spinner shows (`Page.spinnerColor`).
+final class PullRefresh: UIRefreshControl {
+    var tint: WorkspaceTint?
 }

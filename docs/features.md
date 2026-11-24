@@ -414,6 +414,8 @@ control of what you see and what is sent to websites.
 - **Switch tabs from the address bar.** Hold the address bar and slide to
   move through your tabs. The iPhone app shows a picture of each tab's page
   and of each pin's page you've opened.
+- **Pull to refresh.** Pull down from the top of a page to reload the
+  page.
 - **Search suggestions.** As you type in the address bar, the iPhone app
   shows suggestions from your search engine, following the search settings
   you chose on your computer. A private tab gets no suggestions.

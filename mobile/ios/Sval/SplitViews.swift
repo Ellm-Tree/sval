@@ -287,7 +287,7 @@ struct SplitStage: View {
                 PickPage(pane: pane)
                     .simultaneousGesture(TapGesture().onEnded { if !focused { browser.select(id) } })
             } else {
-                PaneHost(view: browser.paneView(id), bottomCover: cover(id)) {
+                PaneHost(view: browser.paneView(id), bottomCover: cover(id), tint: theme.tint) {
                     if !focused { browser.select(id) }
                 }
             }
@@ -413,6 +413,9 @@ struct PaneHost: UIViewRepresentable {
     /// How much of the pane's foot the bar covers: the lower pane's while
     /// upright, both panes' while sideways.
     var bottomCover: CGFloat = 0
+    /// The Workspace's colour, which pull to refresh's spinner takes
+    /// where it reads on the page (`Page.spinnerColor`).
+    let tint: WorkspaceTint?
     let onTouch: () -> Void
 
     func makeUIView(context: Context) -> UIView {
@@ -428,6 +431,7 @@ struct PaneHost: UIViewRepresentable {
 
     func updateUIView(_ container: UIView, context: Context) {
         context.coordinator.touch?.onTouch = onTouch
+        (view?.scrollView.refreshControl as? PullRefresh)?.tint = tint
         if let view, view.obscuredContentInsets.bottom != bottomCover {
             view.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottomCover, right: 0)
         }
