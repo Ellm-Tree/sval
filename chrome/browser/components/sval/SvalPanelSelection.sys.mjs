@@ -51,11 +51,14 @@ export class SvalPanelSelection {
   #anchor = null;
 
   /**
-   * The selection and the containers above it when `reveal` last opened
-   * them, as one string, so a redraw can tell a selected tab that moved from
-   * one whose group the user has since folded.
+   * The selection and the containers above it when `reveal` last looked, as
+   * one string per workspace this window has shown, so a redraw can tell a
+   * selected tab that moved from one whose group the user has since folded.
+   * Kept per workspace because a switch changes the chain without anything
+   * moving: a switch back to a workspace whose group the user folded over
+   * its selected tab keeps the fold.
    */
-  #revealedPath = null;
+  #revealedPaths = new Map();
 
   /** @param {PanelView} view */
   constructor(view) {
@@ -107,10 +110,14 @@ export class SvalPanelSelection {
     if (!workspace.id) {
       return;
     }
+    // The tab already selected is selected again whenever its tabs come back
+    // (a switch back to its workspace, a launch), and that is no new
+    // selection: a group the user folded over it stays folded.
+    const changed = settings.selectionIn(workspace.id) !== id;
     settings.setSelection(workspace.id, id);
     // A row drawn only because it led to the old selection goes with it.
     const pathDrawn = rows.some(row => row.showsSelection);
-    if (this.reveal({ force: true }) || pathDrawn) {
+    if (this.reveal({ force: changed }) || pathDrawn) {
       this.#view.render();
     } else {
       this.paint();
@@ -123,15 +130,17 @@ export class SvalPanelSelection {
    * viewing always has a row. Every way a tab comes to be selected reaches
    * `select` (a row's click, `TabSelect` from the strip, Cmd+number, a
    * workspace switch's hand-over, a link, restoration, an agent), and that
-   * call forces this, so a selection is never drawn hidden. Spec §5.6 starts
-   * every group a device has not seen collapsed, which is the state a tab
-   * arriving from sync or first run is selected into.
+   * call forces this when the selection changes. Spec §5.6 starts every
+   * group a device has not seen collapsed, which is the state a tab arriving
+   * from sync or first run is selected into.
    *
-   * A redraw after the tree changes calls it unforced, and it then acts only
-   * when the selection or the chain above it differs from the last time: a
-   * peer moving the selected tab into a group this device has never opened
-   * reveals it, and a group the user folded over the selected tab stays
-   * folded until the selection next changes.
+   * Otherwise it acts only when the chain above the selection differs from
+   * the last time this window looked at its workspace: a peer moving the
+   * selected tab into a group this device has never opened reveals it, and
+   * a group the user folded over the selected tab stays folded until the
+   * selection next changes. A workspace this window has not looked at yet
+   * is recorded as it stands. A collapsed group still draws the path to
+   * the selection (`SvalPanelModel.rows`), so a fold never hides it.
    *
    * Collapse is device-local (spec §5.6), so nothing here reaches the engine
    * or another device. The caller redraws, and flushes the settings.
@@ -142,14 +151,15 @@ export class SvalPanelSelection {
    * @returns {boolean} whether any container was opened.
    */
   reveal({ force = false } = {}) {
-    const { nodes, settings } = this.#view;
+    const { nodes, settings, workspace } = this.#view;
     const id = this.selectedId();
     const above = ancestorIds(nodes, id);
     const path = [id, ...above].join(" ");
-    if (!force && path === this.#revealedPath) {
+    const last = this.#revealedPaths.get(workspace.id);
+    this.#revealedPaths.set(workspace.id, path);
+    if (!force && (last === undefined || path === last)) {
       return false;
     }
-    this.#revealedPath = path;
     let opened = false;
     for (const container of above) {
       if (settings.isCollapsed(container)) {

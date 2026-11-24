@@ -737,6 +737,60 @@ add_task(async function a_collapsed_group_keeps_the_selected_tab_drawn() {
 });
 
 /**
+ * A fold over the selected tab is kept when that same tab is selected again
+ * without the user choosing it: a switch away and back, whose hand-over
+ * selects the tab the workspace left selected, and a launch, which selects
+ * the tab the window shows.
+ */
+add_task(async function a_fold_over_the_selection_survives_a_switch_back() {
+  const { engine, settings, ids } = await withFreshPanel();
+  await viewTab(ids.tab2);
+  await SvalPanel._setCollapsed(ids.groupA, true);
+
+  const other = crypto.randomUUID();
+  await engine.mutate({
+    kind: "addWorkspace",
+    name: "Elsewhere",
+    id: other,
+    now: Date.now(),
+  });
+  await engine.mutate({
+    kind: "addTab",
+    parent: other,
+    name: "Away",
+    url: "https://example.com/Away",
+    id: crypto.randomUUID(),
+    now: Date.now(),
+  });
+  const workspace = SvalWindowWorkspace.of(window);
+  Assert.ok(
+    await within(workspace.switchTo(other), 10_000, "the switch away"),
+    "the window switched away"
+  );
+  Assert.ok(
+    await within(workspace.switchTo(ids.workspace), 10_000, "the switch back"),
+    "and back"
+  );
+  await within(
+    SvalPanel.observer.settled(),
+    10_000,
+    "the observer filing the switch's tabs"
+  );
+  Assert.equal(
+    SvalPanel.selection.selectedId(),
+    ids.tab2,
+    "the same tab is selected"
+  );
+  Assert.ok(settings.isCollapsed(ids.groupA), "and its group stays folded");
+
+  await SvalPanel.selection.select(ids.tab2);
+  Assert.ok(
+    settings.isCollapsed(ids.groupA),
+    "selecting the tab already selected opens nothing"
+  );
+});
+
+/**
  * Two groups deep, the selected tab is drawn whichever group above it is
  * collapsed, with only the groups on its path.
  */
