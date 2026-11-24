@@ -21,12 +21,24 @@
  * hand focus to the page, as a pick does by loading it. Focus leaving the
  * field and its search-mode switcher another way ends the float too.
  *
+ * While the floating field holds the page's address as the float opened on
+ * it, a pill set at its end copies that address, whole or clean
+ * (`SvalTabActions`), and closes the float. `sval-launcher.css` hides it once
+ * the field holds anything else.
+ *
  * **No address or query is ever logged** (Sval `CONTRIBUTING.md` rule 10).
  */
+
+import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserUIUtils: "resource:///modules/BrowserUIUtils.sys.mjs",
+  CLEAN_ADDRESS_NAME:
+    "moz-src:///browser/components/sval/SvalSiteControls.sys.mjs",
+  COPY_ADDRESS_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
+  copyAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
+  copyCleanAddress: "moz-src:///browser/components/sval/SvalTabActions.sys.mjs",
   URLBAR_KEY_ID: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
   SvalLauncherCommands:
     "moz-src:///browser/components/sval/SvalLauncherCommands.sys.mjs",
@@ -47,6 +59,9 @@ export const FLOATING = "sval-launcher-floating";
 const SCRIM_ID = "sval-launcher-scrim";
 const ADDRESS_ID = "sval-launcher-address";
 const KEY_CAP_ID = "sval-launcher-key";
+const COPIES_ID = "sval-launcher-copies";
+export const COPY_ADDRESS_BUTTON_ID = "sval-launcher-copy-address";
+export const COPY_CLEAN_ADDRESS_BUTTON_ID = "sval-launcher-copy-clean-address";
 
 /** The float's card, by the Launcher's design: its width, at most. */
 const CARD_WIDTH = 760;
@@ -124,6 +139,67 @@ function place(win) {
 }
 
 /**
+ * The pill set that copies the page's address, whole or clean, at the
+ * field's end. A press keeps focus in the field, which would otherwise end
+ * the float before the click; the click closes the float with focus on the
+ * page, then copies, so the copy's confirmation outlives the close.
+ *
+ * @param {Window} win
+ * @returns {Element}
+ */
+function buildCopies(win) {
+  const doc = win.document;
+  const button = (id, icon, copy) => {
+    const el = htmlElement(doc, "button", {
+      type: "button",
+      id,
+      className: "sval-launcher-copy",
+      dataset: { icon },
+    });
+    el.addEventListener("mousedown", event => event.preventDefault());
+    el.addEventListener("click", () => {
+      SvalLauncher.close(win, { focusPage: true });
+      copy(win);
+    });
+    return el;
+  };
+  const clean = button(
+    COPY_CLEAN_ADDRESS_BUTTON_ID,
+    "clean-address",
+    lazy.copyCleanAddress
+  );
+  clean.title = lazy.CLEAN_ADDRESS_NAME;
+  return htmlElement(
+    doc,
+    "div",
+    { id: COPIES_ID, attrs: { role: "group", "aria-label": "Copy" } },
+    button(COPY_ADDRESS_BUTTON_ID, "copy", lazy.copyAddress),
+    clean
+  );
+}
+
+/**
+ * Names Copy Address's button with its key as it is now, which Settings ›
+ * Keyboard may have changed or cleared.
+ *
+ * @param {Window} win
+ */
+function refreshCopyTitle(win) {
+  const doc = win.document;
+  const button = doc.getElementById(COPY_ADDRESS_BUTTON_ID);
+  const key = doc.getElementById(lazy.COPY_ADDRESS_KEY);
+  button.title = "Copy Address";
+  button.removeAttribute("aria-keyshortcuts");
+  if (key?.getAttribute("key") || key?.getAttribute("keycode")) {
+    button.title += ` (${lazy.shortcutText(lazy.keyOf(key))})`;
+    button.setAttribute(
+      "aria-keyshortcuts",
+      lazy.ariaShortcut(lazy.keyOf(key))
+    );
+  }
+}
+
+/**
  * Makes a window's scrim and toolbar address, and listens for what ends the
  * float, once per window.
  *
@@ -155,6 +231,8 @@ function prepare(win) {
   address.id = ADDRESS_ID;
   address.setAttribute("aria-hidden", "true");
   urlbar.parentNode.append(address);
+
+  urlbar.inputField.closest(".urlbar-input-box").after(buildCopies(win));
 
   state = { scrim, address, fading: null };
   windows.set(win, state);
@@ -406,6 +484,7 @@ export const SvalLauncher = {
       state.fading?.cancel();
       state.fading = null;
       state.address.textContent = addressShown(win);
+      refreshCopyTitle(win);
       place(win);
       urlbar.setAttribute(FLOATING, "");
       state.scrim.setAttribute("open", "");

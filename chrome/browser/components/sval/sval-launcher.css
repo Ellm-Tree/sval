@@ -500,6 +500,66 @@
   }
 }
 
+/* The pill set that copies the page's address (`SvalLauncher`): only while
+   the floating field holds that address, which Firefox marks a valid page
+   proxy state, and never over the search terms it shows for a results page
+   (`persistsearchterms`). */
+#sval-launcher-copies {
+  display: none;
+}
+
+#urlbar[sval-launcher-floating][pageproxystate="valid"]:not([persistsearchterms])
+  > .urlbar-input-container:not(:has(.urlbar-input:placeholder-shown))
+  > #sval-launcher-copies {
+  display: flex;
+  align-self: center;
+  flex-shrink: 0;
+  border: 1px solid var(--sval-launcher-divider);
+  border-radius: 999px;
+  overflow: clip;
+}
+
+.sval-launcher-copy {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--sval-launcher-icon);
+
+  & + & {
+    border-inline-start: 1px solid var(--sval-launcher-divider);
+  }
+
+  &::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    background-color: currentColor;
+    mask: var(--sval-glyph) center / contain no-repeat;
+  }
+
+  &[data-icon="copy"] {
+    --sval-glyph: var(--sval-icon-copy);
+  }
+
+  &[data-icon="clean-address"] {
+    --sval-glyph: var(--sval-icon-clean-address);
+  }
+
+  &:hover {
+    background-color: var(--sval-launcher-hover);
+  }
+
+  &:hover:active {
+    background-color: var(--sval-launcher-selected);
+  }
+}
+
 /* ---------------------------------------------------------------- motion */
 
 @keyframes sval-launcher-in {

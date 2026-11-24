@@ -241,7 +241,9 @@ control of what you see and what is sent to websites.
   sites add to links, like `utm_source`. Sval takes out only the
   parameters its tracking lists name and leaves the rest of the address
   alone. The pin next to Copy Clean Address puts its button in the address
-  bar, and the Launcher has Copy clean address too.
+  bar, and the Launcher has Copy clean address too. Press ⌘L (Ctrl+L) on a
+  page, and the two buttons at the end of the Launcher's field copy the
+  page's whole address or its clean one.
 - **Put tabs to sleep.** Choose Put to Sleep from a tab's or a group's menu
   to free the memory its pages use. Sleeping tabs stay in the Workspace, dimmed,
   and wake when you select them.

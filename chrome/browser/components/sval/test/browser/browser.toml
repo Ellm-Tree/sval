@@ -553,6 +553,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_launcher_commands.js"]
 
+["browser_sval_launcher_copy_address.js"]
+
 ["browser_sval_launcher_enter.js"]
 
 ["browser_sval_launcher_float.js"]
