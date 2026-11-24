@@ -1,0 +1,47 @@
+Sval: The empty address bar lists frequent sites under the recent tabs
+
+With nothing typed, the Launcher lists the recently used tabs, then the
+sites the user visits most. Sval's tab provider outranks the other rows
+Firefox lists then, since the providers manager queries only the active
+providers of the highest priority. The top sites provider is raised to the
+same priority, so both are queried and nothing else is. Its rows go to a
+group of Sval's, which the Launcher's layout places after the recent tabs
+under a heading of its own and caps at its own limit.
+
+diff --git a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+index 6c17702617..ab733af82e 100644
+--- a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+@@ -86,7 +86,9 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+    * @returns {number} The provider's priority for the given query.
+    */
+   getPriority() {
+-    return UrlbarProviderTopSites.PRIORITY;
++    // Level with SvalLauncherTabs' recent tabs, which outrank PRIORITY, so
++    // the empty address bar lists those tabs and these sites alone.
++    return UrlbarProviderTopSites.PRIORITY + 1;
+   }
+ 
+   /**
+diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/urlbar/UrlbarUtils.sys.mjs
+index 1bd5568da5..05ccbbcca7 100644
+--- a/browser/components/urlbar/UrlbarUtils.sys.mjs
++++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
+@@ -35,6 +35,8 @@ const lazy = XPCOMUtils.declareLazy({
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+   SearchSuggestionController:
+     "moz-src:///toolkit/components/search/SearchSuggestionController.sys.mjs",
++  FREQUENT_SITES_GROUP:
++    "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+   UrlbarShared: "chrome://browser/content/urlbar/UrlbarShared.mjs",
+   UrlbarProviderInterventions:
+@@ -631,6 +633,8 @@ export var UrlbarUtils = {
+         return this.RESULT_GROUP.INPUT_HISTORY;
+       case "UrlbarProviderQuickSuggest":
+         return this.RESULT_GROUP.GENERAL_PARENT;
++      case "UrlbarProviderTopSites":
++        return lazy.FREQUENT_SITES_GROUP;
+       default:
+         break;
+     }

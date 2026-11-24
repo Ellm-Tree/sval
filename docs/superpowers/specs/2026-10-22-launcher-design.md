@@ -135,8 +135,14 @@ shown only when it has rows:
 A row shows once, in the first place it qualifies: an open tab is never also
 a history row, and a pin's open tab is a pin row.
 
-**Empty Launcher** (⌘L, nothing typed): the most recently used tabs across
-every workspace, as a ⌃Tab list would, labelled by workspace.
+**Empty Launcher** (⌘L, nothing typed), and the home page's empty field:
+
+| Section | At most | Order within |
+|---|---|---|
+| Recent tabs | 5 | The most recently used tabs across every workspace, as a ⌃Tab list would, labelled by workspace |
+| Frequent sites | 5 | Firefox's top sites (`TopSites.getSites`), in its order, leaving out any site (`siteOf`) the tree holds open as a tab in any workspace |
+
+These two limits are fixed; no setting changes them.
 
 **Removing a row:** ⇧Delete removes a history row or a suggestion, as in
 Firefox. Open tabs, pins, Favorites and commands cannot be removed

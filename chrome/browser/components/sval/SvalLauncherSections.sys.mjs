@@ -46,6 +46,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
   FAVORITES_PROVIDER:
     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
+  FREQUENT_SITES: "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs",
+  FREQUENT_SITES_GROUP:
+    "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs",
   PINS_GROUP:
     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
   RECENT_TABS: "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs",
@@ -127,8 +130,8 @@ export const SvalLauncherSections = {
   },
 
   /**
-   * The address bar's layout: Firefox's top area, Recent tabs for the empty
-   * address bar, then the sections in their order.
+   * The address bar's layout: Firefox's top area, Recent tabs and Frequent
+   * sites for the empty address bar, then the sections in their order.
    *
    * @param {object} firefox What `makeDefaultResultGroups` made: the
    *   heuristic group, the extensions' group, then a group of suggestions
@@ -175,6 +178,10 @@ export const SvalLauncherSections = {
         ...top,
         inputHistory,
         { group: lazy.RECENT_TABS_GROUP, maxResultCount: lazy.RECENT_TABS },
+        {
+          group: lazy.FREQUENT_SITES_GROUP,
+          maxResultCount: lazy.FREQUENT_SITES,
+        },
         ...sections,
       ],
     };
@@ -214,6 +221,9 @@ export const SvalLauncherSections = {
     }
     if (result.rowLabel) {
       return result.rowLabel;
+    }
+    if (UrlbarUtils.getResultGroup(result) === lazy.FREQUENT_SITES_GROUP) {
+      return { id: "launcher-section-frequent-sites" };
     }
     if (!queryContext.trimmedSearchString) {
       return undefined;

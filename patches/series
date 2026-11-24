@@ -172,6 +172,7 @@ launcher-enter.patch
 launcher-sections.patch
 launcher-rows.patch
 launcher-float.patch
+launcher-frequent-sites.patch
 windows-titlebar-reset-on-destroy.patch
 extension-popup-hidden-access-keys.patch
 mochitest-files-start-without-leftovers.patch

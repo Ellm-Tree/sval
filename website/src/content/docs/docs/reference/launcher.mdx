@@ -5,6 +5,7 @@ description: What the address bar and the Launcher show, the keys they answer, a
 
 import Screenshot from "../../../../components/Screenshot.astro";
 import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
 
 The Launcher is the address bar, opened over the page. What you type in
 the Launcher can go to a page, search the web, switch to an open tab in
@@ -35,8 +36,19 @@ Windows and Linux. In the menu bar, **File › Launcher…** opens it too.
 
 - Escape, or a click outside the Launcher, closes the Launcher and takes
   you back to the page.
+<Until v="0.1.0-rc.11">
+
 - With nothing typed, the Launcher lists your most recently used tabs
   under Recent tabs.
+
+</Until>
+<Since v="0.1.0-rc.11">
+
+- With nothing typed, the Launcher lists your most recently used tabs
+  under Recent tabs. The sites you visit most follow under Frequent sites,
+  except any you already have open in a tab.
+
+</Since>
 - The field reads "Search, go to a tab, or run a command" until you type.
 
 ## Sections

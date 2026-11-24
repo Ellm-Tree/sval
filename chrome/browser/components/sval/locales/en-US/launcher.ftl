@@ -18,6 +18,11 @@ launcher-section-suggestions =
 launcher-section-recent-tabs =
     .label = Recent tabs
 
+# The heading above the sites the user visits most, which the address bar
+# lists under the recent tabs while nothing is typed.
+launcher-section-frequent-sites =
+    .label = Frequent sites
+
 # An open tab's row as a screen reader names and describes it.
 # Variables:
 #   $title (String) - the tab's title.

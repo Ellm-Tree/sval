@@ -14,7 +14,8 @@
  * heading and within its limit. An open tab that matches strongly moves
  * Open tabs up, right after the first row. A page shows once, in the first
  * section it qualifies for, and a pin's open tab is its pin's row. With
- * nothing typed the list is the most recently used tabs of every workspace.
+ * nothing typed the list is the most recently used tabs of every workspace,
+ * then the frequent sites.
  * ⇧Delete removes a history row. Enter pressed before the slow rows arrive
  * searches, and a late row never moves the open tab's.
  */
@@ -407,8 +408,9 @@ add_task(async function a_pins_open_tab_is_its_pin_row() {
 });
 
 /**
- * With nothing typed, the list is the most recently used tabs of every
- * workspace, at most six, newest first, each named with its workspace.
+ * With nothing typed, the list starts with the most recently used tabs of
+ * every workspace, at most five, newest first, each named with its
+ * workspace.
  */
 add_task(async function the_empty_launcher_lists_recent_tabs() {
   const { work, tabs, engine, observer } = await workAndHome(
@@ -429,11 +431,12 @@ add_task(async function the_empty_launcher_lists_recent_tabs() {
   order.forEach((id, i) => SvalPanel.settings.setLastActive(id, now - i));
   const shownId = observer.nodeIdFor(gBrowser.selectedTab);
 
-  const rows = await rowsFor("");
+  // Any frequent sites follow the tabs (browser_sval_launcher_top_sites.js).
+  const rows = (await rowsFor("")).filter(r => r.result.payload.svalNodeId);
   Assert.deepEqual(
     rows.map(r => r.result.payload.svalNodeId),
-    order,
-    "six tabs, the most recently used first"
+    order.slice(0, 5),
+    "five tabs, the most recently used first"
   );
   Assert.ok(
     !rows.some(r => r.result.payload.svalNodeId === shownId),
@@ -455,7 +458,7 @@ add_task(async function the_empty_launcher_lists_recent_tabs() {
   );
   Assert.deepEqual(
     rows.map(r => r.result.payload.svalWorkspaceName),
-    ["Home", "Home", "Work", "Home", "Home", "Home"],
+    ["Home", "Home", "Work", "Home", "Home"],
     "each named with its workspace"
   );
   await close();
@@ -716,7 +719,8 @@ add_task(async function an_open_pin_is_listed_after_percent() {
 });
 
 /**
- * `%` with nothing after it lists every open tab, not six recent ones.
+ * `%` with nothing after it lists every open tab, beyond the five recent
+ * ones.
  */
 add_task(async function percent_alone_lists_every_open_tab() {
   const { observer } = await workAndHome(
@@ -730,7 +734,7 @@ add_task(async function percent_alone_lists_every_open_tab() {
   const rows = await rowsFor("% ");
   const listed = rows.filter(r => r.result.payload.svalNodeId);
   Assert.equal(listed.length, others.length, "every other tab is listed");
-  Assert.greater(listed.length, 6, "more than the empty address bar's six");
+  Assert.greater(listed.length, 6, "more than the empty address bar's five");
   Assert.equal(listed[0].heading, "launcher-section-tabs", "under Open tabs");
   await close();
 });

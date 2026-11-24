@@ -350,16 +350,6 @@ add_task(async function a_favorite_among_the_top_sites_wears_the_star() {
     (await TopSites.getSites()).some(site => site.url === page),
     "the page is a top site"
   );
-  // With nothing typed the address bar lists the tree's other tabs in place
-  // of the top sites (launcher spec §5), so the tree holds this window's tab
-  // alone, whatever an earlier file left in the profile's document.
-  const own = SvalPanel.observer.nodeIdFor(gBrowser.selectedTab);
-  for (const [id, node] of Object.entries(SvalPanel.nodes)) {
-    if (node?.kind === "tab" && id !== own) {
-      await SvalPanel.engine.mutate({ kind: "remove", id, now: Date.now() });
-    }
-  }
-  await SvalPanel.refresh();
   const rows = await rowsFor("");
   const found = rows.filter(r => r.url === page);
   Assert.equal(found.length, 1, "the top sites list it once");

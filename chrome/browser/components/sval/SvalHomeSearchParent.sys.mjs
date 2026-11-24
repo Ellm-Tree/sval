@@ -585,12 +585,6 @@ function rowLabelFor(result, context) {
   if (result.isBestMatch) {
     return { id: "urlbar-group-best-match" };
   }
-  if (
-    result.providerName == "UrlbarProviderTopSites" &&
-    context.results[0].providerName != "UrlbarProviderTopSites"
-  ) {
-    return { id: "urlbar-group-shortcuts" };
-  }
   if (!context.searchString || result.heuristic) {
     return null;
   }

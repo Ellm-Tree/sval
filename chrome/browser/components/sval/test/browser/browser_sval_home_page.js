@@ -411,7 +411,7 @@ add_task(async function the_field_lists_what_the_address_bar_lists() {
 
 /**
  * A click on the empty field lists what a click on the empty address bar
- * lists: the recent tabs (launcher spec §5).
+ * lists: the recent tabs, then the frequent sites (launcher spec §5).
  */
 add_task(async function a_click_lists_what_a_click_on_the_address_bar_lists() {
   const tab = await openPage("about:home");

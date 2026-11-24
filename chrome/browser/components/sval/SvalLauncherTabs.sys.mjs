@@ -10,8 +10,13 @@
  * the address bar's providers manager, lists the tree's tabs instead, read
  * from the window's tree at query time, as switch-to-tab rows carrying the
  * node: the tabs that match in the Open tabs section; with nothing typed,
- * the most recently used tabs, under Recent tabs, in place of Firefox's top
- * sites; and in the Tabs search mode or after `%`, every tab.
+ * the most recently used tabs, under Recent tabs, above Firefox's top sites
+ * under Frequent sites; and in the Tabs search mode or after `%`, every tab.
+ *
+ * Frequent sites are `UrlbarProviderTopSites`' rows, which
+ * `launcher-frequent-sites.patch` places in a group of their own. A site the
+ * tree holds open as a tab is left out of them, as is a top site Firefox
+ * offers as a switch to a tab, since an open tab is the way back to it.
  *
  * An open tab is never the row Enter takes: what was typed is searched for,
  * or visited when it is an address, as Firefox's address bar does (launcher
@@ -74,6 +79,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   UrlbarTokenizer:
     "moz-src:///browser/components/urlbar/UrlbarTokenizer.sys.mjs",
   latestNodes: "moz-src:///browser/components/sval/SvalTreeSnapshot.sys.mjs",
+  siteOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   refusedAddress:
     "moz-src:///browser/components/sval/SvalSyncableAddress.sys.mjs",
 });
@@ -88,7 +94,13 @@ export const TABS_TOP_GROUP = "sval-tabs-top";
 export const RECENT_TABS_GROUP = "sval-recent-tabs";
 
 /** How many tabs the empty address bar lists (the Launcher's design). */
-export const RECENT_TABS = 6;
+export const RECENT_TABS = 5;
+
+/** The group of the top sites listed while nothing is typed. */
+export const FREQUENT_SITES_GROUP = "sval-frequent-sites";
+
+/** How many top sites the empty address bar lists (the Launcher's design). */
+export const FREQUENT_SITES = 5;
 
 /** The Fluent file of the Launcher's strings, as `sval/<file>.ftl`. */
 export const LAUNCHER_FTL = "sval/launcher.ftl";
@@ -247,7 +259,9 @@ function ranked(tabs, { currentWorkspaceId, lastActive }) {
  * the context.
  *
  * @type {WeakMap<object, {query: object, rows: object[], strong: boolean,
- *   currentWorkspaceId: string|null, recent: boolean, pages: Set<string>}>}
+ *   currentWorkspaceId: string|null, recent: boolean, pages: Set<string>,
+ *   sites: Set<string>|null}>} `sites` is made from `pages` when a top site
+ *   first asks for it, since a typed query has none.
  */
 const found = new WeakMap();
 
@@ -353,6 +367,7 @@ function lookUp(queryContext, query, win) {
     currentWorkspaceId: options.currentWorkspaceId,
     recent,
     pages,
+    sites: null,
   };
   found.set(queryContext, entry);
   return entry;
@@ -414,10 +429,11 @@ export class SvalLauncherTabsProvider extends UrlbarProvider {
   }
 
   /**
-   * With nothing typed, above the top sites and the other rows Firefox lists
-   * then (`UrlbarProviderTopSites.PRIORITY`), so the list is the recent tabs
-   * alone (launcher spec §5): the manager queries only the active providers
-   * of the highest priority.
+   * With nothing typed, above the other rows Firefox lists then
+   * (`UrlbarProviderTopSites.PRIORITY`), and level with the top sites, which
+   * `launcher-frequent-sites.patch` raises to match: the manager queries only
+   * the active providers of the highest priority, so the list is the recent
+   * tabs and the frequent sites alone (launcher spec §5).
    *
    * @param {object} queryContext
    * @returns {number}
@@ -455,17 +471,32 @@ export const SvalLauncherTabs = {
   /**
    * Whether the muxer drops a result of another provider: Firefox's
    * switch-to-tab row for a page the window's tree holds as a tab, which
-   * Sval's own row stands for (launcher spec §6).
+   * Sval's own row stands for (launcher spec §6), and a frequent site open
+   * in a tab (launcher spec §5).
    *
    * @param {UrlbarResult} result
    * @param {object} queryContext
    * @returns {boolean}
    */
   replaces(result, queryContext) {
+    const { TAB_SWITCH } = UrlbarUtils.RESULT_TYPE;
+    const entry = found.get(queryContext);
+    if (result.providerName === "UrlbarProviderTopSites") {
+      if (result.type === TAB_SWITCH) {
+        return true;
+      }
+      const { url } = result.payload;
+      if (!entry || !url) {
+        return false;
+      }
+      // An address with no site, such as a file's, stands for itself.
+      entry.sites ??= new Set([...entry.pages].map(u => lazy.siteOf(u) ?? u));
+      return entry.sites.has(lazy.siteOf(url) ?? url);
+    }
     return (
-      result.type === UrlbarUtils.RESULT_TYPE.TAB_SWITCH &&
+      result.type === TAB_SWITCH &&
       !result.payload.svalNodeId &&
-      !!found.get(queryContext)?.pages.has(result.payload.url)
+      !!entry?.pages.has(result.payload.url)
     );
   },
 

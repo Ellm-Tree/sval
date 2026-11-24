@@ -297,6 +297,9 @@ control of what you see and what is sent to websites.
   shows that Workspace's name and emoji in its color. You can reorder the
   sections, and choose how many results each shows, in Settings › Search and
   Launcher.
+  With nothing typed, the Launcher and the home page's search field list the
+  tabs you used most recently under Recent tabs. The sites you visit most
+  follow under Frequent sites, except any you already have open in a tab.
   The address bar shows the Launcher's key at its right end when there's
   room.
 - **Commands.** Type a few letters, like "new wor" or "split", to run one of
