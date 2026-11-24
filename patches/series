@@ -297,7 +297,6 @@ libsecret-reconnects.patch
 audio-playback-gone-browser.patch
 backport-bug-2065499-quota-usage-underflow.patch
 backport-bug-1955841-playback-rate-drift.patch
-backport-bug-2067925-image-bridge-not-used-flush.patch
 backport-bug-2064792-native-set-interface-bound.patch
 backport-bug-2045119-shared-memory-size-check.patch
 backport-bug-2048474-gmp-fcntl.patch

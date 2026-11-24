@@ -8,7 +8,7 @@ SvalSecureDns.canonicalURL before it looks it up. The setting's matching
 is private to privacy.mjs, so no chrome API reaches it.
 
 diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
-index 8f9073fd87..68d618a798 100644
+index 8d041275da..73964511fe 100644
 --- a/browser/components/preferences/config/privacy.mjs
 +++ b/browser/components/preferences/config/privacy.mjs
 @@ -28,6 +28,7 @@ const lazy = XPCOMUtils.declareLazy({
@@ -19,24 +19,15 @@ index 8f9073fd87..68d618a798 100644
    IPProtection:
      "moz-src:///browser/components/ipprotection/IPProtection.sys.mjs",
    BANDWIDTH: "chrome://browser/content/ipprotection/ipprotection-constants.mjs",
-@@ -3477,7 +3478,8 @@ Preferences.addSetting({
-       // so we'll make a stub for it. Without an id, we'll have to use the url as the label
-       resolvers.unshift({ uri: defaultURI });
-     }
--    let currentURI = deps.dohURL.value;
-+    // Sval: a URL that names a listed resolver another way reads as it.
-+    let currentURI = lazy.SvalSecureDns.canonicalURL(deps.dohURL.value);
-     if (currentURI && !resolvers.some(p => p.uri == currentURI)) {
-       this._custom = true;
-     }
-@@ -3510,7 +3512,9 @@ Preferences.addSetting({
-     if (this._custom) {
-       return "custom";
-     }
+@@ -3507,7 +3508,10 @@ Preferences.addSetting({
+     };
+   },
+   get(_val, deps) {
 -    let currentURI = deps.dohURL.value || deps.dohDefaultURL.value;
++    // Sval: a URL that names a listed resolver another way reads as it.
 +    let currentURI = lazy.SvalSecureDns.canonicalURL(
 +      deps.dohURL.value || deps.dohDefaultURL.value
 +    );
      let resolvers = lazy.DoHConfigController.currentConfig.providerList;
-     if (!resolvers.some(p => p.uri == currentURI)) {
-       this._custom = true;
+     // We always show the custom state if the current URI matches the custom pref,
+     // or if it is not in the list of resolvers.

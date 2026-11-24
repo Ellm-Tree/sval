@@ -22,5 +22,5 @@
 #
 # values must not contain spaces — this file is sourced as shell.
 UPSTREAM_REMOTE=https://github.com/mozilla-firefox/firefox.git
-# renovate: datasource=github-tags depName=mozilla-firefox/firefox tag=FIREFOX_153_7_0esr_RELEASE
-UPSTREAM_REF=9aecd40e03ebf6e866e32a0a3001488ed751228d
+# renovate: datasource=github-tags depName=mozilla-firefox/firefox tag=FIREFOX_153_8_0esr_RELEASE
+UPSTREAM_REF=7a005ddca7c1e2b14706aca399520a822055164a

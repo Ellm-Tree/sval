@@ -2055,7 +2055,6 @@ dropped on time.
 | `backport-bug-1933057-mozcrash-stdout-and-stderr.patch` | 1933057 | Firefox 155 |
 | `backport-bug-2065499-quota-usage-underflow.patch` | 2065499 | Firefox 155 |
 | `backport-bug-1955841-playback-rate-drift.patch` | 1955841 | Firefox 157 |
-| `backport-bug-2067925-image-bridge-not-used-flush.patch` | 2067925 | Firefox 161 |
 | `backport-bug-2064792-native-set-interface-bound.patch` | 2064792 | Firefox 156 |
 | `backport-bug-2045119-shared-memory-size-check.patch` | 2045119 | Firefox 155 |
 | `backport-bug-1470011-download-content-encoding.patch` | 1470011 | Firefox 154 |
