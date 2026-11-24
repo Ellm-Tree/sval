@@ -33,6 +33,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+  Downloads: "resource://gre/modules/Downloads.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
 });
 
@@ -169,9 +170,98 @@ function startingWorkspace(download, { top, browser, win }) {
 }
 
 /**
+ * The private session each private download was started in, as its jar
+ * (`SvalPrivateJars`). Kept in memory alone, as the private list is.
+ *
+ * @type {WeakMap<object, number>}
+ */
+const sessions = new WeakMap();
+
+/** Whether the ends of private sessions are followed. */
+let followingSessions = false;
+
+/**
+ * The private session a private download belongs to: the one of the page
+ * that started it, or, for one no live page started, the one of the private
+ * window in front, which is the window that lists it.
+ *
+ * @param {object} download
+ * @param {{top: BrowsingContext|null}} place From {@link startingPlace}.
+ * @returns {number|null}
+ */
+function startingSession(download, { top }) {
+  const jar =
+    lazy.SvalPrivateJars.sessionOf(top?.originAttributes) ||
+    download.source.userContextId;
+  if (jar) {
+    return jar;
+  }
+  const front = lazy.BrowserWindowTracker.getTopWindow({
+    private: true,
+    allowPopups: true,
+  });
+  return front?.gBrowser?.defaultUserContextId ?? null;
+}
+
+/**
+ * Ends the downloads of the private session `jar` as Gecko ends every
+ * private download once the last private window has closed
+ * (`DownloadObserver`'s `last-pb-context-exited`): each leaves the private
+ * list and is cancelled, with what it had written so far. With "Delete
+ * files downloaded in private windows" on, the files it finished go too
+ * (`nsExternalHelperAppService::ExpungePrivateFiles`, which finds them gone
+ * when its turn comes).
+ *
+ * @param {number} jar
+ * @returns {Promise<void>}
+ */
+export async function endSession(jar) {
+  const list = await lazy.Downloads.getList(lazy.Downloads.PRIVATE);
+  const ended = (await list.getAll()).filter(
+    download => sessions.get(download) === jar
+  );
+  const deleting =
+    Services.prefs.getBoolPref("browser.download.enableDeletePrivate", false) &&
+    Services.prefs.getBoolPref("browser.download.deletePrivate", false);
+  await Promise.all(
+    ended.map(async download => {
+      await list.remove(download);
+      await download.finalize(true).catch(() => {});
+      if (deleting && download.succeeded) {
+        const { path } = download.target;
+        // A file opened from the download may be read-only, as Gecko makes it.
+        await IOUtils.setPermissions(path, 0o600).catch(() => {});
+        await IOUtils.remove(path, { ignoreAbsent: true }).catch(() => {});
+      }
+    })
+  );
+}
+
+/**
+ * Follows each private session's end, which `SvalPrivateJars` tells by
+ * clearing the session's jar.
+ */
+function followSessions() {
+  if (followingSessions) {
+    return;
+  }
+  followingSessions = true;
+  Services.obs.addObserver((subject, topic, data) => {
+    let pattern = {};
+    try {
+      pattern = JSON.parse(data);
+    } catch {}
+    if (pattern.privateBrowsingId && pattern.userContextId) {
+      endSession(pattern.userContextId);
+    }
+  }, "clear-origin-attributes-data");
+}
+
+/**
  * Records the workspace a download was started in, once, as it joins the
  * list, and the Peek it was started in, if any. A download restored from a
- * past session keeps the workspace it has.
+ * past session keeps the workspace it has. A private download's session is
+ * recorded with it.
  *
  * @param {object} download
  */
@@ -180,6 +270,13 @@ export function record(download) {
     return;
   }
   const place = startingPlace(download);
+  if (download.source?.isPrivate) {
+    const session = startingSession(download, place);
+    if (session) {
+      sessions.set(download, session);
+      followSessions();
+    }
+  }
   if (lazy.isPeek(place.win)) {
     startedInPeek.set(download, new WeakRef(place.win));
   }

@@ -585,6 +585,20 @@ export class SvalHistorySync {
     await this.#queue.idle();
   }
 
+  /**
+   * Writes every title a hold keeps back, ending its hold. A hold ends up
+   * to `TITLE_HOLD_MS` after the page set its title, so a test that compares
+   * the documents across a stretch of time calls this first, then
+   * {@link whenIdle}.
+   */
+  _writeHeldTitlesForTests() {
+    for (const [url, title] of this.#heldTitles) {
+      this.#titleHold.forget(url);
+      this.#queue.post(() => this.#writeTitle(url, title));
+    }
+    this.#heldTitles.clear();
+  }
+
   /** Whether Places is recording history here: "Never remember" turns it off. */
   get #enabled() {
     return this.#places.enabled();

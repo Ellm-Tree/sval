@@ -311,6 +311,7 @@
           "sval-private-notifications",
           "dom.webnotifications.privateBrowsing.enabled",
         ],
+        ["sval-private-delete-downloads", "browser.download.deletePrivate"],
         ["sval-peek", lazy.SvalPeek.ENABLED_PREF],
         ["sval-quick-peek", lazy.QUICK_PEEK_PREF],
         ["sval-pins-quick-peek", lazy.PINS_QUICK_PEEK_PREF],
@@ -326,6 +327,16 @@
           Preferences.add({ id: pref, type: "bool", inverted })
         ).updateElements();
       }
+      // The Downloads panel of a private window asks this once, until the
+      // user has answered here or there (`PrivateDownloadsSubview.choose`).
+      document
+        .getElementById("sval-private-delete-downloads")
+        .addEventListener("change", () =>
+          Services.prefs.setBoolPref(
+            "browser.download.deletePrivate.chosen",
+            true
+          )
+        );
     },
 
     /**

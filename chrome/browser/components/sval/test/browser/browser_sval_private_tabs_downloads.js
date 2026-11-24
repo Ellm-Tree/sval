@@ -167,6 +167,96 @@ add_task(async function each_private_window_lists_its_own_downloads() {
 });
 
 /**
+ * @param {Window} win A private window.
+ * @param {string} path Where the download's file is, which this writes.
+ * @returns {Promise<object>} A finished download a page of `win` started,
+ *   on the private list.
+ */
+async function downloadedIn(win, path) {
+  const tab = await openIsolationPage(win);
+  await IOUtils.writeUTF8(path, "private");
+  const download = await Downloads.createDownload({
+    source: {
+      url: ISOLATION_PAGE,
+      isPrivate: true,
+      browsingContextId: tab.linkedBrowser.browsingContext.id,
+    },
+    target: path,
+    succeeded: true,
+  });
+  await (await Downloads.getList(Downloads.PRIVATE)).add(download);
+  return download;
+}
+
+/**
+ * A private window's downloads end with its session while another private
+ * window stays open. Gecko ends them only with the last private window
+ * (`DownloadObserver`'s `last-pb-context-exited`).
+ */
+add_task(async function a_private_windows_downloads_end_with_it() {
+  const dir = await makeTempDir("sval-downloads");
+  const list = await Downloads.getList(Downloads.PRIVATE);
+  const a = await openPrivate();
+  const b = await openPrivate();
+  try {
+    const closedPath = PathUtils.join(dir, "closed.txt");
+    const openPath = PathUtils.join(dir, "open.txt");
+    const closed = await downloadedIn(a, closedPath);
+    const open = await downloadedIn(b, openPath);
+
+    await closePrivate(a);
+    await TestUtils.waitForCondition(
+      async () => !(await list.getAll()).includes(closed),
+      "the closed window's download leaves the private list"
+    );
+    Assert.ok(
+      (await list.getAll()).includes(open),
+      "the open window keeps its download"
+    );
+    Assert.ok(
+      await IOUtils.exists(closedPath),
+      "the file stays, as the user has not chosen otherwise"
+    );
+  } finally {
+    await closePrivate(a);
+    await closePrivate(b);
+    await IOUtils.remove(dir, { recursive: true });
+  }
+});
+
+/**
+ * With "Delete files downloaded in a private window when that window
+ * closes" on, a private window's files go as it closes, and no other
+ * window's do.
+ */
+add_task(async function a_private_windows_files_go_with_it_when_chosen() {
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.download.deletePrivate", true]],
+  });
+  const dir = await makeTempDir("sval-downloads");
+  const a = await openPrivate();
+  const b = await openPrivate();
+  try {
+    const closedPath = PathUtils.join(dir, "closed.txt");
+    const openPath = PathUtils.join(dir, "open.txt");
+    await downloadedIn(a, closedPath);
+    await downloadedIn(b, openPath);
+
+    await closePrivate(a);
+    await TestUtils.waitForCondition(
+      async () => !(await IOUtils.exists(closedPath)),
+      "the closed window's file is deleted"
+    );
+    Assert.ok(await IOUtils.exists(openPath), "the open window's file stays");
+  } finally {
+    await closePrivate(a);
+    await closePrivate(b);
+    await IOUtils.remove(dir, { recursive: true });
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
  * A private download no tab started is listed in the private window in
  * front, so it can always be reached.
  */

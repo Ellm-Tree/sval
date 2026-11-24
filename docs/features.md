@@ -268,7 +268,13 @@ control of what you see and what is sent to websites.
   belongs to the current Workspace, or everything. History opens next to the
   page. Remove a download
   from the Downloads list with its Remove from list button, or choose Clear
-  list to remove every finished download it shows.
+  list to remove every finished download it shows. A private window lists
+  only the downloads you started in that window. When the window closes, Sval
+  clears that list and cancels any download that hasn't finished, and the
+  files you downloaded stay on your computer. To have
+  Sval delete those files as the window closes, go to Settings › Privacy and
+  protection and turn on "Delete files downloaded in a private window when
+  that window closes".
 - **Private windows.** Press Cmd+Shift+N (Ctrl+Shift+N). Each private window
   is its own session. A private window can't see another private window's
   cookies or site data. Nothing about its tabs is saved to disk, and Sval

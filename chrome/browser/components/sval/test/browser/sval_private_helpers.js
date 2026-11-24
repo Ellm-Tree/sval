@@ -395,6 +395,9 @@ async function flushEverything() {
   // each settles before every publish. A pass whose extra document fails
   // leaves its changes unpublished, and every publish after it runs again;
   // that fails here rather than spinning.
+  // A title an earlier test's page set is written when its hold ends, which
+  // would be in the middle of what the caller compares.
+  SvalHistorySync.instance?._writeHeldTitlesForTests();
   for (let passes = 0; ; passes++) {
     await within(
       Promise.all([

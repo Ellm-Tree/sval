@@ -203,6 +203,42 @@ add_task(async function private_window_notifications_are_a_setting() {
 });
 
 /**
+ * The same card holds Gecko's choice to delete a private window's downloaded
+ * files, off as Gecko ships it. Choosing here answers the question the
+ * Downloads panel of a private window asks once.
+ */
+add_task(async function deleting_private_downloads_is_a_setting() {
+  const PREF = "browser.download.deletePrivate";
+  const CHOSEN = "browser.download.deletePrivate.chosen";
+  await panelWithFolder(null);
+  const ui = await openSettings();
+  await showPane(ui.page, "privacy");
+  const toggle = () => ui.byId("sval-private-delete-downloads");
+  await TestUtils.waitForCondition(
+    () => toggle()?.checkVisibility(),
+    "Privacy and protection shows the switch"
+  );
+  Assert.equal(
+    toggle().closest(".sval-card").id,
+    "sval-private-windows",
+    "in the Private windows card"
+  );
+  Assert.ok(!toggle().checked, "off by default");
+  toggle().click();
+  Assert.ok(Services.prefs.getBoolPref(PREF), "on writes the pref");
+  Assert.ok(
+    Services.prefs.getBoolPref(CHOSEN),
+    "and the Downloads panel has no question left to ask"
+  );
+  Services.prefs.clearUserPref(PREF);
+  Services.prefs.clearUserPref(CHOSEN);
+  await TestUtils.waitForCondition(
+    () => !toggle().checked,
+    "the switch follows the pref"
+  );
+});
+
+/**
  * Appearance holds the address bar's display choice, after Theme, and each
  * segment is the pref.
  */
