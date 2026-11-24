@@ -346,8 +346,8 @@ function isPreloadedNewTab(browser) {
  * load cannot go on.
  *
  * @param {CanonicalBrowsingContext} bc A top-level context.
- * @returns {Promise<"filed"|"failed">} Whether the tree holds a node for
- *   the tab once the filing has landed.
+ * @returns {Promise<string>} "filed" once the tree holds a node for the
+ *   tab, or why it does not, for the log.
  */
 export async function fileBeforeLoad(bc) {
   const id = bc.browserId;
@@ -358,22 +358,27 @@ export async function fileBeforeLoad(bc) {
     const win = tab?.documentGlobal;
     const panel = win?.SvalPanel;
     if (!panel) {
-      return "failed";
+      return tab ? "its window has no panel" : "it is in no tab";
     }
     await panel.started;
     if (tabOf(browserOf(id)) !== tab) {
       continue;
     }
     const observer = panel.observer;
-    if (!observer || tab.closing) {
-      return "failed";
+    if (!observer) {
+      return "its window has no tab observer";
+    }
+    if (tab.closing) {
+      return "its tab is closing";
     }
     await observer.fileNow(tab);
     if (tabOf(browserOf(id)) === tab) {
-      return nodeOf(tab.linkedBrowser) ? "filed" : "failed";
+      return nodeOf(tab.linkedBrowser)
+        ? "filed"
+        : "the tree holds no node for it";
     }
   }
-  return "failed";
+  return "its content kept moving between tabs";
 }
 
 /**

@@ -833,7 +833,7 @@ export function createAgentGate({
         SvalLog.warn(
           `filing a tab before its first load failed: ${SvalLog.errorName(err)}`
         );
-        return "failed";
+        return "its filing threw";
       })
       .then(outcome => {
         if (!filing.delete(channel)) {
@@ -847,16 +847,20 @@ export function createAgentGate({
           // load is still that tab's: one discarded or replaced meanwhile
           // is not the tab the tree now answers for.
           const current = BrowsingContext.getCurrentTopByBrowserId(id);
-          if (
-            outcome === "failed" ||
-            bc.isDiscarded ||
-            current !== channel.loadInfo.browsingContext
-          ) {
+          let refusal = null;
+          if (outcome !== "filed") {
+            refusal = outcome;
+          } else if (bc.isDiscarded) {
+            refusal = "its context was discarded";
+          } else if (current !== channel.loadInfo.browsingContext) {
+            refusal = "its context was replaced";
+          }
+          if (refusal) {
             SvalLog.warn(
-              "a tab could not be filed, so its first load is refused"
+              `a tab could not be filed, so its first load is refused: ${refusal}`
             );
             channel.cancel(Cr.NS_ERROR_TAB_NOT_FILED);
-          } else if (!closed && outcome === "filed") {
+          } else if (!closed) {
             decideTopLoad(channel);
           }
         } catch (err) {
