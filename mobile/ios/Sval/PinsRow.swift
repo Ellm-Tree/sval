@@ -177,7 +177,7 @@ struct PinsRow: View {
                 }
             }
         }
-        .animation(.easeOut(duration: 0.15), value: showsRefresh)
+        .animation(Motion.disclose, value: showsRefresh)
         .accessibilityLabel(showsRefresh ? "Back to \(title(pin))" : title(pin))
         .accessibilityAddTraits(front ? .isSelected : [])
         .contextMenu { pinMenu(pin, front: front) }
@@ -291,11 +291,7 @@ struct PinsRow: View {
     private func tile<Content: View>(selected: Bool, @ViewBuilder _ content: () -> Content) -> some View {
         content()
             .frame(width: tileSize, height: tileSize)
-            .background(theme.cell, in: .rect(cornerRadius: 16))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(selected ? theme.accent : theme.divider, lineWidth: selected ? 2 : 1)
-            }
+            .well(theme.cell, edge: selected ? theme.accent : theme.divider, radius: 16, lineWidth: selected ? 2 : 1)
             .contentShape(.rect)
     }
 

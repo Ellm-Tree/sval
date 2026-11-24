@@ -191,7 +191,7 @@ private struct WalkthroughPages: View {
     private var footer: some View {
         HStack(spacing: 16) {
             PageDots(count: Walkthrough.pages, current: page, on: FirstRunStyle.cyan,
-                     off: Color(hex: 0xA6E8FF, opacity: 0.3), height: 6, wide: 20, through: true)
+                     off: Color(hex: Palette.ice, opacity: 0.3), height: 6, wide: 20, through: true)
                 .accessibilityElement()
                 .accessibilityLabel("Page \(page + 1) of \(Walkthrough.pages)")
             Spacer()
@@ -222,7 +222,7 @@ private struct WalkthroughMark: View {
         let shift = reduceMotion ? 0 : -36 * tanh(pull / 240)
         Image("mark").resizable().scaledToFit()
             .frame(width: 144, height: 144)
-            .shadow(color: Color(hex: 0x13328F).opacity(0.6), radius: 20)
+            .shadow(color: Color(hex: Palette.navy).opacity(0.6), radius: 20)
             .shadow(color: .black.opacity(0.65), radius: 28, y: 22)
             .offset(x: shift)
             .animation(.bouncy(duration: 0.5, extraBounce: 0.25), value: shift)
@@ -263,7 +263,7 @@ struct BarSpotlight: View {
             }
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
-        .animation(reduceMotion ? nil : .smooth(duration: 0.4), value: capsule)
+        .animation(reduceMotion ? nil : Motion.glide, value: capsule)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear { pulsing = true }

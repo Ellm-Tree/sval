@@ -206,7 +206,7 @@ struct WorkspaceStrip: View {
         let playing = model.tabs(in: workspace.id).contains { browser.playingTabs.contains($0.id) }
         return Button {
             guard !current else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+            withAnimation(reduceMotion ? nil : Motion.disclose) {
                 browser.showWorkspace(workspace.id)
             }
         } label: {

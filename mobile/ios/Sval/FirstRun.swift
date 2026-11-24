@@ -49,7 +49,7 @@ struct FirstRunView: View {
 struct NightSky: View {
     var body: some View {
         RadialGradient(
-            colors: [Color(hex: 0x13328F), Color(hex: 0x060A2E)],
+            colors: [Color(hex: Palette.navy), Color(hex: Palette.ink950)],
             center: UnitPoint(x: 0.5, y: 0.22), startRadius: 0, endRadius: 520)
             .overlay {
                 Image("starfield").resizable().scaledToFill().opacity(0.7)
@@ -68,7 +68,7 @@ enum FirstRunStyle {
     static var muted: Color { theme.muted }
     static var cyan: Color { theme.accent }
     static let field = Color(hex: 0x0C1446)
-    static let well = Color(hex: 0x03051A)
+    static let well = Color(hex: Palette.night)
     static var warning: Color { theme.warning }
     static var danger: Color { theme.dangerText }
 
@@ -103,7 +103,7 @@ private struct StepBar: View {
         // At the accessibility sizes Back reaches the dots at the centre,
         // so they go to the trailing edge.
         ZStack(alignment: typeSize.isAccessibilitySize && onBack != nil ? .trailing : .center) {
-            PageDots(count: 3, current: step, on: FirstRunStyle.cyan, off: Color(hex: 0xA6E8FF, opacity: 0.3),
+            PageDots(count: 3, current: step, on: FirstRunStyle.cyan, off: Color(hex: Palette.ice, opacity: 0.3),
                      height: 6, wide: 20, through: true)
             .accessibilityElement()
             .accessibilityLabel("Step \(step + 1) of 3")
@@ -145,7 +145,7 @@ private struct FolderSteps: View {
             case .server: ServerStep { step = .choose }
             }
         }
-        .animation(.easeOut(duration: 0.2), value: step)
+        .animation(Motion.overlay, value: step)
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             switch result {
             case .success(let url): Task { await model.chooseFolder(url) }
@@ -161,13 +161,13 @@ private struct FolderSteps: View {
                     .resizable()
                     .frame(width: 112, height: 112)
                     .clipShape(.rect(cornerRadius: 26))
-                    .shadow(color: Color(hex: 0x5CF2FF, opacity: 0.35), radius: 30)
+                    .shadow(color: Color(hex: Palette.neon, opacity: 0.35), radius: 30)
                     .accessibilityHidden(true)
                 VStack(spacing: 0) {
                     FirstRunStyle.headline("Your Workspaces.", size: 40)
                     FirstRunStyle.headline("Now in your pocket.", size: 40)
                         .foregroundStyle(LinearGradient(
-                            colors: [.white, Color(hex: 0x5CF2FF), Color(hex: 0x0AA0FF)],
+                            colors: [.white, Color(hex: Palette.neon), Color(hex: 0x0AA0FF)],
                             startPoint: .top, endPoint: .bottom))
                 }
                 .multilineTextAlignment(.center)
@@ -722,13 +722,7 @@ private struct CodeStep: View {
             .focused($focused)
             .tint(FirstRunStyle.cyan)
             .onChange(of: code) { _, new in group(new) }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(FirstRunStyle.well, in: .rect(cornerRadius: 16))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(failure != nil ? FirstRunStyle.danger : FirstRunStyle.cyan, lineWidth: 2)
-            }
+            .codeField(failed: failure != nil)
             .accessibilityLabel("Pairing code")
             .padding(.top, 12)
     }
@@ -773,13 +767,7 @@ private struct CodeStep: View {
                     }.joined(separator: " ")
                     if grouped != new { code = grouped }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(FirstRunStyle.well, in: .rect(cornerRadius: 16))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(failure != nil ? FirstRunStyle.danger : FirstRunStyle.cyan, lineWidth: 2)
-                }
+                .codeField(failed: failure != nil)
                 .accessibilityLabel("Backup key")
             Text("\(bare.count) of 52")
                 .font(.system(.footnote))
@@ -976,8 +964,17 @@ private struct WarningBox: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(FirstRunStyle.warning.opacity(0.10), in: .rect(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(FirstRunStyle.warning.opacity(0.30), lineWidth: 1) }
+        .well(FirstRunStyle.warning.opacity(0.10), edge: FirstRunStyle.warning.opacity(0.30), radius: 14)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private extension View {
+    /// A field for a pairing code or a backup key: mono text in first
+    /// run's deep well, ringed in the accent, or in red once it failed.
+    func codeField(failed: Bool) -> some View {
+        padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .well(FirstRunStyle.well, edge: failed ? FirstRunStyle.danger : FirstRunStyle.cyan, radius: 16, lineWidth: 2)
     }
 }

@@ -161,3 +161,28 @@ struct MoonGlyph: View {
         return path
     }()
 }
+
+/// The sync moon's warning badge, on the Settings button while sync has a
+/// problem, so it shows without the moon. Settings says what it is.
+struct SyncProblemBadge: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.appearance) private var scheme
+    @Environment(\.sheetTint) private var sheetTint
+    /// The surface under the badge, which rings it.
+    let ring: Color
+
+    var body: some View {
+        let theme = Theme(scheme, tint: sheetTint)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            if model.stage == .ready, SyncIndicator(model, now: context.date).icon == .warning {
+                Badge(diameter: 17, fill: theme.warning, ring: ring, ringWidth: 1) {
+                    Image("badge-bang").resizable()
+                        .foregroundStyle(theme.warningInk)
+                        .frame(width: 14, height: 14)
+                }
+                .offset(x: 3, y: 3)
+                .accessibilityLabel("Sync needs attention")
+            }
+        }
+    }
+}

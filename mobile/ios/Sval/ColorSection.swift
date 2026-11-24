@@ -50,7 +50,7 @@ struct ColorSection: View {
         }
         .listRowBackground(Color(hex: sheet.cell))
         .listRowSeparatorTint(Color(hex: sheet.ring).opacity(0.4))
-        .animation(.easeOut(duration: 0.2), value: isCustom)
+        .animation(Motion.overlay, value: isCustom)
         .onAppear {
             // A stored custom colour that no swatch picks is the custom slot.
             if custom == nil, isCustom { custom = DesktopColor.Custom(color) }

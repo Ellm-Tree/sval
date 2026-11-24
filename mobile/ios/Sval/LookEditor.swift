@@ -183,7 +183,7 @@ struct LookEditor: View {
         .presentationBackground(look.ground)
         .presentationCornerRadius(Radius.sheet)
         .presentationDetents([.medium, .large])
-        .animation(.easeOut(duration: 0.15), value: color)
+        .animation(Motion.disclose, value: color)
         .onAppear {
             // A new one is named first; an edit opens on its look.
             if editing == nil { nameFocused = true }

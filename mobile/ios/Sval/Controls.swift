@@ -185,7 +185,7 @@ struct SelectionTick: View {
     var body: some View {
         Image(systemName: ticked ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 22))
-            .foregroundStyle(ticked ? tick : (onPicture ? Color(hex: 0x060A2E, opacity: 0.55) : off))
+            .foregroundStyle(ticked ? tick : (onPicture ? Color(hex: Palette.ink950, opacity: 0.55) : off))
             .background { if onPicture { Circle().fill(.white.opacity(0.9)).padding(1) } }
             .accessibilityHidden(true)
     }
@@ -279,5 +279,60 @@ struct NewDestinationRow: View {
             .frame(minHeight: RowMetrics.chooser)
             .contentShape(.rect)
         }
+    }
+}
+
+extension View {
+    /// A fill in a rounded rectangle, edged with a line on the same corner.
+    func well(_ fill: some ShapeStyle, edge: some ShapeStyle, radius: CGFloat, lineWidth: CGFloat = 1) -> some View {
+        background(fill, in: .rect(cornerRadius: radius))
+            .overlay { RoundedRectangle(cornerRadius: radius).strokeBorder(edge, lineWidth: lineWidth) }
+    }
+
+    /// A card on the Workspace's glass over the page, inset from the
+    /// screen's sides: the media card and the element picker's card.
+    func glassCard(_ colors: BarColors) -> some View {
+        foregroundStyle(colors.ink)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+            .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .rect(cornerRadius: Radius.card))
+            .padding(.horizontal, 10)
+    }
+}
+
+/// A capsule on the Workspace's glass above the bar: what it holds, a
+/// rule, and a × that puts it away.
+struct ClosingCapsule<Content: View>: View {
+    let colors: BarColors
+    let closeLabel: LocalizedStringKey
+    let onClose: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 0) {
+            content
+            colors.rule.frame(width: 1, height: 22)
+            Button(action: onClose) {
+                Label(closeLabel, systemImage: "xmark")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(colors.ink.opacity(0.75))
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, 4)
+        .foregroundStyle(colors.ink)
+        .glassCapsule(colors.layer)
+    }
+}
+
+extension Binding where Value == Bool {
+    /// Whether `item` holds something, for an alert or sheet that shows
+    /// while it does; dismissing it clears `item`.
+    init<Item>(presenting item: Binding<Item?>) {
+        self.init(get: { item.wrappedValue != nil }, set: { if !$0 { item.wrappedValue = nil } })
     }
 }

@@ -67,7 +67,7 @@ struct Theme {
     static let privateLabel = Color(hex: 0xC9BFFF)
     /// The private backdrop's deepest violet, under the starfield.
     static let privateNight = Color(hex: 0x06031A)
-    var text: Color { window.map { Color(hex: $0.strong) } ?? pick(0xFFFFFF, 0x060A2E) }
+    var text: Color { window.map { Color(hex: $0.strong) } ?? pick(0xFFFFFF, Palette.ink950) }
     var body: Color { isPrivate ? Color(hex: 0xE2DCFF) : window.map { Color(hex: $0.body) } ?? pick(0xD6DDF0, 0x1C2A6B) }
     var muted: Color {
         isPrivate ? Color(hex: 0xA79FD0) : window.map { Color(hex: $0.muted) }
@@ -81,23 +81,23 @@ struct Theme {
     private var more: Bool { DesktopColor.contrast.more }
     var divider: Color {
         isPrivate ? Theme.privateEdge.opacity(0.14)
-            : dark ? Color(hex: 0xA6E8FF, opacity: 0.10) : Color(hex: 0x13328F, opacity: 0.10)
+            : dark ? Color(hex: Palette.ice, opacity: 0.10) : Color(hex: Palette.navy, opacity: 0.10)
     }
     /// Sval's cyan and, on a light surface, a blue a step darker than the
     /// action blue, so accent text meets 4.5:1 on the light sheet.
-    var accent: Color { window.map { Color(hex: $0.focus) } ?? pick(0x5CF2FF, 0x1A62F0) }
-    var accentWash: Color { dark ? Color(hex: 0x5CF2FF, opacity: 0.16) : Color(hex: 0x1F6BFF, opacity: 0.12) }
+    var accent: Color { window.map { Color(hex: $0.focus) } ?? pick(Palette.neon, 0x1A62F0) }
+    var accentWash: Color { dark ? Color(hex: Palette.neon, opacity: 0.16) : Color(hex: Palette.blue, opacity: 0.12) }
     var well: Color {
         isPrivate ? Theme.privateEdge.opacity(0.10)
-            : dark ? Color(hex: 0xA6E8FF, opacity: 0.07) : Color(hex: 0x13328F, opacity: 0.05)
+            : dark ? Color(hex: Palette.ice, opacity: 0.07) : Color(hex: Palette.navy, opacity: 0.05)
     }
     /// Sval's blue on what a tap acts on (`--sval-palette-blue`), the
     /// app's AccentColor. `accent` marks what is selected or in front.
     var action: Color { Theme.blue }
-    static let blue = Color(hex: 0x1F6BFF)
+    static let blue = Color(hex: Palette.blue)
     var dangerText: Color { pick(0xFF8A90, 0xC42F3A) }
     var tileRing: Color { pick(0x5A688C, 0x929292) }
-    var scrim: Color { dark ? Color(hex: 0x03051A, opacity: 0.6) : Color(hex: 0x060A2E, opacity: 0.3) }
+    var scrim: Color { dark ? Color(hex: Palette.night, opacity: 0.6) : Color(hex: Palette.ink950, opacity: 0.3) }
     var warning: Color { pick(0xFFB224, 0xB86E00) }
     /// A mark on a `warning` fill.
     var warningInk: Color { dark ? Color(hex: 0x241600) : .white }
@@ -126,27 +126,27 @@ struct BarColors {
             layer = theme.sheet
             darkInk = !theme.dark
         }
-        ink = darkInk ? Color(hex: 0x060A2E) : .white
-        muted = darkInk ? Color(hex: 0x060A2E, opacity: 0.6) : Color(hex: 0xFFFFFF, opacity: 0.66)
+        ink = darkInk ? Color(hex: Palette.ink950) : .white
+        muted = darkInk ? Color(hex: Palette.ink950, opacity: 0.6) : Color(hex: 0xFFFFFF, opacity: 0.66)
     }
 
     /// Sval's accent on the glass: the action blue where the ink is dark,
     /// the cyan where it is white, as on the desktop's light and dark
     /// headers.
-    var accent: Color { darkInk ? Theme.blue : Color(hex: 0x5CF2FF) }
+    var accent: Color { darkInk ? Theme.blue : Color(hex: Palette.neon) }
     /// The ink on a fill of `accent`.
-    var onAccent: Color { darkInk ? .white : Color(hex: 0x060A2E) }
+    var onAccent: Color { darkInk ? .white : Color(hex: Palette.ink950) }
     /// A rule between controls on the glass.
     var rule: Color { ink.opacity(0.22) }
     /// The edge of a tile on the glass (`--sval-dialog-border`).
-    var edge: Color { darkInk ? Color(hex: 0x13328F, opacity: 0.14) : Color(hex: 0xA6E8FF, opacity: 0.16) }
+    var edge: Color { darkInk ? Color(hex: Palette.navy, opacity: 0.14) : Color(hex: Palette.ice, opacity: 0.16) }
     /// A badge's disc on the glass: opaque, on the side of the ink's
     /// contrast, so the badge's mark reads whatever is under the glass.
     var badge: Color { darkInk ? .white : Color(hex: 0x0A1140) }
 
     /// Dark ink or white, whichever reads better on an opaque `fill`.
     static func ink(on fill: Color, dark: Bool) -> Color {
-        readsDark(fill, dark: dark) ? Color(hex: 0x060A2E) : .white
+        readsDark(fill, dark: dark) ? Color(hex: Palette.ink950) : .white
     }
 
     /// How strongly the Workspace's colour tints the bar's glass.
@@ -215,8 +215,13 @@ enum Radius {
     static let sheet: CGFloat = 38
     /// A card floating over the page: the media card, the Launcher's list.
     static let card: CGFloat = 26
-    /// A tab's card in the grid, and a split's pane.
+    /// A split's pane on the main screen.
     static let pane: CGFloat = 16
+    /// A page's picture: a card in the grid, a split's card, a card in the
+    /// scrub.
+    static let picture: CGFloat = 14
+    /// A split's tray of page tiles, in the tree and in the bar.
+    static let tray: CGFloat = 12
     /// A Workspace's or site's tile, as a share of its size.
     static let tileFactor: CGFloat = 0.28
 }
@@ -303,10 +308,19 @@ extension View {
 /// The animations Sval's controls share. Under Reduce Motion each is a
 /// short fade or none, as the caller picks.
 enum Motion {
-    /// A row or group opening or closing in place.
+    /// A quick change in place: a row or group opening or closing, a
+    /// control or a colour changing, a picture fading in.
     static let disclose = Animation.easeOut(duration: 0.15)
-    /// A card or toast coming and going over the page.
+    /// A card, toast or step coming and going over the page.
     static let overlay = Animation.easeOut(duration: 0.2)
+    /// The short fade a moving panel or scrub becomes under Reduce Motion.
+    static let reduced = Animation.easeOut(duration: 0.12)
+    /// The bar folding or opening, and the walkthrough's ring moving
+    /// along the bar.
+    static let glide = Animation.smooth(duration: 0.4)
+    /// A split pane sliding out of the tray once a swipe or a step has
+    /// picked the next one: fast away, slow to settle.
+    static let paneSlide = Animation.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)
 }
 
 /// Sval's typefaces, scaled with Dynamic Type from the text style each
@@ -320,6 +334,23 @@ enum SvalFont {
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
         .custom("JetBrains Mono", size: size, relativeTo: style).weight(weight)
     }
+}
+
+/// The base colours Sval's own surfaces mix from, as `Color(hex:)` takes
+/// them. The desktop's names are given where it has one.
+enum Palette {
+    /// The darkest ink (`--sval-palette-ink-950`).
+    static let ink950: UInt32 = 0x060A2E
+    /// The action blue (`--sval-palette-blue`).
+    static let blue: UInt32 = 0x1F6BFF
+    /// The cyan accent on a dark surface (`--sval-palette-neon`).
+    static let neon: UInt32 = 0x5CF2FF
+    /// The deep blue a light surface's wells, edges and glows are mixed from.
+    static let navy: UInt32 = 0x13328F
+    /// The pale cyan a dark surface's wells and edges are mixed from.
+    static let ice: UInt32 = 0xA6E8FF
+    /// The deepest ground: first run's well, the dark scrim.
+    static let night: UInt32 = 0x03051A
 }
 
 extension Color {

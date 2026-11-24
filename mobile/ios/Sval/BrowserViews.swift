@@ -234,7 +234,7 @@ struct BrowserView: View {
                 }
             }
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.22), value: showingTabs && verticalSize == .compact)
+        .animation(reduceMotion ? Motion.reduced : .easeOut(duration: 0.22), value: showingTabs && verticalSize == .compact)
         // Turning the phone sideways swaps the sheet for the panel. That
         // close is the app's own, so it leaves the Workspace open; only the
         // user's closing the sheet closes it.
@@ -479,7 +479,6 @@ struct BrowserView: View {
         }
     }
 
-
     @ViewBuilder private func page(_ theme: Theme) -> some View {
         ZStack {
             // Tabs playing behind stay in the window even with no tab in
@@ -519,13 +518,7 @@ struct BrowserView: View {
     /// there, as when another device changed the front tab's address.
     private func elsewhere(_ row: OutlineRow, address: String, theme: Theme) -> some View {
         VStack(spacing: 16) {
-            Image(systemName: "laptopcomputer")
-                .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(theme.body)
-                .frame(width: 68, height: 68)
-                .background(theme.well, in: .rect(cornerRadius: 20))
-                .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(theme.divider, lineWidth: 1) }
-                .accessibilityHidden(true)
+            NoticeMark(symbol: "laptopcomputer", theme: theme)
             Text("Sval on \(UIDevice.current.model) can't open this tab")
                 .font(SvalFont.outfit(22, .bold, relativeTo: .title2))
                 .foregroundStyle(theme.text)
@@ -535,14 +528,7 @@ struct BrowserView: View {
                 .font(.system(.body))
                 .foregroundStyle(theme.body)
                 .multilineTextAlignment(.center)
-            Text(address)
-                .font(SvalFont.mono(13, relativeTo: .footnote))
-                .foregroundStyle(theme.body)
-                .lineLimit(3)
-                .textSelection(.enabled)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(theme.well, in: .rect(cornerRadius: 12))
+            NoticeAddress(address: address, theme: theme)
             HStack(spacing: 10) {
                 CopyButton(title: "Copy Address", text: address, localOnly: browser.inPrivate)
                     .foregroundStyle(theme.text)
@@ -600,7 +586,7 @@ struct BrowserView: View {
                 opened = TabScrub(kind: kind, items: items, start: items.firstIndex { $0.id == workspace } ?? 0)
             }
             scrubEntered = false
-            withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .spring(duration: 0.3, bounce: 0.2)) {
+            withAnimation(reduceMotion ? Motion.reduced : .spring(duration: 0.3, bounce: 0.2)) {
                 scrub = opened
             }
             runAtEdges()
@@ -632,7 +618,7 @@ struct BrowserView: View {
         scrubFinger = nil
         guard let ended = scrub else { return }
         let item = ended.items[ended.index]
-        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .smooth(duration: 0.22)) {
+        withAnimation(reduceMotion ? Motion.reduced : .smooth(duration: 0.22)) {
             scrub = nil
             guard switching, item.id != browser.currentTabId else { return }
             switch item {
@@ -717,453 +703,6 @@ private struct OpenBarSpotlight: View {
         if model.browser.fold.phase == .open {
             BarSpotlight(size: size, capsule: capsule)
                 .transition(.opacity)
-        }
-    }
-}
-
-/// Shows a page that `Browser` owns. The page outlives this view, so it
-/// keeps its place when the view is rebuilt.
-struct WebContainer: UIViewRepresentable {
-    /// Back to front; the last is the page in front. The others are tabs
-    /// playing behind it (`Browser.stagedPages`): they stay in the window,
-    /// hidden from VoiceOver and touch.
-    let pages: [WKWebView]
-    /// Whether the last page is the one in front. A split in front shows
-    /// its panes itself, and every page here is behind it.
-    var showsFront = true
-    /// How much of the page's foot the bar covers.
-    var bottomCover: CGFloat = Browser.barRoom
-
-    func makeUIView(context: Context) -> PageStage {
-        let stage = PageStage()
-        updateUIView(stage, context: context)
-        return stage
-    }
-
-    func updateUIView(_ stage: PageStage, context: Context) {
-        if showsFront, let front = pages.last, front.obscuredContentInsets.bottom != bottomCover {
-            front.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottomCover, right: 0)
-        }
-        stage.show(pages, showsFront: showsFront)
-    }
-}
-
-/// The view `WebContainer` puts its pages in. A split's pane can take a
-/// page from it as the split closes, when the pane is updated after the
-/// page has come here, and nothing would put it back until the next
-/// update: the stage takes back a page it still shows once the update is
-/// over.
-final class PageStage: UIView {
-    private var pages: [WKWebView] = []
-    private var showsFront = true
-    private var arranging = false
-
-    func show(_ pages: [WKWebView], showsFront: Bool) {
-        self.pages = pages
-        self.showsFront = showsFront
-        arrange()
-    }
-
-    override func willRemoveSubview(_ subview: UIView) {
-        super.willRemoveSubview(subview)
-        guard !arranging, pages.contains(where: { $0 === subview }) else { return }
-        DispatchQueue.main.async { [weak self] in self?.arrange() }
-    }
-
-    private func arrange() {
-        guard subviews.map(ObjectIdentifier.init) != pages.map(ObjectIdentifier.init)
-                || subviews.last?.isUserInteractionEnabled != showsFront else { return }
-        arranging = true
-        defer { arranging = false }
-        #if DEBUG
-        if Page.pageDiagnostics {
-            Diagnostics.log("tabs: the window shows \(pages.count) page(s), was \(subviews.count)")
-        }
-        #endif
-        for view in subviews where !pages.contains(where: { $0 === view }) {
-            view.removeFromSuperview()
-        }
-        for (index, page) in pages.enumerated() {
-            if page.superview !== self {
-                place(page)
-            }
-            insertSubview(page, at: index)
-            let inFront = showsFront && index == pages.count - 1
-            page.accessibilityElementsHidden = !inFront
-            page.isUserInteractionEnabled = inFront
-        }
-    }
-
-    private func place(_ page: WKWebView) {
-        page.removeFromSuperview()
-        page.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(page)
-        NSLayoutConstraint.activate([
-            page.leadingAnchor.constraint(equalTo: leadingAnchor),
-            page.trailingAnchor.constraint(equalTo: trailingAnchor),
-            page.topAnchor.constraint(equalTo: topAnchor),
-            page.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-    }
-}
-
-/// The page's site: protections and JavaScript for it, and the blocking
-/// level for every site, as the desktop's site controls set them. Each
-/// change syncs, and the page reloads to take it.
-struct SiteMenuView: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.appearance) private var scheme
-    @Environment(\.sheetTint) private var sheetTint
-    /// Told when protections go off for a site, so the browser can say so
-    /// once the page has reloaded.
-    var onProtectionsOff: (String) -> Void = { _ in }
-    /// What the page group asks for, done once the menu has closed.
-    var onPage: (PageAction) -> Void = { _ in }
-
-    /// The page's zoom as the zoom row last set or found it.
-    @State private var zoom: Double = 1
-    @State private var rulesShown = false
-    /// How many elements each hiding rule matches on the page, by line.
-    @State private var ruleCounts: [String: Int?] = [:]
-
-    private var theme: Theme { Theme(scheme, tint: sheetTint) }
-    private var host: String? { model.browser.currentURL?.host() }
-    private var rules: SiteRules { model.siteRules(private: inPrivate) }
-    private var inPrivate: Bool { model.browser.privateInFront }
-
-    var body: some View {
-        let site = host.flatMap { host in
-            SiteRules.scope(of: host).flatMap { scope in SiteRules.site(of: host).map { (host, scope, $0) } }
-        }
-        Form {
-                pageGroup
-                if let (host, scope, _) = site {
-                    let protections = rules.protectionsOn(for: host)
-                    let javaScript = rules.javaScriptEnabled(on: host)
-                    Section {
-                        toggleRow(
-                            icon: "pr-shield", title: "Protections",
-                            detail: protections ? "Blocks ads and trackers on this site." : "Protections are off, so ads and trackers load on this site.",
-                            isOn: Binding(get: { protections }, set: { on in
-                                if inPrivate {
-                                    model.setPrivateProtections(scope, on: on)
-                                    model.browser.reload()
-                                } else {
-                                    change(rules.protectionsChange(for: scope, on: on))
-                                }
-                                if !on { onProtectionsOff(scope) }
-                            }))
-                        toggleRow(
-                            icon: "javascript", title: "JavaScript",
-                            detail: javaScript ? "Lets this site run scripts." : "JavaScript is off, so this site's scripts don't run.",
-                            isOn: Binding(get: { javaScript }, set: { on in
-                                change(rules.javaScriptChange(for: scope, enabled: on))
-                            }))
-                            // The desktop's private window can't change it
-                            // either (`SvalSiteControls`).
-                            .disabled(inPrivate)
-                        // Takes effect at the next link, so nothing reloads.
-                        toggleRow(
-                            icon: "sc-external", title: "Keep Links in This Tab",
-                            detail: "Links between \(scope) pages can't open a new tab or window.",
-                            isOn: Binding(get: { rules.keepLinks(on: host) }, set: { on in
-                                let change = rules.keepLinksChange(for: scope, on: on)
-                                Task { await model.setSetting(change.key, to: change.value) }
-                            }))
-                            .disabled(inPrivate)
-                        // The site's video and audio choice, as the desktop's
-                        // site menu sets it. The page is made again for it.
-                        Picker(selection: Binding(get: { rules.media(for: host) }, set: { choice in
-                            if inPrivate {
-                                model.setPrivateMedia(scope, to: choice)
-                                return
-                            }
-                            let change = rules.mediaChange(for: scope, to: choice)
-                            Task { await model.setSetting(change.key, to: change.value) }
-                        })) {
-                            ForEach(SiteRules.Media.allCases) { Text($0.words).tag($0) }
-                        } label: {
-                            Label {
-                                Text("Video and Audio")
-                            } icon: {
-                                Image("media").resizable().frame(width: 20, height: 20).foregroundStyle(theme.muted)
-                            }
-                        }
-                        // A rule names the site and syncs, so a private
-                        // page can't make one (element picker spec).
-                        pageRow(icon: "eraser", title: "Remove from This Site",
-                                detail: inPrivate ? "Off in private, because it saves a rule." : nil) {
-                            act(.removeElement)
-                        }
-                        .disabled(inPrivate)
-                        removalRules(on: host)
-                    }
-                    .listRowBackground(theme.cell)
-                    Section {
-                        zoomRow
-                    } header: {
-                        SectionCaption("Zoom", color: theme.muted)
-                    }
-                    .listRowBackground(theme.cell)
-                }
-        }
-        .listSectionSpacing(.compact)
-        // A bar keeps the rows' scroll edge effect under the header.
-        .safeAreaBar(edge: .top) {
-            header(title: site?.1 ?? "Sval", protections: site.map { rules.protectionsOn(for: $0.0) })
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 12)
-        }
-        .foregroundStyle(theme.text)
-        .sheetGround()
-    }
-
-    /// The page's zoom on this iPhone, for its host (decision 12): − and +
-    /// step along Firefox's zoom steps, and the level between them goes
-    /// back to 100%.
-    private var zoomRow: some View {
-        HStack(spacing: 0) {
-            Button { setZoom(PageZoom.step(zoom, by: -1)) } label: {
-                Image(systemName: "minus").frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .accessibilityLabel("Zoom Out")
-            .disabled(zoom <= PageZoom.steps[0])
-            Button { setZoom(1) } label: {
-                Text("\(Int((zoom * 100).rounded()))%")
-                    .monospacedDigit()
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .accessibilityLabel("Zoom")
-            .accessibilityValue("\(Int((zoom * 100).rounded()))%")
-            .accessibilityAdjustableAction { direction in
-                setZoom(PageZoom.step(zoom, by: direction == .increment ? 1 : -1))
-            }
-            Button { setZoom(PageZoom.step(zoom, by: 1)) } label: {
-                Image(systemName: "plus").frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .accessibilityLabel("Zoom In")
-            .disabled(zoom >= PageZoom.steps[PageZoom.steps.count - 1])
-        }
-        .buttonStyle(.borderless)
-        .font(.system(.body, weight: .medium))
-        .foregroundStyle(theme.text)
-        .onAppear { zoom = model.browser.currentZoom }
-    }
-
-    private func setZoom(_ level: Double) {
-        model.browser.setZoom(level)
-        zoom = level
-    }
-
-    private func header(title: String, protections: Bool?) -> some View {
-        HStack(spacing: 12) {
-            Image(protections == false ? "pr-shield-off" : (protections == nil ? "sc-shield-plain" : "pr-shield"))
-                .resizable()
-                .frame(width: 22, height: 22)
-                .foregroundStyle(protections == false ? theme.muted : theme.text)
-                .frame(width: 46, height: 46)
-                .background(theme.well, in: .rect(cornerRadius: 14))
-                .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(theme.divider, lineWidth: 1) }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(SvalFont.outfit(20, .bold, relativeTo: .title3))
-                    .titleLines()
-                Text(protections == nil ? "Not a website. Protections don't apply."
-                     : (protections! ? "Protections on" : "Protections off for this site"))
-                    .font(.system(.subheadline))
-                    .foregroundStyle(theme.muted)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            CloseCircle { dismiss() }
-        }
-    }
-
-    private func toggleRow(icon: String, title: String, detail: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(.body))
-                    Text(detail)
-                        .font(.system(.footnote))
-                        .foregroundStyle(theme.muted)
-                }
-            } icon: {
-                Image(icon).resizable().frame(width: 20, height: 20).foregroundStyle(theme.muted)
-            }
-        }
-        .tint(theme.action)
-    }
-
-    /// The page's own group (14d3): Move to Workspace…, Pin Tab or Move to
-    /// Favorites, and Add to Favorites or where it is in Favorites. None of it
-    /// applies to a private tab.
-    @ViewBuilder private var pageGroup: some View {
-        let browser: Browser = model.browser
-        let tab = browser.currentTabId.flatMap(model.row).flatMap { $0.kind == .tab ? $0 : nil }
-        let star = StarState(model)
-        if !browser.privateInFront, tab != nil || browser.currentPin != nil {
-            Section {
-                if let tab, let home = model.workspace(of: tab.id).flatMap(model.row) {
-                    pageRow(icon: "folder", title: "Move to Workspace…", detail: "In \(WorkspaceTile.name(home))",
-                            chevron: true) { act(.move(tab)) }
-                }
-                if let pin = browser.currentPin {
-                    pageRow(icon: "star", title: "Move to Favorites") { act(.moveToFavorites(pin)) }
-                } else if let tab, !model.isPane(tab), let url = browser.currentURL ?? tab.url.flatMap(URL.init(string:)),
-                          AppModel.opensHere(url.absoluteString) {
-                    pageRow(icon: "pin", title: "Pin Tab") { act(.pin(tab, url)) }
-                }
-                switch star {
-                case .add(let url, let title):
-                    pageRow(icon: "star", title: "Add to Favorites") { act(.star(.add(url, title: title))) }
-                case .favorite(let item):
-                    Menu {
-                        Button("Rename…", systemImage: "pencil") { act(.star(.rename(item))) }
-                        Button("Move to…", systemImage: "folder") { act(.star(.move(item))) }
-                        Button("Remove from Favorites", systemImage: "star.slash", role: .destructive) {
-                            act(.star(.remove(item)))
-                        }
-                    } label: {
-                        pageLabel(icon: "star.fill", title: favoritePlace(item), detail: nil, chevron: false)
-                    }
-                case .none:
-                    EmptyView()
-                }
-            }
-            .listRowBackground(theme.cell)
-        }
-    }
-
-    /// The site's removal rules, collapsed each time the menu opens, as
-    /// the desktop's site menu lists them (element picker spec §6): a row
-    /// for each line that removes something here, newest first. Its X
-    /// takes this site out of the line; a private page lists them alone.
-    @ViewBuilder private func removalRules(on host: String) -> some View {
-        let removals = MyFilters.removals(on: host, settings: model.settings)
-        if !removals.isEmpty {
-            DisclosureGroup(isExpanded: $rulesShown) {
-                ForEach(removals) { removal in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(removal.shown)
-                                .font(.system(.footnote).monospaced())
-                                .lineLimit(2)
-                                .truncationMode(.middle)
-                            Text(removalWords(removal))
-                                .font(.system(.footnote))
-                                .foregroundStyle(theme.muted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if !inPrivate {
-                            Button { showAgain(removal) } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(theme.muted)
-                                    .frame(width: 44, height: 44)
-                            }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Delete Rule")
-                        }
-                    }
-                    .frame(minHeight: 44)
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 17))
-                        .foregroundStyle(theme.muted)
-                        .frame(width: 20, height: 20)
-                    Text("Removed from This Site").font(.system(.body))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("\(removals.count)")
-                        .monospacedDigit()
-                        .foregroundStyle(theme.muted)
-                }
-                .frame(minHeight: 44)
-            }
-            .tint(theme.muted)
-            .task(id: rulesShown ? removals.map(\.line) : []) {
-                guard rulesShown, let view = model.browser.currentPage() else { return }
-                let hiding = removals.filter { $0.kind == .hide }
-                let found = await ElementPick.counts(hiding.map(\.shown), in: view)
-                ruleCounts = Dictionary(zip(hiding.map(\.id), found), uniquingKeysWith: { a, _ in a })
-            }
-        }
-    }
-
-    /// What a rule's row says it does on this page.
-    private func removalWords(_ removal: MyFilters.Removal) -> String {
-        if removal.kind == .network { return "Stops a download" }
-        guard let n = ruleCounts[removal.id] ?? nil else { return "" }
-        return n == 0 ? "Not currently removing anything on this page"
-            : "Removes \(n) \(n == 1 ? "element" : "elements") on this page"
-    }
-
-    /// Takes this site out of the rule, and shows what it hid in the open
-    /// page where Remove hid it this visit.
-    private func showAgain(_ removal: MyFilters.Removal) {
-        let writes = MyFilters.showingAgain(removal, settings: model.settings)
-        Task {
-            await model.setSettings(writes.map { ($0.key, $0.value as Any?) })
-            if removal.kind == .hide, let view = model.browser.currentPage() {
-                await ElementPick.showAgain(removal.shown, in: view)
-            }
-        }
-    }
-
-    private func act(_ action: PageAction) {
-        onPage(action)
-        dismiss()
-    }
-
-    private func pageRow(icon: String, title: String, detail: String? = nil, chevron: Bool = false,
-                         action: @escaping () -> Void) -> some View {
-        Button(action: action) { pageLabel(icon: icon, title: title, detail: detail, chevron: chevron) }
-            .buttonStyle(.plain)
-    }
-
-    private func pageLabel(icon: String, title: String, detail: String?, chevron: Bool) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 17))
-                .foregroundStyle(theme.muted)
-                .frame(width: 20, height: 20)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(.body))
-                if let detail {
-                    Text(detail)
-                        .font(.system(.footnote))
-                        .foregroundStyle(theme.muted)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if chevron {
-                Chevron(color: theme.muted)
-            }
-        }
-        .foregroundStyle(theme.text)
-        .frame(minHeight: 44)
-        .contentShape(.rect)
-    }
-
-    /// "In Favorites", or "In Favorites › Travel" for one in a folder.
-    private func favoritePlace(_ item: Favorite) -> String {
-        guard let parent = item.parent, parent != model.favoritesRootId, let folder = model.favorite(parent) else {
-            return "In Favorites"
-        }
-        return "In Favorites › \(FavoritesView.name(folder))"
-    }
-
-    /// Saves `setting` and reloads the page to take it, once the script
-    /// rules a JavaScript choice changes are compiled.
-    private func change(_ setting: (key: String, value: Any?)) {
-        Task {
-            await model.setSetting(setting.key, to: setting.value)
-            await model.browser.blocker.scriptsApplied()
-            model.browser.reload()
-            Diagnostics.log("page: reloaded for a site setting")
         }
     }
 }

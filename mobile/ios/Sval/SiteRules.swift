@@ -3,6 +3,7 @@
 
 import Foundation
 import os
+import WebKit
 
 /// A site's choices, read and written as the desktop's site controls keep
 /// them, so a choice made on either reaches the other.
@@ -260,5 +261,43 @@ struct SiteRules {
         case .allow: (mediaDefaultKey, 1)
         case .block: (mediaDefaultKey, 2)
         }
+    }
+}
+
+/// Whether a page may run JavaScript, by the rules the desktop syncs
+/// (`SvalJavascript.sys.mjs`): each rule is a setting under `siteBranch`,
+/// named for a site or a host and holding `allow` or `block`, and the rule
+/// for the most specific name covering the host wins (`siteNames`). With
+/// none, `javascript.enabled` decides.
+enum JavaScriptRules {
+    static let siteBranch = "browser.sval.javascript.site."
+    static let enabledKey = "javascript.enabled"
+
+    static func allowed(host: String?, settings: [String: Any]) -> Bool {
+        let fallback = settings[enabledKey] as? Bool ?? true
+        for name in SiteRules.names(of: host ?? "") {
+            if let rule = settings[siteBranch + name] as? String, rule == "allow" || rule == "block" {
+                return rule == "allow"
+            }
+        }
+        return fallback
+    }
+
+    /// Whether a load may run JavaScript. A web address takes its own host's
+    /// rule. A frame loaded from anything else (`about:blank`, `data:`,
+    /// `blob:`) takes the rule of the frame that made it, as it does on the
+    /// desktop, where such a frame gets its creator's principal. One whose
+    /// creator has no host of its own, such as a sandboxed frame, runs
+    /// JavaScript only when both its page's rule and the default allow it.
+    static func allowed(_ action: WKNavigationAction, in webView: WKWebView, settings: [String: Any]) -> Bool {
+        if let url = action.request.url, let scheme = url.scheme?.lowercased(),
+           ["http", "https"].contains(scheme) {
+            return allowed(host: url.host(), settings: settings)
+        }
+        let origin = action.sourceFrame.securityOrigin.host
+        if !origin.isEmpty {
+            return allowed(host: origin, settings: settings)
+        }
+        return allowed(host: nil, settings: settings) && allowed(host: webView.url?.host(), settings: settings)
     }
 }

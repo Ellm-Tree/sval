@@ -141,12 +141,7 @@ struct MediaCard: View {
             position
             controls()
         }
-        .foregroundStyle(colors.ink)
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .rect(cornerRadius: Radius.card))
-        .padding(.horizontal, 10)
+        .glassCard(colors)
         // Read only while the app is in front, where the card shows.
         .task(id: scenePhase == .active ? tabId : nil) {
             guard scenePhase == .active else { return }
@@ -317,7 +312,7 @@ struct MediaAsk: View {
 
     var body: some View {
         let browser: Browser = model.browser
-        HStack(spacing: 0) {
+        ClosingCapsule(colors: colors, closeLabel: "Close", onClose: { browser.closeAsk() }) {
             Menu {
                 Button("Allow Video and Audio", systemImage: "speaker.wave.2") { browser.allowMediaForVisit() }
                 Button("Always Allow on This Site", systemImage: "checkmark.circle") {
@@ -336,19 +331,6 @@ struct MediaAsk: View {
             .accessibilityAction(named: "Always Allow on This Site") {
                 Task { await browser.alwaysAllowMedia() }
             }
-            colors.rule.frame(width: 1, height: 22)
-            Button { browser.closeAsk() } label: {
-                Label("Close", systemImage: "xmark")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(colors.ink.opacity(0.75))
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
-            }
         }
-        .buttonStyle(.plain)
-        .padding(.trailing, 4)
-        .foregroundStyle(colors.ink)
-        .glassCapsule(colors.layer)
     }
 }

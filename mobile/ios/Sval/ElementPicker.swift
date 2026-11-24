@@ -462,12 +462,7 @@ struct PickCard: View {
                 }
             }
         }
-        .foregroundStyle(colors.ink)
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .rect(cornerRadius: Radius.card))
-        .padding(.horizontal, 10)
+        .glassCard(colors)
         // Over the page, as the media card is: VoiceOver stays in it, and
         // the escape gesture cancels.
         .accessibilityAddTraits(.isModal)

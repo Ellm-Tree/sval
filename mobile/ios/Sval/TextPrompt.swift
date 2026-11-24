@@ -57,7 +57,7 @@ struct TextPrompt<Item, Value>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert(title, isPresented: Binding(get: { item != nil }, set: { if !$0 { item = nil } })) {
+            .alert(title, isPresented: Binding(presenting: $item)) {
                 TextField(placeholder, text: $text)
                     .keyboardType(keyboard)
                     .modifier(PromptField(address: keyboard == .URL, submit: submit))

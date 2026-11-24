@@ -113,6 +113,19 @@ final class BarFold {
         run = 0
         guard value != end else { return }
         // Under Reduce Motion the bar goes to its fold at once.
-        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .smooth(duration: 0.4)) { value = end }
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : Motion.glide) { value = end }
     }
+}
+
+/// What a page's scrolling tells the bar (`BarFold.pageScrolled`).
+enum ScrollReport {
+    /// A finger came down on the page.
+    case touched
+    /// The finger lifted, perhaps leaving the page to coast.
+    case released
+    /// The page reached its end.
+    case atEnd
+    /// The page moved by `by` points, down when positive; `atTop` once
+    /// back at its start, and `held` while a finger is on it.
+    case moved(by: Double, atTop: Bool, held: Bool)
 }

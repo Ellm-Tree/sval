@@ -76,7 +76,7 @@ struct FavoritesView: View {
         }
         .confirmationDialog(
             deletingFolder.map { "Delete the “\(Self.name($0))” folder?" } ?? "",
-            isPresented: Binding(get: { deletingFolder != nil }, set: { if !$0 { deletingFolder = nil } }),
+            isPresented: Binding(presenting: $deletingFolder),
             titleVisibility: .visible, presenting: deletingFolder
         ) { item in
             Button("Delete Folder", role: .destructive) { delete(item) }
@@ -88,7 +88,7 @@ struct FavoritesView: View {
         }
         .confirmationDialog(
             openingAll.map { "Open \(urls(in: $0).count) tabs?" } ?? "",
-            isPresented: Binding(get: { openingAll != nil }, set: { if !$0 { openingAll = nil } }),
+            isPresented: Binding(presenting: $openingAll),
             titleVisibility: .visible, presenting: openingAll
         ) { item in
             Button("Open Tabs") { Task { await openAll(urls(in: item)) } }

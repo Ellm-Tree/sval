@@ -20,7 +20,7 @@ struct DeleteWorkspaceDialog: ViewModifier {
     func body(content: Content) -> some View {
         content.confirmationDialog(
             workspace.map { "Delete the “\(WorkspaceTile.name($0))” Workspace?" } ?? "",
-            isPresented: Binding(get: { workspace != nil }, set: { if !$0 { workspace = nil } }),
+            isPresented: Binding(presenting: $workspace),
             titleVisibility: .visible, presenting: workspace
         ) { row in
             Button("Delete Workspace", role: .destructive) {

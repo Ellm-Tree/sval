@@ -1,0 +1,395 @@
+// SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+// Copyright 2026 Ellm Tree, Inc.
+
+import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
+
+/// A tab's card (15b, 15c): its picture, under a bar with the site's icon,
+/// the title and ×, and the speaker in the corner while it plays. The
+/// collection view's cell is the button: its tap, menu and drag are the
+/// system's.
+struct GridCard: View {
+    let model: AppModel
+    /// The tab's row, read here so a change to it redraws this card alone.
+    let box: RowBox
+    let height: CGFloat
+    let theme: Theme
+    let editing: Bool
+    let ticked: Bool
+    let dropState: GridDropState
+    let onClose: () -> Void
+
+    private var row: OutlineRow { box.row }
+
+    var body: some View {
+        let browser: Browser = model.browser
+        let front = row.id == browser.currentTabId
+        let elsewhere = Browser.openable(row) == nil && row.url != nil
+        let playing = browser.playingTabs.contains(row.id)
+        let muted = browser.mutedTabs.contains(row.id)
+        CardPicture(row: row, height: height, elsewhere: elsewhere, theme: theme, loading: browser.hasPage(row.id),
+                    top: GridMetrics.bar)
+            .overlay { GridHalves(id: row.id, dropState: dropState, theme: theme) }
+            .overlay(alignment: .top) {
+                CardBar(theme: theme, title: row.displayTitle, bold: front, dim: elsewhere,
+                        closeLabel: "Close \(row.displayTitle)", onClose: onClose) {
+                    SiteTile(row: row, size: 16).opacity(elsewhere ? 0.4 : 1)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if editing {
+                    // Over a picture of any colour, the tick sits on a
+                    // white disc.
+                    SelectionTick(ticked: ticked, tick: theme.action, off: theme.muted, onPicture: true)
+                        .padding(8)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if playing {
+                    HStack(spacing: 6) {
+                        mediaButton("stop.fill", label: "Stop") { Task { await browser.stopMedia(row.id) } }
+                        mediaButton(muted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: muted ? "Unmute" : "Mute") {
+                            browser.toggleMute(row.id)
+                        }
+                    }
+                    .padding(6)
+                    .environment(\.colorScheme, theme.dark ? .dark : .light)
+                }
+            }
+            .clipShape(.rect(cornerRadius: Radius.picture))
+            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
+            .modifier(FrontRing(front: front, color: theme.accent))
+            .padding(GridMetrics.ring)
+            // VoiceOver reads the title, the site, then any state; the tab in
+            // front says so through the selected trait, and × is an action.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label(elsewhere: elsewhere, playing: playing))
+            .accessibilityAddTraits(front || (editing && ticked) ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction(named: "Close", onClose)
+            .accessibilityActions {
+                if playing {
+                    Button("Stop") { Task { await browser.stopMedia(row.id) } }
+                    Button(muted ? "Unmute" : "Mute") { browser.toggleMute(row.id) }
+                }
+            }
+    }
+
+    /// A media control in the picture's corner, on a disc of the sheet's
+    /// material so it reads over any page.
+    private func mediaButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.accent)
+                .frame(width: 38, height: 38)
+                .background(.regularMaterial, in: .circle)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(label)
+    }
+
+    private func label(elsewhere: Bool, playing: Bool) -> String {
+        var parts = [row.displayTitle]
+        if let host = row.url.flatMap(URL.init(string:))?.host() { parts.append(SiteRules.site(of: host) ?? host) }
+        if playing { parts.append("playing") }
+        if elsewhere { parts.append("can't open on \(UIDevice.current.model)") }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// The bar over the top of a card's picture: icons, the title cut to fit,
+/// and ×, on the sheet's material so the page shows through.
+struct CardBar<Icon: View>: View {
+    let theme: Theme
+    let title: String
+    let bold: Bool
+    var dim = false
+    let closeLabel: String
+    let onClose: () -> Void
+    @ViewBuilder let icon: Icon
+
+    var body: some View {
+        HStack(spacing: 7) {
+            icon
+            Text(title)
+                .font(.system(.subheadline, weight: bold ? .semibold : .medium))
+                .foregroundStyle(dim ? theme.muted : theme.text)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.muted)
+                    .frame(width: 36, height: GridMetrics.bar)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(closeLabel)
+        }
+        .padding(.leading, 9)
+        .frame(height: GridMetrics.bar)
+        .background(.regularMaterial)
+        .environment(\.colorScheme, theme.dark ? .dark : .light)
+    }
+}
+
+/// A split as one card (15e): each pane's picture, laid out as the split
+/// shows them upright.
+struct GridSplitCard: View {
+    let model: AppModel
+    /// The split's row and its panes', read here so a change to any of
+    /// them redraws this card alone.
+    let split: RowBox
+    let panes: [RowBox]
+    let height: CGFloat
+    let theme: Theme
+    let editing: Bool
+    let dropState: GridDropState
+    let onClose: () -> Void
+
+    var body: some View {
+        let panes = panes.map(\.row)
+        let split = split.row
+        let front = panes.contains { $0.id == (model.browser as Browser).currentTabId }
+        let first = panes[0]
+        let title = split.name.isEmpty ? first.displayTitle : split.name
+        let closeName = panes.count == 2 ? "Close Both" : "Close All"
+        SplitPicture(panes: panes, height: height, theme: theme)
+            .overlay { GridHalves(id: split.id, dropState: dropState, theme: theme) }
+            .overlay(alignment: .top) {
+                CardBar(theme: theme, title: title, bold: front, closeLabel: closeName, onClose: onClose) {
+                    HStack(spacing: -5) {
+                        ForEach(panes, id: \.id) { pane in
+                            SiteTile(row: pane, size: 16)
+                                .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(theme.sheet, lineWidth: 1.5) }
+                        }
+                    }
+                    .padding(.trailing, 2)
+                }
+            }
+            .clipShape(.rect(cornerRadius: Radius.picture))
+            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
+            .modifier(FrontRing(front: front, color: theme.accent))
+            .padding(GridMetrics.ring)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Split, \(title)")
+            .accessibilityAddTraits(front ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction(named: closeName, onClose)
+    }
+}
+
+/// A card's halves while a card is held over its middle (15f2).
+private struct GridHalves: View {
+    let id: String
+    let dropState: GridDropState
+    let theme: Theme
+
+    var body: some View {
+        if let hover = dropState.hover, hover.id == id, let halves = hover.halves {
+            DropHalvesMark(halves: halves, onSplit: hover.kind != .newGroup, color: theme.accent,
+                           muted: theme.muted, cover: theme.sheet, compact: true)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// A group's header in the grid (15d): its tile, name, count and chevron,
+/// and when closed, the first three icons inside it.
+struct GridGroupHeader: View {
+    /// The group's row, read here so a change to it redraws this header.
+    let box: RowBox
+    let header: GroupHeader
+    /// The first three tabs inside the group, whose icons show while it's
+    /// closed.
+    let icons: [RowBox]
+    let theme: Theme
+    let onToggle: () -> Void
+    let menu: (OutlineRow) -> [[MenuItem]]
+
+    private var group: OutlineRow { box.row }
+
+    var body: some View {
+        let tint = group.color.flatMap(WorkspaceTint.init(rawValue:))
+        let open = header.open, nested = header.nested
+        Button(action: onToggle) {
+            HStack(spacing: nested ? 9 : 10) {
+                tile(tint, size: nested ? 24 : 28)
+                Text(group.displayTitle)
+                    .font(.system(nested ? .subheadline : .body, weight: .semibold))
+                    .foregroundStyle(theme.text)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if !open {
+                    HStack(spacing: -6) {
+                        ForEach(icons.map(\.row), id: \.id) { tab in SiteTile(row: tab, size: 20) }
+                    }
+                    .padding(.trailing, 6)
+                }
+                Text("\(header.count)")
+                    .font(.system(.subheadline))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.muted)
+                Chevron(open: open, color: theme.muted)
+            }
+            .padding(.horizontal, 12)
+            .frame(maxHeight: .infinity)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(open ? "Expanded" : "Collapsed")
+        // The header is a supplementary view, which the collection view's
+        // item menus don't cover.
+        .contextMenu { MenuItems(sections: menu(group)) }
+    }
+
+    private func tile(_ tint: WorkspaceTint?, size: CGFloat) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.29).fill(theme.cell)
+            if let emoji = group.emoji, !emoji.isEmpty {
+                Text(emoji).font(.system(size: size * 0.57)).accessibilityIgnoresInvertColors()
+            } else {
+                Image(systemName: "folder")
+                    .font(.system(size: size * 0.55, weight: .medium))
+                    .foregroundStyle(tint?.swatch(dark: theme.dark) ?? theme.body)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// A card's picture: the top of its page, or the site's icon and domain
+/// when the phone has no picture of it (15c).
+struct CardPicture: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let row: OutlineRow
+    let height: CGFloat
+    let elsewhere: Bool
+    let theme: Theme
+    /// Whether the page is open on this phone, so its picture is on its
+    /// way (15c, "picture loading").
+    var loading = false
+    /// The bar over the picture's top, which the icon in its place sits
+    /// below.
+    var top: CGFloat = 0
+    @State private var sweep = false
+
+    var body: some View {
+        let picture = elsewhere ? nil : PagePreviews.shared.picture(for: row.id)
+        Color.clear
+            .frame(height: height)
+            .frame(maxWidth: .infinity)
+            .background(theme.cell)
+            .overlay(alignment: .top) {
+                if let picture {
+                    Image(uiImage: picture).resizable().scaledToFill()
+                        .accessibilityIgnoresInvertColors()
+                        .transition(.opacity.animation(Motion.disclose))
+                } else if loading {
+                    SiteTile(row: row, size: 28)
+                        .opacity(0.45)
+                        .frame(maxHeight: .infinity)
+                        .padding(.top, top)
+                        .overlay {
+                            if !reduceMotion {
+                                LinearGradient(colors: [.clear, theme.text.opacity(0.08), .clear],
+                                               startPoint: .leading, endPoint: .trailing)
+                                    .frame(width: 120)
+                                    .offset(x: sweep ? 200 : -200)
+                                    .onAppear {
+                                        withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { sweep = true }
+                                    }
+                            }
+                        }
+                } else {
+                    VStack(spacing: 8) {
+                        SiteTile(row: row, size: 44).opacity(elsewhere ? 0.4 : 1)
+                        if let host = row.url.flatMap(URL.init(string:))?.host() {
+                            Text(SiteRules.site(of: host) ?? host)
+                                .font(.system(.footnote))
+                                .foregroundStyle(theme.muted)
+                                .lineLimit(1)
+                        }
+                        if elsewhere {
+                            Label("Can't open on \(UIDevice.current.model)", systemImage: "laptopcomputer")
+                                .font(.system(.caption, weight: .semibold))
+                                .foregroundStyle(theme.text)
+                                .padding(.horizontal, 9)
+                                .frame(height: 24)
+                                .background(theme.well, in: .capsule)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(maxHeight: .infinity)
+                    .padding(.top, top)
+                }
+            }
+    }
+
+    /// The card's 1pt ring, drawn around the picture and bar.
+    static func ring(_ theme: Theme) -> Color {
+        theme.divider
+    }
+}
+
+/// A split's picture: each pane's, two stacked, three as one over two,
+/// four as two by two, with 3pt gaps (15e).
+struct SplitPicture: View {
+    let panes: [OutlineRow]
+    let height: CGFloat
+    let theme: Theme
+
+    var body: some View {
+        let rows: [[OutlineRow]] = switch panes.count {
+        case 2: [[panes[0]], [panes[1]]]
+        case 3: [[panes[0]], [panes[1], panes[2]]]
+        default: [Array(panes.prefix(2)), Array(panes.dropFirst(2).prefix(2))]
+        }
+        VStack(spacing: 3) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, line in
+                HStack(spacing: 3) {
+                    ForEach(line, id: \.id) { row in
+                        cell(row)
+                    }
+                }
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .background(theme.cell)
+    }
+
+    private func cell(_ pane: OutlineRow) -> some View {
+        Color.clear
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(theme.well)
+            .overlay(alignment: .top) {
+                if let picture = PagePreviews.shared.picture(for: pane.id) {
+                    Image(uiImage: picture).resizable().scaledToFill()
+                        .accessibilityIgnoresInvertColors()
+                } else {
+                    SiteTile(row: pane, size: 24).frame(maxHeight: .infinity)
+                }
+            }
+            .clipShape(.rect(cornerRadius: 3))
+    }
+}
+
+/// The tab in front's ring: 2.5pt of accent outside a 2pt gap (15c).
+struct FrontRing: ViewModifier {
+    let front: Bool
+    let color: Color
+    let radius: CGFloat = 14
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if front {
+                RoundedRectangle(cornerRadius: radius + 4.5)
+                    .strokeBorder(color, lineWidth: 2.5)
+                    .padding(-4.5)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+}

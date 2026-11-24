@@ -365,9 +365,9 @@ struct TabScrubStrip: View {
     /// `CardPicture` leaves both to whatever holds it.
     private func rounded(_ picture: some View) -> some View {
         picture
-            .clipShape(.rect(cornerRadius: 14))
+            .clipShape(.rect(cornerRadius: Radius.picture))
             .overlay {
-                RoundedRectangle(cornerRadius: 14).strokeBorder(CardPicture.ring(theme), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(CardPicture.ring(theme), lineWidth: 1)
             }
     }
 }

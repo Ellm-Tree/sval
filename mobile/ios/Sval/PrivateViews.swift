@@ -31,7 +31,7 @@ struct EmptyHome: View {
         let theme = Theme(scheme, tint: model.tint(of: workspace))
         // The glow's colour: the Workspace's, or Sval's blue with none
         // (`--grad-night`, `--g-nh`).
-        let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: 0x13328F)
+        let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: Palette.navy)
         ScrollView {
             VStack(spacing: 16) {
                 Image(isPrivate ? "mark-private" : (theme.dark ? "mark" : "mark-light"))
@@ -79,8 +79,7 @@ struct EmptyHome: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.privateNight.opacity(0.55), in: .rect(cornerRadius: 14))
-                        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.privateEdge.opacity(0.24), lineWidth: 1) }
+                        .well(Theme.privateNight.opacity(0.55), edge: Theme.privateEdge.opacity(0.24), radius: 14)
                 }
                 Button("New Tab", systemImage: "plus", action: onNewTab)
                     .buttonStyle(.glassProminent)

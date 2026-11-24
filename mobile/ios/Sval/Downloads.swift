@@ -193,7 +193,7 @@ struct DownloadCapsule: View {
         let shown = downloads.shown
         if let item = shown.last {
             let title = shown.count > 1 ? "\(item.name) and \(shown.count - 1) more" : item.name
-            HStack(spacing: 0) {
+            ClosingCapsule(colors: colors, closeLabel: "Cancel \(item.name)", onClose: { downloads.cancel(item) }) {
                 HStack(spacing: 10) {
                     Gauge(value: item.fraction) { EmptyView() }
                         .gaugeStyle(.accessoryCircularCapacity)
@@ -211,20 +211,7 @@ struct DownloadCapsule: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Downloading \(title)")
                 .accessibilityValue(Text(item.fraction, format: .percent.precision(.fractionLength(0))))
-                colors.rule.frame(width: 1, height: 22)
-                Button { downloads.cancel(item) } label: {
-                    Label("Cancel \(item.name)", systemImage: "xmark")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(colors.ink.opacity(0.75))
-                        .frame(width: 44, height: 44)
-                        .contentShape(.rect)
-                }
             }
-            .buttonStyle(.plain)
-            .padding(.trailing, 4)
-            .foregroundStyle(colors.ink)
-            .glassCapsule(colors.layer)
             .frame(maxWidth: 360)
         }
     }
@@ -297,16 +284,10 @@ struct TabNotice<Actions: View>: View {
 
     var body: some View {
         let theme = Theme(scheme, tint: model.tint(of: workspace))
-        let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: 0x13328F)
+        let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: Palette.navy)
         ScrollView {
             VStack(spacing: 16) {
-                Image(systemName: symbol)
-                    .font(.system(size: 30, weight: .medium))
-                    .foregroundStyle(theme.body)
-                    .frame(width: 68, height: 68)
-                    .background(theme.well, in: .rect(cornerRadius: 20))
-                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(theme.divider, lineWidth: 1) }
-                    .accessibilityHidden(true)
+                NoticeMark(symbol: symbol, theme: theme)
                 Text(title)
                     .font(SvalFont.outfit(22, .bold, relativeTo: .title2))
                     .foregroundStyle(theme.text)
@@ -319,14 +300,7 @@ struct TabNotice<Actions: View>: View {
                         .foregroundStyle(theme.body)
                         .multilineTextAlignment(.center)
                 }
-                Text(address)
-                    .font(SvalFont.mono(13, relativeTo: .footnote))
-                    .foregroundStyle(theme.body)
-                    .lineLimit(3)
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.well, in: .rect(cornerRadius: 12))
+                NoticeAddress(address: address, theme: theme)
                 HStack(spacing: 10) {
                     actions
                     if let row {
@@ -353,5 +327,37 @@ struct TabNotice<Actions: View>: View {
                 HomeField(ground: theme.sheet, glow: glow, dark: theme.dark)
             }
         }
+    }
+}
+
+/// A notice page's symbol, in a well at the head of the page.
+struct NoticeMark: View {
+    let symbol: String
+    let theme: Theme
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 30, weight: .medium))
+            .foregroundStyle(theme.body)
+            .frame(width: 68, height: 68)
+            .well(theme.well, edge: theme.divider, radius: 20)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The address a notice page is about, in a well to select and copy from.
+struct NoticeAddress: View {
+    let address: String
+    let theme: Theme
+
+    var body: some View {
+        Text(address)
+            .font(SvalFont.mono(13, relativeTo: .footnote))
+            .foregroundStyle(theme.body)
+            .lineLimit(3)
+            .textSelection(.enabled)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.well, in: .rect(cornerRadius: 12))
     }
 }

@@ -108,7 +108,7 @@ final class Toasts {
         timer = nil
         if windowed { attach() }
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
-        let animation = toast.notice ? (reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.35)) : Motion.overlay
+        let animation = toast.notice ? (reduceMotion ? Motion.overlay : .spring(duration: 0.35)) : Motion.overlay
         withAnimation(animation) { current = toast }
         AccessibilityNotification.Announcement(toast.text).post()
         if toast.undo != nil, assistive() { return }

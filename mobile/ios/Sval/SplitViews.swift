@@ -27,13 +27,13 @@ struct SplitColors {
         if let group {
             let ink = group.swatch(dark: dark)
             border = ink.opacity(0.62)
-            tray = dark ? Color(hex: 0x03051A, opacity: 0.5) : .white.opacity(0.65)
+            tray = dark ? Color(hex: Palette.night, opacity: 0.5) : .white.opacity(0.65)
             cell = ink.opacity(0.26)
             glyph = ink
         } else {
-            border = dark ? Color(hex: 0xA6E8FF, opacity: 0.42) : Color(hex: 0x13328F, opacity: 0.40)
-            tray = dark ? Color(hex: 0x03051A, opacity: 0.62) : Color(hex: 0x13328F, opacity: 0.14)
-            cell = dark ? Color(hex: 0xA6E8FF, opacity: 0.16) : .white
+            border = dark ? Color(hex: Palette.ice, opacity: 0.42) : Color(hex: Palette.navy, opacity: 0.40)
+            tray = dark ? Color(hex: Palette.night, opacity: 0.62) : Color(hex: Palette.navy, opacity: 0.14)
+            cell = dark ? Color(hex: Palette.ice, opacity: 0.16) : .white
             glyph = theme.body.opacity(0.6)
         }
     }
@@ -126,8 +126,7 @@ struct SplitRow<Menu: View>: View {
             .frame(width: geometry.size.width, height: 44, alignment: .leading)
         }
         .frame(height: 44)
-        .background(colors.tray, in: .rect(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(colors.border, lineWidth: 1) }
+        .well(colors.tray, edge: colors.border, radius: Radius.tray)
     }
 
     private func tile(_ pane: OutlineRow, colors: SplitColors, titled: Bool) -> some View {
@@ -300,7 +299,7 @@ struct SplitStage: View {
                 // edge shows on a light page and a dark one alike.
                 ZStack {
                     RoundedRectangle(cornerRadius: Radius.pane).strokeBorder(theme.accent, lineWidth: 3)
-                    RoundedRectangle(cornerRadius: 13).strokeBorder(Color(hex: 0x060A2E), lineWidth: 2).padding(3)
+                    RoundedRectangle(cornerRadius: 13).strokeBorder(Color(hex: Palette.ink950), lineWidth: 2).padding(3)
                 }
                 .allowsHitTesting(false)
             } else {
@@ -568,11 +567,11 @@ struct PaneTray: View {
             .padding(2)
             .background {
                 if let glass {
-                    RoundedRectangle(cornerRadius: 12).fill(.clear)
-                        .glassEffect(workspaceGlass(glass.layer, interactive: false), in: .rect(cornerRadius: 12))
+                    RoundedRectangle(cornerRadius: Radius.tray).fill(.clear)
+                        .glassEffect(workspaceGlass(glass.layer, interactive: false), in: .rect(cornerRadius: Radius.tray))
                 } else {
-                    RoundedRectangle(cornerRadius: 12).fill(colors.tray)
-                        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(colors.border, lineWidth: 1) }
+                    RoundedRectangle(cornerRadius: Radius.tray).fill(colors.tray)
+                        .overlay { RoundedRectangle(cornerRadius: Radius.tray).strokeBorder(colors.border, lineWidth: 1) }
                 }
             }
             .contentShape(.rect)
@@ -638,10 +637,10 @@ struct PaneTray: View {
 
     private func step(_ direction: Int) {
         guard let target = browser.paneStep(direction) else { return }
-        guard !reduceMotion else { return withAnimation(.easeOut(duration: 0.15)) { browser.select(target) } }
+        guard !reduceMotion else { return withAnimation(Motion.disclose) { browser.select(target) } }
         browser.paneSlideTarget = target
         let width = browser.focusedSlotWidth + 8
-        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)) {
+        withAnimation(Motion.paneSlide) {
             browser.paneSlide = direction > 0 ? -width : width
         } completion: { finish(target) }
     }
@@ -672,10 +671,10 @@ struct PaneTray: View {
                     return
                 }
                 guard !reduceMotion else {
-                    withAnimation(.easeOut(duration: 0.15)) { browser.select(target) }
+                    withAnimation(Motion.disclose) { browser.select(target) }
                     return
                 }
-                withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)) {
+                withAnimation(Motion.paneSlide) {
                     browser.paneSlide = direction > 0 ? -width : width
                 } completion: { finish(target) }
             }
