@@ -200,7 +200,7 @@ add_task(async function a_typed_address_that_is_not_a_web_page_is_not_opened() {
     "TabOpen"
   );
   const closed = BrowserTestUtils.domWindowClosed(win);
-  win.document.getElementById("sval-peek-open-main").click();
+  await clickOpenButton(win);
   const tab = expectOpened(
     (await within(opened, 10_000, "the moved tab")).target
   );

@@ -686,6 +686,13 @@ add_task(async function a_home_tab_open_before_attach_is_filed() {
     handWorkspaceTo(OpenBrowserWindow({ args }), workspace);
     const win = await within(opening, 15_000, "a window opening on a page");
     await within(win.SvalPanel.started, 20_000, "the window's startup");
+    // `waitForNewWindow` without a url resolves before the first tab's load
+    // commits, and until it does the tab reads the initial `about:blank`.
+    await committed(
+      () => win.gBrowser.selectedBrowser,
+      url,
+      `the window's first tab committing ${url}`
+    );
     await within(
       win.SvalPanel.observer.settled(),
       10_000,

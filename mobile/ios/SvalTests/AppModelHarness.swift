@@ -156,8 +156,10 @@ final class AppHarness {
         return document.outline()
     }
 
-    /// Returns once `condition` holds, yielding to the work that makes it
-    /// hold, and fails the test when it hasn't within `limit`.
+    /// Returns once `condition` holds, and fails the test when it hasn't
+    /// within `limit`. It checks every few milliseconds and sleeps between,
+    /// so the main thread and a core stay free for the work it waits on:
+    /// web processes launching, and the replies the main thread handles.
     func until(_ what: @autoclosure () -> String, limit: Duration = .seconds(10),
                _ condition: @MainActor () -> Bool) async throws {
         let deadline = ContinuousClock.now + limit
@@ -166,7 +168,7 @@ final class AppHarness {
                 XCTFail("timed out: \(what())")
                 throw CancellationError()
             }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(10))
         }
     }
 

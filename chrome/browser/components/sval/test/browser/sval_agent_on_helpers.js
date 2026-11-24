@@ -16,7 +16,8 @@
 
 /* exported SvalAgents, SvalQuickPeek, SvalPeek, SvalPanelModel, SvalTree, RED,
             agentAccessOn, titledRed, middlePixel, shows, linkFromAnotherApp,
-            secondWindow, failFirstLoad, errorPageShown, movedInShows, dialogIn, typeIn,
+            secondWindow, failFirstLoad, errorPageShown, clickOpenButton, movedInShows, dialogIn,
+            typeIn,
             newWorkspace, switchVia, tearOffVia, rowIn, clickRow, rowNameIn,
             switcherNameIn, contextMenuIn, menuCommand, nodeOfTab,
             selectedShows, clickRowShows, workspaceWith, rowIdsIn,
@@ -331,6 +332,21 @@ async function errorPageShown(browser, url, what, page = "about:neterror") {
 }
 
 /**
+ * Clicks a Peek's open button once it shows, as a user can. The button
+ * names its workspace only after `renderOpenButton` has read the tree, and
+ * a click before then has no workspace to open the page in.
+ *
+ * @param {Window} win A Peek.
+ */
+async function clickOpenButton(win) {
+  await TestUtils.waitForCondition(
+    () => !win.document.getElementById("sval-peek-open").hidden,
+    "the Peek's open button names a workspace"
+  );
+  win.document.getElementById("sval-peek-open-main").click();
+}
+
+/**
  * Moves the peek's page into the main window's workspace, as its open
  * button does, and asserts the page loads there.
  *
@@ -347,7 +363,7 @@ async function movedInShows(win, url, { whenOpened } = {}) {
     "TabOpen"
   );
   const closed = BrowserTestUtils.domWindowClosed(win);
-  win.document.getElementById("sval-peek-open-main").click();
+  await clickOpenButton(win);
   const tab = expectOpened(
     (await within(opened, 10_000, "the moved page")).target
   );
