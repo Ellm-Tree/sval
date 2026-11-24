@@ -117,7 +117,11 @@ export class SvalPanelSelection {
     settings.setSelection(workspace.id, id);
     // A row drawn only because it led to the old selection goes with it.
     const pathDrawn = rows.some(row => row.showsSelection);
-    if (this.reveal({ force: changed }) || pathDrawn) {
+    // Leaving a pin's page for the selected tab changes no selection, and
+    // the rows drawn while the page showed have no path to that tab.
+    const viewed = this.viewedId();
+    const unshown = viewed !== null && !rows.some(row => row.id === viewed);
+    if (this.reveal({ force: changed }) || pathDrawn || unshown) {
       this.#view.render();
     } else {
       this.paint();
