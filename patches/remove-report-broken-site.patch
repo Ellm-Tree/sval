@@ -1,0 +1,678 @@
+Sval: Remove Report Broken Site
+
+Reports go to webcompat.com, a Mozilla service (spec §10.9). The reporter
+goes whole: both components, the toolkit actor, the Help menu item, the
+app menu and protections panel buttons, its panel, command, strings,
+styles, prefs, Nimbus feature and Glean metrics.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 260b46c3f6..becafbb353 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -3436,17 +3436,6 @@ pref("cookiebanners.ui.desktop.showCallout", false);
+   pref("browser.swipe.navigation-icon-max-radius", 20);
+ #endif
+ 
+-pref("ui.new-webcompat-reporter.enabled", true);
+-
+-#if defined(EARLY_BETA_OR_EARLIER)
+-pref("ui.new-webcompat-reporter.send-more-info-link", true);
+-#else
+-pref("ui.new-webcompat-reporter.send-more-info-link", false);
+-#endif
+-
+-# 0 = disabled, 1 = reason optional, 2 = reason required.
+-pref("ui.new-webcompat-reporter.reason-dropdown", 2);
+-
+ // Reset Private Browsing Session feature a.k.a "Fire Button"
+ pref("browser.privatebrowsing.resetPBM.enabled", true);
+ 
+diff --git a/browser/base/content/appmenu-viewcache.inc.xhtml b/browser/base/content/appmenu-viewcache.inc.xhtml
+index 69f8c2555a..6df1a36e92 100644
+--- a/browser/base/content/appmenu-viewcache.inc.xhtml
++++ b/browser/base/content/appmenu-viewcache.inc.xhtml
+@@ -167,12 +167,6 @@
+                      data-l10n-id="appmenuitem-more-tools"
+                      closemenu="none"
+                      />
+-      <toolbarbutton id="appMenu-report-broken-site-button"
+-                     class="subviewbutton subviewbutton-nav"
+-                     data-l10n-id="appmenuitem-report-broken-site"
+-                     closemenu="none"
+-                     disabled="true"
+-                     command="cmd_reportBrokenSite"/>
+       <toolbarbutton id="appMenu-help-button2"
+                      class="subviewbutton subviewbutton-nav"
+                      data-l10n-id="appmenuitem-help"
+@@ -963,5 +957,4 @@
+     </vbox>
+   </panelview>
+ 
+-#include ../../components/reportbrokensite/content/reportBrokenSitePanel.inc.xhtml
+ </html:template>
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index f772e9e669..79773ce141 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -449,11 +449,6 @@
+                           data-l10n-id="menu-get-help"
+                           appmenu-data-l10n-id="appmenu-get-help"
+                           />
+-                <menuitem id="help_reportBrokenSite"
+-                          command="cmd_reportBrokenSite"
+-                          data-l10n-id="menu-report-broken-site"
+-                          disabled="true"
+-                          appmenu-data-l10n-id="appmenuitem-report-broken-site"/>
+                 <menuitem id="feedbackPage"
+                           data-l10n-id="menu-help-share-ideas"
+                           appmenu-data-l10n-id="appmenu-help-share-ideas"/>
+diff --git a/browser/base/content/browser-sets.inc.xhtml b/browser/base/content/browser-sets.inc.xhtml
+index d52140f203..bae4e8366c 100644
+--- a/browser/base/content/browser-sets.inc.xhtml
++++ b/browser/base/content/browser-sets.inc.xhtml
+@@ -52,7 +52,6 @@
+ #ifdef XP_MACOSX
+     <command id="cmd_findSelection" />
+ #endif
+-    <command id="cmd_reportBrokenSite"/>
+     <command id="cmd_translate" />
+     <command id="cmd_openAboutTranslations" />
+     <!-- work-around bug 392512 -->
+diff --git a/browser/base/content/browser-siteProtections.js b/browser/base/content/browser-siteProtections.js
+index b99b442344..c0dfae79bb 100644
+--- a/browser/base/content/browser-siteProtections.js
++++ b/browser/base/content/browser-siteProtections.js
+@@ -5,8 +5,6 @@
+ ChromeUtils.defineESModuleGetters(this, {
+   ContentBlockingAllowList:
+     "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
+-  ReportBrokenSite:
+-    "moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs",
+   SpecialMessageActions:
+     "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+ });
+@@ -1988,8 +1986,6 @@ var gProtectionsHandler = {
+           delete this._protectionsPopupToggleDelayTimer;
+         }, this._protectionsPopupButtonDelay);
+       }
+-
+-      ReportBrokenSite.updateParentMenu(event);
+     }
+   },
+ 
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index c29e2fdf91..1a9c825c4c 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -70,7 +70,6 @@
+   <link rel="localization" href="browser/panelUI.ftl"/>
+   <link rel="localization" href="browser/places.ftl"/>
+   <link rel="localization" href="browser/protectionsPanel.ftl"/>
+-  <link rel="localization" href="browser/reportBrokenSite.ftl"/>
+   <link rel="localization" href="browser/screenshots.ftl"/>
+   <link rel="localization" href="browser/search.ftl"/>
+   <link rel="localization" href="browser/sidebarMenu.ftl"/>
+diff --git a/browser/base/content/macWindow.inc.xhtml b/browser/base/content/macWindow.inc.xhtml
+index 3fd7860e21..f210a6d02f 100644
+--- a/browser/base/content/macWindow.inc.xhtml
++++ b/browser/base/content/macWindow.inc.xhtml
+@@ -13,7 +13,6 @@
+   <html:link rel="localization" href="browser/browserSets.ftl"/>
+   <html:link rel="localization" href="browser/firefoxView.ftl"/>
+   <html:link rel="localization" href="browser/menubar.ftl"/>
+-  <html:link rel="localization" href="browser/reportBrokenSite.ftl"/>
+   <html:link rel="localization" href="browser/screenshots.ftl"/>
+   <html:link rel="localization" href="preview/aiWindow.ftl"/>
+   <html:link rel="localization" href="toolkit/branding/brandings.ftl"/>
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index f075128f21..ca12c7c987 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -58,8 +58,7 @@ category browser-window-load moz-src:///browser/components/customkeys/CustomKeys
+ 
+ category browser-window-delayed-startup moz-src:///browser/components/contentanalysis/content/ContentAnalysis.sys.mjs ContentAnalysis.initialize
+ category browser-window-delayed-startup resource:///modules/HomePage.sys.mjs HomePage.delayedStartup
+ category browser-window-delayed-startup moz-src:///browser/components/genai/LinkPreview.sys.mjs LinkPreview.init
+-category browser-window-delayed-startup moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs ReportBrokenSite.init
+ category browser-window-delayed-startup moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.init
+ 
+ category browser-window-location-change chrome://browser/content/browser-places.js BookmarkingUI.onLocationChange
+@@ -73,7 +72,6 @@ category browser-window-location-change resource://gre/actors/TranslationsParent
+ 
+ category browser-window-unload-begin chrome://browser/content/browser-customtitlebar.js CustomTitlebar.uninit
+ category browser-window-unload-begin moz-src:///browser/themes/ToolbarIconColor.sys.mjs ToolbarIconColor.uninit
+-category browser-window-unload-begin moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs ReportBrokenSite.uninit
+ category browser-window-unload-begin chrome://browser/content/browser.js gUIDensity.uninit
+ 
+ category browser-window-unload chrome://browser/content/downloads/indicator.js DownloadsButton.uninit
+diff --git a/browser/components/controlcenter/content/protectionsPanel.inc.xhtml b/browser/components/controlcenter/content/protectionsPanel.inc.xhtml
+index e2aacd1b06..61f2dab962 100644
+--- a/browser/components/controlcenter/content/protectionsPanel.inc.xhtml
++++ b/browser/components/controlcenter/content/protectionsPanel.inc.xhtml
+@@ -48,13 +48,6 @@
+           </hbox>
+         </vbox>
+ 
+-        <toolbarseparator observes="cmd_reportBrokenSite"></toolbarseparator>
+-        <toolbarbutton id="protections-popup-report-broken-site-button"
+-                     command="cmd_reportBrokenSite"
+-                     class="subviewbutton subviewbutton-nav"
+-                     data-l10n-id="protections-panel-report-broken-site"
+-                     disabled="true"
+-                     closemenu="none"/>
+ 
+         <!-- Tracking Protection Section -->
+         <toolbarseparator></toolbarseparator>
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index b9c21b4582..760fa280dc 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -61,7 +61,6 @@ DIRS += [
+     "protections",
+     "protocolhandler",
+     "qrcode",
+-    "reportbrokensite",
+     "resistfingerprinting",
+     "screenshots",
+     "search",
+diff --git a/browser/locales/en-US/browser/appmenu.ftl b/browser/locales/en-US/browser/appmenu.ftl
+index d750b91209..12a6ca6694 100644
+--- a/browser/locales/en-US/browser/appmenu.ftl
++++ b/browser/locales/en-US/browser/appmenu.ftl
+@@ -308,8 +308,6 @@ appmenu-abouttranslations =
+ appmenu-developer-tools-subheader = Browser tools
+ appmenu-developer-tools-extensions =
+     .label = Extensions for developers
+-appmenuitem-report-broken-site =
+-  .label = Report Broken Site
+ 
+ ## Panel for privacy and security products
+ 
+diff --git a/browser/locales/en-US/browser/menubar.ftl b/browser/locales/en-US/browser/menubar.ftl
+index ec721372fb..ff7bf9eaf1 100644
+--- a/browser/locales/en-US/browser/menubar.ftl
++++ b/browser/locales/en-US/browser/menubar.ftl
+@@ -347,5 +347,3 @@ menu-help-report-deceptive-site =
+ menu-help-not-deceptive =
+     .label = This Isn’t a Deceptive Site…
+     .accesskey = D
+-menu-report-broken-site =
+-  .label = Report Broken Site
+diff --git a/browser/locales/en-US/browser/protectionsPanel.ftl b/browser/locales/en-US/browser/protectionsPanel.ftl
+index 9492435c01..e16c3d73bf 100644
+--- a/browser/locales/en-US/browser/protectionsPanel.ftl
++++ b/browser/locales/en-US/browser/protectionsPanel.ftl
+@@ -125,9 +125,6 @@ protections-panel-cookie-banner-view-turn-off-label =
+ protections-panel-cookie-banner-view-turn-on-label =
+   .label = Turn On
+ 
+-protections-panel-report-broken-site =
+-  .label = Report broken site
+-  .title = Report broken site
+ 
+ ## Protections panel info message
+ 
+diff --git a/browser/themes/shared/customizableui/panelUI-shared.css b/browser/themes/shared/customizableui/panelUI-shared.css
+index 87c737253d..57f50ccd50 100644
+--- a/browser/themes/shared/customizableui/panelUI-shared.css
++++ b/browser/themes/shared/customizableui/panelUI-shared.css
+@@ -494,11 +494,6 @@ menupopup[emptyplacesresult] > .hide-if-empty-places-result {
+ }
+ 
+ #appMenu-popup panelview,
+-/* The Report Broken Site panel can be opened from the Help menu
+- * in the menubar, which isn't a descendant of #appMenu-popup.
+- * Target it specifically in this rule to make it the same width
+- * as if it was a standard panelview opened from the app menu. */
+-#report-broken-site-popup-mainView[mainview],
+ #PanelUI-fxa {
+   width: 22.5em;
+ }
+@@ -2113,313 +2108,6 @@ radiogroup:focus-visible > .subviewradio[focused="true"] {
+   margin-inline: 0 8px;
+ }
+ 
+-/* Report Broken Site panels */
+-
+-/* Hide the Report Broken Site menu item that
+- * is on the App Menu's Help sub-menu.
+- */
+-#appMenu_help_reportBrokenSite {
+-  display: none;
+-}
+-
+-.report-broken-site-view {
+-  max-height: 80vh;
+-
+-  &.main-view > .panel-subview-body > moz-box-group {
+-    /* let the reason-options scroll if the panelview is too short */
+-    overflow: unset;
+-  }
+-
+-  &.wrong-tab-info {
+-    .favicon,
+-    .tab-specific-data,
+-    #report-broken-site-popup-screenshot-toggle,
+-    #report-broken-site-popup-blocked-trackers-toggle {
+-      display: none;
+-    }
+-  }
+-
+-  &.no-screenshot,
+-  &.screenshots-disabled,
+-  &.screenshot-opt-out {
+-    .preview-screenshot {
+-      display: none;
+-    }
+-  }
+-
+-  &.no-screenshot,
+-  &.screenshots-disabled {
+-    #report-broken-site-popup-screenshot-toggle {
+-      display: none;
+-    }
+-  }
+-
+-  &.no-blocked-trackers,
+-  &.blocked-trackers-opt-out {
+-    .preview-blockedOrigins {
+-      display: none;
+-    }
+-  }
+-
+-  &.no-blocked-trackers {
+-    #report-broken-site-popup-blocked-trackers-toggle {
+-      display: none;
+-    }
+-  }
+-
+-  description,
+-  label,
+-  menulist,
+-  input,
+-  textarea {
+-    margin: 0;
+-  }
+-
+-  #report-broken-site-popup-intro {
+-    margin-block-end: 0;
+-    margin-block-start: var(--space-small);
+-  }
+-
+-  #report-broken-site-popup-intro,
+-  #report-broken-site-details-instructions {
+-    line-height: 1.25em;
+-  }
+-
+-  #report-broken-site-reason-selector-intro,
+-  #report-broken-site-details-instructions {
+-    margin-block: 0 var(--space-large);
+-  }
+-
+-  #report-broken-site-popup-screenshot {
+-    max-height: 13rem;
+-    object-fit: contain;
+-    object-position: left top;
+-  }
+-
+-  button.arrow-button {
+-    font-weight: normal;
+-    padding: var(--space-large) var(--space-medium);
+-    margin: 0 0 var(--space-large);
+-    border: 0;
+-
+-    > hbox > label {
+-      text-align: start;
+-
+-      /* allow for multi-line localizations */
+-      display: block !important;
+-      text-wrap: balance;
+-      width: 100%;
+-    }
+-
+-    background: url("chrome://global/skin/icons/arrow-right.svg") no-repeat calc(100% - var(--panel-menuitem-padding-inline)) center;
+-    &:dir(rtl) {
+-      background: url("chrome://global/skin/icons/arrow-left.svg") no-repeat var(--panel-menuitem-padding-inline) center;
+-    }
+-    background-color: var(--background-color-box);
+-    -moz-context-properties: fill;
+-    fill: currentColor;
+-
+-    &:not(:hover, :active) {
+-      background-color: inherit;
+-    }
+-  }
+-
+-  &.preview-view {
+-    toolbarseparator {
+-      display: none;
+-    }
+-
+-    #report-broken-site-panel-preview-items.update {
+-      margin: 0;
+-      border-inline: 0;
+-      border-radius: 0;
+-      details > summary {
+-        border-radius: 0;
+-      }
+-    }
+-  }
+-
+-  #report-broken-site-panel-preview-items {
+-    margin: var(--panel-menuitem-padding);
+-    display: flex;
+-    flex-direction: column;
+-    align-items: flex-start;
+-    border: var(--border-width) solid var(--card-border-color);
+-    border-radius: var(--border-radius-medium);
+-    background-color: var(--background-color-box);
+-    box-sizing: border-box;
+-
+-    summary {
+-      cursor: pointer;
+-      padding-block: var(--space-large);
+-    }
+-
+-    .data {
+-      padding: var(--panel-menuitem-padding);
+-      background:
+-        linear-gradient(0deg, color-mix(in srgb, currentColor 7%, transparent) 0, transparent var(--panel-padding)),
+-        linear-gradient(180deg, color-mix(in srgb, currentColor 7%, transparent) 0, transparent var(--panel-padding));
+-      overflow: auto;
+-
+-      .entry {
+-        text-indent: var(--space-large) hanging;
+-      }
+-
+-      .entry > span:first-child {
+-        margin-inline-end: var(--space-small);
+-      }
+-    }
+-
+-    details {
+-      width: 100%;
+-
+-      &:not(:first-of-type) > summary {
+-        border-top: 1px solid var(--card-border-color);
+-      }
+-
+-      > summary {
+-        list-style: none;
+-        cursor: pointer;
+-        width: -moz-available;
+-        padding: var(--panel-menuitem-padding);
+-        padding-inline-start: calc(var(--icon-size-small) + var(--space-xlarge));
+-        background-image: url("chrome://global/skin/icons/arrow-down.svg");
+-        background-position: var(--panel-menuitem-padding-block) var(--panel-menuitem-padding-inline);
+-        background-repeat: no-repeat;
+-        -moz-context-properties: fill;
+-        fill: currentColor;
+-      }
+-
+-      > summary,
+-      > .data {
+-        /* prevent the keyboard-focus outlines from being partly cut off due to the summaries taking up the full width */
+-        outline-offset: calc(-1 * var(--default-focusring-width));
+-      }
+-
+-      &[open] > summary {
+-        background-image: url("chrome://global/skin/icons/arrow-up.svg");
+-      }
+-
+-      img {
+-        /* the screenshot */
+-        display: block;
+-        max-width: -moz-available;
+-        max-height: 15vh;
+-      }
+-    }
+-  }
+-
+-  @media not (prefers-contrast) {
+-    fieldset > label,
+-    details > summary {
+-      color: var(--button-text-color);
+-      background-color: var(--button-background-color-ghost);
+-
+-      &:hover {
+-        background-color: var(--button-background-color-hover);
+-        color: var(--button-text-color-hover);
+-      }
+-
+-      &:active {
+-        background-color: var(--button-background-color-active);
+-        color: var(--button-text-color-active);
+-      }
+-
+-      &:focus-visible {
+-        outline: var(--focus-outline);
+-      }
+-    }
+-  }
+-
+-  p {
+-    line-height: 1.5;
+-  }
+-
+-  .report-broken-site-url-label {
+-    margin-block-start: 0;
+-    margin-block-end: var(--space-xsmall);
+-  }
+-
+-  url-input {
+-    margin-block-end: var(--space-xlarge);
+-  }
+-
+-  textarea {
+-    resize: vertical;
+-
+-    &:invalid {
+-      outline-color: var(--border-color-error);
+-    }
+-
+-    &:not(:invalid) + .invalid-message {
+-      display: none;
+-    }
+-
+-    + .invalid-message {
+-      background-image: url("chrome://global/skin/icons/error.svg");
+-      background-position: left center;
+-      background-repeat: no-repeat;
+-      -moz-context-properties: fill;
+-      fill: var(--icon-color-critical);
+-      margin-block-start: var(--space-xsmall);
+-      padding-inline-start: calc(var(--icon-size-small) + var(--space-small));
+-
+-      &:-moz-locale-dir(rtl) {
+-        background-position-x: right;
+-      }
+-    }
+-  }
+-
+-  moz-toggle[disabled],
+-  moz-toggle:not([pressed]) {
+-    #report-broken-site-popup-screenshot {
+-      display: none;
+-    }
+-  }
+-
+-  > .panel-subview-body {
+-    moz-toggle,
+-    textarea:not(:invalid),
+-    textarea:invalid + label {
+-      margin-block-end: var(--space-xxlarge);
+-    }
+-  }
+-
+-  &.sent-view {
+-    @media not (prefers-contrast) {
+-      background-color: var(--background-color-success);
+-    }
+-
+-    > .panel-header {
+-      --panel-header-additional-element-width: var(--icon-size-small);
+-
+-      > .checkmark-icon {
+-        list-style-image: url(chrome://global/skin/icons/check-filled.svg);
+-        -moz-context-properties: fill;
+-        fill: var(--color-accent-attention);
+-      }
+-    }
+-
+-    > .panel-subview-body {
+-      > .subview-subheader {
+-        font-size: inherit;
+-      }
+-    }
+-  }
+-}
+-
+-#report-broken-site-panel-container {
+-  padding: var(--space-small) var(--space-xlarge) var(--space-xlarge);
+-}
+-
+-#report-broken-site-popup-detailsView > .panel-subview-body {
+-  padding: var(--space-small) var(--space-xlarge) 0 var(--space-xlarge);
+-}
+-
+-#report-broken-site-popup-previewView > .panel-footer {
+-  padding-block-start: var(--space-small);
+-}
+-
+ /* ----- Profiles panels ----- */
+ 
+ #profiles-header-content {
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index b044960a77..91dccdb257 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -336,8 +336,6 @@ export default [
+       "browser/components/profiles/Profiles**",
+       "browser/components/protections/content/*card.mjs",
+       "browser/components/protocolhandler/WebProtocolHandlerRegistrar.sys.mjs",
+-      "browser/components/reportbrokensite/ReportBrokenSite.sys.mjs",
+-      "browser/components/reportbrokensite/test/browser/head.js",
+       "browser/components/resistfingerprinting/test/browser/head.js",
+       "browser/components/safebrowsing/content/test/**",
+       "browser/components/screenshots/**",
+@@ -435,7 +433,6 @@ export default [
+       "toolkit/components/prompts/**",
+       "toolkit/components/reader/**",
+       "toolkit/components/remotebrowserutils/RemoteWebNavigation.sys.mjs",
+-      "toolkit/components/reportbrokensite/ReportBrokenSite*.sys.mjs",
+       "toolkit/components/reputationservice/test/unit/test_app_rep_windows.js",
+       "toolkit/components/resistfingerprinting/**",
+       "toolkit/components/satchel/**",
+diff --git a/mots.yaml b/mots.yaml
+index 7a594914e6..17adc802a8 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -4682,7 +4682,6 @@ modules:
+           - browser/extensions/webcompat
+           - mobile/android/android-components/components/feature/webcompat
+           - mobile/android/android-components/components/feature/webcompat-reporter
+-          - toolkit/components/reportbrokensite
+           - https://github.com/mozilla-extensions/webcompat-addon
+         meta:
+           url: https://wiki.mozilla.org/Compatibility/System_Addon
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index d0fde85a79..a73d5f6dba 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -154,7 +154,6 @@ firefox_desktop_metrics = [
+     "toolkit/components/nimbus/metrics.yaml",
+     "toolkit/components/pictureinpicture/metrics.yaml",
+     "toolkit/components/places/metrics.yaml",
+-    "toolkit/components/reportbrokensite/metrics.yaml",
+     "toolkit/components/satchel/megalist/metrics.yaml",
+     "toolkit/components/search/metrics.yaml",
+     "toolkit/components/telemetry/metrics.yaml",
+@@ -229,7 +228,6 @@ firefox_desktop_pings = [
+     "services/fxaccounts/pings.yaml",
+     "services/sync/pings.yaml",
+     "toolkit/components/nimbus/pings.yaml",
+-    "toolkit/components/reportbrokensite/pings.yaml",
+     "toolkit/components/telemetry/pings.yaml",
+     "toolkit/modules/pings.yaml",
+     "toolkit/mozapps/update/shared_pings.yaml",
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 6291ac923d..d39f3c137f 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -73,7 +73,6 @@ DIRS += [
+     "remotebrowserutils",
+     "reflect",
+     "reputationservice",
+-    "reportbrokensite",
+     "resistfingerprinting",
+     "search",
+     "sessionstore",
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index beb6801ae3..7932a5f0d3 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -4715,36 +4715,6 @@ backgroundThreads:
+         branch: user
+         pref: threads.lower_mainthread_priority_in_background.enabled
+ 
+-reportBrokenSite:
+-  description: The Report Broken Site feature
+-  owner: twisniewski@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: user
+-        pref: ui.new-webcompat-reporter.enabled
+-      description: >-
+-        Whether Report Broken Site is enabled
+-    sendMoreInfo:
+-      type: boolean
+-      setPref:
+-        branch: user
+-        pref: ui.new-webcompat-reporter.send-more-info-link
+-      description: >-
+-        Whether Report Broken Site shows the send more info link directing
+-        users to webcompat.com (defaults to true for prerelease channels)
+-    reasonDropdown:
+-      type: int
+-      setPref:
+-        branch: user
+-        pref: ui.new-webcompat-reporter.reason-dropdown
+-      description: >-
+-        0 = do not show the "reason" dropdown
+-        1 = show an optional "reason" dropdown
+-        2 = show a required "reason" dropdown
+-
+ phc:
+   description: Prefs to control the Probabalistic Heap Checker (PHC)
+   owner: pbone@mozilla.com
+diff --git a/toolkit/modules/ActorManagerParent.sys.mjs b/toolkit/modules/ActorManagerParent.sys.mjs
+index 964fb91b1c..b1df666980 100644
+--- a/toolkit/modules/ActorManagerParent.sys.mjs
++++ b/toolkit/modules/ActorManagerParent.sys.mjs
+@@ -545,23 +545,6 @@ let JSWINDOWACTORS = {
+     allFrames: true,
+   },
+ 
+-  ReportBrokenSite: {
+-    parent: {
+-      esModuleURI: "resource://gre/actors/ReportBrokenSiteParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://gre/actors/ReportBrokenSiteChild.sys.mjs",
+-    },
+-    matches: [
+-      "http://*/*",
+-      "https://*/*",
+-      "about:certerror?*",
+-      "about:neterror?*",
+-    ],
+-    messageManagerGroups: ["browsers"],
+-    allFrames: true,
+-  },
+-
+   TLSCertificateBinding: {
+     child: {
+       esModuleURI: "resource://gre/actors/TLSCertificateBindingChild.sys.mjs",

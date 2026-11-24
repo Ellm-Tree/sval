@@ -7,7 +7,8 @@
 
 /**
  * The Firefox pages Sval replaces or has no use for are not built
- * (`no-closed-about-pages.patch`, `no-mozilla-credits-rights-pages.patch`):
+ * (`no-closed-about-pages.patch`, `no-mozilla-credits-rights-pages.patch`,
+ * `remove-messaging.patch`):
  * no about: name of theirs is registered, none of their documents is in the
  * package, and nothing Sval shows leads to them.
  */
@@ -22,6 +23,7 @@ const ABOUT_NAMES = [
   "about:loginsimportreport",
   "about:protections",
   "about:keyboard",
+  "about:welcome",
   "about:welcomeback",
   "about:studies",
   "about:asrouter",
@@ -117,42 +119,6 @@ add_task(async function no_name_has_a_page() {
   }
 });
 
-/**
- * @param {string} spec A chrome: or resource: address.
- * @returns {boolean} whether the package holds a file at it. Opening a
- *   missing one is no way to ask: under automation Gecko crashes on it
- *   (`CheckForBrokenChromeURL`).
- */
-function packaged(spec) {
-  let uri = Services.io.newURI(spec);
-  // An override maps a chrome: address to another one.
-  while (uri.schemeIs("chrome")) {
-    uri = Cc["@mozilla.org/chrome/chrome-registry;1"]
-      .getService(Ci.nsIChromeRegistry)
-      .convertChromeURL(uri);
-  }
-  if (uri.schemeIs("resource")) {
-    uri = Services.io.newURI(
-      Services.io
-        .getProtocolHandler("resource")
-        .QueryInterface(Ci.nsIResProtocolHandler)
-        .resolveURI(uri)
-    );
-  }
-  if (uri instanceof Ci.nsIJARURI) {
-    const reader = Cc["@mozilla.org/libjar/zip-reader;1"].createInstance(
-      Ci.nsIZipReader
-    );
-    reader.open(uri.JARFile.QueryInterface(Ci.nsIFileURL).file);
-    try {
-      return reader.hasEntry(uri.JAREntry);
-    } finally {
-      reader.close();
-    }
-  }
-  return uri.QueryInterface(Ci.nsIFileURL).file.exists();
-}
-
 add_task(function no_document_is_in_the_package() {
   Assert.ok(
     packaged("chrome://global/content/license.html"),
@@ -161,27 +127,6 @@ add_task(function no_document_is_in_the_package() {
   for (const spec of DOCUMENTS) {
     Assert.ok(!packaged(spec), `${spec} is not in the package`);
   }
-});
-
-/**
- * about:welcome is Sval's home page while Firefox's onboarding is off, which
- * is why the onboarding's document goes and its name stays.
- */
-add_task(async function welcome_is_home() {
-  await BrowserTestUtils.withNewTab(
-    { gBrowser, url: "about:blank" },
-    async browser => {
-      const loaded = BrowserTestUtils.browserLoaded(browser);
-      BrowserTestUtils.startLoadingURIString(browser, "about:welcome");
-      await within(loaded, 15_000, "about:welcome loading in the tab");
-      const shown = await SpecialPowers.spawn(
-        browser,
-        [],
-        () => content.document.documentURI
-      );
-      Assert.equal(shown, "about:home", "about:welcome shows about:home");
-    }
-  );
 });
 
 /** about:about lists none of them. */

@@ -1,0 +1,33 @@
+Sval: the faster backend removes what a removed install target installed
+
+FasterMakeBackend gives each install target under dist/bin its own
+install manifest and .track file. A target that leaves the build has no
+manifest, so its .track is never processed and its files stay in
+dist/bin, which a reused objdir then runs and packages. After writing
+the manifests, the backend processes every orphaned .track with an empty
+manifest (python/mozbuild/mozbuild/backend/sval_stale_installs.py).
+
+diff --git a/python/mozbuild/mozbuild/backend/fastermake.py b/python/mozbuild/mozbuild/backend/fastermake.py
+index 7a73e9d4f8..ef21ccf344 100644
+--- a/python/mozbuild/mozbuild/backend/fastermake.py
++++ b/python/mozbuild/mozbuild/backend/fastermake.py
+@@ -10,6 +10,7 @@ from mozpack.manifests import InstallManifest
+ 
+ from mozbuild.backend.base import PartialBackend
+ from mozbuild.backend.make import MakeBackend
++from mozbuild.backend.sval_stale_installs import purge_removed_install_targets
+ from mozbuild.frontend.context import ObjDirPath, Path
+ from mozbuild.frontend.data import (
+     ChromeManifestEntry,
+@@ -268,6 +269,11 @@ class FasterMakeBackend(MakeBackend, PartialBackend):
+         ) as fh:
+             mk.dump(fh, removal_guard=False)
+ 
++        if not self.dry_run:
++            purge_removed_install_targets(
++                self.environment.topobjdir, self._install_manifests.keys()
++            )
++
+     def _pretty_path(self, path, obj):
+         if path.startswith(self.environment.topobjdir):
+             return mozpath.join(

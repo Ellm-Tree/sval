@@ -683,11 +683,9 @@ export class SvalHomeSearchParent extends JSWindowActorParent {
   /**
    * about:privatebrowsing is the private window's home page, and says so. A
    * normal window shows it when the user types its address there; it opens in
-   * a new private window instead, as upstream's page offers
-   * (`AboutPrivateBrowsingParent`, "OpenPrivateWindow"). The tab it was typed
-   * into goes back to the page it showed, or closes if it showed none. The
-   * window's last tab gives way to a new tab (`closeWindowWithLastTab`), so
-   * the window stays open.
+   * a new private window instead. The tab it was typed into goes back to the
+   * page it showed, or closes if it showed none. The window's last tab gives
+   * way to a new tab (`closeWindowWithLastTab`), so the window stays open.
    *
    * The window's privacy and the page's address are this side's own, so the
    * page cannot steer it. A private window's page is left where it is.

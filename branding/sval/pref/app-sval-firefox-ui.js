@@ -78,8 +78,6 @@ pref("sidebar.verticalTabs", false, locked);               // upstream: false
 pref("sidebar.revamp", false, locked);                     // upstream: false on ESR
 // Dragging one tab onto another in the strip to make a tab group.
 pref("browser.tabs.dragDrop.createGroup.enabled", false, locked); // upstream: true
-// Windows taskbar previews, one per tab.
-pref("browser.taskbar.previews.enable", false, locked);    // upstream: false
 // Closing a window keeps its workspace, so there are no tabs to warn about.
 pref("browser.tabs.warnOnClose", false, locked);           // upstream: false
 // A link asking for a new window opens a tab instead, from a page or from

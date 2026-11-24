@@ -1,0 +1,14 @@
+browser/components/attribution/AttributionCode.sys.mjs
+browser/components/attribution/MacAttribution.sys.mjs
+browser/components/attribution/docs/index.rst
+browser/components/attribution/metrics.yaml
+browser/components/attribution/moz.build
+browser/components/attribution/test/browser/browser.toml
+browser/components/attribution/test/browser/browser_AttributionCode_Mac_telemetry.js
+browser/components/attribution/test/browser/browser_AttributionCode_telemetry.js
+browser/components/attribution/test/browser/head.js
+browser/components/attribution/test/xpcshell/head.js
+browser/components/attribution/test/xpcshell/test_AttributionCode.js
+browser/components/attribution/test/xpcshell/test_MacAttribution.js
+browser/components/attribution/test/xpcshell/test_attribution_parsing.js
+browser/components/attribution/test/xpcshell/xpcshell.toml

@@ -1,0 +1,1913 @@
+Sval: Remove tab notes and content sharing
+
+Tab notes and content sharing were pref-off experiments; content
+sharing published a page of links through a Mozilla server and needed a
+Mozilla account. Both go whole, with their menu items, hover preview
+panel, the canonical URL actor and session field that only tab notes
+read, prefs, Nimbus features, strings, icons and tests.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 129a759b03..c04bd045cf 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1080,8 +1080,6 @@ pref("browser.tabs.groups.enabled", true);
+ pref("browser.tabs.groups.hoverPreview.enabled", true);
+ pref("browser.tabs.groups.alternateMenu", false);
+ 
+-pref("browser.tabs.notes.enabled", false);
+-
+ pref("browser.tabs.dragDrop.createGroup.enabled", true);
+ pref("browser.tabs.dragDrop.createGroup.delayMS", 240);
+ pref("browser.tabs.dragDrop.expandGroup.delayMS", 350);
+@@ -3428,9 +3426,6 @@ pref("browser.settings-redesign.enabled", true);
+ pref("widget.support-xdg-config", true, locked);
+ #endif
+ 
+-// A preference that enables Content Sharing
+-pref("browser.contentsharing.enabled", false);
+-
+ // When enabled, Firefox ignores the distribution.ini file if global.id is MozillaOnline.
+ pref("distribution.mozillaonline.ignore", true);
+ 
+diff --git a/browser/base/content/browser-main.js b/browser/base/content/browser-main.js
+index 65c9aeabd2..b38fc3a1c6 100644
+--- a/browser/base/content/browser-main.js
++++ b/browser/base/content/browser-main.js
+@@ -21,7 +21,6 @@
+   Services.scriptloader.loadSubScript("chrome://browser/content/tabbrowser/tabbrowser.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/tabbrowser/tabgroup.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/tabbrowser/tabgroup-menu.js", this);
+-  Services.scriptloader.loadSubScript("chrome://browser/content/tabbrowser/tabnote-menu.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/tabbrowser/tabs.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/tabbrowser/tabsplitview.js", this);
+   Services.scriptloader.loadSubScript("chrome://browser/content/places/places-menupopup.js", this);
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index be02bd6d2f..c0228d2386 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -26,8 +26,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   Color: "resource://gre/modules/Color.sys.mjs",
+   ContentAnalysis:
+     "moz-src:///browser/components/contentanalysis/content/ContentAnalysis.sys.mjs",
+-  ContentSharingUtils:
+-    "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs",
+   ContextualIdentityService:
+     "resource://gre/modules/ContextualIdentityService.sys.mjs",
+   CustomizableUI:
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 2ce40feb9e..7e2ad4a925 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -229,6 +229,5 @@
+   "ActionsProviderContextualSearch",
+   "ToolbarDropHandler",
+   "ProfilesDatastoreService",
+-  "gTrustPanelHandler",
+-  "ContentSharingUtils"
++  "gTrustPanelHandler"
+ ]
+diff --git a/browser/base/content/main-popupset.inc.xhtml b/browser/base/content/main-popupset.inc.xhtml
+index 77169c051f..f9165af729 100644
+--- a/browser/base/content/main-popupset.inc.xhtml
++++ b/browser/base/content/main-popupset.inc.xhtml
+@@ -68,8 +68,6 @@
+               data-lazy-l10n-id="bookmark-selected-tabs"/>
+     <menuitem id="context_bookmarkTab"
+               data-lazy-l10n-id="tab-context-bookmark-tab"/>
+-    <menuitem id="context_addNote" hidden="true" data-lazy-l10n-id="tab-context-add-note" />
+-    <menuitem id="context_editNote" hidden="true" data-lazy-l10n-id="tab-context-edit-note" />
+     <menu id="context_moveTabOptions"
+           data-lazy-l10n-id="tab-context-move-tabs"
+           data-l10n-args='{"tabCount": 1}'>
+@@ -92,10 +90,6 @@
+     </menu>
+     <menuitem id="context_selectAllTabs" data-lazy-l10n-id="select-all-tabs"/>
+     <menuseparator/>
+-    <menuitem id="context_shareSelectedTabs"
+-          hidden="true"
+-          data-lazy-l10n-id="tab-context-share-selected-tabs"/>
+-    <menuseparator id="context_shareSelectedTabsSeparator" hidden="true"/>
+     <menu id="context_sendTabToDevice"
+           class="sync-ui-item"
+           data-lazy-l10n-id="tab-context-send-to-device"
+@@ -153,7 +147,6 @@
+   <!-- for search and content formfill/pw manager -->
+ 
+   <tabgroup-menu id="tab-group-editor"></tabgroup-menu>
+-  <tabnote-menu id="tab-note-menu"></tabnote-menu>
+ 
+   <!-- Starting point for sidebar tools overflow -->
+   <panel id="sidebar-tools-overflow"
+@@ -622,7 +615,6 @@
+          consumeoutsideclicks="false"
+          nonnative=""
+          role="tooltip">
+-    <html:div class="tab-preview-content-interactive"></html:div>
+     <html:div class="tab-preview-content-main">
+       <html:div class="tab-preview-thumbnail-container"></html:div>
+       <html:div class="tab-preview-text-container">
+@@ -636,38 +628,6 @@
+     </html:div>
+   </panel>
+ 
+-  <!--
+-    TODO Bug 2008627: put all of #tab-preview-panel in here, not just this button.
+-    This is being lazy-loaded because otherwise it will eagerly load multiple svg
+-    images on startup (see browser_startup_images.js).
+-    -->
+-  <html:template id="tabPreviewPanelTemplate">
+-    <toolbarbutton
+-      badged="true"
+-      image="chrome://global/skin/icons/tab-notes.svg"
+-      data-l10n-id="tab-context-add-note"
+-      class="tab-preview-add-note subviewbutton subviewbutton-nav"
+-    >
+-      <html:moz-badge type="new" data-l10n-id="tab-note-panel-add-note-new-badge" move-after-stack="true" />
+-    </toolbarbutton>
+-  </html:template>
+-
+-  <panel id="tab-note-preview-panel"
+-         type="arrow"
+-         orient="vertical"
+-         noautofocus="true"
+-         norolluponanchor="true"
+-         consumeoutsideclicks="false"
+-         role="tooltip">
+-    <html:div class="tab-note-preview-container">
+-      <html:div class="tab-note-preview-text"></html:div>
+-      <html:div class="tab-note-preview-actions">
+-        <!-- Not using a real button here to avoid having to unset default styles -->
+-        <html:div role="button" tabindex="0" class="tab-note-preview-expand" data-l10n-id="tab-note-preview-expand"></html:div>
+-      </html:div>
+-    </html:div>
+-  </panel>
+-
+   <panel id="tabgroup-preview-panel"
+          role="menu"
+          data-l10n-id="tab-group-preview-name"
+diff --git a/browser/base/content/main-popupset.js b/browser/base/content/main-popupset.js
+index 970958f64c..43497a6eb3 100644
+--- a/browser/base/content/main-popupset.js
++++ b/browser/base/content/main-popupset.js
+@@ -7,10 +7,7 @@ document.addEventListener(
+   () => {
+     const lazy = {};
+     ChromeUtils.defineESModuleGetters(lazy, {
+-      ContentSharingUtils:
+-        "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs",
+       TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
+-      TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
+     });
+     let mainPopupSet = document.getElementById("mainPopupSet");
+     // eslint-disable-next-line complexity
+@@ -91,22 +88,9 @@ document.addEventListener(
+         case "context_bookmarkSelectedTabs":
+           PlacesCommandHook.bookmarkTabs(gBrowser.selectedTabs);
+           break;
+-        case "context_shareSelectedTabs":
+-          lazy.ContentSharingUtils.handleShareTabs(TabContextMenu.contextTabs);
+-          break;
+         case "context_bookmarkTab":
+           PlacesCommandHook.bookmarkTabs([TabContextMenu.contextTab]);
+           break;
+-        case "context_addNote":
+-        case "context_editNote":
+-          gBrowser.tabNoteMenu.openPanel(TabContextMenu.contextTab, {
+-            telemetrySource: lazy.TabNotes.TELEMETRY_SOURCE.TAB_CONTEXT_MENU,
+-          });
+-          Services.prefs.setBoolPref(
+-            "browser.tabs.notes.newBadge.enabled",
+-            false
+-          );
+-          break;
+         case "context_moveToStart":
+           gBrowser.moveTabsToStart(TabContextMenu.contextTab);
+           break;
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index d9559f9f99..fa1e0342a5 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -288,34 +288,6 @@ let JSWINDOWACTORS = {
+     messageManagerGroups: ["browsers"],
+   },
+ 
+-  CanonicalURL: {
+-    parent: {
+-      esModuleURI: "resource:///actors/CanonicalURLParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/CanonicalURLChild.sys.mjs",
+-      events: {
+-        DOMContentLoaded: {},
+-        pageshow: {},
+-        // `popstate` does not bubble, so it needs to be captured.
+-        popstate: { capture: true },
+-      },
+-    },
+-    matches: ["http://*/*", "https://*/*"],
+-    messageManagerGroups: ["browsers"],
+-    enablePreference: "browser.tabs.notes.enabled",
+-    onPreferenceChanged: isEnabled => {
+-      if (isEnabled) {
+-        Services.obs.notifyObservers(undefined, "CanonicalURL:ActorRegistered");
+-      } else {
+-        Services.obs.notifyObservers(
+-          undefined,
+-          "CanonicalURL:ActorUnregistered"
+-        );
+-      }
+-    },
+-  },
+-
+   ClickHandler: {
+     parent: {
+       esModuleURI: "resource:///actors/ClickHandlerParent.sys.mjs",
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index 235ea8cc77..69b627ca22 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -80,7 +80,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
+   TargetingContext: "resource://messaging-system/targeting/Targeting.sys.mjs",
+-  TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
+   TelemetryEnvironment: "resource://gre/modules/TelemetryEnvironment.sys.mjs",
+   TelemetrySession: "resource://gre/modules/TelemetrySession.sys.mjs",
+ });
+@@ -1464,14 +1463,6 @@ const TargetingGetters = {
+     return Services.prefs.getIntPref("browser.startup.page") === 3;
+   },
+ 
+-  /**
+-   * @returns {Promise<number>}
+-   *   The total number of tab notes the user has stored in their current profile.
+-   */
+-  get tabNotesCount() {
+-    return lazy.TabNotes.init().then(() => lazy.TabNotes.count());
+-  },
+-
+   // Number of weekdays in the past month the user was active
+   get userWeekdaysActiveInLastMonth() {
+     return QueryCache.queries.UserMonthlyActivity.get().then(activity => {
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index ae92e5f311..a82d5c638c 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -32,7 +32,6 @@ DIRS += [
+     "attribution",
+     "backup",
+     "contentanalysis",
+-    "contentsharing",
+     "contextualidentity",
+     "controlcenter",
+     "customizableui",
+@@ -65,7 +64,6 @@ DIRS += [
+     "sval",
+     "syncedtabs",
+     "tabbrowser",
+-    "tabnotes",
+     "topsites",
+     "translations",
+     "uitour",
+diff --git a/browser/components/places/PlacesUIUtils.sys.mjs b/browser/components/places/PlacesUIUtils.sys.mjs
+index 62d5b64d9a..f77d69ad45 100644
+--- a/browser/components/places/PlacesUIUtils.sys.mjs
++++ b/browser/components/places/PlacesUIUtils.sys.mjs
+@@ -12,8 +12,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   CLIENT_NOT_CONFIGURED: "resource://services-sync/constants.sys.mjs",
+   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+-  ContentSharingUtils:
+-    "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs",
+   CustomizableUI:
+     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+   MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+@@ -1346,13 +1344,6 @@ export var PlacesUIUtils = {
+       return true;
+     }
+ 
+-    if (
+-      item.hasAttribute("hide-if-content-sharing-disabled") &&
+-      !lazy.ContentSharingUtils.isEnabled
+-    ) {
+-      return true;
+-    }
+-
+     return false;
+   },
+ 
+@@ -1790,24 +1781,6 @@ export var PlacesUIUtils = {
+       }
+     }
+   },
+-
+-  /**
+-   * Event handler for experimental link sharing context menu item.
+-   */
+-  shareBookmarkFolder() {
+-    let view = PlacesUIUtils.getViewForNode(
+-      PlacesUIUtils.lastContextMenuTriggerNode
+-    );
+-    try {
+-      lazy.ContentSharingUtils.createShareableLinkFromBookmarkFolders(
+-        view.selectedNodes
+-          .filter(n => lazy.PlacesUtils.nodeIsFolderOrShortcut(n))
+-          .map(n => lazy.PlacesUtils.getConcreteItemGuid(n))
+-      );
+-    } catch (ex) {
+-      console.error("Failed to create shareable link: ", ex);
+-    }
+-  },
+ };
+ 
+ /**
+diff --git a/browser/components/places/content/browserPlacesViews.js b/browser/components/places/content/browserPlacesViews.js
+index 262bfad13c..813f2876d9 100644
+--- a/browser/components/places/content/browserPlacesViews.js
++++ b/browser/components/places/content/browserPlacesViews.js
+@@ -759,37 +759,6 @@ class PlacesViewBase {
+       });
+       aPopup.appendChild(aPopup._endOptOpenAllInTabs);
+     }
+-
+-    // Share Folder should be visible if there is at least one uri and the feature is enabled.
+-    if (
+-      numURINodes > 0 &&
+-      ContentSharingUtils.isEnabled &&
+-      !aPopup._endOptShareFolder
+-    ) {
+-      // Add the "Share Folder" menuitem.
+-      aPopup._endOptShareFolder = document.createXULElement("menuitem");
+-      aPopup._endOptShareFolder.className = "openintabs-menuitem badge-new";
+-      aPopup._endOptShareFolder.setAttribute(
+-        "data-l10n-id",
+-        "places-share-folder2"
+-      );
+-      aPopup._endOptShareFolder.setAttribute("data-l10n-attrs", "badge");
+-
+-      aPopup._endOptShareFolder.addEventListener("command", event => {
+-        ContentSharingUtils.createShareableLinkFromBookmarkFolders([
+-          PlacesUtils.getConcreteItemGuid(
+-            event.currentTarget.parentNode._placesNode
+-          ),
+-        ]);
+-      });
+-      aPopup.appendChild(aPopup._endOptShareFolder);
+-    } else if (
+-      aPopup._endOptShareFolder &&
+-      (!ContentSharingUtils.isEnabled || !numURINodes)
+-    ) {
+-      aPopup.removeChild(aPopup._endOptShareFolder);
+-      aPopup._endOptShareFolder = null;
+-    }
+   }
+ 
+   _ensureMarkers(aPopup) {
+diff --git a/browser/components/places/content/placesContextMenu.inc.xhtml b/browser/components/places/content/placesContextMenu.inc.xhtml
+index 28ce630e9b..3095354914 100644
+--- a/browser/components/places/content/placesContextMenu.inc.xhtml
++++ b/browser/components/places/content/placesContextMenu.inc.xhtml
+@@ -62,13 +62,6 @@
+             node-type="link_bookmark"
+             hide-if-not-search="true"
+             selection-type="single"/>
+-  <menuitem id="contentsharing_sharefolder"
+-            class="badge-new"
+-            data-l10n-attrs="badge"
+-            data-l10n-id="places-share-folder2"
+-            selection-type="single|multiple"
+-            node-type="folder"
+-            hide-if-content-sharing-disabled="true" />
+   <menuseparator id="placesContext_openSeparator"/>
+   <menuitem id="placesContext_show_bookmark:info"
+             command="placesCmd_show:info"
+diff --git a/browser/components/places/content/placesContextMenu.js b/browser/components/places/content/placesContextMenu.js
+index b353f722d5..f70b269d23 100644
+--- a/browser/components/places/content/placesContextMenu.js
++++ b/browser/components/places/content/placesContextMenu.js
+@@ -22,10 +22,6 @@ document.addEventListener(
+         case "placesContext_openLinks:tabs":
+           PlacesUIUtils.openSelectionInTabs(event);
+           break;
+-        case "contentsharing_sharefolder": {
+-          PlacesUIUtils.shareBookmarkFolder();
+-          break;
+-        }
+       }
+     });
+ 
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index 2dc7dab130..1a0cd59d0f 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -6685,10 +6685,6 @@ var SessionStoreInternal = {
+       window.gCustomizeMode.setTab(tab);
+     }
+ 
+-    if (tabData.canonicalUrl) {
+-      tab.canonicalUrl = tabData.canonicalUrl;
+-    }
+-
+     // Update tab label and icon to show something
+     // while we wait for the messages to be processed.
+     this.updateTabLabelAndIcon(tab, tabData);
+diff --git a/browser/components/sessionstore/TabState.sys.mjs b/browser/components/sessionstore/TabState.sys.mjs
+index 43ccd14b23..3513937b5c 100644
+--- a/browser/components/sessionstore/TabState.sys.mjs
++++ b/browser/components/sessionstore/TabState.sys.mjs
+@@ -90,16 +90,6 @@ class _TabState {
+       tabData.splitViewId = tab.splitview.splitViewId;
+     }
+ 
+-    if (tab.canonicalUrl) {
+-      let canonicalUrl = tab.canonicalUrl;
+-      if (!options.includePrivateData) {
+-        canonicalUrl = lazy.PrivacyFilter.filterCanonicalUrl(canonicalUrl);
+-      }
+-      if (canonicalUrl) {
+-        tabData.canonicalUrl = canonicalUrl;
+-      }
+-    }
+-
+     tabData.searchMode = tab.documentGlobal.gURLBar.getSearchMode(
+       browser,
+       true
+diff --git a/browser/components/sessionstore/session.schema.json b/browser/components/sessionstore/session.schema.json
+index 552daf5734..5381affdd4 100644
+--- a/browser/components/sessionstore/session.schema.json
++++ b/browser/components/sessionstore/session.schema.json
+@@ -304,9 +304,6 @@
+           "additionalProperties": {
+             "type": "object"
+           }
+-        },
+-        "canonicalUrl": {
+-          "type": "string"
+         }
+       },
+       "required": [
+diff --git a/browser/components/sessionstore/test/browser.toml b/browser/components/sessionstore/test/browser.toml
+index 1c22c8226e..74cd3662fc 100644
+--- a/browser/components/sessionstore/test/browser.toml
++++ b/browser/components/sessionstore/test/browser.toml
+@@ -387,8 +387,6 @@ skip-if = [
+ ["browser_tab_label_during_restore.js"]
+ https_first_disabled = true
+ 
+-["browser_tab_notes_canonicalurl.js"]
+-
+ ["browser_tabicon_after_bg_tab_crash.js"]
+ run-if = [
+   "crashreporter",
+diff --git a/browser/components/sessionstore/test/marionette/manifest.toml b/browser/components/sessionstore/test/marionette/manifest.toml
+index 7f78197c1c..cbeff8be1f 100644
+--- a/browser/components/sessionstore/test/marionette/manifest.toml
++++ b/browser/components/sessionstore/test/marionette/manifest.toml
+@@ -51,8 +51,6 @@ skip-if = [
+ 
+ ["test_tabgroups_restore.py"]
+ 
+-["test_tabnotes_canonicalurl_restore.py"]
+-
+ ["test_taskbartab_restore.py"]
+ run-if = [
+   "os == 'win'",
+diff --git a/browser/components/tabbrowser/content/tab-hover-preview.mjs b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+index bef6388ac3..6158eb5188 100644
+--- a/browser/components/tabbrowser/content/tab-hover-preview.mjs
++++ b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+@@ -10,7 +10,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   PageWireframes: "resource:///modules/sessionstore/PageWireframes.sys.mjs",
+   SponsorProtection:
+     "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
+-  TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
+ });
+ 
+ // Denotes the amount of time (in ms) that the panel will *not* respect
+@@ -70,10 +69,6 @@ export default class TabHoverPanelSet {
+       this.#win.document.getElementById("tabgroup-preview-panel"),
+       this
+     );
+-    this.tabNotePanel = new TabNotePanel(
+-      this.#win.document.getElementById("tab-note-preview-panel"),
+-      this
+-    );
+ 
+     this.#setExternalPopupListeners();
+     this.#win.gBrowser.tabContainer.addEventListener("dragstart", event => {
+@@ -143,8 +138,7 @@ export default class TabHoverPanelSet {
+     }
+ 
+     if (this.#win.gBrowser.isTab(tabOrGroup) || !tabOrGroup) {
+-      this.tabPanel.deactivate(tabOrGroup, { force });
+-      this.tabNotePanel.deactivate(tabOrGroup, { force });
++      this.tabPanel.deactivate(tabOrGroup);
+     }
+ 
+     if (this.#win.gBrowser.isTabGroup(tabOrGroup) || !tabOrGroup) {
+@@ -152,21 +146,6 @@ export default class TabHoverPanelSet {
+     }
+   }
+ 
+-  activateNotePanel(tab, anchorElement) {
+-    if (!this.shouldActivate()) {
+-      return;
+-    }
+-    this.#setActivePanel(this.tabNotePanel);
+-    this.tabNotePanel.activate(tab, anchorElement);
+-  }
+-
+-  deactivateNotePanel(tab) {
+-    if (this._prefDisableAutohide) {
+-      return;
+-    }
+-    this.tabNotePanel.deactivate(tab);
+-  }
+-
+   #setActivePanel(panel) {
+     if (this.#activePanel && this.#activePanel != panel) {
+       this.requestDeactivate(this.#activePanel, { force: true });
+@@ -245,8 +224,8 @@ export default class TabHoverPanelSet {
+     // the first time.
+ 
+     const initialPopups = this.#win.document.querySelectorAll(
+-      `panel[panelopen=true]:not(#tab-preview-panel):not(#tabgroup-preview-panel):not(#tab-note-preview-panel),
+-       panel[animating=true]:not(#tab-preview-panel):not(#tabgroup-preview-panel):not(#tab-note-preview-panel),
++      `panel[panelopen=true]:not(#tab-preview-panel):not(#tabgroup-preview-panel),
++       panel[animating=true]:not(#tab-preview-panel):not(#tabgroup-preview-panel),
+        menupopup[open=true]`.trim()
+     );
+     this.#openPopups = new Set(initialPopups);
+@@ -257,7 +236,6 @@ export default class TabHoverPanelSet {
+         if (
+           target !== this.tabPanel.panelElement &&
+           target !== this.tabGroupPanel.panelElement &&
+-          target !== this.tabNotePanel.panelElement &&
+           (target.nodeName == "panel" || target.nodeName == "menupopup")
+         ) {
+           this.#openPopups[setMethod](target);
+@@ -302,12 +280,6 @@ class TabPanel extends HoverPanel {
+   /** @type {DOMElement|null} */
+   #thumbnailElement;
+ 
+-  /** @type {DOMElement|null} */
+-  #interactiveArea;
+-
+-  /** @type {DOMElement|null} */
+-  #addNoteButton;
+-
+   /**
+    * Sval: the tab's row in the Workspace panel draws it, since the tab strip
+    * is hidden: `{ anchor, position, x, y, thumbnail }`, the picture an
+@@ -331,34 +303,9 @@ class TabPanel extends HoverPanel {
+       "_prefCollectWireframes",
+       "browser.history.collectWireframes"
+     );
+-    XPCOMUtils.defineLazyPreferenceGetter(
+-      this,
+-      "_prefUseTabNotes",
+-      "browser.tabs.notes.enabled",
+-      false
+-    );
+ 
+     this.#tab = null;
+     this.#thumbnailElement = null;
+-    this.#interactiveArea = this.panelElement.querySelector(
+-      ".tab-preview-content-interactive"
+-    );
+-
+-    // #tabPreviewPanelTemplate is currently just the .tab-preview-add-note
+-    // button element, and it needs to be added the tab preview panel body manually.
+-    /** @type {HTMLTemplateElement} */
+-    const tabPreviewTemplate = this.win.document.getElementById(
+-      "tabPreviewPanelTemplate"
+-    );
+-    const importedFragment = this.win.document.importNode(
+-      tabPreviewTemplate.content,
+-      true
+-    );
+-    this.#addNoteButton = importedFragment.firstElementChild;
+-
+-    this.#addNoteButton.addEventListener("click", () =>
+-      this.#openTabNotePanel()
+-    );
+   }
+ 
+   /**
+@@ -368,23 +315,12 @@ class TabPanel extends HoverPanel {
+     switch (e.type) {
+       case "popupshowing":
+         await this.#updatePreview();
+-        this.mouseoutTarget?.addEventListener("mouseout", this);
+         break;
+       case "TabAttrModified":
+         this.#updatePreview(e.target);
+         break;
+       case "TabSelect":
+-        this.deactivate(null, { force: true });
+-        break;
+-      case "mouseout":
+-        // Ignore mouseouts from descendant elements of the target -- we only want to know
+-        // when the user has moused out from the target itself
+-        if (
+-          this.mouseoutTarget &&
+-          !this.mouseoutTarget.contains(e.relatedTarget)
+-        ) {
+-          this.deactivate();
+-        }
++        this.deactivate();
+         break;
+     }
+   }
+@@ -440,27 +376,23 @@ class TabPanel extends HoverPanel {
+    * @param {object} [options]
+    * @param {boolean} [options.force=false]
+    */
+-  deactivate(leavingTab = null, { force = false } = {}) {
+-    if (!this._prefUseTabNotes) {
+-      force = true;
+-    }
++  deactivate(leavingTab = null) {
+     if (leavingTab) {
+       if (this.#tab != leavingTab) {
+         return;
+       }
+       this.win.requestAnimationFrame(() => {
+         if (this.#tab == leavingTab) {
+-          this.deactivate(null, { force });
++          this.deactivate();
+         }
+       });
+       return;
+     }
+-    super.deactivate({ force });
++    super.deactivate({ force: true });
+   }
+ 
+   onBeforeHide() {
+     this.panelElement.removeEventListener("popupshowing", this);
+-    this.mouseoutTarget?.removeEventListener("mouseout", this);
+     this.win.removeEventListener("TabSelect", this);
+     this.#tab?.removeEventListener("TabAttrModified", this);
+     this.#tab = null;
+@@ -470,26 +402,12 @@ class TabPanel extends HoverPanel {
+ 
+   get hoverTargets() {
+     let targets = [];
+-    if (this.#interactiveArea.childNodes.length) {
+-      targets.push(this.#interactiveArea);
+-    }
+     if (this.#tab) {
+       targets.push(this.#source?.anchor ?? this.#tab);
+     }
+     return targets;
+   }
+ 
+-  /**
+-   * If mouseoutTarget is set, the panel will register a mouseout listener on
+-   * the target element, causing the panel to hide when this element has been
+-   * moused out.
+-   */
+-  get mouseoutTarget() {
+-    return this.#interactiveArea.childNodes.length
+-      ? this.#interactiveArea
+-      : null;
+-  }
+-
+   getPrettyURI(uri) {
+     let url = URL.parse(uri);
+     if (!url) {
+@@ -598,19 +516,6 @@ class TabPanel extends HoverPanel {
+       : "";
+   }
+ 
+-  /**
+-   * Opens the tab note menu in the context of the current tab. Since only
+-   * one panel should be open at a time, this also closes the tab hover preview
+-   * panel.
+-   */
+-  #openTabNotePanel() {
+-    Services.prefs.setBoolPref("browser.tabs.notes.newBadge.enabled", false);
+-    this.win.gBrowser.tabNoteMenu.openPanel(this.#tab, {
+-      telemetrySource: lazy.TabNotes.TELEMETRY_SOURCE.TAB_HOVER_PREVIEW_PANEL,
+-    });
+-    this.deactivate(this.#tab, { force: true });
+-  }
+-
+   async #updatePreview(tab = null) {
+     if (tab) {
+       this.#tab = tab;
+@@ -632,26 +537,6 @@ class TabPanel extends HoverPanel {
+         "";
+     }
+ 
+-    if (this._prefUseTabNotes && lazy.TabNotes.isEligible(this.#tab)) {
+-      let note = await lazy.TabNotes.get(this.#tab);
+-
+-      if (note) {
+-        this.#addNoteButton.remove();
+-      } else {
+-        this.#interactiveArea.append(this.#addNoteButton);
+-
+-        let showNewBadge = Services.prefs.getBoolPref(
+-          "browser.tabs.notes.newBadge.enabled",
+-          true
+-        );
+-        this.#addNoteButton
+-          .querySelector("moz-badge")
+-          .toggleAttribute("hidden", !showNewBadge);
+-      }
+-    } else {
+-      this.#addNoteButton.remove();
+-    }
+-
+     let thumbnailContainer = this.panelElement.querySelector(
+       ".tab-preview-thumbnail-container"
+     );
+@@ -934,201 +819,6 @@ class TabGroupPanel extends HoverPanel {
+   }
+ }
+ 
+-class TabNotePanel extends HoverPanel {
+-  /** @type {MozTabbrowserTab|null} */
+-  #tab;
+-
+-  /** @type {HTMLElement|null} */
+-  #anchorElement;
+-
+-  constructor(panel, panelSet) {
+-    super(panel, panelSet);
+-
+-    this.#tab = null;
+-    this.#anchorElement = null;
+-
+-    this.panelElement
+-      .querySelector(".tab-note-preview-expand")
+-      .addEventListener("click", () => (this.#noteExpanded = true));
+-
+-    // Edit icon is created in JS to avoid eagerly loading the image at
+-    // startup (see browser_startup_images.js).
+-    const actionsContainer = this.panelElement.querySelector(
+-      ".tab-note-preview-actions"
+-    );
+-    const editIcon = this.win.document.createElement("img");
+-    editIcon.className = "tab-note-preview-edit-icon";
+-    editIcon.src = "chrome://global/skin/icons/edit-outline.svg";
+-    editIcon.setAttribute("role", "button");
+-    editIcon.dataset.l10nId = "tab-note-preview-edit-icon";
+-    editIcon.addEventListener("click", () => this.#openTabNotePanel());
+-    actionsContainer.appendChild(editIcon);
+-
+-    this.panelElement
+-      .querySelector(".tab-note-preview-text")
+-      .addEventListener("dblclick", () => this.#openTabNotePanel());
+-  }
+-
+-  handleEvent(e) {
+-    switch (e.type) {
+-      case "popupshowing":
+-        this.panelElement.addEventListener("mouseout", this);
+-        this.#updatePanelContent();
+-        break;
+-      case "TabAttrModified":
+-        this.#updatePanelContent(e.target);
+-        break;
+-      case "TabSelect":
+-        this.deactivate(null, { force: true });
+-        break;
+-      case "mouseout":
+-        if (!this.panelElement.contains(e.relatedTarget)) {
+-          this.deactivate();
+-        }
+-        break;
+-    }
+-  }
+-
+-  activate(tab, anchorElement) {
+-    if (this.#tab === tab && this.panelElement.state == "open") {
+-      return;
+-    }
+-    let originalTab = this.#tab;
+-    this.#tab = tab;
+-    this.#anchorElement = anchorElement;
+-
+-    this.#movePanel();
+-    this.#noteExpanded = false;
+-
+-    originalTab?.removeEventListener("TabAttrModified", this);
+-    this.#tab.addEventListener("TabAttrModified", this);
+-
+-    if (
+-      this.panelElement.state == "open" ||
+-      this.panelElement.state == "showing"
+-    ) {
+-      this.#updatePanelContent();
+-    } else {
+-      this.panelSet.panelOpener.execute(() => {
+-        if (!this.panelSet.shouldActivate()) {
+-          return;
+-        }
+-        this.panelElement.openPopup(this.#anchorElement, this.popupOptions);
+-      }, this);
+-      this.win.addEventListener("TabSelect", this);
+-      this.panelElement.addEventListener("popupshowing", this);
+-    }
+-  }
+-
+-  /**
+-   * @param {MozTabbrowserTab} [leavingTab]
+-   * @param {object} [options]
+-   * @param {boolean} [options.force=false]
+-   */
+-  deactivate(leavingTab = null, { force = false } = {}) {
+-    if (leavingTab) {
+-      if (this.#tab != leavingTab) {
+-        return;
+-      }
+-      this.win.requestAnimationFrame(() => {
+-        if (this.#tab == leavingTab) {
+-          this.deactivate(null, { force });
+-        }
+-      });
+-      return;
+-    }
+-    super.deactivate({ force });
+-  }
+-
+-  onBeforeHide() {
+-    this.panelElement.removeEventListener("popupshowing", this);
+-    this.panelElement.removeEventListener("mouseout", this);
+-    this.win.removeEventListener("TabSelect", this);
+-    this.#tab?.removeEventListener("TabAttrModified", this);
+-    this.#tab = null;
+-    this.#anchorElement = null;
+-    this.panelSet.panelOpener.setZeroDelay();
+-  }
+-
+-  async #updatePanelContent(tab = null) {
+-    if (tab) {
+-      this.#tab = tab;
+-    }
+-
+-    let currentTab = this.#tab;
+-    let currentUrl = currentTab?.canonicalUrl;
+-
+-    const noteTextContainer = this.panelElement.querySelector(
+-      ".tab-note-preview-text"
+-    );
+-    const note = await lazy.TabNotes.get(currentTab);
+-
+-    // In case the tab navigated after the note fetch started, ensure we
+-    // still want to show this note
+-    if (this.#tab != currentTab || this.#tab?.canonicalUrl != currentUrl) {
+-      return;
+-    }
+-
+-    noteTextContainer.textContent = note?.text || "";
+-
+-    this.#noteOverflow =
+-      noteTextContainer.scrollHeight > noteTextContainer.clientHeight;
+-
+-    let actionsContainer = this.panelElement.querySelector(
+-      ".tab-note-preview-actions"
+-    );
+-    noteTextContainer.style.setProperty(
+-      "--tab-note-expand-toggle-width",
+-      `${actionsContainer.offsetWidth}px`
+-    );
+-
+-    this.#movePanel();
+-  }
+-
+-  #movePanel() {
+-    if (this.#anchorElement) {
+-      this.panelElement.moveToAnchor(
+-        this.#anchorElement,
+-        this.popupOptions.position,
+-        this.popupOptions.x,
+-        this.popupOptions.y
+-      );
+-    }
+-  }
+-
+-  set #noteExpanded(val) {
+-    this.panelElement.toggleAttribute("note-expanded", val);
+-    if (val && this.#tab) {
+-      this.#tab.dispatchEvent(
+-        new CustomEvent("TabNote:Expand", { bubbles: true })
+-      );
+-    }
+-  }
+-
+-  set #noteOverflow(val) {
+-    this.panelElement.toggleAttribute("note-overflow", val);
+-  }
+-
+-  #openTabNotePanel() {
+-    this.win.gBrowser.tabNoteMenu.openPanel(this.#tab, {
+-      telemetrySource: lazy.TabNotes.TELEMETRY_SOURCE.TAB_NOTE_PREVIEW_PANEL,
+-    });
+-    this.deactivate(null, { force: true });
+-  }
+-
+-  get popupOptions() {
+-    return {
+-      position: "bottomleft topleft",
+-      x: 0,
+-      y: -2,
+-    };
+-  }
+-}
+-
+-/**
+- * A wrapper that allows for delayed function execution, but with the
+- * ability to "zero" (i.e. cancel) the delay for a predetermined period
+- */
+ class TabPreviewPanelTimedFunction {
+   /** @type {number} */
+   #zeroDelayTime;
+diff --git a/browser/components/tabbrowser/content/tab.js b/browser/components/tabbrowser/content/tab.js
+index 8f2ebf3a0b..a413d0a9e1 100644
+--- a/browser/components/tabbrowser/content/tab.js
++++ b/browser/components/tabbrowser/content/tab.js
+@@ -27,7 +27,6 @@
+             <html:img class="tab-icon-image" role="presentation" decoding="sync" />
+             <image class="tab-sharing-icon-overlay" role="presentation"/>
+             <image class="tab-icon-overlay" role="presentation"/>
+-            <image class="tab-note-icon-overlay" role="presentation"/>
+           </stack>
+           <html:moz-button type="icon ghost" size="small" class="tab-audio-button" tabindex="-1"></html:moz-button>
+           <vbox class="tab-label-container"
+@@ -36,7 +35,6 @@
+                 flex="1">
+             <label class="tab-text tab-label" role="presentation"/>
+           </vbox>
+-          <image class="tab-note-icon" role="presentation"/>
+           <image class="tab-close-button close-icon" role="button" data-l10n-id="tabbrowser-close-tabs-button" data-l10n-args='{"tabCount": 1}' keyNav="false"/>
+         </hbox>
+       </stack>
+@@ -60,7 +58,6 @@
+ 
+       this._hover = false;
+       this._selectedOnFirstMouseDown = false;
+-      this._noteIconHover = false;
+ 
+       /**
+        * Describes how the tab ended up in this mute state. May be any of:
+@@ -379,14 +376,6 @@
+       return this.querySelector(".tab-close-button");
+     }
+ 
+-    get noteIcon() {
+-      return this.querySelector(".tab-note-icon");
+-    }
+-
+-    get noteIconOverlay() {
+-      return this.querySelector(".tab-note-icon-overlay");
+-    }
+-
+     get group() {
+       return this.closest("tab-group");
+     }
+@@ -398,20 +387,6 @@
+       return null;
+     }
+ 
+-    /**
+-     * @returns {boolean}
+-     */
+-    get hasTabNote() {
+-      return this.hasAttribute("tab-note");
+-    }
+-
+-    /**
+-     * @param {boolean} val
+-     */
+-    set hasTabNote(val) {
+-      this.toggleAttribute("tab-note", val);
+-    }
+-
+     updateLastAccessed(aDate) {
+       this._lastAccessed = this.selected ? Infinity : aDate || Date.now();
+     }
+@@ -448,28 +423,6 @@
+         : this;
+       gBrowser.warmupTab(tabToWarm);
+ 
+-      if (this.hasTabNote) {
+-        const noteIcon = this.noteIcon;
+-        const noteIconOverlay = this.noteIconOverlay;
+-        const isOverNoteIcon =
+-          (noteIcon && noteIcon.contains(event.target)) ||
+-          (noteIconOverlay && noteIconOverlay.contains(event.target));
+-
+-        if (isOverNoteIcon && !this._noteIconHover) {
+-          this._noteIconHover = true;
+-          this.dispatchEvent(
+-            new CustomEvent("TabNoteIconHoverStart", {
+-              bubbles: true,
+-              detail: {
+-                noteIconElement: noteIcon?.contains(event.target)
+-                  ? noteIcon
+-                  : noteIconOverlay,
+-              },
+-            })
+-          );
+-        }
+-      }
+-
+       // If the previous target wasn't part of this tab then this is a mouseenter event.
+       if (!this.contains(event.relatedTarget)) {
+         this._mouseenter();
+@@ -477,24 +430,6 @@
+     }
+ 
+     on_mouseout(event) {
+-      if (this._noteIconHover) {
+-        const noteIcon = this.noteIcon;
+-        const noteIconOverlay = this.noteIconOverlay;
+-        const stillOverNoteIcon =
+-          (noteIcon && noteIcon.contains(event.relatedTarget)) ||
+-          (noteIconOverlay && noteIconOverlay.contains(event.relatedTarget));
+-
+-        if (!stillOverNoteIcon) {
+-          this._noteIconHover = false;
+-          this.dispatchEvent(
+-            new CustomEvent("TabNoteIconHoverEnd", {
+-              bubbles: true,
+-              detail: { returningToTab: this.contains(event.relatedTarget) },
+-            })
+-          );
+-        }
+-      }
+-
+       // If the new target is not part of this tab then this is a mouseleave event.
+       if (!this.contains(event.relatedTarget)) {
+         this._mouseleave();
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index eb1cfcd507..306b048c69 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -181,7 +181,6 @@
+     init() {
+       this.tabContainer = document.getElementById("tabbrowser-tabs");
+       this.tabGroupMenu = document.getElementById("tab-group-editor");
+-      this.tabNoteMenu = document.getElementById("tab-note-menu");
+       this.tabbox = document.getElementById("tabbrowser-tabbox");
+       this.tabpanels = document.getElementById("tabbrowser-tabpanels");
+       this.pinnedTabsContainer = document.getElementById(
+@@ -252,12 +251,6 @@
+         "browser.tabs.groups.enabled",
+         false
+       );
+-      XPCOMUtils.defineLazyPreferenceGetter(
+-        this,
+-        "_tabNotesEnabled",
+-        "browser.tabs.notes.enabled",
+-        false
+-      );
+       XPCOMUtils.defineLazyPreferenceGetter(
+         this,
+         "showPidAndActiveness",
+@@ -6382,10 +6375,6 @@
+         aOtherTab.dispatchEvent(event);
+       }
+ 
+-      // Copy tab note-related properties of the tab.
+-      aOurTab.hasTabNote = aOtherTab.hasTabNote;
+-      aOurTab.canonicalUrl = aOtherTab.canonicalUrl;
+-
+       if (otherBrowser.isDistinctProductPageVisit) {
+         ourBrowser.isDistinctProductPageVisit = true;
+       }
+@@ -10413,37 +10402,6 @@ var TabContextMenu = {
+       contextUngroupSplitView.hidden = true;
+     }
+ 
+-    let contextAddNote = document.getElementById("context_addNote");
+-    let contextEditNote = document.getElementById("context_editNote");
+-    if (gBrowser._tabNotesEnabled) {
+-      // Tab notes behaviour is disabled if a user has a selection of tabs that
+-      // contains more than one canonical URL.
+-      let multiselectingDiverseUrls =
+-        this.multiselected &&
+-        !this.contextTabs.every(
+-          t => t.canonicalUrl === this.contextTabs[0].canonicalUrl
+-        );
+-
+-      contextAddNote.disabled =
+-        multiselectingDiverseUrls || !this.TabNotes.isEligible(this.contextTab);
+-      contextEditNote.disabled = multiselectingDiverseUrls;
+-
+-      this.removeNewBadge(contextAddNote);
+-      if (
+-        Services.prefs.getBoolPref("browser.tabs.notes.newBadge.enabled", true)
+-      ) {
+-        this.addNewBadge(contextAddNote);
+-      }
+-
+-      this.TabNotes.has(this.contextTab).then(hasNote => {
+-        contextAddNote.hidden = hasNote;
+-        contextEditNote.hidden = !hasNote;
+-      });
+-    } else {
+-      contextAddNote.hidden = true;
+-      contextEditNote.hidden = true;
+-    }
+-
+     // Split View
+     let splitViewEnabled = Services.prefs.getBoolPref(
+       "browser.tabs.splitView.enabled",
+@@ -10676,19 +10634,6 @@ var TabContextMenu = {
+     );
+     bookmarkMultiSelectedTabs.hidden = !this.multiselected;
+ 
+-    let contentSharingShareTabs = document.getElementById(
+-      "context_shareSelectedTabs"
+-    );
+-
+-    const hideContentSharing =
+-      !this.multiselected || !ContentSharingUtils.isEnabled;
+-    contentSharingShareTabs.hidden = hideContentSharing;
+-    document.getElementById("context_shareSelectedTabsSeparator").hidden =
+-      hideContentSharing;
+-    if (!contentSharingShareTabs.hidden) {
+-      this.addNewBadge(contentSharingShareTabs);
+-    }
+-
+     let toggleMute = document.getElementById("context_toggleMuteTab");
+     let toggleMultiSelectMute = document.getElementById(
+       "context_toggleMuteSelectedTabs"
+@@ -11077,7 +11022,3 @@ var TabContextMenu = {
+     menuItem.classList.remove("badge-new");
+   },
+ };
+-
+-ChromeUtils.defineESModuleGetters(TabContextMenu, {
+-  TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
+-});
+diff --git a/browser/components/tabbrowser/content/tabgroup-menu.js b/browser/components/tabbrowser/content/tabgroup-menu.js
+index 5a23812075..04b6a5c492 100644
+--- a/browser/components/tabbrowser/content/tabgroup-menu.js
++++ b/browser/components/tabbrowser/content/tabgroup-menu.js
+@@ -13,9 +13,6 @@
+   const { TabStateFlusher } = ChromeUtils.importESModule(
+     "resource:///modules/sessionstore/TabStateFlusher.sys.mjs"
+   );
+-  const { ContentSharingUtils } = ChromeUtils.importESModule(
+-    "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs"
+-  );
+ 
+   class MozTabbrowserTabGroupMenu extends MozXULElement {
+     static COLORS = [
+@@ -89,15 +86,6 @@
+           class="subviewbutton"
+           data-l10n-id="tab-group-editor-action-ungroup">
+         </toolbarbutton>
+-        <toolbarbutton
+-          tabindex="0"
+-          id="tabGroupEditor_shareTabGroup"
+-          class="subviewbutton"
+-          badged="true"
+-          data-l10n-id="tab-group-editor-action-share-tab-group"
+-          hidden="">
+-          <html:moz-badge type="new" move-after-stack="true"></html:moz-badge>
+-        </toolbarbutton>
+         <toolbarseparator class="tab-group-edit-mode-only" />
+         <toolbarbutton
+           tabindex="0"
+@@ -243,7 +231,6 @@
+           "tabGroupEditor_saveAndCloseGroup"
+         ),
+         deleteGroup: document.getElementById("tabGroupEditor_deleteGroup"),
+-        shareTabGroup: document.getElementById("tabGroupEditor_shareTabGroup"),
+       };
+ 
+       this.#commandButtons.addNewTabInGroup.addEventListener("command", () => {
+@@ -286,11 +273,6 @@
+         );
+       });
+ 
+-      this.#commandButtons.shareTabGroup.addEventListener("command", () => {
+-        ContentSharingUtils.handleShareTabGroup(this.activeGroup);
+-        this.close();
+-      });
+-
+       this.panel.addEventListener("popupshown", this);
+       this.panel.addEventListener("popuphidden", this);
+       this.panel.addEventListener("keypress", this);
+@@ -472,9 +454,6 @@
+       for (const button of Object.values(this.#commandButtons)) {
+         button.tooltipText = button.label;
+       }
+-
+-      this.#commandButtons.shareTabGroup.hidden =
+-        !ContentSharingUtils.isEnabled;
+     }
+ 
+     on_popuphidden() {
+diff --git a/browser/components/tabbrowser/content/tabs.js b/browser/components/tabbrowser/content/tabs.js
+index 568f3a7cc7..d2faa2e469 100644
+--- a/browser/components/tabbrowser/content/tabs.js
++++ b/browser/components/tabbrowser/content/tabs.js
+@@ -32,8 +32,6 @@
+       this.addEventListener("TabShow", this);
+       this.addEventListener("TabHoverStart", this);
+       this.addEventListener("TabHoverEnd", this);
+-      this.addEventListener("TabNoteIconHoverStart", this);
+-      this.addEventListener("TabNoteIconHoverEnd", this);
+       this.addEventListener("TabGroupLabelHoverStart", this);
+       this.addEventListener("TabGroupLabelHoverEnd", this);
+       // Capture collapse/expand early so we mark animating groups before
+@@ -331,24 +329,6 @@
+       this.previewPanel?.deactivate(event.target);
+     }
+ 
+-    on_TabNoteIconHoverStart(event) {
+-      if (!this._showTabHoverPreview) {
+-        return;
+-      }
+-      this.ensureTabPreviewPanelLoaded();
+-      this.previewPanel.activateNotePanel(
+-        event.target,
+-        event.detail.noteIconElement
+-      );
+-    }
+-
+-    on_TabNoteIconHoverEnd(event) {
+-      this.previewPanel?.deactivateNotePanel(event.target);
+-      if (event.detail.returningToTab) {
+-        this.previewPanel?.activate(event.target);
+-      }
+-    }
+-
+     cancelTabGroupPreview() {
+       this.previewPanel?.panelOpener.clear();
+     }
+diff --git a/browser/components/tabbrowser/jar.mn b/browser/components/tabbrowser/jar.mn
+index e6da92ca5f..89d5087e78 100644
+--- a/browser/components/tabbrowser/jar.mn
++++ b/browser/components/tabbrowser/jar.mn
+@@ -18,6 +18,5 @@ browser.jar:
+    content/browser/tabbrowser/tabbrowser.js               (content/tabbrowser.js)
+    content/browser/tabbrowser/tabgroup.js                 (content/tabgroup.js)
+    content/browser/tabbrowser/tabgroup-menu.js            (content/tabgroup-menu.js)
+-   content/browser/tabbrowser/tabnote-menu.js             (content/tabnote-menu.js)
+    content/browser/tabbrowser/tabs.js                     (content/tabs.js)
+    content/browser/tabbrowser/tabsplitview.js             (content/tabsplitview.js)
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser.toml b/browser/components/tabbrowser/test/browser/tabs/browser.toml
+index 9f16c7d9d9..d8760aeceb 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser.toml
++++ b/browser/components/tabbrowser/test/browser/tabs/browser.toml
+@@ -638,11 +638,6 @@ tags = "vertical-tabs"
+ ["browser_tab_move_to_new_window_reload.js"]
+ tags = "vertical-tabs"
+ 
+-["browser_tab_note_preview.js"]
+-skip-if = [
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt && a11y_checks", # Bug 2020468
+-]
+-
+ ["browser_tab_play.js"]
+ tags = "vertical-tabs"
+ 
+diff --git a/browser/locales/en-US/browser/places.ftl b/browser/locales/en-US/browser/places.ftl
+index e36c00a396..2bae7f75dd 100644
+--- a/browser/locales/en-US/browser/places.ftl
++++ b/browser/locales/en-US/browser/places.ftl
+@@ -291,9 +291,3 @@ places-search-downloads =
+ ##
+ 
+ places-locked-prompt = The bookmarks and history system will not be functional because one of { -brand-short-name }’s files is in use by another application. Some security software can cause this problem.
+-
+-# Share is a verb here. Meaning to "Share" the bookmark "Folder"
+-# .badge used to promote the sharing menu item; keep it as short as possible.
+-places-share-folder2 =
+-  .label = Share Folder
+-  .badge = New
+diff --git a/browser/locales/en-US/browser/tabContextMenu.ftl b/browser/locales/en-US/browser/tabContextMenu.ftl
+index 5093c6fe59..fbdc0d87a7 100644
+--- a/browser/locales/en-US/browser/tabContextMenu.ftl
++++ b/browser/locales/en-US/browser/tabContextMenu.ftl
+@@ -204,8 +204,3 @@ tab-context-send-to-mobile =
+            *[other] Send { $tabCount } Tabs to Mobile
+         }
+     .accesskey = n
+-
+-# Verb: share a collection of selected tabs as a link
+-tab-context-share-selected-tabs =
+-    .label = Create Shareable Link
+-    .accesskey = a
+diff --git a/browser/locales/en-US/browser/tabbrowser.ftl b/browser/locales/en-US/browser/tabbrowser.ftl
+index f47b1306c1..33c2fc0fde 100644
+--- a/browser/locales/en-US/browser/tabbrowser.ftl
++++ b/browser/locales/en-US/browser/tabbrowser.ftl
+@@ -363,9 +363,6 @@ tab-group-editor-action-delete =
+ tab-group-editor-done =
+     .label = Done
+     .accessKey = D
+-# Share is a verb here. Meaning to "Share" the "tab group"
+-tab-group-editor-action-share-tab-group =
+-    .label = Share tab group
+ 
+ tab-context-reopen-tab-group =
+     .label = Reopen tab group
+@@ -424,52 +421,6 @@ tab-group-context-open-saved-group-in-this-window =
+ tab-group-context-open-saved-group-in-new-window =
+     .label = Open Group in New Window
+ 
+-## Tab Notes
+-
+-tab-context-add-note =
+-    .label = Add Note
+-    .accesskey = A
+-tab-context-edit-note =
+-    .label = Edit Note
+-    .accesskey = E
+-
+-# TODO Bug 2023230: `tab-context-delete-note` is no longer used as of bug 2023200,
+-# but it seems likely to return, so this string is being left in place for now.
+-
+-tab-context-delete-note =
+-    .label = Delete Note
+-    .accesskey = D
+-tab-note-editor-title-create = Add note
+-tab-note-editor-title-edit = Edit note
+-tab-note-editor-text-field =
+-    .placeholder = What do you want to remember about this tab?
+-tab-note-editor-button-cancel =
+-    .label = Cancel
+-    .accesskey = C
+-tab-note-editor-button-save =
+-    .label = Save
+-    .accesskey = S
+-tab-note-editor-button-delete =
+-    .title = Delete note
+-    .aria-label = Delete note
+-    .accesskey = D
+-tab-note-preview-edit-icon =
+-    .alt = Edit note
+-# Link to show the full tab note in case it was truncated.
+-tab-note-preview-expand = Read more
+-tab-note-panel-add-note-new-badge =
+-    .label = New
+-
+-# Displayed within the tab note edit dialog box when the user has entered more
+-# characters than are allowed.
+-# Variables:
+-#   $totalCharacters (Number): the number of characters the user has entered.
+-#   $maxAllowedCharacters (Number): the maximum number of characters allowed for a tab note.
+-tab-note-editor-character-limit =
+-    { $maxAllowedCharacters ->
+-         *[other] { NUMBER($totalCharacters, useGrouping: "false") }/{ NUMBER($maxAllowedCharacters, useGrouping: "false") } characters
+-    }
+-
+ ## Split View
+ 
+ # Split view tabs display their respective contents side by side
+diff --git a/browser/themes/shared/customizableui/panelUI-shared.css b/browser/themes/shared/customizableui/panelUI-shared.css
+index d50787ff1c..0930d6a849 100644
+--- a/browser/themes/shared/customizableui/panelUI-shared.css
++++ b/browser/themes/shared/customizableui/panelUI-shared.css
+@@ -1336,8 +1336,7 @@ panelview .toolbarbutton-1,
+ 
+ #protections-popup-mainView .subviewbutton-nav:not(.notFound),
+ .widget-overflow-list .subviewbutton-nav,
+-.PanelUI-subView .subviewbutton-nav,
+-.tab-preview-add-note.subviewbutton-nav {
++.PanelUI-subView .subviewbutton-nav {
+   &::after {
+     -moz-context-properties: fill, fill-opacity;
+     content: url(chrome://global/skin/icons/arrow-right.svg);
+diff --git a/browser/themes/shared/tabbrowser/tab-hover-preview.css b/browser/themes/shared/tabbrowser/tab-hover-preview.css
+index abb9310013..23b0b71b1a 100644
+--- a/browser/themes/shared/tabbrowser/tab-hover-preview.css
++++ b/browser/themes/shared/tabbrowser/tab-hover-preview.css
+@@ -5,19 +5,16 @@
+ #tab-preview-panel {
+   --panel-width: 280px;
+   --panel-padding: 0;
+-  @media not -moz-pref("browser.tabs.notes.enabled") {
+-    pointer-events: none;
++  pointer-events: none;
+ 
+-    .tab-preview-text-container {
+-      order: 1;
+-    }
+-    .tab-preview-thumbnail-container {
+-      order: 2;
+-    }
++  .tab-preview-text-container {
++    order: 1;
++  }
++  .tab-preview-thumbnail-container {
++    order: 2;
+   }
+ }
+ 
+-.tab-preview-content-interactive:not(:empty),
+ .tab-preview-content-main {
+   gap: var(--space-small);
+   display: flex;
+@@ -25,10 +22,6 @@
+   padding: var(--space-small);
+ }
+ 
+-.tab-preview-content-interactive:not(:empty) {
+-  padding-block-end: 0;
+-}
+-
+ .tab-preview-text-container {
+   margin: 0 var(--space-small);
+ }
+@@ -73,139 +66,6 @@
+   }
+ }
+ 
+-.tab-preview-add-note {
+-  margin: 0 !important;
+-  -moz-context-properties: fill;
+-  fill: currentColor;
+-
+-  &[hidden] {
+-    display: none;
+-  }
+-
+-  &::after {
+-    /* The badge is a flex child of the toolbarbutton, so without this the
+-     * arrow would appear immediately after the badge rather than at the end. */
+-    margin-inline-start: auto !important;
+-  }
+-
+-  > .toolbarbutton-text {
+-    max-width: max-content;
+-  }
+-
+-  > moz-badge {
+-    margin-inline-start: 8px;
+-    align-self: center;
+-  }
+-}
+-
+-/*
+- * Tab note preview panel
+- */
+-
+-#tab-note-preview-panel {
+-  --panel-width: 280px;
+-  --panel-padding: var(--space-small);
+-  --tab-note-text-background: light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.3));
+-  --tab-note-text-border-color: transparent;
+-  @media (prefers-contrast) {
+-    --tab-note-text-background: transparent;
+-    --tab-note-text-border-color: var(--card-border-color);
+-  }
+-  @media (prefers-color-scheme: light) {
+-    :root:not([lwtheme]) & {
+-      --tab-note-text-background: var(--color-violet-0);
+-    }
+-  }
+-}
+-
+-.tab-note-preview-container {
+-  font: menu;
+-  position: relative;
+-  padding: var(--space-small);
+-  border-radius: var(--border-radius-medium);
+-  background-color: var(--tab-note-text-background);
+-  border: var(--border-width) solid var(--tab-note-text-border-color);
+-}
+-
+-.tab-note-preview-text {
+-  overflow-wrap: break-word;
+-
+-  &::after {
+-    /*
+-    * The edit note icon is absolutely positioned along with the "read more"
+-    * button. This ensures the text container adds a newline when the text flows
+-    * to the edge, to prevent it overlapping the icon.
+-    */
+-    content: "";
+-    display: inline-block;
+-    width: var(--tab-note-expand-toggle-width, 0);
+-    height: 1lh;
+-  }
+-
+-  #tab-note-preview-panel:not([note-expanded]) & {
+-    overflow: hidden;
+-    -webkit-line-clamp: 10;
+-  }
+-
+-  #tab-note-preview-panel[note-overflow]:not([note-expanded]) & {
+-    /* Set by Javascript */
+-    --tab-note-expand-toggle-width: 0;
+-
+-    --gradient-width: 40px;
+-    --gradient-offset: 10px;
+-    --gradient-direction: right;
+-
+-    mask:
+-      /* Mask 1: make all lines except the last visible (by default,
+-       * unmasked portions of an element are invisible, which is why
+-       * this is needed). Mask 2: Fade out the end of the last line */
+-      linear-gradient(black) 0 0 / 100% calc(100% - 1lh) no-repeat,
+-      linear-gradient(
+-          to var(--gradient-direction),
+-          black calc(100% - var(--tab-note-expand-toggle-width) - var(--gradient-width) - var(--gradient-offset)),
+-          transparent calc(100% - var(--tab-note-expand-toggle-width) - var(--gradient-offset))
+-        )
+-        0 100% / 100% 1lh no-repeat;
+-
+-    &:dir(rtl) {
+-      --gradient-direction: left;
+-    }
+-  }
+-}
+-
+-.tab-note-preview-actions {
+-  display: flex;
+-  align-items: center;
+-  gap: var(--space-large);
+-  position: absolute;
+-  inset-block-end: 0;
+-  inset-inline-end: 0;
+-  padding: var(--space-small);
+-}
+-
+-.tab-note-preview-expand {
+-  cursor: pointer;
+-  display: none;
+-  text-decoration: underline;
+-
+-  #tab-note-preview-panel[note-overflow]:not([note-expanded]) & {
+-    display: block;
+-  }
+-}
+-
+-.tab-note-preview-edit-icon {
+-  width: var(--icon-size-xsmall);
+-  height: var(--icon-size-xsmall);
+-  -moz-context-properties: fill;
+-  fill: currentColor;
+-  cursor: pointer;
+-  visibility: hidden;
+-
+-  .tab-note-preview-container:hover & {
+-    visibility: visible;
+-  }
+-}
+-
+ @keyframes tab-hover-preview-fadein {
+   from {
+     opacity: 0;
+diff --git a/browser/themes/shared/tabbrowser/tabs.css b/browser/themes/shared/tabbrowser/tabs.css
+index 24ad9ab050..403aadd755 100644
+--- a/browser/themes/shared/tabbrowser/tabs.css
++++ b/browser/themes/shared/tabbrowser/tabs.css
+@@ -36,7 +36,6 @@
+   --tab-collapsed-background-width: var(--tab-min-height);
+   --tab-collapsed-width: calc(var(--tab-collapsed-background-width) + 2 * var(--tab-inner-inline-margin));
+   --tab-pinned-min-width-expanded: calc(var(--tab-pinned-expanded-background-width) + 2 * var(--tab-pinned-margin-inline-expanded));
+-  --tab-note-icon-end-margin: var(--dimension-4);
+   --tab-selected-color-scheme: var(--toolbar-color-scheme);
+   &[lwt-tab-selected="light"] {
+     --tab-selected-color-scheme: light;
+@@ -226,15 +225,9 @@ tab-split-view-wrapper[dragtarget] {
+ 
+     &[fadein] {
+       min-width: calc(var(--tab-min-width-pref, var(--tab-min-width)) + var(--tab-min-width-extra-icons) + var(--tab-min-width-uidensity));
+-      &:is([muted], [soundplaying], [activemedia-blocked]):not([tab-note]) {
++      &:is([muted], [soundplaying], [activemedia-blocked]) {
+         --tab-min-width-extra-icons: 24px;
+       }
+-      &[tab-note]:not([muted], [soundplaying], [activemedia-blocked]) {
+-        --tab-min-width-extra-icons: 20px;
+-      }
+-      &[tab-note]:is([muted], [soundplaying], [activemedia-blocked]) {
+-        --tab-min-width-extra-icons: 44px;
+-      }
+     }
+   }
+ 
+@@ -548,8 +541,7 @@ tab-split-view-wrapper[dragtarget] {
+ }
+ 
+ .tab-sharing-icon-overlay,
+-.tab-icon-overlay,
+-.tab-note-icon-overlay {
++.tab-icon-overlay {
+   display: none;
+ }
+ 
+@@ -733,70 +725,6 @@ tab-split-view-wrapper[dragtarget] {
+   }
+ }
+ 
+-/*
+- * Tab note icon that overlays the favicon for pinned tabs and the collapsed
+- * vertical tab strip. The horizontal tab strip and expanded vertical tab strip
+- * get a separate, more spacious treatment using the `.tab-notes-icon` image.
+- * Note: This is intended to display instead of the `.tab-icon-overlay`. This
+- * is defined separately from `.tab-icon-overlay` since the tab notes icon has
+- * fewer features (e.g. no icon interactivity) and
+- */
+-.tab-note-icon-overlay {
+-  position: relative;
+-  padding: 2px;
+-  top: -7px;
+-  inset-inline-end: -7px;
+-  z-index: 1; /* Overlay tab title */
+-  list-style-image: url("chrome://global/skin/icons/tab-notes-12.svg");
+-
+-  background-color: var(--lwt-accent-color);
+-  /* FIXME: What's the point of the image(transparent)? */
+-  background-image: image(transparent), image(var(--toolbox-background-color));
+-  -moz-context-properties: fill;
+-  fill: var(--tab-selected-textcolor);
+-  color-scheme: var(--tab-selected-color-scheme);
+-  border-radius: var(--border-radius-circle);
+-
+-  .tabbrowser-tab &:-moz-window-inactive {
+-    background-image: image(transparent), image(var(--toolbox-background-color-inactive));
+-  }
+-  .tabbrowser-tab[selected] & {
+-    background-image: image(transparent), image(var(--tab-background-color-selected)), image(var(--toolbox-background-color));
+-  }
+-  .tabbrowser-tab[selected] &:-moz-window-inactive {
+-    background-image: image(transparent), image(var(--tab-background-color-selected)), image(var(--toolbox-background-color-inactive));
+-  }
+-
+-  #tabbrowser-tabs[orient="vertical"] & {
+-    top: 7px;
+-  }
+-
+-  #tabbrowser-tabs[orient="vertical"]:not([expanded]) .tabbrowser-tab[tab-note]:not([crashed], [soundplaying], [muted], [activemedia-blocked]) &,
+-  .tabbrowser-tab[pinned][tab-note]:not([crashed], [soundplaying], [muted], [activemedia-blocked]) & {
+-    display: revert;
+-  }
+-
+-  @media -moz-pref("sidebar.visibility", "expand-on-hover") {
+-    /* We need these rules to apply at all times when the sidebar.visibility
+-    pref is set to "expand-on-hover" as opposed to when the "sidebar-expand-on-hover" attribute
+-    has been added to root. There are certain scenarios when that attribute is temporarily
+-    removed from root such as when toggling the sidebar to expand with the toolbar button. */
+-    #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[tab-note]:not([crashed], [soundplaying], [muted], [activemedia-blocked]) & {
+-      display: revert;
+-    }
+-  }
+-
+-  @media not -moz-pref("sidebar.visibility", "expand-on-hover") {
+-    /* We need these rules to apply at all times when the sidebar.visibility
+-    pref is not set to "expand-on-hover" as opposed to when the "sidebar-expand-on-hover" attribute
+-    has not been added to root. There are certain scenarios when that attribute is temporarily
+-    removed from root such as when toggling the sidebar to expand with the toolbar button. */
+-    #tabbrowser-tabs[orient="vertical"]:not([expanded]) .tabbrowser-tab[tab-note]:not([crashed], [soundplaying], [muted], [activemedia-blocked]) & {
+-      display: revert;
+-    }
+-  }
+-}
+-
+ .tab-audio-button {
+   display: none;
+   margin-inline-end: var(--tab-icon-end-margin);
+@@ -884,7 +812,7 @@ tab-split-view-wrapper[dragtarget] {
+  * the button has a visible outline shown */
+ @media not (forced-colors) {
+   #tabbrowser-tabs[orient="horizontal"] {
+-    .tabbrowser-tab:not([labelendaligned], [tab-note], :hover) > .tab-stack > .tab-content > .tab-close-button {
++    .tabbrowser-tab:not([labelendaligned], :hover) > .tab-stack > .tab-content > .tab-close-button {
+       padding-inline-start: 0;
+       width: 18px;
+     }
+@@ -2163,62 +2091,6 @@ tab-group {
+   }
+ }
+ 
+-/* Tab Notes */
+-.tab-note-editor-panel {
+-  --panel-width: 300px;
+-  font: menu;
+-
+-  > .panel-header[hidden] {
+-    display: none;
+-  }
+-
+-  > toolbarseparator {
+-    padding-inline: var(--panel-padding);
+-  }
+-
+-  > .panel-subview-body {
+-    padding-top: var(--panel-subview-body-padding-block);
+-    padding-inline: var(--panel-padding);
+-  }
+-
+-  > .panel-action-row {
+-    display: flex;
+-    justify-content: space-between;
+-    align-items: center;
+-    gap: var(--space-large);
+-  }
+-}
+-
+-#tab-note-editor-button-delete {
+-  color: var(--icon-color-critical);
+-}
+-
+-#tab-note-text {
+-  padding: var(--space-medium);
+-  resize: none;
+-  min-height: 3lh;
+-  max-height: 352px;
+-  overflow-y: auto;
+-}
+-
+-#tab-note-overflow-indicator {
+-  font-size: 0.85em;
+-  visibility: hidden;
+-  color: var(--text-color-deemphasized);
+-
+-  /* This will apply to both the overflow=warn state (the user has almost
+-   * overflowed the limit) and the overflow=overflow state (the user actually
+-   * has overflowed the limit).
+-   */
+-  .tab-note-editor-panel[overflow] & {
+-    visibility: inherit;
+-  }
+-
+-  .tab-note-editor-panel[overflow="overflow"] & {
+-    color: var(--text-color-error);
+-  }
+-}
+-
+ /* Tab Overflow */
+ 
+ #tabbrowser-arrowscrollbox,
+@@ -2898,47 +2770,6 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
+   }
+ }
+ 
+-/*
+- * Tab note icon that displays inline on unpinned tabs in the horizontal tab
+- * strip and the expanded vertical tab strip. Pinned tabs and the collapsed
+- * vertical tab strip get a separate space-constrained treatment using the
+- * `.tab-notes-icon-overlay` image.
+- */
+-.tab-note-icon {
+-  display: none;
+-  box-sizing: border-box;
+-
+-  width: calc(var(--icon-size-xsmall) + 8px);
+-  height: calc(var(--icon-size-xsmall) + 8px);
+-  padding: 4px;
+-  margin-inline-end: var(--tab-note-icon-end-margin);
+-
+-  list-style-image: url("chrome://global/skin/icons/tab-notes-12.svg");
+-  -moz-context-properties: fill;
+-  fill: currentColor;
+-
+-  /* Vertical expanded: reserve space so the note icon does not jump when the close shows.*/
+-  #tabbrowser-tabs[orient="vertical"][expanded] & {
+-    .tabbrowser-tab:not(:hover) & {
+-      /* .tab-close-button is 24px wide with border-box sizing */
+-      margin-inline-end: calc(var(--tab-note-icon-end-margin) + 24px - var(--tab-close-button-padding) / 2);
+-    }
+-
+-    .tabbrowser-tab:is([visuallyselected], :hover) & {
+-      margin-inline-end: var(--tab-note-icon-end-margin);
+-    }
+-  }
+-}
+-
+-@media -moz-pref("browser.tabs.notes.enabled") and (not -moz-pref("sidebar.visibility", "expand-on-hover")) {
+-  .tabbrowser-tab[tab-note]:not([pinned]) .tab-note-icon {
+-    #tabbrowser-tabs[orient="horizontal"] &,
+-    #tabbrowser-tabs[orient="vertical"][expanded] & {
+-      display: revert;
+-    }
+-  }
+-}
+-
+ /* NOTE(emilio): The double class is an specificity hack to win over the
+  * .subviewbutton-iconic rules */
+ .tab-group-icon.tab-group-icon {
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index f69450372f..00c0dca9e4 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -116,7 +116,6 @@ firefox_desktop_metrics = [
+     "browser/components/asrouter/metrics.yaml",
+     "browser/components/attribution/metrics.yaml",
+     "browser/components/backup/metrics.yaml",
+-    "browser/components/contentsharing/metrics.yaml",
+     "browser/components/contextualidentity/metrics.yaml",
+     "browser/components/controlcenter/metrics.yaml",
+     "browser/components/customkeys/metrics.yaml",
+@@ -137,7 +136,6 @@ firefox_desktop_metrics = [
+     "browser/components/sessionstore/metrics.yaml",
+     "browser/components/sidebar/metrics.yaml",
+     "browser/components/tabbrowser/metrics.yaml",
+-    "browser/components/tabnotes/metrics.yaml",
+     "browser/components/urlbar/metrics.yaml",
+     "browser/modules/metrics.yaml",
+     "dom/media/platforms/wmf/metrics.yaml",
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 9f86decd33..73a08cec0e 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -5178,21 +5178,6 @@ setToDefaultPrompt:
+       description: Message to show instead of the default prompt
+       type: json
+ 
+-tabNotes:
+-  description: >-
+-    Associate short text notes with specific web pages and surface those notes later
+-    when the user returns to that web page in a tab.
+-  owner: sthompson@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      description: >-
+-        Controls whether tab notes storage, code, and UI elements are turned on.
+-      setPref:
+-        branch: default
+-        pref: browser.tabs.notes.enabled
+-
+ tabGroups:
+   description: Prefs to control Tab Groups
+   owner: dao@mozilla.com
+@@ -5771,24 +5756,6 @@ macAppMenuSetAsDefault:
+       description: >-
+         Whether or not the macOS app menu contains "Set as Default Browser" item
+ 
+-contentSharing:
+-  description: Controls the content sharing feature, which allows users to share browser content.
+-  owner: nbarrett@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: browser.contentsharing.enabled
+-      description: Whether the content sharing feature is enabled.
+-    serverUrl:
+-      type: string
+-      setPref:
+-        branch: default
+-        pref: browser.contentsharing.server.url
+-      description: The URL of the content sharing server.
+-
+ webNotificationsPermissionUi:
+   description: >-
+     Overrides the copy and optional logo of the native Web Notifications
+diff --git a/toolkit/locales/en-US/toolkit/firefoxlabs/features.ftl b/toolkit/locales/en-US/toolkit/firefoxlabs/features.ftl
+index 4ca1362054..8c8ea208ba 100644
+--- a/toolkit/locales/en-US/toolkit/firefoxlabs/features.ftl
++++ b/toolkit/locales/en-US/toolkit/firefoxlabs/features.ftl
+@@ -102,8 +102,3 @@ experimental-features-newtab-widget-clocks-description = Add up to four clocks w
+ experimental-features-semantic-history-search =
+     .label = Semantic History Search
+ experimental-features-semantic-history-search-description = Use a local Machine Learning model to suggest entries from history that are related to your searches based on natural language understanding in the { -brand-product-name } address bar. <a data-l10n-name="connect">Share feedback</a>
+-
+-# Tab Notes
+-experimental-features-tab-notes =
+-    .label = Tab notes
+-experimental-features-tab-notes-description = Tab notes are an experimental feature that lets you add sticky notes to your browser tabs. Jot down context, reminders, or next steps so you can come back and remember why you opened it. We’d love your feedback as we keep improving this feature. <a data-l10n-name="connect">Share feedback</a>
+diff --git a/toolkit/modules/sessionstore/PrivacyFilter.sys.mjs b/toolkit/modules/sessionstore/PrivacyFilter.sys.mjs
+index fd085dcef9..d4c867b129 100644
+--- a/toolkit/modules/sessionstore/PrivacyFilter.sys.mjs
++++ b/toolkit/modules/sessionstore/PrivacyFilter.sys.mjs
+@@ -13,19 +13,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+  * from a tab by the current privacy level as set by the user.
+  */
+ export var PrivacyFilter = Object.freeze({
+-  /**
+-   * Filters canonical URLs according to the current privacy level.
+-   *
+-   * @param {string} url
+-   * @returns {string|null} The url if allowed to be saved, otherwise null.
+-   */
+-  filterCanonicalUrl(url) {
+-    if (!url) {
+-      return null;
+-    }
+-    return lazy.PrivacyLevel.check(url) ? url : null;
+-  },
+-
+   /**
+    * Filters the given (serialized) session storage |data| according to the
+    * current privacy level and returns a new object containing only data that
+diff --git a/toolkit/themes/shared/desktop-jar.inc.mn b/toolkit/themes/shared/desktop-jar.inc.mn
+index ffd23f2439..7571eb6066 100644
+--- a/toolkit/themes/shared/desktop-jar.inc.mn
++++ b/toolkit/themes/shared/desktop-jar.inc.mn
+@@ -127,8 +127,6 @@
+   skin/classic/global/icons/thumbs-up-20.svg               (../../shared/icons/thumbs-up-20.svg)
+   skin/classic/global/icons/trending.svg                   (../../shared/icons/trending.svg)
+   skin/classic/global/icons/trophy.svg                     (../../shared/icons/trophy.svg)
+-  skin/classic/global/icons/tab-notes.svg                  (../../shared/icons/tab-notes.svg)
+-  skin/classic/global/icons/tab-notes-12.svg               (../../shared/icons/tab-notes-12.svg)
+   skin/classic/global/icons/update-icon.svg                (../../shared/icons/update-icon.svg)
+   skin/classic/global/icons/arrow-counterclockwise-16.svg  (../../shared/icons/arrow-counterclockwise-16.svg)
+   skin/classic/global/icons/arrow-down-12.svg              (../../shared/icons/arrow-down-12.svg)

@@ -1,0 +1,392 @@
+Sval: Remove LaterRun and the address bar's search tips
+
+LaterRun opened Mozilla's pages some sessions after a new profile or an
+update, and was off. The search tips were Mozilla's onboarding rows in
+the address bar, gated on a recommendation pref Sval locks off. Both go,
+with their prefs, strings and tests. modules/libpref/Preferences.cpp
+still names browser.laterrun.bookkeeping.profileCreationTime among the
+prefs it sanitizes.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 24e1b1506b..129a759b03 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -2617,8 +2617,6 @@ pref("toolkit.pageThumbs.minHeight", 190);
+ 
+ pref("browser.esedbreader.loglevel", "Error");
+ 
+-pref("browser.laterrun.enabled", false);
+-
+ #ifdef FUZZING_SNAPSHOT
+ pref("dom.ipc.processPrelaunch.enabled", false);
+ #else
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 9db88b8e5e..be02bd6d2f 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -104,8 +104,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   UpdateUtils: "resource://gre/modules/UpdateUtils.sys.mjs",
+   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+-  UrlbarProviderSearchTips:
+-    "moz-src:///browser/components/urlbar/UrlbarProviderSearchTips.sys.mjs",
+   UrlbarTokenizer:
+     "moz-src:///browser/components/urlbar/UrlbarTokenizer.sys.mjs",
+   UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 9a1b3bc9f0..2ce40feb9e 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -139,7 +139,6 @@
+   "UpdateUtils",
+   "URILoadingHelper",
+   "UrlbarPrefs",
+-  "UrlbarProviderSearchTips",
+   "UrlbarTokenizer",
+   "UrlbarUtils",
+   "Weave",
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 8fda141bd1..2733d0e2f2 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -63,7 +63,6 @@ category browser-window-location-change chrome://browser/content/browser-places.
+ category browser-window-location-change chrome://browser/content/browser-sitePermissionPanel.js gPermissionPanel.onLocationChange
+ category browser-window-location-change chrome://browser/content/browser-siteProtections.js gProtectionsHandler.onLocationChange
+ category browser-window-location-change chrome://browser/content/browser-pageActions.js BrowserPageActions.onLocationChange
+-category browser-window-location-change moz-src:///browser/components/urlbar/UrlbarProviderSearchTips.sys.mjs UrlbarProviderSearchTips.onLocationChange
+ category browser-window-location-change moz-src:///browser/components/urlbar/ActionsProviderContextualSearch.sys.mjs ActionsProviderContextualSearch.onLocationChange
+ category browser-window-location-change resource:///modules/asrouter/CFRPageActions.sys.mjs CFRPageActions.onLocationChange
+ category browser-window-location-change resource:///actors/AboutReaderParent.sys.mjs AboutReaderParent.onLocationChange
+diff --git a/browser/components/BrowserContentHandler.sys.mjs b/browser/components/BrowserContentHandler.sys.mjs
+index 2bbbe80008..3f0c29a8c4 100644
+--- a/browser/components/BrowserContentHandler.sys.mjs
++++ b/browser/components/BrowserContentHandler.sys.mjs
+@@ -14,7 +14,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   FirstStartup: "resource://gre/modules/FirstStartup.sys.mjs",
+   HeadlessShell: "moz-src:///browser/components/shell/HeadlessShell.sys.mjs",
+   HomePage: "resource:///modules/HomePage.sys.mjs",
+-  LaterRun: "resource:///modules/LaterRun.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+@@ -708,10 +707,7 @@ nsBrowserContentHandler.prototype = {
+   // For the startup version of this function, please use getFirstWindowArgs().
+   // See Bug 1642039 for more information.
+   getNewWindowArgs(skipStartPage = false) {
+-    var page = lazy.LaterRun.getURL();
+-    if (page == "about:blank") {
+-      page = "";
+-    }
++    var page = "";
+     var startPage = "";
+     var prefb = Services.prefs;
+     try {
+@@ -791,8 +787,6 @@ nsBrowserContentHandler.prototype = {
+             additionalPage = Services.urlFormatter.formatURLPref(
+               "startup.homepage_welcome_url.additional"
+             );
+-            // Turn on 'later run' pages for new profiles.
+-            lazy.LaterRun.enable(lazy.LaterRun.ENABLE_REASON_NEW_PROFILE);
+             break;
+           case OVERRIDE_NEW_MSTONE: {
+             // Check whether we will restore a session. If we will, we assume
+@@ -923,8 +917,6 @@ nsBrowserContentHandler.prototype = {
+                   .ready()
+                   .then(() => nimbusWNPFeature.recordExposureEvent());
+               }
+-
+-              lazy.LaterRun.enable(lazy.LaterRun.ENABLE_REASON_UPDATE_APPLIED);
+             }
+ 
+             // Send the update ping to signal that the update was successful.
+@@ -958,8 +950,7 @@ nsBrowserContentHandler.prototype = {
+           case OVERRIDE_NEW_BUILD_ID: {
+             // We must spin the events loop because `getFirstWindowArgs` cannot be
+             // easily made asynchronous, having too many synchronous callers. Additionally
+-            // we must know the value of `updateInstalledAtStartup` immediately,
+-            // in order to properly enable `lazy.LaterRun`, that will be invoked shortly after this.
++            // we must know the value of `updateInstalledAtStartup` immediately.
+             let updateInstalledAtStartup = spinForUpdateInstalledAtStartup();
+ 
+             if (updateInstalledAtStartup) {
+@@ -974,8 +965,6 @@ nsBrowserContentHandler.prototype = {
+                 handleUpdateSuccessTask,
+                 { fetchState: () => ({ progress }) }
+               );
+-
+-              lazy.LaterRun.enable(lazy.LaterRun.ENABLE_REASON_UPDATE_APPLIED);
+             }
+             break;
+           }
+@@ -1033,10 +1022,6 @@ nsBrowserContentHandler.prototype = {
+       }
+     }
+ 
+-    if (!additionalPage) {
+-      additionalPage = lazy.LaterRun.getURL() || "";
+-    }
+-
+     if (additionalPage && additionalPage != "about:blank") {
+       if (overridePage) {
+         overridePage += "|" + additionalPage;
+diff --git a/browser/components/urlbar/UrlbarPrefs.sys.mjs b/browser/components/urlbar/UrlbarPrefs.sys.mjs
+index 34dd10e1f4..9c0923103f 100644
+--- a/browser/components/urlbar/UrlbarPrefs.sys.mjs
++++ b/browser/components/urlbar/UrlbarPrefs.sys.mjs
+@@ -454,11 +454,6 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
+   // Feature gate pref for search restrict keywords being shown in the urlbar.
+   ["searchRestrictKeywords.featureGate", false],
+ 
+-  // Hidden pref. Disables checks that prevent search tips being shown, thus
+-  // showing them every time the newtab page or the default search engine
+-  // homepage is opened.
+-  ["searchTips.test.ignoreShowLimits", false],
+-
+   // Feature gate pref for secondary actions being shown in the urlbar.
+   ["secondaryActions.featureGate", false],
+ 
+@@ -622,12 +617,6 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
+   // onboarding results before we stop showing them.
+   ["tabToSearch.onboard.interactionsLeft", 3],
+ 
+-  // The number of times the user has been shown the onboarding search tip.
+-  ["tipShownCount.searchTip_onboard", 0],
+-
+-  // The number of times the user has been shown the redirect search tip.
+-  ["tipShownCount.searchTip_redirect", 0],
+-
+   // Feature gate pref for trending suggestions in the urlbar.
+   ["trending.featureGate", true],
+ 
+@@ -828,7 +817,6 @@ function makeDefaultResultGroups({
+         children: [
+           { group: lazy.UrlbarUtils.RESULT_GROUP.HEURISTIC_TEST },
+           { group: lazy.UrlbarUtils.RESULT_GROUP.HEURISTIC_EXTENSION },
+-          { group: lazy.UrlbarUtils.RESULT_GROUP.HEURISTIC_SEARCH_TIP },
+           { group: lazy.UrlbarUtils.RESULT_GROUP.HEURISTIC_OMNIBOX },
+           { group: lazy.UrlbarUtils.RESULT_GROUP.HEURISTIC_ENGINE_ALIAS },
+           { group: lazy.UrlbarUtils.RESULT_GROUP.HEURISTIC_BOOKMARK_KEYWORD },
+diff --git a/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs b/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs
+index f71a4dfe1a..d2150de7d1 100644
+--- a/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderPlaces.sys.mjs
+@@ -1134,7 +1134,6 @@ class Search {
+         case UrlbarUtils.RESULT_GROUP.HEURISTIC_EXTENSION:
+         case UrlbarUtils.RESULT_GROUP.HEURISTIC_FALLBACK:
+         case UrlbarUtils.RESULT_GROUP.HEURISTIC_OMNIBOX:
+-        case UrlbarUtils.RESULT_GROUP.HEURISTIC_SEARCH_TIP:
+         case UrlbarUtils.RESULT_GROUP.HEURISTIC_TEST:
+         case UrlbarUtils.RESULT_GROUP.HEURISTIC_TOKEN_ALIAS_ENGINE:
+           type = MATCH_TYPE.HEURISTIC;
+diff --git a/browser/components/urlbar/UrlbarProvidersManager.sys.mjs b/browser/components/urlbar/UrlbarProvidersManager.sys.mjs
+index 9dbebca8da..49721d0ebe 100644
+--- a/browser/components/urlbar/UrlbarProvidersManager.sys.mjs
++++ b/browser/components/urlbar/UrlbarProvidersManager.sys.mjs
+@@ -164,12 +164,6 @@ var localProviderModules = [
+       "moz-src:///browser/components/urlbar/UrlbarProviderRestrictKeywordsAutofill.sys.mjs",
+     supportedSAPs: ["urlbar"],
+   },
+-  {
+-    name: "UrlbarProviderSearchTips",
+-    module:
+-      "moz-src:///browser/components/urlbar/UrlbarProviderSearchTips.sys.mjs",
+-    supportedSAPs: ["urlbar"],
+-  },
+   {
+     name: "UrlbarProviderSearchSuggestions",
+     module:
+diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/urlbar/UrlbarUtils.sys.mjs
+index f8bc7f475b..86da30cbf3 100644
+--- a/browser/components/urlbar/UrlbarUtils.sys.mjs
++++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
+@@ -41,8 +41,6 @@ const lazy = XPCOMUtils.declareLazy({
+     "moz-src:///browser/components/urlbar/UrlbarProviderInterventions.sys.mjs",
+   UrlbarProviderOpenTabs:
+     "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
+-  UrlbarProviderSearchTips:
+-    "moz-src:///browser/components/urlbar/UrlbarProviderSearchTips.sys.mjs",
+   UrlbarSearchUtils:
+     "moz-src:///browser/components/urlbar/UrlbarSearchUtils.sys.mjs",
+   UrlUtils: "resource://gre/modules/UrlUtils.sys.mjs",
+@@ -112,7 +110,6 @@ export var UrlbarUtils = {
+     HEURISTIC_HISTORY_URL: "heuristicHistoryUrl",
+     HEURISTIC_OMNIBOX: "heuristicOmnibox",
+     HEURISTIC_RESTRICT_KEYWORD_AUTOFILL: "heuristicRestrictKeywordAutofill",
+-    HEURISTIC_SEARCH_TIP: "heuristicSearchTip",
+     HEURISTIC_TEST: "heuristicTest",
+     HEURISTIC_TOKEN_ALIAS_ENGINE: "heuristicTokenAliasEngine",
+     INPUT_HISTORY: "inputHistory",
+@@ -611,8 +608,6 @@ export var UrlbarUtils = {
+           return this.RESULT_GROUP.HEURISTIC_RESTRICT_KEYWORD_AUTOFILL;
+         case "UrlbarProviderTokenAliasEngines":
+           return this.RESULT_GROUP.HEURISTIC_TOKEN_ALIAS_ENGINE;
+-        case "UrlbarProviderSearchTips":
+-          return this.RESULT_GROUP.HEURISTIC_SEARCH_TIP;
+         default:
+           if (result.providerName.startsWith("TestProvider")) {
+             return this.RESULT_GROUP.HEURISTIC_TEST;
+@@ -2174,10 +2169,6 @@ export var UrlbarUtils = {
+           }
+         }
+         switch (result.payload.type) {
+-          case lazy.UrlbarProviderSearchTips.TIP_TYPE.ONBOARD:
+-            return "tip_onboard";
+-          case lazy.UrlbarProviderSearchTips.TIP_TYPE.REDIRECT:
+-            return "tip_redirect";
+           case "dismissalAcknowledgment":
+             return "tip_dismissal_acknowledgment";
+           default:
+@@ -3044,8 +3035,6 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
+           "intervention_update_restart",
+           "intervention_update_web",
+           "realtime_opt_in",
+-          "searchTip_onboard",
+-          "searchTip_redirect",
+           "test", // for tests only
+         ],
+       },
+diff --git a/browser/components/urlbar/content/UrlbarView.mjs b/browser/components/urlbar/content/UrlbarView.mjs
+index 857958165f..d31820ac29 100644
+--- a/browser/components/urlbar/content/UrlbarView.mjs
++++ b/browser/components/urlbar/content/UrlbarView.mjs
+@@ -866,14 +866,10 @@ export class UrlbarView {
+       });
+ 
+       // Show the one-off search buttons unless any of the following are true:
+-      //  * The first result is a search tip
+-      //  * The search string is empty
+       //  * The search string starts with an `@` or a search restriction
+       //    character
+       this.oneOffSearchButtons?.enable(
+-        (firstResult.providerName != "UrlbarProviderSearchTips" ||
+-          queryContext.trimmedSearchString) &&
+-          queryContext.trimmedSearchString[0] != "@" &&
++        queryContext.trimmedSearchString[0] != "@" &&
+           (queryContext.trimmedSearchString[0] !=
+             UrlbarShared.RESTRICT_TOKENS.SEARCH ||
+             queryContext.trimmedSearchString.length != 1)
+@@ -2159,10 +2155,7 @@ export class UrlbarView {
+       // and the focus goes straight to the tip button.)
+       item.addEventListener("focus", () => this.input.focus(), true);
+ 
+-      if (
+-        result.providerName == "UrlbarProviderSearchTips" ||
+-        result.payload.type == "dismissalAcknowledgment"
+-      ) {
++      if (result.payload.type == "dismissalAcknowledgment") {
+         // For a11y, we treat search tips as alerts. We use ariaNotify
+         // instead of role="alert" because role="alert" will only fire an alert
+         // event when the alert (or something inside it) is the root of an
+diff --git a/browser/components/urlbar/moz.build b/browser/components/urlbar/moz.build
+index 18035d2049..0f26e00cd3 100644
+--- a/browser/components/urlbar/moz.build
++++ b/browser/components/urlbar/moz.build
+@@ -43,7 +43,6 @@ MOZ_SRC_FILES += [
+     "UrlbarProviderRestrictKeywords.sys.mjs",
+     "UrlbarProviderRestrictKeywordsAutofill.sys.mjs",
+     "UrlbarProviderSearchSuggestions.sys.mjs",
+-    "UrlbarProviderSearchTips.sys.mjs",
+     "UrlbarProviderSemanticHistorySearch.sys.mjs",
+     "UrlbarProvidersManager.sys.mjs",
+     "UrlbarProviderTabToSearch.sys.mjs",
+@@ -103,7 +102,6 @@ BROWSER_CHROME_MANIFESTS += [
+     "tests/browser-telemetry/browserNova.toml",
+     "tests/browser-tips/browser.toml",
+     "tests/browser-tips/browserNova.toml",
+-    "tests/browser-tips/suppress-tips/browser.toml",
+     "tests/browser-updateResults/browser.toml",
+     "tests/browser-updateResults/browserNova.toml",
+     "tests/browser-UrlbarInput/browser.toml",
+diff --git a/browser/components/urlbar/tests/browser-tips/browser.toml b/browser/components/urlbar/tests/browser-tips/browser.toml
+index d164c776ca..c287a60f24 100644
+--- a/browser/components/urlbar/tests/browser-tips/browser.toml
++++ b/browser/components/urlbar/tests/browser-tips/browser.toml
+@@ -7,16 +7,6 @@ prefs = ["browser.bookmarks.testing.skipDefaultBookmarksImport=true"]
+ 
+ ["browser_picks.js"]
+ 
+-["browser_searchTips.js"]
+-support-files = [
+-  "../browser/slow-page.sjs",
+-  "slow-page.html",
+-]
+-https_first_disabled = true
+-
+-["browser_searchTips_interaction.js"]
+-https_first_disabled = true
+-
+ ["browser_selection.js"]
+ 
+ ["browser_tip_richSuggestion.js"]
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index e22751a981..cd1e30c74c 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -125,9 +125,6 @@ urlbar-dismissal-acknowledgment-weather = Thanks for your feedback. You won’t
+ ## Variables:
+ ##  $engineName (String): The name of the user's default search engine. e.g. "Google" or "DuckDuckGo".
+ 
+-urlbar-search-tips-onboard = Type less, find more: Search { $engineName } right from your address bar.
+-urlbar-search-tips-redirect-2 = Start your search in the address bar to see suggestions from { $engineName } and your browsing history.
+-
+ # Prompts users to use the Urlbar when they are typing in the domain of a
+ # search engine, e.g. google.com or amazon.com.
+ urlbar-tabtosearch-onboard = Select this shortcut to find what you need faster.
+diff --git a/browser/modules/moz.build b/browser/modules/moz.build
+index 6af8dd39fd..67102d7170 100644
+--- a/browser/modules/moz.build
++++ b/browser/modules/moz.build
+@@ -35,9 +35,6 @@ with Files("test/browser/browser_urlBar_zoom.js"):
+ with Files("test/unit/test_E10SUtils_nested_URIs.js"):
+     BUG_COMPONENT = ("Core", "Security: Process Sandboxing")
+ 
+-with Files("test/unit/test_LaterRun.js"):
+-    BUG_COMPONENT = ("Firefox", "Tours")
+-
+ with Files("test/unit/test_SitePermissions.js"):
+     BUG_COMPONENT = ("Firefox", "Site Permissions")
+ 
+@@ -59,9 +56,6 @@ with Files("EveryWindow.sys.mjs"):
+ with Files("ExtensionsUI.sys.mjs"):
+     BUG_COMPONENT = ("WebExtensions", "General")
+ 
+-with Files("LaterRun.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Tours")
+-
+ with Files("PartnerLinkAttribution.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Search")
+ 
+@@ -121,7 +115,6 @@ EXTRA_JS_MODULES += [
+     "FilterAdult.sys.mjs",
+     "FirefoxBridgeExtensionUtils.sys.mjs",
+     "HomePage.sys.mjs",
+-    "LaterRun.sys.mjs",
+     "LinksCache.sys.mjs",
+     "PageActions.sys.mjs",
+     "PartnerLinkAttribution.sys.mjs",
+diff --git a/browser/modules/test/unit/xpcshell.toml b/browser/modules/test/unit/xpcshell.toml
+index a54203dd3a..2c992c9a47 100644
+--- a/browser/modules/test/unit/xpcshell.toml
++++ b/browser/modules/test/unit/xpcshell.toml
+@@ -39,8 +39,6 @@ run-if = [
+   "os == 'win'", # Test of a Windows-specific feature
+ ]
+ 
+-["test_LaterRun.js"]
+-
+ ["test_LinksCache.js"]
+ 
+ ["test_ProfileCounter.js"]
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index c426f7c0dd..c91b372bfa 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -877,8 +877,6 @@ export default [
+       "browser/components/uitour/test/head.js",
+       "browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs",
+       "browser/components/urlbar/tests/browser-tips/browser_picks.js",
+-      "browser/components/urlbar/tests/browser-tips/browser_searchTips.js",
+-      "browser/components/urlbar/tests/browser-tips/browser_searchTips_interaction.js",
+       "browser/components/urlbar/tests/browser-tips/browser_selection.js",
+       "browser/components/urlbar/tests/browser-tips/head.js",
+       "browser/components/urlbar/tests/browser-updateResults/browser_appendSpanCount.js",

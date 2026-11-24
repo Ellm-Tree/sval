@@ -308,14 +308,9 @@ add_task(async function firefox_s_pages() {
 
 /**
  * Settings panes Sval takes out of reach: Firefox Labs
- * (`no-firefox-labs.patch`), the AI window's (`browser.ai.control.*`) and
- * Containers (`browser_sval_upstream_ui.js`).
+ * (`no-firefox-labs.patch`) and Containers (`browser_sval_upstream_ui.js`).
  */
-const REMOVED_PANES = [
-  "paneExperimental",
-  "panePersonalizeSmartWindow",
-  "paneContainers",
-];
+const REMOVED_PANES = ["paneExperimental", "paneContainers"];
 
 add_task(async function every_settings_pane() {
   const tab = await openPage("about:preferences");

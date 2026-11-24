@@ -38,6 +38,43 @@ Each entry gives:
 - **Upstream**: file a bug in Core :: Layout: Scrolling and Overflow with
   the patch and the test as a mochitest. Not submitted.
 
+### A reused objdir keeps the files of a removed install target
+
+- **Patch**: `patches/faster-make-purge-removed-targets.patch`, with the
+  logic in `chrome/python/mozbuild/mozbuild/backend/sval_stale_installs.py`.
+- **Mozilla bug**: none filed.
+- **Defect**: `FasterMakeBackend` writes an install manifest per install
+  target under `dist/bin`, and `config/faster/rules.mk` processes each with
+  its own `.track` file, which is how `process_install_manifest` finds the
+  files a manifest stopped listing. When a target leaves the build, as when
+  a directory's `MOZ_SRC_FILES` go, the backend deletes its manifest and
+  make never processes its `.track`, so everything it installed stays in
+  `dist/bin`. `browser/installer/package-manifest.in` packages
+  `@RESPATH@/moz-src/*`, so a package built from that objdir ships the
+  removed modules. The fix processes each orphaned `.track` with an empty
+  manifest when the backend is written.
+- **Evidence**: on a Windows CI runner whose objdir outlives each job,
+  `browser_sval_no_ai.js` found `moz-src:///browser/components/aiwindow/`
+  and `genai/` modules after their directories were deleted. Locally, a
+  directory added with `MOZ_SRC_FILES`, built, then removed and rebuilt,
+  kept its file in `dist/bin/moz-src` without the patch and lost it with it.
+- **Upstream**: file a bug in Firefox Build System :: General. Upstream
+  would fold the module into `fastermake.py`. Not submitted.
+
+### PageLoadEventUtils.h needs its includer to bring the string traits
+
+- **Patch**: `patches/page-load-event-utils-include.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `dom/ipc/PageLoadEventUtils.h` writes and reads an `nsCString`
+  through `IPC::ParamTraits` but includes only `IPCMessageUtils.h`. The
+  traits for strings live in `IPCMessageUtilsSpecializations.h`, so the
+  header compiles only where something included earlier brings them.
+- **Evidence**: `nsImageLoadingContent.cpp` stops including `PContent.h`
+  once Sval removes text recognition, and the macOS Gecko build then fails
+  in `nsImageLoadingContent.cpp` on `ParamTraitsFundamental<nsTString<char>>`.
+- **Upstream**: file a bug in Core :: DOM: Content Processes with the
+  one-line include. Not submitted.
+
 ### A tab moved mid-load files its session state under the wrong key
 
 - **Patch**: `patches/tab-move-keeps-session-key.patch`
@@ -1163,6 +1200,26 @@ Each entry gives:
   client's Rust tests.
 - **Upstream**: the patch, with a case in `report_response` in the same
   file. Not submitted.
+
+### The topsites module's list goes stale while the browser runs
+
+- **Patch**: `patches/topsites-refresh-on-rank-change.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: with `browser.topsites.component.enabled`, the address bar
+  reads `TopSites.getSites()`, which returns the list `TopSites.refresh`
+  last built. `refresh` runs on bookmark, history-removal, search and pref
+  events only. The new tab add-on's `TopSitesFeed` also refreshes on
+  `SYSTEM_TICK`, which the module has no counterpart for. A page the user
+  makes frequent after the list was first read stays out of it until one
+  of those events or a restart. The fix refreshes on Places'
+  `pages-rank-changed`, which every visit and frecency recalculation fires.
+- **Evidence**: `browser_sval_launcher_top_sites.js`'s
+  `a_site_made_frequent_later_joins_the_launcher` visits a page fifteen
+  times after the list was read. Without the patch the list never
+  refreshes and the page is missing.
+- **Upstream**: file a bug in Firefox :: Address Bar with the patch and an
+  xpcshell case in `browser/components/topsites/test/unit/test_top_sites.js`.
+  Not submitted.
 
 ## Worked around in Sval's code, Mozilla's code unchanged
 

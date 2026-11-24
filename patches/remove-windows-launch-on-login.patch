@@ -1,0 +1,603 @@
+Sval: Remove Windows launch on login
+
+Windows' own Startup apps settings start Sval at login. Firefox's
+launch-on-login goes whole: the module that writes the Run key and the
+startup shortcut, the first-run default that enabled it, its prefs and
+Nimbus features, the Settings checkbox and its notices, the infobar
+prompts' strings, the targeting attribute, and the startup check and
+telemetry that read it. The `-os-autostart` flag Windows passes an
+MSIX package's startup task stays read, as the shell service's C++
+launch-on-login state does.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index b7e793a973..260b46c3f6 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -321,18 +321,6 @@ pref("browser.startup.couldRestoreSession.count", 0);
+ // users as it is not implemented anywhere else.
+ #if defined(XP_WIN)
+ pref("browser.startup.preXulSkeletonUI", true);
+-
+-// Whether the checkbox to enable Windows launch on login is shown
+-pref("browser.startup.windowsLaunchOnLogin.enabled", true);
+-// Whether to show the launch on login infobar notification
+-pref("browser.startup.windowsLaunchOnLogin.disableLaunchOnLoginPrompt", false);
+-// Whether new installs default to launching Firefox on Windows login when the
+-// user is not enrolled in Nimbus for this feature. When false, launch-on-login
+-// is enabled only by a Nimbus rollout or experiment; when true, it is enabled
+-// by default for everyone. A Nimbus enrollment overrides this in either
+-// direction.
+-pref("browser.startup.windowsLaunchOnLogin.defaultEnabled", false);
+-pref("browser.startup.windowsLaunchOnLogin.alreadyApplied", false);
+ #endif
+ 
+ // Show an upgrade dialog on major upgrades.
+diff --git a/browser/base/content/test/performance/browser_startup.js b/browser/base/content/test/performance/browser_startup.js
+index ed3be34e87..c61a5bb7aa 100644
+--- a/browser/base/content/test/performance/browser_startup.js
++++ b/browser/base/content/test/performance/browser_startup.js
+@@ -107,13 +107,6 @@ const startupPhases = {
+   },
+ };
+ 
+-if (AppConstants.platform == "win") {
+-  // On Windows we call checkForLaunchOnLogin early in startup.
+-  startupPhases["before profile selection"].allowlist.modules.add(
+-    "moz-src:///browser/components/shell/StartupOSIntegration.sys.mjs"
+-  );
+-}
+-
+ if (
+   Services.prefs.getBoolPref("browser.startup.blankWindow") &&
+   (Services.prefs.getCharPref(
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 5c6d07111b..f075128f21 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -136,7 +136,6 @@ category browser-idle-startup resource:///modules/UpdatePolicyEnforcer.sys.mjs U
+ #endif
+ #ifdef XP_WIN
+ category browser-idle-startup resource:///modules/WindowsJumpLists.sys.mjs WinTaskbarJumpList.startup
+-category browser-idle-startup resource:///modules/DefaultWindowsLaunchOnLogin.sys.mjs DefaultWindowsLaunchOnLogin.maybeEnableOnFirstRun
+ #endif
+ #if defined(XP_WIN) || defined(XP_MACOSX)
+ category browser-idle-startup moz-src:///browser/components/shell/StartupOSIntegration.sys.mjs StartupOSIntegration.onStartupIdle
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 6729104925..62794c63a1 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -324,9 +324,6 @@ BrowserGlue.prototype = {
+           "os-autostart",
+           false
+         );
+-        if (AppConstants.platform == "win") {
+-          lazy.StartupOSIntegration.checkForLaunchOnLogin();
+-        }
+         break;
+       }
+     }
+diff --git a/browser/components/StartupTelemetry.sys.mjs b/browser/components/StartupTelemetry.sys.mjs
+index e230201da3..71eb9e82ac 100644
+--- a/browser/components/StartupTelemetry.sys.mjs
++++ b/browser/components/StartupTelemetry.sys.mjs
+@@ -12,7 +12,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   OsEnvironment: "resource://gre/modules/OsEnvironment.sys.mjs",
+-  WindowsLaunchOnLogin: "resource://gre/modules/WindowsLaunchOnLogin.sys.mjs",
+   PlacesDBUtils: "resource://gre/modules/PlacesDBUtils.sys.mjs",
+   ShellService: "moz-src:///browser/components/shell/ShellService.sys.mjs",
+   TelemetryReportingPolicy:
+@@ -77,7 +76,6 @@ export let StartupTelemetry = {
+       () => this.httpsOnlyState(),
+       () => this.globalPrivacyControl(),
+       () => this.aiControlBlocking(),
+-      () => this.launchOnLoginState(),
+     ];
+     if (this._willUseExpensiveTelemetry) {
+       tasks.push(() => lazy.PlacesDBUtils.telemetry());
+@@ -479,31 +477,6 @@ export let StartupTelemetry = {
+     });
+   },
+ 
+-  async launchOnLoginState() {
+-    let state;
+-    if (AppConstants.platform != "win") {
+-      state = "not_supported";
+-    } else {
+-      try {
+-        const enablementDetails =
+-          await lazy.WindowsLaunchOnLogin.getLaunchOnLoginEnablementDetails();
+-        if (enablementDetails.isEnabled) {
+-          state = "enabled";
+-        } else if (!enablementDetails.isSupported) {
+-          state = "not_supported";
+-        } else if (!enablementDetails.isAllowedByPolicy) {
+-          state = "disabled_by_settings";
+-        } else {
+-          state = "disabled";
+-        }
+-      } catch (ex) {
+-        console.error(ex);
+-        state = "error";
+-      }
+-    }
+-    Glean.osEnvironment.launchOnLoginState.set(state);
+-  },
+-
+   macDockStatus() {
+     // Report macOS Dock status
+     Glean.osEnvironment.isKeptInDock.set(
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index bec9d32da9..859a2972ad 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -85,7 +85,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
+   TelemetryEnvironment: "resource://gre/modules/TelemetryEnvironment.sys.mjs",
+   TelemetrySession: "resource://gre/modules/TelemetrySession.sys.mjs",
+-  WindowsLaunchOnLogin: "resource://gre/modules/WindowsLaunchOnLogin.sys.mjs",
+ });
+ 
+ ChromeUtils.defineLazyGetter(lazy, "fxAccounts", () => {
+@@ -1100,13 +1099,6 @@ const TargetingGetters = {
+     return QueryCache.getters.doesAppNeedPrivatePin.get();
+   },
+ 
+-  get launchOnLoginEnabled() {
+-    if (AppConstants.platform !== "win") {
+-      return false;
+-    }
+-    return lazy.WindowsLaunchOnLogin.getLaunchOnLoginEnabled();
+-  },
+-
+   get isMSIX() {
+     if (AppConstants.platform !== "win") {
+       return false;
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 7fd3bdd8a1..b9c21b4582 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -89,7 +89,6 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
+     DIRS += ["touchbar"]
+ elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+     DIRS += [
+-        "defaultwindowslaunchonlogin",
+         "installerprefs",
+     ]
+ 
+diff --git a/browser/components/preferences/main.js b/browser/components/preferences/main.js
+index b21fb0b72a..527a8b1c88 100644
+--- a/browser/components/preferences/main.js
++++ b/browser/components/preferences/main.js
+@@ -49,7 +49,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   TranslationsParent: "resource://gre/actors/TranslationsParent.sys.mjs",
+   TranslationsUtils:
+     "chrome://global/content/translations/TranslationsUtils.mjs",
+-  WindowsLaunchOnLogin: "resource://gre/modules/WindowsLaunchOnLogin.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   FormAutofillPreferences:
+     "resource://autofill/FormAutofillPreferences.sys.mjs",
+@@ -104,7 +103,6 @@ Preferences.addAll([
+   // Startup
+   { id: "browser.startup.page", type: "int" },
+   { id: "browser.sessionstore.newTabOnRestore", type: "bool" },
+-  { id: "browser.startup.windowsLaunchOnLogin.enabled", type: "bool" },
+   { id: "browser.privatebrowsing.autostart", type: "bool" },
+ 
+   // AI Controls, these pref values can affect settings on the main pane and
+@@ -138,158 +136,6 @@ Preferences.addSetting({
+   pref: "browser.privatebrowsing.autostart",
+ });
+ 
+-Preferences.addSetting(
+-  /** @type {{ _getLaunchOnLoginApprovedCachedValue: boolean } & SettingConfig} */ ({
+-    id: "launchOnLoginApproved",
+-    _getLaunchOnLoginApprovedCachedValue: true,
+-    get() {
+-      return this._getLaunchOnLoginApprovedCachedValue;
+-    },
+-    // Check for a launch on login registry key
+-    // This accounts for if a user manually changes it in the registry
+-    // Disabling in Task Manager works outside of just deleting the registry key
+-    // in HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run
+-    // but it is not possible to change it back to enabled as the disabled value is just a random
+-    // hexadecimal number
+-    setup() {
+-      if (AppConstants.platform !== "win") {
+-        /**
+-         * WindowsLaunchOnLogin isnt available if not on windows
+-         * but this setup function still fires, so must prevent
+-         * WindowsLaunchOnLogin.getLaunchOnLoginApproved
+-         * below from executing unnecessarily.
+-         */
+-        return;
+-      }
+-      // @ts-ignore bug 1996860
+-      WindowsLaunchOnLogin.getLaunchOnLoginApproved().then(val => {
+-        this._getLaunchOnLoginApprovedCachedValue = val;
+-      });
+-    },
+-  })
+-);
+-
+-Preferences.addSetting({
+-  id: "windowsLaunchOnLoginEnabled",
+-  pref: "browser.startup.windowsLaunchOnLogin.enabled",
+-});
+-
+-Preferences.addSetting(
+-  /** @type {{_getLaunchOnLoginEnabledValue: boolean, startWithLastProfile: boolean} & SettingConfig} */ ({
+-    id: "windowsLaunchOnLogin",
+-    deps: ["launchOnLoginApproved", "windowsLaunchOnLoginEnabled"],
+-    _getLaunchOnLoginEnabledValue: false,
+-    get startWithLastProfile() {
+-      return Cc["@mozilla.org/toolkit/profile-service;1"].getService(
+-        Ci.nsIToolkitProfileService
+-      ).startWithLastProfile;
+-    },
+-    get() {
+-      return this._getLaunchOnLoginEnabledValue;
+-    },
+-    setup(emitChange) {
+-      if (AppConstants.platform !== "win") {
+-        /**
+-         * WindowsLaunchOnLogin isnt available if not on windows
+-         * but this setup function still fires, so must prevent
+-         * WindowsLaunchOnLogin.getLaunchOnLoginEnabled
+-         * below from executing unnecessarily.
+-         */
+-        return;
+-      }
+-
+-      /** @type {boolean} */
+-      let getLaunchOnLoginEnabledValue;
+-      let maybeEmitChange = () => {
+-        if (
+-          getLaunchOnLoginEnabledValue !== this._getLaunchOnLoginEnabledValue
+-        ) {
+-          this._getLaunchOnLoginEnabledValue = getLaunchOnLoginEnabledValue;
+-          emitChange();
+-        }
+-      };
+-      if (!this.startWithLastProfile) {
+-        getLaunchOnLoginEnabledValue = false;
+-        maybeEmitChange();
+-      } else {
+-        // @ts-ignore bug 1996860
+-        WindowsLaunchOnLogin.getLaunchOnLoginEnabled().then(val => {
+-          getLaunchOnLoginEnabledValue = val;
+-          maybeEmitChange();
+-        });
+-      }
+-    },
+-    visible: ({ windowsLaunchOnLoginEnabled }) => {
+-      let isVisible =
+-        AppConstants.platform === "win" && windowsLaunchOnLoginEnabled.value;
+-      if (isVisible) {
+-        // @ts-ignore bug 1996860
+-        NimbusFeatures.windowsLaunchOnLogin.recordExposureEvent({
+-          once: true,
+-        });
+-      }
+-      return isVisible;
+-    },
+-    disabled({ launchOnLoginApproved }) {
+-      return !this.startWithLastProfile || !launchOnLoginApproved.value;
+-    },
+-    onUserChange(checked) {
+-      Glean.launchOnLogin.userToggle.record({ enabled: checked });
+-      if (checked) {
+-        // windowsLaunchOnLogin has been checked: create registry key or shortcut
+-        // The shortcut is created with the same AUMID as Firefox itself. However,
+-        // this is not set during browser tests and the fallback of checking the
+-        // registry fails. As such we pass an arbitrary AUMID for the purpose
+-        // of testing.
+-        // @ts-ignore bug 1996860
+-        WindowsLaunchOnLogin.createLaunchOnLogin();
+-        Services.prefs.setBoolPref(
+-          "browser.startup.windowsLaunchOnLogin.disableLaunchOnLoginPrompt",
+-          true
+-        );
+-      } else {
+-        // windowsLaunchOnLogin has been unchecked: delete registry key and shortcut
+-        // @ts-ignore bug 1996860
+-        WindowsLaunchOnLogin.removeLaunchOnLogin();
+-      }
+-    },
+-  })
+-);
+-
+-Preferences.addSetting({
+-  id: "windowsLaunchOnLoginDisabledProfileBox",
+-  deps: ["windowsLaunchOnLoginEnabled"],
+-  visible: ({ windowsLaunchOnLoginEnabled }) => {
+-    if (AppConstants.platform !== "win") {
+-      return false;
+-    }
+-    let startWithLastProfile = Cc[
+-      "@mozilla.org/toolkit/profile-service;1"
+-    ].getService(Ci.nsIToolkitProfileService).startWithLastProfile;
+-
+-    return !startWithLastProfile && windowsLaunchOnLoginEnabled.value;
+-  },
+-});
+-
+-Preferences.addSetting({
+-  id: "windowsLaunchOnLoginDisabledBox",
+-  deps: ["launchOnLoginApproved", "windowsLaunchOnLoginEnabled"],
+-  visible: ({ launchOnLoginApproved, windowsLaunchOnLoginEnabled }) => {
+-    if (AppConstants.platform !== "win") {
+-      return false;
+-    }
+-    let startWithLastProfile = Cc[
+-      "@mozilla.org/toolkit/profile-service;1"
+-    ].getService(Ci.nsIToolkitProfileService).startWithLastProfile;
+-
+-    return (
+-      startWithLastProfile &&
+-      !launchOnLoginApproved.value &&
+-      windowsLaunchOnLoginEnabled.value
+-    );
+-  },
+-});
+-
+ Preferences.addSetting({
+   /**
+    * The "Open previous windows and tabs" option on about:preferences page.
+@@ -678,42 +524,6 @@ function createStartupConfig(hidden = false) {
+           },
+         ],
+       },
+-      {
+-        id: "windowsLaunchOnLogin",
+-        l10nId: "windows-launch-on-login",
+-      },
+-      {
+-        id: "windowsLaunchOnLoginDisabledBox",
+-        control: "moz-message-bar",
+-        controlAttrs: {
+-          role: "status",
+-        },
+-        options: [
+-          {
+-            control: "span",
+-            l10nId: "windows-launch-on-login-disabled",
+-            slot: "message",
+-            options: [
+-              {
+-                control: "a",
+-                controlAttrs: {
+-                  "data-l10n-name": "startup-link",
+-                  href: "ms-settings:startupapps",
+-                  target: "_self",
+-                },
+-              },
+-            ],
+-          },
+-        ],
+-      },
+-      {
+-        id: "windowsLaunchOnLoginDisabledProfileBox",
+-        control: "moz-message-bar",
+-        l10nId: "startup-windows-launch-on-login-profile-disabled",
+-        controlAttrs: {
+-          role: "status",
+-        },
+-      },
+       {
+         id: "alwaysCheckDefault",
+         l10nId: "always-check-default",
+diff --git a/browser/components/preferences/tests/browser-srd.toml b/browser/components/preferences/tests/browser-srd.toml
+index a33fd3d07a..835d8e6d33 100644
+--- a/browser/components/preferences/tests/browser-srd.toml
++++ b/browser/components/preferences/tests/browser-srd.toml
+@@ -70,9 +70,3 @@ support-files = ["subdialog.xhtml", "subdialog2.xhtml"]
+ ["browser_tabs_open_external_next_to_active_tab.js"]
+ 
+ ["browser_updates_managed_by_os.js"]
+-
+-["browser_windows_launch_on_login.js"]
+-run-if = ["os == 'win' && !msix"]
+-
+-["browser_windows_launch_on_login_msix.js"]
+-run-if = ["os == 'win' && msix"]
+diff --git a/browser/components/preferences/tests/browser.toml b/browser/components/preferences/tests/browser.toml
+index 1119216668..17d1adc6f5 100644
+--- a/browser/components/preferences/tests/browser.toml
++++ b/browser/components/preferences/tests/browser.toml
+@@ -71,9 +71,3 @@ run-if = ["os == 'mac'"]
+ support-files = ["subdialog.xhtml", "subdialog2.xhtml"]
+ 
+ ["browser_tabs_open_external_next_to_active_tab.js"]
+-
+-["browser_windows_launch_on_login.js"]
+-run-if = ["os == 'win' && !msix"]
+-
+-["browser_windows_launch_on_login_msix.js"]
+-run-if = ["os == 'win' && msix"]
+diff --git a/browser/components/shell/StartupOSIntegration.sys.mjs b/browser/components/shell/StartupOSIntegration.sys.mjs
+index 8c956424fc..e04a28b567 100644
+--- a/browser/components/shell/StartupOSIntegration.sys.mjs
++++ b/browser/components/shell/StartupOSIntegration.sys.mjs
+@@ -27,7 +27,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+     "resource:///modules/FirefoxBridgeExtensionUtils.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   ShellService: "moz-src:///browser/components/shell/ShellService.sys.mjs",
+-  WindowsLaunchOnLogin: "resource://gre/modules/WindowsLaunchOnLogin.sys.mjs",
+   WindowsGPOParser: "resource://gre/modules/policies/WindowsGPOParser.sys.mjs",
+ });
+ 
+@@ -118,32 +117,6 @@ export let StartupOSIntegration = {
+     return true;
+   },
+ 
+-  checkForLaunchOnLogin() {
+-    // We only support launch on login on Windows at the moment.
+-    if (AppConstants.platform != "win") {
+-      return;
+-    }
+-    let launchOnLoginPref = "browser.startup.windowsLaunchOnLogin.enabled";
+-    if (!lazy.profileService.startWithLastProfile) {
+-      // If we don't start with last profile, the user
+-      // likely sees the profile selector on launch.
+-      if (Services.prefs.getBoolPref(launchOnLoginPref)) {
+-        Glean.launchOnLogin.lastProfileDisableStartup.record();
+-        // Disable launch on login messaging if we are disabling the
+-        // feature.
+-        Services.prefs.setBoolPref(
+-          "browser.startup.windowsLaunchOnLogin.disableLaunchOnLoginPrompt",
+-          true
+-        );
+-      }
+-      // To reduce confusion when running multiple Gecko profiles,
+-      // delete launch on login shortcuts and registry keys so that
+-      // users are not presented with the outdated profile selector
+-      // dialog.
+-      lazy.WindowsLaunchOnLogin.removeLaunchOnLogin();
+-    }
+-  },
+-
+   // Note: currently only invoked on Windows and macOS.
+   async onStartupIdle() {
+     // Catch and report exceptions, including async rejections:
+diff --git a/browser/components/tests/unit/xpcshell.toml b/browser/components/tests/unit/xpcshell.toml
+index 8561b291a4..0c4e2167c6 100644
+--- a/browser/components/tests/unit/xpcshell.toml
++++ b/browser/components/tests/unit/xpcshell.toml
+@@ -49,5 +49,3 @@ skip-if = [
+ run-if = [
+   "os == 'win'",
+ ]
+-
+-["test_startupTelemetry_launchOnLoginState.js"]
+diff --git a/browser/locales/en-US/browser/newtab/asrouter.ftl b/browser/locales/en-US/browser/newtab/asrouter.ftl
+index cb66e2346d..cf049bb854 100644
+--- a/browser/locales/en-US/browser/newtab/asrouter.ftl
++++ b/browser/locales/en-US/browser/newtab/asrouter.ftl
+@@ -255,36 +255,6 @@ pdf-default-notification-set-default-button =
+ pdf-default-notification-decline-button =
+     .label = Not now
+ 
+-## Launch on login infobar notification
+-
+-launch-on-login-infobar-message = <strong>Open { -brand-short-name } every time you restart your computer?</strong> Now you can set { -brand-short-name } to open automatically when you restart your device.
+-launch-on-login-learnmore = Learn more
+-launch-on-login-infobar-confirm-button = Yes, open { -brand-short-name }
+-  .accesskey = Y
+-launch-on-login-infobar-reject-button = Not now
+-  .accesskey = N
+-
+-## These string variants are used when the “launch on login” infobar
+-## notification is displayed for a second time.
+-
+-launch-on-login-infobar-final-message = <strong>Open { -brand-short-name } every time you restart your computer?</strong> To manage your Startup preferences, search “startup” in settings.
+-launch-on-login-infobar-final-reject-button = No thanks
+-  .accesskey = N
+-
+-## Launch on login spotlight
+-##
+-## Shown as a spotlight message when the user closes the browser, offering to set
+-## { -brand-short-name } to launch when the computer starts up.
+-
+-launch-on-login-spotlight-title = Open { -brand-short-name } next time your computer starts up?
+-launch-on-login-spotlight-startup-checkbox = Launch { -brand-short-name } at startup
+-launch-on-login-spotlight-pin-taskbar-checkbox = Pin to taskbar
+-# This checkbox label intentionally matches “startup-restore-windows-and-tabs”
+-# in the Settings (preferences.ftl). Localizers can reuse the existing
+-# translation suggested by translation memory.
+-launch-on-login-spotlight-restore-checkbox = Open previous windows and tabs
+-launch-on-login-spotlight-primary-button = Save and close { -brand-short-name }
+-
+ ## Tail Fox Set Default Spotlight
+ 
+ # This title is displayed together with the picture of a running fox with a long tail.
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 3a72934e95..55c9913bf9 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -192,14 +192,6 @@ always-check-default =
+ startup-restore-windows-and-tabs =
+     .label = Open previous windows and tabs
+     .accesskey = s
+-startup-windows-launch-on-login-profile-disabled =
+-    .message = Enable this preference by checking “{ profile-manager-use-selected.label }” in the “Choose User Profile” window.
+-
+-windows-launch-on-login =
+-    .label = Open { -brand-short-name } automatically when your computer starts up
+-    .accesskey = O
+-windows-launch-on-login-disabled = This preference has been disabled in Windows. To change, visit <a data-l10n-name="startup-link">Startup Apps</a> in System settings.
+-
+ # Option to also opens a new tab, in addition to restoring previous tabs and windows
+ windows-launch-on-login-open-new-tab =
+     .label = Also open a new tab
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 7f2a92f4f3..beb6801ae3 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -1000,21 +1000,6 @@ moreFromMozilla:
+       fallbackPref: browser.preferences.moreFromMozilla.template
+       description: UI template used to display Mozilla products. Possible values simple, advanced. Default is simple.
+ 
+-windowsLaunchOnLogin:
+-  description: "New checkbox in about:preferences startup section to start Firefox on Windows login"
+-  owner: omc-core@mozilla.com
+-  hasExposure: true
+-  exposureDescription: >-
+-    Exposure is sent once per browsing session when the about:preferences URL is
+-    first accessed.
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: browser.startup.windowsLaunchOnLogin.enabled
+-      description: Should users see the Windows launch on login checkbox.
+-
+ firefoxBridge:
+   description: "Controls for Firefox Bridge extension and extension registration"
+   owner: install-update@mozilla.com
+@@ -5708,21 +5693,6 @@ ipProtection:
+       description: >-
+         Hides Mozilla VPN promotions for users in regions where it is unavailable
+ 
+-defaultWindowsLaunchOnLogin:
+-  description: >-
+-    Controls whether or not new Windows users get defaulted to launch on login
+-  owner: drubino@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: browser.startup.windowsLaunchOnLogin.defaultEnabled
+-      description: >-
+-        If true, and allowed by Windows policy, a new user will be defaulted
+-        to have Firefox launched when they log on.
+-
+ passwordManager:
+   description: Password manager related prefs
+   owner: maltejur@mozilla.com
+diff --git a/toolkit/modules/moz.build b/toolkit/modules/moz.build
+index b899ec50e1..4f4a0b006d 100644
+--- a/toolkit/modules/moz.build
++++ b/toolkit/modules/moz.build
+@@ -121,9 +121,6 @@ with Files("SubDialog.sys.mjs"):
+ with Files("UpdateUtils.sys.mjs"):
+     BUG_COMPONENT = ("Toolkit", "Application Update")
+ 
+-with Files("WindowsLaunchOnLogin.sys.mjs"):
+-    BUG_COMPONENT = ("Toolkit", "General")
+-
+ with Files("WindowsRegistry.sys.mjs"):
+     BUG_COMPONENT = ("Toolkit", "General")
+ 
+@@ -273,7 +270,6 @@ if CONFIG["OS_TARGET"] not in ("Android", "WINNT"):
+ 
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+     EXTRA_JS_MODULES += [
+-        "WindowsLaunchOnLogin.sys.mjs",
+         "WindowsRegistry.sys.mjs",
+     ]
+ 

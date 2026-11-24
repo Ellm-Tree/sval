@@ -8,21 +8,15 @@ const { SvalSettingsRegistry } = ChromeUtils.importESModule(
 );
 
 add_task(function the_list_has_every_synced_pref() {
-  Assert.equal(SvalSettingsRegistry.SYNCED_PREFS.length, 166);
+  Assert.equal(SvalSettingsRegistry.SYNCED_PREFS.length, 159);
 });
 
 // Synced prefs that have no default on the default branch of an xpcshell run.
 // Every other synced pref must have one.
 const NO_STATIC_DEFAULT = new Set([
-  // The new-tab code registers these defaults at runtime, not in firefox.js.
+  // Read only with a fallback (NewTabUtils' `Storage.get`, TopSites'
+  // TOP_SITES_ROWS_PREF reads).
   "browser.newtabpage.pinned",
-  "browser.newtabpage.activity-stream.feeds.section.highlights",
-  "browser.newtabpage.activity-stream.feeds.topsites",
-  "browser.newtabpage.activity-stream.section.highlights.includeBookmarks",
-  "browser.newtabpage.activity-stream.section.highlights.includeDownloads",
-  "browser.newtabpage.activity-stream.section.highlights.includeVisited",
-  "browser.newtabpage.activity-stream.section.highlights.rows",
-  "browser.newtabpage.activity-stream.showSearch",
   "browser.newtabpage.activity-stream.topSitesRows",
   // No default by design: only ever set by the user (sanitizeDialog.js).
   "spellchecker.dictionary",

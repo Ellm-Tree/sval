@@ -1,0 +1,1557 @@
+Sval: Remove IP Protection
+
+IP Protection is Mozilla's VPN service, reached through Mozilla's
+servers (spec §10.9). It goes whole: both components, the ipp-activator
+built-in add-on, the toolbar button and its panels, the Settings
+section, the ipp-vpn site exclusions in the permissions dialog, the
+VPN error page and its pref, the startup hooks, prefs, Nimbus feature, enterprise policy
+and strings. The permission manager's C++ list of stripped permission
+types still names ipp-vpn.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 24792aa3bc..a097b022da 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -3501,52 +3501,6 @@ pref("startup.homepage_override_nimbus_disable_wnp", false);
+ // rotation altogether.
+ pref("browser.contextual-services.contextId.rotation-in-days", 3);
+ pref("browser.contextual-services.contextId.rust-component.enabled", true);
+-// Pref to block feature callout messages related to IP protection
+-pref("browser.ipProtection.blockIPProtectionCallouts", false);
+-// Pref to enable the IP protection feature
+-pref("browser.ipProtection.enabled", false);
+-// Pref to track whether the user has opted out of using IP Protection
+-pref("browser.ipProtection.optedOut", false);
+-// Pref to enable the autoStart feature
+-pref("browser.ipProtection.features.autoStart", false);
+-// Prefs to track the user turning on autostart preference
+-pref("browser.ipProtection.autoStartEnabled", false);
+-pref("browser.ipProtection.autoStartPrivateEnabled", false);
+-pref("browser.ipProtection.autoRestoreEnabled", false);
+-// Pref to track whether the user has turned IP protection on
+-pref("browser.ipProtection.userEnabled", false);
+-// Pref to track the number of times the user has enabled IP protection (max 3)
+-pref("browser.ipProtection.userEnableCount", 0);
+-// Pref to track if user has ever opened the VPN panel
+-pref("browser.ipProtection.everOpenedPanel", false);
+-// Pref to track if user has opened the VPN panel since location controls were introduced
+-pref("browser.ipProtection.openedPanelWithLocation", false);
+-// Pref to enable support for site exceptions
+-pref("browser.ipProtection.features.siteExceptions", true);
+-// Pref to show confirmation hints for site exceptions
+-pref("browser.ipProtection.siteExceptionsHintsEnabled", true);
+-pref("browser.ipProtection.log", false);
+-pref("browser.ipProtection.guardian.endpoint", "https://vpn.mozilla.org/");
+-pref("browser.ipProtection.added", false);
+-// Pref to track whether the user has upgraded to Mozilla VPN
+-pref("browser.ipProtection.hasUpgraded", false);
+-// Pref to disable upgrade-related messaging when VPN upgrade is not available
+-pref("browser.ipProtection.upgradeNotAvailable", false);
+-// Pref that enables bandwidth usage feature
+-pref("browser.ipProtection.bandwidth.enabled", true);
+-// Pref for messaging the maximum bandwidth allowance in GB
+-pref("browser.ipProtection.bandwidth.maxInGb", 50);
+-// Pref that stores the current egress location for the VPN
+-pref("browser.ipProtection.egressLocation", "");
+-// Pref that flips at 50%, 75%, and 90% bandwidth usage thresholds
+-pref("browser.ipProtection.bandwidthThreshold", 0);
+-// Tracks the highest bandwidth warning threshold (75 or 90) dismissed per surface.
+-// Stored as JSON: { infobar: <number>, panel: <number> }. Reset when bandwidth resets.
+-pref("browser.ipProtection.bandwidthWarningDismissedThreshold", "");
+-// Pref to track if the "NEW" badge on the location selection button should be visible.
+-pref("browser.ipProtection.locationButtonBadgeDismissed", false);
+-// Pref to use the FxA activate flow as the auth provider.
+-pref("browser.ipProtection.fxa.useActivateFlow", true);
+ 
+ // Pref to enable aboug:glean redesign.
+ pref("about.glean.redesign.enabled", false);
+diff --git a/browser/base/content/appmenu-viewcache.inc.xhtml b/browser/base/content/appmenu-viewcache.inc.xhtml
+index 6df1a36e92..4cb915dad4 100644
+--- a/browser/base/content/appmenu-viewcache.inc.xhtml
++++ b/browser/base/content/appmenu-viewcache.inc.xhtml
+@@ -859,48 +859,6 @@
+     </vbox>
+   </panelview>
+ 
+-  <panelview id="PanelUI-ipprotection"
+-             class="PanelUI-subView"
+-             mainview-with-header="true"
+-             has-custom-header="true">
+-    <hbox id="PanelUI-ipprotection-header"
+-         class="panel-header panel-header-with-info-button">
+-        <html:h1>
+-          <html:span id="ipprotection-header-content"
+-                     data-l10n-id="ipprotection-title"></html:span>
+-          <html:moz-badge
+-            id="ipprotection-experiment-badge"
+-            data-l10n-id="ipprotection-experiment-badge"
+-          ></html:moz-badge>
+-        </html:h1>
+-        <html:moz-button
+-          id="ipprotection-header-button"
+-          class="panel-info-button"
+-          data-captures-focus="true"
+-          type="ghost"
+-          iconsrc="chrome://global/skin/icons/info.svg"
+-          size="small"
+-          data-l10n-id="ipprotection-help-button">
+-        </html:moz-button>
+-    </hbox>
+-    <toolbarseparator/>
+-    <vbox id="PanelUI-ipprotection-content" class="panel-subview-body"/>
+-  </panelview>
+-
+-  <panelview id="PanelUI-ipprotection-locations"
+-             class="PanelUI-subView"
+-             data-l10n-id="ipprotection-locations-subview"
+-             data-l10n-attrs="title">
+-    <hbox id="PanelUI-ipprotection-locations-header"
+-         class="panel-header">
+-      <html:h1>
+-        <html:span></html:span>
+-      </html:h1>
+-    </hbox>
+-    <toolbarseparator/>
+-    <vbox id="PanelUI-ipprotection-locations-content" class="panel-subview-body"/>
+-  </panelview>
+-
+   <panelview id="ai-window-toggle-view" class="PanelUI-subView">
+     <vbox class="panel-subview-body">
+       <toolbarbutton id="ai-window-switch-classic"
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index f2b776a857..9d6a9515e0 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -4611,14 +4611,6 @@ var ConfirmationHint = {
+     MozXULElement.insertFTLIfNeeded("toolkit/branding/brandings.ftl");
+     MozXULElement.insertFTLIfNeeded("browser/confirmationHints.ftl");
+ 
+-    // IP Protection strings are still in preview (see Bug 2011776).
+-    // Only insert the preview file if we're showing a hint for IP Protection.
+-    if (
+-      messageId === "confirmation-hint-ipprotection-navigated-to-excluded-site"
+-    ) {
+-      MozXULElement.insertFTLIfNeeded("browser/ipProtection.ftl");
+-    }
+-
+     document.l10n.setAttributes(this._message, messageId, l10nArgs);
+     if (descriptionId) {
+       document.l10n.setAttributes(this._description, descriptionId);
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index 1a9c825c4c..8d85ccfc83 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -63,7 +63,6 @@
+   <link rel="localization" href="browser/firefoxView.ftl"/>
+   <link rel="localization" href="browser/genai.ftl"/>
+   <link rel="localization" href="browser/identityCredentialNotification.ftl" />
+-  <link rel="localization" href="browser/ipProtection.ftl"/>
+   <link rel="localization" href="browser/menubar.ftl"/>
+   <link rel="localization" href="browser/openTabs.ftl"/>
+   <link rel="localization" href="browser/originControls.ftl"/>
+diff --git a/browser/base/content/navigator-toolbox.js b/browser/base/content/navigator-toolbox.js
+index beb9129228..bbfe754cdc 100644
+--- a/browser/base/content/navigator-toolbox.js
++++ b/browser/base/content/navigator-toolbox.js
+@@ -325,7 +325,6 @@ document.addEventListener(
+         #fxa-toolbar-menu-button,
+         #unified-extensions-button,
+         #library-button,
+-        #ipprotection-button,
+         #split-view-button,
+         #smartwindow-ask-button
+       `);
+@@ -411,10 +410,6 @@ document.addEventListener(
+           PanelUI.showSubView("appMenu-libraryView", element, event);
+           break;
+ 
+-        case "ipprotection-button":
+-          PanelUI.showSubView("PanelUI-ipprotection", element, event);
+-          break;
+-
+         case "split-view-button":
+           if (isLikeLeftClick) {
+             gBrowser.openSplitViewMenu(element);
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index d2bd55a8aa..2b0169baaf 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -239,9 +239,6 @@ var allowlist = [
+   { file: "resource://pdf.js/web/debugger.mjs" },
+   { file: "resource://pdf.js/web/debugger.css" },
+ 
+-  // File from the ipp-activator add-on
+-  { file: "resource://builtin-addons/ipp-activator/breakages/tab.json" },
+-
+   // Starting from here, files in the allowlist are bugs that need fixing.
+   // Bug 1339424 (wontfix?)
+   {
+diff --git a/browser/base/jar.mn b/browser/base/jar.mn
+index cd1b8c18c8..d9a53158a9 100644
+--- a/browser/base/jar.mn
++++ b/browser/base/jar.mn
+@@ -14,7 +14,6 @@ browser.jar:
+         content/browser/aboutRobots.css               (content/aboutRobots.css)
+         content/browser/logos/etp-mobile.svg          (content/logos/etp-mobile.svg)
+         content/browser/logos/fxa-logo.svg            (content/logos/fxa-logo.svg)
+-        content/browser/logos/ipprotection-states.svg  (content/logos/ipprotection-states.svg)
+         content/browser/logos/lockwise.svg            (content/logos/lockwise.svg)
+         content/browser/logos/monitor.svg             (content/logos/monitor.svg)
+         content/browser/logos/passkey.svg             (content/logos/passkey.svg)
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 56675023bf..22c32d4d62 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -105,7 +105,6 @@ category browser-first-window-ready moz-src:///toolkit/components/doh/DoHControl
+ category browser-first-window-ready moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs ProfilesDatastoreService.init
+ category browser-first-window-ready resource:///modules/profiles/SelectableProfileService.sys.mjs SelectableProfileService.init
+ category browser-first-window-ready moz-src:///browser/components/protections/ContentBlockingPrefs.sys.mjs ContentBlockingPrefs.init
+-category browser-first-window-ready moz-src:///browser/components/ipprotection/IPProtectionHelpers.sys.mjs IPProtectionActivator.init
+ category browser-first-window-ready moz-src:///browser/components/customizableui/SearchWidgetTracker.sys.mjs SearchWidgetTracker.init
+ #ifdef MOZ_SANDBOX
+ #ifdef XP_LINUX
+@@ -154,7 +153,6 @@ category browser-quit-application-granted resource:///modules/asrouter/ASRouterN
+ category browser-quit-application-granted resource://gre/modules/UpdateListener.sys.mjs UpdateListener.reset
+ #endif
+ category browser-quit-application-granted moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.uninit
+-category browser-quit-application-granted moz-src:///browser/components/ipprotection/IPProtectionHelpers.sys.mjs IPProtectionActivator.uninit
+ 
+ category search-service-notification moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.showSearchServiceNotification
+ 
+diff --git a/browser/components/customizableui/CustomizableUI.sys.mjs b/browser/components/customizableui/CustomizableUI.sys.mjs
+index ee184e79a4..fbd5c12b85 100644
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -265,28 +265,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   ""
+ );
+ 
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "ippEnabled",
+-  "browser.ipProtection.enabled",
+-  false,
+-  (_pref, _oldVal, newVal) => {
+-    if (!newVal) {
+-      return;
+-    }
+-    let navbarPlacements = gAreas
+-      .get(CustomizableUI.AREA_NAVBAR)
+-      .get("defaultPlacements");
+-
+-    // If IPP wasn't available when the navbar area was registered,
+-    // we need to add the buttons default placement now.
+-    if (navbarPlacements && !navbarPlacements.includes("ipprotection-button")) {
+-      let index = navbarPlacements.indexOf("fxa-toolbar-menu-button");
+-      navbarPlacements.splice(index, 0, "ipprotection-button");
+-    }
+-  }
+-);
+-
+ ChromeUtils.defineLazyGetter(lazy, "log", () => {
+   let { ConsoleAPI } = ChromeUtils.importESModule(
+     "resource://gre/modules/Console.sys.mjs"
+@@ -366,7 +344,6 @@ var CustomizableUIInternal = {
+       "spring",
+       "downloads-button",
+       AppConstants.MOZ_DEV_EDITION ? "developer-button" : null,
+-      lazy.ippEnabled ? "ipprotection-button" : null,
+       "fxa-toolbar-menu-button",
+       lazy.resetPBMToolbarButtonEnabled ? "reset-pbm-toolbar-button" : null,
+     ].filter(name => name);
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index 6fcb642bdd..8b59f67d1e 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -2210,14 +2210,6 @@ export var Policies = {
+     },
+   },
+ 
+-  IPProtectionAvailable: {
+-    onBeforeAddons(manager, param) {
+-      if (!param) {
+-        setAndLockPref("browser.ipProtection.enabled", false);
+-      }
+-    },
+-  },
+-
+   LegacyProfiles: {
+     // Handled in nsToolkitProfileService.cpp (Windows only)
+   },
+diff --git a/browser/components/enterprisepolicies/schemas/policies-schema.json b/browser/components/enterprisepolicies/schemas/policies-schema.json
+index 7945ea5491..8176c025aa 100644
+--- a/browser/components/enterprisepolicies/schemas/policies-schema.json
++++ b/browser/components/enterprisepolicies/schemas/policies-schema.json
+@@ -1194,9 +1194,6 @@
+       }
+     },
+ 
+-    "IPProtectionAvailable": {
+-      "type": "boolean"
+-    },
+ 
+     "LegacyProfiles": {
+       "type": "boolean"
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 760fa280dc..e2c9e17f04 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -43,7 +43,6 @@ DIRS += [
+     "extensions",
+     "firefoxview",
+     "genai",
+-    "ipprotection",
+     "messagepreview",
+     "migration",
+     "mozcachedohttp",
+diff --git a/browser/components/preferences/config/LegacyPaneMappings.mjs b/browser/components/preferences/config/LegacyPaneMappings.mjs
+index 60cdd897d4..5f5a012485 100644
+--- a/browser/components/preferences/config/LegacyPaneMappings.mjs
++++ b/browser/components/preferences/config/LegacyPaneMappings.mjs
+@@ -13,7 +13,6 @@ export const LEGACY_PANE_MAPPINGS = new Map([
+   ["privacy-permissions", { category: "permissionsData" }],
+ 
+   ["privacy-sitedata", { category: "privacy", subcategory: "sitedata" }],
+-  ["privacy-vpn", { category: "privacy", subcategory: "vpn" }],
+   [
+     "privacy-trackingprotection",
+     { category: "privacy", subcategory: "etpStatus" },
+diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
+index 68d618a798..dd3ddca33e 100644
+--- a/browser/components/preferences/config/privacy.mjs
++++ b/browser/components/preferences/config/privacy.mjs
+@@ -29,9 +29,6 @@ const lazy = XPCOMUtils.declareLazy({
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+   SiteDataManager: "resource:///modules/SiteDataManager.sys.mjs",
+   SvalSecureDns: "moz-src:///browser/components/sval/SvalSecureDns.sys.mjs",
+-  IPProtection:
+-    "moz-src:///browser/components/ipprotection/IPProtection.sys.mjs",
+-  BANDWIDTH: "chrome://browser/content/ipprotection/ipprotection-constants.mjs",
+   TrackingDBService: {
+     service: "@mozilla.org/tracking-db-service;1",
+     iid: Ci.nsITrackingDBService,
+@@ -398,17 +395,6 @@ Preferences.addAll([
+     type: "bool",
+   },
+ 
+-  // Firefox VPN
+-  { id: "browser.ipProtection.enabled", type: "bool" },
+-  { id: "browser.ipProtection.entitlementCache", type: "string" },
+-  { id: "browser.ipProtection.features.siteExceptions", type: "bool" },
+-  { id: "browser.ipProtection.features.autoStart", type: "bool" },
+-  { id: "browser.ipProtection.autoStartEnabled", type: "bool" },
+-  { id: "browser.ipProtection.autoStartPrivateEnabled", type: "bool" },
+-  { id: "browser.ipProtection.bandwidth.enabled", type: "bool" },
+-  { id: "browser.ipProtection.usageCache", type: "string" },
+-  { id: "browser.ipProtection.upgradeNotAvailable", type: "bool" },
+-
+   // Media
+   { id: "media.autoplay.default", type: "int" },
+ 
+@@ -1453,78 +1439,6 @@ SettingGroupManager.registerGroups({
+       },
+     ],
+   },
+-  ipprotection: {
+-    subcategory: "vpn",
+-    l10nId: "ip-protection-description-1",
+-    headingLevel: 2,
+-    supportPage: "built-in-vpn",
+-    items: [
+-      {
+-        id: "ipProtectionNotOptedInSection",
+-        l10nId: "ip-protection-not-opted-in-4",
+-        control: "moz-promo",
+-        controlAttrs: {
+-          imagesrc:
+-            "chrome://browser/content/ipprotection/assets/vpn-settings-get-started.svg",
+-          imagealignment: "end",
+-        },
+-        items: [
+-          {
+-            id: "getStartedButton",
+-            l10nId: "ip-protection-not-opted-in-button",
+-            control: "moz-button",
+-            slot: "actions",
+-            controlAttrs: {
+-              type: "primary",
+-            },
+-          },
+-        ],
+-      },
+-      {
+-        id: "ipProtectionExceptions",
+-        control: "moz-fieldset",
+-        controlAttrs: {
+-          ".headingLevel": 3,
+-        },
+-        items: [
+-          {
+-            id: "ipProtectionExceptionAllListButton",
+-            control: "moz-box-button",
+-          },
+-        ],
+-      },
+-      {
+-        id: "ipProtectionAutoStart",
+-        l10nId: "ip-protection-autostart",
+-        control: "moz-fieldset",
+-        items: [
+-          {
+-            id: "ipProtectionAutoStartCheckbox",
+-            l10nId: "ip-protection-autostart-checkbox",
+-            control: "moz-checkbox",
+-          },
+-          {
+-            id: "ipProtectionAutoStartPrivateCheckbox",
+-            l10nId: "ip-protection-autostart-private-checkbox",
+-            control: "moz-checkbox",
+-          },
+-        ],
+-      },
+-      {
+-        id: "ipProtectionBandwidthSection",
+-        control: "moz-box-item",
+-        items: [{ id: "ipProtectionBandwidth", control: "bandwidth-usage" }],
+-      },
+-      {
+-        id: "ipProtectionLinks",
+-        control: "moz-box-link",
+-        l10nId: "ip-protection-vpn-upgrade-link",
+-        controlAttrs: {
+-          href: "https://www.mozilla.org/products/vpn/?utm_medium=fx-desktop&utm_campaign=fx-vpn&utm_source=settings",
+-        },
+-      },
+-    ],
+-  },
+   privacyPanel: {
+     iconSrc: "chrome://devtools/skin/images/globe.svg",
+     l10nId: "privacy-panel-settings-header",
+@@ -2013,260 +1927,6 @@ if (SECURITY_PRIVACY_STATUS_CARD_ENABLED) {
+   });
+ }
+ 
+-Preferences.addSetting({
+-  id: "ipProtectionVisible",
+-  pref: "browser.ipProtection.enabled",
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionNotOptedIn",
+-  pref: "browser.ipProtection.entitlementCache",
+-  get: prefVal => !prefVal,
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionSubscribedToVpn",
+-  pref: "browser.ipProtection.entitlementCache",
+-  get: cacheObj => {
+-    try {
+-      // subscribed property should be a boolean, so assume not subscribed
+-      // if the property is somehow an invalid type (eg. string).
+-      return JSON.parse(cacheObj)?.subscribed === true;
+-    } catch {
+-      // Assume not subscribed if cache is missing or malformed.
+-      return false;
+-    }
+-  },
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionUpgradeNotAvailable",
+-  pref: "browser.ipProtection.upgradeNotAvailable",
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionNotOptedInSection",
+-  deps: ["ipProtectionVisible", "ipProtectionNotOptedIn"],
+-  visible: ({ ipProtectionVisible, ipProtectionNotOptedIn }) =>
+-    ipProtectionVisible.value && ipProtectionNotOptedIn.value,
+-});
+-Preferences.addSetting({
+-  id: "getStartedButton",
+-  deps: ["ipProtectionVisible", "ipProtectionNotOptedIn"],
+-  visible: ({ ipProtectionVisible, ipProtectionNotOptedIn }) =>
+-    ipProtectionVisible.value && ipProtectionNotOptedIn.value,
+-  onUserClick() {
+-    lazy.IPProtection.getPanel(window.browsingContext.topChromeWindow)?.enroll({
+-      entrypoint: "vpn_integration_settings",
+-      utm_source: "settings",
+-    });
+-  },
+-});
+-
+-Preferences.addSetting({
+-  id: "ipProtectionSiteExceptionsFeatureEnabled",
+-  pref: "browser.ipProtection.features.siteExceptions",
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionExceptions",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionSiteExceptionsFeatureEnabled",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  visible: ({
+-    ipProtectionVisible,
+-    ipProtectionSiteExceptionsFeatureEnabled,
+-    ipProtectionNotOptedIn,
+-  }) =>
+-    ipProtectionVisible.value &&
+-    ipProtectionSiteExceptionsFeatureEnabled.value &&
+-    !ipProtectionNotOptedIn.value,
+-});
+-
+-Preferences.addSetting({
+-  id: "ipProtectionExceptionAllListButton",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionSiteExceptionsFeatureEnabled",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  setup(emitChange) {
+-    let permObserver = {
+-      observe(subject, topic, _data) {
+-        if (subject && topic === "perm-changed") {
+-          let permission = subject.QueryInterface(Ci.nsIPermission);
+-          if (permission.type === "ipp-vpn") {
+-            emitChange();
+-          }
+-        }
+-      },
+-    };
+-    Services.obs.addObserver(permObserver, "perm-changed");
+-    return () => {
+-      Services.obs.removeObserver(permObserver, "perm-changed");
+-    };
+-  },
+-  visible: ({
+-    ipProtectionVisible,
+-    ipProtectionSiteExceptionsFeatureEnabled,
+-    ipProtectionNotOptedIn,
+-  }) =>
+-    ipProtectionVisible.value &&
+-    ipProtectionSiteExceptionsFeatureEnabled.value &&
+-    !ipProtectionNotOptedIn.value,
+-  onUserClick() {
+-    let params = {
+-      addVisible: true,
+-      hideStatusColumn: true,
+-      prefilledHost: "",
+-      permissionType: "ipp-vpn",
+-      capabilityFilter: Ci.nsIPermissionManager.DENY_ACTION,
+-    };
+-
+-    gSubDialog.open(
+-      "chrome://browser/content/preferences/dialogs/permissions.xhtml",
+-      { features: "resizable=yes" },
+-      params
+-    );
+-  },
+-  getControlConfig(config) {
+-    let l10nId = "ip-protection-site-exceptions-all-sites-button";
+-
+-    let savedExceptions = Services.perms.getAllByTypes(["ipp-vpn"]);
+-    let numberOfExclusions = savedExceptions.filter(
+-      perm => perm.capability === Ci.nsIPermissionManager.DENY_ACTION
+-    ).length;
+-
+-    let l10nArgs = {
+-      count: numberOfExclusions,
+-    };
+-
+-    return {
+-      ...config,
+-      l10nId,
+-      l10nArgs,
+-    };
+-  },
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionAutoStartFeatureEnabled",
+-  pref: "browser.ipProtection.features.autoStart",
+-  get: prefVal => prefVal,
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionAutoStart",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionAutoStartFeatureEnabled",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  visible: ({
+-    ipProtectionVisible,
+-    ipProtectionAutoStartFeatureEnabled,
+-    ipProtectionNotOptedIn,
+-  }) =>
+-    ipProtectionVisible.value &&
+-    ipProtectionAutoStartFeatureEnabled.value &&
+-    !ipProtectionNotOptedIn.value,
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionAutoStartCheckbox",
+-  pref: "browser.ipProtection.autoStartEnabled",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionAutoStart",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  visible: ({ ipProtectionVisible, ipProtectionNotOptedIn }) =>
+-    ipProtectionVisible.value && !ipProtectionNotOptedIn.value,
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionAutoStartPrivateCheckbox",
+-  pref: "browser.ipProtection.autoStartPrivateEnabled",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionAutoStart",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  visible: ({ ipProtectionVisible, ipProtectionNotOptedIn }) =>
+-    ipProtectionVisible.value && !ipProtectionNotOptedIn.value,
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionBandwidthVisible",
+-  deps: ["ipProtectionVisible"],
+-  pref: "browser.ipProtection.bandwidth.enabled",
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionBandwidthSection",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionBandwidthVisible",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  visible: ({
+-    ipProtectionVisible,
+-    ipProtectionBandwidthVisible,
+-    ipProtectionNotOptedIn,
+-  }) =>
+-    ipProtectionVisible.value &&
+-    ipProtectionBandwidthVisible.value &&
+-    !ipProtectionNotOptedIn.value,
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionBandwidth",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionBandwidthVisible",
+-    "ipProtectionBandwidthSection",
+-    "ipProtectionNotOptedIn",
+-  ],
+-  visible: ({
+-    ipProtectionVisible,
+-    ipProtectionBandwidthVisible,
+-    ipProtectionNotOptedIn,
+-  }) =>
+-    ipProtectionVisible.value &&
+-    ipProtectionBandwidthVisible.value &&
+-    !ipProtectionNotOptedIn.value,
+-  pref: "browser.ipProtection.usageCache",
+-  getControlConfig: config => {
+-    const usagePref = Services.prefs.getStringPref(
+-      "browser.ipProtection.usageCache",
+-      ""
+-    );
+-    let usage;
+-    if (usagePref) {
+-      usage = JSON.parse(usagePref);
+-    } else {
+-      usage = {
+-        max: lazy.BANDWIDTH.MAX_IN_GB * lazy.BANDWIDTH.BYTES_IN_GB,
+-        remaining: lazy.BANDWIDTH.MAX_IN_GB * lazy.BANDWIDTH.BYTES_IN_GB,
+-      };
+-    }
+-
+-    return {
+-      ...config,
+-      controlAttrs: usage,
+-    };
+-  },
+-});
+-Preferences.addSetting({
+-  id: "ipProtectionLinks",
+-  deps: [
+-    "ipProtectionVisible",
+-    "ipProtectionNotOptedIn",
+-    "ipProtectionSubscribedToVpn",
+-    "ipProtectionUpgradeNotAvailable",
+-  ],
+-  visible: ({
+-    ipProtectionVisible,
+-    ipProtectionNotOptedIn,
+-    ipProtectionSubscribedToVpn,
+-    ipProtectionUpgradeNotAvailable,
+-  }) =>
+-    ipProtectionVisible.value &&
+-    !ipProtectionNotOptedIn.value &&
+-    !ipProtectionSubscribedToVpn.value &&
+-    !ipProtectionUpgradeNotAvailable.value,
+-});
+-
+ Preferences.addSetting({
+   id: "gpcFunctionalityEnabled",
+   pref: "privacy.globalprivacycontrol.functionality.enabled",
+diff --git a/browser/components/preferences/dialogs/permissions.js b/browser/components/preferences/dialogs/permissions.js
+index 2f92ec1d5d..6e6b31ae8c 100644
+--- a/browser/components/preferences/dialogs/permissions.js
++++ b/browser/components/preferences/dialogs/permissions.js
+@@ -49,10 +49,6 @@ const permissionExceptionsL10n = {
+     window: "permissions-exceptions-addons-window2",
+     description: "permissions-exceptions-addons-desc",
+   },
+-  "ipp-vpn": {
+-    window: "ip-protection-exceptions-dialog-window",
+-    description: "ip-protection-exclusions-desc",
+-  },
+ };
+ 
+ function Permission(principal, type, capability) {
+@@ -88,7 +84,6 @@ var gPermissionManager = {
+    * @param {boolean} params.sessionVisible Display the "Allow for Session" button in the dialog (Only for Cookie & HTTPS-Only permissions)
+    * @param {boolean} params.allowVisible Display the "Allow" button in the dialog
+    * @param {boolean} params.disableETPVisible Display the "Add Exception" button in the dialog (Only for ETP permissions)
+-   * @param {boolean} params.addVisible Display the "Add" button in the dialog (Only for ipp-vpn permissions)
+    * @param {boolean} params.hideStatusColumn Hide the "Status" column in the dialog
+    * @param {boolean} params.forcedHTTP Save inputs whose URI has a HTTPS scheme with a HTTP scheme (Used by HTTPS-Only)
+    * @param {number} params.capabilityFilter Display permissions that have the specified capability only. See Ci.nsIPermissionManager.
+@@ -112,7 +107,6 @@ var gPermissionManager = {
+     this._btnAllow = document.getElementById("btnAllow");
+     this._btnHttpsOnlyOff = document.getElementById("btnHttpsOnlyOff");
+     this._btnHttpsOnlyOffTmp = document.getElementById("btnHttpsOnlyOffTmp");
+-    this._btnAdd = document.getElementById("btnAdd");
+ 
+     this._capabilityFilter = params.capabilityFilter;
+ 
+@@ -127,8 +121,7 @@ var gPermissionManager = {
+       params.blockVisible ||
+       params.sessionVisible ||
+       params.allowVisible ||
+-      params.disableETPVisible ||
+-      params.addVisible;
++      params.disableETPVisible;
+ 
+     this._urlField = document.getElementById("url");
+     this._urlField.value = params.prefilledHost;
+@@ -153,7 +146,6 @@ var gPermissionManager = {
+       params.sessionVisible && this._type == "https-only-load-insecure"
+     );
+     document.getElementById("btnAllow").hidden = !params.allowVisible;
+-    document.getElementById("btnAdd").hidden = !params.addVisible;
+ 
+     this.onHostInput(this._urlField);
+ 
+@@ -245,10 +237,6 @@ var gPermissionManager = {
+             Ci.nsIHttpsOnlyModePermission.LOAD_INSECURE_ALLOW_SESSION
+           );
+           break;
+-        case "btnAdd":
+-          // This button is for ipp-vpn, which only supports
+-          // site exclusions at this time.
+-          gPermissionManager.addPermission(Ci.nsIPermissionManager.DENY_ACTION);
+       }
+     });
+   },
+@@ -578,8 +566,6 @@ var gPermissionManager = {
+         document.getElementById("btnHttpsOnlyOff").click();
+       } else if (!document.getElementById("btnDisableETP").hidden) {
+         document.getElementById("btnDisableETP").click();
+-      } else if (!document.getElementById("btnAdd").hidden) {
+-        document.getElementById("btnAdd").click();
+       }
+     }
+   },
+@@ -595,7 +581,6 @@ var gPermissionManager = {
+     this._btnDisableETP.disabled =
+       this._btnDisableETP.hidden || !siteField.value;
+     this._btnAllow.disabled = this._btnAllow.hidden || !siteField.value;
+-    this._btnAdd.disabled = this._btnAdd.hidden || !siteField.value;
+   },
+ 
+   _setRemoveButtonState() {
+diff --git a/browser/components/preferences/dialogs/permissions.xhtml b/browser/components/preferences/dialogs/permissions.xhtml
+index 778cc04b79..e15a425c36 100644
+--- a/browser/components/preferences/dialogs/permissions.xhtml
++++ b/browser/components/preferences/dialogs/permissions.xhtml
+@@ -36,7 +36,6 @@
+         rel="localization"
+         href="browser/preferences/permissions.ftl"
+       />
+-      <html:link rel="localization" href="browser/ipProtection.ftl" />
+     </linkset>
+ 
+     <script src="chrome://browser/content/preferences/dialogs/permissions.js" />
+@@ -87,7 +86,6 @@
+           disabled="true"
+           data-l10n-id="permissions-button-off-temporarily"
+         />
+-        <button id="btnAdd" disabled="true" data-l10n-id="permissions-add" />
+       </hbox>
+       <separator class="thin" />
+       <listheader>
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index b02bdfba28..7c74166ce5 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -390,7 +390,6 @@ const CONFIG_PANES = Object.freeze({
+       "securityPrivacyWarnings",
+       "httpsOnly",
+       "browsingProtection",
+-      "ipprotection",
+       "history2",
+     ],
+     module: "chrome://browser/content/preferences/config/privacy.mjs",
+diff --git a/browser/components/preferences/preferences.xhtml b/browser/components/preferences/preferences.xhtml
+index 1b8c381593..997815525c 100644
+--- a/browser/components/preferences/preferences.xhtml
++++ b/browser/components/preferences/preferences.xhtml
+@@ -51,7 +51,6 @@
+   <!-- Temporary until localization is done -->
+   <link rel="localization" href="preview/smartTabGroups.ftl"/>
+   <link rel="localization" href="preview/privacyPreferences.ftl"/>
+-  <link rel="localization" href="browser/ipProtection.ftl"/>
+   <link rel="localization" href="preview/aiFeatures.ftl"/>
+ 
+   <!-- Links below are only used for search-l10n-ids into subdialogs -->
+@@ -97,7 +96,6 @@
+   <script type="module" src="chrome://browser/content/preferences/widgets/sync-engines-list.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/update-information.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/update-state.mjs"></script>
+-  <script type="module" src="chrome://browser/content/ipprotection/bandwidth-usage.mjs"></script>
+ </head>
+ 
+ <html:body xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+diff --git a/browser/components/preferences/privacy.inc.xhtml b/browser/components/preferences/privacy.inc.xhtml
+index 78e2e934cf..0c62024d1d 100644
+--- a/browser/components/preferences/privacy.inc.xhtml
++++ b/browser/components/preferences/privacy.inc.xhtml
+@@ -397,9 +397,6 @@
+ <html:setting-group id="nonTechnicalPrivacyGroup" groupid="nonTechnicalPrivacy" data-category="panePrivacy" hidden="true" data-srd-groupid="nonTechnicalPrivacy2"/>
+ <html:setting-group groupid="nonTechnicalPrivacy2" data-category="panePrivacy" hidden="true" data-srd-migrated=""/>
+ 
+-<!-- Firefox VPN - IP Protection -->
+-<html:setting-group groupid="ipprotection" data-category="panePrivacy" data-subcategory="vpn" hidden="true" data-srd-migrated=""></html:setting-group>
+-
+ <html:setting-group groupid="cookiesAndSiteData" data-category="panePrivacy" hidden="true" data-srd-groupid="cookiesAndSiteData2"/>
+ <html:setting-group groupid="cookiesAndSiteData2" data-category="panePrivacy" hidden="true" data-srd-migrated="" />
+ 
+diff --git a/browser/components/preferences/privacy.js b/browser/components/preferences/privacy.js
+index a780854936..d9dc6866d2 100644
+--- a/browser/components/preferences/privacy.js
++++ b/browser/components/preferences/privacy.js
+@@ -75,9 +75,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+   SelectableProfileService:
+     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+-  IPProtection:
+-    "moz-src:///browser/components/ipprotection/IPProtection.sys.mjs",
+-  BANDWIDTH: "chrome://browser/content/ipprotection/ipprotection-constants.mjs",
+ });
+ 
+ const SANITIZE_ON_SHUTDOWN_MAPPINGS = {
+@@ -622,7 +619,6 @@ var gPrivacyPane = {
+     initSettingGroup("cookiesAndSiteData");
+     initSettingGroup("cookiesAndSiteData2");
+     initSettingGroup("certificates");
+-    initSettingGroup("ipprotection");
+     initSettingGroup("history");
+     initSettingGroup("history2");
+     initSettingGroup("permissions");
+diff --git a/browser/components/preferences/tests/browser_bug731866.js b/browser/components/preferences/tests/browser_bug731866.js
+index 65eb1477ba..7055da0bd3 100644
+--- a/browser/components/preferences/tests/browser_bug731866.js
++++ b/browser/components/preferences/tests/browser_bug731866.js
+@@ -8,10 +8,6 @@ const backupSectionDisabled = !(
+   SpecialPowers.getBoolPref("browser.backup.archive.enabled") ||
+   SpecialPowers.getBoolPref("browser.backup.restore.enabled")
+ );
+-const ipProtectionEnabled = SpecialPowers.getBoolPref(
+-  "browser.ipProtection.enabled",
+-  false
+-);
+ const profilesGroupDisabled = !SelectableProfileService.isEnabled;
+ const updatePrefContainers = ["updatesCategory", "updateApp"];
+ const updateContainersGroupDisabled =
+@@ -69,12 +65,6 @@ function checkElements(expectedPane) {
+       continue;
+     }
+ 
+-    // IP Protection section is gated by browser.ipProtection.enabled
+-    if (element.id === "dataIPProtectionGroup" && !ipProtectionEnabled) {
+-      is_element_hidden(element, "Disabled ipProtection should be hidden");
+-      continue;
+-    }
+-
+     if (element.getAttribute("data-hidden-from-search") == "true") {
+       is_element_hidden(element, "Hidden from search element should be hidden");
+       continue;
+diff --git a/browser/components/preferences/tests/browser_bug795764_cachedisabled.js b/browser/components/preferences/tests/browser_bug795764_cachedisabled.js
+index c0b4fc151f..c20004e190 100644
+--- a/browser/components/preferences/tests/browser_bug795764_cachedisabled.js
++++ b/browser/components/preferences/tests/browser_bug795764_cachedisabled.js
+@@ -25,10 +25,6 @@ function test() {
+ }
+ 
+ async function runTest(win) {
+-  const ipProtectionEnabled = SpecialPowers.getBoolPref(
+-    "browser.ipProtection.enabled",
+-    false
+-  );
+   is(gBrowser.currentURI.spec, "about:preferences", "about:preferences loaded");
+ 
+   let tab = win.document;
+@@ -45,12 +41,6 @@ async function runTest(win) {
+       continue;
+     }
+ 
+-    // IP Protection section is gated by browser.ipProtection.enabled
+-    if (element.id === "dataIPProtectionGroup" && !ipProtectionEnabled) {
+-      is_element_hidden(element, "Disabled ipProtection should be hidden");
+-      continue;
+-    }
+-
+     if (element.getAttribute("data-hidden-from-search") == "true") {
+       is_element_hidden(element, "Hidden from search element should be hidden");
+       continue;
+diff --git a/browser/components/preferences/tests/browser_legacy_pane_mappings.js b/browser/components/preferences/tests/browser_legacy_pane_mappings.js
+index 7b30bc0b53..162bb76baa 100644
+--- a/browser/components/preferences/tests/browser_legacy_pane_mappings.js
++++ b/browser/components/preferences/tests/browser_legacy_pane_mappings.js
+@@ -196,8 +196,7 @@ add_task(async function test_paneSearch_normalization() {
+ /**
+  * Assert that legacy names that have mapping entries route to the right pane.
+  * Where the destination group has a data-subcategory attribute, we
+- * also wait for it to render. For feature-gated groups (ipprotection/vpn) we
+- * only assert the hash.
++ * also wait for it to render.
+  */
+ add_task(async function test_legacy_name_routing_and_subcategory_attr() {
+   await SpecialPowers.pushPrefEnv({
+@@ -223,7 +222,6 @@ add_task(async function test_legacy_name_routing_and_subcategory_attr() {
+     ["privacy-trackingprotection", "#privacy", "panePrivacy", "etpStatus"],
+     ["privacy-doh", "#privacy", "panePrivacy", "dnsOverHttps"],
+     ["privacy-sitedata", "#privacy", "panePrivacy", "sitedata"],
+-    ["privacy-vpn", "#privacy", "panePrivacy", null],
+     ["privacy-logins", "#passwordsAutofill", "panePasswordsAutofill", "logins"],
+     ["privacy-permissions", "#permissionsData", "panePermissionsData", null],
+     ["search-firefoxSuggest", "#search", "paneSearch", "locationBar"],
+diff --git a/browser/components/preferences/tests/permissions/browser_capability_filter.js b/browser/components/preferences/tests/permissions/browser_capability_filter.js
+index c2462d977b..75cb38d2e4 100644
+--- a/browser/components/preferences/tests/permissions/browser_capability_filter.js
++++ b/browser/components/preferences/tests/permissions/browser_capability_filter.js
+@@ -4,9 +4,6 @@
+ 
+ "use strict";
+ 
+-const ONBOARDING_MESSAGE_MASK_PREF =
+-  "browser.ipProtection.onboardingMessageMask";
+-
+ /**
+  * Opens the dialog for a specified permission type with a set capabilityFilter.
+  *
+@@ -182,8 +179,8 @@ function cleanupPermissions(permissionType) {
+  */
+ add_task(async function test_filter_dialog_DENY_ACTION_only() {
+   // capabilityFilter isn't exclusive to any permission type.
+-  // Let's use ipp-vpn as an example to test the filter.
+-  const permissionType = "ipp-vpn";
++  // Let's use cookie as an example to test the filter.
++  const permissionType = "cookie";
+   const capabilityFilter = Ci.nsIPermissionManager.DENY_ACTION;
+ 
+   let sites = getMockSiteOrigins(permissionType, capabilityFilter);
+@@ -195,9 +192,6 @@ add_task(async function test_filter_dialog_DENY_ACTION_only() {
+   );
+ 
+   cleanupPermissions(permissionType);
+-  // Since we're using ipp-vpn for this test, clear any prefs related to the permission.
+-  // We can remove this line if we change the permission type.
+-  Services.prefs.clearUserPref(ONBOARDING_MESSAGE_MASK_PREF);
+ });
+ 
+ /**
+@@ -206,8 +200,8 @@ add_task(async function test_filter_dialog_DENY_ACTION_only() {
+  */
+ add_task(async function test_filter_dialog_ALLOW_ACTION_only() {
+   // capabilityFilter isn't exclusive to any permission type.
+-  // Let's use ipp-vpn as an example to test the filter.
+-  const permissionType = "ipp-vpn";
++  // Let's use cookie as an example to test the filter.
++  const permissionType = "cookie";
+   const capabilityFilter = Ci.nsIPermissionManager.ALLOW_ACTION;
+ 
+   let sites = getMockSiteOrigins(permissionType, capabilityFilter);
+@@ -219,7 +213,4 @@ add_task(async function test_filter_dialog_ALLOW_ACTION_only() {
+   );
+ 
+   cleanupPermissions(permissionType);
+-  // Since we're using ipp-vpn for this test, clear any prefs related to the permission.
+-  // We can remove this line if we change the permission type.
+-  Services.prefs.clearUserPref(ONBOARDING_MESSAGE_MASK_PREF);
+ });
+diff --git a/browser/components/preferences/tests/privacy/browser-srd.toml b/browser/components/preferences/tests/privacy/browser-srd.toml
+index b4516c9064..ee1ee11b12 100644
+--- a/browser/components/preferences/tests/privacy/browser-srd.toml
++++ b/browser/components/preferences/tests/privacy/browser-srd.toml
+@@ -23,7 +23,6 @@ tags = "os_integration"
+ 
+ ["browser_privacy_history_search_l10n_ids.js"]
+ 
+-["browser_privacy_ipprotection.js"]
+ 
+ ["browser_privacy_passwordGenerationAndAutofill_srd.js"]
+ 
+diff --git a/browser/components/preferences/tests/privacy/browser.toml b/browser/components/preferences/tests/privacy/browser.toml
+index 938c4d33a9..921073e446 100644
+--- a/browser/components/preferences/tests/privacy/browser.toml
++++ b/browser/components/preferences/tests/privacy/browser.toml
+@@ -35,7 +35,6 @@ skip-if = [
+ 
+ ["browser_privacy_gpc.js"]
+ 
+-["browser_privacy_ipprotection.js"]
+ 
+ ["browser_privacy_passwordGenerationAndAutofill.js"]
+ 
+diff --git a/browser/extensions/moz.build b/browser/extensions/moz.build
+index b304949519..132b4d30dc 100644
+--- a/browser/extensions/moz.build
++++ b/browser/extensions/moz.build
+@@ -4,7 +4,6 @@
+ 
+ DIRS += [
+     "formautofill",
+-    "ipp-activator",
+     "webcompat",
+     "pictureinpicture",
+     "newtab",
+diff --git a/browser/locales/en-US/browser/policies/policies-descriptions.ftl b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+index 074bc27fdf..7071110858 100644
+--- a/browser/locales/en-US/browser/policies/policies-descriptions.ftl
++++ b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+@@ -166,8 +166,6 @@ policy-HttpsOnlyMode = Allow HTTPS-Only Mode to be enabled.
+ 
+ policy-InstallAddonsPermission = Allow certain websites to install add-ons.
+ 
+-policy-IPProtectionAvailable = Prevent the built-in VPN from being available to users.
+-
+ policy-LegacyProfiles = Disable the feature enforcing a separate profile for each installation.
+ 
+ ## Do not translate "SameSite", it's the name of a cookie attribute.
+diff --git a/browser/locales/en-US/browser/preferences/permissions.ftl b/browser/locales/en-US/browser/preferences/permissions.ftl
+index d43821b3db..104ac0eca8 100644
+--- a/browser/locales/en-US/browser/preferences/permissions.ftl
++++ b/browser/locales/en-US/browser/preferences/permissions.ftl
+@@ -28,9 +28,6 @@ permissions-allow =
+     .label = Allow
+     .accesskey = A
+ 
+-permissions-add =
+-    .label = Add
+-    .accesskey = A
+ 
+ permissions-button-off =
+     .label = Turn Off
+diff --git a/browser/themes/shared/customizableui/panelUI-shared.css b/browser/themes/shared/customizableui/panelUI-shared.css
+index 57f50ccd50..5f5d4f0464 100644
+--- a/browser/themes/shared/customizableui/panelUI-shared.css
++++ b/browser/themes/shared/customizableui/panelUI-shared.css
+@@ -2179,37 +2179,3 @@ radiogroup:focus-visible > .subviewradio[focused="true"] {
+ #content-analysis-panel-container {
+   padding: 8px;
+ }
+-
+-/* ----- IP Protection panel ----- */
+-#PanelUI-ipprotection {
+-  width: 400px;
+-  padding: var(--space-small);
+-
+-  > .panel-header {
+-    margin: 0;
+-  }
+-
+-  > .panel-subview-body {
+-    padding: 0;
+-  }
+-
+-  > toolbarseparator {
+-    display: none;
+-  }
+-}
+-
+-@media not -moz-pref("browser.nova.enabled") {
+-  #ipprotection-header-content {
+-    color: var(--text-color);
+-  }
+-}
+-
+-#ipprotection-experiment-badge {
+-  margin-inline-start: var(--space-xsmall);
+-  display: inline-block;
+-  color: var(--text-color-deemphasized);
+-}
+-
+-#PanelUI-ipprotection-locations {
+-  max-height: 400px;
+-}
+diff --git a/browser/themes/shared/toolbarbutton-icons.css b/browser/themes/shared/toolbarbutton-icons.css
+index fbf6ba90b1..f78cd4fdf9 100644
+--- a/browser/themes/shared/toolbarbutton-icons.css
++++ b/browser/themes/shared/toolbarbutton-icons.css
+@@ -321,65 +321,6 @@
+   list-style-image: url("chrome://branding/content/about-logo.png");
+ }
+ 
+-#ipprotection-button {
+-  list-style-image: url("chrome://browser/content/logos/ipprotection-states.svg#off");
+-  -moz-context-properties: fill, stroke, fill-opacity;
+-
+-  &:is([overflowedItem="true"], [cui-areatype="panel"]) {
+-    list-style-image: url("chrome://browser/content/ipprotection/assets/states/ipprotection-off.svg");
+-  }
+-
+-  &.ipprotection-on {
+-    list-style-image: url("chrome://browser/content/logos/ipprotection-states.svg#on");
+-    stroke: var(--icon-color-success);
+-
+-    &:is([overflowedItem="true"], [cui-areatype="panel"]) {
+-      list-style-image: url("chrome://browser/content/ipprotection/assets/states/ipprotection-on.svg");
+-      fill: var(--icon-color-success);
+-    }
+-  }
+-
+-  &.ipprotection-network-error {
+-    list-style-image: url("chrome://browser/content/logos/ipprotection-states.svg#info");
+-    stroke: var(--icon-color-information);
+-
+-    &:is([overflowedItem="true"], [cui-areatype="panel"]) {
+-      list-style-image: url("chrome://global/skin/icons/info-filled.svg");
+-      fill: var(--icon-color-information);
+-    }
+-  }
+-
+-  &.ipprotection-error {
+-    list-style-image: url("chrome://browser/content/logos/ipprotection-states.svg#error");
+-    stroke: var(--icon-color-critical);
+-
+-    &:is([overflowedItem="true"], [cui-areatype="panel"]) {
+-      list-style-image: url("chrome://browser/content/ipprotection/assets/states/ipprotection-error.svg");
+-      fill: var(--icon-color-critical);
+-    }
+-  }
+-
+-  &.ipprotection-excluded {
+-    list-style-image: url("chrome://browser/content/logos/ipprotection-states.svg#excluded");
+-    stroke: var(--icon-color-success);
+-
+-    &:is([overflowedItem="true"], [cui-areatype="panel"]) {
+-      list-style-image: url("chrome://browser/content/ipprotection/assets/states/ipprotection-excluded.svg");
+-      fill: transparent;
+-      stroke: var(--icon-color-success);
+-    }
+-  }
+-
+-  &.ipprotection-paused {
+-    list-style-image: url("chrome://browser/content/logos/ipprotection-states.svg#paused");
+-    fill: var(--icon-color);
+-
+-    &:is([overflowedItem="true"], [cui-areatype="panel"]) {
+-      list-style-image: url("chrome://browser/content/ipprotection/assets/states/ipprotection-paused.svg");
+-    }
+-  }
+-}
+-
+ #tab-groups-button {
+   list-style-image: url("chrome://browser/skin/tabbrowser/tab-groups.svg");
+ }
+diff --git a/browser/themes/shared/toolbarbuttons.css b/browser/themes/shared/toolbarbuttons.css
+index 814c2d228b..faa77e61a1 100644
+--- a/browser/themes/shared/toolbarbuttons.css
++++ b/browser/themes/shared/toolbarbuttons.css
+@@ -723,30 +723,6 @@ toolbar[keyNav]:not([collapsed], [customizing]) toolbartabstop,
+   -moz-user-focus: normal;
+ }
+ 
+-/* IP Protection */
+-#ipprotection-button {
+-  --panel-and-palette-icon-size: var(--size-image-small);
+-
+-  &:not(:is([overflowedItem="true"], [cui-areatype="panel"])) {
+-    > .toolbarbutton-icon {
+-      width: calc(2 * var(--toolbarbutton-padding-inner) + var(--size-image-small));
+-      max-width: var(--size-image-large);
+-      padding-block: 0;
+-    }
+-
+-    > .toolbarbutton-badge-stack > .toolbarbutton-icon {
+-      width: var(--size-image-small);
+-    }
+-  }
+-
+-  toolbarpaletteitem[place="palette"] > & > .toolbarbutton-icon,
+-  toolbarpaletteitem[place="palette"] > & > .toolbarbutton-badge-stack > .toolbarbutton-icon {
+-    min-height: 16px;
+-    max-height: 16px;
+-    max-width: var(--size-image-small);
+-  }
+-}
+-
+ /* Smart Window toolbar ask button */
+ #smartwindow-ask-button {
+   align-items: center;
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index c058152656..c2e1c9c2c7 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -128,7 +128,6 @@ export default [
+       "toolkit/components/extensions/test/xpcshell/test_ext_privacy_disable.js",
+       "toolkit/components/extensions/test/xpcshell/test_ext_privacy_update.js",
+       "toolkit/components/extensions/test/xpcshell/test_ext_proxy_config.js",
+-      "toolkit/components/ipprotection/IPPSessionPrefManager.sys.mjs",
+       "toolkit/components/normandy/test/browser/head.js",
+       "toolkit/components/normandy/test/NormandyTestUtils.sys.mjs",
+       "toolkit/modules/tests/xpcshell/head.js",
+@@ -474,11 +473,7 @@ export default [
+   {
+     // TODO: Bug 1997306. Fix these instances after the jsdoc 60.8.0 upgrade.
+     name: "rollout-jsdoc-valid-types-updates",
+-    files: [
+-      "browser/components/uitour/UITour-lib.js",
+-      "toolkit/components/ipprotection/IPPNetworkErrorObserver.sys.mjs",
+-      "toolkit/components/ipprotection/IPProtectionService.sys.mjs",
+-    ],
++    files: ["browser/components/uitour/UITour-lib.js"],
+     rules: {
+       "jsdoc/valid-types": "off",
+     },
+diff --git a/mots.yaml b/mots.yaml
+index 17adc802a8..534d19a5ba 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -3768,24 +3768,6 @@ modules:
+           - *janika
+         machine_name: form_autofill
+ 
+-      - name: IP Protection
+-        description: Built-in IP Protection (VPN) in the browser.
+-        includes:
+-          - browser/components/ipprotection/**/*
+-          - toolkit/components/ipprotection/**/*
+-        meta:
+-          components:
+-            - Firefox::IP Protection
+-          url: https://firefox-source-docs.mozilla.org/toolkit/ipprotection/
+-          review_group: ip-protection-reviewers
+-        owners:
+-          - *fchasen
+-        peers:
+-          - *kpatenio
+-          - *rking
+-          - *niklas
+-        machine_name: ip_protection
+-
+       - name: In-product Messaging
+         description: The system for delivering in-product messaging and onboarding,
+           including ASRouter, about:welcome, and reusable messaging templates like
+diff --git a/netwerk/test/browser/head_local_network_access.js b/netwerk/test/browser/head_local_network_access.js
+index b224c834a4..94f4223fcb 100644
+--- a/netwerk/test/browser/head_local_network_access.js
++++ b/netwerk/test/browser/head_local_network_access.js
+@@ -234,7 +234,6 @@ async function setupLnaPrefs() {
+       ["network.lna.blocking", true],
+       ["network.lna.websocket.enabled", true],
+       ["network.lna.local-network-to-localhost.skip-checks", false],
+-      ["browser.ipProtection.enabled", false],
+     ],
+   });
+   Services.obs.notifyObservers(null, "testonly-reload-permissions-from-disk");
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 86ea35e70d..38e89841b0 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -61,8 +61,6 @@ module.exports = [
+       "browser/components/genai/chat.css",
+       "browser/components/genai/content/link-preview-card.css",
+       "browser/components/genai/content/model-optin.css",
+-      "browser/components/ipprotection/content/ipprotection-content.css",
+-      "browser/components/ipprotection/content/ipprotection-status-card.css",
+       "browser/components/messagepreview/messagepreview.css",
+       "browser/components/places/content/clearDataForSite.css",
+       "browser/components/places/metadataViewer/interactionsViewer.css",
+diff --git a/testing/profiles/perf/user.js b/testing/profiles/perf/user.js
+index 7a04fdaa69..0b4aee1a43 100644
+--- a/testing/profiles/perf/user.js
++++ b/testing/profiles/perf/user.js
+@@ -27,7 +27,6 @@ user_pref("browser.safebrowsing.provider.google5.gethashURL", "http://127.0.0.1/
+ user_pref("browser.safebrowsing.provider.google5.updateURL", "http://127.0.0.1/safebrowsing5-dummy/update");
+ user_pref("browser.safebrowsing.provider.mozilla.gethashURL", "http://127.0.0.1/safebrowsing-dummy/gethash");
+ user_pref("browser.safebrowsing.provider.mozilla.updateURL", "http://127.0.0.1/safebrowsing-dummy/update");
+-user_pref("browser.ipProtection.guardian.endpoint", "http://127.0.0.1/vpn-dummy");
+ user_pref("browser.shell.checkDefaultBrowser", false);
+ user_pref("browser.warnOnQuit", false);
+ user_pref("datareporting.healthreport.documentServerURI", "http://127.0.0.1/healthreport/");
+diff --git a/testing/profiles/unittest-required/user.js b/testing/profiles/unittest-required/user.js
+index 509ae821fa..60cf454240 100644
+--- a/testing/profiles/unittest-required/user.js
++++ b/testing/profiles/unittest-required/user.js
+@@ -35,7 +35,6 @@ user_pref("browser.safebrowsing.provider.google5.gethashURL", "http://{server}/s
+ user_pref("browser.safebrowsing.provider.google5.updateURL", "http://{server}/safebrowsing5-dummy/update");
+ user_pref("browser.safebrowsing.provider.mozilla.gethashURL", "http://{server}/safebrowsing-dummy/gethash");
+ user_pref("browser.safebrowsing.provider.mozilla.updateURL", "http://{server}/safebrowsing-dummy/update");
+-user_pref("browser.ipProtection.guardian.endpoint", "http://{server}/vpn-dummy");
+ user_pref("browser.search.suggest.timeout", 10000); // use a 10s suggestion timeout in tests
+ user_pref("browser.shell.checkDefaultBrowser", false);
+ user_pref("browser.startup.page", 0); // use about:blank, not browser.startup.homepage
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index b6a7bc4a88..98720d8e14 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -81,7 +81,6 @@ gecko_metrics = [
+     "toolkit/components/formautofill/metrics.yaml",
+     "toolkit/components/gecko-trace/generated-metrics.yaml",
+     "toolkit/components/glean/metrics.yaml",
+-    "toolkit/components/ipprotection/metrics.yaml",
+     "toolkit/components/mediasniffer/metrics.yaml",
+     "toolkit/components/messaging-system/metrics.yaml",
+     "toolkit/components/ml/metrics.yaml",
+@@ -126,7 +125,6 @@ firefox_desktop_metrics = [
+     "browser/components/extensions/metrics.yaml",
+     "browser/components/firefoxview/metrics.yaml",
+     "browser/components/genai/metrics.yaml",
+-    "browser/components/ipprotection/metrics.yaml",
+     "browser/components/metrics.yaml",
+     "browser/components/migration/metrics.yaml",
+     "browser/components/newtab/metrics.yaml",
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 8fdef6f5fb..6e3dddb884 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -136,8 +136,6 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] not in ("android", "windows"):
+ if CONFIG["MOZ_BUILD_APP"] == "browser":
+     DIRS += ["messaging-system", "normandy"]
+ 
+-if CONFIG["MOZ_BUILD_APP"] != "comm/mail":
+-    DIRS += ["ipprotection"]
+ 
+ DIRS += ["nimbus"]
+ 
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 8709384bcd..f33a630f93 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -5604,33 +5604,6 @@ deletePrivate:
+         pref: browser.download.enableDeletePrivate
+       description: Whether the setting for deleting files downloaded in private browsing is available to the user
+ 
+-ipProtection:
+-  description: Prefs to control IP Protection feature
+-  owner: fchasen@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: user
+-        pref: browser.ipProtection.enabled
+-      description: >-
+-        Enables the IP Protection feature.
+-    bandwidthMax:
+-      type: int
+-      setPref:
+-        branch: default
+-        pref: browser.ipProtection.bandwidth.maxInGb
+-      description: >-
+-        Maximum bandwidth allowance in GB for messaging.
+-    upgradeNotAvailable:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: browser.ipProtection.upgradeNotAvailable
+-      description: >-
+-        Hides Mozilla VPN promotions for users in regions where it is unavailable
+-
+ passwordManager:
+   description: Password manager related prefs
+   owner: maltejur@mozilla.com
+diff --git a/toolkit/content/aboutNetErrorHelpers.mjs b/toolkit/content/aboutNetErrorHelpers.mjs
+index 5728d3f628..1226a67c82 100644
+--- a/toolkit/content/aboutNetErrorHelpers.mjs
++++ b/toolkit/content/aboutNetErrorHelpers.mjs
+@@ -39,10 +39,6 @@ export let gNoConnectivity =
+ // the File menu. gOffline is true for both that case and when there's no
+ // network connectivity.
+ export let gOffline = gErrorCode === "netOffline" || gNoConnectivity;
+-export const VPN_ACTIVE = RPMGetBoolPref(
+-  "browser.ipProtection.userEnabled",
+-  false
+-);
+ 
+ export function isCaptive() {
+   return searchParams.get("captive") == "true";
+diff --git a/toolkit/content/errors/error-lookup.mjs b/toolkit/content/errors/error-lookup.mjs
+index 0d9bb80d5c..faa779b38e 100644
+--- a/toolkit/content/errors/error-lookup.mjs
++++ b/toolkit/content/errors/error-lookup.mjs
+@@ -19,7 +19,7 @@ import {
+  * Resolve browser error signals to a canonical registry ID.
+  *
+  * Handles resolution scenarios in priority order:
+- * 1. System state overrides (no connectivity, VPN active)
++ * 1. System state overrides (no connectivity)
+  * 2. Direct registry lookup by errorCodeString (C++ error strings)
+  * 3. Fallback to a shared config when errorCodeString is unregistered
+  * 4. Direct registry lookup by gErrorCode (URL-derived error codes)
+@@ -28,7 +28,6 @@ import {
+  * @param {string} signals.errorCodeString - Raw error string from the security/network layer
+  * @param {string} signals.gErrorCode - URL-derived error code (e= parameter)
+  * @param {boolean} signals.noConnectivity - System has no network connectivity
+- * @param {boolean} signals.vpnActive - VPN is currently active
+  * @returns {string|null} Canonical registry ID, or null if the error has no
+  *   Felt Privacy config.
+  */
+@@ -36,16 +35,12 @@ export function resolveErrorID({
+   errorCodeString,
+   gErrorCode,
+   noConnectivity,
+-  vpnActive,
+ }) {
+   // System state overrides.
+   // Currently these are all network-related.
+   if (noConnectivity) {
+     return "NS_ERROR_OFFLINE";
+   }
+-  if (gErrorCode === "proxyConnectFailure" && vpnActive) {
+-    return "vpnFailure";
+-  }
+ 
+   // Default: use errorCodeString if it is set and registered. This value comes
+   // from getFailedCertSecurityInfo() or getNetErrorInfo() and identifies the
+diff --git a/toolkit/content/errors/net-errors.mjs b/toolkit/content/errors/net-errors.mjs
+index f6bbadc748..ddfc2a8258 100644
+--- a/toolkit/content/errors/net-errors.mjs
++++ b/toolkit/content/errors/net-errors.mjs
+@@ -788,24 +788,6 @@ export const NET_ERRORS = [
+     },
+     hasNoUserFix: false,
+   },
+-  {
+-    id: "vpnFailure",
+-    errorCode: "vpnFailure",
+-    category: "net",
+-    bodyTitleL10nId: "proxyConnectFailure-title",
+-    introContent: {
+-      dataL10nId: "fp-neterror-vpn-error-description",
+-    },
+-
+-    buttons: {
+-      showTryAgain: true,
+-    },
+-    customNetError: {
+-      titleL10nId: "fp-neterror-vpn-error-title",
+-    },
+-    image: NET_ERROR_ILLUSTRATIONS.noConnection,
+-    hasNoUserFix: false,
+-  },
+   {
+     id: "proxyResolveFailure",
+     errorCode: "proxyResolveFailure",
+diff --git a/toolkit/content/net-error-card.mjs b/toolkit/content/net-error-card.mjs
+index d8bb4768ca..e675a3578d 100644
+--- a/toolkit/content/net-error-card.mjs
++++ b/toolkit/content/net-error-card.mjs
+@@ -19,7 +19,6 @@ import {
+   gOffline,
+   gNoConnectivity,
+   retryThis,
+-  VPN_ACTIVE,
+   detectClockSkew,
+ } from "chrome://global/content/aboutNetErrorHelpers.mjs";
+ import { initializeRegistry } from "chrome://global/content/errors/error-registry.mjs";
+@@ -99,7 +98,6 @@ export class NetErrorCard extends MozLitElement {
+       errorCodeString: errorInfo.errorCodeString,
+       gErrorCode,
+       noConnectivity: gNoConnectivity,
+-      vpnActive: VPN_ACTIVE,
+     });
+ 
+     // Bug 2038887: the felt privacy error page does not surface the DoH
+@@ -189,7 +187,6 @@ export class NetErrorCard extends MozLitElement {
+       errorCodeString: this.errorInfo.errorCodeString,
+       gErrorCode,
+       noConnectivity: gNoConnectivity,
+-      vpnActive: VPN_ACTIVE,
+     });
+     this.errorConfig = this.getErrorConfig();
+     this.hideExceptionButton = this.shouldHideExceptionButton();
+diff --git a/toolkit/content/tests/browser/browser_error_registry.js b/toolkit/content/tests/browser/browser_error_registry.js
+index 7e2bdfd943..ee1d76ce6e 100644
+--- a/toolkit/content/tests/browser/browser_error_registry.js
++++ b/toolkit/content/tests/browser/browser_error_registry.js
+@@ -703,7 +703,6 @@ add_task(async function test_resolve_error_id_nss_fallthrough() {
+       errorCodeString: "SSL_ERROR_RX_CERTIFICATE_REQUIRED_ALERT",
+       gErrorCode: "nssFailure2",
+       noConnectivity: false,
+-      vpnActive: false,
+     }),
+     "nssFailure2",
+     "Unrecognized errorCodeString with gErrorCode=nssFailure2 should fall through to nssFailure2"
+@@ -714,7 +713,6 @@ add_task(async function test_resolve_error_id_nss_fallthrough() {
+       errorCodeString: "SSL_ERROR_RX_CERTIFICATE_REQUIRED_ALERT",
+       gErrorCode: "dnsNotFound",
+       noConnectivity: false,
+-      vpnActive: false,
+     }),
+     null,
+     "Unrecognized errorCodeString with gErrorCode other than nssFailure2 should return null"
+diff --git a/toolkit/content/tests/browser/browser_felt_privacy_fallback.js b/toolkit/content/tests/browser/browser_felt_privacy_fallback.js
+index 51cd616c34..7f7abc3327 100644
+--- a/toolkit/content/tests/browser/browser_felt_privacy_fallback.js
++++ b/toolkit/content/tests/browser/browser_felt_privacy_fallback.js
+@@ -79,7 +79,6 @@ add_task(async function test_registered_ssl_error() {
+         errorCodeString: "SSL_ERROR_RX_RECORD_TOO_LONG",
+         gErrorCode: "nssFailure2",
+         noConnectivity: false,
+-        vpnActive: false,
+       }),
+       "SSL_ERROR_RX_RECORD_TOO_LONG",
+       "Should resolve to the registered error, not fall back to nssFailure2"
+diff --git a/toolkit/docs/index.rst b/toolkit/docs/index.rst
+index 4d1c8c9b1f..9519eeaa1b 100644
+--- a/toolkit/docs/index.rst
++++ b/toolkit/docs/index.rst
+@@ -16,7 +16,6 @@ This is the nascent documentation of the Toolkit code that is shared across Fire
+    crashreporter/crashreporter/index
+    internal-urls
+    search/index
+-   ipprotection/index
+    components/normandy/normandy/index
+    components/nimbus/docs/index
+    components/messaging-system/docs/index
+diff --git a/toolkit/locales/en-US/toolkit/neterror/netError.ftl b/toolkit/locales/en-US/toolkit/neterror/netError.ftl
+index 5c64bb1a88..eed13d2018 100644
+--- a/toolkit/locales/en-US/toolkit/neterror/netError.ftl
++++ b/toolkit/locales/en-US/toolkit/neterror/netError.ftl
+@@ -238,7 +238,4 @@ fp-neterror-http-auth-disabled-what-can-you-do-body = Try changing the URL to HT
+ fp-neterror-coop-coep-why-did-this-happen-body = Sometimes websites set up protections for themselves from unwanted interactions with other sites.
+ fp-learn-more-about-https-connections = Learn about HTTPS connections
+ 
+-fp-neterror-vpn-error-title = Couldn’t connect to VPN
+-fp-neterror-vpn-error-description = Try again in a few minutes.
+-
+ fp-neterror-denied-port-access = This address uses a network port which is normally used for purposes other than Web browsing. { -brand-short-name } has canceled the request for your protection.
+diff --git a/toolkit/modules/RemotePageAccessManager.sys.mjs b/toolkit/modules/RemotePageAccessManager.sys.mjs
+index 8932cf3063..7dada8629c 100644
+--- a/toolkit/modules/RemotePageAccessManager.sys.mjs
++++ b/toolkit/modules/RemotePageAccessManager.sys.mjs
+@@ -49,7 +49,6 @@ export let RemotePageAccessManager = {
+         "security.enterprise_roots.auto-enabled",
+         "security.certerror.hideAddException",
+         "security.certerrors.felt-privacy-v1",
+-        "browser.ipProtection.userEnabled",
+         "browser.netError.illustration.enabled",
+       ],
+       RPMGetIntPref: [
+@@ -121,7 +120,6 @@ export let RemotePageAccessManager = {
+         "security.enterprise_roots.auto-enabled",
+         "security.certerror.hideAddException",
+         "security.certerrors.felt-privacy-v1",
+-        "browser.ipProtection.userEnabled",
+         "browser.netError.illustration.enabled",
+       ],
+       RPMGetHostForDisplay: ["*"],

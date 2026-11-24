@@ -33,7 +33,6 @@ const OVERRIDES = {
   "chrome://browser/content/firefoxview/synced-tabs-error.svg": `${SVAL}illustrations/monitor-smartphone.svg`,
   "chrome://global/skin/illustrations/kit-concerned.svg": APP_ICON,
   "chrome://global/skin/illustrations/kit-happy.svg": APP_ICON,
-  "chrome://global/skin/illustrations/kit-in-circle.svg": APP_ICON,
   "chrome://browser/skin/sidebar/firefox.svg": `${SVAL}sval-glyph.svg`,
   "chrome://browser/skin/firefox-view.svg": `${SVAL}sval-glyph.svg`,
   "chrome://browser/skin/window-firefox.svg": `${SVAL}firefox-icons/app-window-16x14.svg`,

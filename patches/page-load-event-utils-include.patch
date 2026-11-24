@@ -1,0 +1,20 @@
+Sval: Include the string traits PageLoadEventUtils.h uses
+
+PageLoadEventUtils.h writes and reads an nsCString through ParamTraits
+but includes only IPCMessageUtils.h, so it compiles only after something
+else has included IPCMessageUtilsSpecializations.h. nsImageLoadingContent
+got that from PContent.h, which it stops including once text
+recognition goes.
+
+diff --git a/dom/ipc/PageLoadEventUtils.h b/dom/ipc/PageLoadEventUtils.h
+index b2812ab344..0501eaa762 100644
+--- a/dom/ipc/PageLoadEventUtils.h
++++ b/dom/ipc/PageLoadEventUtils.h
+@@ -6,6 +6,7 @@
+ #define mozilla_dom_page_load_event_utils_h_
+ 
+ #include "ipc/IPCMessageUtils.h"
++#include "ipc/IPCMessageUtilsSpecializations.h"
+ #include "mozilla/PageloadEvent.h"
+ 
+ namespace IPC {

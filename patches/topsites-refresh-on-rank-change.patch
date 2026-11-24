@@ -1,0 +1,58 @@
+Sval: Top Sites follow the pages the user visits
+
+The topsites module refreshes its list on bookmark and history-removal
+events. The new tab add-on refreshed it on its own five-minute tick, so
+without the add-on a page made frequent after the list was first read
+never joined it until a restart. Places fires pages-rank-changed after
+every visit and frecency recalculation, which is the change the list
+follows.
+
+diff --git a/browser/components/topsites/TopSites.sys.mjs b/browser/components/topsites/TopSites.sys.mjs
+index 6f15cd406d..6bcc0c3aab 100644
+--- a/browser/components/topsites/TopSites.sys.mjs
++++ b/browser/components/topsites/TopSites.sys.mjs
+@@ -160,7 +160,13 @@ class _TopSites {
+     Services.prefs.addObserver(TOP_SITES_ROWS_PREF, this);
+     Services.prefs.addObserver(TOP_SITE_SEARCH_SHORTCUTS_PREF, this);
+     lazy.PlacesUtils.observers.addListener(
+-      ["bookmark-added", "bookmark-removed", "history-cleared", "page-removed"],
++      [
++        "bookmark-added",
++        "bookmark-removed",
++        "history-cleared",
++        "page-removed",
++        "pages-rank-changed",
++      ],
+       this.handlePlacesEvents
+     );
+     this.#hasObservers = true;
+@@ -181,7 +187,13 @@ class _TopSites {
+     Services.prefs.removeObserver(TOP_SITES_ROWS_PREF, this);
+     Services.prefs.removeObserver(TOP_SITE_SEARCH_SHORTCUTS_PREF, this);
+     lazy.PlacesUtils.observers.removeListener(
+-      ["bookmark-added", "bookmark-removed", "history-cleared", "page-removed"],
++      [
++        "bookmark-added",
++        "bookmark-removed",
++        "history-cleared",
++        "page-removed",
++        "pages-rank-changed",
++      ],
+       this.handlePlacesEvents
+     );
+     this.#hasObservers = false;
+@@ -259,6 +271,14 @@ class _TopSites {
+       type,
+     } of events) {
+       switch (type) {
++        // Sval: a visit or a frecency recalculation changes which pages are
++        // frecent, and nothing else refreshes the list while the browser
++        // runs. The frecent cache answers until it is older than
++        // `LinksCache`'s expiration time, so history is read at most once in
++        // that time however many visits come.
++        case "pages-rank-changed":
++          this.refresh();
++          break;
+         case "history-cleared":
+           this.frecentCache.expire();
+           this.refresh();

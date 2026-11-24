@@ -383,6 +383,7 @@ SPDX-License-Identifier = "MPL-2.0"
 [[annotations]]
 path = [
   "patches/*.patch",
+  "patches/*.delete",
   "chrome/browser/app/sval.exe.manifest",
   "chrome/ipc/app/sval-child.exe.manifest",
   "chrome/toolkit/components/maintenanceservice/sval-update-service.exe.manifest",

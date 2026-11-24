@@ -1,13 +1,13 @@
 Sval: Firefox's pages Sval has no use for are not built
 
 Each page is removed from the about: redirect tables and the components.conf
-beside them, and its document from its jar.mn, so the name opens as any
-unknown about: address does (`nsAboutProtocolHandler::NewChannel` answers a
+beside them, and its document from its jar.mn (or, for a page whose
+component a later deletion list removes, from the build), so the
+name opens as any unknown about: address does (`nsAboutProtocolHandler::NewChannel` answers a
 missing module with NS_ERROR_MALFORMED_URI) and the document is not shipped.
 A name is registered by a contract compiled into libxul, so no chrome API
 removes it. The pages: about:logins and its import report, about:protections,
-about:keyboard, about:welcomeback and the onboarding's document,
-about:studies, about:asrouter, about:messagepreview, about:aichatcontent,
+about:keyboard, about:welcomeback, about:studies, about:asrouter, about:messagepreview, about:aichatcontent,
 about:inference, about:mozilla, about:logo, about:unloads, about:telemetry,
 about:glean, about:profiling, about:firefoxview, about:robots, about:sync-log,
 about:profiles, the selectable profiles' pages, about:pdf,
@@ -256,42 +256,6 @@ index f0847671ac..f40441e589 100644
 -  content/browser/aboutlogins/aboutLoginsImportReport.html               (content/aboutLoginsImportReport.html)
    content/browser/aboutlogins/aboutLoginsUtils.mjs                        (content/aboutLoginsUtils.mjs)
    content/browser/aboutlogins/common.css                                 (content/common.css)
-diff --git a/browser/components/aboutwelcome/jar.mn b/browser/components/aboutwelcome/jar.mn
-index 14365db169..ad5a1002d0 100644
---- a/browser/components/aboutwelcome/jar.mn
-+++ b/browser/components/aboutwelcome/jar.mn
-@@ -5,7 +5,6 @@
- browser.jar:
-   content/browser/aboutwelcome/aboutwelcome.bundle.js (./content/aboutwelcome.bundle.js)
-   content/browser/aboutwelcome/aboutwelcome.css (./content/aboutwelcome.css)
--  content/browser/aboutwelcome/aboutwelcome.html (./content/aboutwelcome.html)
- 
- # This section is for image assets for about:welcome. These are currently
- # placed in the chrome://activity-stream/ path to provide backwards compability
-diff --git a/browser/components/aiwindow/ui/jar.mn b/browser/components/aiwindow/ui/jar.mn
-index 7066a99721..12e75c7fcd 100644
---- a/browser/components/aiwindow/ui/jar.mn
-+++ b/browser/components/aiwindow/ui/jar.mn
-@@ -3,7 +3,6 @@
- # file, You can obtain one at http://mozilla.org/MPL/2.0/.
- 
- browser.jar:
--  content/browser/aiwindow/aiChatContent.html                       (content/aiChatContent.html)
-   content/browser/aiwindow/aiWindow.html                            (content/aiWindow.html)
-   content/browser/aiwindow/assets/ai-chat-grid-loading.svg          (assets/ai-chat-grid-loading.svg)
-   content/browser/aiwindow/assets/ask-icon.svg                      (assets/ask-icon.svg)
-diff --git a/browser/components/asrouter/jar.mn b/browser/components/asrouter/jar.mn
-index 9ffcbe424c..44b99875df 100644
---- a/browser/components/asrouter/jar.mn
-+++ b/browser/components/asrouter/jar.mn
-@@ -6,7 +6,6 @@ browser.jar:
- % resource activity-stream %res/activity-stream/ contentaccessible=yes
- % content activity-stream %content/activity-stream/ contentaccessible=yes
-   content/activity-stream/data/content/assets/glyph-webextension-16.svg  (content/assets/glyph-webextension-16.svg)
--  content/browser/asrouter/asrouter-admin.html                           (content/asrouter-admin.html)
-   content/browser/asrouter/asrouter-admin.bundle.js                      (content/asrouter-admin.bundle.js)
-   content/browser/asrouter/components/ASRouterAdmin/ASRouterAdmin.css    (content/components/ASRouterAdmin/ASRouterAdmin.css)
-   content/browser/asrouter/components/menu-message.mjs               (content/components/menu-message/menu-message.mjs)
 diff --git a/browser/components/customkeys/content/jar.mn b/browser/components/customkeys/content/jar.mn
 index 4b841dcfe9..243b5c23a5 100644
 --- a/browser/components/customkeys/content/jar.mn
@@ -314,18 +278,6 @@ index 939cb9185f..e7bb57e166 100644
      content/browser/firefoxview/firefoxview.mjs
      content/browser/firefoxview/history.css
      content/browser/firefoxview/history.mjs
-diff --git a/browser/components/messagepreview/jar.mn b/browser/components/messagepreview/jar.mn
-index 592a782d76..296e7313b9 100644
---- a/browser/components/messagepreview/jar.mn
-+++ b/browser/components/messagepreview/jar.mn
-@@ -3,7 +3,6 @@
- # file, You can obtain one at http://mozilla.org/MPL/2.0/.
- 
- browser.jar:
--    content/browser/messagepreview/messagepreview.html
-     content/browser/messagepreview/messagepreview.js
-     content/browser/messagepreview/limelight.svg
-     content/browser/messagepreview/switch.svg
 diff --git a/browser/components/migration/jar.mn b/browser/components/migration/jar.mn
 index bf1d7516ed..f56c6db1bc 100644
 --- a/browser/components/migration/jar.mn
@@ -382,16 +334,6 @@ index b31a4fb351..78c0b0e324 100644
  browser.jar:
 -*   content/browser/aboutSessionRestore.xhtml             (content/aboutSessionRestore.xhtml)
      content/browser/aboutSessionRestore.js                (content/aboutSessionRestore.js)
-diff --git a/browser/components/tabunloader/jar.mn b/browser/components/tabunloader/jar.mn
-index f2b6effcd8..bd9899497b 100644
---- a/browser/components/tabunloader/jar.mn
-+++ b/browser/components/tabunloader/jar.mn
-@@ -4,5 +4,4 @@
- 
- browser.jar:
-   content/browser/tabunloader/aboutUnloads.css  (content/aboutUnloads.css)
--  content/browser/tabunloader/aboutUnloads.html (content/aboutUnloads.html)
-   content/browser/tabunloader/aboutUnloads.js   (content/aboutUnloads.js)
 diff --git a/docshell/base/nsAboutRedirector.cpp b/docshell/base/nsAboutRedirector.cpp
 index 9ae7cf5c1d..b8a95fa365 100644
 --- a/docshell/base/nsAboutRedirector.cpp
@@ -558,39 +500,6 @@ index a750487481..592d6e4f4f 100644
 -        'constructor': 'AboutWeaveLog',
 -    },
  ]
-diff --git a/toolkit/components/aboutcheckerboard/jar.mn b/toolkit/components/aboutcheckerboard/jar.mn
-index 5d8cd6729d..5acdcda8c5 100644
---- a/toolkit/components/aboutcheckerboard/jar.mn
-+++ b/toolkit/components/aboutcheckerboard/jar.mn
-@@ -4,5 +4,4 @@
- 
- toolkit.jar:
-   content/global/aboutCheckerboard.js           (content/aboutCheckerboard.js)
--  content/global/aboutCheckerboard.html        (content/aboutCheckerboard.html)
-   content/global/aboutCheckerboard.css          (content/aboutCheckerboard.css)
-diff --git a/toolkit/components/aboutinference/jar.mn b/toolkit/components/aboutinference/jar.mn
-index 5259e95638..f32c3e3188 100644
---- a/toolkit/components/aboutinference/jar.mn
-+++ b/toolkit/components/aboutinference/jar.mn
-@@ -3,7 +3,6 @@
- # file, You can obtain one at http://mozilla.org/MPL/2.0/.
- 
- toolkit.jar:
--  content/global/aboutInference.html                (content/aboutInference.html)
-   content/global/aboutInference.js                  (content/aboutInference.js)
-   content/global/aboutInference.css                 (content/aboutInference.css)
-   content/global/model-files-view.mjs               (content/model-files-view.mjs)
-diff --git a/toolkit/components/aboutpdf/jar.mn b/toolkit/components/aboutpdf/jar.mn
-index 1ffcf86a8e..aa1e347380 100644
---- a/toolkit/components/aboutpdf/jar.mn
-+++ b/toolkit/components/aboutpdf/jar.mn
-@@ -3,6 +3,5 @@
- # file, You can obtain one at http://mozilla.org/MPL/2.0/.
- 
- toolkit.jar:
--  content/global/aboutPDF.html    (content/aboutPDF.html)
-   content/global/aboutPDF.mjs     (content/aboutPDF.mjs)
-   content/global/aboutPDF.css     (content/aboutPDF.css)
 diff --git a/toolkit/components/normandy/jar.mn b/toolkit/components/normandy/jar.mn
 index ff3dbfb319..c918a81d71 100644
 --- a/toolkit/components/normandy/jar.mn

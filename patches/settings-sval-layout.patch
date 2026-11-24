@@ -33,7 +33,7 @@ diff --git a/browser/components/preferences/config/LegacyPaneMappings.mjs b/brow
 index 689281d..60cdd89 100644
 --- a/browser/components/preferences/config/LegacyPaneMappings.mjs
 +++ b/browser/components/preferences/config/LegacyPaneMappings.mjs
-@@ -90,6 +90,57 @@ export const LEGACY_PANE_MAPPINGS = new Map([
+@@ -90,6 +90,56 @@ export const LEGACY_PANE_MAPPINGS = new Map([
      { category: "passwordsAutofill", subcategory: "address-autofill" },
    ],
    ["privacy-logins", { category: "passwordsAutofill", subcategory: "logins" }],
@@ -57,7 +57,6 @@ index 689281d..60cdd89 100644
 +  ["languages", { category: "sync" }],
 +  ["accessibility", { category: "appearance" }],
 +  ["general-drm", { category: "sync", subcategory: "drm" }],
-+  ["general-link-preview", { category: "sync", subcategory: "link-preview" }],
 +  ["general-fxtranslations", { category: "sync", subcategory: "translations" }],
 +  ["general-translations", { category: "sync", subcategory: "translations" }],
 +  // Sval's cards in Privacy and protection replace Enhanced Tracking

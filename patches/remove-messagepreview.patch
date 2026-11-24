@@ -1,0 +1,78 @@
+Sval: Remove about:messagepreview
+
+The page previewed Firefox Messaging System messages for their authors.
+no-closed-about-pages.patch already unregisters its name, so its document,
+actors and tests go, with its directory in the build.
+
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index fa1e0342a5..c2aa49fb62 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -126,22 +126,6 @@ let JSWINDOWACTORS = {
+     remoteTypes: ["privilegedabout"],
+   },
+ 
+-  AboutMessagePreview: {
+-    parent: {
+-      esModuleURI: "resource:///actors/AboutMessagePreviewParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/AboutMessagePreviewChild.sys.mjs",
+-      events: {
+-        DOMDocElementInserted: { capture: true },
+-      },
+-    },
+-    matches: ["about:messagepreview", "about:messagepreview?*"],
+-    remoteTypes: ["privilegedabout"],
+-    enablePreference:
+-      "browser.newtabpage.activity-stream.asrouter.devtoolsEnabled",
+-  },
+-
+   AboutPrivateBrowsing: {
+     parent: {
+       esModuleURI: "resource:///actors/AboutPrivateBrowsingParent.sys.mjs",
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index a82d5c638c..ebc4577a07 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -40,7 +40,6 @@ DIRS += [
+     "enterprisepolicies",
+     "extensions",
+     "firefoxview",
+-    "messagepreview",
+     "migration",
+     "mozcachedohttp",
+     "newtab",
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index c91b372bfa..357f748c7e 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -175,8 +175,6 @@ export default [
+       "browser/base/content/browser-sync.js",
+       "browser/components/BrowserContentHandler.sys.mjs",
+       "browser/components/enterprisepolicies/Policies.sys.mjs",
+-      "browser/components/messagepreview/actors/AboutMessagePreviewChild.sys.mjs",
+-      "browser/components/messagepreview/actors/AboutMessagePreviewParent.sys.mjs",
+       "browser/components/migration/ChromeMigrationUtils.sys.mjs",
+       "browser/components/migration/SafariProfileMigrator.sys.mjs",
+       "browser/components/places/content/places-tree.js",
+@@ -327,7 +325,6 @@ export default [
+       "browser/components/enterprisepolicies/Policies.sys.mjs",
+       "browser/components/extensions/**",
+       "browser/components/firefoxview/**",
+-      "browser/components/messagepreview/actors/**",
+       "browser/components/newtab/**",
+       "browser/components/originattributes/test/browser/**",
+       "browser/components/preferences/**",
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index b56fe2e6eb..2e7c3b67b3 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -57,7 +57,6 @@ module.exports = [
+       "browser/components/firefoxview/opentabs-tab-row.css",
+       "browser/components/firefoxview/view-opentabs.css",
+       "browser/components/firefoxview/view-syncedtabs.css",
+-      "browser/components/messagepreview/messagepreview.css",
+       "browser/components/places/content/clearDataForSite.css",
+       "browser/components/places/metadataViewer/interactionsViewer.css",
+       "browser/components/preferences/dialogs/sitePermissions.css",

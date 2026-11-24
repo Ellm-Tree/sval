@@ -5,6 +5,7 @@
 # Windows clone with the default core.autocrlf=true converts these to CRLF,
 # and `git apply` of an LF patch against an LF upstream checkout then rejects.
 *.patch text eol=lf
+*.delete text eol=lf
 *.sh text eol=lf
 series text eol=lf
 

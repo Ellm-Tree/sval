@@ -6,8 +6,8 @@ favicons, cookies, logins, form history, bookmark backups and the dictionary.
 Sval's state in the profile, its settings and its identity among them, would
 be left behind in the old profile. ResetProfile.resetSupported is the gate
 every way to a reset asks: about:support's Refresh button, the Troubleshoot
-Mode dialog, the address bar's refresh tips and quick action, the reset prompt
-BrowserGlue shows and UITour. The policy feature profileRefresh, the chrome
+Mode dialog, the address bar's refresh tips and quick action and the reset
+prompt BrowserGlue shows. The policy feature profileRefresh, the chrome
 API for turning reset off, can only be disallowed by an enterprise policy, so
 the gate is patched.
 

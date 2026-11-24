@@ -1,0 +1,2 @@
+browser/modules/PermissionPromptTargeting.sys.mjs
+browser/modules/test/unit/test_PermissionPromptTargeting.js

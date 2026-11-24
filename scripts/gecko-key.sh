@@ -10,8 +10,8 @@
 # The inputs are the upstream pin, the mozconfig identity and gecko fragment,
 # scripts/build.sh (which writes the tree's mozconfig, a target's lines
 # included, and runs mach), the CI image's Dockerfile and rust-toolchain.toml
-# (the compilers), the branding files a compiler reads, every patch that
-# touches a file outside the front end, the two
+# (the compilers), the branding files a compiler reads, every patch and
+# deletion list that touches a file outside the front end, the two
 # scripts that lay the tree out from them (scripts/apply-patches.sh and the
 # scripts/sync-files.sh it runs), every file under chrome/ that a compiler
 # reads, and the NSIS plugins under chrome/ that the compile's installer
@@ -34,9 +34,9 @@
 # and the installer art, firefox64.ico among it.
 #
 # scripts/artifact-gecko.sh is the part of the build only an artifact build
-# sources, so it is left out. A patch counts as front end only when every file it touches is
-# JS, CSS, markup, Fluent, a .properties file or an image, which artifact
-# builds package themselves. Anything else, a moz.build, a .configure file, a
+# sources, so it is left out. A patch or deletion list counts as front end
+# only when every file it touches is JS, CSS, markup, Fluent, a .properties
+# file or an image, which artifact builds package themselves. Anything else, a moz.build, a .configure file, a
 # Makefile.in, the package manifest, counts as native, and so does any file
 # under js/src/: SpiderMonkey compiles its self-hosted JS into libxul
 # (selfhosted_inputs in js/src/builtin/moz.build).
@@ -77,7 +77,11 @@ native_source='\.(c|cc|cpp|cxx|h|hh|hpp|mm|m|rs|idl|webidl|ipdl|ipdlh|S|s|asm|de
 inputs=(scripts/build.sh scripts/apply-patches.sh scripts/sync-files.sh mozconfig mozconfig.gecko .forgejo/docker/Dockerfile rust-toolchain.toml)
 while IFS= read -r line; do
   [[ -z "${line// }" || "$line" == \#* ]] && continue
-  paths="$(awk '/^diff --git / { print $3 }' "patches/$line" | sed 's|^a/||')"
+  if [[ "$line" == *.delete ]]; then
+    paths="$(grep -v '^#' "patches/$line")"
+  else
+    paths="$(awk '/^diff --git / { print $3 }' "patches/$line" | sed 's|^a/||')"
+  fi
   if grep -Evq "$frontend" <<<"$paths" || grep -q '^js/src/' <<<"$paths"; then
     inputs+=("patches/$line")
   fi

@@ -6,39 +6,39 @@ and offers them as a menu at the button (settings-favorites.js). The
 button's setting decides what a press does in its onUserClick, which no
 chrome API replaces.
 
-diff --git a/browser/extensions/newtab/lib/AboutPreferences.sys.mjs b/browser/extensions/newtab/lib/AboutPreferences.sys.mjs
-index 3e05585f51..112f04ed6a 100644
---- a/browser/extensions/newtab/lib/AboutPreferences.sys.mjs
-+++ b/browser/extensions/newtab/lib/AboutPreferences.sys.mjs
-@@ -978,27 +978,10 @@ export class AboutPreferences {
-     Preferences.addSetting({
-       id: "customHomepageReplaceWithBookmarksButton",
-       deps: ["homepageDisplayPref", "disableBookmarkButton"],
--      onUserClick(e, { homepageDisplayPref }) {
--        const rv = { urls: null, names: null };
+diff --git a/browser/components/preferences/config/home-startup.mjs b/browser/components/preferences/config/home-startup.mjs
+index 69c8746e71..2a94de6840 100644
+--- a/browser/components/preferences/config/home-startup.mjs
++++ b/browser/components/preferences/config/home-startup.mjs
+@@ -654,27 +654,10 @@ function setupCustomHomepageGroup() {
+   Preferences.addSetting({
+     id: "customHomepageReplaceWithBookmarksButton",
+     deps: ["homepageDisplayPref", "disableBookmarkButton"],
+-    onUserClick(e, { homepageDisplayPref }) {
+-      const rv = { urls: null, names: null };
 -
--        // Callback to use when bookmark dialog closes
--        const closingCallback = event => {
--          if (event.detail.button !== "accept") {
--            return;
--          }
--          if (rv.urls) {
--            homepageDisplayPref.value = rv.urls.join("|");
--          }
--        };
+-      // Callback to use when bookmark dialog closes
+-      const closingCallback = event => {
+-        if (event.detail.button !== "accept") {
+-          return;
+-        }
+-        if (rv.urls) {
+-          homepageDisplayPref.value = rv.urls.join("|");
+-        }
+-      };
 -
--        window.gSubDialog.open(
--          "chrome://browser/content/preferences/dialogs/selectBookmark.xhtml",
--          {
--            features: "resizable=yes, modal=yes",
--            closingCallback,
--          },
--          rv
--        );
-+      // Sval: the home page comes from Sval's Favorites, which
-+      // settings-favorites.js offers at the button.
-+      onUserClick(e) {
-+        window.SvalFavoritesSettings.pick(e);
-       },
-       disabled: ({ disableBookmarkButton, homepageDisplayPref }) =>
-         // Disable this button if an enterprise policy sets a special pref to true
+-      window.gSubDialog.open(
+-        "chrome://browser/content/preferences/dialogs/selectBookmark.xhtml",
+-        {
+-          features: "resizable=yes, modal=yes",
+-          closingCallback,
+-        },
+-        rv
+-      );
++    // Sval: the home page comes from Sval's Favorites, which
++    // settings-favorites.js offers at the button.
++    onUserClick(e) {
++      window.SvalFavoritesSettings.pick(e);
+     },
+     disabled: ({ disableBookmarkButton, homepageDisplayPref }) =>
+       // Disable this button if an enterprise policy sets a special pref to true

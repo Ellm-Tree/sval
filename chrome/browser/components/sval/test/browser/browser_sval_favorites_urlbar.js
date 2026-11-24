@@ -20,6 +20,9 @@ UrlbarTestUtils.init(this);
 const { PlacesTestUtils } = ChromeUtils.importESModule(
   "resource://testing-common/PlacesTestUtils.sys.mjs"
 );
+const { TopSites } = ChromeUtils.importESModule(
+  "resource:///modules/topsites/TopSites.sys.mjs"
+);
 
 const MAIL = "https://example.com/sval-mailbox/inbox";
 const NEVER = "https://sval-never.example.net/";
@@ -338,17 +341,13 @@ add_task(async function an_open_favorite_offers_its_tab() {
 add_task(async function a_favorite_among_the_top_sites_wears_the_star() {
   const page = "https://sval-top.example.net/";
   const [guid] = await store.insertTree([{ title: "Top Pick", url: page }]);
-  // Five visits make a page a top site (`TopSitesFeed`'s threshold).
+  // Five visits make a page a top site (`TopSites.getLinksWithDefaults`'
+  // frecency threshold).
   await PlacesTestUtils.addVisits(Array(6).fill({ uri: page, title: "Top" }));
-  // Top sites come from a cache the newtab feed refreshes on its own tick;
-  // the visits reach it here as they would at the next tick.
-  const feed = AboutNewTab.activityStream.store.feeds.get(
-    "feeds.system.topsites"
-  );
-  feed.frecentCache.expire();
-  await feed.refresh({ broadcast: true });
-  await TestUtils.waitForCondition(
-    () => AboutNewTab.getTopSites().some(site => site?.url === page),
+  TopSites.frecentCache.expire();
+  await within(TopSites.refresh(), 10_000, "the top sites refreshing");
+  Assert.ok(
+    (await TopSites.getSites()).some(site => site.url === page),
     "the page is a top site"
   );
   // With nothing typed the address bar lists the tree's other tabs in place

@@ -4,8 +4,14 @@
 #
 # Sync added files, then apply the patch series in order.
 #
+# The series names two kinds of entry. A `.patch` is applied with `git apply`.
+# A `.delete` lists Mozilla files a removal deletes, one path per line relative
+# to the tree; the files go at that point in the series. A list carries no file
+# contents, which a deletion in a patch would.
+#
 # Stops at the first patch that neither applies nor merges, which names the
-# Mozilla file that moved under it.
+# Mozilla file that moved under it, and at the first listed file that does not
+# exist, which names a file an upstream update moved or removed.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,6 +44,28 @@ while IFS= read -r line; do
   if [[ ! -f "$patch_file" ]]; then
     echo "error: $line listed in patches/series but not found at $patch_file" >&2
     exit 1
+  fi
+  if [[ "$line" == *.delete ]]; then
+    echo "==> Deleting $line"
+    while IFS= read -r path; do
+      [[ -z "${path// }" || "$path" == \#* ]] && continue
+      if [[ ! -e "$SRC/$path" && ! -L "$SRC/$path" ]]; then
+        echo "error: $line lists $path, which is not in $SRC." >&2
+        echo "  An upstream update moved or removed it: find where it went and" >&2
+        echo "  update the list, or drop the line if the file is gone." >&2
+        exit 1
+      fi
+      rm -f "$SRC/$path"
+      # A directory left empty goes too, as `git apply` removes one when a
+      # patch deletes its last file.
+      dir="$(dirname "$path")"
+      while [[ "$dir" != "." ]] && rmdir "$SRC/$dir" 2>/dev/null; do
+        dir="$(dirname "$dir")"
+      done
+      touched_files+=("$path")
+    done < "$patch_file"
+    applied=$((applied + 1))
+    continue
   fi
   echo "==> Applying $line"
   # A patch that does not apply is tried once more as a three-way merge,
@@ -100,5 +128,5 @@ fi
 git -C "$SRC" -c user.name=sval -c user.email=sval@localhost \
   commit -q --allow-empty -m "sval: patch series applied" >/dev/null
 
-echo "==> Applied $applied patch(es)"
-echo "    Patch surface: $applied patch(es) touching $surface Mozilla file(s)"
+echo "==> Applied $applied patch(es) and deletion list(s)"
+echo "    Patch surface: $applied entries touching $surface Mozilla file(s)"

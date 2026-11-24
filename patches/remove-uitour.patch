@@ -1,0 +1,443 @@
+Sval: Remove UITour
+
+UITour let pages on Mozilla's sites open Firefox's menus, highlight its
+buttons and show tour panels. Sval granted no site the permission it
+needs and locked it off. The component goes, with its actor, its panels'
+markup, styles and string, its prefs and default permissions, and its
+tests. The Heartbeat survey's browser.uitour.surveyDuration pref stays:
+Normandy reads it.
+
+diff --git a/browser/app/permissions b/browser/app/permissions
+index fe018a08c7..17b5c4e5a8 100644
+--- a/browser/app/permissions
++++ b/browser/app/permissions
+@@ -7,14 +7,6 @@
+ # Permissions defined here will also be set for private browsing.
+ # See PermissionManager.cpp for more...
+ 
+-# UITour
+-origin	uitour	1	https://www.mozilla.org
+-origin	uitour	1	https://support.mozilla.org
+-origin	uitour	1	about:home
+-origin	uitour	1	about:newtab
+-# Bug 1942328: firefox.com needs the same privileges as mozilla.org
+-origin	uitour	1	https://www.firefox.com
+-
+ # XPInstall
+ origin	install	1	https://addons.mozilla.org
+ 
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index d0ad9d7f0d..c4d254a1ee 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -239,10 +239,6 @@ pref("lightweightThemes.getMoreURL", "https://addons.mozilla.org/%LOCALE%/firefo
+   pref("browser.eme.ui.enabled", false);
+ #endif
+ 
+-// UI tour experience.
+-pref("browser.uitour.enabled", true);
+-pref("browser.uitour.loglevel", "Error");
+-pref("browser.uitour.url", "https://www.mozilla.org/%LOCALE%/firefox/%VERSION%/tour/");
+ // How long to show a Hearbeat survey (two hours, in seconds)
+ pref("browser.uitour.surveyDuration", 7200);
+ 
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 8e9e753f0b..1cebd6cc68 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -97,7 +97,6 @@ ChromeUtils.defineESModuleGetters(this, {
+     "moz-src:///browser/components/customizableui/ToolbarDropHandler.sys.mjs",
+   ToolbarIconColor: "moz-src:///browser/themes/ToolbarIconColor.sys.mjs",
+   TranslationsParent: "resource://gre/actors/TranslationsParent.sys.mjs",
+-  UITour: "moz-src:///browser/components/uitour/UITour.sys.mjs",
+   UpdateUtils: "resource://gre/modules/UpdateUtils.sys.mjs",
+   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 4851c36a78..85e5257096 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -134,7 +134,6 @@
+   "TabsSetupFlowManager",
+   "TelemetryEnvironment",
+   "TranslationsParent",
+-  "UITour",
+   "UpdateUtils",
+   "URILoadingHelper",
+   "UrlbarPrefs",
+diff --git a/browser/base/content/main-popupset.inc.xhtml b/browser/base/content/main-popupset.inc.xhtml
+index f9165af729..dbabda1fd9 100644
+--- a/browser/base/content/main-popupset.inc.xhtml
++++ b/browser/base/content/main-popupset.inc.xhtml
+@@ -253,44 +253,6 @@
+     </panel>
+   </html:template>
+ 
+-  <html:template id="UITourTooltipTemplate">
+-    <!-- UI tour experience -->
+-    <panel id="UITourTooltip"
+-           type="arrow"
+-           noautofocus="true"
+-           noautohide="true"
+-           align="start"
+-           orient="vertical"
+-           role="alert">
+-     <vbox>
+-      <hbox id="UITourTooltipBody">
+-        <image id="UITourTooltipIcon"/>
+-        <vbox flex="1">
+-          <hbox id="UITourTooltipTitleContainer">
+-            <label id="UITourTooltipTitle" flex="1"/>
+-            <toolbarbutton id="UITourTooltipClose" class="close-icon"
+-                           data-l10n-id="ui-tour-info-panel-close"/>
+-          </hbox>
+-          <description id="UITourTooltipDescription" flex="1"/>
+-        </vbox>
+-      </hbox>
+-      <hbox id="UITourTooltipButtons" flex="1" align="center"/>
+-     </vbox>
+-    </panel>
+-  </html:template>
+-  <html:template id="UITourHighlightTemplate">
+-    <!-- type="default" forces frames to be created so that the panel's size can be determined -->
+-    <panel id="UITourHighlightContainer"
+-           type="default"
+-           noautofocus="true"
+-           noautohide="true"
+-           flip="none"
+-           consumeoutsideclicks="false"
+-           level="top">
+-      <box id="UITourHighlight"></box>
+-    </panel>
+-  </html:template>
+-
+   <html:template id="dialogStackTemplate">
+     <stack class="dialogStack tab-dialog-box" hidden="true">
+       <vbox class="dialogTemplate dialogOverlay" topmost="true" hidden="true">
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 9375feba4d..fb3fd464eb 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -598,21 +598,6 @@ let JSWINDOWACTORS = {
+     allFrames: true,
+   },
+ 
+-  UITour: {
+-    parent: {
+-      esModuleURI: "moz-src:///browser/components/uitour/UITourParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "moz-src:///browser/components/uitour/UITourChild.sys.mjs",
+-      events: {
+-        mozUITour: { wantUntrusted: true },
+-      },
+-    },
+-
+-    enablePreference: "browser.uitour.enabled",
+-    messageManagerGroups: ["browsers"],
+-  },
+-
+   WebRTC: {
+     parent: {
+       esModuleURI: "resource:///actors/WebRTCParent.sys.mjs",
+diff --git a/browser/components/customizableui/test/browser_synced_tabs_menu.js b/browser/components/customizableui/test/browser_synced_tabs_menu.js
+index 2a0d4c1687..7d80d37809 100644
+--- a/browser/components/customizableui/test/browser_synced_tabs_menu.js
++++ b/browser/components/customizableui/test/browser_synced_tabs_menu.js
+@@ -17,7 +17,6 @@ let { UIState } = ChromeUtils.importESModule(
+ );
+ 
+ ChromeUtils.defineESModuleGetters(this, {
+-  UITour: "moz-src:///browser/components/uitour/UITour.sys.mjs",
+ });
+ 
+ const DECKINDEX_TABS = 0;
+@@ -111,11 +110,6 @@ async function openPrefsFromMenuPanel(expectedPanelId, entryPoint) {
+   // check the button's functionality
+   await document.getElementById("nav-bar").overflowable.show();
+ 
+-  if (entryPoint == "uitour") {
+-    UITour.tourBrowsersByWindow.set(window, new Set());
+-    UITour.tourBrowsersByWindow.get(window).add(gBrowser.selectedBrowser);
+-  }
+-
+   let syncButton = document.getElementById("sync-button");
+   ok(syncButton, "The Sync button was added to the Panel Menu");
+ 
+@@ -172,7 +166,6 @@ async function asyncCleanup() {
+   // restore the tabs
+   BrowserTestUtils.addTab(gBrowser, initialLocation);
+   gBrowser.removeTab(newTab);
+-  UITour.tourBrowsersByWindow.delete(window);
+ }
+ 
+ // When Sync is not setup.
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index ccdf24fb88..3a2ac317c7 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -64,7 +64,6 @@ DIRS += [
+     "tabbrowser",
+     "topsites",
+     "translations",
+-    "uitour",
+     "urlbar",
+     "webrtc",
+ ]
+diff --git a/browser/docs/index.rst b/browser/docs/index.rst
+index 49d06ce15a..88247439eb 100644
+--- a/browser/docs/index.rst
++++ b/browser/docs/index.rst
+@@ -26,7 +26,6 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    places/index
+    search/index
+    base/tabbrowser/index
+-   components/uitour/docs/index
+    branding/docs/index
+    components/storybook/docs/README.storybook.stories
+    components/storybook/docs/README.reusable-widgets.stories
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index cd1e30c74c..57ac2bdb79 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -1197,9 +1197,6 @@ menu-share-copy-links =
+            *[other] Copy { $count } Links
+         }
+     .accesskey = L
+-ui-tour-info-panel-close =
+-    .tooltiptext = Close
+-
+ ## Variables:
+ ##  $uriHost (String): URI host for which the popup was allowed or blocked.
+ 
+diff --git a/browser/themes/linux/browser.css b/browser/themes/linux/browser.css
+index 5a088e3658..fc47dac416 100644
+--- a/browser/themes/linux/browser.css
++++ b/browser/themes/linux/browser.css
+@@ -125,35 +125,6 @@
+   font-weight: var(--font-weight-bold);
+ }
+ 
+-#UITourHighlight {
+-  /* Below are some fixes for people without an X compositor on Linux.
+-     This is why we can't have nice things: */
+-  /* Animations don't repaint properly without an X compositor. */
+-  animation-name: none !important;
+-  /* Opacity rounds to 0 or 1 on Linux without an X compositor, making the
+-     background color not visible. Anti-aliasing is not available either. Make a
+-     thicker outline and cancel border-radius for that case. */
+-  outline: 4px solid rgb(0, 200, 215);
+-  border-radius: 0 !important;
+-}
+-
+-#UITourTooltipDescription {
+-  font-size: 1.05rem;
+-}
+-
+-#UITourTooltipClose {
+-  margin-inline-end: -4px;
+-}
+-
+-/**
+- * Override the --panel-padding so the background extends
+- * to the sides and bottom of the panel.
+- */
+-#UITourTooltipButtons {
+-  margin-inline-start: -10px;
+-  margin-bottom: -10px;
+-}
+-
+ /* The button box must appear on top of the navigator-toolbox in order for
+  * click and hover mouse events to work properly for the button in the restored
+  * window state. Otherwise, elements in the navigator-toolbox, like the menubar,
+diff --git a/browser/themes/osx/browser.css b/browser/themes/osx/browser.css
+index 486e269838..3e16c6eb15 100644
+--- a/browser/themes/osx/browser.css
++++ b/browser/themes/osx/browser.css
+@@ -172,13 +172,3 @@
+   background: SelectedItem !important;
+   color: SelectedItemText !important;
+ }
+-
+-#UITourTooltipDescription {
+-  font-size: 1.18rem;
+-  line-height: 2rem;
+-}
+-
+-#UITourTooltipClose {
+-  margin-inline-end: -10px;
+-  margin-top: -14px;
+-}
+diff --git a/browser/themes/shared/browser-shared.css b/browser/themes/shared/browser-shared.css
+index 74be041708..58a51d3b6f 100644
+--- a/browser/themes/shared/browser-shared.css
++++ b/browser/themes/shared/browser-shared.css
+@@ -31,7 +31,6 @@
+ @import url("chrome://browser/skin/searchbar.css");
+ @import url("chrome://browser/skin/sidebar.css");
+ @import url("chrome://browser/skin/customizableui/customizeMode.css");
+-@import url("chrome://browser/skin/UITour.css");
+ @import url("chrome://browser/skin/formautofill-notification.css");
+ 
+ :root,
+diff --git a/browser/themes/shared/jar.inc.mn b/browser/themes/shared/jar.inc.mn
+index d5cbdb6727..58ada52258 100644
+--- a/browser/themes/shared/jar.inc.mn
++++ b/browser/themes/shared/jar.inc.mn
+@@ -54,7 +54,6 @@
+   skin/classic/browser/urlbar/view-nova.css                    (../shared/urlbar/view-nova.css)
+   skin/classic/browser/urlbar/view-proton.css                  (../shared/urlbar/view-proton.css)
+   skin/classic/browser/urlbar-searchbar.css                    (../shared/urlbar-searchbar.css)
+-  skin/classic/browser/UITour.css                              (../shared/UITour.css)
+   skin/classic/browser/webRTC-indicator.css                    (../shared/webRTC-indicator.css)
+   skin/classic/browser/webRTC-menubar-indicator.css            (../shared/webRTC-menubar-indicator.css)
+   skin/classic/browser/addons/addon-install-blocked.svg        (../shared/addons/addon-install-blocked.svg)
+diff --git a/browser/themes/windows/browser.css b/browser/themes/windows/browser.css
+index 9a1c7e5e17..cd09dc2792 100644
+--- a/browser/themes/windows/browser.css
++++ b/browser/themes/windows/browser.css
+@@ -259,15 +259,6 @@
+   font-weight: var(--font-weight-bold);
+ }
+ 
+-#UITourTooltipButtons {
+-  /**
+-   * Override the --panel-padding so the background extends
+-   * to the sides and bottom of the panel.
+-   */
+-  margin-inline: -10px;
+-  margin-bottom: -10px;
+-}
+-
+ /* Make menu items larger when opened through touch. */
+ panel[touchmode],
+ menupopup[touchmode] {
+diff --git a/docs/config.yml b/docs/config.yml
+index ce273fb9ff..06e2a8d3fc 100644
+--- a/docs/config.yml
++++ b/docs/config.yml
+@@ -151,7 +151,6 @@ allowed_warnings:
+     - "networking/http/prioritization\\.md:.*: ERROR: Document may not end with a transition"
+     - "overview/index\\.rst:.*: WARNING: toctree contains reference to nonexisting document 'mobile/android/overview'"
+     - "testing/automated-testing/manifest-sandbox\\.rst:.*: WARNING: download file not readable"
+-    - "UITour-lib.Mozilla.UITour.* WARNING: duplicate class description of Mozilla.UITour"
+     - "mobile/android/shared/android/device_testing\\.md:.*: WARNING: Pygments lexer name"
+     - "widget/windows/windows-pointing-device/index.md:.*: WARNING: image file not readable"
+     # Unknown document warnings
+@@ -220,7 +219,6 @@ js_source_paths:
+     - browser/components/migration/content
+     - browser/components/mozcachedohttp
+     - browser/components/mozcachedohttp/actors
+-    - browser/components/uitour
+     - browser/components/urlbar
+     - browser/components/urlbar/content
+     - js/xpconnect/loader
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index 5a1a55b0dd..283a577f78 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -64,7 +64,6 @@ export default [
+   {
+     name: "globals-commonjs",
+     files: [
+-      "browser/components/uitour/UITour-lib.js",
+       "mobile/shared/modules/dbg-browser-actors.js",
+       "toolkit/components/promiseworker/worker/PromiseWorker.template.worker.js",
+       "toolkit/components/workerloader/tests/moduleA-depends.js",
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index b030c3538c..82796124f3 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -68,7 +68,6 @@ export default [
+       "browser/components/protocolhandler/WebProtocolHandlerRegistrar.sys.mjs",
+       "browser/components/shell/ShellService.sys.mjs",
+       "browser/components/syncedtabs/TabListComponent.sys.mjs",
+-      "browser/components/uitour/UITour.sys.mjs",
+       "browser/tools/mozscreenshots/mozscreenshots/extension/Screenshot.sys.mjs",
+       "devtools/client/webconsole/test/**",
+       "devtools/shared/tests/xpcshell/test_console_filtering.js",
+@@ -343,7 +342,6 @@ export default [
+       "browser/components/tests/browser/**",
+       "browser/components/topsites/**",
+       "browser/components/translations/**",
+-      "browser/components/uitour/**",
+       "browser/extensions/formautofill/**",
+       "browser/extensions/newtab/**",
+       "browser/extensions/pictureinpicture/**",
+@@ -461,14 +459,6 @@ export default [
+     ignores: ["devtools/shared/css/parsing-utils.js", "devtools/startup/**"],
+     rules: mozilla.turnOff(mozilla.configs["flat/require-jsdoc"].rules),
+   },
+-  {
+-    // TODO: Bug 1997306. Fix these instances after the jsdoc 60.8.0 upgrade.
+-    name: "rollout-jsdoc-valid-types-updates",
+-    files: ["browser/components/uitour/UITour-lib.js"],
+-    rules: {
+-      "jsdoc/valid-types": "off",
+-    },
+-  },
+   {
+     name: "rollout-layout",
+     files: ["layout/**"],
+@@ -866,8 +856,6 @@ export default [
+       "browser/components/tests/browser/browser_bug538331.js",
+       "browser/components/tests/browser/browser_initial_tab_remoteType.js",
+       "browser/components/tests/browser/browser_startup_homepage.js",
+-      "browser/components/uitour/test/browser_UITour.js",
+-      "browser/components/uitour/test/head.js",
+       "browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs",
+       "browser/components/urlbar/tests/browser-tips/browser_picks.js",
+       "browser/components/urlbar/tests/browser-tips/browser_selection.js",
+diff --git a/eslint-test-paths.config.mjs b/eslint-test-paths.config.mjs
+index 63e6e0281b..f47b294c65 100644
+--- a/eslint-test-paths.config.mjs
++++ b/eslint-test-paths.config.mjs
+@@ -129,7 +129,6 @@ const extraBrowserTestPaths = [
+   "browser/components/safebrowsing/content/test/",
+   "browser/components/sessionstore/test/",
+   "browser/components/shell/test/",
+-  "browser/components/uitour/test/",
+   "browser/tools/mozscreenshots/",
+   "caps/tests/mochitest/",
+   "devtools/client/debugger/test/mochitest/",
+diff --git a/mots.yaml b/mots.yaml
+index 5e9007d29d..7ebe2a537d 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -3772,9 +3772,7 @@ modules:
+           Feature Callout and Spotlight.
+         includes:
+           - browser/components/asrouter/**/*
+-          - browser/components/uitour/**/*
+           - toolkit/components/messaging-system/**/*
+-          - browser/components/uitour/docs/**/*
+         meta:
+           components:
+             - Firefox::Messaging System
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 7148eb80e7..a7e44c497c 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -149,7 +149,6 @@ module.exports = [
+       "browser/themes/osx/customizableui/panelUI.css",
+       "browser/themes/osx/downloads/allDownloadsView.css",
+       "browser/themes/osx/places/organizer.css",
+-      "browser/themes/shared/UITour.css",
+       "browser/themes/shared/aboutRestartRequired.css",
+       "browser/themes/shared/aboutSessionRestore.css",
+       "browser/themes/shared/aboutTabCrashed.css",
+diff --git a/toolkit/components/reader/tests/browser/browser_readerMode.js b/toolkit/components/reader/tests/browser/browser_readerMode.js
+index 8def225f63..d022fb425d 100644
+--- a/toolkit/components/reader/tests/browser/browser_readerMode.js
++++ b/toolkit/components/reader/tests/browser/browser_readerMode.js
+@@ -41,10 +41,6 @@ add_task(async function test_reader_button() {
+     readerButton,
+     "Reader mode button is not present on a new tab"
+   );
+-  ok(
+-    !UITour.isInfoOnTarget(window, "readerMode-urlBar"),
+-    "Info panel shouldn't appear without the reader mode button"
+-  );
+ 
+   // Point tab to a test page that is reader-able.
+   let url = TEST_PATH + "readerModeArticle.html";

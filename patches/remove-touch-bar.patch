@@ -1,0 +1,686 @@
+Sval: Remove the Touch Bar
+
+Sval gives the macOS Touch Bar no buttons of its own. The front end
+(MacTouchBar and its components), the Cocoa widget code that built the
+bar for each window, the Customize Touch Bar items in the application
+menu and in Customize Toolbar, the urlbar's Touch Bar search mode entry,
+their interfaces, strings, docs and tests go. A window that builds no
+bar of its own shows the Touch Bar macOS gives any app.
+
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index 79773ce141..77ecb96bce 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -420,7 +420,6 @@
+               <menuitem id="menu_mac_hide_app" data-l10n-id="menu-application-hide-this" key="key_hideThisAppCmdMac"/>
+               <menuitem id="menu_mac_hide_others" data-l10n-id="menu-application-hide-other" key="key_hideOtherAppsCmdMac"/>
+               <menuitem id="menu_mac_show_all" data-l10n-id="menu-application-show-all"/>
+-              <menuitem id="menu_mac_touch_bar" data-l10n-id="menu-application-touch-bar"/>
+ #endif
+               </menupopup>
+             </menu>
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 9d6a9515e0..b28383e2b2 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -2174,12 +2174,6 @@ var XULBrowserWindow = {
+ 
+     UpdateBackForwardCommands(gBrowser.webNavigation);
+ 
+-    Services.obs.notifyObservers(
+-      aWebProgress,
+-      "touchbar-location-change",
+-      location
+-    );
+-
+     // For most changes we only need to update the browser UI if the primary
+     // content area was navigated or the selected tab was changed. We don't need
+     // to do anything else if there was a subframe navigation.
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index 2b0169baaf..d21ae1df57 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -143,7 +143,6 @@ if (AppConstants.platform == "win") {
+ // the test on a non-packaged build.
+ if (AppConstants.platform == "macosx") {
+   gExceptionPaths.push("resource://gre/res/cursors/");
+-  gExceptionPaths.push("resource://gre/res/touchbar/");
+ }
+ 
+ if (AppConstants.MOZ_BACKGROUNDTASKS) {
+@@ -266,12 +265,6 @@ var allowlist = [
+   },
+   { file: "chrome://devtools/skin/images/next.svg", isFromDevTools: true },
+ 
+-  // Bug 1526672
+-  {
+-    file: "resource://app/localization/en-US/browser/touchbar/touchbar.ftl",
+-    platforms: ["linux", "win"],
+-  },
+-
+   // dom/media/mediacontrol/MediaControlService.cpp
+   { file: "resource://gre/localization/en-US/dom/media.ftl" },
+ 
+diff --git a/browser/components/customizableui/CustomizeMode.sys.mjs b/browser/components/customizableui/CustomizeMode.sys.mjs
+index 45361822a1..21d9792f20 100644
+--- a/browser/components/customizableui/CustomizeMode.sys.mjs
++++ b/browser/components/customizableui/CustomizeMode.sys.mjs
+@@ -19,7 +19,6 @@ const kDownloadAutohidePanelId = "downloads-button-autohide-panel";
+ const kDownloadAutoHidePref = "browser.download.autohideButton";
+ 
+ import { CustomizableUI } from "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs";
+-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ 
+ const lazy = {};
+@@ -35,12 +34,6 @@ ChromeUtils.defineLazyGetter(lazy, "gWidgetsBundle", function () {
+     "chrome://browser/locale/customizableui/customizableWidgets.properties";
+   return Services.strings.createBundle(kUrl);
+ });
+-XPCOMUtils.defineLazyServiceGetter(
+-  lazy,
+-  "gTouchBarUpdater",
+-  "@mozilla.org/widget/touchbarupdater;1",
+-  Ci.nsITouchBarUpdater
+-);
+ 
+ let gDebug;
+ ChromeUtils.defineLazyGetter(lazy, "log", () => {
+@@ -534,7 +527,6 @@ export class CustomizeMode {
+ 
+       this.#updateResetButton();
+       this.#updateUndoResetButton();
+-      this.#updateTouchBarButton();
+       this.#updateDensityMenu();
+ 
+       this.#skipSourceNodeCheck =
+@@ -2136,22 +2128,6 @@ export class CustomizeMode {
+     undoResetButton.hidden = !CustomizableUI.canUndoReset;
+   }
+ 
+-  /**
+-   * On macOS, if a touch bar is available on the device, updates the
+-   * hidden / visible state of the Customize Touch Bar button and spacer.
+-   */
+-  #updateTouchBarButton() {
+-    if (AppConstants.platform != "macosx") {
+-      return;
+-    }
+-    let touchBarButton = this.$("customization-touchbar-button");
+-    let touchBarSpacer = this.$("customization-touchbar-spacer");
+-
+-    let isTouchBarInitialized = lazy.gTouchBarUpdater.isTouchBarInitialized();
+-    touchBarButton.hidden = !isTouchBarInitialized;
+-    touchBarSpacer.hidden = !isTouchBarInitialized;
+-  }
+-
+   /**
+    * Updates the hidden / visible state of the UI density button.
+    */
+@@ -2337,9 +2313,6 @@ export class CustomizeMode {
+         case "whimsy-button":
+           this.#togglePong(event.target.checked);
+           break;
+-        case "customization-touchbar-button":
+-          this.#customizeTouchBar();
+-          break;
+         case "customization-undo-reset-button":
+           this.undoReset();
+           break;
+@@ -3682,16 +3655,6 @@ export class CustomizeMode {
+     event.view.gCustomizeMode.#moveDownloadsButtonToNavBar = checkbox.checked;
+   }
+ 
+-  /**
+-   * Called when the button to customize the macOS touchbar is clicked.
+-   */
+-  #customizeTouchBar() {
+-    let updater = Cc["@mozilla.org/widget/touchbarupdater;1"].getService(
+-      Ci.nsITouchBarUpdater
+-    );
+-    updater.enterCustomizeMode();
+-  }
+-
+   /**
+    * This is a method to toggle pong on or off in customize mode. You heard me.
+    *
+diff --git a/browser/components/customizableui/content/customizeMode.inc.xhtml b/browser/components/customizableui/content/customizeMode.inc.xhtml
+index 25d901904a..ddabb3882b 100644
+--- a/browser/components/customizableui/content/customizeMode.inc.xhtml
++++ b/browser/components/customizableui/content/customizeMode.inc.xhtml
+@@ -74,13 +74,6 @@
+         hidden="true"/>
+ 
+ <spacer id="customization-footer-spacer"/>
+-#ifdef XP_MACOSX
+-    <button id="customization-touchbar-button"
+-        class="footer-button"
+-        hidden="true"
+-        data-l10n-id="customize-mode-touchbar-cmd"/>
+-    <spacer hidden="true" id="customization-touchbar-spacer"/>
+-#endif
+ <button id="customization-undo-reset-button"
+         class="footer-button"
+         hidden="true"
+diff --git a/browser/components/customizableui/test/browser.toml b/browser/components/customizableui/test/browser.toml
+index c53a33655c..7d44fb720e 100644
+--- a/browser/components/customizableui/test/browser.toml
++++ b/browser/components/customizableui/test/browser.toml
+@@ -446,13 +446,6 @@ fail-if = [
+ 
+ ["browser_toolbar_collapsed_states.js"]
+ 
+-["browser_touchbar_customization.js"]
+-skip-if = [
+-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
+-  "os == 'win'",
+-]
+-
+ ["browser_unified_extensions_reset.js"]
+ 
+ ["browser_vertical_tabs_customize_navbar.js"]
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 944e983094..0254fd94e0 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -82,9 +82,7 @@ DIRS += ["build"]
+ if CONFIG["MOZ_SELECTABLE_PROFILES"]:
+     DIRS += ["profiles"]
+ 
+-if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
+-    DIRS += ["touchbar"]
+-elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
++if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+     DIRS += [
+         "installerprefs",
+     ]
+diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/urlbar/UrlbarUtils.sys.mjs
+index 95e914fd49..f7eb292653 100644
+--- a/browser/components/urlbar/UrlbarUtils.sys.mjs
++++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
+@@ -266,7 +266,6 @@ export var UrlbarUtils = {
+     "tabtosearch_onboard",
+     "topsites_newtab",
+     "topsites_urlbar",
+-    "touchbar",
+     "typed",
+   ]),
+ 
+diff --git a/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js b/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js
+index 3cd1d1822d..d7e723adbb 100644
+--- a/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js
++++ b/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js
+@@ -29,13 +29,6 @@ ChromeUtils.defineESModuleGetters(this, {
+     "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+ });
+ 
+-XPCOMUtils.defineLazyServiceGetter(
+-  this,
+-  "TouchBarHelper",
+-  "@mozilla.org/widget/touchbarhelper;1",
+-  Ci.nsITouchBarHelper
+-);
+-
+ /**
+  * Asserts that search mode legacy telemetry was recorded correctly.
+  *
+@@ -612,35 +605,6 @@ add_task(async function test_handoff_pbm() {
+   await SpecialPowers.popPrefEnv();
+ });
+ 
+-// Enters search mode by tapping a search shortcut on the Touch Bar.
+-add_task(async function test_touchbar() {
+-  if (AppConstants.platform != "macosx") {
+-    return;
+-  }
+-
+-  let tab = await BrowserTestUtils.openNewForegroundTab(gBrowser);
+-
+-  await UrlbarTestUtils.promiseAutocompleteResultPopup({
+-    window,
+-    value: TEST_QUERY,
+-  });
+-  // We have to fake the tap on the Touch Bar since mochitests have no way of
+-  // interacting with the Touch Bar.
+-  TouchBarHelper.insertRestrictionInUrlbar(
+-    UrlbarShared.RESTRICT_TOKENS.HISTORY
+-  );
+-  await UrlbarTestUtils.assertSearchMode(window, {
+-    source: UrlbarUtils.RESULT_SOURCE.HISTORY,
+-    entry: "touchbar",
+-  });
+-  let loadPromise = BrowserTestUtils.browserLoaded(tab.linkedBrowser);
+-  EventUtils.synthesizeKey("KEY_ArrowDown");
+-  EventUtils.synthesizeKey("KEY_Enter");
+-  await loadPromise;
+-  assertSearchModeScalars("touchbar", "history", 0);
+-  BrowserTestUtils.removeTab(tab);
+-});
+-
+ // Enters search mode by selecting a tab-to-search result.
+ // Tests that tab-to-search results preview search mode when highlighted. These
+ // results are worth testing separately since they do not set the
+diff --git a/browser/docs/index.rst b/browser/docs/index.rst
+index ae1546f91a..838ca1d163 100644
+--- a/browser/docs/index.rst
++++ b/browser/docs/index.rst
+@@ -29,7 +29,6 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    components/asrouter/docs/index
+    search/index
+    base/tabbrowser/index
+-   touchbar/index
+    components/uitour/docs/index
+    branding/docs/index
+    components/storybook/docs/README.storybook.stories
+diff --git a/browser/locales/en-US/browser/customizeMode.ftl b/browser/locales/en-US/browser/customizeMode.ftl
+index e5f54b2317..58162e2e75 100644
+--- a/browser/locales/en-US/browser/customizeMode.ftl
++++ b/browser/locales/en-US/browser/customizeMode.ftl
+@@ -32,7 +32,5 @@ customize-mode-uidensity-menu-compact-unsupported =
+ customize-mode-undo-cmd =
+     .label = Undo
+ customize-mode-lwthemes-link = Manage Themes
+-customize-mode-touchbar-cmd =
+-    .label = Customize Touch Bar…
+ customize-mode-downloads-button-autohide =
+     .label = Hide button when empty
+diff --git a/browser/locales/en-US/browser/menubar.ftl b/browser/locales/en-US/browser/menubar.ftl
+index ff7bf9eaf1..592cfd5f58 100644
+--- a/browser/locales/en-US/browser/menubar.ftl
++++ b/browser/locales/en-US/browser/menubar.ftl
+@@ -24,8 +24,6 @@ menu-application-hide-other =
+     .label = Hide Others
+ menu-application-show-all =
+     .label = Show All
+-menu-application-touch-bar =
+-    .label = Customize Touch Bar…
+ 
+ ##
+ 
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index a850a987ff..309ac92c1a 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -348,7 +348,6 @@ export default [
+       "browser/components/tabpreview/tabpreview.mjs",
+       "browser/components/tests/browser/**",
+       "browser/components/topsites/**",
+-      "browser/components/touchbar/**",
+       "browser/components/translations/**",
+       "browser/components/uitour/**",
+       "browser/extensions/formautofill/**",
+@@ -878,8 +877,6 @@ export default [
+       "browser/components/tests/browser/browser_bug538331.js",
+       "browser/components/tests/browser/browser_initial_tab_remoteType.js",
+       "browser/components/tests/browser/browser_startup_homepage.js",
+-      "browser/components/touchbar/tests/browser/browser_touchbar_searchrestrictions.js",
+-      "browser/components/touchbar/tests/browser/browser_touchbar_tests.js",
+       "browser/components/uitour/test/browser_UITour.js",
+       "browser/components/uitour/test/head.js",
+       "browser/components/urlbar/tests/UrlbarTestUtils.sys.mjs",
+diff --git a/eslint-test-paths.config.mjs b/eslint-test-paths.config.mjs
+index 015bf703a4..63e6e0281b 100644
+--- a/eslint-test-paths.config.mjs
++++ b/eslint-test-paths.config.mjs
+@@ -129,7 +129,6 @@ const extraBrowserTestPaths = [
+   "browser/components/safebrowsing/content/test/",
+   "browser/components/sessionstore/test/",
+   "browser/components/shell/test/",
+-  "browser/components/touchbar/tests/",
+   "browser/components/uitour/test/",
+   "browser/tools/mozscreenshots/",
+   "caps/tests/mochitest/",
+diff --git a/tools/lint/codespell.yml b/tools/lint/codespell.yml
+index df1014ea0e..943e95aeb5 100644
+--- a/tools/lint/codespell.yml
++++ b/tools/lint/codespell.yml
+@@ -7,7 +7,6 @@ codespell:
+         - browser/components/asrouter/docs/
+         - browser/components/places/docs/
+         - browser/components/search/docs/
+-        - browser/components/touchbar/docs/
+         - browser/components/urlbar/docs/
+         - browser/extensions/newtab/docs/
+         - browser/installer/windows/docs/
+diff --git a/tools/lint/eslint/eslint-plugin-mozilla/lib/rules/valid-ci-uses.mjs b/tools/lint/eslint/eslint-plugin-mozilla/lib/rules/valid-ci-uses.mjs
+index 25dbacd4b8..71bac442de 100644
+--- a/tools/lint/eslint/eslint-plugin-mozilla/lib/rules/valid-ci-uses.mjs
++++ b/tools/lint/eslint/eslint-plugin-mozilla/lib/rules/valid-ci-uses.mjs
+@@ -45,9 +45,6 @@ const platformSpecificInterfaces = new Map([
+   ["nsISecondaryTileService", "windows"],
+   ["nsISecondaryTileListener", "windows"],
+   ["nsIStandaloneNativeMenu", "darwin"],
+-  ["nsITouchBarHelper", "darwin"],
+-  ["nsITouchBarInput", "darwin"],
+-  ["nsITouchBarUpdater", "darwin"],
+   ["mozISandboxReporter", "linux"],
+   ["nsIApplicationChooser", "linux"],
+   ["nsIAvailableMemoryWatcherTestingLinux", "linux"],
+diff --git a/tools/ts/build_xpcom.js b/tools/ts/build_xpcom.js
+index cf40d3d3c1..a44a003627 100644
+--- a/tools/ts/build_xpcom.js
++++ b/tools/ts/build_xpcom.js
+@@ -68,9 +68,6 @@ const PLATFORM_SPECIFIC = new Set([
+   "nsITaskbarProgress.idl",
+   "nsITaskbarTabPreview.idl",
+   "nsITaskbarWindowPreview.idl",
+-  "nsITouchBarHelper.idl",
+-  "nsITouchBarInput.idl",
+-  "nsITouchBarUpdater.idl",
+   "nsIWinAppHelper.idl",
+   "nsIWinTaskbar.idl",
+   "nsIWinTaskSchedulerService.idl",
+diff --git a/widget/cocoa/components.conf b/widget/cocoa/components.conf
+index 22b140d90a..8ed53011dc 100644
+--- a/widget/cocoa/components.conf
++++ b/widget/cocoa/components.conf
+@@ -165,12 +165,6 @@ Classes = [
+         'type': 'nsSystemStatusBarCocoa',
+         'processes': ProcessSelector.ALLOW_IN_GPU_RDD_VR_SOCKET_AND_UTILITY_PROCESS,
+     },
+-    {
+-        'cid': '{38f396e2-93c9-4a77-aaf7-2d50b9962186}',
+-        'contract_ids': ['@mozilla.org/widget/touchbarupdater;1'],
+-        'type': 'nsTouchBarUpdater',
+-        'processes': ProcessSelector.ALLOW_IN_GPU_RDD_VR_SOCKET_AND_UTILITY_PROCESS,
+-    },
+     {
+         'cid': '{c5765549-7cf1-4b3d-9baa-5e74282be542}',
+         'contract_ids': ['@mozilla.org/permission-monitor;1'],
+diff --git a/widget/cocoa/moz.build b/widget/cocoa/moz.build
+index 15dae0bab1..db519ec428 100644
+--- a/widget/cocoa/moz.build
++++ b/widget/cocoa/moz.build
+@@ -69,10 +69,6 @@ UNIFIED_SOURCES += [
+     "nsStandaloneNativeMenu.mm",
+     "nsSystemStatusBarCocoa.mm",
+     "nsToolkit.mm",
+-    "nsTouchBar.mm",
+-    "nsTouchBarInput.mm",
+-    "nsTouchBarInputIcon.mm",
+-    "nsTouchBarUpdater.mm",
+     "nsUserIdleServiceX.mm",
+     "nsWidgetFactory.mm",
+     "nsWindowMap.mm",
+diff --git a/widget/cocoa/nsCocoaWindow.h b/widget/cocoa/nsCocoaWindow.h
+index b15bde4eff..45a3eff2d6 100644
+--- a/widget/cocoa/nsCocoaWindow.h
++++ b/widget/cocoa/nsCocoaWindow.h
+@@ -14,7 +14,6 @@
+ #include "mozilla/layers/NativeLayerRootRemoteMacParent.h"
+ #include "nsIWidget.h"
+ #include "nsCocoaUtils.h"
+-#include "nsTouchBar.h"
+ #include "ViewRegion.h"
+ #include "mozView.h"
+ #include <dlfcn.h>
+@@ -55,8 +54,6 @@ class TextInputHandler;
+   NSRect mDirtyRect;
+ 
+   BOOL mIsAnimationSuppressed;
+-
+-  nsTouchBar* mTouchBar;
+ }
+ 
+ - (void)importState:(NSDictionary*)aState;
+@@ -112,8 +109,6 @@ class TextInputHandler;
+ - (void)setTitlebarSeparatorStyle:(NSTitlebarSeparatorStyle)aStyle
+     API_AVAILABLE(macos(11.0));
+ 
+-- (void)releaseJSObjects;
+-
+ @end
+ 
+ @interface NSWindow (Undocumented)
+diff --git a/widget/cocoa/nsCocoaWindow.mm b/widget/cocoa/nsCocoaWindow.mm
+index ff3bb8e938..40637f4d50 100644
+--- a/widget/cocoa/nsCocoaWindow.mm
++++ b/widget/cocoa/nsCocoaWindow.mm
+@@ -109,8 +109,7 @@ using namespace mozilla::layers;
+ using namespace mozilla::widget;
+ using namespace mozilla::gl;
+ using namespace mozilla;
+-
+-BOOL sTouchBarIsInitialized = NO;
++using namespace mozilla::dom;
+ 
+ // defined in nsMenuBarX.mm
+ extern NSMenu* sApplicationMenu;  // Application menu shared by all menubars
+@@ -5000,7 +4999,6 @@ void nsCocoaWindow::DestroyNativeWindow() {
+ 
+   [mWindow removeTrackingArea];
+ 
+-  [mWindow releaseJSObjects];
+   // We want to unhook the delegate here because we don't want events
+   // sent to it after this object has been destroyed.
+   mWindow.delegate = nil;
+@@ -8227,7 +8225,6 @@ static NSMutableSet* gSwizzledFrameViewClasses = nil;
+   mTrackingArea = nil;
+   mViewWithTrackingArea = nil;
+   mDirtyRect = NSZeroRect;
+-  mTouchBar = nil;
+   mIsAnimationSuppressed = NO;
+ 
+   return self;
+@@ -8299,35 +8296,6 @@ static NSImage* GetMenuMaskImage() {
+   [wrapper release];
+ }
+ 
+-- (NSTouchBar*)makeTouchBar {
+-  [mTouchBar release];
+-  mTouchBar = [[nsTouchBar alloc] init];
+-  if (mTouchBar && !sTouchBarIsInitialized) {
+-    sTouchBarIsInitialized = YES;
+-    // The menu bar may have been built before the Touch Bar was initialized,
+-    // in which case the "Customize Touch Bar" item was hidden and its trailing
+-    // separator was never added. Unhide the item and add the separator now so
+-    // the menu matches what CreateApplicationMenu would have produced.
+-    if (sApplicationMenu) {
+-      NSMenuItem* touchBarItem =
+-          [sApplicationMenu itemWithTag:eCommand_ID_TouchBar];
+-      if (touchBarItem) {
+-        [touchBarItem setHidden:NO];
+-        NSInteger touchBarIndex = [sApplicationMenu indexOfItem:touchBarItem];
+-        NSInteger separatorIndex = touchBarIndex + 1;
+-        BOOL hasSeparator = separatorIndex < [sApplicationMenu numberOfItems] &&
+-                            [[sApplicationMenu
+-                                itemAtIndex:separatorIndex] isSeparatorItem];
+-        if (touchBarIndex != -1 && !hasSeparator) {
+-          [sApplicationMenu insertItem:[NSMenuItem separatorItem]
+-                               atIndex:separatorIndex];
+-        }
+-      }
+-    }
+-  }
+-  return mTouchBar;
+-}
+-
+ - (BOOL)isVisibleOrBeingShown {
+   return [super isVisible] || self.isBeingShown;
+ }
+@@ -8349,7 +8317,6 @@ static NSImage* GetMenuMaskImage() {
+ }
+ 
+ - (void)dealloc {
+-  [mTouchBar release];
+   ChildViewMouseTracker::OnDestroyWindow(self);
+   [super dealloc];
+ }
+@@ -8659,10 +8626,6 @@ static const NSString* kStateCollectionBehavior = @"collectionBehavior";
+   return [self.mainChildView hasMozAccessible];
+ }
+ 
+-- (void)releaseJSObjects {
+-  [mTouchBar releaseJSObjects];
+-}
+-
+ #endif
+ 
+ @end
+diff --git a/widget/cocoa/nsMenuBarX.mm b/widget/cocoa/nsMenuBarX.mm
+index eb42249180..bac06296ef 100644
+--- a/widget/cocoa/nsMenuBarX.mm
++++ b/widget/cocoa/nsMenuBarX.mm
+@@ -46,9 +46,6 @@ BOOL gSomeMenuBarPainted = NO;
+ // explanation of why this switch is necessary.
+ static BOOL gMenuItemsExecuteCommands = YES;
+ 
+-// defined in nsCocoaWindow.mm.
+-extern BOOL sTouchBarIsInitialized;
+-
+ // We keep references to the first quit and pref item content nodes we find,
+ // which will be from the hidden window. We use these when the document for the
+ // current window does not have a quit or pref item. We don't need strong refs
+@@ -707,7 +704,6 @@ void nsMenuBarX::AquifyMenuBar() {
+     HideItem(domDoc, u"menu_mac_hide_app"_ns);
+     HideItem(domDoc, u"menu_mac_hide_others"_ns);
+     HideItem(domDoc, u"menu_mac_show_all"_ns);
+-    HideItem(domDoc, u"menu_mac_touch_bar"_ns);
+   }
+ }
+ 
+@@ -822,8 +818,6 @@ void nsMenuBarX::CreateApplicationMenu(nsMenuX* aMenu) {
+     = Hide Others          = <- menu_mac_hide_others
+     = Show All             = <- menu_mac_show_all
+     ========================
+-    = Customize Touch Bar… = <- menu_mac_touch_bar
+-    ========================
+     = Quit                 = <- menu_FileQuitItem
+     ========================
+ 
+@@ -978,30 +972,6 @@ void nsMenuBarX::CreateApplicationMenu(nsMenuX* aMenu) {
+       [sApplicationMenu addItem:[NSMenuItem separatorItem]];
+     }
+ 
+-    BOOL addTouchBarSeparator = NO;
+-
+-    // Add Touch Bar customization menu item.
+-    itemBeingAdded = CreateNativeAppMenuItem(
+-        aMenu, u"menu_mac_touch_bar"_ns, @selector(menuItemHit:),
+-        eCommand_ID_TouchBar, nsMenuBarX::sNativeEventTarget);
+-
+-    if (itemBeingAdded) {
+-      [sApplicationMenu addItem:itemBeingAdded];
+-      // We hide the menu item on Macs that don't have a Touch Bar.
+-      if (!sTouchBarIsInitialized) {
+-        [itemBeingAdded setHidden:YES];
+-      } else {
+-        addTouchBarSeparator = YES;
+-      }
+-      [itemBeingAdded release];
+-      itemBeingAdded = nil;
+-    }
+-
+-    // Add a separator after the Touch Bar menu item if it exists
+-    if (addTouchBarSeparator) {
+-      [sApplicationMenu addItem:[NSMenuItem separatorItem]];
+-    }
+-
+     // Add quit menu item
+     itemBeingAdded = CreateNativeAppMenuItem(
+         aMenu, u"menu_FileQuitItem"_ns, @selector(menuItemHit:),
+@@ -1269,10 +1239,6 @@ void nsMenuBarX::CreateApplicationMenu(nsMenuX* aMenu) {
+     [NSApp unhideAllApplications:aSender];
+     return;
+   }
+-  if (tag == eCommand_ID_TouchBar) {
+-    [NSApp toggleTouchBarCustomizationPalette:aSender];
+-    return;
+-  }
+   if (tag == eCommand_ID_Quit) {
+     nsIContent* mostSpecificContent = sQuitItemContent;
+     if (menuBar && menuBar->mQuitItemContent) {
+diff --git a/widget/cocoa/nsMenuGroupOwnerX.h b/widget/cocoa/nsMenuGroupOwnerX.h
+index 6d6485fbbd..f57fc809a7 100644
+--- a/widget/cocoa/nsMenuGroupOwnerX.h
++++ b/widget/cocoa/nsMenuGroupOwnerX.h
+@@ -33,7 +33,6 @@ enum {
+   eCommand_ID_HideOthers = 5,
+   eCommand_ID_ShowAll = 6,
+   eCommand_ID_Update = 7,
+-  eCommand_ID_TouchBar = 8,
+   eCommand_ID_Account = 9,
+   eCommand_ID_SetAsDefault = 10,
+   eCommand_ID_Last = 11
+diff --git a/widget/cocoa/nsNativeThemeCocoa.mm b/widget/cocoa/nsNativeThemeCocoa.mm
+index ea919696e6..cf520d6c7d 100644
+--- a/widget/cocoa/nsNativeThemeCocoa.mm
++++ b/widget/cocoa/nsNativeThemeCocoa.mm
+@@ -1210,10 +1210,11 @@ Maybe<nsNativeThemeCocoa::WidgetInfo> nsNativeThemeCocoa::ComputeWidgetInfo(
+         // default buttons in active windows have blue background and white
+         // text, and default buttons in inactive windows have white background
+         // and black text.)
+-        DocumentState docState = aFrame->PresContext()->Document()->State();
++        dom::DocumentState docState =
++            aFrame->PresContext()->Document()->State();
+         ControlParams params = ComputeControlParams(aFrame, elementState);
+         params.insideActiveWindow =
+-            !docState.HasState(DocumentState::WINDOW_INACTIVE);
++            !docState.HasState(dom::DocumentState::WINDOW_INACTIVE);
+         return Some(WidgetInfo::Button(
+             ButtonParams{params, ButtonType::eDefaultPushButton}));
+       }
+diff --git a/widget/cocoa/nsWidgetFactory.h b/widget/cocoa/nsWidgetFactory.h
+index 13ba1d15ef..7ef88de2f5 100644
+--- a/widget/cocoa/nsWidgetFactory.h
++++ b/widget/cocoa/nsWidgetFactory.h
+@@ -36,7 +36,6 @@ class nsPrinterListCUPS;
+ class nsSound;
+ class nsStandaloneNativeMenu;
+ class nsSystemStatusBarCocoa;
+-class nsTouchBarUpdater;
+ class nsTransferable;
+ class nsUserIdleServiceX;
+ 
+diff --git a/widget/cocoa/nsWidgetFactory.mm b/widget/cocoa/nsWidgetFactory.mm
+index 6bb563066f..89b65646bb 100644
+--- a/widget/cocoa/nsWidgetFactory.mm
++++ b/widget/cocoa/nsWidgetFactory.mm
+@@ -107,9 +107,6 @@ MAKE_GENERIC_CTOR(nsStandaloneNativeMenu, nsIStandaloneNativeMenu)
+ #include "nsSystemStatusBarCocoa.h"
+ MAKE_GENERIC_CTOR(nsSystemStatusBarCocoa, nsISystemStatusBar)
+ 
+-#include "nsTouchBarUpdater.h"
+-MAKE_GENERIC_CTOR(nsTouchBarUpdater, nsITouchBarUpdater)
+-
+ #include "nsMacPermissionMonitor.h"
+ MAKE_GENERIC_CTOR(nsMacPermissionMonitor, nsIPermissionMonitor)
+ 
+diff --git a/widget/moz.build b/widget/moz.build
+index 76b77cc8cb..d9b14583ef 100644
+--- a/widget/moz.build
++++ b/widget/moz.build
+@@ -68,9 +68,6 @@ if toolkit == "cocoa":
+         # Sval: ordering windows among other apps' (SvalMacWindowOrder.mm).
+         "nsISvalMacWindowOrder.idl",
+         "nsITaskbarProgress.idl",
+-        "nsITouchBarHelper.idl",
+-        "nsITouchBarInput.idl",
+-        "nsITouchBarUpdater.idl",
+     ]
+ elif toolkit == "gtk":
+     XPIDL_SOURCES += [
+diff --git a/widget/nsWidgetsCID.h b/widget/nsWidgetsCID.h
+index 55b0529804..3bad51b889 100644
+--- a/widget/nsWidgetsCID.h
++++ b/widget/nsWidgetsCID.h
+@@ -68,18 +68,6 @@
+ #define NS_SYSTEMSTATUSBAR_CID \
+   {0xb6e1a890, 0xb2b8, 0x4883, {0xa6, 0x5f, 0x94, 0x76, 0xf6, 0x18, 0x53, 0x13}}
+ 
+-// {ea109912-3acc-48de-b679-c23b6a122da5}
+-#define NS_TOUCHBARHELPER_CID \
+-  {0xea109912, 0x3acc, 0x48de, {0xb6, 0x79, 0xc2, 0x3b, 0x6a, 0x12, 0x2d, 0xa5}}
+-
+-// {38f396e2-93c9-4a77-aaf7-2d50b9962186}
+-#define NS_TOUCHBARUPDATER_CID \
+-  {0x38f396e2, 0x93c9, 0x4a77, {0xaa, 0xf7, 0x2d, 0x50, 0xb9, 0x96, 0x21, 0x86}}
+-
+-// {77441d17-f29c-49d7-982f-f20a5ab5a900}
+-#define NS_TOUCHBARINPUT_CID \
+-  {0x77441d17, 0xf29c, 0x49d7, {0x98, 0x2f, 0xf2, 0x0a, 0x5a, 0xb5, 0xa9, 0x00}}
+-
+ //-----------------------------------------------------------
+ // Drag & Drop & Clipboard
+ //-----------------------------------------------------------

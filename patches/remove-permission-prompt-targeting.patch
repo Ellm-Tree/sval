@@ -1,0 +1,43 @@
+Sval: Remove PermissionPromptTargeting
+
+The module evaluates targeting for permission prompts and nothing
+imports it outside its own test.
+
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index 07d8b16f5b..d2bd55a8aa 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -243,8 +243,6 @@ var allowlist = [
+   { file: "resource://builtin-addons/ipp-activator/breakages/tab.json" },
+ 
+   // Starting from here, files in the allowlist are bugs that need fixing.
+-  // Bug 2042933 - consumed by PermissionUI.sys.mjs in a follow-up patch.
+-  { file: "resource://app/modules/PermissionPromptTargeting.sys.mjs" },
+   // Bug 1339424 (wontfix?)
+   {
+     file: "chrome://browser/locale/taskbar.properties",
+diff --git a/browser/modules/moz.build b/browser/modules/moz.build
+index 5660bf5ff9..eeea1bb6bc 100644
+--- a/browser/modules/moz.build
++++ b/browser/modules/moz.build
+@@ -130,7 +130,6 @@ EXTRA_JS_MODULES += [
+     "LinksCache.sys.mjs",
+     "PageActions.sys.mjs",
+     "PartnerLinkAttribution.sys.mjs",
+-    "PermissionPromptTargeting.sys.mjs",
+     "PermissionUI.sys.mjs",
+     "PopupAndRedirectBlockerObserver.sys.mjs",
+     "ProcessHangMonitor.sys.mjs",
+diff --git a/browser/modules/test/unit/xpcshell.toml b/browser/modules/test/unit/xpcshell.toml
+index f70ee93529..820abbb835 100644
+--- a/browser/modules/test/unit/xpcshell.toml
++++ b/browser/modules/test/unit/xpcshell.toml
+@@ -43,8 +43,6 @@ run-if = [
+ 
+ ["test_LinksCache.js"]
+ 
+-["test_PermissionPromptTargeting.js"]
+-
+ ["test_ProfileCounter.js"]
+ run-if = [
+   "os == 'win'", # Test of a Windows-specific feature

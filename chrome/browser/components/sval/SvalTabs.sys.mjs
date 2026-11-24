@@ -715,13 +715,12 @@ const chromeTabAdapter = {
    * `history.pushState` and a fragment make.
    *
    * A tabs progress listener's `onLocationChange` is the mechanism
-   * (`tabbrowser.js`'s `TabProgressListener`), the one
-   * `browser/components/tabnotes/TabNotesController.sys.mjs` follows a tab's
-   * page by. `isTopLevel` keeps an iframe's navigation from being read as
-   * the tab's own. `LOCATION_CHANGE_SESSION_STORE` marks the session store
-   * setting a restoring tab's address without navigating
-   * (`nsDocShell::SetCurrentURIForSessionStore`), which commits nothing, and
-   * TabNotesController passes over it for the same reason. An error page for
+   * (`tabbrowser.js`'s `TabProgressListener`). `isTopLevel` keeps an
+   * iframe's navigation from being read as the tab's own.
+   * `LOCATION_CHANGE_SESSION_STORE` marks the session store setting a
+   * restoring tab's address without navigating
+   * (`nsDocShell::SetCurrentURIForSessionStore`), which commits nothing. An
+   * error page for
    * an address too malformed to keep commits at `about:blank`
    * (`nsDocShell::CreateDocumentViewer`), which names no page, and tabbrowser's
    * `onLocationChange` passes over that address on an error page too. A load

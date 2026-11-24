@@ -4,45 +4,21 @@
 "use strict";
 
 /**
- * None of Mozilla's AI features ship in Sval (spec §2, principle 6): each is
- * locked off in app-sval-prefs.js, settings offers none of them, and the
- * menus and sidebar that would offer one are empty of it. Translations runs
- * on the device and stays.
+ * None of Mozilla's AI features ship in Sval (spec §2, principle 6). Smart
+ * Window, the chatbot, link previews and smart tab groups are not built, the
+ * on-device models that remain are locked off, settings offers none of them,
+ * and the menus and sidebar that would offer one are empty of it.
+ * Translations runs on the device and stays.
  */
 
 ChromeUtils.defineESModuleGetters(this, {
-  AIWindow:
-    "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   EngineProcess: "chrome://global/content/ml/EngineProcess.sys.mjs",
-  GenAI: "resource:///modules/GenAI.sys.mjs",
 });
 
 /** Each AI pref, and the value Sval locks it to. */
 const LOCKED = {
   "browser.ml.enable": false,
   "browser.ai.control.default": "blocked",
-  "browser.preferences.aiControls": false,
-  "browser.ml.chat.enabled": false,
-  "browser.ml.chat.provider": "",
-  "browser.ml.chat.page": false,
-  "browser.ml.chat.menu": false,
-  "browser.ml.chat.sidebar": false,
-  "browser.ml.chat.shortcuts": false,
-  "browser.ml.chat.shortcuts.smartwindow": false,
-  "browser.ml.pageAssist.enabled": false,
-  "browser.ai.control.sidebarChatbot": "blocked",
-  "browser.smartwindow.enabled": false,
-  "browser.smartwindow.worldcup.enabled": false,
-  "browser.smartwindow.endpoint": "",
-  "browser.ai.control.smartWindow": "blocked",
-  "browser.ml.linkPreview.enabled": false,
-  "browser.ml.linkPreview.optin": false,
-  "browser.ml.linkPreview.longPress": false,
-  "browser.ai.control.linkPreviewKeyPoints": "blocked",
-  "browser.tabs.groups.smart.enabled": false,
-  "browser.tabs.groups.smart.userEnabled": false,
-  "browser.tabs.groups.smart.optin": false,
-  "browser.ai.control.smartTabGroups": "blocked",
   "pdfjs.enableAltText": false,
   "pdfjs.enableGuessAltText": false,
   "pdfjs.enableAltTextModelDownload": false,
@@ -52,6 +28,26 @@ const LOCKED = {
   "places.semanticHistory.featureGate": false,
   "extensions.formautofill.useml": false,
 };
+
+/**
+ * A file of each removed AI component, and the vendored model runtimes only
+ * those components loaded.
+ */
+const REMOVED_FILES = [
+  "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  "resource:///modules/GenAI.sys.mjs",
+  "moz-src:///browser/components/genai/LinkPreview.sys.mjs",
+  "moz-src:///browser/components/pagedata/PageDataService.sys.mjs",
+  "resource://gre/actors/PageExtractorParent.sys.mjs",
+  "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs",
+  "chrome://browser/content/urlbar/SmartbarInput.mjs",
+  "chrome://browser/content/multilineeditor/multiline-editor.mjs",
+  "chrome://browser/content/preferences/config/aiFeatures.mjs",
+  "chrome://global/content/ml/transformers.js",
+  "chrome://global/content/ml/ort.webgpu.mjs",
+  "chrome://global/content/ml/wllama-module.mjs",
+  "chrome://global/content/ml/openai.mjs",
+];
 
 add_task(function ai_prefs_are_locked_off() {
   for (const [name, value] of Object.entries(LOCKED)) {
@@ -72,11 +68,7 @@ add_task(function ai_prefs_are_locked_off() {
  */
 add_task(function every_ai_feature_switch_is_locked() {
   const kept = new Set(["browser.ai.control.translations"]);
-  const switches = [
-    "browser.ml.",
-    "browser.ai.control.",
-    "browser.smartwindow.",
-  ]
+  const switches = ["browser.ml.", "browser.ai.control."]
     .flatMap(branch => Services.prefs.getChildList(branch))
     .filter(
       name =>
@@ -89,25 +81,13 @@ add_task(function every_ai_feature_switch_is_locked() {
   }
 });
 
-/**
- * Smart Window, the chatbot and link previews start from Firefox's startup
- * categories. None of them is registered, so none of them runs.
- */
-add_task(function no_ai_feature_starts_with_the_browser() {
-  const categories = [
-    "browser-first-window-ready",
-    "browser-window-delayed-startup",
-    "browser-idle-startup",
-    "browser-window-unload",
-    "browser-quit-application-granted",
-  ];
-  for (const category of categories) {
-    for (const { value } of Services.catMan.enumerateCategory(category)) {
-      Assert.ok(
-        !/\/(aiwindow|genai)\/|GenAI\.sys\.mjs/.test(value),
-        `${category} does not start ${value}`
-      );
-    }
+add_task(function removed_ai_files_do_not_ship() {
+  Assert.ok(
+    packaged("chrome://global/content/ml/EngineProcess.sys.mjs"),
+    "the engine process Translations runs in is found"
+  );
+  for (const spec of REMOVED_FILES) {
+    Assert.ok(!packaged(spec), `${spec} is not in the package`);
   }
 });
 
@@ -151,61 +131,34 @@ add_task(async function settings_offer_no_ai_controls() {
         "linkPreviewKeyPoints",
         "tabGroupSuggestions",
       ]) {
-        const setting = win.Preferences.getSetting(id);
-        Assert.ok(setting, `${id} is a setting`);
-        Assert.ok(!setting.visible, `${id} is not shown`);
+        Assert.strictEqual(
+          win.Preferences.getSetting(id),
+          undefined,
+          `${id} is not a setting`
+        );
       }
     }
   );
 });
 
-add_task(async function no_chatbot_or_smart_window_entry_points() {
-  Assert.ok(!GenAI.canShowChatEntrypoint, "no chatbot entry point is offered");
-  const chat = SidebarController.sidebars.get("viewGenaiChatSidebar");
-  Assert.ok(!chat?.visible, "no chatbot in the sidebar");
-  const viewItem = document.getElementById("menu_genaiChatSidebar");
-  Assert.ok(!viewItem || viewItem.hidden, "no chatbot in View > Sidebar");
-
-  Assert.ok(!AIWindow.isAIWindowEnabled(), "Smart Window is unavailable");
-  Assert.strictEqual(
-    await AIWindow.launchWindow(gBrowser.selectedBrowser, true, "menu"),
-    false,
-    "Smart Window does not open"
+add_task(function no_chatbot_or_smart_window_entry_points() {
+  Assert.ok(
+    !SidebarController.sidebars.has("viewGenaiChatSidebar"),
+    "no chatbot in the sidebar"
   );
-});
-
-add_task(async function the_page_menu_offers_no_ai() {
-  await BrowserTestUtils.withNewTab(
-    {
-      gBrowser,
-      url: "data:text/html,<p id=text>Some text <a id=link href='https://example.com/'>a link</a></p>",
-    },
-    async browser => {
-      await SpecialPowers.spawn(browser, [], () => {
-        content.getSelection().selectAllChildren(content.document.body);
-      });
-      const menu = document.getElementById("contentAreaContextMenu");
-      const shown = BrowserTestUtils.waitForEvent(menu, "popupshown");
-      await BrowserTestUtils.synthesizeMouseAtCenter(
-        "#link",
-        { type: "contextmenu", button: 2 },
-        browser
-      );
-      await within(shown, 5_000, "the content context menu's popupshown");
-      try {
-        for (const id of [
-          "context-ask-chat",
-          "context-previewlink",
-          "context-openlinksmartwindow",
-        ]) {
-          const item = document.getElementById(id);
-          Assert.ok(!item || item.hidden, `${id} is hidden`);
-        }
-      } finally {
-        const hidden = BrowserTestUtils.waitForEvent(menu, "popuphidden");
-        menu.hidePopup();
-        await within(hidden, 5_000, "the content context menu's popuphidden");
-      }
-    }
-  );
+  for (const id of [
+    "menu_genaiChatSidebar",
+    "menu_newAIWindow",
+    "menu_newClassicWindow",
+    "chatsHistoryMenu",
+    "viewGenaiChatSidebarKb",
+    "ai-window-toggle",
+    "smartwindow-ask-button",
+    "context_askChat",
+    "context-ask-chat",
+    "context-previewlink",
+    "context-openlinksmartwindow",
+  ]) {
+    Assert.equal(document.getElementById(id), null, `no #${id}`);
+  }
 });

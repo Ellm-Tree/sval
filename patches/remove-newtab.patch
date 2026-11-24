@@ -1,0 +1,3496 @@
+Sval: Remove Firefox's New Tab add-on
+
+Sval's own page serves about:home and about:newtab, so the New Tab
+add-on and what served it only ran in the background: its
+ActivityStream store, the about:home startup cache, the AboutNewTab
+actors, the remote-renderer protocol, sponsored-link protection and
+attribution, the contextual-services context id, the cached-OHTTP
+protocol, the search hand-off bar it hosted, and the FirefoxHome
+policy. The about: module, the new tab URL extensions override, and
+the address bar's Top Sites, which the topsites module answers, stay.
+
+diff --git a/.prettierignore b/.prettierignore
+index fb995bf768..c758a51865 100644
+--- a/.prettierignore
++++ b/.prettierignore
+@@ -1022,7 +1022,6 @@ browser/components/sessionstore/test/unit/data/sessionstore_invalid.js
+ !browser/components/storybook/.storybook/*.js
+ 
+ # Ignore newtab files
+-browser/extensions/newtab/logs/
+ 
+ # Ignore about:welcome files
+ 
+@@ -1253,8 +1252,6 @@ toolkit/components/uniffi-bindgen-gecko-js/tests/generated/*
+ ##############################################################################
+ 
+ # These files are generated in some way.
+-browser/extensions/newtab/**/*.css
+-browser/extensions/newtab/data/content/bundled-renderer-index.js
+ 
+ # Note that the debugger has its own stylelint setup, but that currently
+ # produces errors. Bug 1831302 tracks making this better
+@@ -1565,14 +1562,6 @@ rlbox/rlbox_sandbox.hpp
+ .gradle/
+ browser/components/backup/tests/marionette/compat-files/backups
+ browser/components/storybook/storybook-static/
+-browser/extensions/newtab/data/content/activity-stream.bundle.js
+-browser/extensions/newtab/data/content/vendor.bundle.js
+-browser/extensions/newtab/test/vendor/react-dom-test-utils.js
+-browser/extensions/newtab/logs/
+-browser/extensions/newtab/node_modules/
+-browser/extensions/newtab/prerendered/
+-browser/extensions/newtab/webext-glue/locales/locales-report.json
+-browser/extensions/newtab/webext-glue/locales/supported-locales.json
+ browser/locales/l10n-changesets.json
+ browser/locales/l10n-onchange-changesets.json
+ devtools/client/aboutdebugging/test/jest/node_modules/
+diff --git a/.stylelintignore b/.stylelintignore
+index 2f51a14bd5..34db158208 100644
+--- a/.stylelintignore
++++ b/.stylelintignore
+@@ -24,7 +24,6 @@
+ obj*/
+ 
+ # These files are generated in some way.
+-browser/extensions/newtab/**/*.css
+ 
+ # Note that the debugger has its own stylelint setup, but that currently
+ # produces errors. Bug 1831302 tracks making this better
+diff --git a/.stylelintrc.js b/.stylelintrc.js
+index 2795840c9b..2276d0914c 100644
+--- a/.stylelintrc.js
++++ b/.stylelintrc.js
+@@ -296,113 +296,6 @@ module.exports = {
+         "stylelint-plugin-mozilla/media-query-no-invalid": null,
+       },
+     },
+-    {
+-      files: [
+-        "browser/extensions/newtab/**",
+-      ],
+-      customSyntax: "postcss-scss",
+-      extends: "stylelint-config-standard-scss",
+-      rules: {
+-        "@stylistic/color-hex-case": "upper",
+-        "@stylistic/indentation": 2,
+-        "@stylistic/no-eol-whitespace": true,
+-        "@stylistic/no-missing-end-of-source-newline": true,
+-        "@stylistic/number-leading-zero": "always",
+-        "@stylistic/number-no-trailing-zeros": true,
+-        "@stylistic/string-quotes": [
+-          "single",
+-          {
+-            avoidEscape: true,
+-          },
+-        ],
+-        "at-rule-disallowed-list": [
+-          ["debug", "warn", "error"],
+-          {
+-            message: "Clean up %s directives before committing",
+-          },
+-        ],
+-        "at-rule-no-vendor-prefix": null,
+-        "color-function-notation": null,
+-        "comment-empty-line-before": [
+-          "always",
+-          {
+-            except: ["first-nested"],
+-            ignore: ["after-comment", "stylelint-commands"],
+-          },
+-        ],
+-        "custom-property-empty-line-before": null,
+-        "custom-property-pattern": null,
+-        "declaration-block-no-duplicate-properties": true,
+-        "declaration-block-no-redundant-longhand-properties": null,
+-        "declaration-no-important": true,
+-        "function-no-unknown": [
+-          true,
+-          {
+-            ignoreFunctions: ["div"],
+-          },
+-        ],
+-        "function-url-no-scheme-relative": true,
+-        "keyframes-name-pattern": null,
+-        "media-feature-name-no-vendor-prefix": null,
+-        "no-descending-specificity": null,
+-        "property-disallowed-list": [
+-          ["margin-left", "margin-right"],
+-          {
+-            message: "Use margin-inline instead of %s",
+-          },
+-        ],
+-        "property-no-unknown": true,
+-        "property-no-vendor-prefix": null,
+-        "scss/dollar-variable-empty-line-before": null,
+-        "scss/double-slash-comment-empty-line-before": [
+-          "always",
+-          {
+-            except: ["first-nested"],
+-            ignore: ["between-comments", "stylelint-commands", "inside-block"],
+-          },
+-        ],
+-        "selector-class-pattern": null,
+-        "selector-no-vendor-prefix": null,
+-        "value-keyword-case": null,
+-        "value-no-vendor-prefix": null,
+-      },
+-    },
+-    {
+-      files: ["browser/extensions/newtab/**"],
+-      rules: {
+-        "declaration-property-value-disallowed-list": [
+-          {
+-            "font-size": [
+-              "/^[0-9.]+(px|em|rem|%)$/",
+-              "/^[0-9.]+$/",
+-              "/^(small|medium|large|x-large|xx-large)$/",
+-            ],
+-            "border-radius": [
+-              "/^[0-9.]+(px|em|rem|%)$/",
+-              "/^(small|medium|large|x-large|xx-large)$/",
+-            ],
+-            // Validate to only allow variables and global values
+-            "font-weight": [
+-              "/^(?!var\\(|inherit$|initial$|unset$|revert$|revert-layer$).+$/",
+-            ],
+-            [/^(margin|padding|inset|gap|row-gap|column-gap|grid-row-gap|grid-column-gap|top|right|bottom|left)($|-)/]:
+-              ["/[0-9.]+(px|em|rem)|\\$/"],
+-          },
+-          {
+-            message:
+-              "Avoid literal values. Use variables (e.g. var(--font-size-small)) or inherit/unset/etc.",
+-          },
+-        ],
+-        "csstools/use-logical": [
+-          "always",
+-          {
+-            // Bug 2003301: Do not enforce logical properties for any height/width properties
+-            except: [/^(min-|max-)?width/i, /^(min-|max-)?height/i],
+-            severity: "error",
+-          },
+-        ],
+-      },
+-    },
+     {
+       name: "design-token-rules-off",
+       files: [
+@@ -440,11 +333,6 @@ module.exports = {
+         // into the HTML backup archive files that exist on a user's file system
+         // and can be opened in any browser.
+         "browser/components/backup/content/archive.css",
+-        // Bug 2003877 - this is a centralization of a bunch of rules that had
+-        // been spread across about:newtab and about:privatebrowsing. We'll
+-        // fix these design tokens issues in a follow-up (presuming the
+-        // replacement of the handoff bar doesn't land and remove this first).
+-        "browser/components/search/content/contentSearchHandoffUI.css",
+       ],
+       rules: {
+         "stylelint-plugin-mozilla/use-design-tokens": null,
+diff --git a/browser/actors/BrowserProcessChild.sys.mjs b/browser/actors/BrowserProcessChild.sys.mjs
+index 1f2b7d3cad..6190315ed6 100644
+--- a/browser/actors/BrowserProcessChild.sys.mjs
++++ b/browser/actors/BrowserProcessChild.sys.mjs
+@@ -5,25 +5,10 @@
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  AboutHomeStartupCacheChild:
+-    "resource:///modules/AboutNewTabRedirector.sys.mjs",
+   WebRTCChild: "resource:///actors/WebRTCChild.sys.mjs",
+ });
+ 
+ export class BrowserProcessChild extends JSProcessActorChild {
+-  receiveMessage(message) {
+-    switch (message.name) {
+-      case "AboutHomeStartupCache:InputStreams": {
+-        let { pageInputStream, scriptInputStream } = message.data;
+-        lazy.AboutHomeStartupCacheChild.init(
+-          pageInputStream,
+-          scriptInputStream
+-        );
+-        break;
+-      }
+-    }
+-  }
+-
+   observe(subject, topic, data) {
+     switch (topic) {
+       case "getUserMedia:request":
+diff --git a/browser/actors/ContentSearchParent.sys.mjs b/browser/actors/ContentSearchParent.sys.mjs
+index eede200506..13e14757b9 100644
+--- a/browser/actors/ContentSearchParent.sys.mjs
++++ b/browser/actors/ContentSearchParent.sys.mjs
+@@ -5,7 +5,6 @@
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   BrowserSearchTelemetry:
+     "moz-src:///browser/components/search/BrowserSearchTelemetry.sys.mjs",
+   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+@@ -514,29 +513,11 @@ export let ContentSearch = {
+       : lazy.SearchService.defaultEngine;
+     let isFirstChange = true;
+ 
+-    // It's possible that this is a handoff from about:home / about:newtab,
+-    // in which case we want to include the newtab_session_id in our call to
+-    // urlBar.handoff. We have to jump through some unfortunate hoops to get
+-    // that.
+-    let newtabSessionId = null;
+-    let newtabActor =
+-      browser.browsingContext?.currentWindowGlobal?.getExistingActor(
+-        "AboutNewTab"
+-      );
+-    if (newtabActor) {
+-      const portID = newtabActor.getTabDetails()?.portID;
+-      if (portID) {
+-        newtabSessionId = lazy.AboutNewTab.activityStream.store.feeds
+-          .get("feeds.telemetry")
+-          ?.sessions.get(portID)?.session_id;
+-      }
+-    }
+-
+     if (!text) {
+       urlBar.setHiddenFocus();
+     } else {
+       // Pass the provided text to the awesomebar
+-      urlBar.handoff(text, searchEngine, newtabSessionId);
++      urlBar.handoff(text, searchEngine);
+       isFirstChange = false;
+     }
+ 
+@@ -547,7 +528,7 @@ export let ContentSearch = {
+       if (isFirstChange) {
+         isFirstChange = false;
+         urlBar.removeHiddenFocus(true);
+-        urlBar.handoff("", searchEngine, newtabSessionId);
++        urlBar.handoff("", searchEngine);
+         actor.sendAsyncMessage("DisableSearch");
+         urlBar.removeEventListener("compositionstart", checkFirstChange);
+         urlBar.removeEventListener("paste", checkFirstChange);
+diff --git a/browser/actors/moz.build b/browser/actors/moz.build
+index edff822b77..9ac28a0f08 100644
+--- a/browser/actors/moz.build
++++ b/browser/actors/moz.build
+@@ -2,9 +2,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-with Files("AboutNewTab*.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "New Tab Page")
+-
+ with Files("AboutProtections*.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Protections UI")
+ 
+@@ -82,8 +79,6 @@ with Files("WebRTC*.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Site Permissions")
+ 
+ FINAL_TARGET_FILES.actors += [
+-    "AboutNewTabChild.sys.mjs",
+-    "AboutNewTabParent.sys.mjs",
+     "AboutProtectionsChild.sys.mjs",
+     "AboutProtectionsParent.sys.mjs",
+     "AboutReaderChild.sys.mjs",
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index c4d254a1ee..c619237610 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -301,8 +301,6 @@ pref("browser.shell.setDefaultPDFHandler.attemptWaitTimeMs", 30000);
+ // The behavior of option 3 is detailed at: http://wiki.mozilla.org/Session_Restore
+ pref("browser.startup.page",                1);
+ pref("browser.startup.homepage",            "about:home");
+-pref("browser.startup.homepage.abouthome_cache.enabled", true);
+-pref("browser.startup.homepage.abouthome_cache.loglevel", "Warn");
+ 
+ // Whether we should skip the homepage when opening the first-run page
+ pref("browser.startup.firstrunSkipsHomepage", true);
+@@ -1753,18 +1751,7 @@ pref("services.sync.syncedTabs.syncDelayAfterTabChange", 5000);
+ // This is a fallback value for when prompt callers do not specify a modalType.
+ pref("prompts.defaultModalType", 3);
+ 
+-// Whether to use the discrete Top Sites component.
+-pref("browser.topsites.component.enabled", false);
+-
+ pref("browser.topsites.useRemoteSetting", true);
+-// Fetch sponsored Top Sites from Mozilla Tiles Service (Contile)
+-pref("browser.topsites.contile.enabled", true);
+-pref("browser.topsites.contile.endpoint", "https://contile.services.mozilla.com/v1/tiles");
+-
+-// The base URL for the Quick Suggest anonymizing proxy. To make a request to
+-// the proxy, include a campaign ID in the path.
+-pref("browser.partnerlink.attributionURL", "https://topsites.services.mozilla.com/cid/");
+-pref("browser.partnerlink.campaign.topsites", "amzn_2020_a1");
+ 
+ // Activates preloading of the new tab url.
+ pref("browser.newtab.preload", true);
+@@ -1800,211 +1787,15 @@ pref("termsofuse.minimumVersion", 4);
+   pref("termsofuse.bypassNotification", true);
+ #endif
+ 
+-// Show "Download Firefox for mobile" QR code modal on newtab
+-pref("browser.newtabpage.activity-stream.mobileDownloadModal.enabled", false);
+-pref("browser.newtabpage.activity-stream.mobileDownloadModal.variant-a", false);
+-pref("browser.newtabpage.activity-stream.mobileDownloadModal.variant-b", false);
+-pref("browser.newtabpage.activity-stream.mobileDownloadModal.variant-c", false);
+-
+-// Mozilla Ad Routing Service (MARS) unified ads service
+-pref("browser.newtabpage.activity-stream.unifiedAds.tiles.enabled", true);
+-pref("browser.newtabpage.activity-stream.unifiedAds.spocs.enabled", true);
+-pref("browser.newtabpage.activity-stream.unifiedAds.endpoint", "https://ads.mozilla.org/");
+-pref("browser.newtabpage.activity-stream.unifiedAds.adsFeed.enabled", false);
+-pref("browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled", true);
+-
+-// Weather widget for newtab
+-pref("browser.newtabpage.activity-stream.showWeather", true);
+-pref("browser.newtabpage.activity-stream.weather.query", "");
+-pref("browser.newtabpage.activity-stream.weather.display", "detailed");
+-
+-pref("browser.newtabpage.activity-stream.images.smart", true);
+-
+-// enable location search for newtab weather widget
+-pref("browser.newtabpage.activity-stream.weather.locationSearchEnabled", true);
+-
+-// List of regions that get weather by default.
+-pref("browser.newtabpage.activity-stream.discoverystream.region-weather-config", "AT,BE,BG,CA,CH,CY,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IS,IT,LI,LT,LV,MT,NL,NO,PL,PT,RO,SE,SI,SK,US");
+-
+-// List of locales that weather widget supports.
+-pref("browser.newtabpage.activity-stream.discoverystream.locale-weather-config", "bg,cs,da,de,el,en-CA,en-GB,en-US,es-ES,et,fi,fr,hr,hu,is,it,lv,nb-NO,nl,pl,pt-PT,ro,sk,sl,sv-SE,tr");
+-
+-// Promo card visibility
+-pref("browser.newtabpage.activity-stream.discoverystream.promoCard.visible", true);
+-
+-// Preference to enable wallpaper selection in the Customize Menu of new tab page
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.enabled", true);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.customColor.enabled", true);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.customWallpaper.enabled", true);
+-
+ // Utility preferences for custom wallpaper upload
+ pref("browser.newtabpage.activity-stream.newtabWallpapers.customWallpaper.uuid", "");
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.customWallpaper.fileSize", 0);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.customWallpaper.fileSize.enabled", false);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.customWallpaper.theme", "");
+ 
+ // Current new tab page background images.
+ pref("browser.newtabpage.activity-stream.newtabWallpapers.wallpaper", "");
+ 
+-// Preference to show feature highlight about wallpaper on new tab page
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.highlightEnabled", false);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.highlightDismissed", false);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.highlightSeenCounter", 0);
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.highlightHeaderText", "");
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.highlightContentText", "");
+-pref("browser.newtabpage.activity-stream.newtabWallpapers.highlightCtaText", "");
+-
+-pref("browser.newtabpage.activity-stream.newNewtabExperience.colors", "#004CA4,#009E97,#7550C2,#B63B39,#C96A00,#CA9600,#CC527F");
+-
+-// Activity Stream prefs that control to which page to redirect
+-#ifndef RELEASE_OR_BETA
+-  pref("browser.newtabpage.activity-stream.debug", false);
+-#endif
+-
+-// The remote FxA root content URL for the Activity Stream firstrun page.
+-pref("browser.newtabpage.activity-stream.fxaccounts.endpoint", "https://accounts.firefox.com/");
+-
+ // The pref that controls if the search shortcuts experiment is on
+ pref("browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts", true);
+ 
+-// These prefs control if Discovery Stream is enabled.
+-pref("browser.newtabpage.activity-stream.discoverystream.enabled", true);
+-pref("browser.newtabpage.activity-stream.discoverystream.hardcoded-basic-layout", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.hybridLayout.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.hideCardBackground.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.fourCardLayout.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.newFooterSection.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.hideDescriptions.enabled", true);
+-pref("browser.newtabpage.activity-stream.discoverystream.hideDescriptionsRegions", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.compactGrid.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.compactImages.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.imageGradient.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.titleLines", 3);
+-pref("browser.newtabpage.activity-stream.discoverystream.descLines", 3);
+-pref("browser.newtabpage.activity-stream.discoverystream.readTime.enabled", true);
+-pref("browser.newtabpage.activity-stream.discoverystream.newSponsoredLabel.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.spoc-positions", "2,4,8,13,17,20");
+-
+-// For both spoc and tiles, count corresponds to the matching placement. So the first placement in an array corresponds to the first count.
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.spocs", "newtab_stories_1, newtab_stories_2, newtab_stories_3, newtab_stories_4, newtab_stories_5, newtab_stories_6");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.spocs.counts", "1,1,1,1,1,1");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.contextualSpocs", "newtab_stories_1, newtab_stories_2, newtab_stories_3, newtab_stories_4, newtab_stories_5, newtab_stories_6");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.contextualSpocs.counts", "1, 1, 1, 1, 1, 1");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.tiles", "newtab_tile_1, newtab_tile_2, newtab_tile_3");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.tiles.counts", "1, 1, 1");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.contextualBanners", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.placements.contextualBanners.counts", "");
+-
+-// This is a 0-based index, for consistency with the other position CSVs,
+-// but Contile positions are a 1-based index, so we end up adding 1 to these before using them.
+-pref("browser.newtabpage.activity-stream.discoverystream.contile-topsites-positions", "0,1,2");
+-pref("browser.newtabpage.activity-stream.discoverystream.widget-positions", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.spocs-endpoint", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.spocs-endpoint-query", "");
+-
+-// Changes the spoc content.
+-pref("browser.newtabpage.activity-stream.discoverystream.spocAdTypes", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.spocZoneIds", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.spocSiteId", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.ctaButtonSponsors", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.ctaButtonVariant", "");
+-
+-// Pref enabling content reporting
+-pref("browser.newtabpage.activity-stream.discoverystream.reportAds.enabled", true);
+-
+-// List of regions that do not get stories, regardless of locale-list-config.
+-pref("browser.newtabpage.activity-stream.discoverystream.region-stories-block", "");
+-// List of locales that get stories, regardless of region-stories-config.
+-#ifdef NIGHTLY_BUILD
+-  pref("browser.newtabpage.activity-stream.discoverystream.locale-list-config", "en-US,en-CA,en-GB");
+-#else
+-  pref("browser.newtabpage.activity-stream.discoverystream.locale-list-config", "");
+-#endif
+-// List of regions that get stories by default.
+-pref("browser.newtabpage.activity-stream.discoverystream.region-stories-config", "US,DE,CA,GB,IE,CH,AT,BE,IN,FR,IT,ES");
+-
+-// List of regions that get topics selection by default.
+-pref("browser.newtabpage.activity-stream.discoverystream.topicSelection.region-topics-config", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.topicSelection.onboarding.enabled", false);
+-
+-// List of locales that get topics selection by default.
+-pref("browser.newtabpage.activity-stream.discoverystream.topicLabels.region-topic-label-config", "US, CA");
+-pref("browser.newtabpage.activity-stream.discoverystream.topicSelection.locale-topics-config", "en-US, en-GB, en-CA");
+-pref("browser.newtabpage.activity-stream.discoverystream.topicLabels.locale-topic-label-config", "en-US, en-GB, en-CA");
+-
+-// List of locales that get section layout by default
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.locale-content-config", "en-US,en-CA,en-GB");
+-// List of regions that get section layout by default
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.region-content-config", "US,GB,CA,IE");
+-
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.cards.enabled", true);
+-
+-// List of regions that use inferred personalization.
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.personalization.inferred.region-config", "");
+-// List of locales that use inferred personalization.
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.personalization.inferred.locale-config", "en-US,en-GB,en-CA");
+-
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.personalization.inferred.user.enabled", true);
+-
+-// Override inferred personalization model JSON string that typically comes from rec API. Or "TEST" for a test model.
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.personalization.inferred.model.override", "");
+-
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.interestPicker.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.interestPicker.visibleSections", "");
+-
+-// List of regions for contextual ads.
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.contextualAds.region-config", "");
+-// List of locales for contextual ads.
+-pref("browser.newtabpage.activity-stream.discoverystream.sections.contextualAds.locale-config", "en-US,en-GB,en-CA");
+-
+-pref("browser.newtabpage.activity-stream.discoverystream.merino-provider.endpoint", "merino.services.mozilla.com");
+-pref("browser.newtabpage.activity-stream.discoverystream.merino-provider.ohttp.enabled", false);
+-pref("browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL", "https://mozilla-ohttp.fastly-edge.com/");
+-pref("browser.newtabpage.activity-stream.discoverystream.ohttp.configURL", "https://prod.ohttp-gateway.prod.webservices.mozgcp.net/ohttp-configs");
+-pref("browser.newtabpage.activity-stream.discoverystream.imageProxy.enabled", true);
+-
+-// List of regions that get spocs by default.
+-pref("browser.newtabpage.activity-stream.discoverystream.region-spocs-config", "US,CA,DE,GB,FR,IT,ES");
+-// List of regions that don't get the 7 row layout.
+-pref("browser.newtabpage.activity-stream.discoverystream.region-basic-config", "");
+-
+-// Add parameters to Pocket feed URL.
+-pref("browser.newtabpage.activity-stream.discoverystream.pocket-feed-parameters", "");
+-pref("browser.newtabpage.activity-stream.discoverystream.merino-feed-experiment", false);
+-
+-// List of locales that get thumbs up/down on recommended stories by default.
+-pref("browser.newtabpage.activity-stream.discoverystream.thumbsUpDown.locale-thumbs-config", "en-US, en-GB, en-CA");
+-
+-pref("browser.newtabpage.activity-stream.telemetry.privatePing.enabled", true);
+-
+-// Redacts content interaction ids from original New Tab ping once data processing migrated to the Newtab_content private ping
+-pref("browser.newtabpage.activity-stream.telemetry.privatePing.redactNewtabPing.enabled", true);
+-pref("browser.newtabpage.activity-stream.telemetry.privatePing.maxSubmissionDelayMs", 5000);
+-
+-  // Include differentialy private inferred New Tab interests with New Tab content Ping. Only used when user has enabled personalization.
+-pref("browser.newtabpage.activity-stream.telemetry.privatePing.inferredInterests.enabled", false);
+-
+-// surface ID sent from merino to the client from the curated-recommendations request
+-pref("browser.newtabpage.activity-stream.telemetry.surfaceId", "");
+-
+-// List of regions that get thumbs up/down on recommended stories by default.
+-#ifdef EARLY_BETA_OR_EARLIER
+-  pref("browser.newtabpage.activity-stream.discoverystream.thumbsUpDown.region-thumbs-config", "US, CA");
+-#else
+-  pref("browser.newtabpage.activity-stream.discoverystream.thumbsUpDown.region-thumbs-config", "US");
+-#endif
+-
+-// Shows users compact layout of Home New Tab page. Also requires region-thumbs-config.
+-pref("browser.newtabpage.activity-stream.discoverystream.thumbsUpDown.searchTopsitesCompact", true);
+-
+-// Displays publisher favicons on recommended stories of New Tab page
+-pref("browser.newtabpage.activity-stream.discoverystream.publisherFavicon.enabled", true);
+-
+-// The pref controls if search hand-off is enabled for Activity Stream.
+-pref("browser.newtabpage.activity-stream.improvesearch.handoffToAwesomebar", true);
+-
+-pref("browser.newtabpage.activity-stream.logowordmark.alwaysVisible", true);
+-
+ // URLs from the user's history that contain this search param will be hidden
+ // from the top sites. The value is a string with one of the following forms:
+ // - "" (empty) - Disable this feature
+@@ -2013,20 +1804,6 @@ pref("browser.newtabpage.activity-stream.logowordmark.alwaysVisible", true);
+ // - "key=value" - Search param named "key" with value "value"
+ pref("browser.newtabpage.activity-stream.hideTopSitesWithSearchParam", "mfadid=adm");
+ 
+-// Communicates to AboutNewTabChild whether or not it should load the classic scripts or do nothing.
+-pref("browser.newtabpage.activity-stream.selfLoading.enabled", true);
+-
+-// Enables the Nova UI refresh for the new tab page.
+-pref("browser.newtabpage.activity-stream.nova.enabled", true);
+-
+-// Set to true to enable debug logging for AboutNewTabResourceMapping.
+-pref("browser.newtabpage.resource-mapping.log", false);
+-
+-// Base URL for the newtab trainhop add-on version xpi downloads.
+-pref("browser.newtabpage.trainhopAddon.xpiBaseURL", "https://archive.mozilla.org/pub/system-addons/newtab/");
+-
+-pref("browser.newtabpage.sponsor-protection.enabled", true);
+-
+ // Global Nova enabled pref
+ pref("browser.nova.enabled", false);
+ 
+@@ -3340,11 +3117,6 @@ pref("startup.homepage_override_nimbus_minVersion", "");
+ // Pref to disable all What's New pages
+ pref("startup.homepage_override_nimbus_disable_wnp", false);
+ 
+-// The number of days after which to rotate the context ID. 0 means to disable
+-// rotation altogether.
+-pref("browser.contextual-services.contextId.rotation-in-days", 3);
+-pref("browser.contextual-services.contextId.rust-component.enabled", true);
+-
+ // Pref to enable aboug:glean redesign.
+ pref("about.glean.redesign.enabled", false);
+ 
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+index bed5f11fc9..2aadf3743c 100644
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -1147,8 +1147,6 @@ var gBrowserInit = {
+ 
+       // If the given URI is different from the homepage, we want to load it.
+       if (uri != defaultArgs) {
+-        AboutNewTab.noteNonDefaultStartup();
+-
+         if (uri instanceof Ci.nsIArray) {
+           // Transform the nsIArray of nsISupportsString's into a JS Array of
+           // JS strings.
+diff --git a/browser/base/content/test/performance/browser_urlbar_search.js b/browser/base/content/test/performance/browser_urlbar_search.js
+index 7cbc330662..6d47b5b6ec 100644
+--- a/browser/base/content/test/performance/browser_urlbar_search.js
++++ b/browser/base/content/test/performance/browser_urlbar_search.js
+@@ -39,8 +39,13 @@ add_setup(async function () {
+ 
+   // The row is filled asynchronously from the pref, so wait for it rather than
+   // racing the feed.
++  let { TopSites } = ChromeUtils.importESModule(
++    "resource:///modules/topsites/TopSites.sys.mjs"
++  );
++  TopSites.uninit();
++  await TopSites.init();
+   await TestUtils.waitForCondition(
+-    () => AboutNewTab.getTopSites().length,
++    async () => (await TopSites.getSites()).length,
+     "Waiting for the Top Sites row to be populated"
+   );
+ });
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index 4f66cf6911..c0b5f5ac85 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -86,11 +86,6 @@ var gExceptionPaths = [
+   // The webcompat add-on.
+   "resource://builtin-addons/webcompat/",
+ 
+-  // The newtab add-on
+-  "resource://builtin-addons/newtab/",
+-  "resource://newtab/",
+-  "chrome://newtab/",
+-
+   // UniFFI test files.
+   "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/tests/generated/",
+ 
+@@ -311,15 +306,6 @@ if (AppConstants.NIGHTLY_BUILD) {
+   );
+ }
+ 
+-if (!AppConstants.RELEASE_OR_BETA) {
+-  allowlist.push(
+-    // browser/extensions/newtab/actors/AboutNewTabChild.sys.mjs constructs the
+-    // URL dynamically: `chrome://global/content/vendor/react${debugString}.js`
+-    { file: "chrome://global/content/vendor/react-dev.js" },
+-    { file: "chrome://global/content/vendor/react-dom-dev.js" }
+-  );
+-}
+-
+ if (AppConstants.platform != "win") {
+   // toolkit/mozapps/defaultagent/Notification.cpp
+   // toolkit/mozapps/defaultagent/ScheduledTask.cpp
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 16ef4f42fe..5c590891ac 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -9,15 +9,12 @@
+ 
+ category app-startup nsBrowserGlue @mozilla.org/browser/browserglue;1 application={ec8030f7-c20a-464f-9b0e-13a3a9e97384} application={aa3c5121-dab2-40e2-81ca-7ea25febc110}
+ 
+-category first-startup-new-profile resource:///modules/AboutNewTabResourceMapping.sys.mjs AboutNewTabResourceMapping.firstStartupNewProfile
+-
+ # Browser global components initializing before UI startup
+ category browser-before-ui-startup resource:///modules/sessionstore/SessionStore.sys.mjs SessionStore.init
+ category browser-before-ui-startup resource:///modules/BuiltInThemes.sys.mjs BuiltInThemes.maybeInstallActiveBuiltInTheme
+ #ifdef MOZ_NORMANDY
+ category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init
+ #endif
+-category browser-before-ui-startup resource:///modules/AboutHomeStartupCache.sys.mjs AboutHomeStartupCache.init
+ category browser-before-ui-startup resource:///modules/AccountsGlue.sys.mjs AccountsGlue.init
+ category browser-before-ui-startup moz-src:///browser/modules/ObserverForwarder.sys.mjs ObserverForwarder.init
+ 
+@@ -92,7 +89,6 @@ category browser-window-final-unload resource:///modules/BrowserDOMWindow.sys.mj
+ 
+ # App startup consumers
+ 
+-category browser-first-window-ready resource:///modules/AboutNewTab.sys.mjs AboutNewTab.init
+ category browser-first-window-ready resource:///modules/ContentCrashHandlers.sys.mjs TabCrashHandler.init
+ category browser-first-window-ready resource:///modules/ProcessHangMonitor.sys.mjs ProcessHangMonitor.init
+ category browser-first-window-ready resource://gre/modules/PageThumbs.sys.mjs PageThumbs.init
+@@ -150,5 +146,3 @@ category browser-quit-application-granted resource://gre/modules/UpdateListener.
+ category browser-quit-application-granted moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.uninit
+ 
+ category search-service-notification moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.showSearchServiceNotification
+-
+-category browser-newtab-external-component moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchNewTabComponentsRegistrant
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index a1617c34a9..37813990d4 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -8,7 +8,6 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  AboutHomeStartupCache: "resource:///modules/AboutHomeStartupCache.sys.mjs",
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+   BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+   BrowserSearchTelemetry:
+@@ -342,11 +341,6 @@ BrowserGlue.prototype = {
+ 
+   // cleanup (called on application shutdown)
+   _dispose: function BG__dispose() {
+-    // AboutHomeStartupCache might write to the cache during
+-    // quit-application-granted, so we defer uninitialization
+-    // until here.
+-    lazy.AboutHomeStartupCache.uninit();
+-
+     if (this._lateTasksIdleObserver) {
+       this._userIdleService.removeIdleObserver(
+         this._lateTasksIdleObserver,
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index fb3fd464eb..79f5f48328 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -33,15 +33,6 @@ let JSPROCESSACTORS = {
+     },
+   },
+ 
+-  MozCachedOHTTP: {
+-    parent: {
+-      esModuleURI:
+-        "moz-src:///browser/components/mozcachedohttp/actors/MozCachedOHTTPParent.sys.mjs",
+-    },
+-    includeParent: true,
+-    remoteTypes: ["parent", "privilegedabout"],
+-  },
+-
+   RefreshBlockerObserver: {
+     child: {
+       esModuleURI: "resource:///actors/RefreshBlockerChild.sys.mjs",
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index 335975e7b5..6a61d0ff66 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -50,8 +50,6 @@ const { FirefoxRelay, RELAY_PROFILE_CACHE_INTERVAL } =
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  AboutNewTabResourceMapping:
+-    "resource:///modules/AboutNewTabResourceMapping.sys.mjs",
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   AppProvidedConfigEngine:
+@@ -932,7 +930,7 @@ const TargetingGetters = {
+     return {
+       isWebExt,
+       isCustomUrl,
+-      isDefault: lazy.AboutNewTab.activityStreamEnabled,
++      isDefault: !lazy.AboutNewTab.newTabURLOverridden,
+       url: urls[0].url,
+       host: urls[0].host,
+     };
+@@ -1171,16 +1169,6 @@ const TargetingGetters = {
+     return lazy.useEmbeddedMigrationWizard;
+   },
+ 
+-  /**
+-   * Returns the version number of the New Tab built-in addon being used
+-   * by the build.
+-   *
+-   * @return {string}
+-   */
+-  get newtabAddonVersion() {
+-    return lazy.AboutNewTabResourceMapping.addonVersion;
+-  },
+-
+   /**
+    * The values of the height and width available to the browser to display
+    * web content. The available height and width are each calculated taking
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index cf32eceabb..bc4a64ad34 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -1735,115 +1735,6 @@ export var Policies = {
+     },
+   },
+ 
+-  FirefoxHome: {
+-    onBeforeAddons(manager, param) {
+-      if ("Search" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.showSearch",
+-          param.Search,
+-          param.Locked
+-        );
+-      }
+-      if ("Weather" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.showWeather",
+-          param.Weather,
+-          param.Locked
+-        );
+-        // The Nova layout (enabled by default) binds the weather toggle to a
+-        // different pref, so set it too.
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.widgets.weather.enabled",
+-          param.Weather,
+-          param.Locked
+-        );
+-      }
+-      if ("TopSites" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.feeds.topsites",
+-          param.TopSites,
+-          param.Locked
+-        );
+-      }
+-      if ("SponsoredTopSites" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.showSponsoredTopSites",
+-          param.SponsoredTopSites,
+-          param.Locked
+-        );
+-      }
+-      if ("Highlights" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.feeds.section.highlights",
+-          param.Highlights,
+-          param.Locked
+-        );
+-      }
+-      if ("Pocket" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.feeds.section.topstories",
+-          param.Pocket,
+-          param.Locked
+-        );
+-      }
+-      if ("Stories" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.feeds.section.topstories",
+-          param.Stories,
+-          param.Locked
+-        );
+-      }
+-      if ("SponsoredPocket" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.showSponsored",
+-          param.SponsoredPocket,
+-          param.Locked
+-        );
+-      }
+-      if ("SponsoredStories" in param) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.showSponsored",
+-          param.SponsoredStories,
+-          param.Locked
+-        );
+-      }
+-      // The "Support Firefox" toggle in the settings UI is a parent control for
+-      // the two sponsored child settings. When both are locked by policy, lock
+-      // it to their combined value so it can't be toggled to no effect.
+-      if (
+-        param.Locked &&
+-        "SponsoredTopSites" in param &&
+-        "SponsoredStories" in param
+-      ) {
+-        PoliciesUtils.setDefaultPref(
+-          "browser.newtabpage.activity-stream.showSponsoredCheckboxes",
+-          param.SponsoredTopSites || param.SponsoredStories,
+-          param.Locked
+-        );
+-      }
+-      if (param.Widgets) {
+-        if ("Enabled" in param.Widgets) {
+-          PoliciesUtils.setDefaultPref(
+-            "browser.newtabpage.activity-stream.widgets.enabled",
+-            param.Widgets.Enabled,
+-            param.Locked
+-          );
+-        }
+-        // Blocked always locks, regardless of the Locked property: the lock is
+-        // what blocks the widget, and it is enough on its own whatever the
+-        // widget's system pref is set to. IDs aren't validated, so one policy
+-        // file stays valid across versions that add or remove widgets.
+-        for (let id of param.Widgets.Blocked ?? []) {
+-          PoliciesUtils.setDefaultPref(
+-            `browser.newtabpage.activity-stream.widgets.${id}.enabled`,
+-            false,
+-            true
+-          );
+-        }
+-      }
+-    },
+-  },
+-
+   FirefoxSuggest: {
+     onBeforeAddons(manager, param) {
+       (async () => {
+diff --git a/browser/components/enterprisepolicies/content/aboutPolicies.js b/browser/components/enterprisepolicies/content/aboutPolicies.js
+index 5145898a22..4fabc34ef1 100644
+--- a/browser/components/enterprisepolicies/content/aboutPolicies.js
++++ b/browser/components/enterprisepolicies/content/aboutPolicies.js
+@@ -397,7 +397,6 @@ function generateDocumentation() {
+     DisableMasterPasswordCreation: "DisablePrimaryPasswordCreation",
+     DisablePasswordReveal: "DisablePasswordReveal2",
+     DisableSetDesktopBackground: "DisableSetAsDesktopBackground",
+-    FirefoxHome: "FirefoxHome2",
+     Permissions: "Permissions2",
+     PopupBlocking: "PopupBlocking2",
+     SanitizeOnShutdown: "SanitizeOnShutdown2",
+diff --git a/browser/components/enterprisepolicies/schemas/policies-schema.json b/browser/components/enterprisepolicies/schemas/policies-schema.json
+index 58c7b4ffbc..44e5591170 100644
+--- a/browser/components/enterprisepolicies/schemas/policies-schema.json
++++ b/browser/components/enterprisepolicies/schemas/policies-schema.json
+@@ -914,59 +914,6 @@
+       "type": "boolean"
+     },
+ 
+-    "FirefoxHome": {
+-      "type": "object",
+-      "properties": {
+-        "Search": {
+-          "type": "boolean"
+-        },
+-        "Weather": {
+-          "type": "boolean"
+-        },
+-        "TopSites": {
+-          "type": "boolean"
+-        },
+-        "SponsoredTopSites": {
+-          "type": "boolean"
+-        },
+-        "Highlights": {
+-          "type": "boolean"
+-        },
+-        "Pocket": {
+-          "type": "boolean"
+-        },
+-        "Stories": {
+-          "type": "boolean"
+-        },
+-        "SponsoredPocket": {
+-          "type": "boolean"
+-        },
+-        "SponsoredStories": {
+-          "type": "boolean"
+-        },
+-        "Snippets": {
+-          "type": "boolean"
+-        },
+-        "Widgets": {
+-          "type": "object",
+-          "properties": {
+-            "Enabled": {
+-              "type": "boolean"
+-            },
+-            "Blocked": {
+-              "type": "array",
+-              "items": {
+-                "type": "string"
+-              }
+-            }
+-          }
+-        },
+-        "Locked": {
+-          "type": "boolean"
+-        }
+-      }
+-    },
+-
+     "FirefoxSuggest": {
+       "type": "object",
+       "properties": {
+diff --git a/browser/components/enterprisepolicies/tests/browser/browser.toml b/browser/components/enterprisepolicies/tests/browser/browser.toml
+index efdf659b2c..11e5b2e50e 100644
+--- a/browser/components/enterprisepolicies/tests/browser/browser.toml
++++ b/browser/components/enterprisepolicies/tests/browser/browser.toml
+@@ -111,11 +111,6 @@ https_first_disabled = true
+ 
+ ["browser_policy_extensionsettings2.js"]
+ 
+-["browser_policy_firefoxhome.js"]
+-support-files = [
+-  "../../../../extensions/newtab/test/browser/topstories.json",
+-]
+-
+ ["browser_policy_firefoxsuggest.js"]
+ 
+ ["browser_policy_handlers.js"]
+diff --git a/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js b/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js
+index ebf6199b60..d6fe093e17 100644
+--- a/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js
++++ b/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js
+@@ -608,96 +608,6 @@ const POLICIES_TESTS = [
+     },
+   },
+ 
+-  // POLICY: FirefoxHome
+-  {
+-    policies: {
+-      FirefoxHome: {
+-        Stories: false,
+-        SponsoredStories: false,
+-        Locked: true,
+-      },
+-    },
+-    lockedPrefs: {
+-      "browser.newtabpage.activity-stream.feeds.section.topstories": false,
+-      "browser.newtabpage.activity-stream.showSponsored": false,
+-    },
+-  },
+-
+-  // POLICY: FirefoxHome (Weather sets both the legacy and Nova prefs)
+-  {
+-    policies: {
+-      FirefoxHome: {
+-        Weather: false,
+-        Locked: true,
+-      },
+-    },
+-    lockedPrefs: {
+-      "browser.newtabpage.activity-stream.showWeather": false,
+-      "browser.newtabpage.activity-stream.widgets.weather.enabled": false,
+-    },
+-  },
+-
+-  // POLICY: FirefoxHome (locking both sponsored settings locks the parent
+-  // "Support Firefox" toggle to their combined value)
+-  {
+-    policies: {
+-      FirefoxHome: {
+-        SponsoredTopSites: false,
+-        SponsoredStories: false,
+-        Locked: true,
+-      },
+-    },
+-    lockedPrefs: {
+-      "browser.newtabpage.activity-stream.showSponsoredCheckboxes": false,
+-    },
+-  },
+-
+-  // POLICY: FirefoxHome->Widgets (Enabled honors Locked)
+-  // Must run before the Locked entry below, which locks the same prefs.
+-  {
+-    policies: {
+-      FirefoxHome: {
+-        Widgets: {
+-          Enabled: false,
+-        },
+-      },
+-    },
+-    unlockedPrefs: {
+-      "browser.newtabpage.activity-stream.widgets.enabled": false,
+-    },
+-  },
+-
+-  // POLICY: FirefoxHome->Widgets
+-  {
+-    policies: {
+-      FirefoxHome: {
+-        Widgets: {
+-          Enabled: true,
+-          Blocked: ["crossword"],
+-        },
+-        Locked: true,
+-      },
+-    },
+-    lockedPrefs: {
+-      "browser.newtabpage.activity-stream.widgets.enabled": true,
+-      "browser.newtabpage.activity-stream.widgets.crossword.enabled": false,
+-    },
+-  },
+-
+-  // POLICY: FirefoxHome->Widgets (Blocked locks even without Locked)
+-  {
+-    policies: {
+-      FirefoxHome: {
+-        Widgets: {
+-          Blocked: ["stocks"],
+-        },
+-      },
+-    },
+-    lockedPrefs: {
+-      "browser.newtabpage.activity-stream.widgets.stocks.enabled": false,
+-    },
+-  },
+-
+   // POLICY: OfferToSaveLoginsDefault
+   {
+     policies: {
+diff --git a/browser/components/extensions/parent/ext-topSites.js b/browser/components/extensions/parent/ext-topSites.js
+index 96d15c717e..1637f58d9f 100644
+--- a/browser/components/extensions/parent/ext-topSites.js
++++ b/browser/components/extensions/parent/ext-topSites.js
+@@ -5,29 +5,23 @@
+ "use strict";
+ 
+ ChromeUtils.defineESModuleGetters(this, {
+-  AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   NewTabUtils: "resource://gre/modules/NewTabUtils.sys.mjs",
++  TopSites: "resource:///modules/topsites/TopSites.sys.mjs",
+   getSearchProvider:
+     "moz-src:///toolkit/components/search/SearchShortcuts.sys.mjs",
+ });
+ 
+ const SHORTCUTS_PREF =
+   "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts";
+-const TOPSITES_FEED_PREF =
+-  "browser.newtabpage.activity-stream.feeds.system.topsites";
+ 
+ this.topSites = class extends ExtensionAPI {
+   getAPI() {
+     return {
+       topSites: {
+         get: async function (options) {
+-          // We fallback to newtab = false behavior if the user disabled their
+-          // Top Sites feed.
+-          let getNewtabSites =
+-            options.newtab &&
+-            Services.prefs.getBoolPref(TOPSITES_FEED_PREF, false);
++          let getNewtabSites = options.newtab;
+           let links = getNewtabSites
+-            ? AboutNewTab.getTopSites()
++            ? await TopSites.getSites()
+             : await NewTabUtils.activityStreamLinks.getTopSites({
+                 ignoreBlocked: options.includeBlocked,
+                 onePerDomain: options.onePerDomain,
+diff --git a/browser/components/extensions/test/browser/browser_ext_topSites.js b/browser/components/extensions/test/browser/browser_ext_topSites.js
+index a2750c42c0..b18b1d9423 100644
+--- a/browser/components/extensions/test/browser/browser_ext_topSites.js
++++ b/browser/components/extensions/test/browser/browser_ext_topSites.js
+@@ -14,6 +14,10 @@ const { SearchTestUtils } = ChromeUtils.importESModule(
+ 
+ SearchTestUtils.init(this);
+ 
++const { TopSites } = ChromeUtils.importESModule(
++  "resource:///modules/topsites/TopSites.sys.mjs"
++);
++
+ // The Baidu search shortcut, see SEARCH_SHORTCUTS in SearchShortcuts.sys.mjs.
+ const BAIDU_SHORTCUT_URL = "https://baidu.com";
+ const BAIDU_KEYWORD = "@百度";
+@@ -31,9 +35,12 @@ async function updateTopSites(condition) {
+     ],
+   });
+ 
++  TopSites.uninit();
++  await TopSites.init();
++
+   // Wait for the feed to be updated.
+-  await TestUtils.waitForCondition(() => {
+-    let sites = AboutNewTab.getTopSites();
++  await TestUtils.waitForCondition(async () => {
++    let sites = await TopSites.getSites();
+     return condition(sites);
+   }, "Waiting for top sites to be updated");
+ }
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 4b790d29f0..7f5d53fc62 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -39,7 +39,6 @@ DIRS += [
+     "extensions",
+     "firefoxview",
+     "migration",
+-    "mozcachedohttp",
+     "newtab",
+     "originattributes",
+     "passwordmgr",
+diff --git a/browser/components/newtab/AboutNewTabRedirector.sys.mjs b/browser/components/newtab/AboutNewTabRedirector.sys.mjs
+index 011db9ff31..859682b1d7 100644
+--- a/browser/components/newtab/AboutNewTabRedirector.sys.mjs
++++ b/browser/components/newtab/AboutNewTabRedirector.sys.mjs
+@@ -22,16 +22,11 @@
+  * been put into an abstract base class.
+  */
+ 
+-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ import { E10SUtils } from "resource://gre/modules/E10SUtils.sys.mjs";
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ 
+ const lazy = {};
+ 
+-ChromeUtils.defineESModuleGetters(lazy, {
+-  BasePromiseWorker: "resource://gre/modules/PromiseWorker.sys.mjs",
+-});
+-
+ XPCOMUtils.defineLazyPreferenceGetter(
+   lazy,
+   "BUILTIN_NEWTAB_ENABLED",
+@@ -39,385 +34,14 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   true
+ );
+ 
+-/**
+- * BEWARE: Do not add variables for holding state in the global scope.
+- * Any state variables should be properties of the appropriate class
+- * below. This is to avoid confusion where the state is set in one process,
+- * but not in another.
+- *
+- * Constants are fine in the global scope.
+- */
+-
+-const PREF_ABOUT_HOME_CACHE_TESTING =
+-  "browser.startup.homepage.abouthome_cache.testing";
+-
+-const CACHE_WORKER_URL = "resource://newtab/lib/cache.worker.js";
+-
+ const IS_PRIVILEGED_PROCESS =
+   Services.appinfo.remoteType === E10SUtils.PRIVILEGEDABOUT_REMOTE_TYPE;
+ 
+-const PREF_ACTIVITY_STREAM_DEBUG = "browser.newtabpage.activity-stream.debug";
+-const PREF_NEWTAB_SELF_LOADING =
+-  "browser.newtabpage.activity-stream.selfLoading.enabled";
+-const PREF_NEWTAB_REMOTE_RENDERER_ENABLED =
+-  "browser.newtabpage.activity-stream.remote-renderer.enabled";
+-/**
+- * The AboutHomeStartupCacheChild is responsible for connecting the
+- * AboutNewTabRedirectorChild with a cached document and script for about:home
+- * if one happens to exist. The AboutHomeStartupCacheChild is only ever
+- * handed the streams for those caches when the "privileged about content
+- * process" first launches, so subsequent loads of about:home do not read
+- * from this cache.
+- *
+- * See https://firefox-source-docs.mozilla.org/browser/extensions/newtab/docs/v2-system-addon/about_home_startup_cache.html
+- * for further details.
+- */
+-export const AboutHomeStartupCacheChild = {
+-  _initted: false,
+-  CACHE_REQUEST_MESSAGE: "AboutHomeStartupCache:CacheRequest",
+-  CACHE_RESPONSE_MESSAGE: "AboutHomeStartupCache:CacheResponse",
+-  CACHE_USAGE_RESULT_MESSAGE: "AboutHomeStartupCache:UsageResult",
+-  STATES: {
+-    UNAVAILABLE: 0,
+-    UNCONSUMED: 1,
+-    PAGE_CONSUMED: 2,
+-    PAGE_AND_SCRIPT_CONSUMED: 3,
+-    FAILED: 4,
+-    DISQUALIFIED: 5,
+-  },
+-  REQUEST_TYPE: {
+-    PAGE: 0,
+-    SCRIPT: 1,
+-  },
+-  _state: 0,
+-  _consumerBCID: null,
+-
+-  /**
+-   * Called via a process script very early on in the process lifetime. This
+-   * prepares the AboutHomeStartupCacheChild to pass an nsIChannel back to
+-   * the AboutNewTabRedirectorChild when the initial about:home document is
+-   * eventually requested.
+-   *
+-   * @param {nsIInputStream} pageInputStream
+-   *   The stream for the cached page markup.
+-   * @param {nsIInputStream} scriptInputStream
+-   *   The stream for the cached script to run on the page.
+-   */
+-  init(pageInputStream, scriptInputStream) {
+-    if (
+-      !IS_PRIVILEGED_PROCESS &&
+-      !Services.prefs.getBoolPref(PREF_ABOUT_HOME_CACHE_TESTING, false)
+-    ) {
+-      throw new Error(
+-        "Can only instantiate in the privileged about content processes."
+-      );
+-    }
+-
+-    if (
+-      !Services.prefs.getBoolPref(
+-        "browser.startup.homepage.abouthome_cache.enabled"
+-      )
+-    ) {
+-      return;
+-    }
+-
+-    if (this._initted) {
+-      throw new Error("AboutHomeStartupCacheChild already initted.");
+-    }
+-
+-    Services.obs.addObserver(this, "memory-pressure");
+-    Services.cpmm.addMessageListener(this.CACHE_REQUEST_MESSAGE, this);
+-
+-    this._pageInputStream = pageInputStream;
+-    this._scriptInputStream = scriptInputStream;
+-    this._initted = true;
+-    this.setState(this.STATES.UNCONSUMED);
+-  },
+-
+-  /**
+-   * A function that lets us put the AboutHomeStartupCacheChild back into
+-   * its initial state. This is used by tests to let us simulate the startup
+-   * behaviour of the module without having to manually launch a new privileged
+-   * about content process every time.
+-   */
+-  uninit() {
+-    if (!Services.prefs.getBoolPref(PREF_ABOUT_HOME_CACHE_TESTING, false)) {
+-      throw new Error(
+-        "Cannot uninit AboutHomeStartupCacheChild unless testing."
+-      );
+-    }
+-
+-    if (!this._initted) {
+-      return;
+-    }
+-
+-    Services.obs.removeObserver(this, "memory-pressure");
+-    Services.cpmm.removeMessageListener(this.CACHE_REQUEST_MESSAGE, this);
+-
+-    if (this._cacheWorker) {
+-      this._cacheWorker.terminate();
+-      this._cacheWorker = null;
+-    }
+-
+-    this._pageInputStream = null;
+-    this._scriptInputStream = null;
+-    this._initted = false;
+-    this._state = this.STATES.UNAVAILABLE;
+-    this._consumerBCID = null;
+-  },
+-
+-  /**
+-   * Attempts to return an nsIChannel for a cached about:home document that
+-   * we were initialized with. If we failed to be initted with the cache, or the
+-   * input streams that we were sent have no data yet available, this function
+-   * returns null. The caller should fall back to generating the page
+-   * dynamically.
+-   *
+-   * This function will be called when loading about:home, or
+-   * about:home?jscache - the latter returns the cached script.
+-   *
+-   * It is expected that the same BrowsingContext that loads the cached
+-   * page will also load the cached script.
+-   *
+-   * @param {nsIURI} uri
+-   *   The URI for the requested page, as passed by AboutNewTabRedirectorChild.
+-   * @param {nsILoadInfo} loadInfo
+-   *   The nsILoadInfo for the requested load, as passed by
+-   *   AboutNewTabRedirectorChild.
+-   * @returns {?nsIChannel}
+-   */
+-  maybeGetCachedPageChannel(uri, loadInfo) {
+-    if (!this._initted) {
+-      return null;
+-    }
+-
+-    if (this._state >= this.STATES.PAGE_AND_SCRIPT_CONSUMED) {
+-      return null;
+-    }
+-
+-    let requestType =
+-      uri.query === "jscache"
+-        ? this.REQUEST_TYPE.SCRIPT
+-        : this.REQUEST_TYPE.PAGE;
+-
+-    // If this is a page request, then we need to be in the UNCONSUMED state,
+-    // since we expect the page request to come first. If this is a script
+-    // request, we expect to be in PAGE_CONSUMED state, since the page cache
+-    // stream should he been consumed already.
+-    if (
+-      (requestType === this.REQUEST_TYPE.PAGE &&
+-        this._state !== this.STATES.UNCONSUMED) ||
+-      (requestType === this.REQUEST_TYPE_SCRIPT &&
+-        this._state !== this.STATES.PAGE_CONSUMED)
+-    ) {
+-      return null;
+-    }
+-
+-    // If by this point, we don't have anything in the streams,
+-    // then either the cache was too slow to give us data, or the cache
+-    // doesn't exist. The caller should fall back to generating the
+-    // page dynamically.
+-    //
+-    // We only do this on the page request, because by the time
+-    // we get to the script request, we should have already drained
+-    // the page input stream.
+-    if (requestType === this.REQUEST_TYPE.PAGE) {
+-      try {
+-        if (
+-          !this._scriptInputStream.available() ||
+-          !this._pageInputStream.available()
+-        ) {
+-          this.setState(this.STATES.FAILED);
+-          this.reportUsageResult(false /* success */);
+-          return null;
+-        }
+-      } catch (e) {
+-        this.setState(this.STATES.FAILED);
+-        if (e.result === Cr.NS_BASE_STREAM_CLOSED) {
+-          this.reportUsageResult(false /* success */);
+-          return null;
+-        }
+-        throw e;
+-      }
+-    }
+-
+-    if (
+-      requestType === this.REQUEST_TYPE.SCRIPT &&
+-      this._consumerBCID !== loadInfo.browsingContextID
+-    ) {
+-      // Some other document is somehow requesting the script - one
+-      // that didn't originally request the page. This is not allowed.
+-      this.setState(this.STATES.FAILED);
+-      return null;
+-    }
+-
+-    let channel = Cc[
+-      "@mozilla.org/network/input-stream-channel;1"
+-    ].createInstance(Ci.nsIInputStreamChannel);
+-    channel.QueryInterface(Ci.nsIChannel);
+-    channel.setURI(uri);
+-    channel.loadInfo = loadInfo;
+-    channel.contentStream =
+-      requestType === this.REQUEST_TYPE.PAGE
+-        ? this._pageInputStream
+-        : this._scriptInputStream;
+-
+-    if (requestType === this.REQUEST_TYPE.SCRIPT) {
+-      this.setState(this.STATES.PAGE_AND_SCRIPT_CONSUMED);
+-      this.reportUsageResult(true /* success */);
+-    } else {
+-      this.setState(this.STATES.PAGE_CONSUMED);
+-      // Stash the BrowsingContext ID so that when the script stream
+-      // attempts to be consumed, we ensure that it's from the same
+-      // BrowsingContext that loaded the page.
+-      this._consumerBCID = loadInfo.browsingContextID;
+-    }
+-
+-    return channel;
+-  },
+-
+-  /**
+-   * This function takes the state information required to generate
+-   * the about:home cache markup and script, and then generates that
+-   * markup in script asynchronously. Once that's done, a message
+-   * is sent to the parent process with the nsIInputStream's for the
+-   * markup and script contents.
+-   *
+-   * @param {object} state
+-   *   The Redux state of the about:home document to render.
+-   * @returns {Promise<undefined>}
+-   *   Fulfills after the message with the nsIInputStream's have been sent to
+-   *   the parent.
+-   */
+-  async constructAndSendCache(state) {
+-    if (!IS_PRIVILEGED_PROCESS) {
+-      throw new Error("Wrong process type.");
+-    }
+-
+-    let worker = this.getOrCreateWorker();
+-
+-    let timerId = Glean.newtab.abouthomeCacheConstruction.start();
+-    let direction = Services.locale.isAppLocaleRTL ? "rtl" : "ltr";
+-
+-    let { page, script } = await worker
+-      .post("construct", [state, direction])
+-      .finally(() => {
+-        Glean.newtab.abouthomeCacheConstruction.stopAndAccumulate(timerId);
+-      });
+-
+-    let pageInputStream = Cc[
+-      "@mozilla.org/io/string-input-stream;1"
+-    ].createInstance(Ci.nsIStringInputStream);
+-
+-    pageInputStream.setUTF8Data(page);
+-
+-    let scriptInputStream = Cc[
+-      "@mozilla.org/io/string-input-stream;1"
+-    ].createInstance(Ci.nsIStringInputStream);
+-
+-    scriptInputStream.setUTF8Data(script);
+-
+-    Services.cpmm.sendAsyncMessage(this.CACHE_RESPONSE_MESSAGE, {
+-      pageInputStream,
+-      scriptInputStream,
+-    });
+-  },
+-
+-  _cacheWorker: null,
+-  getOrCreateWorker() {
+-    if (this._cacheWorker) {
+-      return this._cacheWorker;
+-    }
+-
+-    this._cacheWorker = new lazy.BasePromiseWorker(CACHE_WORKER_URL);
+-    return this._cacheWorker;
+-  },
+-
+-  receiveMessage(message) {
+-    if (message.name === this.CACHE_REQUEST_MESSAGE) {
+-      let { state } = message.data;
+-      this.constructAndSendCache(state);
+-    }
+-  },
+-
+-  reportUsageResult(success) {
+-    Services.cpmm.sendAsyncMessage(this.CACHE_USAGE_RESULT_MESSAGE, {
+-      success,
+-    });
+-  },
+-
+-  observe(subject, topic) {
+-    if (topic === "memory-pressure" && this._cacheWorker) {
+-      this._cacheWorker.terminate();
+-      this._cacheWorker = null;
+-    }
+-  },
+-
+-  /**
+-   * Transitions the AboutHomeStartupCacheChild from one state
+-   * to the next, where each state is defined in this.STATES.
+-   *
+-   * States can only be transitioned in increasing order, otherwise
+-   * an error is logged.
+-   */
+-  setState(state) {
+-    if (state > this._state) {
+-      this._state = state;
+-    } else {
+-      console.error(
+-        "AboutHomeStartupCacheChild could not transition from state " +
+-          `${this._state} to ${state}`,
+-        new Error().stack
+-      );
+-    }
+-  },
+-
+-  /**
+-   * If the cache hasn't been used, transitions it into the DISQUALIFIED
+-   * state so that it cannot be used. This should be called if it's been
+-   * determined that about:newtab is going to be loaded, which doesn't
+-   * use the cache.
+-   */
+-  disqualifyCache() {
+-    if (this._state === this.STATES.UNCONSUMED) {
+-      this.setState(this.STATES.DISQUALIFIED);
+-      this.reportUsageResult(false /* success */);
+-    }
+-  },
+-};
+-
+ /**
+  * This is an abstract base class for the nsIAboutModule implementations for
+  * about:home and about:newtab that has some common methods and properties.
+  */
+ class BaseAboutNewTabRedirector {
+-  constructor() {
+-    if (!AppConstants.RELEASE_OR_BETA) {
+-      XPCOMUtils.defineLazyPreferenceGetter(
+-        this,
+-        "activityStreamDebug",
+-        PREF_ACTIVITY_STREAM_DEBUG,
+-        false
+-      );
+-    } else {
+-      this.activityStreamDebug = false;
+-    }
+-
+-    XPCOMUtils.defineLazyPreferenceGetter(
+-      this,
+-      "selfLoadingEnabled",
+-      PREF_NEWTAB_SELF_LOADING,
+-      false
+-    );
+-
+-    XPCOMUtils.defineLazyPreferenceGetter(
+-      this,
+-      "remoteRendererEnabled",
+-      PREF_NEWTAB_REMOTE_RENDERER_ENABLED,
+-      false
+-    );
+-  }
+-
+   /**
+    * @returns {string} the default URL
+    *
+@@ -458,71 +82,6 @@ class BaseAboutNewTabRedirector {
+  * before the AboutNewTabRedirectorChild has a chance to handle the request).
+  */
+ export class AboutNewTabRedirectorParent extends BaseAboutNewTabRedirector {
+-  #addonInitialized = false;
+-  #suspendedChannels = [];
+-  #addonInitializedPromise = null;
+-  #addonInitializedResolver = null;
+-
+-  constructor() {
+-    super();
+-
+-    let { promise, resolve } = Promise.withResolvers();
+-    this.#addonInitializedPromise = promise;
+-    this.#addonInitializedResolver = resolve;
+-
+-    ChromeUtils.registerWindowActor("AboutNewTab", {
+-      parent: {
+-        esModuleURI: "resource:///actors/AboutNewTabParent.sys.mjs",
+-      },
+-      child: {
+-        esModuleURI: "resource:///actors/AboutNewTabChild.sys.mjs",
+-        events: {
+-          DOMDocElementInserted: {},
+-          DOMContentLoaded: { capture: true },
+-          load: { capture: true },
+-          unload: { capture: true },
+-          pageshow: {},
+-          visibilitychange: {},
+-        },
+-        observers: ["intl:l10n-sources-changed"],
+-      },
+-      // The wildcard on about:newtab is for the # parameter
+-      // that is used for the newtab devtools. The wildcard for about:home
+-      // is similar, and also allows for falling back to loading the
+-      // about:home document dynamically if an attempt is made to load
+-      // about:home?jscache from the AboutHomeStartupCache as a top-level
+-      // load.
+-      matches: ["about:home*", "about:newtab*"],
+-      remoteTypes: ["privilegedabout"],
+-    });
+-    this.wrappedJSObject = this;
+-  }
+-
+-  /**
+-   * Waits for the AddonManager to be fully initialized, and for the built-in
+-   * addon to be ready. Once that's done, it tterates any suspended channels and
+-   * resumes them, now that the built-in addon has been set up.
+-   */
+-  notifyBuiltInAddonInitialized() {
+-    this.#addonInitialized = true;
+-
+-    for (let suspendedChannel of this.#suspendedChannels) {
+-      suspendedChannel.resume();
+-    }
+-    this.#suspendedChannels = [];
+-    this.#addonInitializedResolver();
+-  }
+-
+-  /**
+-   * Returns a Promise that resolves when the newtab built-in addon has notified
+-   * that it has finished initializing.
+-   *
+-   * @type {Promise<undefined>}
+-   */
+-  get promiseBuiltInAddonInitialized() {
+-    return this.#addonInitializedPromise;
+-  }
+-
+   newChannel(uri, loadInfo) {
+     let chromeURI = this.getChromeURI(uri);
+ 
+@@ -538,37 +97,12 @@ export class AboutNewTabRedirectorParent extends BaseAboutNewTabRedirector {
+       loadInfo
+     );
+     resultChannel.originalURI = uri;
+-
+-    if (!this.#addonInitialized) {
+-      return this.#getSuspendedChannel(resultChannel);
+-    }
+-
+     return resultChannel;
+   }
+-
+-  /**
+-   * Wraps an nsIChannel with an nsISuspendableChannelWrapper, suspends that
+-   * wrapper, and then stores the wrapper in #suspendedChannels so that it can
+-   * be resumed with a call to #notifyBuildInAddonInitialized.
+-   *
+-   * @param {nsIChannel} innerChannel
+-   *   The channel to wrap and suspend.
+-   * @returns {nsISuspendableChannelWrapper}
+-   */
+-  #getSuspendedChannel(innerChannel) {
+-    let suspendedChannel =
+-      Services.io.newSuspendableChannelWrapper(innerChannel);
+-    suspendedChannel.suspend();
+-
+-    this.#suspendedChannels.push(suspendedChannel);
+-    return suspendedChannel;
+-  }
+ }
+ 
+ /**
+- * The child-process implementation of nsIAboutModule, which also does the work
+- * of redirecting about:home loads to the about:home startup cache if its
+- * available.
++ * The child-process implementation of nsIAboutModule.
+  */
+ export class AboutNewTabRedirectorChild extends BaseAboutNewTabRedirector {
+   newChannel(uri, loadInfo) {
+@@ -581,29 +115,14 @@ export class AboutNewTabRedirectorChild extends BaseAboutNewTabRedirector {
+ 
+     let pageURI;
+ 
+-    if (uri.spec.startsWith("about:home")) {
+-      let cacheChannel = AboutHomeStartupCacheChild.maybeGetCachedPageChannel(
+-        uri,
+-        loadInfo
+-      );
+-      if (cacheChannel) {
+-        return cacheChannel;
+-      }
++    if (
++      uri.spec.startsWith("about:home") ||
++      // The only other possibility is about:newtab.
++      lazy.BUILTIN_NEWTAB_ENABLED
++    ) {
+       pageURI = Services.io.newURI(this.defaultURL);
+     } else {
+-      // The only other possibility is about:newtab.
+-      //
+-      // If about:newtab is being requested, then any subsequent request for
+-      // about:home should _never_ request the cache (which might be woefully
+-      // out of date compared to about:newtab), so we disqualify the cache if
+-      // it still happens to be around.
+-      AboutHomeStartupCacheChild.disqualifyCache();
+-
+-      if (lazy.BUILTIN_NEWTAB_ENABLED) {
+-        pageURI = Services.io.newURI(this.defaultURL);
+-      } else {
+-        pageURI = this.getChromeURI(uri);
+-      }
++      pageURI = this.getChromeURI(uri);
+     }
+ 
+     let resultChannel = Services.io.newChannelFromURIWithLoadInfo(
+diff --git a/browser/components/newtab/components.conf b/browser/components/newtab/components.conf
+index 2e51150966..5b5bcdc95c 100644
+--- a/browser/components/newtab/components.conf
++++ b/browser/components/newtab/components.conf
+@@ -15,20 +15,4 @@ Classes = [
+         'esModule': 'resource:///modules/AboutNewTabRedirector.sys.mjs',
+         'constructor': 'AboutNewTabRedirectorStub',
+     },
+-    {
+-        'cid': '{04cb5d8f-a76b-49c1-b265-93b0a6e57302}',
+-        'contract_ids': ['@mozilla.org/network/protocol;1?name=moz-newtab-remote-renderer'],
+-        "esModule": "moz-src:///browser/components/newtab/MozNewTabRemoteRendererProtocolHandler.sys.mjs",
+-        'constructor': "MozNewTabRemoteRendererProtocolHandler",
+-        'protocol_config': {
+-            'scheme': 'moz-newtab-remote-renderer',
+-            'flags': [
+-                'URI_STD',
+-                'URI_IS_LOCAL_RESOURCE',
+-                'URI_IS_POTENTIALLY_TRUSTWORTHY',
+-                'URI_IS_UI_RESOURCE',
+-            ],
+-        },
+-    },
+-
+ ]
+diff --git a/browser/components/newtab/moz.build b/browser/components/newtab/moz.build
+index a7b7a77359..b10a19bd47 100644
+--- a/browser/components/newtab/moz.build
++++ b/browser/components/newtab/moz.build
+@@ -6,15 +6,7 @@ with Files("**"):
+     BUG_COMPONENT = ("Firefox", "New Tab Page")
+ 
+ EXTRA_JS_MODULES += [
+-    "AboutHomeStartupCache.sys.mjs",
+     "AboutNewTabRedirector.sys.mjs",
+-    "AboutNewTabResourceMapping.sys.mjs",
+-]
+-
+-MOZ_SRC_FILES += [
+-    "AboutNewTabComponents.sys.mjs",
+-    "MozNewTabRemoteRendererProtocolHandler.sys.mjs",
+-    "SponsorProtection.sys.mjs",
+ ]
+ 
+ XPCOM_MANIFESTS += [
+@@ -22,20 +14,3 @@ XPCOM_MANIFESTS += [
+ ]
+ 
+ FINAL_LIBRARY = "browsercomps"
+-
+-TESTING_JS_MODULES += [
+-    "test/xpcshell/component-registrants/NotARegistrant.sys.mjs",
+-    "test/xpcshell/component-registrants/TestRegistrant1.sys.mjs",
+-    "test/xpcshell/component-registrants/TestRegistrant2.sys.mjs",
+-    "test/xpcshell/component-registrants/TestRegistrantDuplicateTypes.sys.mjs",
+-    "test/xpcshell/component-registrants/TestRegistrantInvalidConfigs.sys.mjs",
+-]
+-
+-XPCSHELL_TESTS_MANIFESTS += [
+-    "test/xpcshell/xpcshell.toml",
+-]
+-
+-BROWSER_CHROME_MANIFESTS += [
+-    "test/browser/abouthomecache/browser.toml",
+-    "test/browser/browser.toml",
+-]
+diff --git a/browser/components/search/BrowserSearchTelemetry.sys.mjs b/browser/components/search/BrowserSearchTelemetry.sys.mjs
+index 48e731a053..891334df39 100644
+--- a/browser/components/search/BrowserSearchTelemetry.sys.mjs
++++ b/browser/components/search/BrowserSearchTelemetry.sys.mjs
+@@ -7,7 +7,6 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ const lazy = XPCOMUtils.declareLazy({
+   ConfigSearchEngine:
+     "moz-src:///toolkit/components/search/ConfigSearchEngine.sys.mjs",
+-  ContextId: "moz-src:///browser/modules/ContextId.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
+   UrlbarSearchUtils:
+@@ -157,8 +156,6 @@ class BrowserSearchTelemetryHandler {
+    *        true if this event was generated by a form history result.
+    * @param {string} [details.alias=null]
+    *        The search engine alias used in the search, if any.
+-   * @param {string} [details.newtabSessionId=undefined]
+-   *        The newtab session that prompted this search, if any.
+    * @param {Values<typeof lazy.SearchUtils.URL_TYPE>} [details.searchUrlType=undefined]
+    *        A `SearchUtils.URL_TYPE` value that indicates the type of search.
+    *        Defaults to `SearchUtils.URL_TYPE.SEARCH`, a plain old search.
+@@ -251,7 +248,6 @@ class BrowserSearchTelemetryHandler {
+       }
+       if (["urlbar_handoff", "about_home", "about_newtab"].includes(source)) {
+         Glean.newtabSearch.issued.record({
+-          newtab_visit_id: details.newtabSessionId,
+           search_access_point: source,
+           telemetry_id: engine.telemetryId,
+         });
+@@ -355,12 +351,7 @@ class BrowserSearchTelemetryHandler {
+    *   The url to be sent to contextual services.
+    */
+   async #reportSearchInGlean(reportingUrl) {
+-    let defaultValuesByGleanKey = {
+-      contextId: await lazy.ContextId.request(),
+-    };
+-
+     let sendGleanPing = valuesByGleanKey => {
+-      valuesByGleanKey = { ...defaultValuesByGleanKey, ...valuesByGleanKey };
+       for (let [gleanKey, value] of Object.entries(valuesByGleanKey)) {
+         let glean = Glean.searchWith[gleanKey];
+         if (value !== undefined && value !== "") {
+diff --git a/browser/components/search/SearchUIUtils.sys.mjs b/browser/components/search/SearchUIUtils.sys.mjs
+index 94eb32e1a3..fd6aeb8aab 100644
+--- a/browser/components/search/SearchUIUtils.sys.mjs
++++ b/browser/components/search/SearchUIUtils.sys.mjs
+@@ -14,10 +14,6 @@
+ 
+ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+-import {
+-  AboutNewTabComponentRegistry,
+-  BaseAboutNewTabComponentRegistrant,
+-} from "moz-src:///browser/components/newtab/AboutNewTabComponents.sys.mjs";
+ 
+ const lazy = XPCOMUtils.declareLazy({
+   BrowserSearchTelemetry:
+@@ -547,45 +543,3 @@ export var SearchUIUtils = {
+     });
+   },
+ };
+-
+-/**
+- * A registrant that adds the handoff search bar to about:newtab / about:home.
+- */
+-export class SearchNewTabComponentsRegistrant extends BaseAboutNewTabComponentRegistrant {
+-  constructor() {
+-    super();
+-    // Wire up a lazy preference getter, primarily so that we have an easy way
+-    // of updating our external component registration if the pref changes.
+-    this.lazy = XPCOMUtils.declareLazy({
+-      prefHandoffToAwesomebar: {
+-        pref: "browser.newtabpage.activity-stream.improvesearch.handoffToAwesomebar",
+-        default: true,
+-        onUpdate: () => {
+-          this.updated();
+-        },
+-      },
+-    });
+-  }
+-
+-  getComponents() {
+-    const { caretBlinkCount, caretBlinkTime } = Services.appinfo;
+-
+-    return [
+-      {
+-        type: AboutNewTabComponentRegistry.TYPES.SEARCH,
+-        l10nURLs: [],
+-        componentURL: "chrome://browser/content/contentSearchHandoffUI.mjs",
+-        tagName: "content-search-handoff-ui",
+-        cssVariables: {
+-          "--caret-blink-count":
+-            caretBlinkCount > -1 ? caretBlinkCount : "infinite",
+-          "--caret-blink-time":
+-            caretBlinkTime > 0 ? `${caretBlinkTime * 2}ms` : `${1134}ms`,
+-        },
+-        attributes: {
+-          nonhandoff: !this.lazy.prefHandoffToAwesomebar,
+-        },
+-      },
+-    ];
+-  }
+-}
+diff --git a/browser/components/search/jar.mn b/browser/components/search/jar.mn
+index 2bb460df5b..96693e5346 100644
+--- a/browser/components/search/jar.mn
++++ b/browser/components/search/jar.mn
+@@ -8,5 +8,3 @@ browser.jar:
+         content/browser/search/addEngine.xhtml                      (content/addEngine.xhtml)
+         content/browser/search/autocomplete-popup.js                (content/autocomplete-popup.js)
+         content/browser/search/searchbar.js                         (content/searchbar.js)
+-        content/browser/contentSearchHandoffUI.mjs                  (content/contentSearchHandoffUI.mjs)
+-        content/browser/contentSearchHandoffUI.css                  (content/contentSearchHandoffUI.css)
+diff --git a/browser/components/search/test/browser/browser_remote_override.js b/browser/components/search/test/browser/browser_remote_override.js
+index 6ab42d67d4..b8c660acac 100644
+--- a/browser/components/search/test/browser/browser_remote_override.js
++++ b/browser/components/search/test/browser/browser_remote_override.js
+@@ -113,11 +113,6 @@ add_task(async function test_remote_override() {
+         "https://example.org/somewhere",
+         "Should have recorded the reporting URL"
+       );
+-      Assert.equal(
+-        Glean.searchWith.contextId.testGetValue().length,
+-        36,
+-        "Should have sent a context id with the ping"
+-      );
+     },
+     async () => {
+       let loadPromise = BrowserTestUtils.browserLoaded(tab.linkedBrowser);
+diff --git a/browser/components/sidebar/tests/browser/browser_vertical_tabs_stacking_context.js b/browser/components/sidebar/tests/browser/browser_vertical_tabs_stacking_context.js
+index 8401eeaed5..24f9c644e5 100644
+--- a/browser/components/sidebar/tests/browser/browser_vertical_tabs_stacking_context.js
++++ b/browser/components/sidebar/tests/browser/browser_vertical_tabs_stacking_context.js
+@@ -7,13 +7,9 @@ const { TopSites } = ChromeUtils.importESModule(
+   "resource:///modules/topsites/TopSites.sys.mjs"
+ );
+ 
+-// Mirrors UrlbarProviderTopSites, which reads the row from whichever
+-// implementation is enabled.
++// Mirrors UrlbarProviderTopSites, which reads the row from TopSites.
+ async function getTopSites() {
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    return TopSites.getSites();
+-  }
+-  return AboutNewTab.getTopSites();
++  return TopSites.getSites();
+ }
+ 
+ /**
+diff --git a/browser/components/tabbrowser/content/tab-hover-preview.mjs b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+index 6158eb5188..56f7029587 100644
+--- a/browser/components/tabbrowser/content/tab-hover-preview.mjs
++++ b/browser/components/tabbrowser/content/tab-hover-preview.mjs
+@@ -8,8 +8,6 @@ var { XPCOMUtils } = ChromeUtils.importESModule(
+ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   PageWireframes: "resource:///modules/sessionstore/PageWireframes.sys.mjs",
+-  SponsorProtection:
+-    "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
+ });
+ 
+ // Denotes the amount of time (in ms) that the panel will *not* respect
+@@ -509,13 +507,6 @@ class TabPanel extends HoverPanel {
+     return this.#tab?.linkedBrowser?.docShellIsActive ? "[A]" : "";
+   }
+ 
+-  get #displaySponsorProtection() {
+-    return lazy.SponsorProtection.debugEnabled &&
+-      lazy.SponsorProtection.isProtectedBrowser(this.#tab?.linkedBrowser)
+-      ? "[S]"
+-      : "";
+-  }
+-
+   async #updatePreview(tab = null) {
+     if (tab) {
+       this.#tab = tab;
+@@ -530,7 +521,7 @@ class TabPanel extends HoverPanel {
+       this.panelElement.querySelector(".tab-preview-pid").textContent =
+         this.#displayPids;
+       this.panelElement.querySelector(".tab-preview-activeness").textContent =
+-        this.#displayActiveness + this.#displaySponsorProtection;
++        this.#displayActiveness;
+     } else {
+       this.panelElement.querySelector(".tab-preview-pid").textContent = "";
+       this.panelElement.querySelector(".tab-preview-activeness").textContent =
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 8ae2ad7b85..f609baccb9 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -193,8 +193,6 @@
+         OpenInTabsUtils:
+           "moz-src:///browser/components/tabbrowser/OpenInTabsUtils.sys.mjs",
+         PictureInPicture: "resource://gre/modules/PictureInPicture.sys.mjs",
+-        SponsorProtection:
+-          "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
+         // Sval: a private window's session (SvalPrivateJars).
+         SvalPrivateJars:
+           "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
+@@ -8331,10 +8329,6 @@
+           debugStringArray.push("[A]");
+         }
+ 
+-        if (this.SponsorProtection.isProtectedBrowser(tab.linkedBrowser)) {
+-          debugStringArray.push("[S]");
+-        }
+-
+         if (debugStringArray.length) {
+           labelArray.push(debugStringArray.join(" "));
+         }
+@@ -9769,10 +9763,6 @@
+       { loadFlags, globalHistoryOptions }
+     ) {
+       if (globalHistoryOptions?.triggeringSponsoredURL) {
+-        if (globalHistoryOptions.triggeringSource == "newtab") {
+-          gBrowser.SponsorProtection.addProtectedBrowser(browser);
+-        }
+-
+         try {
+           // Browser may access URL after fixing it up, then store the URL into DB.
+           // To match with it, fix the link up explicitly.
+@@ -9793,8 +9783,6 @@
+             globalHistoryOptions.triggeringSource
+           );
+         } catch (e) {}
+-      } else {
+-        gBrowser.SponsorProtection.removeProtectedBrowser(browser);
+       }
+ 
+       if (globalHistoryOptions?.triggeringSearchEngine) {
+diff --git a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+index a50a65d843..6c17702617 100644
+--- a/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderTopSites.sys.mjs
+@@ -16,7 +16,6 @@ import {
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   SvalFavoritesProvider:
+     "moz-src:///browser/components/sval/SvalFavoritesProvider.sys.mjs",
+   TopSites: "resource:///modules/topsites/TopSites.sys.mjs",
+@@ -31,12 +30,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+ });
+ 
+ // These prefs must be true for the provider to return results. They are assumed
+-// to be booleans. We check `system.topsites` because if it is disabled we would
+-// get stale or empty top sites data.
+-const TOP_SITES_ENABLED_PREFS = [
+-  "browser.urlbar.suggest.topsites",
+-  "browser.newtabpage.activity-stream.feeds.system.topsites",
+-];
++// to be booleans.
++const TOP_SITES_ENABLED_PREFS = ["browser.urlbar.suggest.topsites"];
+ 
+ // Helper function to compare 2 URLs without refs.
+ function sameUrlIgnoringRef(url1, url2) {
+@@ -116,12 +111,7 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+       return;
+     }
+ 
+-    let sites;
+-    if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-      sites = await lazy.TopSites.getSites();
+-    } else {
+-      sites = lazy.AboutNewTab.getTopSites();
+-    }
++    let sites = await lazy.TopSites.getSites();
+ 
+     let instance = this.queryInstance;
+ 
+@@ -165,7 +155,6 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+         // don't have titles but `hostname` instead.
+         title: link.label || link.title || link.hostname || "",
+         favicon: link.smallFavicon || link.favicon || undefined,
+-        sendAttributionRequest: !!link.sendAttributionRequest,
+         lastVisitDate: link.lastVisitDate,
+       };
+       if (site.isSponsored) {
+@@ -247,7 +236,6 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+             payload.sponsoredTileId = site.sponsoredTileId;
+             payload.sponsoredClickUrl = site.sponsoredClickUrl;
+           }
+-          payload.sendAttributionRequest = site.sendAttributionRequest;
+ 
+           /** @type {Values<typeof UrlbarUtils.RESULT_SOURCE>} */
+           let resultSource = UrlbarUtils.RESULT_SOURCE.OTHER_LOCAL;
+@@ -345,11 +333,7 @@ export class UrlbarProviderTopSites extends UrlbarProvider {
+     if (!UrlbarProviderTopSites.#topSitesListeners) {
+       UrlbarProviderTopSites.#topSitesListeners = [];
+       let callListeners = UrlbarProviderTopSites.#callTopSitesListeners;
+-      if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-        Services.obs.addObserver(callListeners, "topsites-refreshed");
+-      } else {
+-        Services.obs.addObserver(callListeners, "newtab-top-sites-changed");
+-      }
++      Services.obs.addObserver(callListeners, "topsites-refreshed");
+       for (let pref of TOP_SITES_ENABLED_PREFS) {
+         Services.prefs.addObserver(pref, callListeners);
+       }
+diff --git a/browser/components/urlbar/UrlbarUtils.sys.mjs b/browser/components/urlbar/UrlbarUtils.sys.mjs
+index 86da30cbf3..1bd5568da5 100644
+--- a/browser/components/urlbar/UrlbarUtils.sys.mjs
++++ b/browser/components/urlbar/UrlbarUtils.sys.mjs
+@@ -2823,9 +2823,6 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
+       requestId: {
+         type: "string",
+       },
+-      sendAttributionRequest: {
+-        type: "boolean",
+-      },
+       shouldShowUrl: {
+         type: "boolean",
+       },
+diff --git a/browser/components/urlbar/content/UrlbarInput.mjs b/browser/components/urlbar/content/UrlbarInput.mjs
+index 5e58868689..36c92c69c7 100644
+--- a/browser/components/urlbar/content/UrlbarInput.mjs
++++ b/browser/components/urlbar/content/UrlbarInput.mjs
+@@ -59,7 +59,6 @@ const lazy = XPCOMUtils.declareLazy({
+     "resource://gre/modules/ExtensionSearchHandler.sys.mjs",
+   ExtensionUtils: "resource://gre/modules/ExtensionUtils.sys.mjs",
+   ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
+-  PartnerLinkAttribution: "resource:///modules/PartnerLinkAttribution.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
+   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
+@@ -1454,12 +1453,9 @@ ${
+    * @param {SearchEngine} [searchEngine]
+    *   Optional. If included and the right prefs are set, we will enter search
+    *   mode when handing `searchString` from the fake input to the Urlbar.
+-   * @param {string} [newtabSessionId]
+-   *   Optional. The id of the newtab session that handed off this search.
+    */
+-  handoff(searchString, searchEngine, newtabSessionId) {
++  handoff(searchString, searchEngine) {
+     this._isHandoffSession = true;
+-    this._handoffSession = newtabSessionId;
+     if (lazy.UrlbarPrefs.get("shouldHandOffToSearchMode") && searchEngine) {
+       this.search(searchString, {
+         searchEngine,
+@@ -2110,21 +2106,6 @@ ${
+       windowMode: this.windowMode,
+     });
+ 
+-    if (result.payload.sendAttributionRequest) {
+-      lazy.PartnerLinkAttribution.makeRequest({
+-        targetURL: result.payload.url,
+-        source: this.#sapName,
+-        campaignID: Services.prefs.getStringPref(
+-          "browser.partnerlink.campaign.topsites"
+-        ),
+-      });
+-      if (!this.isPrivate && result.providerName === "UrlbarProviderTopSites") {
+-        // The position is 1-based for telemetry
+-        const position = result.rowIndex + 1;
+-        Glean.contextualServicesTopsites.click[`urlbar_${position}`].add(1);
+-      }
+-    }
+-
+     this._loadURL(
+       url,
+       event,
+@@ -4010,7 +3991,6 @@ ${
+     lazy.BrowserSearchTelemetry.recordSearch(browser, engine, searchSource, {
+       ...searchActionDetails,
+       isOneOff,
+-      newtabSessionId: this._handoffSession,
+     });
+   }
+ 
+@@ -5275,7 +5255,6 @@ ${
+     });
+ 
+     this.focusedViaMousedown = false;
+-    this._handoffSession = undefined;
+     this._isHandoffSession = false;
+     this.removeAttribute("focused");
+     // Reset this, so that it doesn't cause issues with different tests
+diff --git a/browser/components/urlbar/private/AmpSuggestions.sys.mjs b/browser/components/urlbar/private/AmpSuggestions.sys.mjs
+index f3b812d952..2945bb0093 100644
+--- a/browser/components/urlbar/private/AmpSuggestions.sys.mjs
++++ b/browser/components/urlbar/private/AmpSuggestions.sys.mjs
+@@ -9,9 +9,6 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AmpMatchingStrategy:
+     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustSuggest.sys.mjs",
+-  CONTEXTUAL_SERVICES_PING_TYPES:
+-    "resource:///modules/PartnerLinkAttribution.sys.mjs",
+-  ContextId: "moz-src:///browser/modules/ContextId.sys.mjs",
+   QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
+   rawSuggestionUrlMatches:
+     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustSuggest.sys.mjs",
+@@ -21,6 +18,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   UrlbarUtils: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
+ });
+ 
++const CONTEXTUAL_SERVICES_PING_TYPES = {
++  QS_BLOCK: "quicksuggest-block",
++  QS_IMPRESSION: "quicksuggest-impression",
++  QS_SELECTION: "quicksuggest-click",
++};
++
+ const TIMESTAMP_TEMPLATE = "%YYYYMMDDHH%";
+ const TIMESTAMP_LENGTH = 10;
+ const TIMESTAMP_REGEXP = /^\d{10}$/;
+@@ -30,8 +33,7 @@ const TIMESTAMP_REGEXP = /^\d{10}$/;
+  */
+ export class AmpSuggestions extends SuggestProvider {
+   // Serializes `quick-suggest` ping submissions so that pings are submitted in
+-  // the order they were initiated, despite the async ContextId.request() call
+-  // inside each submission.
++  // the order they were initiated.
+   #lastPingSubmission = Promise.resolve();
+ 
+   get enablingPreferences() {
+@@ -265,13 +267,13 @@ export class AmpSuggestions extends SuggestProvider {
+     switch (details.selType) {
+       case "quicksuggest":
+         pingData = {
+-          pingType: lazy.CONTEXTUAL_SERVICES_PING_TYPES.QS_SELECTION,
++          pingType: CONTEXTUAL_SERVICES_PING_TYPES.QS_SELECTION,
+           reportingUrl: result.payload.sponsoredClickUrl,
+         };
+         break;
+       case "dismiss":
+         pingData = {
+-          pingType: lazy.CONTEXTUAL_SERVICES_PING_TYPES.QS_BLOCK,
++          pingType: CONTEXTUAL_SERVICES_PING_TYPES.QS_BLOCK,
+           iabCategory: result.payload.sponsoredIabCategory,
+         };
+         break;
+@@ -352,9 +354,7 @@ export class AmpSuggestions extends SuggestProvider {
+     }
+ 
+     // Chain this submission to the previous one so that pings are always
+-    // submitted in the order they were initiated. Without this, multiple
+-    // concurrent calls can race at the async ContextId.request() and submit
+-    // their pings out of order.
++    // submitted in the order they were initiated.
+     let submission = this.#lastPingSubmission.then(async () => {
+       let allPingData = {
+         pingType,
+@@ -375,7 +375,6 @@ export class AmpSuggestions extends SuggestProvider {
+         suggestedIndexRelativeToGroup: !!result.isSuggestedIndexRelativeToGroup,
+         requestId: result.payload.requestId,
+         source: result.payload.source,
+-        contextId: await lazy.ContextId.request(),
+       };
+ 
+       for (let [gleanKey, value] of Object.entries(allPingData)) {
+@@ -396,7 +395,7 @@ export class AmpSuggestions extends SuggestProvider {
+     return this.#submitQuickSuggestPing({
+       result,
+       queryContext,
+-      pingType: lazy.CONTEXTUAL_SERVICES_PING_TYPES.QS_IMPRESSION,
++      pingType: CONTEXTUAL_SERVICES_PING_TYPES.QS_IMPRESSION,
+       isClicked:
+         // `selType` == "quicksuggest" if the result itself was clicked. It will
+         // be a command name if a command was clicked, e.g., "dismiss".
+@@ -405,18 +404,6 @@ export class AmpSuggestions extends SuggestProvider {
+     });
+   }
+ 
+-  // eslint-disable-next-line no-unused-private-class-members
+-  async #submitQuickSuggestDeletionRequestPing() {
+-    if (lazy.ContextId.rotationEnabled) {
+-      // The ContextId module will take care of sending the appropriate
+-      // deletion requests if rotation is enabled.
+-      lazy.ContextId.forceRotation();
+-    } else {
+-      Glean.quickSuggest.contextId.set(await lazy.ContextId.request());
+-      GleanPings.quickSuggestDeletionRequest.submit();
+-    }
+-  }
+-
+   /**
+    * Some AMP suggestion URL properties include timestamp templates that must be
+    * replaced with timestamps at query time. This method replaces them in place.
+diff --git a/browser/components/urlbar/tests/browser-UrlbarInput/browser_searchTerms.js b/browser/components/urlbar/tests/browser-UrlbarInput/browser_searchTerms.js
+index 799694df6d..b99ebb83a1 100644
+--- a/browser/components/urlbar/tests/browser-UrlbarInput/browser_searchTerms.js
++++ b/browser/components/urlbar/tests/browser-UrlbarInput/browser_searchTerms.js
+@@ -201,8 +201,8 @@ add_task(async function focus_after_top_sites() {
+     }
+   }
+ 
+-  let changedPromise = TestUtils.topicObserved("newtab-top-sites-changed").then(
+-    () => info("Observed newtab-top-sites-changed")
++  let changedPromise = TestUtils.topicObserved("topsites-refreshed").then(() =>
++    info("Observed topsites-refreshed")
+   );
+   await updateTopSites(sites => sites?.length == N_TOP_SITES);
+   await changedPromise;
+diff --git a/browser/components/urlbar/tests/browser-telemetry/browser_zeroPrefix.js b/browser/components/urlbar/tests/browser-telemetry/browser_zeroPrefix.js
+index 34f0306751..379accd0b3 100644
+--- a/browser/components/urlbar/tests/browser-telemetry/browser_zeroPrefix.js
++++ b/browser/components/urlbar/tests/browser-telemetry/browser_zeroPrefix.js
+@@ -211,9 +211,9 @@ async function updateTopSitesAndAwaitChanged() {
+     await PlacesTestUtils.addVisits(url);
+   }
+ 
+-  info("Updating top sites and awaiting newtab-top-sites-changed");
+-  let changedPromise = TestUtils.topicObserved("newtab-top-sites-changed").then(
+-    () => info("Observed newtab-top-sites-changed")
++  info("Updating top sites and awaiting topsites-refreshed");
++  let changedPromise = TestUtils.topicObserved("topsites-refreshed").then(() =>
++    info("Observed topsites-refreshed")
+   );
+   await updateTopSites(sites => sites?.length);
+   await changedPromise;
+diff --git a/browser/components/urlbar/tests/browser/browser_queryContextCache.js b/browser/components/urlbar/tests/browser/browser_queryContextCache.js
+index 1f0fc7bc54..c2d4ae3d06 100644
+--- a/browser/components/urlbar/tests/browser/browser_queryContextCache.js
++++ b/browser/components/urlbar/tests/browser/browser_queryContextCache.js
+@@ -26,7 +26,7 @@ if (AppConstants.platform == "macosx") {
+ add_setup(async function () {
+   // Clear history and bookmarks to make sure the URLs we add below are truly
+   // the top sites. If any existing history or bookmarks were the top sites,
+-  // which is likely but not guaranteed, one or more "newtab-top-sites-changed"
++  // which is likely but not guaranteed, one or more "topsites-refreshed"
+   // notifications will be sent, potentially interfering with the rest of the
+   // test. Waiting for Places updates to finish and then an extra tick should be
+   // enough to make sure no more notfications occur.
+@@ -165,14 +165,9 @@ add_task(async function topSites_changed() {
+     });
+ 
+     // Remove the new URL. The top sites will update themselves automatically,
+-    // so we only need to wait for newtab-top-sites-changed.
+-    info("Removing new URL and awaiting newtab-top-sites-changed");
+-    let changedPromise;
+-    if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-      changedPromise = TestUtils.topicObserved("topsites-refreshed");
+-    } else {
+-      changedPromise = TestUtils.topicObserved("newtab-top-sites-changed");
+-    }
++    // so we only need to wait for topsites-refreshed.
++    info("Removing new URL and awaiting topsites-refreshed");
++    let changedPromise = TestUtils.topicObserved("topsites-refreshed");
+     await PlacesUtils.history.remove([newURL]);
+     await changedPromise;
+ 
+@@ -472,7 +467,7 @@ async function openViewAndAssertCached({
+ }
+ 
+ /**
+- * Updates the top sites and waits for the "newtab-top-sites-changed"
++ * Updates the top sites and waits for the "topsites-refreshed"
+  * notification. Note that this notification is not sent if the sites don't
+  * actually change. In that case, use only `updateTopSites()` instead.
+  *
+@@ -480,17 +475,10 @@ async function openViewAndAssertCached({
+  *   The new expected number of top sites.
+  */
+ async function updateTopSitesAndAwaitChanged(expectedCount) {
+-  info("Updating top sites and awaiting newtab-top-sites-changed");
+-  let changedPromise;
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    changedPromise = TestUtils.topicObserved("topsites-refreshed").then(() =>
+-      info("Observed topsites-refreshed")
+-    );
+-  } else {
+-    changedPromise = TestUtils.topicObserved("newtab-top-sites-changed").then(
+-      () => info("Observed newtab-top-sites-changed")
+-    );
+-  }
++  info("Updating top sites and awaiting topsites-refreshed");
++  let changedPromise = TestUtils.topicObserved("topsites-refreshed").then(() =>
++    info("Observed topsites-refreshed")
++  );
+   await updateTopSites(sites => sites?.length == expectedCount);
+   await changedPromise;
+ }
+diff --git a/browser/components/urlbar/tests/browser/browser_top_sites.js b/browser/components/urlbar/tests/browser/browser_top_sites.js
+index 46118144d2..8af83fd542 100644
+--- a/browser/components/urlbar/tests/browser/browser_top_sites.js
++++ b/browser/components/urlbar/tests/browser/browser_top_sites.js
+@@ -35,16 +35,11 @@ async function addTestVisits() {
+   });
+ 
+   // Adding a bookmark will refresh the TopSites feed.
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    await TestUtils.topicObserved("topsites-refreshed");
+-  }
++  await TestUtils.topicObserved("topsites-refreshed");
+ }
+ 
+ async function getTopSites() {
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    return await TopSites.getSites();
+-  }
+-  return AboutNewTab.getTopSites();
++  return await TopSites.getSites();
+ }
+ 
+ async function checkDoesNotOpenOnFocus(win = window) {
+@@ -549,7 +544,7 @@ add_task(async function tabSwitchBehavior() {
+     "Waiting for Top Sites to settle after the previous test"
+   );
+ 
+-  let sites = AboutNewTab.getTopSites();
++  let sites = await getTopSites();
+   Assert.equal(
+     sites.length,
+     6,
+@@ -589,7 +584,7 @@ add_task(async function tabSwitchBehavior() {
+ 
+   await BrowserTestUtils.switchTab(gBrowser, aboutRobotsTab);
+ 
+-  sites = AboutNewTab.getTopSites();
++  sites = await getTopSites();
+   Assert.equal(
+     sites.length,
+     6,
+diff --git a/browser/components/urlbar/tests/browser/browser_top_sites_private.js b/browser/components/urlbar/tests/browser/browser_top_sites_private.js
+index 3aff0062ab..af13f8e225 100644
+--- a/browser/components/urlbar/tests/browser/browser_top_sites_private.js
++++ b/browser/components/urlbar/tests/browser/browser_top_sites_private.js
+@@ -30,9 +30,7 @@ async function addTestVisits() {
+   });
+ 
+   // Adding a bookmark will refresh the TopSites feed.
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    await TestUtils.topicObserved("topsites-refreshed");
+-  }
++  await TestUtils.topicObserved("topsites-refreshed");
+ }
+ 
+ add_setup(async function () {
+@@ -64,12 +62,7 @@ add_task(async function topSitesPrivateWindow() {
+     private: true,
+   });
+   await addTestVisits();
+-  let sites;
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    sites = await TopSites.getSites();
+-  } else {
+-    sites = AboutNewTab.getTopSites();
+-  }
++  let sites = await TopSites.getSites();
+   Assert.equal(
+     sites.length,
+     7,
+@@ -127,12 +120,7 @@ add_task(async function topSitesTabSwitch() {
+ 
+   // Wait for the expected number of Top sites.
+   await updateTopSites(sites => sites?.length == 7);
+-  let sites;
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    sites = await TopSites.getSites();
+-  } else {
+-    sites = AboutNewTab.getTopSites();
+-  }
++  let sites = await TopSites.getSites();
+   Assert.equal(
+     sites.length,
+     7,
+diff --git a/browser/components/urlbar/tests/browser/browser_urlbar_annotation.js b/browser/components/urlbar/tests/browser/browser_urlbar_annotation.js
+index 18ea7fa734..228d06d206 100644
+--- a/browser/components/urlbar/tests/browser/browser_urlbar_annotation.js
++++ b/browser/components/urlbar/tests/browser/browser_urlbar_annotation.js
+@@ -3,11 +3,6 @@
+ 
+ "use strict";
+ 
+-ChromeUtils.defineESModuleGetters(this, {
+-  SponsorProtection:
+-    "moz-src:///browser/components/newtab/SponsorProtection.sys.mjs",
+-});
+-
+ // Test whether a visit information is annotated correctly when picking a result.
+ 
+ if (AppConstants.platform === "macosx") {
+@@ -192,10 +187,6 @@ add_task(async function basic() {
+         expected,
+       });
+       databaseResults.push({ description, frecency });
+-      Assert.ok(
+-        !SponsorProtection.isProtectedBrowser(browser),
+-        "Navigations from the URL bar do not cause sponsor protection at this time."
+-      );
+     });
+ 
+     ProvidersManager.getInstanceForSap("urlbar").unregisterProvider(provider);
+diff --git a/browser/components/urlbar/tests/browser/head-common.js b/browser/components/urlbar/tests/browser/head-common.js
+index 727e52c0fe..5828d6198e 100644
+--- a/browser/components/urlbar/tests/browser/head-common.js
++++ b/browser/components/urlbar/tests/browser/head-common.js
+@@ -128,30 +128,16 @@ async function updateTopSites(condition, searchShortcuts = false) {
+     ],
+   });
+ 
+-  if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    // The previous way of updating Top Sites was to toggle the preference which
+-    // removes the instance of the Top Sites Feed and re-creates it.
+-    TopSites.uninit();
+-    await TopSites.init();
+-  }
++  // The previous way of updating Top Sites was to toggle the preference which
++  // removes the instance of the Top Sites Feed and re-creates it.
++  TopSites.uninit();
++  await TopSites.init();
+ 
+   // Wait for the feed to be updated.
+   await TestUtils.waitForCondition(async () => {
+-    let sites;
+-    if (Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-      sites = await TopSites.getSites();
+-    } else {
+-      sites = AboutNewTab.getTopSites();
+-    }
++    let sites = await TopSites.getSites();
+     return condition(sites);
+   }, "Waiting for top sites to be updated");
+-
+-  if (!Services.prefs.getBoolPref("browser.topsites.component.enabled")) {
+-    let feed = AboutNewTab.activityStream?.store?.feeds.get(
+-      "feeds.system.topsites"
+-    );
+-    await feed?._latestRefreshPromise;
+-  }
+ }
+ 
+ async function installPersistTestEngines(globalDefault = "Example") {
+diff --git a/browser/components/urlbar/tests/quicksuggest/browser/browser.toml b/browser/components/urlbar/tests/quicksuggest/browser/browser.toml
+index 9dd38b41e3..bb1d4933d8 100644
+--- a/browser/components/urlbar/tests/quicksuggest/browser/browser.toml
++++ b/browser/components/urlbar/tests/quicksuggest/browser/browser.toml
+@@ -38,12 +38,6 @@ prefs = [
+ ["browser_quicksuggest_ping_amp.js"]
+ tags = "search-telemetry"
+ 
+-["browser_quicksuggest_ping_deletionRequest.js"]
+-tags = "search-telemetry"
+-skip-if = [
+-  "true", # Bug 2056936 - The `quick-suggest-deletion-request` ping is disabled
+-]
+-
+ ["browser_quicksuggest_ping_merinoAndNullValues.js"]
+ tags = "search-telemetry"
+ 
+diff --git a/browser/components/urlbar/tests/quicksuggest/browser/head.js b/browser/components/urlbar/tests/quicksuggest/browser/head.js
+index 2964fe67cc..0c5af5cdba 100644
+--- a/browser/components/urlbar/tests/quicksuggest/browser/head.js
++++ b/browser/components/urlbar/tests/quicksuggest/browser/head.js
+@@ -10,9 +10,13 @@ Services.scriptloader.loadSubScript(
+   this
+ );
+ 
++const CONTEXTUAL_SERVICES_PING_TYPES = {
++  QS_BLOCK: "quicksuggest-block",
++  QS_IMPRESSION: "quicksuggest-impression",
++  QS_SELECTION: "quicksuggest-click",
++};
++
+ ChromeUtils.defineESModuleGetters(this, {
+-  CONTEXTUAL_SERVICES_PING_TYPES:
+-    "resource:///modules/PartnerLinkAttribution.sys.mjs",
+   QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
+   Region: "resource://gre/modules/Region.sys.mjs",
+   TelemetryTestUtils: "resource://testing-common/TelemetryTestUtils.sys.mjs",
+@@ -81,16 +85,14 @@ async function updateTopSites(condition, searchShortcuts = false) {
+     ],
+   });
+ 
++  TopSites.uninit();
++  await TopSites.init();
++
+   // Wait for the feed to be updated.
+-  await TestUtils.waitForCondition(() => {
+-    let sites = AboutNewTab.getTopSites();
++  await TestUtils.waitForCondition(async () => {
++    let sites = await TopSites.getSites();
+     return condition(sites);
+   }, "Waiting for top sites to be updated");
+-
+-  let feed = AboutNewTab.activityStream?.store?.feeds.get(
+-    "feeds.system.topsites"
+-  );
+-  await feed?._latestRefreshPromise;
+ }
+ 
+ /**
+diff --git a/browser/docs/index.rst b/browser/docs/index.rst
+index 6a129aebec..e7a95b3014 100644
+--- a/browser/docs/index.rst
++++ b/browser/docs/index.rst
+@@ -18,7 +18,6 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    components/enterprisepolicies/docs/index
+    components/taskbartabs/docs/index
+    extensions/formautofill/docs/index
+-   extensions/newtab/docs/index
+    installer/windows/installer/index
+    /toolkit/mozapps/defaultagent/default-browser-agent/index
+    components/migration/docs/index
+@@ -35,4 +34,3 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    /toolkit/themes/shared/design-system/docs/README.design-tokens.stories
+    components/backup/docs/index
+    components/sidebar/docs/index
+-   components/mozcachedohttp/docs/index
+diff --git a/browser/extensions/moz.build b/browser/extensions/moz.build
+index 132b4d30dc..c03e1ce59d 100644
+--- a/browser/extensions/moz.build
++++ b/browser/extensions/moz.build
+@@ -6,7 +6,6 @@ DIRS += [
+     "formautofill",
+     "webcompat",
+     "pictureinpicture",
+-    "newtab",
+ ]
+ 
+ JAR_MANIFESTS += ["jar.mn"]
+diff --git a/browser/locales/en-US/browser/policies/policies-descriptions.ftl b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+index 6914890ca1..5d0297c2da 100644
+--- a/browser/locales/en-US/browser/policies/policies-descriptions.ftl
++++ b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+@@ -143,8 +143,6 @@ policy-ExtensionSettings = Manage all aspects of extension installation.
+ 
+ policy-ExtensionUpdate = Enable or disable automatic extension updates.
+ 
+-policy-FirefoxHome2 = Configure { -firefox-home-brand-name }.
+-
+ policy-FirefoxSuggest = Configure { -firefox-suggest-brand-name }.
+ 
+ policy-GoToIntranetSiteForSingleWordEntryInAddressBar = Force direct intranet site navigation instead of searching when typing single word entries in the address bar.
+diff --git a/browser/modules/AboutNewTab.sys.mjs b/browser/modules/AboutNewTab.sys.mjs
+index 4d6b04e72b..b2b85a9dff 100644
+--- a/browser/modules/AboutNewTab.sys.mjs
++++ b/browser/modules/AboutNewTab.sys.mjs
+@@ -2,144 +2,18 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+-
+-const lazy = {};
+-
+-ChromeUtils.defineESModuleGetters(lazy, {
+-  AboutNewTabResourceMapping:
+-    "resource:///modules/AboutNewTabResourceMapping.sys.mjs",
+-  ActivityStream: "resource://newtab/lib/ActivityStream.sys.mjs",
+-  NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+-  ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
+-  ProfileAge: "resource://gre/modules/ProfileAge.sys.mjs",
+-  TelemetryReportingPolicy:
+-    "resource://gre/modules/TelemetryReportingPolicy.sys.mjs",
+-});
+-
+ const ABOUT_URL = "about:newtab";
+-const PREF_ACTIVITY_STREAM_DEBUG = "browser.newtabpage.activity-stream.debug";
+-// AboutHomeStartupCache needs us in "quit-application", so stay alive longer.
+-// TODO: We could better have a shared async shutdown blocker?
+-const TOPIC_APP_QUIT = "profile-before-change";
+-const TRAINHOP_NIMBUS_FEATURE = "newtabTrainhop";
+ 
++/**
++ * The new tab page's address: about:newtab unless an extension overrides it
++ * (ext-url-overrides.js, ext-browserSettings.js).
++ */
+ export const AboutNewTab = {
+-  QueryInterface: ChromeUtils.generateQI([
+-    "nsIObserver",
+-    "nsISupportsWeakReference",
+-  ]),
+-
+-  // AboutNewTab
+-  initialized: false,
+-
+   willNotifyUser: false,
+ 
+-  _activityStreamEnabled: false,
+-  activityStream: null,
+-  activityStreamDebug: false,
+-  activityStreamPromise: null,
+-  _activityStreamResolver: null,
+-
+-  _cachedTopSites: null,
+-
+   _newTabURL: ABOUT_URL,
+   _newTabURLOverridden: false,
+ 
+-  /**
+-   * init - Initializes an instance of Activity Stream if one doesn't exist already.
+-   */
+-  init() {
+-    if (this.initialized) {
+-      return;
+-    }
+-    let { promise, resolve } = Promise.withResolvers();
+-    this.activityStreamPromise = promise;
+-    this._activityStreamResolver = resolve;
+-
+-    Services.obs.addObserver(this, TOPIC_APP_QUIT);
+-    if (!AppConstants.RELEASE_OR_BETA) {
+-      XPCOMUtils.defineLazyPreferenceGetter(
+-        this,
+-        "activityStreamDebug",
+-        PREF_ACTIVITY_STREAM_DEBUG,
+-        false,
+-        () => {
+-          this.notifyChange();
+-        }
+-      );
+-    }
+-
+-    XPCOMUtils.defineLazyPreferenceGetter(
+-      this,
+-      "privilegedAboutProcessEnabled",
+-      "browser.tabs.remote.separatePrivilegedContentProcess",
+-      false,
+-      () => {
+-        this.notifyChange();
+-      }
+-    );
+-
+-    // Make sure to register newtab resource mapping as early as possible
+-    // on startup.
+-    lazy.AboutNewTabResourceMapping.init();
+-
+-    // ActivityStream.init() also sets this default,
+-    // but it is gated behind TOU acceptance, which is too late for
+-    // about:welcome's first-screen impression.
+-    // Setting it here lets AboutWelcomeTelemetry and ASRouter
+-    // telemetry submit pings before TOU is accepted while Glean gates the
+-    // upload on datareporting.healthreport.uploadEnabled.
+-    const AStelemetryPref = "browser.newtabpage.activity-stream.telemetry";
+-    if (
+-      Services.prefs.getPrefType(AStelemetryPref) ===
+-      Services.prefs.PREF_INVALID
+-    ) {
+-      Services.prefs
+-        .getDefaultBranch("")
+-        .setBoolPref(AStelemetryPref, AppConstants.MOZILLA_OFFICIAL);
+-    }
+-
+-    // More initialization happens here
+-    this.toggleActivityStream(true);
+-    this.initialized = true;
+-
+-    Services.obs.addObserver(
+-      this,
+-      lazy.TelemetryReportingPolicy.TELEMETRY_TOU_ACCEPTED_OR_INELIGIBLE
+-    );
+-  },
+-
+-  /**
+-   * React to changes to the activity stream being enabled or not.
+-   *
+-   * This will only act if there is a change of state and if not overridden.
+-   *
+-   * @returns {boolean} Returns if there has been a state change
+-   *
+-   * @param {boolean}   stateEnabled    activity stream enabled state to set to
+-   * @param {boolean}   forceState      force state change
+-   */
+-  toggleActivityStream(stateEnabled, forceState = false) {
+-    if (
+-      !forceState &&
+-      (this._newTabURLOverridden ||
+-        stateEnabled === this._activityStreamEnabled)
+-    ) {
+-      // exit there is no change of state
+-      return false;
+-    }
+-    if (stateEnabled) {
+-      this._activityStreamEnabled = true;
+-    } else {
+-      this._activityStreamEnabled = false;
+-    }
+-
+-    this._newTabURL = ABOUT_URL;
+-    return true;
+-  },
+-
+   get newTabURL() {
+     return this._newTabURL;
+   },
+@@ -154,7 +28,6 @@ export const AboutNewTab = {
+       newTabURL = "about:blank";
+     }
+ 
+-    this.toggleActivityStream(false);
+     this._newTabURL = newTabURL;
+     this._newTabURLOverridden = true;
+     this.notifyChange();
+@@ -164,182 +37,13 @@ export const AboutNewTab = {
+     return this._newTabURLOverridden;
+   },
+ 
+-  get activityStreamEnabled() {
+-    return this._activityStreamEnabled;
+-  },
+-
+   resetNewTabURL() {
+     this._newTabURLOverridden = false;
+     this._newTabURL = ABOUT_URL;
+-    this.toggleActivityStream(true, true);
+     this.notifyChange();
+   },
+ 
+   notifyChange() {
+     Services.obs.notifyObservers(null, "newtab-url-changed", this._newTabURL);
+   },
+-
+-  /**
+-   * onBrowserReady - Continues the initialization of Activity Stream after browser is ready.
+-   */
+-  async onBrowserReady() {
+-    if (this.activityStream && this.activityStream.initialized) {
+-      return;
+-    }
+-
+-    // We want to block newtab startup on two things:
+-    //  - The built-in addon has reported that it has finished
+-    //    initializing
+-    //  - The TRAINHOP_NIMBUS_FEATURE feature is up-to-date and ready to
+-    //    read.
+-    //
+-    // That way, when the various feeds initialize, they can be certain that
+-    // the addon has finished registering its resources, and that the
+-    // trainhopConfig value computed in PrefsFeed is ready to be read.
+-
+-    const nimbusFeature = lazy.NimbusFeatures[TRAINHOP_NIMBUS_FEATURE];
+-    const trainhopFeatureReady = nimbusFeature.ready();
+-
+-    let redirector = Cc[
+-      "@mozilla.org/network/protocol/about;1?what=newtab"
+-    ].getService(Ci.nsIAboutModule).wrappedJSObject;
+-
+-    const addonInitted = redirector.promiseBuiltInAddonInitialized;
+-
+-    // The ProfileAge function itself returns a Promise, which resolves to the
+-    // underlying accessor, and the created getter on that accessor also returns
+-    // a Promise. This construct gives us a Promise that ultimately resolves
+-    // to the created timestamp.
+-    const profileCreatedAccessorReady = lazy
+-      .ProfileAge()
+-      .then(accessor => accessor.created);
+-
+-    const [createdTimestamp] = await Promise.all([
+-      profileCreatedAccessorReady,
+-      trainhopFeatureReady,
+-      addonInitted,
+-    ]);
+-    const createdInstant = createdTimestamp
+-      ? Temporal.Instant.fromEpochMilliseconds(createdTimestamp)
+-      : null;
+-
+-    lazy.AboutNewTabResourceMapping.scheduleUpdateTrainhopAddonState();
+-
+-    try {
+-      this.activityStream = new lazy.ActivityStream(createdInstant);
+-      Glean.newtab.activityStreamCtorSuccess.set(true);
+-      this._activityStreamResolver();
+-    } catch (error) {
+-      // Send Activity Stream loading failure telemetry
+-      // This probe will help to monitor if ActivityStream failure has crossed
+-      // a threshold and send alert. See Bug 1965278
+-      Glean.newtab.activityStreamCtorSuccess.set(false);
+-      console.error(error);
+-      throw error;
+-    }
+-
+-    try {
+-      this.activityStream.init();
+-      this._subscribeToActivityStream();
+-    } catch (e) {
+-      console.error(e);
+-    }
+-  },
+-
+-  _subscribeToActivityStream() {
+-    const store = this.activityStream.store;
+-    let unsubscribe = store.subscribe(() => {
+-      // If the top sites changed, broadcast "newtab-top-sites-changed". We
+-      // ignore changes to the `screenshot` property in each site because
+-      // screenshots are generated at times that are hard to predict and it ends
+-      // up interfering with tests that rely on "newtab-top-sites-changed".
+-      // Observers likely don't care about screenshots anyway.
+-      let topSites = store.getState().TopSites.rows.map(site => {
+-        site = { ...site };
+-        delete site.screenshot;
+-        return site;
+-      });
+-      if (!lazy.ObjectUtils.deepEqual(topSites, this._cachedTopSites)) {
+-        this._cachedTopSites = topSites;
+-        Services.obs.notifyObservers(null, "newtab-top-sites-changed");
+-      }
+-    });
+-    this._unsubscribeFromActivityStream = () => {
+-      try {
+-        unsubscribe();
+-      } catch (e) {
+-        console.error(e);
+-      }
+-    };
+-  },
+-
+-  /**
+-   * uninit - Uninitializes Activity Stream if it exists.
+-   */
+-  uninit() {
+-    if (this.activityStream) {
+-      this._unsubscribeFromActivityStream?.();
+-      this.activityStream.uninit();
+-      this.activityStream = null;
+-    }
+-    try {
+-      Services.obs.removeObserver(this, TOPIC_APP_QUIT);
+-      Services.obs.removeObserver(
+-        this,
+-        lazy.TelemetryReportingPolicy.TELEMETRY_TOU_ACCEPTED_OR_INELIGIBLE
+-      );
+-    } catch (e) {
+-      // If init failed before registering these observers, removeObserver may throw.
+-      // Safe to ignore during shutdown.
+-    }
+-
+-    this.initialized = false;
+-  },
+-
+-  getTopSites() {
+-    return this.activityStream
+-      ? this.activityStream.store.getState().TopSites.rows
+-      : [];
+-  },
+-
+-  _alreadyRecordedTopsitesPainted: false,
+-  _nonDefaultStartup: false,
+-
+-  noteNonDefaultStartup() {
+-    this._nonDefaultStartup = true;
+-  },
+-
+-  maybeRecordTopsitesPainted(timestamp) {
+-    if (this._alreadyRecordedTopsitesPainted || this._nonDefaultStartup) {
+-      return;
+-    }
+-
+-    let startupInfo = Services.startup.getStartupInfo();
+-    let processStartTs = startupInfo.process.getTime();
+-    let delta = Math.round(timestamp - processStartTs);
+-    Glean.timestamps.aboutHomeTopsitesFirstPaint.set(delta);
+-    ChromeUtils.addProfilerMarker("aboutHomeTopsitesFirstPaint");
+-    this._alreadyRecordedTopsitesPainted = true;
+-  },
+-
+-  // nsIObserver implementation
+-
+-  observe(subject, topic) {
+-    switch (topic) {
+-      case TOPIC_APP_QUIT: {
+-        this.uninit();
+-        break;
+-      }
+-      case lazy.TelemetryReportingPolicy.TELEMETRY_TOU_ACCEPTED_OR_INELIGIBLE: {
+-        Services.obs.removeObserver(
+-          this,
+-          lazy.TelemetryReportingPolicy.TELEMETRY_TOU_ACCEPTED_OR_INELIGIBLE
+-        );
+-
+-        // Avoid running synchronously during this event that's used for timing
+-        Services.tm.dispatchToMainThread(() => this.onBrowserReady());
+-        break;
+-      }
+-    }
+-  },
+ };
+diff --git a/browser/modules/moz.build b/browser/modules/moz.build
+index 67102d7170..669f3702fb 100644
+--- a/browser/modules/moz.build
++++ b/browser/modules/moz.build
+@@ -56,9 +56,6 @@ with Files("EveryWindow.sys.mjs"):
+ with Files("ExtensionsUI.sys.mjs"):
+     BUG_COMPONENT = ("WebExtensions", "General")
+ 
+-with Files("PartnerLinkAttribution.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Search")
+-
+ with Files("PermissionUI.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Site Permissions")
+ 
+@@ -117,7 +114,6 @@ EXTRA_JS_MODULES += [
+     "HomePage.sys.mjs",
+     "LinksCache.sys.mjs",
+     "PageActions.sys.mjs",
+-    "PartnerLinkAttribution.sys.mjs",
+     "PermissionUI.sys.mjs",
+     "PopupAndRedirectBlockerObserver.sys.mjs",
+     "ProcessHangMonitor.sys.mjs",
+@@ -136,7 +132,6 @@ EXTRA_JS_MODULES += [
+ 
+ MOZ_SRC_FILES += [
+     "CanvasPermissionPromptHelper.sys.mjs",
+-    "ContextId.sys.mjs",
+     "ObserverForwarder.sys.mjs",
+     "PrivateBrowsingUI.sys.mjs",
+ ]
+diff --git a/browser/modules/test/unit/xpcshell.toml b/browser/modules/test/unit/xpcshell.toml
+index 2c992c9a47..fab4476730 100644
+--- a/browser/modules/test/unit/xpcshell.toml
++++ b/browser/modules/test/unit/xpcshell.toml
+@@ -6,12 +6,6 @@ head =  ''
+ firefox-appdir = "browser"
+ tags = "os_integration"
+ 
+-["test_ContextId_LegacyBackend.js"]
+-prefs = ["browser.contextual-services.contextId.rust-component.enabled=false"]
+-
+-["test_ContextId_RustBackend.js"]
+-prefs = ["browser.contextual-services.contextId.rust-component.enabled=true"]
+-
+ ["test_Dedupe.js"]
+ 
+ ["test_E10SUtils_nested_URIs.js"]
+diff --git a/build/sparse-profiles/taskgraph b/build/sparse-profiles/taskgraph
+index fc5207a823..3bcaf6ee4e 100644
+--- a/build/sparse-profiles/taskgraph
++++ b/build/sparse-profiles/taskgraph
+@@ -38,8 +38,6 @@ path:package-lock.json
+ path:tools/lint/
+ 
+ # for other node toolchain packaging
+-path:browser/extensions/newtab/package.json
+-path:browser/extensions/newtab/package-lock.json
+ path:tools/terser/package.json
+ path:tools/terser/package-lock.json
+ path:remote/test/puppeteer/
+diff --git a/docs/config.yml b/docs/config.yml
+index 06e2a8d3fc..e99f01a0dc 100644
+--- a/docs/config.yml
++++ b/docs/config.yml
+@@ -100,7 +100,6 @@ categories:
+ 
+ redirects:
+     browser/browser: browser
+-    browser/components/newtab/docs/index.html: browser/extensions/newtab/docs/index.html
+     contributing/how_to_contribute_firefox.html: contributing/contribution_quickref.html
+     contributing/artifact_builds.html: contributing/build/artifact_builds.html
+     contributing/linux_build.html: setup/linux_build.html
+@@ -217,8 +216,6 @@ js_source_paths:
+     - browser/components/extensions
+     - browser/components/migration
+     - browser/components/migration/content
+-    - browser/components/mozcachedohttp
+-    - browser/components/mozcachedohttp/actors
+     - browser/components/urlbar
+     - browser/components/urlbar/content
+     - js/xpconnect/loader
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index 283a577f78..b412c1cc1c 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -372,8 +372,6 @@ export default [
+       "browser/components/shopping/content/settings.mjs",
+       "browser/components/shopping/content/shopping-container.mjs",
+       "browser/components/shopping/content/shopping-message-bar.mjs",
+-      "browser/extensions/newtab/content-src/lib/init-store.mjs",
+-      "browser/extensions/newtab/data/content/activity-stream.bundle.js",
+       "toolkit/components/certviewer/content/certviewer.mjs",
+       "toolkit/components/certviewer/content/components/about-certificate-items.mjs",
+       "toolkit/components/certviewer/content/components/about-certificate-section.mjs",
+@@ -492,7 +490,6 @@ export default [
+       "browser/components/preferences/tests/browser_contentblocking.js",
+       "browser/components/preferences/tests/browser_extension_controlled.js",
+       "browser/extensions/formautofill/background.js",
+-      "browser/extensions/newtab/webext-glue/background.js",
+       "devtools/client/responsive/test/browser/browser_ext_messaging.js",
+       "dom/fetch/tests/test_ext_response_constructor.html",
+       "mobile/android/android-components/components/browser/icons/src/main/assets/extensions/browser-icons/icons.js",
+diff --git a/eslint-ignores.config.mjs b/eslint-ignores.config.mjs
+index 04ea1258f1..374d64884d 100644
+--- a/eslint-ignores.config.mjs
++++ b/eslint-ignores.config.mjs
+@@ -70,7 +70,6 @@ export default [
+   "browser/extensions/formautofill/phonenumberutils/PhoneNumberMetaData.sys.mjs",
+ 
+   // Ignore newtab files
+-  "browser/extensions/newtab/logs/",
+ 
+   // Ignore devtools debugger files which aren't intended for linting.
+   "devtools/client/debugger/bin/",
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 2f5e7ea4cd..ab1ec61ad5 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -113,7 +113,6 @@ export default [
+       "browser/components/urlbar/tests/browser/head-common.js",
+       "browser/components/urlbar/tests/quicksuggest/unit/head.js",
+       "browser/components/urlbar/tests/quicksuggest/unit/test_quicksuggest_defaultPrefs.js",
+-      "browser/extensions/newtab/lib/ActivityStreamPrefs.sys.mjs",
+       "dom/push/test/xpcshell/head.js",
+       "mobile/android/geckoview/src/androidTest/assets/web_extensions/test-support/test-api.js",
+       "toolkit/components/aboutconfig/content/aboutconfig.js",
+@@ -247,7 +246,6 @@ export default [
+       "browser/components/storybook/.storybook/**",
+       "browser/components/tabbrowser/**",
+       "browser/components/tests/browser/**",
+-      "browser/extensions/newtab/**",
+       "browser/modules/**",
+       "devtools/**",
+       "docshell/base/URIFixup.sys.mjs",
+@@ -340,7 +338,6 @@ export default [
+       "browser/components/topsites/**",
+       "browser/components/translations/**",
+       "browser/extensions/formautofill/**",
+-      "browser/extensions/newtab/**",
+       "browser/extensions/pictureinpicture/**",
+       "browser/extensions/webcompat/**",
+       "browser/fxr/content/permissions.js",
+diff --git a/eslint-subdirs.config.mjs b/eslint-subdirs.config.mjs
+index 05b06935d8..f5d08bfdc0 100644
+--- a/eslint-subdirs.config.mjs
++++ b/eslint-subdirs.config.mjs
+@@ -76,7 +76,6 @@ export default [
+   )),
+   ...(await convertConfigurationFile("browser/components/search")),
+   ...(await convertConfigurationFile("browser/components/urlbar")),
+-  ...(await convertConfigurationFile("browser/extensions/newtab")),
+   ...(await convertConfigurationFile(
+     "browser/extensions/pictureinpicture/tests/browser"
+   )),
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+index 1c5a3b4549..df88dede4f 100644
+--- a/eslint.config.mjs
++++ b/eslint.config.mjs
+@@ -440,10 +440,7 @@ let config = [
+     // Rules of Hooks broadly checks for camelCase "use" identifiers, so
+     // enable only for paths actually using React to avoid false positives.
+     name: "react-hooks",
+-    files: [
+-      "browser/extensions/newtab/**",
+-      "devtools/**",
+-    ],
++    files: ["devtools/**"],
+     ...reactHooks.configs["recommended-latest"],
+     plugins: { "react-hooks": reactHooks },
+     rules: {
+diff --git a/mots.yaml b/mots.yaml
+index 7ebe2a537d..63a7455dfe 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -3829,7 +3829,6 @@ modules:
+         description: The new tab/home page.
+         includes:
+           - browser/components/newtab/**/*
+-          - browser/extensions/newtab/**/*
+         meta:
+           components:
+             - Firefox::New Tab Page
+diff --git a/python/mach/mach/command_util.py b/python/mach/mach/command_util.py
+index 54138dbf9c..bc602a34cd 100644
+--- a/python/mach/mach/command_util.py
++++ b/python/mach/mach/command_util.py
+@@ -173,7 +173,6 @@ MACH_COMMANDS = {
+     ),
+     "mozharness": MachCommandReference("testing/mozharness/mach_commands.py"),
+     "mozregression": MachCommandReference("tools/mach_commands.py"),
+-    "newtab": MachCommandReference("browser/extensions/newtab/mach_commands.py"),
+     "node": MachCommandReference("tools/mach_commands.py"),
+     "npm": MachCommandReference("tools/mach_commands.py"),
+     "npx": MachCommandReference("tools/mach_commands.py"),
+diff --git a/services/settings/dumps/main/moz.build b/services/settings/dumps/main/moz.build
+index 38c8ddbe49..edb93f0141 100644
+--- a/services/settings/dumps/main/moz.build
++++ b/services/settings/dumps/main/moz.build
+@@ -6,7 +6,6 @@ if CONFIG["MOZ_BUILD_APP"] == "browser":
+     # These collections are only referenced from browser/
+     FINAL_TARGET_FILES.defaults.settings.main += [
+         "language-dictionaries.json",
+-        "newtab-wallpapers-v2.json",
+         "sites-classification.json",
+         "top-sites.json",
+         "urlbar-persisted-search-terms.json"
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index a7e44c497c..3867fdc5c0 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -86,61 +86,6 @@ module.exports = [
+       "browser/extensions/formautofill/skin/shared/editAddress.css",
+       "browser/extensions/formautofill/skin/shared/editCreditCard.css",
+       "browser/extensions/formautofill/skin/shared/editDialog-shared.css",
+-      "browser/extensions/newtab/content-src/components/A11yLinkButton/_A11yLinkButton.scss",
+-      "browser/extensions/newtab/content-src/components/ActivationWindowMessage/_ActivationWindowMessage.scss",
+-      "browser/extensions/newtab/content-src/components/Base/_Base.scss",
+-      "browser/extensions/newtab/content-src/components/Card/_Card.scss",
+-      "browser/extensions/newtab/content-src/components/CollapsibleSection/_CollapsibleSection.scss",
+-      "browser/extensions/newtab/content-src/components/ConfirmDialog/_ConfirmDialog.scss",
+-      "browser/extensions/newtab/content-src/components/ContextMenu/_ContextMenu.scss",
+-      "browser/extensions/newtab/content-src/components/CustomizeMenu/_CustomizeMenu.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamAdmin/DiscoveryStreamAdmin.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamBase/_DiscoveryStreamBase.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/_AdBanner.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBannerContextMenu/AdBannerContextMenu.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/CardGrid/_CardGrid.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/CardSections/_CardSections.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/DSCard/_DSCard.scss",
+-      "browser/extensions/newtab/content-src/styles/nova/_DSCard.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/DSContextFooter/_DSContextFooter.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/DSEmptyState/_DSEmptyState.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/DSImage/_DSImage.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/DSMessage/_DSMessage.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/FeatureHighlight/_DownloadMobilePromoHighlight.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/FeatureHighlight/_FeatureHighlight.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/FeatureHighlight/_WallpaperFeatureHighlight.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/Highlights/_Highlights.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/InterestPicker/_InterestPicker.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/Navigation/_Navigation.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PersonalizedCard/_PersonalizedCard.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/_PromoCard.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/ReportContent/ReportContent.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/SectionTitle/_SectionTitle.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/TopSites/_TopSites.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/TopicSelection/_TopicSelection.scss",
+-      "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/TopicsWidget/_TopicsWidget.scss",
+-      "browser/extensions/newtab/content-src/components/DownloadModalToggle/_DownloadModalToggle.scss",
+-      "browser/extensions/newtab/content-src/components/ErrorBoundary/_ErrorBoundary.scss",
+-      "browser/extensions/newtab/content-src/components/Logo/_Logo.scss",
+-      "browser/extensions/newtab/content-src/components/ModalOverlay/_ModalOverlay.scss",
+-      "browser/extensions/newtab/content-src/components/MoreRecommendations/_MoreRecommendations.scss",
+-      "browser/extensions/newtab/content-src/components/Search/_Search.scss",
+-      "browser/extensions/newtab/content-src/components/Sections/_Sections.scss",
+-      "browser/extensions/newtab/content-src/components/TopSites/_TopSites.scss",
+-      "browser/extensions/newtab/content-src/components/WallpaperCategories/_WallpaperCategories.scss",
+-      "browser/extensions/newtab/content-src/components/Weather/_Weather.scss",
+-      "browser/extensions/newtab/content-src/components/Widgets/FocusTimer/_FocusTimer.scss",
+-      "browser/extensions/newtab/content-src/components/Widgets/Lists/_Lists.scss",
+-      "browser/extensions/newtab/content-src/components/Widgets/SportsWidget/_SportsWidget.scss",
+-      "browser/extensions/newtab/content-src/components/Widgets/Weather/_Weather.scss",
+-      "browser/extensions/newtab/content-src/components/Widgets/WeatherForecast/WeatherForecast.scss",
+-      "browser/extensions/newtab/content-src/components/Widgets/_Widgets.scss",
+-      "browser/extensions/newtab/content-src/styles/_icons.scss",
+-      "browser/extensions/newtab/content-src/styles/_mixins.scss",
+-      "browser/extensions/newtab/content-src/styles/_variables.scss",
+-      "browser/extensions/newtab/content-src/styles/nova/_CardSections.scss",
+-      "browser/extensions/newtab/content-src/styles/nova/activity-stream.scss",
+-      "browser/extensions/newtab/content-src/styles/activity-stream.scss",
+       "browser/extensions/webcompat/about-compat/aboutCompat.css",
+       "browser/themes/linux/browser.css",
+       "browser/themes/linux/customizableui/panelUI.css",
+diff --git a/toolkit/components/cleardata/ClearDataService.sys.mjs b/toolkit/components/cleardata/ClearDataService.sys.mjs
+index 0abd82fcf7..9f489cedac 100644
+--- a/toolkit/components/cleardata/ClearDataService.sys.mjs
++++ b/toolkit/components/cleardata/ClearDataService.sys.mjs
+@@ -1980,64 +1980,6 @@ const ContentBlockingCleaner = {
+   },
+ };
+ 
+-/**
+- * The about:home startup cache, if it exists, might contain information
+- * about where the user has been, or what they've downloaded.
+- */
+-const AboutHomeStartupCacheCleaner = {
+-  async deleteByPrincipal(aPrincipal, aIsUserRequest) {
+-    if (!aIsUserRequest) {
+-      return;
+-    }
+-    await this.deleteAll();
+-  },
+-
+-  async deleteBySite(
+-    _aSchemelessSite,
+-    _aOriginAttributesPattern,
+-    aIsUserRequest
+-  ) {
+-    if (!aIsUserRequest) {
+-      return;
+-    }
+-    await this.deleteAll();
+-  },
+-
+-  deleteAll() {
+-    // This cleaner only makes sense on Firefox desktop, which is the only
+-    // application that uses the about:home startup cache.
+-    if (!AppConstants.MOZ_BUILD_APP == "browser") {
+-      return Promise.resolve();
+-    }
+-
+-    return new Promise((aResolve, aReject) => {
+-      let lci = Services.loadContextInfo.default;
+-      let storage = Services.cache2.diskCacheStorage(lci);
+-      let uri = Services.io.newURI("about:home");
+-      try {
+-        storage.asyncDoomURI(uri, "", {
+-          onCacheEntryDoomed(aResult) {
+-            if (
+-              Components.isSuccessCode(aResult) ||
+-              aResult == Cr.NS_ERROR_NOT_AVAILABLE
+-            ) {
+-              aResolve();
+-            } else {
+-              aReject({
+-                message: "asyncDoomURI for about:home failed",
+-              });
+-            }
+-          },
+-        });
+-      } catch (e) {
+-        aReject({
+-          message: "Failed to doom about:home startup cache entry",
+-        });
+-      }
+-    });
+-  },
+-};
+-
+ const PreflightCacheCleaner = {
+   // TODO: Bug 1727141: We should call the cache to clear by principal, rather
+   // than over-clearing for user requests or bailing out for programmatic calls.
+@@ -2412,7 +2354,7 @@ const FLAGS_MAP = [
+ 
+   {
+     flag: Ci.nsIClearDataService.CLEAR_DOWNLOADS,
+-    cleaners: [DownloadsCleaner, AboutHomeStartupCacheCleaner],
++    cleaners: [DownloadsCleaner],
+   },
+ 
+   {
+@@ -2429,11 +2371,7 @@ const FLAGS_MAP = [
+ 
+   {
+     flag: Ci.nsIClearDataService.CLEAR_HISTORY,
+-    cleaners: [
+-      HistoryCleaner,
+-      SessionHistoryCleaner,
+-      AboutHomeStartupCacheCleaner,
+-    ],
++    cleaners: [HistoryCleaner, SessionHistoryCleaner],
+   },
+ 
+   {
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 484e7fd6b4..09bbd67568 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -122,7 +122,6 @@ firefox_desktop_metrics = [
+     "browser/components/firefoxview/metrics.yaml",
+     "browser/components/metrics.yaml",
+     "browser/components/migration/metrics.yaml",
+-    "browser/components/newtab/metrics.yaml",
+     "browser/components/places/metrics.yaml",
+     "browser/components/preferences/metrics.yaml",
+     "browser/components/profiles/metrics.yaml",
+@@ -206,7 +205,6 @@ gecko_pings = [
+ # Order is lexicographical, enforced by t/c/glean/tests/pytest/test_yaml_indices.py
+ firefox_desktop_pings = [
+     "browser/components/backup/pings.yaml",
+-    "browser/components/newtab/pings.yaml",
+     "browser/components/profiles/pings.yaml",
+     "browser/components/search/pings.yaml",
+     "browser/components/urlbar/pings.yaml",
+diff --git a/toolkit/modules/RemotePageAccessManager.sys.mjs b/toolkit/modules/RemotePageAccessManager.sys.mjs
+index 707efb2678..21c7bcdb80 100644
+--- a/toolkit/modules/RemotePageAccessManager.sys.mjs
++++ b/toolkit/modules/RemotePageAccessManager.sys.mjs
+@@ -61,11 +61,6 @@ export let RemotePageAccessManager = {
+       RPMGetInnermostAsciiHost: ["*"],
+       RPMIsWindowPrivate: ["*"],
+     },
+-    "about:home": {
+-      RPMSendAsyncMessage: ["ActivityStream:ContentToMain"],
+-      RPMAddMessageListener: ["ActivityStream:MainToContent"],
+-      RPMGetFormatURLPref: ["app.support.baseURL"],
+-    },
+     "about:httpsonlyerror": {
+       RPMGetFormatURLPref: ["app.support.baseURL"],
+       RPMGetIntPref: ["security.dialog_enable_delay"],
+@@ -136,11 +131,6 @@ export let RemotePageAccessManager = {
+       RPMSendQuery: ["Browser:AddTRRExcludedDomain"],
+       RPMGetIntPref: ["network.trr.mode", "security.dialog_enable_delay"],
+     },
+-    "about:newtab": {
+-      RPMSendAsyncMessage: ["ActivityStream:ContentToMain"],
+-      RPMAddMessageListener: ["ActivityStream:MainToContent"],
+-      RPMGetFormatURLPref: ["app.support.baseURL"],
+-    },
+     "about:deleteprofile": {
+       RPMSendQuery: ["Profiles:GetDeleteProfileContent"],
+       RPMSendAsyncMessage: ["Profiles:CancelDelete", "Profiles:DeleteProfile"],
+diff --git a/tools/lint/codespell.yml b/tools/lint/codespell.yml
+index 142f9fa927..4c506d0e46 100644
+--- a/tools/lint/codespell.yml
++++ b/tools/lint/codespell.yml
+@@ -7,7 +7,6 @@ codespell:
+         - browser/components/places/docs/
+         - browser/components/search/docs/
+         - browser/components/urlbar/docs/
+-        - browser/extensions/newtab/docs/
+         - browser/installer/windows/docs/
+         - browser/locales/en-US/
+         - build/docs/
+diff --git a/tools/lint/file-whitespace.yml b/tools/lint/file-whitespace.yml
+index bf67c991aa..3cbec106ce 100644
+--- a/tools/lint/file-whitespace.yml
++++ b/tools/lint/file-whitespace.yml
+@@ -4,7 +4,6 @@ file-whitespace:
+     exclude:
+         - accessible/tests/crashtests
+         - accessible/tests/mochitest
+-        - browser/extensions/newtab/webext-glue/locales/
+         - browser/locales/en-US/chrome/browser/uiDensity.properties
+         - build/pgo/blueprint
+         - build/pgo/js-input
+diff --git a/tools/lint/fluent-lint.yml b/tools/lint/fluent-lint.yml
+index 65bb621764..8d8a5d956b 100644
+--- a/tools/lint/fluent-lint.yml
++++ b/tools/lint/fluent-lint.yml
+@@ -2,7 +2,6 @@
+ fluent-lint:
+     description: Linter for Fluent files
+     exclude:
+-        - browser/extensions/newtab/webext-glue/locales/
+         - dom/l10n/tests/mochitest/document_l10n/non-system-principal/localization/test.ftl
+     extensions: ['ftl']
+     support-files:
+diff --git a/tools/lint/rejected-words.yml b/tools/lint/rejected-words.yml
+index eae20774aa..dd18a3a423 100644
+--- a/tools/lint/rejected-words.yml
++++ b/tools/lint/rejected-words.yml
+@@ -68,7 +68,6 @@ avoid-blacklist-and-whitelist:
+         - browser/components/urlbar/tests/unit/test_providerHeuristicFallback.js
+         - browser/components/urlbar/tests/unit/test_search_suggestions.js
+         - browser/components/urlbar/tests/unit/test_tokenizer.js
+-        - browser/extensions/newtab/data/content/activity-stream.bundle.js
+         - browser/extensions/webcompat/shims/nielsen.js
+         - browser/modules/SitePermissions.sys.mjs
+         - browser/tools/mozscreenshots/mozscreenshots/extension/configurations/PermissionPrompts.sys.mjs
+diff --git a/taskcluster/kinds/source-test/node.yml b/taskcluster/kinds/source-test/node.yml
+index 0a967225a0..0ae4800d75 100644
+--- a/taskcluster/kinds/source-test/node.yml
++++ b/taskcluster/kinds/source-test/node.yml
+@@ -17,74 +17,6 @@ task-defaults:
+         cwd: '{checkout}'
+         use-caches: [checkout, npm]
+ 
+-newtab-unit-tests:
+-    description: newtab unit tests
+-    treeherder:
+-        symbol: node(newtab)
+-    require-build:
+-        by-project:
+-            autoland:
+-                linux2404-64/opt: build-linux64/opt
+-            try:
+-                linux2404-64/opt: build-linux64/opt
+-            default:
+-                linux2404-64/opt: build-linux64-shippable/opt
+-    fetches:
+-        build:
+-            - target.tar.xz
+-        toolchain:
+-            - linux64-node
+-            - node-modules
+-            - newtab-node-modules
+-    run:
+-        command: >
+-            cd /builds/worker/checkouts/gecko &&
+-            cp -r $MOZ_FETCHES_DIR/node_modules node_modules &&
+-            cd /builds/worker/checkouts/gecko/browser/extensions/newtab &&
+-            cp -r $MOZ_FETCHES_DIR/newtab/node_modules node_modules &&
+-            FIREFOX_BIN=$MOZ_FETCHES_DIR/firefox/firefox PATH=$PATH:$MOZ_FETCHES_DIR/node/bin node bin/try-runner.js
+-    when:
+-        files-changed:
+-            - "browser/extensions/newtab/**"
+-
+-newtab-unit-tests-ccov:
+-    description: newtab unit tests code coverage
+-    attributes:
+-        ccov: true
+-    treeherder:
+-        symbol: node(newtab-ccov)
+-    worker:
+-        artifacts:
+-            - name: public/code-coverage-grcov.zip
+-              path: /builds/worker/checkouts/gecko/browser/extensions/newtab/logs/coverage/code-coverage-grcov.zip
+-              type: file
+-    require-build:
+-        by-project:
+-            try:
+-                linux2404-64/opt: build-linux64/opt
+-            default:
+-                linux2404-64/opt: build-linux64-shippable/opt
+-    fetches:
+-        build:
+-            - target.tar.xz
+-        toolchain:
+-            - linux64-node
+-            - node-modules
+-            - newtab-node-modules
+-    run:
+-        command: >
+-            cd /builds/worker/checkouts/gecko &&
+-            cp -r $MOZ_FETCHES_DIR/node_modules node_modules &&
+-            cd /builds/worker/checkouts/gecko/browser/extensions/newtab &&
+-            cp -r $MOZ_FETCHES_DIR/newtab/node_modules node_modules &&
+-            FIREFOX_BIN=$MOZ_FETCHES_DIR/firefox/firefox PATH=$PATH:$MOZ_FETCHES_DIR/node/bin node bin/try-runner.js
+-    # This should only run on mozilla-central, as the bot will only parse mozilla-central
+-    # coverage anyways.
+-    run-on-projects: ["mozilla-central"]
+-    # Note the lack of a "when" rule here. This is to avoid seeing fluctuating
+-    # coverage on searchfox depending on whether the latest
+-    # push contained patches touching these files or not.
+-
+ devtools-tests:
+     description: devtools node-based tests (for instance jest)
+     attributes:
+diff --git a/taskcluster/kinds/toolchain/misc.yml b/taskcluster/kinds/toolchain/misc.yml
+index 9cf599b36a..ecbefb8ebe 100644
+--- a/taskcluster/kinds/toolchain/misc.yml
++++ b/taskcluster/kinds/toolchain/misc.yml
+@@ -484,22 +484,6 @@ terser:
+         toolchain:
+             - linux64-node
+ 
+-newtab-node-modules:
+-    description: "npm install newtab node_modules"
+-    treeherder:
+-        symbol: TL(newtab-node)
+-    run:
+-        script: generic-node-modules.sh
+-        arguments: ['newtab', 'browser/extensions/newtab/']
+-        sparse-profile: null
+-        resources:
+-            - 'browser/extensions/newtab/package.json'
+-            - 'browser/extensions/newtab/package-lock.json'
+-        toolchain-artifact: public/build/newtab-node-modules.tar.zst
+-    fetches:
+-        toolchain:
+-            - linux64-node
+-
+ node-modules:
+     description: "npm install top-level node_modules"
+     treeherder:

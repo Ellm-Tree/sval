@@ -85,19 +85,6 @@ index 1516c920c4..3bef3ee82a 100644
  addressbar-locbar-clipboard-option =
      .label = Clipboard
      .accesskey = C
-diff --git a/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl b/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl
-index aafc2b168c..70dc0b7c5c 100644
---- a/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl
-+++ b/browser/extensions/newtab/webext-glue/locales/en-US/browser/newtab/newtab.ftl
-@@ -1241,7 +1241,7 @@ home-custom-homepage-current-pages-button =
- 
- # Button that appears in-line after text "Replace with" (home-custom-homepage-replace-with-prompt)
- home-custom-homepage-bookmarks-button =
--    .label = Bookmarks…
-+    .label = Favorites…
- 
- ## Firefox Home content
- 
 diff --git a/browser/locales/en-US/browser/newtab/newtab.ftl b/browser/locales/en-US/browser/newtab/newtab.ftl
 index aafc2b168c..70dc0b7c5c 100644
 --- a/browser/locales/en-US/browser/newtab/newtab.ftl

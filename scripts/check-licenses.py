@@ -64,8 +64,8 @@ HEADER_LINES = 12
 
 # Files that cannot carry a comment, or whose format would be damaged by one.
 UNCOMMENTABLE_SUFFIXES = {
-    ".bmp", ".dll", ".icns", ".ico", ".jpg", ".json", ".lock", ".md", ".patch",
-    ".pdf", ".png", ".wasm",
+    ".bmp", ".delete", ".dll", ".icns", ".ico", ".jpg", ".json", ".lock", ".md",
+    ".patch", ".pdf", ".png", ".wasm",
 }
 # A Debian package's compat file is a bare number, and its changelog format
 # has no comment syntax.

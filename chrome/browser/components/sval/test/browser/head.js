@@ -3341,3 +3341,39 @@ async function uncovered(win) {
     "the window's page can see it"
   );
 }
+
+/**
+ * @param {string} spec A chrome:, resource: or moz-src: address.
+ * @returns {boolean} whether the package holds a file at it. Opening a
+ *   missing one is no way to ask: under automation Gecko crashes on it
+ *   (`CheckForBrokenChromeURL`).
+ */
+function packaged(spec) {
+  let uri = Services.io.newURI(spec);
+  // An override maps a chrome: address to another one.
+  while (uri.schemeIs("chrome")) {
+    uri = Cc["@mozilla.org/chrome/chrome-registry;1"]
+      .getService(Ci.nsIChromeRegistry)
+      .convertChromeURL(uri);
+  }
+  if (uri.schemeIs("resource") || uri.schemeIs("moz-src")) {
+    uri = Services.io.newURI(
+      Services.io
+        .getProtocolHandler(uri.scheme)
+        .QueryInterface(Ci.nsISubstitutingProtocolHandler)
+        .resolveURI(uri)
+    );
+  }
+  if (uri instanceof Ci.nsIJARURI) {
+    const reader = Cc["@mozilla.org/libjar/zip-reader;1"].createInstance(
+      Ci.nsIZipReader
+    );
+    reader.open(uri.JARFile.QueryInterface(Ci.nsIFileURL).file);
+    try {
+      return reader.hasEntry(uri.JAREntry);
+    } finally {
+      reader.close();
+    }
+  }
+  return uri.QueryInterface(Ci.nsIFileURL).file.exists();
+}

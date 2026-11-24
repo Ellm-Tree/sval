@@ -1,0 +1,12 @@
+browser/actors/AboutPrivateBrowsingChild.sys.mjs
+browser/actors/AboutPrivateBrowsingParent.sys.mjs
+browser/components/privatebrowsing/content/assets/cookie-banners-begone.svg
+browser/components/privatebrowsing/content/assets/focus-logo.svg
+browser/components/privatebrowsing/content/assets/focus-promo.png
+browser/components/privatebrowsing/content/assets/focus-qr-code.svg
+browser/components/privatebrowsing/content/assets/klar-qr-code.svg
+browser/components/privatebrowsing/content/assets/moz-vpn.svg
+browser/components/privatebrowsing/content/assets/private-promo-asset.svg
+browser/components/privatebrowsing/content/assets/vpn-logo.svg
+browser/components/privatebrowsing/jar.mn
+browser/components/privatebrowsing/metrics.yaml

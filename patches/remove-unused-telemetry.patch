@@ -1,0 +1,1133 @@
+Sval: Remove telemetry-only components
+
+Sval sends no telemetry (CONTRIBUTING.md rule 4), and these components
+do nothing else. Search results page telemetry (its actor, which watched
+every https page, the categorization that downloads site-category lists,
+their Remote Settings dump and schemas), captcha detection (its actors
+on captcha hosts and the page counters it reads), content relevancy and
+its Suggest ranking mode, and Discovery (the add-on recommendation
+cookie) go whole, with their startup hooks, prefs, Nimbus features and
+tests. Glean metrics other components still declare stay for a
+telemetry sweep.
+
+diff --git a/browser/actors/moz.build b/browser/actors/moz.build
+index 2e0b31de0a..d353870987 100644
+--- a/browser/actors/moz.build
++++ b/browser/actors/moz.build
+@@ -71,8 +71,6 @@ with Files("RefreshBlocker*.sys.mjs"):
+ with Files("ScreenshotsComponentChild.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Screenshots")
+ 
+-with Files("SearchSERPTelemetry*.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Search")
+ 
+ with Files("SpeechDispatcher*.sys.mjs"):
+     BUG_COMPONENT = ("Core", "Web Speech")
+@@ -128,8 +126,6 @@ FINAL_TARGET_FILES.actors += [
+     "RefreshBlockerChild.sys.mjs",
+     "RefreshBlockerParent.sys.mjs",
+     "ScreenshotsComponentChild.sys.mjs",
+-    "SearchSERPTelemetryChild.sys.mjs",
+-    "SearchSERPTelemetryParent.sys.mjs",
+     "SpeechDispatcherChild.sys.mjs",
+     "SpeechDispatcherParent.sys.mjs",
+     "SwitchDocumentDirectionChild.sys.mjs",
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index becafbb353..24792aa3bc 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -543,7 +543,7 @@ pref("browser.urlbar.quicksuggest.contextualOptIn.impressionDaysLimit", 5);
+ pref("browser.urlbar.quicksuggest.enabled", false);
+ 
+ // Ranking mode of QuickSuggest. Currently used for relevance ranking
+-// experimentation. It can be any of "default", "interest", and "random".
++// experimentation. It can be either "default" or "random".
+ pref("browser.urlbar.quicksuggest.rankingMode", "default");
+ 
+ // Whether Firefox Suggest will use the new Rust backend instead of the original
+@@ -902,13 +902,6 @@ pref("browser.search.separatePrivateDefault.ui.enabled", false);
+ // The maximum amount of times the private default banner is shown.
+ pref("browser.search.separatePrivateDefault.ui.banner.max", 0);
+ 
+-// Enables search SERP telemetry page categorization.
+-pref("browser.search.serpEventTelemetryCategorization.enabled", true);
+-
+-// A count of Glean SERP categorization event metrics that have been recorded
+-// but not yet submitted in a ping. Needed to prevent sending a ping with only
+-// experiment info (and not actual SERP categorizations) at startup.
+-pref("browser.search.serpMetricsRecordedCounter", 0);
+ 
+ // Search Bar removal from the toolbar for users who haven’t used it in 120
+ // days
+@@ -2889,8 +2882,6 @@ pref("toolkit.coverage.endpoint.base", "https://coverage.mozilla.org");
+ 
+ // Discovery prefs
+ pref("browser.discovery.enabled", true);
+-pref("browser.discovery.containers.enabled", true);
+-pref("browser.discovery.sites", "addons.mozilla.org");
+ 
+ pref("browser.engagement.recent_visited_origins.expiry", 86400); // 24 * 60 * 60 (24 hours in seconds)
+ pref("browser.engagement.downloads-button.has-used", false);
+@@ -3506,13 +3497,6 @@ pref("startup.homepage_override_nimbus_minVersion", "");
+ // Pref to disable all What's New pages
+ pref("startup.homepage_override_nimbus_disable_wnp", false);
+ 
+-// Pref to enable the content relevancy feature.
+-pref("toolkit.contentRelevancy.enabled", false);
+-// Pref to enable the ingestion through the Rust component.
+-pref("toolkit.contentRelevancy.ingestEnabled", false);
+-// Pref to enable extra logging for the content relevancy feature
+-pref("toolkit.contentRelevancy.log", false);
+-
+ // The number of days after which to rotate the context ID. 0 means to disable
+ // rotation altogether.
+ pref("browser.contextual-services.contextId.rotation-in-days", 3);
+diff --git a/browser/base/content/test/performance/browser_startup_content.js b/browser/base/content/test/performance/browser_startup_content.js
+index 32395b8fbb..c46f6598d5 100644
+--- a/browser/base/content/test/performance/browser_startup_content.js
++++ b/browser/base/content/test/performance/browser_startup_content.js
+@@ -35,7 +35,6 @@ const known_scripts = {
+     "resource:///actors/AboutReaderChild.sys.mjs",
+     "resource:///actors/InteractionsChild.sys.mjs",
+     "resource:///actors/LinkHandlerChild.sys.mjs",
+-    "resource:///actors/SearchSERPTelemetryChild.sys.mjs",
+     "resource://gre/actors/ContentMetaChild.sys.mjs",
+     "resource://gre/modules/Readerable.sys.mjs",
+ 
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index ca12c7c987..56675023bf 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -105,7 +105,6 @@ category browser-first-window-ready moz-src:///toolkit/components/doh/DoHControl
+ category browser-first-window-ready moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs ProfilesDatastoreService.init
+ category browser-first-window-ready resource:///modules/profiles/SelectableProfileService.sys.mjs SelectableProfileService.init
+ category browser-first-window-ready moz-src:///browser/components/protections/ContentBlockingPrefs.sys.mjs ContentBlockingPrefs.init
+-category browser-first-window-ready resource://gre/modules/CaptchaDetectionPingUtils.sys.mjs CaptchaDetectionPingUtils.init
+ category browser-first-window-ready moz-src:///browser/components/ipprotection/IPProtectionHelpers.sys.mjs IPProtectionActivator.init
+ category browser-first-window-ready moz-src:///browser/components/customizableui/SearchWidgetTracker.sys.mjs SearchWidgetTracker.init
+ #ifdef MOZ_SANDBOX
+@@ -124,9 +123,7 @@ category browser-idle-startup resource://gre/modules/psm/RemoteSecuritySettings.
+ category browser-idle-startup moz-src:///browser/components/tabbrowser/TabUnloader.sys.mjs TabUnloader.init
+ category browser-idle-startup resource:///modules/GenAI.sys.mjs GenAI.init
+ category browser-idle-startup moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs QuickSuggest.init
+ category browser-idle-startup moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.init
+-category browser-idle-startup moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.init
+-category browser-idle-startup resource://gre/modules/ContentRelevancyManager.sys.mjs ContentRelevancyManager.init
+ category browser-idle-startup resource://gre/modules/ColorwayThemeMigration.sys.mjs ColorwayThemeMigration.maybeWarn
+ category browser-idle-startup resource://gre/modules/AppServicesTracing.sys.mjs RustLogForwarder.init
+ #ifdef MOZ_UPDATER
+@@ -153,8 +150,6 @@ category browser-quit-application-granted resource://gre/modules/NewTabUtils.sys
+ category browser-quit-application-granted resource://normandy/Normandy.sys.mjs Normandy.uninit
+ category browser-quit-application-granted resource://gre/modules/RFPHelper.sys.mjs RFPHelper.uninit
+ category browser-quit-application-granted resource:///modules/asrouter/ASRouterNewTabHook.sys.mjs ASRouterNewTabHook.destroy
+-category browser-quit-application-granted moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.uninit
+-category browser-quit-application-granted moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs SearchSERPTelemetry.uninit
+ #ifdef MOZ_UPDATER
+ category browser-quit-application-granted resource://gre/modules/UpdateListener.sys.mjs UpdateListener.reset
+ #endif
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 62794c63a1..90bb055f86 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -32,7 +32,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+     "moz-src:///browser/components/DefaultBrowserCheck.sys.mjs",
+   DesktopActorRegistry:
+     "moz-src:///browser/components/DesktopActorRegistry.sys.mjs",
+-  Discovery: "resource:///modules/Discovery.sys.mjs",
+   DistributionManagement: "resource:///modules/distribution.sys.mjs",
+   DownloadsViewableInternally:
+     "moz-src:///browser/components/downloads/DownloadsViewableInternally.sys.mjs",
+@@ -59,8 +58,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   ScreenshotsUtils:
+     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+-  SearchSERPTelemetry:
+-    "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs",
+   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
+   SessionWindowUI: "resource:///modules/sessionstore/SessionWindowUI.sys.mjs",
+   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
+@@ -925,7 +922,6 @@ BrowserGlue.prototype = {
+     this._windowsWereRestored = true;
+ 
+     lazy.BrowserUsageTelemetry.init();
+-    lazy.SearchSERPTelemetry.init();
+ 
+     lazy.Interactions.init();
+     lazy.PageDataService.init();
+@@ -1064,7 +1060,6 @@ BrowserGlue.prototype = {
+         name: "ContextualIdentityService.load",
+         task: async () => {
+           await lazy.ContextualIdentityService.load();
+-          lazy.Discovery.update();
+         },
+       },
+     ];
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 7fc7a50462..52ddaca661 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -755,24 +755,6 @@ let JSWINDOWACTORS = {
+     enablePreference: "screenshots.browser.component.enabled",
+   },
+ 
+-  SearchSERPTelemetry: {
+-    parent: {
+-      esModuleURI: "resource:///actors/SearchSERPTelemetryParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/SearchSERPTelemetryChild.sys.mjs",
+-      events: {
+-        DOMContentLoaded: {},
+-        pageshow: { mozSystemGroup: true },
+-        // The 'pagehide' event is only used to clean up state, and should not
+-        // force actor creation.
+-        pagehide: { createActor: false },
+-        load: { mozSystemGroup: true, capture: true },
+-      },
+-    },
+-    matches: ["https://*/*"],
+-  },
+-
+   ShieldFrame: {
+     parent: {
+       esModuleURI: "resource://normandy-content/ShieldFrameParent.sys.mjs",
+diff --git a/browser/components/search/BrowserSearchTelemetry.sys.mjs b/browser/components/search/BrowserSearchTelemetry.sys.mjs
+index 9c80f48acf..260e3c070c 100644
+--- a/browser/components/search/BrowserSearchTelemetry.sys.mjs
++++ b/browser/components/search/BrowserSearchTelemetry.sys.mjs
+@@ -9,8 +9,6 @@ const lazy = XPCOMUtils.declareLazy({
+     "moz-src:///toolkit/components/search/ConfigSearchEngine.sys.mjs",
+   ContextId: "moz-src:///browser/modules/ContextId.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+-  SearchSERPTelemetry:
+-    "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs",
+   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
+   UrlbarSearchUtils:
+     "moz-src:///browser/components/urlbar/UrlbarSearchUtils.sys.mjs",
+@@ -248,10 +246,10 @@ class BrowserSearchTelemetryHandler {
+           break;
+         case "about_home":
+         case "about_newtab":
+-          this.#recordSearch(browser, source, "enter");
++          this.#recordSearch(source, "enter");
+           break;
+         default:
+-          this.#recordSearch(browser, source);
++          this.#recordSearch(source);
+           break;
+       }
+       if (["urlbar_handoff", "about_home", "about_newtab"].includes(source)) {
+@@ -260,10 +258,6 @@ class BrowserSearchTelemetryHandler {
+           search_access_point: source,
+           telemetry_id: engine.telemetryId,
+         });
+-        lazy.SearchSERPTelemetry.recordBrowserNewtabSession(
+-          browser,
+-          details.newtabSessionId
+-        );
+       }
+     } catch (ex) {
+       // Catch any errors here, so that search actions are not broken if
+@@ -342,20 +336,16 @@ class BrowserSearchTelemetryHandler {
+       action = "alias";
+     }
+ 
+-    this.#recordSearch(browser, source, action);
++    this.#recordSearch(source, action);
+   }
+ 
+   /**
+-   * Records source information to the SERP telemetry, and records
+-   * the browser engagement navigation data.
++   * Records the browser engagement navigation data.
+    *
+-   * @param {MozBrowser} browser
+    * @param {keyof typeof BrowserSearchTelemetry.KNOWN_SEARCH_SOURCES} source
+    * @param {string} [action]
+    */
+-  #recordSearch(browser, source, action = null) {
+-    lazy.SearchSERPTelemetry.recordBrowserSource(browser, source);
+-
++  #recordSearch(source, action = null) {
+     let label = action ? "search_" + action : "search";
+     let name = source.replace(/_([a-z])/g, (m, p) => p.toUpperCase());
+     Glean.browserEngagementNavigation[name][label].add(1);
+diff --git a/browser/components/search/moz.build b/browser/components/search/moz.build
+index 0088d25ec5..d9991bd0f2 100644
+--- a/browser/components/search/moz.build
++++ b/browser/components/search/moz.build
+@@ -6,22 +6,17 @@ MOZ_SRC_FILES += [
+     "BrowserSearchTelemetry.sys.mjs",
+     "OpenSearchManager.sys.mjs",
+     "SearchOneOffs.sys.mjs",
+-    "SearchSERPTelemetry.sys.mjs",
+     "SearchUIUtils.sys.mjs",
+-    "SERPCategorization.sys.mjs",
+ ]
+ 
+ BROWSER_CHROME_MANIFESTS += [
+     "test/browser/browser.toml",
+-    "test/browser/telemetry/browser.toml",
+ ]
+ 
+ MARIONETTE_MANIFESTS += [
+     "test/marionette/manifest.toml",
+-    "test/marionette/telemetry/manifest.toml",
+ ]
+ 
+-XPCSHELL_TESTS_MANIFESTS += ["test/unit/xpcshell.toml"]
+ 
+ TESTING_JS_MODULES += [
+     "test/SearchUITestUtils.sys.mjs",
+diff --git a/browser/components/search/test/marionette/manifest.toml b/browser/components/search/test/marionette/manifest.toml
+index 89f1504efb..810113ada0 100644
+--- a/browser/components/search/test/marionette/manifest.toml
++++ b/browser/components/search/test/marionette/manifest.toml
+@@ -5,6 +5,5 @@ run-if = [
+ subsuite = "integration"
+ tags = "os_integration"
+ 
+-["include:telemetry/manifest.toml"]
+ 
+ ["test_engines_on_restart.py"]
+diff --git a/browser/components/urlbar/UrlbarProviderQuickSuggest.sys.mjs b/browser/components/urlbar/UrlbarProviderQuickSuggest.sys.mjs
+index a458e1c425..245aa58a3e 100644
+--- a/browser/components/urlbar/UrlbarProviderQuickSuggest.sys.mjs
++++ b/browser/components/urlbar/UrlbarProviderQuickSuggest.sys.mjs
+@@ -10,8 +10,6 @@ import {
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  ContentRelevancyManager:
+-    "resource://gre/modules/ContentRelevancyManager.sys.mjs",
+   QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
+   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
+   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+@@ -521,9 +519,6 @@ export class UrlbarProviderQuickSuggest extends UrlbarProvider {
+       case "random":
+         suggestion.score = Math.random();
+         break;
+-      case "interest":
+-        await this.#updateScoreByRelevance(suggestion);
+-        break;
+       case "default":
+       default:
+         // Do nothing.
+@@ -537,37 +532,6 @@ export class UrlbarProviderQuickSuggest extends UrlbarProvider {
+     });
+   }
+ 
+-  /**
+-   * Update score by interest-based relevance scoring. The final score is a mean
+-   * between the interest-based score and the default static score, which means
+-   * if the former is 0 or less than the latter, the combined score will be less
+-   * than the static score.
+-   *
+-   * @param {object} suggestion
+-   *   The suggestion to be ranked.
+-   */
+-  async #updateScoreByRelevance(suggestion) {
+-    if (!suggestion.categories?.length) {
+-      return;
+-    }
+-
+-    let score;
+-    try {
+-      score = await lazy.ContentRelevancyManager.score(suggestion.categories);
+-    } catch (error) {
+-      Glean.suggestRelevance.status.failure.add(1);
+-      this.logger.error("Error updating suggestion score", error);
+-      return;
+-    }
+-
+-    Glean.suggestRelevance.status.success.add(1);
+-    let oldScore = suggestion.score;
+-    suggestion.score = (oldScore + score) / 2;
+-    Glean.suggestRelevance.outcome[
+-      suggestion.score >= oldScore ? "boosted" : "decreased"
+-    ].add(1);
+-  }
+-
+   /**
+    * Returns whether a given result can be added for a query, assuming the
+    * provider itself should be active.
+diff --git a/browser/components/urlbar/tests/browser-telemetry/browser.toml b/browser/components/urlbar/tests/browser-telemetry/browser.toml
+index ddda21d00a..d4fff5c670 100644
+--- a/browser/components/urlbar/tests/browser-telemetry/browser.toml
++++ b/browser/components/urlbar/tests/browser-telemetry/browser.toml
+@@ -11,8 +11,6 @@ tags = "search-telemetry"
+ ["browser_extension.js"]
+ tags = "search-telemetry"
+ 
+-["browser_handoff.js"]
+-tags = "search-telemetry"
+ 
+ ["browser_heuristic.js"]
+ tags = "search-telemetry"
+diff --git a/browser/components/urlbar/tests/browser-telemetry/browser_persisted.js b/browser/components/urlbar/tests/browser-telemetry/browser_persisted.js
+index 7dafabc60a..6ee4f075d9 100644
+--- a/browser/components/urlbar/tests/browser-telemetry/browser_persisted.js
++++ b/browser/components/urlbar/tests/browser-telemetry/browser_persisted.js
+@@ -8,10 +8,6 @@
+ 
+ "use strict";
+ 
+-const { SearchSERPTelemetry } = ChromeUtils.importESModule(
+-  "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs"
+-);
+-
+ const SCALAR_URLBAR_PERSISTED =
+   "browser.engagement.navigation.urlbar_persisted";
+ 
+diff --git a/browser/components/urlbar/tests/browser-telemetry/browser_urlbar_telemetry.js b/browser/components/urlbar/tests/browser-telemetry/browser_urlbar_telemetry.js
+index 6145ab38ae..b89b9c2dd0 100644
+--- a/browser/components/urlbar/tests/browser-telemetry/browser_urlbar_telemetry.js
++++ b/browser/components/urlbar/tests/browser-telemetry/browser_urlbar_telemetry.js
+@@ -14,11 +14,6 @@ const SCALAR_SEARCHMODE = "browser.engagement.navigation.urlbar_searchmode";
+ // The preference to enable suggestions in the urlbar.
+ const SUGGEST_URLBAR_PREF = "browser.urlbar.suggest.searches";
+ 
+-ChromeUtils.defineESModuleGetters(this, {
+-  SearchSERPTelemetry:
+-    "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs",
+-});
+-
+ function searchInAwesomebar(value, win = window) {
+   return UrlbarTestUtils.promiseAutocompleteResultPopup({
+     window: win,
+@@ -414,199 +409,3 @@ add_task(async function test_formHistory_click() {
+     await SpecialPowers.popPrefEnv();
+   });
+ });
+-
+-add_task(async function test_privateWindow() {
+-  // This test assumes the showSearchTerms feature is not enabled,
+-  // as multiple searches are made one after another, relying on
+-  // urlbar as the keyed scalar SAP, not urlbar_persisted.
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.urlbar.showSearchTerms.featureGate", false]],
+-  });
+-
+-  // Override the search telemetry search provider info to
+-  // count in-content SAP telemetry for our test engine.
+-  SearchSERPTelemetry.overrideSearchTelemetryForTests([
+-    {
+-      telemetryId: "example",
+-      searchPageRegexp: "^https://example\\.com/",
+-      queryParamNames: ["q"],
+-    },
+-  ]);
+-
+-  clearSAPTelemetry();
+-
+-  // First, do a bunch of searches in a private window.
+-  let win = await BrowserTestUtils.openNewBrowserWindow({ private: true });
+-
+-  info("Search in a private window and the pref does not exist");
+-  let p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 1,
+-  });
+-  let scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    1
+-  );
+-
+-  info("Search again in a private window after setting the pref to true");
+-  Services.prefs.setBoolPref("browser.engagement.search_counts.pbm", true);
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("another query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  // SAP counts should not be incremented.
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 1,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    1
+-  );
+-
+-  info("Search again in a private window after setting the pref to false");
+-  Services.prefs.setBoolPref("browser.engagement.search_counts.pbm", false);
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("another query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 2,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    2
+-  );
+-
+-  info("Search again in a private window after clearing the pref");
+-  Services.prefs.clearUserPref("browser.engagement.search_counts.pbm");
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("another query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 3,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    3
+-  );
+-
+-  await BrowserTestUtils.closeWindow(win);
+-
+-  // Now, do a bunch of searches in a non-private window.  Telemetry should
+-  // always be recorded regardless of the pref's value.
+-  win = await BrowserTestUtils.openNewBrowserWindow();
+-
+-  info("Search in a non-private window and the pref does not exist");
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 4,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    4
+-  );
+-
+-  info("Search again in a non-private window after setting the pref to true");
+-  Services.prefs.setBoolPref("browser.engagement.search_counts.pbm", true);
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("another query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 5,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    5
+-  );
+-
+-  info("Search again in a non-private window after setting the pref to false");
+-  Services.prefs.setBoolPref("browser.engagement.search_counts.pbm", false);
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("another query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 6,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    6
+-  );
+-
+-  info("Search again in a non-private window after clearing the pref");
+-  Services.prefs.clearUserPref("browser.engagement.search_counts.pbm");
+-  p = BrowserTestUtils.browserLoaded(win.gBrowser.selectedBrowser);
+-  await searchInAwesomebar("another query", win);
+-  EventUtils.synthesizeKey("KEY_Enter", undefined, win);
+-  await p;
+-
+-  await SearchUITestUtils.assertSAPTelemetry({
+-    engineName: "MozSearch",
+-    source: "urlbar",
+-    count: 7,
+-  });
+-  scalars = TelemetryTestUtils.getProcessScalars("parent", true);
+-  TelemetryTestUtils.assertKeyedScalar(
+-    scalars,
+-    "browser.search.content.urlbar",
+-    "example:organic:none",
+-    7
+-  );
+-
+-  await BrowserTestUtils.closeWindow(win);
+-
+-  // Reset the search provider info.
+-  SearchSERPTelemetry.overrideSearchTelemetryForTests();
+-  await UrlbarTestUtils.formHistory.clear();
+-  await SpecialPowers.popPrefEnv();
+-});
+diff --git a/browser/components/urlbar/tests/quicksuggest/unit/test_quicksuggest_relevanceRanking.js b/browser/components/urlbar/tests/quicksuggest/unit/test_quicksuggest_relevanceRanking.js
+index c003301657..d0a374f78f 100644
+--- a/browser/components/urlbar/tests/quicksuggest/unit/test_quicksuggest_relevanceRanking.js
++++ b/browser/components/urlbar/tests/quicksuggest/unit/test_quicksuggest_relevanceRanking.js
+@@ -6,16 +6,6 @@
+ 
+ "use strict";
+ 
+-const lazy = {};
+-
+-ChromeUtils.defineESModuleGetters(lazy, {
+-  ContentRelevancyManager:
+-    "resource://gre/modules/ContentRelevancyManager.sys.mjs",
+-  InterestVector:
+-    "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustRelevancy.sys.mjs",
+-});
+-
+-const PREF_CONTENT_RELEVANCY_ENABLED = "toolkit.contentRelevancy.enabled";
+ const PREF_RANKING_MODE = "browser.urlbar.quicksuggest.rankingMode";
+ 
+ function makeTestSuggestions() {
+@@ -33,16 +23,6 @@ function makeTestSuggestions() {
+   ];
+ }
+ 
+-function makeTestSuggestionsWithInvalidCategories() {
+-  return [
+-    {
+-      title: "suggestion",
+-      categories: [-1], // "Education"
+-      score: 0.2,
+-    },
+-  ];
+-}
+-
+ const MERINO_SUGGESTIONS = [
+   {
+     provider: "adm",
+@@ -81,13 +61,6 @@ const EXPECTED_AMP_RESULT = QuickSuggestTestUtils.ampResult({
+   requestId: "request_id",
+   suggestedIndex: -1,
+ });
+-const EXPECTED_WIKIPEDIA_RESULT = QuickSuggestTestUtils.wikipediaResult({
+-  source: "merino",
+-  provider: "wikipedia",
+-  telemetryType: "wikipedia",
+-});
+-
+-let gSandbox;
+ 
+ add_setup(async () => {
+   // FOG needs a profile directory to put its data in.
+@@ -107,67 +80,6 @@ add_setup(async () => {
+       ["quicksuggest.ampTopPickCharThreshold", 0],
+     ],
+   });
+-  gSandbox = sinon.createSandbox();
+-
+-  const fakeStore = {
+-    close: gSandbox.fake(),
+-    userInterestVector: gSandbox.stub(),
+-  };
+-  const rustRelevancyStore = {
+-    init: gSandbox.fake.returns(fakeStore),
+-  };
+-  fakeStore.userInterestVector.resolves(
+-    new lazy.InterestVector({
+-      animals: 0,
+-      arts: 0,
+-      autos: 0,
+-      business: 0,
+-      career: 0,
+-      education: 50,
+-      fashion: 0,
+-      finance: 0,
+-      food: 0,
+-      government: 0,
+-      hobbies: 0,
+-      home: 0,
+-      news: 0,
+-      realEstate: 0,
+-      society: 0,
+-      sports: 0,
+-      tech: 0,
+-      travel: 0,
+-      inconclusive: 0,
+-    })
+-  );
+-
+-  Services.prefs.setBoolPref(PREF_CONTENT_RELEVANCY_ENABLED, true);
+-  lazy.ContentRelevancyManager.init(rustRelevancyStore);
+-
+-  registerCleanupFunction(() => {
+-    lazy.ContentRelevancyManager.uninit();
+-    Services.prefs.clearUserPref(PREF_CONTENT_RELEVANCY_ENABLED);
+-    gSandbox.restore();
+-  });
+-});
+-
+-add_task(async function test_interest_mode() {
+-  Services.prefs.setStringPref(PREF_RANKING_MODE, "interest");
+-
+-  const suggestions = makeTestSuggestions();
+-  await applyRanking(suggestions);
+-
+-  Assert.greater(
+-    suggestions[0].score,
+-    0.2,
+-    "The score should be boosted for relevant suggestions"
+-  );
+-  Assert.less(
+-    suggestions[1].score,
+-    0.2,
+-    "The score should be lowered for irrelevant suggestion"
+-  );
+-
+-  Services.prefs.clearUserPref(PREF_RANKING_MODE);
+ });
+ 
+ add_task(async function test_default_mode() {
+@@ -233,79 +145,6 @@ add_task(async function test_default_mode_end2end() {
+   Services.prefs.clearUserPref(PREF_RANKING_MODE);
+ });
+ 
+-add_task(async function test_interest_mode_end2end() {
+-  Services.prefs.setStringPref(PREF_RANKING_MODE, "interest");
+-
+-  let context = createContext(SEARCH_STRING, {
+-    providers: [UrlbarProviderQuickSuggest.name],
+-    isPrivate: false,
+-  });
+-
+-  await check_results({
+-    context,
+-    matches: [EXPECTED_WIKIPEDIA_RESULT],
+-  });
+-
+-  Services.prefs.clearUserPref(PREF_RANKING_MODE);
+-});
+-
+-add_task(async function test_telemetry_interest_mode() {
+-  Services.prefs.setStringPref(PREF_RANKING_MODE, "interest");
+-
+-  Services.fog.testResetFOG();
+-
+-  Assert.equal(null, Glean.suggestRelevance.status.success.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.status.failure.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.outcome.boosted.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.outcome.decreased.testGetValue());
+-
+-  const suggestions = makeTestSuggestions();
+-  await applyRanking(suggestions);
+-
+-  // The scoring should succeed for both suggestions with one boosted score
+-  // and one decreased score.
+-  Assert.equal(2, Glean.suggestRelevance.status.success.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.status.failure.testGetValue());
+-  Assert.equal(1, Glean.suggestRelevance.outcome.boosted.testGetValue());
+-  Assert.equal(1, Glean.suggestRelevance.outcome.decreased.testGetValue());
+-
+-  Services.prefs.clearUserPref(PREF_RANKING_MODE);
+-});
+-
+-add_task(async function test_telemetry_interest_mode_with_failures() {
+-  Services.prefs.setStringPref(PREF_RANKING_MODE, "interest");
+-
+-  Services.fog.testResetFOG();
+-
+-  Assert.equal(null, Glean.suggestRelevance.status.success.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.status.failure.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.outcome.boosted.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.outcome.decreased.testGetValue());
+-
+-  const suggestions = makeTestSuggestionsWithInvalidCategories();
+-  await applyRanking(suggestions);
+-
+-  // The scoring should fail.
+-  Assert.equal(null, Glean.suggestRelevance.status.success.testGetValue());
+-  Assert.equal(1, Glean.suggestRelevance.status.failure.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.outcome.boosted.testGetValue());
+-  Assert.equal(null, Glean.suggestRelevance.outcome.decreased.testGetValue());
+-
+-  Services.prefs.clearUserPref(PREF_RANKING_MODE);
+-});
+-
+-add_task(async function offline_interest_mode_end2end() {
+-  // Interest mode should return the suggestion whose category has the largest
+-  // interest vector value: the Education suggestion.
+-  await doOfflineTest({
+-    mode: "interest",
+-    expectedResultArgs: {
+-      url: "https://example.com/6-education",
+-      title: "Suggestion with category 6 (Education)",
+-    },
+-  });
+-});
+-
+ add_task(async function offline_default_mode_end2end() {
+   // Default mode should return the first suggestion with the highest score,
+   // which is just the first suggestion returned by the backend since they all
+diff --git a/browser/modules/BrowserUsageTelemetry.sys.mjs b/browser/modules/BrowserUsageTelemetry.sys.mjs
+index 3fd122a4f7..f102d80d43 100644
+--- a/browser/modules/BrowserUsageTelemetry.sys.mjs
++++ b/browser/modules/BrowserUsageTelemetry.sys.mjs
+@@ -15,10 +15,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   PageActions: "resource:///modules/PageActions.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+-  SearchSERPTelemetry:
+-    "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs",
+-  SearchSERPTelemetryUtils:
+-    "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs",
+   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
+   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
+   WindowsInstallsInfo:
+@@ -339,17 +335,6 @@ export let URICountListener = {
+   },
+ 
+   onLocationChange(browser, webProgress, request, uri, flags) {
+-    if (
+-      !(flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT) &&
+-      webProgress.isTopLevel
+-    ) {
+-      // By default, assume we no longer need to track this tab.
+-      lazy.SearchSERPTelemetry.stopTrackingBrowser(
+-        browser,
+-        lazy.SearchSERPTelemetryUtils.ABANDONMENTS.NAVIGATION
+-      );
+-    }
+-
+     // Don't count this URI if it's an error page.
+     if (flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE) {
+       return;
+@@ -418,17 +403,6 @@ export let URICountListener = {
+       return;
+     }
+ 
+-    if (!(flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT)) {
+-      lazy.SearchSERPTelemetry.updateTrackingStatus(browser, uri, webProgress);
+-    } else {
+-      lazy.SearchSERPTelemetry.updateTrackingSinglePageApp(
+-        browser,
+-        uriSpec,
+-        webProgress,
+-        flags
+-      );
+-    }
+-
+     // Update total URI count, including when in private mode.
+     Glean.browserEngagement.uriCount.add(1);
+ 
+diff --git a/browser/modules/moz.build b/browser/modules/moz.build
+index 53ee3e3cda..6af8dd39fd 100644
+--- a/browser/modules/moz.build
++++ b/browser/modules/moz.build
+@@ -115,7 +115,6 @@ EXTRA_JS_MODULES += [
+     "BrowserWindowTracker.sys.mjs",
+     "ContentCrashHandlers.sys.mjs",
+     "Dedupe.sys.mjs",
+-    "Discovery.sys.mjs",
+     "EveryWindow.sys.mjs",
+     "ExtensionsUI.sys.mjs",
+     "FaviconLoader.sys.mjs",
+diff --git a/browser/modules/test/unit/xpcshell.toml b/browser/modules/test/unit/xpcshell.toml
+index 820abbb835..a54203dd3a 100644
+--- a/browser/modules/test/unit/xpcshell.toml
++++ b/browser/modules/test/unit/xpcshell.toml
+@@ -67,5 +67,3 @@ firefox-appdir = "browser"
+ ["test_UpdatePolicySettings.js"]
+ head =  "../../../../toolkit/components/enterprisepolicies/tests/xpcshell/head.js"
+ firefox-appdir = "browser"
+-
+-["test_discovery.js"]
+diff --git a/dom/ipc/WindowGlobalParent.cpp b/dom/ipc/WindowGlobalParent.cpp
+index 99be1963e3..3d1848d517 100644
+--- a/dom/ipc/WindowGlobalParent.cpp
++++ b/dom/ipc/WindowGlobalParent.cpp
+@@ -54,7 +54,6 @@
+ #include "mozilla/dom/WindowGlobalChild.h"
+ #include "mozilla/dom/ipc/IdType.h"
+ #include "mozilla/dom/ipc/StructuredCloneData.h"
+-#include "mozilla/glean/CaptchadetectionMetrics.h"
+ #include "mozilla/glean/DomMediaMetrics.h"
+ #include "mozilla/glean/DomSecurityMetrics.h"
+ #include "mozilla/glean/DomUseCounterMetrics.h"
+@@ -1403,13 +1402,6 @@ WindowGlobalParent::FinishAccumulatingPageUseCounters() {
+     }
+ 
+     glean::use_counter::top_level_content_documents_destroyed.Add();
+-    if (CanonicalBrowsingContext* bc = BrowsingContext()) {
+-      if (bc->UsePrivateBrowsing()) {
+-        glean::captcha_detection::pages_visited_pbm.Add();
+-      } else {
+-        glean::captcha_detection::pages_visited.Add();
+-      }
+-    }
+ 
+     bool any = false;
+     for (const UseCounter uc : MakeEnumeratedRange(eUseCounter_Count)) {
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 91dccdb257..c058152656 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -402,7 +402,6 @@ export default [
+       "toolkit/components/certviewer/**",
+       "toolkit/components/cleardata/**",
+       "toolkit/components/contentprefs/ContentPrefService*.sys.mjs",
+-      "toolkit/components/contentrelevancy/ContentRelevancyManager.sys.mjs",
+       "toolkit/components/cookiebanners/**",
+       "toolkit/components/crashes/**",
+       "toolkit/components/crashmonitor/CrashMonitor.sys.mjs",
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index f0f3449b57..f72ce493a1 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -4111,9 +4111,6 @@ pref("privacy.query_stripping.strip_on_share.enableTestMode", false);
+   pref("toolkit.backgroundtasks.tests.geckoPrefsOverriden", 18);
+ #endif
+ 
+-// Captcha Detection
+-pref("captchadetection.loglevel", "Warn");
+-pref("captchadetection.actor.enabled", true);
+ 
+ // Make general.smoothScroll sticky to avoid being clobbered by
+ // preferes-reduced-motion system setting.
+diff --git a/services/settings/dumps/main/moz.build b/services/settings/dumps/main/moz.build
+index 2c83ffc787..5aa96f253c 100644
+--- a/services/settings/dumps/main/moz.build
++++ b/services/settings/dumps/main/moz.build
+@@ -8,7 +8,6 @@ if CONFIG["MOZ_BUILD_APP"] == "browser":
+         "ai-window-prompts.json",
+         "language-dictionaries.json",
+         "newtab-wallpapers-v2.json",
+-        "search-telemetry-v2.json",
+         "sites-classification.json",
+         "top-sites.json",
+         "urlbar-persisted-search-terms.json"
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 76d80f7329..86ea35e70d 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -83,7 +83,6 @@ module.exports = [
+       "browser/components/screenshots/overlay/overlay.css",
+       "browser/components/screenshots/screenshots-buttons.css",
+       "browser/components/screenshots/screenshots-preview.css",
+-      "browser/components/search/test/browser/telemetry/serp.css",
+       "browser/components/sidebar/sidebar-customize.css",
+       "browser/components/sidebar/sidebar-main.css",
+       "browser/components/sidebar/sidebar-panel-header.css",
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index a73d5f6dba..b6a7bc4a88 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -72,7 +72,6 @@ gecko_metrics = [
+     "toolkit/components/antitracking/bouncetrackingprotection/metrics.yaml",
+     "toolkit/components/antitracking/metrics.yaml",
+     "toolkit/components/backgroundhangmonitor/metrics.yaml",
+-    "toolkit/components/captchadetection/metrics.yaml",
+     "toolkit/components/cleardata/metrics.yaml",
+     "toolkit/components/cookiebanners/metrics.yaml",
+     "toolkit/components/doh/metrics.yaml",
+@@ -149,7 +148,6 @@ firefox_desktop_metrics = [
+     "dom/media/platforms/wmf/metrics.yaml",
+     "services/fxaccounts/metrics.yaml",
+     "toolkit/components/contentanalysis/metrics.yaml",
+-    "toolkit/components/contentrelevancy/metrics.yaml",
+     "toolkit/components/crashes/metrics.yaml",
+     "toolkit/components/nimbus/metrics.yaml",
+     "toolkit/components/pictureinpicture/metrics.yaml",
+@@ -208,7 +206,6 @@ gecko_pings = [
+     "netwerk/pings.yaml",
+     "toolkit/components/antitracking/bouncetrackingprotection/pings.yaml",
+     "toolkit/components/backgroundhangmonitor/pings.yaml",
+-    "toolkit/components/captchadetection/pings.yaml",
+     "toolkit/components/gecko-trace/pings.yaml",
+     "toolkit/components/glean/pings.yaml",
+     "toolkit/components/resistfingerprinting/pings.yaml",
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index d39f3c137f..8fdef6f5fb 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -22,7 +22,6 @@ DIRS += [
+     "backgroundhangmonitor",
+     "bitsdownload",
+     "browser",
+-    "captchadetection",
+     "cascade_bloom_filter",
+     "certviewer",
+     "cleardata",
+@@ -33,7 +32,6 @@ DIRS += [
+     "content-classifier/content_classifier_engine",
+     "contentanalysis",
+     "contentprefs",
+-    "contentrelevancy",
+     "contextualidentity",
+     "crashes",
+     "crashmonitor",
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 7932a5f0d3..8709384bcd 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -503,14 +503,12 @@ urlbar:
+       description: >-
+         Specify the ranking mode for QuickSuggest.
+           - "default": ranking by static scores specified by individual providers.
+-          - "interest": ranking by relevance scores provided by `ContentRelevancyManager`.
+           - "random": ranking by randomly selecting a winner out of candidates.
+         Note that this ranking mode can still be overridden by `quickSuggestScoreMap`.
+         If the ranking mode is unspecified or set to any unknown values, it will default
+         to the static score based ranking.
+       enum:
+         - default
+-        - interest
+         - random
+     quickSuggestScoreMap:
+       type: json
+@@ -4885,36 +4883,6 @@ httpsFirst:
+         branch: default
+         pref: dom.security.https_only_fire_http_request_background_timer_ms
+ 
+-contentRelevancy:
+-  description: >-
+-    A feature for interest-based content relevance ranking and personalization
+-    for Firefox.
+-  owner: disco-team@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      description: Enable this feature
+-      type: boolean
+-      fallbackPref: toolkit.contentRelevancy.enabled
+-    maxInputUrls:
+-      description: The maximum number of input URLs for interest classification
+-      type: int
+-    minInputUrls:
+-      description: The minimal number of input URLs for interest classification
+-      type: int
+-    timerInterval:
+-      description: >-
+-        The interval (in seconds) of the background update timer for the content
+-        relevancy manager
+-      type: int
+-      setPref:
+-        branch: user
+-        pref: toolkit.contentRelevancy.timerInterval
+-    ingestEnabled:
+-      description: Enable the ingestion through the Rust component
+-      type: boolean
+-      fallbackPref: toolkit.contentRelevancy.ingestEnabled
+-
+ backupService:
+   description: Prefs to control the profile backup service
+   owner: mconley@mozilla.com
+diff --git a/toolkit/components/telemetry/metrics.yaml b/toolkit/components/telemetry/metrics.yaml
+index 56fe135882..a0251eb040 100644
+--- a/toolkit/components/telemetry/metrics.yaml
++++ b/toolkit/components/telemetry/metrics.yaml
+@@ -51,7 +51,6 @@ legacy.telemetry:
+       - 'nimbus-targeting-context'
+       - 'third-party-modules'
+       - 'temp-fog-initial-state'
+-      - 'captcha-detection'
+       - 'health'
+       - 'addons'
+       - 'new-profile'
+diff --git a/toolkit/modules/ActorManagerParent.sys.mjs b/toolkit/modules/ActorManagerParent.sys.mjs
+index b1df666980..0360bdebdd 100644
+--- a/toolkit/modules/ActorManagerParent.sys.mjs
++++ b/toolkit/modules/ActorManagerParent.sys.mjs
+@@ -248,54 +248,6 @@ let JSWINDOWACTORS = {
+     allFrames: true,
+   },
+ 
+-  CaptchaDetection: {
+-    parent: {
+-      esModuleURI: "resource://gre/actors/CaptchaDetectionParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://gre/actors/CaptchaDetectionChild.sys.mjs",
+-      events: {
+-        DOMContentLoaded: { capture: true },
+-        pageshow: {},
+-        pagehide: {},
+-      },
+-    },
+-    matches: [
+-      // Google reCAPTCHA v2
+-      "https://www.google.com/recaptcha/api2/*",
+-      "https://www.google.com/recaptcha/enterprise/*",
+-      // CF Turnstile
+-      "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/*",
+-      // DataDome Captcha
+-      "https://geo.captcha-delivery.com/captcha/*",
+-      // hCaptcha
+-      "https://newassets.hcaptcha.com/captcha/v1/*",
+-      // Arkose Labs Captcha
+-      "https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/*",
+-      // Mochitest
+-      ...(Cu.isInAutomation
+-        ? [
+-            "https://example.com/tests/toolkit/components/captchadetection/tests/mochitest/*",
+-            "https://example.org/tests/toolkit/components/captchadetection/tests/mochitest/*",
+-          ]
+-        : []),
+-    ],
+-    messageManagerGroups: ["browsers"],
+-    allFrames: true,
+-    enablePreference: "captchadetection.actor.enabled",
+-  },
+-
+-  CaptchaDetectionCommunication: {
+-    parent: {
+-      esModuleURI: "resource://gre/actors/CaptchaDetectionParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI:
+-        "resource://gre/actors/CaptchaDetectionCommunicationChild.sys.mjs",
+-    },
+-    allFrames: true,
+-  },
+-
+   CookieBanner: {
+     parent: {
+       esModuleURI: "resource://gre/actors/CookieBannerParent.sys.mjs",
+diff --git a/tools/lint/codespell.yml b/tools/lint/codespell.yml
+index caeb7e4906..df1014ea0e 100644
+--- a/tools/lint/codespell.yml
++++ b/tools/lint/codespell.yml
+@@ -7,7 +7,6 @@ codespell:
+         - browser/components/asrouter/docs/
+         - browser/components/places/docs/
+         - browser/components/search/docs/
+-        - browser/components/search/schema/
+         - browser/components/touchbar/docs/
+         - browser/components/urlbar/docs/
+         - browser/extensions/newtab/docs/

@@ -1,0 +1,437 @@
+Sval: Remove the private session reset button
+
+The private window's Clear Private Session button and its confirmation
+panel go, with their startup hook, toolbar placement and migration,
+prefs, strings and styles. Firefox's about:privatebrowsing page goes
+too: Sval's jar.mn overrides the page's URL with its own, so its markup,
+script and style never load. The page's tests go with it. The component
+keeps its private-browsing tests, which cover kept behaviour.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index a097b022da..2ccb641462 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -3427,13 +3427,6 @@ pref("cookiebanners.ui.desktop.showCallout", false);
+   pref("browser.swipe.navigation-icon-max-radius", 20);
+ #endif
+ 
+-// Reset Private Browsing Session feature a.k.a "Fire Button"
+-pref("browser.privatebrowsing.resetPBM.enabled", true);
+-
+-// Whether the reset private browsing panel should ask for confirmation before
+-// performing the clear action.
+-pref("browser.privatebrowsing.resetPBM.showConfirmationDialog", true);
+-
+ // the preferences related to the Nimbus experiment, to activate and deactivate
+ // the the entire rollout (see: bug 1864216 - two prompts, 1877500 - set two in one prompt)
+ pref("browser.mailto.dualPrompt", false);
+diff --git a/browser/base/content/appmenu-viewcache.inc.xhtml b/browser/base/content/appmenu-viewcache.inc.xhtml
+index 4cb915dad4..d3b20e22ff 100644
+--- a/browser/base/content/appmenu-viewcache.inc.xhtml
++++ b/browser/base/content/appmenu-viewcache.inc.xhtml
+@@ -827,29 +827,6 @@
+     </vbox>
+   </panelview>
+ 
+-  <panelview id="reset-pbm-panel" class="PanelUI-subView" role="document">
+-    <vbox id="reset-pbm-panel-container" role="alertdialog" aria-labelledby="reset-pbm-panel-header">
+-      <hbox id="reset-pbm-panel-header">
+-        <description data-l10n-id="reset-pbm-panel-heading2" role="heading" aria-level="2"/>
+-      </hbox>
+-
+-      <description id="reset-pbm-panel-description" data-l10n-id="reset-pbm-panel-description2"/>
+-      <checkbox id="reset-pbm-panel-checkbox" data-l10n-id="reset-pbm-panel-always-ask-checkbox"/>
+-
+-      <html:moz-button-group id="reset-pbm-panel-footer" class="panel-footer">
+-        <button id="reset-pbm-panel-cancel-button"
+-                class="footer-button"
+-                data-l10n-id="reset-pbm-panel-cancel-button"
+-                ></button>
+-        <button slot="primary"
+-                id="reset-pbm-panel-confirm-button"
+-                class="footer-button"
+-                data-l10n-id="reset-pbm-panel-confirm-button2"
+-                ></button>
+-      </html:moz-button-group>
+-    </vbox>
+-  </panelview>
+-
+   <panelview id="content-analysis-panel" class="PanelUI-subView" role="document" mainview-with-header="true">
+     <vbox id="content-analysis-panel-container" role="alertdialog" aria-labelledby="content-analysis-header">
+       <hbox class="panel-header">
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index b28383e2b2..193fcfab60 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -76,8 +76,6 @@ ChromeUtils.defineESModuleGetters(this, {
+     "moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs",
+   PromptUtils: "resource://gre/modules/PromptUtils.sys.mjs",
+   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
+-  ResetPBMPanel:
+-    "moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs",
+   SafeBrowsing: "resource://gre/modules/SafeBrowsing.sys.mjs",
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+   ScreenshotsUtils:
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index c0890c891f..c793da11eb 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -119,7 +119,6 @@
+   "ProcessHangMonitor",
+   "PromptUtils",
+   "ReaderMode",
+-  "ResetPBMPanel",
+   "SafeBrowsing",
+   "Sanitizer",
+   "ScreenshotsUtils",
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 22c32d4d62..8d04617503 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -17,7 +17,6 @@ category browser-before-ui-startup resource:///modules/BuiltInThemes.sys.mjs Bui
+ #ifdef MOZ_NORMANDY
+ category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init
+ #endif
+-category browser-before-ui-startup moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs ResetPBMPanel.init
+ category browser-before-ui-startup resource:///modules/AboutHomeStartupCache.sys.mjs AboutHomeStartupCache.init
+ category browser-before-ui-startup resource:///modules/AccountsGlue.sys.mjs AccountsGlue.init
+ category browser-before-ui-startup moz-src:///browser/modules/ObserverForwarder.sys.mjs ObserverForwarder.init
+diff --git a/browser/components/customizableui/CustomizableUI.sys.mjs b/browser/components/customizableui/CustomizableUI.sys.mjs
+index fbd5c12b85..12f67faebf 100644
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -204,13 +204,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   }
+ );
+ 
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "resetPBMToolbarButtonEnabled",
+-  "browser.privatebrowsing.resetPBM.enabled",
+-  false
+-);
+-
+ XPCOMUtils.defineLazyPreferenceGetter(
+   lazy,
+   "sidebarRevampEnabled",
+@@ -345,7 +338,6 @@ var CustomizableUIInternal = {
+       "downloads-button",
+       AppConstants.MOZ_DEV_EDITION ? "developer-button" : null,
+       "fxa-toolbar-menu-button",
+-      lazy.resetPBMToolbarButtonEnabled ? "reset-pbm-toolbar-button" : null,
+     ].filter(name => name);
+ 
+     this.registerArea(
+@@ -817,18 +809,6 @@ var CustomizableUIInternal = {
+         navbarPlacements.splice(buttonIndex, 1);
+       }
+     }
+-
+-    // Add the PBM reset button as the right most button item
+-    if (currentVersion < 24) {
+-      let navbarPlacements = gSavedState.placements[CustomizableUI.AREA_NAVBAR];
+-      // Place the button as the first item to the left of the hamburger menu
+-      if (
+-        navbarPlacements &&
+-        !navbarPlacements.includes("reset-pbm-toolbar-button")
+-      ) {
+-        navbarPlacements.push("reset-pbm-toolbar-button");
+-      }
+-    }
+   },
+ 
+   /**
+diff --git a/browser/components/customizableui/test/browser_1042100_default_placements_update.js b/browser/components/customizableui/test/browser_1042100_default_placements_update.js
+index 190287eae6..853c89ed7c 100644
+--- a/browser/components/customizableui/test/browser_1042100_default_placements_update.js
++++ b/browser/components/customizableui/test/browser_1042100_default_placements_update.js
+@@ -152,7 +152,6 @@ function test() {
+         "urlbar-container",
+         "downloads-button",
+         "fxa-toolbar-menu-button",
+-        "reset-pbm-toolbar-button",
+       ],
+       "Nav-bar placements should be correct."
+     );
+@@ -179,11 +178,7 @@ function test() {
+   CustomizableUIInternal.updateForNewVersion();
+   Assert.deepEqual(
+     getSavedStatePlacements("nav-bar"),
+-    oldNavbarPlacements.concat([
+-      "downloads-button",
+-      "fxa-toolbar-menu-button",
+-      "reset-pbm-toolbar-button",
+-    ]),
++    oldNavbarPlacements.concat(["downloads-button", "fxa-toolbar-menu-button"]),
+     "Downloads button inserted in navbar"
+   );
+   Assert.deepEqual(
+@@ -201,11 +196,7 @@ function test() {
+   CustomizableUIInternal.updateForNewVersion();
+   Assert.deepEqual(
+     getSavedStatePlacements("nav-bar"),
+-    oldNavbarPlacements.concat([
+-      "downloads-button",
+-      "fxa-toolbar-menu-button",
+-      "reset-pbm-toolbar-button",
+-    ]),
++    oldNavbarPlacements.concat(["downloads-button", "fxa-toolbar-menu-button"]),
+     "Downloads button reinserted in navbar"
+   );
+ 
+@@ -231,7 +222,6 @@ function test() {
+     "downloads-button",
+     "other-widget",
+     "fxa-toolbar-menu-button",
+-    "reset-pbm-toolbar-button",
+   ];
+   Assert.deepEqual(
+     getSavedStatePlacements("nav-bar"),
+@@ -239,74 +229,6 @@ function test() {
+     "Downloads button inserted in navbar before other widgets"
+   );
+ 
+-  // Test re-running the reset PBM button migration (version 24).
+-  // Users who were on versions 20-23 may not have gotten the button because
+-  // the feature was previously limited to certain channels. The migration was
+-  // re-run at version 24 to ensure all users get it.
+-
+-  // Case 1: User at version 23 without the button - it should be added.
+-  CustomizableUI.setTestOnlyInternalProp("gSavedState", {
+-    currentVersion: 23,
+-    placements: {
+-      "nav-bar": [
+-        "back-button",
+-        "forward-button",
+-        "stop-reload-button",
+-        "vertical-spacer",
+-        "urlbar-container",
+-        "downloads-button",
+-        "fxa-toolbar-menu-button",
+-      ],
+-    },
+-  });
+-  CustomizableUIInternal.updateForNewVersion();
+-  Assert.deepEqual(
+-    getSavedStatePlacements("nav-bar"),
+-    [
+-      "back-button",
+-      "forward-button",
+-      "stop-reload-button",
+-      "vertical-spacer",
+-      "urlbar-container",
+-      "downloads-button",
+-      "fxa-toolbar-menu-button",
+-      "reset-pbm-toolbar-button",
+-    ],
+-    "Reset PBM button should be added for users upgrading from version 23"
+-  );
+-
+-  // Case 2: User at version 23 who already has the button - no duplicate.
+-  CustomizableUI.setTestOnlyInternalProp("gSavedState", {
+-    currentVersion: 23,
+-    placements: {
+-      "nav-bar": [
+-        "back-button",
+-        "forward-button",
+-        "stop-reload-button",
+-        "vertical-spacer",
+-        "urlbar-container",
+-        "downloads-button",
+-        "fxa-toolbar-menu-button",
+-        "reset-pbm-toolbar-button",
+-      ],
+-    },
+-  });
+-  CustomizableUIInternal.updateForNewVersion();
+-  Assert.deepEqual(
+-    getSavedStatePlacements("nav-bar"),
+-    [
+-      "back-button",
+-      "forward-button",
+-      "stop-reload-button",
+-      "vertical-spacer",
+-      "urlbar-container",
+-      "downloads-button",
+-      "fxa-toolbar-menu-button",
+-      "reset-pbm-toolbar-button",
+-    ],
+-    "Reset PBM button should not be duplicated for users who already have it"
+-  );
+-
+   gFuturePlacements.delete(CustomizableUI.AREA_NAVBAR);
+   gPalette.delete(testWidgetNew.id);
+   gPalette.delete(testWidgetOld.id);
+diff --git a/browser/components/privatebrowsing/moz.build b/browser/components/privatebrowsing/moz.build
+index fb2a4a5107..8209bb2b96 100644
+--- a/browser/components/privatebrowsing/moz.build
++++ b/browser/components/privatebrowsing/moz.build
+@@ -8,9 +8,5 @@ BROWSER_CHROME_MANIFESTS += [
+ 
+ JAR_MANIFESTS += ["jar.mn"]
+ 
+-MOZ_SRC_FILES += [
+-    "ResetPBMPanel.sys.mjs",
+-]
+-
+ with Files("**"):
+     BUG_COMPONENT = ("Firefox", "Private Browsing")
+diff --git a/browser/components/privatebrowsing/test/browser/browser.toml b/browser/components/privatebrowsing/test/browser/browser.toml
+index 917d2c82f2..f91336f95f 100644
+--- a/browser/components/privatebrowsing/test/browser/browser.toml
++++ b/browser/components/privatebrowsing/test/browser/browser.toml
+@@ -26,36 +26,8 @@ support-files = [
+ 
+ ["browser_privatebrowsing_DownloadLastDirWithCPS.js"]
+ 
+-["browser_privatebrowsing_about.js"]
+-tags = "trackingprotection"
+-
+ ["browser_privatebrowsing_aboutSessionRestore.js"]
+ 
+-["browser_privatebrowsing_about_cookie_banners_promo.js"]
+-
+-["browser_privatebrowsing_about_default_pin_promo.js"]
+-skip-if = [
+-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'",
+-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'",
+-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'",
+-  "os == 'win' && msix", # We don't support private pinning in MSIX builds
+-]
+-
+-["browser_privatebrowsing_about_default_promo.js"]
+-
+-["browser_privatebrowsing_about_focus_promo.js"]
+-skip-if = [
+-  "os == 'win' && standalone", # Bug 2028646
+-]
+-
+-["browser_privatebrowsing_about_nimbus_dismiss.js"]
+-
+-["browser_privatebrowsing_about_nimbus_impressions.js"]
+-
+-["browser_privatebrowsing_about_search_banner.js"]
+-
+ ["browser_privatebrowsing_beacon.js"]
+ 
+ ["browser_privatebrowsing_blobUrl.js"]
+@@ -115,8 +87,6 @@ skip-if = [
+ ["browser_privatebrowsing_rememberprompt.js"]
+ tags = "geolocation xr"
+ 
+-["browser_privatebrowsing_resetPBM.js"]
+-
+ ["browser_privatebrowsing_sidebar.js"]
+ 
+ ["browser_privatebrowsing_theming.js"]
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index 734594b533..2050754064 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -1354,24 +1354,6 @@ unified-extensions-button-blocklisted =
+         Extensions
+         Some extensions are disabled
+ 
+-## Private browsing reset button
+-
+-reset-pbm-toolbar-button2 =
+-    .label = Clear Private Session
+-    .tooltiptext = Clear Private Session
+-reset-pbm-panel-heading2 = Clear data and start a fresh private session?
+-reset-pbm-panel-description2 = This deletes history, cookies, and all other site data without closing your Private Window.
+-reset-pbm-panel-always-ask-checkbox =
+-     .label = Always ask me
+-     .accesskey = A
+-reset-pbm-panel-cancel-button =
+-    .label = Cancel
+-    .accesskey = C
+-reset-pbm-panel-confirm-button2 =
+-    .label = Clear private session
+-    .accesskey = l
+-reset-pbm-panel-complete = Private session data deleted
+-
+ ## Autorefresh blocker
+ 
+ refresh-blocked-refresh-label = { -brand-short-name } prevented this page from automatically reloading.
+diff --git a/browser/themes/shared/customizableui/panelUI-shared.css b/browser/themes/shared/customizableui/panelUI-shared.css
+index 5f5d4f0464..d50787ff1c 100644
+--- a/browser/themes/shared/customizableui/panelUI-shared.css
++++ b/browser/themes/shared/customizableui/panelUI-shared.css
+@@ -2079,35 +2079,6 @@ radiogroup:focus-visible > .subviewradio[focused="true"] {
+   position: relative;
+ }
+ 
+-/* Reset/Restart Private Browsing Panel */
+-
+-#reset-pbm-panel {
+-  max-width: var(--menu-panel-width-wide);
+-}
+-
+-#reset-pbm-panel-container {
+-  padding: 16px 16px 0;
+-  gap: 8px;
+-}
+-
+-#reset-pbm-panel-header > description {
+-  margin-bottom: 0;
+-}
+-
+-#reset-pbm-panel-header > description,
+-#reset-pbm-panel-description,
+-#reset-pbm-panel-footer {
+-  margin-inline: 0;
+-}
+-
+-#reset-pbm-panel-header > description {
+-  font-weight: var(--font-weight-heading);
+-}
+-
+-#reset-pbm-panel-checkbox {
+-  margin-inline: 0 8px;
+-}
+-
+ /* ----- Profiles panels ----- */
+ 
+ #profiles-header-content {
+diff --git a/browser/themes/shared/toolbarbutton-icons.css b/browser/themes/shared/toolbarbutton-icons.css
+index f78cd4fdf9..2aa908bead 100644
+--- a/browser/themes/shared/toolbarbutton-icons.css
++++ b/browser/themes/shared/toolbarbutton-icons.css
+@@ -185,10 +185,6 @@
+   list-style-image: url("chrome://mozapps/skin/extensions/extension.svg");
+ }
+ 
+-#reset-pbm-toolbar-button {
+-  list-style-image: url("chrome://browser/skin/flame.svg");
+-}
+-
+ #email-link-button {
+   list-style-image: url("chrome://browser/skin/mail.svg");
+ }
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index c15744aeaf..5a1a55b0dd 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -363,7 +363,6 @@ export default [
+       "browser/base/content/aboutRestartRequired.js",
+       "browser/base/content/aboutTabCrashed.js",
+       "browser/components/customkeys/content/customkeys.js",
+-      "browser/components/privatebrowsing/content/aboutPrivateBrowsing.js",
+       "browser/components/profiles/content/delete-profile-card.mjs",
+       "browser/components/profiles/content/edit-profile-card.mjs",
+       "browser/components/profiles/content/new-profile-card.mjs",
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 309ac92c1a..03c3d7fd6e 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -791,8 +791,6 @@ export default [
+       "browser/components/preferences/tests/siteData/browser_siteData_multi_select.js",
+       "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_DownloadLastDirWithCPS.js",
+       "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_about_nimbus.js",
+-      "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_about_nimbus_dismiss.js",
+-      "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_about_nimbus_impressions.js",
+       "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_about_nimbus_messaging.js",
+       "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_cleanup.js",
+       "browser/components/privatebrowsing/test/browser/browser_privatebrowsing_downloadLastDir.js",

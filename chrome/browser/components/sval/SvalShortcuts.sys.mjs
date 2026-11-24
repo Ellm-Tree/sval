@@ -329,8 +329,6 @@ export const DROPPED_KEYS = new Set([
   "viewBookmarksSidebarKb",
   "viewBookmarksToolbarKb",
   "bookmarkAllTabsKb",
-  // Firefox's AI chatbot, which Sval's prefs turn off.
-  "viewGenaiChatSidebarKb",
   // Firefox's list of all tabs, which opens from the tab strip Sval hides;
   // the panel lists every tab.
   "key_showAllTabs",

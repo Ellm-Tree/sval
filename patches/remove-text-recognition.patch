@@ -1,0 +1,724 @@
+Sval: Remove Copy Text From Image
+
+The image context menu's text recognition goes whole, down to the
+platform: the menu item and its dialog component, the context-menu actor
+messages, the chrome-only HTMLImageElement.recognizeCurrentImageText and
+its ImageText dictionary, the content-process request for it, the
+image's text-selection UA widget, nsIXULRuntime's
+isTextRecognitionSupported, and the macOS Vision implementation behind
+them, with the pref, strings and tests.
+
+diff --git a/.prettierignore b/.prettierignore
+index 5aac000c6a..49e732fc18 100644
+--- a/.prettierignore
++++ b/.prettierignore
+@@ -209,7 +209,6 @@ browser/components/sessionstore/test/browser_scrollPositions_sample_frameset.htm
+ browser/components/tabbrowser/test/browser/tabs/dummy_page.html
+ browser/components/tabbrowser/test/browser/tabs/file_anchor_elements.html
+ browser/components/tabbrowser/test/browser/tabs/tab_that_closes.html
+-browser/components/textrecognition/textrecognition.html
+ browser/components/urlbar/content/quicksuggestOnboarding.html
+ browser/components/urlbar/tests/browser/dummy_page.html
+ browser/components/urlbar/tests/browser/file_urlbar_edit_dos.html
+diff --git a/.stylelintrc.js b/.stylelintrc.js
+index b484bf6600..b04761de40 100644
+--- a/.stylelintrc.js
++++ b/.stylelintrc.js
+@@ -438,7 +438,6 @@ module.exports = {
+         "toolkit/themes/shared/media/videocontrols.css",
+         "toolkit/content/widgets/datetimebox.css",
+         "toolkit/content/widgets/marquee.css",
+-        "toolkit/themes/shared/media/textrecognition.css",
+         // The contents of backup/content/archive.css are injected as inline CSS
+         // into the HTML backup archive files that exist on a user's file system
+         // and can be opened in any browser.
+diff --git a/browser/actors/ContextMenuChild.sys.mjs b/browser/actors/ContextMenuChild.sys.mjs
+index bdb9252578..4bc7376759 100644
+--- a/browser/actors/ContextMenuChild.sys.mjs
++++ b/browser/actors/ContextMenuChild.sys.mjs
+@@ -148,17 +148,6 @@ export class ContextMenuChild extends JSWindowActorChild {
+         break;
+       }
+ 
+-      case "ContextMenu:GetImageText": {
+-        let img = lazy.ContentDOMReference.resolve(
+-          message.data.targetIdentifier
+-        );
+-        const { direction } = this.contentWindow.getComputedStyle(img);
+-
+-        return img.recognizeCurrentImageText().then(results => {
+-          return { results, direction };
+-        });
+-      }
+-
+       case "ContextMenu:ToggleRevealPassword": {
+         let target = lazy.ContentDOMReference.resolve(
+           message.data.targetIdentifier
+diff --git a/browser/actors/ContextMenuParent.sys.mjs b/browser/actors/ContextMenuParent.sys.mjs
+index 9e0ef4f14f..0cad4809f2 100644
+--- a/browser/actors/ContextMenuParent.sys.mjs
++++ b/browser/actors/ContextMenuParent.sys.mjs
+@@ -62,12 +62,6 @@ export class ContextMenuParent extends JSWindowActorParent {
+     });
+   }
+ 
+-  getImageText(targetIdentifier) {
+-    return this.sendQuery("ContextMenu:GetImageText", {
+-      targetIdentifier,
+-    });
+-  }
+-
+   toggleRevealPassword(targetIdentifier) {
+     this.sendAsyncMessage("ContextMenu:ToggleRevealPassword", {
+       targetIdentifier,
+diff --git a/browser/base/content/browser-context.inc.xhtml b/browser/base/content/browser-context.inc.xhtml
+index 1e88421fd6..c7b877f522 100644
+--- a/browser/base/content/browser-context.inc.xhtml
++++ b/browser/base/content/browser-context.inc.xhtml
+@@ -251,9 +251,6 @@
+       <menuitem id="context-sendaudio"
+                 data-l10n-id="main-context-menu-audio-email"
+                 />
+-      <menuitem id="context-imagetext"
+-                data-l10n-id="main-context-menu-image-copy-text"
+-                />
+       <menuitem id="context-viewimageinfo"
+                 hidden="true"
+                 data-l10n-id="main-context-menu-image-info"
+diff --git a/browser/base/content/browser-context.js b/browser/base/content/browser-context.js
+index 042341cecb..e92946f9ea 100644
+--- a/browser/base/content/browser-context.js
++++ b/browser/base/content/browser-context.js
+@@ -153,9 +153,6 @@ document.addEventListener(
+         case "context-sendvideo":
+           gContextMenu.sendMedia();
+           break;
+-        case "context-imagetext":
+-          gContextMenu.getImageText();
+-          break;
+         case "context-viewimageinfo":
+           gContextMenu.viewImageInfo();
+           break;
+diff --git a/browser/base/content/nsContextMenu.sys.mjs b/browser/base/content/nsContextMenu.sys.mjs
+index 0dfa3ffdd6..743a25d248 100644
+--- a/browser/base/content/nsContextMenu.sys.mjs
++++ b/browser/base/content/nsContextMenu.sys.mjs
+@@ -47,13 +47,6 @@ ChromeUtils.defineLazyGetter(lazy, "ReferrerInfo", () =>
+   )
+ );
+ 
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "TEXT_RECOGNITION_ENABLED",
+-  "dom.text-recognition.enabled",
+-  false
+-);
+-
+ XPCOMUtils.defineLazyPreferenceGetter(
+   lazy,
+   "STRIP_ON_SHARE_ENABLED",
+@@ -750,14 +743,6 @@ export class nsContextMenu {
+     // Copy image location depends on whether we're on an image.
+     this.showItem("context-copyimage", this.onImage || showBGImage);
+ 
+-    // Performing text recognition only works on images, and if the feature is enabled.
+-    this.showItem(
+-      "context-imagetext",
+-      this.onImage &&
+-        Services.appinfo.isTextRecognitionSupported &&
+-        lazy.TEXT_RECOGNITION_ENABLED
+-    );
+-
+     // Send media URL (but not for canvas, since it's a big data: URL)
+     this.showItem("context-sendimage", this.onImage || showBGImage);
+ 
+@@ -2588,23 +2573,6 @@ export class nsContextMenu {
+     );
+   }
+ 
+-  getImageText() {
+-    let dialogBox = this.window.gBrowser.getTabDialogBox(this.browser);
+-    const imageTextResult = this.actor.getImageText(this.targetIdentifier);
+-    let timerId = Glean.textRecognition.apiPerformance.start();
+-    const { dialog } = dialogBox.open(
+-      "chrome://browser/content/textrecognition/textrecognition.html",
+-      {
+-        features: "resizable=no",
+-        modalType: Services.prompt.MODAL_TYPE_CONTENT,
+-      },
+-      imageTextResult,
+-      () => dialog.resizeVertically(),
+-      this.window.openLinkIn,
+-      timerId
+-    );
+-  }
+-
+   drmLearnMore(aEvent) {
+     let drmInfoURL =
+       Services.urlFormatter.formatURLPref("app.support.baseURL") +
+diff --git a/browser/base/content/test/contextMenu/browser_contextmenu.js b/browser/base/content/test/contextMenu/browser_contextmenu.js
+index e2d74d758e..b7bfba992a 100644
+--- a/browser/base/content/test/contextMenu/browser_contextmenu.js
++++ b/browser/base/content/test/contextMenu/browser_contextmenu.js
+@@ -526,7 +526,6 @@ add_task(async function test_image() {
+         true,
+         "context-sendimage",
+         true,
+-        ...getTextRecognitionItems(),
+         ...(Services.prefs.getBoolPref("browser.menu.showViewImageInfo", false)
+           ? ["context-viewimageinfo", true]
+           : []),
+@@ -1451,7 +1450,6 @@ add_task(async function test_image_in_iframe() {
+       true,
+       "context-sendimage",
+       true,
+-      ...getTextRecognitionItems(),
+       ...(Services.prefs.getBoolPref("browser.menu.showViewImageInfo", false)
+         ? ["context-viewimageinfo", true]
+         : []),
+@@ -2112,7 +2110,6 @@ add_task(async function test_imagelink() {
+       true,
+       "context-sendimage",
+       true,
+-      ...getTextRecognitionItems(),
+       ...(Services.prefs.getBoolPref("browser.menu.showViewImageInfo", false)
+         ? ["context-viewimageinfo", true]
+         : []),
+@@ -2231,7 +2228,6 @@ add_task(async function test_longdesc() {
+       true,
+       "context-sendimage",
+       true,
+-      ...getTextRecognitionItems(),
+       ...(Services.prefs.getBoolPref("browser.menu.showViewImageInfo", false)
+         ? ["context-viewimageinfo", true]
+         : []),
+@@ -2901,15 +2897,3 @@ async function selectText(selector) {
+     }
+   );
+ }
+-
+-/**
+- * Not all platforms support text recognition.
+- *
+- * @returns {string[]}
+- */
+-function getTextRecognitionItems() {
+-  return Services.prefs.getBoolPref("dom.text-recognition.enabled") &&
+-    Services.appinfo.isTextRecognitionSupported
+-    ? ["context-imagetext", true]
+-    : [];
+-}
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index e2c9e17f04..944e983094 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -70,7 +70,6 @@ DIRS += [
+     "syncedtabs",
+     "tabbrowser",
+     "tabnotes",
+-    "textrecognition",
+     "topsites",
+     "translations",
+     "uitour",
+diff --git a/browser/locales/en-US/browser/browserContext.ftl b/browser/locales/en-US/browser/browserContext.ftl
+index 85b875194a..e766db9535 100644
+--- a/browser/locales/en-US/browser/browserContext.ftl
++++ b/browser/locales/en-US/browser/browserContext.ftl
+@@ -308,10 +308,6 @@ main-context-menu-image-set-image-as-background =
+     .label = Set Image as Desktop Background…
+     .accesskey = S
+ 
+-main-context-menu-image-copy-text =
+-    .label = Copy Text From Image
+-    .accesskey = x
+-
+ main-context-menu-image-info =
+     .label = View Image Info
+     .accesskey = f
+diff --git a/dom/base/nsImageLoadingContent.cpp b/dom/base/nsImageLoadingContent.cpp
+index a9ea4ab127..d10a411bf8 100644
+--- a/dom/base/nsImageLoadingContent.cpp
++++ b/dom/base/nsImageLoadingContent.cpp
+@@ -32,9 +32,7 @@
+ #include "mozilla/dom/Element.h"
+ #include "mozilla/dom/FetchPriority.h"
+ #include "mozilla/dom/HTMLImageElement.h"
+-#include "mozilla/dom/ImageTextBinding.h"
+ #include "mozilla/dom/LargestContentfulPaint.h"
+-#include "mozilla/dom/PContent.h"  // For TextRecognitionResult
+ #include "mozilla/dom/PageLoadEventUtils.h"
+ #include "mozilla/dom/ReferrerInfo.h"
+ #include "mozilla/dom/ResponsiveImageSelector.h"
+@@ -42,7 +40,6 @@
+ #include "mozilla/intl/Locale.h"
+ #include "mozilla/intl/LocaleService.h"
+ #include "mozilla/net/ChannelClassifierUtils.h"
+-#include "mozilla/widget/TextRecognition.h"
+ #include "nsContentPolicyUtils.h"
+ #include "nsContentUtils.h"
+ #include "nsError.h"
+@@ -1274,125 +1271,6 @@ nsresult nsImageLoadingContent::LoadImage(nsIURI* aNewURI, bool aForce,
+   return NS_OK;
+ }
+ 
+-already_AddRefed<Promise> nsImageLoadingContent::RecognizeCurrentImageText(
+-    ErrorResult& aRv) {
+-  using widget::TextRecognition;
+-
+-  if (!mCurrentRequest) {
+-    aRv.ThrowInvalidStateError("No current request");
+-    return nullptr;
+-  }
+-  nsCOMPtr<imgIContainer> image;
+-  mCurrentRequest->GetImage(getter_AddRefs(image));
+-  if (!image) {
+-    aRv.ThrowInvalidStateError("No image");
+-    return nullptr;
+-  }
+-
+-  // XXX Probably should use this->GetRelevantGlobal()
+-  RefPtr<Promise> domPromise =
+-      Promise::Create(GetOurOwnerDoc()->GetScopeObject(), aRv);
+-  if (aRv.Failed()) {
+-    return nullptr;
+-  }
+-
+-  // The list of ISO 639-1 language tags to pass to the text recognition API.
+-  AutoTArray<nsCString, 4> languages;
+-  {
+-    // The document's locale should be the top language to use. Parse the BCP 47
+-    // locale and extract the ISO 639-1 language tag. e.g. "en-US" -> "en".
+-    nsAutoCString elementLanguage;
+-    nsAtom* imgLanguage = AsContent()->GetLang();
+-    intl::Locale locale;
+-    if (imgLanguage) {
+-      imgLanguage->ToUTF8String(elementLanguage);
+-      auto result = intl::LocaleParser::TryParse(elementLanguage, locale);
+-      if (result.isOk()) {
+-        languages.AppendElement(locale.Language().Span());
+-      }
+-    }
+-  }
+-
+-  {
+-    // The app locales should also be included after the document's locales.
+-    // Extract the language tag like above.
+-    nsTArray<nsCString> appLocales;
+-    intl::LocaleService::GetInstance()->GetAppLocalesAsBCP47(appLocales);
+-
+-    for (const auto& localeString : appLocales) {
+-      intl::Locale locale;
+-      auto result = intl::LocaleParser::TryParse(localeString, locale);
+-      if (result.isErr()) {
+-        NS_WARNING("Could not parse an app locale string, ignoring it.");
+-        continue;
+-      }
+-      languages.AppendElement(locale.Language().Span());
+-    }
+-  }
+-
+-  TextRecognition::FindText(*image, languages)
+-      ->Then(
+-          GetCurrentSerialEventTarget(), __func__,
+-          [weak = RefPtr{do_GetWeakReference(this)},
+-           request = RefPtr{mCurrentRequest}, domPromise](
+-              TextRecognition::NativePromise::ResolveOrRejectValue&& aValue) {
+-            if (aValue.IsReject()) {
+-              domPromise->MaybeRejectWithNotSupportedError(
+-                  aValue.RejectValue());
+-              return;
+-            }
+-            RefPtr<nsIImageLoadingContent> iilc = do_QueryReferent(weak.get());
+-            if (!iilc) {
+-              domPromise->MaybeRejectWithInvalidStateError(
+-                  "Element was dead when we got the results");
+-              return;
+-            }
+-            auto* ilc = static_cast<nsImageLoadingContent*>(iilc.get());
+-            if (ilc->mCurrentRequest != request) {
+-              domPromise->MaybeRejectWithInvalidStateError(
+-                  "Request not current");
+-              return;
+-            }
+-            auto& textRecognitionResult = aValue.ResolveValue();
+-            Element* el = ilc->AsContent()->AsElement();
+-
+-            // When enabled, this feature will place the recognized text as
+-            // spans inside of the shadow dom of the img element. These are then
+-            // positioned so that the user can select the text.
+-            if (Preferences::GetBool("dom.text-recognition.shadow-dom-enabled",
+-                                     false)) {
+-              el->AttachAndSetUAShadowRoot(Element::NotifyUAWidget::Yes);
+-              TextRecognition::FillShadow(*el->GetShadowRoot(),
+-                                          textRecognitionResult);
+-              el->NotifyUAWidgetSetupOrChange();
+-            }
+-
+-            nsTArray<ImageText> imageTexts(
+-                textRecognitionResult.quads().Length());
+-            // XXX shouldn't this be GetRelevantGlobal? But it's privileged code
+-            // so seems probably fine.
+-            nsIGlobalObject* global = el->GetDocumentGlobal();
+-
+-            for (const auto& quad : textRecognitionResult.quads()) {
+-              NotNull<ImageText*> imageText = imageTexts.AppendElement();
+-
+-              // Note: These points are not actually CSSPixels, but a DOMQuad is
+-              // a conveniently similar structure that can store these values.
+-              CSSPoint points[4];
+-              points[0] = CSSPoint(quad.points()[0].x, quad.points()[0].y);
+-              points[1] = CSSPoint(quad.points()[1].x, quad.points()[1].y);
+-              points[2] = CSSPoint(quad.points()[2].x, quad.points()[2].y);
+-              points[3] = CSSPoint(quad.points()[3].x, quad.points()[3].y);
+-
+-              imageText->mQuad = new DOMQuad(global, points);
+-              imageText->mConfidence = quad.confidence();
+-              imageText->mString = quad.string();
+-            }
+-            domPromise->MaybeResolve(std::move(imageTexts));
+-          });
+-  return domPromise.forget();
+-}
+-
+ CSSIntSize nsImageLoadingContent::NaturalSize(
+     DoDensityCorrection aDensityCorrection) {
+   if (!mCurrentRequest) {
+diff --git a/dom/base/nsImageLoadingContent.h b/dom/base/nsImageLoadingContent.h
+index cd7f35f0ad..83b6beafdb 100644
+--- a/dom/base/nsImageLoadingContent.h
++++ b/dom/base/nsImageLoadingContent.h
+@@ -94,10 +94,6 @@ class nsImageLoadingContent : public nsIImageLoadingContent {
+    */
+   void NotifyOwnerDocumentActivityChanged();
+ 
+-  // Trigger text recognition for the current image request.
+-  already_AddRefed<mozilla::dom::Promise> RecognizeCurrentImageText(
+-      mozilla::ErrorResult&);
+-
+  protected:
+   enum ImageLoadType {
+     // Most normal image loads
+diff --git a/dom/chrome-webidl/moz.build b/dom/chrome-webidl/moz.build
+index 4a5c4fcb1c..5947b86475 100644
+--- a/dom/chrome-webidl/moz.build
++++ b/dom/chrome-webidl/moz.build
+@@ -64,7 +64,6 @@ WEBIDL_FILES = [
+     "FrameLoader.webidl",
+     "Grid.webidl",
+     "HeapSnapshot.webidl",
+-    "ImageText.webidl",
+     "InspectorUtils.webidl",
+     "IteratorResult.webidl",
+     "JSActor.webidl",
+diff --git a/dom/ipc/ContentParent.cpp b/dom/ipc/ContentParent.cpp
+index f1d7a74b6a..d16fa9d84e 100644
+--- a/dom/ipc/ContentParent.cpp
++++ b/dom/ipc/ContentParent.cpp
+@@ -173,7 +173,6 @@
+ #include "mozilla/net/UrlClassifierFeatureFactory.h"
+ #include "mozilla/widget/RemoteLookAndFeel.h"
+ #include "mozilla/widget/ScreenManager.h"
+-#include "mozilla/widget/TextRecognition.h"
+ #include "nsAnonymousTemporaryFile.h"
+ #include "nsAppRunner.h"
+ #include "nsCExternalHandlerService.h"
+@@ -5090,33 +5089,6 @@ mozilla::ipc::IPCResult ContentParent::RecvCopyFavicon(
+   return IPC_OK();
+ }
+ 
+-mozilla::ipc::IPCResult ContentParent::RecvFindImageText(
+-    IPCImage&& aImage, nsTArray<nsCString>&& aLanguages,
+-    FindImageTextResolver&& aResolver) {
+-  if (!TextRecognition::IsSupported() ||
+-      !Preferences::GetBool("dom.text-recognition.enabled")) {
+-    return IPC_FAIL(this, "Text recognition not available.");
+-  }
+-
+-  RefPtr<DataSourceSurface> surf = nsContentUtils::IPCImageToSurface(aImage);
+-  if (!surf) {
+-    aResolver(TextRecognitionResultOrError("Failed to read image"_ns));
+-    return IPC_OK();
+-  }
+-  TextRecognition::FindText(*surf, aLanguages)
+-      ->Then(
+-          GetCurrentSerialEventTarget(), __func__,
+-          [resolver = std::move(aResolver)](
+-              TextRecognition::NativePromise::ResolveOrRejectValue&& aValue) {
+-            if (aValue.IsResolve()) {
+-              resolver(TextRecognitionResultOrError(aValue.ResolveValue()));
+-            } else {
+-              resolver(TextRecognitionResultOrError(aValue.RejectValue()));
+-            }
+-          });
+-  return IPC_OK();
+-}
+-
+ bool ContentParent::ShouldContinueFromReplyTimeout() {
+   RefPtr<ProcessHangMonitor> monitor = ProcessHangMonitor::Get();
+   return !monitor || !monitor->ShouldTimeOutCPOWs();
+diff --git a/dom/ipc/ContentParent.h b/dom/ipc/ContentParent.h
+index b26c732093..a4dedb678b 100644
+--- a/dom/ipc/ContentParent.h
++++ b/dom/ipc/ContentParent.h
+@@ -1092,8 +1092,6 @@ class ContentParent final : public PContentParent,
+   mozilla::ipc::IPCResult RecvCopyFavicon(nsIURI* aOldURI, nsIURI* aNewURI,
+                                           const bool& aInPrivateBrowsing);
+ 
+-  mozilla::ipc::IPCResult RecvFindImageText(IPCImage&&, nsTArray<nsCString>&&,
+-                                            FindImageTextResolver&&);
+ 
+   virtual void ProcessingError(Result aCode, const char* aMsgName) override;
+ 
+diff --git a/dom/ipc/PContent.ipdl b/dom/ipc/PContent.ipdl
+index fba923b55a..82af36c3d2 100644
+--- a/dom/ipc/PContent.ipdl
++++ b/dom/ipc/PContent.ipdl
+@@ -110,7 +110,6 @@ using mozilla::dom::ContentParentId from "mozilla/dom/ipc/IdType.h";
+ using mozilla::dom::NavigationType from "mozilla/dom/NavigationAPIIPCUtils.h";
+ using mozilla::EventMessage from "mozilla/EventForwards.h";
+ using mozilla::LayoutDeviceIntPoint from "Units.h";
+-using mozilla::ImagePoint from "Units.h";
+ using mozilla::widget::ThemeChangeKind from "mozilla/widget/WidgetMessageUtils.h";
+ using mozilla::ColorScheme from "mozilla/ColorScheme.h";
+ using class mozilla::dom::MessagePort from "mozilla/dom/MessagePort.h";
+@@ -457,21 +456,6 @@ union BlobURLDataRequestResult
+   nsresult;
+ };
+ 
+-struct TextRecognitionQuad {
+-    float confidence;
+-    nsString string;
+-    ImagePoint[] points;
+-};
+-
+-struct TextRecognitionResult {
+-    TextRecognitionQuad[] quads;
+-};
+-
+-union TextRecognitionResultOrError {
+-    TextRecognitionResult;
+-    nsCString;
+-};
+-
+ struct ClipboardReadRequest {
+     ManagedEndpoint<PClipboardReadRequestChild> childEndpoint;
+     nsCString[] availableTypes;
+@@ -1299,9 +1283,6 @@ parent:
+ 
+     async CopyFavicon(nullable nsIURI oldURI, nullable nsIURI newURI, bool isPrivate);
+ 
+-    async FindImageText(IPCImage image, nsCString[] languages)
+-        returns (TextRecognitionResultOrError result);
+-
+     // Graphics errors
+     async GraphicsError(nsCString aError);
+ 
+diff --git a/dom/webidl/HTMLImageElement.webidl b/dom/webidl/HTMLImageElement.webidl
+index e7cd22b051..ee6dfa00e8 100644
+--- a/dom/webidl/HTMLImageElement.webidl
++++ b/dom/webidl/HTMLImageElement.webidl
+@@ -49,8 +49,6 @@ interface HTMLImageElement : HTMLElement {
+   readonly attribute boolean complete;
+            [NewObject]
+            Promise<undefined> decode();
+-           [NewObject, ChromeOnly]
+-           Promise<sequence<ImageText>> recognizeCurrentImageText();
+ };
+ 
+ // http://www.whatwg.org/specs/web-apps/current-work/#other-elements,-attributes-and-apis
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index c2e1c9c2c7..be1d6e8c6e 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -347,7 +347,6 @@ export default [
+       "browser/components/tabbrowser/**",
+       "browser/components/tabpreview/tabpreview.mjs",
+       "browser/components/tests/browser/**",
+-      "browser/components/textrecognition/**",
+       "browser/components/topsites/**",
+       "browser/components/touchbar/**",
+       "browser/components/translations/**",
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index f72ce493a1..9c205fa330 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -141,10 +141,6 @@ pref("dom.keyboardevent.keypress.hack.use_legacy_keycode_and_charcode", "*.colla
+ // Pref for end-users and policy to add additional values.
+ pref("dom.keyboardevent.keypress.hack.use_legacy_keycode_and_charcode.addl", "");
+ 
+-// Text recognition is a platform dependent feature, so even if this preference is
+-// enabled here, the feature may not be visible in all browsers.
+-pref("dom.text-recognition.enabled", true);
+-
+ // Blocklist of domains of web apps which we should not dispatch `input` event
+ // immediately before `compositionend`.
+ pref("editor.texteditor.inputevent.hack.no_dispatch_before_compositionend", "");
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 38e89841b0..3c0c06711d 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -87,7 +87,6 @@ module.exports = [
+       "browser/components/sidebar/sidebar-pins-promo.css",
+       "browser/components/sidebar/sidebar-tab-row.css",
+       "browser/components/sidebar/sidebar.css",
+-      "browser/components/textrecognition/textrecognition.css",
+       "browser/components/urlbar/tests/browser/dynamicResult0.css",
+       "browser/components/urlbar/tests/browser/dynamicResult1.css",
+       "browser/components/webrtc/content/webrtc-preview/webrtc-preview.css",
+diff --git a/toolkit/actors/UAWidgetsChild.sys.mjs b/toolkit/actors/UAWidgetsChild.sys.mjs
+index e4e56dd7e5..963bdeb7a9 100644
+--- a/toolkit/actors/UAWidgetsChild.sys.mjs
++++ b/toolkit/actors/UAWidgetsChild.sys.mjs
+@@ -104,9 +104,6 @@ export class UAWidgetsChild extends JSWindowActorChild {
+         uri = "chrome://global/content/elements/marquee.js";
+         widgetName = "MarqueeWidget";
+         break;
+-      case "img":
+-        uri = "chrome://global/content/elements/textrecognition.js";
+-        widgetName = "TextRecognitionWidget";
+     }
+ 
+     if (!uri || !widgetName) {
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 98720d8e14..05a0fed42d 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -140,7 +140,6 @@ firefox_desktop_metrics = [
+     "browser/components/sidebar/metrics.yaml",
+     "browser/components/tabbrowser/metrics.yaml",
+     "browser/components/tabnotes/metrics.yaml",
+-    "browser/components/textrecognition/metrics.yaml",
+     "browser/components/urlbar/metrics.yaml",
+     "browser/modules/metrics.yaml",
+     "dom/media/platforms/wmf/metrics.yaml",
+diff --git a/toolkit/content/jar.mn b/toolkit/content/jar.mn
+index 4011e38a9f..d5aedd09f6 100644
+--- a/toolkit/content/jar.mn
++++ b/toolkit/content/jar.mn
+@@ -190,7 +190,6 @@ toolkit.jar:
+    content/global/elements/stringbundle.js     (widgets/stringbundle.js)
+    content/global/elements/tabbox.js           (widgets/tabbox.js)
+    content/global/elements/text.js             (widgets/text.js)
+-   content/global/elements/textrecognition.js  (widgets/textrecognition.js)
+    content/global/elements/toolbarbutton.js    (widgets/toolbarbutton.js)
+    content/global/elements/videocontrols.js    (widgets/videocontrols.js)
+    content/global/elements/tree.js             (widgets/tree.js)
+diff --git a/toolkit/content/tests/widgets/mochitest.toml b/toolkit/content/tests/widgets/mochitest.toml
+index cbfd89634a..38b7af104e 100644
+--- a/toolkit/content/tests/widgets/mochitest.toml
++++ b/toolkit/content/tests/widgets/mochitest.toml
+@@ -37,29 +37,6 @@ tags = "os_integration"
+ 
+ ["test_bug1654500.html"]
+ 
+-["test_image_recognition.html"]
+-run-if = [
+-  "os == 'mac'", # Mac only feature.
+-]
+-tags = "os_integration"
+-
+-["test_image_recognition_unsupported.html"]
+-skip-if = [
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # Bug 1929419
+-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'", # Bug 1929419
+-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 2019466
+-]
+-
+-["test_image_recognition_zh.html"]
+-run-if = [
+-  "os == 'mac' && os_version != '10.15'", # Mac only feature, requires > 10.15 to support multilingual results.
+-]
+-tags = "os_integration"
+-skip-if = [
+-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64' && xorigin", # Bug 1929419
+-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 2034604
+-]
+-
+ ["test_mousecapture_area.html"]
+ tags = "os_integration"
+ 
+diff --git a/toolkit/themes/shared/minimal-toolkit.jar.inc.mn b/toolkit/themes/shared/minimal-toolkit.jar.inc.mn
+index 48b41881dc..429e27e532 100644
+--- a/toolkit/themes/shared/minimal-toolkit.jar.inc.mn
++++ b/toolkit/themes/shared/minimal-toolkit.jar.inc.mn
+@@ -44,7 +44,6 @@ toolkit.jar:
+   skin/classic/global/media/picture-in-picture-seekBackward-button.svg (../../shared/media/picture-in-picture-seekBackward-button.svg)
+ # Text recognition widget
+ 
+-  skin/classic/global/media/textrecognition.css            (../../shared/media/textrecognition.css)
+ 
+ # used in about:logging on Android
+   skin/classic/global/icons/open-in-new.svg                (../../shared/icons/open-in-new.svg)
+diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
+index 8f37a0c5c2..9331550537 100644
+--- a/toolkit/xre/nsAppRunner.cpp
++++ b/toolkit/xre/nsAppRunner.cpp
+@@ -41,7 +41,6 @@
+ #include "mozilla/glean/ToolkitMozappsUpdateSharedMetrics.h"
+ #include "mozilla/glean/ToolkitXreMetrics.h"
+ #include "mozilla/glean/GleanPings.h"
+-#include "mozilla/widget/TextRecognition.h"
+ #include "mozJSModuleLoader.h"
+ 
+ #include "nsAppRunner.h"
+@@ -1470,12 +1469,6 @@ nsXULAppInfo::GetIs64Bit(bool* aResult) {
+   return NS_OK;
+ }
+ 
+-NS_IMETHODIMP
+-nsXULAppInfo::GetIsTextRecognitionSupported(bool* aResult) {
+-  *aResult = widget::TextRecognition::IsSupported();
+-  return NS_OK;
+-}
+-
+ NS_IMETHODIMP
+ nsXULAppInfo::InvalidateCachesOnRestart() {
+   nsCOMPtr<nsIFile> file;
+diff --git a/widget/cocoa/moz.build b/widget/cocoa/moz.build
+index bc69f80531..15dae0bab1 100644
+--- a/widget/cocoa/moz.build
++++ b/widget/cocoa/moz.build
+@@ -78,7 +78,6 @@ UNIFIED_SOURCES += [
+     "nsWindowMap.mm",
+     "ScreenHelperCocoa.mm",
+     "TextInputHandler.mm",
+-    "TextRecognition.mm",
+     "VibrancyManager.mm",
+     "ViewRegion.mm",
+ ]
+diff --git a/widget/moz.build b/widget/moz.build
+index 04771a17a1..76b77cc8cb 100644
+--- a/widget/moz.build
++++ b/widget/moz.build
+@@ -233,7 +233,6 @@ EXPORTS.mozilla.widget += [
+     "RemoteLookAndFeel.h",
+     "Screen.h",
+     "ScreenManager.h",
+-    "TextRecognition.h",
+     "ThemeChangeKind.h",
+     "ThemeDrawing.h",
+     "WidgetLogging.h",
+@@ -288,7 +287,6 @@ UNIFIED_SOURCES += [
+     "SharedWidgetUtils.cpp",
+     "SwipeTracker.cpp",
+     "TextEventDispatcher.cpp",
+-    "TextRecognition.cpp",
+     "Theme.cpp",
+     "ThemeCocoa.cpp",
+     "ThemeColors.cpp",
+diff --git a/xpcom/system/nsIXULRuntime.idl b/xpcom/system/nsIXULRuntime.idl
+index 5971413a56..fed4976002 100644
+--- a/xpcom/system/nsIXULRuntime.idl
++++ b/xpcom/system/nsIXULRuntime.idl
+@@ -266,11 +266,6 @@ interface nsIXULRuntime : nsISupports
+    */
+   readonly attribute boolean is64Bit;
+ 
+-  /**
+-   * Indicates whether or not text recognition of images supported by the OS.
+-   */
+-  readonly attribute boolean isTextRecognitionSupported;
+-
+   /**
+    * Signal the apprunner to invalidate caches on the next restart.
+    * This will cause components to be autoregistered and all

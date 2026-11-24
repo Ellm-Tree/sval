@@ -29,6 +29,7 @@ PATHS=("$@")
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$REPO_ROOT/build/firefox"
 OUT="$REPO_ROOT/patches/${NAME}.patch"
+DELETE_LIST="$REPO_ROOT/patches/${NAME}.delete"
 
 if [[ ${#PATHS[@]} -eq 0 ]]; then
   echo "warning: no pathspec given — capturing EVERY modification in $SRC." >&2
@@ -48,6 +49,28 @@ if git diff --quiet ${DIFF_ARGS[@]+"${DIFF_ARGS[@]}"}; then
   exit 1
 fi
 
+# A whole file the change deletes goes in the patch's deletion list, which
+# names it, and stays out of the patch, which would carry every line of it
+# (apply-patches.sh). The list keeps the paths it already holds, because
+# those files are gone from the tree this diffs against.
+deleted="$(git diff --name-only --diff-filter=D ${DIFF_ARGS[@]+"${DIFF_ARGS[@]}"})"
+if [[ -n "$deleted" ]]; then
+  {
+    [[ -f "$DELETE_LIST" ]] && cat "$DELETE_LIST"
+    printf '%s\n' "$deleted"
+  } | LC_ALL=C sort -u > "$DELETE_LIST.tmp"
+  mv "$DELETE_LIST.tmp" "$DELETE_LIST"
+  echo "==> Wrote $DELETE_LIST"
+fi
+
+if git diff --quiet --diff-filter=d ${DIFF_ARGS[@]+"${DIFF_ARGS[@]}"}; then
+  echo "==> The change only deletes files, so it has no patch"
+  echo ""
+  echo "Now add this line to patches/series:"
+  echo "    ${NAME}.delete"
+  exit 0
+fi
+
 # A patch starts with a `Sval: <what>` line and a paragraph saying why, which
 # `git apply` skips. Regenerating keeps whatever header is already there.
 header=""
@@ -58,7 +81,7 @@ fi
   if [[ -n "$header" ]]; then
     printf '%s\n\n' "$header"
   fi
-  git diff ${DIFF_ARGS[@]+"${DIFF_ARGS[@]}"}
+  git diff --diff-filter=d ${DIFF_ARGS[@]+"${DIFF_ARGS[@]}"}
 } > "$OUT"
 echo "==> Wrote $OUT"
 if [[ -z "$header" ]]; then
@@ -71,3 +94,7 @@ git diff --name-only ${DIFF_ARGS[@]+"${DIFF_ARGS[@]}"} | sed 's/^/    /'
 echo ""
 echo "Now add this line to patches/series:"
 echo "    ${NAME}.patch"
+if [[ -f "$DELETE_LIST" ]]; then
+  echo "and, on the line after it:"
+  echo "    ${NAME}.delete"
+fi

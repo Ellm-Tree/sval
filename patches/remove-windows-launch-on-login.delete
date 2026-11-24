@@ -1,0 +1,9 @@
+browser/components/defaultwindowslaunchonlogin/DefaultWindowsLaunchOnLogin.sys.mjs
+browser/components/defaultwindowslaunchonlogin/moz.build
+browser/components/defaultwindowslaunchonlogin/tests/test_DefaultWindowsLaunchOnLogin.js
+browser/components/defaultwindowslaunchonlogin/tests/xpcshell.toml
+browser/components/preferences/tests/browser_windows_launch_on_login.js
+browser/components/preferences/tests/browser_windows_launch_on_login_msix.js
+browser/components/tests/unit/test_startupTelemetry_launchOnLoginState.js
+toolkit/components/messaging-system/schemas/SpecialMessageActionSchemas/test/browser/browser_sma_launch_on_login.js
+toolkit/modules/WindowsLaunchOnLogin.sys.mjs

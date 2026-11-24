@@ -37,7 +37,8 @@ Sval is built from Firefox ESR, Mozilla's commit
 of {remote}.
 
 - patches/ holds Sval's changes to Mozilla's files. Apply them to that
-  commit with `git apply`, in the order patches/series lists.
+  commit in the order patches/series lists: a .patch with `git apply`, and
+  a .delete by deleting each file it lists.
 - chrome/ holds files Sval adds to Mozilla's tree, at the same paths
   without the leading chrome/.
 - branding/sval/ is copied to browser/branding/sval/.

@@ -2,8 +2,8 @@
 # Copyright 2026 Ellm Tree, Inc.
 #
 # Permissions Sval grants by default. Firefox's own list also lets
-# support.mozilla.org request a troubleshooting snapshot of the browser, and
-# lets Mozilla's sites drive UITour; Sval grants neither (Sval spec §10.9).
+# support.mozilla.org request a troubleshooting snapshot of the browser;
+# Sval does not grant it (Sval spec §10.9).
 #
 # Format: origin <TAB> type <TAB> capability <TAB> origin.
 

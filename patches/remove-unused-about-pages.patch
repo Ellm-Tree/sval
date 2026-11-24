@@ -1,0 +1,216 @@
+Sval: Remove about:unloads, about:inference, about:checkerboard and about:pdf
+
+no-closed-about-pages.patch takes each name out of the about: redirect
+tables, so nothing opens these pages. Their components go with them:
+the directories and their build entries, about:pdf's window actor, its
+remote page permissions and its async pref, the Fluent files only they
+read, the Kit illustration only about:pdf's promo drew, and their tests.
+TabUnloader itself, in tabbrowser, stays.
+
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 9ee1e4061b..7fd3bdd8a1 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -72,7 +72,6 @@ DIRS += [
+     "syncedtabs",
+     "tabbrowser",
+     "tabnotes",
+-    "tabunloader",
+     "textrecognition",
+     "topsites",
+     "translations",
+diff --git a/browser/installer/allowed-dupes.mn b/browser/installer/allowed-dupes.mn
+index ff5c784439..29f4d241d1 100644
+--- a/browser/installer/allowed-dupes.mn
++++ b/browser/installer/allowed-dupes.mn
+@@ -116,9 +116,3 @@ browser/chrome/browser/builtin-addons/newtab/data/data/content/assets/shaft-arro
+ chrome/toolkit/skin/classic/global/icons/shaft-arrow-left.svg
+ browser/chrome/browser/builtin-addons/newtab/data/data/content/assets/shaft-arrow-right.svg
+ chrome/toolkit/skin/classic/global/icons/shaft-arrow-right.svg
+-
+-# Bug 2034982 - kit-in-circle.svg is shared between the about:pdf landing page
+-# (toolkit global skin, used by the promo) and browser/extensions/newtab, which
+-# ship in separate packaging domains.
+-browser/chrome/browser/builtin-addons/newtab/data/data/content/assets/kit-in-circle.svg
+-chrome/toolkit/skin/classic/global/illustrations/kit-in-circle.svg
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 3954226541..84328ffd80 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -204,7 +204,6 @@ export default [
+       "taskcluster/docker/index-task/insert-indexes.js",
+       "testing/**",
+       "toolkit/actors/NetErrorParent.sys.mjs",
+-      "toolkit/components/aboutcheckerboard/content/aboutCheckerboard.js",
+       "toolkit/components/backgroundtasks/BackgroundTask_message.sys.mjs",
+       "toolkit/components/backgroundtasks/BackgroundTasksTestUtils.sys.mjs",
+       "toolkit/components/credentialmanagement/IdentityCredentialPromptService.sys.mjs",
+diff --git a/mots.yaml b/mots.yaml
+index bd4b492c96..7a594914e6 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -2296,7 +2296,6 @@ modules:
+     description: AI services and local inference
+     includes:
+       - browser/components/genai/
+-      - toolkit/components/aboutinference/
+       - toolkit/components/ml/
+     meta:
+       components:
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 5a6e25000d..76d80f7329 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -90,7 +90,6 @@ module.exports = [
+       "browser/components/sidebar/sidebar-pins-promo.css",
+       "browser/components/sidebar/sidebar-tab-row.css",
+       "browser/components/sidebar/sidebar.css",
+-      "browser/components/tabunloader/content/aboutUnloads.css",
+       "browser/components/textrecognition/textrecognition.css",
+       "browser/components/urlbar/tests/browser/dynamicResult0.css",
+       "browser/components/urlbar/tests/browser/dynamicResult1.css",
+@@ -262,10 +261,7 @@ module.exports = [
+       "security/manager/pki/resources/content/deletecert.css",
+       "security/manager/pki/resources/content/exceptionDialog.css",
+       "security/manager/ssl/tests/mochitest/mixedcontent/somestyle.css",
+-      "toolkit/components/aboutcheckerboard/content/aboutCheckerboard.css",
+       "toolkit/components/aboutconfig/content/aboutconfig.css",
+-      "toolkit/components/aboutinference/content/aboutInference.css",
+-      "toolkit/components/aboutinference/content/model-files-view.css",
+       "toolkit/components/aboutmemory/content/aboutMemory.css",
+       "toolkit/components/aboutprocesses/content/aboutProcesses.css",
+       "toolkit/components/aboutthirdparty/content/aboutThirdParty.css",
+diff --git a/toolkit/actors/moz.build b/toolkit/actors/moz.build
+index 37de22741f..333b8564b4 100644
+--- a/toolkit/actors/moz.build
++++ b/toolkit/actors/moz.build
+@@ -5,9 +5,6 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Toolkit", "General")
+ 
+-with Files("AboutPDF*.sys.mjs"):
+-    BUG_COMPONENT = ("Core", "PDF Viewer")
+-
+ with Files("AutoScroll*.sys.mjs"):
+     BUG_COMPONENT = ("Core", "Panning and Zooming")
+ 
+@@ -32,8 +29,6 @@ TESTING_JS_MODULES += [
+ FINAL_TARGET_FILES.actors += [
+     "AboutHttpsOnlyErrorChild.sys.mjs",
+     "AboutHttpsOnlyErrorParent.sys.mjs",
+-    "AboutPDFChild.sys.mjs",
+-    "AboutPDFParent.sys.mjs",
+     "AboutRestrictedChild.sys.mjs",
+     "AboutRestrictedParent.sys.mjs",
+     "AudioPlaybackChild.sys.mjs",
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 1435813505..6291ac923d 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -13,7 +13,6 @@ if CONFIG["MOZ_HAS_REMOTE"]:
+     DIRS += ["remote"]
+ 
+ DIRS += [
+-    "aboutcheckerboard",
+     "aboutmemory",
+     "aboutprocesses",
+     "alerts",
+@@ -103,7 +102,6 @@ if CONFIG["NS_PRINTING"]:
+ if CONFIG["MOZ_BUILD_APP"] != "mobile/android":
+     DIRS += [
+         "aboutconfig",
+-        "aboutpdf",
+         "narrate",
+         "pictureinpicture",
+         "uniffi-js",
+@@ -152,9 +150,6 @@ if CONFIG["MOZ_BACKGROUNDTASKS"]:
+ if CONFIG["MOZ_UNIFFI_FIXTURES"]:
+     DIRS += ["uniffi-bindgen-gecko-js/tests"]
+ 
+-if CONFIG["NIGHTLY_BUILD"]:
+-    DIRS += ["aboutinference"]
+-
+ UNIFIED_SOURCES += [
+     "/toolkit/components/antitracking/ContentBlockingAllowList.cpp",
+ ]
+diff --git a/toolkit/locales/jar.mn b/toolkit/locales/jar.mn
+index 480dbd7db7..3ffde87355 100644
+--- a/toolkit/locales/jar.mn
++++ b/toolkit/locales/jar.mn
+@@ -12,9 +12,6 @@
+ #ifdef MOZ_LAYOUT_DEBUGGER
+   layoutdebug/layoutdebug.ftl                      (../../layout/tools/layout-debug/ui/content/layoutdebug.ftl)
+ #endif
+-#if defined(NIGHTLY_BUILD)
+-  preview/aboutInference.ftl                       (../components/aboutinference/content/aboutInference.ftl)
+-#endif
+ 
+ @AB_CD@.jar:
+ % locale global @AB_CD@ %locale/@AB_CD@/global/
+diff --git a/toolkit/modules/ActorManagerParent.sys.mjs b/toolkit/modules/ActorManagerParent.sys.mjs
+index fbaea5e9bf..964fb91b1c 100644
+--- a/toolkit/modules/ActorManagerParent.sys.mjs
++++ b/toolkit/modules/ActorManagerParent.sys.mjs
+@@ -778,20 +778,6 @@ if (AppConstants.platform != "android") {
+     allFrames: true,
+   };
+ 
+-  JSWINDOWACTORS.AboutPDF = {
+-    parent: {
+-      esModuleURI: "resource://gre/actors/AboutPDFParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://gre/actors/AboutPDFChild.sys.mjs",
+-      events: {
+-        DOMDocElementInserted: {},
+-      },
+-    },
+-    matches: ["about:pdf", "about:pdf?*", "about:pdf#*"],
+-    remoteTypes: ["privilegedabout"],
+-  };
+-
+   JSWINDOWACTORS.AboutTranslations = {
+     parent: {
+       esModuleURI: "resource://gre/actors/AboutTranslationsParent.sys.mjs",
+diff --git a/toolkit/modules/AsyncPrefs.sys.mjs b/toolkit/modules/AsyncPrefs.sys.mjs
+index 45548a6847..8932738b24 100644
+--- a/toolkit/modules/AsyncPrefs.sys.mjs
++++ b/toolkit/modules/AsyncPrefs.sys.mjs
+@@ -12,7 +12,6 @@ const kPrivilegedAboutPrefs = new Set([
+   "testing.allowed-prefs.some-char-pref",
+   "testing.allowed-prefs.some-int-pref",
+ 
+-  "browser.aboutpdf.promo.dismissed",
+   "browser.contentblocking.report.hide_vpn_banner",
+   "browser.contentblocking.report.show_mobile_app",
+ ]);
+diff --git a/toolkit/modules/RemotePageAccessManager.sys.mjs b/toolkit/modules/RemotePageAccessManager.sys.mjs
+index 889bb92894..8932cf3063 100644
+--- a/toolkit/modules/RemotePageAccessManager.sys.mjs
++++ b/toolkit/modules/RemotePageAccessManager.sys.mjs
+@@ -78,13 +78,6 @@ export let RemotePageAccessManager = {
+     "about:certificate": {
+       RPMSendQuery: ["getCertificates"],
+     },
+-    "about:pdf": {
+-      RPMCanSetDefaultPDFHandler: ["*"],
+-      RPMGetBoolPref: ["browser.aboutpdf.promo.dismissed"],
+-      RPMPickPDFFile: ["*"],
+-      RPMSetDefaultPDFHandler: ["*"],
+-      RPMSetPref: ["browser.aboutpdf.promo.dismissed"],
+-    },
+     "about:keyboard": {
+       RPMAddMessageListener: ["CustomKeys:CapturedKey"],
+       RPMSendAsyncMessage: ["CustomKeys:CaptureKey"],
+diff --git a/toolkit/themes/shared/desktop-jar.inc.mn b/toolkit/themes/shared/desktop-jar.inc.mn
+index 9861375026..90f62cf077 100644
+--- a/toolkit/themes/shared/desktop-jar.inc.mn
++++ b/toolkit/themes/shared/desktop-jar.inc.mn
+@@ -151,7 +151,6 @@
+   skin/classic/global/illustrations/no-connection.svg      (../../shared/illustrations/no-connection.svg)
+   skin/classic/global/illustrations/kit-concerned.svg      (../../shared/illustrations/kit-concerned.svg)
+   skin/classic/global/illustrations/kit-happy.svg	   (../../shared/illustrations/kit-happy.svg)
+-  skin/classic/global/illustrations/kit-in-circle.svg      (../../shared/illustrations/kit-in-circle.svg)
+   skin/classic/global/media/picture-in-picture-open.svg    (../../shared/media/picture-in-picture-open.svg)
+   skin/classic/global/media/picture-in-picture-closed.svg  (../../shared/media/picture-in-picture-closed.svg)
+   skin/classic/global/icons/minus.svg                      (../../shared/icons/minus.svg)

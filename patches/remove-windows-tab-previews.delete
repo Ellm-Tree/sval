@@ -1,0 +1,2 @@
+browser/modules/WindowsPreviewPerTab.sys.mjs
+browser/modules/test/browser/browser_taskbar_preview.js

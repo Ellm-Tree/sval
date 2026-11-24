@@ -567,6 +567,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_launcher_tabs.js"]
 
+["browser_sval_launcher_top_sites.js"]
+
 ["browser_sval_letterboxing.js"]
 
 ["browser_sval_link_routing.js"]
@@ -606,6 +608,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 ["browser_sval_no_ai.js"]
 
 ["browser_sval_no_mozilla_links.js"]
+
+["browser_sval_no_newtab_addon.js"]
 
 ["browser_sval_no_profile_reset.js"]
 
@@ -682,6 +686,8 @@ run-if = ["os == 'win'", "os == 'mac'"]
 ["browser_sval_pip_on_tab_switch.js"]
 
 ["browser_sval_pip_toggle_size.js"]
+
+["browser_sval_preferences_home_page.js"]
 
 ["browser_sval_preferences_in_firefox_categories.js"]
 

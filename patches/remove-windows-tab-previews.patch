@@ -1,0 +1,225 @@
+Sval: Remove Windows taskbar tab previews
+
+Sval shows one taskbar entry per window. The per-tab previews module
+goes with its prefs, the window's open and close hooks that started it,
+and the Settings checkbox that turned it on.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 05e9559873..b7e793a973 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1648,10 +1648,6 @@ pref("browser.bookmarks.editDialog.maxRecentFolders", 7);
+ #endif
+ 
+ #ifdef XP_WIN
+-  pref("browser.taskbar.previews.enable", false);
+-  pref("browser.taskbar.previews.max", 20);
+-  pref("browser.taskbar.previews.cachetime", 5);
+-
+   pref("browser.taskbar.lists.enabled", true);
+   pref("browser.taskbar.lists.frequent.enabled", true);
+   pref("browser.taskbar.lists.recent.enabled", false);
+@@ -1717,7 +1713,6 @@ pref("services.sync.prefs.sync.browser.startup.upgradeDialog.enabled", true);
+ pref("services.sync.prefs.sync.browser.tabs.loadInBackground", true);
+ pref("services.sync.prefs.sync.browser.tabs.warnOnClose", true);
+ pref("services.sync.prefs.sync.browser.tabs.warnOnOpen", true);
+-pref("services.sync.prefs.sync.browser.taskbar.previews.enable", true);
+ pref("services.sync.prefs.sync.browser.urlbar.maxRichResults", true);
+ pref("services.sync.prefs.sync.browser.urlbar.showSearchSuggestionsFirst", true);
+ pref("services.sync.prefs.sync.browser.urlbar.suggest.bookmark", true);
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+index 3c286d0173..73a6a7292c 100644
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -1113,10 +1113,6 @@ var gBrowserInit = {
+       { timeout: 10000 }
+     );
+ 
+-    if (Win7Features) {
+-      scheduleIdleTask(() => Win7Features.onOpenWindow());
+-    }
+-
+     scheduleIdleTask(async () => {
+       NewTabPagePreloading.maybeCreatePreloadedBrowser(window);
+     });
+@@ -1245,9 +1241,6 @@ var gBrowserInit = {
+     if (this._boundDelayedStartup) {
+       this._cancelDelayedStartup();
+     } else {
+-      if (Win7Features) {
+-        Win7Features.onCloseWindow();
+-      }
+       Services.prefs.removeObserver(ctrlTab.prefName, ctrlTab);
+       ctrlTab.uninit();
+       gBrowserThumbnails.uninit();
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 9995330a7c..f2b776a857 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -507,35 +507,6 @@ ChromeUtils.defineLazyGetter(this, "MacUserActivityUpdater", () => {
+   );
+ });
+ 
+-ChromeUtils.defineLazyGetter(this, "Win7Features", () => {
+-  if (AppConstants.platform != "win") {
+-    return null;
+-  }
+-
+-  const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
+-  if (
+-    WINTASKBAR_CONTRACTID in Cc &&
+-    Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available
+-  ) {
+-    let { AeroPeek } = ChromeUtils.importESModule(
+-      "resource:///modules/WindowsPreviewPerTab.sys.mjs"
+-    );
+-    return {
+-      onOpenWindow() {
+-        AeroPeek.onOpenWindow(window);
+-        this.handledOpening = true;
+-      },
+-      onCloseWindow() {
+-        if (this.handledOpening) {
+-          AeroPeek.onCloseWindow(window);
+-        }
+-      },
+-      handledOpening: false,
+-    };
+-  }
+-  return null;
+-});
+-
+ ChromeUtils.defineLazyGetter(this, "gRestoreLastSessionObserver", () => {
+   let { RestoreLastSessionObserver } = ChromeUtils.importESModule(
+     "resource:///modules/sessionstore/SessionWindowUI.sys.mjs"
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 19a60681ff..c0890c891f 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -217,7 +217,6 @@
+   "InlineSpellCheckerUI",
+   "PopupNotifications",
+   "MacUserActivityUpdater",
+-  "Win7Features",
+   "gToolbarKeyNavEnabled",
+   "gBookmarksToolbarVisibility",
+   "gFxaToolbarEnabled",
+diff --git a/browser/components/preferences/config/tabs-browsing.mjs b/browser/components/preferences/config/tabs-browsing.mjs
+index cad7886454..17596eb33e 100644
+--- a/browser/components/preferences/config/tabs-browsing.mjs
++++ b/browser/components/preferences/config/tabs-browsing.mjs
+@@ -41,8 +41,6 @@ Preferences.addAll([
+     once (e.g. a large folder of bookmarks), false otherwise
+   browser.warnOnQuitShortcut
+   - true if the user should be warned if they quit using the keyboard shortcut
+-  browser.taskbar.previews.enable
+-  - true if tabs are to be shown in the Windows 7 taskbar
+   */
+ 
+   { id: "browser.link.open_newwindow", type: "int" },
+@@ -104,10 +102,6 @@ Preferences.addAll([
+   { id: "sidebar.revamp", type: "bool" },
+ ]);
+ 
+-if (lazy.AppConstants.platform === "win") {
+-  Preferences.addAll([{ id: "browser.taskbar.previews.enable", type: "bool" }]);
+-}
+-
+ let srdEnabled = Services.prefs.getBoolPref(
+   "browser.settings-redesign.enabled",
+   false
+@@ -282,29 +276,6 @@ Preferences.addSetting({
+   id: "tabGroupDragToCreate",
+   pref: "browser.tabs.dragDrop.createGroup.enabled",
+ });
+-if (lazy.AppConstants.platform === "win") {
+-  /**
+-   * browser.taskbar.previews.enable - bool
+-   *   True - Tabs are to be shown in Windows 7 taskbar.
+-   *   False - Only the window is to be shown in Windows 7 taskbar.
+-   */
+-  Preferences.addSetting({
+-    id: "showTabsInTaskbar",
+-    pref: "browser.taskbar.previews.enable",
+-    // Functionality for "Show tabs in taskbar" on Windows 7 and up.
+-    visible: () => {
+-      try {
+-        let ver = parseFloat(Services.sysinfo.getProperty("version"));
+-        return ver >= 6.1;
+-      } catch (ex) {
+-        return false;
+-      }
+-    },
+-  });
+-} else {
+-  // Not supported unless we're on Windows
+-  Preferences.addSetting({ id: "showTabsInTaskbar", visible: () => false });
+-}
+ 
+ // "Containers" tabs settings
+ Preferences.addSetting({
+@@ -660,10 +631,6 @@ SettingGroupManager.registerGroups({
+             id: "tabGroupDragToCreate",
+             l10nId: "settings-tabs-drag-to-create-tab-groups",
+           },
+-          {
+-            id: "showTabsInTaskbar",
+-            l10nId: "show-tabs-in-taskbar",
+-          },
+         ],
+       },
+       {
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index c8871a2445..3a72934e95 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -300,10 +300,6 @@ switch-to-new-tabs-2 =
+     .label = When opening links or media in a new tab, switch to it immediately
+     .accesskey = h
+ 
+-show-tabs-in-taskbar =
+-    .label = Show tab previews in the Windows taskbar
+-    .accesskey = k
+-
+ browser-containers-enabled-2 =
+     .label = Use Container Tabs
+     .accesskey = n
+diff --git a/browser/modules/moz.build b/browser/modules/moz.build
+index eeea1bb6bc..53ee3e3cda 100644
+--- a/browser/modules/moz.build
++++ b/browser/modules/moz.build
+@@ -94,10 +94,6 @@ with Files("WindowsJumpLists.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Shell Integration")
+     SCHEDULES.exclusive = ["windows"]
+ 
+-with Files("WindowsPreviewPerTab.sys.mjs"):
+-    BUG_COMPONENT = ("Core", "Widget: Win32")
+-    SCHEDULES.exclusive = ["windows"]
+-
+ with Files("webrtcUI.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Site Permissions")
+ 
+@@ -157,7 +153,6 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+     EXTRA_JS_MODULES += [
+         "FilePickerCrashed.sys.mjs",
+         "WindowsJumpLists.sys.mjs",
+-        "WindowsPreviewPerTab.sys.mjs",
+     ]
+ 
+     EXTRA_JS_MODULES.backgroundtasks += [
+diff --git a/browser/modules/test/browser/browser.toml b/browser/modules/test/browser/browser.toml
+index 484fc20654..3a2567caf8 100644
+--- a/browser/modules/test/browser/browser.toml
++++ b/browser/modules/test/browser/browser.toml
+@@ -99,11 +99,6 @@ https_first_disabled = true
+ 
+ ["browser_preloading_tab_moving.js"]
+ 
+-["browser_taskbar_preview.js"]
+-run-if = [
+-  "os == 'win'",
+-]
+-
+ ["browser_urlBar_zoom.js"]
+ skip-if = [
+   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'", # Bug 1775794

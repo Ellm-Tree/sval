@@ -196,7 +196,8 @@ a comment. Brand art is reserved (`branding/sval/LICENSE`).
 
 ### Layout
 
-- `patches/`: patches to Mozilla's code, ordered by `patches/series`.
+- `patches/`: patches to Mozilla's code, and lists of Mozilla files a removal
+  deletes, ordered by `patches/series`.
 - `chrome/`: new files copied into the tree. Sval's UI code lives here.
 - `branding/`: copied to `browser/branding/sval`. `branding/sval/README.md`
   describes the art.
@@ -245,8 +246,12 @@ To modify one of Mozilla's own files:
 3. `./scripts/make-patch.sh <name> <path...>` captures your diff against the
    applied series. A new patch needs a header above its first `diff` line:
    `Sval: <what>`, a blank line, then why. `make-patch.sh` keeps the header.
-4. Add `<name>.patch` to `patches/series`, and prove it applies from pristine
-   with `./scripts/apply-patches.sh`.
+   A file deleted whole goes in `<name>.delete`, one path per line, and
+   stays out of the patch.
+4. Add `<name>.patch` to `patches/series`, and `<name>.delete` on the line
+   after it if there is one, and prove the series applies from pristine with
+   `./scripts/apply-patches.sh`. It fails on a listed file that does not
+   exist.
 
 A new file goes in `chrome/`, mirroring the upstream layout, never in a patch.
 

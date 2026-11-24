@@ -95,14 +95,17 @@ committed.
 
 | Asset | Where Firefox shows it | Why Sval does not |
 |---|---|---|
-| `browser/extensions/newtab/**` | New tab and Firefox Home | Sval's home page replaces both (`sval-home-page.patch`) |
+| `browser/extensions/newtab/**` | New tab and Firefox Home | Removed (`remove-newtab.delete`) |
 | `browser/components/topsites/**` | Default top sites | No default sites, and no Firefox Home (`app-sval-prefs.js`) |
-| `browser/components/aboutwelcome/**` | Onboarding and what's new | `browser.aboutwelcome.enabled` off; Sval's first run replaces it |
-| `browser/components/asrouter/**`, `browser/themes/shared/app-marketplace-icons/**` | Firefox's messages and mobile promos | Every message provider off (`app-sval-prefs.js`) |
+| `browser/components/aboutwelcome/**` | Onboarding and what's new | Removed (`remove-messaging.delete`) |
+| `browser/components/asrouter/**` | Firefox's messages | Removed (`remove-messaging.delete`) |
+| `browser/themes/shared/app-marketplace-icons/**` | Mobile app store badges | Removed (`remove-messaging.delete`) |
 | `browser/components/aboutlogins/content/icons/intro-illustration.svg` | A password-manager message | Messages off |
-| `browser/components/privatebrowsing/**`, `browser/themes/shared/privatebrowsing/fox-tail.svg` | about:privatebrowsing | Sval's private page replaces it (`jar.mn` override) |
+| `browser/components/privatebrowsing/**` | about:privatebrowsing's promotions | Removed (`remove-private-browsing-promos.delete`) |
+| `browser/themes/shared/privatebrowsing/fox-tail.svg` | about:privatebrowsing | Sval's private page replaces it (`jar.mn` override) |
 | `browser/components/ipprotection/**` | Firefox's VPN | Locked off |
-| `browser/components/aiwindow/**`, `browser/components/genai/**`, `browser/themes/shared/icons/smart-window*.svg`, `toolkit/components/ml/**` | AI window, chatbot and link previews | Locked off (`browser.ai.control.*`, `browser.ml.*`) |
+| `browser/components/aiwindow/**`, `browser/components/genai/**`, `browser/themes/shared/icons/smart-window*.svg` | AI window, chatbot and link previews | Removed (`remove-ai.delete`) |
+| `toolkit/components/ml/**` | On-device AI models | Locked off (`browser.ml.enable`) |
 | `browser/themes/shared/fxa/**`, `browser/base/content/logos/fxa-logo.svg` | Mozilla accounts, sync, send tab to device | `identity.fxaccounts.enabled` locked off |
 | `browser/base/content/logos/monitor.svg`, `browser/base/content/logos/relay.svg`, `browser/base/content/logos/vpn*.svg` | about:protections and settings promos | Locked off; the Monitor card is off by Firefox's default |
 | `browser/themes/shared/preferences/monitor-logo.svg`, `browser/themes/shared/preferences/relay-logo.svg`, `browser/themes/shared/preferences/vpn-logo.svg`, `browser/themes/shared/preferences/mozilla-16.svg`, `browser/themes/shared/preferences/mozilla-logo.svg`, `browser/themes/shared/preferences/thunderbird-color-16.svg`, `browser/themes/shared/preferences/solo-ai-logo.svg`, `browser/components/preferences/more-from-mozilla-qr-code-simple.svg` | Settings, More from Mozilla and account | `browser.preferences.moreFromMozilla` locked off; the account groups and chatbot providers are hidden (`settings-hide-removed-features.patch`) |

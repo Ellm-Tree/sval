@@ -668,49 +668,20 @@ pref("browser.ctrlTab.sortByRecentlyUsed", true); // upstream: false
 pref("browser.link.force_default_user_context_id_for_external_opens", true); // upstream: false
 
 // Nothing interrupts a launch. The default-browser check raises a notification
-// bar on first run, and Sval has no onboarding tour to show.
+// bar on first run.
 pref("browser.shell.checkDefaultBrowser", false); // upstream: true
-pref("browser.aboutwelcome.enabled", false); // upstream: true
 
-// The new tab page asks the thumbnail service for a screenshot of every top
-// site, and a miss is logged as "getScreenshot(<url>) failed"
-// (browser/extensions/newtab/lib/Screenshots.sys.mjs). With capturing
-// disabled, BackgroundPageThumbs.captureIfMissing returns without capturing
-// and the caller takes the moz-page-thumb URL path, so there is no failure to
-// log and no background page loads of the user's sites.
+// A background thumbnail (BackgroundPageThumbs.capture, which PlacesPreviews
+// calls) loads one of the user's pages in a hidden browser. With capturing
+// disabled, PageThumbs._prefEnabled is false and no such load starts.
 pref("browser.pagethumbnails.capturing_disabled", true); // upstream: false
 
 // Nimbus has three independent reasons to consider itself enabled
 // (ExperimentAPI.sys.mjs): Firefox Labs, rollouts, and opt-out studies.
 // app.shield.optoutstudies.enabled above covers studies; this covers rollouts.
-// Labs is allowed unless an enterprise policy forbids it, so the Remote
-// Settings loader still runs.
+// Labs is always off (`labsEnabled`, no-firefox-labs.patch), so Nimbus stays
+// disabled and its Remote Settings loader does not start.
 pref("nimbus.rollouts.enabled", false, locked); // upstream: true
-
-// Messaging: Sval shows no campaigns, no contextual feature recommendations and
-// no onboarding, and it fetches none. Three of upstream's four providers pull
-// message sets from Remote Settings or from Nimbus, and the fourth is the
-// onboarding set; with no messages, ASRouter evaluates no targeting.
-//
-// A provider whose JSON parses to null is dropped from the list without
-// complaint (ASRouterPreferences.sys.mjs `_getProviderConfig`), so each entry
-// says "enabled": false and still names what it turns off.
-pref(
-  "browser.newtabpage.activity-stream.asrouter.providers.cfr",
-  '{"id":"cfr","enabled":false}'
-);
-pref(
-  "browser.newtabpage.activity-stream.asrouter.providers.message-groups",
-  '{"id":"message-groups","enabled":false}'
-);
-pref(
-  "browser.newtabpage.activity-stream.asrouter.providers.messaging-experiments",
-  '{"id":"messaging-experiments","enabled":false}'
-);
-pref(
-  "browser.newtabpage.activity-stream.asrouter.providers.onboarding",
-  '{"id":"onboarding","enabled":false}'
-);
 
 // Every launch brings back the windows the last session had (spec §10.4):
 // each window's place, size, stacking and the workspace it showed. Firefox's
@@ -877,42 +848,6 @@ pref("browser.urlbar.suggest.quicksuggest.all", false, locked);
 pref("browser.urlbar.suggest.quicksuggest.sponsored", false, locked);
 pref("browser.urlbar.suggest.quicksuggest.nonsponsored", false, locked);
 pref("browser.urlbar.suggest.weather", false, locked); // upstream: true
-pref("browser.newtabpage.activity-stream.showWeather", false, locked); // upstream: true
-pref("browser.newtabpage.activity-stream.system.showWeather", false, locked);
-// The new tab's widget weather is a second weather feature with its own
-// switches, and its system switch turns on by region (ActivityStream
-// PREFS_CONFIG, `widgets.system.weather.enabled`). Without Merino it shows
-// built-in placeholder weather.
-pref(
-  "browser.newtabpage.activity-stream.widgets.weather.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.widgets.system.weather.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.widgets.weatherForecast.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.widgets.system.weatherForecast.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.system.showWeatherOptIn",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.weather.staticData.enabled",
-  false,
-  locked
-);
 pref("browser.urlbar.merino.endpointURL", "", locked);
 pref("browser.urlbar.merino.ohttpConfigURL", "", locked);
 pref("browser.urlbar.merino.ohttpRelayURL", "", locked);
@@ -965,11 +900,11 @@ pref(
 // (`TRRServiceBase::CheckURIPrefs`): the list's first.
 pref("network.trr.default_provider_uri", "https://dns.quad9.net/dns-query"); // upstream: mozilla.cloudflare-dns.com
 
-// New tabs: no seeded top sites, so the tiles come only from the user's own
-// history. DNS prefetch is off everywhere, so no page, the new tab included,
-// makes Sval look up hosts the user never visits.
+// Top sites: none seeded, so the list comes only from the user's own history.
+// DNS prefetch is off everywhere, so no page makes Sval look up hosts the user
+// never visits.
 pref("browser.newtabpage.activity-stream.default.sites", "", locked);
-// Search shortcuts seed tiles such as "@amazon" for the region's partner
+// Search shortcuts seed top sites such as "@amazon" for the region's partner
 // engines. Shortcuts the user pins, and sites from their own history, stay.
 pref(
   "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts",
@@ -977,16 +912,7 @@ pref(
   locked
 ); // upstream: true
 pref("browser.topsites.useRemoteSetting", false, locked); // upstream: true
-pref(
-  "browser.newtabpage.activity-stream.newtabWallpapers.enabled",
-  false,
-  locked
-); // upstream: true
 pref("network.dns.disablePrefetch", true); // upstream: false
-// about:home is Sval's own page (chrome/browser/components/sval/home/). The
-// startup cache stores the activity stream's rendered markup and would serve it
-// in place of that page on the first about:home of a session.
-pref("browser.startup.homepage.abouthome_cache.enabled", false, locked); // upstream: true
 
 // Search suggestions send what the user types to their chosen engine, which
 // they already trust with what they search for. Settings > Search turns them
@@ -1004,11 +930,6 @@ pref("browser.urlbar.suggest.engines", false, locked); // upstream: true
 // libpref otherwise drops a user value equal to the default, and the gate
 // would later open a connection the user had closed.
 pref("dom.push.connection.enabled", false, sticky); // upstream: true
-
-// Search-results categorization is search telemetry: it downloads Mozilla's
-// site-category lists to classify the pages a search returns. It turns on by
-// region.
-pref("browser.search.serpEventTelemetryCategorization.enabled", false, locked); // upstream: true
 
 // Breach alerts are fetched from Mozilla's Monitor service.
 pref("signon.management.page.breach-alerts.enabled", false, locked); // upstream: true
@@ -1042,111 +963,8 @@ pref("browser.safebrowsing.downloads.remote.enabled", false); // upstream: true
 // turned on. Everything here is either locked off, so it disappears or cannot
 // be re-enabled, or set to its dismissed state.
 
-// The new tab's own telemetry, including a ping it sends through an OHTTP
-// relay.
-pref("browser.newtabpage.activity-stream.telemetry", false, locked);
-pref(
-  "browser.newtabpage.activity-stream.telemetry.privatePing.enabled",
-  false,
-  locked
-);
-pref("browser.newtabpage.ping.enabled", false, locked);
-
-// New tab. "Support Firefox" is a master switch whose change handler sets both
-// sponsored prefs to its own value (newtab AboutPreferences.sys.mjs), so the
-// sponsored prefs above are locked as well as hidden.
-pref(
-  "browser.newtabpage.activity-stream.showSponsoredCheckboxes",
-  false,
-  locked
-);
-pref("browser.newtabpage.activity-stream.showSponsored", false, locked);
-pref("browser.newtabpage.activity-stream.showSponsoredTopSites", false, locked);
-pref(
-  "browser.newtabpage.activity-stream.unifiedAds.tiles.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.unifiedAds.spocs.enabled",
-  false,
-  locked
-);
-pref("browser.newtabpage.activity-stream.unifiedAds.endpoint", "", locked);
-pref(
-  "browser.newtabpage.activity-stream.discoverystream.endpointSpocsClear",
-  "",
-  locked
-);
-pref("browser.topsites.contile.enabled", false, locked);
-pref("browser.topsites.contile.endpoint", "", locked);
-// Recommended stories, and topics, sections, the daily brief and inferred
-// personalization beneath them.
-pref(
-  "browser.newtabpage.activity-stream.feeds.system.topstories",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.feeds.section.topstories",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.discoverystream.endpoints",
-  "",
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.widgets.system.sportsWidget.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.widgets.sportsWidget.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.mobileDownloadModal.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.discoverystream.promoCard.enabled",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.discoverystream.promoCard.visible",
-  false,
-  locked
-);
-// The new tab can replace itself with an add-on downloaded from Mozilla.
-pref("browser.newtabpage.trainhopAddon.xpiBaseURL", "", locked);
-
 // Settings and browser chrome.
 pref("browser.preferences.moreFromMozilla", false, locked);
-// "Recommend extensions/features as you browse" also gates the address bar's
-// search tips, separately from the message providers turned off above.
-pref(
-  "browser.newtabpage.activity-stream.asrouter.userprefs.cfr.addons",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features",
-  false,
-  locked
-);
-pref(
-  "browser.newtabpage.activity-stream.asrouter.useRemoteL10n",
-  false,
-  locked
-);
-pref("browser.ipProtection.enabled", false, locked);
-pref("browser.ipProtection.blockIPProtectionCallouts", true, locked);
-pref("browser.ipProtection.guardian.endpoint", "", locked);
 pref("signon.firefoxRelay.feature", "", locked);
 // Firefox's site panel, which Sval's protection button replaces (decision
 // 0131). Off, it reads nothing and the address bar has no padlock for it.
@@ -1155,8 +973,6 @@ pref("browser.urlbar.trustPanel.featureGate", false, locked); // upstream: true
 // separate from the password manager's.
 pref("browser.urlbar.trustPanel.breachAlerts.featureGate", false, locked);
 pref("browser.urlbar.trustPanel.breachAlerts", false, locked);
-// Lets mozilla.org pages open menus and highlight browser buttons.
-pref("browser.uitour.enabled", false, locked);
 // Sval's own default permissions (branding/sval/sval-permissions): Firefox's also
 // let support.mozilla.org request a troubleshooting snapshot of the browser.
 pref(
@@ -1177,60 +993,21 @@ pref("termsofuse.bypassNotification", true, locked);
 pref("browser.preonboarding.enabled", false, locked);
 pref("default-browser-agent.enabled", false, locked);
 
-// AI is deferred past v1, and nothing speaks first (spec §2, principle 6), so
-// none of Mozilla's AI features ship. Each is locked off with the values
-// Mozilla's own AIControls policy writes to block it
-// (browser/components/enterprisepolicies/Policies.sys.mjs `AIControls`), so
-// neither about:config nor settings can turn one back on, and every setting
-// for one is hidden (settings-hide-removed-features.patch hides a locked
-// pref's control).
+// AI is deferred past v1, and nothing speaks first (spec §2, principle 6).
+// Smart Window, the chatbot, link previews and smart tab groups are not
+// built. The on-device models that remain are each locked off, so a future
+// upstream default flip cannot re-arm one.
 //
 // browser.ml.enable is the root: the MLEngine actor is registered only while
 // it is on (ActorManagerParent.sys.mjs `MLEngine` enablePreference), and
 // EngineProcess.getMLEngineParent throws without it, so no feature can start
-// an on-device model or download one from Mozilla's model hub. The feature
-// prefs are locked too, so the menus and buttons that offer each feature are
-// gone, and a future upstream default flip cannot re-arm one.
+// an on-device model or download one from Mozilla's model hub.
 //
 // Translations is not among them: it runs on the device through its own
 // engine, which does not need browser.ml.enable, and its models come from the
 // Remote Settings collections spec §10.9 keeps for it.
 pref("browser.ml.enable", false, locked); // upstream: true
 pref("browser.ai.control.default", "blocked", locked); // upstream: "available"
-// The AI Controls settings pane.
-pref("browser.preferences.aiControls", false, locked); // upstream: true
-
-// The chatbot sidebar, its page and tab menu items, and the selection
-// shortcut. The page and tab menus offer the chatbot from browser.ml.chat.page
-// alone, without checking that the chatbot is on (GenAI.sys.mjs
-// isPageFeatureAllowed).
-pref("browser.ml.chat.enabled", false, locked); // upstream: true
-pref("browser.ml.chat.provider", "", locked);
-pref("browser.ml.chat.page", false, locked);
-pref("browser.ml.chat.menu", false, locked);
-pref("browser.ml.chat.sidebar", false, locked);
-pref("browser.ml.chat.shortcuts", false, locked);
-pref("browser.ml.chat.shortcuts.smartwindow", false, locked);
-pref("browser.ml.pageAssist.enabled", false, locked);
-pref("browser.ai.control.sidebarChatbot", "blocked", locked);
-
-// Smart Window: a vendor-hosted model that an experiment can switch on.
-pref("browser.smartwindow.enabled", false, locked);
-pref("browser.smartwindow.worldcup.enabled", false, locked);
-pref("browser.smartwindow.endpoint", "", locked);
-pref("browser.ai.control.smartWindow", "blocked", locked);
-
-// Link previews, with their generated key points.
-pref("browser.ml.linkPreview.enabled", false, locked); // upstream: true
-pref("browser.ml.linkPreview.optin", false, locked);
-pref("browser.ml.linkPreview.longPress", false, locked);
-pref("browser.ai.control.linkPreviewKeyPoints", "blocked", locked);
-
-// Smart tab groups: suggested names and tabs for a group.
-pref("browser.tabs.groups.smart.enabled", false, locked); // upstream: true
-pref("browser.tabs.groups.smart.userEnabled", false, locked); // upstream: true
-pref("browser.tabs.groups.smart.optin", false, locked);
-pref("browser.ai.control.smartTabGroups", "blocked", locked);
 
 // PDF alt text, which pdf.js offers to generate with a downloaded model.
 pref("pdfjs.enableAltText", false, locked);

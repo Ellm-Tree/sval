@@ -1,0 +1,314 @@
+Sval: Remove SpecialMessageActions
+
+SpecialMessageActions ran the actions of Firefox's in-app messages. With
+the messages removed (remove-messaging.patch), its last callers did one
+thing each, which they do directly: the protections panel's info message
+opens its link, Firefox View's signed-out Send Tab item opens the account
+sign-in page, and a Windows notification that carries messaging relaunch
+data is no longer acted on. The module, its schemas, their docs and tests
+go, with about:privatebrowsing's remote page access, which only Firefox's
+own page used. Targeting.sys.mjs and Logger.sys.mjs stay for Nimbus.
+
+diff --git a/browser/base/content/browser-siteProtections.js b/browser/base/content/browser-siteProtections.js
+index c0dfae79bb..8693df81ef 100644
+--- a/browser/base/content/browser-siteProtections.js
++++ b/browser/base/content/browser-siteProtections.js
+@@ -5,8 +5,6 @@
+ ChromeUtils.defineESModuleGetters(this, {
+   ContentBlockingAllowList:
+     "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
+-  SpecialMessageActions:
+-    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+ });
+ 
+ XPCOMUtils.defineLazyServiceGetter(
+@@ -2986,16 +2984,12 @@ var gProtectionsHandler = {
+       console.error(e);
+       url = message.content.cta_url;
+     }
+-    SpecialMessageActions.handleAction(
+-      {
+-        type: message.content.cta_type,
+-        data: {
+-          args: url,
+-          where: message.content.cta_where || "tabshifted",
+-        },
+-      },
+-      window.gBrowser.selectedBrowser
+-    );
++    openLinkIn(url, message.content.cta_where || "tabshifted", {
++      private: false,
++      triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal(
++        {}
++      ),
++    });
+ 
+     // Only send telemetry for non private browsing windows
+     if (!PrivateBrowsingUtils.isWindowPrivate(window)) {
+@@ -3040,7 +3034,6 @@ var gProtectionsHandler = {
+         cta_url: `${Services.urlFormatter.formatURLPref(
+           "app.support.baseURL"
+         )}etp-promotions?as=u&utm_source=inproduct`,
+-        cta_type: "OPEN_URL",
+       },
+     };
+ 
+diff --git a/browser/components/BrowserContentHandler.sys.mjs b/browser/components/BrowserContentHandler.sys.mjs
+index 3f0c29a8c4..8ebf7d0054 100644
+--- a/browser/components/BrowserContentHandler.sys.mjs
++++ b/browser/components/BrowserContentHandler.sys.mjs
+@@ -19,8 +19,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
+   ShellService: "moz-src:///browser/components/shell/ShellService.sys.mjs",
+-  SpecialMessageActions:
+-    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+   UpdatePing: "resource://gre/modules/UpdatePing.sys.mjs",
+ });
+ 
+@@ -1400,9 +1398,8 @@ nsDefaultCommandLineHandler.prototype = {
+   },
+ 
+   /**
+-   * Returns when the signal is sent to the relevant notification handler, either:
+-   * 1. The service worker via nsINotificationHandler for a web notification, or
+-   * 2. SpecialMessageActions for a Messaging-System-invoked one
++   * Returns when the signal is sent to the service worker via
++   * nsINotificationHandler for a web notification.
+    *
+    * @param {nsICommandLine} cmdLine
+    * @param {string} notificationId
+@@ -1425,28 +1422,12 @@ nsDefaultCommandLineHandler.prototype = {
+       );
+     }
+ 
+-    // This is awkward: the relaunch data set by the caller is _wrapped_
+-    // into a compound object that includes additional notification data,
+-    // and everything is exchanged as strings.  Unwrap and parse here.
+-    let opaqueRelaunchData = null;
+-    if (notificationData?.opaqueRelaunchData) {
+-      try {
+-        opaqueRelaunchData = JSON.parse(notificationData.opaqueRelaunchData);
+-      } catch (e) {
+-        console.error(
+-          `Failed to parse (opaqueRelaunchData=${notificationData.opaqueRelaunchData}) for Windows notification (id=${notificationId})`
+-        );
+-      }
+-    }
+-
+     if (notificationData?.privilegedName) {
+       Glean.browserLaunchedToHandle.systemNotification.record({
+         name: notificationData.privilegedName,
+       });
+     }
+ 
+-    // If we have an action in the notification data, this will be the
+-    // window to perform the action in.
+     let winForAction;
+ 
+     // Fall back to launchUrl to not break notifications opened from
+@@ -1471,7 +1452,7 @@ nsDefaultCommandLineHandler.prototype = {
+       );
+     }
+ 
+-    if (!tagWasHandled && origin && !opaqueRelaunchData) {
++    if (!tagWasHandled && origin) {
+       let originPrincipal =
+         Services.scriptSecurityManager.createContentPrincipalFromOrigin(origin);
+ 
+@@ -1485,32 +1466,6 @@ nsDefaultCommandLineHandler.prototype = {
+         action,
+         /* aAutoClosed */ true
+       );
+-      return;
+-    }
+-
+-    // Relaunch in private windows only if we're in perma-private mode.
+-    let allowPrivate = lazy.PrivateBrowsingUtils.permanentPrivateBrowsing;
+-    winForAction = lazy.BrowserWindowTracker.getTopWindow({
+-      private: allowPrivate,
+-      allowFromInactiveWorkspace: true,
+-    });
+-
+-    // Note: at time of writing `opaqueRelaunchData` was only used by the
+-    // Messaging System; if present it could be inferred that the message
+-    // originated from the Messaging System. The Messaging System did not
+-    // act on Windows 8 style notification callbacks, so there was no risk
+-    // of duplicating behavior. If a non-Messaging System consumer is
+-    // modified to populate `opaqueRelaunchData` or the Messaging System
+-    // modified to use the callback directly, we will need to revisit
+-    // this assumption.
+-    if (opaqueRelaunchData && winForAction) {
+-      // Without dispatch, `OPEN_URL` with `where: "tab"` does not work on relaunch.
+-      Services.tm.dispatchToMainThread(() => {
+-        lazy.SpecialMessageActions.handleAction(
+-          opaqueRelaunchData,
+-          winForAction.gBrowser
+-        );
+-      });
+     }
+   },
+ 
+diff --git a/browser/components/firefoxview/opentabs.mjs b/browser/components/firefoxview/opentabs.mjs
+index 9c91e289a7..a6c450f9ad 100644
+--- a/browser/components/firefoxview/opentabs.mjs
++++ b/browser/components/firefoxview/opentabs.mjs
+@@ -27,8 +27,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   OpenTabsController: "resource:///modules/OpenTabsController.sys.mjs",
+   getTabsTargetForWindow: "resource:///modules/OpenTabs.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+-  SpecialMessageActions:
+-    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
+ });
+ 
+@@ -858,12 +856,10 @@ class OpenTabsContextMenu extends MozLitElement {
+ 
+   onSendTabSignedOutItemClick() {
+     (async () => {
+-      let browser = this.ownerViewPage.getWindow().gBrowser;
+-      let data = {
+-        entrypoint: "send-tab-firefox-view-three-dots",
+-      };
+-
+-      await lazy.SpecialMessageActions.fxaSignInFlow(data, browser);
++      const url = await lazy.FxAccounts.config.promiseConnectAccountURI(
++        "send-tab-firefox-view-three-dots"
++      );
++      this.ownerViewPage.getWindow().openTrustedLinkIn(url, "tab");
+     })();
+   }
+ 
+diff --git a/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js b/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js
+index d7e723adbb..15f7797533 100644
+--- a/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js
++++ b/browser/components/urlbar/tests/browser-telemetry/browser_searchmode.js
+@@ -25,8 +25,6 @@ const BAIDU_KEYWORD = "@百度";
+ ChromeUtils.defineESModuleGetters(this, {
+   UrlbarProviderTabToSearch:
+     "moz-src:///browser/components/urlbar/UrlbarProviderTabToSearch.sys.mjs",
+-  SpecialMessageActions:
+-    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+ });
+ 
+ /**
+@@ -762,32 +760,3 @@ add_task(async function test_unified_search_button() {
+   await SpecialPowers.popPrefEnv();
+ });
+ 
+-add_task(async function test_messaging_system() {
+-  // Enter Search mode through messaging system.
+-  let searchMode = {
+-    engineName: "Bing",
+-    isGeneralPurposeEngine: true,
+-    source: UrlbarUtils.RESULT_SOURCE.SEARCH,
+-    isPreview: false,
+-    entry: "messagingSystem",
+-  };
+-
+-  let action = {
+-    type: "SET_SEARCH_MODE",
+-    data: searchMode,
+-    dismiss: true,
+-  };
+-  await SpecialMessageActions.handleAction(action, gBrowser);
+-
+-  await UrlbarTestUtils.assertSearchMode(window, {
+-    engineName: "Bing",
+-    isGeneralPurposeEngine: true,
+-    source: UrlbarUtils.RESULT_SOURCE.SEARCH,
+-    isPreview: false,
+-    entry: "messagingSystem",
+-  });
+-
+-  // Test only Glean telemetry because this is a new label counter recorded only in Glean.
+-  assertSearchModeTelemetry("messagingSystem", "Bing");
+-  await UrlbarTestUtils.exitSearchMode(window);
+-});
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 29170b4d6e..b030c3538c 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -1753,7 +1753,6 @@ export default [
+       "toolkit/components/extensions/parent/ext-browsingData.js",
+       "toolkit/components/formautofill/FormAutofillPreferences.sys.mjs",
+       "toolkit/components/formautofill/default/FormAutofillPrompter.sys.mjs",
+-      "toolkit/components/messaging-system/lib/SpecialMessageActions.sys.mjs",
+       "toolkit/components/normandy/actions/ShowHeartbeatAction.sys.mjs",
+       "toolkit/components/passwordmgr/LoginAutoComplete.sys.mjs",
+       "toolkit/components/passwordmgr/LoginHelper.sys.mjs",
+diff --git a/mots.yaml b/mots.yaml
+index 85f3de33eb..5e9007d29d 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -3774,7 +3774,6 @@ modules:
+           - browser/components/asrouter/**/*
+           - browser/components/uitour/**/*
+           - toolkit/components/messaging-system/**/*
+-          - toolkit/components/messaging-system/schemas/**/*
+           - browser/components/uitour/docs/**/*
+         meta:
+           components:
+diff --git a/toolkit/components/messaging-system/moz.build b/toolkit/components/messaging-system/moz.build
+index 8a407dbaca..de2edcaa27 100644
+--- a/toolkit/components/messaging-system/moz.build
++++ b/toolkit/components/messaging-system/moz.build
+@@ -5,16 +5,6 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Firefox", "Messaging System")
+ 
+-BROWSER_CHROME_MANIFESTS += [
+-    "schemas/SpecialMessageActionSchemas/test/browser/browser.toml",
+-]
+-
+-SPHINX_TREES["docs"] = "schemas"
+-
+ XPCSHELL_TESTS_MANIFESTS += ["targeting/test/unit/xpcshell.toml"]
+ 
+-TESTING_JS_MODULES += [
+-    "schemas/SpecialMessageActionSchemas/SpecialMessageActionSchemas.json",
+-]
+-
+ JAR_MANIFESTS += ["jar.mn"]
+diff --git a/toolkit/docs/index.rst b/toolkit/docs/index.rst
+index 9519eeaa1b..027743931a 100644
+--- a/toolkit/docs/index.rst
++++ b/toolkit/docs/index.rst
+@@ -18,7 +18,6 @@ This is the nascent documentation of the Toolkit code that is shared across Fire
+    search/index
+    components/normandy/normandy/index
+    components/nimbus/docs/index
+-   components/messaging-system/docs/index
+    components/pictureinpicture/pictureinpicture/index
+    components/prompts/prompts/index
+    modules/subprocess/toolkit_modules/subprocess/index
+diff --git a/toolkit/modules/RemotePageAccessManager.sys.mjs b/toolkit/modules/RemotePageAccessManager.sys.mjs
+index df14a7775c..707efb2678 100644
+--- a/toolkit/modules/RemotePageAccessManager.sys.mjs
++++ b/toolkit/modules/RemotePageAccessManager.sys.mjs
+@@ -141,25 +141,6 @@ export let RemotePageAccessManager = {
+       RPMAddMessageListener: ["ActivityStream:MainToContent"],
+       RPMGetFormatURLPref: ["app.support.baseURL"],
+     },
+-    "about:privatebrowsing": {
+-      RPMSendAsyncMessage: [
+-        "OpenPrivateWindow",
+-        "SearchBannerDismissed",
+-        "OpenSearchPreferences",
+-        "SearchHandoff",
+-      ],
+-      RPMSendQuery: [
+-        "IsPromoBlocked",
+-        "ShouldShowSearchBanner",
+-        "ShouldShowPromo",
+-        "SpecialMessageActionDispatch",
+-      ],
+-      RPMAddMessageListener: ["*"],
+-      RPMRemoveMessageListener: ["*"],
+-      RPMGetFormatURLPref: ["app.support.baseURL"],
+-      RPMIsWindowPrivate: ["*"],
+-      RPMGetBoolPref: ["browser.nova.enabled"],
+-    },
+     "about:deleteprofile": {
+       RPMSendQuery: ["Profiles:GetDeleteProfileContent"],
+       RPMSendAsyncMessage: ["Profiles:CancelDelete", "Profiles:DeleteProfile"],

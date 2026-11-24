@@ -1,0 +1,192 @@
+Sval: Remove Reader View's read-aloud
+
+Reader View stays; its narration goes: the narrate component, its
+toolbar controls, styles, icons, strings, prefs and tests. The DOM
+security monitor's C++ allowlist of scripts that may set innerHTML still
+names its voice picker.
+
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index be1d6e8c6e..a850a987ff 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -417,7 +417,6 @@ export default [
+       "toolkit/components/messaging-system/**",
+       "toolkit/components/ml/**",
+       "toolkit/components/mozintl/mozIntl.sys.mjs",
+-      "toolkit/components/narrate/**",
+       "toolkit/components/nimbus/**",
+       "toolkit/components/normandy/**",
+       "toolkit/components/passwordmgr/**",
+@@ -1633,7 +1632,6 @@ export default [
+       "toolkit/components/httpsonlyerror/tests/browser/browser_errorpage_timeout.js",
+       "toolkit/components/httpsonlyerror/tests/browser/browser_errorpage_www_suggestion.js",
+       "toolkit/components/httpsonlyerror/tests/browser/browser_exception.js",
+-      "toolkit/components/narrate/test/head.js",
+       "toolkit/components/normandy/test/NormandyTestUtils.sys.mjs",
+       "toolkit/components/normandy/test/browser/browser_RecipeRunner.js",
+       "toolkit/components/normandy/test/browser/browser_actions_ShowHeartbeatAction.js",
+@@ -1885,11 +1883,7 @@ export default [
+       "tools/profiler/tests/**",
+       "tools/tryselect/selectors/chooser/static/filter.js",
+     ],
+-    ignores: [
+-      "**/*.sys.mjs",
+-      "toolkit/components/narrate/**",
+-      "toolkit/components/reader/**",
+-    ],
++    ignores: ["**/*.sys.mjs", "toolkit/components/reader/**"],
+     rules: {
+       "no-shadow": "off",
+     },
+diff --git a/eslint-subdirs.config.mjs b/eslint-subdirs.config.mjs
+index 6392c60a4a..1b283c062e 100644
+--- a/eslint-subdirs.config.mjs
++++ b/eslint-subdirs.config.mjs
+@@ -167,7 +167,6 @@ export default [
+   ...(await convertConfigurationFile(
+     "toolkit/components/extensions/test/xpcshell/webidl-api"
+   )),
+-  ...(await convertConfigurationFile("toolkit/components/narrate")),
+   ...(await convertConfigurationFile("toolkit/components/normandy/test")),
+   ...(await convertConfigurationFile(
+     "toolkit/components/passwordmgr/test/browser"
+diff --git a/eslint-test-paths.config.mjs b/eslint-test-paths.config.mjs
+index 0d3bd58e7f..015bf703a4 100644
+--- a/eslint-test-paths.config.mjs
++++ b/eslint-test-paths.config.mjs
+@@ -208,7 +208,6 @@ const extraBrowserTestPaths = [
+   "testing/mochitest/tests/python/files/",
+   "toolkit/components/alerts/test/",
+   "toolkit/components/mozprotocol/tests/",
+-  "toolkit/components/narrate/test/",
+   "toolkit/components/pdfjs/test/",
+   "toolkit/components/pictureinpicture/tests/",
+   "toolkit/components/printing/tests/",
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index 9c205fa330..2b61e54878 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -3535,18 +3535,6 @@ pref("reader.custom_colors.selection-highlight", "");
+ // Whether to use a vertical or horizontal toolbar.
+ pref("reader.toolbar.vertical", true);
+ 
+-#if !defined(ANDROID)
+-  pref("narrate.enabled", true);
+-#else
+-  pref("narrate.enabled", false);
+-#endif
+-
+-pref("narrate.test", false);
+-pref("narrate.rate", 0);
+-pref("narrate.voice", " { \"default\": \"automatic\" }");
+-// Only make voices that match content language available.
+-pref("narrate.filter-voices", true);
+-
+ pref("memory.report_concurrency", 10);
+ 
+ // Enable logging downloads operations to the Console.
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 3c0c06711d..37963a5c6d 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -348,7 +348,6 @@ module.exports = [
+       "toolkit/themes/shared/downloads/unknownContentType.css",
+       "toolkit/themes/shared/error-pages.css",
+       "toolkit/themes/shared/findbar.css",
+-      "toolkit/themes/shared/narrate.css",
+       "toolkit/themes/shared/offlineSupportPages.css",
+       "toolkit/themes/shared/pictureinpicture/player.css",
+       "toolkit/themes/shared/pictureinpicture/texttracks.css",
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 6e3dddb884..12ffe1c337 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -99,7 +99,6 @@ if CONFIG["NS_PRINTING"]:
+ if CONFIG["MOZ_BUILD_APP"] != "mobile/android":
+     DIRS += [
+         "aboutconfig",
+-        "narrate",
+         "pictureinpicture",
+         "uniffi-js",
+         "uniffi-bindgen-gecko-js/components",
+diff --git a/toolkit/components/reader/AboutReader.sys.mjs b/toolkit/components/reader/AboutReader.sys.mjs
+index c9067dd44e..360c98d1ba 100644
+--- a/toolkit/components/reader/AboutReader.sys.mjs
++++ b/toolkit/components/reader/AboutReader.sys.mjs
+@@ -12,7 +12,6 @@ let lastSelectedTheme = "auto";
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AsyncPrefs: "resource://gre/modules/AsyncPrefs.sys.mjs",
+-  NarrateControls: "resource://gre/modules/narrate/NarrateControls.sys.mjs",
+ });
+ 
+ ChromeUtils.defineLazyGetter(
+@@ -412,10 +411,6 @@ export var AboutReader = function (
+ 
+   this._setupFontSizeButtons();
+ 
+-  if (win.speechSynthesis && Services.prefs.getBoolPref("narrate.enabled")) {
+-    new lazy.NarrateControls(win, this._languageDeferred.promise);
+-  }
+-
+   this._loadArticle(docContentType);
+ };
+ 
+diff --git a/toolkit/components/reader/tests/browser/browser_readerMode_tabnavigation.js b/toolkit/components/reader/tests/browser/browser_readerMode_tabnavigation.js
+index 77b3770605..a43bdeb097 100644
+--- a/toolkit/components/reader/tests/browser/browser_readerMode_tabnavigation.js
++++ b/toolkit/components/reader/tests/browser/browser_readerMode_tabnavigation.js
+@@ -28,9 +28,6 @@ add_task(async function test_tabnavigation() {
+ 
+       await SpecialPowers.spawn(browser, [], async () => {
+         let doc = content.document;
+-        await ContentTaskUtils.waitForCondition(() =>
+-          doc.querySelector(".narrate-toggle:not([hidden])")
+-        );
+         function ensureFocusOrder(list, shiftKey = false) {
+           let first = list.shift();
+           first.focus();
+diff --git a/toolkit/locales/jar.mn b/toolkit/locales/jar.mn
+index 3ffde87355..c1f8466f80 100644
+--- a/toolkit/locales/jar.mn
++++ b/toolkit/locales/jar.mn
+@@ -25,7 +25,6 @@
+   locale/@AB_CD@/global/intl.css                        (%chrome/global/intl.css)
+   locale/@AB_CD@/global/keys.properties                 (%chrome/global/keys.properties)
+ #ifndef MOZ_GECKOVIEW
+-  locale/@AB_CD@/global/narrate.properties              (%chrome/global/narrate.properties)
+ #endif
+ #if !defined(XP_WIN) && !defined(MOZ_GECKOVIEW)
+   locale/@AB_CD@/global/printdialog.properties          (%chrome/global/printdialog.properties)
+diff --git a/toolkit/modules/AsyncPrefs.sys.mjs b/toolkit/modules/AsyncPrefs.sys.mjs
+index 8932738b24..e70dd47e9e 100644
+--- a/toolkit/modules/AsyncPrefs.sys.mjs
++++ b/toolkit/modules/AsyncPrefs.sys.mjs
+@@ -24,9 +24,6 @@ const kPrivilegedAboutPrefs = new Set([
+  * security team before adding more prefs to this list.
+  */
+ const kUnprivilegedExposedPrefs = new Set([
+-  "narrate.rate",
+-  "narrate.voice",
+-
+   "reader.font_size",
+   "reader.font_type",
+   "reader.font_weight",
+diff --git a/toolkit/themes/shared/desktop-jar.inc.mn b/toolkit/themes/shared/desktop-jar.inc.mn
+index 90f62cf077..ffd23f2439 100644
+--- a/toolkit/themes/shared/desktop-jar.inc.mn
++++ b/toolkit/themes/shared/desktop-jar.inc.mn
+@@ -154,13 +154,6 @@
+   skin/classic/global/media/picture-in-picture-open.svg    (../../shared/media/picture-in-picture-open.svg)
+   skin/classic/global/media/picture-in-picture-closed.svg  (../../shared/media/picture-in-picture-closed.svg)
+   skin/classic/global/icons/minus.svg                      (../../shared/icons/minus.svg)
+-  skin/classic/global/narrate.css                          (../../shared/narrate.css)
+-  skin/classic/global/narrate/skip-backward-20.svg         (../../shared/narrate/skip-backward-20.svg)
+-  skin/classic/global/narrate/skip-forward-20.svg          (../../shared/narrate/skip-forward-20.svg)
+-  skin/classic/global/narrate/fast.svg                     (../../shared/narrate/fast.svg)
+-  skin/classic/global/narrate/slow.svg                     (../../shared/narrate/slow.svg)
+-  skin/classic/global/narrate/headphone.svg                (../../shared/narrate/headphone.svg)
+-  skin/classic/global/narrate/headphone-active.svg         (../../shared/narrate/headphone-active.svg)
+   skin/classic/global/pictureinpicture/player.css          (../../shared/pictureinpicture/player.css)
+   skin/classic/global/pictureinpicture/texttracks.css           (../../shared/pictureinpicture/texttracks.css)
+   skin/classic/global/reader/RM-Type-Controls-24x24.svg    (../../shared/reader/RM-Type-Controls-24x24.svg)

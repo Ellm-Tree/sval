@@ -331,23 +331,11 @@ add_task(async function the_address_bar_shows_none_of_it() {
 });
 
 /**
- * Report broken site, whose report offers to send what tracking protection
- * blocked, is out of reach from the moment a window opens: its report would
- * go to webcompat.com, a Mozilla service (Sval spec §10.9).
+ * Sval has no Report broken site, whose report offers to send what tracking
+ * protection blocked to webcompat.com, a Mozilla service (Sval spec §10.9).
  */
-add_task(async function report_broken_site_is_out_of_reach() {
-  const { ReportBrokenSite } = ChromeUtils.importESModule(
-    "moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs"
-  );
-  await BrowserTestUtils.withNewTab("https://example.com/", async () => {
-    Assert.ok(!ReportBrokenSite.enabled, "the reporter is off");
-    Assert.ok(
-      document.getElementById("cmd_reportBrokenSite").hidden,
-      "its command is hidden"
-    );
-    Assert.ok(
-      document.getElementById("help_reportBrokenSite").hidden,
-      "and so is its Help menu item, before any menu has opened"
-    );
-  });
+add_task(async function report_broken_site_is_absent() {
+  for (const id of ["cmd_reportBrokenSite", "help_reportBrokenSite"]) {
+    Assert.ok(!document.getElementById(id), `the window has no ${id}`);
+  }
 });

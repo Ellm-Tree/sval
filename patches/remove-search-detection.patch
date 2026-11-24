@@ -1,0 +1,55 @@
+Sval: Remove the search-detection built-in add-on
+
+The add-on watches search requests for add-on redirects and only
+records telemetry about them, which Sval never sends.
+
+diff --git a/browser/extensions/moz.build b/browser/extensions/moz.build
+index 780cf23b9c..b304949519 100644
+--- a/browser/extensions/moz.build
++++ b/browser/extensions/moz.build
+@@ -7,7 +7,6 @@ DIRS += [
+     "ipp-activator",
+     "webcompat",
+     "pictureinpicture",
+-    "search-detection",
+     "newtab",
+ ]
+ 
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 84328ffd80..b044960a77 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -358,7 +358,6 @@ export default [
+       "browser/extensions/formautofill/**",
+       "browser/extensions/newtab/**",
+       "browser/extensions/pictureinpicture/**",
+-      "browser/extensions/search-detection/extension/background.js",
+       "browser/extensions/webcompat/**",
+       "browser/fxr/content/permissions.js",
+       "browser/modules/**",
+diff --git a/eslint-subdirs.config.mjs b/eslint-subdirs.config.mjs
+index 27f62f5576..6392c60a4a 100644
+--- a/eslint-subdirs.config.mjs
++++ b/eslint-subdirs.config.mjs
+@@ -83,9 +83,6 @@ export default [
+   ...(await convertConfigurationFile(
+     "browser/extensions/pictureinpicture/tests/browser"
+   )),
+-  ...(await convertConfigurationFile(
+-    "browser/extensions/search-detection/tests/browser"
+-  )),
+   ...(await convertConfigurationFile("devtools")),
+   ...(await convertConfigurationFile("devtools/client")),
+   ...(await convertConfigurationFile("devtools/client/debugger/src")),
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 000b148875..d0fde85a79 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -145,7 +145,6 @@ firefox_desktop_metrics = [
+     "browser/components/tabnotes/metrics.yaml",
+     "browser/components/textrecognition/metrics.yaml",
+     "browser/components/urlbar/metrics.yaml",
+-    "browser/extensions/search-detection/metrics.yaml",
+     "browser/modules/metrics.yaml",
+     "dom/media/platforms/wmf/metrics.yaml",
+     "services/fxaccounts/metrics.yaml",

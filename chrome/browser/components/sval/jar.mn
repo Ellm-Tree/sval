@@ -10,7 +10,6 @@ browser.jar:
 # not ship, so Sval's logo stands in.
 % override chrome://global/skin/illustrations/kit-concerned.svg chrome://branding/content/about-logo.svg
 % override chrome://global/skin/illustrations/kit-happy.svg chrome://branding/content/about-logo.svg
-% override chrome://global/skin/illustrations/kit-in-circle.svg chrome://branding/content/about-logo.svg
 # Firefox's logo glyphs: settings' About and Languages icons and the Sval View
 # button take Sval's glyph.
 % override chrome://browser/skin/sidebar/firefox.svg chrome://browser/content/sval/sval-glyph.svg

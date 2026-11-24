@@ -1,0 +1,655 @@
+Sval: Remove installer attribution
+
+AttributionCode read the campaign Mozilla's download pages stamp on an
+installer, and MacAttribution its macOS counterpart, for Firefox's
+telemetry, onboarding and messaging. Sval's installers carry no such
+stamp and Sval sends no telemetry. The component goes, with the
+targeting attributes and Nimbus targeting context metric built on it,
+the telemetry environment's attribution section, Normandy's
+`attribution` filter value and the tests that spoofed it. The
+component's metrics file also defined glean.distribution, which the
+telemetry environment records, so that metric moves to Telemetry's own
+metrics file.
+
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index e60a42c37b..335975e7b5 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -56,8 +56,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   AppProvidedConfigEngine:
+     "moz-src:///toolkit/components/search/ConfigSearchEngine.sys.mjs",
+-  AttributionCode:
+-    "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
+   BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+   BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+@@ -204,12 +202,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   "browser.profiles.created",
+   false
+ );
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "didHandleCampaignAction",
+-  "trailhead.firstrun.didHandleCampaignAction",
+-  false
+-);
+ 
+ XPCOMUtils.defineLazyServiceGetters(lazy, {
+   AUS: [
+@@ -277,43 +269,6 @@ export function CachedTargetingGetter(
+   };
+ }
+ 
+-function CacheUnhandledCampaignAction() {
+-  return {
+-    _lastUpdated: 0,
+-    _value: null,
+-    expire() {
+-      this._lastUpdated = 0;
+-      this._value = null;
+-    },
+-    get() {
+-      const now = Date.now();
+-      // Don't get cached value until the action has been handled to ensure
+-      // proper screen targeting in about:welcome
+-      if (
+-        now - this._lastUpdated >= FRECENT_SITES_UPDATE_INTERVAL ||
+-        !lazy.didHandleCampaignAction
+-      ) {
+-        this._value = null;
+-        if (!lazy.didHandleCampaignAction) {
+-          const attributionData =
+-            lazy.AttributionCode.getCachedAttributionData();
+-          const ALLOWED_CAMPAIGN_ACTIONS = [
+-            "PIN_AND_DEFAULT",
+-            "PIN_FIREFOX_TO_TASKBAR",
+-            "SET_DEFAULT_BROWSER",
+-          ];
+-          const campaign = attributionData?.campaign?.toUpperCase();
+-          if (campaign && ALLOWED_CAMPAIGN_ACTIONS.includes(campaign)) {
+-            this._value = campaign;
+-          }
+-        }
+-        this._lastUpdated = now;
+-      }
+-      return this._value;
+-    },
+-  };
+-}
+-
+ function CheckBrowserNeedsUpdate(
+   updateInterval = FRECENT_SITES_UPDATE_INTERVAL
+ ) {
+@@ -381,7 +336,6 @@ export const QueryCache = {
+     CheckBrowserNeedsUpdate: new CheckBrowserNeedsUpdate(),
+     RecentBookmarks: new CachedTargetingGetter("getRecentBookmarks"),
+     UserMonthlyActivity: new CachedTargetingGetter("getUserMonthlyActivity"),
+-    UnhandledCampaignAction: new CacheUnhandledCampaignAction(),
+   },
+   getters: {
+     doesAppNeedPin: new CachedTargetingGetter(
+@@ -649,30 +603,6 @@ async function getAutofillRecords(data) {
+   return records?.length ?? 0;
+ }
+ 
+-// Attribution data can be encoded multiple times so we need this function to
+-// get a cleartext value.
+-function decodeAttributionValue(value) {
+-  if (!value) {
+-    return null;
+-  }
+-
+-  let decodedValue = value;
+-
+-  while (decodedValue.includes("%")) {
+-    try {
+-      const result = decodeURIComponent(decodedValue);
+-      if (result === decodedValue) {
+-        break;
+-      }
+-      decodedValue = result;
+-    } catch (e) {
+-      break;
+-    }
+-  }
+-
+-  return decodedValue;
+-}
+-
+ async function getPinStatus() {
+   return await ShellService.doesAppNeedPin();
+ }
+@@ -693,10 +623,6 @@ const TargetingGetters = {
+       update: settings.update,
+     };
+   },
+-  get attributionData() {
+-    // Attribution is determined at startup - so we can use the cached attribution at this point
+-    return lazy.AttributionCode.getCachedAttributionData();
+-  },
+   get currentDate() {
+     return new Date();
+   },
+@@ -1255,57 +1181,6 @@ const TargetingGetters = {
+     return lazy.AboutNewTabResourceMapping.addonVersion;
+   },
+ 
+-  /**
+-   * Whether the user installed Firefox via the RTAMO flow.
+-   *
+-   * @return {boolean} `true` when RTAMO has been used to download Firefox,
+-   * `false` otherwise.
+-   */
+-  get isRTAMO() {
+-    const { attributionData } = this;
+-
+-    return (
+-      attributionData?.source === "addons.mozilla.org" &&
+-      !!decodeAttributionValue(attributionData?.content)?.startsWith("rta:")
+-    );
+-  },
+-
+-  /**
+-   * Whether the user installed via the device migration flow.
+-   *
+-   * @return {boolean} `true` when the link to download the browser was part
+-   * of guidance for device migration. `false` otherwise.
+-   */
+-  get isDeviceMigration() {
+-    const { attributionData } = this;
+-
+-    return attributionData?.campaign === "migration";
+-  },
+-
+-  /**
+-   * Whether the user installed via the Smart Window marketing site.
+-   *
+-   * @return {boolean} `true` when the link to download the browser was part
+-   * of the Smart Window campaign. `false` otherwise.
+-   */
+-  get isSmartWindowOnboarding() {
+-    const { attributionData } = this;
+-
+-    return attributionData?.campaign === "smart_window";
+-  },
+-
+-  /**
+-   * Whether the user opted into a special message action represented by an
+-   * installer attribution campaign and this choice still needs to be honored.
+-   *
+-   * @return {string} A special message action to be executed on first-run. For
+-   * example, `"SET_DEFAULT_BROWSER"` when the user selected to set as default
+-   * via the install marketing page and set default has not yet been
+-   * automatically triggered, 'null' otherwise.
+-   */
+-  get unhandledCampaignAction() {
+-    return QueryCache.queries.UnhandledCampaignAction.get();
+-  },
+   /**
+    * The values of the height and width available to the browser to display
+    * web content. The available height and width are each calculated taking
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 3a2ac317c7..4b790d29f0 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -28,7 +28,6 @@ DIRS += [
+     "about",
+     "aboutlogins",
+     "asrouter",
+-    "attribution",
+     "backup",
+     "contentanalysis",
+     "contextualidentity",
+diff --git a/browser/docs/index.rst b/browser/docs/index.rst
+index 88247439eb..6a129aebec 100644
+--- a/browser/docs/index.rst
++++ b/browser/docs/index.rst
+@@ -20,7 +20,6 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    extensions/formautofill/docs/index
+    extensions/newtab/docs/index
+    installer/windows/installer/index
+-   components/attribution/docs/index
+    /toolkit/mozapps/defaultagent/default-browser-agent/index
+    components/migration/docs/index
+    places/index
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 82796124f3..2f5e7ea4cd 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -59,7 +59,6 @@ export default [
+       "browser/base/content/browser-sync.js",
+       "browser/base/content/browser.js",
+       "browser/components/shell/StartupOSIntegration.sys.mjs",
+-      "browser/components/attribution/AttributionCode.sys.mjs",
+       "browser/components/customizableui/**",
+       "browser/components/downloads/**",
+       "browser/components/enterprisepolicies/**",
+@@ -238,7 +237,6 @@ export default [
+       "browser/base/content/**",
+       "browser/components/aboutlogins/content/aboutLoginsUtils.mjs",
+       "browser/components/asrouter/**",
+-      "browser/components/attribution/AttributionCode.sys.mjs",
+       "browser/components/downloads/**",
+       "browser/components/originattributes/test/browser/**",
+       "browser/components/preferences/**",
+@@ -314,7 +312,6 @@ export default [
+       "browser/components/Browser*",
+       "browser/components/aboutlogins/**",
+       "browser/components/asrouter/**",
+-      "browser/components/attribution/**",
+       "browser/components/customizableui/**",
+       "browser/components/doh/TRRPerformance.sys.mjs",
+       "browser/components/downloads/**",
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 0822e41dcf..484e7fd6b4 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -113,7 +113,6 @@ gecko_metrics = [
+ # Order is lexicographical, enforced by t/c/glean/tests/pytest/test_yaml_indices.py
+ firefox_desktop_metrics = [
+     "browser/actors/metrics.yaml",
+-    "browser/components/attribution/metrics.yaml",
+     "browser/components/backup/metrics.yaml",
+     "browser/components/contextualidentity/metrics.yaml",
+     "browser/components/controlcenter/metrics.yaml",
+diff --git a/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs b/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
+index e4d9b2b120..603a881b9f 100644
+--- a/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
++++ b/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
+@@ -124,7 +124,6 @@ export const ATTRIBUTE_TRANSFORMS = Object.freeze({
+   }),
+   addressesSaved: typeAssertions.quantity,
+   archBits: typeAssertions.quantity,
+-  attributionData: pick("medium", "source", "ua"),
+   browserSettings: pickWith({
+     update: pick("channel"),
+   }),
+diff --git a/toolkit/components/nimbus/metrics.yaml b/toolkit/components/nimbus/metrics.yaml
+index c8570dcb5c..33a4ed23f2 100644
+--- a/toolkit/components/nimbus/metrics.yaml
++++ b/toolkit/components/nimbus/metrics.yaml
+@@ -126,7 +126,6 @@ nimbus_targeting_environment:
+       - "addonsInfo"
+       - "addressesSaved"
+       - "archBits"
+-      - "attributionData"
+       - "browserSettings"
+       - "buildId"
+       - "currentDate"
+@@ -327,27 +326,6 @@ nimbus_targeting_context:
+     type: quantity
+     unit: bits
+ 
+-  attribution_data:
+-    bugs: *targeting_context_bugs
+-    data_reviews: *targeting_context_data_reviews
+-    expires: *targeting_context_expiry
+-    notification_emails: *targeting_context_notification_emails
+-    send_in_pings: *targeting_context_pings
+-    description: >
+-      Attribution data.
+-    data_sensitivity:
+-      - interaction
+-    type: object
+-    structure:
+-      type: object
+-      properties:
+-        medium:
+-          type: string
+-        source:
+-          type: string
+-        ua:
+-          type: string
+-
+   browser_settings:
+     bugs: *targeting_context_bugs
+     data_reviews: *targeting_context_data_reviews
+diff --git a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+index d51d13f8a8..69d32a439b 100644
+--- a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
++++ b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+@@ -21,8 +21,6 @@ import {
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  AttributionCode:
+-    "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
+   ProfileAge: "resource://gre/modules/ProfileAge.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+   WindowsRegistry: "resource://gre/modules/WindowsRegistry.sys.mjs",
+@@ -45,8 +43,6 @@ if (AppConstants.MOZ_UPDATER) {
+   );
+ }
+ 
+-// The maximum length of a string value in the settings.attribution object.
+-const MAX_ATTRIBUTION_STRING_LENGTH = 100;
+ // The maximum lengths for the experiment id and branch in the experiments section.
+ const MAX_EXPERIMENT_ID_LENGTH = 100;
+ const MAX_EXPERIMENT_BRANCH_LENGTH = 100;
+@@ -612,9 +608,6 @@ function EnvironmentCache() {
+ 
+   this._currentEnvironment.profile = {};
+   p.push(this._updateProfile());
+-  if (AppConstants.MOZ_BUILD_APP == "browser") {
+-    p.push(this._loadAttributionAsync());
+-  }
+   p.push(this._loadAsyncUpdateSettings());
+   p.push(this._loadIntlData());
+ 
+@@ -1293,9 +1286,6 @@ EnvironmentCache.prototype = {
+     this._currentEnvironment.settings.addonCompatibilityCheckEnabled =
+       AddonManager.checkCompatibility;
+ 
+-    if (AppConstants.MOZ_BUILD_APP == "browser") {
+-      this._updateAttribution();
+-    }
+     this._updateDefaultBrowser();
+     this._updateSearchEngine();
+     this._loadAsyncUpdateSettingsFromCache();
+@@ -1398,67 +1388,6 @@ EnvironmentCache.prototype = {
+     }
+   },
+ 
+-  /**
+-   * Load the attribution data object and updates the environment.
+-   *
+-   * @returns Promise<> resolved when the I/O is complete.
+-   */
+-  async _loadAttributionAsync() {
+-    try {
+-      await lazy.AttributionCode.getAttrDataAsync();
+-    } catch (e) {
+-      // The AttributionCode.sys.mjs module might not be always available
+-      // (e.g. tests). Gracefully handle this.
+-      return;
+-    }
+-    this._updateAttribution();
+-  },
+-
+-  /**
+-   * Update the environment with the cached attribution data.
+-   */
+-  _updateAttribution() {
+-    let data = null;
+-    try {
+-      data = lazy.AttributionCode.getCachedAttributionData();
+-    } catch (e) {
+-      // The AttributionCode.sys.mjs module might not be always available
+-      // (e.g. tests). Gracefully handle this.
+-    }
+-
+-    if (!data || !Object.keys(data).length) {
+-      return;
+-    }
+-
+-    let attributionData = {};
+-    for (let key in data) {
+-      attributionData[key] =
+-        // At least one of these may be boolean, and limitStringToLength
+-        // returns null for non-string inputs.
+-        typeof data[key] === "string"
+-          ? limitStringToLength(data[key], MAX_ATTRIBUTION_STRING_LENGTH)
+-          : data[key];
+-    }
+-    this._currentEnvironment.settings.attribution = attributionData;
+-    let extAttribution = {
+-      experiment: attributionData.experiment,
+-      variation: attributionData.variation,
+-      ua: attributionData.ua,
+-      dltoken: attributionData.dltoken,
+-      msstoresignedin: attributionData.msstoresignedin,
+-      msclkid: attributionData.msclkid,
+-      dlsource: attributionData.dlsource,
+-    };
+-    Services.fog.updateAttribution(
+-      attributionData.source,
+-      attributionData.medium,
+-      attributionData.campaign,
+-      attributionData.term,
+-      attributionData.content
+-    );
+-    Glean.gleanAttribution.ext.set(extAttribution);
+-  },
+-
+   /**
+    * Load the per-installation update settings, cache them, and add them to the
+    * environment.
+diff --git a/toolkit/components/telemetry/metrics.yaml b/toolkit/components/telemetry/metrics.yaml
+index a0251eb040..7210cac44a 100644
+--- a/toolkit/components/telemetry/metrics.yaml
++++ b/toolkit/components/telemetry/metrics.yaml
+@@ -1504,3 +1504,49 @@ startup.io:
+     labels:
+       - sessionRestore
+       - windowVisible
++
++glean.distribution:
++  ext:
++    type: object
++    lifetime: user
++    description: |
++      Extended distribution information.
++      Mapped to client_info.distribution.ext in datasets.
++      * `distributionVersion`: pref `distribution.version`, `null` on failure
++      * `partnerId`: pref `mozilla.partner.id`, `null` on failure
++      * `distributor`:  pref `app.distributor`, `null` on failure
++      * `distributorChannel`: pref `app.distributor.channel`, `null` on failure
++      * `partnerNames`: list from prefs `app.partner.<name>=<name>`
++    bugs:
++      - https://bugzilla.mozilla.org/1955429
++    data_reviews:
++      - https://bugzilla.mozilla.org/1955429
++    notification_emails:
++      - chutten@mozilla.com
++    send_in_pings:
++      - metrics
++      - baseline
++      - events
++    expires: never
++    structure:
++      type: object
++      properties:
++        distributionVersion:
++          type: string
++        partnerId:
++          type: string
++        distributor:
++          type: string
++        distributorChannel:
++          type: string
++        partnerNames:
++          type: array
++          items:
++            type: string
++    send_in_pings:
++      - metrics
++      - update
++      - baseline
++      - events
++    no_lint:
++      - BASELINE_PING
+diff --git a/toolkit/components/telemetry/tests/unit/TelemetryEnvironmentTesting.sys.mjs b/toolkit/components/telemetry/tests/unit/TelemetryEnvironmentTesting.sys.mjs
+index 73c8151a2a..5342dd26d7 100644
+--- a/toolkit/components/telemetry/tests/unit/TelemetryEnvironmentTesting.sys.mjs
++++ b/toolkit/components/telemetry/tests/unit/TelemetryEnvironmentTesting.sys.mjs
+@@ -8,10 +8,6 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+   Assert: "resource://testing-common/Assert.sys.mjs",
+-  // AttributionCode is only needed for Firefox
+-  AttributionCode:
+-    "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
+-
+   MockRegistrar: "resource://testing-common/MockRegistrar.sys.mjs",
+ });
+ 
+@@ -50,23 +46,6 @@ const GFX_DEVICE_ID = "0x1234";
+ 
+ const EXPECTED_HDD_FIELDS = ["profile", "binary", "system"];
+ 
+-// Valid attribution code to write so that settings.attribution can be tested.
+-const ATTRIBUTION_CODE = [
+-  ["source", "%3D", "google.com"],
+-  ["medium", "%3D", "referral"],
+-  ["campaign", "%3D", "Firefox-Brand-US-Chrome"],
+-  ["content", "%3D", "(not set)"],
+-  ["experiment", "%3D", "(not set)"],
+-  ["variation", "%3D", "(not set)"],
+-  ["ua", "%3D", "chrome"],
+-  ["dltoken", "%3D", "(not set)"],
+-  ["msstoresignedin", "%3D", "false"],
+-  ["storeBingAd", "_", "(not set)"], // `storeBingAd` uniquely uses `_` as a seperator.
+-  ["dlsource", "%3D", "unittest"],
+-]
+-  .map(attr => attr.join(""))
+-  .join("%26");
+-
+ function truncateToDays(aMsec) {
+   return Math.floor(aMsec / MILLISECONDS_PER_DAY);
+ }
+@@ -167,31 +146,6 @@ export var TelemetryEnvironmentTesting = {
+     }
+   },
+ 
+-  async spoofAttributionData() {
+-    if (gIsWindows) {
+-      lazy.AttributionCode._clearCache();
+-      await lazy.AttributionCode.writeAttributionFile(ATTRIBUTION_CODE);
+-    } else if (gIsMac) {
+-      lazy.AttributionCode._clearCache();
+-      const { MacAttribution } = ChromeUtils.importESModule(
+-        "moz-src:///browser/components/attribution/MacAttribution.sys.mjs"
+-      );
+-      await MacAttribution.setAttributionString(ATTRIBUTION_CODE);
+-    }
+-  },
+-
+-  async cleanupAttributionData() {
+-    if (gIsWindows) {
+-      lazy.AttributionCode.attributionFile.remove(false);
+-      lazy.AttributionCode._clearCache();
+-    } else if (gIsMac) {
+-      const { MacAttribution } = ChromeUtils.importESModule(
+-        "moz-src:///browser/components/attribution/MacAttribution.sys.mjs"
+-      );
+-      await MacAttribution.delAttributionString();
+-    }
+-  },
+-
+   registerFakeSysInfo() {
+     lazy.MockRegistrar.register("@mozilla.org/system-info;1", SysInfo);
+   },
+@@ -417,50 +371,6 @@ export var TelemetryEnvironmentTesting = {
+       );
+     }
+ 
+-    if ((gIsWindows || gIsMac) && AppConstants.MOZ_BUILD_APP == "browser") {
+-      lazy.Assert.equal(typeof data.settings.attribution, "object");
+-      lazy.Assert.equal(data.settings.attribution.source, "google.com");
+-      lazy.Assert.equal(data.settings.attribution.dlsource, "unittest");
+-      let attr = Services.fog.testGetAttribution();
+-      lazy.Assert.equal(
+-        attr.source,
+-        "google.com",
+-        "Must have correct attribution.source."
+-      );
+-      let attrExt = Glean.gleanAttribution.ext.testGetValue();
+-      lazy.Assert.equal(
+-        attrExt.experiment,
+-        "(not set)",
+-        "Must have correct `experiment`."
+-      );
+-      lazy.Assert.equal(
+-        attrExt.variation,
+-        "(not set)",
+-        "Must have correct `variation`."
+-      );
+-      lazy.Assert.equal(attrExt.ua, "chrome", "Must have correct `ua`.");
+-      lazy.Assert.equal(
+-        attrExt.dltoken,
+-        "(not set)",
+-        "Must have correct `dltoken`."
+-      );
+-      lazy.Assert.equal(
+-        attrExt.msstoresignedin,
+-        false,
+-        "Must have correct `msstoresignedin`."
+-      );
+-      lazy.Assert.equal(
+-        attrExt.msclkid,
+-        "(not set)",
+-        "`storeBingAd_[value] should translate to `msclkid=[value]`."
+-      );
+-      lazy.Assert.equal(
+-        attrExt.dlsource,
+-        "unittest",
+-        "Must have correct `dlsource`."
+-      );
+-    }
+-
+     this.checkIntlSettings(data.settings);
+   },
+ 
+diff --git a/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment.js b/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment.js
+index f0f888be34..0b13599ef8 100644
+--- a/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment.js
++++ b/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment.js
+@@ -173,14 +173,6 @@ add_setup(async function setup() {
+   gHttpServer.registerDirectory("/data/", do_get_cwd());
+   registerCleanupFunction(() => gHttpServer.stop(() => {}));
+ 
+-  // Create the attribution data file, so that settings.attribution will exist.
+-  // The attribution functionality only exists in Firefox.
+-  if (AppConstants.MOZ_BUILD_APP == "browser") {
+-    TelemetryEnvironmentTesting.spoofAttributionData();
+-    registerCleanupFunction(async function () {
+-      await TelemetryEnvironmentTesting.cleanupAttributionData;
+-    });
+-  }
+   await TelemetryEnvironmentTesting.spoofProfileReset();
+   await TelemetryEnvironment.delayedInit();
+   // The environment needs the search service initialised, so use a dummy
+diff --git a/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment_search.js b/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment_search.js
+index 9494d163b6..8eac8f1e20 100644
+--- a/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment_search.js
++++ b/toolkit/components/telemetry/tests/unit/test_TelemetryEnvironment_search.js
+@@ -85,14 +85,6 @@ add_setup(async function setup() {
+   gHttpServer.registerDirectory("/data/", do_get_cwd());
+   registerCleanupFunction(() => gHttpServer.stop(() => {}));
+ 
+-  // Create the attribution data file, so that settings.attribution will exist.
+-  // The attribution functionality only exists in Firefox.
+-  if (AppConstants.MOZ_BUILD_APP == "browser") {
+-    TelemetryEnvironmentTesting.spoofAttributionData();
+-    registerCleanupFunction(async function () {
+-      await TelemetryEnvironmentTesting.cleanupAttributionData;
+-    });
+-  }
+ 
+   await TelemetryEnvironmentTesting.spoofProfileReset();
+   await TelemetryEnvironment.delayedInit();
+diff --git a/toolkit/components/utils/ClientEnvironment.sys.mjs b/toolkit/components/utils/ClientEnvironment.sys.mjs
+index 4d821b026f..86dd278a6b 100644
+--- a/toolkit/components/utils/ClientEnvironment.sys.mjs
++++ b/toolkit/components/utils/ClientEnvironment.sys.mjs
+@@ -8,8 +8,6 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+-  AttributionCode:
+-    "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
+   NormandyUtils: "resource://normandy/lib/NormandyUtils.sys.mjs",
+   Region: "resource://gre/modules/Region.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+@@ -303,10 +301,6 @@ export class ClientEnvironmentBase {
+     return osInfo;
+   }
+ 
+-  static get attribution() {
+-    return lazy.AttributionCode.getAttrDataAsync();
+-  }
+-
+   static get appinfo() {
+     Services.appinfo.QueryInterface(Ci.nsIXULAppInfo);
+     Services.appinfo.QueryInterface(Ci.nsIPlatformInfo);

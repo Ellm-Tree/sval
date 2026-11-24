@@ -1,0 +1,13 @@
+browser/extensions/search-detection/extension/api.js
+browser/extensions/search-detection/extension/background.js
+browser/extensions/search-detection/extension/manifest.json
+browser/extensions/search-detection/extension/schema.json
+browser/extensions/search-detection/jar.mn
+browser/extensions/search-detection/metrics.yaml
+browser/extensions/search-detection/moz.build
+browser/extensions/search-detection/tests/browser/.eslintrc.mjs
+browser/extensions/search-detection/tests/browser/browser.toml
+browser/extensions/search-detection/tests/browser/browser_client_side_redirection.js
+browser/extensions/search-detection/tests/browser/browser_extension_loaded.js
+browser/extensions/search-detection/tests/browser/browser_server_side_redirection.js
+browser/extensions/search-detection/tests/browser/redirect.sjs
