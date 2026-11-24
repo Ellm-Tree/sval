@@ -109,6 +109,10 @@
   --toolbarbutton-padding-inner: 8px;
   --toolbarbutton-hover-background: var(--sval-wash);
   --toolbarbutton-active-background: var(--sval-wash-strong);
+  /* Firefox's tokens give every toolbar icon a fixed gray, which on Sval's
+     light and tinted windows reads as disabled. An icon wears the ink of
+     the text around it. */
+  --toolbarbutton-icon-fill: currentColor;
   --focus-outline-color: var(--sval-focus);
 }
 
