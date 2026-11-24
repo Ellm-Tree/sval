@@ -177,4 +177,17 @@ final class TreeStoreTests: XCTestCase {
         assertWhole(store, devices.phone, own: [], "after the older read")
         XCTAssertEqual(store.install(devices.phone.treeRead(since: nil), own: []), .none)
     }
+
+    /// A read taken before an edit lacks it, so it stands for no revision
+    /// after the edit: a refresh marked there reads the tree again.
+    func testAReadBeforeAnEditIsNotCurrentAfterIt() {
+        let devices = TwoDevices()
+        let id = TwoDevices.id
+        devices.phoneEdits(#"[{"kind":"addWorkspace","name":"Work","id":"\#(id(1))"}]"#)
+        let before = devices.phone.treeRead(since: nil)
+        XCTAssertNotNil(before.current(at: devices.phone.revision()), "a read is current at its own revision")
+        devices.phoneEdits(#"[{"kind":"addTab","parent":"\#(id(1))","name":"T","url":"https://t.example/","id":"\#(id(2))"}]"#)
+        XCTAssertNil(before.current(at: devices.phone.revision()), "the read lacks the edit")
+        XCTAssertNotNil(devices.phone.treeRead(since: before.revision).current(at: devices.phone.revision()))
+    }
 }

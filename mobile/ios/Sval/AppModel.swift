@@ -2442,7 +2442,11 @@ final class AppModel {
         refreshedFrom = mark
         let revisions = mark.revisions
         let outlining = Signposts.outline.beginInterval("outline")
-        var tree = read.flatMap { $0.0 === syncer ? $0.1 : nil }
+        // A pass reads the tree before this refresh takes its mark, and an
+        // edit landing between the two is in the mark: a read without it
+        // would stand for the mark, and the edit's own refresh, finding the
+        // mark unmoved, would show nothing.
+        var tree = read.flatMap { $0.0 === syncer ? $0.1.current(at: revisions.workspaces) : nil }
         if tree == nil { tree = await syncer.treeRead(since: treeStore.revision) }
         let own = privateDocument?.outline() ?? []
         Signposts.outline.endInterval("outline", outlining)

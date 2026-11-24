@@ -14,6 +14,19 @@ enum TreeRead: Sendable {
     /// The whole outline, read when a row may have moved, or when no
     /// revision was held or the document forgot it.
     case whole(revision: UInt64, [OutlineRow])
+
+    /// The revision the read leaves the tree at.
+    var revision: UInt64 {
+        switch self {
+        case .same(let since): since
+        case .rows(_, let revision, _), .whole(let revision, _): revision
+        }
+    }
+
+    /// The read, when it holds every change up to `revision`.
+    func current(at revision: UInt64) -> TreeRead? {
+        self.revision >= revision ? self : nil
+    }
 }
 
 /// A document the tree is read from: the `Syncer`'s, or a test's own.
