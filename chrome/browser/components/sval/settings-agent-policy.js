@@ -4,7 +4,7 @@
 /**
  * A paired agent's row in the Agents pane, which leads to its page, and the
  * permissions editor that page holds (agent-control spec §5.2): the default level, the site rules with their
- * file, app and upload columns, site tools (site-tools spec §4.1) and
+ * file, app and upload settings, site tools (site-tools spec §4.1) and
  * remembered tools, and the add row. Every change is a call to the
  * agent store through `_changePolicy`, with an Undo where one is offered.
  *
@@ -19,12 +19,16 @@
   const lazy = {};
   ChromeUtils.defineESModuleGetters(lazy, {
     SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
+    agentBrandOf: "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs",
+    agentMarkURL:
+      "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     appsOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     defaultOf: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     filePermissionOf:
       "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     levelFor: "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
+    PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
     PAGE_TOOL_SITE_ANSWERS:
       "moz-src:///browser/components/sval/SvalAgentPolicy.sys.mjs",
     pageToolsSettingOf:
@@ -86,7 +90,7 @@
   const AGENT_LEVELS = {
     ask: {
       label: "Ask on first visit",
-      what: "Sval asks you the first time the agent opens a site. Your answer becomes a site rule.",
+      what: "Sval asks you the first time the agent opens a site, and your answer becomes that site's own rule.",
     },
     blocked: { label: "Blocked", what: "The agent can't open the site." },
     "read-only": {
@@ -122,14 +126,7 @@
     },
   };
 
-  /** A site rule's file and console columns, by the policy map each sets. */
-  const AGENT_FILE_COLUMNS = [
-    { kind: "downloads", label: "Downloads" },
-    { kind: "uploads", label: "Uploads" },
-    { kind: "console", label: "Console" },
-  ];
-
-  /** The policy maps a site rule's file, console and app columns set. */
+  /** The policy maps a site rule's file, console and app settings set. */
   const AGENT_FILE_AND_APP_MAPS = ["downloads", "uploads", "console", "apps"];
 
   /** What an app scheme's answer reads as in Settings. */
@@ -230,7 +227,10 @@
           this._el(
             "span",
             { className: "sval-agent-tile" },
-            this._glyph("laptop")
+            this._el("img", {
+              src: lazy.agentMarkURL(lazy.agentBrandOf(agent.label)),
+              alt: "",
+            })
           ),
           this._el(
             "span",
@@ -316,21 +316,21 @@
         );
       }
       const { label, what } = AGENT_LEVELS[current];
-      let unasked = " Sites with no rule get this without asking.";
+      let unasked = "";
       if (current !== "blocked") {
         unasked =
-          " Sites with no rule get this without asking, except a service on this computer or a device on your local network, which Sval asks about first.";
+          " Sval doesn't ask before the agent opens a site, except a service on this computer or a device on your local network.";
       }
       const noteId = `sval-agent-default-note-${id}`;
       const defaults = this._el(
         "fieldset",
         { className: "sval-agent-fieldset", ariaDescribedby: noteId },
-        this._el("legend", {}, "Default for sites with no rule"),
+        this._el("legend", {}, "Every site"),
         choices,
         this._el(
           "p",
           { className: "sval-agents-note", id: noteId },
-          `${label}: ${what}${current === "ask" ? "" : unasked}`
+          `${label}: ${what}${current === "ask" ? "" : unasked} A site with its own rule below follows that rule for each setting the rule changes.`
         )
       );
 
@@ -370,7 +370,7 @@
         this._el(
           "div",
           { className: "sval-agent-rules-head" },
-          this._el("h3", {}, "Site rules"),
+          this._el("h3", {}, "Sites with their own rules"),
           this._el(
             "span",
             { className: "sval-agents-note" },
@@ -383,7 +383,14 @@
         rules.append(this._addRow(id, policy, sites));
       }
       if (sites.length) {
-        rules.append(this._ruleTools(id, policy));
+        // A short list is read whole, so it needs no search, and a search
+        // left from a longer list would hide rules with no way to clear it.
+        if (sites.length > AGENT_RULES_SHOWN) {
+          rules.append(this._ruleTools(id, policy));
+        } else {
+          view.q = "";
+          view.filt = "all";
+        }
         const table = this._el("div", { className: "sval-agent-table-wrap" });
         this._fillRules(table, id, policy);
         rules.append(table);
@@ -468,7 +475,11 @@
         { className: "sval-agent-fieldset" },
         this._el("legend", {}, "Site tools"),
         choices,
-        this._el("p", { className: "sval-agents-note" }, `${label}: ${what}`)
+        this._el(
+          "p",
+          { className: "sval-agents-note" },
+          `${label}: ${what}${current === "off" ? "" : " A site's own rule below can allow or block that site's tools."}`
+        )
       );
     },
 
@@ -618,7 +629,6 @@
       const matches = ordered.filter(
         site => (!q || site.includes(q)) && kept(site)
       );
-      const tools = this._showsSiteTools(policy);
       const filtering = !!q || view.filt !== "all";
       let found = "";
       if (filtering) {
@@ -634,27 +644,10 @@
 
       wrap.textContent = "";
       const table = this._el("div", {
-        className: "sval-agent-table",
-        role: "table",
-        ariaLabel: "Site rules",
+        className: "sval-agent-table sval-rule-list",
+        role: "list",
+        ariaLabel: "Sites with their own rules",
       });
-      table.classList.toggle("sval-agent-table-tools", tools);
-      table.append(
-        this._el(
-          "div",
-          { className: "sval-agent-rule sval-agent-rule-head", role: "row" },
-          ...[
-            "Site",
-            "Access",
-            "Downloads",
-            "Uploads",
-            "Console",
-            "Apps",
-            ...(tools ? ["Site tools"] : []),
-          ].map(text => this._el("span", { role: "columnheader" }, text)),
-          this._actionsHeader()
-        )
-      );
       for (const [index, site] of shown.entries()) {
         const parent = under(site);
         table.append(
@@ -666,22 +659,6 @@
             !!parent && shown.slice(0, index).includes(parent)
           )
         );
-        if (ownUploadFolders(policy, site).length) {
-          table.append(this._uploadFolders(id, policy, site));
-        }
-        const apps = lazy.appsOf(policy.apps?.[site]);
-        if (apps && apps !== "deny") {
-          table.append(this._siteApps(id, site, apps));
-        }
-        // A tool is remembered under the name its alert was answered for,
-        // which can be a host whose site holds the Allowed.
-        if (
-          tools &&
-          (ownToolSite(policy, site) === "allow" ||
-            this._grantsOn(policy, site).length)
-        ) {
-          table.append(this._rememberedTools(id, policy, site));
-        }
       }
       wrap.append(table);
 
@@ -733,7 +710,131 @@
     },
 
     /**
-     * One site's rule: its level and its file permissions.
+     * What a site's rule changes from Every site, in sentences, for its
+     * closed row.
+     *
+     * @param {object} policy
+     * @param {string} site
+     * @returns {string}
+     */
+    _ruleSummary(policy, site) {
+      const level = policy.sites?.[site];
+      const said = [
+        level
+          ? `Access: ${AGENT_LEVELS[level].label}.`
+          : `Access: Same as every site (${AGENT_LEVELS[lazy.defaultOf(policy)].label}).`,
+      ];
+      const can = [];
+      const cannot = [];
+      const put = (answer, what) => {
+        if (answer === "allow") {
+          can.push(what);
+        } else if (answer === "deny") {
+          cannot.push(what);
+        }
+      };
+      put(ownFilePermission(policy, "downloads", site), "download files");
+      const upload = ownFilePermission(policy, "uploads", site);
+      put(
+        upload,
+        upload === "allow"
+          ? `upload from ${counted(ownUploadFolders(policy, site).length, "folder")}`
+          : "upload files"
+      );
+      put(ownFilePermission(policy, "console", site), "read the console");
+      const apps = lazy.appsOf(policy.apps?.[site]);
+      if (apps === "deny") {
+        cannot.push("open other apps");
+      } else if (apps) {
+        const answers = Object.values(apps);
+        const allowed = answers.filter(a => a === "allow").length;
+        const denied = answers.filter(a => a === "deny").length;
+        if (allowed) {
+          can.push(`open ${counted(allowed, "other app")}`);
+        }
+        if (denied) {
+          cannot.push(`open ${counted(denied, "other app")}`);
+        }
+      }
+      let remembered = 0;
+      if (this._showsSiteTools(policy)) {
+        put(ownToolSite(policy, site), "use the site's tools");
+        remembered = this._grantsOn(policy, site).length;
+      }
+      const list = (items, and) =>
+        items.length < 3
+          ? items.join(` ${and} `)
+          : `${items.slice(0, -1).join(", ")}, ${and} ${items.at(-1)}`;
+      const parts = [];
+      if (can.length) {
+        parts.push(`can ${list(can, "and")}`);
+      }
+      if (cannot.length) {
+        parts.push(`can't ${list(cannot, "or")}`);
+      }
+      if (parts.length) {
+        said.push(`The agent ${parts.join(", and ")}.`);
+      }
+      if (remembered) {
+        said.push(`Sval remembers ${remembered} of the site's tools.`);
+      }
+      return said.join(" ");
+    },
+
+    /**
+     * A labelled setting in an open rule: its name and what it decides,
+     * beside its control.
+     *
+     * @param {string} name
+     * @param {string} what
+     * @param {Element} control
+     * @returns {Element}
+     */
+    _ruleSetting(name, what, control) {
+      return this._el(
+        "div",
+        { className: "sval-agent-setting" },
+        this._el(
+          "span",
+          { className: "sval-agent-setting-words" },
+          this._el("span", { className: "sval-agent-setting-name" }, name),
+          this._el("span", { className: "sval-agents-note" }, what)
+        ),
+        control
+      );
+    },
+
+    /**
+     * Asks Places for a rule's site icon, which falls back to the root
+     * domain's icon (`nsIFaviconService.getFaviconForPage`), and draws it
+     * over the globe once it loads.
+     *
+     * @param {string} site
+     * @param {Element} tile
+     */
+    async _findRuleIcon(site, tile) {
+      let favicon = null;
+      try {
+        favicon = await lazy.PlacesUtils.favicons.getFaviconForPage(
+          Services.io.newURI(`https://${site}/`)
+        );
+      } catch (err) {
+        lazy.SvalLog.warn(
+          `a rule's site icon did not load: ${lazy.SvalLog.errorName(err)}`
+        );
+      }
+      if (favicon && tile.isConnected) {
+        tile.replaceChildren(
+          this._el("img", { src: favicon.dataURI.spec, alt: "" })
+        );
+      }
+    },
+
+    /**
+     * One site's rule: a row naming the site and what its rule changes,
+     * which opens in place to every setting the rule holds. A closed row's
+     * settings are drawn too, hidden, so each control keeps one place in
+     * the page whether its row is open or not.
      *
      * @param {string} id The agent's id.
      * @param {object} policy
@@ -744,27 +845,34 @@
      * @returns {Element}
      */
     _ruleRow(id, policy, site, isNew, nested = false) {
+      const view = this._agentView;
       const level = policy.sites?.[site] ?? "";
       const files = AGENT_FILE_AND_APP_MAPS.filter(kind =>
         Object.hasOwn(policy[kind] ?? {}, site)
       );
+      const tools = this._showsSiteTools(policy);
 
       const access = this._el("select", {
         className: "sval-agent-select",
         ariaLabel: `Access for ${site}`,
         dataset: { svalKey: `level:${id}:${site}` },
       });
-      access.append(this._el("option", { value: "" }, "Default"));
+      access.append(
+        this._el(
+          "option",
+          { value: "" },
+          `Same as every site (${AGENT_LEVELS[lazy.defaultOf(policy)].label})`
+        )
+      );
       for (const [value, { label }] of Object.entries(AGENT_LEVELS)) {
         if (value !== "ask") {
           access.append(this._el("option", { value }, label));
         }
       }
       access.value = level;
-      // A site-tools setting keeps the site's row while it shows, so Default
-      // never takes it with the level.
-      const toolsSetting =
-        this._showsSiteTools(policy) && ownToolSite(policy, site);
+      // A site-tools setting keeps the site's rule while it shows, so Same
+      // as every site never takes it with the level.
+      const toolsSetting = tools && ownToolSite(policy, site);
       access.addEventListener("change", () => {
         const value = access.value;
         if (!value && !files.length && !toolsSetting) {
@@ -793,55 +901,148 @@
             )
           )
         : this._el("span", { className: "sval-agent-site", title: site }, site);
-      const siteCell = this._el(
+      const heading = this._el(
         "span",
-        { className: "sval-agent-site-cell", role: "cell" },
+        { className: "sval-agent-site-line" },
         name
       );
       if (isNew) {
-        siteCell.append(
+        heading.append(
           this._el("span", { className: "sval-agent-new" }, "Just added")
         );
       }
+      const words = this._el(
+        "span",
+        { className: "sval-agent-site-cell" },
+        heading,
+        this._el(
+          "span",
+          { className: "sval-agents-note sval-agent-summary" },
+          this._ruleSummary(policy, site)
+        )
+      );
+
+      const tile = this._el(
+        "span",
+        { className: "sval-agent-site-icon" },
+        this._glyph("globe")
+      );
+      this._findRuleIcon(site, tile);
+
+      const open = view.expanded === site;
+      const bodyId = `sval-agent-rule-${id}-${site}`;
+      const toggle = this._el(
+        "button",
+        {
+          type: "button",
+          className: "sval-agent-rule-toggle",
+          ariaExpanded: String(open),
+          ariaControls: bodyId,
+          dataset: { svalKey: `rule:${id}:${site}` },
+        },
+        tile,
+        words,
+        this._glyph("chevron-down", "sval-agent-chevron")
+      );
+      toggle.addEventListener("click", () => {
+        this._agentView.expanded = open ? null : site;
+        this._redrawAgents();
+      });
 
       const remove = this._el(
         "button",
         {
           type: "button",
-          className: "sval-agent-remove",
+          className: "sval-button sval-agent-small sval-rule-remove",
           ariaLabel: `Remove rule for ${site}`,
-          title: "Remove rule",
           dataset: { svalKey: `remove:${id}:${site}` },
         },
-        this._glyph("x")
+        "Remove rule"
       );
       remove.addEventListener("click", () => this.removeRule(id, policy, site));
+
+      const body = this._el(
+        "div",
+        {
+          className: "sval-agent-rule-body",
+          id: bodyId,
+          hidden: !open,
+          role: "group",
+          ariaLabel: `Rule for ${site}`,
+        },
+        this._ruleSetting(
+          "Access",
+          "What the agent can do on the site.",
+          this._el(
+            "span",
+            { className: "sval-agent-access" },
+            this._el("span", {
+              className: "sval-level-dot",
+              dataset: { level: level || lazy.defaultOf(policy) },
+            }),
+            access
+          )
+        ),
+        this._ruleSetting(
+          "Downloads",
+          "Whether the agent can save files from the site to this computer.",
+          this._fileSelect(id, policy, site, "downloads", "Downloads")
+        ),
+        this._ruleSetting(
+          "Uploads",
+          "Whether the agent can send files from this computer to the site.",
+          this._fileSelect(id, policy, site, "uploads", "Uploads")
+        )
+      );
+      if (ownUploadFolders(policy, site).length) {
+        body.append(this._uploadFolders(id, policy, site));
+      }
+      body.append(
+        this._ruleSetting(
+          "Console",
+          "Whether the agent can read what the site's pages write to the console.",
+          this._fileSelect(id, policy, site, "console", "Console")
+        ),
+        this._ruleSetting(
+          "Apps",
+          "Whether the agent can open links from the site in another app, such as Zoom.",
+          this._appsSelect(id, policy, site)
+        )
+      );
+      const apps = lazy.appsOf(policy.apps?.[site]);
+      if (apps && apps !== "deny") {
+        body.append(this._siteApps(id, site, apps));
+      }
+      if (tools) {
+        body.append(
+          this._ruleSetting(
+            "Site tools",
+            "Whether the agent can use the tools the site offers to agents.",
+            this._toolSiteSelect(id, policy, site)
+          )
+        );
+        // A tool is remembered under the name its alert was answered for,
+        // which can be a host whose site holds the Allowed.
+        if (
+          ownToolSite(policy, site) === "allow" ||
+          this._grantsOn(policy, site).length
+        ) {
+          body.append(this._rememberedTools(id, policy, site));
+        }
+      }
+      body.append(
+        this._el("div", { className: "sval-agent-rule-actions" }, remove)
+      );
 
       return this._el(
         "div",
         {
           className: `sval-agent-rule${isNew ? " sval-agent-rule-new" : ""}`,
-          role: "row",
+          role: "listitem",
           dataset: nested ? { host: site } : {},
         },
-        siteCell,
-        this._el(
-          "span",
-          { className: "sval-agent-access", role: "cell" },
-          this._el("span", {
-            className: "sval-level-dot",
-            dataset: { level: level || "none" },
-          }),
-          access
-        ),
-        ...AGENT_FILE_COLUMNS.map(({ kind, label }) =>
-          this._fileSelect(id, policy, site, kind, label)
-        ),
-        this._appsSelect(id, policy, site),
-        ...(this._showsSiteTools(policy)
-          ? [this._toolSiteSelect(id, policy, site)]
-          : []),
-        this._actionCell(remove)
+        toggle,
+        body
       );
     },
 
@@ -861,7 +1062,6 @@
       const blocked = lazy.levelFor(policy, site).level === "blocked";
       const select = this._el("select", {
         className: "sval-agent-select sval-agent-tool-site",
-        role: "cell",
         ariaLabel: `Site tools on ${site}`,
         disabled: blocked,
         title: blocked
@@ -1034,7 +1234,6 @@
       const folders = kind === "uploads" ? ownUploadFolders(policy, site) : [];
       const select = this._el("select", {
         className: "sval-agent-select sval-agent-file",
-        role: "cell",
         ariaLabel: `${label} on ${site}`,
         title: folders.map(f => f.path).join("\n"),
         dataset: { svalKey: `${kind}:${id}:${site}`, value },
@@ -1091,7 +1290,6 @@
       }
       const select = this._el("select", {
         className: "sval-agent-select sval-agent-file",
-        role: "cell",
         ariaLabel: `Apps on ${site}`,
         title: schemes.join("\n"),
         dataset: { svalKey: `apps:${id}:${site}`, value },

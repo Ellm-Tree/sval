@@ -72,7 +72,8 @@ async function openEditor(id) {
   await TestUtils.waitForCondition(row, "the agent is listed");
   await open("Claude Code");
   const q = selector => editor()?.querySelector(selector);
-  const control = (kind, site) => q(`[data-sval-key="${kind}:${id}:${site}"]`);
+  const control = (kind, site) =>
+    editor() && ruleControl(editor, `[data-sval-key="${kind}:${id}:${site}"]`);
   return {
     page,
     byId,
@@ -81,11 +82,10 @@ async function openEditor(id) {
     reopen: () => open("Claude Code"),
     q,
     control,
-    // A site with no upload folders or apps has its remembered tools next.
     remembered: site =>
       control("page-tool-site", site)
         ?.closest(".sval-agent-rule")
-        .nextElementSibling?.closest(".sval-agent-remembered"),
+        .querySelector(".sval-agent-remembered"),
     sites: () =>
       [...editor().querySelectorAll(".sval-agent-site")].map(
         s => s.textContent
@@ -186,9 +186,10 @@ add_task(async function the_agent_chooses_off_ask_or_on() {
     "the summary follows"
   );
 
-  const filter = () => ui.q(`[data-sval-key="filt:${id}"]`);
-  setValue(ui.page, filter(), "tools");
-  Assert.deepEqual(ui.sites(), ["github.com", "ocado.com"], "the filter");
+  Assert.ok(
+    !ui.q(`[data-sval-key="filt:${id}"]`),
+    "a short list has no filter"
+  );
 
   ui.q('.sval-agent-page-tools input[value="off"]').click();
   await TestUtils.waitForCondition(
@@ -197,7 +198,6 @@ add_task(async function the_agent_chooses_off_ask_or_on() {
   );
   await TestUtils.waitForCondition(() => !ui.q(".sval-agent-tool-site"));
   Assert.ok(ui.q('.sval-agent-page-tools input[value="off"]').checked);
-  Assert.equal(filter().value, "all", "the tools filter resets");
   Assert.deepEqual(ui.sites(), ["github.com", "paypal.com"]);
   Assert.ok(!ui.q(".sval-agent-remembered"));
 

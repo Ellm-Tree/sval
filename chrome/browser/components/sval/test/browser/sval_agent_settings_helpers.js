@@ -13,7 +13,7 @@
  * `loadSubScript` into its own scope.
  */
 
-/* exported SvalAgents, unpairAll, openAgents, setValue */
+/* exported SvalAgents, unpairAll, openAgents, setValue, ruleControl */
 
 Services.scriptloader.loadSubScript(
   getRootDirectory(gTestPath) + "sval_preferences_helpers.js",
@@ -67,6 +67,25 @@ async function openAgents() {
     editor: () =>
       ui.byId("sval-agent-cards").querySelector(".sval-agent-editor"),
   };
+}
+
+/**
+ * A control in a site's rule, with the rule's row opened first when it is
+ * closed, as the user opens it to reach the control.
+ *
+ * @param {Function} editor Returns the permissions editor, which each
+ *   change draws afresh.
+ * @param {string} selector
+ * @returns {?Element}
+ */
+function ruleControl(editor, selector) {
+  const body = editor()
+    .querySelector(selector)
+    ?.closest(".sval-agent-rule-body");
+  if (body?.hidden) {
+    body.parentElement.querySelector(".sval-agent-rule-toggle").click();
+  }
+  return editor().querySelector(selector);
 }
 
 /**

@@ -809,16 +809,14 @@ control of what you see and what is sent to websites.
   shows the agent's task as the Workspace's name. From the Workspace's menu,
   you can stop or resume the agent there, open the app's permissions in
   Settings › Agents, or delete the Workspace.
-- **See which app and model each agent uses.** An agent Workspace shows its
-  app's icon, for apps like Claude Code, Codex, Grok, Mistral, and LM Studio.
-  Sval shows a robot for an app it doesn't know. Your phone shows the same
-  icons. The switcher, the
-  Workspaces menu, Move to Workspace, and the strip list each app's
-  Workspaces. There, each Workspace shows the icon of the model its agent
-  named, like Claude, GPT, Qwen, DeepSeek, or Llama. A Workspace whose agent named no
-  model Sval knows shows no model icon. On the strip, an app with more than
-  one Workspace has one icon with a count. Click the icon to choose one of
-  the app's Workspaces.
+- **See which app and model each agent uses.** An agent Workspace on your
+  computer or phone shows its app's icon, for apps like Claude Code, Codex,
+  and LM Studio. Sval shows a robot for an app it doesn't know. The switcher,
+  the Workspaces menu, Move to Workspace, and the strip list each app's
+  Workspaces with the icon of the model its agent named, like Claude, GPT,
+  or Llama. A Workspace whose agent named no model Sval knows shows no
+  model icon. On the strip, an app with more than one Workspace has one
+  icon with a count that you click to choose one of the app's Workspaces.
 - **Unused agent Workspaces clean themselves up.** Sval deletes an agent's
   Workspace once no session has used it for 30 days. You can choose 7 or 90
   days, or Never, in Settings › Agents.
@@ -839,7 +837,9 @@ control of what you see and what is sent to websites.
   keeps. On an address like `nas.example.com`, you choose
   what the rule covers. It can cover only that address or all of
   `example.com`. Each
-  agent has a page with its rules in Settings › Agents. Sval knows a device
+  agent has a page with its rules in Settings › Agents. The page lists each
+  site with a rule and says what the rule changes, and selecting a site
+  opens its settings. Sval knows a device
   is local from its address, or from a name like `localhost`,
   `printer.local`, or `nas`. A public name that points to your network
   counts as a site on the internet.

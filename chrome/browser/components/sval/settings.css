@@ -1556,9 +1556,33 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   color: var(--sval-ink-body);
 }
 
-.sval-agent-tile .sval-glyph {
+.sval-agent-tile .sval-glyph,
+.sval-agent-tile > img {
   width: 18px;
   height: 18px;
+}
+
+/* An agent's mark paints in `context-fill`, so it takes the ink. */
+.sval-agent-tile > img {
+  -moz-context-properties: fill;
+  fill: var(--sval-ink);
+}
+
+/* The agent's page names it with its Workspaces under the name, both lined
+   up beside the mark. */
+.sval-agent-head-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-agent-head-words > .sval-site-nothing {
+  margin: 0;
+}
+
+.sval-agent-head-words > .sval-site-nothing[hidden] {
+  display: none;
 }
 
 .sval-agent-words {
@@ -1998,6 +2022,156 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 .sval-pane select.sval-agent-tool-site:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* An agent's site rules: one row per site, which opens in place to its
+   settings stacked one per line, so no column has to fit a select. */
+.sval-rule-list {
+  gap: 6px;
+}
+
+.sval-rule-list > .sval-agent-rule {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--sval-border-subtle);
+  border-radius: 12px;
+}
+
+.sval-rule-list > .sval-agent-rule:hover {
+  background: none;
+}
+
+.sval-pane button.sval-agent-rule-toggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.sval-pane button.sval-agent-rule-toggle:hover {
+  background: var(--sval-card-hover);
+}
+
+.sval-agent-rule-toggle[aria-expanded="true"] {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.sval-agent-rule-toggle[aria-expanded="true"] .sval-agent-chevron {
+  transform: rotate(180deg);
+}
+
+.sval-agent-rule-toggle .sval-agent-chevron {
+  flex: none;
+  color: var(--sval-ink-muted);
+}
+
+.sval-agent-site-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--sval-card);
+  color: var(--sval-ink-muted);
+}
+
+.sval-agent-site-icon img {
+  width: 16px;
+  height: 16px;
+}
+
+.sval-rule-list .sval-agent-site-cell {
+  flex: 1;
+}
+
+.sval-agent-site-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sval-agent-summary {
+  font-size: var(--settings-note-size);
+  line-height: 1.4;
+}
+
+.sval-agent-rule-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 12px 12px 52px;
+}
+
+.sval-agent-rule-body[hidden] {
+  display: none;
+}
+
+.sval-agent-setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding-block: 8px;
+  border-block-start: 1px solid var(--sval-border-subtle);
+}
+
+.sval-agent-setting:first-child {
+  border-block-start: 0;
+}
+
+.sval-agent-setting-words {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-agent-setting-name {
+  color: var(--sval-ink);
+  font-size: var(--settings-text-size);
+  font-weight: 600;
+}
+
+.sval-agent-setting-words .sval-agents-note {
+  font-size: var(--settings-note-size);
+  line-height: 1.4;
+}
+
+.sval-agent-setting select.sval-agent-select {
+  width: 15em;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sval-agent-setting > .sval-agent-access {
+  width: 15em;
+  max-width: 100%;
+}
+
+.sval-agent-rule-body .sval-agent-remembered {
+  margin: 0 0 8px;
+}
+
+.sval-agent-rule-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-block-start: 8px;
 }
 
 /* An allowed site's remembered tools, in a sunken box under its row. */

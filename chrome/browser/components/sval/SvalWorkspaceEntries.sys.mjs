@@ -273,7 +273,7 @@ export function workspaceIcon(nodes, id) {
  * @param {string|null} brand `SvalAgentBrands.agentBrandOf`'s answer.
  * @returns {string}
  */
-function agentMarkURL(brand) {
+export function agentMarkURL(brand) {
   return brandURL(brand) ?? AGENT_ROBOT_URL;
 }
 

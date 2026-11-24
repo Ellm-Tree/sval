@@ -73,10 +73,10 @@ permissions.
 
 ## An agent's page
 
-- **Default for sites with no rule.** This is the access the agent gets
-  on a site that has no rule of its own.
-  - **Ask on first visit:** Sval asks you the first time the agent opens a
-    site. Your answer becomes a site rule. This is the default.
+- **Every site.** This is the access the agent gets on a site that has no
+  rule of its own.
+  - **Ask on first visit:** the default, where Sval asks you the first time
+    the agent opens a site and your answer becomes that site's own rule.
   - **Blocked:** the agent can't open the site.
   - **Read only:** the agent reads pages. It never clicks, types, or
     submits.
@@ -87,20 +87,24 @@ permissions.
 
   Sval asks before the agent opens a service on this computer or a device
   on your local network. That holds for every default except Blocked.
-- **Site tools.** This shows while sites are allowed to offer tools.
-  **Off** hides every site's tools from this agent. With **Ask**, Sval asks
-  you before every tool call. **On** follows the site's access level. With
-  On, tools you've already allowed run without asking.
-- **Site rules.** The list has a rule for each site, with a search box and
-  a filter. **Add site** adds a rule. Each row has these columns:
-  - **Access:** Default, or one of the levels above.
+- **Site tools.** This setting shows while sites are allowed to offer
+  tools. **Off** hides every site's tools from this agent, and with **Ask**
+  Sval asks you before every tool call. **On** follows the site's access
+  level and runs the tools you've already allowed without asking, and a
+  site's own rule can still allow or block that site's tools.
+- **Sites with their own rules.** The list has a row for each site with a
+  rule, which says what the rule changes from Every site and opens to the
+  rule's settings when you select it. Past eight rules, a search box and a
+  filter show above the list, and **Add site** adds a rule. Each rule has
+  these settings:
+  - **Access:** Same as every site, or one of the levels above.
   - **Downloads**, **Uploads**, and **Console:** Ask, Allow, or Deny. An
     upload rule names the folders the agent can upload files from.
   - **Apps:** Ask, Deny, or a list of the apps the site has asked to open.
     Each app in the list has its own answer.
-  - **Site tools:** this column shows while the agent's Site tools setting
+  - **Site tools:** this setting shows while the agent's Site tools setting
     is On or Ask.
-  - **Remove rule:** Sval removes the row's rule. **Undo** puts the rule
+  - **Remove rule:** Sval removes the site's rule. **Undo** puts the rule
     back.
 - **Unpair.** Sval disconnects the agent and deletes its permissions.
 

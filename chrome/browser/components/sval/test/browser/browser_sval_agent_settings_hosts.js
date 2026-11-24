@@ -145,9 +145,7 @@ add_task(async function a_host_rule_is_listed_under_its_site() {
     "the site's row shows only its own answers"
   );
 
-  editor()
-    .querySelector(`[data-sval-key="remove:${id}:nas.example.org"]`)
-    .click();
+  ruleControl(editor, `[data-sval-key="remove:${id}:nas.example.org"]`).click();
   await TestUtils.waitForCondition(() => {
     const policy = store.policyOf(id);
     return (

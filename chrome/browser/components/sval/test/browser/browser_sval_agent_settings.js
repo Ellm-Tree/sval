@@ -269,7 +269,7 @@ add_task(async function a_level_is_edited_in_place() {
   );
 
   const control = (kind, site) =>
-    editor().querySelector(`[data-sval-key="${kind}:${claude}:${site}"]`);
+    ruleControl(editor, `[data-sval-key="${kind}:${claude}:${site}"]`);
   const access = () => control("level", "a.example");
   Assert.equal(access().value, "read-only");
   setValue(ui.page, access(), "blocked");
@@ -322,11 +322,11 @@ add_task(async function apps_and_upload_folders_are_edited_in_place() {
   const editor = ui.editor;
 
   const apps = () =>
-    editor().querySelector(`[data-sval-key="apps:${claude}:zoom.us"]`);
+    ruleControl(editor, `[data-sval-key="apps:${claude}:zoom.us"]`);
   Assert.equal(apps().value, "schemes", "the site's apps are listed");
   Assert.deepEqual(apps().title.split("\n"), ["zoommtg", "zoomus"]);
   const scheme = name =>
-    editor().querySelector(`[data-sval-key="app:${claude}:zoom.us:${name}"]`);
+    ruleControl(editor, `[data-sval-key="app:${claude}:zoom.us:${name}"]`);
   Assert.equal(scheme("zoommtg").value, "allow");
   Assert.equal(scheme("zoomus").value, "deny");
   setValue(ui.page, scheme("zoomus"), "");
@@ -347,9 +347,10 @@ add_task(async function apps_and_upload_folders_are_edited_in_place() {
   );
 
   const folders = () =>
-    editor()
-      .querySelector(`[data-sval-key^="folder-remove:${claude}:b.example:"]`)
-      ?.closest(".sval-agent-remembered");
+    ruleControl(
+      editor,
+      `[data-sval-key^="folder-remove:${claude}:b.example:"]`
+    )?.closest(".sval-agent-remembered");
   const chip = () => folders()?.querySelector(".sval-agent-chip");
   await TestUtils.waitForCondition(() => folders(), "the folders show");
   Assert.equal(chip().dataset.subfolders, "true", "with their scope");
@@ -449,9 +450,10 @@ add_task(async function a_site_is_added_and_removed_with_undo() {
       )?.value === "deny",
     "the file rule shows"
   );
-  editor()
-    .querySelector(`[data-sval-key="remove:${claude}:amazon.co.uk"]`)
-    .click();
+  ruleControl(
+    editor,
+    `[data-sval-key="remove:${claude}:amazon.co.uk"]`
+  ).click();
   await TestUtils.waitForCondition(() => {
     const policy = store.policyOf(claude);
     return (

@@ -34,6 +34,9 @@
     SvalAgentClients:
       "moz-src:///browser/components/sval/SvalAgentClients.sys.mjs",
     SvalAgents: "moz-src:///browser/components/sval/SvalAgents.sys.mjs",
+    agentBrandOf: "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs",
+    agentMarkURL:
+      "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
     SvalColor: "moz-src:///browser/components/sval/SvalColor.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     politeRate: "moz-src:///browser/components/sval/SvalAgentPolite.sys.mjs",
@@ -139,6 +142,7 @@
         unpairCancel: byId("sval-unpair-cancel"),
         unpairConfirm: byId("sval-unpair-confirm"),
         agentPage: byId("sval-agent-page"),
+        agentMark: byId("sval-agent-mark"),
         agentTitle: byId("sval-agent-title"),
         agentMeta: byId("sval-agent-meta"),
         agentPageSaid: byId("sval-agent-page-said"),
@@ -550,6 +554,7 @@
         this._agentView = {
           ...this._agentView,
           open: id,
+          expanded: null,
           q: "",
           filt: "all",
           showAll: false,
@@ -652,6 +657,7 @@
       const agent = agents[at];
       const els = this._els;
       this._setText(els.agentTitle, agent.label);
+      els.agentMark.src = lazy.agentMarkURL(lazy.agentBrandOf(agent.label));
       const held = agent.workspaces.filter(w => workspaces[w.workspaceId]);
       let where = "";
       if (held.length === 1) {
@@ -665,7 +671,7 @@
         "button",
         {
           type: "button",
-          className: "sval-button",
+          className: "sval-agent-unpair",
           dataset: { svalKey: `page-unpair:${id}` },
         },
         `Unpair ${agent.label}`

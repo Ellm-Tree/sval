@@ -31,7 +31,7 @@ If you haven't changed the agent's default, each answer does this:
 
 1. Open Settings › Agents.
 2. Under Paired agents, select **Permissions** next to the agent.
-3. Under Site rules, select **Add site**.
+3. Under Sites with their own rules, select **Add site**.
 4. Type the site, or paste an address from the agent's tab.
 5. Choose a level: **Blocked**, **Read only**, **Ask before writes**, or
    **Full**.
@@ -40,11 +40,13 @@ If you haven't changed the agent's default, each answer does this:
 ## Change or remove a rule
 
 1. Open the agent's **Permissions** page.
-2. In the site's row, choose another level under Access.
+2. Select the site's row. The row opens to show the rule's settings.
+3. Choose another level under Access.
 
-To remove a rule, select **Remove rule** at the end of the rule's row. A site
-then follows the default for sites with no rule. An address follows the
-rule for its whole site, or that default when the site has no rule. If you change your mind, select **Undo**.
+To remove a rule, open the site's row and select **Remove rule**, and the
+site then follows Every site. An address follows the rule for its whole
+site, or Every site when the site has no rule of its own. If you change
+your mind, **Undo** puts the rule back.
 
 ## Details
 
@@ -56,21 +58,22 @@ rule for its whole site, or that default when the site has no rule. If you chang
     agent clicks, types, or submits.
   - **Full.** The agent clicks, types, and submits on its own, without
     asking.
-- **Default for sites with no rule.** This setting starts at **Ask on
-  first visit**. You can change the default to any level. Sites with no rule then get that
+- **Every site.** This setting starts at **Ask on first visit**, and you
+  can change it to any level. Sites with no rule of their own then get that
   level without Sval asking you.
+- A site's rule changes only the settings you set in it, so a site whose
+  Access is **Same as every site** keeps the level that Every site sets.
 - Even with a default level set, Sval asks you before an agent opens a
   service on this computer or a device on your local network.
-- On an address like nas.example.com, you choose what the rule covers.
-  It can cover that address alone or all of example.com. A rule for one
-  address wins over the rule for its whole site.
+- On an address like `nas.example.com`, you choose whether the rule
+  covers that address alone or all of `example.com`. A rule for one address
+  wins over the rule for its whole site.
 - When Sval asks before writes, it lists what the page is about to send.
-  To set the site to Full, choose **Always allow writes**. To set the site
-  to Read only, choose **Always deny writes**.
-- Downloads, Uploads, Console, and Apps each have their own column in the
-  rules table. Each column starts at Ask. Sval asks you the first time an
-  agent needs to download, upload, use the console, or open an app on a
-  site.
+  Choose **Always allow writes** to set the site to Full, or **Always deny
+  writes** to set the site to Read only.
+- Each site's rule has a setting for downloads, one for uploads, one for
+  the console, and one for apps. Each of them starts at Ask, so Sval asks
+  you the first time an agent needs that permission on the site.
 - When Sval asks about a download or an upload, **Allow** and **Deny**
   answer only that once. The **Always** choices save a rule for the site.
 - Sval remembers your answer about a site's console.
@@ -80,14 +83,14 @@ rule for its whole site, or that default when the site has no rule. If you chang
 - An upload rule never covers a hidden file, or any file inside a hidden
   folder, such as the keys and passwords your home folder keeps. Sval asks
   you about each of those files every time.
-- Once a site asks to open an app, the Apps column lists that app.
+- Once a site asks to open an app, the site's rule lists that app under Apps.
 - Rules belong to the app, so every session of the app follows them.
 - Sval keeps the rules on this device.
 
 ## If something goes wrong
 
 - **already has a rule.** The site has a rule already. Select **Show it**
-  to find it in the table.
+  to find it in the list.
 - **Enter a site like ebay.co.uk, or paste an address.** Sval couldn't read
   what you typed as a site.
 
