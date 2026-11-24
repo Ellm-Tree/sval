@@ -306,6 +306,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_back_after_address_bar_load.js"]
 
+["browser_sval_back_to_opener.js"]
+
 ["browser_sval_background_both_ways.js"]
 
 ["browser_sval_background_peer_workspace.js"]

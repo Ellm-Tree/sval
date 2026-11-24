@@ -172,6 +172,10 @@ control of what you see and what is sent to websites.
   Sval shows the tab or pin in the same Workspace that you looked at
   before. Close that tab too, and Sval goes back one more step through the
   tabs and pins you've looked at in that Workspace.
+- **Back from a new tab.** When a link opens a page in a new tab, Back
+  closes the new tab and takes you to the tab or pin that holds the link.
+  If you've followed links in the new tab, Back goes through those pages
+  first.
 - **Undo.** The bottom of the Workspace panel offers Undo for 8 seconds
   when you close several tabs or move a pin to Favorites. It does the same
   when you delete a group, a pin, or a Workspace. Undo puts back what you

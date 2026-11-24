@@ -53,6 +53,7 @@ MOZ_SRC_FILES += [
     "SvalAgentWrites.sys.mjs",
     "SvalAppNotices.sys.mjs",
     "SvalArchive.sys.mjs",
+    "SvalBackToOpener.sys.mjs",
     "SvalBackupKey.sys.mjs",
     "SvalBlocking.sys.mjs",
     "SvalBlockingLists.sys.mjs",

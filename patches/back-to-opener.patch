@@ -1,0 +1,60 @@
+Sval: Back on a tab another tab opened closes it and shows its opener
+
+A tab opened from a link or by window.open starts with no page to go
+back to, so Firefox leaves Back disabled there. Sval enables Back on such
+a tab: it closes the tab and selects the tab that opened it, as Safari
+does. SvalBackToOpener decides when Back does this, for the Back command,
+the Back command's state and the history swipe.
+
+diff --git a/browser/base/content/browser-commands.js b/browser/base/content/browser-commands.js
+index 8684b60db3..2a99e6913a 100644
+--- a/browser/base/content/browser-commands.js
++++ b/browser/base/content/browser-commands.js
+@@ -13,6 +13,14 @@ var BrowserCommands = {
+     const where = BrowserUtils.whereToOpenLink(aEvent, false, true);
+ 
+     if (where == "current") {
++      // Sval: a tab another tab opened closes back to it (SvalBackToOpener).
++      if (
++        ChromeUtils.importESModule(
++          "moz-src:///browser/components/sval/SvalBackToOpener.sys.mjs"
++        ).backToOpener(gBrowser.selectedTab)
++      ) {
++        return;
++      }
+       try {
+         gBrowser.goBack();
+       } catch (ex) {}
+diff --git a/browser/base/content/browser-gestureSupport.js b/browser/base/content/browser-gestureSupport.js
+index f94b39d26a..a78bc42157 100644
+--- a/browser/base/content/browser-gestureSupport.js
++++ b/browser/base/content/browser-gestureSupport.js
+@@ -848,7 +848,10 @@ var gHistorySwipeAnimation = {
+    * @return true if there is a previous page in history, false otherwise.
+    */
+   canGoBack: function HSA_canGoBack() {
+-    return gBrowser.webNavigation.canGoBack;
++    // Sval: Back also closes a tab back to its opener (SvalBackToOpener).
++    return ChromeUtils.importESModule(
++      "moz-src:///browser/components/sval/SvalBackToOpener.sys.mjs"
++    ).canGoBack(window);
+   },
+ 
+   /**
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 1cebd6cc68..1b494e3632 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -779,7 +779,11 @@ function UpdateBackForwardCommands(aWebNavigation) {
+ 
+   var backDisabled = backCommand.hasAttribute("disabled");
+   var forwardDisabled = forwardCommand.hasAttribute("disabled");
+-  if (backDisabled == aWebNavigation.canGoBack) {
++  // Sval: Back also closes a tab back to its opener (SvalBackToOpener).
++  var canGoBack = ChromeUtils.importESModule(
++    "moz-src:///browser/components/sval/SvalBackToOpener.sys.mjs"
++  ).canGoBack(window);
++  if (backDisabled == canGoBack) {
+     if (backDisabled) {
+       backCommand.removeAttribute("disabled");
+     } else {

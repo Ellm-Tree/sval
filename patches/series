@@ -424,3 +424,4 @@ remove-attribution.delete
 topsites-refresh-on-rank-change.patch
 remove-newtab.patch
 remove-newtab.delete
+back-to-opener.patch
