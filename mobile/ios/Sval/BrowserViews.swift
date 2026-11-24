@@ -117,7 +117,7 @@ struct BrowserView: View {
                     .overlay {
                         // The next Workspace's bar, coming in beside this one.
                         if let target = swipeTarget, !reduceMotion {
-                            BarPreview(workspace: target, fold: browser.barFold)
+                            BarPreview(workspace: target)
                                 .offset(x: swipe + (swipe < 0 ? barWidth : -barWidth))
                         }
                     }
@@ -137,8 +137,8 @@ struct BrowserView: View {
             // The walkthrough's light on the capsule its page names.
             if !walkthroughDone, let capsule = Walkthrough.capsule(on: walkthroughPage),
                browser.currentTabId == nil, workspace?.id == model.ownWorkspace?.id, entering == nil,
-               verticalSize != .compact, browser.barFold == 0, barFrame.width > 0 {
-                BarSpotlight(size: CGSize(width: barFrame.width, height: barHeight), capsule: capsule)
+               verticalSize != .compact, barFrame.width > 0 {
+                OpenBarSpotlight(size: CGSize(width: barFrame.width, height: barHeight), capsule: capsule)
                     .transition(.opacity)
             }
             if let scrub {
@@ -695,14 +695,29 @@ struct BrowserView: View {
                     instant.disablesAnimations = true
                     withTransaction(instant) {
                         // The bar that slid in is the one that stays.
-                        let fold = browser.barFold
+                        let fold = browser.fold.value
                         browser.showWorkspace(target.id)
-                        browser.keepFold(fold)
+                        browser.fold.keepFold(fold)
                         swipe = 0
                         swipingTo = nil
                     }
                 }
             }
+    }
+}
+
+/// The walkthrough's light on the bar, while the bar is open. It reads
+/// the fold's phase itself, so the screen around it never reads the fold.
+private struct OpenBarSpotlight: View {
+    @Environment(AppModel.self) private var model
+    let size: CGSize
+    let capsule: Int
+
+    var body: some View {
+        if model.browser.fold.phase == .open {
+            BarSpotlight(size: size, capsule: capsule)
+                .transition(.opacity)
+        }
     }
 }
 

@@ -45,17 +45,8 @@ final class Browser {
     private(set) var progress = 0.0
     /// The failed load that left the page in front empty.
     private(set) var loadFailure: Page.LoadFailure?
-    /// How far the bar has folded into its pill, from 0 (open) to 1,
-    /// following the page as it scrolls (`pageScrolled`).
-    private(set) var barFold = 0.0
-    /// The scroll so far toward folding or unfolding a bar at rest.
-    @ObservationIgnored private var foldRun = 0.0
-    /// Set when the bar is opened by a tap: the page's coasting leaves it
-    /// open until a finger drags the page again.
-    @ObservationIgnored private var foldHeldOpen = false
-    @ObservationIgnored private var foldSettle: Task<Void, Never>?
-    /// When the page counts as at rest, unless another report comes first.
-    @ObservationIgnored private var foldSettleAt: ContinuousClock.Instant?
+    /// The bar's fold, which follows the page in front as it scrolls.
+    let fold = BarFold()
 
     @ObservationIgnored private var pages: [String: Page] = [:] {
         didSet { if Set(oldValue.keys) != Set(pages.keys) { pagesChanged += 1 } }
@@ -320,85 +311,6 @@ final class Browser {
     /// above it.
     static let barRoom = 48.0 + 24.0
     static let sidewaysBarRoom = 44.0 + 8.0
-
-    /// How far the page scrolls one way before a resting bar starts to
-    /// fold or unfold.
-    static let foldStart = 100.0
-    /// How far the page scrolls to fold the bar all the way, once started.
-    static let foldDistance = 86.0
-
-    /// Moves the bar's fold with the page in front: down folds it, up
-    /// opens it, by the distance scrolled once past `foldStart`, so it
-    /// stops when the finger stops and turns when the finger turns. Once
-    /// the page comes to rest, a fold left partway finishes toward its
-    /// nearer end.
-    func pageScrolled(_ report: ScrollReport) {
-        foldSettleAt = nil
-        switch report {
-        case .touched:
-            foldHeldOpen = false
-            return
-        case .released:
-            break
-        case .atEnd:
-            if !foldHeldOpen, barFold > 0 { foldBar(to: 0) }
-            return
-        case .moved(let delta, let atTop, let held):
-            guard !foldHeldOpen else { return }
-            var moved = delta
-            if !atTop, barFold == 0 || barFold == 1 {
-                let toward = barFold == 0 ? delta > 0 : delta < 0
-                foldRun = toward && (foldRun == 0 || (foldRun > 0) == (delta > 0)) ? foldRun + delta : 0
-                guard abs(foldRun) > Self.foldStart else { return }
-                moved = foldRun - (foldRun > 0 ? Self.foldStart : -Self.foldStart)
-                foldRun = 0
-            }
-            let next = atTop ? 0 : min(1, max(0, barFold + moved / Self.foldDistance))
-            if next != barFold {
-                var still = Transaction()
-                still.disablesAnimations = true
-                withTransaction(still) { barFold = next }
-            }
-            if held { return }
-        }
-        // Coasting reports keep coming; the page is at rest once they stop.
-        // They come each frame, so one task waits out a deadline each
-        // report moves on.
-        foldSettleAt = .now + .milliseconds(120)
-        guard foldSettle == nil else { return }
-        foldSettle = Task { [weak self] in
-            while let at = self?.foldSettleAt {
-                try? await Task.sleep(until: at, clock: .continuous)
-                guard let self else { return }
-                guard let due = foldSettleAt else { break }
-                if due > .now { continue }
-                foldSettleAt = nil
-                if barFold > 0, barFold < 1 { foldBar(to: barFold >= 0.5 ? 1 : 0) }
-            }
-            self?.foldSettle = nil
-        }
-    }
-
-    /// Opens the bar from a tap on its pill. The page's coasting leaves
-    /// it open until a finger drags the page again.
-    func openBar() {
-        foldHeldOpen = true
-        foldBar(to: 0)
-    }
-
-    /// Puts the bar's fold back as it was, at once, as when a Workspace
-    /// swipe ends on the bar that slid in.
-    func keepFold(_ fold: Double) {
-        foldRun = 0
-        barFold = fold
-    }
-
-    private func foldBar(to end: Double) {
-        foldRun = 0
-        guard barFold != end else { return }
-        // Under Reduce Motion the bar goes to its fold at once.
-        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .smooth(duration: 0.4)) { barFold = end }
-    }
 
     /// When each tab was last brought to the front on this phone.
     var usedAtSnapshot: [String: Double] { usedAt }
@@ -813,7 +725,7 @@ final class Browser {
         let tabs = Set(model.rows.lazy.filter { $0.kind == .tab }.map(\.id))
         usedAt = usedAt.filter { tabs.contains($0.key) }
         UserDefaults.standard.set(usedAt.filter { !model.isPrivate($0.key) }, forKey: Self.usedKey)
-        foldBar(to: 0)
+        fold.foldBar(to: 0)
         if let workspace = model.workspace(of: id) ?? Self.pinParts(id)?.workspace {
             frontTabs[workspace] = id
             UserDefaults.standard.set(frontTabs.filter { !model.isPrivate($0.key) }, forKey: Self.frontKey)
@@ -853,7 +765,7 @@ final class Browser {
         currentTabId = nil
         UserDefaults.standard.removeObject(forKey: Self.currentKey)
         workspaceId = id
-        foldBar(to: 0)
+        fold.foldBar(to: 0)
         refreshState()
     }
 
@@ -1638,7 +1550,7 @@ final class Browser {
             self?.refreshState()
         } onScroll: { [weak self] tabId, report in
             guard let self, tabId == currentTabId else { return }
-            pageScrolled(report)
+            fold.pageScrolled(report)
         }
         pages[id] = page
         page.mediaChoice = { [weak self] host in
@@ -2315,7 +2227,7 @@ final class Page: NSObject, WKNavigationDelegate {
             MainActor.assumeIsolated { onState() }
         })
         // The bar folds as the user scrolls down and comes back as they
-        // scroll up or reach the end (`Browser.pageScrolled`). Offsets the
+        // scroll up or reach the end (`BarFold.pageScrolled`). Offsets the
         // page sets itself, as a load or an anchor does, are left alone.
         observations.append(view.scrollView.observe(\.contentOffset, options: [.old, .new]) { [tabId] scroll, change in
             MainActor.assumeIsolated {
@@ -3700,7 +3612,7 @@ enum PrivacyCover {
     }
 }
 
-/// What a page's scrolling tells the bar (`Browser.pageScrolled`).
+/// What a page's scrolling tells the bar (`BarFold.pageScrolled`).
 enum ScrollReport {
     /// A finger came down on the page.
     case touched

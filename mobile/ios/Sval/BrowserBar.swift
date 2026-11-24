@@ -6,7 +6,7 @@ import SwiftUI
 /// The bar at the foot of the browser: four glass capsules floating over
 /// the page, each in the Workspace's colour (round 6). Back and Forward,
 /// the address with the site menu and reload, New Tab, and the Workspace.
-/// As the page scrolls down they fold into one pill (`Browser.barFold`).
+/// As the page scrolls down they fold into one pill (`BarFold`).
 /// The bar's Workspace button, as the bar draws it.
 struct WorkspaceButtonBounds: PreferenceKey {
     static let defaultValue: Anchor<CGRect>? = nil
@@ -18,10 +18,11 @@ struct WorkspaceButtonBounds: PreferenceKey {
 struct BrowserBar: View {
     @Environment(\.horizontalSizeClass) private var horizontalSize
     @Environment(AppModel.self) private var model
-    @Environment(\.appearance) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.verticalSizeClass) private var verticalSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// A line of the address's text, which is `.subheadline`, as
+    /// `GlassFold` sizes the bar by it.
+    @ScaledMetric(relativeTo: .subheadline) private var addressLine: CGFloat = 20
 
     let facts: BarFacts
     let colors: BarColors
@@ -46,17 +47,6 @@ struct BrowserBar: View {
     private var otherMedia: String? { facts.otherMedia }
     private var frontMedia: String? { facts.frontMedia }
 
-    /// The capsules above the bar: the download under way, then the ask for
-    /// video and audio, which stays nearest the bar. Each rises by its own
-    /// height and spacing above the one under it.
-    @ViewBuilder private var notices: some View {
-        VStack(spacing: 8) {
-            DownloadCapsule(colors: colors)
-            if facts.asks { MediaAsk(colors: colors) }
-        }
-        .alignmentGuide(.top) { $0[.bottom] - 44 }
-    }
-
     /// The Workspace colour the capsules' glass is tinted with.
     private var layer: Color { colors.layer }
 
@@ -67,15 +57,7 @@ struct BrowserBar: View {
             if verticalSize == .compact {
                 sideways
             } else {
-                GlassFold(progress: browser.barFold) { at, t, shape in
-                    capsules(at, t, shape)
-                }
-                // Above the full bar and the folded pill alike, and above
-                // another tab's now-playing capsule while that shows.
-                .overlay(alignment: .top) {
-                    notices.offset(y: otherMedia != nil && browser.barFold < 1 ? -112 : -52)
-                }
-                .padding(.bottom, 24)
+                upright
             }
         }
         .background { ProgressFollower(line: $line, shown: $lineShown) }
@@ -84,183 +66,44 @@ struct BrowserBar: View {
         }
     }
 
-    /// The upright bar at fold `t`, its capsules at `at`: Back and Forward,
-    /// the address, New Tab and the Workspace button (14a1). Folded, they
-    /// slide into one pill holding the shield, the address and a dot in the
-    /// Workspace colour (14i5). The shield and the address stay as they
-    /// are; the rest fade over the first third of the fold, and the dot
-    /// over the last.
-    private func capsules(_ at: [CGRect], _ t: Double, _ shape: BarShape) -> some View {
+    /// The upright bar. Its controls are built here, once for each change
+    /// of what the bar shows, and `FoldingBar` places them at each step of
+    /// the fold, so a page's scrolling builds none of them again.
+    private var upright: some View {
+        let shape = BarShape(typeSize, line: addressLine)
         let k = shape.scale
-        let buttons = 1 - foldStep(0, 0.35, t)
-        let dot = foldStep(0.65, 1, t)
-        let address = at[1]
-        // Each capsule's controls are its glass's own content, so they move
-        // with the glass when it answers a touch.
-        return ZStack(alignment: .topLeading) {
-            GlassEffectContainer(spacing: 3) {
-                ZStack(alignment: .topLeading) {
-                    // Folded, Back, New Tab and the Workspace button lie
-                    // inside the pill's ends, where their glass would show
-                    // at its edge and answer a touch meant for the pill;
-                    // they go once the fold is done, and their glass stops
-                    // answering touches once it starts.
-                    if t < 1 {
-                        capsule(at[0], interactive: t == 0) {
-                            HStack(spacing: 0) {
-                                navButton("Back", "back", size: 24 * k, frame: 40 * k, enabled: facts.canGoBack) { browser.goBack() }
-                                navButton("Forward", "forward", size: 24 * k, frame: 40 * k, enabled: facts.canGoForward) {
-                                    browser.goForward()
-                                }
-                            }
-                            .opacity(buttons)
-                            .allowsHitTesting(t == 0)
-                            .accessibilityHidden(t > 0)
-                        }
-                    }
-                    capsule(address) { addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k) }
-                    if t < 1 {
-                        capsule(at[2], interactive: t == 0) {
-                            newTabButton(size: 24 * k, frame: shape.control)
-                                .opacity(buttons)
-                                .allowsHitTesting(t == 0)
-                                .accessibilityHidden(t > 0)
-                        }
-                        // Held for a scrub, its glass stays still under the
-                        // lifted button, which would show it swelling and
-                        // following the finger past its edge.
-                        capsule(at[3], interactive: t == 0 && scrubbing != .workspaces) {
-                            workspaceButton(size: shape.control, scale: k)
-                                .opacity(buttons)
-                                .allowsHitTesting(t == 0)
-                                .accessibilityHidden(t > 0)
-                        }
-                    }
+        return FoldingBar(
+            facts: facts, colors: colors, scrubbing: scrubbing,
+            nav: HStack(spacing: 0) {
+                navButton("Back", "back", size: 24 * k, frame: 40 * k, enabled: facts.canGoBack) { browser.goBack() }
+                navButton("Forward", "forward", size: 24 * k, frame: 40 * k, enabled: facts.canGoForward) {
+                    browser.goForward()
                 }
-            }
-            if scrubbing == .tabs && t == 0 {
-                liftedAddress(address, t: t, buttons: buttons, dot: dot, scale: k)
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
-            }
-            if scrubbing == .workspaces && t == 0 {
-                liftedWorkspaceButton(at[3], scale: k)
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
-            }
-            // Media playing, in this tab or another, rides above the bar in
-            // its own capsule (14k4, 17c). Folded, the page in front's is the
-            // speaker in the pill, and another tab's is its icon beside it.
-            if let media = frontMedia ?? otherMedia {
+            },
+            // The address capsule's height, open or folded, less its 6pt
+            // margins.
+            row: addressRow(height: shape.address - 12, scale: k),
+            newTab: newTabButton(size: 24 * k, frame: shape.control),
+            workspaceButton: workspaceButton(size: shape.control, scale: k),
+            workspaceLabel: workspaceLabel(size: shape.control, named: false, scale: k),
+            otherMedia: frontMedia == nil ? otherMedia.map(otherMediaButton) : nil,
+            rider: (frontMedia ?? otherMedia).map { media in
                 NowPlayingCapsule(tabId: media, colors: colors) { actions.media(media) }
-                    .frame(width: at[3].maxX - 8)
-                    .offset(x: 8, y: -60)
-                    .opacity(buttons)
-                    .allowsHitTesting(t == 0)
-                    .accessibilityHidden(t > 0)
-            }
-            if frontMedia == nil, let media = otherMedia {
-                Button { actions.media(media) } label: {
-                    Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: 26) } }
-                        .frame(width: 48, height: 48)
-                }
-                .glassEffect(workspaceGlass(layer), in: .circle)
-                .offset(x: address.maxX + 6, y: address.minY)
-                .opacity(dot)
-                .allowsHitTesting(t == 1)
-                .accessibilityHidden(t < 1)
-                .accessibilityLabel("Video and Audio")
-            }
+            },
+            speaker: frontMedia.map(speaker),
+            progress: ProgressLine(line: $line, shown: $lineShown, colors: colors),
+            openBar: { browser.fold.openBar() })
+            .padding(.bottom, 24)
+    }
+
+    /// Another tab's media beside the folded pill: its site's icon.
+    private func otherMediaButton(_ media: String) -> some View {
+        Button { actions.media(media) } label: {
+            Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: 26) } }
+                .frame(width: 48, height: 48)
         }
-        .foregroundStyle(colors.ink)
-        .animation(.spring(duration: 0.35, bounce: 0.2), value: scrubbing)
-    }
-
-    /// One capsule: its content centred in its frame, on glass of the
-    /// frame's shape, at its place in the fold.
-    private func capsule<Content: View>(_ frame: CGRect, interactive: Bool = true,
-                                        @ViewBuilder content: () -> Content) -> some View {
-        content()
-            .frame(width: frame.width, height: frame.height)
-            .glassEffect(workspaceGlass(layer, interactive: interactive), in: .capsule)
-            .glassEffectTransition(.identity)
-            .offset(x: frame.minX, y: frame.minY)
-    }
-
-    /// The address lifted over the bar while it is held for a scrub, grown
-    /// past the buttons beside it. It is drawn outside the bar's glass
-    /// container, which would merge its glass with theirs where they
-    /// overlap, and it takes no touches, so the hold under it carries on.
-    private func liftedAddress(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
-        let grown: CGFloat = 1.15
-        let lifted = address.insetBy(dx: -address.width * (grown - 1) / 2, dy: -address.height * (grown - 1) / 2)
-        return addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k)
-            .scaleEffect(grown)
-            .frame(width: lifted.width, height: lifted.height)
-            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
-            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-            .offset(x: lifted.minX, y: lifted.minY)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-
-    /// The Workspace button lifted over the bar while it is held for a
-    /// scrub, drawn as `liftedAddress` is.
-    private func liftedWorkspaceButton(_ frame: CGRect, scale k: Double) -> some View {
-        let grown: CGFloat = 1.15
-        let lifted = frame.insetBy(dx: -frame.width * (grown - 1) / 2, dy: -frame.height * (grown - 1) / 2)
-        return workspaceLabel(size: frame.height, named: false, scale: k)
-            .scaleEffect(grown)
-            .frame(width: lifted.width, height: lifted.height)
-            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
-            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-            .offset(x: lifted.minX, y: lifted.minY)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-
-    /// The address capsule's content. The shield and the address hold their
-    /// place, 36pt tall on the capsule's midline, as it shrinks to the pill;
-    /// Reload fades at its end, where the Workspace's dot fades in. Partway
-    /// or folded, a tap anywhere on it brings the full bar back.
-    private func addressCapsule(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
-        let row = address.height - 12
-        let inset = 4 * (1 - t)
-        // With no page there is nothing to reload, and the address takes
-        // Reload's room.
-        let reloads = facts.reloads
-        let room = address.width - inset - ((reloads ? 40 * k : 8) * (1 - t) + (frontMedia != nil ? 60 : 30) * t)
-        return ZStack(alignment: .leading) {
-            addressRow(height: row, scale: k)
-                .frame(width: max(0, room), height: row, alignment: .leading)
-                .padding(.leading, inset)
-                // Partway or folded, the pill is one button.
-                .allowsHitTesting(t == 0)
-                .accessibilityHidden(t > 0)
-            ReloadButton(reloads: reloads, scale: k).frame(width: 36 * k, height: 44)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, 4)
-                .opacity(reloads ? buttons : 0)
-                .allowsHitTesting(t == 0)
-                .accessibilityHidden(t > 0)
-            workspaceDot
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, 6)
-                .opacity(dot)
-            if t > 0 {
-                Button { browser.openBar() } label: { Color.clear.contentShape(.capsule) }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Show the toolbar")
-            }
-            if let media = frontMedia {
-                speaker(media)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, 32)
-                    .opacity(dot)
-                    .allowsHitTesting(t == 1)
-                    .accessibilityHidden(t < 1)
-            }
-        }
-        .frame(width: address.width, height: address.height)
-        .overlay(alignment: .bottom) { ProgressLine(line: $line, shown: $lineShown, colors: colors).padding(.bottom, 1) }
+        .glassEffect(workspaceGlass(layer), in: .circle)
+        .accessibilityLabel("Video and Audio")
     }
 
     /// The shield, the pane mark of a split in front, the JavaScript-off
@@ -365,7 +208,7 @@ struct BrowserBar: View {
         }
         .foregroundStyle(colors.ink)
         .overlay(alignment: .top) {
-            notices.offset(y: -52)
+            BarNotices(colors: colors, asks: facts.asks).offset(y: -52)
         }
         // Clear of the screen's rounded corners.
         .padding(.horizontal, 20)
@@ -376,7 +219,7 @@ struct BrowserBar: View {
 
     /// The page in front's media in the address capsule, folded or
     /// sideways (6f): the speaker on an accent wash.
-    private func speaker(_ media: String) -> some View {
+    private func speaker(_ media: String) -> PillSpeaker {
         PillSpeaker(colors: colors, frame: CGSize(width: 30, height: 36), disc: 28, glyph: 13,
                     open: mediaCard == media) { actions.media(media) }
     }
@@ -549,18 +392,6 @@ struct BrowserBar: View {
         WorkspaceMark(workspace: workspace, isPrivate: isPrivateSession, size: size)
     }
 
-    /// The folded pill's dot: the Workspace colour, solid, with its emoji.
-    private var workspaceDot: some View {
-        Circle()
-            .fill(layer)
-            .frame(width: 24, height: 24)
-            .overlay {
-                workspaceMark(size: 13)
-                    .foregroundStyle(BarColors.ink(on: layer, dark: scheme == .dark))
-            }
-            .accessibilityHidden(true)
-    }
-
     private func newTabButton(size: CGFloat, frame: CGFloat) -> some View {
         Button(action: actions.newTab) {
             Image(systemName: "plus")
@@ -588,6 +419,250 @@ struct BrowserBar: View {
         case .search: (placeholder, true)
         case .text(let text, let placeholder): (text, placeholder)
         }
+    }
+}
+
+/// The capsules above the bar: the download under way, then the ask for
+/// video and audio, which stays nearest the bar. Each rises by its own
+/// height and spacing above the one under it.
+private struct BarNotices: View {
+    let colors: BarColors
+    let asks: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            DownloadCapsule(colors: colors)
+            if asks { MediaAsk(colors: colors) }
+        }
+        .alignmentGuide(.top) { $0[.bottom] - 44 }
+    }
+}
+
+/// The upright bar at its fold: the one view of the bar that reads the
+/// fold's value, which changes with each scroll report. It places the
+/// controls `BrowserBar` built, so a page's scrolling runs neither
+/// `BrowserBar`'s body nor its builders.
+private struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, WorkspaceLabel: View, OtherMedia: View>: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.appearance) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let facts: BarFacts
+    let colors: BarColors
+    /// What is held for a scrub: the address or the Workspace button.
+    let scrubbing: ScrubKind?
+    /// Back and Forward.
+    let nav: Nav
+    /// The shield, the pane mark, the JavaScript-off mark and the address.
+    let row: Row
+    let newTab: NewTab
+    let workspaceButton: WorkspaceButton
+    /// The Workspace button's label, lifted while it is held for a scrub.
+    let workspaceLabel: WorkspaceLabel
+    /// Another tab's media, beside the folded pill.
+    let otherMedia: OtherMedia?
+    /// The media playing, in this tab or another, above the open bar.
+    let rider: NowPlayingCapsule?
+    /// The page in front's media, in the folded pill.
+    let speaker: PillSpeaker?
+    let progress: ProgressLine
+    let openBar: () -> Void
+
+    /// The Workspace colour the capsules' glass is tinted with.
+    private var layer: Color { colors.layer }
+
+    var body: some View {
+        let fold = model.browser.fold.value
+        GlassFold(progress: fold) { at, t, shape in
+            capsules(at, t, shape)
+        }
+        // Above the full bar and the folded pill alike, and above
+        // another tab's now-playing capsule while that shows.
+        .overlay(alignment: .top) {
+            BarNotices(colors: colors, asks: facts.asks)
+                .offset(y: facts.otherMedia != nil && fold < 1 ? -112 : -52)
+        }
+    }
+
+    /// The upright bar at fold `t`, its capsules at `at`: Back and Forward,
+    /// the address, New Tab and the Workspace button (14a1). Folded, they
+    /// slide into one pill holding the shield, the address and a dot in the
+    /// Workspace colour (14i5). The shield and the address stay as they
+    /// are; the rest fade over the first third of the fold, and the dot
+    /// over the last.
+    private func capsules(_ at: [CGRect], _ t: Double, _ shape: BarShape) -> some View {
+        let k = shape.scale
+        let buttons = 1 - foldStep(0, 0.35, t)
+        let dot = foldStep(0.65, 1, t)
+        let address = at[1]
+        // Each capsule's controls are its glass's own content, so they move
+        // with the glass when it answers a touch.
+        return ZStack(alignment: .topLeading) {
+            GlassEffectContainer(spacing: 3) {
+                ZStack(alignment: .topLeading) {
+                    // Folded, Back, New Tab and the Workspace button lie
+                    // inside the pill's ends, where their glass would show
+                    // at its edge and answer a touch meant for the pill;
+                    // they go once the fold is done, and their glass stops
+                    // answering touches once it starts.
+                    if t < 1 {
+                        capsule(at[0], interactive: t == 0) {
+                            nav
+                                .opacity(buttons)
+                                .allowsHitTesting(t == 0)
+                                .accessibilityHidden(t > 0)
+                        }
+                    }
+                    capsule(address) { addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k) }
+                    if t < 1 {
+                        capsule(at[2], interactive: t == 0) {
+                            newTab
+                                .opacity(buttons)
+                                .allowsHitTesting(t == 0)
+                                .accessibilityHidden(t > 0)
+                        }
+                        // Held for a scrub, its glass stays still under the
+                        // lifted button, which would show it swelling and
+                        // following the finger past its edge.
+                        capsule(at[3], interactive: t == 0 && scrubbing != .workspaces) {
+                            workspaceButton
+                                .opacity(buttons)
+                                .allowsHitTesting(t == 0)
+                                .accessibilityHidden(t > 0)
+                        }
+                    }
+                }
+            }
+            if scrubbing == .tabs && t == 0 {
+                liftedAddress(address, t: t, buttons: buttons, dot: dot, scale: k)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
+            }
+            if scrubbing == .workspaces && t == 0 {
+                liftedWorkspaceButton(at[3])
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
+            }
+            // Media playing, in this tab or another, rides above the bar in
+            // its own capsule (14k4, 17c). Folded, the page in front's is the
+            // speaker in the pill, and another tab's is its icon beside it.
+            if let rider {
+                rider
+                    .frame(width: at[3].maxX - 8)
+                    .offset(x: 8, y: -60)
+                    .opacity(buttons)
+                    .allowsHitTesting(t == 0)
+                    .accessibilityHidden(t > 0)
+            }
+            if let otherMedia {
+                otherMedia
+                    .offset(x: address.maxX + 6, y: address.minY)
+                    .opacity(dot)
+                    .allowsHitTesting(t == 1)
+                    .accessibilityHidden(t < 1)
+            }
+        }
+        .foregroundStyle(colors.ink)
+        .animation(.spring(duration: 0.35, bounce: 0.2), value: scrubbing)
+    }
+
+    /// One capsule: its content centred in its frame, on glass of the
+    /// frame's shape, at its place in the fold.
+    private func capsule<Content: View>(_ frame: CGRect, interactive: Bool = true,
+                                        @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .frame(width: frame.width, height: frame.height)
+            .glassEffect(workspaceGlass(layer, interactive: interactive), in: .capsule)
+            .glassEffectTransition(.identity)
+            .offset(x: frame.minX, y: frame.minY)
+    }
+
+    /// The address lifted over the bar while it is held for a scrub, grown
+    /// past the buttons beside it. It is drawn outside the bar's glass
+    /// container, which would merge its glass with theirs where they
+    /// overlap, and it takes no touches, so the hold under it carries on.
+    private func liftedAddress(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
+        let grown: CGFloat = 1.15
+        let lifted = address.insetBy(dx: -address.width * (grown - 1) / 2, dy: -address.height * (grown - 1) / 2)
+        return addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k)
+            .scaleEffect(grown)
+            .frame(width: lifted.width, height: lifted.height)
+            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            .offset(x: lifted.minX, y: lifted.minY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// The Workspace button lifted over the bar while it is held for a
+    /// scrub, drawn as `liftedAddress` is.
+    private func liftedWorkspaceButton(_ frame: CGRect) -> some View {
+        let grown: CGFloat = 1.15
+        let lifted = frame.insetBy(dx: -frame.width * (grown - 1) / 2, dy: -frame.height * (grown - 1) / 2)
+        return workspaceLabel
+            .scaleEffect(grown)
+            .frame(width: lifted.width, height: lifted.height)
+            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            .offset(x: lifted.minX, y: lifted.minY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// The address capsule's content. The shield and the address hold their
+    /// place, 36pt tall on the capsule's midline, as it shrinks to the pill;
+    /// Reload fades at its end, where the Workspace's dot fades in. Partway
+    /// or folded, a tap anywhere on it brings the full bar back.
+    private func addressCapsule(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
+        let height = address.height - 12
+        let inset = 4 * (1 - t)
+        // With no page there is nothing to reload, and the address takes
+        // Reload's room.
+        let reloads = facts.reloads
+        let room = address.width - inset - ((reloads ? 40 * k : 8) * (1 - t) + (speaker != nil ? 60 : 30) * t)
+        return ZStack(alignment: .leading) {
+            row
+                .frame(width: max(0, room), height: height, alignment: .leading)
+                .padding(.leading, inset)
+                // Partway or folded, the pill is one button.
+                .allowsHitTesting(t == 0)
+                .accessibilityHidden(t > 0)
+            ReloadButton(reloads: reloads, scale: k).frame(width: 36 * k, height: 44)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 4)
+                .opacity(reloads ? buttons : 0)
+                .allowsHitTesting(t == 0)
+                .accessibilityHidden(t > 0)
+            workspaceDot
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 6)
+                .opacity(dot)
+            if t > 0 {
+                Button(action: openBar) { Color.clear.contentShape(.capsule) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show the toolbar")
+            }
+            if let speaker {
+                speaker
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 32)
+                    .opacity(dot)
+                    .allowsHitTesting(t == 1)
+                    .accessibilityHidden(t < 1)
+            }
+        }
+        .frame(width: address.width, height: address.height)
+        .overlay(alignment: .bottom) { progress.padding(.bottom, 1) }
+    }
+
+    /// The folded pill's dot: the Workspace colour, solid, with its emoji.
+    private var workspaceDot: some View {
+        Circle()
+            .fill(layer)
+            .frame(width: 24, height: 24)
+            .overlay {
+                WorkspaceMark(workspace: facts.workspace, isPrivate: facts.isPrivateSession, size: 13)
+                    .foregroundStyle(BarColors.ink(on: layer, dark: scheme == .dark))
+            }
+            .accessibilityHidden(true)
     }
 }
 
@@ -850,8 +925,6 @@ struct BarPreview: View {
     @Environment(\.appearance) private var scheme
     @Environment(\.verticalSizeClass) private var verticalSize
     let workspace: OutlineRow
-    /// How far the bar it stands beside is folded.
-    var fold = 0.0
 
     private var colors: BarColors { BarColors(token: model.tint(of: workspace), dark: scheme == .dark) }
     private var layer: Color { colors.layer }
@@ -878,7 +951,8 @@ struct BarPreview: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
             } else {
-                GlassFold(progress: fold) { at, t, shape in
+                // Folded as far as the bar it stands beside.
+                GlassFold(progress: model.browser.fold.value) { at, t, shape in
                     ZStack(alignment: .topLeading) {
                         GlassEffectContainer(spacing: 3) {
                             ZStack(alignment: .topLeading) {
