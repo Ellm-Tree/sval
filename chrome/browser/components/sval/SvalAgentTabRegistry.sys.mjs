@@ -298,11 +298,16 @@ function mayBeAgents(browser) {
  *   Quick Peek's owner is known without a node (`quickPeekAgentHomeOf`), and it is
  *   never filed while open, so it never waits. A window's preloaded new tab
  *   page (`gBrowser.preloadedBrowser`) is in no tab and opened by no page,
- *   so it is no one's until a tab takes its browser. Any other browser in no
- *   tab could be an agent's, and waits.
+ *   so it is no one's until a tab takes its browser. An extension's own
+ *   view, its toolbar popup or sidebar, is the extension's, and no agent
+ *   works in one. Any other browser in no tab could be an agent's, and
+ *   waits.
  */
 export function awaitsFiling(browser) {
-  if (isPreloadedNewTab(browser)) {
+  if (
+    isPreloadedNewTab(browser) ||
+    browser?.hasAttribute?.("webextension-view-type")
+  ) {
     return false;
   }
   return (

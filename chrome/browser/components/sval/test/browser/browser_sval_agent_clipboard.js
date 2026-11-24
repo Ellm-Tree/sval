@@ -6,6 +6,7 @@
 /* import-globals-from ../../sval-panel.js */
 /* import-globals-from head.js */
 /* import-globals-from sval_take_control_helpers.js */
+/* globals browser */
 
 /**
  * A page in a tab an agent controls does not write the system clipboard
@@ -133,4 +134,46 @@ add_task(async function a_write_naming_no_window_is_refused_beside_an_agent() {
     "written once the user has control",
     "the process writes as any other"
   );
+});
+
+/**
+ * An extension's popup is in no tab, so no agent works in it, and it writes
+ * the clipboard while an agent works elsewhere.
+ */
+add_task(async function an_extension_popup_writes_while_an_agent_works() {
+  await layerSetup();
+  await within(SimpleTest.promiseFocus(window), 10_000, "the user's window");
+  await SpecialPowers.pushPrefEnv({
+    set: [["extensions.openPopupWithoutUserGesture.enabled", true]],
+  });
+  const ext = ExtensionTestUtils.loadExtension({
+    manifest: {
+      permissions: ["clipboardWrite"],
+      browser_action: { default_popup: "popup.html" },
+    },
+    files: {
+      "popup.html": `<!DOCTYPE html><meta charset="utf-8"><script src="popup.js"></script>`,
+      "popup.js": () => {
+        navigator.clipboard.writeText("written by the popup").then(
+          () => browser.test.sendMessage("wrote", "written"),
+          error => browser.test.sendMessage("wrote", error.name)
+        );
+      },
+    },
+    background() {
+      browser.test.onMessage.addListener(() =>
+        browser.browserAction.openPopup()
+      );
+    },
+  });
+  await ext.startup();
+  SpecialPowers.clipboardCopyString("the user's own");
+  ext.sendMessage("open");
+  Assert.equal(await ext.awaitMessage("wrote"), "written", "the popup writes");
+  Assert.equal(
+    SpecialPowers.getClipboardData("text/plain"),
+    "written by the popup",
+    "the clipboard holds what the popup wrote"
+  );
+  await ext.unload();
 });
