@@ -236,12 +236,15 @@ add_task(async function a_closed_private_peek_reopens_in_its_session_only() {
   const opened = BrowserTestUtils.domWindowOpenedAndLoaded();
   Assert.ok(SvalPeek.reopenClosed(kept), "a Peek of its session reopens it");
   const back = await within(opened, 20_000, "the reopened Peek");
+  const restored = BrowserTestUtils.waitForEvent(back, "SSTabRestored");
   atTaskEnd(
     () =>
       !back.closed &&
       within(BrowserTestUtils.closeWindow(back), 10_000, "it closing")
   );
   await committed(() => back.gBrowser?.selectedBrowser, PEEK_PAGE);
+  // The restore's own load of the page replaces one started before it ends.
+  await within(restored, 10_000, "the reopened Peek's page restoring");
   Assert.ok(PrivateBrowsingUtils.isWindowPrivate(back), "as a private Peek");
   Assert.equal(jarOf(back), jar, "in the same session");
 
