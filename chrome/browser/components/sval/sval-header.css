@@ -2737,6 +2737,125 @@ split-view-footer {
   }
 }
 
+/*
+ * A see-through window shows the system's material around the page, which
+ * only the window's own transparent pixels reveal: a colour painted over the
+ * page cannot match it. There the tab is the window seen through a cut in
+ * the page. The tab paints its ink and lines with no colour of its own, and
+ * the page, its backdrop and the frame's edge are masked out in the tab's
+ * outline, so the material shows through as it does around the frame.
+ *
+ * The mask is the tab's shape: the label with its far corner rounded, and the
+ * corner each fillet fills outside its ring. `SvalHeader.startWindow` writes
+ * the label's width (`--sval-status-w`). A pane carries the tab's rise
+ * (`--sval-status-hole-drop`) so the cut moves with the tab.
+ */
+@property --sval-status-hole-drop {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 32px;
+}
+
+:root[data-sval-see-through]:not([inDOMFullscreen], [inFullscreen]) {
+  #statuspanel {
+    --sval-status-bg: transparent;
+  }
+
+  #tabbrowser-tabpanels > .browserSidebarContainer {
+    /* Hidden, the tab stands its height and a fillet below the frame's
+       edge, as `#statuspanel[inactive]` places it. */
+    --sval-status-hole-drop: 32px;
+    transition: --sval-status-hole-drop 160ms var(--sval-ease);
+
+    &:has(> .browserContainer > .browserStack > #statuspanel:not([inactive])) {
+      --sval-status-hole-drop: 0px;
+    }
+  }
+
+  #tabbrowser-tabpanels > .browserSidebarContainer:has(> .browserContainer > .browserStack > #statuspanel:not([hidden])) {
+    --sval-hole-r: 8px;
+    --sval-hole-h: 24px;
+    --sval-hole-ring: 7px;
+    --sval-hole-w: var(--sval-status-w, 0px);
+    --sval-hole-d: var(--sval-status-hole-drop);
+    --sval-hole-side: left;
+    --sval-hole-far: right;
+    --sval-hole-corner: 0 100%;
+    --sval-hole-fillet: 100% 0;
+
+    &:has(#statuspanel[mirror]):-moz-locale-dir(ltr),
+    &:has(#statuspanel:not([mirror])):-moz-locale-dir(rtl) {
+      --sval-hole-side: right;
+      --sval-hole-far: left;
+      --sval-hole-corner: 100% 100%;
+      --sval-hole-fillet: 0 0;
+    }
+
+    &::after,
+    > .browserContainer > .browserStack > browser,
+    > .browserContainer:not(:has(> findbar:not([hidden])))::before {
+      mask-image:
+        linear-gradient(#000 0 0), linear-gradient(#000 0 0), linear-gradient(#000 0 0),
+        radial-gradient(circle at var(--sval-hole-corner), #000 var(--sval-hole-r), transparent var(--sval-hole-r)),
+        radial-gradient(circle at var(--sval-hole-fillet), transparent var(--sval-hole-ring), #000 var(--sval-hole-ring)),
+        radial-gradient(circle at var(--sval-hole-fillet), transparent var(--sval-hole-ring), #000 var(--sval-hole-ring));
+      mask-size:
+        100% 100%,
+        calc(var(--sval-hole-w) - var(--sval-hole-r)) var(--sval-hole-h),
+        var(--sval-hole-r) calc(var(--sval-hole-h) - var(--sval-hole-r)),
+        var(--sval-hole-r) var(--sval-hole-r),
+        calc(var(--sval-hole-ring) + 1px) calc(var(--sval-hole-ring) + 1px),
+        calc(var(--sval-hole-ring) + 1px) calc(var(--sval-hole-ring) + 1px);
+      mask-position:
+        0 0,
+        var(--sval-hole-side) 0 bottom calc(0px - var(--sval-hole-d)),
+        var(--sval-hole-side) calc(var(--sval-hole-w) - var(--sval-hole-r)) bottom calc(0px - var(--sval-hole-d)),
+        var(--sval-hole-side) calc(var(--sval-hole-w) - var(--sval-hole-r)) bottom calc(var(--sval-hole-h) - var(--sval-hole-r) - var(--sval-hole-d)),
+        var(--sval-hole-side) 0 bottom calc(var(--sval-hole-h) - 1px - var(--sval-hole-d)),
+        var(--sval-hole-side) calc(var(--sval-hole-w) - 1px) bottom calc(0px - var(--sval-hole-d));
+      mask-repeat: no-repeat;
+      /* The page less the union of the tab's pieces. A shorter list would
+         repeat, subtracting every other piece. */
+      mask-composite: subtract, add, add, add, add, add;
+    }
+
+    /* The label's lines run on under the fillets, whose rings take over
+       from them where they turn: its top line from its near side, and its
+       far side down to the pane's foot. A fillet's corner covers those runs
+       in a window of one colour, and here the label drops them. */
+    #statuspanel-label {
+      mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+      mask-size:
+        100% 100%,
+        calc(var(--sval-hole-ring) + 1px) 1px,
+        1px calc(var(--sval-hole-ring) + 1px);
+      mask-position:
+        0 0,
+        var(--sval-hole-side) 0 top 0,
+        var(--sval-hole-far) 0 bottom 0;
+      mask-repeat: no-repeat;
+      mask-composite: subtract, add, add;
+    }
+
+    /* The backdrop Firefox paints behind the page (`.browserContainer` in
+       `content-area.css`) moves to a layer of its own, which the mask can
+       cut without cutting the tab. The find bar's rule above clears it. */
+    > .browserContainer {
+      isolation: isolate;
+      background: transparent;
+
+      &:not(:has(> findbar:not([hidden])))::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: var(--tabpanel-background-color);
+        pointer-events: none;
+      }
+    }
+  }
+}
+
 #statuspanel-label {
   /* The chrome's scheme, which the chrome's colours are picked in, where
      Firefox gives the label the page's. */

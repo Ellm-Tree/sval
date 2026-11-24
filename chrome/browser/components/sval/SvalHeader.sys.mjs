@@ -1389,6 +1389,16 @@ export const SvalHeader = {
       item => item.getAttribute("checked") === "true"
     );
     const { gBrowser, gURLBar } = win;
+    // The cut a see-through window makes under the status panel's tab is the
+    // label's width (`sval-header.css`, status panel). The panel moves to
+    // each selected page, so the width goes on their common ancestor.
+    const statusLabel = doc.getElementById("statuspanel-label");
+    new win.ResizeObserver(([entry]) => {
+      gBrowser.tabpanels.style.setProperty(
+        "--sval-status-w",
+        `${entry.borderBoxSize[0].inlineSize}px`
+      );
+    }).observe(statusLabel);
     const box = gURLBar.querySelector(".urlbar-input-box");
     if (!box) {
       return;

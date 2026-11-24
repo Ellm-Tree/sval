@@ -858,6 +858,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_startup_workspace.js"]
 
+["browser_sval_status_panel.js"]
+
 ["browser_sval_surrogate_pair_keys.js"]
 
 ["browser_sval_switch_lands.js"]
