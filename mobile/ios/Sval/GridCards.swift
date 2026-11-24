@@ -17,7 +17,7 @@ struct GridCard: View {
     let theme: Theme
     let editing: Bool
     let ticked: Bool
-    let dropState: GridDropState
+    let dropState: TreeDropState
     let onClose: () -> Void
 
     private var row: OutlineRow { box.row }
@@ -146,7 +146,7 @@ struct GridSplitCard: View {
     let height: CGFloat
     let theme: Theme
     let editing: Bool
-    let dropState: GridDropState
+    let dropState: TreeDropState
     let onClose: () -> Void
 
     var body: some View {
@@ -183,7 +183,7 @@ struct GridSplitCard: View {
 /// A card's halves while a card is held over its middle (15f2).
 private struct GridHalves: View {
     let id: String
-    let dropState: GridDropState
+    let dropState: TreeDropState
     let theme: Theme
 
     var body: some View {

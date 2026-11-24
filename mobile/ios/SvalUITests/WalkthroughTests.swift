@@ -648,6 +648,199 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["You're All Set"].exists, "Next reaches the last page")
     }
 
+    /// Opens the Workspace sheet's list on Work.
+    private func openWorkList() {
+        XCTAssertTrue(app.buttons["New Tab"].firstMatch.waitForExistence(timeout: 30), "the bar shows")
+        let sheet = app.buttons.matching(NSPredicate(format: "label CONTAINS 'tabs' OR label CONTAINS '1 tab'")).firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the bar's Workspace button shows")
+        sheet.tap()
+        let work = app.buttons["Work"].firstMatch
+        XCTAssertTrue(work.waitForExistence(timeout: 10), "the strip shows Work")
+        work.tap()
+        XCTAssertTrue(labelled("Swift").waitForExistence(timeout: 10), "Work's list shows")
+    }
+
+    /// The list's cell holding the row whose label starts with `text`: the
+    /// row's whole height, where its label may be a line of text in it.
+    private func cell(_ text: String) -> XCUIElement {
+        app.collectionViews.cells.containing(NSPredicate(format: "label BEGINSWITH %@", text)).firstMatch
+    }
+
+    /// Swipes a row left far enough to show its actions.
+    private func swipeOpen(_ row: XCUIElement) {
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: row.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)),
+                   withVelocity: .default, thenHoldForDuration: 0.2)
+    }
+
+    /// Lifts `row` and moves it to `target`, slowly unless told, resting
+    /// there long enough for the list to open its gap, then lets go.
+    private func listDrag(_ row: XCUIElement, to target: CGPoint, velocity: XCUIGestureVelocity = .slow) {
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let at = { (point: CGPoint) in
+            origin.withOffset(CGVector(dx: point.x - origin.screenPoint.x, dy: point.y - origin.screenPoint.y))
+        }
+        let from = at(row.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)).screenPoint)
+        from.press(forDuration: 0.6, thenDragTo: at(target), withVelocity: velocity, thenHoldForDuration: 1.5)
+    }
+
+    /// Waits for `holds` to be true of the app.
+    private func waitUntil(_ message: String, _ holds: @escaping () -> Bool) {
+        let expected = expectation(for: NSPredicate { _, _ in holds() }, evaluatedWith: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [expected], timeout: 10), .completed, message)
+    }
+
+    /// A row's swipe: Move to… opens its sheet, and Close closes the tab
+    /// with a toast whose Undo brings it back.
+    func testListSwipeCloseAndMove() {
+        openWorkList()
+        swipeOpen(labelled("Swift"))
+        let move = app.collectionViews.buttons["Move to…"]
+        XCTAssertTrue(move.waitForExistence(timeout: 5), "a row's swipe offers Move to…")
+        move.tap()
+        let moveSheet = app.navigationBars["Move to…"]
+        XCTAssertTrue(moveSheet.waitForExistence(timeout: 5), "Move to… opens its sheet")
+        moveSheet.buttons["Close"].tap()
+        XCTAssertTrue(moveSheet.waitForNonExistence(timeout: 5), "Move to… closes")
+        swipeOpen(labelled("Swift"))
+        let close = app.collectionViews.buttons["Close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "a row's swipe offers Close")
+        close.tap()
+        XCTAssertTrue(labelled("Swift").waitForNonExistence(timeout: 5), "Close closes the tab")
+        let undo = app.buttons["Undo"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "closing shows a toast with Undo")
+        undo.tap()
+        XCTAssertTrue(labelled("Swift").waitForExistence(timeout: 5), "Undo brings the tab back")
+    }
+
+    /// A group's row closes and opens it.
+    func testListGroupToggle() {
+        openWorkList()
+        labelled("Pricing pages").tap()
+        XCTAssertTrue(labelled("Apple").waitForNonExistence(timeout: 5), "closing a group hides its tabs")
+        XCTAssertTrue(labelled("Swift").exists, "the rest of the list stays")
+        labelled("Pricing pages").tap()
+        XCTAssertTrue(labelled("Apple").waitForExistence(timeout: 5), "opening the group shows its tabs")
+    }
+
+    /// A row let go on the line under a group's last tab lands at the
+    /// group's end; one let go below the last row, at the Workspace's end.
+    func testListDropInGroupAndAtEnd() {
+        openWorkList()
+        let apple = labelled("Apple"), wikipedia = labelled("Wikipedia"), swift = labelled("Swift")
+        XCTAssertLessThan(apple.frame.minY, wikipedia.frame.minY, "Apple is above Wikipedia in Pricing pages")
+        // Wikipedia's bottom quarter: the line under Wikipedia, inside the
+        // group, at its end.
+        listDrag(swift, to: CGPoint(x: cell("Wikipedia").frame.midX, y: cell("Wikipedia").frame.maxY - 5))
+        waitUntil("Swift lands at the group's end, after Wikipedia") {
+            wikipedia.frame.minY < swift.frame.minY
+        }
+        listDrag(apple, to: CGPoint(x: cell("Wikipedia").frame.midX, y: cell("Wikipedia").frame.maxY + 60))
+        waitUntil("Apple lands below the group, at the Workspace's end") {
+            apple.frame.minY > wikipedia.frame.maxY
+        }
+    }
+
+    /// The point on the line between two rows of the list.
+    private func seam(_ upper: String, _ lower: String) -> CGPoint {
+        let above = cell(upper).frame, below = cell(lower).frame
+        return CGPoint(x: above.midX, y: (above.maxY + below.minY) / 2)
+    }
+
+    /// A tab let go on the line between two tabs lands between them,
+    /// coming from below through the lower tab's middle.
+    func testListDropBetweenTwoTabs() {
+        openWorkList()
+        let apple = labelled("Apple"), wikipedia = labelled("Wikipedia"), swift = labelled("Swift")
+        listDrag(swift, to: seam("Apple", "Wikipedia"))
+        waitUntil("Swift lands between Apple and Wikipedia") {
+            apple.frame.minY < swift.frame.minY && swift.frame.minY < wikipedia.frame.minY
+        }
+        XCTAssertFalse(app.navigationBars["New Group"].exists, "the drop made no group")
+    }
+
+    /// Wikipedia out of Pricing pages with Move to…, to the Workspace's
+    /// end: Pricing pages, Apple, Swift, Wikipedia.
+    private func moveWikipediaOut() {
+        let wikipedia = labelled("Wikipedia"), swift = labelled("Swift")
+        swipeOpen(wikipedia)
+        let move = app.collectionViews.buttons["Move to…"]
+        XCTAssertTrue(move.waitForExistence(timeout: 5), "Wikipedia's swipe offers Move to…")
+        move.tap()
+        let work = app.buttons.matching(identifier: "Work").allElementsBoundByIndex.last { $0.isHittable }
+        XCTAssertNotNil(work, "Move to… offers Work")
+        work?.tap()
+        waitUntil("Wikipedia lands at the Workspace's end") { wikipedia.frame.minY > swift.frame.minY }
+    }
+
+    /// A tab let go on the line between two top-level tabs lands between
+    /// them, out of its group.
+    func testListDropBetweenTopLevelTabs() {
+        openWorkList()
+        moveWikipediaOut()
+        let apple = labelled("Apple"), wikipedia = labelled("Wikipedia"), swift = labelled("Swift")
+        listDrag(apple, to: seam("Swift", "Wikipedia"))
+        waitUntil("Apple lands between Swift and Wikipedia") {
+            swift.frame.minY < apple.frame.minY && apple.frame.minY < wikipedia.frame.minY
+        }
+    }
+
+    /// A tab let go on the line above a group's row lands before the group,
+    /// between it and the group above.
+    func testListDropTabBetweenGroups() {
+        openWorkList()
+        moveWikipediaOut()
+        // Wikipedia onto Swift's New Group half: a group of the two, named
+        // Zed. Pricing pages, Apple, then Zed: Swift, Wikipedia.
+        let wikipedia = labelled("Wikipedia"), swift = labelled("Swift")
+        let target = cell("Swift").frame
+        listDrag(wikipedia, to: CGPoint(x: target.minX + 70, y: target.midY))
+        let name = app.textFields["Name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5), "a drop on a tab's New Group half asks the group's name")
+        name.tap()
+        name.typeText("Zed")
+        app.navigationBars["New Group"].buttons["Create"].tap()
+        let zed = labelled("Zed"), apple = labelled("Apple")
+        XCTAssertTrue(zed.waitForExistence(timeout: 5), "the new group shows")
+        waitUntil("Swift is in Zed") { zed.frame.minY < swift.frame.minY }
+        // Zed's top quarter: the line above Zed, outside both groups.
+        listDrag(swift, to: CGPoint(x: cell("Zed").frame.midX, y: cell("Zed").frame.minY + 5))
+        waitUntil("Swift lands between Pricing pages and Zed") {
+            apple.frame.minY < swift.frame.minY && swift.frame.minY < zed.frame.minY
+        }
+    }
+
+    /// An open group carried by its row and let go on the line between two
+    /// rows lands there with its tabs.
+    func testListCarryOpenGroupBetweenRows() {
+        openWorkList()
+        let pricing = labelled("Pricing pages"), apple = labelled("Apple")
+        let wikipedia = labelled("Wikipedia"), swift = labelled("Swift")
+        moveWikipediaOut()
+        // A group's menu opens below its row, so a slow move down slides
+        // through the menu's items instead of lifting the row.
+        listDrag(pricing, to: seam("Swift", "Wikipedia"), velocity: XCUIGestureVelocity(300))
+        waitUntil("the group lands between Swift and Wikipedia") {
+            swift.frame.minY < pricing.frame.minY && pricing.frame.minY < wikipedia.frame.minY
+        }
+        waitUntil("the group's tab goes with it") {
+            pricing.frame.minY < apple.frame.minY && apple.frame.minY < wikipedia.frame.minY
+        }
+    }
+
+    /// The group holding Work's tab in front opens when the list shows
+    /// Work again.
+    func testListOpensOnFrontTab() {
+        openWorkList()
+        XCTAssertTrue(labelled("Apple").exists, "Work's tab in front is Apple, in Pricing pages")
+        labelled("Pricing pages").tap()
+        XCTAssertTrue(labelled("Apple").waitForNonExistence(timeout: 5), "the group closes")
+        app.buttons["Reading"].firstMatch.tap()
+        XCTAssertTrue(labelled("Pricing pages").waitForNonExistence(timeout: 5), "the list shows Reading")
+        app.buttons["Work"].firstMatch.tap()
+        XCTAssertTrue(labelled("Apple").waitForExistence(timeout: 10), "the group holding the tab in front opens")
+    }
+
     /// Work's sheet: the options menu, then its tab dragged onto a tab in
     /// its group.
     func testWorkspaceOptionsAndDrag() {
@@ -694,11 +887,14 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["New Group"].exists, "a drop on a tab's middle asks for the new group's name")
         app.navigationBars["New Group"].buttons["Close"].tap()
         sleep(1)
-        // Let go over Apple's top edge, 20pt above its name's middle: Swift
-        // goes into the group, above it.
-        drag(row("Swift"), to: row("Apple").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: -20)), marked: "before")
+        // Let go over the lower half of the group's row: Swift goes into
+        // the group, first, above Apple.
+        // Briskly: a slow move after the row's menu opened slides through
+        // the menu's items instead of lifting the row.
+        listDrag(row("Swift"), to: cell("Pricing pages").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)).screenPoint,
+                 velocity: XCUIGestureVelocity(300))
         shot("drop-before")
-        XCTAssertLessThan(row("Swift").frame.minY, row("Apple").frame.minY, "a drop on a row's top edge lands above it")
+        XCTAssertLessThan(row("Swift").frame.minY, row("Apple").frame.minY, "a drop on an open group's row lands first in it")
         // A tap above the sheet closes it, showing Work's bar.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
         sleep(2)

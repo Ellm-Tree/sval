@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 
 /// Where a card held over another's middle would land: the card, what the
 /// drop there does, and the halves it shows.
-struct GridHover: Equatable {
+struct TreeHover: Equatable {
     let id: String
     let over: DropOver
     let kind: DropKind
@@ -19,21 +19,33 @@ struct GridHover: Equatable {
 /// the cards as they draw.
 @MainActor
 @Observable
-final class GridDropState {
-    var hover: GridHover?
+final class TreeDropState {
+    var hover: TreeHover?
+    /// Where the list's line between rows is, while a drag shows one.
+    var line: String?
 }
 
-/// What the grid asks of the sheet.
-struct GridActions {
-    /// A tap on a card: open it, or tick it while editing.
+/// What the list and the grid ask of the sheet.
+struct TreeActions {
+    /// A tap on a card or row: open it, or tick it while editing.
     var open: (OutlineRow) -> Void
     var toggle: (OutlineRow) -> Void
     var close: (OutlineRow) -> Void
     var closeSplit: (OutlineRow, [OutlineRow]) -> Void
+    /// Move to…, from a row's swipe.
+    var move: (OutlineRow) -> Void
     var drop: (DropPlan) -> Void
     var tabMenu: (OutlineRow) -> UIMenu
     var splitMenu: (OutlineRow, [OutlineRow]) -> UIMenu
     var groupMenu: (OutlineRow) -> [[MenuItem]]
+    /// A pane's menu in the list's tray: the pane, its split and the
+    /// panes the line draws.
+    var paneMenu: (OutlineRow, OutlineRow, [OutlineRow]) -> [[MenuItem]]
+    /// A tap on a pane in a split's tray: opens the split at that pane,
+    /// while editing too.
+    var openPane: (String) -> Void
+    /// Closes the sheet once a pin in the list's pins row opened.
+    var pinOpened: () -> Void
 }
 
 extension WorkspaceSheet {
@@ -44,13 +56,7 @@ extension WorkspaceSheet {
             if panel {
                 PinsRow(onOpened: { close() }, tileSize: 48)
             }
-            if let workspace {
-                TabGrid(grid: TabGridView(
-                    model: model, workspace: workspace.id, collapsed: collapsed, editing: editing,
-                    selected: selected, scheme: scheme, tint: model.tint(of: workspace), sideways: panel,
-                    dropState: gridDrop,
-                    actions: gridActions))
-            }
+            treeView(.grid)
         }
         .onAppear {
             // The tab in front has been drawn since it was last left; its
@@ -58,11 +64,31 @@ extension WorkspaceSheet {
             if let id = browser.currentTabId { browser.takePreview(id) }
         }
         // A card held over a card, as a row held over a row in the list.
-        .sensoryFeedback(.selection, trigger: gridDrop.hover.map { "\($0.id) \($0.kind)" })
+        .sensoryFeedback(.selection, trigger: treeDrop.hover.map { "\($0.id) \($0.kind)" })
     }
 
-    private var gridActions: GridActions {
-        GridActions(
+    /// The Workspace's tree as rows, in the same collection view as the
+    /// grid, in list sections. In the sideways panel the pins scroll away
+    /// with the rows (12f3).
+    var list: some View {
+        treeView(.list)
+            .onAppear { revealFront() }
+            .sensoryFeedback(.selection, trigger: treeDrop.hover.map { "\($0.id) \($0.kind)" } ?? treeDrop.line)
+    }
+
+    @ViewBuilder private func treeView(_ layout: TabLayout) -> some View {
+        if let workspace {
+            // The two rows of a merge waiting on its new group's name.
+            let merging: Set<String> = if case .mergeGroup(let plan) = look { [plan.id, plan.target] } else { [] }
+            FadedTree(tree: TreeView(
+                model: model, workspace: workspace.id, layout: layout, collapsed: collapsed, editing: editing,
+                selected: selected, marked: merging, scheme: scheme, tint: model.tint(of: workspace), sideways: panel,
+                reduceMotion: reduceMotion, dropState: treeDrop, actions: treeActions))
+        }
+    }
+
+    private var treeActions: TreeActions {
+        TreeActions(
             open: { row in
                 if row.kind == .split {
                     guard !editing else { return }
@@ -87,6 +113,7 @@ extension WorkspaceSheet {
             toggle: { toggle($0) },
             close: { close($0) },
             closeSplit: { closeSplit($0, panes: $1) },
+            move: { moving = $0 },
             drop: { plan in
                 switch plan {
                 case .ops(let ops): Task { await model.editTree(ops) }
@@ -95,7 +122,13 @@ extension WorkspaceSheet {
             },
             tabMenu: { row in uiTabMenu(row) },
             splitMenu: { split, panes in uiSplitMenu(split, panes: panes) },
-            groupMenu: { groupMenu($0) })
+            groupMenu: { groupMenu($0) },
+            paneMenu: { pane, split, panes in paneMenu(pane, split: split, panes: panes, rename: { renameCard(pane) }) },
+            openPane: { id in
+                browser.select(id)
+                close()
+            },
+            pinOpened: { close() })
     }
 
     // MARK: Menus
@@ -124,16 +157,20 @@ extension WorkspaceSheet {
 
 /// What the grid draws from: its sections, the ticks, and what every card
 /// takes from the sheet.
-struct GridState: Equatable {
+struct TreeState: Equatable {
     var sections: [TreeSection]
     var editing: Bool
     var ticked: Set<String>
-    var look: GridLook
+    var look: TreeLook
+    /// The rows a merge waiting on its new group's name outlines.
+    var marked: Set<String> = []
+    /// The rows a drag in the list lifted, dimmed in place.
+    var dimmed: Set<String> = []
 }
 
 /// What every card and box is drawn with: the sheet's colours, whether it
 /// is the sideways panel, and the text size the measures follow.
-struct GridLook: Equatable {
+struct TreeLook: Equatable {
     let scheme: ColorScheme
     let tint: String?
     let sideways: Bool

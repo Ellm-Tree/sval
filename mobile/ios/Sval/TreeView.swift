@@ -54,19 +54,19 @@ final class GridCell: UICollectionViewCell {
     }
 }
 
-/// What a new `GridState` asks of the collection view: a new snapshot
+/// What a new `TreeState` asks of the collection view: a new snapshot
 /// where cards or sections came, went or moved; the cards and headers whose
 /// own facts changed; and a new layout where a section's shape changed. A
 /// change to a row's content alone asks for nothing: each card and header
 /// reads its row's `RowBox`.
-struct GridUpdate: Equatable {
+struct TreeUpdate: Equatable {
     var apply = false
     var reconfigure: [String] = []
     var headers: [String] = []
     var relayout = false
 
-    static func between(_ old: GridState?, _ new: GridState) -> GridUpdate {
-        var update = GridUpdate()
+    static func between(_ old: TreeState?, _ new: TreeState) -> TreeUpdate {
+        var update = TreeUpdate()
         guard let old else {
             update.apply = true
             return update
@@ -78,11 +78,14 @@ struct GridUpdate: Equatable {
         for line in new.sections.flatMap(\.lines) {
             guard let was = before[line.id] else { continue }
             if looks || old.editing != new.editing || was != line
-                || old.ticked.contains(line.id) != new.ticked.contains(line.id) {
+                || old.ticked.contains(line.id) != new.ticked.contains(line.id)
+                || old.marked.contains(line.id) != new.marked.contains(line.id)
+                || old.dimmed.contains(line.id) != new.dimmed.contains(line.id) {
                 update.reconfigure.append(line.id)
             }
         }
-        update.relayout = looks || old.sections.map(\.layout) != new.sections.map(\.layout)
+        // A lifted group's box dims with its rows.
+        update.relayout = looks || old.sections.map(\.layout) != new.sections.map(\.layout) || old.dimmed != new.dimmed
         let headers = Dictionary(old.sections.map { ($0.id, $0.header) }, uniquingKeysWith: { a, _ in a })
         for section in new.sections where section.header != nil {
             if let was = headers[section.id], looks || was != section.header { update.headers.append(section.id) }
@@ -91,47 +94,50 @@ struct GridUpdate: Equatable {
     }
 }
 
-/// Which of the grid's edges have more cards to scroll to.
+/// Which of the tree's edges have more to scroll to.
 @MainActor
 @Observable
-final class GridEdges {
+final class TreeEdges {
     var before = false
     var after = false
 }
 
-/// The grid, faded at an edge with more to scroll to, as the list is
-/// (`ScrollEdgeFade`).
-struct TabGrid: View {
-    let grid: TabGridView
-    @State private var edges = GridEdges()
+/// The tree, faded at an edge with more to scroll to (`ScrollEdgeFade`).
+struct FadedTree: View {
+    let tree: TreeView
+    @State private var edges = TreeEdges()
 
     var body: some View {
-        grid.edges(edges).edgeFade(.vertical, before: edges.before, after: edges.after)
+        tree.edges(edges).edgeFade(.vertical, before: edges.before, after: edges.after)
     }
 }
 
-/// The grid: the system's collection view, with its compositional layout,
-/// diffable data source, drag and drop and context menus. The cards and
-/// group headers are SwiftUI views in its cells; the group boxes are the
+/// The list and the grid: the system's collection view, with its
+/// compositional layout, diffable data source, drag and drop, context
+/// menus and, in the list, swipe actions. The rows, cards and group
+/// headers are SwiftUI views in its cells; the group boxes are the
 /// sections' background decorations.
-struct TabGridView: UIViewRepresentable {
+struct TreeView: UIViewRepresentable {
     let model: AppModel
     let workspace: String
+    let layout: TabLayout
     let collapsed: Set<String>
     let editing: Bool
     let selected: Set<String>
+    let marked: Set<String>
     let scheme: ColorScheme
     let tint: String?
     let sideways: Bool
-    let dropState: GridDropState
-    let actions: GridActions
-    /// Where the grid reports which edges have more to scroll to.
-    var reportsEdges: GridEdges?
+    let reduceMotion: Bool
+    let dropState: TreeDropState
+    let actions: TreeActions
+    /// Where the tree reports which edges have more to scroll to.
+    var reportsEdges: TreeEdges?
 
-    func edges(_ edges: GridEdges) -> TabGridView {
-        var grid = self
-        grid.reportsEdges = edges
-        return grid
+    func edges(_ edges: TreeEdges) -> TreeView {
+        var tree = self
+        tree.reportsEdges = edges
+        return tree
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -147,8 +153,8 @@ struct TabGridView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate,
         UICollectionViewDropDelegate, UIGestureRecognizerDelegate {
-        private var parent: TabGridView!
-        private var state: GridState?
+        private var parent: TreeView!
+        private var state: TreeState?
         /// Each card's line, by id, as `state` holds it.
         private var lines: [String: TreeLine] = [:]
         private var theme = Theme(.light)
@@ -171,15 +177,46 @@ struct TabGridView: UIViewRepresentable {
         /// closes, which stays off until the tree drops it.
         private var swiped: (id: String, cell: UICollectionViewCell)?
         private var closing: String?
+        /// The rows a drag in the list lifted: the row, and a group's rows
+        /// under it, dimmed in place while the row is held.
+        private var lifted: Set<String> = []
+        /// What a drag over the list would do, and the line that shows a
+        /// landing between rows.
+        private var aim: ListAim?
+        private var lineView: DropLineView?
+        #if DEBUG
+        /// The last drag trace line written, so a line is written when the
+        /// decision changes.
+        private var traced = ""
+        #endif
+        /// The closed groups the list was last drawn with.
+        private var drawnCollapsed: Set<String> = []
+
+        private var isList: Bool { parent.layout == .list }
 
         private var sections: [TreeSection] { state?.sections ?? [] }
 
-        func make(_ parent: TabGridView) -> UICollectionView {
+        func make(_ parent: TreeView) -> UICollectionView {
             self.parent = parent
-            let layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
-                self?.layout(section: index)
+            let layout: UICollectionViewCompositionalLayout
+            if parent.layout == .list {
+                let configuration = UICollectionViewCompositionalLayoutConfiguration()
+                if parent.sideways {
+                    // In the sideways panel the pins scroll away with the
+                    // rows (12f3).
+                    configuration.boundarySupplementaryItems = [NSCollectionLayoutBoundarySupplementaryItem(
+                        layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .estimated(64)),
+                        elementKind: Self.pinsKind, alignment: .top)]
+                }
+                layout = UICollectionViewCompositionalLayout(sectionProvider: { [weak self] index, environment in
+                    self?.listLayout(section: index, environment: environment)
+                }, configuration: configuration)
+            } else {
+                layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
+                    self?.layout(section: index)
+                }
             }
-            let view = GridCollectionView(frame: .zero, collectionViewLayout: layout)
+            let view = TreeCollectionView(frame: .zero, collectionViewLayout: layout)
             // Each layout pass, a scroll's included, says which edges have
             // more to scroll to.
             view.laidOut = { [weak self] view in self?.reportEdges(view) }
@@ -188,8 +225,27 @@ struct TabGridView: UIViewRepresentable {
             view.dragDelegate = self
             view.dropDelegate = self
             view.dragInteractionEnabled = true
-            view.contentInset.top = 6
             self.view = view
+            if parent.layout == .list {
+                view.contentInset.top = 7
+                let row = UICollectionView.CellRegistration<UICollectionViewListCell, String> { [weak self] cell, _, id in
+                    self?.configure(row: cell, id: id)
+                }
+                dataSource = UICollectionViewDiffableDataSource(collectionView: view) { view, index, id in
+                    view.dequeueConfiguredReusableCell(using: row, for: index, item: id)
+                }
+                let pins = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(
+                    elementKind: Self.pinsKind
+                ) { [weak self] cell, _, _ in
+                    self?.configurePins(cell)
+                }
+                dataSource.supplementaryViewProvider = { view, _, index in
+                    view.dequeueConfiguredReusableSupplementary(using: pins, for: index)
+                }
+                update(parent)
+                return view
+            }
+            view.contentInset.top = 6
             // A sideways swipe closes a card. The scroll waits on it, which
             // fails at once on an upright drag.
             let swipe = UIPanGestureRecognizer(target: self, action: #selector(swipe(_:)))
@@ -215,19 +271,28 @@ struct TabGridView: UIViewRepresentable {
             return view
         }
 
+        static let pinsKind = "pins"
+
         /// Draws the grid from the tree as it is: a card or header whose
         /// own facts changed is configured again, and the rest are left.
         @discardableResult
-        func update(_ parent: TabGridView) -> GridUpdate {
+        func update(_ parent: TreeView) -> TreeUpdate {
             self.parent = parent
-            let look = GridLook(scheme: parent.scheme, tint: parent.tint, sideways: parent.sideways,
+            let look = TreeLook(scheme: parent.scheme, tint: parent.tint, sideways: parent.sideways,
                                 size: UIApplication.shared.preferredContentSizeCategory)
-            let new = GridState(sections: TreeLines.grid(parent.model.tree, workspace: parent.workspace,
-                                                         collapsed: parent.collapsed),
-                                editing: parent.editing, ticked: parent.selected, look: look)
-            let update = GridUpdate.between(state, new)
+            let sections = parent.layout == .list
+                ? TreeLines.list(parent.model.tree, workspace: parent.workspace, collapsed: parent.collapsed)
+                : TreeLines.grid(parent.model.tree, workspace: parent.workspace, collapsed: parent.collapsed)
+            let new = TreeState(sections: sections, editing: parent.editing, ticked: parent.selected, look: look,
+                                marked: parent.marked, dimmed: lifted)
+            let update = TreeUpdate.between(state, new)
             theme = Theme(parent.scheme, tint: parent.tint)
             GridBox.theme = theme
+            ListBox.theme = theme
+            // A group opening or closing in the list takes the data source's
+            // own animation.
+            let animates = isList && state != nil && parent.collapsed != drawnCollapsed && !parent.reduceMotion
+            drawnCollapsed = parent.collapsed
             state = new
             lines = Dictionary(new.sections.flatMap(\.lines).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             if let closing, lines[closing] == nil { self.closing = nil }
@@ -243,7 +308,7 @@ struct TabGridView: UIViewRepresentable {
                     snapshot = dataSource.snapshot()
                 }
                 snapshot.reconfigureItems(update.reconfigure)
-                dataSource.apply(snapshot, animatingDifferences: false)
+                dataSource.apply(snapshot, animatingDifferences: animates)
             }
             // The headers and boxes follow the sections, which the
             // snapshot doesn't carry.
@@ -275,10 +340,8 @@ struct TabGridView: UIViewRepresentable {
         }
 
         private func indexPath(holding id: String) -> IndexPath? {
-            let model = parent.model
-            let split = model.row(id)?.parentId.flatMap(model.row).flatMap { $0.kind == .split ? $0.id : nil }
             for (s, section) in sections.enumerated() {
-                if let i = section.items.firstIndex(where: { $0 == id || $0 == split }) {
+                if let i = section.items.firstIndex(where: { $0 == id || lines[$0]?.panes?.contains(id) == true }) {
                     return IndexPath(item: i, section: s)
                 }
             }
@@ -387,14 +450,14 @@ struct TabGridView: UIViewRepresentable {
 
         /// Runs `action` on the row `id` as the tree holds it now: a cell
         /// keeps its closures while its row's content changes.
-        private func act(on id: String, _ action: (GridActions, OutlineRow) -> Void) {
+        private func act(on id: String, _ action: (TreeActions, OutlineRow) -> Void) {
             guard let row = parent.model.row(id) else { return }
             action(parent.actions, row)
         }
 
         private func close(_ id: String) {
             let model = parent.model
-            act(on: id) { actions, row in
+            act(on: TreeLines.rowId(of: id)) { actions, row in
                 if row.kind == .split {
                     actions.closeSplit(row, model.children(of: row.id).filter { $0.kind == .tab })
                 } else {
@@ -450,13 +513,19 @@ struct TabGridView: UIViewRepresentable {
         // MARK: Taps and menus
 
         func collectionView(_ view: UICollectionView, didSelectItemAt path: IndexPath) {
-            view.deselectItem(at: path, animated: false)
-            guard let id = dataSource.itemIdentifier(for: path), let row = parent.model.row(id) else { return }
-            parent.actions.open(row)
+            view.deselectItem(at: path, animated: isList)
+            guard let id = dataSource.itemIdentifier(for: path),
+                  let row = parent.model.row(TreeLines.rowId(of: id)) else { return }
+            if row.kind == .group {
+                parent.actions.toggle(row)
+            } else {
+                parent.actions.open(row)
+            }
         }
 
         func collectionView(_ view: UICollectionView, contextMenuConfigurationForItemsAt paths: [IndexPath],
                             point: CGPoint) -> UIContextMenuConfiguration? {
+            if isList { return listMenu(at: paths) }
             // While editing, a press picks a card up at once, with no menu.
             guard !parent.editing, paths.count == 1, let id = dataSource.itemIdentifier(for: paths[0]),
                   let row = parent.model.row(id) else { return nil }
@@ -490,6 +559,23 @@ struct TabGridView: UIViewRepresentable {
 
         /// The lifted card's outline: the card's own rounded shape, where
         /// the system would draw the cell's square bounds.
+        /// A row lifted in the list stays in place, dimmed, with a group's
+        /// rows under it, as the desktop's panel dims a dragged row.
+        func collectionView(_ view: UICollectionView, dragSessionWillBegin session: UIDragSession) {
+            guard isList, let id = session.items.first?.localObject as? String else { return }
+            lifted = [id]
+            if lines[id]?.group != nil {
+                lifted.formUnion(sections.filter { $0.groups.contains(id) }.flatMap(\.items))
+            }
+            update(parent)
+        }
+
+        func collectionView(_ view: UICollectionView, dragSessionDidEnd session: UIDragSession) {
+            guard isList, !lifted.isEmpty else { return }
+            lifted = []
+            update(parent)
+        }
+
         func collectionView(_ view: UICollectionView, dragPreviewParametersForItemAt path: IndexPath) -> UIDragPreviewParameters? {
             preview(at: path, in: view)
         }
@@ -499,6 +585,14 @@ struct TabGridView: UIViewRepresentable {
         }
 
         private func preview(at path: IndexPath, in view: UICollectionView) -> UIDragPreviewParameters? {
+            if isList, let cell = view.cellForItem(at: path) {
+                // The row's own rounded shape, inside the sheet's margins.
+                let parameters = UIDragPreviewParameters()
+                parameters.visiblePath = UIBezierPath(
+                    roundedRect: cell.bounds.insetBy(dx: ListMetrics.inset, dy: 0), cornerRadius: WorkspaceSheet.cardCorner)
+                parameters.backgroundColor = UIColor(theme.sheet)
+                return parameters
+            }
             guard let cell = view.cellForItem(at: path) as? GridCell else { return nil }
             let parameters = UIDragPreviewParameters()
             let room = cell.card.insetBy(dx: -GridMetrics.ring, dy: -GridMetrics.ring)
@@ -517,6 +611,7 @@ struct TabGridView: UIViewRepresentable {
         func collectionView(_ view: UICollectionView, dropSessionDidUpdate session: UIDropSession,
                             withDestinationIndexPath path: IndexPath?) -> UICollectionViewDropProposal {
             guard let id = dragged(session) else { return UICollectionViewDropProposal(operation: .cancel) }
+            if isList { return listDropUpdate(session, dragged: id, in: view) }
             let point = session.location(in: view)
             let overPath = view.indexPathForItem(at: point)
             if let over = overPath, let overId = dataSource.itemIdentifier(for: over), overId != id,
@@ -572,10 +667,12 @@ struct TabGridView: UIViewRepresentable {
         }
 
         func collectionView(_ view: UICollectionView, dropSessionDidExit session: UIDropSession) {
+            if isList { show(nil, in: view) }
             parent.dropState.hover = nil
         }
 
         func collectionView(_ view: UICollectionView, dropSessionDidEnd session: UIDropSession) {
+            if isList { show(nil, in: view) }
             parent.dropState.hover = nil
             lastLanding = nil
             edge = nil
@@ -585,6 +682,10 @@ struct TabGridView: UIViewRepresentable {
 
         func collectionView(_ view: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
             defer { parent.dropState.hover = nil }
+            if isList {
+                listDrop(coordinator, in: view)
+                return
+            }
             let model = parent.model
             if let (over, kind) = placed, let id = dragged(coordinator.session),
                let plan = model.dropPlan(id, over: over, kind) {
@@ -669,7 +770,7 @@ struct TabGridView: UIViewRepresentable {
         /// The halves under the finger, when it's over a card's middle, or
         /// anywhere in the cell of a `latched` card (15f2).
         private func middle(of id: String, cell: GridCell, at point: CGPoint, in view: UICollectionView,
-                            dragged: String, latched: Bool) -> GridHover? {
+                            dragged: String, latched: Bool) -> TreeHover? {
             guard let row = parent.model.row(id) else { return nil }
             guard let (x, span, picture) = GridMetrics.middle(cell.convert(point, from: view), card: cell.card,
                                                               latched: latched)
@@ -679,7 +780,7 @@ struct TabGridView: UIViewRepresentable {
             let kind = model.dropIntent(dragged, over: over, x: x, y: picture / 2, w: span, h: picture)
             guard [DropKind.newGroup, .split, .join, .merge, .refused(full: true)].contains(kind) else { return nil }
             let split = model.dropIntent(dragged, over: over, x: span - 1, y: picture / 2, w: span, h: picture)
-            var hover = GridHover(id: id, over: over, kind: kind, writes: model.dropPlan(dragged, over: over, kind) != nil)
+            var hover = TreeHover(id: id, over: over, kind: kind, writes: model.dropPlan(dragged, over: over, kind) != nil)
             hover.halves = DropHalves(groups: model.makesGroups(in: parent.workspace),
                                       group: model.dropPlan(dragged, over: over, .newGroup) != nil, split: split,
                                       splits: model.dropPlan(dragged, over: over, split) != nil)
@@ -782,8 +883,278 @@ struct TabGridView: UIViewRepresentable {
     }
 }
 
-/// The grid's collection view, which says when it lays out.
-final class GridCollectionView: UICollectionView {
+// MARK: The list
+
+extension TreeView.Coordinator {
+    /// A list section: the system's plain list, without separators, with
+    /// the room above a coloured group and below it, and the section's
+    /// coloured blocks behind its rows.
+    fileprivate func listLayout(section index: Int, environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection? {
+        guard sections.indices.contains(index) else { return nil }
+        var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
+        configuration.showsSeparators = false
+        configuration.backgroundColor = .clear
+        configuration.trailingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipeActions(at: path) }
+        let layout = NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
+        let gap = ListMetrics.gapAbove(sections, index) ? ListMetrics.gap : 0
+        layout.contentInsets = NSDirectionalEdgeInsets(top: gap, leading: 0, bottom: 0, trailing: 0)
+        let layers = sections[index].layers
+        if ListBox.draws(layers) {
+            let kind = ListBox.kind(layers, groups: sections[index].groups, dimmed: state?.dimmed ?? [], theme: theme)
+            if !registered.contains(kind) {
+                registered.insert(kind)
+                view?.collectionViewLayout.register(ListBox.self, forDecorationViewOfKind: kind)
+            }
+            // A background decoration spans the section's insets; the
+            // block starts below the room above it.
+            let box = NSCollectionLayoutDecorationItem.background(elementKind: kind)
+            box.contentInsets = NSDirectionalEdgeInsets(top: gap, leading: 0, bottom: 0, trailing: 0)
+            layout.decorationItems = [box]
+        }
+        return layout
+    }
+
+    fileprivate func configure(row cell: UICollectionViewListCell, id: String) {
+        guard let line = lines[id], let state, let box = parent.model.treeStore.box(TreeLines.rowId(of: id)) else {
+            cell.contentConfiguration = nil
+            return
+        }
+        let model = parent.model, theme = theme, dropState = parent.dropState
+        let scheme: ColorScheme = parent.scheme
+        let token: String? = parent.tint
+        let marked = state.marked.contains(id), dimmed = state.dimmed.contains(id)
+        if let header = line.group {
+            cell.contentConfiguration = UIHostingConfiguration {
+                TreeGroupRow(box: box, line: line, header: header, theme: theme, marked: marked, dimmed: dimmed,
+                             dropState: dropState)
+                    .treeCell(model, scheme: scheme, token: token)
+            }
+            .margins(.horizontal, ListMetrics.inset)
+            .margins(.vertical, 0)
+        } else if let panes = line.panes {
+            let boxes = panes.compactMap(model.treeStore.box)
+            let actions = parent.actions
+            cell.contentConfiguration = UIHostingConfiguration {
+                TreeSplitRow(model: model, split: box, panes: boxes, line: line, theme: theme, marked: marked,
+                             dimmed: dimmed, dropState: dropState,
+                             onOpen: { pane in
+                                 let split = box.row.id
+                                 guard let id = pane ?? model.browser.focusedPane(of: split, among: panes) else { return }
+                                 actions.openPane(id)
+                             },
+                             menu: actions.paneMenu)
+                    .treeCell(model, scheme: scheme, token: token)
+            }
+            .margins(.horizontal, ListMetrics.inset)
+            .margins(.vertical, 0)
+        } else {
+            let ticked = state.ticked.contains(id), editing = state.editing
+            cell.contentConfiguration = UIHostingConfiguration {
+                TreeTabRow(model: model, box: box, line: line, theme: theme, editing: editing, ticked: ticked,
+                           marked: marked, dimmed: dimmed, dropState: dropState,
+                           onClose: { [weak self] in self?.close(id) })
+                    .treeCell(model, scheme: scheme, token: token)
+            }
+            .margins(.horizontal, ListMetrics.inset)
+            .margins(.vertical, 0)
+        }
+        // The system's press highlight, in the row's rounded shape inside
+        // the sheet's margins; the row's block lies behind it.
+        cell.configurationUpdateHandler = { cell, state in
+            var background = UIBackgroundConfiguration.listCell().updated(for: state)
+            if !state.isHighlighted { background.backgroundColor = .clear }
+            background.cornerRadius = WorkspaceSheet.cardCorner
+            background.backgroundInsets = NSDirectionalEdgeInsets(top: 0, leading: ListMetrics.inset, bottom: 0,
+                                                                  trailing: ListMetrics.inset)
+            cell.backgroundConfiguration = background
+        }
+    }
+
+    fileprivate func configurePins(_ cell: UICollectionViewCell) {
+        let model = parent.model, actions = parent.actions
+        let scheme: ColorScheme = parent.scheme
+        let token: String? = parent.tint
+        cell.contentConfiguration = UIHostingConfiguration {
+            PinsRow(onOpened: actions.pinOpened, tileSize: 48)
+                .treeCell(model, scheme: scheme, token: token)
+                .environment(model.toasts)
+        }
+        .margins(.all, 0)
+    }
+
+    /// A row's swipe: Close, which a full swipe runs, and Move to…; a
+    /// split's closes all its panes and takes no full swipe. A group's row
+    /// has none.
+    fileprivate func swipeActions(at path: IndexPath) -> UISwipeActionsConfiguration? {
+        guard let id = dataSource.itemIdentifier(for: path), let line = lines[id], line.group == nil,
+              let row = parent.model.row(TreeLines.rowId(of: id)) else { return nil }
+        let actions = parent.actions
+        let move = UIContextualAction(style: .normal, title: "Move to…") { _, _, done in
+            actions.move(row)
+            done(true)
+        }
+        move.image = UIImage(systemName: "folder")
+        move.backgroundColor = UIColor(theme.action)
+        guard let panes = line.panes else {
+            let close = UIContextualAction(style: .destructive, title: "Close") { _, _, done in
+                actions.close(row)
+                done(true)
+            }
+            close.image = UIImage(systemName: "xmark")
+            return UISwipeActionsConfiguration(actions: [close, move])
+        }
+        let paneRows = panes.compactMap(parent.model.row)
+        let close = UIContextualAction(style: .destructive, title: paneRows.count == 2 ? "Close Both" : "Close All") {
+            _, _, done in
+            actions.closeSplit(row, paneRows)
+            done(true)
+        }
+        close.image = UIImage(systemName: "xmark")
+        let configuration = UISwipeActionsConfiguration(actions: [close, move])
+        configuration.performsFirstActionWithFullSwipe = false
+        return configuration
+    }
+
+    /// A row's long-press menu, built when it opens: a tab's or a group's.
+    /// A split's line has none of its own: each pane in its tray has its
+    /// menu (12e1).
+    fileprivate func listMenu(at paths: [IndexPath]) -> UIContextMenuConfiguration? {
+        guard paths.count == 1, let id = dataSource.itemIdentifier(for: paths[0]), let line = lines[id],
+              line.panes == nil, let row = parent.model.row(id) else { return nil }
+        let actions = parent.actions
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+            row.kind == .group ? UIMenu(sections: actions.groupMenu(row)) : actions.tabMenu(row)
+        }
+    }
+
+    /// Reads a drag over the list as the desktop's panel does
+    /// (`SvalPanelDrag`): a line between rows where the row would land, an
+    /// outline on a closed group it would go into, a tab's or split's
+    /// halves. The rows hold still: every answer holds the layout, and the
+    /// list draws its line itself.
+    fileprivate func listDropUpdate(_ session: UIDropSession, dragged id: String,
+                                    in view: UICollectionView) -> UICollectionViewDropProposal {
+        let model = parent.model
+        let point = session.location(in: view)
+        let spots = view.indexPathsForVisibleItems.compactMap { path -> ListSpot? in
+            guard let item = dataSource.itemIdentifier(for: path), let line = lines[item],
+                  let frame = view.layoutAttributesForItem(at: path)?.frame else { return nil }
+            return ListSpot(line: line, frame: frame)
+        }.sorted { $0.frame.minY < $1.frame.minY }
+        let last = sections.last?.lines.last?.id
+        let next = ListMetrics.aim(model.tree, dragged: id, spots: spots, at: point, workspace: parent.workspace,
+                                   ends: spots.last?.line.id == last, makesGroups: model.makesGroups(in: parent.workspace))
+        show(next, in: view)
+        #if DEBUG
+        traceDrop(point, spots: spots, aim: next, in: view)
+        #endif
+        guard case .middle(let item, let over, let kind) = next, let spot = spots.first(where: { $0.line.id == item }) else {
+            if parent.dropState.hover != nil { parent.dropState.hover = nil }
+            return UICollectionViewDropProposal(operation: next == nil ? .forbidden : .move, intent: .unspecified)
+        }
+        var hover = TreeHover(id: item, over: over, kind: kind, writes: model.dropPlan(id, over: over, kind) != nil)
+        if kind != .into {
+            let place = RowPlace(spot.line)
+            let leading = spot.line.panes == nil ? place.indent : place.cardLeading
+            let width = spot.frame.width - 2 * ListMetrics.inset - leading - place.trailing
+            let row = ListMetrics.desktopRow
+            let split = model.dropIntent(id, over: over, x: width - 1, y: row / 2, w: width, h: row)
+            hover.halves = DropHalves(groups: model.makesGroups(in: parent.workspace),
+                                      group: model.dropPlan(id, over: over, .newGroup) != nil, split: split,
+                                      splits: model.dropPlan(id, over: over, split) != nil)
+        }
+        if parent.dropState.hover != hover { parent.dropState.hover = hover }
+        return UICollectionViewDropProposal(operation: hover.writes ? .move : .forbidden,
+                                            intent: .insertIntoDestinationIndexPath)
+    }
+
+    /// Shows the line for `aim` between its rows, or hides it.
+    fileprivate func show(_ aim: ListAim?, in view: UICollectionView) {
+        self.aim = aim
+        guard case .line(let y, let depth, _, _) = aim else {
+            lineView?.isHidden = true
+            if parent.dropState.line != nil { parent.dropState.line = nil }
+            return
+        }
+        let line = lineView ?? DropLineView()
+        if lineView == nil {
+            lineView = line
+            line.layer.zPosition = 10
+            view.addSubview(line)
+        }
+        line.color = UIColor(theme.accent)
+        line.ring = UIColor(theme.sheet)
+        // The line starts at the content of a row at its depth, where the
+        // desktop indents it (`sval-drop-line`, `--sval-drop-depth`).
+        let leading = ListMetrics.inset + 12 + CGFloat(depth) * ListMetrics.indent - DropLineView.ring
+        line.frame = CGRect(x: leading, y: y - DropLineView.ring, width: view.bounds.width - leading - ListMetrics.inset - 8,
+                            height: DropLineView.ring * 2)
+        line.isHidden = false
+        let mark = "\(Int(y)) \(depth)"
+        if parent.dropState.line != mark { parent.dropState.line = mark }
+    }
+
+    /// Writes the drop the list showed last.
+    fileprivate func listDrop(_ coordinator: UICollectionViewDropCoordinator, in view: UICollectionView) {
+        defer { show(nil, in: view) }
+        guard let id = dragged(coordinator.session) else { return }
+        let model = parent.model
+        switch aim {
+        case .line(_, _, let over, let kind)?:
+            guard let plan = model.dropPlan(id, over: over, kind) else { return }
+            Diagnostics.log("sheet: dropped in the list, \(kind)")
+            parent.actions.drop(plan)
+        case .middle(_, let over, let kind)?:
+            guard let plan = model.dropPlan(id, over: over, kind) else { return }
+            Diagnostics.log("sheet: dropped in the list, \(kind)")
+            if let item = coordinator.items.first, let path = coordinator.destinationIndexPath,
+               let cell = view.cellForItem(at: path) {
+                coordinator.drop(item.dragItem, intoItemAt: path, rect: cell.bounds.insetBy(dx: ListMetrics.inset, dy: 0))
+            }
+            parent.actions.drop(plan)
+        case nil:
+            return
+        }
+    }
+
+    #if DEBUG
+    /// A drag's trace in the Debug log, one line each time what the list
+    /// shows changes or the list scrolls: the row under the finger by its
+    /// place, how far down it the finger is and its height, the row's
+    /// quarter, what a drop there does, and the list's scroll offset.
+    /// Places and counts alone.
+    fileprivate func traceDrop(_ point: CGPoint, spots: [ListSpot], aim: ListAim?, in view: UICollectionView) {
+        var row = "off", zone = "off"
+        if let over = view.indexPathForItem(at: point), let frame = view.layoutAttributesForItem(at: over)?.frame {
+            let y = point.y - frame.minY
+            row = "\(over.section).\(over.item) y=\(Int(y))/\(Int(frame.height))"
+            zone = y < frame.height / 4 ? "top" : y >= frame.height * 3 / 4 ? "bottom" : "middle"
+        }
+        let shown = switch aim {
+        case .line(let y, let depth, _, let kind)?: "line y=\(Int(y)) depth=\(depth) \(kind)"
+        case .middle(_, _, let kind)?: "middle \(kind)"
+        case nil: "none"
+        }
+        let key = "zone=\(zone) aim=\(shown) offset=\(Int(view.contentOffset.y))"
+        guard key != traced else { return }
+        traced = key
+        Diagnostics.log("list trace: row=\(row) \(key)")
+    }
+    #endif
+
+}
+
+extension View {
+    /// What a list cell's SwiftUI view reads from its sheet: the model and
+    /// the sheet's colours, which a hosting configuration in a cell isn't
+    /// given from the views around the collection view.
+    func treeCell(_ model: AppModel, scheme: ColorScheme, token: String?) -> some View {
+        environment(model).environment(\.appearance, scheme).environment(\.sheetTint, token)
+    }
+}
+
+/// The tree's collection view, which says when it lays out.
+final class TreeCollectionView: UICollectionView {
     var laidOut: ((UICollectionView) -> Void)?
 
     override func layoutSubviews() {

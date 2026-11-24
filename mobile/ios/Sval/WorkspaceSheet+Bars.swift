@@ -77,7 +77,9 @@ extension WorkspaceSheet {
     /// The tabs Edit can tick: every tab in this Workspace but a split's
     /// panes, which move with their split.
     private var editableTabs: [OutlineRow] {
-        visibleEntries.compactMap { $0.panes == nil && $0.row.kind == .tab ? $0.row : nil }
+        guard let id = workspace?.id else { return [] }
+        return TreeLines.list(model.tree, workspace: id, collapsed: collapsed).flatMap(\.lines)
+            .compactMap { $0.panes == nil && $0.group == nil ? model.row($0.id) : nil }
     }
 
     func endEditing() {

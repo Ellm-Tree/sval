@@ -62,6 +62,40 @@ final class TreeLinesTests: XCTestCase {
                                            TreeLine(id: "t5", depth: 0, panes: nil)])
     }
 
+    /// The list's sections are the grid's, with each group's own row first
+    /// in the section its header heads.
+    func testListSections() {
+        let sections = TreeLines.list(index, workspace: "w1", collapsed: [])
+        XCTAssertEqual(ids(sections), ["w1#0: t1", "g1#0: g1 t2", "g2#0: g2 t3", "g1#1: t4", "w1#1: s1 p3 t5"])
+        let g1 = sections[1].lines[0]
+        XCTAssertEqual(g1.group, sections[1].header, "a group's row carries its header's facts")
+        XCTAssertEqual(g1.depth, 0, "a group's row sits at its own level, a step out from its rows")
+        XCTAssertEqual(sections[1].lines[1].depth, 1)
+        XCTAssertEqual(sections[2].lines.map(\.tints), [["blue", nil], ["blue", nil]],
+                       "each row knows the colours around it, its own group's included")
+        XCTAssertEqual(sections[0].lines[0].tints, [])
+    }
+
+    /// A closed group's section holds its row alone.
+    func testAClosedGroupInTheListIsItsRowAlone() {
+        let sections = TreeLines.list(index, workspace: "w1", collapsed: ["g1"])
+        XCTAssertEqual(ids(sections), ["w1#0: t1", "g1#0: g1", "w1#1: s1 p3 t5"])
+        XCTAssertEqual(sections[1].lines[0].group?.open, false)
+    }
+
+    /// A split of more than four tabs is a line per run of four, the first
+    /// under the split's id, and a last run of one is that tab's line.
+    func testASplitOfMoreThanFourIsOneLinePerRun() {
+        let panes = (1...9).map { TreeLinesTests.row("q\($0)", "s9", .tab, depth: 2) }
+        let rows = [TreeLinesTests.row("w1", nil, .workspace), TreeLinesTests.row("s9", "w1", .split, depth: 1)] + panes
+        let lines = TreeLines.list(OutlineIndex(rows), workspace: "w1", collapsed: []).flatMap(\.lines)
+        XCTAssertEqual(lines.map(\.id), ["s9", "s9#1", "q9"])
+        XCTAssertEqual(lines.map(\.panes), [["q1", "q2", "q3", "q4"], ["q5", "q6", "q7", "q8"], nil])
+        XCTAssertEqual(TreeLines.rowId(of: "s9#1"), "s9")
+        let grid = TreeLines.grid(OutlineIndex(rows), workspace: "w1", collapsed: []).flatMap(\.lines)
+        XCTAssertEqual(grid.map(\.id), ["s9"], "the grid draws the split as one card")
+    }
+
     func testClosedGroupKeepsItsHeaderAlone() {
         let sections = TreeLines.grid(index, workspace: "w1", collapsed: ["g1"])
         XCTAssertEqual(ids(sections), ["w1#0: t1", "g1#0: ", "w1#1: s1 p3 t5"])

@@ -51,23 +51,10 @@ struct WorkspaceSheet: View {
     @State var selected: Set<String> = []
     /// The tabs Edit's Move to… is moving.
     @State var movingMany: [OutlineRow]?
-    /// Each drawn line's frame in the tree, for the row under a drag. Kept
-    /// outside the view's state: frames change on every scroll, and a
-    /// scroll must not redraw the sheet.
-    @State var frames = TreeFrames()
-    /// Whether a row of the tree is lifted, which puts the drop target
-    /// over it.
-    @State var lifted = false
-    /// The node being dragged: the first row asked for its item. The drag
-    /// asks again for rows the finger passes, and a drop's data can't be
-    /// read before it's let go.
-    @State var dragging: String?
-    /// The row under a drag in the tree, and what a drop there would do.
-    @State var hover: DropHover?
     /// The row being renamed in the Rename Tab alert.
     @State var renamingCard: OutlineRow?
-    /// The halves a card in the grid shows while a card is held over it.
-    @State var gridDrop = GridDropState()
+    /// The halves or outline a row or card shows while one is held over it.
+    @State var treeDrop = TreeDropState()
     /// How the tree is drawn: a list, or the grid of cards (15a).
     @AppStorage(TabLayout.key) var layout = TabLayout.list
 
@@ -99,7 +86,7 @@ struct WorkspaceSheet: View {
                         theme.divider.frame(height: 1).padding(.horizontal, 16)
                     }
                     Group {
-                        if layout == .grid { grid } else { tree }
+                        if layout == .grid { grid } else { list }
                     }
                     .id("\(workspace?.id ?? "")-\(layout.rawValue)")
                     .transition(.opacity)
@@ -187,78 +174,13 @@ struct WorkspaceSheet: View {
         }
     }
 
-    private var tree: some View {
-        ScrollViewReader { reader in
-            let rows = visibleEntries
-            let blocks = blocks(for: rows)
-            let gaps = gaps(for: rows, blocks: blocks)
-            ZStack {
-            List {
-                // In the sideways panel the pins scroll away with the tree.
-                if panel {
-                    PinsRow(onOpened: { close() }, tileSize: 48)
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-                ForEach(rows, id: \.id) { entry in
-                    item(entry, block: blocks[entry.id])
-                        .opacity(isDragged(entry) ? 0.4 : 1)
-                        .overlay { rowMark(entry, block: blocks[entry.id]).allowsHitTesting(false) }
-                        // In screen space: each List row is a view of its own,
-                        // where a space named outside the List can't be seen.
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
-                            frames.rows[entry.id] = $0
-                        }
-                        .onDrag { startDrag(entry) } preview: { dragPreview(entry) }
-                        .modifier(DragSessionPhases(began: { if !lifted { lifted = true } }, ended: endDrag))
-                        .padding(.top, gaps.contains(entry.id) ? 4 : 0)
-                        .listRowInsets(EdgeInsets(top: 0, leading: TreeFrames.inset, bottom: 0, trailing: TreeFrames.inset))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .id(entry.id)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 48)
-            .scrollEdgeFade()
-            .contentMargins(.top, 7, for: .scrollContent)
-            .onAppear {
-                revealFront()
-                // After the opened groups' rows are drawn.
-                Task { @MainActor in
-                    if let id = browser.currentTabId {
-                        reader.scrollTo(rows.first { $0.holds(id) }?.id ?? id, anchor: .center)
-                    }
-                }
-            }
-                // Rows are dragged as the system drags anything, from a
-                // long press that moves, and the tree is one drop target
-                // that reads the row under the finger as the desktop's
-                // panel does. It lies over the List while a row is lifted:
-                // each List row is a view of its own, which takes a drop
-                // before anything around the List can.
-                if lifted {
-                    Color.clear
-                        .contentShape(.rect)
-                        .onDrop(of: [.svalNode], delegate: TreeDropDelegate(
-                            update: { dragMoved(to: $0, rows: rows, blocks: blocks, reader: reader) },
-                            exit: { hover = nil },
-                            perform: drop))
-                        // A drag let go outside the tree leaves it behind on
-                        // iOS 26, which never says so; a touch clears it.
-                        .onTapGesture { endDrag() }
-                }
-            }
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frames.tree = $0 }
-            .sensoryFeedback(.selection, trigger: hover.map { "\($0.entry) \($0.kind)" })
-        }
-    }
-
     var isPrivateSession: Bool { workspace.map { model.isPrivate($0.id) } ?? false }
 
     // MARK: Actions
+
+    func name(_ row: OutlineRow) -> String {
+        row.displayTitle
+    }
 
     /// Pins a tab: its page becomes the pin's, and it leaves the tree
     /// (pins spec §8.1).

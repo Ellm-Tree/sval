@@ -1,0 +1,485 @@
+// SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+// Copyright 2026 Ellm Tree, Inc.
+
+import SwiftUI
+import UIKit
+
+/// The list's measures.
+enum ListMetrics {
+    /// The room between the sheet's edge and a row, on each side.
+    static let inset: CGFloat = 16
+    /// Each group level's step inward.
+    static let indent: CGFloat = 24
+    /// How far each nested coloured block ends inside its parent's.
+    static let nestTrailing: CGFloat = 6
+    /// The room above a coloured group and below it, outside its block.
+    static let gap: CGFloat = 4
+
+    /// Whether section `index` keeps `gap` above it: it opens an outermost
+    /// coloured group, or the section above closes one. Opening or closing
+    /// a group moves no row but those it shows or hides.
+    static func gapAbove(_ sections: [TreeSection], _ index: Int) -> Bool {
+        func outer(_ section: TreeSection) -> GroupLayer? {
+            section.layers.first { $0.tint.flatMap(WorkspaceTint.init(rawValue:)) != nil }
+        }
+        if outer(sections[index])?.top == true { return true }
+        return index > 0 && outer(sections[index - 1])?.bottom == true
+    }
+
+    /// How much a lifted row and what it carries fade in place, as the
+    /// desktop's dragged rows do (`.sval-row-dragging`,
+    /// `--opacity-deemphasized-strong`).
+    static let dimmed = 0.6
+
+    /// The desktop's row height, whose top and bottom `TreeDrop.edge`
+    /// mean "beside this row" (`--sval-row-h`, `DROP_EDGE_PX`). A phone row
+    /// is read at the same proportions: its top and bottom quarters.
+    static let desktopRow = TreeDrop.edge * 4
+
+    /// What a drag of `id` over the list would do with the finger at
+    /// `point`, as the desktop's panel reads it (`SvalPanelDrag`,
+    /// `dropIntent`): before or after a row, first in an open group, at the
+    /// Workspace's end below the last row, or a row's middle. Off every
+    /// row, the nearest row is read at its edge, so a finger inside the
+    /// list always aims somewhere. Nil for a drop that changes nothing.
+    static func aim(_ index: OutlineIndex, dragged id: String, spots: [ListSpot], at point: CGPoint,
+                    workspace: String, ends: Bool, makesGroups: Bool) -> ListAim? {
+        guard let last = spots.last else { return nil }
+        if ends, point.y >= last.frame.maxY {
+            let end = DropOver(id: workspace, kind: .workspace, expanded: true)
+            guard index.dropPlan(id, over: end, .end) != nil else { return nil }
+            return .line(y: last.frame.maxY, depth: 0, over: end, kind: .end)
+        }
+        func distance(_ spot: ListSpot) -> CGFloat {
+            max(spot.frame.minY - point.y, point.y - spot.frame.maxY, 0)
+        }
+        guard let spot = spots.min(by: { distance($0) < distance($1) }) else { return nil }
+        let height = spot.frame.height
+        let y = min(max(point.y - spot.frame.minY, 0), height - 0.5)
+        let rowId = TreeLines.rowId(of: spot.line.id)
+        guard let row = index.row(rowId) else { return nil }
+        let over = DropOver(id: rowId, kind: spot.line.panes == nil ? row.kind : .split,
+                            expanded: spot.line.group?.open == true)
+        let place = RowPlace(spot.line)
+        let leading = spot.line.panes == nil ? place.indent : place.cardLeading
+        let width = spot.frame.width - 2 * inset - leading - place.trailing
+        let kind = index.dropIntent(id, over: over, x: point.x - spot.frame.minX - inset - leading,
+                                    y: y * desktopRow / height, w: width, h: desktopRow, makesGroups: makesGroups)
+        switch kind {
+        case .before, .after, .firstChild:
+            guard index.dropPlan(id, over: over, kind) != nil else { return nil }
+            // The line sits at the row's top or bottom, indented to the depth
+            // the row lands at (`SvalPanelDrag.paint`).
+            return .line(y: kind == .before ? spot.frame.minY : spot.frame.maxY,
+                         depth: spot.line.depth + (kind == .firstChild ? 1 : 0), over: over, kind: kind)
+        case .into, .newGroup, .split, .join, .merge, .refused(full: true):
+            return .middle(id: spot.line.id, over: over, kind: kind)
+        default:
+            return nil
+        }
+    }
+}
+
+/// A drawn row of the list and its frame in the list.
+struct ListSpot: Equatable {
+    let line: TreeLine
+    let frame: CGRect
+}
+
+/// What a drag over the list would do.
+enum ListAim: Equatable {
+    /// Between rows: where the line goes, the depth it is indented to, and
+    /// the landing.
+    case line(y: CGFloat, depth: Int, over: DropOver, kind: DropKind)
+    /// A row's middle: into a closed group, or a tab's or split's halves.
+    case middle(id: String, over: DropOver, kind: DropKind)
+}
+
+/// Where a dragged row lands between rows in the list: a line, with a ring
+/// at its start (`sval-drop-line`).
+final class DropLineView: UIView {
+    /// The ring's radius, and half the line's frame height.
+    static let ring: CGFloat = 4
+    var color = UIColor.tintColor { didSet { setNeedsDisplay() } }
+    var ring = UIColor.systemBackground { didSet { setNeedsDisplay() } }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isOpaque = false
+        isUserInteractionEnabled = false
+        contentMode = .redraw
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ rect: CGRect) {
+        let r = Self.ring
+        color.setFill()
+        UIRectFill(CGRect(x: 2 * r - 1, y: r - 1, width: bounds.width - 2 * r + 1, height: 2))
+        let circle = UIBezierPath(ovalIn: CGRect(x: 1, y: 1, width: 2 * r - 2, height: 2 * r - 2))
+        ring.setFill()
+        circle.fill()
+        color.setStroke()
+        circle.lineWidth = 2
+        circle.stroke()
+    }
+}
+
+/// Where a list row sits among the coloured groups around it: its
+/// indent, and each coloured group's level and colour, outermost first.
+struct RowPlace {
+    let indent: CGFloat
+    let blocks: [(level: Int, tint: WorkspaceTint)]
+
+    init(_ line: TreeLine) {
+        indent = CGFloat(line.depth) * ListMetrics.indent
+        blocks = line.tints.enumerated().compactMap { level, tint in
+            tint.flatMap(WorkspaceTint.init(rawValue:)).map { (level, $0) }
+        }
+    }
+
+    /// How far the innermost block's card ends inside the row's trailing
+    /// edge, which the row's own content stays inside.
+    var cardInset: CGFloat { CGFloat(max(blocks.count - 1, 0)) * ListMetrics.nestTrailing }
+
+    /// How far the row's own target ends inside its trailing edge.
+    var trailing: CGFloat { CGFloat(blocks.count) * ListMetrics.nestTrailing }
+
+    /// Where a card nested inside the innermost block starts, as a split's
+    /// or the front row's.
+    var cardLeading: CGFloat { blocks.last.map { CGFloat($0.level) * ListMetrics.indent + ListMetrics.indent } ?? 0 }
+
+    /// The row's text and muted text: on a coloured group's block, solved
+    /// on the innermost block (`sval-panel.css`, `data-sval-fill`), else
+    /// the sheet's.
+    func ink(_ theme: Theme) -> (text: Color, muted: Color) {
+        let surface = DesktopColor.Surface(l: theme.sheetLightness, surfaceDark: theme.dark, dir: theme.blockDir)
+        guard let tint = blocks.last?.tint, let ink = DesktopColor.groupInk(tint.rawValue, on: surface) else {
+            return (theme.text, theme.muted)
+        }
+        return (Color(hex: ink.text), Color(hex: ink.muted))
+    }
+}
+
+/// The row in front: inside a coloured group it lifts as a card of its own
+/// within the group's block, as a split does, never to the block's edges;
+/// outside any group it takes the accent wash.
+struct FrontCard: View {
+    let place: RowPlace
+    let front: Bool
+    let theme: Theme
+
+    var body: some View {
+        if front {
+            if let last = place.blocks.last {
+                RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner)
+                    .fill(GroupBlock.color(last.tint, dark: theme.dark, surface: theme.sheetLightness,
+                                           blockDir: theme.blockDir, selected: true))
+                    .padding(.leading, place.cardLeading)
+                    .padding(.trailing, CGFloat(place.blocks.count) * ListMetrics.nestTrailing)
+                    .padding(.vertical, WorkspaceSheet.cardGap)
+            } else {
+                RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner).fill(theme.accentWash)
+            }
+        }
+    }
+}
+
+/// A row's drop mark, as the desktop panel draws them (`SvalPanelDrag.paint`):
+/// an outline on a closed group a drop would go into, and on a tab's or
+/// split's middle its two halves. The two rows waiting on a new group's
+/// name keep dashed outlines. A landing between rows is the list's line
+/// (`DropLineView`).
+struct RowDropMark: View {
+    let id: String
+    let leading: CGFloat
+    let trailing: CGFloat
+    let marked: Bool
+    let dropState: TreeDropState
+    let theme: Theme
+
+    var body: some View {
+        let color = theme.accent
+        ZStack {
+            if marked {
+                RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner)
+                    .strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+            }
+            if let hover = dropState.hover, hover.id == id,
+               hover.writes || hover.halves.map({ $0.group || $0.splits }) == true {
+                if hover.kind == .into {
+                    RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner)
+                        .fill(color.opacity(0.3))
+                        .strokeBorder(color, lineWidth: 1.5)
+                } else if let halves = hover.halves {
+                    DropHalvesMark(halves: halves, onSplit: hover.kind != .newGroup, color: color,
+                                   muted: theme.muted, cover: theme.sheet)
+                }
+            }
+        }
+        .padding(.leading, leading)
+        .padding(.trailing, trailing)
+        .allowsHitTesting(false)
+    }
+}
+
+/// A tab's row in the list. The collection view's cell is the button: its
+/// tap, menu, swipe and drag are the system's.
+struct TreeTabRow: View {
+    let model: AppModel
+    /// The tab's row, read here so a change to it redraws this row alone.
+    let box: RowBox
+    let line: TreeLine
+    let theme: Theme
+    let editing: Bool
+    let ticked: Bool
+    let marked: Bool
+    let dimmed: Bool
+    let dropState: TreeDropState
+    let onClose: () -> Void
+
+    var body: some View {
+        let row = box.row
+        let browser: Browser = model.browser
+        let front = row.id == browser.currentTabId
+        let elsewhere = Browser.openable(row) == nil && row.url != nil
+        let playing = browser.playingTabs.contains(row.id)
+        let muted = browser.mutedTabs.contains(row.id)
+        let place = RowPlace(line)
+        let ink = place.ink(theme)
+        HStack(spacing: 10) {
+            if editing {
+                SelectionTick(ticked: ticked, tick: theme.action, off: ink.muted)
+            }
+            SiteTile(row: row, size: 28)
+                .opacity(elsewhere ? 0.55 : 1)
+            // The title, and under it the page's site as the bar shows
+            // it: a title alone can be the same on many pages, and the
+            // site tells them apart (Teevan et al., CHI 2009).
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.displayTitle)
+                    .font(.system(.body, weight: front ? .semibold : .regular))
+                    .foregroundStyle(elsewhere ? ink.muted : ink.text)
+                    .titleLines()
+                if let site = row.site {
+                    Text(site)
+                        .font(.system(.footnote))
+                        .foregroundStyle(ink.muted)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if elsewhere {
+                Image(systemName: "laptopcomputer")
+                    .font(.system(size: 14))
+                    .foregroundStyle(ink.muted)
+                    .frame(width: 36, height: 36)
+                    .accessibilityLabel("Can't open on \(UIDevice.current.model)")
+            }
+            // Every row closes from its ×, which a playing tab's speaker
+            // takes the place of (14b1).
+            RowAccessory(playing: playing, muted: muted, editing: editing, title: row.displayTitle,
+                         ink: ink.muted, accent: theme.accent,
+                         onMute: { browser.toggleMute(row.id) }, onClose: onClose)
+        }
+        .padding(.leading, 12 + place.indent)
+        .padding(.trailing, 2 + place.cardInset)
+        .rowHeight(RowMetrics.tab)
+        .background { FrontCard(place: place, front: front, theme: theme) }
+        .opacity(dimmed ? ListMetrics.dimmed : 1)
+        .overlay {
+            RowDropMark(id: line.id, leading: place.indent, trailing: place.trailing, marked: marked,
+                        dropState: dropState, theme: theme)
+        }
+        // One element, as a grid card is: the title, the site, then any
+        // state, with × and the speaker as actions.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.spokenLabel(elsewhere: elsewhere, playing: playing))
+        .accessibilityAddTraits(front || (editing && ticked) ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction(named: "Close", onClose)
+        .accessibilityActions {
+            if playing {
+                Button(muted ? "Unmute" : "Mute") { browser.toggleMute(row.id) }
+            }
+        }
+    }
+}
+
+/// A group's row in the list: its chevron, emoji or folder, name and the
+/// tabs inside it at any depth. A tap opens or closes it.
+struct TreeGroupRow: View {
+    /// The group's row, read here so a change to it redraws this row alone.
+    let box: RowBox
+    let line: TreeLine
+    let header: GroupHeader
+    let theme: Theme
+    let marked: Bool
+    let dimmed: Bool
+    let dropState: TreeDropState
+
+    var body: some View {
+        let row = box.row
+        let place = RowPlace(line)
+        let ink = place.ink(theme)
+        HStack(spacing: 10) {
+            Chevron(open: header.open, color: ink.muted)
+                .frame(width: 14)
+            GroupMark(row: row, open: header.open, theme: theme)
+            Text(row.displayTitle)
+                .font(.system(.body, weight: .semibold))
+                .foregroundStyle(ink.text)
+                .titleLines()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(header.count)")
+                .font(.system(.subheadline))
+                .monospacedDigit()
+                .foregroundStyle(ink.muted)
+                .padding(.trailing, 10)
+        }
+        .padding(.leading, 12 + place.indent)
+        .padding(.trailing, place.cardInset)
+        .rowHeight(RowMetrics.group)
+        .opacity(dimmed ? ListMetrics.dimmed : 1)
+        .overlay {
+            RowDropMark(id: line.id, leading: place.indent, trailing: place.trailing, marked: marked,
+                        dropState: dropState, theme: theme)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(header.open ? "Expanded" : "Collapsed")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// A split's line in the list: its tray of panes (`SplitRow`), reading its
+/// rows' boxes so a pane's title redraws this line alone.
+struct TreeSplitRow: View {
+    let model: AppModel
+    let split: RowBox
+    let panes: [RowBox]
+    let line: TreeLine
+    let theme: Theme
+    let marked: Bool
+    let dimmed: Bool
+    let dropState: TreeDropState
+    let onOpen: (String?) -> Void
+    let menu: (OutlineRow, OutlineRow, [OutlineRow]) -> [[MenuItem]]
+
+    var body: some View {
+        let split = split.row
+        let panes = panes.map(\.row)
+        let place = RowPlace(line)
+        let front = panes.contains { $0.id == (model.browser as Browser).currentTabId }
+        // The split's card starts where a group nested at its depth would,
+        // and ends 6pt inside its group's card. The tray, which starts at
+        // the glyph's left edge, keeps the same room to the card's right
+        // edge as to its left.
+        let trailing = place.trailing + (12 + place.indent + 1 - place.cardLeading)
+        SplitRow(split: split, panes: panes, indent: place.indent, trailing: trailing,
+                 countTrailing: 10 + place.cardInset, group: place.blocks.last?.tint, onOpen: onOpen) { pane in
+            MenuItems(sections: menu(pane, split, panes))
+        }
+        .background { FrontCard(place: place, front: front, theme: theme) }
+        .opacity(dimmed ? ListMetrics.dimmed : 1)
+        .overlay {
+            RowDropMark(id: line.id, leading: place.cardLeading, trailing: place.trailing, marked: marked,
+                        dropState: dropState, theme: theme)
+        }
+    }
+}
+
+/// A group's emoji, or its folder in its colour's ink: the block carries
+/// the colour, and the name stays in the text colour, which reads on every
+/// block (`sval-panel.css`, `data-sval-fill="own"`).
+struct GroupMark: View {
+    let row: OutlineRow
+    let open: Bool
+    let theme: Theme
+
+    var body: some View {
+        let tint = row.color.flatMap(WorkspaceTint.init(rawValue:))
+        if let emoji = row.emoji, !emoji.isEmpty {
+            Text(emoji).font(.system(size: 20)).accessibilityIgnoresInvertColors().frame(width: 28)
+        } else {
+            Image(systemName: open ? "folder" : "folder.fill")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(tint?.swatch(dark: theme.dark) ?? theme.body)
+                .frame(width: 28)
+        }
+    }
+}
+
+extension OutlineRow {
+    /// A tab's site, as the bar shows the page in front's.
+    var site: String? {
+        guard let host = url.flatMap(URL.init(string:))?.host() else { return nil }
+        return SiteRules.site(of: host) ?? host
+    }
+
+    /// A tab row's spoken label: its title, its site, and whether it plays
+    /// or can't open here.
+    @MainActor func spokenLabel(elsewhere: Bool, playing: Bool) -> String {
+        [displayTitle, site, playing ? "playing" : nil, elsewhere ? "can't open on \(UIDevice.current.model)" : nil]
+            .compactMap { $0 }.joined(separator: ", ")
+    }
+}
+
+/// A list section's coloured group blocks, drawn behind its rows: each
+/// coloured group around the section from its level's indent, a nested one
+/// as a card inside its parent's, rounded where the group starts or ends.
+/// The layers ride in the decoration's kind, as `GridBox`'s do.
+final class ListBox: UICollectionReusableView {
+    static var theme: Theme?
+
+    /// The kind for `layers`, the groups around a section; a group in
+    /// `dimmed` was lifted by a drag, and its block fades with its rows.
+    static func kind(_ layers: [GroupLayer], groups: [String], dimmed: Set<String>, theme: Theme) -> String {
+        "list|" + zip(layers, groups).map { layer, group in
+            "\(layer.tint ?? "-"):\(layer.top ? 1 : 0):\(layer.bottom ? 1 : 0):\(dimmed.contains(group) ? 1 : 0)"
+        }.joined(separator: ",") + "|\(theme.dark ? 1 : 0):\(theme.sheetLightness):\(theme.blockDir)"
+    }
+
+    /// Whether any group around a section draws a block.
+    static func draws(_ layers: [GroupLayer]) -> Bool {
+        layers.contains { $0.tint.flatMap(WorkspaceTint.init(rawValue:)) != nil }
+    }
+
+    private var layers: [(tint: WorkspaceTint?, top: Bool, bottom: Bool, dimmed: Bool)] = []
+
+    override func apply(_ attributes: UICollectionViewLayoutAttributes) {
+        super.apply(attributes)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
+        contentMode = .redraw
+        let spec = attributes.representedElementKind?.split(separator: "|").dropFirst().first ?? ""
+        layers = spec.split(separator: ",").map { part in
+            let bits = part.split(separator: ":")
+            return (WorkspaceTint(rawValue: String(bits[0])), bits[1] == "1", bits[2] == "1", bits[3] == "1")
+        }
+        setNeedsDisplay()
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard let theme = Self.theme else { return }
+        let corner = WorkspaceSheet.cardCorner
+        var nested = 0
+        for (level, layer) in layers.enumerated() {
+            guard let tint = layer.tint else { continue }
+            defer { nested += 1 }
+            let top = nested > 0 && layer.top ? WorkspaceSheet.cardGap : 0
+            let bottom = nested > 0 && layer.bottom ? WorkspaceSheet.cardGap : 0
+            let leading = ListMetrics.inset + CGFloat(level) * ListMetrics.indent
+            let trailing = ListMetrics.inset + CGFloat(nested) * ListMetrics.nestTrailing
+            let frame = CGRect(x: leading, y: top, width: bounds.width - leading - trailing,
+                               height: bounds.height - top - bottom)
+            var corners: UIRectCorner = []
+            if layer.top { corners.formUnion([.topLeft, .topRight]) }
+            if layer.bottom { corners.formUnion([.bottomLeft, .bottomRight]) }
+            let path = UIBezierPath(roundedRect: frame, byRoundingCorners: corners,
+                                    cornerRadii: CGSize(width: corner, height: corner))
+            UIColor(GroupBlock.color(tint, dark: theme.dark, surface: theme.sheetLightness, blockDir: theme.blockDir))
+                .withAlphaComponent(layer.dimmed ? ListMetrics.dimmed : 1)
+                .setFill()
+            path.fill()
+        }
+    }
+}
