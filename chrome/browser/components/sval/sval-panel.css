@@ -1467,7 +1467,7 @@ menupopup:not([sval-stem]) {
   border-start-end-radius: var(--border-radius-medium);
 }
 
-.sval-row:is([data-sval-fill="own"][aria-expanded="false"]:not([data-sval-shows-selection]), [data-sval-group-end]) {
+.sval-row:is([data-sval-fill="own"][aria-expanded="false"]:not([data-sval-shows-selection], [data-sval-nested]), [data-sval-group-end]) {
   margin-bottom: var(--space-xsmall);
   border-end-start-radius: var(--border-radius-medium);
   border-end-end-radius: var(--border-radius-medium);
