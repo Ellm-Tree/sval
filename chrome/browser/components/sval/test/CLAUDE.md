@@ -69,6 +69,11 @@ unmigrated files and only shrinks.
   with `committed(browser, url)` (`sval/address-wait`). A request that takes
   a page away waits for nothing in that page: its actors go with it, and an
   answer may never come.
+- **Act on a control only once a user could.** When the UI hides or
+  disables a button until its handler has what it needs, wait for the
+  button to show and be enabled before the test clicks it. A click before
+  then runs the handler at a moment no user can, and the test fails for a
+  reason no user meets.
 - **Click inside a window that is on the screen.** Send a native mouse event
   with head.js's `nativeMouse(options)`, which fails on a point off the
   screen or past the window, after `moveWindowOnScreen(win)`

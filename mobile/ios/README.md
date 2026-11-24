@@ -161,6 +161,11 @@ The UI tests open the app with `-svalDemo`. A folder inside the app stands
 in for the shared folder. The first launch fills that folder with sample
 Workspaces, so you don't need an account or a computer.
 
+A test's wait sleeps between its checks, as `AppHarness.until` does,
+because a wait that spins on `Task.yield()` holds the main thread and a
+core. A page load waits for a web content process to launch, and that
+launch needs both, taking longer the busier the Mac is.
+
 CI's `mobile-ios` job runs the same tests on the Mac runners whenever a
 pull request changes what the app is built from: `mobile/`, `engine/`,
 and the desktop's files the app takes its icons and art from. A change to
