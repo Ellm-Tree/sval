@@ -248,6 +248,10 @@ class QuickPeek {
         originStoragePrincipal: load.originStoragePrincipal,
         triggeringRemoteType: load.triggeringRemoteType,
         policyContainer: load.policyContainer,
+        // The owner as the page's opener lets Gecko close the tab when its
+        // load turns out to be a download (`MaybeCloseWindowHelper`), as it
+        // closes the tab a link click opens.
+        openerBrowser: owner.linkedBrowser,
         allowInheritPrincipal: true,
         hasValidUserGestureActivation: true,
         textDirectiveUserActivation: true,

@@ -703,6 +703,46 @@ add_task(async function a_quick_peek_closes_when_its_tab_goes() {
   await untilClosed(quickPeek, "closing the tab closes it");
 });
 
+add_task(async function a_link_to_a_download_leaves_no_quick_peek() {
+  const dir = await makeTempDir("sval-quick-peek-download");
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.download.dir", dir],
+      ["browser.download.folderList", 2],
+      ["browser.download.useDownloadDir", true],
+      ["browser.download.always_ask_before_handling_new_types", false],
+      ["browser.download.alwaysOpenPanel", false],
+    ],
+  });
+  const list = await Downloads.getList(Downloads.ALL);
+  atTaskEnd(async () => {
+    for (const download of await list.getAll()) {
+      await download.finalize(true).catch(() => {});
+      await list.remove(download);
+    }
+    await SpecialPowers.popPrefEnv();
+  });
+  const { tab } = await openLinks();
+  const tabs = gBrowser.tabs.length;
+
+  await BrowserTestUtils.synthesizeMouseAtCenter(
+    "#download",
+    { altKey: true },
+    tab.linkedBrowser
+  );
+  await TestUtils.waitForCondition(async () => {
+    const downloads = await list.getAll();
+    return downloads.some(
+      d => d.succeeded && d.source.url.endsWith("?name=invite.ics")
+    );
+  }, "the file downloads");
+  await TestUtils.waitForCondition(
+    () => !SvalQuickPeek.tabOf(window) && gBrowser.tabs.length === tabs,
+    "the Quick Peek opened for it closes"
+  );
+  Assert.equal(gBrowser.selectedTab, tab, "the tab clicked in is in front");
+});
+
 add_task(
   async function the_quick_peeked_pages_own_windows_open_as_firefox_opens_them() {
     const { tab } = await openLinks();
