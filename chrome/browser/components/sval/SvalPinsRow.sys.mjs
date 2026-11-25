@@ -1591,7 +1591,7 @@ export class SvalPinsRow {
     const store = lazy.SvalFavoritesStore.readyInstance;
     const current = store?.get(pin.guid)?.parentGuid;
     popup.replaceChildren();
-    for (const folder of store?.pinFolders() ?? []) {
+    for (const folder of this.#pinFolders()) {
       const el = doc.createXULElement("menuitem");
       el.dataset.folder = folder.guid;
       el.setAttribute("label", folder.name || NEW_PIN_FOLDER_NAME);
@@ -1600,6 +1600,16 @@ export class SvalPinsRow {
       }
       popup.append(el);
     }
+  }
+
+  /**
+   * The pin folders this window's row shows, in its order: a folder limited
+   * to another workspace is not one a pin here can move into (pins spec §7).
+   *
+   * @returns {object[]}
+   */
+  #pinFolders() {
+    return this.#slots.filter(slot => slot.kind === "folder");
   }
 
   #menuShowing(menu) {
@@ -1611,8 +1621,7 @@ export class SvalPinsRow {
       saveCurrent: !folder,
       // A pin inside a pin folder goes where its folder goes (§7).
       showIn: top,
-      moveToPinFolder:
-        !folder && !!lazy.SvalFavoritesStore.readyInstance?.pinFolders().length,
+      moveToPinFolder: !folder && !!this.#pinFolders().length,
       rename: true,
       editAddress: !folder,
       // A folder in a folder's popover has the row only beyond its parent.

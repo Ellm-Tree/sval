@@ -400,18 +400,6 @@ export class SvalFavoritesStore {
   }
 
   /**
-   * The row's pin folders, in the row's order, as "Move to Pin Folder"
-   * lists them (pins-root spec §5).
-   *
-   * @returns {Array<{guid: string, name: string}>}
-   */
-  pinFolders() {
-    return this.children(PINS_ROOT)
-      .filter(row => row.kind === "folder")
-      .map(row => ({ guid: row.guid, name: row.name }));
-  }
-
-  /**
    * The workspaces the pin `guid` shows in: workspace node ids, or null for
    * every workspace (pins spec §7).
    *

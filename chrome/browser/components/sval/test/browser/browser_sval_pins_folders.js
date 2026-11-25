@@ -316,6 +316,49 @@ add_task(async function a_folders_menu_and_move_to_folder() {
   atTaskEnd(() => store.get(folder) && store.delete(folder));
 });
 
+/**
+ * Move to Pin Folder lists only the pin folders this workspace's row shows
+ * (pins spec §7).
+ */
+add_task(async function move_to_folder_leaves_out_another_workspaces() {
+  forgetFavorites();
+  await aTab();
+  const { store, work } = pinsFixture;
+  const elsewhere = await pinsFolder("Work only");
+  const pin = await pinFavorite(PAGE2, "A");
+  await untilPinShows(pin);
+  await store.setPinScope(elsewhere, [work]);
+  await TestUtils.waitForCondition(
+    () => !tileOf(elsewhere),
+    "a folder limited to Work is not in Home"
+  );
+
+  let menu = await pinMenuOn(tileOf(pin));
+  Assert.ok(
+    !shown(menu).includes("moveToPinFolder"),
+    "with no folder in this row, the menu leaves it out"
+  );
+  let hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
+  menu.hidePopup();
+  await within(hidden, 10_000, "the menu closing");
+
+  const here = await pinsFolder("Home");
+  await untilPinShows(here);
+  menu = await pinMenuOn(tileOf(pin));
+  const moveTo = menu.querySelector('[data-command="moveToPinFolder"]');
+  const opened = BrowserTestUtils.waitForPopupEvent(moveTo.menupopup, "shown");
+  moveTo.openMenu(true);
+  await within(opened, 10_000, "Move to Pin Folder opens");
+  Assert.deepEqual(
+    [...moveTo.menupopup.children].map(el => el.dataset.folder),
+    [here],
+    "listing this row's folder alone"
+  );
+  hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
+  menu.hidePopup();
+  await within(hidden, 10_000, "the menu closing");
+});
+
 /** The row's own menu makes an empty pin folder at the end of the row. */
 add_task(async function the_rows_menu_makes_a_folder() {
   forgetFavorites();
