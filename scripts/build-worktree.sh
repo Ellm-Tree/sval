@@ -59,23 +59,33 @@ elif [[ "$WT" != "$MAIN" && -d "$MAIN_SRC/.git" ]]; then
   # git-config(1)), and trusts the copied index.
   git -C "$WT/build/firefox" config core.checkStat minimal
   git -C "$WT/build/firefox" config core.trustCtime false
+  # The main checkout's tree holds the commit its own last fetch pinned, which
+  # may be older than this worktree's pin.
+  "$WT/scripts/fetch-upstream.sh"
 else
   "$WT/scripts/fetch-upstream.sh"
   skip_bootstrap=0
 fi
 
 # The engine artifact is gitignored, so a new worktree does not have it. Without
-# it sync-files.sh stubs the engine out and every engine test fails. It is built
-# from the worktree's own engine/, which is what CI's engine job builds. The
-# main checkout's artifact is only as new as its last build, and may come from
-# another engine, so it is the fallback.
+# it sync-files.sh stubs the engine out and every engine test fails. CI's engine
+# job publishes the engine built from each engine key (scripts/engine-key.sh),
+# so a worktree whose engine/ CI has built fetches those bytes. One whose
+# engine CI has not built yet builds it from its own engine/, which is what CI's
+# engine job builds. The main checkout's artifact is only as new as its last
+# build, and may come from another engine, so it is the last resort.
 ENGINE="chrome/browser/components/sval"
-# Cargo rebuilds whatever in a copied target directory is stale, so starting
-# from the main checkout's leaves it the worktree's own crate to compile.
-if [[ -d "$MAIN/engine/target" && ! -e "$WT/engine/target" ]]; then
-  "${clone[@]}" "$MAIN/engine/target" "$WT/engine/target"
-fi
-if ! "$WT/scripts/build-core-wasm.sh"; then
+build_engine() {
+  # Cargo rebuilds whatever in a copied target directory is stale, so starting
+  # from the main checkout's leaves it the worktree's own crate to compile.
+  if [[ -d "$MAIN/engine/target" && ! -e "$WT/engine/target" ]]; then
+    "${clone[@]}" "$MAIN/engine/target" "$WT/engine/target"
+  fi
+  "$WT/scripts/build-core-wasm.sh"
+}
+if "$WT/scripts/fetch-engine.sh" "$("$WT/scripts/engine-key.sh")"; then
+  echo "==> Fetched the engine CI built from this engine/"
+elif ! build_engine; then
   echo "warning: could not build engine/; copying the main checkout's engine," >&2
   echo "         which may not be the engine CI tests against." >&2
   for f in sval_core.mjs sval_core_bg.wasm; do
