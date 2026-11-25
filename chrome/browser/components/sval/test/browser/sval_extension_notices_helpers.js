@@ -11,6 +11,32 @@
  * (`SvalExtensionNotices`).
  */
 
+// The panel's notices live for the whole process, outside Known Good state,
+// and the files that share these helpers count them, so each starts with
+// none.
+add_setup(function startWithoutNotices() {
+  const { noticeLines, removeNotice } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalAppNotices.sys.mjs"
+  );
+  const { AppMenuNotifications } = ChromeUtils.importESModule(
+    "resource://gre/modules/AppMenuNotifications.sys.mjs"
+  );
+  const { ExtensionsUI } = ChromeUtils.importESModule(
+    "resource:///modules/ExtensionsUI.sys.mjs"
+  );
+  const left = noticeLines(window).map(line => line.key);
+  if (left.length) {
+    info(`notices an earlier file left: ${left.join(", ")}`);
+  }
+  for (const key of left) {
+    removeNotice(key);
+  }
+  AppMenuNotifications.removeNotification(/^addon-/);
+  ExtensionsUI.sideloaded.clear();
+  ExtensionsUI.updates.clear();
+  ExtensionsUI.emit("change");
+});
+
 const extensionsButton = (win = window) =>
   win.document.getElementById("unified-extensions-button");
 
@@ -92,16 +118,30 @@ async function closeExtensionsPanel(win = window) {
  */
 async function waitForBars(count, message, win = window) {
   await openExtensionsPanel(win);
-  await within(
-    TestUtils.waitForCondition(() => {
-      const bars = noticeBars(win);
-      return (
-        bars.length === count &&
-        bars.every(bar => barButtons(bar).every(BrowserTestUtils.isVisible))
-      );
-    }, message),
-    10_000,
-    message
-  );
+  try {
+    await within(
+      TestUtils.waitForCondition(() => {
+        const bars = noticeBars(win);
+        return (
+          bars.length === count &&
+          bars.every(bar => barButtons(bar).every(BrowserTestUtils.isVisible))
+        );
+      }, message),
+      10_000,
+      message
+    );
+  } catch (e) {
+    // What the panel showed instead.
+    const shown = noticeBars(win).map(bar => ({
+      key: bar.dataset.key,
+      buttons: barButtons(bar).map(BrowserTestUtils.isVisible),
+    }));
+    throw new Error(
+      `${e.message}: ${JSON.stringify({
+        panel: extensionsPanel(win).state,
+        shown,
+      })}`
+    );
+  }
   return noticeBars(win);
 }

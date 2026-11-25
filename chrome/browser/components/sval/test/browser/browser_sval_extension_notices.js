@@ -347,9 +347,11 @@ add_task(async function the_footer_holds_no_extension_notice() {
   await shown;
 
   // Offline, the password manager's download from addons.mozilla.org fails
-  // without contacting it.
+  // without contacting it. Back online, a failed install is tried again
+  // (`SvalPasswordManager`), so no manager is chosen by then.
   Services.io.offline = true;
-  atTaskEnd(() => {
+  atTaskEnd(async () => {
+    await SvalPasswordManager.choose("none");
     Services.io.offline = false;
   });
   const { failed } = await SvalPasswordManager.choose("bitwarden");
@@ -374,10 +376,7 @@ add_task(async function the_footer_holds_no_extension_notice() {
     );
   }
 
-  // Choosing no manager stops the retry that the network's return would
-  // start.
   await SvalPasswordManager.choose("none");
-  Services.io.offline = false;
   barButtons(bars[1])[0].click();
   await waitForBars(0, "choosing no manager and answering clear them");
   await closeExtensionsPanel();
