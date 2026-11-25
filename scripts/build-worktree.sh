@@ -14,9 +14,10 @@
 # syncs, patches and builds. A worktree whose build/ points at the main
 # checkout's is not: two agents syncing into one tree test each other's files.
 #
-# The upstream tree is copied from the main checkout rather than fetched. On
-# APFS `cp -c` clones files copy-on-write, so the tree costs almost no disk.
-# The object directory is left behind and built fresh, because it holds
+# The upstream tree is copied rather than fetched. On APFS `cp -c` clones
+# files copy-on-write, so the tree costs almost no disk. The source of every
+# copy is an unpatched tree at the pin in the common git directory, which no
+# checkout builds in. The object directory is built fresh, because it holds
 # absolute symlinks into the tree it was built from.
 set -euo pipefail
 
@@ -25,6 +26,7 @@ WT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 COMMON="$(cd "$(git -C "$WT" rev-parse --git-common-dir)" && pwd -P)"
 MAIN="$(dirname "$COMMON")"
 MAIN_SRC="$MAIN/build/firefox"
+SOURCE="$COMMON/sval-upstream/firefox"
 
 # A worktree's build grows to 6-12 GB, and a build that runs the disk out of
 # space fails partway and leaves both trees hard to trust. SVAL_MIN_FREE_GB sets
@@ -43,25 +45,53 @@ case "$(uname -s)" in
   *) clone=(cp -Rp) ;;
 esac
 
+# A copy keeps each file's mtime and size but has a new inode and ctime, which
+# git's default stat check treats as a change, so the first `git reset --hard`
+# would rehash the whole tree. With these settings git compares the
+# whole-second mtime and the size alone (core.checkStat in git-config(1)), and
+# trusts the copied index. A copy of a tree carries its settings.
+trust_copied_index() {
+  git -C "$1" config core.checkStat minimal
+  git -C "$1" config core.trustCtime false
+}
+
 mkdir -p "$WT/build"
 skip_bootstrap=1
 if [[ -d "$WT/build/firefox/.git" ]]; then
   echo "==> Keeping $WT/build/firefox"
-elif [[ "$WT" != "$MAIN" && -d "$MAIN_SRC/.git" ]]; then
-  echo "==> Cloning $MAIN_SRC (without its object directory)"
+elif [[ "$WT" != "$MAIN" ]]; then
+  # shellcheck disable=SC1091
+  source "$WT/upstream.txt"
+  # One setup at a time brings the source tree to its pin, holding the lock
+  # exclusively, and copies share it. `flock` is util-linux and absent on
+  # macOS, so the lock is taken through Python's fcntl on this shell's fd 8,
+  # as scripts/test.sh takes its own.
+  exec 8>"$COMMON/sval-upstream.lock"
+  python3 -I -c 'import fcntl; fcntl.flock(8, fcntl.LOCK_EX)'
+  if [[ ! -d "$SOURCE/.git" ]]; then
+    # Built beside its final path and moved into place, so a setup that
+    # stops partway leaves no half-made source for the next one.
+    rm -rf "$SOURCE.new"
+    mkdir -p "$SOURCE.new"
+    if [[ -d "$MAIN_SRC/.git" ]]; then
+      echo "==> Cloning $MAIN_SRC into $SOURCE"
+      find "$MAIN_SRC" -mindepth 1 -maxdepth 1 ! -name 'objdir-*' -exec \
+        "${clone[@]}" {} "$SOURCE.new/" \;
+      trust_copied_index "$SOURCE.new"
+    else
+      skip_bootstrap=0
+    fi
+    "$WT/scripts/fetch-upstream.sh" "$SOURCE.new"
+    trust_copied_index "$SOURCE.new"
+    mv "$SOURCE.new" "$SOURCE"
+  elif [[ "$(git -C "$SOURCE" rev-parse HEAD)" != "$UPSTREAM_REF" ]]; then
+    "$WT/scripts/fetch-upstream.sh" "$SOURCE"
+  fi
+  python3 -I -c 'import fcntl; fcntl.flock(8, fcntl.LOCK_SH)'
+  echo "==> Cloning $SOURCE"
   mkdir -p "$WT/build/firefox"
-  find "$MAIN_SRC" -mindepth 1 -maxdepth 1 ! -name 'objdir-*' -exec \
-    "${clone[@]}" {} "$WT/build/firefox/" \;
-  # A copy keeps each file's mtime and size but has a new inode and ctime,
-  # which git's default stat check treats as a change, so the first
-  # `git reset --hard` would rehash the whole tree. With these settings git
-  # compares the whole-second mtime and the size alone (core.checkStat in
-  # git-config(1)), and trusts the copied index.
-  git -C "$WT/build/firefox" config core.checkStat minimal
-  git -C "$WT/build/firefox" config core.trustCtime false
-  # The main checkout's tree holds the commit its own last fetch pinned, which
-  # may be older than this worktree's pin.
-  "$WT/scripts/fetch-upstream.sh"
+  find "$SOURCE" -mindepth 1 -maxdepth 1 -exec "${clone[@]}" {} "$WT/build/firefox/" \;
+  exec 8>&-
 else
   "$WT/scripts/fetch-upstream.sh"
   skip_bootstrap=0

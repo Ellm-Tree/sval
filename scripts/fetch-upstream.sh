@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 # Copyright 2026 Ellm Tree, Inc.
 #
-# Clone the pinned Firefox ESR source into build/firefox.
+# Clone the pinned Firefox ESR source into build/firefox, or into <dest>.
 # Safe to re-run: re-fetches into a clean tree.
+#
+#   scripts/fetch-upstream.sh [<dest>]
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,7 +14,7 @@ cd "$REPO_ROOT"
 # shellcheck disable=SC1091
 source ./upstream.txt
 
-DEST="build/firefox"
+DEST="${1:-build/firefox}"
 
 # `mach artifact` walks back up to 500 revisions looking for indexed
 # TaskCluster artifacts. A depth-1 clone gives it one candidate, so if HEAD's
@@ -80,7 +82,7 @@ if [[ -d "$DEST/.git" ]]; then
   git -C "$DEST" clean -fdx -e mozconfig -e 'objdir-*'
 else
   echo "==> Cloning $UPSTREAM_REF from $SOURCE (shallow, depth $DEPTH)"
-  mkdir -p build
+  mkdir -p "$DEST"
   # UPSTREAM_REF is a commit SHA, which `git clone --branch` cannot take, so
   # the checkout is fetched by hand. core.autocrlf=false keeps upstream files
   # LF on Windows, where Git for Windows and MozillaBuild default to
