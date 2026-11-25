@@ -57,8 +57,7 @@ struct GridCard: View {
                     .environment(\.colorScheme, theme.dark ? .dark : .light)
                 }
             }
-            .clipShape(.rect(cornerRadius: Radius.picture))
-            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
+            .cardFrame(theme)
             .modifier(FrontRing(front: front, color: theme.accent))
             .padding(GridMetrics.ring)
             // VoiceOver reads the title, the site, then any state; the tab in
@@ -92,7 +91,7 @@ struct GridCard: View {
 
     private func label(elsewhere: Bool, playing: Bool) -> String {
         var parts = [row.displayTitle]
-        if let host = row.url.flatMap(URL.init(string:))?.host() { parts.append(SiteRules.site(of: host) ?? host) }
+        if let site = row.site { parts.append(site) }
         if playing { parts.append("playing") }
         if elsewhere { parts.append("can't open on \(UIDevice.current.model)") }
         return parts.joined(separator: ", ")
@@ -145,7 +144,6 @@ struct GridSplitCard: View {
     let panes: [RowBox]
     let height: CGFloat
     let theme: Theme
-    let editing: Bool
     let dropState: TreeDropState
     let onClose: () -> Void
 
@@ -169,8 +167,7 @@ struct GridSplitCard: View {
                     .padding(.trailing, 2)
                 }
             }
-            .clipShape(.rect(cornerRadius: Radius.picture))
-            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(CardPicture.ring(theme), lineWidth: 1) }
+            .cardFrame(theme)
             .modifier(FrontRing(front: front, color: theme.accent))
             .padding(GridMetrics.ring)
             .accessibilityElement(children: .ignore)
@@ -305,8 +302,8 @@ struct CardPicture: View {
                 } else {
                     VStack(spacing: 8) {
                         SiteTile(row: row, size: 44).opacity(elsewhere ? 0.4 : 1)
-                        if let host = row.url.flatMap(URL.init(string:))?.host() {
-                            Text(SiteRules.site(of: host) ?? host)
+                        if let site = row.site {
+                            Text(site)
                                 .font(.system(.footnote))
                                 .foregroundStyle(theme.muted)
                                 .lineLimit(1)
@@ -325,11 +322,6 @@ struct CardPicture: View {
                     .padding(.top, top)
                 }
             }
-    }
-
-    /// The card's 1pt ring, drawn around the picture and bar.
-    static func ring(_ theme: Theme) -> Color {
-        theme.divider
     }
 }
 
@@ -380,7 +372,7 @@ struct SplitPicture: View {
 struct FrontRing: ViewModifier {
     let front: Bool
     let color: Color
-    let radius: CGFloat = 14
+    let radius = Radius.picture
 
     func body(content: Content) -> some View {
         content.overlay {
@@ -391,5 +383,13 @@ struct FrontRing: ViewModifier {
                     .allowsHitTesting(false)
             }
         }
+    }
+}
+
+extension View {
+    /// A card's corners and its 1pt ring, around the picture and bar.
+    func cardFrame(_ theme: Theme) -> some View {
+        clipShape(.rect(cornerRadius: Radius.picture))
+            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(theme.divider, lineWidth: 1) }
     }
 }

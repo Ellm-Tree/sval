@@ -364,11 +364,7 @@ struct TabScrubStrip: View {
     /// A page's card, cut to the grid card's corners and ringed as it is.
     /// `CardPicture` leaves both to whatever holds it.
     private func rounded(_ picture: some View) -> some View {
-        picture
-            .clipShape(.rect(cornerRadius: Radius.picture))
-            .overlay {
-                RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(CardPicture.ring(theme), lineWidth: 1)
-            }
+        picture.cardFrame(theme)
     }
 }
 

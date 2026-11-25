@@ -3,7 +3,7 @@
 
 import CryptoKit
 import Foundation
-import Observation
+import Synchronization
 import UIKit
 import WebKit
 
@@ -16,7 +16,6 @@ import WebKit
 /// Every other picture is kept in the app's caches, which iOS may empty,
 /// and is deleted once its tab leaves the tree or its pin its Workspace.
 @MainActor
-@Observable
 final class PagePreviews {
     static let shared = PagePreviews()
 
@@ -26,35 +25,40 @@ final class PagePreviews {
     static let width: CGFloat = 180
     static let aspect: CGFloat = 140 / 171
 
-    /// Counts the pictures taken or read, so a card drawing one is redrawn
-    /// when its picture arrives. The caches below change while views draw,
-    /// so they are kept out of observation.
-    private var taken = 0
+    /// What redraws a card when its own picture arrives, and no other card.
+    private let marks = KeyMarks()
     /// Each picture is about a megabyte decoded, so only the last few
     /// dozen drawn stay in memory; the rest are read again from disk.
-    @ObservationIgnored private let pictures: NSCache<NSString, UIImage> = {
+    private let pictures: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.countLimit = 30
         return cache
     }()
     /// A private tab's pictures, which have no copy on disk to read again.
-    @ObservationIgnored private var privatePictures: [String: UIImage] = [:]
-    @ObservationIgnored private var reading: Set<String> = []
-    @ObservationIgnored private var names: [String: String] = [:]
-    @ObservationIgnored private var kept: Set<String> = []
+    private var privatePictures: [String: UIImage] = [:]
+    /// Reads pictures from disk one at a time: decoding a collection
+    /// view's images on a concurrent queue asks for too many threads
+    /// (`UIImage.preparingForDisplay()`).
+    private let reader: DispatchQueue
+    /// The pictures asked for and not yet read. A card that leaves the
+    /// screen takes its id out, and the reader skips it.
+    private let wanted = Wanted()
+    private var names: [String: String] = [:]
+    private var kept: Set<String> = []
     /// The tabs with a picture on disk, by file name, read once at start.
-    @ObservationIgnored private lazy var onDisk: Set<String> = {
+    private lazy var onDisk: Set<String> = {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path())) ?? []
         return Set(names.compactMap { $0.hasSuffix(".jpg") ? String($0.dropLast(4)) : nil })
     }()
-    @ObservationIgnored private let folder: URL = {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let folder = caches.appending(path: "PagePreviews", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder
-    }()
+    private let folder: URL
 
-    init() {
+    init(folder: URL? = nil, reader: DispatchQueue = DispatchQueue(label: "app.sval.previews", qos: .userInitiated)) {
+        self.reader = reader
+        self.folder = folder ?? {
+            let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            return caches.appending(path: "PagePreviews", directoryHint: .isDirectory)
+        }()
+        try? FileManager.default.createDirectory(at: self.folder, withIntermediateDirectories: true)
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -65,50 +69,79 @@ final class PagePreviews {
     /// The picture of tab `id`'s page. One on disk is read off the main
     /// thread, and the card asking is redrawn when it arrives.
     func picture(for id: String) -> UIImage? {
-        _ = taken
-        if let picture = privatePictures[id] ?? pictures.object(forKey: id as NSString) { return picture }
+        marks.read(id)
+        if let picture = cached(id) { return picture }
+        read(id)
+        return nil
+    }
+
+    /// The picture of `id` already in memory.
+    func cached(_ id: String) -> UIImage? {
+        privatePictures[id] ?? pictures.object(forKey: id as NSString)
+    }
+
+    /// Starts reading the pictures of cards about to show
+    /// (`UICollectionViewDataSourcePrefetching`).
+    func prefetch(_ ids: [String]) {
+        for id in ids where cached(id) == nil { read(id) }
+    }
+
+    /// Drops the reads of cards no longer about to show, before they
+    /// decode.
+    func cancel(_ ids: [String]) {
+        wanted.ids.withLock { $0.subtract(ids) }
+    }
+
+    private func read(_ id: String) {
         let name = fileName(id)
-        guard onDisk.contains(name), !reading.contains(id) else { return nil }
-        reading.insert(id)
+        guard onDisk.contains(name), wanted.ids.withLock({ $0.insert(id).inserted }) else { return }
         let file = folder.appending(path: name + ".jpg")
-        Task.detached(priority: .userInitiated) {
+        reader.async { [wanted, weak self] in
+            guard wanted.ids.withLock({ $0.contains(id) }) else { return }
             // Decoded here, so drawing it on the main thread doesn't.
             let image = (try? Data(contentsOf: file)).flatMap(UIImage.init(data:))?.preparingForDisplay()
-            await MainActor.run {
-                self.reading.remove(id)
-                guard let image else { return }
-                self.pictures.setObject(image, forKey: id as NSString)
-                self.taken += 1
-            }
+            Task { @MainActor in self?.landed(id, image) }
         }
-        return nil
+    }
+
+    private func landed(_ id: String, _ image: UIImage?) {
+        wanted.ids.withLock { _ = $0.remove(id) }
+        guard let image else { return }
+        pictures.setObject(image, forKey: id as NSString)
+        marks.bump(id)
     }
 
     /// Takes the picture of tab `id`'s page as `view` last drew it. A page
     /// that hasn't drawn anything yet gives none, and the last picture
     /// stays.
     func take(_ id: String, from view: WKWebView, isPrivate: Bool) {
+        Self.snapshot(view) { [weak self] image in self?.keep(image, for: id, isPrivate: isPrivate) }
+    }
+
+    /// The top of `view`'s page, `width` across and cut to `aspect`,
+    /// cropped by the snapshot itself.
+    static func snapshot(_ view: WKWebView, then done: @escaping @MainActor (UIImage) -> Void) {
         guard view.url != nil, view.bounds.width > 0 else { return }
         let configuration = WKSnapshotConfiguration()
-        configuration.snapshotWidth = NSNumber(value: Double(Self.width))
+        configuration.rect = CGRect(x: 0, y: 0, width: view.bounds.width,
+                                    height: min(view.bounds.height, view.bounds.width * aspect))
+        configuration.snapshotWidth = NSNumber(value: Double(width))
         configuration.afterScreenUpdates = false
-        view.takeSnapshot(with: configuration) { [weak self] image, _ in
-            guard let self, let image else { return }
-            let crop = CGSize(width: image.size.width, height: min(image.size.height, image.size.width * Self.aspect))
-            let top = UIGraphicsImageRenderer(size: crop, format: image.imageRendererFormat).image { _ in
-                image.draw(at: .zero)
-            }
-            MainActor.assumeIsolated { self.keep(top, for: id, isPrivate: isPrivate) }
+        view.takeSnapshot(with: configuration) { image, _ in
+            guard let image else { return }
+            MainActor.assumeIsolated { done(image) }
         }
     }
 
-    private func keep(_ image: UIImage, for id: String, isPrivate: Bool) {
-        taken += 1
+    /// Keeps `image` as tab `id`'s picture.
+    func keep(_ image: UIImage, for id: String, isPrivate: Bool) {
         if isPrivate {
             privatePictures[id] = image
+            marks.bump(id)
             return
         }
         pictures.setObject(image, forKey: id as NSString)
+        marks.bump(id)
         let name = fileName(id)
         Task.detached(priority: .utility) { [folder] in
             guard let data = image.jpegData(compressionQuality: 0.7) else { return }
@@ -128,7 +161,7 @@ final class PagePreviews {
         Task.detached(priority: .utility) {
             for file in files { try? FileManager.default.removeItem(at: file) }
         }
-        taken += 1
+        marks.bumpAll()
     }
 
     /// Deletes the pictures of every page not in `tabs`
@@ -136,6 +169,7 @@ final class PagePreviews {
     func keep(only tabs: Set<String>) {
         guard tabs != kept else { return }
         kept = tabs
+        marks.keep(only: tabs)
         for id in privatePictures.keys where !tabs.contains(id) { privatePictures[id] = nil }
         for id in names.keys where !tabs.contains(id) {
             pictures.removeObject(forKey: id as NSString)
@@ -152,10 +186,16 @@ final class PagePreviews {
     }
 
     /// A tab's file name: the hash of its id, so any id makes a safe name.
-    private func fileName(_ id: String) -> String {
+    func fileName(_ id: String) -> String {
         if let name = names[id] { return name }
         let name = SHA256.hash(data: Data(id.utf8)).map { String(format: "%02x", $0) }.joined()
         names[id] = name
         return name
     }
+}
+
+/// The ids a reader still wants, shared between the main actor and the
+/// reader's queue.
+private final class Wanted: Sendable {
+    let ids = Mutex<Set<String>>([])
 }

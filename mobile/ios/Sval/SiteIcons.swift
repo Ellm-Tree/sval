@@ -4,7 +4,6 @@
 import CryptoKit
 import Foundation
 import ImageIO
-import Observation
 import UIKit
 import WebKit
 
@@ -20,31 +19,29 @@ import WebKit
 /// asked for. The fetch carries no cookies. Hosts are never logged
 /// (`CONTRIBUTING.md` rule 10).
 @MainActor
-@Observable
 final class SiteIcons {
     static let shared = SiteIcons()
 
-    /// Counts the icons learned, so a view drawing one is redrawn when a
-    /// new one arrives. The caches below change while views draw, so they
-    /// are kept out of observation.
-    private var learned = 0
-    @ObservationIgnored private var icons: [String: UIImage] = [:]
-    @ObservationIgnored private var reading: Set<String> = []
-    @ObservationIgnored private var names: [String: String] = [:]
+    /// What redraws a view when its own site's icon arrives, and no other
+    /// view.
+    private let marks = KeyMarks()
+    private var icons: [String: UIImage] = [:]
+    private var reading: Set<String> = []
+    private var names: [String: String] = [:]
     /// The sites with an icon on disk, by file name, listed once.
-    @ObservationIgnored private lazy var onDisk: Set<String> = {
+    private lazy var onDisk: Set<String> = {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path())) ?? []
         return Set(names.compactMap { $0.hasSuffix(".png") ? String($0.dropLast(4)) : nil })
     }()
-    @ObservationIgnored private var fetching: Set<String> = []
+    private var fetching: Set<String> = []
     /// Sites that gave no icon this session, tried again only when a page
     /// names one.
-    @ObservationIgnored private var gaveNone: Set<String> = []
-    @ObservationIgnored private let session = URLSession(configuration: .ephemeral)
+    private var gaveNone: Set<String> = []
+    private let session = URLSession(configuration: .ephemeral)
     /// The request blocking a page of the address given loads under, or
     /// none where nothing is blocked.
-    @ObservationIgnored var blocking: (@MainActor (URL) -> RequestBlocker?)?
-    @ObservationIgnored private let folder: URL = {
+    var blocking: (@MainActor (URL) -> RequestBlocker?)?
+    private let folder: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         let folder = caches.appending(path: "SiteIcons", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -54,7 +51,7 @@ final class SiteIcons {
     /// The icon kept for `host`. One on disk is read off the main thread,
     /// and the view asking is redrawn when it arrives.
     func icon(for host: String) -> UIImage? {
-        _ = learned
+        marks.read(host)
         if let icon = icons[host] { return icon }
         guard known(host), !reading.contains(host) else { return nil }
         reading.insert(host)
@@ -64,8 +61,7 @@ final class SiteIcons {
             await MainActor.run {
                 self.reading.remove(host)
                 guard let image else { return }
-                self.icons[host] = image
-                self.learned += 1
+                self.landed(host, image)
             }
         }
         return nil
@@ -97,8 +93,7 @@ final class SiteIcons {
             defer { fetching.remove(host) }
             if let image = await Self.download(candidates, check: check, session: session, to: file) {
                 onDisk.insert(fileName(host))
-                icons[host] = image
-                learned += 1
+                landed(host, image)
                 return
             }
             gaveNone.insert(host)
@@ -113,7 +108,13 @@ final class SiteIcons {
         onDisk.removeAll()
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         for file in files { try? FileManager.default.removeItem(at: file) }
-        learned += 1
+        marks.bumpAll()
+    }
+
+    /// Keeps `image` as `host`'s icon.
+    func landed(_ host: String, _ image: UIImage) {
+        icons[host] = image
+        marks.bump(host)
     }
 
     /// The most an icon may weigh. A site's icon is a few kilobytes, and

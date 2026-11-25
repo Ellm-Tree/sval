@@ -152,7 +152,7 @@ struct TreeView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate,
-        UICollectionViewDropDelegate, UIGestureRecognizerDelegate {
+        UICollectionViewDropDelegate, UICollectionViewDataSourcePrefetching, UIGestureRecognizerDelegate {
         private var parent: TreeView!
         private var state: TreeState?
         /// Each card's line, by id, as `state` holds it.
@@ -224,6 +224,7 @@ struct TreeView: UIViewRepresentable {
             view.delegate = self
             view.dragDelegate = self
             view.dropDelegate = self
+            view.prefetchDataSource = self
             view.dragInteractionEnabled = true
             self.view = view
             if parent.layout == .list {
@@ -411,7 +412,7 @@ struct TreeView: UIViewRepresentable {
                 let boxes = panes.compactMap(model.treeStore.box)
                 cell.contentConfiguration = UIHostingConfiguration {
                     GridSplitCard(model: model, split: box, panes: boxes, height: height, theme: theme,
-                                  editing: editing, dropState: dropState,
+                                  dropState: dropState,
                                   onClose: { [weak self] in self?.close(id) })
                 }
                 .margins(.leading, leading)
@@ -508,6 +509,31 @@ struct TreeView: UIViewRepresentable {
             default:
                 break
             }
+        }
+
+        // MARK: Pictures
+
+        /// The pictures the card at `path` draws: its tab's, or a split's
+        /// first four panes' (`SplitPicture`). A tab open elsewhere draws
+        /// none, and the list draws none.
+        private func pictures(at path: IndexPath) -> [String] {
+            guard !isList, let id = dataSource.itemIdentifier(for: path), let line = lines[id] else { return [] }
+            if let panes = line.panes { return Array(panes.prefix(4)) }
+            guard let row = parent.model.row(id), Browser.openable(row) != nil || row.url == nil else { return [] }
+            return [id]
+        }
+
+        func collectionView(_ view: UICollectionView, prefetchItemsAt paths: [IndexPath]) {
+            PagePreviews.shared.prefetch(paths.flatMap(pictures))
+        }
+
+        func collectionView(_ view: UICollectionView, cancelPrefetchingForItemsAt paths: [IndexPath]) {
+            PagePreviews.shared.cancel(paths.flatMap(pictures))
+        }
+
+        func collectionView(_ view: UICollectionView, didEndDisplaying cell: UICollectionViewCell,
+                            forItemAt path: IndexPath) {
+            PagePreviews.shared.cancel(pictures(at: path))
         }
 
         // MARK: Taps and menus
