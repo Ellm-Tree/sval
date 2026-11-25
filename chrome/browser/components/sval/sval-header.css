@@ -2211,6 +2211,48 @@ button.sval-notice-row {
   transition: transform 250ms var(--sval-ease);
 }
 
+/*
+ * A see-through window shows the system's material through the panel
+ * (`sval-panel.css`, window tint), which a panel slid in over the page
+ * covers. There the page is cut where the panel stands, as the status
+ * panel's tab cuts it (page frame, below), so the panel shows the window
+ * through itself as it does in the layout. `SvalPanelReveal.measureCut`
+ * writes the panel's width and where the tab panels start; the cut grows by
+ * the share of the slide (`--sval-reveal-share`), which keeps the panel's
+ * duration and curve.
+ */
+@property --sval-reveal-share {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+:root[data-sval-see-through] #browser:has(> #sval-panel-container[sval-collapsed][sval-reveal]) #tabbrowser-tabpanels {
+  --sval-reveal-cut: max(0px, var(--sval-reveal-reach, 0px) * var(--sval-reveal-share) - var(--sval-reveal-inset, 0px));
+  --sval-reveal-dir: to right;
+  mask-image: linear-gradient(var(--sval-reveal-dir), transparent var(--sval-reveal-cut), #000 var(--sval-reveal-cut));
+  transition: --sval-reveal-share 250ms var(--sval-ease);
+
+  &:-moz-locale-dir(rtl),
+  #browser:has(> #sval-panel-container[sval-placement="right"]) &:-moz-locale-dir(ltr) {
+    --sval-reveal-dir: to left;
+  }
+
+  #browser:has(> #sval-panel-container[sval-placement="right"]) &:-moz-locale-dir(rtl) {
+    --sval-reveal-dir: to right;
+  }
+}
+
+/* The panel stands in the window, as it does in the layout, so it casts no
+   shadow, which would fall past its clear gutter onto the page. */
+:root[data-sval-see-through] #sval-panel-container[sval-collapsed][sval-reveal] {
+  box-shadow: none;
+}
+
+:root[data-sval-see-through] #browser:has(> #sval-panel-container[sval-collapsed][sval-reveal="shown"]) #tabbrowser-tabpanels {
+  --sval-reveal-share: 1;
+}
+
 /* The panel's width is the lifted box's (`lift`, `SvalHeader`), which a
    drag of its edge does not change. */
 #sval-panel-container[sval-reveal] > .sval-panel-resizer {

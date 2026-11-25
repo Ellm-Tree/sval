@@ -271,13 +271,19 @@ class Reveal {
     ) {
       return;
     }
+    this.measureCut();
     if (instant) {
       // A popup opening from a button in the panel is placed once, where
       // the button is drawn as it opens.
-      this.container.style.transition = "none";
+      const panels = this.doc.getElementById("tabbrowser-tabpanels");
+      for (const el of [this.container, panels]) {
+        el.style.transition = "none";
+      }
       this.container.setAttribute("sval-reveal", "shown");
       this.container.getBoundingClientRect();
-      this.container.style.removeProperty("transition");
+      for (const el of [this.container, panels]) {
+        el.style.removeProperty("transition");
+      }
     } else {
       this.container.setAttribute("sval-reveal", "shown");
     }
@@ -286,6 +292,29 @@ class Reveal {
     this.doc.addEventListener("dragend", this);
     // Called at once with the pointer's last place, which is on the strip.
     this.win.MousePosTracker.addListener(this.tracker);
+  }
+
+  /**
+   * Writes the cut a see-through window makes in the page under the slid-in
+   * panel (`sval-header.css`, panel reveal): the panel's width inside its
+   * gutter, and how far the tab panels start from the window's edge on the
+   * panel's side. The slid-out box is measured by its width alone, which
+   * its slide leaves alone.
+   */
+  measureCut() {
+    const browser = this.doc.getElementById("browser");
+    const panels = this.doc.getElementById("tabbrowser-tabpanels");
+    const outer = browser.getBoundingClientRect();
+    const inner = panels.getBoundingClientRect();
+    const atStart =
+      (this.container.getAttribute("sval-placement") === "right") ===
+      (this.win.getComputedStyle(browser).direction === "rtl");
+    const inset = atStart ? inner.left - outer.left : outer.right - inner.right;
+    browser.style.setProperty(
+      "--sval-reveal-reach",
+      `${this.container.clientWidth}px`
+    );
+    browser.style.setProperty("--sval-reveal-inset", `${Math.max(0, inset)}px`);
   }
 
   /** Slides the panel back out, if it is in. */
