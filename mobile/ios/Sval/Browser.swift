@@ -51,9 +51,10 @@ final class Browser {
     @ObservationIgnored var pages: [String: Page] = [:] {
         didSet { if Set(oldValue.keys) != Set(pages.keys) { pagesChanged += 1 } }
     }
-    /// Counts the pages made and let go, so the window takes up a page made
-    /// after it last drew: the tab in front's, at launch, is made once the
-    /// window has drawn without it.
+    /// Counts the pages made and let go, so the window and a split's panes
+    /// take up a page made after they last drew: the tab in front's and a
+    /// split's panes', at launch, are made once they have drawn without
+    /// them.
     var pagesChanged = 0
     /// The saved state of each tab's and pin's page, and the address it was
     /// at, by page key.
@@ -454,9 +455,11 @@ final class Browser {
     }
 
     /// The page of a pane the split shows, if it is loaded
-    /// (`makeShownPages`).
+    /// (`makeShownPages`). It reads `pagesChanged`, so a pane drawn before
+    /// its page was made draws again once it is.
     func paneView(_ id: String) -> WKWebView? {
-        pages[id]?.view
+        _ = pagesChanged
+        return pages[id]?.view
     }
 
     /// Whether a tab's page is loaded on this phone.

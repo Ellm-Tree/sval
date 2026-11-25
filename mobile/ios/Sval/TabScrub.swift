@@ -17,12 +17,13 @@ enum ScrubPhase {
     case ended
 }
 
-/// One place the strip can go to: a pin's page or a tab, with the group
-/// at the Workspace's top level that holds the tab, if one does; or a
-/// Workspace.
+/// One place the strip can go to: a pin's page, a tab or a split of two
+/// or more panes, with the group at the Workspace's top level that holds
+/// it, if one does; or a Workspace.
 enum ScrubItem: Identifiable {
     case pin(PinRow, key: String)
     case tab(OutlineRow, group: OutlineRow?)
+    case split(OutlineRow, panes: [OutlineRow], group: OutlineRow?)
     case workspace(OutlineRow)
 
     /// The page's key in `Browser`, which its picture is kept under too,
@@ -31,19 +32,30 @@ enum ScrubItem: Identifiable {
         switch self {
         case .pin(_, let key): key
         case .tab(let row, _): row.id
+        case .split(let split, _, _): split.id
         case .workspace(let row): row.id
         }
     }
 
     var group: OutlineRow? {
-        if case .tab(_, let group) = self { return group }
-        return nil
+        switch self {
+        case .tab(_, let group), .split(_, _, let group): group
+        case .pin, .workspace: nil
+        }
+    }
+
+    /// Whether the strip opens on this item while tab `id` is in front:
+    /// it is that tab, or a split holding it.
+    func holds(_ id: String?) -> Bool {
+        if case .split(_, let panes, _) = self { return panes.contains { $0.id == id } }
+        return self.id == id
     }
 
     @MainActor var title: String {
         switch self {
         case .pin(let pin, _): pin.name
         case .tab(let row, _): row.displayTitle
+        case .split(let split, let panes, _): split.name.isEmpty ? panes[0].displayTitle : split.name
         case .workspace(let row): WorkspaceTile.name(row)
         }
     }
@@ -90,12 +102,31 @@ struct TabScrub {
         let pins = (model.pinsByWorkspace[workspace] ?? [])
             .filter { $0.kind == "favorite" && $0.url != nil }
             .map { ScrubItem.pin($0, key: Browser.pinKey($0.guid, in: workspace)) }
-        // A tab whose address only another device can open is left out, as
-        // the grid greys it.
-        let tabs = model.tabs(in: workspace)
-            .filter { Browser.openable($0) != nil || $0.url == nil }
-            .map { ScrubItem.tab($0, group: topGroup(of: $0, model: model)) }
-        return pins + tabs
+        return pins + pages(in: workspace, index: model.tree)
+    }
+
+    /// The Workspace's tabs in tree order, each split as the grid's one
+    /// card for it (`TreeLines.line`). A tab whose address only another
+    /// device can open is left out, as the grid greys it.
+    static func pages(in workspace: String, index: OutlineIndex) -> [ScrubItem] {
+        var items: [ScrubItem] = []
+        var splits: Set<String> = []
+        for tab in index.tabs(in: workspace) {
+            var line = TreeLine(id: tab.id, depth: 0, panes: nil)
+            if let split = tab.parentId.flatMap(index.row), split.kind == .split {
+                guard splits.insert(split.id).inserted, let card = TreeLines.line(split, index: index, depth: 0) else {
+                    continue
+                }
+                line = card
+            }
+            let group = topGroup(of: tab, index: index)
+            if let panes = line.panes, let split = index.row(line.id) {
+                items.append(.split(split, panes: panes.compactMap(index.row), group: group))
+            } else if let row = index.row(line.id), Browser.openable(row) != nil || row.url == nil {
+                items.append(.tab(row, group: group))
+            }
+        }
+        return items
     }
 
     /// The Workspaces, in the Workspace sheet's strip's order.
@@ -107,13 +138,12 @@ struct TabScrub {
     /// The group directly under the Workspace that holds `row`. The tree
     /// keeps a group's tabs together, nested groups' included, so its
     /// cards lie side by side.
-    @MainActor
-    private static func topGroup(of row: OutlineRow, model: AppModel) -> OutlineRow? {
+    private static func topGroup(of row: OutlineRow, index: OutlineIndex) -> OutlineRow? {
         var found: OutlineRow?
-        var parent = row.parentId.flatMap(model.row)
+        var parent = row.parentId.flatMap(index.row)
         while let at = parent, at.kind != .workspace {
             if at.kind == .group { found = at }
-            parent = at.parentId.flatMap(model.row)
+            parent = at.parentId.flatMap(index.row)
         }
         return found
     }
@@ -150,6 +180,7 @@ struct TabScrub {
 /// front one's colour and name.
 struct TabScrubStrip: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.verticalSizeClass) private var verticalSize
     @Environment(AppModel.self) private var model
     let scrub: TabScrub
     let theme: Theme
@@ -227,7 +258,7 @@ struct TabScrubStrip: View {
             .frame(maxWidth: .infinity)
             .background { band }
             VStack(spacing: 10) {
-                Text(footerText)
+                caption
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(theme.text)
                     .lineLimit(1)
@@ -278,13 +309,64 @@ struct TabScrubStrip: View {
         }
     }
 
-    /// Under the cards, the front tab's title, or the front Workspace's
-    /// tab count.
+    /// Under the cards: a split's symbol before its name, or before
+    /// "Split:" and every pane's icon and title, each title cut on its own
+    /// so all of them show; otherwise a page's icon before `footerText`.
+    @ViewBuilder private var caption: some View {
+        if case .split(let split, let panes, _) = scrub.items[scrub.index] {
+            let titles = panes.map(\.displayTitle)
+            HStack(spacing: 4) {
+                Image(systemName: SplitPicture.symbol(sideways: verticalSize == .compact))
+                if !split.name.isEmpty {
+                    Text(split.name)
+                } else {
+                    fixed("Split:")
+                    ForEach(Array(panes.enumerated()), id: \.offset) { at, pane in
+                        if at > 0, at == panes.count - 1 { fixed("&") }
+                        HStack(spacing: 0) {
+                            SiteTile(row: pane, size: 16).padding(.trailing, 4)
+                            Text(pane.displayTitle)
+                            if at < panes.count - 2 { fixed(",") }
+                        }
+                    }
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(split.name.isEmpty ? "Split: " + Self.joined(titles) : split.name)
+        } else {
+            HStack(spacing: 4) {
+                switch scrub.items[scrub.index] {
+                case .tab(let row, _): SiteTile(row: row, size: 16)
+                case .pin(let pin, _): SiteTile(url: pin.url, name: pin.name, size: 16)
+                case .split, .workspace: EmptyView()
+                }
+                Text(footerText)
+            }
+        }
+    }
+
+    /// A word of the caption that the titles beside it give way to.
+    private func fixed(_ word: String) -> some View {
+        Text(word).fixedSize().layoutPriority(1)
+    }
+
+    /// Titles as a sentence lists them: "A & B", "A, B & C".
+    static func joined(_ titles: [String]) -> String {
+        guard let last = titles.last, titles.count > 1 else { return titles.first ?? "" }
+        return titles.dropLast().joined(separator: ", ") + " & " + last
+    }
+
+    /// Under the cards, the front tab's title, or the front Workspace's tab
+    /// count.
     private var footerText: String {
         let item = scrub.items[scrub.index]
-        guard case .workspace(let row) = item else { return item.title }
-        let count = model.tabs(in: row.id).count
-        return count == 1 ? "1 tab" : "\(count) tabs"
+        switch item {
+        case .workspace(let row):
+            let count = model.tabs(in: row.id).count
+            return count == 1 ? "1 tab" : "\(count) tabs"
+        default:
+            return item.title
+        }
     }
 
     /// The front card's group, as the grid's group header shows it, or
@@ -333,8 +415,9 @@ struct TabScrubStrip: View {
         Group {
             switch item {
             case .tab(let row, _):
-                rounded(CardPicture(row: row, height: card.height, elsewhere: false, theme: theme,
-                                    loading: false))
+                rounded(CardPicture(row: row, height: card.height, elsewhere: false, theme: theme))
+            case .split(_, let panes, _):
+                rounded(SplitPicture(panes: panes, height: card.height, theme: theme, sideways: verticalSize == .compact))
             case .pin(let pin, let key):
                 rounded(pinPicture(pin, key: key))
             case .workspace(let row):

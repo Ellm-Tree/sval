@@ -28,8 +28,7 @@ struct GridCard: View {
         let elsewhere = Browser.openable(row) == nil && row.url != nil
         let playing = browser.playingTabs.contains(row.id)
         let muted = browser.mutedTabs.contains(row.id)
-        CardPicture(row: row, height: height, elsewhere: elsewhere, theme: theme, loading: browser.hasPage(row.id),
-                    top: GridMetrics.bar)
+        CardPicture(row: row, height: height, elsewhere: elsewhere, theme: theme, top: GridMetrics.bar)
             .overlay { GridHalves(id: row.id, dropState: dropState, theme: theme) }
             .overlay(alignment: .top) {
                 CardBar(theme: theme, title: row.displayTitle, bold: front, dim: elsewhere,
@@ -74,15 +73,15 @@ struct GridCard: View {
             }
     }
 
-    /// A media control in the picture's corner, on a disc of the sheet's
-    /// material so it reads over any page.
+    /// A media control in the picture's corner, on a disc of the card's
+    /// fill so it reads over any page.
     private func mediaButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(theme.accent)
                 .frame(width: 38, height: 38)
-                .background(.regularMaterial, in: .circle)
+                .background(theme.cell, in: .circle)
                 .contentShape(.circle)
         }
         .buttonStyle(.borderless)
@@ -99,7 +98,7 @@ struct GridCard: View {
 }
 
 /// The bar over the top of a card's picture: icons, the title cut to fit,
-/// and ×, on the sheet's material so the page shows through.
+/// and ×, on the card's fill so it reads over any page.
 struct CardBar<Icon: View>: View {
     let theme: Theme
     let title: String
@@ -129,7 +128,7 @@ struct CardBar<Icon: View>: View {
         }
         .padding(.leading, 9)
         .frame(height: GridMetrics.bar)
-        .background(.regularMaterial)
+        .background(theme.cell.opacity(0.92))
         .environment(\.colorScheme, theme.dark ? .dark : .light)
     }
 }
@@ -144,6 +143,9 @@ struct GridSplitCard: View {
     let panes: [RowBox]
     let height: CGFloat
     let theme: Theme
+    /// Whether the phone is sideways, where a split's two panes sit side
+    /// by side, as `SplitStage` shows them.
+    let sideways: Bool
     let dropState: TreeDropState
     let onClose: () -> Void
 
@@ -154,10 +156,15 @@ struct GridSplitCard: View {
         let first = panes[0]
         let title = split.name.isEmpty ? first.displayTitle : split.name
         let closeName = panes.count == 2 ? "Close Both" : "Close All"
-        SplitPicture(panes: panes, height: height, theme: theme)
+        SplitPicture(panes: panes, height: height, theme: theme, sideways: sideways)
             .overlay { GridHalves(id: split.id, dropState: dropState, theme: theme) }
             .overlay(alignment: .top) {
                 CardBar(theme: theme, title: title, bold: front, closeLabel: closeName, onClose: onClose) {
+                    // The split's mark goes first, so the card reads as a
+                    // split however far its title is cut.
+                    Image(systemName: SplitPicture.symbol(sideways: sideways))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.muted)
                     HStack(spacing: -5) {
                         ForEach(panes, id: \.id) { pane in
                             SiteTile(row: pane, size: 16)
@@ -257,20 +264,15 @@ struct GridGroupHeader: View {
 }
 
 /// A card's picture: the top of its page, or the site's icon and domain
-/// when the phone has no picture of it (15c).
+/// while the phone has no picture of it (15c).
 struct CardPicture: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let row: OutlineRow
     let height: CGFloat
     let elsewhere: Bool
     let theme: Theme
-    /// Whether the page is open on this phone, so its picture is on its
-    /// way (15c, "picture loading").
-    var loading = false
     /// The bar over the picture's top, which the icon in its place sits
     /// below.
     var top: CGFloat = 0
-    @State private var sweep = false
 
     var body: some View {
         let picture = elsewhere ? nil : PagePreviews.shared.picture(for: row.id)
@@ -283,22 +285,6 @@ struct CardPicture: View {
                     Image(uiImage: picture).resizable().scaledToFill()
                         .accessibilityIgnoresInvertColors()
                         .transition(.opacity.animation(Motion.disclose))
-                } else if loading {
-                    SiteTile(row: row, size: 28)
-                        .opacity(0.45)
-                        .frame(maxHeight: .infinity)
-                        .padding(.top, top)
-                        .overlay {
-                            if !reduceMotion {
-                                LinearGradient(colors: [.clear, theme.text.opacity(0.08), .clear],
-                                               startPoint: .leading, endPoint: .trailing)
-                                    .frame(width: 120)
-                                    .offset(x: sweep ? 200 : -200)
-                                    .onAppear {
-                                        withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { sweep = true }
-                                    }
-                            }
-                        }
                 } else {
                     VStack(spacing: 8) {
                         SiteTile(row: row, size: 44).opacity(elsewhere ? 0.4 : 1)
@@ -325,22 +311,29 @@ struct CardPicture: View {
     }
 }
 
-/// A split's picture: each pane's, two stacked, three as one over two,
-/// four as two by two, with 3pt gaps (15e).
+/// A split's picture: each pane's, two stacked upright and side by side
+/// sideways, three as one over two, four as two by two, each pane ringed
+/// on the sheet's colour as `SplitStage` draws them (15e).
 struct SplitPicture: View {
     let panes: [OutlineRow]
     let height: CGFloat
     let theme: Theme
+    let sideways: Bool
+
+    /// The split's symbol, its panes laid out as this picture lays out two.
+    static func symbol(sideways: Bool) -> String {
+        sideways ? "rectangle.split.2x1" : "rectangle.split.1x2"
+    }
 
     var body: some View {
         let rows: [[OutlineRow]] = switch panes.count {
-        case 2: [[panes[0]], [panes[1]]]
+        case 2: sideways ? [[panes[0], panes[1]]] : [[panes[0]], [panes[1]]]
         case 3: [[panes[0]], [panes[1], panes[2]]]
         default: [Array(panes.prefix(2)), Array(panes.dropFirst(2).prefix(2))]
         }
-        VStack(spacing: 3) {
+        VStack(spacing: 6) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, line in
-                HStack(spacing: 3) {
+                HStack(spacing: 6) {
                     ForEach(line, id: \.id) { row in
                         cell(row)
                     }
@@ -349,7 +342,7 @@ struct SplitPicture: View {
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
-        .background(theme.cell)
+        .background(theme.sheet)
     }
 
     private func cell(_ pane: OutlineRow) -> some View {
@@ -364,7 +357,10 @@ struct SplitPicture: View {
                     SiteTile(row: pane, size: 24).frame(maxHeight: .infinity)
                 }
             }
-            .clipShape(.rect(cornerRadius: 3))
+            .clipShape(.rect(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(theme.dark ? theme.divider : theme.line, lineWidth: 1)
+            }
     }
 }
 

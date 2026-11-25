@@ -440,7 +440,8 @@ control of what you see and what is sent to websites.
   A private tab's history and place never reach your phone.
 - **Switch tabs from the address bar.** Hold the address bar and slide to
   move through your tabs. The iPhone app shows a picture of each tab's page
-  and of each pin's page you've opened.
+  and of each pin's page you've opened. A Split shows as one card with a
+  picture of each of the Split's pages.
 - **Pull to refresh.** Pull down from the top of a page to reload the
   page.
 - **Search suggestions.** As you type in the address bar, the iPhone app

@@ -80,6 +80,11 @@ final class PagePreviews {
         privatePictures[id] ?? pictures.object(forKey: id as NSString)
     }
 
+    /// Whether tab `id` has a picture, in memory or on disk.
+    func has(_ id: String) -> Bool {
+        cached(id) != nil || onDisk.contains(fileName(id))
+    }
+
     /// Starts reading the pictures of cards about to show
     /// (`UICollectionViewDataSourcePrefetching`).
     func prefetch(_ ids: [String]) {

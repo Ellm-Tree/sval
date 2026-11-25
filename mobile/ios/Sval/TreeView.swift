@@ -177,6 +177,8 @@ struct TreeView: UIViewRepresentable {
         /// closes, which stays off until the tree drops it.
         private var swiped: (id: String, cell: UICollectionViewCell)?
         private var closing: String?
+        /// The live pages this sheet has taken a picture of, once each.
+        private var photographed: Set<String> = []
         /// The rows a drag in the list lifted: the row, and a group's rows
         /// under it, dimmed in place while the row is held.
         private var lifted: Set<String> = []
@@ -412,7 +414,7 @@ struct TreeView: UIViewRepresentable {
                 let boxes = panes.compactMap(model.treeStore.box)
                 cell.contentConfiguration = UIHostingConfiguration {
                     GridSplitCard(model: model, split: box, panes: boxes, height: height, theme: theme,
-                                  dropState: dropState,
+                                  sideways: state.look.sideways, dropState: dropState,
                                   onClose: { [weak self] in self?.close(id) })
                 }
                 .margins(.leading, leading)
@@ -431,6 +433,7 @@ struct TreeView: UIViewRepresentable {
             }
             // The configuration's content view takes the card's place.
             cell.place(cell.frame)
+            photograph(line.panes.map { Array($0.prefix(4)) } ?? [id])
         }
 
         private func configureHeader(_ cell: UICollectionViewCell, section index: Int) {
@@ -521,6 +524,18 @@ struct TreeView: UIViewRepresentable {
             if let panes = line.panes { return Array(panes.prefix(4)) }
             guard let row = parent.model.row(id), Browser.openable(row) != nil || row.url == nil else { return [] }
             return [id]
+        }
+
+        /// Takes the picture of each of `ids`' pages that is live in a
+        /// window and has none, so its card shows the page in place of its
+        /// icon. A page out of a window is left, as
+        /// `Page.webView(_:didFinish:)` leaves one.
+        private func photograph(_ ids: [String]) {
+            let browser: Browser = parent.model.browser
+            for id in ids where browser.paneView(id)?.window != nil && !PagePreviews.shared.has(id)
+                && photographed.insert(id).inserted {
+                browser.takePreview(id)
+            }
         }
 
         func collectionView(_ view: UICollectionView, prefetchItemsAt paths: [IndexPath]) {

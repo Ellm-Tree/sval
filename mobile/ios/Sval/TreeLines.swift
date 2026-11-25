@@ -150,7 +150,7 @@ enum TreeLines {
     /// A card for `row`: a tab's, a split's, or for a split holding one
     /// tab, that tab's; a split holding none draws nothing (split-view spec
     /// §5.1).
-    private static func line(_ row: OutlineRow, index: OutlineIndex, depth: Int) -> TreeLine? {
+    static func line(_ row: OutlineRow, index: OutlineIndex, depth: Int) -> TreeLine? {
         guard row.kind == .split else { return row.kind == .tab ? TreeLine(id: row.id, depth: depth, panes: nil) : nil }
         let panes = index.children(of: row.id).filter { $0.kind == .tab }.map(\.id)
         if panes.count == 1 { return TreeLine(id: panes[0], depth: depth, panes: nil) }

@@ -576,9 +576,9 @@ struct BrowserView: View {
             switch kind {
             case .tabs:
                 let items = TabScrub.items(in: workspace, model: model)
-                guard items.count > 1 || (items.count == 1 && items[0].id != browser.currentTabId) else { return }
+                guard items.count > 1 || (items.count == 1 && !items[0].holds(browser.currentTabId)) else { return }
                 opened = TabScrub(kind: kind, items: items,
-                                  start: items.firstIndex { $0.id == browser.currentTabId } ?? 0)
+                                  start: items.firstIndex { $0.holds(browser.currentTabId) } ?? 0)
             case .workspaces:
                 // The private session is one Workspace, and the bar's swipe
                 // passes it by (13b).
@@ -621,10 +621,13 @@ struct BrowserView: View {
         let item = ended.items[ended.index]
         withAnimation(reduceMotion ? Motion.reduced : .smooth(duration: 0.22)) {
             scrub = nil
-            guard switching, item.id != browser.currentTabId else { return }
+            guard switching, !item.holds(browser.currentTabId) else { return }
             switch item {
             case .pin(let pin, _): browser.selectPin(pin)
             case .tab(let row, _): browser.select(row.id)
+            case .split(let split, let panes, _):
+                let ids = panes.map(\.id)
+                if let id = browser.focusedPane(of: split.id, among: ids) ?? ids.first { browser.select(id) }
             case .workspace(let row): browser.showWorkspace(row.id)
             }
         }
