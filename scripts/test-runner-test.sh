@@ -330,6 +330,11 @@ touch "$repo/build/firefox/browser/components/sval/test/browser/browser.toml"
 mkdir -p "$repo/build/firefox/dom/a/crashtests"
 printf '["test_one.html"]\n' >"$repo/build/firefox/dom/a/mochitest.toml"
 printf 'load 1.html\n' >"$repo/build/firefox/dom/a/crashtests/crashtests.list"
+# test.sh refuses a test file the tree lacks.
+mkdir -p "$repo/build/firefox/dom/a/unit"
+touch "$repo/build/firefox/dom/a/crashtests/1.html" "$repo/build/firefox/dom/a/test_one.html" \
+  "$repo/build/firefox/dom/a/browser_two.js" "$repo/build/firefox/dom/a/unit/test_three.js" \
+  "$repo/build/firefox/browser/components/sval/test/browser/browser_one.js"
 expect_flags default dom/a/crashtests/1.html
 expect_flags default dom/a/test_one.html dom/a/crashtests/1.html
 expect_flags closed dom/a/test_one.html
@@ -343,6 +348,16 @@ expect_flags compared browser/components/sval/test/browser/browser_one.js
 expect_flags compared browser/components/sval/test/browser/
 expect_flags closed browser/components/sval/test/browser/browser_one.js dom/a/browser_two.js
 
+# A test file the tree lacks fails the run before it waits on the lock, and a
+# chrome/ path names the build tree's copy of the file.
+status=0
+"$repo/scripts/test.sh" dom/a/test_missing.html >"$work/missing.log" 2>&1 || status=$?
+[[ "$status" == 1 ]] && grep -q 'dom/a/test_missing.html' "$work/missing.log" ||
+  fail "a missing test file: exit $status"
+mkdir -p "$repo/chrome/browser/components/sval/test/browser"
+touch "$repo/chrome/browser/components/sval/test/browser/browser_one.js"
+expect_flags compared chrome/browser/components/sval/test/browser/browser_one.js
+
 # A manifest's https tests run in a harness of their own, after the rest,
 # because Sval reopens a reused profile's tabs (test.sh says why).
 mkdir -p "$repo/build/firefox/dom/b"
@@ -354,6 +369,7 @@ cat >"$repo/build/firefox/dom/b/mochitest.toml" <<'EOF'
 ["test_secure.html"]
 scheme = "https"
 EOF
+touch "$repo/build/firefox/dom/b/test_plain.html" "$repo/build/firefox/dom/b/test_secure.html"
 rm -f "$work/args"
 ARGS_FILE="$work/args" "$repo/scripts/test.sh" dom/b/test_plain.html dom/b/test_secure.html \
   >"$work/args.log" 2>&1 || true

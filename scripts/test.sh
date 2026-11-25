@@ -24,6 +24,34 @@ if [[ ! -f "$SRC/mach" ]]; then
   exit 1
 fi
 
+# A test path names a file in the build tree (`browser/components/sval/...`).
+# Sval's own files live under chrome/ in the repository and sync-files.sh
+# copies them to the same path without the prefix, so a chrome/ path is read
+# as the build tree's. A test file that is not there fails the run here,
+# before it waits on the lock: `mach test` would only say "UNKNOWN TEST" once
+# the lock was its turn.
+args=()
+missing=()
+for arg in "$@"; do
+  if [[ "$arg" == chrome/* && -e "$REPO_ROOT/$arg" ]]; then
+    arg="${arg#chrome/}"
+  fi
+  case "$arg" in
+    -*) ;;
+    *.js | *.toml | *.html | *.xhtml | *.xul)
+      [[ -e "$SRC/$arg" || -e "$arg" ]] || missing+=("$arg")
+      ;;
+  esac
+  args+=("$arg")
+done
+if ((${#missing[@]})); then
+  echo "error: no such test file in the build tree ($SRC):" >&2
+  printf '  %s\n' "${missing[@]}" >&2
+  echo "       A new file reaches it through scripts/sync-files.sh." >&2
+  exit 1
+fi
+set -- ${args[@]+"${args[@]}"}
+
 # The engine a run tests is the wasm last staged and synced, which nothing
 # rebuilds when engine/ changes: sync-files.sh never overwrites a real
 # artifact. build-core-wasm.sh compiles engine/'s tree id at HEAD into it as
