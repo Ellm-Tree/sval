@@ -124,6 +124,12 @@ struct WorkspaceSheet: View {
             // sheet read as one thing.
             .background(theme.sheet.opacity(Theme.glassSheet).ignoresSafeArea())
             .animation(Motion.disclose, value: editing)
+            // A tick holds only a tab Edit can reach. A tab closed, moved
+            // out of the Workspace or into a closed group, or whose group
+            // closes, leaves the ticks and the count.
+            .onChange(of: editing ? Self.tickable(model.tree, workspace: workspace?.id, collapsed: collapsed) : []) {
+                _, shown in selected.formIntersection(shown)
+            }
             .toolbar(.visible, for: .navigationBar)
             .toolbar { topBar }
             .toolbar { bottomBar }

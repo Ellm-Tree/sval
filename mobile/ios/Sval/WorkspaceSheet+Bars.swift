@@ -74,12 +74,18 @@ extension WorkspaceSheet {
         }
     }
 
-    /// The tabs Edit can tick: every tab in this Workspace but a split's
-    /// panes, which move with their split.
+    /// The tabs Edit can tick.
     private var editableTabs: [OutlineRow] {
-        guard let id = workspace?.id else { return [] }
-        return TreeLines.list(model.tree, workspace: id, collapsed: collapsed).flatMap(\.lines)
-            .compactMap { $0.panes == nil && $0.group == nil ? model.row($0.id) : nil }
+        Self.tickable(model.tree, workspace: workspace?.id, collapsed: collapsed).compactMap(model.row)
+    }
+
+    /// The tabs Edit can tick in `workspace`, in the tree's order: every
+    /// tab the open rows show but a split's panes, which move with their
+    /// split. A tab in a closed group is out of reach.
+    static func tickable(_ tree: OutlineIndex, workspace: String?, collapsed: Set<String>) -> [String] {
+        guard let workspace else { return [] }
+        return TreeLines.list(tree, workspace: workspace, collapsed: collapsed).flatMap(\.lines)
+            .compactMap { $0.panes == nil && $0.group == nil && tree.row($0.id) != nil ? $0.id : nil }
     }
 
     func endEditing() {

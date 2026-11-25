@@ -723,6 +723,35 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertTrue(labelled("Apple").waitForExistence(timeout: 5), "opening the group shows its tabs")
     }
 
+    /// A ticked tab closed in Edit Tabs leaves the count.
+    func testEditTickLeavesWithItsTab() {
+        openWorkList()
+        startEditing()
+        labelled("Swift").tap()
+        XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 5), "a tap ticks Swift")
+        swipeOpen(labelled("Swift"))
+        let close = app.collectionViews.buttons["Close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Swift's swipe offers Close")
+        close.tap()
+        XCTAssertTrue(labelled("Swift").waitForNonExistence(timeout: 5), "Swift closes")
+        XCTAssertTrue(app.navigationBars["Select Tabs"].waitForExistence(timeout: 5), "the closed tab left the count")
+    }
+
+    /// A ticked tab whose group closes leaves the count, and shows unticked
+    /// when the group opens again.
+    func testEditTickLeavesWhenItsGroupCloses() {
+        openWorkList()
+        startEditing()
+        labelled("Apple").tap()
+        XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 5), "a tap ticks Apple")
+        labelled("Pricing pages").tap()
+        XCTAssertTrue(labelled("Apple").waitForNonExistence(timeout: 5), "the group closes")
+        XCTAssertTrue(app.navigationBars["Select Tabs"].waitForExistence(timeout: 5), "the hidden tab left the count")
+        labelled("Pricing pages").tap()
+        XCTAssertTrue(labelled("Apple").waitForExistence(timeout: 5), "the group opens")
+        XCTAssertTrue(app.navigationBars["Select Tabs"].exists, "Apple comes back unticked")
+    }
+
     /// A row let go on the line under a group's last tab lands at the
     /// group's end; one let go below the last row, at the Workspace's end.
     func testListDropInGroupAndAtEnd() {

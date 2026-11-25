@@ -112,4 +112,15 @@ final class TreeLinesTests: XCTestCase {
         ])
         XCTAssertEqual(ids(TreeLines.grid(index, workspace: "w1", collapsed: [])), ["g3#0: ", "g4#0: t6"])
     }
+
+    /// Edit reaches the tabs the open rows show, and no tab in a closed
+    /// group, so a tick there leaves the count.
+    func testEditReachesNoTabInAClosedGroup() {
+        let open = WorkspaceSheet.tickable(index, workspace: "w1", collapsed: [])
+        XCTAssertTrue(["t1", "t2", "t3", "t4", "t5"].allSatisfy(open.contains), "every tab the open rows show")
+        XCTAssertFalse(open.contains("g1") || open.contains("p1") || open.contains("s1"), "no group, pane or split")
+        let closed = WorkspaceSheet.tickable(index, workspace: "w1", collapsed: ["g1"])
+        XCTAssertEqual(closed.filter { ["t2", "t3", "t4"].contains($0) }, [], "no tab inside the closed group")
+        XCTAssertTrue(closed.contains("t1") && closed.contains("t5"), "the tabs outside it")
+    }
 }
