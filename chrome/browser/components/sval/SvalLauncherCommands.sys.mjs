@@ -775,7 +775,6 @@ export const COMMANDS = [
   firefoxAction("extensions", "extensions", "key_openAddons", {
     ordinary: true,
   }),
-  firefoxAction("logins", "logins", null, { ordinary: true }),
   {
     id: "new-peek",
     l10nId: "launcher-command-new-peek",

@@ -242,20 +242,6 @@ index 2ffc0b624f..9b7e6c64af 100644
  Classes = [
      {
          'cid': '{7e4bb6ad-2fc4-4dc6-89ef-23e8e5ccf980}',
-diff --git a/browser/components/aboutlogins/jar.mn b/browser/components/aboutlogins/jar.mn
-index f0847671ac..f40441e589 100644
---- a/browser/components/aboutlogins/jar.mn
-+++ b/browser/components/aboutlogins/jar.mn
-@@ -48,9 +48,7 @@ browser.jar:
-   content/browser/aboutlogins/icons/intro-illustration.svg               (content/icons/intro-illustration.svg)
-   content/browser/aboutlogins/aboutLogins.css                            (content/aboutLogins.css)
-   content/browser/aboutlogins/aboutLogins.mjs                             (content/aboutLogins.mjs)
--  content/browser/aboutlogins/aboutLogins.html                           (content/aboutLogins.html)
-   content/browser/aboutlogins/aboutLoginsImportReport.css                (content/aboutLoginsImportReport.css)
-   content/browser/aboutlogins/aboutLoginsImportReport.mjs                 (content/aboutLoginsImportReport.mjs)
--  content/browser/aboutlogins/aboutLoginsImportReport.html               (content/aboutLoginsImportReport.html)
-   content/browser/aboutlogins/aboutLoginsUtils.mjs                        (content/aboutLoginsUtils.mjs)
-   content/browser/aboutlogins/common.css                                 (content/common.css)
 diff --git a/browser/components/customkeys/content/jar.mn b/browser/components/customkeys/content/jar.mn
 index 4b841dcfe9..243b5c23a5 100644
 --- a/browser/components/customkeys/content/jar.mn
@@ -290,29 +276,6 @@ index bf1d7516ed..f56c6db1bc 100644
     content/browser/migration/migration-dialog-window.html     (content/migration-dialog-window.html)
     content/browser/migration/migration-dialog-window.js       (content/migration-dialog-window.js)
     content/browser/migration/migration-wizard.mjs             (content/migration-wizard.mjs)
-diff --git a/browser/components/profiles/jar.mn b/browser/components/profiles/jar.mn
-index b76fe67065..c261ce00aa 100644
---- a/browser/components/profiles/jar.mn
-+++ b/browser/components/profiles/jar.mn
-@@ -8,12 +8,9 @@ browser.jar:
-     content/browser/profiles/avatarSelectionHelpers.mjs (content/avatarSelectionHelpers.mjs)
-     content/browser/profiles/delete-profile-card.css (content/delete-profile-card.css)
-     content/browser/profiles/delete-profile-card.mjs (content/delete-profile-card.mjs)
--    content/browser/profiles/delete-profile.html    (content/delete-profile.html)
-     content/browser/profiles/edit-profile-card.css (content/edit-profile-card.css)
-     content/browser/profiles/edit-profile-card.mjs (content/edit-profile-card.mjs)
--    content/browser/profiles/edit-profile.html    (content/edit-profile.html)
-     content/browser/profiles/new-profile-card.mjs (content/new-profile-card.mjs)
--    content/browser/profiles/new-profile.html     (content/new-profile.html)
-     content/browser/profiles/profile-avatar-selector.css (content/profile-avatar-selector.css)
-     content/browser/profiles/profile-avatar-selector.mjs (content/profile-avatar-selector.mjs)
-     content/browser/profiles/profile-card.css     (content/profile-card.css)
-@@ -23,5 +20,4 @@ browser.jar:
-     content/browser/profiles/profiles-pages.css   (content/profiles-pages.css)
-     content/browser/profiles/profiles-theme-card.css (content/profiles-theme-card.css)
-     content/browser/profiles/profiles-theme-card.mjs (content/profiles-theme-card.mjs)
--    content/browser/profiles/profiles.html        (content/profiles.html)
-     content/browser/profiles/assets/              (content/assets/*)
 diff --git a/browser/components/protections/jar.mn b/browser/components/protections/jar.mn
 index b3454b70e9..84d38921d4 100644
 --- a/browser/components/protections/jar.mn
@@ -500,19 +463,6 @@ index a750487481..592d6e4f4f 100644
 -        'constructor': 'AboutWeaveLog',
 -    },
  ]
-diff --git a/toolkit/components/normandy/jar.mn b/toolkit/components/normandy/jar.mn
-index ff3dbfb319..c918a81d71 100644
---- a/toolkit/components/normandy/jar.mn
-+++ b/toolkit/components/normandy/jar.mn
-@@ -13,7 +13,7 @@ toolkit.jar:
-   res/normandy/schemas/ (./schemas/*.schema.json)
- 
- % resource normandy-content %res/normandy/content/ contentaccessible=yes
--  res/normandy/content/ (./content/*)
-+  res/normandy/content/ (./content/*.sys.mjs)
- 
- % resource normandy-vendor %res/normandy/vendor/ contentaccessible=yes
-   res/normandy/vendor/ (./vendor/*)
 diff --git a/toolkit/components/resistfingerprinting/jar.mn b/toolkit/components/resistfingerprinting/jar.mn
 index 3d71f08c19..f0560bab14 100644
 --- a/toolkit/components/resistfingerprinting/jar.mn

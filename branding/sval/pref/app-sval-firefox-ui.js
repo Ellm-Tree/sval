@@ -47,9 +47,8 @@ pref("extensions.recommendations.themeRecommendationUrl", "");
 // page on PDF comments.
 pref("pdfjs.commentLearnMoreUrl", "");
 
-// Links for features Sval turns off (studies, data collection), so a page that
-// still reaches for them has no Mozilla address to show.
-pref("app.normandy.shieldLearnMoreUrl", "");
+// Links for features Sval turns off (data collection), so a page that still
+// reaches for them has no Mozilla address to show.
 pref("toolkit.datacollection.infoURL", "");
 
 // ------------------------------------------------------------- profiler
@@ -104,19 +103,6 @@ pref("privacy.userContext.ui.enabled", false, locked);     // upstream: true
 pref("privacy.userContext.newTabContainerOnLeftClick.enabled", false, locked); // upstream: false
 // The add-on that claimed the containers setting, if any.
 pref("privacy.userContext.extension", "", locked);         // upstream: ""
-
-// ------------------------------------------------------------- profiles
-
-// Firefox's selectable profiles: the File menu's Profiles menu, the app
-// menu's profile buttons, Settings' profile controls and the
-// about:profilemanager, about:newprofile, about:editprofile and
-// about:deleteprofile pages they open, which Sval keeps closed
-// (SvalClosedPages.sys.mjs). Each reads `SelectableProfileService.isEnabled`,
-// which this pref decides until a profile group exists (`#getEnabledState`).
-// While it is false AboutRedirector refuses the pages, about:profilemanager
-// once startup is over (`AboutRedirector::NewChannel`). Locked, so nothing
-// turns the feature back on.
-pref("browser.profiles.enabled", false, locked);           // upstream: true
 
 // ------------------------------------------------------------- favorites
 

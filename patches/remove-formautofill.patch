@@ -1,0 +1,3830 @@
+Sval: Remove address and card autofill
+
+Firefox's address and card autofill is locked off (Sval spec §7.3), so
+its built-in add-on registered actors and settings that never ran. The
+component goes with what only it used: the native card field model and
+its ChromeUtils entry, the FormHandler actor, the save prompts, the
+settings groups and their dialogs, the addresses and credit cards sync
+engines, the import of payment methods from Chrome, the policies,
+prefs, Nimbus features, targeting attributes, strings and tests. Form
+history, which still refuses to keep a card number, and the DOM's
+autocomplete and autofill states stay.
+
+diff --git a/.prettierignore b/.prettierignore
+index 1c1ff91eec..c33824ee9f 100644
+--- a/.prettierignore
++++ b/.prettierignore
+@@ -53,7 +53,6 @@ devtools/client/debugger/src/**/fixtures/**
+ # Imported files where we don't want to change the format, but we do want ESLint
+ # to keep an eye on them (hence not in Generated.txt/ThirdPartyFiles.txt)
+ devtools/shared/plural-form.js
+-toolkit/components/formautofill/shared/CreditCardRuleset.sys.mjs
+ 
+ # Ignore .inc.(x)html files, since they may contain preprocessor directives/
+ # incomplete HTML.
+@@ -1027,7 +1026,6 @@ browser/components/sessionstore/test/unit/data/sessionstore_invalid.js
+ # The only file in browser/locales/ is pre-processed.
+ browser/locales/
+ # Generated data files
+-browser/extensions/formautofill/phonenumberutils/PhoneNumberMetaData.sys.mjs
+ 
+ # Ignore devtools debugger files which aren't intended for linting.
+ devtools/client/debugger/bin/
+@@ -1339,8 +1337,6 @@ testing/web-platform/tests/
+ browser/components/storybook/node_modules/
+ browser/components/topsites/content/tippytop/favicons/
+ browser/components/topsites/content/tippytop/images/
+-browser/extensions/formautofill/content/third-party/
+-browser/extensions/formautofill/test/fixtures/third_party/
+ devtools/client/inspector/markup/test/events/lib_*
+ devtools/client/jsonview/lib/require.js
+ devtools/client/shared/build/babel.js
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 221e891c2a..9c9d29eb1e 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -2345,7 +2345,6 @@ pref("browser.migrate.canary.enabled", true);
+ pref("browser.migrate.chrome.enabled", true);
+ // See comments in bug 1340115 on how we got to this number.
+ pref("browser.migrate.chrome.history.limit", 2000);
+-pref("browser.migrate.chrome.payment_methods.enabled", true);
+ pref("browser.migrate.chrome.extensions.enabled", true);
+ pref("browser.migrate.chrome.get_permissions.enabled", true);
+ 
+@@ -2388,7 +2387,6 @@ pref("browser.migrate.preferences-entrypoint.enabled", true);
+ pref("signon.firefoxRelay.feature", "available");
+ 
+ pref("signon.management.page.os-auth.locked.enabled", false);
+-pref("extensions.formautofill.creditCards.os-auth.locked.enabled", false);
+ 
+ pref("signon.passwordEditCapture.enabled", true);
+ pref("signon.relatedRealms.enabled", false);
+@@ -2417,10 +2415,6 @@ pref("browser.crashReports.unsubmittedCheck.autoSubmit2", false);
+ // cap).
+ pref("browser.crashReports.cleanupCheck.enabled", true);
+ 
+-// Preferences for the form autofill toolkit component.
+-// Checkbox in sync options for credit card data sync service
+-pref("services.sync.engine.creditcards.available", true);
+-
+ // Whether or not to restore a session with lazy-browser tabs.
+ pref("browser.sessionstore.restore_tabs_lazily", true);
+ 
+diff --git a/browser/base/content/popup-notifications.inc.xhtml b/browser/base/content/popup-notifications.inc.xhtml
+index 7fc8e22385..fbab36fe31 100644
+--- a/browser/base/content/popup-notifications.inc.xhtml
++++ b/browser/base/content/popup-notifications.inc.xhtml
+@@ -263,32 +263,3 @@
+       </html:div>
+     </template>
+ 
+-    <popupnotification id="credit-card-save-update-notification" class="credit-card-capture-notification" hidden="true">
+-      <popupnotificationcontent class="credit-card-save-update-notification-content" orient="vertical">
+-        <html:div class="credit-card-capture-content">
+-        </html:div>
+-      </popupnotificationcontent>
+-    </popupnotification>
+-
+-    <popupnotification id="address-save-update-notification" class="address-capture-notification" hidden="true">
+-      <popupnotificationcontent class="address-save-update-notification-content" orient="vertical">
+-        <html:div class="address-capture-header">
+-          <html:h1/>
+-        </html:div>
+-        <html:div class="address-capture-description">
+-          <html:p/>
+-        </html:div>
+-        <html:div class="address-capture-content">
+-        </html:div>
+-      </popupnotificationcontent>
+-    </popupnotification>
+-
+-    <popupnotification id="address-edit-notification" class="address-capture-notification" hidden="true">
+-      <popupnotificationcontent class="address-edit-notification-content" orient="vertical">
+-        <html:div class="address-capture-header">
+-          <html:h1/>
+-        </html:div>
+-        <html:div class="address-capture-content">
+-        </html:div>
+-      </popupnotificationcontent>
+-    </popupnotification>
+diff --git a/browser/base/content/test/performance/browser.toml b/browser/base/content/test/performance/browser.toml
+index f05df68452..839ae4fa0e 100644
+--- a/browser/base/content/test/performance/browser.toml
++++ b/browser/base/content/test/performance/browser.toml
+@@ -10,9 +10,6 @@ prefs = [
+   "browser.migration.version=9999999",
+   "browser.startup.record=true",
+   "gfx.canvas.willReadFrequently.enable=true",
+-  # The form autofill framescript is only used in certain locales if this
+-  # pref is set to 'detect', which is the default value on non-Nightly.
+-  "extensions.formautofill.addresses.available='on'",
+   # For perfomance tests do not enable the remote control cue, which gets set
+   # when Marionette is enabled, but users normally don't see.
+   "browser.chrome.disableRemoteControlCueForTests=true",
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index 88ac14b445..07667d4014 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -36,12 +36,6 @@ var gExceptionPaths = [
+   "resource://pdf.js/web/wasm/openjpeg_nowasm_fallback.js",
+   "resource://pdf.js/web/wasm/jbig2_nowasm_fallback.js",
+ 
+-  // Exclude the form autofill path that has been moved out of the extensions to
+-  // toolkit, see bug 1691821.
+-  "resource://gre-resources/autofill/",
+-  // Localization file added programatically in FormAutofillUtils.sys.mjs
+-  "resource://gre/localization/en-US/toolkit/formautofill",
+-
+   // Exclude all services-automation because they are used through webdriver
+   "resource://gre/modules/services-automation/",
+ 
+@@ -77,9 +71,6 @@ var gExceptionPaths = [
+   // The picture-in-picture add-on.
+   "resource://builtin-addons/pictureinpicture/",
+ 
+-  // The formautofill add-on.
+-  "resource://builtin-addons/formautofill/",
+-
+   // The webcompat add-on.
+   "resource://builtin-addons/webcompat/",
+ 
+@@ -432,12 +423,6 @@ function trackChromeUri(uri) {
+   gChromeMap.set(getBaseUriForChromeUri(uri), uri);
+ }
+ 
+-// formautofill registers resource://formautofill/ and
+-// chrome://formautofill/content/ dynamically at runtime.
+-// Bug 1480276 is about addressing this without this hard-coding.
+-trackResourcePrefix("autofill");
+-trackChromeUri("chrome://formautofill/content/");
+-
+ function parseManifest(manifestUri) {
+   return fetchFile(manifestUri.spec).then(data => {
+     for (let line of data.split("\n")) {
+diff --git a/browser/base/content/test/static/browser_parsable_css.js b/browser/base/content/test/static/browser_parsable_css.js
+index ff09d2c6f9..baa73a50cb 100644
+--- a/browser/base/content/test/static/browser_parsable_css.js
++++ b/browser/base/content/test/static/browser_parsable_css.js
+@@ -21,7 +21,7 @@ let ignoreList = [
+   },
+   {
+     sourceName:
+-      /\b(scrollbars|xul|html|mathml|ua|EditorOverride|contenteditable|forms|svg|manageDialog|formautofill)\.css$/i,
++      /\b(scrollbars|xul|html|mathml|ua|EditorOverride|contenteditable|forms|svg)\.css$/i,
+     errorMessage: /Unknown property.*-moz-/i,
+     isFromDevTools: false,
+   },
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 164f825a93..bf49bdb743 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -31,7 +31,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+     "moz-src:///browser/components/downloads/DownloadsViewableInternally.sys.mjs",
+   ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
+   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
+-  FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+   Interactions: "moz-src:///browser/components/places/Interactions.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+@@ -381,7 +380,6 @@ BrowserGlue.prototype = {
+     }
+ 
+     if (!AppConstants.NIGHTLY_BUILD && this._isNewProfile) {
+-      lazy.FormAutofillUtils.setOSAuthEnabled(false);
+       lazy.LoginHelper.setOSAuthEnabled(false);
+     }
+ 
+diff --git a/browser/components/ProfileDataUpgrader.sys.mjs b/browser/components/ProfileDataUpgrader.sys.mjs
+index 4ff89080fc..b26462af07 100644
+--- a/browser/components/ProfileDataUpgrader.sys.mjs
++++ b/browser/components/ProfileDataUpgrader.sys.mjs
+@@ -8,7 +8,6 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+-  FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   PlacesUIUtils: "moz-src:///browser/components/places/PlacesUIUtils.sys.mjs",
+   UsageReporting: "resource://gre/modules/UsageReporting.sys.mjs",
+@@ -425,42 +424,6 @@ export let ProfileDataUpgrader = {
+     // Bug 1745248: Due to multiple backouts, do not use UI Version 123
+     // as this version is most likely set for the Nightly channel
+ 
+-    if (existingDataVersion < 124) {
+-      // Migrate "extensions.formautofill.available" and
+-      // "extensions.formautofill.creditCards.available" from old to new prefs
+-      const oldFormAutofillModule = "extensions.formautofill.available";
+-      const oldCreditCardsAvailable =
+-        "extensions.formautofill.creditCards.available";
+-      const newCreditCardsAvailable =
+-        "extensions.formautofill.creditCards.supported";
+-      const newAddressesAvailable =
+-        "extensions.formautofill.addresses.supported";
+-      if (Services.prefs.prefHasUserValue(oldFormAutofillModule)) {
+-        let moduleAvailability = Services.prefs.getCharPref(
+-          oldFormAutofillModule
+-        );
+-        if (moduleAvailability == "on") {
+-          Services.prefs.setCharPref(newAddressesAvailable, moduleAvailability);
+-          Services.prefs.setCharPref(
+-            newCreditCardsAvailable,
+-            Services.prefs.getBoolPref(oldCreditCardsAvailable) ? "on" : "off"
+-          );
+-        }
+-
+-        if (moduleAvailability == "off") {
+-          Services.prefs.setCharPref(
+-            newCreditCardsAvailable,
+-            moduleAvailability
+-          );
+-          Services.prefs.setCharPref(newAddressesAvailable, moduleAvailability);
+-        }
+-      }
+-
+-      // after migrating, clear old prefs so we can remove them later.
+-      Services.prefs.clearUserPref(oldFormAutofillModule);
+-      Services.prefs.clearUserPref(oldCreditCardsAvailable);
+-    }
+-
+     if (existingDataVersion < 125) {
+       // Bug 1756243 - Clear PiP cached coordinates since we changed their
+       // coordinate space.
+@@ -675,15 +638,6 @@ export let ProfileDataUpgrader = {
+       // Directly copy old os auth pref values prior to 147 to the new boolean
+       // pref for OS auth (UI migration 156). Previously, this migration version
+       // migrated the old OS auth pref values to an encrypted string pref.
+-      const prevOsAuthForCc = !Services.prefs.getBoolPref(
+-        "signon.management.page.os-auth.enabled",
+-        false
+-      );
+-      const newOSAuthNameForCc =
+-        "extensions.formautofill.creditCards.os-auth.locked.enabled";
+-      Services.prefs.setBoolPref(newOSAuthNameForCc, prevOsAuthForCc);
+-      Services.prefs.lockPref(newOSAuthNameForCc);
+-
+       const prevOsAuthForPw = !Services.prefs.getBoolPref(
+         "extensions.formautofill.reauth.enabled",
+         false
+@@ -819,21 +773,13 @@ export let ProfileDataUpgrader = {
+         // This treats any non-empty-string value as "turned off", irrespective of
+         // whether it correctly decrypts to the correct value, because we cannot do
+         // the decryption if the primary password has not yet been provided.
+-        const prevOsAuthForCc = !Services.prefs.getStringPref(
+-          "extensions.formautofill.creditCards.reauth.optout",
+-          ""
+-        );
+         const prevOsAuthForPw = !Services.prefs.getStringPref(
+           "signon.management.page.os-auth.optout",
+           ""
+         );
+ 
+         lazy.LoginHelper.setOSAuthEnabled(prevOsAuthForPw);
+-        lazy.FormAutofillUtils.setOSAuthEnabled(prevOsAuthForCc);
+ 
+-        Services.prefs.clearUserPref(
+-          "extensions.formautofill.creditCards.reauth.optout"
+-        );
+         Services.prefs.clearUserPref("signon.management.page.os-auth.optout");
+       }
+     }
+@@ -844,7 +790,6 @@ export let ProfileDataUpgrader = {
+     // migration. So we force the pref to false. See bug 1974217.
+     if (AppConstants.NIGHTLY_BUILD && existingDataVersion === 158) {
+       lazy.LoginHelper.setOSAuthEnabled(false);
+-      lazy.FormAutofillUtils.setOSAuthEnabled(false);
+     }
+ 
+     if (existingDataVersion < 159) {
+diff --git a/browser/components/StartupTelemetry.sys.mjs b/browser/components/StartupTelemetry.sys.mjs
+index 2bd6850c37..d43e151796 100644
+--- a/browser/components/StartupTelemetry.sys.mjs
++++ b/browser/components/StartupTelemetry.sys.mjs
+@@ -8,7 +8,6 @@ let lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
+   BrowserUsageTelemetry: "resource:///modules/BrowserUsageTelemetry.sys.mjs",
+-  FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   OsEnvironment: "resource://gre/modules/OsEnvironment.sys.mjs",
+@@ -509,10 +508,8 @@ export let StartupTelemetry = {
+   },
+ 
+   osAuthEnabled() {
+-    const osAuthForCc = lazy.FormAutofillUtils.getOSAuthEnabled();
+     const osAuthForPw = lazy.LoginHelper.getOSAuthEnabled();
+ 
+-    Glean.formautofill.osAuthEnabled.set(osAuthForCc);
+     Glean.pwmgr.osAuthEnabled.set(osAuthForPw);
+   },
+ 
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index 2bfd475574..81d610c451 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -571,37 +571,6 @@ function parseAboutPageURL(url) {
+   return ret;
+ }
+ 
+-/**
+- * Get the number of records in autofill storage, e.g. credit cards/addresses.
+- *
+- * @param  {object} [data]
+- * @param  {string} [data.collectionName]
+- *         The name used to specify which collection to retrieve records.
+- * @param  {string} [data.searchString]
+- *         The typed string for filtering out the matched records.
+- * @param  {string} [data.info]
+- *         The input autocomplete property's information.
+- * @returns {Promise<number>} The number of matched records.
+- * @see FormAutofillParent._getRecords
+- */
+-async function getAutofillRecords(data) {
+-  let actor;
+-  try {
+-    const win = Services.wm.getMostRecentBrowserWindow();
+-    actor =
+-      win.gBrowser.selectedBrowser.browsingContext.currentWindowGlobal.getActor(
+-        "FormAutofill"
+-      );
+-  } catch (error) {
+-    // If the actor is not available, we can't get the records. We could import
+-    // the records directly from FormAutofillStorage to avoid the messiness of
+-    // JSActors, but that would import a lot of code for a targeting attribute.
+-    return 0;
+-  }
+-  let records = await actor?.getRecords(data);
+-  return records?.length ?? 0;
+-}
+-
+ async function getPinStatus() {
+   return await ShellService.doesAppNeedPin();
+ }
+@@ -1112,14 +1081,6 @@ const TargetingGetters = {
+     return QueryCache.getters.defaultPDFHandler.get();
+   },
+ 
+-  get creditCardsSaved() {
+-    return getAutofillRecords({ collectionName: "creditCards" });
+-  },
+-
+-  get addressesSaved() {
+-    return getAutofillRecords({ collectionName: "addresses" });
+-  },
+-
+   /**
+    * Has the user ever used the Migration Wizard to migrate bookmarks?
+    *
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index dcaf0b166a..92f7478575 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -330,18 +330,6 @@ export var Policies = {
+     },
+   },
+ 
+-  AutofillAddressEnabled: {
+-    onBeforeAddons(manager, param) {
+-      setAndLockPref("extensions.formautofill.addresses.enabled", param);
+-    },
+-  },
+-
+-  AutofillCreditCardEnabled: {
+-    onBeforeAddons(manager, param) {
+-      setAndLockPref("extensions.formautofill.creditCards.enabled", param);
+-    },
+-  },
+-
+   AutoLaunchProtocolsFromOrigins: {
+     onBeforeAddons(manager, param) {
+       for (let info of param) {
+diff --git a/browser/components/enterprisepolicies/schemas/policies-schema.json b/browser/components/enterprisepolicies/schemas/policies-schema.json
+index b7a67c436c..95e1c1d386 100644
+--- a/browser/components/enterprisepolicies/schemas/policies-schema.json
++++ b/browser/components/enterprisepolicies/schemas/policies-schema.json
+@@ -103,14 +103,6 @@
+       }
+     },
+ 
+-    "AutofillAddressEnabled": {
+-      "type": "boolean"
+-    },
+-
+-    "AutofillCreditCardEnabled": {
+-      "type": "boolean"
+-    },
+-
+     "AutoLaunchProtocolsFromOrigins": {
+       "type": "array",
+       "contentMediaType": "application/json",
+diff --git a/browser/components/enterprisepolicies/tests/browser/browser_policy_masterpassword.js b/browser/components/enterprisepolicies/tests/browser/browser_policy_masterpassword.js
+index 05838a33cc..c161101503 100644
+--- a/browser/components/enterprisepolicies/tests/browser/browser_policy_masterpassword.js
++++ b/browser/components/enterprisepolicies/tests/browser/browser_policy_masterpassword.js
+@@ -11,14 +11,9 @@ let { sinon } = ChromeUtils.importESModule(
+   "resource://testing-common/Sinon.sys.mjs"
+ );
+ 
+-let { FormAutofillUtils } = ChromeUtils.importESModule(
+-  "resource://gre/modules/shared/FormAutofillUtils.sys.mjs"
+-);
+-
+ add_setup(async function () {
+   // Stub these out so we don't end up invoking the MP dialog
+   // in order to decrypt prefs to find out if these are enabled or disabled.
+-  sinon.stub(FormAutofillUtils, "getOSAuthEnabled").returns(false);
+   sinon.stub(LoginHelper, "getOSAuthEnabled").returns(false);
+ 
+   registerCleanupFunction(async function () {
+diff --git a/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js b/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js
+index d6fe093e17..ecf6e9a79b 100644
+--- a/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js
++++ b/browser/components/enterprisepolicies/tests/xpcshell/test_simple_pref_policies.js
+@@ -1034,19 +1034,6 @@ const POLICIES_TESTS = [
+     },
+   },
+ 
+-  // POLICY: AutofillAddressEnabled, AutofillCreditCardEnabled
+-
+-  {
+-    policies: {
+-      AutofillAddressEnabled: false,
+-      AutofillCreditCardEnabled: false,
+-    },
+-    lockedPrefs: {
+-      "extensions.formautofill.addresses.enabled": false,
+-      "extensions.formautofill.creditCards.enabled": false,
+-    },
+-  },
+-
+   // POLICY: Proxy - locking if no values are set
+   {
+     policies: {
+diff --git a/browser/components/migration/ChromeProfileMigrator.sys.mjs b/browser/components/migration/ChromeProfileMigrator.sys.mjs
+index 69b6a90566..e917bdeb11 100644
+--- a/browser/components/migration/ChromeProfileMigrator.sys.mjs
++++ b/browser/components/migration/ChromeProfileMigrator.sys.mjs
+@@ -248,8 +248,7 @@ export class ChromeProfileMigrator extends MigratorBase {
+         ];
+         if (lazy.ChromeMigrationUtils.supportsLoginsForPlatform) {
+           possibleResourcePromises.push(
+-            this._GetPasswordsResource(profileFolder),
+-            this._GetPaymentMethodsResource(profileFolder, this.constructor.key)
++            this._GetPasswordsResource(profileFolder)
+           );
+         }
+ 
+@@ -536,125 +535,6 @@ export class ChromeProfileMigrator extends MigratorBase {
+       },
+     };
+   }
+-  async _GetPaymentMethodsResource(aProfileFolder, aBrowserKey = "chrome") {
+-    if (
+-      !Services.prefs.getBoolPref(
+-        "browser.migrate.chrome.payment_methods.enabled",
+-        false
+-      )
+-    ) {
+-      return null;
+-    }
+-
+-    // We no longer support importing payment methods from Chrome or Edge on
+-    // Windows.
+-    if (
+-      AppConstants.platform == "win" &&
+-      (aBrowserKey == "chrome" || aBrowserKey == "chromium-edge")
+-    ) {
+-      return null;
+-    }
+-
+-    let paymentMethodsPath = PathUtils.join(aProfileFolder, "Web Data");
+-
+-    if (!(await IOUtils.exists(paymentMethodsPath))) {
+-      return null;
+-    }
+-
+-    let tempFilePath = null;
+-    if (MigrationUtils.IS_LINUX_SNAP_PACKAGE) {
+-      tempFilePath = await IOUtils.createUniqueFile(
+-        PathUtils.tempDir,
+-        "Web Data"
+-      );
+-      await IOUtils.copy(paymentMethodsPath, tempFilePath);
+-      paymentMethodsPath = tempFilePath;
+-    }
+-
+-    let rows = await MigrationUtils.getRowsFromDBWithoutLocks(
+-      paymentMethodsPath,
+-      "Chrome Credit Cards",
+-      "SELECT name_on_card, card_number_encrypted, expiration_month, expiration_year FROM credit_cards"
+-    )
+-      .catch(ex => {
+-        console.error(ex);
+-      })
+-      .finally(() => {
+-        return tempFilePath && IOUtils.remove(tempFilePath);
+-      });
+-
+-    if (!rows?.length) {
+-      return null;
+-    }
+-
+-    let {
+-      _chromeUserDataPathSuffix,
+-      _keychainServiceName,
+-      _keychainAccountName,
+-      _keychainMockPassphrase = null,
+-    } = this;
+-
+-    return {
+-      type: MigrationUtils.resourceTypes.PAYMENT_METHODS,
+-
+-      async migrate(aCallback) {
+-        let loginCrypto;
+-        try {
+-          if (AppConstants.platform == "win") {
+-            let { ChromeWindowsLoginCrypto } = ChromeUtils.importESModule(
+-              "resource:///modules/ChromeWindowsLoginCrypto.sys.mjs"
+-            );
+-            loginCrypto = new ChromeWindowsLoginCrypto(
+-              _chromeUserDataPathSuffix
+-            );
+-          } else if (AppConstants.platform == "macosx") {
+-            let { ChromeMacOSLoginCrypto } = ChromeUtils.importESModule(
+-              "resource:///modules/ChromeMacOSLoginCrypto.sys.mjs"
+-            );
+-            loginCrypto = new ChromeMacOSLoginCrypto(
+-              _keychainServiceName,
+-              _keychainAccountName,
+-              _keychainMockPassphrase
+-            );
+-          } else {
+-            aCallback(false);
+-            return;
+-          }
+-        } catch (ex) {
+-          // Handle the user canceling Keychain access or other OSCrypto errors.
+-          console.error(ex);
+-          aCallback(false);
+-          return;
+-        }
+-
+-        let cards = [];
+-        for (let row of rows) {
+-          try {
+-            cards.push({
+-              "cc-name": row.getResultByName("name_on_card"),
+-              "cc-number": await loginCrypto.decryptData(
+-                row.getResultByName("card_number_encrypted"),
+-                null
+-              ),
+-              "cc-exp-month": parseInt(
+-                row.getResultByName("expiration_month"),
+-                10
+-              ),
+-              "cc-exp-year": parseInt(
+-                row.getResultByName("expiration_year"),
+-                10
+-              ),
+-            });
+-          } catch (e) {
+-            console.error(e);
+-          }
+-        }
+-
+-        await MigrationUtils.insertCreditCardsWrapper(cards);
+-        aCallback(true);
+-      },
+-    };
+-  }
+ }
+ 
+ async function GetBookmarksResource(aProfileFolder, aBrowserKey) {
+diff --git a/browser/components/migration/MigrationUtils.sys.mjs b/browser/components/migration/MigrationUtils.sys.mjs
+index da9ae1286b..29bffa68ce 100644
+--- a/browser/components/migration/MigrationUtils.sys.mjs
++++ b/browser/components/migration/MigrationUtils.sys.mjs
+@@ -202,7 +202,6 @@ class MigrationUtils {
+     BOOKMARKS: 0x0020,
+     OTHERDATA: 0x0040,
+     SESSION: 0x0080,
+-    PAYMENT_METHODS: 0x0100,
+     EXTENSIONS: 0x0200,
+   });
+ 
+@@ -774,7 +773,6 @@ class MigrationUtils {
+     bookmarks: 0,
+     logins: 0,
+     history: 0,
+-    cards: 0,
+     extensions: 0,
+   };
+ 
+@@ -932,22 +930,6 @@ class MigrationUtils {
+     }
+   }
+ 
+-  async insertCreditCardsWrapper(cards) {
+-    this._importQuantities.cards += cards.length;
+-    let { formAutofillStorage } = ChromeUtils.importESModule(
+-      "resource://autofill/FormAutofillStorage.sys.mjs"
+-    );
+-
+-    await formAutofillStorage.initialize();
+-    for (let card of cards) {
+-      try {
+-        await formAutofillStorage.creditCards.add(card);
+-      } catch (e) {
+-        console.error("Failed to insert credit card due to error: ", e, card);
+-      }
+-    }
+-  }
+-
+   /**
+    * Responsible for calling the AddonManager API that ultimately installs the
+    * matched add-ons.
+diff --git a/browser/components/migration/MigrationWizardChild.sys.mjs b/browser/components/migration/MigrationWizardChild.sys.mjs
+index 5b817c59eb..acda54206d 100644
+--- a/browser/components/migration/MigrationWizardChild.sys.mjs
++++ b/browser/components/migration/MigrationWizardChild.sys.mjs
+@@ -238,7 +238,6 @@ export class MigrationWizardChild extends JSWindowActorChild {
+       formdata: "0",
+       passwords: "0",
+       bookmarks: "0",
+-      payment_methods: "0",
+       extensions: "0",
+       other: 0,
+     };
+@@ -270,12 +269,6 @@ export class MigrationWizardChild extends JSWindowActorChild {
+           break;
+         }
+ 
+-        case MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES
+-          .PAYMENT_METHODS: {
+-          extraArgs.payment_methods = "1";
+-          break;
+-        }
+-
+         default: {
+           extraArgs.other++;
+         }
+diff --git a/browser/components/migration/MigrationWizardParent.sys.mjs b/browser/components/migration/MigrationWizardParent.sys.mjs
+index 0a4b1a0191..23c7378aad 100644
+--- a/browser/components/migration/MigrationWizardParent.sys.mjs
++++ b/browser/components/migration/MigrationWizardParent.sys.mjs
+@@ -779,16 +779,6 @@ export class MigrationWizardParent extends JSWindowActorParent {
+           "migration-wizard-progress-success-formdata"
+         );
+       }
+-      case lazy.MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES
+-        .PAYMENT_METHODS: {
+-        let quantity = MigrationUtils.getImportedCount("cards");
+-        return lazy.gFluentStrings.formatValue(
+-          "migration-wizard-progress-success-payment-methods",
+-          {
+-            quantity,
+-          }
+-        );
+-      }
+       default: {
+         return "";
+       }
+diff --git a/browser/components/migration/content/migration-wizard-constants.mjs b/browser/components/migration/content/migration-wizard-constants.mjs
+index e121466ad1..78294c1974 100644
+--- a/browser/components/migration/content/migration-wizard-constants.mjs
++++ b/browser/components/migration/content/migration-wizard-constants.mjs
+@@ -56,7 +56,6 @@ export const MigrationWizardConstants = Object.freeze({
+     FORMDATA: "FORMDATA",
+     PASSWORDS: "PASSWORDS",
+     BOOKMARKS: "BOOKMARKS",
+-    PAYMENT_METHODS: "PAYMENT_METHODS",
+     EXTENSIONS: "EXTENSIONS",
+ 
+     COOKIES: "COOKIES",
+diff --git a/browser/components/migration/content/migration-wizard.mjs b/browser/components/migration/content/migration-wizard.mjs
+index 8064d7f214..0da6694b9c 100644
+--- a/browser/components/migration/content/migration-wizard.mjs
++++ b/browser/components/migration/content/migration-wizard.mjs
+@@ -105,9 +105,6 @@ export class MigrationWizard extends HTMLElement {
+                 <label id="form-autofill" class="resource-type-label" data-resource-type="FORMDATA">
+                   <input type="checkbox"/><span data-l10n-id="migration-form-autofill-option-label"></span>
+                 </label>
+-                <label id="payment-methods" class="resource-type-label" data-resource-type="PAYMENT_METHODS">
+-                  <input type="checkbox"/><span data-l10n-id="migration-payment-methods-option-label"></span>
+-                </label>
+               </fieldset>
+             </details>
+ 
+@@ -163,13 +160,6 @@ export class MigrationWizard extends HTMLElement {
+                 <a class="support-text text-deemphasized"></a>
+               </div>
+ 
+-              <div data-resource-type="PAYMENT_METHODS" class="resource-progress-group">
+-                <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
+-                <span data-l10n-id="migration-payment-methods-option-label"></span>
+-                <span class="message-text text-deemphasized">&nbsp;</span>
+-                <a class="support-text text-deemphasized"></a>
+-              </div>
+-
+               <div data-resource-type="COOKIES" class="resource-progress-group">
+                 <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
+                 <span data-l10n-id="migration-cookies-option-label"></span>
+@@ -1285,8 +1275,6 @@ export class MigrationWizard extends HTMLElement {
+         "migration-list-extensions-label",
+       [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.FORMDATA]:
+         "migration-list-autofill-label",
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]:
+-        "migration-list-payment-methods-label",
+     };
+ 
+     if (MigrationWizardConstants.USES_FAVORITES.includes(key)) {
+diff --git a/browser/components/migration/metrics.yaml b/browser/components/migration/metrics.yaml
+index 386a38d1e4..57de6b2b06 100644
+--- a/browser/components/migration/metrics.yaml
++++ b/browser/components/migration/metrics.yaml
+@@ -152,11 +152,6 @@ browser.migration:
+         description: >
+           "1" if bookmarks were selected. "0" otherwise.
+ 
+-        type: string
+-      payment_methods:
+-        description: >
+-          "1" if payment methods were selected. "0" otherwise.
+-
+         type: string
+       extensions:
+         description: >
+@@ -283,11 +278,6 @@ browser.migration:
+         description: >
+           "1" if bookmarks are being migrated. "0" otherwise.
+ 
+-        type: string
+-      payment_methods:
+-        description: >
+-          "1" if payment methods are being migrated. "0" otherwise.
+-
+         type: string
+       extensions:
+         description: >
+@@ -337,11 +327,6 @@ browser.migration:
+         description: >
+           "1" if bookmarks were migrated. "0" otherwise.
+ 
+-        type: string
+-      payment_methods:
+-        description: >
+-          "1" if payment methods were migrated. "0" otherwise.
+-
+         type: string
+       extensions:
+         description: >
+diff --git a/browser/components/migration/tests/browser/head.js b/browser/components/migration/tests/browser/head.js
+index 112784965b..f912bf8e4b 100644
+--- a/browser/components/migration/tests/browser/head.js
++++ b/browser/components/migration/tests/browser/head.js
+@@ -39,7 +39,6 @@ const RESOURCE_TYPES_WITH_QUANTITIES = [
+   MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.HISTORY,
+   MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PASSWORDS,
+   MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.FORMDATA,
+-  MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS,
+   MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.EXTENSIONS,
+ ];
+ 
+diff --git a/browser/components/migration/tests/marionette/test_refresh_firefox.py b/browser/components/migration/tests/marionette/test_refresh_firefox.py
+index 5d60425492..eb5587db2a 100644
+--- a/browser/components/migration/tests/marionette/test_refresh_firefox.py
++++ b/browser/components/migration/tests/marionette/test_refresh_firefox.py
+@@ -34,9 +34,6 @@ class TestFirefoxRefresh(MarionetteTestCase):
+     _formHistoryFieldName = "some-very-unique-marionette-only-firefox-reset-field"
+     _formHistoryValue = "special-pumpkin-value"
+ 
+-    _formAutofillAvailable = False
+-    _formAutofillAddressGuid = None
+-
+     _expectedURLs = ["about:robots", "about:mozilla"]
+     _expectedOpenGroupID = "test-open-group"
+     _expectedSavedGroups = ["test-saved-group"]
+@@ -133,31 +130,6 @@ class TestFirefoxRefresh(MarionetteTestCase):
+         if error:
+             print(error)
+ 
+-    def createFormAutofill(self):
+-        if not self._formAutofillAvailable:
+-            return
+-        self._formAutofillAddressGuid = self.runAsyncCode(
+-            """
+-          let resolve = arguments[arguments.length - 1];
+-          const TEST_ADDRESS_1 = {
+-            "given-name": "John",
+-            "additional-name": "R.",
+-            "family-name": "Smith",
+-            organization: "World Wide Web Consortium",
+-            "street-address": "32 Vassar Street\\\nMIT Room 32-G524",
+-            "address-level2": "Cambridge",
+-            "address-level1": "MA",
+-            "postal-code": "02139",
+-            country: "US",
+-            tel: "+15195555555",
+-            email: "user@example.com",
+-          };
+-          return global.formAutofillStorage.initialize().then(() => {
+-            return global.formAutofillStorage.addresses.add(TEST_ADDRESS_1);
+-          }).then(resolve);
+-        """
+-        )
+-
+     def createCookie(self):
+         self.runCode(
+             """
+@@ -404,33 +376,6 @@ class TestFirefoxRefresh(MarionetteTestCase):
+             formHistoryCount, 1, "There should be only 1 entry in the form history"
+         )
+ 
+-    def checkFormAutofill(self):
+-        if not self._formAutofillAvailable:
+-            return
+-
+-        formAutofillResults = self.runAsyncCode(
+-            """
+-          let resolve = arguments[arguments.length - 1];
+-          return global.formAutofillStorage.initialize().then(() => {
+-            return global.formAutofillStorage.addresses.getAll()
+-          }).then(resolve);
+-        """,
+-        )
+-        if type(formAutofillResults) is str:
+-            self.fail(formAutofillResults)
+-            return
+-
+-        formAutofillAddressCount = len(formAutofillResults)
+-        self.assertEqual(
+-            formAutofillAddressCount,
+-            1,
+-            f"Should have exactly 1 saved address, got {formAutofillAddressCount}",
+-        )
+-        if formAutofillAddressCount == 1:
+-            self.assertEqual(
+-                formAutofillResults[0]["guid"], self._formAutofillAddressGuid
+-            )
+-
+     def checkCookie(self):
+         cookieInfo = self.runCode(
+             """
+@@ -600,7 +545,6 @@ class TestFirefoxRefresh(MarionetteTestCase):
+         self.checkBookmarkInMenu()
+         self.checkHistory()
+         self.checkFormHistory()
+-        self.checkFormAutofill()
+         self.checkCookie()
+         self.checkFxA()
+         self.checkSync(expect_sync_user)
+@@ -618,7 +562,6 @@ class TestFirefoxRefresh(MarionetteTestCase):
+         self.createBookmarksOnToolbar()
+         self.createHistory()
+         self.createFormHistory()
+-        self.createFormAutofill()
+         self.createCookie()
+         self.createSession()
+         self.createFxa()
+@@ -654,18 +597,6 @@ class TestFirefoxRefresh(MarionetteTestCase):
+           ).FormHistory;
+         """  # NOQA: E501
+         )
+-        self._formAutofillAvailable = self.runCode(
+-            """
+-          try {
+-            global.formAutofillStorage = ChromeUtils.importESModule(
+-              "resource://formautofill/FormAutofillStorage.sys.mjs"
+-            ).formAutofillStorage;
+-          } catch(e) {
+-            return false;
+-          }
+-          return true;
+-        """  # NOQA: E501
+-        )
+ 
+     def runCode(self, script, *args, **kwargs):
+         return self.marionette.execute_script(
+@@ -1002,7 +933,6 @@ class TestSelectableProfileFirefoxRefresh(TestFirefoxRefresh):
+         self.checkBookmarkInMenu()
+         self.checkHistory()
+         self.checkFormHistory()
+-        self.checkFormAutofill()
+         self.checkCookie()
+         self.checkFxA()
+         self.checkSync(expect_sync_user)
+diff --git a/browser/components/migration/tests/unit/xpcshell.toml b/browser/components/migration/tests/unit/xpcshell.toml
+index 75b6dd8f1b..93057ee7d1 100644
+--- a/browser/components/migration/tests/unit/xpcshell.toml
++++ b/browser/components/migration/tests/unit/xpcshell.toml
+@@ -40,12 +40,6 @@ run-if = [
+ ["test_Chrome_corrupt_history.js"]
+ run-sequentially = ["true"] # fails more than 50% of the time in parallel
+ 
+-["test_Chrome_credit_cards.js"]
+-run-if = [
+-  "os == 'mac'",
+-  "os == 'win'",
+-]
+-
+ ["test_Chrome_extensions.js"]
+ 
+ ["test_Chrome_formdata.js"]
+diff --git a/browser/components/preferences/config/LegacyPaneMappings.mjs b/browser/components/preferences/config/LegacyPaneMappings.mjs
+index 94357d356d..a59934dc7f 100644
+--- a/browser/components/preferences/config/LegacyPaneMappings.mjs
++++ b/browser/components/preferences/config/LegacyPaneMappings.mjs
+@@ -56,29 +56,6 @@ export const LEGACY_PANE_MAPPINGS = new Map([
+   ["privacy-privacy-segmentation", { category: "privacy" }],
+ 
+   ["privacy-logins", { category: "passwordsAutofill", subcategory: "logins" }],
+-  [
+-    "privacy-payment-methods-autofill",
+-    {
+-      category: "passwordsAutofill",
+-      subcategory: "payment-methods-autofill",
+-    },
+-  ],
+-  [
+-    "privacy-credit-card-autofill",
+-    { category: "passwordsAutofill", subcategory: "credit-card-autofill" },
+-  ],
+-  // Both legacy anchor IDs are intentional: the setting-group declares
+-  // data-subcategory="addresses-autofill address-autofill" and
+-  // responds to both. This preserves the original mapping for downstream
+-  // consumers that match on either ID.
+-  [
+-    "privacy-addresses-autofill",
+-    { category: "passwordsAutofill", subcategory: "addresses-autofill" },
+-  ],
+-  [
+-    "privacy-address-autofill",
+-    { category: "passwordsAutofill", subcategory: "address-autofill" },
+-  ],
+   ["privacy-logins", { category: "passwordsAutofill", subcategory: "logins" }],
+ 
+   // Sval: categories whose topics moved to another. Sval turns off Firefox's
+@@ -86,10 +63,6 @@ export const LEGACY_PANE_MAPPINGS = new Map([
+   // A key given twice takes its last entry.
+   ["passwordsAutofill", { category: "privacy" }],
+   ["privacy-logins", { category: "privacy" }],
+-  ["privacy-payment-methods-autofill", { category: "privacy" }],
+-  ["privacy-credit-card-autofill", { category: "privacy" }],
+-  ["privacy-addresses-autofill", { category: "privacy" }],
+-  ["privacy-address-autofill", { category: "privacy" }],
+   ["svalDevices", { category: "svalSync" }],
+   ["svalDevices-offer", { category: "svalSync", subcategory: "offer" }],
+   ["svalDevices-claim", { category: "svalSync", subcategory: "claim" }],
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index 31c92e59f4..68d1d128f7 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -38,8 +38,6 @@ Preferences.addAll([
+   { id: "services.sync.engine.history", type: "bool" },
+   { id: "services.sync.engine.tabs", type: "bool" },
+   { id: "services.sync.engine.passwords", type: "bool" },
+-  { id: "services.sync.engine.addresses", type: "bool" },
+-  { id: "services.sync.engine.creditcards", type: "bool" },
+   { id: "services.sync.engine.addons", type: "bool" },
+   { id: "services.sync.engine.prefs", type: "bool" },
+ ]);
+@@ -540,16 +538,6 @@ const SYNC_ENGINE_SETTINGS = [
+     pref: "services.sync.engine.passwords",
+     type: "passwords",
+   },
+-  {
+-    id: "syncAddresses",
+-    pref: "services.sync.engine.addresses",
+-    type: "addresses",
+-  },
+-  {
+-    id: "syncPayments",
+-    pref: "services.sync.engine.creditcards",
+-    type: "payments",
+-  },
+   { id: "syncAddons", pref: "services.sync.engine.addons", type: "addons" },
+   { id: "syncSettings", pref: "services.sync.engine.prefs", type: "settings" },
+ ];
+diff --git a/browser/components/preferences/config/passwords-autofill.mjs b/browser/components/preferences/config/passwords-autofill.mjs
+index d2f404190d..f1601bc1a9 100644
+--- a/browser/components/preferences/config/passwords-autofill.mjs
++++ b/browser/components/preferences/config/passwords-autofill.mjs
+@@ -5,111 +5,11 @@
+ import { Preferences } from "chrome://global/content/preferences/Preferences.mjs";
+ import { SettingGroupManager } from "chrome://browser/content/preferences/config/SettingGroupManager.mjs";
+ 
+-const XPCOMUtils = ChromeUtils.importESModule(
+-  "resource://gre/modules/XPCOMUtils.sys.mjs"
+-).XPCOMUtils;
+-
+-const FormAutofill = ChromeUtils.importESModule(
+-  "resource://autofill/FormAutofill.sys.mjs"
+-).FormAutofill;
+-
+-const FormAutofillUtils = ChromeUtils.importESModule(
+-  "resource://gre/modules/shared/FormAutofillUtils.sys.mjs"
+-).FormAutofillUtils;
+-
+ const { AppConstants } = ChromeUtils.importESModule(
+   "resource://gre/modules/AppConstants.sys.mjs"
+ );
+ 
+-const lazy = XPCOMUtils.declareLazy({
+-  AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
+-  OSKeyStore: "resource://gre/modules/OSKeyStore.sys.mjs",
+-  FormAutofillPreferences:
+-    "resource://autofill/FormAutofillPreferences.sys.mjs",
+-});
+-
+-const MANAGE_ADDRESSES_URL =
+-  "chrome://formautofill/content/manageAddresses.xhtml";
+-const MANAGE_CREDITCARDS_URL =
+-  "chrome://formautofill/content/manageCreditCards.xhtml";
+-const {
+-  MANAGE_ADDRESSES_L10N_IDS,
+-  EDIT_ADDRESS_L10N_IDS,
+-  MANAGE_CREDITCARDS_L10N_IDS,
+-  EDIT_CREDITCARD_L10N_IDS,
+-} = FormAutofillUtils;
+-
+-const { ENABLED_AUTOFILL_ADDRESSES_PREF, ENABLED_AUTOFILL_CREDITCARDS_PREF } =
+-  FormAutofill;
+-
+-const FORM_AUTOFILL_CONFIG = {
+-  payments: {
+-    l10nId: "payments-group",
+-    iconSrc: "chrome://browser/skin/payment-methods-16.svg",
+-    headingLevel: 2,
+-    subcategory: "payment-methods-autofill credit-card-autofill",
+-    items: [
+-      {
+-        id: "saveAndFillPayments",
+-        l10nId: "autofill-payment-methods-checkbox-message-2",
+-        supportPage: "credit-card-autofill",
+-        items: [
+-          {
+-            id: "requireOSAuthForPayments",
+-            l10nId: "autofill-reauth-payment-methods-checkbox-2",
+-            supportPage:
+-              "credit-card-autofill#w_require-authentication-for-autofill",
+-          },
+-        ],
+-      },
+-      {
+-        id: "savedPaymentsButton",
+-        loadPane: "managePayments",
+-        l10nId: "autofill-payment-methods-manage-payments-button",
+-        control: "moz-box-button",
+-        controlAttrs: {
+-          "search-l10n-ids": MANAGE_CREDITCARDS_L10N_IDS.concat(
+-            EDIT_CREDITCARD_L10N_IDS
+-          ).join(","),
+-        },
+-      },
+-    ],
+-  },
+-  addresses: {
+-    l10nId: "addresses-group",
+-    iconSrc: "chrome://browser/skin/notification-icons/geo.svg",
+-    headingLevel: 2,
+-    subcategory: "addresses-autofill address-autofill",
+-    items: [
+-      {
+-        id: "saveAndFillAddresses",
+-        l10nId: "autofill-addresses-checkbox-message",
+-        supportPage: "automatically-fill-your-address-web-forms",
+-      },
+-      {
+-        id: "savedAddressesButton",
+-        loadPane: "manageAddresses",
+-        l10nId: "autofill-addresses-manage-addresses-button",
+-        control: "moz-box-button",
+-        controlAttrs: {
+-          "search-l10n-ids": MANAGE_ADDRESSES_L10N_IDS.concat(
+-            EDIT_ADDRESS_L10N_IDS
+-          ).join(","),
+-        },
+-      },
+-    ],
+-  },
+-};
+-
+ Preferences.addAll([
+-  // Credit cards and addresses
+-  { id: ENABLED_AUTOFILL_ADDRESSES_PREF, type: "bool" },
+-  { id: ENABLED_AUTOFILL_CREDITCARDS_PREF, type: "bool" },
+-  {
+-    id: "extensions.formautofill.creditCards.os-auth.locked.enabled",
+-    type: "bool",
+-  },
+-
+   // Windows SSO
+   { id: "network.http.windows-sso.enabled", type: "bool" },
+ 
+@@ -118,271 +18,6 @@ Preferences.addAll([
+   { id: "signon.firefoxRelay.feature", type: "string" },
+ ]);
+ 
+-Preferences.addSetting({
+-  id: "saveAndFillAddresses",
+-  pref: ENABLED_AUTOFILL_ADDRESSES_PREF,
+-  visible: () => FormAutofill.isAutofillAddressesAvailable,
+-});
+-Preferences.addSetting({
+-  id: "savedAddressesButton",
+-  pref: null,
+-  visible: () => FormAutofill.isAutofillAddressesAvailable,
+-  onUserClick: e => {
+-    e.preventDefault();
+-    if (Services.prefs.getBoolPref("browser.settings-redesign.enabled")) {
+-      window.gotoPref("paneManageAddresses");
+-    } else {
+-      window.gSubDialog.open(MANAGE_ADDRESSES_URL);
+-    }
+-  },
+-});
+-
+-Preferences.addSetting({
+-  id: "saveAndFillPayments",
+-  pref: ENABLED_AUTOFILL_CREDITCARDS_PREF,
+-  visible: () => FormAutofill.isAutofillCreditCardsAvailable,
+-});
+-Preferences.addSetting({
+-  id: "savedPaymentsButton",
+-  pref: null,
+-  visible: () => FormAutofill.isAutofillCreditCardsAvailable,
+-  onUserClick: e => {
+-    e.preventDefault();
+-
+-    if (Services.prefs.getBoolPref("browser.settings-redesign.enabled")) {
+-      window.gotoPref("paneManagePayments");
+-    } else {
+-      window.gSubDialog.open(MANAGE_CREDITCARDS_URL);
+-    }
+-  },
+-});
+-Preferences.addSetting({
+-  id: "requireOSAuthForPayments",
+-  // Sval: only with card autofill (Sval spec §7.3).
+-  visible: () =>
+-    FormAutofill.isAutofillCreditCardsAvailable && lazy.OSKeyStore.canReauth(),
+-  get: () => FormAutofillUtils.getOSAuthEnabled(),
+-  async set(checked) {
+-    await lazy.FormAutofillPreferences.trySetOSAuthEnabled(window, checked);
+-
+-    // Trigger change event to keep checkbox UI in sync with pref value
+-    Services.obs.notifyObservers(null, "OSAuthEnabledChange");
+-  },
+-  setup: emitChange => {
+-    Services.obs.addObserver(emitChange, "OSAuthEnabledChange");
+-    return () => Services.obs.removeObserver(emitChange, "OSAuthEnabledChange");
+-  },
+-});
+-
+-Preferences.addSetting({
+-  id: "payment-item",
+-  async onUserClick(e) {
+-    const action = e.target.getAttribute("action");
+-    const guid = e.target.getAttribute("guid");
+-    if (action === "remove") {
+-      let [title, confirmLabel, cancelLabel] = await document.l10n.formatValues(
+-        [
+-          { id: "payments-delete-payment-prompt-title" },
+-          { id: "payments-delete-payment-prompt-confirm-button" },
+-          { id: "payments-delete-payment-prompt-cancel-button" },
+-        ]
+-      );
+-      lazy.FormAutofillPreferences.prototype.openRemovePaymentDialog(
+-        guid,
+-        window.browsingContext.topChromeWindow.browsingContext,
+-        title,
+-        confirmLabel,
+-        cancelLabel
+-      );
+-    } else if (action === "edit") {
+-      lazy.FormAutofillPreferences.prototype.openEditCreditCardDialog(
+-        guid,
+-        window
+-      );
+-    }
+-  },
+-});
+-
+-Preferences.addSetting({
+-  id: "add-payment-button",
+-  deps: ["saveAndFillPayments"],
+-  setup: (emitChange, _, setting) => {
+-    function updateDepsAndChange() {
+-      setting._deps = null;
+-      emitChange();
+-    }
+-    Services.obs.addObserver(
+-      updateDepsAndChange,
+-      "formautofill-preferences-initialized"
+-    );
+-    return () =>
+-      Services.obs.removeObserver(
+-        updateDepsAndChange,
+-        "formautofill-preferences-initialized"
+-      );
+-  },
+-  onUserClick: () => {
+-    window.gSubDialog.open(
+-      "chrome://formautofill/content/editCreditCard.xhtml"
+-    );
+-  },
+-  disabled: ({ saveAndFillPayments }) => !saveAndFillPayments?.value,
+-});
+-
+-Preferences.addSetting({
+-  id: "payments-list-header",
+-});
+-
+-Preferences.addSetting({
+-  id: "no-payments-stored",
+-});
+-
+-Preferences.addSetting(
+-  class extends Preferences.AsyncSetting {
+-    static id = "payments-list";
+-
+-    /** @type {Promise<any[]>} */
+-    paymentMethods;
+-
+-    beforeRefresh() {
+-      this.paymentMethods = this.getPaymentMethods();
+-    }
+-
+-    async getPaymentMethods() {
+-      await lazy.FormAutofillPreferences.prototype.initializePaymentsStorage();
+-      return lazy.FormAutofillPreferences.prototype.makePaymentsListItems();
+-    }
+-
+-    async getControlConfig() {
+-      return {
+-        items: await this.paymentMethods,
+-      };
+-    }
+-
+-    async visible() {
+-      return Boolean((await this.paymentMethods).length);
+-    }
+-
+-    setup() {
+-      Services.obs.addObserver(this.emitChange, "formautofill-storage-changed");
+-      return () =>
+-        Services.obs.removeObserver(
+-          this.emitChange,
+-          "formautofill-storage-changed"
+-        );
+-    }
+-  }
+-);
+-Preferences.addSetting({
+-  /** @type {{ _removeAddressDialogStrings: string[] } & SettingConfig} */
+-  id: "address-item",
+-  _removeAddressDialogStrings: [],
+-  onUserClick(e) {
+-    const action = e.target.getAttribute("action");
+-    const guid = e.target.getAttribute("guid");
+-    if (action === "remove") {
+-      let [title, confirmLabel, cancelLabel] = this._removeAddressDialogStrings;
+-      lazy.FormAutofillPreferences.prototype.openRemoveAddressDialog(
+-        guid,
+-        window.browsingContext.topChromeWindow.browsingContext,
+-        title,
+-        confirmLabel,
+-        cancelLabel
+-      );
+-    } else if (action === "edit") {
+-      lazy.FormAutofillPreferences.prototype.openEditAddressDialog(
+-        guid,
+-        window
+-      );
+-    }
+-  },
+-  setup(emitChange) {
+-    document.l10n
+-      .formatValues([
+-        { id: "addresses-delete-address-prompt-title" },
+-        { id: "addresses-delete-address-prompt-confirm-button" },
+-        { id: "addresses-delete-address-prompt-cancel-button" },
+-      ])
+-      .then(val => (this._removeAddressDialogStrings = val))
+-      .then(emitChange);
+-  },
+-  disabled() {
+-    return !!this._removeAddressDialogStrings.length;
+-  },
+-});
+-
+-Preferences.addSetting({
+-  id: "add-address-button",
+-  deps: ["saveAndFillAddresses"],
+-  setup: (emitChange, _, setting) => {
+-    function updateDepsAndChange() {
+-      setting._deps = null;
+-      emitChange();
+-    }
+-    Services.obs.addObserver(
+-      updateDepsAndChange,
+-      "formautofill-preferences-initialized"
+-    );
+-    return () =>
+-      Services.obs.removeObserver(
+-        updateDepsAndChange,
+-        "formautofill-preferences-initialized"
+-      );
+-  },
+-  onUserClick: () => {
+-    lazy.FormAutofillPreferences.prototype.openEditAddressDialog(
+-      undefined,
+-      window
+-    );
+-  },
+-  disabled: ({ saveAndFillAddresses }) => !saveAndFillAddresses?.value,
+-});
+-
+-Preferences.addSetting({
+-  id: "addresses-list-header",
+-});
+-
+-Preferences.addSetting({
+-  id: "no-addresses-stored",
+-});
+-
+-Preferences.addSetting(
+-  class extends Preferences.AsyncSetting {
+-    static id = "addresses-list";
+-
+-    /** @type {Promise<any[]>} */
+-    addresses;
+-
+-    beforeRefresh() {
+-      this.addresses = this.getAddresses();
+-    }
+-
+-    async getAddresses() {
+-      await lazy.FormAutofillPreferences.prototype.initializeAddressesStorage();
+-      return lazy.FormAutofillPreferences.prototype.makeAddressesListItems();
+-    }
+-
+-    async getControlConfig() {
+-      return {
+-        items: await this.addresses,
+-      };
+-    }
+-
+-    async visible() {
+-      return Boolean((await this.addresses).length);
+-    }
+-
+-    setup() {
+-      Services.obs.addObserver(this.emitChange, "formautofill-storage-changed");
+-      return () =>
+-        Services.obs.removeObserver(
+-          this.emitChange,
+-          "formautofill-storage-changed"
+-        );
+-    }
+-  }
+-);
+-
+ Preferences.addSetting({
+   id: "savePasswords",
+   pref: "signon.rememberSignons",
+@@ -412,38 +47,5 @@ SettingGroupManager.registerGroups({
+       },
+     ],
+   },
+-  managePayments: {
+-    items: [
+-      {
+-        id: "add-payment-button",
+-        control: "moz-button",
+-        l10nId: "autofill-payment-methods-add-button",
+-      },
+-      {
+-        id: "payments-list",
+-        control: "moz-box-group",
+-        controlAttrs: {
+-          type: "list",
+-        },
+-      },
+-    ],
+-  },
+-  manageAddresses: {
+-    items: [
+-      {
+-        id: "add-address-button",
+-        control: "moz-button",
+-        l10nId: "autofill-addresses-add-button",
+-      },
+-      {
+-        id: "addresses-list",
+-        control: "moz-box-group",
+-        controlAttrs: {
+-          type: "list",
+-        },
+-      },
+-    ],
+-  },
+ });
+-SettingGroupManager.registerGroups(FORM_AUTOFILL_CONFIG);
+ Services.obs.notifyObservers(window, "passwordsAutofill-pane-loaded");
+diff --git a/browser/components/preferences/dialogs/syncChooseWhatToSync.js b/browser/components/preferences/dialogs/syncChooseWhatToSync.js
+index 64aa0d98a0..0e0d3ec51e 100644
+--- a/browser/components/preferences/dialogs/syncChooseWhatToSync.js
++++ b/browser/components/preferences/dialogs/syncChooseWhatToSync.js
+@@ -19,14 +19,11 @@ Preferences.addAll([
+   { id: "services.sync.engine.tabs", type: "bool" },
+   { id: "services.sync.engine.prefs", type: "bool" },
+   { id: "services.sync.engine.passwords", type: "bool" },
+-  { id: "services.sync.engine.addresses", type: "bool" },
+-  { id: "services.sync.engine.creditcards", type: "bool" },
+ ]);
+ 
+ let gSyncChooseWhatToSync = {
+   init() {
+     this._setupEventListeners();
+-    this._adjustForPrefs();
+     let options = window.arguments[0];
+     if (options.disconnectFun) {
+       // Offer 'Disconnect' functionality if it was provided
+@@ -44,27 +41,6 @@ let gSyncChooseWhatToSync = {
+     }
+   },
+ 
+-  // make whatever tweaks we need based on preferences.
+-  _adjustForPrefs() {
+-    // These 2 engines are unique in that there are prefs that make the
+-    // entire engine unavailable (which is distinct from "disabled").
+-    let enginePrefs = [
+-      ["services.sync.engine.addresses", ".sync-engine-addresses"],
+-      ["services.sync.engine.creditcards", ".sync-engine-creditcards"],
+-    ];
+-    for (let [enabledPref, className] of enginePrefs) {
+-      let availablePref = enabledPref + ".available";
+-      // If the engine is enabled we force it to be available, otherwise we see
+-      // spooky things happen (like it magically re-appear later)
+-      if (Services.prefs.getBoolPref(enabledPref, false)) {
+-        Services.prefs.setBoolPref(availablePref, true);
+-      }
+-      if (!Services.prefs.getBoolPref(availablePref)) {
+-        let elt = document.querySelector(className);
+-        elt.hidden = true;
+-      }
+-    }
+-  },
+   _setupEventListeners() {
+     document.addEventListener("dialogaccept", () => {
+       // Record when the user saves sync settings.
+@@ -82,8 +58,6 @@ let gSyncChooseWhatToSync = {
+       "tabs",
+       "prefs",
+       "passwords",
+-      "addresses",
+-      "creditcards",
+     ];
+     let settings = {
+       enabledEngines: [],
+diff --git a/browser/components/preferences/dialogs/syncChooseWhatToSync.xhtml b/browser/components/preferences/dialogs/syncChooseWhatToSync.xhtml
+index a893c5ec3d..cea51ac6db 100644
+--- a/browser/components/preferences/dialogs/syncChooseWhatToSync.xhtml
++++ b/browser/components/preferences/dialogs/syncChooseWhatToSync.xhtml
+@@ -58,20 +58,6 @@
+           preference="services.sync.engine.passwords"
+         />
+       </html:div>
+-      <html:div class="sync-engine-addresses">
+-        <checkbox
+-          id="syncEngineAddresses"
+-          data-l10n-id="sync-engine-addresses"
+-          preference="services.sync.engine.addresses"
+-        />
+-      </html:div>
+-      <html:div class="sync-engine-creditcards">
+-        <checkbox
+-          id="syncEngineCreditcards"
+-          data-l10n-id="sync-engine-payment-methods2"
+-          preference="services.sync.engine.creditcards"
+-        />
+-      </html:div>
+       <html:div class="sync-engine-addons">
+         <checkbox
+           id="syncEngineAddons"
+diff --git a/browser/components/preferences/main.js b/browser/components/preferences/main.js
+index edb34fee75..b0c2c5aa91 100644
+--- a/browser/components/preferences/main.js
++++ b/browser/components/preferences/main.js
+@@ -49,8 +49,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   TranslationsUtils:
+     "chrome://global/content/translations/TranslationsUtils.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+-  FormAutofillPreferences:
+-    "resource://autofill/FormAutofillPreferences.sys.mjs",
+ });
+ 
+ importIntoWindow(
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index 536d9c8541..0f744fdf6e 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -312,22 +312,6 @@ const CONFIG_PANES = Object.freeze({
+     module: "chrome://browser/content/preferences/config/languages.mjs",
+     visible: () => srdSectionEnabled("languages"),
+   },
+-  manageAddresses: {
+-    parent: "passwordsAutofill",
+-    l10nId: "autofill-addresses-manage-addresses-title",
+-    groupIds: ["manageAddresses"],
+-    iconSrc: "chrome://browser/skin/notification-icons/geo.svg",
+-    module:
+-      "chrome://browser/content/preferences/config/passwords-autofill.mjs",
+-  },
+-  managePayments: {
+-    parent: "passwordsAutofill",
+-    l10nId: "autofill-payment-methods-manage-payments-title",
+-    groupIds: ["managePayments"],
+-    iconSrc: "chrome://browser/skin/payment-methods-16.svg",
+-    module:
+-      "chrome://browser/content/preferences/config/passwords-autofill.mjs",
+-  },
+   profiles: {
+     parent: srdSectionEnabled("sync") ? "sync" : "general",
+     l10nId: "preferences-profiles-group-header",
+@@ -346,7 +330,7 @@ const CONFIG_PANES = Object.freeze({
+   passwordsAutofill: {
+     l10nId: "preferences-passwords-autofill-header",
+     iconSrc: "chrome://browser/skin/login.svg",
+-    groupIds: ["passwords", "payments", "addresses"],
++    groupIds: ["passwords"],
+     module:
+       "chrome://browser/content/preferences/config/passwords-autofill.mjs",
+     visible: () => srdSectionEnabled("passwordsAutofill"),
+diff --git a/browser/components/preferences/preferences.xhtml b/browser/components/preferences/preferences.xhtml
+index 10dcaf22dc..1ec6365eba 100644
+--- a/browser/components/preferences/preferences.xhtml
++++ b/browser/components/preferences/preferences.xhtml
+@@ -58,7 +58,6 @@
+   <link rel="localization" href="browser/preferences/clearSiteData.ftl"/>
+   <link rel="localization" href="browser/preferences/colors.ftl"/>
+   <link rel="localization" href="browser/preferences/connection.ftl"/>
+-  <link rel="localization" href="browser/preferences/formAutofill.ftl"/>
+   <link rel="localization" href="browser/preferences/languages.ftl"/>
+   <link rel="localization" href="browser/preferences/permissions.ftl"/>
+   <link rel="localization" href="browser/preferences/selectBookmark.ftl"/>
+diff --git a/browser/components/preferences/privacy.inc.xhtml b/browser/components/preferences/privacy.inc.xhtml
+index 314e6714a7..fa632c5936 100644
+--- a/browser/components/preferences/privacy.inc.xhtml
++++ b/browser/components/preferences/privacy.inc.xhtml
+@@ -401,8 +401,6 @@
+ 
+ <html:setting-group groupid="passwords" hidden="true" data-category="panePrivacy" data-srd-migrated=""/>
+ 
+-<html:setting-group data-category="panePrivacy" data-subcategory="payment-methods-autofill credit-card-autofill" groupid="payments" data-group="formAutofill" hidden="true" data-srd-migrated="" />
+-<html:setting-group data-category="panePrivacy" data-subcategory="addresses-autofill address-autofill" groupid="addresses" data-group="formAutofill" hidden="true" data-srd-migrated="" />
+ 
+ <!-- History -->
+ <html:setting-group groupid="history" data-category="panePrivacy" hidden="true" data-srd-groupid="history2"/>
+diff --git a/browser/components/preferences/privacy.js b/browser/components/preferences/privacy.js
+index b67f6c1efa..e572f7b9f7 100644
+--- a/browser/components/preferences/privacy.js
++++ b/browser/components/preferences/privacy.js
+@@ -14,8 +14,8 @@ const { PRIVACY_SEGMENTATION_PREF } = ChromeUtils.importESModule(
+   "chrome://browser/content/preferences/config/permissions-data.mjs",
+   { global: "current" }
+ );
+-// Adds this pane's Windows sign-on, card and address settings, and the
+-// password-saving setting privacy.mjs's settings read, so it loads first.
++// Adds this pane's Windows sign-on setting, and the password-saving setting
++// privacy.mjs's settings read, so it loads first.
+ ChromeUtils.importESModule(
+   "chrome://browser/content/preferences/config/passwords-autofill.mjs",
+   { global: "current" }
+diff --git a/browser/components/preferences/sync.inc.xhtml b/browser/components/preferences/sync.inc.xhtml
+index c379e1a5f8..e5b0c7024d 100644
+--- a/browser/components/preferences/sync.inc.xhtml
++++ b/browser/components/preferences/sync.inc.xhtml
+@@ -208,14 +208,6 @@
+                     <image class="sync-engine-image sync-engine-passwords" alt=""/>
+                     <label data-l10n-id="sync-currently-syncing-passwords"/>
+                   </html:div>
+-                  <html:div engine_preference="services.sync.engine.addresses">
+-                    <image class="sync-engine-image sync-engine-addresses" alt=""/>
+-                    <label data-l10n-id="sync-currently-syncing-addresses"/>
+-                  </html:div>
+-                  <html:div engine_preference="services.sync.engine.creditcards">
+-                    <image class="sync-engine-image sync-engine-creditcards" alt=""/>
+-                    <label data-l10n-id="sync-currently-syncing-payment-methods"/>
+-                  </html:div>
+                   <html:div engine_preference="services.sync.engine.addons">
+                     <image class="sync-engine-image sync-engine-addons" alt=""/>
+                     <label data-l10n-id="sync-currently-syncing-addons"/>
+diff --git a/browser/components/preferences/tests/browser-srd.toml b/browser/components/preferences/tests/browser-srd.toml
+index 835d8e6d33..5525270f5f 100644
+--- a/browser/components/preferences/tests/browser-srd.toml
++++ b/browser/components/preferences/tests/browser-srd.toml
+@@ -1,7 +1,6 @@
+ [DEFAULT]
+ dupe-manifest = true
+ prefs = [
+-  "extensions.formautofill.addresses.available='on'",
+   "signon.management.page.os-auth.enabled=true",
+   "browser.backup.archive.enabled=false",
+   "browser.backup.restore.enabled=false",
+diff --git a/browser/components/preferences/tests/browser.toml b/browser/components/preferences/tests/browser.toml
+index 17d1adc6f5..62e7c2e589 100644
+--- a/browser/components/preferences/tests/browser.toml
++++ b/browser/components/preferences/tests/browser.toml
+@@ -1,7 +1,6 @@
+ [DEFAULT]
+ dupe-manifest = true
+ prefs = [
+-  "extensions.formautofill.addresses.available='on'",
+   "signon.management.page.os-auth.enabled=true",
+   "browser.backup.archive.enabled=false",
+   "browser.backup.restore.enabled=false",
+diff --git a/browser/components/preferences/tests/browser_legacy_pane_mappings.js b/browser/components/preferences/tests/browser_legacy_pane_mappings.js
+index 162bb76baa..570842b298 100644
+--- a/browser/components/preferences/tests/browser_legacy_pane_mappings.js
++++ b/browser/components/preferences/tests/browser_legacy_pane_mappings.js
+@@ -225,30 +225,6 @@ add_task(async function test_legacy_name_routing_and_subcategory_attr() {
+     ["privacy-logins", "#passwordsAutofill", "panePasswordsAutofill", "logins"],
+     ["privacy-permissions", "#permissionsData", "panePermissionsData", null],
+     ["search-firefoxSuggest", "#search", "paneSearch", "locationBar"],
+-    [
+-      "privacy-payment-methods-autofill",
+-      "#passwordsAutofill",
+-      "panePasswordsAutofill",
+-      "payment-methods-autofill",
+-    ],
+-    [
+-      "privacy-credit-card-autofill",
+-      "#passwordsAutofill",
+-      "panePasswordsAutofill",
+-      "credit-card-autofill",
+-    ],
+-    [
+-      "privacy-addresses-autofill",
+-      "#passwordsAutofill",
+-      "panePasswordsAutofill",
+-      "addresses-autofill",
+-    ],
+-    [
+-      "privacy-address-autofill",
+-      "#passwordsAutofill",
+-      "panePasswordsAutofill",
+-      "address-autofill",
+-    ],
+     ["privacy-logins", "#passwordsAutofill", "panePasswordsAutofill", "logins"],
+   ]) {
+     let friendlyCategoryName = getFriendlyPaneName(expectedPane);
+diff --git a/browser/components/preferences/tests/browser_spotlight.js b/browser/components/preferences/tests/browser_spotlight.js
+index e29997cc0f..bee2c01501 100644
+--- a/browser/components/preferences/tests/browser_spotlight.js
++++ b/browser/components/preferences/tests/browser_spotlight.js
+@@ -5,38 +5,9 @@ add_task(async function test_openPreferences_spotlight() {
+ 
+   for (let [arg, expectedPane, expectedHash, expectedSubcategory] of [
+     ["privacy-reports", "panePermissionsData", "#permissionsData", "reports"],
+-    [
+-      "privacy-address-autofill",
+-      "panePasswordsAutofill",
+-      "#passwordsAutofill",
+-      "addresses-autofill address-autofill",
+-    ],
+-    [
+-      "privacy-payment-methods-autofill",
+-      "panePasswordsAutofill",
+-      "#passwordsAutofill",
+-      "payment-methods-autofill credit-card-autofill",
+-    ],
+     ["privacy-logins", "panePasswordsAutofill", "#passwordsAutofill", "logins"],
+     ["privacy-trackingprotection", "panePrivacy", "#privacy", "etpStatus"],
+   ]) {
+-    if (
+-      arg == "privacy-credit-card-autofill" &&
+-      Services.prefs.getCharPref(
+-        "extensions.formautofill.creditCards.supported"
+-      ) == "off"
+-    ) {
+-      continue;
+-    }
+-    if (
+-      arg == "privacy-address-autofill" &&
+-      Services.prefs.getCharPref(
+-        "extensions.formautofill.addresses.supported"
+-      ) == "off"
+-    ) {
+-      continue;
+-    }
+-
+     let prefs = await openPreferencesViaOpenPreferencesAPI(arg, {
+       leaveOpen: true,
+     });
+diff --git a/browser/components/preferences/tests/searchResults/browser.toml b/browser/components/preferences/tests/searchResults/browser.toml
+index fc4707f763..409a298951 100644
+--- a/browser/components/preferences/tests/searchResults/browser.toml
++++ b/browser/components/preferences/tests/searchResults/browser.toml
+@@ -12,8 +12,6 @@ tags = "os_integration"
+ 
+ ["browser_search_results.js"]
+ 
+-["browser_search_subdialog_tooltip_saved_addresses.js"]
+-
+ ["browser_search_subdialogs_within_preferences_1.js"]
+ skip-if = [
+   "tsan", # Bug 1678829
+diff --git a/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.mjs b/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.mjs
+index 9359a485ed..d98f19bd14 100644
+--- a/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.mjs
++++ b/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.mjs
+@@ -34,14 +34,6 @@ const engineTypeToMetadata = {
+     iconSrc: "chrome://browser/skin/login.svg",
+     l10nId: "sync-currently-syncing-passwords",
+   },
+-  addresses: {
+-    iconSrc: "chrome://browser/skin/notification-icons/geo.svg",
+-    l10nId: "sync-currently-syncing-addresses",
+-  },
+-  payments: {
+-    iconSrc: "chrome://browser/skin/payment-methods-16.svg",
+-    l10nId: "sync-currently-syncing-payment-methods",
+-  },
+   addons: {
+     iconSrc: "chrome://mozapps/skin/extensions/extension.svg",
+     l10nId: "sync-currently-syncing-addons",
+@@ -57,7 +49,7 @@ const engineTypeToMetadata = {
+  *
+  * @tagname sync-engines-list
+  * @property {string[]} engines - Array of engine types to display.
+- *   Options: bookmarks, history, tabs, passwords, addresses, payments, addons, settings.
++ *   Options: bookmarks, history, tabs, passwords, addons, settings.
+  */
+ class SyncEnginesList extends MozLitElement {
+   static properties = {
+diff --git a/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.stories.mjs b/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.stories.mjs
+index c3b953b006..96709659c8 100644
+--- a/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.stories.mjs
++++ b/browser/components/preferences/widgets/sync-engine-list/sync-engines-list.stories.mjs
+@@ -21,8 +21,6 @@ export default {
+         "tabs",
+         "passwords",
+         "settings",
+-        "addresses",
+-        "payments",
+         "addons",
+       ],
+     },
+@@ -40,15 +38,7 @@ const Template = ({ engines = [] }) => html`
+ export const Default = Template.bind({});
+ Default.args = {
+   // Note: "addons" icon currently doesn’t render in Storybook.
+-  engines: [
+-    "bookmarks",
+-    "history",
+-    "tabs",
+-    "passwords",
+-    "settings",
+-    "addresses",
+-    "payments",
+-  ],
++  engines: ["bookmarks", "history", "tabs", "passwords", "settings"],
+ };
+ 
+ export const EmptyState = Template.bind({});
+diff --git a/browser/components/storybook/stories/migration-wizard.stories.mjs b/browser/components/storybook/stories/migration-wizard.stories.mjs
+index b8af82e56b..200524cb38 100644
+--- a/browser/components/storybook/stories/migration-wizard.stories.mjs
++++ b/browser/components/storybook/stories/migration-wizard.stories.mjs
+@@ -30,7 +30,6 @@ const FAKE_MIGRATOR_LIST = [
+       "FORMDATA",
+       "PASSWORDS",
+       "BOOKMARKS",
+-      "PAYMENT_METHODS",
+       "EXTENSIONS",
+     ],
+     profile: { id: "Default", name: "Default" },
+@@ -46,7 +45,6 @@ const FAKE_MIGRATOR_LIST = [
+       "FORMDATA",
+       "PASSWORDS",
+       "BOOKMARKS",
+-      "PAYMENT_METHODS",
+       "EXTENSIONS",
+     ],
+     profile: { id: "person-2", name: "Person 2" },
+@@ -75,13 +73,7 @@ const FAKE_MIGRATOR_LIST = [
+     type: MigrationWizardConstants.MIGRATOR_TYPES.BROWSER,
+     key: "chromium-edge",
+     displayName: "Microsoft Edge",
+-    resourceTypes: [
+-      "HISTORY",
+-      "FORMDATA",
+-      "PASSWORDS",
+-      "BOOKMARKS",
+-      "PAYMENT_METHODS",
+-    ],
++    resourceTypes: ["HISTORY", "FORMDATA", "PASSWORDS", "BOOKMARKS"],
+     profile: { id: "Default", name: "Default" },
+     brandImage: "chrome://browser/content/migration/brands/edge.png",
+     hasPermissions: true,
+@@ -90,13 +82,7 @@ const FAKE_MIGRATOR_LIST = [
+     type: MigrationWizardConstants.MIGRATOR_TYPES.BROWSER,
+     key: "brave",
+     displayName: "Brave",
+-    resourceTypes: [
+-      "HISTORY",
+-      "FORMDATA",
+-      "PASSWORDS",
+-      "BOOKMARKS",
+-      "PAYMENT_METHODS",
+-    ],
++    resourceTypes: ["HISTORY", "FORMDATA", "PASSWORDS", "BOOKMARKS"],
+     profile: { id: "Default", name: "Default" },
+     brandImage: "chrome://browser/content/migration/brands/brave.png",
+     hasPermissions: true,
+@@ -360,9 +346,6 @@ Progress.args = {
+       [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.FORMDATA]: {
+         value: MigrationWizardConstants.PROGRESS_VALUE.LOADING,
+       },
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]: {
+-        value: MigrationWizardConstants.PROGRESS_VALUE.LOADING,
+-      },
+     },
+   },
+ };
+@@ -392,10 +375,6 @@ PartialProgress.args = {
+         value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+         message: "Addresses, credit cards, form history",
+       },
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]: {
+-        value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+-        message: "6 payment methods",
+-      },
+     },
+   },
+ };
+@@ -427,10 +406,6 @@ Success.args = {
+         value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+         message: "Addresses, credit cards, form history",
+       },
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]: {
+-        value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+-        message: "6 payment methods",
+-      },
+     },
+   },
+ };
+@@ -462,10 +437,6 @@ SuccessWithWarnings.args = {
+         value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+         message: "Addresses, credit cards, form history",
+       },
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]: {
+-        value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+-        message: "6 payment methods",
+-      },
+     },
+   },
+ };
+@@ -500,10 +471,6 @@ ExtensionsPartialSuccess.args = {
+         value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+         message: "Addresses, credit cards, form history",
+       },
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]: {
+-        value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+-        message: "6 payment methods",
+-      },
+     },
+   },
+ };
+@@ -537,10 +504,6 @@ ExtensionsImportFailure.args = {
+         value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+         message: "Addresses, credit cards, form history",
+       },
+-      [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PAYMENT_METHODS]: {
+-        value: MigrationWizardConstants.PROGRESS_VALUE.SUCCESS,
+-        message: "6 payment methods",
+-      },
+     },
+   },
+ };
+diff --git a/browser/components/tests/browser/browser_browserGlue_os_auth.js b/browser/components/tests/browser/browser_browserGlue_os_auth.js
+index 254f8c3572..b5d61bcb71 100644
+--- a/browser/components/tests/browser/browser_browserGlue_os_auth.js
++++ b/browser/components/tests/browser/browser_browserGlue_os_auth.js
+@@ -3,24 +3,12 @@
+ 
+ "use strict";
+ 
+-const { FormAutofillUtils } = ChromeUtils.importESModule(
+-  "resource://gre/modules/shared/FormAutofillUtils.sys.mjs"
++const { LoginHelper } = ChromeUtils.importESModule(
++  "resource://gre/modules/LoginHelper.sys.mjs"
+ );
+ 
+ // Check whether os auth is disabled by default for new profiles
+-add_task(async function test_creditCards_os_auth_disabled_for_new_profile() {
+-  Assert.ok(
+-    !FormAutofillUtils.getOSAuthEnabled(),
+-    "OS Auth should be disabled for credit cards by default for a new profile."
+-  );
+-
+-  Assert.ok(
+-    Services.prefs.prefIsLocked(
+-      FormAutofillUtils.AUTOFILL_CREDITCARDS_OS_AUTH_LOCKED_PREF
+-    ),
+-    "Pref should be locked"
+-  );
+-
++add_task(async function test_passwords_os_auth_disabled_for_new_profile() {
+   Assert.ok(
+     !LoginHelper.getOSAuthEnabled(),
+     "OS Auth should be disabled for passwords by default."
+diff --git a/browser/components/tests/unit/test_browserGlue_migration_osauth.js b/browser/components/tests/unit/test_browserGlue_migration_osauth.js
+index e4fabb3c24..622d49cc71 100644
+--- a/browser/components/tests/unit/test_browserGlue_migration_osauth.js
++++ b/browser/components/tests/unit/test_browserGlue_migration_osauth.js
+@@ -14,20 +14,11 @@ const NIGHTLY_ONLY_DATA_MIGRATION = 158;
+ const { LoginHelper } = ChromeUtils.importESModule(
+   "resource://gre/modules/LoginHelper.sys.mjs"
+ );
+-const { FormAutofillUtils } = ChromeUtils.importESModule(
+-  "resource://gre/modules/shared/FormAutofillUtils.sys.mjs"
+-);
+-
+-const CC_OLD_PREF = "extensions.formautofill.creditCards.reauth.optout";
+-const CC_NEW_PREF = FormAutofillUtils.AUTOFILL_CREDITCARDS_OS_AUTH_LOCKED_PREF;
+-
+ const PASSWORDS_OLD_PREF = "signon.management.page.os-auth.optout";
+ const PASSWORDS_NEW_PREF = LoginHelper.OS_AUTH_FOR_PASSWORDS_BOOL_PREF;
+ 
+ function clearPrefs() {
+   Services.prefs.clearUserPref("browser.migration.version");
+-  Services.prefs.clearUserPref(CC_OLD_PREF);
+-  Services.prefs.clearUserPref(CC_NEW_PREF);
+   Services.prefs.clearUserPref(PASSWORDS_OLD_PREF);
+   Services.prefs.clearUserPref(PASSWORDS_NEW_PREF);
+   Services.prefs.clearUserPref("browser.startup.homepage_override.mstone");
+@@ -47,15 +38,10 @@ add_task(async function setup() {
+ 
+ add_task(async function test_pref_migration_old_pref_os_auth_disabled() {
+   Services.prefs.setIntPref("browser.migration.version", UI_VERSION - 1);
+-  Services.prefs.setStringPref(CC_OLD_PREF, "off");
+   Services.prefs.setStringPref(PASSWORDS_OLD_PREF, "off");
+ 
+   simulateUIMigration();
+ 
+-  Assert.ok(
+-    !FormAutofillUtils.getOSAuthEnabled(),
+-    "OS Auth should be disabled for credit cards since it was disabled before migration."
+-  );
+   Assert.ok(
+     !LoginHelper.getOSAuthEnabled(),
+     "OS Auth should be disabled for passwords since it was disabled before migration."
+@@ -65,15 +51,10 @@ add_task(async function test_pref_migration_old_pref_os_auth_disabled() {
+ 
+ add_task(async function test_pref_migration_old_pref_os_auth_enabled() {
+   Services.prefs.setIntPref("browser.migration.version", UI_VERSION - 1);
+-  Services.prefs.setStringPref(CC_OLD_PREF, "");
+   Services.prefs.setStringPref(PASSWORDS_OLD_PREF, "");
+ 
+   simulateUIMigration();
+ 
+-  Assert.ok(
+-    FormAutofillUtils.getOSAuthEnabled(),
+-    "OS Auth should be enabled for credit cards since it was enabled before migration."
+-  );
+   Assert.ok(
+     LoginHelper.getOSAuthEnabled(),
+     "OS Auth should be enabled for passwords since it was enabled before migration."
+@@ -93,10 +74,6 @@ add_task(async function test_pref_migration_real_pref_os_auth_disabled() {
+ 
+   simulateUIMigration();
+ 
+-  Assert.ok(
+-    !FormAutofillUtils.getOSAuthEnabled(),
+-    "OS Auth should be disabled for credit cards."
+-  );
+   Assert.ok(
+     !LoginHelper.getOSAuthEnabled(),
+     "OS Auth should be disabled for passwords since it was disabled before migration."
+diff --git a/browser/components/tests/unit/xpcshell.toml b/browser/components/tests/unit/xpcshell.toml
+index 79d21a6fea..5c5bd1b9c4 100644
+--- a/browser/components/tests/unit/xpcshell.toml
++++ b/browser/components/tests/unit/xpcshell.toml
+@@ -8,8 +8,6 @@ support-files = ["distribution.ini"]
+ 
+ ["test_browserGlue_migration_ctrltab_recently_used_order.js"]
+ 
+-["test_browserGlue_migration_formautofill.js"]
+-
+ ["test_browserGlue_migration_no_errors.js"]
+ 
+ ["test_browserGlue_migration_osauth.js"]
+diff --git a/browser/docs/index.rst b/browser/docs/index.rst
+index e7a95b3014..825ea81840 100644
+--- a/browser/docs/index.rst
++++ b/browser/docs/index.rst
+@@ -17,7 +17,6 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    components/customizableui/docs/index
+    components/enterprisepolicies/docs/index
+    components/taskbartabs/docs/index
+-   extensions/formautofill/docs/index
+    installer/windows/installer/index
+    /toolkit/mozapps/defaultagent/default-browser-agent/index
+    components/migration/docs/index
+diff --git a/browser/extensions/moz.build b/browser/extensions/moz.build
+index c03e1ce59d..96028e39b3 100644
+--- a/browser/extensions/moz.build
++++ b/browser/extensions/moz.build
+@@ -3,7 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ DIRS += [
+-    "formautofill",
+     "webcompat",
+     "pictureinpicture",
+ ]
+diff --git a/browser/locales/en-US/browser/confirmationHints.ftl b/browser/locales/en-US/browser/confirmationHints.ftl
+index d63e973b3d..9b98019f14 100644
+--- a/browser/locales/en-US/browser/confirmationHints.ftl
++++ b/browser/locales/en-US/browser/confirmationHints.ftl
+@@ -10,10 +10,6 @@ confirmation-hint-password-removed = Password removed!
+ confirmation-hint-page-bookmarked = Saved to bookmarks
+ confirmation-hint-password-created = Password saved
+ confirmation-hint-password-updated = Password updated
+-confirmation-hint-address-created = Address saved
+-confirmation-hint-address-updated = Address updated
+-confirmation-hint-credit-card-created = Card saved
+-confirmation-hint-credit-card-updated = Card updated
+ confirmation-hint-pin-tab = Pinned!
+ confirmation-hint-pin-tab-description = Right-click the tab to unpin it.
+ confirmation-hint-send-to-device = Sent!
+diff --git a/browser/locales/en-US/browser/migrationWizard.ftl b/browser/locales/en-US/browser/migrationWizard.ftl
+index 8341f95a6f..e833eda058 100644
+--- a/browser/locales/en-US/browser/migrationWizard.ftl
++++ b/browser/locales/en-US/browser/migrationWizard.ftl
+@@ -88,7 +88,6 @@ migration-passwords-option-label = Saved passwords
+ migration-history-option-label = Browsing history
+ migration-extensions-option-label = Extensions
+ migration-form-autofill-option-label = Form autofill data
+-migration-payment-methods-option-label = Payment methods
+ migration-cookies-option-label = Cookies
+ migration-session-option-label = Windows and tabs
+ migration-otherdata-option-label = Other data
+@@ -192,7 +191,6 @@ migration-list-password-label = passwords
+ migration-list-history-label = history
+ migration-list-extensions-label = extensions
+ migration-list-autofill-label = autofill data
+-migration-list-payment-methods-label = payment methods
+ 
+ ##
+ 
+@@ -322,17 +320,6 @@ migration-wizard-progress-success-history =
+ 
+ migration-wizard-progress-success-formdata = Form history
+ 
+-# Shown in the migration wizard after importing payment methods from another
+-# browser has completed.
+-#
+-# Variables:
+-#  $quantity (Number): the number of successfully imported payment methods
+-migration-wizard-progress-success-payment-methods =
+-    { $quantity ->
+-        [one] { $quantity } payment method
+-       *[other] { $quantity } payment methods
+-    }
+-
+ migration-wizard-safari-permissions-sub-header = To import Safari bookmarks and browsing history:
+ migration-wizard-safari-instructions-continue = Select “Continue”
+ migration-wizard-safari-instructions-folder = Select Safari folder in the list and choose “Open”
+diff --git a/browser/locales/en-US/browser/policies/policies-descriptions.ftl b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+index ac00afe5b2..28598ee0fe 100644
+--- a/browser/locales/en-US/browser/policies/policies-descriptions.ftl
++++ b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+@@ -23,10 +23,6 @@ policy-AppUpdateURL = Set custom app update URL.
+ 
+ policy-Authentication = Configure integrated authentication for websites that support it.
+ 
+-policy-AutofillAddressEnabled = Enable autofill for addresses.
+-
+-policy-AutofillCreditCardEnabled = Enable autofill for payment methods.
+-
+ policy-AutoLaunchProtocolsFromOrigins = Define a list of external protocols that can be used from listed origins without prompting the user.
+ 
+ policy-BackgroundAppUpdate2 = Enable or disable the background updater.
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 6266836826..0705a834c5 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -1405,8 +1405,6 @@ sync-currently-syncing-bookmarks = Bookmarks
+ sync-currently-syncing-history = History
+ sync-currently-syncing-tabs = Open tabs
+ sync-currently-syncing-passwords = Passwords
+-sync-currently-syncing-addresses = Addresses
+-sync-currently-syncing-payment-methods = Payment methods
+ sync-currently-syncing-addons = Add-ons
+ sync-currently-syncing-settings = Settings
+ 
+@@ -1449,16 +1447,6 @@ sync-engine-passwords =
+     .tooltiptext = Passwords you’ve saved
+     .accesskey = P
+ 
+-sync-engine-addresses =
+-    .label = Addresses
+-    .tooltiptext = Postal addresses you’ve saved (desktop only)
+-    .accesskey = e
+-
+-sync-engine-payment-methods2 =
+-    .label = Payment methods
+-    .tooltiptext = Names, card numbers, and expiry dates
+-    .accesskey = n
+-
+ sync-engine-addons =
+     .label = Add-ons
+     .tooltiptext = Extensions and themes for { -brand-short-name }
+@@ -1527,84 +1515,6 @@ privacy-panel-breach-alerts =
+ forms-windows-sso =
+     .label = Allow Windows single sign-on for Microsoft, work, and school accounts
+ 
+-## OS Authentication dialog
+-
+-# The macOS string is preceded by the operating system with "Firefox is trying to ".
+-autofill-creditcard-os-dialog-message = { PLATFORM () ->
+-    [macos] change the settings for payment methods
+-    *[other] { -brand-short-name } is trying to change the settings for payment methods. Use your device sign in to allow this.
+-}
+-autofill-creditcard-os-auth-dialog-caption = { -brand-full-name }
+-
+-## Privacy section - Autofill
+-
+-payments-group =
+-    .label = Payment methods
+-
+-autofill-payment-methods-header =
+-    .aria-label = Payment methods
+-autofill-payment-methods-checkbox-message-2 =
+-    .label = Save and autofill payment info
+-    .accesskey = p
+-autofill-payment-methods-manage-payments-title =
+-    .heading = Manage payment methods
+-autofill-payment-methods-manage-payments-button =
+-    .label = Manage payment methods
+-    .accesskey = m
+-# This operation requires the user to authenticate with the operating system (device sign-in)
+-autofill-reauth-payment-methods-checkbox-2 =
+-    .label = Require device sign in to autofill and manage payment methods
+-    .accesskey = o
+-
+-autofill-payment-methods-add-button = Add new payment method
+-payments-list-header =
+-  .label = Payment methods
+-payments-delete-payment-prompt-title = Delete this payment method?
+-payments-delete-payment-prompt-confirm-button = Delete
+-payments-delete-payment-prompt-cancel-button = Cancel
+-payments-delete-payment-button-label =
+-    .aria-label = Delete
+-payments-edit-payment-button-label =
+-    .aria-label = Edit
+-
+-# This message is displayed when no payment methods such as credit card are stored in Firefox
+-payments-no-payments-stored-message =
+-    .label = No payment methods added
+-
+-# These values are displayed for each credit card record listed on the Manage Payment methods
+-# settings page.
+-# Variables:
+-#   $cardNumber (string) - The obscured credit card number (for example: ********* 2423)
+-#   $expDate (string) - The obscured expiry date of the credit card (for example: XX/2027)
+-payment-moz-box-item =
+-  .label = { $cardNumber }
+-  .description = { $expDate }
+-
+-addresses-group =
+-    .label = Addresses and more
+-autofill-addresses-checkbox-message =
+-    .label = Save and autofill addresses
+-    .accesskey = S
+-autofill-addresses-manage-addresses-button =
+-    .label = Manage addresses and more
+-    .accesskey = M
+-addresses-list-header =
+-    .label = Addresses
+-addreses-delete-address-button-label =
+-    .aria-label = Delete
+-addreses-edit-address-button-label =
+-    .aria-label = Edit
+-addresses-delete-address-prompt-title = Delete this address?
+-addresses-delete-address-prompt-confirm-button = Delete
+-addresses-delete-address-prompt-cancel-button = Cancel
+-autofill-addresses-add-button = Add new address
+-autofill-addresses-manage-addresses-title =
+-    .heading = Manage addresses and more
+-
+-# This message is displayed when no addresses are stored in Firefox
+-addresses-no-addresses-stored-message =
+-    .label = No addresses added
+-
+ pane-passwords-autofill-title2 = Passwords and autofill
+   .title = Passwords and autofill
+ preferences-passwords-autofill-header =
+diff --git a/browser/locales/l10n.toml b/browser/locales/l10n.toml
+index 7290692f1c..783b2e8a22 100644
+--- a/browser/locales/l10n.toml
++++ b/browser/locales/l10n.toml
+@@ -133,13 +133,6 @@ locales = [
+     reference = "browser/branding/official/locales/en-US/**"
+     l10n = "{l}browser/branding/official/**"
+ 
+-# This file was removed in bug 1948916. In order to keep this file in
+-# repositories, we need to preserve this entry until esr115 becomes
+-# unsupported.
+-[[paths]]
+-    reference = "browser/extensions/formautofill/locales/en-US/**"
+-    l10n = "{l}browser/extensions/formautofill/**"
+-
+ # This file was removed in bug 1952334. In order to keep this file in
+ # repositories, we need to preserve this entry until esr115 becomes
+ # unsupported.
+diff --git a/browser/themes/shared/browser-shared.css b/browser/themes/shared/browser-shared.css
+index 58a51d3b6f..5dfcb8634e 100644
+--- a/browser/themes/shared/browser-shared.css
++++ b/browser/themes/shared/browser-shared.css
+@@ -31,7 +31,6 @@
+ @import url("chrome://browser/skin/searchbar.css");
+ @import url("chrome://browser/skin/sidebar.css");
+ @import url("chrome://browser/skin/customizableui/customizeMode.css");
+-@import url("chrome://browser/skin/formautofill-notification.css");
+ 
+ :root,
+ body {
+diff --git a/browser/themes/shared/jar.inc.mn b/browser/themes/shared/jar.inc.mn
+index 9963f1d7b2..56e3274a6e 100644
+--- a/browser/themes/shared/jar.inc.mn
++++ b/browser/themes/shared/jar.inc.mn
+@@ -18,7 +18,6 @@
+   skin/classic/browser/blockedSite.css                         (../shared/blockedSite.css)
+   skin/classic/browser/browser-colors.css                      (../shared/browser-colors.css)
+   skin/classic/browser/browser-shared.css                      (../shared/browser-shared.css)
+-  skin/classic/browser/formautofill-notification.css           (../shared/formautofill-notification.css)
+   skin/classic/browser/identity-credential-notification.css    (../shared/identity-credential-notification.css)
+   skin/classic/browser/menupanel.css                           (../shared/menupanel.css)
+   skin/classic/browser/notification-icons.css                  (../shared/notification-icons.css)
+@@ -89,9 +88,6 @@
+   skin/classic/browser/downloads/notification-start-animation.svg        (../shared/downloads/notification-start-animation.svg)
+   skin/classic/browser/downloads/progressmeter.css             (../shared/downloads/progressmeter.css)
+   skin/classic/browser/drm-icon.svg                            (../shared/drm-icon.svg)
+-  skin/classic/browser/formautofill/icon-capture-address-fields.svg      (../shared/formautofill/icon-capture-address-fields.svg)
+-  skin/classic/browser/formautofill/icon-capture-email-fields.svg        (../shared/formautofill/icon-capture-email-fields.svg)
+-  skin/classic/browser/formautofill/icon-doorhanger-menu.svg        (../shared/formautofill/icon-doorhanger-menu.svg)
+   skin/classic/browser/identity-block/identity-block.css       (../shared/identity-block/identity-block.css)
+   skin/classic/browser/permissions.svg                         (../shared/identity-block/permissions.svg)
+   skin/classic/browser/migration/migration-dialog-window.css   (../shared/migration/migration-dialog-window.css)
+@@ -230,7 +226,6 @@
+   skin/classic/browser/new-tab.svg                    (../shared/icons/new-tab.svg)
+   skin/classic/browser/notification-fill-12.svg       (../shared/icons/notification-fill-12.svg)
+   skin/classic/browser/open.svg                       (../shared/icons/open.svg)
+-  skin/classic/browser/payment-methods-16.svg         (../shared/icons/payment-methods-16.svg)
+   skin/classic/browser/pin-12.svg                     (../shared/icons/pin-12.svg)
+   skin/classic/browser/pin.svg                        (../shared/icons/pin.svg)
+   skin/classic/browser/privateBrowsing.svg            (../shared/icons/privateBrowsing.svg)
+diff --git a/browser/themes/shared/preferences/preferences.css b/browser/themes/shared/preferences/preferences.css
+index e760e496bd..32d668124f 100644
+--- a/browser/themes/shared/preferences/preferences.css
++++ b/browser/themes/shared/preferences/preferences.css
+@@ -131,13 +131,6 @@ setting-group[data-category] {
+   margin: 0 0 var(--space-xlarge);
+ }
+ 
+-/* Bug 2002963 - payments and addresses are in a groupbox together, but they probably shouldn't be */
+-#formAutofillGroupBox:not([hidden]) {
+-  display: flex;
+-  flex-direction: column;
+-  gap: 32px;
+-}
+-
+ html|h1 {
+   margin: 0 0 var(--space-large);
+ }
+@@ -947,16 +940,6 @@ dialog > .sync-engines-list + hbox {
+   list-style-image: url("chrome://global/skin/icons/settings.svg");
+ }
+ 
+-.sync-engine-addresses .checkbox-icon,
+-.sync-engine-addresses.sync-engine-image {
+-  list-style-image: url("chrome://formautofill/content/formfill-anchor.svg");
+-}
+-
+-.sync-engine-creditcards .checkbox-icon,
+-.sync-engine-creditcards.sync-engine-image {
+-  list-style-image: url("chrome://formautofill/content/icon-credit-card-generic.svg");
+-}
+-
+ .fxaMobilePromo {
+   margin-top: 2px !important;
+   margin-bottom: var(--space-xxlarge);
+@@ -1565,16 +1548,6 @@ setting-pane[onsearchpane] {
+   gap: var(--space-small);
+ }
+ 
+-#addresses-list-header,
+-#payments-list-header {
+-  --box-label-font-weight: var(--font-weight-heading);
+-}
+-
+-#no-addresses-stored,
+-#no-payments-stored {
+-  color: var(--text-color-deemphasized);
+-}
+-
+ .box-header-bold {
+   --box-label-font-weight: var(--font-weight-heading);
+ }
+diff --git a/dom/base/ChromeUtils.cpp b/dom/base/ChromeUtils.cpp
+index 375d270ac6..b481bb16d8 100644
+--- a/dom/base/ChromeUtils.cpp
++++ b/dom/base/ChromeUtils.cpp
+@@ -29,7 +29,6 @@
+ #include "mozilla/CycleCollectedJSRuntime.h"
+ #include "mozilla/ErrorNames.h"
+ #include "mozilla/EventStateManager.h"
+-#include "mozilla/FormAutofillNative.h"
+ #include "mozilla/IntentionalCrash.h"
+ #include "mozilla/KeySystemConfig.h"
+ #include "mozilla/PerfStats.h"
+@@ -2659,14 +2658,6 @@ already_AddRefed<Promise> ChromeUtils::CollectScrollingData(
+   return promise.forget();
+ }
+ 
+-/* static */
+-void ChromeUtils::GetFormAutofillConfidences(
+-    GlobalObject& aGlobal, const Sequence<OwningNonNull<Element>>& aElements,
+-    nsTArray<FormAutofillConfidences>& aResults, ErrorResult& aRv) {
+-  FormAutofillNative::GetFormAutofillConfidences(aGlobal, aElements, aResults,
+-                                                 aRv);
+-}
+-
+ bool ChromeUtils::IsDarkBackground(GlobalObject&, Element& aElement) {
+   nsIFrame* f = aElement.GetPrimaryFrame(FlushType::Frames);
+   if (!f) {
+diff --git a/dom/base/ChromeUtils.h b/dom/base/ChromeUtils.h
+index faea0c60f1..3e17c03421 100644
+--- a/dom/base/ChromeUtils.h
++++ b/dom/base/ChromeUtils.h
+@@ -326,10 +326,6 @@ class ChromeUtils {
+   static already_AddRefed<Promise> CollectScrollingData(GlobalObject& aGlobal,
+                                                         ErrorResult& aRv);
+ 
+-  static void GetFormAutofillConfidences(
+-      GlobalObject& aGlobal, const Sequence<OwningNonNull<Element>>& aElements,
+-      nsTArray<FormAutofillConfidences>& aResults, ErrorResult& aRv);
+-
+   static bool IsDarkBackground(GlobalObject&, Element&);
+ 
+   static double DateNow(GlobalObject&);
+diff --git a/dom/chrome-webidl/ChromeUtils.webidl b/dom/chrome-webidl/ChromeUtils.webidl
+index b7824d3d33..3c10721b39 100644
+--- a/dom/chrome-webidl/ChromeUtils.webidl
++++ b/dom/chrome-webidl/ChromeUtils.webidl
+@@ -60,15 +60,6 @@ dictionary InteractionData {
+   unsigned long scrollingDistanceInPixels = 0;
+ };
+ 
+-/**
+- * Confidence value of credit card fields. This is used by the native
+- * Fathom Credit Card model to return the score to JS.
+- */
+-dictionary FormAutofillConfidences {
+-  double ccNumber = 0;
+-  double ccName = 0;
+-};
+-
+ enum ResourceCacheType {
+   "stylesheet",
+   "script",
+@@ -895,9 +886,6 @@ partial namespace ChromeUtils {
+   [NewObject]
+   Promise<InteractionData> collectScrollingData();
+ 
+-  [Throws]
+-  sequence<FormAutofillConfidences> getFormAutofillConfidences(sequence<Element> elements);
+-
+   /**
+    * Returns whether the background of the element is dark.
+    */
+diff --git a/dom/security/nsContentSecurityUtils.cpp b/dom/security/nsContentSecurityUtils.cpp
+index 832d6dba5b..021dc9cc98 100644
+--- a/dom/security/nsContentSecurityUtils.cpp
++++ b/dom/security/nsContentSecurityUtils.cpp
+@@ -1298,8 +1298,6 @@ static nsLiteralCString sStyleSrcUnsafeInlineAllowList[] = {
+     "chrome://devtools/content/memory/index.xhtml"_ns,
+     "chrome://devtools/content/shared/sourceeditor/codemirror/cmiframe.html"_ns,
+     "chrome://devtools/content/webconsole/index.html"_ns,
+-    "chrome://formautofill/content/manageAddresses.xhtml"_ns,
+-    "chrome://formautofill/content/manageCreditCards.xhtml"_ns,
+     "chrome://gfxsanity/content/sanityparent.html"_ns,
+     "chrome://global/content/commonDialog.xhtml"_ns,
+     "chrome://global/content/resetProfileProgress.xhtml"_ns,
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index 6a43e9e3ce..1c259edaa8 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -138,7 +138,6 @@ export default [
+   {
+     name: "globals-chrome-script",
+     files: [
+-      "browser/extensions/formautofill/test/mochitest/formautofill_parent_utils.js",
+       "browser/tools/mozscreenshots/mozscreenshots/extension/configurations/PermissionPrompts.sys.mjs",
+       "docshell/test/mochitest/test_bug509055.html",
+       "docshell/test/navigation/test_bug1300461.html",
+@@ -488,7 +487,6 @@ export default [
+       "browser/components/preferences/tests/browser_contentblocking_categories.js",
+       "browser/components/preferences/tests/browser_contentblocking.js",
+       "browser/components/preferences/tests/browser_extension_controlled.js",
+-      "browser/extensions/formautofill/background.js",
+       "devtools/client/responsive/test/browser/browser_ext_messaging.js",
+       "dom/fetch/tests/test_ext_response_constructor.html",
+       "mobile/android/android-components/components/browser/icons/src/main/assets/extensions/browser-icons/icons.js",
+diff --git a/eslint-ignores.config.mjs b/eslint-ignores.config.mjs
+index 973efda4a0..61d240dacf 100644
+--- a/eslint-ignores.config.mjs
++++ b/eslint-ignores.config.mjs
+@@ -67,7 +67,6 @@ export default [
+   // The only file in browser/locales/ is pre-processed.
+   "browser/locales/",
+   // Generated data files
+-  "browser/extensions/formautofill/phonenumberutils/PhoneNumberMetaData.sys.mjs",
+ 
+   // Ignore newtab files
+ 
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 2f820004b0..f7c75ccd32 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -80,7 +80,6 @@ export default [
+       "toolkit/components/crashes/**",
+       "toolkit/components/enterprisepolicies/**",
+       "toolkit/components/extensions/**",
+-      "toolkit/components/formautofill/**",
+       "toolkit/components/messaging-system/**",
+       "toolkit/components/places/**",
+       "toolkit/components/printing/**",
+@@ -329,7 +328,6 @@ export default [
+       "browser/components/tests/browser/**",
+       "browser/components/topsites/**",
+       "browser/components/translations/**",
+-      "browser/extensions/formautofill/**",
+       "browser/extensions/pictureinpicture/**",
+       "browser/extensions/webcompat/**",
+       "browser/fxr/content/permissions.js",
+@@ -386,7 +384,6 @@ export default [
+       "toolkit/components/enterprisepolicies/EnterprisePolicies*.sys.mjs",
+       "toolkit/components/extensions/**",
+       "toolkit/components/forgetaboutsite/**",
+-      "toolkit/components/formautofill/**",
+       "toolkit/components/glean/tests/browser/**",
+       "toolkit/components/httpsonlyerror/tests/browser/head.js",
+       "toolkit/components/kvstore/kvstore.sys.mjs",
+@@ -937,8 +934,6 @@ export default [
+       "browser/components/urlbar/tests/browser-UrlbarView/browser_resultTypes_display.js",
+       "browser/components/urlbar/tests/quicksuggest/browser/browser_quicksuggest_configuration.js",
+       "browser/components/urlbar/tests/quicksuggest/browser/browser_quicksuggest_indexes.js",
+-      "browser/extensions/formautofill/test/browser/browser_dropdown_layout.js",
+-      "browser/extensions/formautofill/test/browser/creditCard/browser_anti_clickjacking.js",
+       "browser/extensions/webcompat/tests/browser/head.js",
+       "browser/modules/test/browser/browser_PageActions.js",
+       "browser/modules/test/browser/browser_PageActions_contextMenus.js",
+@@ -1717,8 +1712,6 @@ export default [
+       "toolkit/components/extensions/WebNavigation.sys.mjs",
+       "toolkit/components/extensions/parent/ext-browserSettings.js",
+       "toolkit/components/extensions/parent/ext-browsingData.js",
+-      "toolkit/components/formautofill/FormAutofillPreferences.sys.mjs",
+-      "toolkit/components/formautofill/default/FormAutofillPrompter.sys.mjs",
+       "toolkit/components/passwordmgr/LoginHelper.sys.mjs",
+       "toolkit/components/pictureinpicture/PictureInPicture.sys.mjs",
+       "toolkit/components/satchel/integrations/FirefoxRelay.sys.mjs",
+diff --git a/modules/libpref/Preferences.cpp b/modules/libpref/Preferences.cpp
+index b6200c2317..1013476bb0 100644
+--- a/modules/libpref/Preferences.cpp
++++ b/modules/libpref/Preferences.cpp
+@@ -6526,8 +6526,6 @@ static const PrefListEntry sDynamicPrefOverrideList[]{
+     PREF_LIST_ENTRY("capability.policy"),
+     PREF_LIST_ENTRY("dom.securecontext.allowlist"),
+     PREF_LIST_ENTRY("extensions.foobaz"),
+-    PREF_LIST_ENTRY(
+-        "extensions.formautofill.creditCards.heuristics.testConfidence"),
+     PREF_LIST_ENTRY("general.appversion.override"),
+     PREF_LIST_ENTRY("general.buildID.override"),
+     PREF_LIST_ENTRY("general.oscpu.override"),
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index f71d7e951a..bc12b8dca1 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -3963,73 +3963,8 @@ pref("dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled", false
+ // "locked" attribute.
+ pref("security.storage.encryption.sqlite.enabled", false, locked);
+ 
+-// Preferences for the form autofill toolkit component.
+-// The truthy values of "extensions.formautofill.addresses.available"
+-// is "on" and "detect",
+-// any other value means autofill isn't available.
+-// "detect" means it's enabled if conditions defined in the extension are met.
+-// Note: "extensions.formautofill.available"
+-// is not being used in form autofill, but need to exist for migration purposes.
+-pref("extensions.formautofill.available", "detect");
+-
+-#if defined(NIGHTLY_BUILD) && !defined(ANDROID)
+-pref("extensions.formautofill.addresses.supported", "on");
+-// Use ML for address form field detection.
+-pref("extensions.formautofill.useml", true);
+-#else
+-pref("extensions.formautofill.addresses.supported", "detect");
+-pref("extensions.formautofill.useml", false);
+-#endif
+-pref("extensions.formautofill.addresses.enabled", true);
+-pref("extensions.formautofill.addresses.capture.enabled", true);
+-#if defined(ANDROID)
+-  // On android we have custom logic to control this. Ideally we should use nimbus there as well.
+-  // https://github.com/mozilla-mobile/firefox-android/blob/d566743ea0f041ce27c1204da903de380f96b46e/fenix/app/src/main/java/org/mozilla/fenix/utils/Settings.kt#L1502-L1510
+-  pref("extensions.formautofill.addresses.experiments.enabled", true);
+-#else
+-  // Whether address autofill is enabled or not ( this is set via Nimbus )
+-  pref("extensions.formautofill.addresses.experiments.enabled", false);
+-#endif
+-pref("extensions.formautofill.addresses.ignoreAutocompleteOff", true);
+-// Supported countries need to follow ISO 3166-1 to align with "browser.search.region"
+-pref("extensions.formautofill.addresses.supportedCountries", "US,CA,GB,FR,DE,BR,ES,JP,AT,IN,IT,PL,AU,NL");
+-pref("extensions.formautofill.creditCards.supported", "on");
+-pref("extensions.formautofill.creditCards.enabled", true);
+-pref("extensions.formautofill.creditCards.ignoreAutocompleteOff", true);
+-
+-// Supported countries need to follow ISO 3166-1 to align with "browser.search.region"
+-pref("extensions.formautofill.creditCards.supportedCountries", "US,CA,GB,FR,DE,IT,ES,AT,BE,PL");
+-
+-// Algorithm used by formautofill while determine whether a field is a credit card field
+-// 0:Heurstics based on regular expression string matching
+-// 1:Fathom in js implementation
+-// 2:Fathom in c++ implementation
+-pref("extensions.formautofill.creditCards.heuristics.mode", 2);
+-pref("extensions.formautofill.creditCards.heuristics.fathom.types", "cc-number,cc-name");
+-// Defines the threshold to identify whether a field is a cc field
+-pref("extensions.formautofill.creditCards.heuristics.fathom.confidenceThreshold", "0.5");
+-// This is Only for testing! Set the confidence value (> 0 && <= 1) after a field is identified by fathom
+-pref("extensions.formautofill.creditCards.heuristics.fathom.testConfidence", "0");
+-
+-pref("extensions.formautofill.loglevel", "Warn");
+-
+-// Temporary prefs that we will be removed if the telemetry data (added in Fx123) does not show any problems with the new heuristics.
+-pref("extensions.formautofill.heuristics.captureOnFormRemoval", true);
+-pref("extensions.formautofill.heuristics.captureOnPageNavigation", true);
+-
+-pref("extensions.formautofill.heuristics.detectDynamicFormChanges", true);
+-pref("extensions.formautofill.heuristics.fillOnDynamicFormChanges", true);
+-// Note: The greater the timeout value the higher the risk of automatically filling fields after a non-script/user action.
+-pref("extensions.formautofill.heuristics.fillOnDynamicFormChanges.timeout", 1000);
+-pref("extensions.formautofill.heuristics.refillOnSiteClearingFields", true);
+-pref("extensions.formautofill.heuristics.refillOnSiteClearingFields.timeout", 500);
+-
+-pref("extensions.formautofill.heuristics.autofillSameOriginWithTop", true);
+-
+ pref("toolkit.osKeyStore.loglevel", "Warn");
+ 
+-pref("extensions.formautofill.supportRTL", false);
+-
+ // Controls the log level for CookieBannerListService.sys.mjs.
+ pref("cookiebanners.listService.logLevel", "Error");
+ 
+diff --git a/mots.yaml b/mots.yaml
+index 63a7455dfe..fe5fb5fa18 100644
+--- a/mots.yaml
++++ b/mots.yaml
+@@ -3745,7 +3745,6 @@ modules:
+       - name: Form Autofill
+         description: Form detection and autocomplete.
+         includes:
+-          - browser/extensions/formautofill/**/*
+           - toolkit/components/autocomplete/**/*
+           - toolkit/components/satchel/**/*
+         meta:
+diff --git a/remote/shared/RecommendedPreferences.sys.mjs b/remote/shared/RecommendedPreferences.sys.mjs
+index deeec23318..1103ef272c 100644
+--- a/remote/shared/RecommendedPreferences.sys.mjs
++++ b/remote/shared/RecommendedPreferences.sys.mjs
+@@ -275,10 +275,6 @@ const COMMON_PREFERENCES = new Map([
+   ["extensions.autoDisableScopes", 0],
+   ["extensions.enabledScopes", 5],
+ 
+-  // Disable form autofill for extensions and credit cards
+-  ["extensions.formautofill.addresses.enabled", false],
+-  ["extensions.formautofill.creditCards.enabled", false],
+-
+   // Disable metadata caching for installed add-ons by default
+   ["extensions.getAddons.cache.enabled", false],
+ 
+diff --git a/services/sync/docs/engines.rst b/services/sync/docs/engines.rst
+index cf1ca2b58a..f5a2b26aa7 100644
+--- a/services/sync/docs/engines.rst
++++ b/services/sync/docs/engines.rst
+@@ -96,30 +96,6 @@ on Sync's behalf.
+ It also attempts to sync themes etc. The future of this engine isn't clear given
+ it doesn't work on mobile platforms.
+ 
+-Addresses / Credit-Cards
+-========================
+-
+-Addresses and Credit-cards have Sync functionality tightly bound with the
+-store. Unlike other engines above, this engine has always been tightly bound,
+-because it was written after we realized this tight-binding was a feature and
+-not a bug.
+-
+-Technically these are 2 separate engines and collections. However, because the
+-underlying storage uses a shared implementation, the syncing also uses a
+-shared implementation - ie, the same logic is used for both - so we tend to
+-treat them as a single engine in practice.
+-
+-As a result, only a shim is in the `services/sync/modules/engines/` directory,
+-while the actual logic is
+-:searchfox:`next to the storage implementation <toolkit/components/formautofill/FormAutofillSync.sys.mjs>`.
+-
+-This engine has a unique twist on the "mirror" concept described above -
+-whenever a change is made to a fields, the original value of the field is
+-stored directly in the storage. This means that on the next sync, the value
+-of the record on the server can be deduced, meaning a "3-way" merge can be
+-done, so it can better tell the difference between local only, remote only, or
+-conflicting changes.
+-
+ WebExt-Storage
+ ==============
+ 
+diff --git a/services/sync/modules/service.sys.mjs b/services/sync/modules/service.sys.mjs
+index 4f4efe5729..026873e3a7 100644
+--- a/services/sync/modules/service.sys.mjs
++++ b/services/sync/modules/service.sys.mjs
+@@ -81,18 +81,6 @@ function getEngineModules() {
+     result.History = { module: "history.sys.mjs", symbol: "HistoryEngine" };
+     result.Tab = { module: "tabs.sys.mjs", symbol: "TabEngine" };
+   }
+-  if (Svc.PrefBranch.getBoolPref("engine.addresses.available", false)) {
+-    result.Addresses = {
+-      module: "resource://autofill/FormAutofillSync.sys.mjs",
+-      symbol: "AddressesEngine",
+-    };
+-  }
+-  if (Svc.PrefBranch.getBoolPref("engine.creditcards.available", false)) {
+-    result.CreditCards = {
+-      module: "resource://autofill/FormAutofillSync.sys.mjs",
+-      symbol: "CreditCardsEngine",
+-    };
+-  }
+   result["Extension-Storage"] = {
+     module: "extension-storage.sys.mjs",
+     controllingPref: "webextensions.storage.sync.kinto",
+diff --git a/services/sync/tests/tps/all_tests.json b/services/sync/tests/tps/all_tests.json
+index ea92e04b8f..c644c3ba2c 100644
+--- a/services/sync/tests/tps/all_tests.json
++++ b/services/sync/tests/tps/all_tests.json
+@@ -27,8 +27,6 @@
+     "test_addon_reconciling.js": { "disabled": "Bug 1498974" },
+     "test_addon_wipe.js": { "disabled": "Bug 1498974" },
+     "test_existing_bookmarks.js": {},
+-    "test_addresses.js": {},
+-    "test_creditcards.js": {},
+     "test_extstorage.js": {}
+   }
+ }
+diff --git a/services/sync/tps/extensions/tps/resource/tps.sys.mjs b/services/sync/tps/extensions/tps/resource/tps.sys.mjs
+index e7c46fd146..5370c724bc 100644
+--- a/services/sync/tps/extensions/tps/resource/tps.sys.mjs
++++ b/services/sync/tps/extensions/tps/resource/tps.sys.mjs
+@@ -14,7 +14,6 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   Addon: "resource://tps/modules/addons.sys.mjs",
+   AddonValidator: "resource://services-sync/engines/addons.sys.mjs",
+-  Address: "resource://tps/modules/formautofill.sys.mjs",
+   Async: "resource://services-common/async.sys.mjs",
+   Authentication: "resource://tps/auth/fxaccounts.sys.mjs",
+   Bookmark: "resource://tps/modules/bookmarks.sys.mjs",
+@@ -23,10 +22,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserTabs: "resource://tps/modules/tabs.sys.mjs",
+   BrowserWindows: "resource://tps/modules/windows.sys.mjs",
+   CommonUtils: "resource://services-common/utils.sys.mjs",
+-  CreditCard: "resource://tps/modules/formautofill.sys.mjs",
+-  DumpAddresses: "resource://tps/modules/formautofill.sys.mjs",
+   DumpBookmarks: "resource://tps/modules/bookmarks.sys.mjs",
+-  DumpCreditCards: "resource://tps/modules/formautofill.sys.mjs",
+   DumpHistory: "resource://tps/modules/history.sys.mjs",
+   DumpPasswords: "resource://tps/modules/passwords.sys.mjs",
+   FormData: "resource://tps/modules/forms.sys.mjs",
+@@ -634,98 +630,6 @@ export var TPS = {
+     }
+   },
+ 
+-  async HandleAddresses(addresses, action) {
+-    try {
+-      for (let address of addresses) {
+-        lazy.Logger.logInfo(
+-          "executing action " +
+-            action.toUpperCase() +
+-            " on address " +
+-            JSON.stringify(address)
+-        );
+-        let addressOb = new lazy.Address(address);
+-        switch (action) {
+-          case ACTION_ADD:
+-            await addressOb.Create();
+-            break;
+-          case ACTION_MODIFY:
+-            await addressOb.Update();
+-            break;
+-          case ACTION_VERIFY:
+-            lazy.Logger.AssertTrue(await addressOb.Find(), "address not found");
+-            break;
+-          case ACTION_VERIFY_NOT:
+-            lazy.Logger.AssertTrue(
+-              !(await addressOb.Find()),
+-              "address found, but it shouldn't exist"
+-            );
+-            break;
+-          case ACTION_DELETE:
+-            lazy.Logger.AssertTrue(await addressOb.Find(), "address not found");
+-            await addressOb.Remove();
+-            break;
+-          default:
+-            lazy.Logger.AssertTrue(false, "invalid action: " + action);
+-        }
+-      }
+-      lazy.Logger.logPass(
+-        "executing action " + action.toUpperCase() + " on addresses"
+-      );
+-    } catch (e) {
+-      await lazy.DumpAddresses();
+-      throw e;
+-    }
+-  },
+-
+-  async HandleCreditCards(creditCards, action) {
+-    try {
+-      for (let creditCard of creditCards) {
+-        lazy.Logger.logInfo(
+-          "executing action " +
+-            action.toUpperCase() +
+-            " on creditCard " +
+-            JSON.stringify(creditCard)
+-        );
+-        let creditCardOb = new lazy.CreditCard(creditCard);
+-        switch (action) {
+-          case ACTION_ADD:
+-            await creditCardOb.Create();
+-            break;
+-          case ACTION_MODIFY:
+-            await creditCardOb.Update();
+-            break;
+-          case ACTION_VERIFY:
+-            lazy.Logger.AssertTrue(
+-              await creditCardOb.Find(),
+-              "creditCard not found"
+-            );
+-            break;
+-          case ACTION_VERIFY_NOT:
+-            lazy.Logger.AssertTrue(
+-              !(await creditCardOb.Find()),
+-              "creditCard found, but it shouldn't exist"
+-            );
+-            break;
+-          case ACTION_DELETE:
+-            lazy.Logger.AssertTrue(
+-              await creditCardOb.Find(),
+-              "creditCard not found"
+-            );
+-            await creditCardOb.Remove();
+-            break;
+-          default:
+-            lazy.Logger.AssertTrue(false, "invalid action: " + action);
+-        }
+-      }
+-      lazy.Logger.logPass(
+-        "executing action " + action.toUpperCase() + " on creditCards"
+-      );
+-    } catch (e) {
+-      await lazy.DumpCreditCards();
+-      throw e;
+-    }
+-  },
+-
+   async Cleanup() {
+     try {
+       await this.WipeServer();
+@@ -1413,24 +1317,6 @@ export var TPS = {
+     },
+   },
+ 
+-  Addresses: {
+-    async add(addresses) {
+-      await this.HandleAddresses(addresses, ACTION_ADD);
+-    },
+-    async modify(addresses) {
+-      await this.HandleAddresses(addresses, ACTION_MODIFY);
+-    },
+-    async delete(addresses) {
+-      await this.HandleAddresses(addresses, ACTION_DELETE);
+-    },
+-    async verify(addresses) {
+-      await this.HandleAddresses(addresses, ACTION_VERIFY);
+-    },
+-    async verifyNot(addresses) {
+-      await this.HandleAddresses(addresses, ACTION_VERIFY_NOT);
+-    },
+-  },
+-
+   Bookmarks: {
+     async add(bookmarks) {
+       await TPS.HandleBookmarks(bookmarks, ACTION_ADD);
+@@ -1451,24 +1337,6 @@ export var TPS = {
+       TPS.shouldValidateBookmarks = false;
+     },
+   },
+-  CreditCards: {
+-    async add(creditCards) {
+-      await this.HandleCreditCards(creditCards, ACTION_ADD);
+-    },
+-    async modify(creditCards) {
+-      await this.HandleCreditCards(creditCards, ACTION_MODIFY);
+-    },
+-    async delete(creditCards) {
+-      await this.HandleCreditCards(creditCards, ACTION_DELETE);
+-    },
+-    async verify(creditCards) {
+-      await this.HandleCreditCards(creditCards, ACTION_VERIFY);
+-    },
+-    async verifyNot(creditCards) {
+-      await this.HandleCreditCards(creditCards, ACTION_VERIFY_NOT);
+-    },
+-  },
+-
+   Formdata: {
+     async add(formdata) {
+       await this.HandleForms(formdata, ACTION_ADD);
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 5217afad82..11830663c1 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -63,11 +63,6 @@ module.exports = [
+       "browser/components/urlbar/tests/browser/dynamicResult0.css",
+       "browser/components/urlbar/tests/browser/dynamicResult1.css",
+       "browser/components/webrtc/content/webrtc-preview/webrtc-preview.css",
+-      "browser/extensions/formautofill/content/formautofill.css",
+-      "browser/extensions/formautofill/content/manageDialog.css",
+-      "browser/extensions/formautofill/skin/shared/editAddress.css",
+-      "browser/extensions/formautofill/skin/shared/editCreditCard.css",
+-      "browser/extensions/formautofill/skin/shared/editDialog-shared.css",
+       "browser/extensions/webcompat/about-compat/aboutCompat.css",
+       "browser/themes/linux/browser.css",
+       "browser/themes/linux/customizableui/panelUI.css",
+@@ -95,7 +90,6 @@ module.exports = [
+       "browser/themes/shared/downloads/downloads.inc.css",
+       "browser/themes/shared/downloads/indicator.css",
+       "browser/themes/shared/downloads/progressmeter.css",
+-      "browser/themes/shared/formautofill-notification.css",
+       "browser/themes/shared/identity-block/identity-block.css",
+       "browser/themes/shared/identity-credential-notification.css",
+       "browser/themes/shared/migration/migration-dialog-window.css",
+diff --git a/testing/marionette/client/marionette_driver/geckoinstance.py b/testing/marionette/client/marionette_driver/geckoinstance.py
+index 2c9130ee92..27362f9213 100644
+--- a/testing/marionette/client/marionette_driver/geckoinstance.py
++++ b/testing/marionette/client/marionette_driver/geckoinstance.py
+@@ -99,9 +99,6 @@ class GeckoInstance:
+         # AddonManager.SCOPE_PROFILE + AddonManager.SCOPE_APPLICATION
+         "extensions.autoDisableScopes": 0,
+         "extensions.enabledScopes": 5,
+-        # Disable form autofill for extensions and credit cards
+-        "extensions.formautofill.addresses.enabled": False,
+-        "extensions.formautofill.creditCards.enabled": False,
+         # Disable metadata caching for installed add-ons by default
+         "extensions.getAddons.cache.enabled": False,
+         # Disable intalling any distribution add-ons
+diff --git a/testing/profiles/base/user.js b/testing/profiles/base/user.js
+index 0383122680..db39f813b4 100644
+--- a/testing/profiles/base/user.js
++++ b/testing/profiles/base/user.js
+@@ -13,9 +13,6 @@ user_pref("webgl.allow-in-parent", true);
+ user_pref("dom.input_events.security.minNumTicks", 0);
+ user_pref("dom.input_events.security.minTimeElapsedInMS", 0);
+ 
+-// Set address autofill to true for tests
+-user_pref("extensions.formautofill.addresses.experiments.enabled", true);
+-
+ // Turn off update
+ user_pref("app.update.disabledForTesting", true);
+ 
+@@ -23,10 +20,6 @@ user_pref("app.update.disabledForTesting", true);
+ // profile across a set of tests. Avoid showing this infobar by default.
+ user_pref("browser.startup.couldRestoreSession.count", -1);
+ 
+-// This is used to disable address autofill telemetry since we cannot download
+-// the model within tests.
+-user_pref("extensions.formautofill.useml", false);
+-
+ // Sval: first run opens a window-modal dialog on a fresh profile, which every
+ // harness profile is, and the harness cannot start a test behind it. Sval's
+ // first-run test turns it on for itself.
+diff --git a/testing/profiles/perf/user.js b/testing/profiles/perf/user.js
+index 9ff188c339..67905f88e2 100644
+--- a/testing/profiles/perf/user.js
++++ b/testing/profiles/perf/user.js
+@@ -41,8 +41,6 @@ user_pref("dom.push.connection.enabled", false);
+ user_pref("extensions.autoDisableScopes", 10);
+ user_pref("extensions.blocklist.enabled", false);
+ user_pref("extensions.checkCompatibility", false);
+-user_pref("extensions.formautofill.addresses.enabled", true);
+-user_pref("extensions.formautofill.creditCards.enabled", true);
+ user_pref("extensions.getAddons.get.url", "http://127.0.0.1/extensions-dummy/repositoryGetURL");
+ user_pref("extensions.getAddons.search.browseURL", "http://127.0.0.1/extensions-dummy/repositoryBrowseURL");
+ user_pref("extensions.hotfix.url", "http://127.0.0.1/extensions-dummy/hotfixURL");
+diff --git a/testing/profiles/unittest-features/user.js b/testing/profiles/unittest-features/user.js
+index 34c530f6fc..cc6d313ce7 100644
+--- a/testing/profiles/unittest-features/user.js
++++ b/testing/profiles/unittest-features/user.js
+@@ -20,8 +20,5 @@ user_pref("dom.forms.datetime.others", true);
+ // Enable Gamepad
+ user_pref("dom.gamepad.enabled", true);
+ user_pref("dom.gamepad.non_standard_events.enabled", true);
+-// Enable form autofill feature testing.
+-user_pref("extensions.formautofill.addresses.available", "on");
+-user_pref("extensions.formautofill.creditCards.available", "on");
+ // Turn off update
+ user_pref("app.update.disabledForTesting", true);
+diff --git a/toolkit/actors/AutoCompleteChild.sys.mjs b/toolkit/actors/AutoCompleteChild.sys.mjs
+index 87fd7dee0a..71e9a71a71 100644
+--- a/toolkit/actors/AutoCompleteChild.sys.mjs
++++ b/toolkit/actors/AutoCompleteChild.sys.mjs
+@@ -213,12 +213,12 @@ export class AutoCompleteChild extends JSWindowActorChild {
+    * - bool shouldSearchForAutoComplete(element);
+    * - jsval getAutoCompleteSearchOption(element);
+    * - jsval searchResultToAutoCompleteResult(searchString, element, record);
+-   * See `FormAutofillChild` for example
++   * See `FormHistoryChild` for example
+    *
+    * @param input - The HTML <input> element that is considered autocompletable by the
+    *                given provider
+    * @param provider - A module that provides autocomplete entries for a <input>, for example,
+-   *                   FormAutofill provides address or credit card autocomplete entries.
++   *                   FormHistory provides the values typed into the field before.
+    */
+   markAsAutoCompletableField(input, provider) {
+     gFormFillController.markAsAutoCompletableField(input);
+diff --git a/toolkit/actors/AutoCompleteParent.sys.mjs b/toolkit/actors/AutoCompleteParent.sys.mjs
+index 9cef41cce9..65f85a84fc 100644
+--- a/toolkit/actors/AutoCompleteParent.sys.mjs
++++ b/toolkit/actors/AutoCompleteParent.sys.mjs
+@@ -450,7 +450,7 @@ export class AutoCompleteParent extends JSWindowActorParent {
+ 
+   // This defines the supported autocomplete providers and the prioity to show the autocomplete
+   // entry.
+-  #AUTOCOMPLETE_PROVIDERS = ["FormAutofill", "FormHistory"];
++  #AUTOCOMPLETE_PROVIDERS = ["FormHistory"];
+ 
+   /**
+    * Search across multiple module to gather autocomplete entries for a given search string.
+diff --git a/toolkit/components/autocomplete/docs/index.rst b/toolkit/components/autocomplete/docs/index.rst
+index 92a7a88aa5..87d11bfb15 100644
+--- a/toolkit/components/autocomplete/docs/index.rst
++++ b/toolkit/components/autocomplete/docs/index.rst
+@@ -7,8 +7,6 @@ Autocomplete can be triggered in the browser chrome UI as well as in several cas
+ 
+ Due to this need to work in several different contexts, some of the autocomplete components may seem a bit unweildly to the novice reader. Although there are some historical complexities that may no longer be needed, mainly the autocomplete handling needs to work both for web page fields, where the input field is in a different process than the autocomplete popup itself, as well as in browser UI fields.
+ 
+-You might also be interested in learning more about :doc:`address and credit card autofill </browser/extensions/formautofill/docs/index>`, which uses autocomplete, and is described separately.
+-
+ Autocomplete Types in the Browser UI
+ ------------------------------------
+ 
+@@ -72,29 +70,24 @@ To summarize, if you wish to modify the events which cause an autocomplete popup
+ Autocomplete Types in Web Pages (Form Fill)
+ -------------------------------------------
+ 
+-For autocomplete in fields in web pages, there are three implementations in use today:
++For autocomplete in fields in web pages, there are two implementations in use today:
+ 
+   * Login Manager, used for passwords.
+-  * Form Autofill, used for addresses and credit cards.
+   * Form History, used as a default autocomplete for other types of fields. It also handles the <datalist> if there is one assigned to an input field.
+ 
+ Each of these is implemented by a pair of actors, one in each process.
+ 
+-There is an actor pair for each of these three types:
++There is an actor pair for each of these two types:
+ 
+   ``Login Manager``:
+     * :searchfox:`toolkit/components/passwordmgr/LoginManagerChild.sys.mjs`
+     * :searchfox:`toolkit/components/passwordmgr/LoginManagerParent.sys.mjs`
+ 
+-  ``Form Autofill``:
+-    * :searchfox:`toolkit/components/formautofill/FormAutofillChild.sys.mjs`
+-    * :searchfox:`toolkit/components/formautofill/FormAutofillParent.sys.mjs`
+-
+   ``Form History``:
+     * :searchfox:`toolkit/components/satchel/FormHistoryChild.sys.mjs`
+     * :searchfox:`toolkit/components/satchel/FormHistoryParent.sys.mjs`
+ 
+-There is also a fourth more general actor pair used for the autocomplete system itself:
++There is also a third more general actor pair used for the autocomplete system itself:
+ 
+   ``AutoComplete``:
+     * :searchfox:`toolkit/actors/AutoCompleteChild.sys.mjs`
+@@ -102,7 +95,7 @@ There is also a fourth more general actor pair used for the autocomplete system
+ 
+ Since the autocomplete UI widgets for the popup only appear in the browser process, this last set of actors are used to abstract this out so that the autocomplete system can operate as if it was in the same process.
+ 
+-While support for other types of autocomplete for web pages can be added, in practice over time, some features have been hard-coded so only the three types of autocomplete above work directly. However, it would be simple to add other types or make support more general again.
++While support for other types of autocomplete for web pages can be added, in practice over time, some features have been hard-coded so only the two types of autocomplete above work directly. However, it would be simple to add other types or make support more general again.
+ 
+ .. _childactor:
+ 
+@@ -111,11 +104,11 @@ Child Actor
+ 
+ The specifics of each autocomplete are handled by an autcomplete provider, managed by the autocomplete child actor ``AutoCompleteChild``. Each provider is able to handle autocomplete for a particular form field.
+ 
+-A custom provider may be specified by calling ``markAsAutoCompletableField(input, provider)`` to associate a provider with a particular form element. Multiple providers can be added for each element. However, currently there are only three types of autocomplete providers that exist, as listed above.
++A custom provider may be specified by calling ``markAsAutoCompletableField(input, provider)`` to associate a provider with a particular form element. Multiple providers can be added for each element. However, currently there are only two types of autocomplete providers that exist, as listed above.
+ 
+-These providers are implemented by the child actor. For example, the form autofill provider is implemented by the ``FormAutofillChild`` actor. Form autofill adds a custom provider for an input field if it believes the field is an address or credit card field.
++These providers are implemented by the child actor.
+ 
+-However, the other two are actually supplied by default by the ``AutoCompleteChild`` child actor, and are included in addition to any custom providers. If the field is a password field, or has been a password field in the past, the child autocomplete actor adds a default provider to handle logins called "LoginManager", which corresponds to the ``LoginManagerChild`` actor. For form history for all input fields, the "FormHistory" provider is used, corresponding to the ``FormHistoryChild`` actor.
++Both are supplied by default by the ``AutoCompleteChild`` child actor, and are included in addition to any custom providers. If the field is a password field, or has been a password field in the past, the child autocomplete actor adds a default provider to handle logins called "LoginManager", which corresponds to the ``LoginManagerChild`` actor. For form history for all input fields, the "FormHistory" provider is used, corresponding to the ``FormHistoryChild`` actor.
+ 
+ When multiple providers are used, they are currently searched according to a priority, the order of which is
+ hard-coded in the ``AUTOCOMPLETE_PROVIDERS`` constant within :searchfox:`toolkit/actors/AutoCompleteParent.sys.mjs`.
+@@ -147,7 +140,7 @@ While the search provider implements some functionality for autocomplete in the
+   `searchAutoCompleteEntries(string, options)`
+     Given a search string, return a list of search results that match. The options are the same as those returned from calling ``getAutoCompleteSearchOption`` in the child, described above.
+ 
+-Each of the three autocomplete types implements the ``searchAutoCompleteEntries`` function to search for results in a different way. For example the LoginManager looks up passwords that match the current hostname and adds a special item if needed to allow a password to be generated.
++Each of the autocomplete types implements the ``searchAutoCompleteEntries`` function to search for results in a different way. For example the LoginManager looks up passwords that match the current hostname and adds a special item if needed to allow a password to be generated.
+ 
+ The options might be used to further define the search. For example, the login manager actors retrieve the maximum length of the input field (input.maxLength) and use this to calculate the maximum allowable password length for generated passwords.
+ 
+@@ -171,16 +164,8 @@ Result Object Fields:
+ The autocomplete popup supports around 10 or so different styles for rows to appear in, for example: "status" for status rows, and "autofill" for form fill items. Each style uses the label, image and comment in a different way. You can add more styles by adding an implementation to
+ :searchfox:`autocomplete-richlistitem.js <toolkit/content/widgets/autocomplete-richlistitem.js>` and then adding a corresponding reference within :searchfox:`autocomplete-popup.js <toolkit/content/widgets/autocomplete-popup.js>` to match.
+ 
+-By default, the "value" field will be filled into the textbox when the item is selected from the popup. However, if the comment field contains ``fillMessageName`` and ``fillMessageData`` properties, these can be used to send custom messages to the actor which implements the autocomplete. The message name must match the actor, for example a message name ``FormAutofill:SaveAddress`` will map to the FormAutofill actor which was described earlier. This allows custom actions to be performed when selecting items from the autocomplete popup. The actor's ``onAutoCompleteEntrySelected`` function will be used to implement this. This behaviour is used when you need a custom action to be performed when selecting an item. For example, to open a settings panel.
++By default, the "value" field will be filled into the textbox when the item is selected from the popup. However, if the comment field contains ``fillMessageName`` and ``fillMessageData`` properties, these can be used to send custom messages to the actor which implements the autocomplete. The message name must match the actor, for example a message name ``FormAutofill:SaveAddress`` would map to a FormAutofill actor. This allows custom actions to be performed when selecting items from the autocomplete popup. The actor's ``onAutoCompleteEntrySelected`` function will be used to implement this. This behaviour is used when you need a custom action to be performed when selecting an item. For example, to open a settings panel.
+ 
+-The form fill item also supports previewing an item when the user hovers the mouse over an item or selects an item with the cursor keys without pressing enter. This operates in a similar way but uses the ``onAutoCompleteEntrySelected`` function. Form Autofill uses this to temporaily highlight the value while the item is selected from the dropdown.
++The form fill item also supports previewing an item when the user hovers the mouse over an item or selects an item with the cursor keys without pressing enter. This operates in a similar way but uses the ``onAutoCompleteEntrySelected`` function.
+ 
+ A autofilled textbox is generally highlighted in yellow. This is done by setting the ``autofillstate`` property of the <input> element when the value is filled or previewed, and cleared when the user modifies the value.
+-
+-See Also
+---------
+-
+-.. toctree::
+-   :maxdepth: 1
+-
+-   /browser/extensions/formautofill/docs/index
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index f13564de68..45a01653f2 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -78,7 +78,6 @@ gecko_metrics = [
+     "toolkit/components/downloads/metrics.yaml",
+     "toolkit/components/enterprisepolicies/metrics.yaml",
+     "toolkit/components/extensions/metrics.yaml",
+-    "toolkit/components/formautofill/metrics.yaml",
+     "toolkit/components/gecko-trace/generated-metrics.yaml",
+     "toolkit/components/glean/metrics.yaml",
+     "toolkit/components/mediasniffer/metrics.yaml",
+diff --git a/toolkit/components/ml/content/EngineProcess.sys.mjs b/toolkit/components/ml/content/EngineProcess.sys.mjs
+index 0b4e8391c6..89f42b0078 100644
+--- a/toolkit/components/ml/content/EngineProcess.sys.mjs
++++ b/toolkit/components/ml/content/EngineProcess.sys.mjs
+@@ -156,11 +156,6 @@ export const FEATURES = {
+     engineId: "about-inference",
+     fluentId: "mlmodel-about-inference",
+   },
+-  // see toolkit/components/formautofill/shared/FormAutofillML.sys.mjs
+-  "formfill-classification": {
+-    engineId: "formfill-classification-engine",
+-    fluentId: "mlmodel-formfill-engine",
+-  },
+   // see toolkit/components/ml/content/nlp/EmbeddingsGenerator.sys.mjs
+   "simple-text-embedder": {
+     engineId: "simple-text-embedder-engine",
+diff --git a/toolkit/components/ml/ml.d.ts b/toolkit/components/ml/ml.d.ts
+index d543b79c65..40e85f3097 100644
+--- a/toolkit/components/ml/ml.d.ts
++++ b/toolkit/components/ml/ml.d.ts
+@@ -41,7 +41,6 @@ export type EngineRequests = EnsureAllFeatures<{
+   "smart-intent": UntypedEngineRequest;
+   "smart-tab-embedding": UntypedEngineRequest;
+   "smart-tab-topic": UntypedEngineRequest;
+-  "formfill-classification": UntypedEngineRequest;
+   chat: UntypedEngineRequest;
+ 
+   "suggest-intent-classification": {
+@@ -81,7 +80,6 @@ export type EngineFeatureIds =
+   | "smart-intent"
+   | "smart-tab-embedding"
+   | "smart-tab-topic"
+-  | "formfill-classification"
+   | "suggest-intent-classification"
+   | "suggest-NER";
+ 
+@@ -110,7 +108,6 @@ export type EngineCreateOptions = EnsureAllFeatures<{
+   "smart-intent": BasicEngineOptions;
+   "smart-tab-embedding": BasicEngineOptions;
+   "smart-tab-topic": BasicEngineOptions;
+-  "formfill-classification": BasicEngineOptions;
+   "suggest-intent-classification": BasicEngineOptions;
+   "suggest-NER": BasicEngineOptions;
+ }>;
+@@ -169,7 +166,6 @@ export type EngineResponses = EnsureAllFeatures<{
+   "smart-intent": UntypedEngineResponse;
+   "smart-tab-embedding": UntypedEngineResponse;
+   "smart-tab-topic": UntypedEngineResponse;
+-  "formfill-classification": UntypedEngineResponse;
+   "suggest-intent-classification": Array<{
+     label: string;
+     score: number;
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 880166c6e7..b0188c17e6 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -41,7 +41,6 @@ DIRS += [
+     "downloads",
+     "enterprisepolicies",
+     "extensions",
+-    "formautofill",
+     "finalizationwitness",
+     "find",
+     "forgetaboutsite",
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 82ab5c8fa1..a514955cb9 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -2086,33 +2086,6 @@ password-autocomplete:
+       description: Enable direct migration?
+ 
+ 
+-# This feature flag mirrors the one used for ios
+-# https://github.com/mozilla-mobile/firefox-ios/blob/main/nimbus-features/addressAutofillFeature.yaml
+-address-autofill-feature:
+-  description: Enabling address autofill feature
+-  owner: issozi@mozilla.com
+-  hasExposure: true
+-  exposureDescription: "Exposure is sent when an address is autofilled."
+-  variables:
+-    status:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: extensions.formautofill.addresses.experiments.enabled
+-      description: If true, we will allow user to use address autofill
+-
+-creditcards-autofill-enabled:
+-  description: Credit card autofill is enabled in all regions
+-  owner: issozi@mozilla.com
+-  hasExposure: false
+-  variables:
+-   creditcardsSupported:
+-      description: Enable credit card autofill in all regions
+-      type: string
+-      setPref:
+-        branch: default
+-        pref: extensions.formautofill.creditCards.supported
+-
+ shellService:
+   description: "Interface with OS, e.g., pinning and set default"
+   owner: desktop-integrations@mozilla.com
+diff --git a/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs b/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
+index 603a881b9f..df1d2b8b7d 100644
+--- a/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
++++ b/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
+@@ -122,7 +122,6 @@ export const ATTRIBUTE_TRANSFORMS = Object.freeze({
+     addons: Object.keys(addonsInfo?.addons ?? {}).sort(),
+     hasInstalledAddons: !!addonsInfo?.hasInstalledAddons,
+   }),
+-  addressesSaved: typeAssertions.quantity,
+   archBits: typeAssertions.quantity,
+   browserSettings: pickWith({
+     update: pick("channel"),
+diff --git a/toolkit/components/nimbus/metrics.yaml b/toolkit/components/nimbus/metrics.yaml
+index 33a4ed23f2..7608545d14 100644
+--- a/toolkit/components/nimbus/metrics.yaml
++++ b/toolkit/components/nimbus/metrics.yaml
+@@ -124,7 +124,6 @@ nimbus_targeting_environment:
+       - "activeExperiments"
+       - "activeRollouts"
+       - "addonsInfo"
+-      - "addressesSaved"
+       - "archBits"
+       - "browserSettings"
+       - "buildId"
+@@ -302,18 +301,6 @@ nimbus_targeting_context:
+         hasInstalledAddons:
+           type: boolean
+ 
+-  addresses_saved:
+-    bugs: *targeting_context_bugs
+-    data_reviews: *targeting_context_data_reviews
+-    expires: *targeting_context_expiry
+-    notification_emails: *targeting_context_notification_emails
+-    send_in_pings: *targeting_context_pings
+-    description: The number of addresses the user has saved.
+-    data_sensitivity:
+-      - interaction
+-    type: quantity
+-    unit: addresses
+-
+   arch_bits:
+     bugs: *targeting_context_bugs
+     data_reviews: *targeting_context_data_reviews
+diff --git a/toolkit/components/nimbus/test/unit/test_nimbusTelemetry.js b/toolkit/components/nimbus/test/unit/test_nimbusTelemetry.js
+index 234e068387..1f6265ca7c 100644
+--- a/toolkit/components/nimbus/test/unit/test_nimbusTelemetry.js
++++ b/toolkit/components/nimbus/test/unit/test_nimbusTelemetry.js
+@@ -150,7 +150,6 @@ add_task(async function test_featureConfigSchema_gleanMetricConfiguration() {
+     "nimbus_targeting_environment.pref_values",
+     "nimbus_targeting_context.active_experiments",
+     "nimbus_targeting_context.active_rollouts",
+-    "nimbus_targeting_context.addresses_saved",
+     "nimbus_events.enrollment",
+     "nimbus_events.is_ready",
+     "nimbus_events.enrollment_status",
+diff --git a/toolkit/components/satchel/moz.build b/toolkit/components/satchel/moz.build
+index 1d8660ed2c..73bac3b74a 100644
+--- a/toolkit/components/satchel/moz.build
++++ b/toolkit/components/satchel/moz.build
+@@ -47,8 +47,6 @@ TESTING_JS_MODULES += [
+ include("/ipc/chromium/chromium-config.mozbuild")
+ 
+ FINAL_TARGET_FILES.actors += [
+-    "FormHandlerChild.sys.mjs",
+-    "FormHandlerParent.sys.mjs",
+     "FormHistoryChild.sys.mjs",
+     "FormHistoryParent.sys.mjs",
+ ]
+diff --git a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+index 442608a023..4adf1221c5 100644
+--- a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
++++ b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+@@ -272,12 +272,6 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
+   ["extensions.blocklist.enabled", { what: RECORD_PREF_VALUE }],
+   ["extensions.enabledScopes", { what: RECORD_PREF_VALUE }],
+   ["extensions.eventPages.enabled", { what: RECORD_PREF_VALUE }],
+-  ["extensions.formautofill.addresses.enabled", { what: RECORD_PREF_VALUE }],
+-  [
+-    "extensions.formautofill.addresses.capture.enabled",
+-    { what: RECORD_PREF_VALUE },
+-  ],
+-  ["extensions.formautofill.creditCards.enabled", { what: RECORD_PREF_VALUE }],
+   ["extensions.quarantinedDomains.enabled", { what: RECORD_PREF_VALUE }],
+   ["extensions.strictCompatibility", { what: RECORD_PREF_VALUE }],
+   ["extensions.update.enabled", { what: RECORD_PREF_VALUE }],
+diff --git a/toolkit/content/license.html b/toolkit/content/license.html
+index 77c1617397..52b7b64c6e 100644
+--- a/toolkit/content/license.html
++++ b/toolkit/content/license.html
+@@ -2387,9 +2387,6 @@ product.
+           <td>
+             <p>This license applies to parts of the code in:</p>
+             <ul>
+-                <li><code>browser/extensions/formautofill</code></li>
+-                <li><code>toolkit/components/formautofill/shared/FormAutofillHeuristics.sys.mjs</code></li>
+-                <li><code>toolkit/components/formautofill/shared/FormAutofillNameUtils.sys.mjs</code></li>
+                 <li><code>editor/libeditor/EditorEventListener.cpp</code></li>
+                 <li><code>security/sandbox/</code></li>
+ #ifdef MOZ_ZUCCHINI
+diff --git a/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl b/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl
+index e2417ad4db..9eb744bd77 100644
+--- a/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl
++++ b/toolkit/locales/en-US/toolkit/about/aboutAddons.ftl
+@@ -630,8 +630,6 @@ mlmodel-pdfjs = { -brand-short-name } uses this to create alt text for images yo
+ mlmodel-smart-tab-topic-engine = { -brand-short-name } uses this to suggest names for your tab groups
+ mlmodel-smart-tab-embedding-engine = { -brand-short-name } uses this to suggest tabs for your tab groups
+ 
+-mlmodel-formfill-engine = { -brand-short-name } uses this to help fill in address forms
+-
+ # AI Model will be downloaded on the users device and used locally
+ addon-category-mlmodel = On-device AI
+ addon-category-mlmodel-title =
+diff --git a/toolkit/modules/ActorManagerParent.sys.mjs b/toolkit/modules/ActorManagerParent.sys.mjs
+index b94a30c910..28c7aa1fb0 100644
+--- a/toolkit/modules/ActorManagerParent.sys.mjs
++++ b/toolkit/modules/ActorManagerParent.sys.mjs
+@@ -347,20 +347,6 @@ let JSWINDOWACTORS = {
+     allFrames: true,
+   },
+ 
+-  FormHandler: {
+-    parent: {
+-      esModuleURI: "resource://gre/actors/FormHandlerParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://gre/actors/FormHandlerChild.sys.mjs",
+-      events: {
+-        DOMFormBeforeSubmit: { createActor: false },
+-      },
+-    },
+-
+-    allFrames: true,
+-  },
+-
+   InlineSpellChecker: {
+     parent: {
+       esModuleURI: "resource://gre/actors/InlineSpellCheckerParent.sys.mjs",
+diff --git a/toolkit/modules/CreditCard.sys.mjs b/toolkit/modules/CreditCard.sys.mjs
+index a22dc5c7a2..c23a4172a4 100644
+--- a/toolkit/modules/CreditCard.sys.mjs
++++ b/toolkit/modules/CreditCard.sys.mjs
+@@ -463,33 +463,6 @@ export class CreditCard {
+     return "•".repeat(number.length - 4) + number.substr(-4);
+   }
+ 
+-  static getCreditCardLogo(network) {
+-    const PATH = "chrome://formautofill/content/";
+-    const THIRD_PARTY_PATH = PATH + "third-party/";
+-    switch (network) {
+-      case "amex":
+-        return THIRD_PARTY_PATH + "cc-logo-amex.png";
+-      case "cartebancaire":
+-        return THIRD_PARTY_PATH + "cc-logo-cartebancaire.png";
+-      case "diners":
+-        return THIRD_PARTY_PATH + "cc-logo-diners.svg";
+-      case "discover":
+-        return THIRD_PARTY_PATH + "cc-logo-discover.png";
+-      case "jcb":
+-        return THIRD_PARTY_PATH + "cc-logo-jcb.svg";
+-      case "mastercard":
+-        return THIRD_PARTY_PATH + "cc-logo-mastercard.svg";
+-      case "mir":
+-        return THIRD_PARTY_PATH + "cc-logo-mir.svg";
+-      case "unionpay":
+-        return THIRD_PARTY_PATH + "cc-logo-unionpay.svg";
+-      case "visa":
+-        return THIRD_PARTY_PATH + "cc-logo-visa.svg";
+-      default:
+-        return PATH + "icon-credit-card-generic.svg";
+-    }
+-  }
+-
+   /*
+    * Validates the number according to the Luhn algorithm. This
+    * method does not throw an exception if the number is invalid.
+@@ -510,14 +483,4 @@ export class CreditCard {
+   static getSupportedNetworks() {
+     return SUPPORTED_NETWORKS;
+   }
+-
+-  /**
+-   * Localised names for supported networks are available in
+-   * `browser/preferences/formAutofill.ftl`.
+-   */
+-  static getNetworkL10nId(network) {
+-    return this.isValidNetwork(network)
+-      ? `autofill-card-network-${network}`
+-      : null;
+-  }
+ }
+diff --git a/toolkit/modules/OSKeyStore.sys.mjs b/toolkit/modules/OSKeyStore.sys.mjs
+index fc6f2c3583..0a7e66799f 100644
+--- a/toolkit/modules/OSKeyStore.sys.mjs
++++ b/toolkit/modules/OSKeyStore.sys.mjs
+@@ -299,14 +299,12 @@ export var OSKeyStore = {
+    *       recover from that and still shows the dialog.)
+    *
+    * @param   {string}         cipherText Encrypted string including the algorithm details.
+-   * @param   {string}         trigger    Caller identifier for telemetry.
+    * @param   {boolean|string} reauth     If set to a string, prompt the reauth login dialog.
+    *                                      The string may be shown on the native OS
+    *                                      login dialog. Empty strings and `true` are disallowed.
+    * @returns {Promise<string>}           resolves to the decrypted string, or rejects otherwise.
+    */
+-  async decrypt(cipherText, trigger, reauth = false) {
+-    let errorResult = 0;
++  async decrypt(cipherText, reauth = false) {
+     try {
+       if (!(await this.ensureLoggedIn(reauth)).authenticated) {
+         lazy.log.warn("User canceled encryption login");
+@@ -321,15 +319,8 @@ export var OSKeyStore = {
+       );
+       return String.fromCharCode.apply(String, bytes);
+     } catch (e) {
+-      errorResult = e.result;
+       lazy.log.warn(`Decryption failed with result: ${e.result}`);
+       throw e;
+-    } finally {
+-      Glean.creditcard.osKeystoreDecrypt.record({
+-        isDecryptSuccess: errorResult === 0,
+-        errorResult,
+-        trigger,
+-      });
+     }
+   },
+ 
+diff --git a/toolkit/modules/Troubleshoot.sys.mjs b/toolkit/modules/Troubleshoot.sys.mjs
+index a3942ce880..1a6d73bee8 100644
+--- a/toolkit/modules/Troubleshoot.sys.mjs
++++ b/toolkit/modules/Troubleshoot.sys.mjs
+@@ -63,7 +63,6 @@ const PREFS_FOR_DISPLAY = [
+   "extensions.backgroundServiceWorker.enabled",
+   "extensions.checkCompatibility",
+   "extensions.eventPages.enabled",
+-  "extensions.formautofill.",
+   "extensions.lastAppVersion",
+   "extensions.quarantinedDomains.enabled",
+   "extensions.InstallTrigger.enabled",
+diff --git a/toolkit/modules/tests/browser/browser_CreditCard.js b/toolkit/modules/tests/browser/browser_CreditCard.js
+index 93e6b5c45f..6f1b699add 100644
+--- a/toolkit/modules/tests/browser/browser_CreditCard.js
++++ b/toolkit/modules/tests/browser/browser_CreditCard.js
+@@ -37,7 +37,7 @@ add_task(async function test_getLabel_withOSKeyStore() {
+ 
+   const ccNumber = "4111111111111111";
+   const encryptedNumber = await OSKeyStore.encrypt(ccNumber);
+-  const decryptedNumber = await OSKeyStore.decrypt(encryptedNumber, "testing");
++  const decryptedNumber = await OSKeyStore.decrypt(encryptedNumber);
+   is(decryptedNumber, ccNumber, "Decrypted CC number should match original");
+ 
+   const name = "Foxkeh";
+diff --git a/toolkit/modules/tests/browser/browser_Troubleshoot.js b/toolkit/modules/tests/browser/browser_Troubleshoot.js
+index d5ef967e9b..f1845218da 100644
+--- a/toolkit/modules/tests/browser/browser_Troubleshoot.js
++++ b/toolkit/modules/tests/browser/browser_Troubleshoot.js
+@@ -335,10 +335,6 @@ const SNAPSHOT_SCHEMA = {
+           required: true,
+           type: "boolean",
+         },
+-        "extensions.formautofill.creditCards.os-auth.locked.enabled": {
+-          required: false,
+-          type: "boolean",
+-        },
+         "signon.management.page.os-auth.locked.enabled": {
+           required: false,
+           type: "boolean",
+diff --git a/toolkit/modules/tests/xpcshell/test_osKeyStore.js b/toolkit/modules/tests/xpcshell/test_osKeyStore.js
+index 45da89b78c..e18e062052 100644
+--- a/toolkit/modules/tests/xpcshell/test_osKeyStore.js
++++ b/toolkit/modules/tests/xpcshell/test_osKeyStore.js
+@@ -38,7 +38,7 @@ add_task(async function test_encrypt_decrypt() {
+   cipherText = await OSKeyStore.encrypt(testText);
+   Assert.notEqual(testText, cipherText);
+ 
+-  let plainText = await OSKeyStore.decrypt(cipherText, "testing");
++  let plainText = await OSKeyStore.decrypt(cipherText);
+   Assert.equal(testText, plainText);
+ });
+ 
+@@ -55,7 +55,7 @@ add_task(async function test_reauth() {
+   let reauthObserved = OSKeyStoreTestUtils.waitForOSKeyStoreLogin(false);
+   await new Promise(resolve => TestUtils.executeSoon(resolve));
+   try {
+-    await OSKeyStore.decrypt(cipherText, "testing", "prompt message text");
++    await OSKeyStore.decrypt(cipherText, "prompt message text");
+     throw new Error("Not receiving canceled OS unlock error");
+   } catch (ex) {
+     Assert.equal(ex.message, "User canceled OS unlock entry");
+@@ -74,11 +74,7 @@ add_task(async function test_reauth() {
+ 
+   reauthObserved = OSKeyStoreTestUtils.waitForOSKeyStoreLogin(true);
+   await new Promise(resolve => TestUtils.executeSoon(resolve));
+-  let plainText2 = await OSKeyStore.decrypt(
+-    cipherText,
+-    "testing",
+-    "prompt message text"
+-  );
++  let plainText2 = await OSKeyStore.decrypt(cipherText, "prompt message text");
+   await reauthObserved;
+   Assert.equal(testText, plainText2);
+ 
+@@ -94,7 +90,7 @@ add_task(async function test_reauth() {
+ 
+ add_task(async function test_decryption_failure() {
+   try {
+-    await OSKeyStore.decrypt("Malformed cipher text", "testing");
++    await OSKeyStore.decrypt("Malformed cipher text");
+     throw new Error("Not receiving decryption error");
+   } catch (ex) {
+     Assert.notEqual(ex.result, Cr.NS_ERROR_ABORT);
+@@ -151,7 +147,7 @@ add_task(async function test_exportRecoveryPhrase() {
+     recoveryPhrase
+   );
+ 
+-  let decryptedString = await OSKeyStore.decrypt(encryptedString, "testing");
++  let decryptedString = await OSKeyStore.decrypt(encryptedString);
+ 
+   Assert.equal(
+     decryptedString,
+diff --git a/tools/@types/generated/lib.gecko.dom.d.ts b/tools/@types/generated/lib.gecko.dom.d.ts
+index 2971239f78..ffc0d7f6f9 100644
+--- a/tools/@types/generated/lib.gecko.dom.d.ts
++++ b/tools/@types/generated/lib.gecko.dom.d.ts
+@@ -1058,11 +1058,6 @@ interface FontFaceSetLoadEventInit extends EventInit {
+     fontfaces?: FontFace[];
+ }
+ 
+-interface FormAutofillConfidences {
+-    ccName?: number;
+-    ccNumber?: number;
+-}
+-
+ interface FormDataEventInit extends EventInit {
+     formData: FormData;
+ }
+@@ -26881,7 +26876,6 @@ declare namespace ChromeUtils {
+     function getCachedJavaScriptSource(key: string, uri: string, hintCharset: string): any;
+     function getCallerLocation(principal: Principal): any;
+     function getClassName(obj: any, unwrap?: boolean): string;
+-    function getFormAutofillConfidences(elements: Element[]): FormAutofillConfidences[];
+     function getGMPContentDecryptionModuleInformation(): Promise<CDMInformation[]>;
+     function getGlobalWindowCommandEnabled(name: string): boolean | null;
+     function getLastOOMStackTrace(): string;
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index 5698860b56..c4c45b3e4d 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -46,7 +46,6 @@ export interface Modules {
+   "chrome://browser/content/urlbar/UrlbarShared.mjs": typeof import("chrome://browser/content/urlbar/UrlbarShared.mjs"),
+   "chrome://browser/content/webrtc/webrtc-preview.mjs": typeof import("chrome://browser/content/webrtc/webrtc-preview.mjs"),
+   "chrome://devtools-startup/content/DevToolsShim.sys.mjs": typeof import("chrome://devtools-startup/content/DevToolsShim.sys.mjs"),
+-  "chrome://formautofill/content/manageDialog.mjs": typeof import("chrome://formautofill/content/manageDialog.mjs"),
+   "chrome://global/content/ScrollOffsets.mjs": typeof import("chrome://global/content/ScrollOffsets.mjs"),
+   "chrome://global/content/aboutLogging/profileStorage.mjs": typeof import("chrome://global/content/aboutLogging/profileStorage.mjs"),
+   "chrome://global/content/bindings/colorpicker-common.mjs": typeof import("chrome://global/content/bindings/colorpicker-common.mjs"),
+@@ -643,17 +642,6 @@ export interface Modules {
+   "resource:///modules/topsites/constants.mjs": typeof import("resource:///modules/topsites/constants.mjs"),
+   "resource:///modules/urlbar/private/GeolocationUtils.sys.mjs": typeof import("resource:///modules/urlbar/private/GeolocationUtils.sys.mjs"),
+   "resource:///modules/webrtcUI.sys.mjs": typeof import("resource:///modules/webrtcUI.sys.mjs"),
+-  "resource://autofill/FormAutofill.sys.mjs": typeof import("resource://autofill/FormAutofill.sys.mjs"),
+-  "resource://autofill/FormAutofillChild.ios.sys.mjs": typeof import("resource://autofill/FormAutofillChild.ios.sys.mjs"),
+-  "resource://autofill/FormAutofillChild.sys.mjs": typeof import("resource://autofill/FormAutofillChild.sys.mjs"),
+-  "resource://autofill/FormAutofillContent.sys.mjs": typeof import("resource://autofill/FormAutofillContent.sys.mjs"),
+-  "resource://autofill/FormAutofillParent.sys.mjs": typeof import("resource://autofill/FormAutofillParent.sys.mjs"),
+-  "resource://autofill/FormAutofillPreferences.sys.mjs": typeof import("resource://autofill/FormAutofillPreferences.sys.mjs"),
+-  "resource://autofill/FormAutofillPrompter.sys.mjs": typeof import("resource://autofill/FormAutofillPrompter.sys.mjs"),
+-  "resource://autofill/FormAutofillStorage.sys.mjs": typeof import("resource://autofill/FormAutofillStorage.sys.mjs"),
+-  "resource://autofill/FormAutofillStorageBase.sys.mjs": typeof import("resource://autofill/FormAutofillStorageBase.sys.mjs"),
+-  "resource://autofill/FormAutofillSync.sys.mjs": typeof import("resource://autofill/FormAutofillSync.sys.mjs"),
+-  "resource://autofill/ProfileAutoCompleteResult.sys.mjs": typeof import("resource://autofill/ProfileAutoCompleteResult.sys.mjs"),
+   "resource://devtools/client/framework/browser-toolbox/Launcher.sys.mjs": typeof import("resource://devtools/client/framework/browser-toolbox/Launcher.sys.mjs"),
+   "resource://devtools/client/jsonview/json-size-profiler.mjs": typeof import("resource://devtools/client/jsonview/json-size-profiler.mjs"),
+   "resource://devtools/client/performance-new/popup/logic.sys.mjs": typeof import("resource://devtools/client/performance-new/popup/logic.sys.mjs"),
+@@ -732,7 +720,6 @@ export interface Modules {
+   "resource://devtools/shared/webconsole/formatMessageParametersAndText.sys.mjs": typeof import("resource://devtools/shared/webconsole/formatMessageParametersAndText.sys.mjs"),
+   "resource://devtools/shared/worker/worker.sys.mjs": typeof import("resource://devtools/shared/worker/worker.sys.mjs"),
+   "resource://gre/actors/AutoCompleteParent.sys.mjs": typeof import("resource://gre/actors/AutoCompleteParent.sys.mjs"),
+-  "resource://gre/actors/FormHandlerChild.sys.mjs": typeof import("resource://gre/actors/FormHandlerChild.sys.mjs"),
+   "resource://gre/actors/MLEngineParent.sys.mjs": typeof import("resource://gre/actors/MLEngineParent.sys.mjs"),
+   "resource://gre/actors/PageExtractorParent.sys.mjs": typeof import("resource://gre/actors/PageExtractorParent.sys.mjs"),
+   "resource://gre/actors/PictureInPictureChild.sys.mjs": typeof import("resource://gre/actors/PictureInPictureChild.sys.mjs"),
+@@ -1081,28 +1068,7 @@ export interface Modules {
+   "resource://gre/modules/sessionstore/PrivacyLevel.sys.mjs": typeof import("resource://gre/modules/sessionstore/PrivacyLevel.sys.mjs"),
+   "resource://gre/modules/sessionstore/SessionHistory.sys.mjs": typeof import("resource://gre/modules/sessionstore/SessionHistory.sys.mjs"),
+   "resource://gre/modules/sessionstore/SessionStoreHelper.sys.mjs": typeof import("resource://gre/modules/sessionstore/SessionStoreHelper.sys.mjs"),
+-  "resource://gre/modules/shared/AddressComponent.sys.mjs": typeof import("resource://gre/modules/shared/AddressComponent.sys.mjs"),
+-  "resource://gre/modules/shared/AddressMetaData.sys.mjs": typeof import("resource://gre/modules/shared/AddressMetaData.sys.mjs"),
+-  "resource://gre/modules/shared/AddressMetaDataExtension.sys.mjs": typeof import("resource://gre/modules/shared/AddressMetaDataExtension.sys.mjs"),
+-  "resource://gre/modules/shared/AddressMetaDataLoader.sys.mjs": typeof import("resource://gre/modules/shared/AddressMetaDataLoader.sys.mjs"),
+-  "resource://gre/modules/shared/AddressParser.sys.mjs": typeof import("resource://gre/modules/shared/AddressParser.sys.mjs"),
+-  "resource://gre/modules/shared/AddressRecord.sys.mjs": typeof import("resource://gre/modules/shared/AddressRecord.sys.mjs"),
+-  "resource://gre/modules/shared/AutofillFormFactory.sys.mjs": typeof import("resource://gre/modules/shared/AutofillFormFactory.sys.mjs"),
+-  "resource://gre/modules/shared/AutofillTelemetry.sys.mjs": typeof import("resource://gre/modules/shared/AutofillTelemetry.sys.mjs"),
+-  "resource://gre/modules/shared/CreditCardRecord.sys.mjs": typeof import("resource://gre/modules/shared/CreditCardRecord.sys.mjs"),
+-  "resource://gre/modules/shared/CreditCardRuleset.sys.mjs": typeof import("resource://gre/modules/shared/CreditCardRuleset.sys.mjs"),
+-  "resource://gre/modules/shared/FieldScanner.sys.mjs": typeof import("resource://gre/modules/shared/FieldScanner.sys.mjs"),
+-  "resource://gre/modules/shared/FormAutofillHandler.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillHandler.sys.mjs"),
+-  "resource://gre/modules/shared/FormAutofillHeuristics.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillHeuristics.sys.mjs"),
+-  "resource://gre/modules/shared/FormAutofillML.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillML.sys.mjs"),
+-  "resource://gre/modules/shared/FormAutofillNameUtils.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillNameUtils.sys.mjs"),
+-  "resource://gre/modules/shared/FormAutofillSection.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillSection.sys.mjs"),
+-  "resource://gre/modules/shared/FormAutofillUtils.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillUtils.sys.mjs"),
+-  "resource://gre/modules/shared/FormStateManager.sys.mjs": typeof import("resource://gre/modules/shared/FormStateManager.sys.mjs"),
+-  "resource://gre/modules/shared/LabelUtils.sys.mjs": typeof import("resource://gre/modules/shared/LabelUtils.sys.mjs"),
+   "resource://gre/modules/shared/NewPasswordModel.sys.mjs": typeof import("resource://gre/modules/shared/NewPasswordModel.sys.mjs"),
+-  "resource://gre/modules/shared/PhoneNumber.sys.mjs": typeof import("resource://gre/modules/shared/PhoneNumber.sys.mjs"),
+-  "resource://gre/modules/shared/PhoneNumberNormalizer.sys.mjs": typeof import("resource://gre/modules/shared/PhoneNumberNormalizer.sys.mjs"),
+   "resource://gre/modules/storage-rust.sys.mjs": typeof import("resource://gre/modules/storage-rust.sys.mjs"),
+   "resource://gre/modules/subprocess/subprocess_unix.sys.mjs": typeof import("resource://gre/modules/subprocess/subprocess_unix.sys.mjs"),
+   "resource://gre/modules/subprocess/subprocess_win.sys.mjs": typeof import("resource://gre/modules/subprocess/subprocess_win.sys.mjs"),
+@@ -1429,7 +1395,6 @@ export interface Modules {
+   "resource://tps/modules/addons.sys.mjs": typeof import("resource://tps/modules/addons.sys.mjs"),
+   "resource://tps/modules/bookmarkValidator.sys.mjs": typeof import("resource://tps/modules/bookmarkValidator.sys.mjs"),
+   "resource://tps/modules/bookmarks.sys.mjs": typeof import("resource://tps/modules/bookmarks.sys.mjs"),
+-  "resource://tps/modules/formautofill.sys.mjs": typeof import("resource://tps/modules/formautofill.sys.mjs"),
+   "resource://tps/modules/forms.sys.mjs": typeof import("resource://tps/modules/forms.sys.mjs"),
+   "resource://tps/modules/history.sys.mjs": typeof import("resource://tps/modules/history.sys.mjs"),
+   "resource://tps/modules/passwords.sys.mjs": typeof import("resource://tps/modules/passwords.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 296ae478fd..abd8eff70d 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -361,18 +361,6 @@
+       "chrome://devtools-startup/content/DevToolsShim.sys.mjs": [
+         "../../../devtools/startup/DevToolsShim.sys.mjs"
+       ],
+-      "chrome://formautofill/content/addressFormLayout.mjs": [
+-        "../../../browser/extensions/formautofill/content/addressFormLayout.mjs"
+-      ],
+-      "chrome://formautofill/content/autofillEditForms.mjs": [
+-        "../../../browser/extensions/formautofill/content/autofillEditForms.mjs"
+-      ],
+-      "chrome://formautofill/content/editDialog.mjs": [
+-        "../../../browser/extensions/formautofill/content/editDialog.mjs"
+-      ],
+-      "chrome://formautofill/content/manageDialog.mjs": [
+-        "../../../browser/extensions/formautofill/content/manageDialog.mjs"
+-      ],
+       "chrome://global/content/ScrollOffsets.mjs": [
+         "../../../toolkit/content/ScrollOffsets.mjs"
+       ],
+@@ -1768,33 +1756,6 @@
+       "resource:///modules/webrtcUI.sys.mjs": [
+         "../../../browser/modules/webrtcUI.sys.mjs"
+       ],
+-      "resource://autofill/FormAutofill.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofill.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillChild.ios.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillChild.ios.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillChild.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillChild.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillContent.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillContent.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillParent.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillParent.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillPreferences.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillPreferences.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillStorageBase.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillStorageBase.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillSync.sys.mjs": [
+-        "../../../toolkit/components/formautofill/FormAutofillSync.sys.mjs"
+-      ],
+-      "resource://autofill/ProfileAutoCompleteResult.sys.mjs": [
+-        "../../../toolkit/components/formautofill/ProfileAutoCompleteResult.sys.mjs"
+-      ],
+       "resource://devtools/client/aboutdebugging/aboutdebugging.js": [
+         "../../../devtools/client/aboutdebugging/aboutdebugging.js"
+       ],
+@@ -5536,9 +5497,6 @@
+       "resource://gre/actors/AutoCompleteParent.sys.mjs": [
+         "../../../toolkit/actors/AutoCompleteParent.sys.mjs"
+       ],
+-      "resource://gre/actors/FormHandlerChild.sys.mjs": [
+-        "../../../toolkit/components/satchel/FormHandlerChild.sys.mjs"
+-      ],
+       "resource://gre/actors/MLEngineParent.sys.mjs": [
+         "../../../toolkit/components/ml/actors/MLEngineParent.sys.mjs"
+       ],
+@@ -6220,9 +6178,6 @@
+       "resource://gre/modules/OsEnvironment.sys.mjs": [
+         "../../../toolkit/modules/OsEnvironment.sys.mjs"
+       ],
+-      "resource://gre/modules/Overrides.ios.js": [
+-        "../../../toolkit/components/formautofill/Overrides.ios.js"
+-      ],
+       "resource://gre/modules/PageThumbUtils.sys.mjs": [
+         "../../../toolkit/components/thumbnails/PageThumbUtils.sys.mjs"
+       ],
+@@ -6646,81 +6601,9 @@
+       "resource://gre/modules/sessionstore/SessionStoreHelper.sys.mjs": [
+         "../../../toolkit/modules/sessionstore/SessionStoreHelper.sys.mjs"
+       ],
+-      "resource://gre/modules/shared/AddressComponent.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AddressComponent.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AddressMetaData.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AddressMetaData.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AddressMetaDataExtension.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AddressMetaDataExtension.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AddressMetaDataLoader.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AddressMetaDataLoader.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AddressParser.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AddressParser.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AddressRecord.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AddressRecord.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AutofillFormFactory.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AutofillFormFactory.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/AutofillTelemetry.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/AutofillTelemetry.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/Constants.ios.mjs": [
+-        "../../../toolkit/components/formautofill/Constants.ios.mjs"
+-      ],
+-      "resource://gre/modules/shared/CreditCardRecord.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/CreditCardRecord.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/CreditCardRuleset.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/CreditCardRuleset.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FieldScanner.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FieldScanner.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormAutofillHandler.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormAutofillHandler.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormAutofillHeuristics.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormAutofillHeuristics.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormAutofillML.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormAutofillML.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormAutofillNameUtils.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormAutofillNameUtils.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormAutofillSection.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormAutofillSection.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormAutofillUtils.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormAutofillUtils.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/FormStateManager.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/FormStateManager.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/HeuristicsRegExp.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/HeuristicsRegExp.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/LabelUtils.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/LabelUtils.sys.mjs"
+-      ],
+       "resource://gre/modules/shared/NewPasswordModel.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/shared/NewPasswordModel.sys.mjs"
+       ],
+-      "resource://gre/modules/shared/PhoneNumber.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/PhoneNumber.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/PhoneNumberMetaData.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/PhoneNumberMetaData.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/PhoneNumberNormalizer.sys.mjs": [
+-        "../../../toolkit/components/formautofill/shared/PhoneNumberNormalizer.sys.mjs"
+-      ],
+       "resource://gre/modules/storage-json.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/storage-json.sys.mjs"
+       ],
+@@ -7732,9 +7615,6 @@
+       "resource://tps/modules/bookmarks.sys.mjs": [
+         "../../../services/sync/tps/extensions/tps/resource/modules/bookmarks.sys.mjs"
+       ],
+-      "resource://tps/modules/formautofill.sys.mjs": [
+-        "../../../services/sync/tps/extensions/tps/resource/modules/formautofill.sys.mjs"
+-      ],
+       "resource://tps/modules/forms.sys.mjs": [
+         "../../../services/sync/tps/extensions/tps/resource/modules/forms.sys.mjs"
+       ],
+@@ -7780,12 +7660,6 @@
+       "resource:///modules/ExtensionBrowsingData.sys.mjs": [
+         "../../../browser/components/extensions/ExtensionBrowsingData.sys.mjs"
+       ],
+-      "resource://autofill/FormAutofillPrompter.sys.mjs": [
+-        "../../../toolkit/components/formautofill/default/FormAutofillPrompter.sys.mjs"
+-      ],
+-      "resource://autofill/FormAutofillStorage.sys.mjs": [
+-        "../../../toolkit/components/formautofill/default/FormAutofillStorage.sys.mjs"
+-      ],
+       "resource://devtools/server/actors/descriptors/webextension.js": [
+         "../../../devtools/server/actors/descriptors/webextension.js"
+       ],
+diff --git a/tools/rewriting/ThirdPartyPaths.txt b/tools/rewriting/ThirdPartyPaths.txt
+index 749ccc50ca..05ec3ab275 100644
+--- a/tools/rewriting/ThirdPartyPaths.txt
++++ b/tools/rewriting/ThirdPartyPaths.txt
+@@ -1,8 +1,6 @@
+ browser/components/storybook/node_modules/
+ browser/components/topsites/content/tippytop/favicons/
+ browser/components/topsites/content/tippytop/images/
+-browser/extensions/formautofill/content/third-party/
+-browser/extensions/formautofill/test/fixtures/third_party/
+ devtools/client/inspector/markup/test/events/lib_*
+ devtools/client/jsonview/lib/require.js
+ devtools/client/shared/build/babel.js
+diff --git a/tools/ts/config/fixed_paths.js b/tools/ts/config/fixed_paths.js
+index 73bcead165..1216867c0b 100644
+--- a/tools/ts/config/fixed_paths.js
++++ b/tools/ts/config/fixed_paths.js
+@@ -31,12 +31,6 @@ exports.fixed = {
+   "resource:///modules/ExtensionBrowsingData.sys.mjs": [
+     "browser/components/extensions/ExtensionBrowsingData.sys.mjs",
+   ],
+-  "resource://autofill/FormAutofillPrompter.sys.mjs": [
+-    "toolkit/components/formautofill/default/FormAutofillPrompter.sys.mjs",
+-  ],
+-  "resource://autofill/FormAutofillStorage.sys.mjs": [
+-    "toolkit/components/formautofill/default/FormAutofillStorage.sys.mjs",
+-  ],
+   "resource://devtools/foo.js": undefined,
+   "resource://devtools/server/actors/descriptors/webextension.js": [
+     "devtools/server/actors/descriptors/webextension.js",

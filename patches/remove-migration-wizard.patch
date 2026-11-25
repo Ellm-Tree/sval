@@ -1,0 +1,1821 @@
+Sval: Remove Firefox's import wizard
+
+Sval imports through its own page, which File › Import and Settings
+open, so the wizard, its dialog, Settings' copy of it, its actors, the
+startup migration that shows it, the bookmarks toolbar's import button,
+the Library's import item and the wizard's strings went unused. The
+migrators, MigrationUtils, the browsers' logos and the strings the
+migrators show stay, since Sval's import reads other browsers through
+them.
+
+diff --git a/browser/base/content/browser-customization.js b/browser/base/content/browser-customization.js
+index 11f9486794..61442db3a2 100644
+--- a/browser/base/content/browser-customization.js
++++ b/browser/base/content/browser-customization.js
+@@ -30,10 +30,6 @@ var CustomizationHandler = {
+       childNode.setAttribute("disabled", true);
+     }
+ 
+-    if (!Services.policies.isAllowed("profileImport")) {
+-      document.documentElement.setAttribute("disableprofileimport", "true");
+-    }
+-
+     UpdateUrlbarSearchSplitterState();
+ 
+     PlacesToolbarHelper.customizeStart();
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+index f3a02356d9..f4cc351777 100644
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -681,9 +681,6 @@ var gBrowserInit = {
+           .getElementById("toolbar-menubar")
+           .removeAttribute("toolbarname");
+       }
+-      if (!Services.policies.isAllowed("profileImport")) {
+-        document.documentElement.setAttribute("disableprofileimport", "true");
+-      }
+       if (!Services.policies.isAllowed("filepickers")) {
+         let savePageCommand = document.getElementById("Browser:SavePage");
+         let openFileCommand = document.getElementById("Browser:OpenFile");
+diff --git a/browser/base/content/browser-places.js b/browser/base/content/browser-places.js
+index 13c0e5283a..c8415ba297 100644
+--- a/browser/base/content/browser-places.js
++++ b/browser/base/content/browser-places.js
+@@ -1728,25 +1728,6 @@ var BookmarkingUI = {
+     }
+   },
+ 
+-  onWidgetBeforeDOMChange: function BUI_onWidgetBeforeDOMChange(
+-    aNode,
+-    aNextNode,
+-    aContainer,
+-    aIsRemoval
+-  ) {
+-    if (aNode.id == "import-button") {
+-      this._updateImportButton(aNode, aIsRemoval ? null : aContainer);
+-    }
+-  },
+-
+-  _updateImportButton: function BUI_updateImportButton(aNode, aContainer) {
+-    // The import button behaves like a bookmark item when in the bookmarks
+-    // toolbar, otherwise like a regular toolbar button.
+-    let isBookmarkItem = aContainer == this.toolbar;
+-    aNode.classList.toggle("toolbarbutton-1", !isBookmarkItem);
+-    aNode.classList.toggle("bookmark-item", isBookmarkItem);
+-  },
+-
+   _onWidgetWasMoved: function BUI_widgetWasMoved() {
+     // If we're moved outside of customize mode, we need to uninit
+     // our view so it gets reconstructed.
+@@ -1764,10 +1745,6 @@ var BookmarkingUI = {
+ 
+   init() {
+     CustomizableUI.addListener(this);
+-    let importButton = document.getElementById("import-button");
+-    if (importButton) {
+-      this._updateImportButton(importButton, importButton.parentNode);
+-    }
+     this.updateEmptyToolbarMessage().catch(console.error);
+   },
+ 
+diff --git a/browser/base/content/browser-sets.inc.xhtml b/browser/base/content/browser-sets.inc.xhtml
+index 19f93e547e..5fa5b98bb5 100644
+--- a/browser/base/content/browser-sets.inc.xhtml
++++ b/browser/base/content/browser-sets.inc.xhtml
+@@ -29,7 +29,6 @@
+     <command id="cmd_print" />
+     <command id="cmd_printPreviewToggle" />
+     <command id="cmd_file_importFromAnotherBrowser" />
+-    <command id="cmd_help_importFromAnotherBrowser" />
+     <command id="cmd_close" />
+     <command id="cmd_closeWindow" />
+     <command id="cmd_returnToOpener" />
+diff --git a/browser/base/content/browser-sets.js b/browser/base/content/browser-sets.js
+index 001f12cd70..3148e80fd8 100644
+--- a/browser/base/content/browser-sets.js
++++ b/browser/base/content/browser-sets.js
+@@ -53,16 +53,6 @@ document.addEventListener(
+               gBrowser.selectedBrowser.browsingContext
+             );
+             break;
+-          case "cmd_file_importFromAnotherBrowser":
+-            MigrationUtils.showMigrationWizard(window, {
+-              entrypoint: MigrationUtils.MIGRATION_ENTRYPOINTS.FILE_MENU,
+-            });
+-            break;
+-          case "cmd_help_importFromAnotherBrowser":
+-            MigrationUtils.showMigrationWizard(window, {
+-              entrypoint: MigrationUtils.MIGRATION_ENTRYPOINTS.HELP_MENU,
+-            });
+-            break;
+           case "cmd_close":
+             BrowserCommands.closeTabOrWindow(event);
+             break;
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 14d74cfc5b..2e71b6710c 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -39,7 +39,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   HomePage: "resource:///modules/HomePage.sys.mjs",
+   LightweightThemeConsumer:
+     "resource://gre/modules/LightweightThemeConsumer.sys.mjs",
+-  MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
+   NewTabPagePreloading:
+     "moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs",
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index f2ee8e91bc..f53754e610 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -97,7 +97,6 @@
+   "ExtensionsUI",
+   "HomePage",
+   "LightweightThemeConsumer",
+-  "MigrationUtils",
+   "NetUtil",
+   "NewTabPagePreloading",
+   "NewTabUtils",
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index 77a4540a7d..d604273f48 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -473,10 +473,6 @@
+     </html:template>
+   </toolbar>
+   <html:template id="BrowserToolbarPalette">
+-    <toolbarbutton id="import-button"
+-                   class="toolbarbutton-1 chromeclass-toolbar-additional"
+-                   data-l10n-id="browser-import-button2"/>
+-
+     <toolbarbutton id="new-window-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
+                    data-l10n-id="appmenuitem-new-window"
+                    command="cmd_newNavigator"
+diff --git a/browser/base/content/navigator-toolbox.js b/browser/base/content/navigator-toolbox.js
+index 55bdbfb3a9..169b6c1101 100644
+--- a/browser/base/content/navigator-toolbox.js
++++ b/browser/base/content/navigator-toolbox.js
+@@ -42,7 +42,6 @@ document.addEventListener(
+         .content-analysis-indicator,
+         #bookmarks-toolbar-button,
+         #PlacesToolbar,
+-        #import-button,
+         #bookmarks-menu-button,
+         #BMB_bookmarksPopup,
+         #BMB_viewBookmarksSidebar,
+@@ -62,12 +61,6 @@ document.addEventListener(
+           BookmarksEventHandler.onCommand(event);
+           break;
+ 
+-        case "import-button":
+-          MigrationUtils.showMigrationWizard(window, {
+-            entrypoint: MigrationUtils.MIGRATION_ENTRYPOINTS.BOOKMARKS_TOOLBAR,
+-          });
+-          break;
+-
+         case "bookmarks-menu-button":
+           BookmarkingUI.onCommand(event);
+           break;
+diff --git a/browser/base/content/test/about/browser_aboutNewTab_bookmarksToolbarEmpty.js b/browser/base/content/test/about/browser_aboutNewTab_bookmarksToolbarEmpty.js
+index c13eb6d47e..07d57f4181 100644
+--- a/browser/base/content/test/about/browser_aboutNewTab_bookmarksToolbarEmpty.js
++++ b/browser/base/content/test/about/browser_aboutNewTab_bookmarksToolbarEmpty.js
+@@ -114,7 +114,6 @@ add_task(async function bookmarks_toolbar_not_shown_when_empty() {
+     "personal-bookmarks",
+     CustomizableUI.AREA_TABSTRIP
+   );
+-  CustomizableUI.removeWidgetFromArea("import-button");
+   await BrowserTestUtils.switchTab(gBrowser, newtab);
+   await waitForBookmarksToolbarVisibility({
+     visible: true,
+diff --git a/browser/base/content/test/menubar/browser.toml b/browser/base/content/test/menubar/browser.toml
+index 3ad3bd2de1..93599002cb 100644
+--- a/browser/base/content/test/menubar/browser.toml
++++ b/browser/base/content/test/menubar/browser.toml
+@@ -9,8 +9,6 @@ support-files = ["file_shareurl.html"]
+ 
+ ["browser_file_close_tabs.js"]
+ 
+-["browser_file_menu_import_wizard.js"]
+-
+ ["browser_file_share_linux.js"]
+ https_first_disabled = true
+ run-if = ["os == 'linux'"]
+diff --git a/browser/components/customizableui/test/browser_bookmarks_empty_message.js b/browser/components/customizableui/test/browser_bookmarks_empty_message.js
+index f4497cefdb..ab2d197d94 100644
+--- a/browser/components/customizableui/test/browser_bookmarks_empty_message.js
++++ b/browser/components/customizableui/test/browser_bookmarks_empty_message.js
+@@ -21,7 +21,6 @@ add_task(async function empty_message_on_non_empty_bookmarks_toolbar() {
+     set: [["browser.toolbars.bookmarks.visibility", "always"]],
+   });
+ 
+-  CustomizableUI.removeWidgetFromArea("import-button");
+   CustomizableUI.removeWidgetFromArea("personal-bookmarks");
+   CustomizableUI.addWidgetToArea(
+     "bookmarks-menu-button",
+diff --git a/browser/components/customizableui/test/browser_reset_dom_events.js b/browser/components/customizableui/test/browser_reset_dom_events.js
+index 2922fe481d..bcba3aa97a 100644
+--- a/browser/components/customizableui/test/browser_reset_dom_events.js
++++ b/browser/components/customizableui/test/browser_reset_dom_events.js
+@@ -1,6 +1,6 @@
+ "use strict";
+ 
+-const widgetId = "import-button";
++const widgetId = "new-window-button";
+ const listener = {
+   _beforeCount: 0,
+   _afterCount: 0,
+diff --git a/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_import.js b/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_import.js
+index 12201d6abc..23e333a8e2 100644
+--- a/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_import.js
++++ b/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_import.js
+@@ -2,17 +2,6 @@
+  * http://creativecommons.org/publicdomain/zero/1.0/ */
+ "use strict";
+ 
+-async function openLibrary() {
+-  return new Promise(resolve => {
+-    let library = window.openDialog(
+-      "chrome://browser/content/places/places.xhtml",
+-      "",
+-      "chrome,toolbar=yes,dialog=no,resizable"
+-    );
+-    waitForFocus(() => resolve(library), library);
+-  });
+-}
+-
+ add_setup(async function setup() {
+   await setupPolicyEngineWithJson({
+     policies: {
+@@ -22,26 +11,6 @@ add_setup(async function setup() {
+ });
+ 
+ add_task(async function test_disable_profile_import() {
+-  let library = await openLibrary();
+-
+-  let menu = library.document.getElementById("maintenanceButtonPopup");
+-  let promisePopupShown = BrowserTestUtils.waitForEvent(menu, "popupshown");
+-  menu.openPopup();
+-  await promisePopupShown;
+-
+-  let profileImportButton = library.document.getElementById("browserImport");
+-  is(
+-    profileImportButton.disabled,
+-    true,
+-    "Profile Import button should be disabled"
+-  );
+-
+-  let promisePopupHidden = BrowserTestUtils.waitForEvent(menu, "popuphidden");
+-  menu.hidePopup();
+-  await promisePopupHidden;
+-
+-  await BrowserTestUtils.closeWindow(library);
+-
+   checkLockedPref("browser.newtabpage.activity-stream.migrationExpired", true);
+ });
+ 
+@@ -65,14 +34,6 @@ add_task(async function test_file_menu() {
+   }
+ });
+ 
+-add_task(async function test_import_button() {
+-  await PlacesUIUtils.maybeAddImportButton();
+-  ok(
+-    !document.getElementById("import-button"),
+-    "Import button should be hidden."
+-  );
+-});
+-
+ add_task(async function test_about_logins() {
+   await BrowserTestUtils.withNewTab("about:logins", async browser => {
+     await SpecialPowers.spawn(browser, [], async () => {
+@@ -91,98 +52,3 @@ add_task(async function test_about_logins() {
+     });
+   });
+ });
+-
+-add_task(async function test_import_button_hidden_in_palette() {
+-  let customizationReady = BrowserTestUtils.waitForEvent(
+-    gNavToolbox,
+-    "customizationready"
+-  );
+-  gCustomizeMode.enter();
+-  await customizationReady;
+-
+-  ok(
+-    document.documentElement.hasAttribute("disableprofileimport"),
+-    "Root should have disableprofileimport attribute in customize mode."
+-  );
+-  let wrapper = document.getElementById("wrapper-import-button");
+-  ok(wrapper, "Import button wrapper should exist in palette.");
+-  ok(
+-    BrowserTestUtils.isHidden(wrapper),
+-    "Import button wrapper should be hidden in palette."
+-  );
+-
+-  let afterCustomization = BrowserTestUtils.waitForEvent(
+-    gNavToolbox,
+-    "aftercustomization"
+-  );
+-  gCustomizeMode.exit();
+-  await afterCustomization;
+-});
+-
+-add_task(async function test_import_button_existing_profile() {
+-  // Simulate an existing profile that had the import button previously added.
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.bookmarks.addedImportButton", true]],
+-  });
+-  CustomizableUI.addWidgetToArea(
+-    "import-button",
+-    CustomizableUI.AREA_BOOKMARKS,
+-    0
+-  );
+-  ok(
+-    document.getElementById("import-button"),
+-    "Import button should be present before calling maybeAddImportButton."
+-  );
+-
+-  const { PlacesBrowserStartup } = ChromeUtils.importESModule(
+-    "moz-src:///browser/components/places/PlacesBrowserStartup.sys.mjs"
+-  );
+-  await PlacesBrowserStartup.maybeAddImportButton();
+-
+-  ok(
+-    !document.getElementById("import-button"),
+-    "Import button should be removed when DisableProfileImport policy is set."
+-  );
+-  ok(
+-    !Services.prefs.prefHasUserValue("browser.bookmarks.addedImportButton"),
+-    "addedImportButton pref should be cleared."
+-  );
+-
+-  await SpecialPowers.popPrefEnv();
+-});
+-
+-add_task(async function test_prefs_entrypoint() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.migrate.preferences-entrypoint.enabled", true]],
+-  });
+-
+-  let finalPaneEvent = Services.prefs.getBoolPref("identity.fxaccounts.enabled")
+-    ? "sync-pane-loaded"
+-    : "privacy-pane-loaded";
+-  let finalPrefPaneLoaded = TestUtils.topicObserved(finalPaneEvent, () => true);
+-  await BrowserTestUtils.withNewTab(
+-    "about:preferences#general-migrate",
+-    async browser => {
+-      await finalPrefPaneLoaded;
+-      await browser.contentWindow.customElements.whenDefined(
+-        "migration-wizard"
+-      );
+-      let doc = browser.contentDocument;
+-      const entrypoint = Services.prefs.getBoolPref(
+-        "browser.settings-redesign.enabled",
+-        false
+-      )
+-        ? doc.querySelector('setting-group[groupid="importBrowserData"]')
+-        : doc.getElementById("dataMigrationGroup");
+-      ok(entrypoint, "Import entrypoint group should exist.");
+-      ok(
+-        BrowserTestUtils.isHidden(entrypoint),
+-        "Import entrypoint should be hidden in prefs if disabled via policy."
+-      );
+-      ok(
+-        !doc.getElementById("migrationWizardDialog").open,
+-        "Should not have opened the migration wizard."
+-      );
+-    }
+-  );
+-});
+diff --git a/browser/components/migration/MigrationUtils.sys.mjs b/browser/components/migration/MigrationUtils.sys.mjs
+index c08f98b006..18ea3e4800 100644
+--- a/browser/components/migration/MigrationUtils.sys.mjs
++++ b/browser/components/migration/MigrationUtils.sys.mjs
+@@ -32,7 +32,6 @@ var gFileMigrators = null;
+ var gProfileStartup = null;
+ var gL10n = null;
+ 
+-let gForceExitSpinResolve = false;
+ let gKeepUndoData = false;
+ let gUndoData = null;
+ 
+@@ -43,8 +42,6 @@ function getL10n() {
+   return gL10n;
+ }
+ 
+-const FIREFOX_REFRESH_MIGRATOR_KEYS = new Set(["firefox"]);
+-
+ const MIGRATOR_MODULES = Object.freeze({
+   EdgeProfileMigrator: {
+     moduleURI: "resource:///modules/EdgeProfileMigrator.sys.mjs",
+@@ -139,36 +136,6 @@ class MigrationUtils {
+       180
+     );
+ 
+-    ChromeUtils.registerWindowActor("MigrationWizard", {
+-      parent: {
+-        esModuleURI: "resource:///actors/MigrationWizardParent.sys.mjs",
+-      },
+-
+-      child: {
+-        esModuleURI: "resource:///actors/MigrationWizardChild.sys.mjs",
+-        events: {
+-          "MigrationWizard:RequestState": { wantUntrusted: true },
+-          "MigrationWizard:BeginMigration": { wantUntrusted: true },
+-          "MigrationWizard:RequestSafariPermissions": { wantUntrusted: true },
+-          "MigrationWizard:SelectManualPasswordFile": { wantUntrusted: true },
+-          "MigrationWizard:OpenAboutAddons": { wantUntrusted: true },
+-          "MigrationWizard:PermissionsNeeded": { wantUntrusted: true },
+-          "MigrationWizard:GetPermissions": { wantUntrusted: true },
+-          "MigrationWizard:OpenURL": { wantUntrusted: true },
+-          "MigrationWizard:LaunchMacOSPasswordsApp": { wantUntrusted: true },
+-        },
+-      },
+-
+-      includeChrome: true,
+-      allFrames: true,
+-      matches: [
+-        "about:preferences",
+-        "about:settings",
+-        "chrome://browser/content/migration/migration-dialog-window.html",
+-      ],
+-      remoteTypes: ["parent", "privilegedabout"],
+-    });
+-
+     ChromeUtils.defineLazyGetter(this, "IS_LINUX_SNAP_PACKAGE", () => {
+       if (
+         AppConstants.platform != "linux" ||
+@@ -386,40 +353,6 @@ class MigrationUtils {
+     return gFileMigrators;
+   }
+ 
+-  forceExitSpinResolve() {
+-    gForceExitSpinResolve = true;
+-  }
+-
+-  spinResolve(promise) {
+-    if (!(promise instanceof Promise)) {
+-      return promise;
+-    }
+-    let done = false;
+-    let result = null;
+-    let error = null;
+-    gForceExitSpinResolve = false;
+-    promise
+-      .catch(e => {
+-        error = e;
+-      })
+-      .then(r => {
+-        result = r;
+-        done = true;
+-      });
+-
+-    Services.tm.spinEventLoopUntil(
+-      "MigrationUtils.sys.mjs:MU_spinResolve",
+-      () => done || gForceExitSpinResolve
+-    );
+-    if (!done) {
+-      throw new Error("Forcefully exited event loop.");
+-    } else if (error) {
+-      throw error;
+-    } else {
+-      return result;
+-    }
+-  }
+-
+   /**
+    * Returns the migrator for the given source, if any data is available
+    * for this source, or if permissions are required in order to read
+@@ -539,224 +472,14 @@ class MigrationUtils {
+ 
+   /**
+    * In the case of startup migration, this is set to the nsIProfileStartup
+-   * instance passed to ProfileMigrator's migrate.
++   * instance passed to nsIProfileMigrator's migrate.
+    *
+-   * @see showMigrationWizard
+    * @type {nsIProfileStartup|null}
+    */
+   get profileStartup() {
+     return gProfileStartup;
+   }
+ 
+-  /**
+-   * Show the migration wizard in about:preferences, or if there is not an existing
+-   * browser window open, in a new top-level dialog window.
+-   *
+-   * NB: If you add new consumers, please add a migration entry point constant to
+-   * MIGRATION_ENTRYPOINTS and supply that entrypoint with the entrypoint property
+-   * in the aOptions argument.
+-   *
+-   * @param {Window} [aOpener=null]
+-   *   optional; the window that asks to open the wizard.
+-   * @param {object} [aOptions=null]
+-   *   optional named arguments for the migration wizard.
+-   * @param {string} [aOptions.entrypoint=undefined]
+-   *   migration entry point constant. See MIGRATION_ENTRYPOINTS.
+-   * @param {string} [aOptions.migratorKey=undefined]
+-   *   The key for which migrator to use automatically. This is the key that is exposed
+-   *   as a static getter on the migrator class.
+-   * @param {MigratorBase} [aOptions.migrator=undefined]
+-   *   A migrator instance to use automatically.
+-   * @param {boolean} [aOptions.isStartupMigration=undefined]
+-   *   True if this is a startup migration.
+-   * @param {boolean} [aOptions.skipSourceSelection=undefined]
+-   *   True if the source selection page of the wizard should be skipped.
+-   * @param {string} [aOptions.profileId]
+-   *   An identifier for the profile to use when migrating.
+-   * @returns {Promise<undefined>}
+-   *   If an about:preferences tab can be opened, this will resolve when
+-   *   that tab has been switched to. Otherwise, this will resolve
+-   *   just after opening the top-level dialog window.
+-   */
+-  showMigrationWizard(aOpener, aOptions) {
+-    // When migration is kicked off from about:welcome, there are
+-    // a few different behaviors that we want to test, controlled
+-    // by a preference that is instrumented for Nimbus. The pref
+-    // has the following possible states:
+-    //
+-    // "autoclose":
+-    //   The user will be directed to the migration wizard in
+-    //   about:preferences, but once the wizard is dismissed,
+-    //   the tab will close.
+-    //
+-    // "standalone":
+-    //   The migration wizard will open in a new top-level content
+-    //   window.
+-    //
+-    // "default" / other
+-    //   The user will be directed to the migration wizard in
+-    //   about:preferences. The tab will not close once the
+-    //   user closes the wizard.
+-    let aboutWelcomeBehavior = Services.prefs.getCharPref(
+-      "browser.migrate.content-modal.about-welcome-behavior",
+-      "default"
+-    );
+-
+-    let entrypoint = aOptions.entrypoint || this.MIGRATION_ENTRYPOINTS.UNKNOWN;
+-    Glean.browserMigration.entryPointCategorical[entrypoint].add(1);
+-
+-    let openStandaloneWindow = blocking => {
+-      let features = "dialog,centerscreen,resizable=no";
+-
+-      if (blocking) {
+-        features += ",modal";
+-      }
+-
+-      Services.ww.openWindow(
+-        aOpener,
+-        "chrome://browser/content/migration/migration-dialog-window.html",
+-        "_blank",
+-        features,
+-        {
+-          options: aOptions,
+-        }
+-      );
+-      return Promise.resolve();
+-    };
+-
+-    if (aOptions.isStartupMigration) {
+-      // Record that the uninstaller requested a profile refresh
+-      if (Services.env.get("MOZ_UNINSTALLER_PROFILE_REFRESH")) {
+-        Services.env.set("MOZ_UNINSTALLER_PROFILE_REFRESH", "");
+-        Glean.migration.uninstallerProfileRefresh.set(true);
+-      }
+-
+-      openStandaloneWindow(true /* blocking */);
+-      return Promise.resolve();
+-    }
+-
+-    if (aOpener?.openPreferences) {
+-      if (aOptions.entrypoint == this.MIGRATION_ENTRYPOINTS.NEWTAB) {
+-        if (aboutWelcomeBehavior == "autoclose") {
+-          return aOpener.openPreferences("general-migrate-autoclose");
+-        } else if (aboutWelcomeBehavior == "standalone") {
+-          openStandaloneWindow(false /* blocking */);
+-          return Promise.resolve();
+-        }
+-      }
+-      return aOpener.openPreferences("general-migrate");
+-    }
+-
+-    // If somehow we failed to open about:preferences, fall back to opening
+-    // the top-level window.
+-    openStandaloneWindow(false /* blocking */);
+-    return Promise.resolve();
+-  }
+-
+-  /**
+-   * Show the migration wizard for startup-migration.  This should only be
+-   * called by ProfileMigrator (see ProfileMigrator.js), which implements
+-   * nsIProfileMigrator. This runs asynchronously if we are running an
+-   * automigration.
+-   *
+-   * @param {nsIProfileStartup} aProfileStartup
+-   *   the nsIProfileStartup instance provided to ProfileMigrator.migrate.
+-   * @param {string|null} [aMigratorKey=null]
+-   *   If set, the migration wizard will import from the corresponding
+-   *   migrator, bypassing the source-selection page.  Otherwise, the
+-   *   source-selection page will be displayed, either with the default
+-   *   browser selected, if it could be detected and if there is a
+-   *   migrator for it, or with the first option selected as a fallback
+-   * @param {string|null} [aProfileToMigrate=null]
+-   *   If set, the migration wizard will import from the profile indicated.
+-   * @throws
+-   *   if aMigratorKey is invalid or if it points to a non-existent
+-   *   source.
+-   */
+-  startupMigration(aProfileStartup, aMigratorKey, aProfileToMigrate) {
+-    this.spinResolve(
+-      this.asyncStartupMigration(
+-        aProfileStartup,
+-        aMigratorKey,
+-        aProfileToMigrate
+-      )
+-    );
+-  }
+-
+-  async asyncStartupMigration(
+-    aProfileStartup,
+-    aMigratorKey,
+-    aProfileToMigrate
+-  ) {
+-    if (!aProfileStartup) {
+-      throw new Error(
+-        "an profile-startup instance is required for startup-migration"
+-      );
+-    }
+-    gProfileStartup = aProfileStartup;
+-
+-    let skipSourceSelection = false,
+-      migrator = null,
+-      migratorKey = "";
+-    if (aMigratorKey) {
+-      migrator = await this.getMigrator(aMigratorKey);
+-      if (!migrator) {
+-        // aMigratorKey must point to a valid source, so, if it doesn't
+-        // cleanup and throw.
+-        this.finishMigration();
+-        throw new Error(
+-          "startMigration was asked to open auto-migrate from " +
+-            "a non-existent source: " +
+-            aMigratorKey
+-        );
+-      }
+-      migratorKey = aMigratorKey;
+-      skipSourceSelection = true;
+-    } else {
+-      let defaultBrowserKey = this.getMigratorKeyForDefaultBrowser();
+-      if (defaultBrowserKey) {
+-        migrator = await this.getMigrator(defaultBrowserKey);
+-        if (migrator) {
+-          migratorKey = defaultBrowserKey;
+-        }
+-      }
+-    }
+-
+-    if (!migrator) {
+-      let migrators = await Promise.all(
+-        this.availableMigratorKeys.map(key => this.getMigrator(key))
+-      );
+-      // If there's no migrator set so far, ensure that there is at least one
+-      // migrator available before opening the wizard.
+-      // Note that we don't need to check the default browser first, because
+-      // if that one existed we would have used it in the block above this one.
+-      if (!migrators.some(m => m)) {
+-        // None of the keys produced a usable migrator, so finish up here:
+-        this.finishMigration();
+-        return;
+-      }
+-    }
+-
+-    let isRefresh =
+-      migrator &&
+-      skipSourceSelection &&
+-      FIREFOX_REFRESH_MIGRATOR_KEYS.has(migratorKey);
+-
+-    let entrypoint = this.MIGRATION_ENTRYPOINTS.FIRSTRUN;
+-    if (isRefresh) {
+-      entrypoint = this.MIGRATION_ENTRYPOINTS.FXREFRESH;
+-    }
+-
+-    this.showMigrationWizard(null, {
+-      entrypoint,
+-      migratorKey,
+-      migrator,
+-      isStartupMigration: !!aProfileStartup,
+-      skipSourceSelection,
+-      profileId: aProfileToMigrate,
+-    });
+-  }
+-
+   /**
+    * This is only pseudo-private because some tests and helper functions
+    * still expect to be able to directly access it.
+@@ -856,18 +579,6 @@ class MigrationUtils {
+     }
+   }
+ 
+-  /**
+-   * Called by MigrationWizardParent during a migration to indicate that a
+-   * manual migration of logins occurred via import from a CSV / TSV file, and
+-   * should be counted towards the total number of imported logins.
+-   *
+-   * @param {number} totalLogins
+-   *   The number of logins imported manually from a CSV / TSV file.
+-   */
+-  notifyLoginsManuallyImported(totalLogins) {
+-    this._importQuantities.logins += totalLogins;
+-  }
+-
+   /**
+    * Iterates through the favicons, sniffs for a mime type,
+    * and uses the mime type to properly import the favicon.
+@@ -1067,94 +778,6 @@ class MigrationUtils {
+     return [...this.#fileMigrators.values()];
+   }
+ 
+-  /**
+-   * Enum for the entrypoint that is being used to start migration.
+-   * Callers can use the MIGRATION_ENTRYPOINTS getter to use these.
+-   *
+-   * These values are what's written into the
+-   * FX_MIGRATION_ENTRY_POINT_CATEGORICAL histogram after a migration.
+-   *
+-   * @see MIGRATION_ENTRYPOINTS
+-   * @readonly
+-   * @enum {string}
+-   */
+-  #MIGRATION_ENTRYPOINTS_ENUM = Object.freeze({
+-    /** The entrypoint was not supplied */
+-    UNKNOWN: "unknown",
+-
+-    /** Migration is occurring at startup */
+-    FIRSTRUN: "firstrun",
+-
+-    /** Migration is occurring at after a profile refresh */
+-    FXREFRESH: "fxrefresh",
+-
+-    /** Migration is being started from the Library window */
+-    PLACES: "places",
+-
+-    /** Migration is being started from our password management UI */
+-    PASSWORDS: "passwords",
+-
+-    /** Migration is being started from the default about:home/about:newtab */
+-    NEWTAB: "newtab",
+-
+-    /** Migration is being started from the File menu */
+-    FILE_MENU: "file_menu",
+-
+-    /** Migration is being started from the Help menu */
+-    HELP_MENU: "help_menu",
+-
+-    /** Migration is being started from the Bookmarks Toolbar */
+-    BOOKMARKS_TOOLBAR: "bookmarks_toolbar",
+-
+-    /** Migration is being started from about:preferences */
+-    PREFERENCES: "preferences",
+-
+-    /** Migration is being started from about:firefoxview */
+-    FIREFOX_VIEW: "firefox_view",
+-  });
+-
+-  /**
+-   * Returns an enum that should be used to record the entrypoint for
+-   * starting a migration.
+-   *
+-   * @returns {number}
+-   */
+-  get MIGRATION_ENTRYPOINTS() {
+-    return this.#MIGRATION_ENTRYPOINTS_ENUM;
+-  }
+-
+-  /**
+-   * Enum for the numeric value written to the FX_MIGRATION_SOURCE_BROWSER.
+-   * histogram
+-   *
+-   * @see getSourceIdForTelemetry
+-   * @readonly
+-   * @enum {number}
+-   */
+-  #SOURCE_NAME_TO_ID_MAPPING_ENUM = Object.freeze({
+-    nothing: 1,
+-    firefox: 2,
+-    edge: 3,
+-    ie: 4,
+-    chrome: 5,
+-    "chrome-beta": 5,
+-    "chrome-dev": 5,
+-    chromium: 6,
+-    canary: 7,
+-    safari: 8,
+-    "chromium-360se": 9,
+-    "chromium-edge": 10,
+-    "chromium-edge-beta": 10,
+-    brave: 11,
+-    opera: 12,
+-    "opera-gx": 14,
+-    vivaldi: 13,
+-  });
+-
+-  getSourceIdForTelemetry(sourceName) {
+-    return this.#SOURCE_NAME_TO_ID_MAPPING_ENUM[sourceName] || 0;
+-  }
+-
+   get HISTORY_MAX_AGE_IN_MILLISECONDS() {
+     return this.HISTORY_MAX_AGE_IN_DAYS * 24 * 60 * 60 * 1000;
+   }
+diff --git a/browser/components/migration/components.conf b/browser/components/migration/components.conf
+index d746e4a3c5..9756daec82 100644
+--- a/browser/components/migration/components.conf
++++ b/browser/components/migration/components.conf
+@@ -5,14 +5,7 @@
+ XP_WIN = buildconfig.substs['OS_ARCH'] == 'WINNT'
+ XP_MACOSX = buildconfig.substs['MOZ_WIDGET_TOOLKIT'] == 'cocoa'
+ 
+-Classes = [
+-    {
+-        'cid': '{6F8BB968-C14F-4D6F-9733-6C6737B35DCE}',
+-        'contract_ids': ['@mozilla.org/toolkit/profile-migrator;1'],
+-        'esModule': 'resource:///modules/ProfileMigrator.sys.mjs',
+-        'constructor': 'ProfileMigrator',
+-    },
+-]
++Classes = []
+ 
+ if XP_WIN:
+     Classes += [
+diff --git a/browser/components/migration/docs/index.rst b/browser/components/migration/docs/index.rst
+index be22b951cb..d34428aa9a 100644
+--- a/browser/components/migration/docs/index.rst
++++ b/browser/components/migration/docs/index.rst
+@@ -13,4 +13,3 @@ The migrator is also used during a "Profile Refresh" to pave over a newly create
+ 
+    migration-utils
+    migrators
+-   migration-wizard
+diff --git a/browser/components/migration/jar.mn b/browser/components/migration/jar.mn
+index f56c6db1bc..6f6261597a 100644
+--- a/browser/components/migration/jar.mn
++++ b/browser/components/migration/jar.mn
+@@ -3,9 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ browser.jar:
+-   content/browser/migration/migration-dialog-window.html     (content/migration-dialog-window.html)
+-   content/browser/migration/migration-dialog-window.js       (content/migration-dialog-window.js)
+-   content/browser/migration/migration-wizard.mjs             (content/migration-wizard.mjs)
+    content/browser/migration/migration-wizard-constants.mjs   (content/migration-wizard-constants.mjs)
+ #ifdef XP_WIN
+    content/browser/migration/brands/360.png                   (content/brands/360.png)
+diff --git a/browser/components/migration/moz.build b/browser/components/migration/moz.build
+index a7815e0ebb..85dfca9838 100644
+--- a/browser/components/migration/moz.build
++++ b/browser/components/migration/moz.build
+@@ -4,12 +4,6 @@
+ 
+ XPCSHELL_TESTS_MANIFESTS += ["tests/unit/xpcshell.toml"]
+ 
+-MARIONETTE_MANIFESTS += ["tests/marionette/manifest.toml"]
+-
+-MOCHITEST_CHROME_MANIFESTS += ["tests/chrome/chrome.toml"]
+-
+-BROWSER_CHROME_MANIFESTS += ["tests/browser/browser.toml"]
+-
+ SPHINX_TREES["docs"] = "docs"
+ 
+ JAR_MANIFESTS += ["jar.mn"]
+@@ -28,12 +22,6 @@ EXTRA_JS_MODULES += [
+     "InternalTestingProfileMigrator.sys.mjs",
+     "MigrationUtils.sys.mjs",
+     "MigratorBase.sys.mjs",
+-    "ProfileMigrator.sys.mjs",
+-]
+-
+-FINAL_TARGET_FILES.actors = [
+-    "MigrationWizardChild.sys.mjs",
+-    "MigrationWizardParent.sys.mjs",
+ ]
+ 
+ if CONFIG["OS_ARCH"] == "WINNT":
+diff --git a/browser/components/places/PlacesBrowserStartup.sys.mjs b/browser/components/places/PlacesBrowserStartup.sys.mjs
+index 10c24aba16..e6864be611 100644
+--- a/browser/components/places/PlacesBrowserStartup.sys.mjs
++++ b/browser/components/places/PlacesBrowserStartup.sys.mjs
+@@ -13,11 +13,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   DistributionManagement: "resource:///modules/distribution.sys.mjs",
+   PlacesBackups: "resource://gre/modules/PlacesBackups.sys.mjs",
+   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+-  PlacesUIUtils: "moz-src:///browser/components/places/PlacesUIUtils.sys.mjs",
+ });
+ 
+ XPCOMUtils.defineLazyServiceGetters(lazy, {
+-  BrowserHandler: ["@mozilla.org/browser/clh;1", Ci.nsIBrowserHandler],
+   UserIdleService: [
+     "@mozilla.org/widget/useridleservice;1",
+     Ci.nsIUserIdleService,
+@@ -327,34 +325,6 @@ export let PlacesBrowserStartup = {
+     }
+   },
+ 
+-  async maybeAddImportButton() {
+-    // First check if we've already added the import button, in which
+-    // case we should check for events indicating we can remove it.
+-    if (
+-      Services.prefs.getBoolPref("browser.bookmarks.addedImportButton", false)
+-    ) {
+-      if (!Services.policies.isAllowed("profileImport")) {
+-        lazy.PlacesUIUtils.removeImportButton();
+-        return;
+-      }
+-      lazy.PlacesUIUtils.removeImportButtonWhenImportSucceeds();
+-      return;
+-    }
+-
+-    // Otherwise, check if this is a new profile where we need to add it.
+-    // `maybeAddImportButton` will call
+-    // `removeImportButtonWhenImportSucceeds`itself if/when it adds the
+-    // button. Doing things in this order avoids listening for removal
+-    // more than once.
+-    if (
+-      lazy.BrowserHandler.firstRunProfile &&
+-      // Not in automation: the button changes CUI state, breaking tests
+-      !Cu.isInAutomation
+-    ) {
+-      await lazy.PlacesUIUtils.maybeAddImportButton();
+-    }
+-  },
+-
+   handleShutdown() {
+     if (this._bookmarksBackupIdleTime) {
+       lazy.UserIdleService.removeIdleObserver(
+diff --git a/browser/components/places/PlacesComponents.manifest b/browser/components/places/PlacesComponents.manifest
+index cee96b7de3..0a42ffb7fa 100644
+--- a/browser/components/places/PlacesComponents.manifest
++++ b/browser/components/places/PlacesComponents.manifest
+@@ -1,8 +1,5 @@
+ category initial-migration-will-import-default-bookmarks moz-src:///browser/components/places/PlacesBrowserStartup.sys.mjs PlacesBrowserStartup.willImportDefaultBookmarks
+ category initial-migration-did-import-default-bookmarks moz-src:///browser/components/places/PlacesBrowserStartup.sys.mjs PlacesBrowserStartup.didImportDefaultBookmarks
+ 
+-# Add import button on first startup
+-category browser-idle-startup moz-src:///browser/components/places/PlacesBrowserStartup.sys.mjs PlacesBrowserStartup.maybeAddImportButton
+-
+ category browser-first-window-ready moz-src:///browser/components/places/PlacesBrowserStartup.sys.mjs PlacesBrowserStartup.onFirstWindowReady
+ category browser-quit-application-granted moz-src:///browser/components/places/PlacesBrowserStartup.sys.mjs PlacesBrowserStartup.handleShutdown
+diff --git a/browser/components/places/PlacesUIUtils.sys.mjs b/browser/components/places/PlacesUIUtils.sys.mjs
+index 0fcbf75318..dd14ccff0f 100644
+--- a/browser/components/places/PlacesUIUtils.sys.mjs
++++ b/browser/components/places/PlacesUIUtils.sys.mjs
+@@ -14,7 +14,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   CustomizableUI:
+     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+-  MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+   OpenInTabsUtils:
+     "moz-src:///browser/components/tabbrowser/OpenInTabsUtils.sys.mjs",
+   PlacesTransactions: "resource://gre/modules/PlacesTransactions.sys.mjs",
+@@ -1573,67 +1572,6 @@ export var PlacesUIUtils = {
+     },
+   },
+ 
+-  async maybeAddImportButton() {
+-    if (!Services.policies.isAllowed("profileImport")) {
+-      return;
+-    }
+-
+-    let numberOfBookmarks = await lazy.PlacesUtils.withConnectionWrapper(
+-      "PlacesUIUtils: maybeAddImportButton",
+-      async db => {
+-        let rows = await db.execute(
+-          `SELECT COUNT(*) as n FROM moz_bookmarks b
+-           JOIN moz_bookmarks p ON p.id = b.parent
+-           WHERE p.guid = :guid`,
+-          { guid: lazy.PlacesUtils.bookmarks.toolbarGuid }
+-        );
+-        return rows[0].getResultByName("n");
+-      }
+-    ).catch(e => {
+-      // We want to report errors, but we still want to add the button then:
+-      console.error(e);
+-      return 0;
+-    });
+-
+-    if (numberOfBookmarks < 3) {
+-      lazy.CustomizableUI.addWidgetToArea(
+-        "import-button",
+-        lazy.CustomizableUI.AREA_BOOKMARKS,
+-        0
+-      );
+-      Services.prefs.setBoolPref("browser.bookmarks.addedImportButton", true);
+-      this.removeImportButtonWhenImportSucceeds();
+-    }
+-  },
+-
+-  removeImportButton() {
+-    lazy.CustomizableUI.removeWidgetFromArea("import-button");
+-    Services.prefs.clearUserPref("browser.bookmarks.addedImportButton");
+-  },
+-
+-  removeImportButtonWhenImportSucceeds() {
+-    // If the user (re)moved the button, clear the pref and stop worrying about
+-    // moving the item.
+-    let placement = lazy.CustomizableUI.getPlacementOfWidget("import-button");
+-    if (placement?.area != lazy.CustomizableUI.AREA_BOOKMARKS) {
+-      Services.prefs.clearUserPref("browser.bookmarks.addedImportButton");
+-      return;
+-    }
+-    // Otherwise, wait for a successful migration:
+-    let obs = (subject, topic, data) => {
+-      if (
+-        data == lazy.MigrationUtils.resourceTypes.BOOKMARKS &&
+-        lazy.MigrationUtils.getImportedCount("bookmarks") > 0
+-      ) {
+-        this.removeImportButton();
+-        Services.obs.removeObserver(obs, "Migration:ItemAfterMigrate");
+-        Services.obs.removeObserver(obs, "Migration:ItemError");
+-      }
+-    };
+-    Services.obs.addObserver(obs, "Migration:ItemAfterMigrate");
+-    Services.obs.addObserver(obs, "Migration:ItemError");
+-  },
+-
+   /**
+    * Tries to initiate a speculative connection to a given url. This is not
+    * infallible, if a speculative connection cannot be initialized, it will be a
+diff --git a/browser/components/places/content/places.js b/browser/components/places/content/places.js
+index e14b838894..115a9fe28c 100644
+--- a/browser/components/places/content/places.js
++++ b/browser/components/places/content/places.js
+@@ -12,7 +12,6 @@ var { XPCOMUtils } = ChromeUtils.importESModule(
+ );
+ ChromeUtils.defineESModuleGetters(this, {
+   BookmarkJSONUtils: "resource://gre/modules/BookmarkJSONUtils.sys.mjs",
+-  MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+   PlacesBackups: "resource://gre/modules/PlacesBackups.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   DownloadUtils: "resource://gre/modules/DownloadUtils.sys.mjs",
+@@ -265,12 +264,6 @@ var PlacesOrganizer = {
+       .getElementById("fileRestorePopup")
+       .addEventListener("popupshowing", () => this.populateRestoreMenu());
+ 
+-    if (!Services.policies.isAllowed("profileImport")) {
+-      document
+-        .getElementById("OrganizerCommand_browserImport")
+-        .setAttribute("disabled", true);
+-    }
+-
+     ContentArea.focus();
+   },
+ 
+@@ -296,9 +289,6 @@ var PlacesOrganizer = {
+           case "OrganizerCommand_import":
+             this.importFromFile();
+             break;
+-          case "OrganizerCommand_browserImport":
+-            this.importFromBrowser();
+-            break;
+           case "OrganizerCommand_backup":
+             this.backupBookmarks();
+             break;
+@@ -550,17 +540,6 @@ var PlacesOrganizer = {
+       .queryOptions;
+   },
+ 
+-  /**
+-   * Show the migration wizard for importing passwords,
+-   * cookies, history, preferences, and bookmarks.
+-   */
+-  importFromBrowser: function PO_importFromBrowser() {
+-    // We pass in the type of source we're using for use in telemetry:
+-    MigrationUtils.showMigrationWizard(window, {
+-      entrypoint: MigrationUtils.MIGRATION_ENTRYPOINTS.PLACES,
+-    });
+-  },
+-
+   /**
+    * Open a file-picker and import the selected file into the bookmarks store
+    */
+diff --git a/browser/components/places/content/places.xhtml b/browser/components/places/content/places.xhtml
+index 11028b5f66..cbabba3bf6 100644
+--- a/browser/components/places/content/places.xhtml
++++ b/browser/components/places/content/places.xhtml
+@@ -90,7 +90,6 @@
+     <command id="OrganizerCommand_find:all"/>
+     <command id="OrganizerCommand_export"/>
+     <command id="OrganizerCommand_import"/>
+-    <command id="OrganizerCommand_browserImport"/>
+     <command id="OrganizerCommand_backup"/>
+     <command id="OrganizerCommand_restoreFromFile"/>
+     <command id="OrganizerCommand_search:save"/>
+@@ -284,10 +283,6 @@
+             <menuitem id="fileExport"
+                       command="OrganizerCommand_export"
+                       data-l10n-id="places-export-bookmarks-to-html"/>
+-            <menuseparator/>
+-            <menuitem id="browserImport"
+-                      command="OrganizerCommand_browserImport"
+-                      data-l10n-id="places-import-other-browser"/>
+           </menupopup>
+         </menu>
+       </menubar>
+diff --git a/browser/components/places/tests/browser/browser.toml b/browser/components/places/tests/browser/browser.toml
+index 7a0bd73c08..2cfa309a1b 100644
+--- a/browser/components/places/tests/browser/browser.toml
++++ b/browser/components/places/tests/browser/browser.toml
+@@ -166,8 +166,6 @@ https_first_disabled = true
+ 
+ ["browser_history_sidebar_search.js"]
+ 
+-["browser_import_button.js"]
+-
+ ["browser_library_bookmark_clear_visits.js"]
+ 
+ ["browser_library_bookmark_move.js"]
+@@ -257,8 +255,6 @@ skip-if = [
+ 
+ ["browser_toolbar_drop_bookmarklet.js"]
+ 
+-["browser_toolbar_drop_indicator_empty.js"]
+-
+ ["browser_toolbar_drop_multiple_flavors.js"]
+ 
+ ["browser_toolbar_drop_multiple_with_bookmarklet.js"]
+diff --git a/browser/components/preferences/config/LegacyPaneMappings.mjs b/browser/components/preferences/config/LegacyPaneMappings.mjs
+index a59934dc7f..201fe639d5 100644
+--- a/browser/components/preferences/config/LegacyPaneMappings.mjs
++++ b/browser/components/preferences/config/LegacyPaneMappings.mjs
+@@ -30,12 +30,6 @@ export const LEGACY_PANE_MAPPINGS = new Map([
+ 
+   ["general-layout", { category: "tabsBrowsing", subcategory: "layout" }],
+ 
+-  ["general-migrate", { category: "sync", subcategory: "migrate" }],
+-  [
+-    "general-migrate-autoclose",
+-    { category: "sync", subcategory: "migrate-autoclose" },
+-  ],
+-
+   ["general-drm", { category: "tabsBrowsing", subcategory: "drm" }],
+ 
+   [
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index ff59e390b5..f10697e6e1 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -925,21 +925,3 @@ SettingGroupManager.registerGroups({
+     ],
+   },
+ });
+-
+-document.addEventListener(
+-  "paneshown",
+-  (/** @type {PaneShownEvent} */ event) => {
+-    if (event.detail.category !== "paneSync") {
+-      return;
+-    }
+-    if (Services.policies && !Services.policies.isAllowed("profileImport")) {
+-      return;
+-    }
+-    let { subcategory } = event.detail;
+-    if (subcategory == "migrate") {
+-      window.gMainPane.showMigrationWizardDialog();
+-    } else if (subcategory == "migrate-autoclose") {
+-      window.gMainPane.showMigrationWizardDialog({ closeTabWhenDone: true });
+-    }
+-  }
+-);
+diff --git a/browser/components/preferences/main.js b/browser/components/preferences/main.js
+index e620d4364c..24d51683ee 100644
+--- a/browser/components/preferences/main.js
++++ b/browser/components/preferences/main.js
+@@ -660,22 +660,6 @@ var gMainPane = {
+     });
+   },
+ 
+-  handleSubcategory(subcategory) {
+-    if (Services.policies && !Services.policies.isAllowed("profileImport")) {
+-      return false;
+-    }
+-    if (subcategory == "migrate") {
+-      this.showMigrationWizardDialog();
+-      return true;
+-    }
+-
+-    if (subcategory == "migrate-autoclose") {
+-      this.showMigrationWizardDialog({ closeTabWhenDone: true });
+-    }
+-
+-    return false;
+-  },
+-
+   // CONTAINERS
+ 
+   /*
+@@ -1478,54 +1462,6 @@ var gMainPane = {
+     );
+   },
+ 
+-  /**
+-   * Displays the migration wizard dialog in an HTML dialog.
+-   */
+-  async showMigrationWizardDialog({ closeTabWhenDone = false } = {}) {
+-    let migrationWizardDialog = document.getElementById(
+-      "migrationWizardDialog"
+-    );
+-
+-    if (migrationWizardDialog.open) {
+-      return;
+-    }
+-
+-    await customElements.whenDefined("migration-wizard");
+-
+-    // Only create the migration-wizard once.
+-    if (!migrationWizardDialog.firstElementChild) {
+-      let wizard = document.createElement("migration-wizard");
+-      wizard.toggleAttribute("dialog-mode", true);
+-      migrationWizardDialog.appendChild(wizard);
+-      migrationWizardDialog.addEventListener(
+-        "MigrationWizard:Close",
+-        function (e) {
+-          e.currentTarget.close();
+-        }
+-      );
+-    }
+-    migrationWizardDialog.firstElementChild.requestState();
+-
+-    migrationWizardDialog.addEventListener(
+-      "close",
+-      () => {
+-        // Let others know that the wizard is closed -- potentially because of a
+-        // user action within the dialog that dispatches "MigrationWizard:Close"
+-        // but this also covers cases like hitting Escape.
+-        Services.obs.notifyObservers(
+-          migrationWizardDialog,
+-          "MigrationWizard:Closed"
+-        );
+-        if (closeTabWhenDone) {
+-          window.close();
+-        }
+-      },
+-      { once: true }
+-    );
+-
+-    migrationWizardDialog.showModal();
+-  },
+-
+   destroy() {
+     window.removeEventListener("unload", this);
+ 
+diff --git a/browser/components/preferences/preferences.xhtml b/browser/components/preferences/preferences.xhtml
+index ff82f2c9ae..98af6f0adb 100644
+--- a/browser/components/preferences/preferences.xhtml
++++ b/browser/components/preferences/preferences.xhtml
+@@ -74,7 +74,6 @@
+   <script src="chrome://browser/content/preferences/preferences.js"/>
+   <script src="chrome://browser/content/preferences/extensionControlled.js"/>
+   <script src="chrome://browser/content/preferences/findInPage.js"/>
+-  <script src="chrome://browser/content/migration/migration-wizard.mjs" type="module"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/dialog-button.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/placeholder-message.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/browser-language-restart-message.mjs"></script>
+@@ -248,7 +247,5 @@
+     </vbox>
+   </vbox>
+   </stack>
+-
+-  <html:dialog id="migrationWizardDialog"></html:dialog>
+ </html:body>
+ </html>
+diff --git a/browser/components/preferences/tests/browser-srd.toml b/browser/components/preferences/tests/browser-srd.toml
+index 4f007559b5..0ba51ce13e 100644
+--- a/browser/components/preferences/tests/browser-srd.toml
++++ b/browser/components/preferences/tests/browser-srd.toml
+@@ -37,8 +37,6 @@ tags = "os_integration"
+ 
+ ["browser_no_id_collision_between_categories_and_mainPane.js"]
+ 
+-["browser_open_migration_wizard.js"]
+-
+ ["browser_privacy_trustPanelBreachAlerts.js"]
+ 
+ ["browser_setting_group_in_progress.js"]
+diff --git a/browser/components/preferences/tests/browser.toml b/browser/components/preferences/tests/browser.toml
+index f7154d79cc..274cdc820a 100644
+--- a/browser/components/preferences/tests/browser.toml
++++ b/browser/components/preferences/tests/browser.toml
+@@ -54,8 +54,6 @@ run-if = ["os == 'mac'"]
+ 
+ ["browser_no_id_collision_between_categories_and_mainPane.js"]
+ 
+-["browser_open_migration_wizard.js"]
+-
+ ["browser_sessionRestoreNewTab.js"]
+ 
+ ["browser_spotlight.js"]
+diff --git a/browser/components/preferences/tests/browser_legacy_pane_mappings.js b/browser/components/preferences/tests/browser_legacy_pane_mappings.js
+index 570842b298..3658a739a4 100644
+--- a/browser/components/preferences/tests/browser_legacy_pane_mappings.js
++++ b/browser/components/preferences/tests/browser_legacy_pane_mappings.js
+@@ -472,68 +472,6 @@ add_task(async function test_hash_url_navigation() {
+   BrowserTestUtils.removeTab(tab);
+ });
+ 
+-/**
+- * general-migrate and general-migrate-autoclose route to the sync
+- * pane and open the migration wizard via the paneshown listener.
+- *
+- * Requires identity.fxaccounts.enabled so that the sync nav button is visible.
+- */
+-add_task(async function test_migration_wizard_dispatch() {
+-  if (!Services.prefs.getBoolPref("identity.fxaccounts.enabled")) {
+-    info("skipping: identity.fxaccounts.enabled is false");
+-    return;
+-  }
+-
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.settings-redesign.enabled", true]],
+-  });
+-
+-  for (let arg of ["general-migrate", "general-migrate-autoclose"]) {
+-    let initialized = TestUtils.topicObserved(
+-      "preferences-MaybeCategoriesInitializedSLOW"
+-    );
+-
+-    let tab = await BrowserTestUtils.addTab(
+-      gBrowser,
+-      `about:preferences#${arg}`
+-    );
+-    gBrowser.selectedTab = tab;
+-    let browser = gBrowser.selectedBrowser;
+-
+-    // Pre-register so we catch the event regardless of when the actor's
+-    // GetAvailableMigrators query resolves — removing the tab before
+-    // MigrationWizard:Ready fires destroys the actor mid-query.
+-    let migrationReady = BrowserTestUtils.waitForEvent(
+-      browser,
+-      "MigrationWizard:Ready",
+-      true
+-    );
+-
+-    await BrowserTestUtils.waitForEvent(browser, "Initialized", true);
+-    if (browser.contentDocument.readyState !== "complete") {
+-      await BrowserTestUtils.waitForEvent(browser.contentWindow, "load");
+-    }
+-    await initialized;
+-
+-    let doc = browser.contentDocument;
+-
+-    await TestUtils.waitForCondition(
+-      () => doc.getElementById("migrationWizardDialog").open,
+-      `${arg}: migration wizard dialog opens`
+-    );
+-    await migrationReady;
+-    let win = browser.contentWindow;
+-
+-    is(win.gLastCategory.category, "paneSync", `${arg}: routed to sync pane`);
+-    ok(
+-      doc.getElementById("migrationWizardDialog").open,
+-      `${arg}: migration wizard dialog is open`
+-    );
+-
+-    BrowserTestUtils.removeTab(tab);
+-  }
+-});
+-
+ /**
+  * A paneXxx-prefixed name passed to openPreferences is normalised to
+  * the friendly form.  The hash must be written without the "pane" prefix.
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index a06fdbbe3a..6ffc4425da 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -466,10 +466,6 @@ browser-window-return-to-opener =
+ 
+ ## Bookmarks toolbar items
+ 
+-browser-import-button2 =
+-    .label = Import bookmarks…
+-    .tooltiptext = Import bookmarks from another browser to { -brand-short-name }.
+-
+ bookmarks-toolbar-empty-message = For quick access, place your bookmarks here on the bookmarks toolbar. <a data-l10n-name="manage-bookmarks">Manage bookmarks…</a>
+ 
+ ## WebRTC Pop-up notifications
+diff --git a/browser/locales/en-US/browser/migrationWizard.ftl b/browser/locales/en-US/browser/migrationWizard.ftl
+index e833eda058..096efff276 100644
+--- a/browser/locales/en-US/browser/migrationWizard.ftl
++++ b/browser/locales/en-US/browser/migrationWizard.ftl
+@@ -2,30 +2,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-migration-wizard-selection-header = Import browser data
+-migration-wizard-selection-list = Select the data you’d like to import.
+-
+-# Shown in the new migration wizard's dropdown selector for choosing the browser
+-# to import from. This variant is shown when the selected browser doesn't support
+-# user profiles, and so we only show the browser name.
+-#
+-# Variables:
+-#  $sourceBrowser (String): the name of the browser to import from.
+-migration-wizard-selection-option-without-profile = { $sourceBrowser }
+-
+-# Shown in the new migration wizard's dropdown selector for choosing the browser
+-# and user profile to import from. This variant is shown when the selected browser
+-# supports user profiles.
+-#
+-# Variables:
+-#  $sourceBrowser (String): the name of the browser to import from.
+-#  $profileName (String): the name of the user profile to import from.
+-migration-wizard-selection-option-with-profile = { $sourceBrowser } — { $profileName }
+-
+-# Each migrator is expected to include a display name string, and that display
+-# name string should have a key with "migration-wizard-migrator-display-name-"
+-# as a prefix followed by the unique identification key for the migrator.
+-
+ migration-wizard-migrator-display-name-brave = Brave
+ migration-wizard-migrator-display-name-canary = Chrome Canary
+ migration-wizard-migrator-display-name-chrome = Chrome
+@@ -39,64 +15,17 @@ migration-wizard-migrator-display-name-edge-legacy = Microsoft Edge Legacy
+ migration-wizard-migrator-display-name-firefox = Firefox
+ migration-wizard-migrator-display-name-file-password-csv = Passwords from CSV file
+ migration-wizard-migrator-display-name-file-bookmarks = Bookmarks from HTML file
+-migration-wizard-migrator-display-name-ie = Microsoft Internet Explorer
+ migration-wizard-migrator-display-name-opera = Opera
+ migration-wizard-migrator-display-name-opera-gx = Opera GX
+ migration-wizard-migrator-display-name-safari = Safari
+ migration-wizard-migrator-display-name-vivaldi = Vivaldi
+ 
+-migration-source-name-ie = Internet Explorer
+-migration-source-name-edge = Microsoft Edge
+-migration-source-name-chrome = Google Chrome
+-
+ migration-imported-safari-reading-list = Reading List (From Safari)
+ migration-imported-edge-reading-list = Reading List (From Edge)
+ 
+-## These strings are shown if the selected browser data directory is unreadable.
+-## In practice, this tends to only occur on Linux when Firefox
+-## is installed as a Snap.
+-
+-migration-no-permissions-message = { -brand-short-name } does not have access to other browsers’ profiles installed on this device.
+-
+-migration-no-permissions-instructions = To continue importing data from another browser, grant { -brand-short-name } access to its profile folder.
+-
+-migration-no-permissions-instructions-step1 = Select “Continue”
+-
+-# The second step in getting permissions to read data for the selected
+-# browser type.
+-#
+-# Variables:
+-#  $permissionsPath (String): the file system path that the user will need to grant read permission to.
+-migration-no-permissions-instructions-step2 = In the file picker, navigate to <code>{ $permissionsPath }</code> and choose “Select”
+-
+-## These strings will be displayed based on how many resources are selected to import
+-
+-migration-all-available-data-label = Import all available data
+-migration-no-selected-data-label = No data selected for import
+-migration-selected-data-label = Import selected data
+-
+-##
+-
+-migration-select-all-option-label = Select all
+-migration-bookmarks-option-label = Bookmarks
+-
+-# Favorites is used for Bookmarks when importing from Internet Explorer or
+-# Edge, as this is the terminology for bookmarks on those browsers.
+-migration-favorites-option-label = Favorites
+-
+-migration-passwords-option-label = Saved passwords
+-migration-history-option-label = Browsing history
+-migration-extensions-option-label = Extensions
+-migration-form-autofill-option-label = Form autofill data
+-migration-cookies-option-label = Cookies
+-migration-session-option-label = Windows and tabs
+-migration-otherdata-option-label = Other data
+-
+ migration-passwords-from-file-progress-header = Import passwords file
+ migration-passwords-from-file-success-header = Passwords imported successfully
+ migration-passwords-from-file = Checking file for passwords
+-migration-passwords-new = New passwords
+-migration-passwords-updated = Existing passwords
+ migration-passwords-from-file-no-valid-data = The file doesn’t include any valid password data. Pick another file.
+ 
+ migration-passwords-from-file-picker-title = Import Passwords File
+@@ -165,161 +94,3 @@ migration-wizard-progress-success-new-bookmarks =
+         [one] { $newEntries } bookmark
+        *[other] { $newEntries } bookmarks
+     }
+-
+-migration-import-button-label = Import
+-migration-choose-to-import-from-file-button-label = Import from file
+-migration-import-from-file-button-label = Select file
+-migration-cancel-button-label = Cancel
+-migration-done-button-label = Done
+-migration-continue-button-label = Continue
+-
+-migration-wizard-import-browser-no-browsers = { -brand-short-name } couldn’t find any programs that contain bookmark, history or password data.
+-migration-wizard-import-browser-no-resources = There was an error. { -brand-short-name } can’t find any data to import from that browser profile.
+-
+-## These strings will be used to create a dynamic list of items that can be
+-## imported. The list will be created using Intl.ListFormat(), so it will
+-## follow each locale's rules, and the first item will be capitalized by code.
+-## When applicable, the resources should be in their plural form.
+-## For example, a possible list could be "Bookmarks, passwords and autofill data".
+-
+-migration-list-bookmark-label = bookmarks
+-
+-# “favorites” refers to bookmarks in Edge and Internet Explorer. Use the same terminology
+-# if the browser is available in your language.
+-migration-list-favorites-label = favorites
+-migration-list-password-label = passwords
+-migration-list-history-label = history
+-migration-list-extensions-label = extensions
+-migration-list-autofill-label = autofill data
+-
+-##
+-
+-migration-wizard-progress-header = Importing data
+-
+-# This header appears in the final page of the migration wizard only if
+-# all resources were imported successfully.
+-migration-wizard-progress-done-header = Data imported successfully
+-
+-# This header appears in the final page of the migration wizard if only
+-# some of the resources were imported successfully. This is meant to be
+-# distinct from migration-wizard-progress-done-header, which is only shown
+-# if all resources were imported successfully.
+-migration-wizard-progress-done-with-warnings-header = Data import complete
+-
+-migration-wizard-progress-icon-in-progress =
+-  .aria-label = Importing…
+-migration-wizard-progress-icon-completed =
+-  .aria-label = Completed
+-
+-migration-safari-password-import-header = Import passwords from Safari
+-migration-safari-password-import-post-sequoia-step1 = Open the <a data-l10n-name="macos-passwords-app">Passwords app</a> on your Mac
+-migration-safari-password-import-post-sequoia-step2 = From the menu bar at the top of the screen, choose File > Export All Passwords to File…
+-migration-safari-password-import-post-sequoia-step3 = Save the file
+-migration-safari-password-import-post-sequoia-step4 = Select the file you saved
+-
+-## These instructions only appear and are applicable on versions of macOS before
+-## Sequoia (macOS 15). They can be removed once importing on pre-Sequoia macOS
+-## is no longer supported.
+-
+-migration-safari-password-import-steps-header = To import Safari passwords:
+-migration-safari-password-import-step1 = In Safari, open “Safari” menu and go to Preferences > Passwords
+-migration-safari-password-import-step2 = Select the <img data-l10n-name="safari-icon-3dots"/> button and choose “Export All Passwords”
+-migration-safari-password-import-step3 = Save the passwords file
+-migration-safari-password-import-step4 = Use “Select file” below to choose the passwords file you saved
+-
+-##
+-
+-migration-chrome-windows-password-import-header = How to import passwords from Chrome
+-migration-chrome-windows-password-import-steps-header = In Chrome:
+-migration-chrome-windows-password-import-step1 = Open the main menu <img data-l10n-name="chrome-icon-3dots"/> and go to Passwords and Autofill > Google Password Manager.
+-migration-chrome-windows-password-import-step2 = Select “Settings” from the menu.
+-migration-chrome-windows-password-import-step3 = Choose “Download file” and save it to your device.
+-migration-chrome-windows-password-import-step4 = Return here and “Select file” to finish import.
+-
+-migration-manual-password-import-skip-button = Skip
+-migration-manual-password-import-cancel-button = Cancel
+-migration-manual-password-import-select-button = Select file
+-
+-# Shown in the migration wizard after importing bookmarks from another
+-# browser has completed.
+-#
+-# Variables:
+-#  $quantity (Number): the number of successfully imported bookmarks
+-migration-wizard-progress-success-bookmarks =
+-    { $quantity ->
+-        [one] { $quantity } bookmark
+-       *[other] { $quantity } bookmarks
+-    }
+-
+-# Shown in the migration wizard after importing bookmarks from either
+-# Internet Explorer or Edge.
+-#
+-# Use the same terminology if the browser is available in your language.
+-#
+-# Variables:
+-#  $quantity (Number): the number of successfully imported bookmarks
+-migration-wizard-progress-success-favorites =
+-    { $quantity ->
+-        [one] { $quantity } favorite
+-       *[other] { $quantity } favorites
+-    }
+-
+-## The import process identifies extensions installed in other supported
+-## browsers and installs the corresponding (matching) extensions compatible
+-## with Firefox, if available.
+-
+-# Shown in the migration wizard after importing all matched extensions
+-# from supported browsers.
+-#
+-# Variables:
+-#   $quantity (Number): the number of successfully imported extensions
+-migration-wizard-progress-success-extensions =
+-    { $quantity ->
+-        [one] { $quantity } extension
+-       *[other] { $quantity } extensions
+-    }
+-
+-# Shown in the migration wizard after importing a partial amount of
+-# matched extensions from supported browsers.
+-#
+-# Variables:
+-#   $matched (Number): the number of matched imported extensions
+-#   $quantity (Number): the number of total extensions found during import
+-migration-wizard-progress-partial-success-extensions = { $matched } of { $quantity } extensions
+-
+-migration-wizard-progress-extensions-support-link = Learn how { -brand-product-name } matches extensions
+-# Shown in the migration wizard if there are no matched extensions
+-# on import from supported browsers.
+-migration-wizard-progress-no-matched-extensions = No matching extensions
+-
+-migration-wizard-progress-extensions-addons-link = Browse extensions for { -brand-short-name }
+-
+-##
+-
+-# Shown in the migration wizard after importing passwords from another
+-# browser has completed.
+-#
+-# Variables:
+-#  $quantity (Number): the number of successfully imported passwords
+-migration-wizard-progress-success-passwords =
+-    { $quantity ->
+-        [one] { $quantity } password
+-       *[other] { $quantity } passwords
+-    }
+-
+-# Shown in the migration wizard after importing history from another
+-# browser has completed.
+-#
+-# Variables:
+-#  $maxAgeInDays (Number): the maximum number of days of history that might be imported.
+-migration-wizard-progress-success-history =
+-    { $maxAgeInDays ->
+-        [one] From the last day
+-       *[other] From the last { $maxAgeInDays } days
+-    }
+-
+-migration-wizard-progress-success-formdata = Form history
+-
+-migration-wizard-safari-permissions-sub-header = To import Safari bookmarks and browsing history:
+-migration-wizard-safari-instructions-continue = Select “Continue”
+-migration-wizard-safari-instructions-folder = Select Safari folder in the list and choose “Open”
+diff --git a/browser/locales/en-US/browser/places.ftl b/browser/locales/en-US/browser/places.ftl
+index 2bae7f75dd..f4be4c797f 100644
+--- a/browser/locales/en-US/browser/places.ftl
++++ b/browser/locales/en-US/browser/places.ftl
+@@ -209,10 +209,6 @@ places-export-bookmarks-to-html =
+   .label = Export Bookmarks to HTML…
+   .accesskey = E
+ 
+-places-import-other-browser =
+-  .label = Import Data from Another Browser…
+-  .accesskey = A
+-
+ places-view-sort-col-name =
+   .label = Name
+ 
+diff --git a/browser/themes/shared/jar.inc.mn b/browser/themes/shared/jar.inc.mn
+index a5ff35dd42..bbe43e3eac 100644
+--- a/browser/themes/shared/jar.inc.mn
++++ b/browser/themes/shared/jar.inc.mn
+@@ -11,7 +11,6 @@
+   skin/classic/browser/aboutRestartRequired.css                (../shared/aboutRestartRequired.css)
+   skin/classic/browser/aboutSessionRestore.css                 (../shared/aboutSessionRestore.css)
+   skin/classic/browser/aboutTabCrashed.css                     (../shared/aboutTabCrashed.css)
+-  skin/classic/browser/aboutWelcomeBack.css                    (../shared/aboutWelcomeBack.css)
+   skin/classic/browser/tab-list-tree.css                       (../shared/tab-list-tree.css)
+   skin/classic/browser/addon-notification.css                  (../shared/addon-notification.css)
+   skin/classic/browser/autocomplete.css                        (../shared/autocomplete.css)
+@@ -89,12 +88,6 @@
+   skin/classic/browser/drm-icon.svg                            (../shared/drm-icon.svg)
+   skin/classic/browser/identity-block/identity-block.css       (../shared/identity-block/identity-block.css)
+   skin/classic/browser/permissions.svg                         (../shared/identity-block/permissions.svg)
+-  skin/classic/browser/migration/migration-dialog-window.css   (../shared/migration/migration-dialog-window.css)
+-  skin/classic/browser/migration/migration-wizard.css          (../shared/migration/migration-wizard.css)
+-  skin/classic/browser/migration/success.svg                   (../shared/migration/success.svg)
+-  skin/classic/browser/migration/progress-mask.svg                   (../shared/migration/progress-mask.svg)
+-  skin/classic/browser/migration/chrome-icon-3dots.svg                   (../shared/migration/chrome-icon-3dots.svg)
+-  skin/classic/browser/migration/safari-icon-3dots.svg                   (../shared/migration/safari-icon-3dots.svg)
+   skin/classic/browser/notification-icons/autoplay-media.svg                (../shared/notification-icons/autoplay-media.svg)
+   skin/classic/browser/notification-icons/autoplay-media-blocked.svg        (../shared/notification-icons/autoplay-media-blocked.svg)
+   skin/classic/browser/notification-icons/camera-blocked.svg                (../shared/notification-icons/camera-blocked.svg)
+diff --git a/browser/themes/shared/toolbarbutton-icons.css b/browser/themes/shared/toolbarbutton-icons.css
+index a1c805926f..6ea12de503 100644
+--- a/browser/themes/shared/toolbarbutton-icons.css
++++ b/browser/themes/shared/toolbarbutton-icons.css
+@@ -291,10 +291,6 @@
+   }
+ }
+ 
+-#import-button {
+-  list-style-image: url("chrome://browser/skin/import.svg");
+-}
+-
+ .content-analysis-indicator {
+   -moz-context-properties: fill, stroke;
+   stroke: var(--toolbarbutton-icon-fill);
+diff --git a/browser/themes/shared/toolbarbuttons.css b/browser/themes/shared/toolbarbuttons.css
+index e78b7827f7..3bb118b1f2 100644
+--- a/browser/themes/shared/toolbarbuttons.css
++++ b/browser/themes/shared/toolbarbuttons.css
+@@ -552,17 +552,10 @@ toolbar:not(#TabsToolbar) > #personal-bookmarks {
+ #managed-bookmarks > .toolbarbutton-icon,
+ #bookmarks-toolbar-placeholder > .toolbarbutton-icon,
+ #PlacesToolbarItems > .bookmark-item > .toolbarbutton-icon[label]:not([label=""]),
+-#PersonalToolbar #import-button > .toolbarbutton-icon,
+ #OtherBookmarks.bookmark-item[container] > .toolbarbutton-icon {
+   margin-inline-end: 4px;
+ }
+ 
+-/* The wrapper selector hides the item in the customize palette, where each
+-   widget is wrapped in a toolbarpaletteitem with id wrapper-<widget-id>. */
+-:root[disableprofileimport] :is(#import-button, #wrapper-import-button) {
+-  display: none;
+-}
+-
+ /* Separators */
+ 
+ toolbarseparator {
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 4f01fa547e..de24cc7186 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -54,7 +54,6 @@ module.exports = [
+       "browser/themes/shared/aboutRestartRequired.css",
+       "browser/themes/shared/aboutSessionRestore.css",
+       "browser/themes/shared/aboutTabCrashed.css",
+-      "browser/themes/shared/aboutWelcomeBack.css",
+       "browser/themes/shared/addon-notification.css",
+       "browser/themes/shared/addons/extension-controlled.css",
+       "browser/themes/shared/addons/unified-extensions.css",
+@@ -72,8 +71,6 @@ module.exports = [
+       "browser/themes/shared/downloads/progressmeter.css",
+       "browser/themes/shared/identity-block/identity-block.css",
+       "browser/themes/shared/identity-credential-notification.css",
+-      "browser/themes/shared/migration/migration-dialog-window.css",
+-      "browser/themes/shared/migration/migration-wizard.css",
+       "browser/themes/shared/notification-icons.css",
+       "browser/themes/shared/pageInfo.css",
+       "browser/themes/shared/places/editBookmark.css",
+diff --git a/testing/marionette/harness/marionette_harness/tests/integration-tests.toml b/testing/marionette/harness/marionette_harness/tests/integration-tests.toml
+index 137fd18f7d..433b05cbe1 100644
+--- a/testing/marionette/harness/marionette_harness/tests/integration-tests.toml
++++ b/testing/marionette/harness/marionette_harness/tests/integration-tests.toml
+@@ -15,8 +15,6 @@
+ 
+ ["include:../../../../../browser/components/customizableui/test/marionette/manifest.toml"]
+ 
+-["include:../../../../../browser/components/migration/tests/marionette/manifest.toml"]
+-
+ ["include:../../../../../browser/components/places/tests/marionette/manifest.toml"]
+ 
+ ["include:../../../../../browser/components/search/test/marionette/manifest.toml"]
+diff --git a/testing/mochitest/BrowserTestUtils/BrowserTestUtils.sys.mjs b/testing/mochitest/BrowserTestUtils/BrowserTestUtils.sys.mjs
+index 94892c538f..37648ad3c0 100644
+--- a/testing/mochitest/BrowserTestUtils/BrowserTestUtils.sys.mjs
++++ b/testing/mochitest/BrowserTestUtils/BrowserTestUtils.sys.mjs
+@@ -2981,27 +2981,6 @@ export var BrowserTestUtils = {
+     });
+   },
+ 
+-  /**
+-   * A helper function for this test that returns a Promise that resolves
+-   * once the migration wizard appears.
+-   *
+-   * @param {DOMWindow} window
+-   *   The top-level window that the about:preferences tab is likely to open
+-   *   in if the new migration wizard is enabled.
+-   * @returns {Promise<Element>}
+-   *   Resolves to the opened about:preferences tab with the migration wizard
+-   *   running and loaded in it.
+-   */
+-  async waitForMigrationWizard(window) {
+-    let wizardReady = this.waitForEvent(window, "MigrationWizard:Ready");
+-    let wizardTab = await this.waitForNewTab(window.gBrowser, url => {
+-      return url.startsWith("about:preferences");
+-    });
+-    await wizardReady;
+-
+-    return wizardTab;
+-  },
+-
+   /**
+    * Run a query selector that pierces into open and closed Shadow DOM roots.
+    *
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 1092e379cd..4035117115 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -130,9 +130,6 @@
+       "chrome://browser/content/migration/migration-wizard-constants.mjs": [
+         "../../../browser/components/migration/content/migration-wizard-constants.mjs"
+       ],
+-      "chrome://browser/content/migration/migration-wizard.mjs": [
+-        "../../../browser/components/migration/content/migration-wizard.mjs"
+-      ],
+       "chrome://browser/content/multilineeditor/multiline-editor.mjs": [
+         "../../../browser/components/multilineeditor/multiline-editor.mjs"
+       ],

@@ -4,9 +4,3 @@
 /* about:support in Settings' look. */
 
 @import url("chrome://browser/content/sval/pages/info.css");
-
-/* The row that links to about:profiles, a page Sval does not build
-   (`no-closed-about-pages.patch`). The profile folder has a row of its own. */
-tr:has(> td > a[href="about:profiles"]) {
-  display: none;
-}

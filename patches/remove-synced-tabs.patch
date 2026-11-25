@@ -1,0 +1,742 @@
+Sval: Remove the synced tabs sidebar
+
+The synced tabs sidebar listed tabs from a Firefox account, and Firefox
+accounts are locked off, so it could only ask the user to sign in. The
+component goes with the sidebar panel, switcher item, context menus and
+all-tabs menu button that opened it, the revamped sidebar's panel for
+it, its strings and tests. WebRTC's indicator used the component's
+event emitter and takes toolkit's, which passes the event name first.
+
+diff --git a/browser/base/content/main-popupset.inc.xhtml b/browser/base/content/main-popupset.inc.xhtml
+index dbabda1fd9..3cf95fa062 100644
+--- a/browser/base/content/main-popupset.inc.xhtml
++++ b/browser/base/content/main-popupset.inc.xhtml
+@@ -275,9 +275,6 @@
+     <menuitem id="sidebar-switcher-history"
+               data-l10n-id="sidebar-menu-history"
+               key="key_gotoHistory"/>
+-    <menuitem id="sidebar-switcher-tabs"
+-              data-l10n-id="sidebar-menu-synced-tabs"
+-              class="sync-ui-item"/>
+     <menuseparator/>
+     <!-- Extension toolbarbuttons go here. -->
+     <menuseparator id="sidebar-extensions-separator"/>
+@@ -365,40 +362,6 @@
+               class="sidebar-history-multiselect-command"/>
+   </menupopup>
+ 
+-  <menupopup id="sidebar-synced-tabs-context-menu">
+-    <menuitem data-l10n-id="sidebar-context-menu-open-in-tab"
+-              id="sidebar-synced-tabs-context-open-in-tab"/>
+-    <menu id="sidebar-synced-tabs-context-menu-container-tab"
+-            data-l10n-id="sidebar-context-menu-open-in-container-tab"
+-            selection-type="single"
+-            node-type="link"
+-            hide-if-private-browsing="true"
+-            hide-if-usercontext-disabled="true">
+-      <menupopup id="sidebar-synced-tabs-context-menu-container-popup"/>
+-    </menu>
+-    <menuitem data-l10n-id="sidebar-context-menu-open-in-window"
+-              id="sidebar-synced-tabs-context-open-in-window"/>
+-    <menuitem data-l10n-id="sidebar-context-menu-open-in-private-window"
+-              id="sidebar-synced-tabs-context-open-in-private-window"/>
+-    <menuseparator/>
+-    <menuitem data-l10n-id="sidebar-context-menu-close-remote-tab"
+-              id="sidebar-context-menu-close-remote-tab"
+-              data-l10n-args='{"deviceName": ""}'
+-              disabled="true"/>
+-    <menuseparator/>
+-    <menuitem data-l10n-id="sidebar-context-menu-bookmark-tab"
+-              id="sidebar-synced-tabs-context-bookmark-tab"/>
+-    <menuitem data-l10n-id="sidebar-context-menu-copy-link"
+-              id="sidebar-synced-tabs-context-copy-link"/>
+-    <menuseparator/>
+-    <menuitem data-l10n-id="synced-tabs-context-open-all-in-tabs"
+-              id="sidebar-synced-tabs-context-open-all-in-tabs"/>
+-    <menuitem data-l10n-id="synced-tabs-context-connect-another-device"
+-              id="sidebar-synced-tabs-context-connect-another-device"/>
+-    <menuitem data-l10n-id="synced-tabs-context-manage-this-device"
+-              id="sidebar-synced-tabs-context-manage-this-device"/>
+-  </menupopup>
+-
+   <menupopup id="sidebar-bookmarks-context-menu">
+     <menuitem data-l10n-id="places-open-all-bookmarks"
+               id="sidebar-bookmarks-context-open-all-bookmarks"/>
+@@ -668,54 +631,6 @@
+ 
+   <tooltip id="dynamic-shortcut-tooltip"/>
+ 
+-  <menupopup id="SyncedTabsSidebarContext">
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-open"
+-              id="syncedTabsOpenSelected" where="current"/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-open-in-tab"
+-              id="syncedTabsOpenSelectedInTab" where="tab"/>
+-    <menu data-lazy-l10n-id="synced-tabs-context-open-in-container-tab"
+-          id="syncedTabsOpenSelectedInContainerTab"
+-          hidden="true">
+-      <menupopup id="SyncedTabsOpenSelectedInContainerTabMenu"/>
+-    </menu>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-open-in-window"
+-              id="syncedTabsOpenSelectedInWindow" where="window"/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-open-in-private-window"
+-              id="syncedTabsOpenSelectedInPrivateWindow" where="window" private="true"/>
+-    <menuseparator/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-bookmark"
+-              id="syncedTabsBookmarkSelected"/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-copy"
+-              id="syncedTabsCopySelected"/>
+-    <menuseparator/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-open-all-in-tabs"
+-              id="syncedTabsOpenAllInTabs"/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-manage-devices"
+-              id="syncedTabsManageDevices"/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-sync-now"
+-              id="syncedTabsRefresh"/>
+-  </menupopup>
+-  <menupopup id="SyncedTabsSidebarTabsFilterContext"
+-             class="textbox-contextmenu">
+-    <menuitem data-l10n-id="text-action-undo"
+-              cmd="cmd_undo"/>
+-    <menuseparator/>
+-    <menuitem data-l10n-id="text-action-cut"
+-              cmd="cmd_cut"/>
+-    <menuitem data-l10n-id="text-action-copy"
+-              cmd="cmd_copy"/>
+-    <menuitem data-l10n-id="text-action-paste"
+-              cmd="cmd_paste"/>
+-    <menuitem data-l10n-id="text-action-delete"
+-              cmd="cmd_delete"/>
+-    <menuseparator/>
+-    <menuitem data-l10n-id="text-action-select-all"
+-              cmd="cmd_selectAll"/>
+-    <menuseparator/>
+-    <menuitem data-lazy-l10n-id="synced-tabs-context-sync-now"
+-              id="syncedTabsRefreshFilter"/>
+-  </menupopup>
+-
+   <hbox id="statuspanel" inactive="true" hidden="true">
+     <label id="statuspanel-label"
+             role="status"
+diff --git a/browser/base/content/main-popupset.js b/browser/base/content/main-popupset.js
+index 43497a6eb3..bdf2fbd609 100644
+--- a/browser/base/content/main-popupset.js
++++ b/browser/base/content/main-popupset.js
+@@ -213,9 +213,6 @@ document.addEventListener(
+         case "sidebar-switcher-history":
+           SidebarController.show("viewHistorySidebar");
+           break;
+-        case "sidebar-switcher-tabs":
+-          SidebarController.show("viewTabsSidebar");
+-          break;
+         case "sidebar-reverse-position":
+           SidebarController.reversePosition();
+           break;
+@@ -321,11 +318,6 @@ document.addEventListener(
+           BrowserPageActions.removeExtensionForContextAction();
+           break;
+ 
+-        // == SyncedTabsSidebarContext ==
+-        case "syncedTabsManageDevices":
+-          gSync.openDevicesManagementPage("syncedtabs-sidebar");
+-          break;
+-
+         // == unified-extensions-context-menu ==
+         case "unified-extensions-context-menu-pin-to-toolbar":
+           gUnifiedExtensions.onPinToToolbarChange(
+@@ -448,16 +440,6 @@ document.addEventListener(
+       PlacesUIUtils.createContainerTabMenu(event)
+     );
+ 
+-    const containerSyncedTabsPopup = document.getElementById(
+-      "sidebar-synced-tabs-context-menu-container-popup"
+-    );
+-    containerSyncedTabsPopup.addEventListener("command", event =>
+-      PlacesUIUtils.openInContainerTab(event)
+-    );
+-    containerSyncedTabsPopup.addEventListener("popupshowing", event =>
+-      PlacesUIUtils.createContainerTabMenu(event)
+-    );
+-
+     document
+       .getElementById("sidebar-bookmarks-context-container-tab-popup")
+       .addEventListener("popupshowing", event =>
+@@ -558,9 +540,6 @@ document.addEventListener(
+         case "dynamic-shortcut-tooltip":
+           DynamicShortcutTooltip.updateText(event.target);
+           break;
+-        case "SyncedTabsOpenSelectedInContainerTabMenu":
+-          createUserContextMenu(event, { isContextMenu: true });
+-          break;
+         case "unified-extensions-context-menu":
+           gUnifiedExtensions.updateContextMenu(event.target, event);
+           break;
+diff --git a/browser/base/content/test/webrtc/browser_webrtc_hooks.js b/browser/base/content/test/webrtc/browser_webrtc_hooks.js
+index 3fb2fc9f8d..6b8e27ab21 100644
+--- a/browser/base/content/test/webrtc/browser_webrtc_hooks.js
++++ b/browser/base/content/test/webrtc/browser_webrtc_hooks.js
+@@ -35,7 +35,7 @@ const Events = {
+   handlers: new Map(),
+   on() {
+     for (let event of this.events) {
+-      let handler = data => {
++      let handler = (_event, data) => {
+         if (this.details.has(event)) {
+           ok(false, `Got multiple ${event} events`);
+         }
+@@ -330,7 +330,7 @@ var gTests = [
+       await blockerPromise;
+ 
+       let eventPromise = new Promise(resolve => {
+-        webrtcUI.on("peer-request-cancel", function listener(details) {
++        webrtcUI.on("peer-request-cancel", function listener(_event, details) {
+           resolve(details);
+           webrtcUI.off("peer-request-cancel", listener);
+         });
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 79f5f48328..7f86636530 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -391,13 +391,11 @@ let JSWINDOWACTORS = {
+     matches: [
+       "about:home",
+       "about:newtab",
+-      "chrome://browser/content/syncedtabs/sidebar.xhtml",
+       "chrome://browser/content/places/historySidebar.xhtml",
+       "chrome://browser/content/places/bookmarksSidebar.xhtml",
+       "chrome://browser/content/sidebar/sidebar-bookmarks.html",
+       "chrome://browser/content/sidebar/sidebar-history.html",
+       "chrome://browser/content/sidebar/sidebar-customize.html",
+-      "chrome://browser/content/sidebar/sidebar-syncedtabs.html",
+       "chrome://browser/content/sidebar/sidebar-opentabs.html",
+       "about:firefoxview",
+       "about:editprofile",
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 7f5d53fc62..d86756fe79 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -58,7 +58,6 @@ DIRS += [
+     "shell",
+     "sidebar",
+     "sval",
+-    "syncedtabs",
+     "tabbrowser",
+     "topsites",
+     "translations",
+diff --git a/browser/components/places/PlacesUIUtils.sys.mjs b/browser/components/places/PlacesUIUtils.sys.mjs
+index f77d69ad45..0fcbf75318 100644
+--- a/browser/components/places/PlacesUIUtils.sys.mjs
++++ b/browser/components/places/PlacesUIUtils.sys.mjs
+@@ -1402,11 +1402,7 @@ export var PlacesUIUtils = {
+   placesContextShowing(event) {
+     let menupopup = /** @type {XULPopupElement} */ (event.target);
+     if (
+-      ![
+-        "placesContext",
+-        "sidebar-history-context-menu",
+-        "sidebar-synced-tabs-context-menu",
+-      ].includes(menupopup.id)
++      !["placesContext", "sidebar-history-context-menu"].includes(menupopup.id)
+     ) {
+       // Ignore any popupshowing events from submenus
+       return;
+@@ -1414,7 +1410,6 @@ export var PlacesUIUtils = {
+ 
+     switch (menupopup.id) {
+       case "sidebar-history-context-menu":
+-      case "sidebar-synced-tabs-context-menu":
+         PlacesUIUtils.lastContextMenuTriggerNode =
+           menupopup.triggerNode.triggerNode;
+         return;
+@@ -1471,7 +1466,6 @@ export var PlacesUIUtils = {
+       [
+         "sidebar-history-context-menu",
+         "placesContext",
+-        "sidebar-synced-tabs-context-menu",
+         "sidebar-bookmarks-context-menu",
+       ].includes(menupopup.id)
+     ) {
+diff --git a/browser/components/sidebar/SidebarManager.sys.mjs b/browser/components/sidebar/SidebarManager.sys.mjs
+index c973ed92e6..1d7505e17b 100644
+--- a/browser/components/sidebar/SidebarManager.sys.mjs
++++ b/browser/components/sidebar/SidebarManager.sys.mjs
+@@ -15,7 +15,7 @@ const PINNED_PROMO_PREF = "sidebar.verticalTabs.dragToPinPromo.dismissed";
+ // New panels that are ready to be introduced to new sidebar users should be added to this list;
+ // ensure your feature flag is enabled at the same time you do this and that its the same value as
+ // what you added to .
+-const DEFAULT_LAUNCHER_TOOLS = "syncedtabs,history,bookmarks,opentabs";
++const DEFAULT_LAUNCHER_TOOLS = "history,bookmarks,opentabs";
+ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+diff --git a/browser/components/sidebar/browser-sidebar.js b/browser/components/sidebar/browser-sidebar.js
+index 1f05cc1118..35a0dbfd13 100644
+--- a/browser/components/sidebar/browser-sidebar.js
++++ b/browser/components/sidebar/browser-sidebar.js
+@@ -13,7 +13,6 @@ const { DeferredTask } = ChromeUtils.importESModule(
+ );
+ 
+ const toolsNameMap = {
+-  viewTabsSidebar: "syncedtabs",
+   viewHistorySidebar: "history",
+   viewBookmarksSidebar: "bookmarks",
+   viewOpenTabsSidebar: "opentabs",
+@@ -134,25 +133,6 @@ var SidebarController = {
+           recordSidebarVersion: true,
+         }),
+       ],
+-      [
+-        "viewTabsSidebar",
+-        this.makeSidebar({
+-          name: "syncedtabs",
+-          elementId: "sidebar-switcher-tabs",
+-          url: this.sidebarRevampEnabled
+-            ? "chrome://browser/content/sidebar/sidebar-syncedtabs.html"
+-            : "chrome://browser/content/syncedtabs/sidebar.xhtml",
+-          menuId: "menu_tabsSidebar",
+-          classAttribute: "sync-ui-item",
+-          menuL10nId: "menu-view-synced-tabs-sidebar",
+-          revampL10nId: "sidebar-menu-synced-tabs-label",
+-          iconUrl: "chrome://browser/skin/synced-tabs.svg",
+-          contextMenuId: this.sidebarRevampEnabled
+-            ? "sidebar-synced-tabs-context-menu"
+-            : undefined,
+-          gleanClickEvent: Glean.sidebar.syncedTabsIconClick,
+-        }),
+-      ],
+       [
+         "viewBookmarksSidebar",
+         this.makeSidebar({
+diff --git a/browser/components/sidebar/jar.mn b/browser/components/sidebar/jar.mn
+index c62c194286..12aa101a75 100644
+--- a/browser/components/sidebar/jar.mn
++++ b/browser/components/sidebar/jar.mn
+@@ -26,8 +26,6 @@ browser.jar:
+     content/browser/sidebar/sidebar-permissions-ui.mjs
+     content/browser/sidebar/sidebar-pins-promo.css
+     content/browser/sidebar/sidebar-pins-promo.mjs
+-    content/browser/sidebar/sidebar-syncedtabs.html
+-    content/browser/sidebar/sidebar-syncedtabs.mjs
+     content/browser/sidebar/sidebar-tab-list.css
+     content/browser/sidebar/sidebar-tab-list.mjs
+     content/browser/sidebar/sidebar-tab-row.css
+diff --git a/browser/components/sidebar/sidebar-customize.mjs b/browser/components/sidebar/sidebar-customize.mjs
+index dac0173b91..d5ea5a27bc 100644
+--- a/browser/components/sidebar/sidebar-customize.mjs
++++ b/browser/components/sidebar/sidebar-customize.mjs
+@@ -16,7 +16,6 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
+ 
+ const l10nMap = new Map([
+   ["viewHistorySidebar", "sidebar-menu-history-label"],
+-  ["viewTabsSidebar", "sidebar-menu-synced-tabs-label"],
+   ["viewBookmarksSidebar", "sidebar-menu-bookmarks-label"],
+   ["viewOpenTabsSidebar", "sidebar-menu-open-tabs-label"],
+   ["viewCPMSidebar", "sidebar-menu-contextual-password-manager-label"],
+@@ -130,11 +129,6 @@ export class SidebarCustomize extends SidebarPage {
+     e.preventDefault();
+     this.getWindow().SidebarController.toggleTool(commandID);
+     switch (commandID) {
+-      case "viewTabsSidebar":
+-        Glean.sidebarCustomize.syncedTabsEnabled.record({
+-          checked: e.target.checked,
+-        });
+-        break;
+       case "viewHistorySidebar":
+         Glean.sidebarCustomize.historyEnabled.record({
+           checked: e.target.checked,
+diff --git a/browser/components/sidebar/sidebar-page.mjs b/browser/components/sidebar/sidebar-page.mjs
+index a0a3ba7db1..4a6bf4ce75 100644
+--- a/browser/components/sidebar/sidebar-page.mjs
++++ b/browser/components/sidebar/sidebar-page.mjs
+@@ -220,32 +220,25 @@ export class SidebarPage extends MozLitElement {
+           ),
+         });
+         break;
+-      case "sidebar-synced-tabs-context-open-in-tab":
+-        this.topWindow.openTrustedLinkIn(this.triggerNode.url, "tab");
+-        break;
+       case "sidebar-history-context-forget-site":
+         this.forgetAboutThisSite().catch(console.error);
+         break;
+       case "sidebar-history-context-open-in-window":
+-      case "sidebar-synced-tabs-context-open-in-window":
+         this.topWindow.openTrustedLinkIn(this.triggerNode.url, "window", {
+           private: false,
+         });
+         break;
+       case "sidebar-history-context-open-in-private-window":
+-      case "sidebar-synced-tabs-context-open-in-private-window":
+         this.topWindow.openTrustedLinkIn(this.triggerNode.url, "window", {
+           private: true,
+         });
+         break;
+       case "sidebar-history-context-copy-link":
+-      case "sidebar-synced-tabs-context-copy-link":
+         lazy.BrowserUtils.copyLink(
+           this.triggerNode.url,
+           this.triggerNode.title
+         );
+         break;
+-      case "sidebar-synced-tabs-context-bookmark-tab":
+       case "sidebar-history-context-bookmark-page":
+         promise = this.topWindow.PlacesCommandHook.bookmarkLink(
+           this.triggerNode.url,
+diff --git a/browser/components/sidebar/tests/browser/browser.toml b/browser/components/sidebar/tests/browser/browser.toml
+index b257e99c86..0db50f316b 100644
+--- a/browser/components/sidebar/tests/browser/browser.toml
++++ b/browser/components/sidebar/tests/browser/browser.toml
+@@ -102,10 +102,6 @@ skip-if = [
+ 
+ ["browser_sidebar_splitter_keyboard.js"]
+ 
+-["browser_syncedtabs_sidebar.js"]
+-
+-["browser_syncedtabs_sidebar_glean.js"]
+-
+ ["browser_toolbar_sidebar_button.js"]
+ skip-if = [
+   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && opt && a11y_checks && swgl && verify-standalone",
+diff --git a/browser/components/tabbrowser/content/browser-allTabsMenu.inc.xhtml b/browser/components/tabbrowser/content/browser-allTabsMenu.inc.xhtml
+index 7bc35a7a1a..03c432c6b2 100644
+--- a/browser/components/tabbrowser/content/browser-allTabsMenu.inc.xhtml
++++ b/browser/components/tabbrowser/content/browser-allTabsMenu.inc.xhtml
+@@ -8,9 +8,6 @@
+       <toolbarbutton id="allTabsMenu-searchTabs"
+                      class="subviewbutton"
+                      data-l10n-id="all-tabs-menu-search-tabs"/>
+-      <toolbarbutton id="allTabsMenu-syncedTabs"
+-                     class="subviewbutton"
+-                     data-l10n-id="all-tabs-menu-synced-tabs"/>
+       <toolbarbutton id="allTabsMenu-closeDuplicateTabs"
+                      class="subviewbutton"
+                      data-l10n-id="all-tabs-menu-close-all-duplicate-tabs"/>
+diff --git a/browser/components/tabbrowser/content/browser-allTabsMenu.js b/browser/components/tabbrowser/content/browser-allTabsMenu.js
+index 7bd67ff15d..8a606a08fb 100644
+--- a/browser/components/tabbrowser/content/browser-allTabsMenu.js
++++ b/browser/components/tabbrowser/content/browser-allTabsMenu.js
+@@ -97,10 +97,6 @@ var gTabsPanel = {
+       );
+       closeDuplicateTabsItem.disabled =
+         !gBrowser.getAllDuplicateTabsToClose().length;
+-
+-      let syncedTabs = document.getElementById("allTabsMenu-syncedTabs");
+-      syncedTabs.hidden =
+-        !PlacesUIUtils.shouldShowTabsFromOtherComputersMenuitem();
+     });
+ 
+     this.allTabsView.addEventListener("ViewShown", () =>
+@@ -129,10 +125,6 @@ var gTabsPanel = {
+         case "allTabsMenu-hiddenTabsButton":
+           PanelUI.showSubView(this.kElements.hiddenTabsView, target);
+           break;
+-        case "allTabsMenu-syncedTabs":
+-          Glean.browserUiInteraction.listAllTabsAction.tabs_from_devices.add(1);
+-          SidebarController.show("viewTabsSidebar");
+-          break;
+         case "allTabsMenu-groupsViewShowMore":
+           PanelUI.showSubView(this.kElements.groupsSubView, target);
+           break;
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser.toml b/browser/components/tabbrowser/test/browser/tabs/browser.toml
+index d8760aeceb..0c2afdc359 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser.toml
++++ b/browser/components/tabbrowser/test/browser/tabs/browser.toml
+@@ -629,9 +629,6 @@ skip-if = [
+ ["browser_tab_manager_keyboard_access.js"]
+ tags = "vertical-tabs"
+ 
+-["browser_tab_manager_synced_tabs.js"]
+-tags = "vertical-tabs"
+-
+ ["browser_tab_move_active_tab.js"]
+ tags = "vertical-tabs"
+ 
+diff --git a/browser/locales/en-US/browser/allTabsMenu.ftl b/browser/locales/en-US/browser/allTabsMenu.ftl
+index 59de50bd34..ac84b1f477 100644
+--- a/browser/locales/en-US/browser/allTabsMenu.ftl
++++ b/browser/locales/en-US/browser/allTabsMenu.ftl
+@@ -15,9 +15,6 @@ all-tabs-menu-hidden-tabs =
+ all-tabs-menu-close-all-duplicate-tabs =
+   .label = Close all duplicate tabs
+ 
+-all-tabs-menu-synced-tabs =
+-  .label = Tabs from other devices
+-
+ # "Recent" refers to tab groups being sorted in recently used order. We show up
+ # to five of these in this section.
+ all-tabs-menu-recent-tab-groups-header = Recent tab groups
+diff --git a/browser/locales/en-US/browser/menubar.ftl b/browser/locales/en-US/browser/menubar.ftl
+index 592cfd5f58..e3f7cc5b09 100644
+--- a/browser/locales/en-US/browser/menubar.ftl
++++ b/browser/locales/en-US/browser/menubar.ftl
+@@ -142,8 +142,6 @@ menu-view-bookmarks =
+     .label = Bookmarks
+ menu-view-history-button =
+     .label = History
+-menu-view-synced-tabs-sidebar =
+-    .label = Synced Tabs
+ menu-view-full-zoom =
+     .label = Zoom
+     .accesskey = Z
+diff --git a/browser/locales/en-US/browser/sidebar.ftl b/browser/locales/en-US/browser/sidebar.ftl
+index 4bd0e60f8f..3c264eb420 100644
+--- a/browser/locales/en-US/browser/sidebar.ftl
++++ b/browser/locales/en-US/browser/sidebar.ftl
+@@ -96,8 +96,6 @@ sidebar-context-menu-open-in-private-window =
+   .label = Open in New Private Window
+ sidebar-context-menu-forget-site =
+   .label = Clear All Data for Website…
+-sidebar-context-menu-bookmark-tab =
+-  .label = Bookmark Tab…
+ sidebar-context-menu-copy-link =
+   .label = Copy Link
+ sidebar-context-menu-hide-sidebar =
+@@ -106,10 +104,6 @@ sidebar-context-menu-enable-vertical-tabs =
+   .label = Turn on Vertical Tabs
+ sidebar-context-menu-customize-sidebar =
+   .label = Customize Sidebar
+-# Variables:
+-#   $deviceName (String) - The name of the device the user is closing a tab for
+-sidebar-context-menu-close-remote-tab =
+-  .label = Close tab on { $deviceName }
+ sidebar-context-menu-remove-extension2 =
+   .label = Remove from { -brand-short-name }
+ sidebar-context-menu-unpin-extension =
+@@ -137,8 +131,6 @@ sidebar-bookmarks-context-menu-delete-separator =
+ 
+ sidebar-menu-history-label =
+   .label = History
+-sidebar-menu-synced-tabs-label =
+-  .label = Tabs from other devices
+ # Label for the Open Tabs panel in the sidebar tools list and customize
+ # menu. "Open tabs" is a noun phrase referring to the tabs currently open
+ # in the browser, not an instruction to open tabs.
+@@ -188,8 +180,6 @@ sidebar-menu-customize-header =
+   .heading = Customize sidebar
+ sidebar-menu-history-header =
+   .heading = History
+-sidebar-menu-syncedtabs-header =
+-  .heading = Tabs from other devices
+ # Heading shown at the top of the Open Tabs sidebar panel. "Open tabs"
+ # refers to the tabs currently open in the browser.
+ sidebar-menu-open-tabs-header =
+@@ -210,7 +200,6 @@ sidebar-bookmarks-folder-mobile = Mobile Bookmarks
+ 
+ sidebar-customize-title = Customize sidebar
+ sidebar-history-title = History
+-sidebar-syncedtabs-title = Tabs from other devices
+ # Title of the Open Tabs sidebar panel. "Open tabs" refers to the tabs
+ # currently open in the browser.
+ sidebar-opentabs-title = Open tabs
+diff --git a/browser/locales/en-US/browser/sidebarMenu.ftl b/browser/locales/en-US/browser/sidebarMenu.ftl
+index 018602a21c..b887bc4062 100644
+--- a/browser/locales/en-US/browser/sidebarMenu.ftl
++++ b/browser/locales/en-US/browser/sidebarMenu.ftl
+@@ -10,9 +10,6 @@ sidebar-menu-bookmarks-2 = Bookmarks
+ sidebar-menu-history =
+   .label = History
+ 
+-sidebar-menu-synced-tabs =
+-  .label = Synced Tabs
+-
+ sidebar-menu-close =
+   .label = Close Sidebar
+ 
+diff --git a/browser/locales/en-US/browser/syncedTabs.ftl b/browser/locales/en-US/browser/syncedTabs.ftl
+index 9a23fab95f..fb2937e3e4 100644
+--- a/browser/locales/en-US/browser/syncedTabs.ftl
++++ b/browser/locales/en-US/browser/syncedTabs.ftl
+@@ -2,69 +2,7 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-synced-tabs-sidebar-title = Synced Tabs
+-synced-tabs-sidebar-noclients-subtitle = Want to see your tabs from other devices here?
+-synced-tabs-sidebar-intro = View a list of tabs from your other devices.
+-synced-tabs-sidebar-unverified = Your account needs to be verified.
+-synced-tabs-sidebar-notabs = No open tabs
+-synced-tabs-sidebar-open-settings = Open Sync settings
+-synced-tabs-sidebar-tabsnotsyncing = Turn on tab syncing to view a list of tabs from your other devices.
+-synced-tabs-sidebar-connect-another-device = Connect Another Device
+-synced-tabs-sidebar-search =
+-    .placeholder = Search synced tabs
+-
+-## Displayed in the Synced Tabs sidebar's context menu when right-clicking tabs
+-## and/or devices in the list. The "Open" strings below should be translated
+-## consistently with the equivalent strings for the bookmarks manager's context
+-## menu. That menu is activated by right-clicking a bookmark in the Library
+-## window. The bookmarks manager context's strings are located in places.ftl.
+-
+-synced-tabs-context-open =
+-    .label = Open
+-    .accesskey = O
+-synced-tabs-context-open-in-tab =
+-    .label = Open in New Tab
+-    .accesskey = w
+-synced-tabs-context-open-in-container-tab =
+-    .label = Open in New Container Tab
+-    .accesskey = i
+-synced-tabs-context-open-in-window =
+-    .label = Open in New Window
+-    .accesskey = N
+-synced-tabs-context-open-in-private-window =
+-    .label = Open in New Private Window
+-    .accesskey = P
+-
+-##
+-
+-# Displayed in the Synced Tabs sidebar's context menu when right-clicking tabs
+-# and/or devices in the list. This string is for a menuitem equivalent to one in
+-# the tab context menu (activated by right-clicking a tab in the tabstrip). That
+-# string is located in tabContextMenu.ftl. So, this string should be translated
+-# consistently with the "Bookmark Tab…" string there.
+-synced-tabs-context-bookmark =
+-    .label = Bookmark Tab…
+-    .accesskey = B
+-synced-tabs-context-copy =
+-    .label = Copy
+-    .accesskey = C
+-synced-tabs-context-open-all-in-tabs =
+-    .label = Open All in Tabs
+-    .accesskey = O
+-synced-tabs-context-manage-devices =
+-    .label = Manage Devices…
+-    .accesskey = D
+-synced-tabs-context-manage-this-device =
+-    .label = Manage This Device
+-    .accesskey = T
+-synced-tabs-context-connect-another-device =
+-    .label = Connect Another Device
+-    .accesskey = A
+-synced-tabs-context-sync-now =
+-    .label = Sync Now
+-    .accesskey = S
+ synced-tabs-fxa-sign-in = Sign in to sync
+-synced-tabs-turn-on-sync = Turn on sync
+ 
+ # Context for hovering over the close tab button that will
+ # send a push to the device to close said tab
+diff --git a/browser/modules/webrtcUI.sys.mjs b/browser/modules/webrtcUI.sys.mjs
+index 68d2b79e81..3371a74fd1 100644
+--- a/browser/modules/webrtcUI.sys.mjs
++++ b/browser/modules/webrtcUI.sys.mjs
+@@ -2,7 +2,7 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-import { EventEmitter } from "resource:///modules/syncedtabs/EventEmitter.sys.mjs";
++import { EventEmitter } from "resource://gre/modules/EventEmitter.sys.mjs";
+ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ 
+diff --git a/browser/themes/shared/jar.inc.mn b/browser/themes/shared/jar.inc.mn
+index f7bb80064f..9963f1d7b2 100644
+--- a/browser/themes/shared/jar.inc.mn
++++ b/browser/themes/shared/jar.inc.mn
+@@ -313,7 +313,6 @@
+   skin/classic/browser/privatebrowsing/fox-tail.svg            (../shared/privatebrowsing/fox-tail.svg)
+   skin/classic/browser/privatebrowsing/pbm-logo.svg            (../shared/privatebrowsing/pbm-logo.svg)
+ 
+-  skin/classic/browser/syncedtabs/sidebar.css                  (../shared/syncedtabs/sidebar.css)
+ 
+   skin/classic/browser/weather/sunny.svg                       (../shared/weather/sunny.svg)
+   skin/classic/browser/weather/mostly-sunny.svg                (../shared/weather/mostly-sunny.svg)
+diff --git a/browser/themes/shared/sidebar.css b/browser/themes/shared/sidebar.css
+index ecb910d1db..b29c6164d8 100644
+--- a/browser/themes/shared/sidebar.css
++++ b/browser/themes/shared/sidebar.css
+@@ -242,13 +242,6 @@ menuseparator + #sidebar-extensions-separator {
+   opacity: 0.8;
+ }
+ 
+-#sidebar-box[sidebarcommand="viewTabsSidebar"] > #sidebar-header > #sidebar-switcher-target > #sidebar-icon {
+-  list-style-image: url(chrome://browser/skin/synced-tabs.svg);
+-  -moz-context-properties: fill;
+-  fill: currentColor;
+-  opacity: 0.8;
+-}
+-
+ /* WebExtension Sidebars */
+ #sidebar-box[sidebarcommand$="-sidebar-action"] > #sidebar-header > #sidebar-switcher-target > #sidebar-icon {
+   list-style-image: var(--webextension-menuitem-image, inherit);
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index ab1ec61ad5..a8bf04ec7b 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -66,7 +66,6 @@ export default [
+       "browser/components/migration/**",
+       "browser/components/protocolhandler/WebProtocolHandlerRegistrar.sys.mjs",
+       "browser/components/shell/ShellService.sys.mjs",
+-      "browser/components/syncedtabs/TabListComponent.sys.mjs",
+       "browser/tools/mozscreenshots/mozscreenshots/extension/Screenshot.sys.mjs",
+       "devtools/client/webconsole/test/**",
+       "devtools/shared/tests/xpcshell/test_console_filtering.js",
+@@ -331,7 +330,6 @@ export default [
+       "browser/components/sessionstore/**",
+       "browser/components/storybook/.storybook/**",
+       "browser/components/storybook/custom-elements-manifest.config.mjs",
+-      "browser/components/syncedtabs/**",
+       "browser/components/tabbrowser/**",
+       "browser/components/tabpreview/tabpreview.mjs",
+       "browser/components/tests/browser/**",
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 3867fdc5c0..6af0bdea28 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -139,7 +139,6 @@ module.exports = [
+       "browser/themes/shared/search/searchbar.css",
+       "browser/themes/shared/setDesktopBackground.css",
+       "browser/themes/shared/sidebar.css",
+-      "browser/themes/shared/syncedtabs/sidebar.css",
+       "browser/themes/shared/tab-list-tree.css",
+       "browser/themes/shared/tabbrowser/content-area.css",
+       "browser/themes/shared/tabbrowser/ctrlTab.css",
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index afa72a0db1..6f4f3250d1 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -636,11 +636,6 @@ export interface Modules {
+   "resource:///modules/sessionstore/TabState.sys.mjs": typeof import("resource:///modules/sessionstore/TabState.sys.mjs"),
+   "resource:///modules/sessionstore/TabStateCache.sys.mjs": typeof import("resource:///modules/sessionstore/TabStateCache.sys.mjs"),
+   "resource:///modules/sessionstore/TabStateFlusher.sys.mjs": typeof import("resource:///modules/sessionstore/TabStateFlusher.sys.mjs"),
+-  "resource:///modules/syncedtabs/EventEmitter.sys.mjs": typeof import("resource:///modules/syncedtabs/EventEmitter.sys.mjs"),
+-  "resource:///modules/syncedtabs/SyncedTabsDeckComponent.sys.mjs": typeof import("resource:///modules/syncedtabs/SyncedTabsDeckComponent.sys.mjs"),
+-  "resource:///modules/syncedtabs/SyncedTabsDeckStore.sys.mjs": typeof import("resource:///modules/syncedtabs/SyncedTabsDeckStore.sys.mjs"),
+-  "resource:///modules/syncedtabs/SyncedTabsListStore.sys.mjs": typeof import("resource:///modules/syncedtabs/SyncedTabsListStore.sys.mjs"),
+-  "resource:///modules/syncedtabs/TabListComponent.sys.mjs": typeof import("resource:///modules/syncedtabs/TabListComponent.sys.mjs"),
+   "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs": typeof import("resource:///modules/taskbartabs/TaskbarTabs.sys.mjs"),
+   "resource:///modules/taskbartabs/TaskbarTabsChrome.sys.mjs": typeof import("resource:///modules/taskbartabs/TaskbarTabsChrome.sys.mjs"),
+   "resource:///modules/taskbartabs/TaskbarTabsPageAction.sys.mjs": typeof import("resource:///modules/taskbartabs/TaskbarTabsPageAction.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 93f42c89da..59c78671e8 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -1774,30 +1774,6 @@
+       "resource:///modules/sessionstore/TabStateFlusher.sys.mjs": [
+         "../../../browser/components/sessionstore/TabStateFlusher.sys.mjs"
+       ],
+-      "resource:///modules/syncedtabs/EventEmitter.sys.mjs": [
+-        "../../../browser/components/syncedtabs/EventEmitter.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/SyncedTabsDeckComponent.sys.mjs": [
+-        "../../../browser/components/syncedtabs/SyncedTabsDeckComponent.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/SyncedTabsDeckStore.sys.mjs": [
+-        "../../../browser/components/syncedtabs/SyncedTabsDeckStore.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/SyncedTabsDeckView.sys.mjs": [
+-        "../../../browser/components/syncedtabs/SyncedTabsDeckView.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/SyncedTabsListStore.sys.mjs": [
+-        "../../../browser/components/syncedtabs/SyncedTabsListStore.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/TabListComponent.sys.mjs": [
+-        "../../../browser/components/syncedtabs/TabListComponent.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/TabListView.sys.mjs": [
+-        "../../../browser/components/syncedtabs/TabListView.sys.mjs"
+-      ],
+-      "resource:///modules/syncedtabs/util.sys.mjs": [
+-        "../../../browser/components/syncedtabs/util.sys.mjs"
+-      ],
+       "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs": [
+         "../../../browser/components/taskbartabs/TaskbarTabs.sys.mjs"
+       ],

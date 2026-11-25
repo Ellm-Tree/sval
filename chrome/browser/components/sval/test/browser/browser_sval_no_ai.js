@@ -26,7 +26,6 @@ const LOCKED = {
   "extensions.ml.enabled": false,
   "browser.urlbar.quicksuggest.mlEnabled": false,
   "places.semanticHistory.featureGate": false,
-  "extensions.formautofill.useml": false,
 };
 
 /**

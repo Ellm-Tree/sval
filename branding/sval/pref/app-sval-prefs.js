@@ -24,7 +24,6 @@ pref("datareporting.policy.dataSubmissionEnabled", false);
 pref("toolkit.telemetry.unified", false);
 pref("toolkit.telemetry.enabled", false);
 pref("toolkit.telemetry.archive.enabled", false);
-pref("app.shield.optoutstudies.enabled", false, locked);
 pref("browser.discovery.enabled", false, locked);
 
 // A crash report leaves the device only when the user sends it, from a crash
@@ -582,15 +581,6 @@ pref("browser.sval.card", "");
 // (history-sync spec §3.1). Empty reads as the computer's name.
 pref("browser.sval.device.name", "");
 
-// Sval runs no servers, and someone else's server has no business pushing
-// remotely-configured experiments into this browser. Disabling
-// app.shield.optoutstudies.enabled above stops Shield opt-out studies, but
-// Normandy itself (the recipe client Shield studies ride on) keeps polling
-// Mozilla's recipe server unless separately disabled. Empty the API URL too
-// so a stray recipe fetch has nowhere to go even if enabled flips back on.
-pref("app.normandy.enabled", false);
-pref("app.normandy.api_url", "");
-
 // Firefox code reads these unconditionally and upstream defines them in the
 // branding pref file this one replaces. Numbers mirror upstream's unofficial
 // branding unless a comment gives Sval's reason. The update
@@ -682,13 +672,6 @@ pref("browser.shell.checkDefaultBrowser", false); // upstream: true
 // calls) loads one of the user's pages in a hidden browser. With capturing
 // disabled, PageThumbs._prefEnabled is false and no such load starts.
 pref("browser.pagethumbnails.capturing_disabled", true); // upstream: false
-
-// Nimbus has three independent reasons to consider itself enabled
-// (ExperimentAPI.sys.mjs): Firefox Labs, rollouts, and opt-out studies.
-// app.shield.optoutstudies.enabled above covers studies; this covers rollouts.
-// Labs is always off (`labsEnabled`, no-firefox-labs.patch), so Nimbus stays
-// disabled and its Remote Settings loader does not start.
-pref("nimbus.rollouts.enabled", false, locked); // upstream: true
 
 // Every launch brings back the windows the last session had (spec §10.4):
 // each window's place, size, stacking and the workspace it showed. Firefox's
@@ -813,7 +796,7 @@ pref("browser.sval.webdriver.useWorkspaceCookies", false);
 pref("browser.sval.breachWarnings", true);
 pref(
   "browser.sval.remoteSettings.collections",
-  "cert-revocations,onecrl,intermediates,addons,addons-bloomfilters,gfx,tracking-protection-lists,query-stripping,url-classifier-skip-urls,url-classifier-exceptions,anti-tracking-url-decoration,bounce-tracking-protection-exceptions,fingerprinting-protection-overrides,partitioning-exempt-urls,third-party-cookie-blocking-exempt-urls,cookie-banner-rules-list,webcompat-interventions,hijack-blocklists,password-rules,password-recipes,websites-with-shared-credential-backends,translations-models,translations-wasm,mfcdm-origins-list,fxmonitor-breaches@browser.sval.breachWarnings"
+  "cert-revocations,onecrl,intermediates,addons,addons-bloomfilters,gfx,tracking-protection-lists,query-stripping,url-classifier-skip-urls,url-classifier-exceptions,anti-tracking-url-decoration,bounce-tracking-protection-exceptions,fingerprinting-protection-overrides,partitioning-exempt-urls,third-party-cookie-blocking-exempt-urls,cookie-banner-rules-list,webcompat-interventions,hijack-blocklists,translations-models,translations-wasm,mfcdm-origins-list,fxmonitor-breaches@browser.sval.breachWarnings"
 );
 
 // Sval holds a push connection only while some site may notify (spec §10.9),
@@ -938,27 +921,13 @@ pref("browser.urlbar.suggest.engines", false, locked); // upstream: true
 // would later open a connection the user had closed.
 pref("dom.push.connection.enabled", false, sticky); // upstream: true
 
-// Breach alerts are fetched from Mozilla's Monitor service.
-pref("signon.management.page.breach-alerts.enabled", false, locked); // upstream: true
-
 // Credentials belong to the user's own password manager (spec §7, decision
-// 0078). Firefox's password manager and its address and card autofill are off,
-// so the user's manager is the only thing on a page that saves, offers or
-// fills. Locked, so the settings that would turn them back on are hidden.
+// 0078). Firefox's password manager is off, so the user's manager is the only
+// thing on a page that saves, offers or fills. Locked, so an extension can't
+// turn it back on.
 pref("signon.rememberSignons", false, locked); // upstream: true
 pref("signon.autofillForms", false, locked); // upstream: true
 pref("signon.generation.enabled", false, locked); // upstream: true
-pref("browser.contextual-password-manager.enabled", false, locked); // upstream: true
-// The pref the PasswordManagerEnabled policy locks to hide "Saved passwords".
-pref("pref.privacy.disable_button.view_passwords", true, locked);
-// "off" removes address and card autofill entirely, settings included;
-// `.enabled` alone leaves the settings showing. Address autofill also turns on
-// through its experiment pref.
-pref("extensions.formautofill.addresses.supported", "off", locked); // upstream: "detect"
-pref("extensions.formautofill.addresses.enabled", false, locked); // upstream: true
-pref("extensions.formautofill.addresses.experiments.enabled", false, locked);
-pref("extensions.formautofill.creditCards.supported", "off", locked); // upstream: "on"
-pref("extensions.formautofill.creditCards.enabled", false, locked); // upstream: true
 
 // Safe Browsing's download check sends details of downloaded programs to
 // Google. Gatekeeper and SmartScreen already examine them.
@@ -972,7 +941,6 @@ pref("browser.safebrowsing.downloads.remote.enabled", false); // upstream: true
 
 // Settings and browser chrome.
 pref("browser.preferences.moreFromMozilla", false, locked);
-pref("signon.firefoxRelay.feature", "", locked);
 // Firefox's site panel, which Sval's protection button replaces (decision
 // 0131). Off, it reads nothing and the address bar has no padlock for it.
 pref("browser.urlbar.trustPanel.featureGate", false, locked); // upstream: true
@@ -990,11 +958,7 @@ pref(
 pref("browser.vpn_promo.enabled", false, locked);
 pref("browser.promo.focus.enabled", false, locked);
 pref("browser.promo.pin.enabled", false, locked);
-pref("browser.contentblocking.report.hide_vpn_banner", true, locked);
-pref("browser.contentblocking.report.show_mobile_app", false, locked);
 pref("browser.contentblocking.cfr-milestone.enabled", false, locked);
-pref("browser.tabs.firefox-view.importHistory.dismissed", true);
-pref("browser.bookmarks.addedImportButton", true);
 pref("sidebar.verticalTabs.dragToPinPromo.dismissed", true);
 pref("termsofuse.bypassNotification", true, locked);
 pref("browser.preonboarding.enabled", false, locked);
@@ -1023,11 +987,10 @@ pref("pdfjs.enableAltTextModelDownload", false, locked); // upstream: true
 pref("browser.ai.control.pdfjsAltText", "blocked", locked);
 
 // The rest of the on-device models: the trial ML API for extensions, address
-// bar intent suggestions, semantic history search and form field detection.
+// bar intent suggestions and semantic history search.
 pref("extensions.ml.enabled", false, locked); // upstream: true
 pref("browser.urlbar.quicksuggest.mlEnabled", false, locked);
 pref("places.semanticHistory.featureGate", false, locked);
-pref("extensions.formautofill.useml", false, locked);
 
 // Address bar: onboarding rows, and Google Lens, which sends the image to
 // Google from a context-menu item badged "New".

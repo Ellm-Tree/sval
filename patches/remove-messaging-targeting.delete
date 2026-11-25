@@ -1,0 +1,9 @@
+browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+browser/components/asrouter/moz.build
+toolkit/components/backgroundtasks/tests/BackgroundTask_targeting.sys.mjs
+toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtask_targeting.js
+toolkit/components/messaging-system/metrics.yaml
+toolkit/components/messaging-system/targeting/Targeting.sys.mjs
+toolkit/components/messaging-system/targeting/test/unit/head.js
+toolkit/components/messaging-system/targeting/test/unit/test_targeting.js
+toolkit/components/messaging-system/targeting/test/unit/xpcshell.toml

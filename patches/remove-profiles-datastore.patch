@@ -1,0 +1,33 @@
+Sval: Remove the profiles datastore
+
+The profiles datastore opened a SQLite database under Profile Groups at
+the first window for Nimbus's enrollments, which no profile writes, and
+nothing else reads it.
+
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index f2966b845c..5b40d5b714 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -92,7 +92,6 @@ category browser-first-window-ready resource://gre/modules/PageThumbs.sys.mjs Pa
+ category browser-first-window-ready resource://gre/modules/NewTabUtils.sys.mjs NewTabUtils.init
+ category browser-first-window-ready resource:///modules/PageActions.sys.mjs PageActions.init
+ category browser-first-window-ready moz-src:///toolkit/components/doh/DoHController.sys.mjs DoHController.init
+-category browser-first-window-ready moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs ProfilesDatastoreService.init
+ category browser-first-window-ready moz-src:///browser/components/protections/ContentBlockingPrefs.sys.mjs ContentBlockingPrefs.init
+ category browser-first-window-ready moz-src:///browser/components/customizableui/SearchWidgetTracker.sys.mjs SearchWidgetTracker.init
+ #ifdef MOZ_SANDBOX
+diff --git a/toolkit/profile/moz.build b/toolkit/profile/moz.build
+index afdc651217..dfc415124c 100644
+--- a/toolkit/profile/moz.build
++++ b/toolkit/profile/moz.build
+@@ -15,10 +15,6 @@ XPIDL_SOURCES += [
+     "nsIToolkitProfileService.idl",
+ ]
+ 
+-MOZ_SRC_FILES += [
+-    "ProfilesDatastoreService.sys.mjs",
+-]
+-
+ XPIDL_MODULE = "toolkitprofile"
+ 
+ EXPORTS += ["nsProfileLock.h"]

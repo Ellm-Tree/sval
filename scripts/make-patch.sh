@@ -4,7 +4,7 @@
 #
 # Capture the current modifications in the upstream tree as a patch file.
 #
-# Usage: ./scripts/make-patch.sh no-firefox-labs [path...]
+# Usage: ./scripts/make-patch.sh remove-normandy [path...]
 #
 # `apply-patches.sh` commits the applied series, so the diff this takes is
 # against pristine plus every existing patch: editing a file another patch

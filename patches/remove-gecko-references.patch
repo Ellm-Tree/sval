@@ -1,0 +1,277 @@
+Sval: Remove Gecko's references to removed components
+
+Gecko's native code named documents, scripts and prefs of front-end
+components Sval removed: the content security allowlists for Smart
+Window, the AI chatbot, about:welcome, Spotlight, about:logins, the
+synced tabs sidebar, about:inference and the selectable profile pages;
+the HTML fragment allowlist entries for the New Tab add-on's bundle,
+Reader View's voice picker and Smart Window's chat messages; Smart
+Window in the frame loader's remote-frame exceptions; the New Tab
+remote renderer's scheme in the script security manager; the reveal
+event about:logins listened for on password fields; LaterRun's profile
+creation time among the prefs kept from web content processes; and IP
+Protection's ipp-vpn permission among those stripped of origin
+attributes.
+
+diff --git a/caps/nsScriptSecurityManager.cpp b/caps/nsScriptSecurityManager.cpp
+index 646f80a767..1013f25b7a 100644
+--- a/caps/nsScriptSecurityManager.cpp
++++ b/caps/nsScriptSecurityManager.cpp
+@@ -1067,8 +1067,7 @@ nsresult nsScriptSecurityManager::CheckLoadURIFlags(
+         }
+       } else if (targetScheme.EqualsLiteral("moz-page-thumb") ||
+                  targetScheme.EqualsLiteral("page-icon") ||
+-                 targetScheme.EqualsLiteral("moz-newtab-wallpaper") ||
+-                 targetScheme.EqualsLiteral("moz-newtab-remote-renderer")) {
++                 targetScheme.EqualsLiteral("moz-newtab-wallpaper")) {
+         if (XRE_IsParentProcess()) {
+           return NS_OK;
+         }
+diff --git a/dom/base/nsFrameLoader.cpp b/dom/base/nsFrameLoader.cpp
+index 2f0039b10f..3c2e07fd46 100644
+--- a/dom/base/nsFrameLoader.cpp
++++ b/dom/base/nsFrameLoader.cpp
+@@ -2589,8 +2589,6 @@ bool nsFrameLoader::TryRemoteBrowserInternal() {
+     if (parentDocShell->ItemType() != nsIDocShellTreeItem::typeChrome) {
+       // Allow three exceptions to this rule :
+       // - about:addons so it can load remote extension options pages
+-      // - smart window (aiWindow.html) so it can load the sandboxed
+-      //   about:aichatcontent frame to contain LLM responses.
+       // - about:preferences (in Thunderbird only) so it can load remote
+       //     extension options pages for FileLink providers
+       // - DevTools webext panels if DevTools is loaded in a content frame
+@@ -2615,7 +2613,6 @@ bool nsFrameLoader::TryRemoteBrowserInternal() {
+       const bool allowed = [&] {
+         const nsLiteralCString kAllowedURIs[] = {
+             "about:addons"_ns,
+-            "chrome://browser/content/aiwindow/aiWindow.html"_ns,
+             "chrome://mozapps/content/extensions/aboutaddons.html"_ns,
+ #ifdef MOZ_THUNDERBIRD
+             "about:3pane"_ns,
+diff --git a/dom/html/HTMLInputElement.cpp b/dom/html/HTMLInputElement.cpp
+index 8418cc36dd..8792312eb6 100644
+--- a/dom/html/HTMLInputElement.cpp
++++ b/dom/html/HTMLInputElement.cpp
+@@ -7219,17 +7219,6 @@ void HTMLInputElement::SetRevealPassword(bool aValue) {
+   if (aValue == State().HasState(ElementState::REVEALED)) {
+     return;
+   }
+-  RefPtr doc = OwnerDoc();
+-  // We allow chrome code to prevent this. This is important for about:logins,
+-  // which may need to run some OS-dependent authentication code before
+-  // revealing the saved passwords.
+-  bool defaultAction = true;
+-  nsContentUtils::DispatchEventOnlyToChrome(
+-      doc, this, u"MozWillToggleReveal"_ns, CanBubble::eYes, Cancelable::eYes,
+-      &defaultAction);
+-  if (NS_WARN_IF(!defaultAction)) {
+-    return;
+-  }
+   SetStates(ElementState::REVEALED, aValue);
+ }
+ 
+diff --git a/dom/security/DOMSecurityMonitor.cpp b/dom/security/DOMSecurityMonitor.cpp
+index 09a435e477..1e695188bd 100644
+--- a/dom/security/DOMSecurityMonitor.cpp
++++ b/dom/security/DOMSecurityMonitor.cpp
+@@ -50,8 +50,6 @@ void DOMSecurityMonitor::AuditParsingOfHTMLXMLFragments(
+       "chrome://global/content/elements/marquee.js"_ns,
+       nsLiteralCString("chrome://devtools/content/shared/sourceeditor/"
+                        "codemirror/codemirror.bundle.js"),
+-      nsLiteralCString(
+-          "resource://newtab/data/content/activity-stream.bundle.js"),
+       nsLiteralCString("resource://devtools/client/debugger/src/components/"
+                        "Editor/Breakpoint.js"),
+       nsLiteralCString("resource://devtools/client/debugger/src/components/"
+@@ -66,9 +64,7 @@ void DOMSecurityMonitor::AuditParsingOfHTMLXMLFragments(
+       nsLiteralCString("resource://devtools/client/shared/widgets/tooltip/"
+                        "inactive-css-tooltip-helper.js"),
+       "resource://devtools/client/shared/widgets/Spectrum.js"_ns,
+-      "resource://gre/modules/narrate/VoiceSelect.sys.mjs"_ns,
+       "chrome://global/content/vendor/react-dom.js"_ns,
+-      "chrome://browser/content/aiwindow/components/ai-chat-message.mjs"_ns,
+       // ------------------------------------------------------------------
+       // test pages
+       // ------------------------------------------------------------------
+diff --git a/dom/security/nsContentSecurityUtils.cpp b/dom/security/nsContentSecurityUtils.cpp
+index 021dc9cc98..d03e91e614 100644
+--- a/dom/security/nsContentSecurityUtils.cpp
++++ b/dom/security/nsContentSecurityUtils.cpp
+@@ -1257,10 +1257,8 @@ static nsLiteralCString sStyleSrcUnsafeInlineAllowList[] = {
+     "about:addons"_ns,
+     // Bug 1584485: Remove 'unsafe-inline' from style-src within:
+     // * about:newtab
+-    // * about:welcome
+     // * about:home
+     "about:newtab"_ns,
+-    "about:welcome"_ns,
+     "about:home"_ns,
+     "chrome://browser/content/pageinfo/pageInfo.xhtml"_ns,
+     "chrome://browser/content/places/bookmarkProperties.xhtml"_ns,
+@@ -1287,7 +1285,6 @@ static nsLiteralCString sStyleSrcUnsafeInlineAllowList[] = {
+     "chrome://browser/content/sanitize_v2.xhtml"_ns,
+     "chrome://browser/content/search/addEngine.xhtml"_ns,
+     "chrome://browser/content/setDesktopBackground.xhtml"_ns,
+-    "chrome://browser/content/spotlight.html"_ns,
+     "chrome://devtools/content/debugger/index.html"_ns,
+     "chrome://devtools/content/framework/browser-toolbox/window.html"_ns,
+     "chrome://devtools/content/framework/toolbox-options.html"_ns,
+@@ -1307,8 +1304,6 @@ static nsLiteralCString sStyleSrcUnsafeInlineAllowList[] = {
+     "chrome://mozapps/content/preferences/changemp.xhtml"_ns,
+     "chrome://mozapps/content/preferences/removemp.xhtml"_ns,
+     "chrome://mozapps/content/profile/profileDowngrade.xhtml"_ns,
+-    "chrome://mozapps/content/profile/profileSelection.xhtml"_ns,
+-    "chrome://mozapps/content/profile/createProfileWizard.xhtml"_ns,
+     "chrome://mozapps/content/update/history.xhtml"_ns,
+     "chrome://mozapps/content/update/updateElevation.xhtml"_ns,
+     "chrome://pippki/content/certManager.xhtml"_ns,
+@@ -1326,10 +1321,8 @@ static nsLiteralCString sImgSrcMozRemoteImageAllowList[] = {
+     "about:preferences"_ns,
+     "about:processes"_ns,
+     "about:settings"_ns,
+-    "chrome://browser/content/aiwindow/aiWindow.html"_ns,
+     "chrome://browser/content/firefoxview/firefoxview.html"_ns,
+     "chrome://browser/content/preferences/dialogs/applicationManager.xhtml"_ns,
+-    "chrome://browser/content/sidebar/sidebar-syncedtabs.html"_ns,
+     "chrome://global/content/aboutProcesses.html"_ns,
+     "chrome://mozapps/content/handling/appChooser.xhtml"_ns,
+ };
+@@ -1337,30 +1330,20 @@ static nsLiteralCString sImgSrcMozRemoteImageAllowList[] = {
+ static nsLiteralCString sImgSrcDataBlobAllowList[] = {
+     "about:addons"_ns,
+     "about:debugging"_ns,
+-    "about:deleteprofile"_ns,
+     "about:devtools-toolbox"_ns,
+-    "about:editprofile"_ns,
+     "about:firefoxview"_ns,
+     "about:home"_ns,
+-    "about:inference"_ns,
+-    "about:logins"_ns,
+-    "about:newprofile"_ns,
+     "about:newtab"_ns,
+     "about:opentabs"_ns,
+     "about:preferences"_ns,
+     "about:privatebrowsing"_ns,
+     "about:processes"_ns,
+-    "about:profilemanager"_ns,
+     "about:protections"_ns,
+     "about:reader"_ns,
+     "about:sessionrestore"_ns,
+     "about:settings"_ns,
+     "about:test-about-content-search-ui"_ns,
+-    "about:welcome"_ns,
+     "chrome://browser/content/aboutDialog.xhtml"_ns,
+-    "chrome://browser/content/aboutlogins/aboutLogins.html"_ns,
+-    "chrome://browser/content/aiwindow/aiWindow.html"_ns,
+-    "chrome://browser/content/genai/chat.html"_ns,
+     "chrome://browser/content/qrcode/qrcode-dialog.html"_ns,
+     "chrome://browser/content/places/bookmarksSidebar.xhtml"_ns,
+     "chrome://browser/content/places/places.xhtml"_ns,
+@@ -1371,9 +1354,6 @@ static nsLiteralCString sImgSrcDataBlobAllowList[] = {
+     "chrome://browser/content/sidebar/sidebar-customize.html"_ns,
+     "chrome://browser/content/sidebar/sidebar-history.html"_ns,
+     "chrome://browser/content/sidebar/sidebar-opentabs.html"_ns,
+-    "chrome://browser/content/sidebar/sidebar-syncedtabs.html"_ns,
+-    "chrome://browser/content/spotlight.html"_ns,
+-    "chrome://browser/content/syncedtabs/sidebar.xhtml"_ns,
+     "chrome://browser/content/webext-panels.xhtml"_ns,
+     "chrome://devtools/content/application/index.html"_ns,
+     "chrome://devtools/content/framework/browser-toolbox/window.html"_ns,
+@@ -1395,7 +1375,6 @@ static nsLiteralCString sImgSrcHttpsAllowList[] = {
+     "about:newtab"_ns,
+     "about:preferences"_ns,
+     "about:settings"_ns,
+-    "about:welcome"_ns,
+     "chrome://devtools/content/application/index.html"_ns,
+     "chrome://devtools/content/framework/browser-toolbox/window.html"_ns,
+     "chrome://devtools/content/framework/toolbox-window.xhtml"_ns,
+@@ -1419,31 +1398,19 @@ static nsLiteralCString sImgSrcAddonsAllowList[] = {
+ //  UNSAFE! Allows loading everything.
+ static nsLiteralCString sImgSrcWildcardAllowList[] = {
+     "about:reader"_ns,
+-    "chrome://browser/content/syncedtabs/sidebar.xhtml"_ns,
+     // STOP! Do not add anything to this list.
+ };
+-// img-src https://example.org
+-//  Any https host source.
+-static nsLiteralCString sImgSrcHttpsHostAllowList[] = {
+-    "about:logins"_ns,
+-    "chrome://browser/content/aboutlogins/aboutLogins.html"_ns,
+-    "chrome://browser/content/spotlight.html"_ns,
+-};
+ // media-src *
+ //  UNSAFE! Allows loading everything.
+ static nsLiteralCString sMediaSrcWildcardAllowList[] = {
+     "about:reader"_ns,
+     // STOP! Do not add anything to this list.
+ };
+-// media-src https://example.org
+-//  Any https host source.
+-static nsLiteralCString sMediaSrcHttpsHostAllowList[] = {"about:welcome"_ns};
+ // connect-src https:
+ static nsLiteralCString sConnectSrcHttpsAllowList[] = {
+     "about:addons"_ns,
+     "about:home"_ns,
+     "about:newtab"_ns,
+-    "about:welcome"_ns,
+ };
+ // connect-src data: http:
+ //  UNSAFE! Do not use.
+@@ -1656,7 +1623,7 @@ class ImgSrcVisitor : public AllowBuiltinSrcVisitor {
+ 
+   bool visitHostSrc(const nsCSPHostSrc& src) override {
+     return VisitHostSrcWithWildcardAndHttpsHostAllowLists(
+-        src, sImgSrcWildcardAllowList, sImgSrcHttpsHostAllowList);
++        src, sImgSrcWildcardAllowList, {});
+   }
+ };
+ 
+@@ -1669,7 +1636,7 @@ class MediaSrcVisitor : public AllowBuiltinSrcVisitor {
+ 
+   bool visitHostSrc(const nsCSPHostSrc& src) override {
+     return VisitHostSrcWithWildcardAndHttpsHostAllowLists(
+-        src, sMediaSrcWildcardAllowList, sMediaSrcHttpsHostAllowList);
++        src, sMediaSrcWildcardAllowList, {});
+   }
+ };
+ 
+diff --git a/extensions/permissions/PermissionManager.cpp b/extensions/permissions/PermissionManager.cpp
+index 03a9975a6e..dcd8461277 100644
+--- a/extensions/permissions/PermissionManager.cpp
++++ b/extensions/permissions/PermissionManager.cpp
+@@ -168,8 +168,8 @@ bool IsPreloadPermission(const nsACString& aType) {
+ // This is because perms are sent to the content process in bulk by perm key.
+ // Non-preloaded, but OA stripped permissions would not be accessible by sites
+ // in private browsing / non-default user context.
+-static constexpr std::array<nsLiteralCString, 3> kStripOAPermissions = {
+-    {"cookie"_ns, "https-only-load-insecure"_ns, "ipp-vpn"_ns}};
++static constexpr std::array<nsLiteralCString, 2> kStripOAPermissions = {
++    {"cookie"_ns, "https-only-load-insecure"_ns}};
+ 
+ bool IsOAForceStripPermission(const nsACString& aType) {
+   if (aType.IsEmpty()) {
+diff --git a/extensions/permissions/test/unit/test_permmanager_oa_strip.js b/extensions/permissions/test/unit/test_permmanager_oa_strip.js
+index d15ddd65bc..01f035ad0d 100644
+--- a/extensions/permissions/test/unit/test_permmanager_oa_strip.js
++++ b/extensions/permissions/test/unit/test_permmanager_oa_strip.js
+@@ -8,7 +8,7 @@ const TEST_PERMISSION3 = "test/oastrip3";
+ 
+ // List of permissions which are not isolated by private browsing or user context
+ // as per array kStripOAPermissions in PermissionManager.cpp
+-const STRIPPED_PERMS = ["cookie", "https-only-load-insecure", "ipp-vpn"];
++const STRIPPED_PERMS = ["cookie", "https-only-load-insecure"];
+ 
+ let principal = Services.scriptSecurityManager.createContentPrincipal(
+   TEST_URI,
+diff --git a/modules/libpref/Preferences.cpp b/modules/libpref/Preferences.cpp
+index 1013476bb0..3499900e0d 100644
+--- a/modules/libpref/Preferences.cpp
++++ b/modules/libpref/Preferences.cpp
+@@ -6476,7 +6476,6 @@ static const PrefListEntry sRestrictFromWebContentProcesses[] = {
+     PREF_LIST_ENTRY(
+         "browser.contentblocking.cfr-milestone.milestone-shown-time"),
+     PREF_LIST_ENTRY("browser.contextual-services.contextId"),
+-    PREF_LIST_ENTRY("browser.laterrun.bookkeeping.profileCreationTime"),
+     PREF_LIST_ENTRY("browser.newtabpage.activity-stream.discoverystream."),
+     PREF_LIST_ENTRY("browser.sessionstore.upgradeBackup.latestBuildID"),
+     PREF_LIST_ENTRY("browser.shell.mostRecentDateSetAsDefault"),

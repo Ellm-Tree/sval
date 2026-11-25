@@ -1,0 +1,485 @@
+Sval: Remove messaging targeting
+
+ASRouter's targeting environment and the messaging system's Targeting
+module evaluated JEXL expressions for Nimbus recipes and for the
+targeting snapshot the background update task reads. Sval runs no
+Nimbus recipe and never writes the snapshot
+(no-messaging-targeting-snapshot.patch), so the snapshot writer goes
+with both modules, their metrics and their tests. The messaging
+system's Logger stays: Top Sites logs through it.
+
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index eb9abdbcc2..6c489a74c7 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -26,7 +26,6 @@ with Files("controlcenter/**"):
+ 
+ DIRS += [
+     "about",
+-    "asrouter",
+     "contentanalysis",
+     "contextualidentity",
+     "controlcenter",
+diff --git a/browser/modules/test/browser/browser_URILoadingHelper_chromeless.js b/browser/modules/test/browser/browser_URILoadingHelper_chromeless.js
+index 609576c2dc..e79dda01a6 100644
+--- a/browser/modules/test/browser/browser_URILoadingHelper_chromeless.js
++++ b/browser/modules/test/browser/browser_URILoadingHelper_chromeless.js
+@@ -5,7 +5,6 @@ http://creativecommons.org/publicdomain/zero/1.0/ */
+ ChromeUtils.defineESModuleGetters(this, {
+   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+-  ASRouterTargeting: "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
+ });
+ 
+ const URL_TO_LOAD = "https://example.com/";
+@@ -59,7 +58,7 @@ add_task(async function opens_a_new_window_not_reusing_existing_window() {
+ });
+ 
+ add_task(async function opens_with_requested_dimensions() {
+-  const { width, height } = ASRouterTargeting.Environment.primaryResolution;
++  const { availWidth: width, availHeight: height } = window.screen;
+   if (width < 800 || height < 600) {
+     ok(true, "Skipping: screen too small to reliably test window dimensions");
+     return;
+diff --git a/toolkit/components/backgroundtasks/moz.build b/toolkit/components/backgroundtasks/moz.build
+index d5e5a9c0b3..21a14b4421 100644
+--- a/toolkit/components/backgroundtasks/moz.build
++++ b/toolkit/components/backgroundtasks/moz.build
+@@ -87,11 +87,6 @@ TESTING_JS_MODULES.backgroundtasks += [
+ ]
+ 
+ if CONFIG["MOZ_BUILD_APP"] == "browser":
+-    # ASRouter is Firefox-only.
+-    TESTING_JS_MODULES.backgroundtasks += [
+-        "tests/BackgroundTask_targeting.sys.mjs",
+-    ]
+-
+     FINAL_TARGET_PP_FILES.browser.defaults.backgroundtasks += [
+         "defaults/backgroundtasks_browser.js",
+     ]
+diff --git a/toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtasksutils.js b/toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtasksutils.js
+index 8cd305ff90..6fe92e2f67 100644
+--- a/toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtasksutils.js
++++ b/toolkit/components/backgroundtasks/tests/xpcshell/test_backgroundtasksutils.js
+@@ -6,11 +6,6 @@ const { BackgroundTasksUtils } = ChromeUtils.importESModule(
+   "resource://gre/modules/BackgroundTasksUtils.sys.mjs"
+ );
+ 
+-const lazy = {};
+-ChromeUtils.defineESModuleGetters(lazy, {
+-  ASRouterTargeting: "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
+-});
+-
+ setupProfileService();
+ 
+ add_task(async function test_withProfileLock() {
+@@ -171,18 +166,10 @@ add_task(
+       /NotFoundError/
+     );
+ 
+-    // We can't take a full environment snapshot under `xpcshell`.  Select a few
+-    // items that do work.
+-    let target = {
+-      // `Date` instances and strings do not `deepEqual` each other.
+-      currentDate: JSON.stringify(
+-        await lazy.ASRouterTargeting.Environment.currentDate
+-      ),
+-      firefoxVersion: lazy.ASRouterTargeting.Environment.firefoxVersion,
++    let expected = {
++      environment: { firefoxVersion: 1 },
++      version: 1,
+     };
+-    let expected = await lazy.ASRouterTargeting.getEnvironmentSnapshot({
+-      targets: [target],
+-    });
+ 
+     let snapshotFile = profile.rootDir.clone();
+     snapshotFile.append("targeting.snapshot.json");
+diff --git a/toolkit/components/backgroundtasks/tests/xpcshell/xpcshell.toml b/toolkit/components/backgroundtasks/tests/xpcshell/xpcshell.toml
+index 188ee232df..9d4a082612 100644
+--- a/toolkit/components/backgroundtasks/tests/xpcshell/xpcshell.toml
++++ b/toolkit/components/backgroundtasks/tests/xpcshell/xpcshell.toml
+@@ -62,12 +62,6 @@ skip-if = [
+ 
+ ["test_backgroundtask_specific_pref.js"]
+ 
+-["test_backgroundtask_targeting.js"]
+-run-if = [
+-  "buildapp == 'browser'",
+-]
+-reason = "ASRouter is Firefox-only."
+-
+ ["test_backgroundtask_unique_profile.js"]
+ 
+ ["test_backgroundtask_update_sync_manager.js"]
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 911ef2b137..2c046c9696 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -81,7 +81,6 @@ gecko_metrics = [
+     "toolkit/components/gecko-trace/generated-metrics.yaml",
+     "toolkit/components/glean/metrics.yaml",
+     "toolkit/components/mediasniffer/metrics.yaml",
+-    "toolkit/components/messaging-system/metrics.yaml",
+     "toolkit/components/ml/metrics.yaml",
+     "toolkit/components/normandy/metrics.yaml",
+     "toolkit/components/passwordmgr/metrics.yaml",
+diff --git a/toolkit/components/messaging-system/jar.mn b/toolkit/components/messaging-system/jar.mn
+index 9cdae90290..d04dda4cbe 100644
+--- a/toolkit/components/messaging-system/jar.mn
++++ b/toolkit/components/messaging-system/jar.mn
+@@ -5,4 +5,3 @@
+ toolkit.jar:
+ % resource messaging-system %res/messaging-system/
+   res/messaging-system/lib/ (./lib/*)
+-  res/messaging-system/targeting/Targeting.sys.mjs (./targeting/Targeting.sys.mjs)
+diff --git a/toolkit/components/messaging-system/moz.build b/toolkit/components/messaging-system/moz.build
+index de2edcaa27..d78f37adbc 100644
+--- a/toolkit/components/messaging-system/moz.build
++++ b/toolkit/components/messaging-system/moz.build
+@@ -5,6 +5,4 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Firefox", "Messaging System")
+ 
+-XPCSHELL_TESTS_MANIFESTS += ["targeting/test/unit/xpcshell.toml"]
+-
+ JAR_MANIFESTS += ["jar.mn"]
+diff --git a/toolkit/mozapps/update/BackgroundUpdate.sys.mjs b/toolkit/mozapps/update/BackgroundUpdate.sys.mjs
+index ff6c58cbe0..8997fed186 100644
+--- a/toolkit/mozapps/update/BackgroundUpdate.sys.mjs
++++ b/toolkit/mozapps/update/BackgroundUpdate.sys.mjs
+@@ -10,12 +10,7 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+-  ASRouterTargeting:
+-    // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+-    "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
+   BackgroundTasksUtils: "resource://gre/modules/BackgroundTasksUtils.sys.mjs",
+-  ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
+-  JSONFile: "resource://gre/modules/JSONFile.sys.mjs",
+   TaskScheduler: "resource://gre/modules/TaskScheduler.sys.mjs",
+   UpdateUtils: "resource://gre/modules/UpdateUtils.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+@@ -43,7 +38,6 @@ ChromeUtils.defineLazyGetter(lazy, "localization", () => {
+ });
+ 
+ XPCOMUtils.defineLazyServiceGetters(lazy, {
+-  idleService: ["@mozilla.org/widget/useridleservice;1", Ci.nsIUserIdleService],
+   UpdateService: [
+     "@mozilla.org/updates/update-service;1",
+     Ci.nsIApplicationUpdateService,
+@@ -69,11 +63,7 @@ function taskNameVersion(taskVersion) {
+ }
+ 
+ export var BackgroundUpdate = {
+-  QueryInterface: ChromeUtils.generateQI([
+-    "nsINamed",
+-    "nsIObserver",
+-    "nsITimerCallback",
+-  ]),
++  QueryInterface: ChromeUtils.generateQI(["nsINamed", "nsIObserver"]),
+   name: "BackgroundUpdate",
+ 
+   _initialized: false,
+@@ -436,19 +426,6 @@ export var BackgroundUpdate = {
+   observe(subject, topic, data) {
+     let whatChanged;
+     switch (topic) {
+-      case "idle-daily":
+-        this._snapshot.saveSoon();
+-        return;
+-
+-      case "user-interaction-active":
+-        this._startTargetingSnapshottingTimer();
+-        Services.obs.removeObserver(this, "idle-daily");
+-        Services.obs.removeObserver(this, "user-interaction-active");
+-        lazy.log.debug(
+-          `observe: ${topic}; started targeting snapshotting timer`
+-        );
+-        return;
+-
+       case "nsPref:changed":
+         whatChanged = `per-profile pref ${data}`;
+         break;
+@@ -751,128 +728,6 @@ export var BackgroundUpdate = {
+     Glean.update.canUsuallyUseBits.set(lazy.UpdateService.canUsuallyUseBits);
+   },
+ 
+-  /**
+-   * Schedule periodic snapshotting of the Firefox Messaging System
+-   * targeting configuration.
+-   *
+-   * The background update task will target messages based on the
+-   * latest snapshot of the default profile's targeting configuration.
+-   */
+-  async scheduleFirefoxMessagingSystemTargetingSnapshotting() {
+-    let SLUG = "scheduleFirefoxMessagingSystemTargetingSnapshotting";
+-    let path = PathUtils.join(PathUtils.profileDir, "targeting.snapshot.json");
+-
+-    let snapshot = new lazy.JSONFile({
+-      beforeSave: async () => {
+-        if (Services.startup.shuttingDown) {
+-          // Collecting targeting information can be slow and cause shutdown
+-          // crashes.  Just write what we have in that case.  During shutdown,
+-          // the regular log apparatus is not available, so use `dump`.
+-          if (lazy.log.shouldLog("debug")) {
+-            dump(
+-              `${SLUG}: shutting down, so not updating Firefox Messaging System targeting information from beforeSave\n`
+-            );
+-          }
+-          return;
+-        }
+-
+-        lazy.log.debug(
+-          `${SLUG}: preparing to write Firefox Messaging System targeting information to ${path}`
+-        );
+-
+-        // Merge latest data into existing data.  This data may be partial, due
+-        // to runtime errors and abbreviated collections, especially when
+-        // shutting down.  We accept the risk of incomplete or even internally
+-        // inconsistent data: it's generally better to have stale data (and
+-        // potentially target a user as they appeared in the past) than to block
+-        // shutdown for more accurate results.  An alternate approach would be
+-        // to restrict the targeting data collected, but it's hard to
+-        // distinguish expensive collection operations and the system loses
+-        // flexibility when restrictions of this type are added.
+-        let latestData = await lazy.ASRouterTargeting.getEnvironmentSnapshot({
+-          targets: [
+-            lazy.ExperimentAPI.manager.createTargetingContext(),
+-            lazy.ASRouterTargeting.Environment,
+-          ],
+-        });
+-        // We expect to always have data, but: belt-and-braces.
+-        if (snapshot?.data?.environment) {
+-          Object.assign(snapshot.data.environment, latestData.environment);
+-        } else {
+-          snapshot.data = latestData;
+-        }
+-      },
+-      path,
+-    });
+-
+-    // We don't `load`, since we don't care about reading existing (now stale)
+-    // data.
+-    snapshot.data = await lazy.ASRouterTargeting.getEnvironmentSnapshot(
+-      lazy.ASRouterTargeting.Environment,
+-      lazy.ExperimentAPI.manager.createTargetingContext()
+-    );
+-
+-    // Persist.
+-    snapshot.saveSoon();
+-
+-    this._snapshot = snapshot;
+-
+-    // Continue persisting periodically.  `JSONFile.sys.mjs` will also persist one
+-    // last time before shutdown.
+-    // Hold a reference to prevent GC.
+-    this._targetingSnapshottingTimer = Cc[
+-      "@mozilla.org/timer;1"
+-    ].createInstance(Ci.nsITimer);
+-    // By default, snapshot Firefox Messaging System targeting for use by the
+-    // background update task every 60 minutes.
+-    this._targetingSnapshottingTimerIntervalSec = Services.prefs.getIntPref(
+-      "app.update.background.messaging.targeting.snapshot.intervalSec",
+-      3600
+-    );
+-    this._startTargetingSnapshottingTimer();
+-  },
+-
+-  // nsITimerCallback
+-  notify() {
+-    const SLUG = "_targetingSnapshottingTimerCallback";
+-
+-    if (Services.startup.shuttingDown) {
+-      // Collecting targeting information can be slow and cause shutdown
+-      // crashes, so if we're shutting down, don't try to collect.  During
+-      // shutdown, the regular log apparatus is not available, so use `dump`.
+-      if (lazy.log.shouldLog("debug")) {
+-        dump(
+-          `${SLUG}: shutting down, so not updating Firefox Messaging System targeting information from timer\n`
+-        );
+-      }
+-      return;
+-    }
+-
+-    this._snapshot.saveSoon();
+-
+-    if (
+-      lazy.idleService.idleTime >
+-      this._targetingSnapshottingTimerIntervalSec * 1000
+-    ) {
+-      lazy.log.debug(
+-        `${SLUG}: idle time longer than interval, adding observers`
+-      );
+-      Services.obs.addObserver(this, "idle-daily");
+-      Services.obs.addObserver(this, "user-interaction-active");
+-    } else {
+-      lazy.log.debug(`${SLUG}: restarting timer`);
+-      this._startTargetingSnapshottingTimer();
+-    }
+-  },
+-
+-  _startTargetingSnapshottingTimer() {
+-    this._targetingSnapshottingTimer.initWithCallback(
+-      this,
+-      this._targetingSnapshottingTimerIntervalSec * 1000,
+-      Ci.nsITimer.TYPE_ONE_SHOT
+-    );
+-  },
+-
+   /**
+    * Reads the snapshotted Firefox Messaging System targeting out of a profile.
+    * Collects background update specific telemetry.  Never throws.
+diff --git a/toolkit/mozapps/update/tests/unit_background_update/test_backgroundupdate_glean.js b/toolkit/mozapps/update/tests/unit_background_update/test_backgroundupdate_glean.js
+index 94061f8d5e..9766a4a1e9 100644
+--- a/toolkit/mozapps/update/tests/unit_background_update/test_backgroundupdate_glean.js
++++ b/toolkit/mozapps/update/tests/unit_background_update/test_backgroundupdate_glean.js
+@@ -4,9 +4,6 @@
+ 
+ "use strict";
+ 
+-const { ASRouterTargeting } = ChromeUtils.importESModule(
+-  "resource:///modules/asrouter/ASRouterTargeting.sys.mjs"
+-);
+ const { BackgroundUpdate } = ChromeUtils.importESModule(
+   "resource://gre/modules/BackgroundUpdate.sys.mjs"
+ );
+@@ -162,137 +159,3 @@ add_task(async function test_targeting_exception() {
+     );
+   });
+ });
+-
+-// Well formed targeting values are reflected into the Glean telemetry.
+-add_task(async function test_targeting_exists() {
+-  // We can't take a full environment snapshot under `xpcshell`; these are just
+-  // the items we need.
+-  let target = {
+-    currentDate: ASRouterTargeting.Environment.currentDate,
+-    profileAgeCreated: ASRouterTargeting.Environment.profileAgeCreated,
+-    firefoxVersion: ASRouterTargeting.Environment.firefoxVersion,
+-  };
+-
+-  // Arrange fake experiment enrollment details.
+-  const { manager, cleanup } = await NimbusTestUtils.setupTest();
+-
+-  await manager.enroll(
+-    NimbusTestUtils.factories.recipe.withFeatureConfig("foo", {
+-      featureId: "testFeature",
+-    }),
+-    "test"
+-  );
+-  manager.unenroll("foo");
+-  await manager.enroll(
+-    NimbusTestUtils.factories.recipe.withFeatureConfig("bar", {
+-      featureId: "testFeature",
+-    }),
+-    "test"
+-  );
+-  manager.unenroll("bar");
+-  await manager.enroll(
+-    NimbusTestUtils.factories.recipe.withFeatureConfig("baz", {
+-      featureId: "testFeature",
+-    }),
+-    "test"
+-  );
+-
+-  await manager.enroll(
+-    NimbusTestUtils.factories.recipe("rol1", { isRollout: true }),
+-    "test"
+-  );
+-  manager.unenroll("rol1");
+-  await manager.enroll(
+-    NimbusTestUtils.factories.recipe("rol2", { isRollout: true }),
+-    "test"
+-  );
+-
+-  let targetSnapshot = await ASRouterTargeting.getEnvironmentSnapshot({
+-    targets: [manager.createTargetingContext(), target],
+-  });
+-
+-  await do_readTargeting(JSON.stringify(targetSnapshot), _reason => {
+-    Assert.equal(true, Glean.backgroundUpdate.targetingExists.testGetValue());
+-
+-    Assert.equal(
+-      false,
+-      Glean.backgroundUpdate.targetingException.testGetValue()
+-    );
+-
+-    // `environment.firefoxVersion` is a positive integer.
+-    Assert.greater(
+-      Glean.backgroundUpdate.targetingEnvFirefoxVersion.testGetValue(),
+-      0
+-    );
+-
+-    Assert.equal(
+-      targetSnapshot.environment.firefoxVersion,
+-      Glean.backgroundUpdate.targetingEnvFirefoxVersion.testGetValue()
+-    );
+-
+-    let profileAge =
+-      Glean.backgroundUpdate.targetingEnvProfileAge.testGetValue();
+-
+-    Assert.ok(profileAge instanceof Date);
+-    Assert.less(0, profileAge.getTime());
+-    Assert.less(profileAge.getTime(), Date.now());
+-
+-    // `environment.profileAgeCreated` is an integer, milliseconds since the
+-    // Unix epoch.
+-    let targetProfileAge = new Date(
+-      targetSnapshot.environment.profileAgeCreated
+-    );
+-    // Our `time_unit: day` has Glean round to the nearest day *in the local
+-    // timezone*, so we must do the same.
+-    targetProfileAge.setHours(0, 0, 0, 0);
+-
+-    Assert.equal(targetProfileAge.toISOString(), profileAge.toISOString());
+-
+-    let currentDate =
+-      Glean.backgroundUpdate.targetingEnvCurrentDate.testGetValue();
+-
+-    Assert.less(0, currentDate.getTime());
+-    Assert.less(currentDate.getTime(), Date.now());
+-
+-    // `environment.currentDate` is in ISO string format.
+-    let targetCurrentDate = new Date(targetSnapshot.environment.currentDate);
+-    // Our `time_unit: day` has Glean round to the nearest day *in the local
+-    // timezone*, so we must do the same.
+-    targetCurrentDate.setHours(0, 0, 0, 0);
+-
+-    Assert.equal(targetCurrentDate.toISOString(), currentDate.toISOString());
+-
+-    // Verify active experiments.
+-    Assert.deepEqual(
+-      {
+-        branch: "control",
+-        extra: { source: "defaultProfile", type: "nimbus-nimbus" },
+-      },
+-      Services.fog.testGetExperimentData("baz"),
+-      "experiment data for active experiment 'baz' is correct"
+-    );
+-
+-    Assert.deepEqual(
+-      {
+-        branch: "control",
+-        extra: { source: "defaultProfile", type: "nimbus-rollout" },
+-      },
+-      Services.fog.testGetExperimentData("rol2"),
+-      "experiment data for active experiment 'rol2' is correct"
+-    );
+-
+-    // Bug 1879247: there is currently no API (even test-only) to get experiment
+-    // data for inactive experiments.
+-    for (let inactive of ["bar", "foo", "rol1"]) {
+-      Assert.equal(
+-        null,
+-        Services.fog.testGetExperimentData(inactive),
+-        `no experiment data for inactive experiment '${inactive}`
+-      );
+-    }
+-  });
+-
+-  manager.unenroll("baz");
+-  manager.unenroll("rol2");
+-  await cleanup();
+-});

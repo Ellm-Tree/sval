@@ -84,7 +84,6 @@ browser/components/extensions/test/browser/browser_ext_find.js  # covers extensi
 browser/components/extensions/test/browser/browser_ext_tabs_autoDiscardable.js  # covers sessionstore-keeps-undiscardable
 browser/components/extensions/test/browser/browser_ext_tabs_capture_blur.js  # covers extension-blocked-sites-js
 browser/components/extensions/test/browser/browser_ext_windows_events.js  # covers ext-tab-tracker-closed-window
-browser/components/extensions/test/xpcshell/test_ext_normandyAddonStudy.js  # covers app-name
 browser/components/places/tests/browser/browser_bookmark_titles.js  # covers sval-menu-bar
 browser/components/places/tests/browser/browser_library_search.js  # covers history-sidebar-hooks
 browser/components/preferences/tests/chrome/test_setting_group.html  # covers settings-hide-removed-features
@@ -235,7 +234,6 @@ toolkit/components/extensions/test/xpcshell/test_ext_native_messaging.js  # cove
 toolkit/components/extensions/test/xpcshell/test_ext_storage_managed.js  # covers native-messaging-manifests
 toolkit/components/extensions/test/xpcshell/test_ext_webRequest_filterResponseData.js  # covers extension-blocked-sites
 toolkit/components/extensions/test/xpcshell/test_native_manifests.js  # covers native-messaging-manifests
-toolkit/components/nimbus/test/browser/browser_SharedDataMap.js  # covers nimbus-ready-rejection-handled
 toolkit/components/pdfjs/test/browser_pdfjs_download_button.js  # covers sval-agent-routing
 toolkit/components/pictureinpicture/tests/browser_contextMenu.js media.autoplay.site-permission-only.default=1  # covers agent-pip-player-refused, remove-firefox-pip-urlbar-button; Settings, Sites: "Allow sites to play video and audio" Always allow, so its play() runs
 toolkit/components/pictureinpicture/tests/browser_keyboardShortcut.js  # covers agent-pip-player-refused, pip-single-shortcut, remove-firefox-pip-urlbar-button

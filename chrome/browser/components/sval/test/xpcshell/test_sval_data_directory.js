@@ -90,7 +90,6 @@ add_task(async function test_starts_on_the_data_directory() {
   Assert.equal(data.name, "default");
   Assert.equal(data.rootDir.path, PathUtils.join(appData, "Data"));
   Assert.equal(data.localDir.path, PathUtils.join(localData, "Data"));
-  Assert.ok(!data.showProfileSelector, "the selector is never shown");
 
   const rootDir = {};
   const localDir = {};

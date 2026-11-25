@@ -1,0 +1,10 @@
+browser/components/asrouter/content/assets/glyph-mail-mask-16.svg
+browser/components/asrouter/jar.mn
+browser/locales/en-US/browser/firefoxRelay.ftl
+toolkit/components/passwordmgr/InsecurePasswordUtils.sys.mjs
+toolkit/components/satchel/FillHelpers.sys.mjs
+toolkit/components/satchel/FormScenarios.sys.mjs
+toolkit/components/satchel/SignUpFormRuleset.sys.mjs
+toolkit/components/satchel/integrations/FirefoxRelay.sys.mjs
+toolkit/components/satchel/integrations/FirefoxRelayUtils.sys.mjs
+toolkit/components/satchel/test/unit/test_isOriginInList.js

@@ -407,6 +407,7 @@ path = [
   "mobile/sval-mobile/src/effective_tld_names.txt",
   "chrome/browser/components/sval/device-phone.svg",
   "chrome/browser/components/sval/device-tablet.svg",
+  "chrome/browser/components/sval/battery-saver-leaf.svg",
 ]
 SPDX-FileCopyrightText = ["Mozilla contributors", "2026 Ellm Tree, Inc."]
 SPDX-License-Identifier = "MPL-2.0"

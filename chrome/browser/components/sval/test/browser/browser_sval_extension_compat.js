@@ -459,9 +459,10 @@ add_task(async function an_extension_sidebar_shows_the_switcher() {
     [document.getElementById("sidebar-switcher-history").label, "Notes"],
     "it lists History and the extension's sidebar alone"
   );
-  for (const id of ["sidebar-switcher-bookmarks", "sidebar-switcher-tabs"]) {
-    Assert.ok(document.getElementById(id).hidden, `${id} is not listed`);
-  }
+  Assert.ok(
+    document.getElementById("sidebar-switcher-bookmarks").hidden,
+    "sidebar-switcher-bookmarks is not listed"
+  );
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
   menu.hidePopup();
   await within(hidden, 10_000, "the menu closing");

@@ -1,0 +1,2495 @@
+Sval: Remove the password manager's form filling
+
+Firefox's password manager is locked off (Sval spec §7.3), so its
+per-page actor bailed on every event it was created for. The
+LoginManager actor goes with what only it used: login autocomplete
+and its popup rows, password generation and its rules, site recipes
+and related realms, passkey rows in the login dropdown, the content
+context menu's password items and Relay mask item, the remote
+settings dumps those read, the login autocomplete search's component
+registration, strings and tests. HTTP authentication prompts and the
+login storage stay.
+
+diff --git a/.prettierignore b/.prettierignore
+index c758a51865..057bf004b7 100644
+--- a/.prettierignore
++++ b/.prettierignore
+@@ -1529,6 +1529,5 @@ toolkit/components/certviewer/content/vendor/
+ toolkit/components/jsoncpp/
+ toolkit/components/ml/vendor/
+-toolkit/components/passwordmgr/shared/PasswordRulesParser.sys.mjs
+ toolkit/components/protobuf/
+ toolkit/components/reader/readability/
+ toolkit/components/reputationservice/chromium/
+diff --git a/browser/actors/ContextMenuChild.sys.mjs b/browser/actors/ContextMenuChild.sys.mjs
+index 4bc7376759..ee25101b00 100644
+--- a/browser/actors/ContextMenuChild.sys.mjs
++++ b/browser/actors/ContextMenuChild.sys.mjs
+@@ -9,8 +9,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
+   InlineSpellCheckerContent:
+     "resource://gre/modules/InlineSpellCheckerContent.sys.mjs",
+-  LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+-  LoginManagerChild: "resource://gre/modules/LoginManagerChild.sys.mjs",
+   SelectionUtils: "resource://gre/modules/SelectionUtils.sys.mjs",
+   SpellCheckHelper: "resource://gre/modules/InlineSpellChecker.sys.mjs",
+ });
+@@ -156,14 +154,6 @@ export class ContextMenuChild extends JSWindowActorChild {
+         break;
+       }
+ 
+-      case "ContextMenu:UseRelayMask": {
+-        const input = lazy.ContentDOMReference.resolve(
+-          message.data.targetIdentifier
+-        );
+-        input.setUserInput(message.data.emailMask);
+-        break;
+-      }
+-
+       case "ContextMenu:ReloadImage": {
+         let image = lazy.ContentDOMReference.resolve(
+           message.data.targetIdentifier
+@@ -581,9 +571,6 @@ export class ContextMenuChild extends JSWindowActorChild {
+       baseURI,
+     } = doc;
+     docLocation = docLocation && docLocation.spec;
+-    const loginManagerChild = lazy.LoginManagerChild.forWindow(doc.defaultView);
+-    const docState = loginManagerChild.stateForDocument(doc);
+-    const loginFillInfo = docState.getFieldContext(aEvent.composedTarget);
+ 
+     let disableSetDesktopBackground = null;
+ 
+@@ -689,7 +676,6 @@ export class ContextMenuChild extends JSWindowActorChild {
+       editFlags,
+       contentType,
+       docLocation,
+-      loginFillInfo,
+       selectionInfo,
+       contentDisposition,
+       disableSetDesktopBackground,
+@@ -1107,12 +1093,6 @@ export class ContextMenuChild extends JSWindowActorChild {
+       context.onEditable = (editFlags & lazy.SpellCheckHelper.EDITABLE) !== 0;
+       context.onPassword = (editFlags & lazy.SpellCheckHelper.PASSWORD) !== 0;
+ 
+-      context.showRelay =
+-        HTMLInputElement.isInstance(context.target) &&
+-        !context.target.disabled &&
+-        !context.target.readOnly &&
+-        (lazy.LoginHelper.isInferredEmailField(context.target) ||
+-          lazy.LoginHelper.isInferredUsernameField(context.target));
+       context.isDesignMode =
+         (editFlags & lazy.SpellCheckHelper.CONTENTEDITABLE) !== 0;
+       context.passwordRevealed =
+diff --git a/browser/actors/ContextMenuParent.sys.mjs b/browser/actors/ContextMenuParent.sys.mjs
+index 0cad4809f2..dfc425b591 100644
+--- a/browser/actors/ContextMenuParent.sys.mjs
++++ b/browser/actors/ContextMenuParent.sys.mjs
+@@ -8,7 +8,6 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
+-  FirefoxRelay: "resource://gre/modules/FirefoxRelay.sys.mjs",
+   WebNavigationFrames: "resource://gre/modules/WebNavigationFrames.sys.mjs",
+ });
+ 
+@@ -41,8 +40,6 @@ export class ContextMenuParent extends JSWindowActorParent {
+       win = topBrowser.documentGlobal;
+     }
+ 
+-    message.data.context.showRelay &&= lazy.FirefoxRelay.isEnabled;
+-
+     this.#openContextMenu(message.data, win, browser);
+   }
+ 
+@@ -68,22 +65,6 @@ export class ContextMenuParent extends JSWindowActorParent {
+     });
+   }
+ 
+-  async useRelayMask(targetIdentifier, origin) {
+-    if (!origin) {
+-      return;
+-    }
+-
+-    const windowGlobal = this.manager.browsingContext.currentWindowGlobal;
+-    const browser = windowGlobal.rootFrameLoader.ownerElement;
+-    const emailMask = await lazy.FirefoxRelay.generateUsername(browser, origin);
+-    if (emailMask) {
+-      this.sendAsyncMessage("ContextMenu:UseRelayMask", {
+-        targetIdentifier,
+-        emailMask,
+-      });
+-    }
+-  }
+-
+   reloadImage(targetIdentifier) {
+     this.sendAsyncMessage("ContextMenu:ReloadImage", { targetIdentifier });
+   }
+@@ -202,8 +183,6 @@ export class ContextMenuParent extends JSWindowActorParent {
+       frameBrowsingContext: wgp.browsingContext,
+       selectionInfo: data.selectionInfo,
+       disableSetDesktopBackground: data.disableSetDesktopBackground,
+-      showRelay: data.showRelay,
+-      loginFillInfo: data.loginFillInfo,
+       userContextId: wgp.browsingContext.originAttributes.userContextId,
+       webExtContextData: data.webExtContextData,
+       cookieJarSettings: wgp.cookieJarSettings,
+diff --git a/browser/base/content/browser-context.inc.xhtml b/browser/base/content/browser-context.inc.xhtml
+index 222c8d3611..cb87995c28 100644
+--- a/browser/base/content/browser-context.inc.xhtml
++++ b/browser/base/content/browser-context.inc.xhtml
+@@ -268,22 +268,6 @@
+                 key="key_savePage"
+                 data-l10n-id="main-context-menu-page-save"
+                 />
+-      <menu id="fill-login" hidden="true">
+-        <menupopup id="fill-login-popup" />
+-      </menu>
+-      <menuitem id="fill-login-generated-password"
+-                data-l10n-id="main-context-menu-suggest-strong-password"
+-                hidden="true"
+-                />
+-      <menuitem id="use-relay-mask"
+-                data-l10n-id="main-context-menu-use-relay-mask"
+-                hidden="true"
+-                />
+-      <menuitem id="manage-saved-logins"
+-                data-l10n-id="main-context-menu-manage-passwords"
+-                hidden="true"
+-                />
+-      <menuseparator id="passwordmgr-items-separator"/>
+       <menuitem id="context-undo"
+                 key="key_undo"
+                 data-l10n-id="text-action-undo"
+diff --git a/browser/base/content/browser-context.js b/browser/base/content/browser-context.js
+index 59888e0e27..af8b9a91c2 100644
+--- a/browser/base/content/browser-context.js
++++ b/browser/base/content/browser-context.js
+@@ -162,15 +162,6 @@ document.addEventListener(
+         case "context-savepage":
+           gContextMenu.savePageAs();
+           break;
+-        case "fill-login-generated-password":
+-          gContextMenu.useGeneratedPassword();
+-          break;
+-        case "use-relay-mask":
+-          gContextMenu.useRelayMask();
+-          break;
+-        case "manage-saved-logins":
+-          gContextMenu.openPasswordManager();
+-          break;
+         case "context-reveal-password":
+           gContextMenu.toggleRevealPassword();
+           break;
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 1cebd6cc68..42cbbf37b4 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -40,7 +40,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   LightweightThemeConsumer:
+     "resource://gre/modules/LightweightThemeConsumer.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+-  LoginManagerParent: "resource://gre/modules/LoginManagerParent.sys.mjs",
+   MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
+   NewTabPagePreloading:
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 85e5257096..e3a4ab29a3 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -99,7 +99,6 @@
+   "HomePage",
+   "LightweightThemeConsumer",
+   "LoginHelper",
+-  "LoginManagerParent",
+   "MigrationUtils",
+   "NetUtil",
+   "NewTabPagePreloading",
+diff --git a/browser/base/content/nsContextMenu.sys.mjs b/browser/base/content/nsContextMenu.sys.mjs
+index 77d93aaf82..0fd241d49c 100644
+--- a/browser/base/content/nsContextMenu.sys.mjs
++++ b/browser/base/content/nsContextMenu.sys.mjs
+@@ -13,9 +13,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+     "resource://gre/modules/ContextualIdentityService.sys.mjs",
+   DevToolsShim: "chrome://devtools-startup/content/DevToolsShim.sys.mjs",
+   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
+-  LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+-  LoginManagerContextMenu:
+-    "resource://gre/modules/LoginManagerContextMenu.sys.mjs",
+   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+@@ -78,9 +75,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   false
+ );
+ 
+-const PASSWORD_FIELDNAME_HINTS = ["current-password", "new-password"];
+-const USERNAME_FIELDNAME_HINT = "username";
+-
+ const ALLOWED_CHROME_IMAGE_URLS = new Set([
+   "chrome://global/skin/illustrations/security-error.svg",
+   "chrome://global/skin/illustrations/no-connection.svg",
+@@ -338,13 +332,6 @@ export class nsContextMenu {
+     this.window.InlineSpellCheckerUI.clearSuggestionsFromMenu();
+     this.window.InlineSpellCheckerUI.clearDictionaryListFromMenu();
+     this.window.InlineSpellCheckerUI.uninit();
+-    if (
+-      Cu.isESModuleLoaded(
+-        "resource://gre/modules/LoginManagerContextMenu.sys.mjs"
+-      )
+-    ) {
+-      lazy.LoginManagerContextMenu.clearLoginsFromMenu(this.document);
+-    }
+ 
+     // This handler self-deletes, only run it if it is still there:
+     if (this._onPopupHiding) {
+@@ -364,7 +351,6 @@ export class nsContextMenu {
+     this.initClipboardItems();
+     this.initMediaPlayerItems();
+     this.initLeaveDOMFullScreenItems();
+-    this.initPasswordManagerItems();
+     this.initViewSourceItems();
+     this.initScreenshotItem();
+     this.initPasswordControlItems();
+@@ -1143,104 +1129,6 @@ export class nsContextMenu {
+     }
+   }
+ 
+-  initPasswordManagerItems() {
+-    let { document } = this;
+-    let showUseSavedLogin = false;
+-    let showGenerate = false;
+-    let showManage = false;
+-    let enableGeneration = Services.logins.isLoggedIn;
+-    try {
+-      // If we could not find a password field we don't want to
+-      // show the form fill, manage logins and the password generation items.
+-      if (!this.isLoginForm()) {
+-        return;
+-      }
+-      showManage = true;
+-
+-      // Disable the fill option if the user hasn't unlocked with their primary password
+-      // or if the password field or target field are disabled.
+-      // XXX: Bug 1529025 to maybe respect signon.rememberSignons.
+-      let loginFillInfo = this.contentData?.loginFillInfo;
+-      let disableFill =
+-        !Services.logins.isLoggedIn ||
+-        loginFillInfo?.passwordField.disabled ||
+-        loginFillInfo?.activeField.disabled;
+-      this.setItemAttr("fill-login", "disabled", disableFill);
+-
+-      let onPasswordLikeField = PASSWORD_FIELDNAME_HINTS.includes(
+-        loginFillInfo.activeField.fieldNameHint
+-      );
+-
+-      // Set the correct label for the fill menu
+-      let fillMenu = document.getElementById("fill-login");
+-      document.l10n.setAttributes(
+-        fillMenu,
+-        "main-context-menu-use-saved-password"
+-      );
+-
+-      let documentURI = this.contentData?.documentURIObject;
+-      let formOrigin = lazy.LoginHelper.getLoginOrigin(documentURI?.spec);
+-      let isGeneratedPasswordEnabled =
+-        lazy.LoginHelper.generationAvailable &&
+-        lazy.LoginHelper.generationEnabled;
+-      showGenerate =
+-        onPasswordLikeField &&
+-        isGeneratedPasswordEnabled &&
+-        Services.logins.getLoginSavingEnabled(formOrigin);
+-
+-      if (disableFill) {
+-        showUseSavedLogin = true;
+-
+-        // No need to update the submenu if the fill item is disabled.
+-        return;
+-      }
+-
+-      // Update sub-menu items.
+-      this.updatePasswordManagerSubMenuItems(document, formOrigin);
+-    } finally {
+-      const documentURI = this.contentData?.documentURIObject;
+-      const showRelay =
+-        this.contentData?.context.showRelay &&
+-        lazy.LoginHelper.getLoginOrigin(documentURI?.spec);
+-
+-      this.showItem("fill-login", showUseSavedLogin);
+-      this.showItem("fill-login-generated-password", showGenerate);
+-      this.showItem("use-relay-mask", showRelay);
+-      this.showItem("manage-saved-logins", showManage);
+-      this.setItemAttr(
+-        "fill-login-generated-password",
+-        "disabled",
+-        !enableGeneration
+-      );
+-      this.setItemAttr(
+-        "passwordmgr-items-separator",
+-        "ensureHidden",
+-        showUseSavedLogin || showGenerate || showManage || showRelay
+-          ? null
+-          : true
+-      );
+-    }
+-  }
+-
+-  async updatePasswordManagerSubMenuItems(document, formOrigin) {
+-    const fragment = await lazy.LoginManagerContextMenu.addLoginsToMenu(
+-      this.targetIdentifier,
+-      this.browser,
+-      formOrigin
+-    );
+-
+-    if (!fragment) {
+-      return;
+-    }
+-
+-    let popup = document.getElementById("fill-login-popup");
+-    popup.appendChild(fragment);
+-
+-    this.showItem("fill-login", true);
+-
+-    this.setItemAttr("passwordmgr-items-separator", "ensureHidden", null);
+-  }
+-
+   initSyncItems() {
+     this.syncItemsShown = this.window.gSync.updateContentContextMenu(this);
+   }
+@@ -1363,36 +1251,6 @@ export class nsContextMenu {
+     this.actor.toggleRevealPassword(this.targetIdentifier);
+   }
+ 
+-  openPasswordManager() {
+-    lazy.LoginHelper.openPasswordManager(this.window, {
+-      entryPoint: "Contextmenu",
+-    });
+-  }
+-
+-  useRelayMask() {
+-    const documentURI = this.contentData?.documentURIObject;
+-    const aOrigin = lazy.LoginHelper.getLoginOrigin(documentURI?.spec);
+-    this.actor.useRelayMask(this.targetIdentifier, aOrigin);
+-  }
+-
+-  useGeneratedPassword() {
+-    lazy.LoginManagerContextMenu.useGeneratedPassword(this.targetIdentifier);
+-  }
+-
+-  isLoginForm() {
+-    let loginFillInfo = this.contentData?.loginFillInfo;
+-    let documentURI = this.contentData?.documentURIObject;
+-
+-    // If we could not find a password field or this is not a username-only
+-    // form, then don't treat this as a login form.
+-    return (
+-      (loginFillInfo?.passwordField?.found ||
+-        loginFillInfo?.activeField.fieldNameHint == USERNAME_FIELDNAME_HINT) &&
+-      !documentURI?.schemeIs("about") &&
+-      this.browser.contentPrincipal.spec != "resource://pdf.js/web/viewer.html"
+-    );
+-  }
+-
+   inspectNode() {
+     return lazy.DevToolsShim.inspectNode(
+       this.window.gBrowser.selectedTab,
+@@ -2450,7 +2308,6 @@ export class nsContextMenu {
+     return (
+       this.onTextInput &&
+       this.onSearchField &&
+-      !this.isLoginForm() &&
+       (uri.schemeIs("http") || uri.schemeIs("https")) &&
+       Services.policies.isAllowed("installSearchEngine")
+     );
+diff --git a/browser/locales/en-US/browser/browserContext.ftl b/browser/locales/en-US/browser/browserContext.ftl
+index 7ac117412b..447bff730e 100644
+--- a/browser/locales/en-US/browser/browserContext.ftl
++++ b/browser/locales/en-US/browser/browserContext.ftl
+@@ -363,23 +363,6 @@ main-context-menu-send-to-mobile-connect-phone-from-page = Connect a Device to S
+ 
+ ##
+ 
+-# Displayed when there are saved passwords and the user clicks inside a username or password field
+-main-context-menu-use-saved-password =
+-    .label = Use Saved Password
+-    .accesskey = o
+-
+-main-context-menu-use-relay-mask =
+-    .label = Use { -relay-brand-short-name } Email Mask
+-    .accesskey = E
+-
+-main-context-menu-suggest-strong-password =
+-    .label = Suggest Strong Password…
+-    .accesskey = S
+-
+-main-context-menu-manage-passwords =
+-    .label = Manage Passwords
+-    .accesskey = M
+-
+ main-context-menu-add-engine =
+     .label = Add Search Engine
+     .accesskey = S
+diff --git a/browser/themes/shared/autocomplete.css b/browser/themes/shared/autocomplete.css
+index 90b0e3b60a..ecc5f78005 100644
+--- a/browser/themes/shared/autocomplete.css
++++ b/browser/themes/shared/autocomplete.css
+@@ -12,21 +12,11 @@
+ 
+ /* Define the minimum width based on the style of result rows.
+    The order of the min-width rules below must be in increasing order. */
+-#PopupAutoComplete:is([resultstyles~="loginsFooter"], [resultstyles~="insecureWarning"])::part(content) {
++#PopupAutoComplete[resultstyles~="insecureWarning"]::part(content) {
+   min-width: 22em;
+ }
+ 
+-#PopupAutoComplete:is([resultstyles~="importableLogins"], [resultstyles~="generatedPassword"])::part(content) {
+-  min-width: 22em;
+-}
+-
+-#PopupAutoComplete:is(
+-    [resultstyles~="autofill"],
+-    [resultstyles~="loginsFooter"],
+-    [resultstyles~="insecureWarning"],
+-    [resultstyles~="importableLogins"],
+-    [resultstyles~="generatedPassword"]
+-  )::part(content) {
++#PopupAutoComplete:is([resultstyles~="autofill"], [resultstyles~="insecureWarning"])::part(content) {
+   min-width: 250px;
+ }
+ 
+@@ -55,67 +45,11 @@
+     margin-inline: 0;
+   }
+ 
+-  > .ac-login-item {
+-    display: flex;
+-    justify-content: center;
+-    width: 100%;
+-
+-    > .ac-secondary-action {
+-      visibility: hidden;
+-      height: 16px;
+-      width: 16px;
+-      border: 0;
+-      color: inherit;
+-      -moz-context-properties: fill;
+-      fill: currentColor;
+-      margin: 8px;
+-      cursor: pointer;
+-      background: url("chrome://global/skin/icons/settings.svg") center no-repeat;
+-    }
+-  }
+-
+-  &:is(:hover, [selected]) > .ac-login-item > .ac-secondary-action {
+-    visibility: visible;
+-  }
+-
+   > .ac-title {
+     font: icon;
+     margin-inline-start: 4px;
+   }
+ 
+-  &[originaltype="importableLearnMore"] {
+-    padding-bottom: 2px;
+-    padding-inline-start: 21px;
+-  }
+-
+-  &[originaltype="loginsFooter"] {
+-    background-color: transparent;
+-    color: currentColor;
+-    position: relative;
+-
+-    &:is(:hover, [selected]) {
+-      background-color: var(--button-background-color-hover);
+-    }
+-
+-    &[selected]:active {
+-      background-color: var(--button-background-color-active);
+-    }
+-  }
+-
+-  &[originaltype="loginsFooter"]:not(:first-child) {
+-    border-top: 1px solid var(--panel-separator-color);
+-    border-start-start-radius: 0;
+-    border-start-end-radius: 0;
+-  }
+-
+-  &[originaltype="loginsFooter"]::before {
+-    content: "";
+-    position: absolute;
+-    top: 0;
+-    inset-inline-start: 4px;
+-    width: calc(100% - 8px);
+-  }
+-
+   &[originaltype="insecureWarning"] {
+     height: auto;
+ 
+@@ -129,13 +63,11 @@
+     }
+   }
+ 
+-  &[originaltype="loginWithOrigin"] > .ac-site-icon,
+   &[originaltype="insecureWarning"] > .ac-site-icon {
+     margin-inline-start: 0;
+     display: initial;
+   }
+ 
+-  &[originaltype="login"] > .ac-site-icon,
+   &[originaltype="possible-username"] > .ac-site-icon,
+   > .two-line-wrapper > .ac-site-icon {
+     display: block;
+@@ -185,70 +117,15 @@
+     }
+   }
+ 
+-  &[originaltype="generatedPassword"] > .two-line-wrapper > .labels-wrapper > .generated-password-autosave,
+-  &[originaltype="importableLearnMore"] > .ac-title,
+   > .two-line-wrapper > .labels-wrapper > .line2-label {
+     padding-top: 2px !important;
+     color: var(--text-color-deemphasized);
+   }
+ 
+-  /* Login form autocompletion (with and without origin showing) and generated passwords */
+-  &[originaltype="generatedPassword"] > .two-line-wrapper > .ac-site-icon,
+-  &[originaltype="loginWithOrigin"] > .two-line-wrapper > .ac-site-icon,
+-  &[originaltype="login"] > .ac-site-icon {
+-    fill: GrayText;
+-  }
+-
+-  &[originaltype="importableLogins"] > .two-line-wrapper > .ac-site-icon {
+-    fill: GrayText;
+-    list-style-image: url(chrome://browser/skin/import.svg);
+-  }
+-
+-  @media (forced-colors) {
+-    &[originaltype="generatedPassword"][selected] > .two-line-wrapper > .ac-site-icon,
+-    &[originaltype="importableLogins"][selected] > .two-line-wrapper > .ac-site-icon,
+-    &[originaltype="loginWithOrigin"][selected] > .two-line-wrapper > .ac-site-icon,
+-    &[originaltype="login"] > .ac-site-icon[selected] {
+-      fill: SelectedItemText;
+-    }
+-  }
+-
+   &[originaltype="action"] > .two-line-wrapper {
+     flex: 1;
+   }
+ 
+-  &[originaltype="generatedPassword"] {
+-    &:not([collapsed]) {
+-      /* Workaround bug 451997 and/or bug 492645 */
+-      display: block;
+-    }
+-
+-    > .two-line-wrapper > .labels-wrapper {
+-      &.line2-label > span {
+-        /* The font-family is only adjusted on the inner span so that the
+-           line-height of .line2-label matches that of .line1-label */
+-        font-family: monospace;
+-      }
+-
+-      > .generated-password-autosave > span {
+-        /* The font-* properties are only adjusted on the inner span so that the
+-           line-height of .generated-password-autosave matches that of .line1-label */
+-        font-style: italic;
+-        font-size: 0.85em;
+-        white-space: normal;
+-      }
+-    }
+-  }
+-
+-  &[originaltype="login"] + richlistitem[originaltype="generatedPassword"],
+-  &[originaltype="loginWithOrigin"] + richlistitem[originaltype="generatedPassword"] {
+-    /* Separator between logins and generated passwords. This uses --panel-separator-color from default
+-     * themes since autocomplete doesn't yet switch to dark. */
+-    border-top: 1px solid hsla(210, 4%, 10%, 0.14);
+-    border-start-start-radius: 0;
+-    border-start-end-radius: 0;
+-  }
+-
+   &[originaltype="action"] {
+     text-align: center;
+   }
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index a8bf04ec7b..368d4cb510 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -1734,11 +1734,8 @@ export default [
+       "toolkit/components/formautofill/FormAutofillPreferences.sys.mjs",
+       "toolkit/components/formautofill/default/FormAutofillPrompter.sys.mjs",
+-      "toolkit/components/passwordmgr/LoginAutoComplete.sys.mjs",
+       "toolkit/components/passwordmgr/LoginHelper.sys.mjs",
+-      "toolkit/components/passwordmgr/LoginManagerParent.sys.mjs",
+       "toolkit/components/pictureinpicture/PictureInPicture.sys.mjs",
+       "toolkit/components/satchel/integrations/FirefoxRelay.sys.mjs",
+-      "toolkit/components/satchel/integrations/WebAuthnFeature.sys.mjs",
+       "toolkit/components/satchel/megalist/MegalistViewModel.sys.mjs",
+       "toolkit/components/satchel/megalist/aggregator/datasources/DataSourceBase.sys.mjs",
+       "toolkit/components/satchel/megalist/aggregator/datasources/LoginDataSource.sys.mjs",
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index 1eb3edab2f..f71d7e951a 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -2992,7 +2992,6 @@ pref("signon.storeWhenAutocompleteOff",     true);
+ pref("signon.userInputRequiredToCapture.enabled", true);
+ pref("signon.usernameOnlyForm.lookupThreshold",  5);
+ pref("signon.debug",                        false);
+-pref("signon.recipes.path", "resource://app/defaults/settings/main/password-recipes.json");
+ pref("signon.recipes.remoteRecipes.enabled", true);
+ pref("signon.relatedRealms.enabled", false);
+ pref("signon.schemeUpgrades",                     true);
+diff --git a/services/settings/dumps/main/moz.build b/services/settings/dumps/main/moz.build
+index edb93f0141..3b80ea18fe 100644
+--- a/services/settings/dumps/main/moz.build
++++ b/services/settings/dumps/main/moz.build
+@@ -22,7 +22,6 @@ if not CONFIG["MOZ_BUILD_APP"].startswith("mobile/"):
+         "example.json",
+         "hijack-blocklists.json",
+         "moz-essential-domain-fallbacks.json",
+-        "password-rules.json",
+         "search-config-icons.json",
+         "search-config-overrides-v2.json",
+         "search-config-v2.json",
+@@ -31,14 +30,8 @@ if not CONFIG["MOZ_BUILD_APP"].startswith("mobile/"):
+         "translations-wasm.json",
+         "url-classifier-skip-urls.json",
+         "url-parser-default-unknown-schemes-interventions.json",
+-        "websites-with-shared-credential-backends.json",
+     ]
+ 
+-# These collections are referenced in toolkit/ or other core code.
+-FINAL_TARGET_FILES.defaults.settings.main += [
+-    "password-recipes.json",
+-]
+-
+ # These search config icons only apply to desktop.
+ if CONFIG["MOZ_BUILD_APP"] == "browser":
+     FINAL_TARGET_FILES.defaults.settings.main["search-config-icons"] += [
+diff --git a/toolkit/actors/AutoCompleteChild.sys.mjs b/toolkit/actors/AutoCompleteChild.sys.mjs
+index 3421638bc5..87fd7dee0a 100644
+--- a/toolkit/actors/AutoCompleteChild.sys.mjs
++++ b/toolkit/actors/AutoCompleteChild.sys.mjs
+@@ -175,9 +175,8 @@ export class AutoCompleteChild extends JSWindowActorChild {
+     return results;
+   }
+ 
+-  getNoRollupOnEmptySearch(input) {
+-    const providers = this.providersByInput(input);
+-    return Array.from(providers).find(p => p.actorName == "LoginManager");
++  getNoRollupOnEmptySearch() {
++    return false;
+   }
+ 
+   // Store the input to interested autocomplete providers mapping
+@@ -189,11 +188,7 @@ export class AutoCompleteChild extends JSWindowActorChild {
+   providersByInput(input) {
+     const providers = new Set(this.#providersByInput.get(input));
+ 
+-    if (input.hasBeenTypePassword) {
+-      providers.add(
+-        input.documentGlobal.windowGlobalChild.getActor("LoginManager")
+-      );
+-    } else {
++    if (!input.hasBeenTypePassword) {
+       // The current design is that FormHistory doesn't call `markAsAutoCompletable`
+       // for every eligilbe input. Instead, when FormFillController receives a focus event,
+       // it would control the <input> if the <input> is eligible to show form history.
+@@ -223,8 +218,7 @@ export class AutoCompleteChild extends JSWindowActorChild {
+    * @param input - The HTML <input> element that is considered autocompletable by the
+    *                given provider
+    * @param provider - A module that provides autocomplete entries for a <input>, for example,
+-   *                   FormAutofill provides address or credit card autocomplete entries,
+-   *                   LoginManager provides logins entreis.
++   *                   FormAutofill provides address or credit card autocomplete entries.
+    */
+   markAsAutoCompletableField(input, provider) {
+     gFormFillController.markAsAutoCompletableField(input);
+@@ -286,7 +280,7 @@ export class AutoCompleteChild extends JSWindowActorChild {
+     // no providers have a non-null result, use the empty results instead.
+     // This is because an autocomplete provider might want to show an
+     // autocomplete popup when there is no search result. For example,
+-    // <datalist> for FormHistory, insecure warning for LoginManager.
++    // <datalist> for FormHistory.
+     let foundResults = [];
+     let emptyResults = [];
+ 
+diff --git a/toolkit/actors/AutoCompleteParent.sys.mjs b/toolkit/actors/AutoCompleteParent.sys.mjs
+index 4fc6b2e869..9cef41cce9 100644
+--- a/toolkit/actors/AutoCompleteParent.sys.mjs
++++ b/toolkit/actors/AutoCompleteParent.sys.mjs
+@@ -234,11 +234,8 @@ export class AutoCompleteParent extends JSWindowActorParent {
+     // Reset fields that were set from the last time the search popup was open
+     this.openedPopup.mInput = AutoCompleteResultView;
+     // Temporarily increase the maxRows as we don't want to show
+-    // the scrollbar in login or form autofill popups.
+-    if (
+-      resultStyles.size &&
+-      (resultStyles.has("autofill") || resultStyles.has("loginsFooter"))
+-    ) {
++    // the scrollbar in form autofill popups.
++    if (resultStyles.size && resultStyles.has("autofill")) {
+       this.openedPopup._normalMaxRows = this.openedPopup.maxRows;
+       this.openedPopup.mInput.maxRows = 10;
+     }
+@@ -256,7 +253,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+     );
+     this.openedPopup.invalidate();
+     this.openedPopup.selectedIndex = selectedIndex;
+-    this._maybeRecordTelemetryEvents(results);
+ 
+     // This is a temporary solution. We should replace it with
+     // proper meta information about the popup once such field
+@@ -270,76 +266,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+     }
+   }
+ 
+-  /**
+-   * @param {object[]} results - Non-empty array of autocomplete results.
+-   */
+-  _maybeRecordTelemetryEvents(results) {
+-    let actor =
+-      this.browsingContext.currentWindowGlobal.getActor("LoginManager");
+-    actor.maybeRecordPasswordGenerationShownTelemetryEvent(results);
+-
+-    // Assume the result with the start time (loginsFooter) is last.
+-    let lastResult = results[results.length - 1];
+-    if (lastResult.style != "loginsFooter") {
+-      return;
+-    }
+-
+-    // The comment field of `loginsFooter` results have many additional pieces of
+-    // information for telemetry purposes. After bug 1555209, this information
+-    // can be passed to the parent process outside of nsIAutoCompleteResult APIs
+-    // so we won't need this hack.
+-    let rawExtraData = JSON.parse(lastResult.comment).telemetryEventData;
+-    if (!rawExtraData.searchStartTimeMS) {
+-      throw new Error("Invalid autocomplete search start time");
+-    }
+-
+-    if (rawExtraData.stringLength > 1) {
+-      // To reduce event volume, only record for lengths 0 and 1.
+-      return;
+-    }
+-
+-    let duration =
+-      Services.telemetry.msSystemNow() - rawExtraData.searchStartTimeMS;
+-    delete rawExtraData.searchStartTimeMS;
+-
+-    // Add counts by result style to rawExtraData.
+-    results.reduce((accumulated, r) => {
+-      // Ignore learn more as it is only added after importable logins.
+-      // Do not track generic items in the telemetry.
+-      if (r.style === "importableLearnMore" || r.style === "generic") {
+-        return accumulated;
+-      }
+-
+-      // Keys can be a maximum of 15 characters and values must be strings.
+-      // Also treat both "loginWithOrigin" and "login" as "login" as extra_keys
+-      // is limited to 10.
+-      let truncatedStyle = r.style.substring(
+-        0,
+-        r.style === "loginWithOrigin" ? 5 : 15
+-      );
+-      accumulated[truncatedStyle] = (accumulated[truncatedStyle] || 0) + 1;
+-      return accumulated;
+-    }, rawExtraData);
+-
+-    // Even though Glean events do not require converting extra values to
+-    // strings, keep doing it so booleans keep being encoded as they were for
+-    // Telemetry recordEvent.
+-    let extraStrings = Object.fromEntries(
+-      Object.entries(rawExtraData).map(([key, val]) => {
+-        let stringVal = "";
+-        if (typeof val == "boolean") {
+-          stringVal += val ? "1" : "0";
+-        } else {
+-          stringVal += val;
+-        }
+-        return [key, stringVal];
+-      })
+-    );
+-
+-    extraStrings.value = duration;
+-    Glean.formAutocomplete.showLogins.record(extraStrings);
+-  }
+-
+   invalidate(results) {
+     if (!this.openedPopup) {
+       return;
+@@ -350,7 +276,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+     } else {
+       AutoCompleteResultView.setResults(this, results);
+       this.openedPopup.invalidate();
+-      this._maybeRecordTelemetryEvents(results);
+     }
+   }
+ 
+@@ -524,10 +449,8 @@ export class AutoCompleteParent extends JSWindowActorParent {
+   }
+ 
+   // This defines the supported autocomplete providers and the prioity to show the autocomplete
+-  // entry. LoginManager is prioritized to handle potential username fields first,
+-  // allowing FormAutofill to safely support single email fields without
+-  // manual exclusions.
+-  #AUTOCOMPLETE_PROVIDERS = ["LoginManager", "FormAutofill", "FormHistory"];
++  // entry.
++  #AUTOCOMPLETE_PROVIDERS = ["FormAutofill", "FormHistory"];
+ 
+   /**
+    * Search across multiple module to gather autocomplete entries for a given search string.
+@@ -569,10 +492,7 @@ export class AutoCompleteParent extends JSWindowActorParent {
+   // Hard-coded the mapping by using the message prefix to find the actor
+   // to process a given message.
+   #getActorByMessagePrefix(message) {
+-    const prefixToActor = [
+-      { prefix: "PasswordManager", actor: "LoginManager" },
+-      { prefix: "FormAutofill", actor: "FormAutofill" },
+-    ];
++    const prefixToActor = [{ prefix: "FormAutofill", actor: "FormAutofill" }];
+ 
+     const name = prefixToActor.find(x => message.startsWith(x.prefix))?.actor;
+     return this.browsingContext.currentWindowGlobal.getActor(name);
+diff --git a/toolkit/components/passwordmgr/moz.build b/toolkit/components/passwordmgr/moz.build
+index 106ece10d8..968b893edc 100644
+--- a/toolkit/components/passwordmgr/moz.build
++++ b/toolkit/components/passwordmgr/moz.build
+@@ -29,28 +29,19 @@ EXTRA_JS_MODULES += [
+     "BreachAlertStore.sys.mjs",
+     "crypto-SDR.sys.mjs",
+     "InsecurePasswordUtils.sys.mjs",
+-    "LoginAutoComplete.sys.mjs",
+     "LoginHelper.sys.mjs",
+     "LoginInfo.sys.mjs",
+     "LoginManager.shared.sys.mjs",
+     "LoginManager.sys.mjs",
+     "LoginManagerAuthPrompter.sys.mjs",
+-    "LoginManagerChild.sys.mjs",
+-    "LoginManagerParent.sys.mjs",
+     "LoginManagerPrompter.sys.mjs",
+     "LoginManagerRustMirror.sys.mjs",
+-    "LoginRecipes.sys.mjs",
+-    "LoginRelatedRealms.sys.mjs",
+-    "PasswordRulesManager.sys.mjs",
+     "storage-json.sys.mjs",
+     "storage-rust.sys.mjs",
+ ]
+ 
+ EXTRA_JS_MODULES.shared += [
+-    "shared/LoginFormFactory.sys.mjs",
+     "shared/NewPasswordModel.sys.mjs",
+-    "shared/PasswordGenerator.sys.mjs",
+-    "shared/PasswordRulesParser.sys.mjs",
+ ]
+ 
+ if CONFIG["OS_TARGET"] != "Android":
+@@ -66,11 +57,6 @@ if CONFIG["OS_TARGET"] == "WINNT":
+         "OSCrypto_win.sys.mjs",
+     ]
+ 
+-if CONFIG["MOZ_BUILD_APP"] == "browser" or CONFIG["MOZ_SUITE"]:
+-    EXTRA_JS_MODULES += [
+-        "LoginManagerContextMenu.sys.mjs",
+-    ]
+-
+ XPCOM_MANIFESTS += [
+     "components.conf",
+ ]
+diff --git a/toolkit/components/passwordmgr/test/LoginTestUtils.sys.mjs b/toolkit/components/passwordmgr/test/LoginTestUtils.sys.mjs
+index ae62cd25c1..278eca1a44 100644
+--- a/toolkit/components/passwordmgr/test/LoginTestUtils.sys.mjs
++++ b/toolkit/components/passwordmgr/test/LoginTestUtils.sys.mjs
+@@ -83,13 +83,6 @@ export const LoginTestUtils = {
+     await storageChangedPromise;
+   },
+ 
+-  resetGeneratedPasswordsCache() {
+-    let { LoginManagerParent } = ChromeUtils.importESModule(
+-      "resource://gre/modules/LoginManagerParent.sys.mjs"
+-    );
+-    LoginManagerParent.getGeneratedPasswordsByPrincipalOrigin().clear();
+-  },
+-
+   /**
+    * Checks that the currently stored list of nsILoginInfo matches the provided
+    * array.  If no `checkFn` is provided, the comparison uses the "equals"
+@@ -489,20 +482,6 @@ LoginTestUtils.testData = {
+   },
+ };
+ 
+-LoginTestUtils.recipes = {
+-  getRecipeParent() {
+-    let { LoginManagerParent } = ChromeUtils.importESModule(
+-      "resource://gre/modules/LoginManagerParent.sys.mjs"
+-    );
+-    if (!LoginManagerParent.recipeParentPromise) {
+-      return null;
+-    }
+-    return LoginManagerParent.recipeParentPromise.then(recipeParent => {
+-      return recipeParent;
+-    });
+-  },
+-};
+-
+ LoginTestUtils.primaryPassword = {
+   primaryPassword: "omgsecret!",
+ 
+diff --git a/toolkit/components/passwordmgr/test/browser/browser.toml b/toolkit/components/passwordmgr/test/browser/browser.toml
+index 11e090b83c..1d4ccea5e0 100644
+--- a/toolkit/components/passwordmgr/test/browser/browser.toml
++++ b/toolkit/components/passwordmgr/test/browser/browser.toml
+@@ -31,52 +31,6 @@ support-files = [
+   "../../../../../browser/components/aboutlogins/tests/browser/head.js",
+ ]
+ 
+-
+-["browser_DOMFormHasPassword.js"]
+-
+-["browser_DOMFormHasPossibleUsername.js"]
+-
+-["browser_DOMInputPasswordAdded.js"]
+-skip-if = [
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # Bug 1337606
+-]
+-
+-["browser_autocomplete_autofocus_with_frame.js"]
+-support-files = ["form_autofocus_frame.html"]
+-
+-["browser_autocomplete_disabled_readonly_passwordField.js"]
+-support-files = ["form_disabled_readonly_passwordField.html"]
+-
+-["browser_autocomplete_footer.js"]
+-
+-["browser_autocomplete_generated_password_private_window.js"]
+-
+-["browser_autocomplete_import.js"]
+-https_first_disabled = true
+-skip-if = [
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1775902
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && verify-standalone",
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # Bug 1775902
+-  "os == 'win' && os_version == '10.2009' && arch == 'x86_64' && opt", # Bug 1775902
+-  "os == 'win' && debug && artifact", # bug 1775902
+-]
+-
+-["browser_autocomplete_insecure_warning.js"]
+-
+-["browser_autocomplete_primary_password.js"]
+-
+-["browser_autofill_after_paint.js"]
+-
+-["browser_autofill_hidden_document.js"]
+-skip-if = [
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && opt", # high frequency intermittent, Bug 1716486
+-]
+-
+-["browser_autofill_http.js"]
+-https_first_disabled = true
+-
+-["browser_autofill_track_filled_logins.js"]
+-
+ ["browser_basicAuth_multiTab.js"]
+ fail-if = [
+   "a11y_checks", # Bug 1854452 clicked button may not be focusable
+@@ -92,177 +46,11 @@ skip-if = [
+   "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && debug", # Bug 1530566
+ ]
+ 
+-["browser_context_menu.js"]
+-skip-if = [
+-  "os == 'win' && os_version == '11.26100' && opt && verify-standalone",
+-  "os == 'win' && os_version == '11.26200' && opt && verify-standalone",
+-]
+-
+-["browser_context_menu_autocomplete_interaction.js"]
+-
+-["browser_context_menu_generated_password.js"]
+-
+-["browser_context_menu_iframe.js"]
+-
+-["browser_crossOriginSubmissionUsesCorrectOrigin.js"]
+-support-files = ["form_cross_origin_secure_action.html"]
+-
+ ["browser_deleteLoginsBackup.js"]
+ skip-if = [
+   "os == 'android'",
+ ]
+ 
+-["browser_doorhanger_autocomplete_values.js"]
+-fail-if = [
+-  "a11y_checks", # Bug 1854452 clicked password-notification-username-dropmaker may not be focusable and/or labeled
+-]
+-
+-["browser_doorhanger_autofill_then_save_password.js"]
+-
+-["browser_doorhanger_crossframe.js"]
+-support-files = [
+-  "form_crossframe.html",
+-  "form_crossframe_inner.html",
+-]
+-
+-["browser_doorhanger_dismissed_for_ccnumber.js"]
+-
+-["browser_doorhanger_empty_password.js"]
+-
+-["browser_doorhanger_form_password_edit.js"]
+-
+-["browser_doorhanger_generated_password.js"]
+-support-files = [
+-  "form_basic_with_confirm_field.html",
+-  "form_password_change.html",
+-]
+-skip-if = [
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'", # Bug 1729196
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && debug", # Bug 1729196
+-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && opt", # Bug 1729196
+-  "os == 'win' && os_version == '11.26100' && arch == 'x86_64'", # Bug 1729196
+-  "os == 'win' && os_version == '11.26200' && arch == 'x86_64'", # Bug 1729196
+-]
+-
+-["browser_doorhanger_httpsUpgrade.js"]
+-support-files = [
+-  "subtst_notifications_1.html",
+-  "subtst_notifications_8.html",
+-]
+-
+-["browser_doorhanger_multipage_form.js"]
+-
+-["browser_doorhanger_password_edits.js"]
+-
+-["browser_doorhanger_promptToChangePassword.js"]
+-skip-if = [
+-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1775906
+-]
+-
+-["browser_doorhanger_remembering.js"]
+-
+-["browser_doorhanger_replace_dismissed_with_visible_while_opening.js"]
+-
+-["browser_doorhanger_reveal_password.js"]
+-skip-if = [
+-  "a11y_checks", # Bugs 1858041, 1854454 and 1824058 for causing intermittent crashes
+-]
+-
+-["browser_doorhanger_save_password.js"]
+-skip-if = [
+-  "a11y_checks", # Bugs 1858041, 1854454 and 1824058 for causing intermittent crashes
+-]
+-
+-["browser_doorhanger_submit_telemetry.js"]
+-fail-if = [
+-  "a11y_checks", # Bug 1854452 clicked dropmaker may not be focusable
+-]
+-skip-if = [
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && asan", # Bug 1695395
+-  "tsan", # Bug 1661305
+-]
+-
+-["browser_doorhanger_target_blank.js"]
+-support-files = ["subtst_notifications_12_target_blank.html"]
+-
+-["browser_doorhanger_username_edits.js"]
+-
+-["browser_doorhanger_window_open.js"]
+-skip-if = [
+-  "os == 'win' && os_version == '11.26200' && asan", # Bug 2019745
+-]
+-support-files = [
+-  "subtst_notifications_11.html",
+-  "subtst_notifications_11_popup.html",
+-]
+-
+-["browser_entry_point_telemetry.js"]
+-
+-["browser_exceptions_dialog.js"]
+-
+-["browser_fileURIOrigin.js"]
+-
+-["browser_focus_before_first_DOMContentLoaded.js"]
+-support-files = ["file_focus_before_DOMContentLoaded.sjs"]
+-
+-["browser_form_history_fallback.js"]
+-https_first_disabled = true # TODO remove that line and move test to HTTPS, see Bug 1776350
+-support-files = [
+-  "subtst_notifications_1.html",
+-  "subtst_notifications_2.html",
+-  "subtst_notifications_2pw_0un.html",
+-  "subtst_notifications_2pw_1un_1text.html",
+-  "subtst_notifications_3.html",
+-  "subtst_notifications_4.html",
+-  "subtst_notifications_5.html",
+-  "subtst_notifications_6.html",
+-  "subtst_notifications_8.html",
+-  "subtst_notifications_9.html",
+-  "subtst_notifications_10.html",
+-  "subtst_notifications_change_p.html",
+-]
+-
+-["browser_formless_submit_chrome.js"]
+-skip-if = [
+-  "tsan", # Bug 1683730
+-]
+-
+-["browser_glean_pwmgr_form_autofill_result.js"]
+-
+-["browser_insecurePasswordConsoleWarning.js"]
+-https_first_disabled = true
+-
+-["browser_isProbablyASignUpForm.js"]
+-support-files = ["form_signup_detection.html"]
+-
+-["browser_localip_frame.js"]
+-skip-if = [
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # Bug 1683848
+-]
+-
+-["browser_message_onFormSubmit.js"]
+-
+-["browser_openPasswordManager.js"]
+-
+-["browser_preselect_login.js"]
+-fail-if = [
+-  "a11y_checks", # Bug 1854452 clicked ac-secondary-action may not be labeled
+-]
+-skip-if = [
+-  "asan",
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1840479
+-  "os == 'win' && os_version == '10.2009' && arch == 'x86_64' && debug", # Bug 1840479
+-  "os == 'win' && os_version == '11.26100' && debug", # Bug 1840479
+-  "os == 'win' && os_version == '11.26200' && debug", # Bug 1840479
+-  "tsan",
+-]
+-
+-["browser_private_window.js"]
+-support-files = [
+-  "subtst_privbrowsing_1.html",
+-  "form_password_change.html",
+-]
+-
+ ["browser_proxyAuth_prompt.js"]
+ skip-if = [
+   "os == 'android'",
+@@ -270,29 +58,8 @@ skip-if = [
+   "os == 'win' && os_version == '11.26200' && verify-standalone",
+ ]
+ 
+-["browser_relay_signup_flow.js"]
+-support-files = ["browser_relay_utils.js"]
+-
+-["browser_relay_signup_flow_showToAllBrowsers.js"]
+-support-files = ["browser_relay_utils.js"]
+-
+-["browser_relay_telemetry.js"]
+-support-files = ["browser_relay_utils.js"]
+-
+-["browser_relay_use.js"]
+-support-files = ["browser_relay_utils.js"]
+-
+ ["browser_rust_mirror.js"]
+ skip-if = [
+   "os == 'android'",
+   "release_or_beta", # Bug 1993218
+ ]
+-
+-["browser_telemetry_SignUpFormRuleset.js"]
+-
+-["browser_test_changeContentInputValue.js"]
+-
+-["browser_username_only_form_telemetry.js"]
+-
+-["browser_username_select_dialog.js"]
+-support-files = ["subtst_notifications_change_p.html"]
+diff --git a/toolkit/components/passwordmgr/test/browser/head.js b/toolkit/components/passwordmgr/test/browser/head.js
+index fd85d899aa..12b758c6c5 100644
+--- a/toolkit/components/passwordmgr/test/browser/head.js
++++ b/toolkit/components/passwordmgr/test/browser/head.js
+@@ -33,17 +33,9 @@ registerCleanupFunction(
+     await SpecialPowers.popPrefEnv();
+ 
+     LoginTestUtils.clearData();
+-    LoginTestUtils.resetGeneratedPasswordsCache();
+     clearHttpAuths();
+     Services.telemetry.clearEvents();
+ 
+-    let recipeParent = LoginTestUtils.recipes.getRecipeParent();
+-    if (!recipeParent) {
+-      // No need to reset the recipes if the recipe module wasn't even loaded.
+-      return;
+-    }
+-    await recipeParent.then(recipeParentResult => recipeParentResult.reset());
+-
+     await cleanupDoorhanger();
+     await cleanupPasswordNotifications();
+     await closePopup(document.getElementById("contentAreaContextMenu"));
+diff --git a/toolkit/components/passwordmgr/test/mochitest/mochitest.toml b/toolkit/components/passwordmgr/test/mochitest/mochitest.toml
+index 4ccaec4682..eaac9b6600 100644
+--- a/toolkit/components/passwordmgr/test/mochitest/mochitest.toml
++++ b/toolkit/components/passwordmgr/test/mochitest/mochitest.toml
+@@ -51,388 +51,6 @@ skip-if = [
+ 
+ # Note: new tests should use scheme = https unless they have a specific reason not to
+ 
+-["test_DOMInputPasswordAdded_fired_between_DOMContentLoaded_and_load_events.html"]
+-scheme = "https"
+-support-files = [
+-  "slow_image.sjs",
+-  "slow_image.html",
+-]
+-
+-["test_LoginManagerContent_passwordEditedOrGenerated.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # password generation
+-]
+-
+-["test_autocomplete_autofill_related_realms_no_dupes.html"]
+-skip-if = [
+-  "xorigin", # Bug 1716412 - New fission platform triage
+-]
+-scheme = "https"
+-
+-["test_autocomplete_basic_form.html"]
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'", # Bug 1857071
+-  "xorigin", # Bug 1716412 - New fission platform triage
+-]
+-scheme = "https"
+-
+-["test_autocomplete_basic_form_formActionOrigin.html"]
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin", # Bug 1716412 - New fission platform triage
+-]
+-scheme = "https"
+-
+-["test_autocomplete_basic_form_insecure.html"]
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin", # Bug 1716412 - New fission platform triage
+-]
+-
+-["test_autocomplete_basic_form_related_realms.html"]
+-skip-if = [
+-  "xorigin", # Bug 1716412 - New fission platform triage
+-]
+-scheme = "https"
+-
+-["test_autocomplete_hasBeenTypePassword.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_highlight.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_highlight_non_login.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_highlight_username_only_form.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_https_downgrade.html"]
+-scheme = "http" # Tests downgrading
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1554959
+-  "xorigin", # Bug 1716412 - New fission platform triage
+-]
+-
+-["test_autocomplete_https_upgrade.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1554959 for linux debug disable
+-]
+-
+-["test_autocomplete_password_generation.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_autocomplete_password_generation_confirm.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_password_generation_telemetry.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_autocomplete_password_open.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_sandboxed.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_autocomplete_tab_between_fields.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_autofill_autocomplete_types.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'", # bug 1533965
+-]
+-
+-["test_autofill_different_formActionOrigin.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'", # Bug 1259768
+-]
+-
+-["test_autofill_different_subdomain.html"]
+-scheme = "https"
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "os == 'android'", # Bug 1259768
+-]
+-
+-["test_autofill_from_bfcache.html"]
+-scheme = "https"
+-support-files = ["form_basic_bfcache.html"]
+-skip-if = [
+-  "os == 'android'", # bug 1527403
+-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && debug && xorigin && verify-standalone",
+-]
+-
+-["test_autofill_hasBeenTypePassword.html"]
+-scheme = "https"
+-
+-["test_autofill_highlight.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'", # Bug 1531185
+-]
+-
+-["test_autofill_highlight_empty_username.html"]
+-scheme = "https"
+-
+-["test_autofill_highlight_username_only_form.html"]
+-scheme = "https"
+-
+-["test_autofill_https_downgrade.html"]
+-scheme = "http" # we need http to test handling of https logins on http forms
+-skip-if = [
+-  "http2",
+-  "http3",
+-]
+-
+-["test_autofill_https_upgrade.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "os == 'android'", # Bug 1259768
+-]
+-
+-["test_autofill_password-only.html"]
+-
+-["test_autofill_sandboxed.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'",
+-]
+-
+-["test_autofill_tab_between_fields.html"]
+-scheme = "https"
+-
+-["test_autofill_username-only.html"]
+-
+-["test_autofill_username-only_threshold.html"]
+-
+-["test_autofocus_js.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-
+-["test_basic_form.html"]
+-
+-["test_basic_form_0pw.html"]
+-
+-["test_basic_form_1pw.html"]
+-
+-["test_basic_form_1pw_2.html"]
+-
+-["test_basic_form_2pw_1.html"]
+-
+-["test_basic_form_2pw_2.html"]
+-
+-["test_basic_form_3pw_1.html"]
+-
+-["test_basic_form_honor_autocomplete_off.html"]
+-scheme = "https"
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_basic_form_html5.html"]
+-
+-["test_basic_form_pwevent.html"]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_basic_form_pwonly.html"]
+-
+-["test_bug_627616.html"]
+-run-if = [
+-  "os != 'android'", # Tests desktop prompts
+-]
+-skip-if = [
+-  "http2",
+-  "http3",
+-]
+-
+-["test_bug_776171.html"]
+-
+-["test_case_differences.html"]
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-scheme = "https"
+-
+-["test_dismissed_doorhanger_in_shadow_DOM.html"]
+-run-if = [
+-  "os != 'android'", # Tests desktop prompts
+-]
+-scheme = "https"
+-
+-["test_formLike_rootElement_with_Shadow_DOM.html"]
+-scheme = "https"
+-
+-["test_form_action_1.html"]
+-
+-["test_form_action_2.html"]
+-
+-["test_form_action_javascript.html"]
+-
+-["test_formless_autofill.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "xorigin",
+-]
+-
+-["test_formless_submit.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "os == 'android' && debug", # bug 1397615
+-]
+-
+-["test_formless_submit_form_removal.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-]
+-
+-["test_formless_submit_form_removal_negative.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-]
+-
+-["test_formless_submit_navigation.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "os == 'android' && debug", # bug 1397615
+-]
+-
+-["test_formless_submit_navigation_negative.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "os == 'android' && debug", # bug 1397615
+-]
+-
+-["test_include_other_subdomains_in_lookup.html"]
+-run-if = [
+-  "os != 'android'", # android:autocomplete.
+-]
+-scheme = "https"
+-
+-["test_input_events.html"]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_input_events_for_identical_values.html"]
+-
+-["test_insecure_form_field_no_saved_login.html"]
+-run-if = [
+-  "os != 'android'", # android:autocomplete.
+-]
+-
+-["test_maxlength.html"]
+-
+-["test_munged_values.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'", # bug 1527403
+-]
+-
+-["test_one_doorhanger_per_un_pw.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'", # bug 1535505
+-]
+-
+-["test_onsubmit_value_change.html"]
+-
+-["test_password_field_autocomplete.html"]
+-run-if = [
+-  "os != 'android'", # android:autocomplete.
+-]
+-
+-["test_password_length.html"]
+-scheme = "https"
+-skip-if = [
+-  "os == 'android'", # bug 1527403
+-]
+-
+-["test_passwords_in_type_password.html"]
+-
+-["test_primary_password.html"]
+-scheme = "https"
+-run-if = [
+-  "os == 'mac'",
+-]
+-skip-if = [
+-  "xorigin", # Tests desktop prompts and bug 1333264
+-]
+-support-files = [
+-  "chrome_timeout.js",
+-  "subtst_primary_pass.html",
+-]
+-
+ ["test_prompt.html"]
+ run-if = [
+   "os != 'android'", # Tests desktop prompts
+@@ -481,29 +99,6 @@ skip-if = [
+   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
+ ]
+ 
+-["test_recipe_login_fields.html"]
+-skip-if = [
+-  "xorigin",
+-]
+-
+-["test_set_stored_logins_during_task.html"]
+-
+-["test_submit_without_field_modifications.html"]
+-support-files = ["subtst_prefilled_form.html"]
+-skip-if = [
+-  "http2",
+-  "http3",
+-  "xorigin",
+-]
+-
+-["test_username_focus.html"]
+-run-if = [
+-  "os != 'android'", # autocomplete
+-]
+-skip-if = [
+-  "xorigin",
+-]
+-
+ ["test_xhr.html"]
+ run-if = [
+   "os != 'android'", # Tests desktop prompts
+diff --git a/toolkit/components/passwordmgr/test/mochitest/pwmgr_common.js b/toolkit/components/passwordmgr/test/mochitest/pwmgr_common.js
+index 2260cd5001..1b6ed4a676 100644
+--- a/toolkit/components/passwordmgr/test/mochitest/pwmgr_common.js
++++ b/toolkit/components/passwordmgr/test/mochitest/pwmgr_common.js
+@@ -793,16 +793,6 @@ async function getTelemetryEvents(options) {
+   return events;
+ }
+ 
+-function loadRecipes(recipes) {
+-  info("Loading recipes");
+-  return PWMGR_COMMON_PARENT.sendQuery("loadRecipes", recipes);
+-}
+-
+-function resetRecipes() {
+-  info("Resetting recipes");
+-  return PWMGR_COMMON_PARENT.sendQuery("resetRecipes");
+-}
+-
+ async function promiseStorageChanged(expectedChangeTypes) {
+   let result = await PWMGR_COMMON_PARENT.sendQuery("storageChanged", {
+     expectedChangeTypes,
+@@ -1010,14 +1000,7 @@ const PWMGR_COMMON_PARENT = runInParent(
+ SimpleTest.registerCleanupFunction(() => {
+   SpecialPowers.flushPrefEnv();
+ 
+-  PWMGR_COMMON_PARENT.sendAsyncMessage("cleanup");
+-
+   runInParent(async function cleanupParent() {
+-    // eslint-disable-next-line no-shadow
+-    const { LoginManagerParent } = ChromeUtils.importESModule(
+-      "resource://gre/modules/LoginManagerParent.sys.mjs"
+-    );
+-
+     // Remove all logins and disabled hosts
+     await Services.logins.removeAllUserFacingLoginsAsync();
+ 
+@@ -1031,12 +1014,6 @@ SimpleTest.registerCleanupFunction(() => {
+     );
+     authMgr.clearAll();
+ 
+-    // Check that it's not null, instead of truthy to catch it becoming undefined
+-    // in a refactoring.
+-    if (LoginManagerParent._recipeManager !== null) {
+-      LoginManagerParent._recipeManager.reset();
+-    }
+-
+     // Cleanup PopupNotifications (if on a relevant platform)
+     let chromeWin = Services.wm.getMostRecentWindow("navigator:browser");
+     if (chromeWin && chromeWin.PopupNotifications) {
+diff --git a/toolkit/components/passwordmgr/test/mochitest/pwmgr_common_parent.js b/toolkit/components/passwordmgr/test/mochitest/pwmgr_common_parent.js
+index a72d53761f..e699b1e48b 100644
+--- a/toolkit/components/passwordmgr/test/mochitest/pwmgr_common_parent.js
++++ b/toolkit/components/passwordmgr/test/mochitest/pwmgr_common_parent.js
+@@ -11,9 +11,6 @@ var { AppConstants } = ChromeUtils.importESModule(
+ var { LoginHelper } = ChromeUtils.importESModule(
+   "resource://gre/modules/LoginHelper.sys.mjs"
+ );
+-var { LoginManagerParent } = ChromeUtils.importESModule(
+-  "resource://gre/modules/LoginManagerParent.sys.mjs"
+-);
+ const { LoginTestUtils } = ChromeUtils.importESModule(
+   "resource://testing-common/LoginTestUtils.sys.mjs"
+ );
+@@ -151,17 +148,6 @@ addMessageListener(
+   }
+ );
+ 
+-addMessageListener("loadRecipes", async function (recipes) {
+-  var recipeParent = await LoginManagerParent.recipeParentPromise;
+-  await recipeParent.load(recipes);
+-  return recipes;
+-});
+-
+-addMessageListener("resetRecipes", async function () {
+-  let recipeParent = await LoginManagerParent.recipeParentPromise;
+-  await recipeParent.reset();
+-});
+-
+ addMessageListener("getTelemetryEvents", options => {
+   options = Object.assign(
+     {
+@@ -229,17 +215,3 @@ addMessageListener("setPrimaryPassword", ({ enable }) => {
+     LoginTestUtils.primaryPassword.disable();
+   }
+ });
+-
+-LoginManagerParent.setListenerForTests((msg, { origin, data }) => {
+-  if (msg == "ShowDoorhanger") {
+-    sendAsyncMessage("formSubmissionProcessed", { origin, data });
+-  } else if (msg == "PasswordEditedOrGenerated") {
+-    sendAsyncMessage("passwordEditedOrGenerated", { origin, data });
+-  } else if (msg == "FormProcessed") {
+-    sendAsyncMessage("formProcessed", data);
+-  }
+-});
+-
+-addMessageListener("cleanup", () => {
+-  LoginManagerParent.setListenerForTests(null);
+-});
+diff --git a/toolkit/components/passwordmgr/test/unit/head.js b/toolkit/components/passwordmgr/test/unit/head.js
+index 8c2dc53f66..ca6ea26106 100644
+--- a/toolkit/components/passwordmgr/test/unit/head.js
++++ b/toolkit/components/passwordmgr/test/unit/head.js
+@@ -12,9 +12,6 @@ const { AppConstants } = ChromeUtils.importESModule(
+ const { XPCOMUtils } = ChromeUtils.importESModule(
+   "resource://gre/modules/XPCOMUtils.sys.mjs"
+ );
+-const { LoginRecipesContent, LoginRecipesParent } = ChromeUtils.importESModule(
+-  "resource://gre/modules/LoginRecipes.sys.mjs"
+-);
+ const { LoginHelper } = ChromeUtils.importESModule(
+   "resource://gre/modules/LoginHelper.sys.mjs"
+ );
+@@ -66,12 +63,6 @@ function getTempFile(leafName) {
+   return FileTestUtils.getTempFile(leafName);
+ }
+ 
+-const RecipeHelpers = {
+-  initNewParent() {
+-    return new LoginRecipesParent({ defaults: null }).initializationPromise;
+-  },
+-};
+-
+ // Initialization functions common to all tests
+ 
+ add_setup(async function test_common_initialize() {
+diff --git a/toolkit/components/passwordmgr/test/unit/xpcshell.toml b/toolkit/components/passwordmgr/test/unit/xpcshell.toml
+index ffe3a11de3..4518011f4a 100644
+--- a/toolkit/components/passwordmgr/test/unit/xpcshell.toml
++++ b/toolkit/components/passwordmgr/test/unit/xpcshell.toml
+@@ -12,52 +12,11 @@ prefs = ["security.storage.encryption.sqlite.enabled=false"]
+ 
+ ["test_CSVParser.js"]
+ 
+-["test_LoginManagerParent_doAutocompleteSearch.js"]
+-run-if = [
+-  "os != 'android'", # Password generation not packaged/used on Android
+-]
+-
+-["test_LoginManagerParent_getGeneratedPassword.js"]
+-run-if = [
+-  "os != 'android'", # Password generation not packaged/used on Android
+-]
+-
+-["test_LoginManagerParent_onPasswordEditedOrGenerated.js"]
+-run-if = [
+-  "os != 'android'", # Password generation not packaged/used on Android
+-]
+-
+-["test_LoginManagerParent_searchAndDedupeLogins.js"]
+-run-if = [
+-  "os != 'android'", # schemeUpgrades aren't supported
+-]
+-
+-["test_LoginManagerPrompter_getUsernameSuggestions.js"]
+-run-if = [
+-  "os != 'android'", # Tests desktop's prompter
+-]
+-
+ ["test_OSCrypto_win.js"]
+ run-if = [
+   "os == 'win'",
+ ]
+ 
+-["test_PasswordGenerator.js"]
+-run-if = [
+-  "os != 'android'", # Not packaged/used on Android
+-]
+-
+-["test_PasswordRulesManager_generatePassword.js"]
+-
+-["test_context_menu.js"]
+-skip-if = [
+-  "os == 'android'", # The context menu isn't used on Android.
+-]
+-# LoginManagerContextMenu is only included for MOZ_BUILD_APP == 'browser'.
+-run-if = [
+-  "buildapp == 'browser'",
+-]
+-
+ ["test_dedupeLogins.js"]
+ 
+ ["test_disabled_hosts.js"]
+@@ -66,37 +25,20 @@ run-if = [
+ 
+ ["test_doLoginsMatch.js"]
+ 
+-["test_findRelatedRealms.js"]
+-
+-["test_getFormFields.js"]
+-
+-["test_getPasswordFields.js"]
+-
+ ["test_getPasswordOrigin.js"]
+ 
+-["test_getUserNameAndPasswordFields.js"]
+-
+-["test_getUsernameFieldFromUsernameOnlyForm.js"]
+-
+ ["test_isInferredLoginForm.js"]
+ 
+ ["test_isInferredUsernameField.js"]
+ 
+ ["test_isOriginMatching.js"]
+ 
+-["test_isProbablyANewPasswordField.js"]
+-
+ ["test_isUsernameFieldType.js"]
+ 
+ ["test_legacy_empty_formActionOrigin.js"]
+ 
+ ["test_legacy_validation.js"]
+ 
+-["test_login_autocomplete_result.js"]
+-run-if = [
+-  "os != 'android'",
+-]
+-
+ ["test_loginsBackup.js"]
+ run-if = [
+   "os != 'android'",
+@@ -139,17 +81,8 @@ run-if = [
+ 
+ ["test_notifications.js"]
+ 
+-["test_recipes_add.js"]
+-
+-["test_recipes_content.js"]
+-
+ ["test_reencrypt.js"]
+ 
+-["test_remote_recipes.js"]
+-run-if = [
+-  "os != 'android'",
+-]
+-
+ ["test_search_schemeUpgrades.js"]
+ 
+ ["test_shadowHTTPLogins.js"]
+diff --git a/toolkit/components/satchel/FormHistoryChild.sys.mjs b/toolkit/components/satchel/FormHistoryChild.sys.mjs
+index 52ce9d6771..2a7325d512 100644
+--- a/toolkit/components/satchel/FormHistoryChild.sys.mjs
++++ b/toolkit/components/satchel/FormHistoryChild.sys.mjs
+@@ -75,12 +75,6 @@ export class FormHistoryChild extends JSWindowActorChild {
+         continue;
+       }
+ 
+-      // Bug 1780571, Bug 394612: If Login Manager marked this input, don't save it.
+-      // The login manager will deal with remembering it.
+-      if (this.manager.getActor("LoginManager")?.isLoginManagerField(input)) {
+-        continue;
+-      }
+-
+       // Don't save values when @autocomplete is "off" or has a sensitive field name.
+       const autocompleteInfo = input.getAutocompleteInfo();
+       if (autocompleteInfo?.canAutomaticallyPersist === false) {
+diff --git a/toolkit/components/satchel/moz.build b/toolkit/components/satchel/moz.build
+index 8c2f561342..602d01d182 100644
+--- a/toolkit/components/satchel/moz.build
++++ b/toolkit/components/satchel/moz.build
+@@ -37,7 +37,6 @@ EXTRA_JS_MODULES += [
+     "FormScenarios.sys.mjs",
+     "integrations/FirefoxRelay.sys.mjs",
+     "integrations/FirefoxRelayUtils.sys.mjs",
+-    "integrations/WebAuthnFeature.sys.mjs",
+     "SignUpFormRuleset.sys.mjs",
+ ]
+ 
+diff --git a/toolkit/content/license.html b/toolkit/content/license.html
+index 59bf42adb6..77c1617397 100644
+--- a/toolkit/content/license.html
++++ b/toolkit/content/license.html
+@@ -63,7 +63,6 @@
+       <li><a href="about:license#apache-llvm">Apache License 2.0 with LLVM exception</a></li>
+ #endif
+       <li><a href="about:license#apple">Apple License</a></li>
+-      <li><a href="about:license#apple-password-rules-parser">Apple Password Rules Parser License</a></li>
+       <li><a href="about:license#arm">ARM License</a></li>
+       <li><a href="about:license#babel">Babel License</a></li>
+       <li><a href="about:license#babylon">Babylon License</a></li>
+@@ -2042,38 +2041,6 @@ product.
+           </td>
+         </tr>
+ 
+-        <tr>
+-          <td>
+-            <h1><a id="apple-password-rules-parser"></a>Apple Password Rules Parser License</h1>
+-          </td>
+-          <td>
+-            <p>This license applies to the file <code>toolkit/components/passwordmgr/shared/PasswordRulesParser.sys.mjs</code>.</p>
+-          </td>
+-          <td>
+-            <pre>
+-            Copyright 2020 Apple Inc.
+-
+-            Permission is hereby granted, free of charge, to any person obtaining a copy
+-            of this software and associated documentation files (the "Software"), to deal
+-            in the Software without restriction, including without limitation the rights
+-            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-            copies of the Software, and to permit persons to whom the Software is
+-            furnished to do so, subject to the following conditions:
+-
+-            The above copyright notice and this permission notice shall be included in all
+-            copies or substantial portions of the Software.
+-
+-            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-            IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-            FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-            AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-            LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-            OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-            SOFTWARE.
+-            </pre>
+-          </td>
+-        </tr>
+-
+         <tr>
+           <td>
+             <h1><a id="arm"></a>ARM License</h1>
+@@ -2428,7 +2395,6 @@ product.
+ #ifdef MOZ_ZUCCHINI
+                 <li><code>third_party/zucchini/</code></li>
+ #endif
+-                <li><code>toolkit/components/passwordmgr/shared/PasswordGenerator.sys.mjs</code></li>
+                 <li><code>widget/cocoa/GfxInfo.mm</code></li>
+                 <li><code>widget/windows/nsWindow.cpp</code></li>
+             </ul>
+diff --git a/toolkit/content/widgets/autocomplete-popup.js b/toolkit/content/widgets/autocomplete-popup.js
+index cbaf6caae3..a903736be1 100644
+--- a/toolkit/content/widgets/autocomplete-popup.js
++++ b/toolkit/content/widgets/autocomplete-popup.js
+@@ -432,13 +432,8 @@
+           const UNREUSEABLE_STYLES = [
+             "autofill",
+             "action",
+-            "generatedPassword",
+             "generic",
+-            "importableLearnMore",
+-            "importableLogins",
+             "insecureWarning",
+-            "loginsFooter",
+-            "loginWithOrigin",
+           ];
+           // Reuse the item when its style is exactly equal to the previous style or
+           // neither of their style are in the UNREUSEABLE_STYLES.
+@@ -463,26 +458,9 @@
+             case "generic":
+               options = { is: "autocomplete-two-line-richlistitem" };
+               break;
+-            case "importableLearnMore":
+-              options = {
+-                is: "autocomplete-importable-learn-more-richlistitem",
+-              };
+-              break;
+-            case "importableLogins":
+-              options = { is: "autocomplete-importable-logins-richlistitem" };
+-              break;
+-            case "generatedPassword":
+-              options = { is: "autocomplete-generated-password-richlistitem" };
+-              break;
+             case "insecureWarning":
+               options = { is: "autocomplete-richlistitem-insecure-warning" };
+               break;
+-            case "loginsFooter":
+-              options = { is: "autocomplete-richlistitem-logins-footer" };
+-              break;
+-            case "loginWithOrigin":
+-              options = { is: "autocomplete-login-richlistitem" };
+-              break;
+             default:
+               options = { is: "autocomplete-richlistitem" };
+           }
+diff --git a/toolkit/content/widgets/autocomplete-richlistitem.js b/toolkit/content/widgets/autocomplete-richlistitem.js
+index 0973e137d1..8c761c4fc2 100644
+--- a/toolkit/content/widgets/autocomplete-richlistitem.js
++++ b/toolkit/content/widgets/autocomplete-richlistitem.js
+@@ -7,10 +7,6 @@
+ // This is loaded into all XUL windows. Wrap in a block to prevent
+ // leaking to window scope.
+ {
+-  const { LoginHelper } = ChromeUtils.importESModule(
+-    "resource://gre/modules/LoginHelper.sys.mjs"
+-  );
+-
+   MozElements.MozAutocompleteRichlistitem = class MozAutocompleteRichlistitem extends (
+     MozElements.MozRichlistitem
+   ) {
+@@ -599,42 +595,6 @@
+     }
+   }
+ 
+-  class MozAutocompleteRichlistitemLoginsFooter
+-    extends MozElements.MozAutocompleteRichlistitem {}
+-
+-  class MozAutocompleteImportableLearnMoreRichlistitem
+-    extends MozElements.MozAutocompleteRichlistitem
+-  {
+-    constructor() {
+-      super();
+-      MozXULElement.insertFTLIfNeeded("toolkit/main-window/autocomplete.ftl");
+-    }
+-
+-    static get markup() {
+-      return `
+-      <image class="ac-type-icon"/>
+-      <image class="ac-site-icon"/>
+-      <vbox class="ac-title" align="left">
+-        <description class="ac-text-overflow-container">
+-          <description class="ac-title-text"
+-                       data-l10n-id="autocomplete-import-learn-more"/>
+-        </description>
+-      </vbox>
+-      <hbox class="ac-separator" align="center">
+-        <description class="ac-separator-text" value="—"/>
+-      </hbox>
+-      <hbox class="ac-url" align="center">
+-        <description class="ac-text-overflow-container">
+-          <description class="ac-url-text"/>
+-        </description>
+-      </hbox>
+-    `;
+-    }
+-
+-    // Override to avoid clearing out fluent description.
+-    _setUpDescription() {}
+-  }
+-
+   class MozAutocompleteTwoLineRichlistitem extends MozElements.MozRichlistitem {
+     connectedCallback() {
+       if (this.delayConnectedCallback()) {
+@@ -644,23 +604,9 @@
+       this.textContent = "";
+       this.appendChild(this.constructor.fragment);
+       this.initializeAttributeInheritance();
+-      this.initializeSecondaryAction();
+       this._adjustAcItem();
+     }
+ 
+-    initializeSecondaryAction() {
+-      const button = this.querySelector(".ac-secondary-action");
+-
+-      if (this.onSecondaryAction) {
+-        button.addEventListener("mousedown", event => {
+-          event.stopPropagation();
+-          this.onSecondaryAction();
+-        });
+-      } else {
+-        button?.remove();
+-      }
+-    }
+-
+     static get inheritedAttributes() {
+       return {
+         // getLabelAt:
+@@ -679,7 +625,6 @@
+           <div class="label-row line1-label"></div>
+           <div class="label-row line2-label"></div>
+         </div>
+-        <button class="ac-secondary-action"></button>
+       </div>
+     `;
+     }
+@@ -699,28 +644,6 @@
+     handleOverUnderflow() {}
+   }
+ 
+-  class MozAutocompleteLoginRichlistitem extends MozAutocompleteTwoLineRichlistitem {
+-    connectedCallback() {
+-      super.connectedCallback();
+-      this.firstChild.classList.add("ac-login-item");
+-    }
+-
+-    onSecondaryAction() {
+-      const comment = JSON.parse(this.getAttribute("ac-comment"));
+-      LoginHelper.openPasswordManager(window, {
+-        loginGuid: comment?.guid,
+-      });
+-    }
+-
+-    static get inheritedAttributes() {
+-      return {
+-        // getLabelAt:
+-        ".line1-label": "text=ac-label",
+-        ".ac-site-icon": "src=ac-image",
+-      };
+-    }
+-  }
+-
+   // This type has an action that is triggered when activated. The comment
+   // for that result should contain a fillMessageName which is the message to send.
+   class MozAutocompleteActionRichlistitem extends MozAutocompleteTwoLineRichlistitem {
+@@ -776,97 +699,6 @@
+     }
+   }
+ 
+-  class MozAutocompleteGeneratedPasswordRichlistitem extends MozAutocompleteTwoLineRichlistitem {
+-    constructor() {
+-      super();
+-
+-      // Line 2 and line 3 both display text with a different line-height than
+-      // line 1 but we want the line-height to be the same so we wrap the text
+-      // in <span> and only adjust the line-height via font CSS properties on them.
+-      this.generatedPasswordText = document.createElement("span");
+-
+-      this.line3Text = document.createElement("span");
+-      this.line3 = document.createElement("div");
+-      this.line3.className = "label-row generated-password-autosave";
+-      this.line3.append(this.line3Text);
+-    }
+-
+-    get _autoSaveString() {
+-      if (!this.__autoSaveString) {
+-        let brandShorterName = Services.strings
+-          .createBundle("chrome://branding/locale/brand.properties")
+-          .GetStringFromName("brandShorterName");
+-        this.__autoSaveString = Services.strings
+-          .createBundle("chrome://passwordmgr/locale/passwordmgr.properties")
+-          .formatStringFromName("generatedPasswordWillBeSaved", [
+-            brandShorterName,
+-          ]);
+-      }
+-      return this.__autoSaveString;
+-    }
+-
+-    _adjustAcItem() {
+-      let { generatedPassword, willAutoSaveGeneratedPassword } = JSON.parse(
+-        this.getAttribute("ac-comment")
+-      );
+-      let line2Label = this.querySelector(".line2-label");
+-      line2Label.textContent = "";
+-      this.generatedPasswordText.textContent = generatedPassword;
+-      line2Label.append(this.generatedPasswordText);
+-
+-      if (willAutoSaveGeneratedPassword) {
+-        this.line3Text.textContent = this._autoSaveString;
+-        this.querySelector(".labels-wrapper").append(this.line3);
+-      } else {
+-        this.line3.remove();
+-      }
+-
+-      super._adjustAcItem();
+-    }
+-  }
+-
+-  class MozAutocompleteImportableLoginsRichlistitem extends MozAutocompleteTwoLineRichlistitem {
+-    constructor() {
+-      super();
+-      MozXULElement.insertFTLIfNeeded("toolkit/main-window/autocomplete.ftl");
+-    }
+-
+-    static get inheritedAttributes() {
+-      return {
+-        // getLabelAt:
+-        ".line1-label": "text=ac-label",
+-      };
+-    }
+-
+-    static get markup() {
+-      return `
+-      <div xmlns="http://www.w3.org/1999/xhtml"
+-           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+-           class="two-line-wrapper">
+-        <xul:image class="ac-site-icon" />
+-        <div class="labels-wrapper">
+-          <div class="label-row line1-label" data-l10n-name="line1" />
+-          <div class="label-row line2-label" data-l10n-name="line2" />
+-        </div>
+-      </div>
+-    `;
+-    }
+-
+-    _adjustAcItem() {
+-      super._adjustAcItem();
+-      document.l10n.setAttributes(
+-        this.querySelector(".labels-wrapper"),
+-        `autocomplete-import-logins-${this.getAttribute("ac-value")}`,
+-        {
+-          host: JSON.parse(this.getAttribute("ac-comment")).hostname.replace(
+-            /^www\./,
+-            ""
+-          ),
+-        }
+-      );
+-    }
+-  }
+-
+   customElements.define(
+     "autocomplete-richlistitem",
+     MozElements.MozAutocompleteRichlistitem,
+@@ -883,14 +715,6 @@
+     }
+   );
+ 
+-  customElements.define(
+-    "autocomplete-richlistitem-logins-footer",
+-    MozAutocompleteRichlistitemLoginsFooter,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+-
+   customElements.define(
+     "autocomplete-two-line-richlistitem",
+     MozAutocompleteTwoLineRichlistitem,
+@@ -907,14 +731,6 @@
+     }
+   );
+ 
+-  customElements.define(
+-    "autocomplete-login-richlistitem",
+-    MozAutocompleteLoginRichlistitem,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+-
+   customElements.define(
+     "autocomplete-action-richlistitem",
+     MozAutocompleteActionRichlistitem,
+@@ -922,28 +738,4 @@
+       extends: "richlistitem",
+     }
+   );
+-
+-  customElements.define(
+-    "autocomplete-generated-password-richlistitem",
+-    MozAutocompleteGeneratedPasswordRichlistitem,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+-
+-  customElements.define(
+-    "autocomplete-importable-learn-more-richlistitem",
+-    MozAutocompleteImportableLearnMoreRichlistitem,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+-
+-  customElements.define(
+-    "autocomplete-importable-logins-richlistitem",
+-    MozAutocompleteImportableLoginsRichlistitem,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+ }
+diff --git a/toolkit/modules/ActorManagerParent.sys.mjs b/toolkit/modules/ActorManagerParent.sys.mjs
+index eb0e46f5f3..b94a30c910 100644
+--- a/toolkit/modules/ActorManagerParent.sys.mjs
++++ b/toolkit/modules/ActorManagerParent.sys.mjs
+@@ -385,30 +385,6 @@ let JSWINDOWACTORS = {
+     allFrames: true,
+   },
+ 
+-  LoginManager: {
+-    parent: {
+-      esModuleURI: "resource://gre/modules/LoginManagerParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://gre/modules/LoginManagerChild.sys.mjs",
+-      events: {
+-        "form-submission-detected": { createActor: false },
+-        "before-form-submission": { createActor: false },
+-        DOMFormHasPassword: {},
+-        DOMPossibleUsernameInputAdded: {},
+-        DOMInputPasswordAdded: {},
+-      },
+-    },
+-
+-    allFrames: true,
+-    messageManagerGroups: [
+-      "browsers",
+-      "webext-browsers",
+-      "chatbot-browser",
+-      "",
+-    ],
+-  },
+-
+   ManifestMessages: {
+     child: {
+       esModuleURI: "resource://gre/modules/ManifestMessagesChild.sys.mjs",
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index 6f4f3250d1..54c467f0f9 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -929,18 +929,12 @@ export interface Modules {
+   "resource://gre/modules/LocationHelper.sys.mjs": typeof import("resource://gre/modules/LocationHelper.sys.mjs"),
+   "resource://gre/modules/Log.sys.mjs": typeof import("resource://gre/modules/Log.sys.mjs"),
+   "resource://gre/modules/LogManager.sys.mjs": typeof import("resource://gre/modules/LogManager.sys.mjs"),
+-  "resource://gre/modules/LoginAutoComplete.sys.mjs": typeof import("resource://gre/modules/LoginAutoComplete.sys.mjs"),
+   "resource://gre/modules/LoginCSVImport.sys.mjs": typeof import("resource://gre/modules/LoginCSVImport.sys.mjs"),
+   "resource://gre/modules/LoginExport.sys.mjs": typeof import("resource://gre/modules/LoginExport.sys.mjs"),
+   "resource://gre/modules/LoginHelper.sys.mjs": typeof import("resource://gre/modules/LoginHelper.sys.mjs"),
+   "resource://gre/modules/LoginManager.shared.sys.mjs": typeof import("resource://gre/modules/LoginManager.shared.sys.mjs"),
+   "resource://gre/modules/LoginManager.sys.mjs": typeof import("resource://gre/modules/LoginManager.sys.mjs"),
+-  "resource://gre/modules/LoginManagerChild.sys.mjs": typeof import("resource://gre/modules/LoginManagerChild.sys.mjs"),
+-  "resource://gre/modules/LoginManagerContextMenu.sys.mjs": typeof import("resource://gre/modules/LoginManagerContextMenu.sys.mjs"),
+-  "resource://gre/modules/LoginManagerParent.sys.mjs": typeof import("resource://gre/modules/LoginManagerParent.sys.mjs"),
+   "resource://gre/modules/LoginManagerPrompter.sys.mjs": typeof import("resource://gre/modules/LoginManagerPrompter.sys.mjs"),
+-  "resource://gre/modules/LoginRecipes.sys.mjs": typeof import("resource://gre/modules/LoginRecipes.sys.mjs"),
+-  "resource://gre/modules/LoginRelatedRealms.sys.mjs": typeof import("resource://gre/modules/LoginRelatedRealms.sys.mjs"),
+   "resource://gre/modules/LoginStore.sys.mjs": typeof import("resource://gre/modules/LoginStore.sys.mjs"),
+   "resource://gre/modules/Manifest.sys.mjs": typeof import("resource://gre/modules/Manifest.sys.mjs"),
+   "resource://gre/modules/ManifestFinder.sys.mjs": typeof import("resource://gre/modules/ManifestFinder.sys.mjs"),
+@@ -964,7 +958,6 @@ export interface Modules {
+   "resource://gre/modules/OsEnvironment.sys.mjs": typeof import("resource://gre/modules/OsEnvironment.sys.mjs"),
+   "resource://gre/modules/PageThumbUtils.sys.mjs": typeof import("resource://gre/modules/PageThumbUtils.sys.mjs"),
+   "resource://gre/modules/PageThumbs.sys.mjs": typeof import("resource://gre/modules/PageThumbs.sys.mjs"),
+-  "resource://gre/modules/PasswordRulesManager.sys.mjs": typeof import("resource://gre/modules/PasswordRulesManager.sys.mjs"),
+   "resource://gre/modules/PermissionsUtils.sys.mjs": typeof import("resource://gre/modules/PermissionsUtils.sys.mjs"),
+   "resource://gre/modules/PictureInPicture.sys.mjs": typeof import("resource://gre/modules/PictureInPicture.sys.mjs"),
+   "resource://gre/modules/PictureInPictureControls.sys.mjs": typeof import("resource://gre/modules/PictureInPictureControls.sys.mjs"),
+@@ -1044,7 +1037,6 @@ export interface Modules {
+   "resource://gre/modules/UsageReporting.sys.mjs": typeof import("resource://gre/modules/UsageReporting.sys.mjs"),
+   "resource://gre/modules/UserCharacteristicsPageService.sys.mjs": typeof import("resource://gre/modules/UserCharacteristicsPageService.sys.mjs"),
+   "resource://gre/modules/WPTEventsParent.sys.mjs": typeof import("resource://gre/modules/WPTEventsParent.sys.mjs"),
+-  "resource://gre/modules/WebAuthnFeature.sys.mjs": typeof import("resource://gre/modules/WebAuthnFeature.sys.mjs"),
+   "resource://gre/modules/WebChannel.sys.mjs": typeof import("resource://gre/modules/WebChannel.sys.mjs"),
+   "resource://gre/modules/WebNavigation.sys.mjs": typeof import("resource://gre/modules/WebNavigation.sys.mjs"),
+   "resource://gre/modules/WebNavigationFrames.sys.mjs": typeof import("resource://gre/modules/WebNavigationFrames.sys.mjs"),
+@@ -1119,10 +1111,7 @@ export interface Modules {
+   "resource://gre/modules/shared/FormAutofillUtils.sys.mjs": typeof import("resource://gre/modules/shared/FormAutofillUtils.sys.mjs"),
+   "resource://gre/modules/shared/FormStateManager.sys.mjs": typeof import("resource://gre/modules/shared/FormStateManager.sys.mjs"),
+   "resource://gre/modules/shared/LabelUtils.sys.mjs": typeof import("resource://gre/modules/shared/LabelUtils.sys.mjs"),
+-  "resource://gre/modules/shared/LoginFormFactory.sys.mjs": typeof import("resource://gre/modules/shared/LoginFormFactory.sys.mjs"),
+   "resource://gre/modules/shared/NewPasswordModel.sys.mjs": typeof import("resource://gre/modules/shared/NewPasswordModel.sys.mjs"),
+-  "resource://gre/modules/shared/PasswordGenerator.sys.mjs": typeof import("resource://gre/modules/shared/PasswordGenerator.sys.mjs"),
+-  "resource://gre/modules/shared/PasswordRulesParser.sys.mjs": typeof import("resource://gre/modules/shared/PasswordRulesParser.sys.mjs"),
+   "resource://gre/modules/shared/PhoneNumber.sys.mjs": typeof import("resource://gre/modules/shared/PhoneNumber.sys.mjs"),
+   "resource://gre/modules/shared/PhoneNumberNormalizer.sys.mjs": typeof import("resource://gre/modules/shared/PhoneNumberNormalizer.sys.mjs"),
+   "resource://gre/modules/storage-rust.sys.mjs": typeof import("resource://gre/modules/storage-rust.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 59c78671e8..0e21623e04 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -6184,9 +6184,6 @@
+       "resource://gre/modules/LogManager.sys.mjs": [
+         "../../../toolkit/modules/LogManager.sys.mjs"
+       ],
+-      "resource://gre/modules/LoginAutoComplete.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginAutoComplete.sys.mjs"
+-      ],
+       "resource://gre/modules/LoginCSVImport.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginCSVImport.sys.mjs"
+       ],
+@@ -6202,27 +6199,12 @@
+       "resource://gre/modules/LoginManager.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginManager.sys.mjs"
+       ],
+-      "resource://gre/modules/LoginManagerChild.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginManagerChild.sys.mjs"
+-      ],
+-      "resource://gre/modules/LoginManagerContextMenu.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginManagerContextMenu.sys.mjs"
+-      ],
+-      "resource://gre/modules/LoginManagerParent.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginManagerParent.sys.mjs"
+-      ],
+       "resource://gre/modules/LoginManagerPrompter.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginManagerPrompter.sys.mjs"
+       ],
+       "resource://gre/modules/LoginManagerRustMirror.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginManagerRustMirror.sys.mjs"
+       ],
+-      "resource://gre/modules/LoginRecipes.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginRecipes.sys.mjs"
+-      ],
+-      "resource://gre/modules/LoginRelatedRealms.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginRelatedRealms.sys.mjs"
+-      ],
+       "resource://gre/modules/LoginStore.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginStore.sys.mjs"
+       ],
+@@ -6295,9 +6277,6 @@
+       "resource://gre/modules/PageThumbs.sys.mjs": [
+         "../../../toolkit/components/thumbnails/PageThumbs.sys.mjs"
+       ],
+-      "resource://gre/modules/PasswordRulesManager.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/PasswordRulesManager.sys.mjs"
+-      ],
+       "resource://gre/modules/PermissionsUtils.sys.mjs": [
+         "../../../toolkit/modules/PermissionsUtils.sys.mjs"
+       ],
+@@ -6553,9 +6532,6 @@
+       "resource://gre/modules/WPTEventsParent.sys.mjs": [
+         "../../../toolkit/components/extensions/WPTEventsParent.sys.mjs"
+       ],
+-      "resource://gre/modules/WebAuthnFeature.sys.mjs": [
+-        "../../../toolkit/components/satchel/integrations/WebAuthnFeature.sys.mjs"
+-      ],
+       "resource://gre/modules/WebChannel.sys.mjs": [
+         "../../../toolkit/modules/WebChannel.sys.mjs"
+       ],
+@@ -6796,18 +6772,9 @@
+       "resource://gre/modules/shared/LabelUtils.sys.mjs": [
+         "../../../toolkit/components/formautofill/shared/LabelUtils.sys.mjs"
+       ],
+-      "resource://gre/modules/shared/LoginFormFactory.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/shared/LoginFormFactory.sys.mjs"
+-      ],
+       "resource://gre/modules/shared/NewPasswordModel.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/shared/NewPasswordModel.sys.mjs"
+       ],
+-      "resource://gre/modules/shared/PasswordGenerator.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/shared/PasswordGenerator.sys.mjs"
+-      ],
+-      "resource://gre/modules/shared/PasswordRulesParser.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/shared/PasswordRulesParser.sys.mjs"
+-      ],
+       "resource://gre/modules/shared/PhoneNumber.sys.mjs": [
+         "../../../toolkit/components/formautofill/shared/PhoneNumber.sys.mjs"
+       ],
+diff --git a/toolkit/components/passwordmgr/components.conf b/toolkit/components/passwordmgr/components.conf
+index 8768ff6..7f4c432 100644
+--- a/toolkit/components/passwordmgr/components.conf
++++ b/toolkit/components/passwordmgr/components.conf
+@@ -17,12 +17,6 @@ Classes = [
+         'esModule': 'resource://gre/modules/LoginManagerAuthPrompter.sys.mjs',
+         'constructor': 'LoginManagerAuthPromptFactory',
+     },
+-    {
+-        'cid': '{2bdac17c-53f1-4896-a521-682ccdeef3a8}',
+-        'contract_ids': ['@mozilla.org/login-manager/autocompletesearch;1'],
+-        'esModule': 'resource://gre/modules/LoginAutoComplete.sys.mjs',
+-        'constructor': 'LoginAutoComplete',
+-    },
+     {
+         'cid': '{8aa66d77-1bbb-45a6-991e-b8f47751c291}',
+         'contract_ids': ['@mozilla.org/login-manager/authprompter;1'],
+diff --git a/browser/components/extensions/test/browser/head.js b/browser/components/extensions/test/browser/head.js
+index 832113059a..9f030a3705 100644
+--- a/browser/components/extensions/test/browser/head.js
++++ b/browser/components/extensions/test/browser/head.js
+@@ -92,15 +92,6 @@ Services.prefs
+   .getDefaultBranch("browser.newtabpage.activity-stream.")
+   .setBoolPref("feeds.system.topsites", false);
+ 
+-{
+-  // Touch the recipeParentPromise lazy getter so we don't get
+-  // `this._recipeManager is undefined` errors during tests.
+-  const { LoginManagerParent } = ChromeUtils.importESModule(
+-    "resource://gre/modules/LoginManagerParent.sys.mjs"
+-  );
+-  void LoginManagerParent.recipeParentPromise;
+-}
+-
+ // Persistent Listener test functionality
+ const { assertPersistentListeners } = ExtensionTestUtils.testAssertions;
+ 

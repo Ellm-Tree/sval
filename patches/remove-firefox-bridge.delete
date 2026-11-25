@@ -1,0 +1,3 @@
+browser/modules/FirefoxBridgeExtensionUtils.sys.mjs
+browser/modules/test/unit/test_FirefoxBridgeExtensionUtils.js
+browser/modules/test/unit/test_FirefoxBridgeExtensionUtilsNativeManifest.js

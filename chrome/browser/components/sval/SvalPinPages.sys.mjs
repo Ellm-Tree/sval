@@ -7,9 +7,9 @@
  * A pin's page is a real tab of the window, marked (`SvalPinTab`) so no tree
  * node describes it and the tab observer leaves it alone, and hidden from
  * everything that walks the window's visible tabs (`gBrowser.hideTab`). A
- * hidden tab can still be the selected one, as Firefox View's is
- * (`FirefoxViewHandler`), so selecting a pin is selecting its tab and the
- * content area, toolbar and history work on it as on any tab.
+ * hidden tab can still be the selected one, so selecting a pin is selecting
+ * its tab and the content area, toolbar and history work on it as on any
+ * tab.
  *
  * A page belongs to its pin and to the workspace it was opened in, keyed by
  * both, so Gmail in Work and Gmail in Home are two pages in two jars. Which

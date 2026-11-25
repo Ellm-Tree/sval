@@ -134,11 +134,8 @@ function showHint(win, messageId) {
   );
 }
 
-/** Commands that open Firefox's import wizard; Sval's import page answers them. */
-const IMPORT_COMMANDS = [
-  "cmd_file_importFromAnotherBrowser",
-  "cmd_help_importFromAnotherBrowser",
-];
+/** File › Import's command, which Sval's import page answers. */
+const IMPORT_COMMANDS = ["cmd_file_importFromAnotherBrowser"];
 
 /**
  * The address a browser's page is saved under, as Firefox's own

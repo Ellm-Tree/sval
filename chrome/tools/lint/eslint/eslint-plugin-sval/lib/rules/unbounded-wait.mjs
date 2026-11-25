@@ -81,7 +81,6 @@ const EVENT_WAITS = {
     "waitForGlobalNotificationBar",
     "waitForLocationChange",
     "waitForMessage",
-    "waitForMigrationWizard",
     "waitForMutationCondition",
     "waitForNewTab",
     "waitForNewWindow",

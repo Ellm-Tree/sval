@@ -1,0 +1,204 @@
+Sval: Remove the Firefox Bridge
+
+The Firefox Bridge let Mozilla's extension for Chrome and Edge open links
+in Firefox through native messaging, by writing a native messaging
+manifest into Chrome's folders. It is off by default and Sval never
+turns it on. FirefoxBridgeExtensionUtils goes with its startup idle task,
+its profile migration, its prefs, its Nimbus feature and its tests.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 758277b0de..f9bc1b8bcd 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -2994,13 +2994,6 @@ pref("svg.context-properties.content.allowed-domains", "profile.accounts.firefox
+   pref("extensions.translations.disabled", true);
+ #endif
+ 
+-#if defined(XP_MACOSX) || defined(XP_WIN)
+-pref("browser.firefoxbridge.enabled", false);
+-pref("browser.firefoxbridge.extensionOrigins",
+-    "chrome-extension://gkcbmfjnnjoambnfmihmnkneakghogca/"
+-);
+-#endif
+-
+ // Turn on interaction measurements
+ pref("browser.places.interactions.enabled", true);
+ 
+diff --git a/browser/components/ProfileDataUpgrader.sys.mjs b/browser/components/ProfileDataUpgrader.sys.mjs
+index 904a9f8a58..4ff89080fc 100644
+--- a/browser/components/ProfileDataUpgrader.sys.mjs
++++ b/browser/components/ProfileDataUpgrader.sys.mjs
+@@ -9,8 +9,6 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+   FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+-  FirefoxBridgeExtensionUtils:
+-    "resource:///modules/FirefoxBridgeExtensionUtils.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   PlacesUIUtils: "moz-src:///browser/components/places/PlacesUIUtils.sys.mjs",
+   UsageReporting: "resource://gre/modules/UsageReporting.sys.mjs",
+@@ -672,41 +670,6 @@ export let ProfileDataUpgrader = {
+       }
+     }
+ 
+-    if (existingDataVersion < 145) {
+-      if (AppConstants.platform == "win") {
+-        // In Firefox 122, we enabled the firefox and firefox-private protocols.
+-        // We switched over to using firefox-bridge and firefox-private-bridge,
+-        // but we want to clean up the use of the other protocols.
+-        lazy.FirefoxBridgeExtensionUtils.maybeDeleteBridgeProtocolRegistryEntries(
+-          lazy.FirefoxBridgeExtensionUtils.OLD_PUBLIC_PROTOCOL,
+-          lazy.FirefoxBridgeExtensionUtils.OLD_PRIVATE_PROTOCOL
+-        );
+-
+-        // Clean up the old user prefs from FX 122
+-        Services.prefs.clearUserPref(
+-          "network.protocol-handler.external.firefox"
+-        );
+-        Services.prefs.clearUserPref(
+-          "network.protocol-handler.external.firefox-private"
+-        );
+-
+-        // In Firefox 126, we switched over to using native messaging so the
+-        // protocols are no longer necessary even in firefox-bridge and
+-        // firefox-private-bridge form
+-        lazy.FirefoxBridgeExtensionUtils.maybeDeleteBridgeProtocolRegistryEntries(
+-          lazy.FirefoxBridgeExtensionUtils.PUBLIC_PROTOCOL,
+-          lazy.FirefoxBridgeExtensionUtils.PRIVATE_PROTOCOL
+-        );
+-        Services.prefs.clearUserPref(
+-          "network.protocol-handler.external.firefox-bridge"
+-        );
+-        Services.prefs.clearUserPref(
+-          "network.protocol-handler.external.firefox-private-bridge"
+-        );
+-        Services.prefs.clearUserPref("browser.shell.customProtocolsRegistered");
+-      }
+-    }
+-
+     let hasRun146Migration = false;
+     if (existingDataVersion < 147) {
+       // Directly copy old os auth pref values prior to 147 to the new boolean
+diff --git a/browser/components/shell/StartupOSIntegration.sys.mjs b/browser/components/shell/StartupOSIntegration.sys.mjs
+index e04a28b567..37a484d927 100644
+--- a/browser/components/shell/StartupOSIntegration.sys.mjs
++++ b/browser/components/shell/StartupOSIntegration.sys.mjs
+@@ -16,15 +16,9 @@ const lazy = {};
+ 
+ XPCOMUtils.defineLazyServiceGetters(lazy, {
+   BrowserHandler: ["@mozilla.org/browser/clh;1", Ci.nsIBrowserHandler],
+-  profileService: [
+-    "@mozilla.org/toolkit/profile-service;1",
+-    Ci.nsIToolkitProfileService,
+-  ],
+ });
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  FirefoxBridgeExtensionUtils:
+-    "resource:///modules/FirefoxBridgeExtensionUtils.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   ShellService: "moz-src:///browser/components/shell/ShellService.sys.mjs",
+   WindowsGPOParser: "resource://gre/modules/policies/WindowsGPOParser.sys.mjs",
+@@ -131,9 +125,6 @@ export let StartupOSIntegration = {
+     // these individual calls are independent and can run without
+     // waiting for each other.
+ 
+-    // Currently we only support Firefox bridge on Windows and macOS.
+-    safeCall(() => this.ensureBridgeRegistered());
+-
+     if (AppConstants.platform == "win") {
+       if (Services.sysinfo.getProperty("hasWinPackageId")) {
+         safeCall(() => this.maybePinMSIXToStartMenu());
+@@ -142,20 +133,6 @@ export let StartupOSIntegration = {
+     }
+   },
+ 
+-  async ensureBridgeRegistered() {
+-    if (!Services.prefs.getBoolPref("browser.firefoxbridge.enabled", false)) {
+-      return;
+-    }
+-    let { defaultProfile, currentProfile } = lazy.profileService;
+-    if (defaultProfile && currentProfile == defaultProfile) {
+-      await lazy.FirefoxBridgeExtensionUtils.ensureRegistered();
+-    } else {
+-      lazy.log.debug(
+-        "FirefoxBridgeExtensionUtils failed to register due to non-default current profile."
+-      );
+-    }
+-  },
+-
+   // Silently pin Firefox to the start menu on first run when using MSIX on a
+   // new profile.
+   // If not first run, check if Firefox is no longer pinned to the Start Menu
+diff --git a/browser/modules/moz.build b/browser/modules/moz.build
+index 669f3702fb..e3f84cc148 100644
+--- a/browser/modules/moz.build
++++ b/browser/modules/moz.build
+@@ -5,12 +5,6 @@
+ with Files("**"):
+     BUG_COMPONENT = ("Firefox", "General")
+ 
+-with Files("FirefoxBridgeExtensionUtils.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Shell Integration")
+-
+-with Files("test/unit/test_FirefoxBridgeExtensionUtils.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Shell Integration")
+-
+ with Files("test/browser/*Telemetry*"):
+     BUG_COMPONENT = ("Toolkit", "Telemetry")
+ 
+@@ -110,7 +104,6 @@ EXTRA_JS_MODULES += [
+     "ExtensionsUI.sys.mjs",
+     "FaviconLoader.sys.mjs",
+     "FilterAdult.sys.mjs",
+-    "FirefoxBridgeExtensionUtils.sys.mjs",
+     "HomePage.sys.mjs",
+     "LinksCache.sys.mjs",
+     "PageActions.sys.mjs",
+diff --git a/browser/modules/test/unit/xpcshell.toml b/browser/modules/test/unit/xpcshell.toml
+index fab4476730..cff28ae2f1 100644
+--- a/browser/modules/test/unit/xpcshell.toml
++++ b/browser/modules/test/unit/xpcshell.toml
+@@ -13,17 +13,6 @@ tags = "os_integration"
+ ["test_FilterAdult.js"]
+ prefs = ["browser.newtabpage.activity-stream.filterAdult=true"]
+ 
+-["test_FirefoxBridgeExtensionUtils.js"]
+-run-if = [
+-  "os == 'win'", # Test of a Windows-specific feature
+-]
+-
+-["test_FirefoxBridgeExtensionUtilsNativeManifest.js"]
+-run-if = [
+-  "os == 'mac'",
+-  "os == 'win'",
+-]
+-
+ ["test_HomePage.js"]
+ 
+ ["test_HomePage_ignore.js"]
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 889e73d61b..82ab5c8fa1 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -998,20 +998,6 @@ moreFromMozilla:
+       fallbackPref: browser.preferences.moreFromMozilla.template
+       description: UI template used to display Mozilla products. Possible values simple, advanced. Default is simple.
+ 
+-firefoxBridge:
+-  description: "Controls for Firefox Bridge extension and extension registration"
+-  owner: install-update@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: browser.firefoxbridge.enabled
+-      description: >-
+-        Should Firefox Bridge be registered within firefoxBridgeNativeMessaging
+-        startup idle task for use with native messaging proxy.
+-
+ abouthomecache:
+   description: "The startup about:home cache."
+   owner: omc-core@mozilla.com, mconley@mozilla.com

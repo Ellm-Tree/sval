@@ -47,10 +47,10 @@ starting with the base (`aboutNetError.mjs`, `net-error-card.mjs`).
 | about:addons "Find more add-ons", search box, blocked and report links | `extensions.getAddons.*`, `extensions.abuseReport.amoFormURL`, `extensions.blocklist.addonItemURL` | Kept: addons.mozilla.org is where Sval's extensions come from |
 | Settings "Find more search engines" | `browser.search.searchEnginesURL` | Kept: addons.mozilla.org |
 | Settings and context menu "Download dictionaries" | `browser.dictionaries.download.url` | Kept: addons.mozilla.org |
-| about:protections and its "Learn more", Monitor, VPN and mobile links | `browser.contentblocking.report.*` | Removed: Sval does not build about:protections (`no-closed-about-pages.patch`) |
+| about:protections and its "Learn more", Monitor, VPN and mobile links | `browser.contentblocking.report.*` | Removed (`remove-about-protections.patch`) |
 | PDF viewer comment sidebar "Learn more" | `pdfjs.commentLearnMoreUrl` | Removed: empty URL drops the link |
 | PDF viewer alt-text "Learn more" | `pdfjs.altTextLearnMoreUrl` | Unused: pdf.js reads it only for its alt-text model, and `pdfjs.enableAltText` is locked off (`app-sval-prefs.js`) |
-| about:studies "Learn more" | `app.normandy.shieldLearnMoreUrl` | Removed: empty; studies are off |
+| about:studies "Learn more" | `app.normandy.shieldLearnMoreUrl` | Removed: Sval does not build Normandy (`remove-normandy.delete`) |
 | Data-collection notice | `toolkit.datacollection.infoURL` | Removed: empty; its settings group is hidden |
 | First-run privacy notice | `datareporting.policy.firstRunURL` | Never opened: data submission is off (`app-sval-prefs.js`) |
 | Settings "More from Mozilla", VPN promos, Relay, breach alerts, Firefox Accounts, send-tab and mobile promos | various | Removed by Sval's locked feature prefs (`app-sval-prefs.js`) |
@@ -87,7 +87,7 @@ goes wherever it still surfaces.
 | Vertical tabs, revamped sidebar, its Customize panel and open-tabs panel | `sidebar.verticalTabs`, `sidebar.revamp` locked off |
 | Tab groups, smart tab groups, hover previews | Off (`app-sval-prefs.js`) |
 | Split view | Kept, at upstream's default: the link menu's "Open Link in Split View", the address bar's split menu, each pane's footer and the `about:opentabs` picker work, and Sval keeps each split in its tree; the strip's own entry points are unreachable with the strip |
-| Firefox View: button, Tools menu item, about:firefoxview | Hidden: the button in `sval-panel.css`, the menu item in every macOS window's menu bar, the hidden window's included (`no-firefox-tab-menuitems.patch`); Sval does not build about:firefoxview (`no-closed-about-pages.patch`) |
+| Firefox View: button, Tools menu item, about:firefoxview | Removed (`remove-firefox-view.patch`) |
 | List-all-tabs button | Hidden in the customize palette (`sval-panel.css`); it cannot open while the strip is hidden |
 | History > Restore Previous Session, app menu copy | Hidden (`no-firefox-tab-menuitems.patch`, `sval-panel.css`) |
 | History > Recently Closed Tabs and Windows | Kept: Sval reopens closed tabs through it |

@@ -4,33 +4,22 @@
 "use strict";
 
 /**
- * Firefox's password manager and its address and card autofill are off, so
- * the user's own password manager is the only thing on a page that saves,
- * offers or fills (spec §7.3, decision 0078).
+ * Firefox's password manager is off and its address and card autofill is not
+ * built, so the user's own password manager is the only thing on a page that
+ * saves, offers or fills (spec §7.3, decision 0078).
  */
 
 const LOGIN_PAGE =
   "data:text/html,<form><input id=user name=username autocomplete=username>" +
   "<input id=pw type=password autocomplete=current-password></form>";
 
-add_task(async function firefoxs_password_manager_and_autofill_are_off() {
+add_task(async function firefoxs_password_manager_is_off() {
   for (const [name, value] of [
     ["signon.rememberSignons", false],
     ["signon.autofillForms", false],
     ["signon.generation.enabled", false],
-    ["browser.contextual-password-manager.enabled", false],
-    ["pref.privacy.disable_button.view_passwords", true],
-    ["extensions.formautofill.addresses.enabled", false],
-    ["extensions.formautofill.creditCards.enabled", false],
   ]) {
     Assert.equal(Services.prefs.getBoolPref(name), value, `${name}`);
-    Assert.ok(Services.prefs.prefIsLocked(name), `${name} is locked`);
-  }
-  for (const name of [
-    "extensions.formautofill.addresses.supported",
-    "extensions.formautofill.creditCards.supported",
-  ]) {
-    Assert.equal(Services.prefs.getStringPref(name), "off", `${name}`);
     Assert.ok(Services.prefs.prefIsLocked(name), `${name} is locked`);
   }
 });
@@ -41,7 +30,6 @@ add_task(async function settings_offer_no_passwords_addresses_or_cards() {
     async browser => {
       const win = browser.contentWindow;
       for (const id of [
-        "savePasswords",
         "managePasswordExceptions",
         "fillUsernameAndPasswords",
         "suggestStrongPasswords",
@@ -49,15 +37,16 @@ add_task(async function settings_offer_no_passwords_addresses_or_cards() {
         "manageSavedPasswords",
         "primaryPasswordNotSet",
         "primaryPasswordSet",
+        "breachAlerts",
         "saveAndFillAddresses",
         "savedAddressesButton",
         "saveAndFillPayments",
         "savedPaymentsButton",
         "requireOSAuthForPayments",
+        "savePasswords",
+        "relayIntegration",
       ]) {
-        const setting = win.Preferences.getSetting(id);
-        Assert.ok(setting, `${id} is a setting`);
-        Assert.ok(!setting.visible, `${id} is not shown`);
+        Assert.ok(!win.Preferences.getSetting(id), `${id} is not a setting`);
       }
     }
   );
@@ -82,7 +71,7 @@ add_task(async function a_login_form_has_no_password_manager_menu_items() {
           "use-relay-mask",
           "manage-saved-logins",
         ]) {
-          Assert.ok(document.getElementById(id).hidden, `${id} is hidden`);
+          Assert.ok(!document.getElementById(id), `the menu has no ${id}`);
         }
       } finally {
         const hidden = BrowserTestUtils.waitForEvent(menu, "popuphidden");

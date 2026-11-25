@@ -168,7 +168,6 @@ export const ICONS = Object.freeze({
   next: "icons/chevron-right.svg",
   "open-external": "icons/external-link.svg",
   link: "icons/link.svg",
-  payment: "icons/credit-card.svg",
   light: "icons/sun.svg",
   dark: "icons/moon.svg",
   spellcheck: "icons/spell-check.svg",
@@ -333,7 +332,6 @@ export const FIREFOX_ICONS = Object.freeze({
     16,
     true,
   ],
-  "chrome://browser/skin/payment-methods-16.svg": ["payment", 16, 16, true],
   "chrome://browser/skin/preferences/category-privacy-security.svg": [
     "privacy",
     20,

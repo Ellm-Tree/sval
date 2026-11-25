@@ -1,0 +1,630 @@
+Sval: Remove about:protections
+
+Sval never built about:protections, so its page, privacy metrics
+service, images and strings shipped for nothing, and the protections
+panel's dashboard button and Settings' dashboard link led to an error
+page. ContentBlockingPrefs, which tracking protection's settings and
+enterprise policy set their prefs through, stays.
+
+diff --git a/browser/actors/moz.build b/browser/actors/moz.build
+index 2f4615b4d3..fc7dc8aa2d 100644
+--- a/browser/actors/moz.build
++++ b/browser/actors/moz.build
+@@ -2,9 +2,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-with Files("AboutProtections*.sys.mjs"):
+-    BUG_COMPONENT = ("Firefox", "Protections UI")
+-
+ with Files("AboutReader*.sys.mjs"):
+     BUG_COMPONENT = ("Toolkit", "Reader Mode")
+ 
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 1b66c17f26..53cfbeb756 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -2106,23 +2106,6 @@ pref("browser.contentblocking.reject-and-isolate-cookies.preferences.ui.enabled"
+ // One value from each section must be included in the browser.contentblocking.features.strict pref.
+ pref("browser.contentblocking.features.strict", "tp,tpPrivate,cookieBehavior5,cookieBehaviorPBM5,cryptoTP,fp,stp,emailTP,emailTPPrivate,-consentmanagerSkip,-consentmanagerSkipPrivate,lvl2,rp,rpTop,qps,qpsPBM,fpp,fppPrivate,btp,lna");
+ 
+-// Enable Protections report's Lockwise card by default.
+-pref("browser.contentblocking.report.lockwise.enabled", true);
+-
+-// Disable rotections report's Monitor card by default. The new Monitor API does
+-// not support this feature as of now. See Bug 1815751.
+-pref("browser.contentblocking.report.monitor.enabled", false);
+-
+-// Enable Protections report's Privacy Metrics card on Nightly only.
+-#ifdef NIGHTLY_BUILD
+-  pref("browser.contentblocking.report.privacy_metrics.enabled", true);
+-#else
+-  pref("browser.contentblocking.report.privacy_metrics.enabled", false);
+-#endif
+-
+-// Disable the mobile promotion by default.
+-pref("browser.contentblocking.report.show_mobile_app", true);
+-
+ // Locales in which Send to Device emails are supported
+ // The most recent list of supported locales can be found at https://github.com/mozilla/bedrock/blob/6a08c876f65924651554decc57b849c00874b4e7/bedrock/settings/base.py#L963
+ pref("browser.send_to_device_locales", "de,en-GB,en-US,es-AR,es-CL,es-ES,es-MX,fr,id,pl,pt-BR,ru,zh-TW");
+@@ -2151,31 +2134,6 @@ pref("browser.promo.pin.enabled", true);
+ // Set to true for Fx113 (see bug 1808611)
+ pref("browser.promo.cookiebanners.enabled", false);
+ 
+-pref("browser.contentblocking.report.hide_vpn_banner", false);
+-pref("browser.contentblocking.report.vpn_sub_id", "sub_HrfCZF7VPHzZkA");
+-
+-pref("browser.contentblocking.report.monitor.url", "https://monitor.firefox.com/?entrypoint=protection_report_monitor&utm_source=about-protections");
+-pref("browser.contentblocking.report.monitor.how_it_works.url", "https://monitor.firefox.com/about");
+-pref("browser.contentblocking.report.monitor.sign_in_url", "https://monitor.firefox.com/oauth/init?entrypoint=protection_report_monitor&utm_source=about-protections&email=");
+-pref("browser.contentblocking.report.monitor.preferences_url", "https://monitor.firefox.com/user/preferences");
+-pref("browser.contentblocking.report.monitor.home_page_url", "https://monitor.firefox.com/user/dashboard");
+-pref("browser.contentblocking.report.manage_devices.url", "https://accounts.firefox.com/settings/clients");
+-pref("browser.contentblocking.report.endpoint_url", "https://monitor.firefox.com/user/breach-stats?includeResolved=true");
+-pref("browser.contentblocking.report.mobile-ios.url", "https://apps.apple.com/app/firefox-private-safe-browser/id989804926");
+-pref("browser.contentblocking.report.mobile-android.url", "https://play.google.com/store/apps/details?id=org.mozilla.firefox&referrer=utm_source%3Dprotection_report%26utm_content%3Dmobile_promotion");
+-pref("browser.contentblocking.report.vpn.url", "https://vpn.mozilla.org/?utm_source=firefox-browser&utm_medium=firefox-browser&utm_campaign=about-protections-card");
+-pref("browser.contentblocking.report.vpn-promo.url", "https://vpn.mozilla.org/?utm_source=firefox-browser&utm_medium=firefox-browser&utm_campaign=about-protections-top-promo");
+-pref("browser.contentblocking.report.vpn-android.url", "https://play.google.com/store/apps/details?id=org.mozilla.firefox.vpn&referrer=utm_source%3Dfirefox-browser%26utm_medium%3Dfirefox-browser%26utm_campaign%3Dabout-protections-mobile-vpn%26anid%3D--");
+-pref("browser.contentblocking.report.vpn-ios.url", "https://apps.apple.com/us/app/firefox-private-network-vpn/id1489407738");
+-
+-// Protection Report's SUMO urls
+-pref("browser.contentblocking.report.lockwise.how_it_works.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/password-manager-report");
+-pref("browser.contentblocking.report.social.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/social-media-tracking-report");
+-pref("browser.contentblocking.report.cookie.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/cross-site-tracking-report");
+-pref("browser.contentblocking.report.tracker.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/tracking-content-report");
+-pref("browser.contentblocking.report.fingerprinter.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/fingerprinters-report");
+-pref("browser.contentblocking.report.cryptominer.url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/cryptominers-report");
+-
+ pref("browser.contentblocking.cfr-milestone.enabled", true);
+ pref("browser.contentblocking.cfr-milestone.milestone-achieved", 0);
+ // Milestones should always be in increasing order
+diff --git a/browser/base/content/browser-siteProtections.js b/browser/base/content/browser-siteProtections.js
+index 8693df81ef..b343eded6b 100644
+--- a/browser/base/content/browser-siteProtections.js
++++ b/browser/base/content/browser-siteProtections.js
+@@ -1566,13 +1566,6 @@ var gProtectionsHandler = {
+       notBlockingWhy.addEventListener("mouseout", closeTooltip);
+       notBlockingWhy.addEventListener("blur", closeTooltip);
+ 
+-      document
+-        .getElementById(
+-          "protections-popup-trackers-blocked-counter-description"
+-        )
+-        .addEventListener("click", () =>
+-          gProtectionsHandler.openProtections(true)
+-        );
+       document
+         .getElementById("protections-popup-cookie-banner-switch")
+         .addEventListener("click", () =>
+@@ -1860,19 +1853,6 @@ var gProtectionsHandler = {
+     openPreferences("privacy-trackingprotection", { origin });
+   },
+ 
+-  openProtections(relatedToCurrent = false) {
+-    switchToTabHavingURI("about:protections", true, {
+-      replaceQueryString: true,
+-      relatedToCurrent,
+-      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+-    });
+-
+-    // Don't show the milestones section anymore.
+-    Services.prefs.clearUserPref(
+-      "browser.contentblocking.cfr-milestone.milestone-shown-time"
+-    );
+-  },
+-
+   async showTrackersSubview() {
+     await TrackingProtection.updateSubView();
+     this._protectionsPopupMultiView.showSubView(
+@@ -2294,14 +2274,6 @@ var gProtectionsHandler = {
+         gProtectionsHandler.openPreferences();
+         Glean.securityUiProtectionspopup.clickSettings.record();
+         break;
+-      case "protections-popup-show-report-button":
+-        gProtectionsHandler.openProtections(true);
+-        Glean.securityUiProtectionspopup.clickFullReport.record();
+-        break;
+-      case "protections-popup-milestones-content":
+-        gProtectionsHandler.openProtections(true);
+-        Glean.securityUiProtectionspopup.clickMilestoneMessage.record();
+-        break;
+       case "protections-popup-trackersView-settings-button":
+         gProtectionsHandler.openPreferences();
+         Glean.securityUiProtectionspopup.clickSubviewSettings.record({
+diff --git a/browser/base/content/test/protectionsUI/browser_protectionsUI.js b/browser/base/content/test/protectionsUI/browser_protectionsUI.js
+index c9d1144677..02952dfc7d 100644
+--- a/browser/base/content/test/protectionsUI/browser_protectionsUI.js
++++ b/browser/base/content/test/protectionsUI/browser_protectionsUI.js
+@@ -203,41 +203,6 @@ add_task(async function testTrackingProtectionLabel() {
+   BrowserTestUtils.removeTab(tab);
+ });
+ 
+-/**
+- * A test for the 'Show Full Report' button in the footer section.
+- */
+-add_task(async function testShowFullReportButton() {
+-  // Open a tab and its protection panel.
+-  let tab = await BrowserTestUtils.openNewForegroundTab(
+-    gBrowser,
+-    "https://example.com"
+-  );
+-  await openProtectionsPanel();
+-
+-  let popuphiddenPromise = BrowserTestUtils.waitForEvent(
+-    gProtectionsHandler._protectionsPopup,
+-    "popuphidden"
+-  );
+-  let newTabPromise = waitForAboutProtectionsTab();
+-  let showFullReportButton = document.getElementById(
+-    "protections-popup-show-report-button"
+-  );
+-
+-  showFullReportButton.click();
+-
+-  // The protection popup should be hidden after clicking the link.
+-  await popuphiddenPromise;
+-  // Wait until the 'about:protections' has been opened correctly.
+-  let newTab = await newTabPromise;
+-
+-  ok(true, "about:protections has been opened successfully");
+-
+-  checkClickTelemetry("full_report");
+-
+-  BrowserTestUtils.removeTab(newTab);
+-  BrowserTestUtils.removeTab(tab);
+-});
+-
+ function checkMiniPanel() {
+   // Check that only the header is displayed.
+   let mainView = document.getElementById("protections-popup-mainView");
+diff --git a/browser/base/content/test/protectionsUI/browser_protectionsUI_milestones.js b/browser/base/content/test/protectionsUI/browser_protectionsUI_milestones.js
+index 41b6310385..708918fab4 100644
+--- a/browser/base/content/test/protectionsUI/browser_protectionsUI_milestones.js
++++ b/browser/base/content/test/protectionsUI/browser_protectionsUI_milestones.js
+@@ -73,28 +73,6 @@ add_task(async function doTest() {
+       "Milestones section should still be visible in the panel."
+     );
+ 
+-    let newTabPromise = waitForAboutProtectionsTab();
+-    EventUtils.synthesizeMouseAtCenter(
+-      document.getElementById("protections-popup-milestones-content"),
+-      {}
+-    );
+-    let protectionsTab = await newTabPromise;
+-
+-    ok(true, "about:protections has been opened as expected.");
+-
+-    BrowserTestUtils.removeTab(protectionsTab);
+-
+-    await openProtectionsPanel();
+-
+-    ok(
+-      !BrowserTestUtils.isVisible(
+-        gProtectionsHandler._protectionsPopupMilestonesText
+-      ),
+-      "Milestones section should no longer be visible in the panel."
+-    );
+-
+-    checkClickTelemetry("milestone_message");
+-
+     await closeProtectionsPanel();
+   }
+ 
+diff --git a/browser/base/content/test/protectionsUI/head.js b/browser/base/content/test/protectionsUI/head.js
+index c6846cb676..2520f63263 100644
+--- a/browser/base/content/test/protectionsUI/head.js
++++ b/browser/base/content/test/protectionsUI/head.js
+@@ -159,25 +159,6 @@ async function addTrackerDataIntoDB(count) {
+   await db.close();
+ }
+ 
+-async function waitForAboutProtectionsTab() {
+-  let tab = await BrowserTestUtils.waitForNewTab(
+-    gBrowser,
+-    "about:protections",
+-    true
+-  );
+-
+-  // When the graph is built it means the messaging has finished,
+-  // we can close the tab.
+-  await SpecialPowers.spawn(tab.linkedBrowser, [], async function () {
+-    await ContentTaskUtils.waitForCondition(() => {
+-      let bars = content.document.querySelectorAll(".graph-bar");
+-      return bars.length;
+-    }, "The graph has been built");
+-  });
+-
+-  return tab;
+-}
+-
+ function waitForSecurityChange(numChanges = 1, win = null) {
+   if (!win) {
+     win = window;
+diff --git a/browser/base/content/test/static/head.js b/browser/base/content/test/static/head.js
+index 0f5c65b0b0..9c73bf3cd4 100644
+--- a/browser/base/content/test/static/head.js
++++ b/browser/base/content/test/static/head.js
+@@ -22,9 +22,6 @@ var { PerfTestHelpers } = ChromeUtils.importESModule(
+ );
+ 
+ const kESModuleList = new Set([
+-  /browser\/lockwise-card.js$/,
+-  /browser\/monitor-card.js$/,
+-  /browser\/vpn-card.js$/,
+   /toolkit\/content\/global\/certviewer\/components\/.*\.js$/,
+   /toolkit\/content\/global\/certviewer\/.*\.js$/,
+   /toolkit\/content\/global\/ml\/transformers.*\.js$/,
+diff --git a/browser/base/jar.mn b/browser/base/jar.mn
+index c51874965d..222ea5772c 100644
+--- a/browser/base/jar.mn
++++ b/browser/base/jar.mn
+@@ -12,16 +12,11 @@ browser.jar:
+         content/browser/aboutRestartRequired.xhtml    (content/aboutRestartRequired.xhtml)
+         content/browser/aboutRobots.js                (content/aboutRobots.js)
+         content/browser/aboutRobots.css               (content/aboutRobots.css)
+-        content/browser/logos/etp-mobile.svg          (content/logos/etp-mobile.svg)
+         content/browser/logos/fxa-logo.svg            (content/logos/fxa-logo.svg)
+-        content/browser/logos/lockwise.svg            (content/logos/lockwise.svg)
+         content/browser/logos/monitor.svg             (content/logos/monitor.svg)
+         content/browser/logos/passkey.svg             (content/logos/passkey.svg)
+         content/browser/logos/relay.svg               (content/logos/relay.svg)
+         content/browser/logos/send.svg                (content/logos/send.svg)
+-        content/browser/logos/tracking-protection-dark-theme.svg (content/logos/tracking-protection-dark-theme.svg)
+-        content/browser/logos/tracking-protection.svg (content/logos/tracking-protection.svg)
+-        content/browser/logos/vpn.svg                 (content/logos/vpn.svg)
+         content/browser/aboutRobots-icon.png          (content/aboutRobots-icon.png)
+         content/browser/aboutFrameCrashed.html        (content/aboutFrameCrashed.html)
+         content/browser/aboutTabCrashed.css           (content/aboutTabCrashed.css)
+diff --git a/browser/components/controlcenter/content/protectionsPanel.inc.xhtml b/browser/components/controlcenter/content/protectionsPanel.inc.xhtml
+index 61f2dab962..22c875c083 100644
+--- a/browser/components/controlcenter/content/protectionsPanel.inc.xhtml
++++ b/browser/components/controlcenter/content/protectionsPanel.inc.xhtml
+@@ -116,11 +116,6 @@
+           <label id="protections-popup-footer-protection-type-label" class="toolbarbutton-text"></label>
+         </toolbarbutton>
+         <stack id="protections-popup-show-report-stack">
+-          <toolbarbutton id="protections-popup-show-report-button"
+-                         class="subviewbutton protections-popup-footer-button">
+-            <image class="protections-popup-footer-icon protections-popup-show-report-icon"/>
+-            <label class="toolbarbutton-text protections-popup-footer-button-label" flex="1" data-l10n-id="protections-panel-protectionsdashboard-label"></label>
+-          </toolbarbutton>
+           <hbox id="protections-popup-trackers-blocked-counter-box"
+                 align="center">
+             <description id="protections-popup-trackers-blocked-counter-description"/>
+diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
+index bc8e5bd316..8fda0c02c0 100644
+--- a/browser/components/preferences/config/privacy.mjs
++++ b/browser/components/preferences/config/privacy.mjs
+@@ -1141,14 +1141,6 @@ SettingGroupManager.registerGroups({
+           },
+         ],
+       },
+-      {
+-        id: "protectionsDashboardLink",
+-        l10nId: "preferences-etp-status-protections-dashboard-link",
+-        control: "moz-box-link",
+-        controlAttrs: {
+-          href: "about:protections",
+-        },
+-      },
+     ],
+   },
+   etpBanner: {
+@@ -3229,10 +3221,6 @@ Preferences.addSetting({
+   },
+ });
+ 
+-Preferences.addSetting({
+-  id: "protectionsDashboardLink",
+-});
+-
+ Preferences.addSetting({
+   id: "etpBannerEl",
+ });
+diff --git a/browser/components/preferences/tests/etp/browser_etp_status.js b/browser/components/preferences/tests/etp/browser_etp_status.js
+index 0e6b25a6ba..1e7e6de486 100644
+--- a/browser/components/preferences/tests/etp/browser_etp_status.js
++++ b/browser/components/preferences/tests/etp/browser_etp_status.js
+@@ -74,39 +74,3 @@ add_task(async function test_status_categories() {
+ 
+   gBrowser.removeCurrentTab();
+ });
+-
+-// Test that the protections dashboard link in the ETP status section opens the about:protections page.
+-add_task(async function test_protections_dashboard_link() {
+-  await openPreferencesViaOpenPreferencesAPI("privacy", { leaveOpen: true });
+-  let doc = gBrowser.contentDocument;
+-
+-  let protectionsDashboardLink = doc.getElementById("protectionsDashboardLink");
+-
+-  Assert.ok(
+-    BrowserTestUtils.isVisible(protectionsDashboardLink),
+-    "Protections dashboard link is visible."
+-  );
+-
+-  let linkPromise = BrowserTestUtils.waitForNewTab(
+-    gBrowser,
+-    "about:protections"
+-  );
+-  protectionsDashboardLink.scrollIntoView();
+-  await BrowserTestUtils.synthesizeMouseAtCenter(
+-    "#protectionsDashboardLink",
+-    {},
+-    gBrowser.selectedBrowser
+-  );
+-  let tab = await linkPromise;
+-
+-  Assert.equal(
+-    tab.linkedBrowser.currentURI.spec,
+-    "about:protections",
+-    "Protections dashboard link opened the about:protections page."
+-  );
+-
+-  // about:protections tab.
+-  BrowserTestUtils.removeTab(tab);
+-  // Preferences tab.
+-  gBrowser.removeCurrentTab();
+-});
+diff --git a/browser/components/protections/moz.build b/browser/components/protections/moz.build
+index 0989e17e3e..9b1c6e3428 100644
+--- a/browser/components/protections/moz.build
++++ b/browser/components/protections/moz.build
+@@ -2,15 +2,8 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-BROWSER_CHROME_MANIFESTS += ["test/browser/browser.toml"]
+-
+-XPCSHELL_TESTS_MANIFESTS += ["test/xpcshell/xpcshell.toml"]
+-
+-JAR_MANIFESTS += ["jar.mn"]
+-
+ MOZ_SRC_FILES += [
+     "ContentBlockingPrefs.sys.mjs",
+-    "PrivacyMetricsService.sys.mjs",
+ ]
+ 
+ with Files("**"):
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 08c688c4c8..0598023b2a 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -2230,10 +2230,6 @@ preferences-etp-level-custom =
+ preferences-etp-status-advanced-button =
+     .label = Advanced settings
+ 
+-preferences-etp-status-protections-dashboard-link =
+-        .label = View your personalized protections dashboard
+-        .description = See how many sneaky trackers { -brand-short-name } has blocked for you, including social media trackers, fingerprinters, and cryptominers.
+-
+ preferences-etp-header =
+     .heading = Enhanced Tracking Protection
+ 
+diff --git a/browser/locales/en-US/browser/protectionsPanel.ftl b/browser/locales/en-US/browser/protectionsPanel.ftl
+index e16c3d73bf..39a6547c20 100644
+--- a/browser/locales/en-US/browser/protectionsPanel.ftl
++++ b/browser/locales/en-US/browser/protectionsPanel.ftl
+@@ -86,7 +86,6 @@ smartblock-placeholder-content-header = Content from blocked embed
+ ##
+ 
+ protections-panel-settings-label = Protection settings
+-protections-panel-protectionsdashboard-label = Protections dashboard
+ 
+ protections-panel-cross-site-tracking-cookies = These cookies follow you from site to site to gather data about what you do online. They are set by third parties such as advertisers and analytics companies.
+ protections-panel-cryptominers = Cryptominers use your system’s computing power to mine digital money. Cryptomining scripts drain your battery, slow down your computer, and can increase your energy bill.
+diff --git a/browser/themes/shared/controlcenter/panel.css b/browser/themes/shared/controlcenter/panel.css
+index 5cc691125e..091cdc3b86 100644
+--- a/browser/themes/shared/controlcenter/panel.css
++++ b/browser/themes/shared/controlcenter/panel.css
+@@ -363,17 +363,11 @@
+ 
+ /* CONTENT BLOCKING / TRACKING PROTECTION */
+ 
+-#protections-popup-not-blocking-section-why:hover,
+-#protections-popup-show-report-stack:hover > .protections-popup-footer-button {
++#protections-popup-not-blocking-section-why:hover {
+   color: var(--button-text-color-ghost-hover);
+   background-color: var(--button-background-color-ghost-hover);
+ }
+ 
+-#protections-popup-show-report-stack:hover:active > .protections-popup-footer-button {
+-  color: var(--button-text-color-ghost-active);
+-  background-color: var(--button-background-color-ghost-active);
+-}
+-
+ /* This subview could get filled with a lot of trackers, set a maximum size
+  * and allow it to scroll vertically.*/
+ #protections-popup-socialblockView,
+diff --git a/browser/themes/shared/jar.inc.mn b/browser/themes/shared/jar.inc.mn
+index e42e1880bb..a5ff35dd42 100644
+--- a/browser/themes/shared/jar.inc.mn
++++ b/browser/themes/shared/jar.inc.mn
+@@ -62,7 +62,6 @@
+   skin/classic/browser/addons/unified-extensions.css           (../shared/addons/unified-extensions.css)
+   skin/classic/browser/controlcenter/3rdpartycookies.svg       (../shared/controlcenter/3rdpartycookies.svg)
+   skin/classic/browser/controlcenter/cryptominers.svg          (../shared/controlcenter/cryptominers.svg)
+-  skin/classic/browser/controlcenter/dashboard.svg             (../shared/controlcenter/dashboard.svg)
+   skin/classic/browser/controlcenter/mcb-disabled.svg          (../shared/controlcenter/mcb-disabled.svg)
+   skin/classic/browser/controlcenter/etp-milestone.svg         (../shared/controlcenter/etp-milestone.svg)
+   skin/classic/browser/controlcenter/panel.css                 (../shared/controlcenter/panel.css)
+@@ -137,10 +136,6 @@
+ 
+   skin/classic/browser/toolbar-drag-indicator.svg                     (../shared/toolbar-drag-indicator.svg)
+ 
+-  skin/classic/browser/protections/resolved-breach.svg         (../shared/protections/resolved-breach.svg)
+-  skin/classic/browser/protections/resolved-breach-gray.svg    (../shared/protections/resolved-breach-gray.svg)
+-  skin/classic/browser/protections/breached-password.svg       (../shared/protections/breached-password.svg)
+-  skin/classic/browser/protections/new-feature.svg             (../shared/protections/new-feature.svg)
+ 
+   skin/classic/browser/preferences/android-menu.svg            (../shared/preferences/android-menu.svg)
+   skin/classic/browser/preferences/category-general.svg        (../shared/preferences/category-general.svg)
+diff --git a/dom/security/nsContentSecurityUtils.cpp b/dom/security/nsContentSecurityUtils.cpp
+index db155d4624..78c37466bc 100644
+--- a/dom/security/nsContentSecurityUtils.cpp
++++ b/dom/security/nsContentSecurityUtils.cpp
+@@ -1335,7 +1335,6 @@ static nsLiteralCString sImgSrcDataBlobAllowList[] = {
+     "about:preferences"_ns,
+     "about:privatebrowsing"_ns,
+     "about:processes"_ns,
+-    "about:protections"_ns,
+     "about:reader"_ns,
+     "about:sessionrestore"_ns,
+     "about:settings"_ns,
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index 317e2e56c7..05069e0a96 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -360,10 +360,6 @@ export default [
+       "browser/base/content/aboutRestartRequired.js",
+       "browser/base/content/aboutTabCrashed.js",
+       "browser/components/customkeys/content/customkeys.js",
+-      "browser/components/protections/content/lockwise-card.mjs",
+-      "browser/components/protections/content/monitor-card.mjs",
+-      "browser/components/protections/content/protections.mjs",
+-      "browser/components/protections/content/vpn-card.mjs",
+       "browser/components/shopping/content/settings.mjs",
+       "browser/components/shopping/content/shopping-container.mjs",
+       "browser/components/shopping/content/shopping-message-bar.mjs",
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 2d84d9b955..39a7dcd00f 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -312,7 +312,6 @@ export default [
+       "browser/components/originattributes/test/browser/**",
+       "browser/components/preferences/**",
+       "browser/components/privatebrowsing/**",
+-      "browser/components/protections/content/*card.mjs",
+       "browser/components/protocolhandler/WebProtocolHandlerRegistrar.sys.mjs",
+       "browser/components/resistfingerprinting/test/browser/head.js",
+       "browser/components/safebrowsing/content/test/**",
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 065f7170da..4f01fa547e 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -31,8 +31,6 @@ module.exports = [
+       "browser/components/preferences/widgets/placeholder-message/placeholder-message.css",
+       "browser/components/preferences/widgets/security-privacy/security-privacy-card/security-privacy-card.css",
+       "browser/components/preferences/widgets/sync-engine-list/sync-engines-list.css",
+-      "browser/components/protections/content/privacy-metrics-card.css",
+-      "browser/components/protections/content/protections.css",
+       "browser/components/screenshots/overlay/overlay.css",
+       "browser/components/screenshots/screenshots-buttons.css",
+       "browser/components/screenshots/screenshots-preview.css",
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 137878bb60..a5bc8ef214 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -119,7 +119,6 @@ firefox_desktop_metrics = [
+     "browser/components/migration/metrics.yaml",
+     "browser/components/places/metrics.yaml",
+     "browser/components/preferences/metrics.yaml",
+-    "browser/components/protections/metrics.yaml",
+     "browser/components/protocolhandler/metrics.yaml",
+     "browser/components/screenshots/metrics.yaml",
+     "browser/components/search/metrics.yaml",
+diff --git a/toolkit/modules/AsyncPrefs.sys.mjs b/toolkit/modules/AsyncPrefs.sys.mjs
+index e70dd47e9e..f8abd5caf4 100644
+--- a/toolkit/modules/AsyncPrefs.sys.mjs
++++ b/toolkit/modules/AsyncPrefs.sys.mjs
+@@ -11,9 +11,6 @@ const kPrivilegedAboutPrefs = new Set([
+   "testing.allowed-prefs.some-bool-pref",
+   "testing.allowed-prefs.some-char-pref",
+   "testing.allowed-prefs.some-int-pref",
+-
+-  "browser.contentblocking.report.hide_vpn_banner",
+-  "browser.contentblocking.report.show_mobile_app",
+ ]);
+ 
+ /**
+diff --git a/toolkit/modules/RemotePageAccessManager.sys.mjs b/toolkit/modules/RemotePageAccessManager.sys.mjs
+index 01641b4cec..222a1f5cbf 100644
+--- a/toolkit/modules/RemotePageAccessManager.sys.mjs
++++ b/toolkit/modules/RemotePageAccessManager.sys.mjs
+@@ -131,73 +131,6 @@ export let RemotePageAccessManager = {
+       RPMSendQuery: ["Browser:AddTRRExcludedDomain"],
+       RPMGetIntPref: ["network.trr.mode", "security.dialog_enable_delay"],
+     },
+-    "about:protections": {
+-      RPMSendAsyncMessage: [
+-        "OpenContentBlockingPreferences",
+-        "OpenAboutLogins",
+-        "OpenSyncPreferences",
+-        "ClearMonitorCache",
+-        "RecordEntryPoint",
+-      ],
+-      RPMSendQuery: [
+-        "FetchUserLoginsData",
+-        "FetchMonitorData",
+-        "FetchContentBlockingEvents",
+-        "FetchMobileDeviceConnected",
+-        "FetchEntryPoint",
+-        "FetchVPNSubStatus",
+-        "FetchShowVPNCard",
+-        "FetchPrivacyMetrics",
+-      ],
+-      RPMAddMessageListener: ["*"],
+-      RPMRemoveMessageListener: ["*"],
+-      RPMSetPref: [
+-        "browser.contentblocking.report.show_mobile_app",
+-        "browser.contentblocking.report.hide_vpn_banner",
+-      ],
+-      RPMGetBoolPref: [
+-        "browser.contentblocking.report.lockwise.enabled",
+-        "browser.contentblocking.report.monitor.enabled",
+-        "privacy.fingerprintingProtection",
+-        "privacy.socialtracking.block_cookies.enabled",
+-        "browser.contentblocking.report.privacy_metrics.enabled",
+-        "privacy.trackingprotection.cryptomining.enabled",
+-        "privacy.trackingprotection.fingerprinting.enabled",
+-        "privacy.trackingprotection.harmfuladdon.enabled",
+-        "privacy.trackingprotection.enabled",
+-        "privacy.trackingprotection.socialtracking.enabled",
+-        "browser.contentblocking.report.show_mobile_app",
+-        "browser.contentblocking.report.hide_vpn_banner",
+-        "browser.vpn_promo.enabled",
+-      ],
+-      RPMGetStringPref: [
+-        "browser.contentblocking.category",
+-        "browser.contentblocking.report.monitor.url",
+-        "browser.contentblocking.report.monitor.sign_in_url",
+-        "browser.contentblocking.report.manage_devices.url",
+-        "browser.contentblocking.report.lockwise.mobile-android.url",
+-        "browser.contentblocking.report.lockwise.mobile-ios.url",
+-        "browser.contentblocking.report.mobile-ios.url",
+-        "browser.contentblocking.report.mobile-android.url",
+-        "browser.contentblocking.report.vpn.url",
+-        "browser.contentblocking.report.vpn-promo.url",
+-        "browser.contentblocking.report.vpn-android.url",
+-        "browser.contentblocking.report.vpn-ios.url",
+-      ],
+-      RPMGetIntPref: ["network.cookie.cookieBehavior"],
+-      RPMGetFormatURLPref: [
+-        "browser.contentblocking.report.monitor.how_it_works.url",
+-        "browser.contentblocking.report.lockwise.how_it_works.url",
+-        "browser.contentblocking.report.monitor.preferences_url",
+-        "browser.contentblocking.report.monitor.home_page_url",
+-        "browser.contentblocking.report.social.url",
+-        "browser.contentblocking.report.cookie.url",
+-        "browser.contentblocking.report.tracker.url",
+-        "browser.contentblocking.report.fingerprinter.url",
+-        "browser.contentblocking.report.cryptominer.url",
+-      ],
+-      RPMRecordGleanEvent: ["securityUiProtections"],
+-    },
+     "about:restricted": {
+       RPMSendAsyncMessage: ["goBack"],
+       RPMGetBoolPref: ["security.restrict_to_adults.always"],
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index 6f96ff8cfc..af24216d16 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -328,7 +328,6 @@ export interface Modules {
+   "moz-src:///browser/components/places/PlacesUIUtils.sys.mjs": typeof import("moz-src:///browser/components/places/PlacesUIUtils.sys.mjs"),
+   "moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs": typeof import("moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs"),
+   "moz-src:///browser/components/protections/ContentBlockingPrefs.sys.mjs": typeof import("moz-src:///browser/components/protections/ContentBlockingPrefs.sys.mjs"),
+-  "moz-src:///browser/components/protections/PrivacyMetricsService.sys.mjs": typeof import("moz-src:///browser/components/protections/PrivacyMetricsService.sys.mjs"),
+   "moz-src:///browser/components/qrcode/QRCodeGenerator.sys.mjs": typeof import("moz-src:///browser/components/qrcode/QRCodeGenerator.sys.mjs"),
+   "moz-src:///browser/components/qrcode/QRCodeWorker.sys.mjs": typeof import("moz-src:///browser/components/qrcode/QRCodeWorker.sys.mjs"),
+   "moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs": typeof import("moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs"),

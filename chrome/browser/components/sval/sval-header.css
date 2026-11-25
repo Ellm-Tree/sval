@@ -2024,7 +2024,7 @@ panel[type="arrow"] {
 }
 
 .sval-battery-saver-tile::before {
-  background-image: url("chrome://browser/content/profiles/assets/20_leaf.svg");
+  background-image: url("chrome://browser/content/sval/battery-saver-leaf.svg");
   -moz-context-properties: fill, stroke;
   fill: transparent;
   stroke: var(--sval-accent);
@@ -2734,7 +2734,7 @@ split-view-footer {
 }
 
 #sval-battery-saver-button {
-  list-style-image: url("chrome://browser/content/profiles/assets/20_leaf.svg");
+  list-style-image: url("chrome://browser/content/sval/battery-saver-leaf.svg");
 
   > .toolbarbutton-icon {
     -moz-context-properties: fill, stroke;

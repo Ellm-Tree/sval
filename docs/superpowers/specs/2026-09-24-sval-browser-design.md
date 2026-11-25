@@ -2088,8 +2088,7 @@ a time:
   `anti-tracking-url-decoration`, `bounce-tracking-protection-exceptions`,
   `fingerprinting-protection-overrides`, `partitioning-exempt-urls`,
   `third-party-cookie-blocking-exempt-urls`, `cookie-banner-rules-list`,
-  `webcompat-interventions`, `hijack-blocklists`. Passwords: `password-rules`,
-  `password-recipes`, `websites-with-shared-credential-backends`. Translations:
+  `webcompat-interventions`, `hijack-blocklists`. Translations:
   `translations-models`, `translations-wasm`. Windows DRM: `mfcdm-origins-list`.
   Breach alerts: `fxmonitor-breaches`, the whole list, matched against the
   site on the device, and synced only while breach warnings are on (decision

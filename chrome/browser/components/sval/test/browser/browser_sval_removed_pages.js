@@ -59,7 +59,6 @@ const DOCUMENTS = [
   "chrome://browser/content/customkeys/customkeys.html",
   "chrome://browser/content/aboutwelcome/aboutwelcome.html",
   "chrome://browser/content/aboutWelcomeBack.xhtml",
-  "resource://normandy-content/about-studies/about-studies.html",
   "chrome://browser/content/asrouter/asrouter-admin.html",
   "chrome://browser/content/messagepreview/messagepreview.html",
   "chrome://browser/content/aiwindow/aiChatContent.html",
@@ -167,38 +166,6 @@ add_task(async function the_address_bar_offers_none_of_them() {
       await UrlbarTestUtils.promisePopupClose(window);
     }
   });
-});
-
-/**
- * Firefox's selectable profiles are off, so the File menu's Profiles menu
- * and Settings' profile controls, the ways to about:profilemanager and the
- * pages it opens, are hidden (`SelectableProfileService.isEnabled`).
- */
-add_task(async function no_menu_or_setting_leads_to_the_profile_pages() {
-  const { SelectableProfileService } = ChromeUtils.importESModule(
-    "resource:///modules/profiles/SelectableProfileService.sys.mjs"
-  );
-  Assert.ok(
-    !SelectableProfileService.isEnabled,
-    "Firefox's selectable profiles are off"
-  );
-  Assert.ok(
-    document.getElementById("profiles-menu").hidden,
-    "the File menu has no Profiles menu"
-  );
-  await BrowserTestUtils.withNewTab(
-    "about:preferences#privacy",
-    async browser => {
-      const { Preferences } = browser.contentWindow;
-      await TestUtils.waitForCondition(
-        () => Preferences.getSetting("preferencesPrivacyProfiles"),
-        "Settings registers its profile controls"
-      );
-      for (const id of ["profilesSettings", "preferencesPrivacyProfiles"]) {
-        Assert.ok(!Preferences.getSetting(id).visible, `Settings hides ${id}`);
-      }
-    }
-  );
 });
 
 /**

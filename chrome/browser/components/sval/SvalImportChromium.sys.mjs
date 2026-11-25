@@ -1052,8 +1052,8 @@ export async function countLogins(dir) {
  * directory. `MigrationUtils.getMigrator` hands out one shared instance that
  * caches its resources per profile, and those resources include a passwords
  * one built against the original `Login Data`; a fresh instance whose
- * password and payment resources are never built is the only way to be sure
- * no password store is opened (spec §7.3).
+ * password resource is never built is the only way to be sure no password
+ * store is opened (spec §7.3).
  *
  * @param {object} profile One of {@link findProfiles}'s results.
  * @returns {Promise<number>} URLs handed to Places, or 0 when the profile has
@@ -1081,8 +1081,8 @@ let ChromiumMigrator = null;
 
 /**
  * `ChromeProfileMigrator` reading one user data directory, with no password
- * or payment resource. Defined on first use, so reading a session does not
- * load Firefox's migration modules.
+ * resource. Defined on first use, so reading a session does not load
+ * Firefox's migration modules.
  *
  * @returns {Function} the class.
  */
@@ -1107,10 +1107,6 @@ function chromiumMigratorClass() {
     }
 
     async _GetPasswordsResource() {
-      return null;
-    }
-
-    async _GetPaymentMethodsResource() {
       return null;
     }
   };

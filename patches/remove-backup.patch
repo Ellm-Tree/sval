@@ -1,0 +1,1285 @@
+Sval: Remove Firefox's profile backup
+
+Firefox's backup archived a profile into a "Restore Firefox" folder and
+restored one from it. Sval keeps its data in one directory of its own
+and backs up its sync key itself, so the component goes whole: the
+service and its resources, its startup task, the Settings section that
+offered it on Windows and Linux, its actor, the BrowserDataBackup
+policy, the messaging targeting attributes that read it, its prefs,
+Nimbus feature, strings, metrics and tests.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index fee3639ee4..8804c4bcd1 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -3024,45 +3024,6 @@ pref("browser.mailto.dualPrompt.onLocationChange", false);
+ pref("browser.mailto.dualPrompt.dismissNotNowMinutes", 525600); // one year
+ pref("browser.mailto.dualPrompt.dismissXClickMinutes", 1440); // one day
+ 
+-// Pref to initialize the BackupService soon after startup.
+-pref("browser.backup.enabled", true);
+-// Pref to control whether scheduled backups run or not.
+-pref("browser.backup.scheduled.enabled", false);
+-
+-// Prefs to control visibility and usability of the create backup and restore from backup features.
+-#ifndef XP_MACOSX
+-  pref("browser.backup.archive.enabled", true);
+-  pref("browser.backup.restore.enabled", true);
+-#else
+-  pref("browser.backup.archive.enabled", false);
+-  pref("browser.backup.restore.enabled", false);
+-#endif
+-
+-// The number of SQLite database pages to backup per step.
+-pref("browser.backup.sqlite.pages_per_step", 50);
+-// The delay between SQLite database backup steps in milliseconds.
+-pref("browser.backup.sqlite.step_delay_ms", 50);
+-pref("browser.backup.scheduled.idle-threshold-seconds", 15);
+-pref("browser.backup.scheduled.minimum-time-between-backups-seconds", 86400);
+-pref("browser.backup.template.fallback-download.release", "https://www.firefox.com/?utm_medium=firefox-desktop&utm_source=html-backup");
+-pref("browser.backup.template.fallback-download.beta", "https://www.firefox.com/channel/desktop/?utm_medium=firefox-desktop&utm_source=html-backup");
+-pref("browser.backup.template.fallback-download.aurora", "https://www.firefox.com/channel/desktop/?utm_medium=firefox-desktop&utm_source=html-backup");
+-pref("browser.backup.template.fallback-download.nightly", "https://www.firefox.com/channel/desktop/?utm_medium=firefox-desktop&utm_source=html-backup");
+-pref("browser.backup.template.fallback-download.esr", " https://www.firefox.com/download/all/desktop-esr/?utm_medium=firefox-desktop&utm_source=html-backup");
+-pref("browser.backup.errorCode", 0);
+-pref("browser.backup.backup-retry-limit", 10);
+-pref("browser.backup.disabled-on-idle-backup-retry", false);
+-// Limit of number of unremovable staging directories and archives that are
+-// permitted before backup will stop making additional backups.  Unremovable
+-// staging directories/archives are ones that the file system prevents us from
+-// removing for any reason.
+-pref("browser.backup.max-num-unremovable-staging-items", 5);
+-pref("browser.backup.scheduled.user-disabled", false);
+-// How many milliseconds to wait for tab state to flush before continuing the
+-// backup process.
+-pref("browser.backup.tab-flush-timeout", 5000);
+-pref("browser.backup.enabled_on.profiles", "[]");
+-
+ // Pref to enable the new profiles
+ pref("browser.profiles.enabled", true);
+ pref("browser.profiles.profile-name.updated", false);
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index 07667d4014..d7673cdb0a 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -251,12 +251,6 @@ var allowlist = [
+   // toolkit/xre/MacRunFromDmgUtils.mm
+   { file: "resource://gre/localization/en-US/toolkit/global/run-from-dmg.ftl" },
+ 
+-  // Referenced programmatically
+-  { file: "chrome://browser/content/backup/BackupManifest.1.schema.json" },
+-  { file: "chrome://browser/content/backup/BackupManifest.2.schema.json" },
+-  { file: "chrome://browser/content/backup/ArchiveJSONBlock.1.schema.json" },
+-  { file: "chrome://browser/content/backup/ArchiveJSONBlock.2.schema.json" },
+-
+   // Bug 1733498 - Migrate necko errors l10n strings from .properties to Fluent
+   {
+     file: "resource://gre/localization/en-US/netwerk/necko.ftl",
+@@ -268,12 +262,6 @@ var allowlist = [
+   // A QA and dev debug tool.
+   { file: "chrome://browser/content/places/interactionsViewer.html" },
+ 
+-  // Bug 1984409: We're doing backups to cloud-synced locations first. We'll do local backups eventually,
+-  // and this file will be needed for that.
+-  {
+-    file: "resource://app/modules/backup/CookiesBackupResource.sys.mjs",
+-  },
+-
+   // Bug 2023223: Replace loginOrigin, addresses, payments, and form history
+   // richlist items with autocomplete-row-item
+   {
+@@ -286,14 +274,6 @@ var allowlist = [
+   { file: "chrome://global/skin/icons/shaft-arrow-right.svg" },
+ ];
+ 
+-if (AppConstants.NIGHTLY_BUILD) {
+-  allowlist.push(
+-    // A debug tool that is only available in Nightly builds, and is accessed
+-    // directly by developers via the chrome URI (bug 1888491)
+-    { file: "chrome://browser/content/backup/debug.html" }
+-  );
+-}
+-
+ if (AppConstants.platform != "win") {
+   // toolkit/mozapps/defaultagent/Notification.cpp
+   // toolkit/mozapps/defaultagent/ScheduledTask.cpp
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index bf49bdb743..184cc76897 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -9,7 +9,6 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+-  BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+   BrowserSearchTelemetry:
+     "moz-src:///browser/components/search/BrowserSearchTelemetry.sys.mjs",
+   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+@@ -1220,14 +1219,6 @@ BrowserGlue.prototype = {
+         },
+       },
+ 
+-      {
+-        name: "BackupService initialization",
+-        condition: Services.prefs.getBoolPref("browser.backup.enabled", false),
+-        task: () => {
+-          lazy.BackupService.init();
+-        },
+-      },
+-
+       {
+         name: "Init hasSSD for SystemInfo",
+         condition: AppConstants.platform == "win",
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 06fb89445a..591c98bd02 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -100,43 +100,6 @@ let JSWINDOWACTORS = {
+     remoteTypes: ["parent"],
+   },
+ 
+-  BackupUI: {
+-    parent: {
+-      esModuleURI: "resource:///actors/BackupUIParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/BackupUIChild.sys.mjs",
+-      events: {
+-        "BackupUI:InitWidget": { wantUntrusted: true },
+-        "BackupUI:TriggerCreateBackup": { wantUntrusted: true },
+-        "BackupUI:EnableScheduledBackups": { wantUntrusted: true },
+-        "BackupUI:DisableScheduledBackups": { wantUntrusted: true },
+-        "BackupUI:ShowFilepicker": { wantUntrusted: true },
+-        "BackupUI:GetBackupFileInfo": { wantUntrusted: true },
+-        "BackupUI:RestoreFromBackupFile": { wantUntrusted: true },
+-        "BackupUI:RestoreFromBackupChooseFile": { wantUntrusted: true },
+-        "BackupUI:EnableEncryption": { wantUntrusted: true },
+-        "BackupUI:DisableEncryption": { wantUntrusted: true },
+-        "BackupUI:ShowBackupLocation": { wantUntrusted: true },
+-        "BackupUI:SetEmbeddedComponentPersistentData": { wantUntrusted: true },
+-        "BackupUI:FlushEmbeddedComponentPersistentData": {
+-          wantUntrusted: true,
+-        },
+-        "BackupUI:ErrorBarDismissed": { wantUntrusted: true },
+-        "BackupUI:FindBackupsInWellKnownLocations": { wantUntrusted: true },
+-      },
+-    },
+-    includeChrome: true,
+-    allFrames: true,
+-    matches: [
+-      "about:preferences*",
+-      "about:settings*",
+-      "about:newtab*",
+-      "about:home*",
+-    ],
+-    remoteTypes: ["parent", "privilegedabout"],
+-  },
+-
+   BlockedSite: {
+     parent: {
+       esModuleURI: "resource:///actors/BlockedSiteParent.sys.mjs",
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index 1ddeb71b22..edd86068f4 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -50,7 +50,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+   AppProvidedConfigEngine:
+     "moz-src:///toolkit/components/search/ConfigSearchEngine.sys.mjs",
+-  BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+   BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+   ClientEnvironmentBase:
+@@ -404,25 +403,6 @@ export const QueryCache = {
+         },
+       }
+     ),
+-    backupsInfo: new CachedTargetingGetter(
+-      "findBackupsInWellKnownLocations",
+-      null,
+-      FRECENT_SITES_UPDATE_INTERVAL,
+-      {
+-        async findBackupsInWellKnownLocations() {
+-          let bs;
+-          try {
+-            bs = lazy.BackupService.get();
+-          } catch {
+-            bs = lazy.BackupService.init();
+-          }
+-          return bs.findBackupsInWellKnownLocations({
+-            validateFile: true,
+-            source: "onboarding",
+-          });
+-        },
+-      }
+-    ),
+     crashData: new CachedTargetingGetter(
+       "getCrashData",
+       null,
+@@ -1189,39 +1169,6 @@ const TargetingGetters = {
+     return parseInt(AppConstants.MOZ_BUILDID, 10);
+   },
+ 
+-  get backupsInfo() {
+-    return QueryCache.getters.backupsInfo.get().catch(() => null);
+-  },
+-
+-  get backupArchiveEnabled() {
+-    let bs;
+-    try {
+-      bs = lazy.BackupService.get();
+-    } catch {
+-      bs = lazy.BackupService.init();
+-    }
+-    return bs.archiveEnabledStatus.enabled;
+-  },
+-
+-  get backupRestoreEnabled() {
+-    let bs;
+-    try {
+-      bs = lazy.BackupService.get();
+-    } catch {
+-      bs = lazy.BackupService.init();
+-    }
+-    return bs.restoreEnabledStatus.enabled;
+-  },
+-
+-  get isEncryptedBackup() {
+-    const isEncryptedBackup =
+-      Services.prefs.getStringPref(
+-        "messaging-system-action.backupChooser",
+-        null
+-      ) === "full";
+-    return isEncryptedBackup;
+-  },
+-
+   get isPrivateWindow() {
+     let win = lazy.BrowserWindowTracker.getTopWindow({
+       allowFromInactiveWorkspace: true,
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index 92f7478575..8e53754b15 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -402,55 +402,6 @@ export var Policies = {
+     },
+   },
+ 
+-  BrowserDataBackup: {
+-    onBeforeUIStartup(manager, param) {
+-      if (typeof param === "boolean") {
+-        setAndLockPref("browser.backup.enabled", param);
+-        setAndLockPref("browser.backup.archive.enabled", param);
+-        setAndLockPref("browser.backup.restore.enabled", param);
+-      } else {
+-        const hasBackup = "AllowBackup" in param;
+-        const hasRestore = "AllowRestore" in param;
+-        let serviceValue;
+-
+-        if (hasBackup && hasRestore) {
+-          // both present but could be set to false
+-          serviceValue = param.AllowBackup || param.AllowRestore;
+-        } else if (hasBackup && param.AllowBackup) {
+-          // only AllowBackup is true
+-          serviceValue = true;
+-        } else if (hasRestore && param.AllowRestore) {
+-          // only AllowRestore is true
+-          serviceValue = true;
+-        }
+-
+-        if (serviceValue !== undefined) {
+-          PoliciesUtils.setDefaultPref(
+-            "browser.backup.enabled",
+-            serviceValue,
+-            true
+-          );
+-        }
+-
+-        if (hasBackup) {
+-          PoliciesUtils.setDefaultPref(
+-            "browser.backup.archive.enabled",
+-            param.AllowBackup,
+-            true
+-          );
+-        }
+-
+-        if (hasRestore) {
+-          PoliciesUtils.setDefaultPref(
+-            "browser.backup.restore.enabled",
+-            param.AllowRestore,
+-            true
+-          );
+-        }
+-      }
+-    },
+-  },
+-
+   CaptivePortal: {
+     onBeforeAddons(manager, param) {
+       setAndLockPref("network.captive-portal-service.enabled", param);
+diff --git a/browser/components/enterprisepolicies/content/aboutPolicies.js b/browser/components/enterprisepolicies/content/aboutPolicies.js
+index 4fabc34ef1..7b87430ec4 100644
+--- a/browser/components/enterprisepolicies/content/aboutPolicies.js
++++ b/browser/components/enterprisepolicies/content/aboutPolicies.js
+@@ -403,7 +403,6 @@ function generateDocumentation() {
+     SecurityDevices: "SecurityDevices2",
+     SkipTermsOfUse: "SkipTermsOfUse2",
+     WindowsSSO: "Windows10SSO",
+-    BrowserDataBackup: "Backup",
+   };
+   let deprecated_policies = ["DisablePocket"];
+ 
+diff --git a/browser/components/enterprisepolicies/schemas/policies-schema.json b/browser/components/enterprisepolicies/schemas/policies-schema.json
+index 95e1c1d386..47716e438b 100644
+--- a/browser/components/enterprisepolicies/schemas/policies-schema.json
++++ b/browser/components/enterprisepolicies/schemas/policies-schema.json
+@@ -167,18 +167,6 @@
+       }
+     },
+ 
+-    "BrowserDataBackup": {
+-      "type": ["boolean", "object"],
+-      "properties": {
+-        "AllowBackup": {
+-          "type": "boolean"
+-        },
+-        "AllowRestore": {
+-          "type": "boolean"
+-        }
+-      }
+-    },
+-
+     "CaptivePortal": {
+       "type": "boolean"
+     },
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index fefff76785..a4fc6ee9be 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -27,7 +27,6 @@ with Files("controlcenter/**"):
+ DIRS += [
+     "about",
+     "asrouter",
+-    "backup",
+     "contentanalysis",
+     "contextualidentity",
+     "controlcenter",
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index 68d1d128f7..f97eef269c 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -26,7 +26,6 @@ const XPCOMUtils = ChromeUtils.importESModule(
+   "resource://gre/modules/XPCOMUtils.sys.mjs"
+ ).XPCOMUtils;
+ const lazy = XPCOMUtils.declareLazy({
+-  BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+   Weave: "resource://services-sync/main.sys.mjs",
+   SelectableProfileService:
+     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+@@ -796,21 +795,6 @@ Preferences.addSetting({
+   visible: () => lazy.SelectableProfileService.initialized,
+ });
+ 
+-// Backup section
+-
+-Preferences.addSetting({
+-  id: "backupSettings",
+-  setup(emitChange) {
+-    Services.obs.addObserver(emitChange, "backup-service-status-updated");
+-    return () =>
+-      Services.obs.removeObserver(emitChange, "backup-service-status-updated");
+-  },
+-  visible: () => {
+-    let bs = lazy.BackupService.init();
+-    return bs.archiveEnabledStatus.enabled || bs.restoreEnabledStatus.enabled;
+-  },
+-});
+-
+ let accountsEnabled = Services.prefs.getBoolPref("identity.fxaccounts.enabled");
+ 
+ SettingGroupManager.registerGroups({
+@@ -1117,19 +1101,6 @@ SettingGroupManager.registerGroups({
+       },
+     ],
+   },
+-  backup: {
+-    l10nId: "settings-data-backup-header2",
+-    headingLevel: 2,
+-    supportPage: "firefox-backup",
+-    iconSrc: "chrome://global/skin/icons/reload.svg",
+-    subcategory: "backup",
+-    items: [
+-      {
+-        id: "backupSettings",
+-        control: "backup-settings",
+-      },
+-    ],
+-  },
+ });
+ 
+ document.addEventListener(
+diff --git a/browser/components/preferences/config/permissions-data.mjs b/browser/components/preferences/config/permissions-data.mjs
+index 9421b42dde..ee64e6cbff 100644
+--- a/browser/components/preferences/config/permissions-data.mjs
++++ b/browser/components/preferences/config/permissions-data.mjs
+@@ -29,8 +29,6 @@ const lazy = XPCOMUtils.declareLazy({
+ 
+ export const PRIVACY_SEGMENTATION_PREF =
+   "browser.privacySegmentation.preferences.show";
+-const BACKUP_ENABLED_ON_PROFILES_PREF_NAME =
+-  "browser.backup.enabled_on.profiles";
+ const PREF_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
+ const PREF_ADDON_RECOMMENDATIONS_ENABLED = "browser.discovery.enabled";
+ const PREF_OPT_OUT_STUDIES_ENABLED = "app.shield.optoutstudies.enabled";
+@@ -49,7 +47,6 @@ Preferences.addAll([
+   // Add-ons, malware, phishing
+   { id: "xpinstall.whitelist.required", type: "bool" },
+   { id: PRIVACY_SEGMENTATION_PREF, type: "bool" },
+-  { id: BACKUP_ENABLED_ON_PROFILES_PREF_NAME, type: "string" },
+ 
+   // Data Choices tab
+   { id: "browser.crashReports.unsubmittedCheck.autoSubmit2", type: "bool" },
+@@ -339,10 +336,6 @@ Preferences.addSetting({
+     return !deps.submitHealthReportBox.value;
+   },
+ });
+-Preferences.addSetting({
+-  id: "profilesBackupEnabled",
+-  pref: BACKUP_ENABLED_ON_PROFILES_PREF_NAME,
+-});
+ Preferences.addSetting({
+   id: "submitHealthReportBox",
+   pref: PREF_UPLOAD_ENABLED,
+@@ -402,64 +395,6 @@ Preferences.addSetting({
+   visible: () =>
+     lazy.AppConstants.MOZ_DATA_REPORTING && lazy.AppConstants.MOZ_CRASHREPORTER,
+ });
+-Preferences.addSetting(
+-  /** @type {{ _originalStateOfDataCollectionPrefs: Map<string, any>} & SettingConfig} */ ({
+-    id: "backup-multi-profile-warning-message-bar",
+-    _originalStateOfDataCollectionPrefs: new Map(),
+-    deps: [
+-      "addonRecommendationEnabled",
+-      "optOutStudiesEnabled",
+-      "submitHealthReportBox",
+-      "submitUsagePingBox",
+-      "automaticallySubmitCrashesBox",
+-      "profilesBackupEnabled",
+-    ],
+-    setup(emitChange, dataCollectionPrefDeps) {
+-      for (let pref in dataCollectionPrefDeps) {
+-        const value = dataCollectionPrefDeps[pref].value;
+-        this._originalStateOfDataCollectionPrefs.set(pref, value);
+-      }
+-      emitChange();
+-    },
+-    visible(dataCollectionPrefDeps) {
+-      const { currentProfile } = lazy.SelectableProfileService;
+-      if (!currentProfile) {
+-        return false;
+-      }
+-      let anyPrefChanged = false;
+-      for (let pref in dataCollectionPrefDeps) {
+-        if (pref === "profilesBackupEnabled") {
+-          continue;
+-        }
+-        const originalValue =
+-          this._originalStateOfDataCollectionPrefs.get(pref);
+-        const updatedValue = dataCollectionPrefDeps[pref].value;
+-        if (updatedValue !== originalValue) {
+-          anyPrefChanged = true;
+-          break;
+-        }
+-      }
+-
+-      const profilesBackupEnabledValue = /** @type {string} */ (
+-        dataCollectionPrefDeps.profilesBackupEnabled.value
+-      );
+-      let profilesEnabledOn;
+-      try {
+-        let parsed = JSON.parse(profilesBackupEnabledValue || "[]");
+-        // The pref may still be in the legacy object format
+-        // ({profileId: true, ...}) that BackupService migrates on read.
+-        profilesEnabledOn = Array.isArray(parsed)
+-          ? parsed
+-          : Object.keys(parsed);
+-      } catch {
+-        profilesEnabledOn = [];
+-      }
+-      let currentId = currentProfile.id;
+-      let otherProfilesEnabled = profilesEnabledOn.some(id => id != currentId);
+-      return otherProfilesEnabled && anyPrefChanged;
+-    },
+-  })
+-);
+ 
+ SettingGroupManager.registerGroups({
+   permissions: {
+@@ -662,14 +597,6 @@ SettingGroupManager.registerGroups({
+               role: "status",
+             },
+           },
+-          {
+-            id: "backup-multi-profile-warning-message-bar",
+-            control: "moz-message-bar",
+-            l10nId: "backup-multi-profile-warning-message",
+-            controlAttrs: {
+-              dismissable: true,
+-            },
+-          },
+           {
+             id: "submitHealthReportBox",
+             supportPage: "technical-and-interaction-data",
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index 0f744fdf6e..87b6703c37 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -384,7 +384,6 @@ const CONFIG_PANES = Object.freeze({
+       "media",
+       "performance",
+       "profiles",
+-      "backup",
+     ],
+     module: "chrome://browser/content/preferences/config/account-sync.mjs",
+     replaces: "sync",
+diff --git a/browser/components/preferences/preferences.xhtml b/browser/components/preferences/preferences.xhtml
+index 1ec6365eba..d7c1ee2bc8 100644
+--- a/browser/components/preferences/preferences.xhtml
++++ b/browser/components/preferences/preferences.xhtml
+@@ -53,7 +53,6 @@
+ 
+   <!-- Links below are only used for search-l10n-ids into subdialogs -->
+   <link rel="localization" href="browser/aboutDialog.ftl"/>
+-  <link rel="localization" href="browser/backupSettings.ftl"/>
+   <link rel="localization" href="browser/search.ftl"/>
+   <link rel="localization" href="browser/preferences/clearSiteData.ftl"/>
+   <link rel="localization" href="browser/preferences/colors.ftl"/>
+@@ -78,7 +77,6 @@
+   <script src="chrome://browser/content/preferences/extensionControlled.js"/>
+   <script src="chrome://browser/content/preferences/findInPage.js"/>
+   <script src="chrome://browser/content/migration/migration-wizard.mjs" type="module"></script>
+-  <script type="module" src="chrome://browser/content/backup/backup-settings.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/dialog-button.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/placeholder-message.mjs"></script>
+   <script type="module" src="chrome://browser/content/preferences/widgets/browser-language-restart-message.mjs"></script>
+diff --git a/browser/components/preferences/privacy.js b/browser/components/preferences/privacy.js
+index d9b1a4ae76..93661cf253 100644
+--- a/browser/components/preferences/privacy.js
++++ b/browser/components/preferences/privacy.js
+@@ -65,8 +65,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+ ChromeUtils.defineESModuleGetters(this, {
+   AppUpdater: "resource://gre/modules/AppUpdater.sys.mjs",
+   DoHConfigController: "moz-src:///toolkit/components/doh/DoHConfig.sys.mjs",
+-  PreferencesBackupResource:
+-    "resource:///modules/backup/PreferencesBackupResource.sys.mjs",
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+   SelectableProfileService:
+     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+diff --git a/browser/components/preferences/sync.inc.xhtml b/browser/components/preferences/sync.inc.xhtml
+index e5b0c7024d..8b97872087 100644
+--- a/browser/components/preferences/sync.inc.xhtml
++++ b/browser/components/preferences/sync.inc.xhtml
+@@ -241,7 +241,4 @@
+ </deck>
+ 
+ 
+-<!-- Firefox Backup -->
+-<html:setting-group groupid="backup" hidden="true" data-category="paneSync" data-subcategory="backup" data-srd-migrated="" />
+-
+ </html:template>
+diff --git a/browser/components/preferences/sync.js b/browser/components/preferences/sync.js
+index acef50b2a3..f95013ddbd 100644
+--- a/browser/components/preferences/sync.js
++++ b/browser/components/preferences/sync.js
+@@ -24,9 +24,6 @@ const FXA_LOGIN_FAILED = 2;
+ const SYNC_DISCONNECTED = 0;
+ const SYNC_CONNECTED = 1;
+ 
+-const BACKUP_ARCHIVE_ENABLED_PREF_NAME = "browser.backup.archive.enabled";
+-const BACKUP_RESTORE_ENABLED_PREF_NAME = "browser.backup.restore.enabled";
+-
+ var gSyncPane = {
+   get page() {
+     return document.getElementById("weavePrefsDeck").selectedIndex;
+@@ -98,8 +95,6 @@ var gSyncPane = {
+   },
+ 
+   _init() {
+-    initSettingGroup("backup");
+-
+     Weave.Svc.Obs.add(UIState.ON_UPDATE, this.updateWeavePrefs, this);
+ 
+     window.addEventListener("unload", () => {
+diff --git a/browser/components/preferences/tests/browser-srd.toml b/browser/components/preferences/tests/browser-srd.toml
+index 5525270f5f..4f007559b5 100644
+--- a/browser/components/preferences/tests/browser-srd.toml
++++ b/browser/components/preferences/tests/browser-srd.toml
+@@ -2,8 +2,6 @@
+ dupe-manifest = true
+ prefs = [
+   "signon.management.page.os-auth.enabled=true",
+-  "browser.backup.archive.enabled=false",
+-  "browser.backup.restore.enabled=false",
+   "browser.settings-redesign.enabled=true",
+   "extensions.getAddons.langpacks.url=https://mochi.test:8000/langpacks",
+ ]
+@@ -23,10 +21,6 @@ tags = "os_integration"
+ 
+ ["browser_appearance_pane.js"]
+ 
+-["browser_backup_visibility.js"]
+-
+-["browser_backup_warning_banner.js"]
+-
+ ["browser_bug1018066_resetScrollPosition.js"]
+ 
+ ["browser_bug1020245_openPreferences_to_paneContent.js"]
+diff --git a/browser/components/preferences/tests/browser.toml b/browser/components/preferences/tests/browser.toml
+index 62e7c2e589..f7154d79cc 100644
+--- a/browser/components/preferences/tests/browser.toml
++++ b/browser/components/preferences/tests/browser.toml
+@@ -2,8 +2,6 @@
+ dupe-manifest = true
+ prefs = [
+   "signon.management.page.os-auth.enabled=true",
+-  "browser.backup.archive.enabled=false",
+-  "browser.backup.restore.enabled=false",
+   "browser.settings-redesign.enabled=false",
+ ]
+ support-files = [
+@@ -23,10 +21,6 @@ run-if = ["updater"]
+ 
+ ["browser_appearance_pane_xul.js"]
+ 
+-["browser_backup_visibility.js"]
+-
+-["browser_backup_warning_banner.js"]
+-
+ ["browser_bug731866.js"]
+ 
+ ["browser_bug795764_cachedisabled.js"]
+diff --git a/browser/components/preferences/tests/browser_bug731866.js b/browser/components/preferences/tests/browser_bug731866.js
+index 7055da0bd3..86de2e2d8f 100644
+--- a/browser/components/preferences/tests/browser_bug731866.js
++++ b/browser/components/preferences/tests/browser_bug731866.js
+@@ -4,10 +4,6 @@
+ const browserContainersGroupDisabled = !SpecialPowers.getBoolPref(
+   "privacy.userContext.ui.enabled"
+ );
+-const backupSectionDisabled = !(
+-  SpecialPowers.getBoolPref("browser.backup.archive.enabled") ||
+-  SpecialPowers.getBoolPref("browser.backup.restore.enabled")
+-);
+ const profilesGroupDisabled = !SelectableProfileService.isEnabled;
+ const updatePrefContainers = ["updatesCategory", "updateApp"];
+ const updateContainersGroupDisabled =
+@@ -50,15 +46,6 @@ function checkElements(expectedPane) {
+       continue;
+     }
+ 
+-    // Backup is currently disabled by default. (bug 1895791)
+-    if (
+-      (element.id == "dataBackupGroup" || element.id == "backupCategory") &&
+-      backupSectionDisabled
+-    ) {
+-      is_element_hidden(element, "Disabled dataBackupSection should be hidden");
+-      continue;
+-    }
+-
+     // Profiles is only enabled in Nightly by default (bug 1947633)
+     if (element.id === "profilesGroup" && profilesGroupDisabled) {
+       is_element_hidden(element, "Disabled profilesGroup should be hidden");
+diff --git a/browser/components/preferences/tests/privacy/browser-srd.toml b/browser/components/preferences/tests/privacy/browser-srd.toml
+index 95efb4ff1f..5d6562be51 100644
+--- a/browser/components/preferences/tests/privacy/browser-srd.toml
++++ b/browser/components/preferences/tests/privacy/browser-srd.toml
+@@ -2,11 +2,6 @@
+ dupe-manifest = true
+ prefs = [
+   "browser.settings-redesign.enabled=true",
+-  # Push BackupService idle observer past test runtime; otherwise
+-  # takeMeasurements -> PathUtils.join throws on empty
+-  # DEFAULT_PARENT_DIR_PATH in headless test environments, surfacing
+-  # an unhandled rejection in whatever test happens to be running.
+-  "browser.backup.scheduled.idle-threshold-seconds=86400",
+ ]
+ support-files = [
+   "head.js",
+diff --git a/browser/components/preferences/tests/privacy/browser.toml b/browser/components/preferences/tests/privacy/browser.toml
+index 2badde04de..dfd6c4beac 100644
+--- a/browser/components/preferences/tests/privacy/browser.toml
++++ b/browser/components/preferences/tests/privacy/browser.toml
+@@ -2,11 +2,6 @@
+ dupe-manifest = true
+ prefs = [
+   "browser.settings-redesign.enabled=false",
+-  # Push BackupService idle observer past test runtime; otherwise
+-  # takeMeasurements -> PathUtils.join throws on empty
+-  # DEFAULT_PARENT_DIR_PATH in headless test environments, surfacing
+-  # an unhandled rejection in whatever test happens to be running.
+-  "browser.backup.scheduled.idle-threshold-seconds=86400",
+ ]
+ support-files = [
+   "head.js",
+diff --git a/browser/components/preferences/tests/searchResults/browser-srd.toml b/browser/components/preferences/tests/searchResults/browser-srd.toml
+index e9c14f07bd..1a6f4b1dfb 100644
+--- a/browser/components/preferences/tests/searchResults/browser-srd.toml
++++ b/browser/components/preferences/tests/searchResults/browser-srd.toml
+@@ -8,8 +8,6 @@ support-files = [
+ ]
+ tags = "os_integration"
+ 
+-["browser_search_backup_multi_profile_legacy_pref.js"]
+-
+ ["browser_search_category_filter.js"]
+ 
+ ["browser_search_no_results_change_category.js"]
+diff --git a/browser/components/preferences/tests/searchResults/browser_search_overlapping_ranges.js b/browser/components/preferences/tests/searchResults/browser_search_overlapping_ranges.js
+index d79d0dba3c..e21b7e2108 100644
+--- a/browser/components/preferences/tests/searchResults/browser_search_overlapping_ranges.js
++++ b/browser/components/preferences/tests/searchResults/browser_search_overlapping_ranges.js
+@@ -87,119 +87,6 @@ add_task(async function overlapping_searches_produce_correct_range_count() {
+   BrowserTestUtils.removeTab(gBrowser.selectedTab);
+ });
+ 
+-const GROUP_SELECTOR =
+-  "setting-group:not([data-hidden-from-search]):not([hidden]):not([data-hidden-by-setting-group])";
+-
+-function findPane(doc, paneName) {
+-  return [
+-    ...doc.getElementById("mainPrefPane").querySelectorAll("setting-pane"),
+-  ].find(p => p.name === paneName);
+-}
+-
+-function visibleGroupIds(doc, paneName) {
+-  let pane = findPane(doc, paneName);
+-  return [...pane.querySelectorAll(GROUP_SELECTOR)]
+-    .filter(g => !g.classList.contains("visually-hidden"))
+-    .map(g => g.getAttribute("groupid"))
+-    .sort();
+-}
+-
+-function searchableGroupCount(doc, paneName) {
+-  return findPane(doc, paneName).querySelectorAll(GROUP_SELECTOR).length;
+-}
+-
+-// Bug 2045703: an overlapping search must not fall back to showing a whole
+-// setting-pane. The typo hides the Backup group. The next "backu" search never
+-// finishes. The following "backup" search then takes the subQuery fast path and
+-// skips the hidden group. No group matches, so the pane-level fallback shows
+-// every group. The searchCompleted gate makes the search run in full instead.
+-add_task(async function overlapping_subquery_does_not_show_whole_pane() {
+-  const PANE = DEFAULT_PANE;
+-
+-  // Backup is off by default on macOS on this branch.
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.backup.archive.enabled", true]],
+-  });
+-
+-  // A fresh, non-overlapping search shows a proper subset of the pane's groups.
+-  let doc = await openSearchWithQuery("backup");
+-  let freshVisible = visibleGroupIds(doc, PANE);
+-  let totalGroups = searchableGroupCount(doc, PANE);
+-  Assert.greater(
+-    freshVisible.length,
+-    0,
+-    "Fresh 'backup' search shows at least one group in " + PANE
+-  );
+-  Assert.less(
+-    freshVisible.length,
+-    totalGroups,
+-    "Fresh 'backup' search does not show the whole " + PANE
+-  );
+-  BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-
+-  // Type the typo so the Backup group is hidden. Deleting the "p" leaves "backuo",
+-  // which still matches nothing, so the group stays hidden.
+-  doc = await openSearchWithQuery("backuop");
+-  let win = gBrowser.contentWindow;
+-  let searchInput = doc.getElementById("searchInput");
+-
+-  searchInput.focus();
+-  let backuoCompleted = BrowserTestUtils.waitForEvent(
+-    win,
+-    "PreferencesSearchCompleted",
+-    e => e.detail == "backuo"
+-  );
+-  EventUtils.synthesizeKey("KEY_Backspace");
+-  await backuoCompleted;
+-
+-  // Block the next search ("backu") at its gotoPref await so it never finishes,
+-  // leaving this.query "backu" and searchCompleted false.
+-  let releaseStale;
+-  let staleBlocked = new Promise(r => (releaseStale = r));
+-  let staleReachedGotoPref;
+-  let staleEnteredGotoPref = new Promise(r => (staleReachedGotoPref = r));
+-  let origGotoPref = win.gotoPref;
+-  let armed = true;
+-  win.gotoPref = async function (...args) {
+-    if (armed && args[0] === "paneSearchResults") {
+-      armed = false;
+-      staleReachedGotoPref();
+-      await staleBlocked;
+-    }
+-    return origGotoPref(...args);
+-  };
+-
+-  try {
+-    // Delete the "o" so the "backu" search blocks at gotoPref.
+-    EventUtils.synthesizeKey("KEY_Backspace");
+-    await staleEnteredGotoPref;
+-
+-    // Add the "p" so the "backup" search runs to completion while "backu" is
+-    // still blocked.
+-    let targetCompleted = BrowserTestUtils.waitForEvent(
+-      win,
+-      "PreferencesSearchCompleted",
+-      e => e.detail == "backup"
+-    );
+-    EventUtils.sendString("p");
+-    await targetCompleted;
+-
+-    Assert.deepEqual(
+-      visibleGroupIds(gBrowser.contentDocument, PANE),
+-      freshVisible,
+-      "Overlapping subQuery search must match a fresh search, not show the whole " +
+-        PANE
+-    );
+-  } finally {
+-    win.gotoPref = origGotoPref;
+-    releaseStale();
+-  }
+-
+-  await waitForRangeCountStable(win);
+-  BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-  await SpecialPowers.popPrefEnv();
+-});
+-
+ // Bug 2045266: same overlap as above, driven through searchInput keystrokes
+ // instead of searchFunction. A single sendString dispatches all its keystrokes
+ // synchronously, so only the last query runs. To force an overlap, the test
+diff --git a/browser/components/preferences/tests/sync/browser_account_sync_visibility.js b/browser/components/preferences/tests/sync/browser_account_sync_visibility.js
+index c58606ebb3..d5defe82df 100644
+--- a/browser/components/preferences/tests/sync/browser_account_sync_visibility.js
++++ b/browser/components/preferences/tests/sync/browser_account_sync_visibility.js
+@@ -374,70 +374,3 @@ add_task(async function testProfilesSettingsHiddenWhenDisabled() {
+ 
+   BrowserTestUtils.removeTab(gBrowser.selectedTab);
+ });
+-
+-// Backup section visibility tests
+-add_task(async function testBackupSettingsHiddenWhenDisabled() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [
+-      ["browser.backup.archive.enabled", false],
+-      ["browser.backup.restore.enabled", false],
+-    ],
+-  });
+-
+-  await openPreferencesViaOpenPreferencesAPI("paneSync", {
+-    leaveOpen: true,
+-  });
+-  let doc = gBrowser.contentDocument;
+-
+-  let backupSettings = doc.getElementById("backupSettings");
+-  ok(
+-    BrowserTestUtils.isHidden(backupSettings),
+-    "Backup settings is hidden when both archive and restore are disabled."
+-  );
+-
+-  BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-});
+-
+-add_task(async function testBackupSettingsVisibleWhenArchiveEnabled() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [
+-      ["browser.backup.archive.enabled", true],
+-      ["browser.backup.restore.enabled", false],
+-    ],
+-  });
+-
+-  await openPreferencesViaOpenPreferencesAPI("paneSync", {
+-    leaveOpen: true,
+-  });
+-  let doc = gBrowser.contentDocument;
+-
+-  let backupSettings = doc.getElementById("backupSettings");
+-  ok(
+-    BrowserTestUtils.isVisible(backupSettings),
+-    "Backup settings is visible when archive is enabled."
+-  );
+-
+-  BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-});
+-
+-add_task(async function testBackupSettingsVisibleWhenRestoreEnabled() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [
+-      ["browser.backup.archive.enabled", false],
+-      ["browser.backup.restore.enabled", true],
+-    ],
+-  });
+-
+-  await openPreferencesViaOpenPreferencesAPI("paneSync", {
+-    leaveOpen: true,
+-  });
+-  let doc = gBrowser.contentDocument;
+-
+-  let backupSettings = doc.getElementById("backupSettings");
+-  ok(
+-    BrowserTestUtils.isVisible(backupSettings),
+-    "Backup settings is visible when restore is enabled."
+-  );
+-
+-  BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-});
+diff --git a/browser/docs/index.rst b/browser/docs/index.rst
+index 825ea81840..a50002b777 100644
+--- a/browser/docs/index.rst
++++ b/browser/docs/index.rst
+@@ -31,5 +31,4 @@ This is the documentation for the code powering the Firefox Desktop front-end.
+    components/storybook/docs/README.xul-and-html.stories
+    components/storybook/docs/README.figma-code-connect.stories
+    /toolkit/themes/shared/design-system/docs/README.design-tokens.stories
+-   components/backup/docs/index
+    components/sidebar/docs/index
+diff --git a/browser/locales/en-US/browser/policies/policies-descriptions.ftl b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+index 28598ee0fe..8b3ee4561e 100644
+--- a/browser/locales/en-US/browser/policies/policies-descriptions.ftl
++++ b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+@@ -27,8 +27,6 @@ policy-AutoLaunchProtocolsFromOrigins = Define a list of external protocols that
+ 
+ policy-BackgroundAppUpdate2 = Enable or disable the background updater.
+ 
+-policy-Backup = Disable backup or restore of profile data.
+-
+ policy-BlockAboutAddons = Block access to the Add-ons Manager (about:addons).
+ 
+ policy-BlockAboutConfig = Block access to the about:config page.
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index bde46f2afb..298619cabb 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -1880,9 +1880,6 @@ data-collection-usage-ping =
+     .description = This helps { -vendor-short-name } to estimate active users.
+     .accesskey = u
+ 
+-backup-multi-profile-warning-message =
+-    .message = To make sure this change is included in your backups, open each profile and choose “Backup now” in Settings.
+-
+ nimbus-rollouts =
+     .label = Allow { -brand-short-name } to improve features, performance, and stability between updates
+     .description = Changes will be rolled out remotely.
+diff --git a/docs/config.yml b/docs/config.yml
+index e99f01a0dc..2f8584dbf4 100644
+--- a/docs/config.yml
++++ b/docs/config.yml
+@@ -209,9 +209,6 @@ exclude_patterns:
+ # excluded from the valid-jsdoc and require-jsdoc sections in the top-level
+ # eslint-rollouts.config.mjs.
+ js_source_paths:
+-    - browser/components/backup
+-    - browser/components/backup/actors
+-    - browser/components/backup/resources
+     - browser/components/customizableui
+     - browser/components/extensions
+     - browser/components/migration
+diff --git a/eslint-ignores.config.mjs b/eslint-ignores.config.mjs
+index 61d240dacf..01643fa177 100644
+--- a/eslint-ignores.config.mjs
++++ b/eslint-ignores.config.mjs
+@@ -54,7 +54,6 @@ export default [
+   "browser/base/content/test/general/gZipOfflineChild.html",
+   "browser/base/content/test/urlbar/file_blank_but_not_blank.html",
+   // Pre-processed template file
+-  "browser/components/backup/content/archive.template.html",
+   // Test files that are really json not js, and don't need to be linted.
+   "browser/components/sessionstore/test/unit/data/sessionstore_valid.js",
+   "browser/components/sessionstore/test/unit/data/sessionstore_invalid.js",
+diff --git a/remote/shared/RecommendedPreferences.sys.mjs b/remote/shared/RecommendedPreferences.sys.mjs
+index 1103ef272c..80e9dea224 100644
+--- a/remote/shared/RecommendedPreferences.sys.mjs
++++ b/remote/shared/RecommendedPreferences.sys.mjs
+@@ -101,9 +101,6 @@ const COMMON_PREFERENCES = new Map([
+   // (bug 1176798, bug 1177018, bug 1210465)
+   ["apz.content_response_timeout", 60000],
+ 
+-  // Disable the profile backup service.
+-  ["browser.backup.enabled", false],
+-
+   // Don't show the content blocking introduction panel.
+   // We use a larger number than the default 22 to have some buffer
+   // This can be removed once Firefox 69 and 68 ESR and are no longer supported.
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 11830663c1..e427ce329d 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -19,11 +19,6 @@ module.exports = [
+     files: [
+       "browser/base/content/aboutDialog.css",
+       "browser/base/content/pageinfo/pageInfo.css",
+-      "browser/components/backup/content/backup-settings.css",
+-      "browser/components/backup/content/password-rules-tooltip.css",
+-      "browser/components/backup/content/password-validation-inputs.css",
+-      "browser/components/backup/content/restore-from-backup.css",
+-      "browser/components/backup/content/turn-on-scheduled-backups.css",
+       "browser/components/contextualidentity/content/usercontext.css",
+       "browser/components/downloads/content/downloads.css",
+       "browser/components/enterprisepolicies/content/aboutPolicies.css",
+diff --git a/testing/marionette/client/marionette_driver/geckoinstance.py b/testing/marionette/client/marionette_driver/geckoinstance.py
+index 27362f9213..27b0aae2b4 100644
+--- a/testing/marionette/client/marionette_driver/geckoinstance.py
++++ b/testing/marionette/client/marionette_driver/geckoinstance.py
+@@ -636,8 +636,6 @@ class DesktopInstance(GeckoInstance):
+         # !!! For backward compatibility up to Firefox 64. Only remove
+         # when this Firefox version is no longer supported by the client !!!
+         "app.update.auto": False,
+-        # Disable the profile backup service.
+-        "browser.backup.enabled": False,
+         # Don't show the content blocking introduction panel
+         # We use a larger number than the default 22 to have some buffer
+         # This can be removed once Firefox 69 and 68 ESR and are no longer supported.
+diff --git a/testing/marionette/harness/marionette_harness/tests/integration-tests.toml b/testing/marionette/harness/marionette_harness/tests/integration-tests.toml
+index 888c015066..137fd18f7d 100644
+--- a/testing/marionette/harness/marionette_harness/tests/integration-tests.toml
++++ b/testing/marionette/harness/marionette_harness/tests/integration-tests.toml
+@@ -12,7 +12,6 @@
+ [DEFAULT]
+ # browser tests
+ 
+-["include:../../../../../browser/components/backup/tests/marionette/manifest.toml"]
+ 
+ ["include:../../../../../browser/components/customizableui/test/marionette/manifest.toml"]
+ 
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 45a01653f2..e7d69a48c8 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -112,7 +112,6 @@ gecko_metrics = [
+ # Order is lexicographical, enforced by t/c/glean/tests/pytest/test_yaml_indices.py
+ firefox_desktop_metrics = [
+     "browser/actors/metrics.yaml",
+-    "browser/components/backup/metrics.yaml",
+     "browser/components/contextualidentity/metrics.yaml",
+     "browser/components/controlcenter/metrics.yaml",
+     "browser/components/customkeys/metrics.yaml",
+@@ -202,7 +201,6 @@ gecko_pings = [
+ # Pings that are sent by Firefox Desktop.
+ # Order is lexicographical, enforced by t/c/glean/tests/pytest/test_yaml_indices.py
+ firefox_desktop_pings = [
+-    "browser/components/backup/pings.yaml",
+     "browser/components/profiles/pings.yaml",
+     "browser/components/search/pings.yaml",
+     "browser/components/urlbar/pings.yaml",
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index a514955cb9..307054cadb 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -4433,59 +4433,6 @@ httpsFirst:
+         branch: default
+         pref: dom.security.https_only_fire_http_request_background_timer_ms
+ 
+-backupService:
+-  description: Prefs to control the profile backup service
+-  owner: mconley@mozilla.com
+-  hasExposure: false
+-  variables:
+-    enabled:
+-      type: boolean
+-      setPref:
+-        branch: default
+-        pref: browser.backup.enabled
+-      description: >-
+-        When true, the profile backup service will be initialized soon after
+-        startup.
+-    sqlitePagesPerStep:
+-      description: >-
+-        The number of database pages to backup per step when backing up an
+-        SQLite database.
+-      type: int
+-      setPref:
+-        branch: user
+-        pref: browser.backup.sqlite.pages_per_step
+-    sqliteStepDelayMs:
+-      description: >-
+-        The delay between SQLite database backup steps in milliseconds.
+-      type: int
+-      setPref:
+-        branch: user
+-        pref: browser.backup.sqlite.step_delay_ms
+-    idleThresholdSeconds:
+-      description: >-
+-        The number of seconds of user idle time to wait for before considering
+-        to schedule a backup.
+-      type: int
+-      setPref:
+-        branch: user
+-        pref: browser.backup.scheduled.idle-threshold-seconds
+-    minTimeBetweenBackupsSeconds:
+-      description: >-
+-        The minimum number of seconds since the last known backup that must
+-        pass before we might schedule a backup.
+-      type: int
+-      setPref:
+-        branch: user
+-        pref: browser.backup.scheduled.minimum-time-between-backups-seconds
+-    archiveKillswitch:
+-      type: boolean
+-      description: >-
+-        Disables backup archiving, overrides all other configs when true.
+-    restoreKillswitch:
+-      type: boolean
+-      description: >-
+-        Disables backup restoration, overrides all other configs when true.
+-
+ pqcrypto:
+   description: Prefs that control the use of post-quantum cryptography.
+   owner: jschanck@mozilla.com
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index 1c605f2303..ff43a60b76 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -7,7 +7,6 @@ export interface Modules {
+   "chrome://browser/content/aiwindow/modules/ChatMarkdownParser.mjs": typeof import("chrome://browser/content/aiwindow/modules/ChatMarkdownParser.mjs"),
+   "chrome://browser/content/aiwindow/modules/TokenStreamParser.mjs": typeof import("chrome://browser/content/aiwindow/modules/TokenStreamParser.mjs"),
+   "chrome://browser/content/asrouter/components/menu-message.mjs": typeof import("chrome://browser/content/asrouter/components/menu-message.mjs"),
+-  "chrome://browser/content/backup/backup-constants.mjs": typeof import("chrome://browser/content/backup/backup-constants.mjs"),
+   "chrome://browser/content/genai/content/link-preview-card-onboarding.mjs": typeof import("chrome://browser/content/genai/content/link-preview-card-onboarding.mjs"),
+   "chrome://browser/content/genai/content/link-preview-card.mjs": typeof import("chrome://browser/content/genai/content/link-preview-card.mjs"),
+   "chrome://browser/content/genai/content/model-optin.mjs": typeof import("chrome://browser/content/genai/content/model-optin.mjs"),
+@@ -583,24 +582,6 @@ export interface Modules {
+   "resource:///modules/asrouter/Spotlight.sys.mjs": typeof import("resource:///modules/asrouter/Spotlight.sys.mjs"),
+   "resource:///modules/asrouter/ToastNotification.sys.mjs": typeof import("resource:///modules/asrouter/ToastNotification.sys.mjs"),
+   "resource:///modules/asrouter/ToolbarBadgeHub.sys.mjs": typeof import("resource:///modules/asrouter/ToolbarBadgeHub.sys.mjs"),
+-  "resource:///modules/backup/AddonsBackupResource.sys.mjs": typeof import("resource:///modules/backup/AddonsBackupResource.sys.mjs"),
+-  "resource:///modules/backup/ArchiveEncryption.sys.mjs": typeof import("resource:///modules/backup/ArchiveEncryption.sys.mjs"),
+-  "resource:///modules/backup/ArchiveEncryptionState.sys.mjs": typeof import("resource:///modules/backup/ArchiveEncryptionState.sys.mjs"),
+-  "resource:///modules/backup/ArchiveUtils.sys.mjs": typeof import("resource:///modules/backup/ArchiveUtils.sys.mjs"),
+-  "resource:///modules/backup/BackupError.mjs": typeof import("resource:///modules/backup/BackupError.mjs"),
+-  "resource:///modules/backup/BackupResource.sys.mjs": typeof import("resource:///modules/backup/BackupResource.sys.mjs"),
+-  "resource:///modules/backup/BackupService.sys.mjs": typeof import("resource:///modules/backup/BackupService.sys.mjs"),
+-  "resource:///modules/backup/BookmarksBackupResource.sys.mjs": typeof import("resource:///modules/backup/BookmarksBackupResource.sys.mjs"),
+-  "resource:///modules/backup/CookiesBackupResource.sys.mjs": typeof import("resource:///modules/backup/CookiesBackupResource.sys.mjs"),
+-  "resource:///modules/backup/CredentialsAndSecurityBackupResource.sys.mjs": typeof import("resource:///modules/backup/CredentialsAndSecurityBackupResource.sys.mjs"),
+-  "resource:///modules/backup/FormHistoryBackupResource.sys.mjs": typeof import("resource:///modules/backup/FormHistoryBackupResource.sys.mjs"),
+-  "resource:///modules/backup/MeasurementUtils.sys.mjs": typeof import("resource:///modules/backup/MeasurementUtils.sys.mjs"),
+-  "resource:///modules/backup/MiscDataBackupResource.sys.mjs": typeof import("resource:///modules/backup/MiscDataBackupResource.sys.mjs"),
+-  "resource:///modules/backup/PlacesBackupResource.sys.mjs": typeof import("resource:///modules/backup/PlacesBackupResource.sys.mjs"),
+-  "resource:///modules/backup/PreferencesBackupResource.sys.mjs": typeof import("resource:///modules/backup/PreferencesBackupResource.sys.mjs"),
+-  "resource:///modules/backup/SelectableProfileBackupResource.sys.mjs": typeof import("resource:///modules/backup/SelectableProfileBackupResource.sys.mjs"),
+-  "resource:///modules/backup/SessionStoreBackupResource.sys.mjs": typeof import("resource:///modules/backup/SessionStoreBackupResource.sys.mjs"),
+-  "resource:///modules/backup/SiteSettingsBackupResource.sys.mjs": typeof import("resource:///modules/backup/SiteSettingsBackupResource.sys.mjs"),
+   "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs": typeof import("resource:///modules/contentsharing/ContentSharingUtils.sys.mjs"),
+   "resource:///modules/distribution.sys.mjs": typeof import("resource:///modules/distribution.sys.mjs"),
+   "resource:///modules/firefox-view-synced-tabs-error-handler.sys.mjs": typeof import("resource:///modules/firefox-view-synced-tabs-error-handler.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index fa73726406..76c0d33da1 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -76,33 +76,6 @@
+       "chrome://browser/content/asrouter/components/menu-message.mjs": [
+         "../../../browser/components/asrouter/content/components/menu-message/menu-message.mjs"
+       ],
+-      "chrome://browser/content/backup/backup-constants.mjs": [
+-        "../../../browser/components/backup/common/backup-constants.mjs"
+-      ],
+-      "chrome://browser/content/backup/backup-errors.mjs": [
+-        "../../../browser/components/backup/common/backup-errors.mjs"
+-      ],
+-      "chrome://browser/content/backup/disable-backup-encryption.mjs": [
+-        "../../../browser/components/backup/content/disable-backup-encryption.mjs"
+-      ],
+-      "chrome://browser/content/backup/enable-backup-encryption.mjs": [
+-        "../../../browser/components/backup/content/enable-backup-encryption.mjs"
+-      ],
+-      "chrome://browser/content/backup/password-rules-tooltip.mjs": [
+-        "../../../browser/components/backup/content/password-rules-tooltip.mjs"
+-      ],
+-      "chrome://browser/content/backup/password-validation-inputs.mjs": [
+-        "../../../browser/components/backup/content/password-validation-inputs.mjs"
+-      ],
+-      "chrome://browser/content/backup/restore-from-backup.mjs": [
+-        "../../../browser/components/backup/content/restore-from-backup.mjs"
+-      ],
+-      "chrome://browser/content/backup/turn-off-scheduled-backups.mjs": [
+-        "../../../browser/components/backup/content/turn-off-scheduled-backups.mjs"
+-      ],
+-      "chrome://browser/content/backup/turn-on-scheduled-backups.mjs": [
+-        "../../../browser/components/backup/content/turn-on-scheduled-backups.mjs"
+-      ],
+       "chrome://browser/content/firefoxview/card-container.mjs": [
+         "../../../browser/components/firefoxview/card-container.mjs"
+       ],
+@@ -1573,63 +1546,6 @@
+       "resource:///modules/asrouter/ToolbarBadgeHub.sys.mjs": [
+         "../../../browser/components/asrouter/modules/ToolbarBadgeHub.sys.mjs"
+       ],
+-      "resource:///modules/backup/AddonsBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/AddonsBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/ArchiveEncryption.sys.mjs": [
+-        "../../../browser/components/backup/ArchiveEncryption.sys.mjs"
+-      ],
+-      "resource:///modules/backup/ArchiveEncryptionState.sys.mjs": [
+-        "../../../browser/components/backup/ArchiveEncryptionState.sys.mjs"
+-      ],
+-      "resource:///modules/backup/ArchiveUtils.sys.mjs": [
+-        "../../../browser/components/backup/ArchiveUtils.sys.mjs"
+-      ],
+-      "resource:///modules/backup/BackupError.mjs": [
+-        "../../../browser/components/backup/BackupError.mjs"
+-      ],
+-      "resource:///modules/backup/BackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/BackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/BackupResources.sys.mjs": [
+-        "../../../browser/components/backup/BackupResources.sys.mjs"
+-      ],
+-      "resource:///modules/backup/BackupService.sys.mjs": [
+-        "../../../browser/components/backup/BackupService.sys.mjs"
+-      ],
+-      "resource:///modules/backup/BookmarksBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/BookmarksBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/CookiesBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/CookiesBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/CredentialsAndSecurityBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/CredentialsAndSecurityBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/FormHistoryBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/FormHistoryBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/MeasurementUtils.sys.mjs": [
+-        "../../../browser/components/backup/MeasurementUtils.sys.mjs"
+-      ],
+-      "resource:///modules/backup/MiscDataBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/MiscDataBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/PlacesBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/PlacesBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/PreferencesBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/PreferencesBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/SelectableProfileBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/SelectableProfileBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/SessionStoreBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/SessionStoreBackupResource.sys.mjs"
+-      ],
+-      "resource:///modules/backup/SiteSettingsBackupResource.sys.mjs": [
+-        "../../../browser/components/backup/resources/SiteSettingsBackupResource.sys.mjs"
+-      ],
+       "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs": [
+         "../../../browser/components/contentsharing/ContentSharingUtils.sys.mjs"
+       ],
+diff --git a/tools/rewriting/Generated.txt b/tools/rewriting/Generated.txt
+index 3fc0612b9c..10db2051e7 100644
+--- a/tools/rewriting/Generated.txt
++++ b/tools/rewriting/Generated.txt
+@@ -1,5 +1,4 @@
+ .gradle/
+-browser/components/backup/tests/marionette/compat-files/backups
+ browser/components/storybook/storybook-static/
+ browser/extensions/newtab/data/content/activity-stream.bundle.js
+ browser/extensions/newtab/data/content/bundled-renderer-index.js

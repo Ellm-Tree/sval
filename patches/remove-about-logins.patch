@@ -1,0 +1,1229 @@
+Sval: Remove about:logins
+
+about:logins was unregistered, and the sidebar's password list it shares
+fields with was locked off with the password manager (Sval spec §7.3).
+Both go, with breach alerts on saved passwords, the about:protections
+actor that read them, password export and every way left that opened
+the page: Page Info's Passwords row, the toolbar button, the app menu
+item and the address bar's quick action. Their prefs, strings, tests and
+tooling entries go too.
+
+diff --git a/.prettierignore b/.prettierignore
+index 057bf004b7..cc28c41cec 100644
+--- a/.prettierignore
++++ b/.prettierignore
+@@ -188,7 +188,6 @@ browser/base/content/test/siteIdentity/test_no_mcb_for_loopback.html
+ browser/base/content/test/siteIdentity/test_no_mcb_for_onions.html
+ browser/base/content/test/static/dummy_page.html
+ browser/base/content/test/webrtc/get_user_media_in_xorigin_frame_ancestor.html
+-browser/components/aboutlogins/content/aboutLogins.html
+ browser/components/extensions/test/browser/file_dummy.html
+ browser/components/extensions/test/browser/file_find_frames.html
+ browser/components/extensions/test/browser/file_title.html
+diff --git a/browser/actors/moz.build b/browser/actors/moz.build
+index 9ac28a0f08..2f4615b4d3 100644
+--- a/browser/actors/moz.build
++++ b/browser/actors/moz.build
+@@ -79,8 +79,6 @@ with Files("WebRTC*.sys.mjs"):
+     BUG_COMPONENT = ("Firefox", "Site Permissions")
+ 
+ FINAL_TARGET_FILES.actors += [
+-    "AboutProtectionsChild.sys.mjs",
+-    "AboutProtectionsParent.sys.mjs",
+     "AboutReaderChild.sys.mjs",
+     "AboutReaderParent.sys.mjs",
+     "AboutTabCrashedChild.sys.mjs",
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index c619237610..62020a52f4 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -905,8 +905,6 @@ pref("browser.search.visualSearch.featureGate", true);
+ // Spin the cursor while the page is loading
+ pref("browser.spin_cursor_while_busy", false);
+ 
+-// Enable display of contextual-password-manager option in browser sidebar
+-pref("browser.contextual-password-manager.enabled", true);
+ 
+ // Whether the user has opted-in to recommended settings for data features.
+ pref("browser.dataFeatureRecommendations.enabled", false);
+@@ -1725,7 +1723,6 @@ pref("services.sync.prefs.sync.security.default_personal_cert", true);
+ pref("services.sync.prefs.sync.services.sync.syncedTabs.showRemoteIcons", true);
+ pref("services.sync.prefs.sync.signon.autofillForms", true);
+ pref("services.sync.prefs.sync.signon.generation.enabled", true);
+-pref("services.sync.prefs.sync.signon.management.page.breach-alerts.enabled", true);
+ pref("services.sync.prefs.sync.signon.rememberSignons", true);
+ pref("services.sync.prefs.sync.spellchecker.dictionary", true);
+ pref("services.sync.prefs.sync.ui.osk.enabled", true);
+@@ -2392,18 +2389,10 @@ pref("browser.migrate.preferences-entrypoint.enabled", true);
+ // "enabled"        - user opted in to the feature.
+ // "disabled"       - user opted out of the feature.
+ pref("signon.firefoxRelay.feature", "available");
+-pref("signon.management.page.breach-alerts.enabled", true);
+-pref("signon.management.page.vulnerable-passwords.enabled", true);
+-pref("signon.management.page.sort", "name");
+ 
+ pref("signon.management.page.os-auth.locked.enabled", false);
+ pref("extensions.formautofill.creditCards.os-auth.locked.enabled", false);
+ 
+-// The utm_creative value is appended within the code (specific to the location on
+-// where it is clicked). Be sure that if these two prefs are updated, that
+-// the utm_creative param be last.
+-pref("signon.management.page.breachAlertUrl",
+-     "https://monitor.firefox.com/breach-details/");
+ pref("signon.passwordEditCapture.enabled", true);
+ pref("signon.relatedRealms.enabled", false);
+ pref("signon.showAutoCompleteFooter", true);
+diff --git a/browser/base/content/appmenu-viewcache.inc.xhtml b/browser/base/content/appmenu-viewcache.inc.xhtml
+index 19ec6889a7..d694a1aea2 100644
+--- a/browser/base/content/appmenu-viewcache.inc.xhtml
++++ b/browser/base/content/appmenu-viewcache.inc.xhtml
+@@ -76,10 +76,6 @@
+                      data-l10n-id="appmenuitem-downloads"
+                      key="key_openDownloads"
+                      command="Tools:Downloads"/>
+-      <toolbarbutton id="appMenu-passwords-button"
+-                     class="subviewbutton"
+-                     data-l10n-id="appmenuitem-passwords"
+-                     />
+       <toolbarbutton id="appMenu-extensions-themes-button"
+                      class="subviewbutton"
+                      data-l10n-id="appmenuitem-extensions-and-themes"
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index f26c8032d6..c03c042531 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -39,7 +39,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   HomePage: "resource:///modules/HomePage.sys.mjs",
+   LightweightThemeConsumer:
+     "resource://gre/modules/LightweightThemeConsumer.sys.mjs",
+-  LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
+   NewTabPagePreloading:
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index e3a4ab29a3..5859e98164 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -98,7 +98,6 @@
+   "ExtensionsUI",
+   "HomePage",
+   "LightweightThemeConsumer",
+-  "LoginHelper",
+   "MigrationUtils",
+   "NetUtil",
+   "NewTabPagePreloading",
+diff --git a/browser/base/content/pageinfo/pageInfo.js b/browser/base/content/pageinfo/pageInfo.js
+index 1ba2ac6861..170eb274ba 100644
+--- a/browser/base/content/pageinfo/pageInfo.js
++++ b/browser/base/content/pageinfo/pageInfo.js
+@@ -404,9 +404,6 @@ window.addEventListener(
+         case "security-clear-sitedata":
+           security.clearSiteData();
+           break;
+-        case "security-view-password":
+-          security.viewPasswords();
+-          break;
+       }
+     });
+ 
+diff --git a/browser/base/content/pageinfo/pageInfo.xhtml b/browser/base/content/pageinfo/pageInfo.xhtml
+index f5f49188d1..ce5ebed1cd 100644
+--- a/browser/base/content/pageinfo/pageInfo.xhtml
++++ b/browser/base/content/pageinfo/pageInfo.xhtml
+@@ -365,20 +365,6 @@
+               </div>
+             </td>
+           </tr>
+-          <!-- Passwords -->
+-          <tr>
+-            <th>
+-              <xul:label control="security-privacy-passwords-value" data-l10n-id="security-view-privacy-passwords-value"/>
+-            </th>
+-            <td>
+-              <div class="table-split-column">
+-                <xul:label id="security-privacy-passwords-value"
+-                           data-l10n-id="security-view-unknown"/>
+-                <xul:button id="security-view-password"
+-                            data-l10n-id="security-view-privacy-viewpasswords"/>
+-              </div>
+-            </td>
+-          </tr>
+         </table>
+       </groupbox>
+ 
+diff --git a/browser/base/content/pageinfo/security.js b/browser/base/content/pageinfo/security.js
+index 09e979dfc0..f76bbc419a 100644
+--- a/browser/base/content/pageinfo/security.js
++++ b/browser/base/content/pageinfo/security.js
+@@ -14,10 +14,6 @@ const { QWACs } = ChromeUtils.importESModule(
+ 
+ /* import-globals-from pageInfo.js */
+ 
+-ChromeUtils.defineESModuleGetters(this, {
+-  LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+-});
+-
+ var security = {
+   async init(uri, windowInfo, browsingContext) {
+     this.uri = uri;
+@@ -231,16 +227,6 @@ var security = {
+       }
+     }
+   },
+-
+-  /**
+-   * Open the login manager window
+-   */
+-  viewPasswords() {
+-    LoginHelper.openPasswordManager(window, {
+-      filterString: this.windowInfo.hostName,
+-      entryPoint: "Pageinfo",
+-    });
+-  },
+ };
+ 
+ async function securityOnLoad(uri, windowInfo, browsingContext) {
+@@ -321,18 +307,6 @@ async function securityOnLoad(uri, windowInfo, browsingContext) {
+     document.getElementById("security-privacy-sitedata-row").hidden = true;
+   }
+ 
+-  if (await realmHasPasswords(uri)) {
+-    document.l10n.setAttributes(
+-      document.getElementById("security-privacy-passwords-value"),
+-      "saved-passwords-yes"
+-    );
+-  } else {
+-    document.l10n.setAttributes(
+-      document.getElementById("security-privacy-passwords-value"),
+-      "saved-passwords-no"
+-    );
+-  }
+-
+   document.l10n.setAttributes(
+     document.getElementById("security-privacy-history-value"),
+     "security-visits-number",
+@@ -405,14 +379,6 @@ function setText(id, value) {
+   }
+ }
+ 
+-/**
+- * Return true iff realm (proto://host:port) (extracted from uri) has
+- * saved passwords
+- */
+-async function realmHasPasswords(uri) {
+-  return (await Services.logins.countLoginsAsync(uri.prePath, "", "")) > 0;
+-}
+-
+ /**
+  * Return the number of previous visits recorded for host before today.
+  *
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 37813990d4..be01976b55 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -32,7 +32,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
+   FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+   Interactions: "moz-src:///browser/components/places/Interactions.sys.mjs",
+-  LoginBreaches: "resource:///modules/LoginBreaches.sys.mjs",
+   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+   PdfJs: "resource://pdf.js/PdfJs.sys.mjs",
+@@ -224,8 +223,6 @@ BrowserGlue.prototype = {
+           this._migrateUI();
+         } else if (data == "places-browser-init-complete") {
+           lazy.PlacesBrowserStartup.notifyIfInitializationComplete();
+-        } else if (data == "add-breaches-sync-handler") {
+-          this._addBreachesSyncHandler();
+         }
+         break;
+       case "handle-xul-text-link": {
+@@ -1084,14 +1081,6 @@ BrowserGlue.prototype = {
+         timeout: 3000,
+       },
+ 
+-      // Add breach alerts pref observer reasonably early so the pref flip works
+-      {
+-        name: "_addBreachAlertsPrefObserver",
+-        task: () => {
+-          this._addBreachAlertsPrefObserver();
+-        },
+-      },
+-
+       {
+         name: "BrowserGlue._maybeShowDefaultBrowserPrompt",
+         task: () => {
+@@ -1295,7 +1284,6 @@ BrowserGlue.prototype = {
+ 
+       function RemoteSettingsInit() {
+         lazy.RemoteSettings.init();
+-        this._addBreachesSyncHandler();
+       }.bind(this),
+ 
+       function searchBackgroundChecks() {
+@@ -1329,35 +1317,6 @@ BrowserGlue.prototype = {
+     });
+   },
+ 
+-  _addBreachesSyncHandler() {
+-    if (
+-      Services.prefs.getBoolPref(
+-        "signon.management.page.breach-alerts.enabled",
+-        false
+-      )
+-    ) {
+-      lazy
+-        .RemoteSettings(lazy.LoginBreaches.REMOTE_SETTINGS_COLLECTION)
+-        .on("sync", async event => {
+-          await lazy.LoginBreaches.update(event.data.current);
+-        });
+-    }
+-  },
+-
+-  _addBreachAlertsPrefObserver() {
+-    const BREACH_ALERTS_PREF = "signon.management.page.breach-alerts.enabled";
+-    const clearVulnerablePasswordsIfBreachAlertsDisabled = async function () {
+-      if (!Services.prefs.getBoolPref(BREACH_ALERTS_PREF)) {
+-        await lazy.LoginBreaches.clearAllPotentiallyVulnerablePasswords();
+-      }
+-    };
+-    clearVulnerablePasswordsIfBreachAlertsDisabled();
+-    Services.prefs.addObserver(
+-      BREACH_ALERTS_PREF,
+-      clearVulnerablePasswordsIfBreachAlertsDisabled
+-    );
+-  },
+-
+   _quitSource: "unknown",
+   _registerQuitSource(source) {
+     this._quitSource = source;
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 7f86636530..0b4b6ccecb 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -68,71 +68,6 @@ let JSPROCESSACTORS = {
+  * available at https://firefox-source-docs.mozilla.org/dom/ipc/jsactors.html
+  */
+ let JSWINDOWACTORS = {
+-  Megalist: {
+-    parent: {
+-      esModuleURI: "resource://gre/actors/MegalistParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://gre/actors/MegalistChild.sys.mjs",
+-      events: {
+-        DOMContentLoaded: {},
+-      },
+-    },
+-    includeChrome: true,
+-    matches: ["chrome://global/content/megalist/megalist.html"],
+-    allFrames: true,
+-    enablePreference: "browser.contextual-password-manager.enabled",
+-    remoteTypes: ["parent"],
+-  },
+-
+-  AboutLogins: {
+-    parent: {
+-      esModuleURI: "resource:///actors/AboutLoginsParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/AboutLoginsChild.sys.mjs",
+-      events: {
+-        AboutLoginsCopyLoginDetail: { wantUntrusted: true },
+-        AboutLoginsCreateLogin: { wantUntrusted: true },
+-        AboutLoginsDeleteLogin: { wantUntrusted: true },
+-        AboutLoginsDismissBreachAlert: { wantUntrusted: true },
+-        AboutLoginsImportFromBrowser: { wantUntrusted: true },
+-        AboutLoginsImportFromFile: { wantUntrusted: true },
+-        AboutLoginsImportReportInit: { wantUntrusted: true },
+-        AboutLoginsImportReportReady: { wantUntrusted: true },
+-        AboutLoginsInit: { wantUntrusted: true },
+-        AboutLoginsGetHelp: { wantUntrusted: true },
+-        AboutLoginsOpenPreferences: { wantUntrusted: true },
+-        AboutLoginsOpenSite: { wantUntrusted: true },
+-        AboutLoginsRecordTelemetryEvent: { wantUntrusted: true },
+-        AboutLoginsRemoveAllLogins: { wantUntrusted: true },
+-        AboutLoginsSortChanged: { wantUntrusted: true },
+-        AboutLoginsSyncEnable: { wantUntrusted: true },
+-        AboutLoginsUpdateLogin: { wantUntrusted: true },
+-        AboutLoginsExportPasswords: { wantUntrusted: true },
+-      },
+-    },
+-    matches: ["about:logins", "about:logins?*", "about:loginsimportreport"],
+-    allFrames: true,
+-    remoteTypes: ["privilegedabout"],
+-  },
+-
+-  AboutProtections: {
+-    parent: {
+-      esModuleURI: "resource:///actors/AboutProtectionsParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/AboutProtectionsChild.sys.mjs",
+-
+-      events: {
+-        DOMDocElementInserted: { capture: true },
+-      },
+-    },
+-
+-    matches: ["about:protections", "about:protections?*"],
+-    remoteTypes: ["privilegedabout"],
+-  },
+-
+   AboutReader: {
+     parent: {
+       esModuleURI: "resource:///actors/AboutReaderParent.sys.mjs",
+diff --git a/browser/components/customizableui/CustomizableWidgets.sys.mjs b/browser/components/customizableui/CustomizableWidgets.sys.mjs
+index 954698aca6..ee665fb81a 100644
+--- a/browser/components/customizableui/CustomizableWidgets.sys.mjs
++++ b/browser/components/customizableui/CustomizableWidgets.sys.mjs
+@@ -11,7 +11,6 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   CustomizableUI:
+     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+-  LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+   PanelMultiView:
+     "moz-src:///browser/components/customizableui/PanelMultiView.sys.mjs",
+   RecentlyClosedTabsAndWindowsMenuUtils:
+@@ -477,14 +476,6 @@ export const CustomizableWidgets = [
+       win.MailIntegration.sendLinkForBrowser(win.gBrowser.selectedBrowser);
+     },
+   },
+-  {
+-    id: "logins-button",
+-    l10nId: "toolbar-button-logins",
+-    onCommand(aEvent) {
+-      let window = aEvent.view;
+-      lazy.LoginHelper.openPasswordManager(window, { entryPoint: "Toolbar" });
+-    },
+-  },
+ ];
+ 
+ if (
+diff --git a/browser/components/customizableui/content/panelUI.js b/browser/components/customizableui/content/panelUI.js
+index 198f5febde..1922eaee8c 100644
+--- a/browser/components/customizableui/content/panelUI.js
++++ b/browser/components/customizableui/content/panelUI.js
+@@ -380,9 +380,6 @@ const PanelUI = {
+       case "appMenu-tab-groups-button":
+         this.showSubView("appMenu-tabGroupsListView", target);
+         break;
+-      case "appMenu-passwords-button":
+-        LoginHelper.openPasswordManager(window, { entryPoint: "Mainmenu" });
+-        break;
+       case "appMenu-fullscreen-button2":
+         // Note that we're custom-handling the hiding of the panel to make
+         // sure it disappears before entering fullscreen. Otherwise it can
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index bc4a64ad34..89967f0498 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -2150,11 +2150,6 @@ export var Policies = {
+ 
+   PasswordManagerEnabled: {
+     onBeforeUIStartup(manager, param) {
+-      if (!param) {
+-        blockAboutPage(manager, "about:logins", true);
+-        setAndLockPref("pref.privacy.disable_button.view_passwords", true);
+-        setAndLockPref("browser.contextual-password-manager.enabled", false);
+-      }
+       setAndLockPref("signon.rememberSignons", param);
+     },
+   },
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index 07950c810d..fefff76785 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -26,7 +26,6 @@ with Files("controlcenter/**"):
+ 
+ DIRS += [
+     "about",
+-    "aboutlogins",
+     "asrouter",
+     "backup",
+     "contentanalysis",
+diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
+index dd3ddca33e..d5b429c4f1 100644
+--- a/browser/components/preferences/config/privacy.mjs
++++ b/browser/components/preferences/config/privacy.mjs
+@@ -398,10 +398,6 @@ Preferences.addAll([
+   // Media
+   { id: "media.autoplay.default", type: "int" },
+ 
+-  // Buttons
+-  { id: "pref.privacy.disable_button.view_passwords", type: "bool" },
+-  { id: "pref.privacy.disable_button.view_passwords_exceptions", type: "bool" },
+-
+   /* Certificates tab
+    * security.default_personal_cert
+    *   - a string:
+diff --git a/browser/components/sidebar/browser-sidebar.js b/browser/components/sidebar/browser-sidebar.js
+index 35a0dbfd13..6581b7da3d 100644
+--- a/browser/components/sidebar/browser-sidebar.js
++++ b/browser/components/sidebar/browser-sidebar.js
+@@ -16,7 +16,6 @@ const toolsNameMap = {
+   viewHistorySidebar: "history",
+   viewBookmarksSidebar: "bookmarks",
+   viewOpenTabsSidebar: "opentabs",
+-  viewCPMSidebar: "passwords",
+ };
+ const EXPAND_ON_HOVER_DEBOUNCE_TIMEOUT_MS = 1000;
+ const LAUNCHER_SPLITTER_WIDTH = 4;
+@@ -158,23 +157,6 @@ var SidebarController = {
+       ],
+     ]);
+ 
+-    this.registerPrefSidebar(
+-      "browser.contextual-password-manager.enabled",
+-      "viewCPMSidebar",
+-      {
+-        name: "passwords",
+-        elementId: "sidebar-switcher-megalist",
+-        url: "chrome://global/content/megalist/megalist.html",
+-        menuId: "menu_megalistSidebar",
+-        menuL10nId: "menu-view-contextual-password-manager",
+-        revampL10nId: "sidebar-menu-contextual-password-manager-label",
+-        iconUrl: "chrome://browser/skin/login.svg",
+-        gleanEvent: Glean.contextualManager.sidebarToggle,
+-        gleanClickEvent: Glean.sidebar.passwordsIconClick,
+-        recordSidebarVersion: true,
+-      }
+-    );
+-
+     if (this.sidebarRevampEnabled) {
+       this.registerPrefSidebar(
+         "sidebar.openTabsPanel.enabled",
+@@ -852,14 +834,7 @@ var SidebarController = {
+     if (!this.sidebarRevampEnabled) {
+       this._state.launcherVisible = false;
+       document.getElementById("sidebar-header").hidden = false;
+-
+-      // Ensure CPM isn't shown.
+-      const cpmMenuItem = document.querySelector("#sidebar-switcher-megalist");
+       this.lastOpenedId = this.DEFAULT_SIDEBAR_ID;
+-      // The menu item can get removed or may not be created yet
+-      if (cpmMenuItem) {
+-        cpmMenuItem.hidden = true;
+-      }
+     }
+     if (!this._sidebars.get(this.lastOpenedId)) {
+       this.lastOpenedId = this.DEFAULT_SIDEBAR_ID;
+@@ -1094,12 +1069,7 @@ var SidebarController = {
+     }
+ 
+     if (!this.sidebarRevampEnabled) {
+-      const cpmMenuItem = document.querySelector("#sidebar-switcher-megalist");
+       this.lastOpenedId = this.DEFAULT_SIDEBAR_ID;
+-      // The menu item can get removed or may not be created yet
+-      if (cpmMenuItem) {
+-        cpmMenuItem.hidden = true;
+-      }
+     }
+ 
+     return this.show(commandID, triggerNode);
+diff --git a/browser/components/sidebar/sidebar-customize.mjs b/browser/components/sidebar/sidebar-customize.mjs
+index d5ea5a27bc..be4585791a 100644
+--- a/browser/components/sidebar/sidebar-customize.mjs
++++ b/browser/components/sidebar/sidebar-customize.mjs
+@@ -18,7 +18,6 @@ const l10nMap = new Map([
+   ["viewHistorySidebar", "sidebar-menu-history-label"],
+   ["viewBookmarksSidebar", "sidebar-menu-bookmarks-label"],
+   ["viewOpenTabsSidebar", "sidebar-menu-open-tabs-label"],
+-  ["viewCPMSidebar", "sidebar-menu-contextual-password-manager-label"],
+ ]);
+ const VISIBILITY_SETTING_PREF = "sidebar.visibility";
+ const EXPAND_ON_HOVER_PREF = "sidebar.expandOnHover";
+@@ -139,11 +138,6 @@ export class SidebarCustomize extends SidebarPage {
+           checked: e.target.checked,
+         });
+         break;
+-      case "viewCPMSidebar":
+-        Glean.contextualManager.passwordsEnabled.record({
+-          checked: e.target.checked,
+-        });
+-        break;
+     }
+   }
+ 
+diff --git a/browser/components/sidebar/tests/marionette/manifest.toml b/browser/components/sidebar/tests/marionette/manifest.toml
+index 3f503978ad..3311074222 100644
+--- a/browser/components/sidebar/tests/marionette/manifest.toml
++++ b/browser/components/sidebar/tests/marionette/manifest.toml
+@@ -2,8 +2,6 @@
+ subsuite = "integration"
+ tags = "local os_integration"
+ 
+-["test_contextual_password_manager_disabled.py"]
+-
+ ["test_default_launcher_visible.py"]
+ skip-if = [
+   "asan", # Bug 2010115
+diff --git a/browser/components/storybook/.storybook/fluent-utils.mjs b/browser/components/storybook/.storybook/fluent-utils.mjs
+index d5213e4470..52a3721820 100644
+--- a/browser/components/storybook/.storybook/fluent-utils.mjs
++++ b/browser/components/storybook/.storybook/fluent-utils.mjs
+@@ -100,13 +100,6 @@ export async function insertFTLIfNeeded(fileName) {
+       `browser/branding/nightly/locales/en-US/${rest}`
+     );
+     ftlContents = imported.default;
+-  } else if (root == "preview") {
+-    // eslint-disable-next-line no-unsanitized/method
+-    let imported = await import(
+-      /* webpackInclude: /\.ftl$/ */
+-      `toolkit/components/satchel/megalist/content/${rest}`
+-    );
+-    ftlContents = imported.default;
+   }
+ 
+   if (loadedResources.has(fileName)) {
+diff --git a/browser/components/storybook/.storybook/main.js b/browser/components/storybook/.storybook/main.js
+index f801730ab3..c8048d011e 100644
+--- a/browser/components/storybook/.storybook/main.js
++++ b/browser/components/storybook/.storybook/main.js
+@@ -22,8 +22,6 @@ module.exports = {
+     "../**/README.*.stories.md",
+     // UI Widgets section
+     `${projectRoot}/toolkit/content/widgets/**/*.stories.@(js|jsx|mjs|ts|tsx|md)`,
+-    // about:logins components stories
+-    `${projectRoot}/browser/components/aboutlogins/content/components/**/*.stories.mjs`,
+     // ASRouter components stories
+     // Backup components stories
+     `${projectRoot}/browser/components/backup/content/**/*.stories.mjs`,
+@@ -33,8 +31,6 @@ module.exports = {
+     `${projectRoot}/browser/components/search/**/*.stories.mjs`,
+     // Reader View components stories
+     `${projectRoot}/toolkit/components/reader/**/*.stories.mjs`,
+-    // megalist components stories
+-    `${projectRoot}/toolkit/components/satchel/megalist/content/**/*.stories.mjs`,
+     // autocomplete-row-item stories
+     `${projectRoot}/toolkit/components/satchel/autocomplete-row-item/**/*.stories.@(mjs|md)`,
+     // WebRTC components stories
+diff --git a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+index ca0c46d400..ebefb0bf92 100644
+--- a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
++++ b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+@@ -162,12 +162,6 @@ const DEFAULT_ACTIONS = {
+       openColorPicker(controller.browserWindow);
+     },
+   },
+-  logins: {
+-    l10nCommands: ["quickactions-cmd-logins"],
+-    icon: "chrome://browser/skin/login.svg",
+-    label: "quickactions-logins2",
+-    onPick: openUrlFun("about:logins"),
+-  },
+   mute: {
+     l10nCommands: ["quickactions-cmd-mute"],
+     label: "quickactions-mute",
+diff --git a/browser/locales/en-US/browser/appmenu.ftl b/browser/locales/en-US/browser/appmenu.ftl
+index 12a6ca6694..2b6b487bce 100644
+--- a/browser/locales/en-US/browser/appmenu.ftl
++++ b/browser/locales/en-US/browser/appmenu.ftl
+@@ -31,8 +31,6 @@ appmenuitem-tab-groups =
+   .label = Tab groups
+ appmenuitem-downloads =
+   .label = Downloads
+-appmenuitem-passwords =
+-    .label = Passwords
+ appmenuitem-extensions-and-themes =
+     .label = Extensions and Themes
+ appmenuitem-extensions =
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index e65b7b568e..dde88c4239 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -303,10 +303,6 @@ quickactions-cmd-colorpicker = color picker, eyedropper, pick color
+ quickactions-cmd-library = library
+ quickactions-library = Open Library
+ 
+-# Opens about:logins
+-quickactions-logins2 = Manage passwords
+-quickactions-cmd-logins = logins, passwords
+-
+ # Mutes all tabs playing audio
+ quickactions-mute = Mute tabs playing audio
+ # List of words that would trigger the "mute tabs" action from the address bar.
+@@ -1098,10 +1094,6 @@ toolbar-button-email-link =
+   .label = Email link
+   .tooltiptext = Email a link to this page
+ 
+-toolbar-button-logins =
+-  .label = Passwords
+-  .tooltiptext = View and manage your saved passwords
+-
+ qrcode-panel-error =
+     .message = Failed to generate QR code. Please try again.
+ 
+diff --git a/browser/locales/en-US/browser/pageInfo.ftl b/browser/locales/en-US/browser/pageInfo.ftl
+index 4cf9d35da2..9001719bb0 100644
+--- a/browser/locales/en-US/browser/pageInfo.ftl
++++ b/browser/locales/en-US/browser/pageInfo.ftl
+@@ -112,11 +112,6 @@ security-view-privacy-clearsitedata =
+     .label = Clear Cookies and Site Data
+     .accesskey = C
+ 
+-security-view-privacy-passwords-value = Have I saved any passwords for this website?
+-
+-security-view-privacy-viewpasswords =
+-    .label = View Saved Passwords
+-    .accesskey = w
+ security-view-technical =
+     .value = Technical Details
+ 
+@@ -153,8 +148,6 @@ media-link = Icon
+ media-input = Input
+ media-video = Video
+ media-audio = Audio
+-saved-passwords-yes = Yes
+-saved-passwords-no = No
+ 
+ no-page-title =
+     .value = Untitled Page:
+diff --git a/browser/locales/en-US/browser/sidebar.ftl b/browser/locales/en-US/browser/sidebar.ftl
+index 3c264eb420..c2666acbb1 100644
+--- a/browser/locales/en-US/browser/sidebar.ftl
++++ b/browser/locales/en-US/browser/sidebar.ftl
+@@ -2,9 +2,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-menu-view-contextual-password-manager =
+-  .label = Passwords
+-
+ # Label for the Open Tabs entry in the View > Sidebars menu bar menu.
+ # "Open Tabs" is a noun phrase referring to the tabs currently open in
+ # the browser, not an instruction to open tabs.
+@@ -140,8 +137,6 @@ sidebar-menu-bookmarks-label =
+   .label = Bookmarks
+ sidebar-menu-customize-label =
+   .label = Customize sidebar
+-sidebar-menu-contextual-password-manager-label =
+-  .label = Passwords
+ sidebar-menu-more-tools-label =
+   .label = More tools
+ 
+diff --git a/browser/themes/shared/sidebar.css b/browser/themes/shared/sidebar.css
+index b29c6164d8..b8c7adfb7c 100644
+--- a/browser/themes/shared/sidebar.css
++++ b/browser/themes/shared/sidebar.css
+@@ -25,10 +25,6 @@
+   &[sidebarcommand="viewGenaiChatSidebar"] {
+     min-width: 400px;
+   }
+-
+-  &[sidebarcommand="viewCPMSidebar"] {
+-    min-width: 260px;
+-  }
+ }
+ 
+ #sidebar-container,
+diff --git a/browser/themes/shared/toolbarbutton-icons.css b/browser/themes/shared/toolbarbutton-icons.css
+index da6025d91f..2b3182eb0e 100644
+--- a/browser/themes/shared/toolbarbutton-icons.css
++++ b/browser/themes/shared/toolbarbutton-icons.css
+@@ -189,10 +189,6 @@
+   list-style-image: url("chrome://browser/skin/mail.svg");
+ }
+ 
+-#logins-button {
+-  list-style-image: url("chrome://browser/skin/login.svg");
+-}
+-
+ #share-tab-button {
+   list-style-image: url("chrome://browser/skin/share.svg");
+ }
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 368d4cb510..8ac83f24e0 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -233,7 +233,6 @@ export default [
+     files: [
+       "accessible/tests/**",
+       "browser/base/content/**",
+-      "browser/components/aboutlogins/content/aboutLoginsUtils.mjs",
+       "browser/components/asrouter/**",
+       "browser/components/downloads/**",
+       "browser/components/originattributes/test/browser/**",
+@@ -307,7 +306,6 @@ export default [
+       "browser/actors/**",
+       "browser/base/content/**",
+       "browser/components/Browser*",
+-      "browser/components/aboutlogins/**",
+       "browser/components/asrouter/**",
+       "browser/components/customizableui/**",
+       "browser/components/doh/TRRPerformance.sys.mjs",
+@@ -635,8 +633,6 @@ export default [
+       // That are all files that produes warnings in the existing test infrastructure.
+       // Since our focus is that new tests won't use http without thinking twice we exempt
+       // these test files for now. Bug 1758951
+-      "browser/components/aboutlogins/tests/browser/browser_createLogin.js",
+-      "browser/components/aboutlogins/tests/chrome/test_login_item.html",
+       "browser/components/contextualidentity/test/browser/browser_broadcastchannel.js",
+       "browser/components/contextualidentity/test/browser/browser_eme.js",
+       "browser/components/contextualidentity/test/browser/browser_favicon.js",
+@@ -1737,10 +1733,6 @@ export default [
+       "toolkit/components/passwordmgr/LoginHelper.sys.mjs",
+       "toolkit/components/pictureinpicture/PictureInPicture.sys.mjs",
+       "toolkit/components/satchel/integrations/FirefoxRelay.sys.mjs",
+-      "toolkit/components/satchel/megalist/MegalistViewModel.sys.mjs",
+-      "toolkit/components/satchel/megalist/aggregator/datasources/DataSourceBase.sys.mjs",
+-      "toolkit/components/satchel/megalist/aggregator/datasources/LoginDataSource.sys.mjs",
+-      "toolkit/components/satchel/megalist/content/MegalistAlpha.mjs",
+       "toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs",
+       "toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs",
+       "toolkit/components/telemetry/app/UsageReporting.sys.mjs",
+diff --git a/eslint-subdirs.config.mjs b/eslint-subdirs.config.mjs
+index f5d08bfdc0..3393711d0a 100644
+--- a/eslint-subdirs.config.mjs
++++ b/eslint-subdirs.config.mjs
+@@ -47,9 +47,6 @@ export default [
+     "browser/base/content/test/webextensions"
+   )),
+   ...(await convertConfigurationFile("browser/components")),
+-  ...(await convertConfigurationFile(
+-    "browser/components/aboutlogins/tests/chrome"
+-  )),
+   ...(await convertConfigurationFile("browser/components/sval")),
+   ...(await convertConfigurationFile("browser/components/customizableui")),
+   ...(await convertConfigurationFile(
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 6af0bdea28..663376a158 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -19,24 +19,6 @@ module.exports = [
+     files: [
+       "browser/base/content/aboutDialog.css",
+       "browser/base/content/pageinfo/pageInfo.css",
+-      "browser/components/aboutlogins/content/aboutLogins.css",
+-      "browser/components/aboutlogins/content/aboutLoginsImportReport.css",
+-      "browser/components/aboutlogins/content/components/confirmation-dialog.css",
+-      "browser/components/aboutlogins/content/components/fxaccounts-button.css",
+-      "browser/components/aboutlogins/content/components/generic-dialog.css",
+-      "browser/components/aboutlogins/content/components/import-error-dialog.css",
+-      "browser/components/aboutlogins/content/components/import-summary-dialog.css",
+-      "browser/components/aboutlogins/content/components/login-alert.css",
+-      "browser/components/aboutlogins/content/components/login-command-button.css",
+-      "browser/components/aboutlogins/content/components/login-filter.css",
+-      "browser/components/aboutlogins/content/components/login-intro.css",
+-      "browser/components/aboutlogins/content/components/login-item.css",
+-      "browser/components/aboutlogins/content/components/login-list-lit-item.css",
+-      "browser/components/aboutlogins/content/components/login-list.css",
+-      "browser/components/aboutlogins/content/components/login-message-popup.css",
+-      "browser/components/aboutlogins/content/components/login-timeline.css",
+-      "browser/components/aboutlogins/content/components/menu-button.css",
+-      "browser/components/aboutlogins/content/components/remove-logins-dialog.css",
+       "browser/components/backup/content/backup-settings.css",
+       "browser/components/backup/content/password-rules-tooltip.css",
+       "browser/components/backup/content/password-validation-inputs.css",
+@@ -223,10 +205,6 @@ module.exports = [
+       "toolkit/components/reader/moz-slider.css",
+       "toolkit/components/resistfingerprinting/content/letterboxing.css",
+       "toolkit/components/resistfingerprinting/content/usercharacteristics.css",
+-      "toolkit/components/satchel/megalist/content/components/login-form/login-form.css",
+-      "toolkit/components/satchel/megalist/content/components/login-line/login-line.css",
+-      "toolkit/components/satchel/megalist/content/components/password-card/password-card.css",
+-      "toolkit/components/satchel/megalist/content/megalist.css",
+       "toolkit/components/translations/content/about-translations.css",
+       "toolkit/content/aboutGlean.css",
+       "toolkit/content/aboutLogging/aboutLogging.css",
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 09bbd67568..f13564de68 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -141,7 +141,6 @@ firefox_desktop_metrics = [
+     "toolkit/components/nimbus/metrics.yaml",
+     "toolkit/components/pictureinpicture/metrics.yaml",
+     "toolkit/components/places/metrics.yaml",
+-    "toolkit/components/satchel/megalist/metrics.yaml",
+     "toolkit/components/search/metrics.yaml",
+     "toolkit/components/telemetry/metrics.yaml",
+     "toolkit/modules/metrics.yaml",
+diff --git a/toolkit/components/passwordmgr/LoginHelper.sys.mjs b/toolkit/components/passwordmgr/LoginHelper.sys.mjs
+index b8dc547c9a..e179a714e9 100644
+--- a/toolkit/components/passwordmgr/LoginHelper.sys.mjs
++++ b/toolkit/components/passwordmgr/LoginHelper.sys.mjs
+@@ -1218,50 +1218,6 @@ export const LoginHelper = {
+     return [...loginsByKeys.values()];
+   },
+ 
+-  /**
+-   * Open the password manager window.
+-   *
+-   * @param {Window} window
+-   *                 the window from where we want to open the dialog
+-   *
+-   * @param {object?} args
+-   *                  params for opening the password manager
+-   * @param {string} [args.filterString=""]
+-   *                 the domain (not origin) to pass to the login manager dialog
+-   *                 to pre-filter the results
+-   * @param {string} args.entryPoint
+-   *                 The name of the entry point, used for telemetry
+-   */
+-  openPasswordManager(
+-    window,
+-    { filterString = "", entryPoint = "", loginGuid = null } = {}
+-  ) {
+-    // Get currently active tab's origin
+-    const openedFrom =
+-      window.gBrowser?.selectedTab.linkedBrowser.currentURI.spec;
+-    // If no loginGuid is set, get sanitized origin, this will return null for about:* uris
+-    const preselectedLogin = loginGuid ?? this.getLoginOrigin(openedFrom);
+-
+-    const params = new URLSearchParams({
+-      ...(filterString && { filter: filterString }),
+-      ...(entryPoint && { entryPoint }),
+-    });
+-
+-    const paramsPart = params.toString() ? `?${params}` : "";
+-
+-    // bug 1985105 - should this only look for windows on the current workspace?
+-    let browserWindow = lazy.BrowserWindowTracker.getTopWindow({
+-      allowFromInactiveWorkspace: true,
+-    });
+-    const browser = browserWindow.gBrowser ?? browserWindow.opener?.gBrowser;
+-
+-    const tab = browser.addTrustedTab(`about:logins${paramsPart}`, {
+-      inBackground: false,
+-    });
+-
+-    tab.setAttribute("preselect-login", preselectedLogin);
+-  },
+-
+   /**
+    * Checks if a field type is password compatible.
+    *
+diff --git a/toolkit/components/passwordmgr/moz.build b/toolkit/components/passwordmgr/moz.build
+index 8959db8187..28eecfce70 100644
+--- a/toolkit/components/passwordmgr/moz.build
++++ b/toolkit/components/passwordmgr/moz.build
+@@ -47,7 +47,6 @@ if CONFIG["OS_TARGET"] != "Android":
+     EXTRA_JS_MODULES += [
+         "CSV.sys.mjs",
+         "LoginCSVImport.sys.mjs",
+-        "LoginExport.sys.mjs",
+         "LoginStore.sys.mjs",
+     ]
+ 
+diff --git a/toolkit/components/passwordmgr/test/browser/browser.toml b/toolkit/components/passwordmgr/test/browser/browser.toml
+index 1d4ccea5e0..bc3acc89d0 100644
+--- a/toolkit/components/passwordmgr/test/browser/browser.toml
++++ b/toolkit/components/passwordmgr/test/browser/browser.toml
+@@ -28,7 +28,6 @@ support-files = [
+   "insecure_test_subframe.html",
+   "head.js",
+   "multiple_forms.html",
+-  "../../../../../browser/components/aboutlogins/tests/browser/head.js",
+ ]
+ 
+ ["browser_basicAuth_multiTab.js"]
+diff --git a/toolkit/components/satchel/jar.mn b/toolkit/components/satchel/jar.mn
+index 1d72f35dde..080e9390d6 100644
+--- a/toolkit/components/satchel/jar.mn
++++ b/toolkit/components/satchel/jar.mn
+@@ -3,17 +3,5 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ toolkit.jar:
+-  content/global/megalist/megalist.css        (megalist/content/megalist.css)
+-  content/global/megalist/megalist.html       (megalist/content/megalist.html)
+-  content/global/megalist/MegalistAlpha.mjs   (megalist/content/MegalistAlpha.mjs)
+-  content/global/megalist/components/password-card/password-card.mjs    (megalist/content/components/password-card/password-card.mjs)
+-  content/global/megalist/components/password-card/password-card.css    (megalist/content/components/password-card/password-card.css)
+-  content/global/megalist/components/login-form/login-form.mjs    (megalist/content/components/login-form/login-form.mjs)
+-  content/global/megalist/components/login-form/login-form.css    (megalist/content/components/login-form/login-form.css)
+-  content/global/megalist/components/login-line/login-line.mjs    (megalist/content/components/login-line/login-line.mjs)
+-  content/global/megalist/components/login-line/login-line.css    (megalist/content/components/login-line/login-line.css)
+-  content/global/megalist/components/notification-message-bar/notification-message-bar.mjs    (megalist/content/components/notification-message-bar/notification-message-bar.mjs)
+-  content/global/megalist/icons/cpm-fox-illustration.svg    (megalist/content/icons/cpm-fox-illustration.svg)
+-  content/global/megalist/components/virtual-passwords-list/virtual-passwords-list.mjs    (megalist/content/components/virtual-passwords-list/virtual-passwords-list.mjs)
+   content/global/autocomplete-row-item/autocomplete-row-item.mjs    (autocomplete-row-item/autocomplete-row-item.mjs)
+   content/global/autocomplete-row-item/autocomplete-row-item.css    (autocomplete-row-item/autocomplete-row-item.css)
+diff --git a/toolkit/components/satchel/moz.build b/toolkit/components/satchel/moz.build
+index 602d01d182..1d8660ed2c 100644
+--- a/toolkit/components/satchel/moz.build
++++ b/toolkit/components/satchel/moz.build
+@@ -25,10 +25,6 @@ LOCAL_INCLUDES += [
+ 
+ JAR_MANIFESTS += ["jar.mn"]
+ 
+-DIRS += [
+-    "megalist",
+-]
+-
+ EXTRA_JS_MODULES += [
+     "FillHelpers.sys.mjs",
+     "FormHistory.sys.mjs",
+diff --git a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+index 69d32a439b..442608a023 100644
+--- a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
++++ b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+@@ -344,7 +344,6 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
+   ["security.mixed_content.block_active_content", { what: RECORD_PREF_VALUE }],
+   ["security.mixed_content.block_display_content", { what: RECORD_PREF_VALUE }],
+   ["security.tls.version.enable-deprecated", { what: RECORD_PREF_VALUE }],
+-  ["signon.management.page.breach-alerts.enabled", { what: RECORD_PREF_VALUE }],
+   ["signon.autofillForms", { what: RECORD_PREF_VALUE }],
+   ["signon.generation.enabled", { what: RECORD_PREF_VALUE }],
+   ["signon.rememberSignons", { what: RECORD_PREF_VALUE }],
+diff --git a/toolkit/modules/BrowserUtils.sys.mjs b/toolkit/modules/BrowserUtils.sys.mjs
+index faef1dc1ee..0476aa06cf 100644
+--- a/toolkit/modules/BrowserUtils.sys.mjs
++++ b/toolkit/modules/BrowserUtils.sys.mjs
+@@ -329,7 +329,6 @@ export var BrowserUtils = {
+     return (
+       !location.startsWith("about:preferences") &&
+       !location.startsWith("about:settings") &&
+-      !location.startsWith("about:logins") &&
+       !location.startsWith("about:firefoxview")
+     );
+   },
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index b1e7be4f07..5698860b56 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -4,7 +4,6 @@
+  */
+ 
+ export interface Modules {
+-  "chrome://browser/content/aboutlogins/aboutLoginsUtils.mjs": typeof import("chrome://browser/content/aboutlogins/aboutLoginsUtils.mjs"),
+   "chrome://browser/content/aiwindow/modules/ChatMarkdownParser.mjs": typeof import("chrome://browser/content/aiwindow/modules/ChatMarkdownParser.mjs"),
+   "chrome://browser/content/aiwindow/modules/TokenStreamParser.mjs": typeof import("chrome://browser/content/aiwindow/modules/TokenStreamParser.mjs"),
+   "chrome://browser/content/asrouter/components/menu-message.mjs": typeof import("chrome://browser/content/asrouter/components/menu-message.mjs"),
+@@ -470,10 +469,8 @@ export interface Modules {
+   "moz-src:///toolkit/modules/PrefUtils.sys.mjs": typeof import("moz-src:///toolkit/modules/PrefUtils.sys.mjs"),
+   "moz-src:///toolkit/modules/WebAuthnPromptHelper.sys.mjs": typeof import("moz-src:///toolkit/modules/WebAuthnPromptHelper.sys.mjs"),
+   "moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs": typeof import("moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs"),
+-  "resource:///actors/AboutLoginsParent.sys.mjs": typeof import("resource:///actors/AboutLoginsParent.sys.mjs"),
+   "resource:///actors/AboutNewTabParent.sys.mjs": typeof import("resource:///actors/AboutNewTabParent.sys.mjs"),
+   "resource:///actors/AboutPrivateBrowsingParent.sys.mjs": typeof import("resource:///actors/AboutPrivateBrowsingParent.sys.mjs"),
+-  "resource:///actors/AboutProtectionsParent.sys.mjs": typeof import("resource:///actors/AboutProtectionsParent.sys.mjs"),
+   "resource:///actors/AboutReaderParent.sys.mjs": typeof import("resource:///actors/AboutReaderParent.sys.mjs"),
+   "resource:///actors/AboutWelcomeParent.sys.mjs": typeof import("resource:///actors/AboutWelcomeParent.sys.mjs"),
+   "resource:///actors/ClickHandlerParent.sys.mjs": typeof import("resource:///actors/ClickHandlerParent.sys.mjs"),
+@@ -497,7 +494,6 @@ export interface Modules {
+   "resource:///modules/BrowserWindowTracker.sys.mjs": typeof import("resource:///modules/BrowserWindowTracker.sys.mjs"),
+   "resource:///modules/BuiltInThemeConfig.sys.mjs": typeof import("resource:///modules/BuiltInThemeConfig.sys.mjs"),
+   "resource:///modules/BuiltInThemes.sys.mjs": typeof import("resource:///modules/BuiltInThemes.sys.mjs"),
+-  "resource:///modules/ChangePasswordURLs.sys.mjs": typeof import("resource:///modules/ChangePasswordURLs.sys.mjs"),
+   "resource:///modules/ChatsController.sys.mjs": typeof import("resource:///modules/ChatsController.sys.mjs"),
+   "resource:///modules/ChromeMacOSLoginCrypto.sys.mjs": typeof import("resource:///modules/ChromeMacOSLoginCrypto.sys.mjs"),
+   "resource:///modules/ChromeMigrationUtils.sys.mjs": typeof import("resource:///modules/ChromeMigrationUtils.sys.mjs"),
+@@ -528,7 +524,6 @@ export interface Modules {
+   "resource:///modules/InternalTestingProfileMigrator.sys.mjs": typeof import("resource:///modules/InternalTestingProfileMigrator.sys.mjs"),
+   "resource:///modules/LaterRun.sys.mjs": typeof import("resource:///modules/LaterRun.sys.mjs"),
+   "resource:///modules/LinksCache.sys.mjs": typeof import("resource:///modules/LinksCache.sys.mjs"),
+-  "resource:///modules/LoginBreaches.sys.mjs": typeof import("resource:///modules/LoginBreaches.sys.mjs"),
+   "resource:///modules/MSMigrationUtils.sys.mjs": typeof import("resource:///modules/MSMigrationUtils.sys.mjs"),
+   "resource:///modules/MerinoClient.sys.mjs": typeof import("resource:///modules/MerinoClient.sys.mjs"),
+   "resource:///modules/MigrationUtils.sys.mjs": typeof import("resource:///modules/MigrationUtils.sys.mjs"),
+@@ -930,7 +925,6 @@ export interface Modules {
+   "resource://gre/modules/Log.sys.mjs": typeof import("resource://gre/modules/Log.sys.mjs"),
+   "resource://gre/modules/LogManager.sys.mjs": typeof import("resource://gre/modules/LogManager.sys.mjs"),
+   "resource://gre/modules/LoginCSVImport.sys.mjs": typeof import("resource://gre/modules/LoginCSVImport.sys.mjs"),
+-  "resource://gre/modules/LoginExport.sys.mjs": typeof import("resource://gre/modules/LoginExport.sys.mjs"),
+   "resource://gre/modules/LoginHelper.sys.mjs": typeof import("resource://gre/modules/LoginHelper.sys.mjs"),
+   "resource://gre/modules/LoginManager.shared.sys.mjs": typeof import("resource://gre/modules/LoginManager.shared.sys.mjs"),
+   "resource://gre/modules/LoginManager.sys.mjs": typeof import("resource://gre/modules/LoginManager.sys.mjs"),
+@@ -1073,10 +1067,6 @@ export interface Modules {
+   "resource://gre/modules/kvstore.sys.mjs": typeof import("resource://gre/modules/kvstore.sys.mjs"),
+   "resource://gre/modules/media/IdpSandbox.sys.mjs": typeof import("resource://gre/modules/media/IdpSandbox.sys.mjs"),
+   "resource://gre/modules/media/PeerConnectionIdp.sys.mjs": typeof import("resource://gre/modules/media/PeerConnectionIdp.sys.mjs"),
+-  "resource://gre/modules/megalist/MegalistViewModel.sys.mjs": typeof import("resource://gre/modules/megalist/MegalistViewModel.sys.mjs"),
+-  "resource://gre/modules/megalist/aggregator/Aggregator.sys.mjs": typeof import("resource://gre/modules/megalist/aggregator/Aggregator.sys.mjs"),
+-  "resource://gre/modules/megalist/aggregator/datasources/DataSourceBase.sys.mjs": typeof import("resource://gre/modules/megalist/aggregator/datasources/DataSourceBase.sys.mjs"),
+-  "resource://gre/modules/megalist/aggregator/datasources/LoginDataSource.sys.mjs": typeof import("resource://gre/modules/megalist/aggregator/datasources/LoginDataSource.sys.mjs"),
+   "resource://gre/modules/narrate/NarrateControls.sys.mjs": typeof import("resource://gre/modules/narrate/NarrateControls.sys.mjs"),
+   "resource://gre/modules/policies/WindowsGPOParser.sys.mjs": typeof import("resource://gre/modules/policies/WindowsGPOParser.sys.mjs"),
+   "resource://gre/modules/policies/macOSPoliciesParser.sys.mjs": typeof import("resource://gre/modules/policies/macOSPoliciesParser.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 9600346864..296ae478fd 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -1,21 +1,6 @@
+ {
+   "compilerOptions": {
+     "paths": {
+-      "chrome://browser/content/aboutlogins/aboutLoginsUtils.mjs": [
+-        "../../../browser/components/aboutlogins/content/aboutLoginsUtils.mjs"
+-      ],
+-      "chrome://browser/content/aboutlogins/components/input-field/login-origin-field.mjs": [
+-        "../../../browser/components/aboutlogins/content/components/input-field/login-origin-field.mjs"
+-      ],
+-      "chrome://browser/content/aboutlogins/components/input-field/login-password-field.mjs": [
+-        "../../../browser/components/aboutlogins/content/components/input-field/login-password-field.mjs"
+-      ],
+-      "chrome://browser/content/aboutlogins/components/input-field/login-username-field.mjs": [
+-        "../../../browser/components/aboutlogins/content/components/input-field/login-username-field.mjs"
+-      ],
+-      "chrome://browser/content/aboutlogins/components/login-message-popup.mjs": [
+-        "../../../browser/components/aboutlogins/content/components/login-message-popup.mjs"
+-      ],
+       "chrome://browser/content/aiwindow/components/ai-action-result.mjs": [
+         "../../../browser/components/aiwindow/ui/components/ai-action-result/ai-action-result.mjs"
+       ],
+@@ -520,21 +505,6 @@
+       "chrome://global/content/lit-utils.mjs": [
+         "../../../toolkit/content/widgets/lit-utils.mjs"
+       ],
+-      "chrome://global/content/megalist/components/login-form/login-form.mjs": [
+-        "../../../toolkit/components/satchel/megalist/content/components/login-form/login-form.mjs"
+-      ],
+-      "chrome://global/content/megalist/components/login-line/login-line.mjs": [
+-        "../../../toolkit/components/satchel/megalist/content/components/login-line/login-line.mjs"
+-      ],
+-      "chrome://global/content/megalist/components/notification-message-bar/notification-message-bar.mjs": [
+-        "../../../toolkit/components/satchel/megalist/content/components/notification-message-bar/notification-message-bar.mjs"
+-      ],
+-      "chrome://global/content/megalist/components/password-card/password-card.mjs": [
+-        "../../../toolkit/components/satchel/megalist/content/components/password-card/password-card.mjs"
+-      ],
+-      "chrome://global/content/megalist/components/virtual-passwords-list/virtual-passwords-list.mjs": [
+-        "../../../toolkit/components/satchel/megalist/content/components/virtual-passwords-list/virtual-passwords-list.mjs"
+-      ],
+       "chrome://global/content/ml/AIFeature.sys.mjs": [
+         "../../../toolkit/components/ml/AIFeature.sys.mjs"
+       ],
+@@ -1267,18 +1237,12 @@
+       "chrome://remote/content/webdriver-bidi/modules/windowglobal/script.sys.mjs": [
+         "../../../remote/webdriver-bidi/modules/windowglobal/script.sys.mjs"
+       ],
+-      "resource:///actors/AboutLoginsParent.sys.mjs": [
+-        "../../../browser/components/aboutlogins/AboutLoginsParent.sys.mjs"
+-      ],
+       "resource:///actors/AboutNewTabParent.sys.mjs": [
+         "../../../browser/actors/AboutNewTabParent.sys.mjs"
+       ],
+       "resource:///actors/AboutPrivateBrowsingParent.sys.mjs": [
+         "../../../browser/actors/AboutPrivateBrowsingParent.sys.mjs"
+       ],
+-      "resource:///actors/AboutProtectionsParent.sys.mjs": [
+-        "../../../browser/actors/AboutProtectionsParent.sys.mjs"
+-      ],
+       "resource:///actors/AboutReaderParent.sys.mjs": [
+         "../../../browser/actors/AboutReaderParent.sys.mjs"
+       ],
+@@ -1348,9 +1312,6 @@
+       "resource:///modules/BuiltInThemes.sys.mjs": [
+         "../../../browser/themes/BuiltInThemes.sys.mjs"
+       ],
+-      "resource:///modules/ChangePasswordURLs.sys.mjs": [
+-        "../../../browser/components/aboutlogins/ChangePasswordURLs.sys.mjs"
+-      ],
+       "resource:///modules/ChatsController.sys.mjs": [
+         "../../../browser/components/firefoxview/ChatsController.sys.mjs"
+       ],
+@@ -1438,9 +1399,6 @@
+       "resource:///modules/LinksCache.sys.mjs": [
+         "../../../browser/modules/LinksCache.sys.mjs"
+       ],
+-      "resource:///modules/LoginBreaches.sys.mjs": [
+-        "../../../browser/components/aboutlogins/LoginBreaches.sys.mjs"
+-      ],
+       "resource:///modules/MSMigrationUtils.sys.mjs": [
+         "../../../browser/components/migration/MSMigrationUtils.sys.mjs"
+       ],
+@@ -6187,9 +6145,6 @@
+       "resource://gre/modules/LoginCSVImport.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginCSVImport.sys.mjs"
+       ],
+-      "resource://gre/modules/LoginExport.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/LoginExport.sys.mjs"
+-      ],
+       "resource://gre/modules/LoginHelper.sys.mjs": [
+         "../../../toolkit/components/passwordmgr/LoginHelper.sys.mjs"
+       ],
+@@ -6643,21 +6598,6 @@
+       "resource://gre/modules/media/PeerConnectionIdp.sys.mjs": [
+         "../../../dom/media/PeerConnectionIdp.sys.mjs"
+       ],
+-      "resource://gre/modules/megalist/MegalistViewModel.sys.mjs": [
+-        "../../../toolkit/components/satchel/megalist/MegalistViewModel.sys.mjs"
+-      ],
+-      "resource://gre/modules/megalist/aggregator/Aggregator.sys.mjs": [
+-        "../../../toolkit/components/satchel/megalist/aggregator/Aggregator.sys.mjs"
+-      ],
+-      "resource://gre/modules/megalist/aggregator/DefaultAggregator.sys.mjs": [
+-        "../../../toolkit/components/satchel/megalist/aggregator/DefaultAggregator.sys.mjs"
+-      ],
+-      "resource://gre/modules/megalist/aggregator/datasources/DataSourceBase.sys.mjs": [
+-        "../../../toolkit/components/satchel/megalist/aggregator/datasources/DataSourceBase.sys.mjs"
+-      ],
+-      "resource://gre/modules/megalist/aggregator/datasources/LoginDataSource.sys.mjs": [
+-        "../../../toolkit/components/satchel/megalist/aggregator/datasources/LoginDataSource.sys.mjs"
+-      ],
+       "resource://gre/modules/narrate/NarrateControls.sys.mjs": [
+         "../../../toolkit/components/narrate/NarrateControls.sys.mjs"
+       ],
+diff --git a/toolkit/components/passwordmgr/test/browser/head.js b/toolkit/components/passwordmgr/test/browser/head.js
+index 12b758c6c5..c630fc7d27 100644
+--- a/toolkit/components/passwordmgr/test/browser/head.js
++++ b/toolkit/components/passwordmgr/test/browser/head.js
+@@ -3,6 +3,9 @@ const DIRECTORY_PATH = "/browser/toolkit/components/passwordmgr/test/browser/";
+ var { LoginTestUtils } = ChromeUtils.importESModule(
+   "resource://testing-common/LoginTestUtils.sys.mjs"
+ );
++var { LoginHelper } = ChromeUtils.importESModule(
++  "resource://gre/modules/LoginHelper.sys.mjs"
++);
+ 
+ const { TelemetryTestUtils } = ChromeUtils.importESModule(
+   "resource://testing-common/TelemetryTestUtils.sys.mjs"
+diff --git a/toolkit/components/passwordmgr/test/unit/test_module_LoginCSVImport.js b/toolkit/components/passwordmgr/test/unit/test_module_LoginCSVImport.js
+index 8977681adb..1c991b35cc 100644
+--- a/toolkit/components/passwordmgr/test/unit/test_module_LoginCSVImport.js
++++ b/toolkit/components/passwordmgr/test/unit/test_module_LoginCSVImport.js
+@@ -11,9 +11,6 @@
+ const { LoginCSVImport } = ChromeUtils.importESModule(
+   "resource://gre/modules/LoginCSVImport.sys.mjs"
+ );
+-const { LoginExport } = ChromeUtils.importESModule(
+-  "resource://gre/modules/LoginExport.sys.mjs"
+-);
+ const { TelemetryTestUtils: TTU } = ChromeUtils.importESModule(
+   "resource://testing-common/TelemetryTestUtils.sys.mjs"
+ );
+@@ -239,27 +236,6 @@ add_task(async function test_import_minimal_with_mixed_naming() {
+   );
+ });
+ 
+-/**
+- * Imports login data from the latest Firefox CSV file for various logins from
+- * LoginTestUtils.testData.loginList().
+- */
+-add_task(async function test_import_from_firefox_various_latest() {
+-  await setupCsv([]);
+-  info("Populate the login list for export");
+-  let logins = LoginTestUtils.testData.loginList();
+-  await Services.logins.addLogins(logins);
+-
+-  let tmpFilePath = FileTestUtils.getTempFile("logins.csv").path;
+-  await LoginExport.exportAsCSV(tmpFilePath);
+-
+-  await LoginCSVImport.importFromCSV(tmpFilePath);
+-
+-  await LoginTestUtils.checkLogins(
+-    logins,
+-    "Check that all of LoginTestUtils.testData.loginList can be re-imported"
+-  );
+-});
+-
+ /**
+  * Imports login data from a Firefox CSV file without quotes.
+  */
+diff --git a/toolkit/components/passwordmgr/test/unit/xpcshell.toml b/toolkit/components/passwordmgr/test/unit/xpcshell.toml
+index 4518011f4a..7f379f2989 100644
+--- a/toolkit/components/passwordmgr/test/unit/xpcshell.toml
++++ b/toolkit/components/passwordmgr/test/unit/xpcshell.toml
+@@ -67,11 +67,6 @@ run-if = [
+ 
+ ["test_module_LoginCSVImport.js"]
+ 
+-["test_module_LoginExport.js"]
+-run-if = [
+-  "os != 'android'", # there is no export for android
+-]
+-
+ ["test_module_LoginManager.js"]
+ 
+ ["test_module_LoginStore.js"]

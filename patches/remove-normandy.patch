@@ -1,0 +1,1898 @@
+Sval: Remove Normandy
+
+Normandy is Mozilla's recipe client for preference studies, add-on
+studies and Heartbeat surveys. Sval locks studies off and points it at no
+server, so it only ran its startup and shutdown work. It goes with its
+about:studies actor, its extension API, the DisableFirefoxStudies policy,
+its prefs and its tests. Normandy started Nimbus once the session's
+windows were restored; BrowserGlue starts it there instead, and
+FirstStartup waits for Nimbus directly. Nimbus and targeting take the
+randomization id from ClientEnvironmentBase. Normandy's metrics.yaml
+stays: Nimbus records its enrollment events under that category.
+
+diff --git a/.prettierignore b/.prettierignore
+index c758a51865..2dd0b140a4 100644
+--- a/.prettierignore
++++ b/.prettierignore
+@@ -1528,7 +1528,6 @@ toolkit/components/contentanalysis/content_analysis/sdk/
+ toolkit/components/certviewer/content/vendor/
+ toolkit/components/jsoncpp/
+ toolkit/components/ml/vendor/
+-toolkit/components/normandy/vendor/
+ toolkit/components/passwordmgr/shared/PasswordRulesParser.sys.mjs
+ toolkit/components/protobuf/
+ toolkit/components/reader/readability/
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index c619237610..758277b0de 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -239,9 +239,6 @@ pref("lightweightThemes.getMoreURL", "https://addons.mozilla.org/%LOCALE%/firefo
+   pref("browser.eme.ui.enabled", false);
+ #endif
+ 
+-// How long to show a Hearbeat survey (two hours, in seconds)
+-pref("browser.uitour.surveyDuration", 7200);
+-
+ #ifdef UNIX_BUT_NOT_MAC
+   pref("general.autoScroll", false);
+ #else
+@@ -2466,16 +2463,8 @@ pref("doh-rollout.clearModeOnShutdown", false);
+ // DoH UI: default the fallback checkbox to on.
+ pref("network.trr_ui.fallback_was_checked", true);
+ 
+-// Normandy client preferences
+-pref("app.normandy.api_url", "https://normandy.cdn.mozilla.net/api/v1");
+-pref("app.normandy.dev_mode", false);
+-pref("app.normandy.enabled", true);
+-pref("app.normandy.first_run", true);
+-pref("app.normandy.logging.level", 50); // Warn
++// How often Nimbus fetches its recipes.
+ pref("app.normandy.run_interval_seconds", 21600); // 6 hours
+-pref("app.normandy.shieldLearnMoreUrl", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/shield");
+-pref("app.normandy.last_seen_buildid", "");
+-pref("app.normandy.onsync_skew_sec", 600);
+ #ifdef MOZ_DATA_REPORTING
+   pref("app.shield.optoutstudies.enabled", true);
+ #else
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index c0b5f5ac85..88ac14b445 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -56,9 +56,6 @@ var gExceptionPaths = [
+   // Nimbus schemas are referenced programmatically.
+   "resource://nimbus/schemas/",
+ 
+-  // Normandy schemas are referenced programmatically.
+-  "resource://normandy/schemas/",
+-
+   // Localization file added programatically in ContentAnalysis.sys.mjs
+   "resource://gre/localization/en-US/toolkit/contentanalysis/",
+ 
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 5c590891ac..f73404ffad 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -12,9 +12,6 @@ category app-startup nsBrowserGlue @mozilla.org/browser/browserglue;1 applicatio
+ # Browser global components initializing before UI startup
+ category browser-before-ui-startup resource:///modules/sessionstore/SessionStore.sys.mjs SessionStore.init
+ category browser-before-ui-startup resource:///modules/BuiltInThemes.sys.mjs BuiltInThemes.maybeInstallActiveBuiltInTheme
+-#ifdef MOZ_NORMANDY
+-category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init
+-#endif
+ category browser-before-ui-startup resource:///modules/AccountsGlue.sys.mjs AccountsGlue.init
+ category browser-before-ui-startup moz-src:///browser/modules/ObserverForwarder.sys.mjs ObserverForwarder.init
+ 
+@@ -138,7 +135,6 @@ category browser-quit-application-granted resource:///modules/BrowserUsageTeleme
+ category browser-quit-application-granted moz-src:///browser/components/places/Interactions.sys.mjs Interactions.uninit
+ category browser-quit-application-granted resource://gre/modules/PageThumbs.sys.mjs PageThumbs.uninit
+ category browser-quit-application-granted resource://gre/modules/NewTabUtils.sys.mjs NewTabUtils.uninit
+-category browser-quit-application-granted resource://normandy/Normandy.sys.mjs Normandy.uninit
+ category browser-quit-application-granted resource://gre/modules/RFPHelper.sys.mjs RFPHelper.uninit
+ #ifdef MOZ_UPDATER
+ category browser-quit-application-granted resource://gre/modules/UpdateListener.sys.mjs UpdateListener.reset
+diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
+index 37813990d4..18a62edd9e 100644
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -29,6 +29,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   DistributionManagement: "resource:///modules/distribution.sys.mjs",
+   DownloadsViewableInternally:
+     "moz-src:///browser/components/downloads/DownloadsViewableInternally.sys.mjs",
++  ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
+   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
+   FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+   Interactions: "moz-src:///browser/components/places/Interactions.sys.mjs",
+@@ -903,6 +904,7 @@ BrowserGlue.prototype = {
+ 
+     lazy.BrowserUsageTelemetry.init();
+ 
++    lazy.ExperimentAPI.init();
+     lazy.Interactions.init();
+     lazy.ExtensionsUI.init();
+ 
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 79f5f48328..3fc3e960d4 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -551,22 +551,6 @@ let JSWINDOWACTORS = {
+     enablePreference: "screenshots.browser.component.enabled",
+   },
+ 
+-  ShieldFrame: {
+-    parent: {
+-      esModuleURI: "resource://normandy-content/ShieldFrameParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource://normandy-content/ShieldFrameChild.sys.mjs",
+-      events: {
+-        pageshow: {},
+-        pagehide: {},
+-        ShieldPageEvent: { wantUntrusted: true },
+-      },
+-    },
+-    matches: ["about:studies*"],
+-    remoteTypes: ["privilegedabout"],
+-  },
+-
+   SpeechDispatcher: {
+     parent: {
+       esModuleURI: "resource:///actors/SpeechDispatcherParent.sys.mjs",
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index 6a61d0ff66..2bfd475574 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -57,7 +57,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+   BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
+   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+-  ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs",
++  ClientEnvironmentBase:
++    "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs",
+   CustomizableUI:
+     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+   ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
+@@ -895,7 +896,7 @@ const TargetingGetters = {
+     return AppConstants.platform;
+   },
+   get userId() {
+-    return lazy.ClientEnvironment.userId;
++    return lazy.ClientEnvironmentBase.randomizationId;
+   },
+   get profileRestartCount() {
+     let bts = Cc["@mozilla.org/backgroundtasks;1"]?.getService(
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index bc4a64ad34..4b2fcb2578 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -1086,14 +1086,6 @@ export var Policies = {
+     },
+   },
+ 
+-  DisableFirefoxStudies: {
+-    onBeforeAddons(manager, param) {
+-      if (param) {
+-        manager.disallowFeature("Shield");
+-      }
+-    },
+-  },
+-
+   DisableForgetButton: {
+     onProfileAfterChange(manager, param) {
+       if (param) {
+diff --git a/browser/components/enterprisepolicies/schemas/policies-schema.json b/browser/components/enterprisepolicies/schemas/policies-schema.json
+index 44e5591170..b7a67c436c 100644
+--- a/browser/components/enterprisepolicies/schemas/policies-schema.json
++++ b/browser/components/enterprisepolicies/schemas/policies-schema.json
+@@ -559,10 +559,6 @@
+       "type": "boolean"
+     },
+ 
+-    "DisableFirefoxStudies": {
+-      "type": "boolean"
+-    },
+-
+     "DisableForgetButton": {
+       "type": "boolean"
+     },
+diff --git a/browser/components/enterprisepolicies/tests/browser/browser.toml b/browser/components/enterprisepolicies/tests/browser/browser.toml
+index 11e5b2e50e..01b5c22559 100644
+--- a/browser/components/enterprisepolicies/tests/browser/browser.toml
++++ b/browser/components/enterprisepolicies/tests/browser/browser.toml
+@@ -90,8 +90,6 @@ support-files = [
+ 
+ ["browser_policy_disable_safemode.js"]
+ 
+-["browser_policy_disable_shield.js"]
+-
+ ["browser_policy_disable_telemetry.js"]
+ 
+ ["browser_policy_display_bookmarks.js"]
+diff --git a/browser/components/extensions/ext-browser.json b/browser/components/extensions/ext-browser.json
+index d5f3e0a500..aff3841d57 100644
+--- a/browser/components/extensions/ext-browser.json
++++ b/browser/components/extensions/ext-browser.json
+@@ -106,12 +106,6 @@
+     "permissions": ["menus", "contextMenus"],
+     "paths": [["contextMenus"], ["menus"], ["menusInternal"]]
+   },
+-  "normandyAddonStudy": {
+-    "url": "chrome://browser/content/parent/ext-normandyAddonStudy.js",
+-    "schema": "chrome://browser/content/schemas/normandyAddonStudy.json",
+-    "scopes": ["addon_parent", "content_parent", "devtools_parent"],
+-    "paths": [["normandyAddonStudy"]]
+-  },
+   "omnibox": {
+     "url": "chrome://browser/content/parent/ext-omnibox.js",
+     "schema": "chrome://browser/content/schemas/omnibox.json",
+diff --git a/browser/components/extensions/jar.mn b/browser/components/extensions/jar.mn
+index 1bb336b45b..f4f14bee52 100644
+--- a/browser/components/extensions/jar.mn
++++ b/browser/components/extensions/jar.mn
+@@ -18,7 +18,6 @@ browser.jar:
+     content/browser/parent/ext-find.js (parent/ext-find.js)
+     content/browser/parent/ext-history.js (parent/ext-history.js)
+     content/browser/parent/ext-menus.js (parent/ext-menus.js)
+-    content/browser/parent/ext-normandyAddonStudy.js (parent/ext-normandyAddonStudy.js)
+     content/browser/parent/ext-omnibox.js (parent/ext-omnibox.js)
+     content/browser/parent/ext-pageAction.js (parent/ext-pageAction.js)
+     content/browser/parent/ext-pkcs11.js (parent/ext-pkcs11.js)
+diff --git a/browser/components/extensions/schemas/jar.mn b/browser/components/extensions/schemas/jar.mn
+index 12428cda26..0b9ba96c4f 100644
+--- a/browser/components/extensions/schemas/jar.mn
++++ b/browser/components/extensions/schemas/jar.mn
+@@ -14,7 +14,6 @@ browser.jar:
+     content/browser/schemas/history.json
+     content/browser/schemas/menus.json
+     content/browser/schemas/menus_child.json
+-    content/browser/schemas/normandyAddonStudy.json
+     content/browser/schemas/omnibox.json
+     content/browser/schemas/pkcs11.json
+     content/browser/schemas/search.json
+diff --git a/browser/components/extensions/test/xpcshell/xpcshell.toml b/browser/components/extensions/test/xpcshell/xpcshell.toml
+index 721277767b..51e596b236 100644
+--- a/browser/components/extensions/test/xpcshell/xpcshell.toml
++++ b/browser/components/extensions/test/xpcshell/xpcshell.toml
+@@ -38,8 +38,6 @@ dupe-manifest = ""
+ ["test_ext_menu_startup.js"]
+ requesttimeoutfactor = 2  # Slow on Linux debug
+ 
+-["test_ext_normandyAddonStudy.js"]
+-
+ ["test_ext_pageAction_shutdown.js"]
+ 
+ ["test_ext_pkcs11_management.js"]
+diff --git a/browser/components/preferences/config/permissions-data.mjs b/browser/components/preferences/config/permissions-data.mjs
+index a35b5131ee..9421b42dde 100644
+--- a/browser/components/preferences/config/permissions-data.mjs
++++ b/browser/components/preferences/config/permissions-data.mjs
+@@ -33,7 +33,6 @@ const BACKUP_ENABLED_ON_PROFILES_PREF_NAME =
+   "browser.backup.enabled_on.profiles";
+ const PREF_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
+ const PREF_ADDON_RECOMMENDATIONS_ENABLED = "browser.discovery.enabled";
+-const PREF_NORMANDY_ENABLED = "app.normandy.enabled";
+ const PREF_OPT_OUT_STUDIES_ENABLED = "app.shield.optoutstudies.enabled";
+ 
+ Preferences.addAll([
+@@ -55,7 +54,6 @@ Preferences.addAll([
+   // Data Choices tab
+   { id: "browser.crashReports.unsubmittedCheck.autoSubmit2", type: "bool" },
+ 
+-  { id: PREF_NORMANDY_ENABLED, type: "bool" },
+   { id: "nimbus.rollouts.enabled", type: "bool" },
+ 
+   // Preference instances for prefs that we need to monitor while the page is open.
+@@ -370,60 +368,21 @@ Preferences.addSetting({
+     return value && deps.submitHealthReportBox.pref.value;
+   },
+ });
+-Preferences.addSetting({
+-  id: "normandyEnabled",
+-  pref: PREF_NORMANDY_ENABLED,
+-});
+-
+ Preferences.addSetting({
+   id: "optOutStudiesEnabled",
+-  visible: () => lazy.AppConstants.MOZ_NORMANDY,
++  visible: () => lazy.AppConstants.MOZ_DATA_REPORTING,
+   pref: PREF_OPT_OUT_STUDIES_ENABLED,
+-  deps: ["submitHealthReportBox", "normandyEnabled"],
+-  disabled: ({ submitHealthReportBox, normandyEnabled }) => {
+-    /**
+-    *  The checkbox should be disabled if any of the below are true. This
+-    prevents the user from changing the value in the box.
+-    * 2. telemetry upload is disabled
+-    * 3. Normandy is disabled
+-    */
+-    const allowedByPolicy = Services.policies.isAllowed("Shield");
+-    return (
+-      !allowedByPolicy || !submitHealthReportBox.value || !normandyEnabled.value
+-    );
+-  },
+-  get: (value, { submitHealthReportBox, normandyEnabled }) => {
+-    /**
+-     * The checkbox should match the value of the preference only if all the below are true:
+-     *
+-     * 1. the policy allows Shield
+-     * 2. telemetry upload is enabled
+-     * 3. Normandy is enabled
+-     *
+-     * Otherwise, the checkbox should remain unchecked. This
+-     * is because in these situations, Shield studies are always disabled, and
+-     * so showing a checkbox would be confusing.
+-     */
+-    const allowedByPolicy = Services.policies.isAllowed("Shield");
+-
+-    if (
+-      !allowedByPolicy ||
+-      !submitHealthReportBox.value ||
+-      !normandyEnabled.value
+-    ) {
+-      return false;
+-    }
+-    return value;
+-  },
+-});
+-Preferences.addSetting({
+-  id: "viewShieldStudies",
++  deps: ["submitHealthReportBox"],
++  // Studies never run while telemetry upload is off, so the checkbox is then
++  // disabled and unchecked.
++  disabled: ({ submitHealthReportBox }) => !submitHealthReportBox.value,
++  get: (value, { submitHealthReportBox }) =>
++    submitHealthReportBox.value && value,
+ });
+ Preferences.addSetting({
+   id: "enableNimbusRollouts",
+   pref: "nimbus.rollouts.enabled",
+-  visible: () =>
+-    lazy.AppConstants.MOZ_DATA_REPORTING && lazy.AppConstants.MOZ_NORMANDY,
++  visible: () => lazy.AppConstants.MOZ_DATA_REPORTING,
+   disabled: () => !Services.policies.isAllowed("NimbusRollouts"),
+   get: value => {
+     if (!Services.policies.isAllowed("NimbusRollouts")) {
+@@ -724,16 +683,6 @@ SettingGroupManager.registerGroups({
+               {
+                 id: "optOutStudiesEnabled",
+                 l10nId: "data-collection-run-studies",
+-                items: [
+-                  {
+-                    id: "viewShieldStudies",
+-                    control: "moz-box-link",
+-                    l10nId: "data-collection-studies-link",
+-                    controlAttrs: {
+-                      href: "about:studies",
+-                    },
+-                  },
+-                ],
+               },
+             ],
+           },
+diff --git a/browser/components/tests/marionette/test_no_errors_clean_profile.py b/browser/components/tests/marionette/test_no_errors_clean_profile.py
+index 03a1223e48..4b80c4f75d 100644
+--- a/browser/components/tests/marionette/test_no_errors_clean_profile.py
++++ b/browser/components/tests/marionette/test_no_errors_clean_profile.py
+@@ -17,11 +17,6 @@ from marionette_harness import MarionetteTestCase
+ # created a bunch of errors on startup, and it wasn't feasible to fix all
+ # of them before landing the test.
+ known_errors = [
+-    {
+-        # Disabling Shield because app.normandy.api_url is not set.
+-        # (Marionette-only error, bug 1826314)
+-        "message": "app.normandy.api_url is not set",
+-    },
+     {
+         # From Remote settings, because it's intercepted by our test
+         # infrastructure which serves text/plain rather than JSON.
+diff --git a/browser/docs/BrowserStartup.md b/browser/docs/BrowserStartup.md
+index ccb4a01bc8..fddc7e35e7 100644
+--- a/browser/docs/BrowserStartup.md
++++ b/browser/docs/BrowserStartup.md
+@@ -81,13 +81,13 @@ first startup experiment? The answer is subtle.
+ During Firefox launch, [`final-ui-startup` is
+ notified](https://searchfox.org/mozilla-central/rev/a965e3c683ecc035dee1de72bd33a8d91b1203ed/toolkit/xre/nsAppRunner.cpp#5764-5765),
+ and in response `SessionStore` is initialized. Additionally,
+-Nimbus/Normandy initialization is [started but not
++Nimbus initialization is [started but not
+ awaited](https://searchfox.org/mozilla-central/rev/a965e3c683ecc035dee1de72bd33a8d91b1203ed/browser/components/BrowserGlue.sys.mjs#1487).
+ 
+ Then the [command line is
+ handled](https://searchfox.org/mozilla-central/rev/a965e3c683ecc035dee1de72bd33a8d91b1203ed/toolkit/xre/nsAppRunner.cpp#5775-5778).
+ When `--first-startup` is passed, we [spin the event loop to allow
+-Nimbus/Normandy time to complete its initialization and first
++Nimbus time to complete its initialization and first
+ fetch](https://searchfox.org/mozilla-central/rev/a965e3c683ecc035dee1de72bd33a8d91b1203ed/browser/components/BrowserContentHandler.sys.mjs#677)
+ before continuing to process the command line. See [the
+ `FirstStartup`
+diff --git a/browser/locales/en-US/browser/policies/policies-descriptions.ftl b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+index 5d0297c2da..ac00afe5b2 100644
+--- a/browser/locales/en-US/browser/policies/policies-descriptions.ftl
++++ b/browser/locales/en-US/browser/policies/policies-descriptions.ftl
+@@ -84,8 +84,6 @@ policy-DisableFirefoxAccounts1 = Disable account-based services, including sync.
+ # Firefox Screenshots is the name of the feature, and should not be translated.
+ policy-DisableFirefoxScreenshots = Disable the { -screenshots-brand-name } feature.
+ 
+-policy-DisableFirefoxStudies = Prevent { -brand-short-name } from running studies.
+-
+ policy-DisableForgetButton = Prevent access to the Forget button.
+ 
+ policy-DisableFormHistory = Don’t remember search and form history.
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 7e5e9ffd00..aab5321a7f 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -2062,8 +2062,6 @@ data-collection-health-report-disabled =
+ data-collection-run-studies =
+     .label = Allow { -brand-short-name } to run feature studies
+     .description = { -brand-short-name } randomly selects users to test features, which helps improve quality for everyone.
+-data-collection-studies-link =
+-    .label = View { -brand-short-name } studies
+ data-collection-backlogged-crash-reports =
+     .label = Automatically send crash reports
+     .description = This helps { -vendor-short-name } diagnose and fix issues with the browser. Reports may include personal or sensitive data.
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index b412c1cc1c..6a43e9e3ce 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -463,7 +463,6 @@ export default [
+       "testing/web-platform/tests/webrtc/third_party/sdp/sdp.js",
+       "testing/xpcshell/moz-http2/moz-http2-child.js",
+       "testing/xpcshell/moz-http2/moz-http2.js",
+-      "toolkit/components/normandy/actions/schemas/export_json.js",
+       "toolkit/themes/shared/design-system/config/*.js",
+       "toolkit/themes/shared/design-system/tests/try-runner.js",
+       "tools/lint/stylelint/stylelint-plugin-mozilla/helpers.mjs",
+diff --git a/eslint-ignores.config.mjs b/eslint-ignores.config.mjs
+index 374d64884d..973efda4a0 100644
+--- a/eslint-ignores.config.mjs
++++ b/eslint-ignores.config.mjs
+@@ -266,7 +266,6 @@ export default [
+   // Intentionally invalid files
+   "toolkit/components/workerloader/tests/moduleF-syntax-error.js",
+   "toolkit/components/enterprisepolicies/tests/browser/config_broken_json.json",
+-  "toolkit/components/normandy/test/unit/mock_api/api/v1/extension/index.json",
+   "toolkit/mozapps/extensions/test/xpcshell/data/test_AddonRepository_fail.json",
+ 
+   // Built files
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index ab1ec61ad5..448ccd8fdf 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -83,7 +83,6 @@ export default [
+       "toolkit/components/extensions/**",
+       "toolkit/components/formautofill/**",
+       "toolkit/components/messaging-system/**",
+-      "toolkit/components/normandy/**",
+       "toolkit/components/places/**",
+       "toolkit/components/printing/**",
+       "toolkit/components/taskscheduler/**",
+@@ -125,8 +124,6 @@ export default [
+       "toolkit/components/extensions/test/xpcshell/test_ext_privacy_disable.js",
+       "toolkit/components/extensions/test/xpcshell/test_ext_privacy_update.js",
+       "toolkit/components/extensions/test/xpcshell/test_ext_proxy_config.js",
+-      "toolkit/components/normandy/test/browser/head.js",
+-      "toolkit/components/normandy/test/NormandyTestUtils.sys.mjs",
+       "toolkit/modules/tests/xpcshell/head.js",
+     ],
+     plugins: { mozilla },
+@@ -271,7 +268,6 @@ export default [
+       "toolkit/components/downloads/**",
+       "toolkit/components/messaging-system/**",
+       "toolkit/components/nimbus/**",
+-      "toolkit/components/normandy/**",
+       "toolkit/components/passwordmgr/**",
+       "toolkit/components/pdfjs/**",
+       "toolkit/components/pictureinpicture/**",
+@@ -403,7 +399,6 @@ export default [
+       "toolkit/components/ml/**",
+       "toolkit/components/mozintl/mozIntl.sys.mjs",
+       "toolkit/components/nimbus/**",
+-      "toolkit/components/normandy/**",
+       "toolkit/components/passwordmgr/**",
+       "toolkit/components/pdfjs/**",
+       "toolkit/components/pictureinpicture/**",
+@@ -598,7 +593,6 @@ export default [
+       "image/test/browser/browser_offscreen_image_in_out_of_process_iframe.js",
+       "security/manager/ssl/tests/mochitest/browser/browser_HSTS.js",
+       "testing/mochitest/tests/browser/browser_browserLoaded_content_loaded.js",
+-      "toolkit/components/normandy/test/browser/browser_about_studies.js",
+       "toolkit/components/remotebrowserutils/tests/browser/browser_RemoteWebNavigation.js",
+       "toolkit/components/viewsource/test/browser/browser_bug464222.js",
+       "toolkit/components/viewsource/test/browser/browser_viewsource_newwindow.js",
+@@ -1598,10 +1592,6 @@ export default [
+       "toolkit/components/httpsonlyerror/tests/browser/browser_errorpage_timeout.js",
+       "toolkit/components/httpsonlyerror/tests/browser/browser_errorpage_www_suggestion.js",
+       "toolkit/components/httpsonlyerror/tests/browser/browser_exception.js",
+-      "toolkit/components/normandy/test/NormandyTestUtils.sys.mjs",
+-      "toolkit/components/normandy/test/browser/browser_RecipeRunner.js",
+-      "toolkit/components/normandy/test/browser/browser_actions_ShowHeartbeatAction.js",
+-      "toolkit/components/normandy/test/browser/head.js",
+       "toolkit/components/passwordmgr/test/LoginTestUtils.sys.mjs",
+       "toolkit/components/passwordmgr/test/browser/browser_autofill_http.js",
+       "toolkit/components/passwordmgr/test/browser/browser_context_menu.js",
+@@ -1735,7 +1725,6 @@ export default [
+       "toolkit/components/extensions/parent/ext-browsingData.js",
+       "toolkit/components/formautofill/FormAutofillPreferences.sys.mjs",
+       "toolkit/components/formautofill/default/FormAutofillPrompter.sys.mjs",
+-      "toolkit/components/normandy/actions/ShowHeartbeatAction.sys.mjs",
+       "toolkit/components/passwordmgr/LoginAutoComplete.sys.mjs",
+       "toolkit/components/passwordmgr/LoginHelper.sys.mjs",
+       "toolkit/components/passwordmgr/LoginManagerParent.sys.mjs",
+diff --git a/eslint-subdirs.config.mjs b/eslint-subdirs.config.mjs
+index f5d08bfdc0..9cacf0294a 100644
+--- a/eslint-subdirs.config.mjs
++++ b/eslint-subdirs.config.mjs
+@@ -163,7 +163,6 @@ export default [
+   ...(await convertConfigurationFile(
+     "toolkit/components/extensions/test/xpcshell/webidl-api"
+   )),
+-  ...(await convertConfigurationFile("toolkit/components/normandy/test")),
+   ...(await convertConfigurationFile(
+     "toolkit/components/passwordmgr/test/browser"
+   )),
+diff --git a/remote/shared/RecommendedPreferences.sys.mjs b/remote/shared/RecommendedPreferences.sys.mjs
+index d6346d939b..deeec23318 100644
+--- a/remote/shared/RecommendedPreferences.sys.mjs
++++ b/remote/shared/RecommendedPreferences.sys.mjs
+@@ -81,9 +81,6 @@ if (Services.appinfo.processType != Ci.nsIXULRuntime.PROCESS_TYPE_DEFAULT) {
+ // - If a `user.js` file in `/testing/profiles` disables recommended preferences,
+ //   identify affected test suites and set the new preference where needed.
+ const COMMON_PREFERENCES = new Map([
+-  // Make sure Shield doesn't hit the network.
+-  ["app.normandy.api_url", ""],
+-
+   // Disable automatically upgrading Firefox
+   //
+   // Note: This preference should have already been set by the client when
+diff --git a/services/settings/docs/index.rst b/services/settings/docs/index.rst
+index adc5fe0e24..0fe3e9a3db 100644
+--- a/services/settings/docs/index.rst
++++ b/services/settings/docs/index.rst
+@@ -304,7 +304,7 @@ From the client API standpoint, this is completely transparent: the ``.get()`` m
+ 
+ .. note::
+ 
+-    The remote settings targets follow the same approach as the :ref:`Normandy recipe client <components/normandy>` (ie. JEXL filter expressions).
++    The remote settings targets follow the same approach as Nimbus's targeting (ie. JEXL filter expressions).
+ 
+ 
+ .. _services/settings/uptake-telemetry:
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 3867fdc5c0..8684415c2d 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -212,8 +212,6 @@ module.exports = [
+       "toolkit/components/extensions/test/xpcshell/data/file_style_good.css",
+       "toolkit/components/extensions/test/xpcshell/data/file_style_redirect.css",
+       "toolkit/components/extensions/test/xpcshell/data/file_stylesheet_cache.css",
+-      "toolkit/components/normandy/content/about-studies/about-studies.css",
+-      "toolkit/components/normandy/skin/shared/Heartbeat.css",
+       "toolkit/components/printing/content/print.css",
+       "toolkit/components/printing/content/printPagination.css",
+       "toolkit/components/printing/content/printPreview.css",
+diff --git a/testing/marionette/client/marionette_driver/geckoinstance.py b/testing/marionette/client/marionette_driver/geckoinstance.py
+index b22159bd1f..2c9130ee92 100644
+--- a/testing/marionette/client/marionette_driver/geckoinstance.py
++++ b/testing/marionette/client/marionette_driver/geckoinstance.py
+@@ -35,8 +35,6 @@ if sys.platform.startswith("darwin"):
+ 
+ class GeckoInstance:
+     required_prefs = {
+-        # Make sure Shield doesn't hit the network.
+-        "app.normandy.api_url": "",
+         # Disable scroll axis lock, WebDriver should be able to scroll arbitrary
+         # directions.
+         "apz.axis_lock.mode": 0,
+diff --git a/testing/mochitest/ignorePrefs.json b/testing/mochitest/ignorePrefs.json
+index 200d2493fa..e958b18baf 100644
+--- a/testing/mochitest/ignorePrefs.json
++++ b/testing/mochitest/ignorePrefs.json
+@@ -1,5 +1,4 @@
+ [
+-  "app.normandy.first_run",
+   "app.normandy.user_id",
+   "app.update.background.rolledout",
+   "app.update.interval",
+diff --git a/testing/profiles/perf/user.js b/testing/profiles/perf/user.js
+index 0b4aee1a43..9ff188c339 100644
+--- a/testing/profiles/perf/user.js
++++ b/testing/profiles/perf/user.js
+@@ -4,7 +4,6 @@
+ 
+ // Base preferences file used by performance harnesses
+ /* globals user_pref */
+-user_pref("app.normandy.api_url", "https://127.0.0.1/selfsupport-dummy/");
+ // Disable Bookmark backups by default.
+ user_pref("browser.bookmarks.max_backups", 0);
+ user_pref("browser.cache.disk.smart_size.enabled", false);
+diff --git a/testing/profiles/raptor/user.js b/testing/profiles/raptor/user.js
+index 51a64582e4..d6fe7cdcca 100644
+--- a/testing/profiles/raptor/user.js
++++ b/testing/profiles/raptor/user.js
+@@ -4,9 +4,6 @@
+ 
+ // Preferences file used by the raptor harness
+ /* globals user_pref */
+-// prevents normandy from running updates during the tests
+-user_pref("app.normandy.enabled", false);
+-
+ // Avoid the status panel indicating loading state which messes up
+ // screenshots.
+ user_pref("browser.tabs.hideStatusPanel", true);
+diff --git a/testing/profiles/reftest/user.js b/testing/profiles/reftest/user.js
+index cdb3a2758d..bdc01789e7 100644
+--- a/testing/profiles/reftest/user.js
++++ b/testing/profiles/reftest/user.js
+@@ -1,7 +1,5 @@
+ // Preference file for the reftest harness.
+ /* globals user_pref */
+-// Make sure Shield doesn't hit the network.
+-user_pref("app.normandy.api_url", "https://localhost/selfsupport-dummy/");
+ user_pref("app.update.staging.enabled", false);
+ user_pref("browser.safebrowsing.blockedURIs.enabled", false);
+ user_pref("browser.safebrowsing.downloads.enabled", false);
+diff --git a/testing/profiles/unittest-required/user.js b/testing/profiles/unittest-required/user.js
+index 60cf454240..353dad4bb9 100644
+--- a/testing/profiles/unittest-required/user.js
++++ b/testing/profiles/unittest-required/user.js
+@@ -6,8 +6,6 @@
+ // NOTE: Toggling prefs for testing features should happen in
+ // unittest-features/user.js or in harness/test manifests, not here!
+ /* globals user_pref */
+-// Make sure Shield doesn't hit the network.
+-user_pref("app.normandy.api_url", "");
+ // Make sure the notification permission migration test doesn't hit the network.
+ user_pref("app.support.baseURL", "http://{server}/support-dummy/");
+ user_pref("app.update.staging.enabled", false);
+diff --git a/testing/profiles/xpcshell/user.js b/testing/profiles/xpcshell/user.js
+index 6571dbbb98..775e291069 100644
+--- a/testing/profiles/xpcshell/user.js
++++ b/testing/profiles/xpcshell/user.js
+@@ -5,7 +5,6 @@
+ // Base preferences file used by the xpcshell harness
+ /* globals user_pref */
+ /* eslint quotes: 0 */
+-user_pref("app.normandy.api_url", "https://%(server)s/selfsupport-dummy/");
+ user_pref("browser.safebrowsing.downloads.remote.url", "https://%(server)s/safebrowsing-dummy");
+ user_pref("extensions.systemAddon.update.url", "http://%(server)s/dummy-system-addons.xml");
+ // Treat WebExtension API/schema warnings as errors.
+diff --git a/toolkit/components/dap/tests/xpcshell/test_dap_incrementality.js b/toolkit/components/dap/tests/xpcshell/test_dap_incrementality.js
+index c4837bd45e..6f42a3c1a6 100644
+--- a/toolkit/components/dap/tests/xpcshell/test_dap_incrementality.js
++++ b/toolkit/components/dap/tests/xpcshell/test_dap_incrementality.js
+@@ -152,8 +152,8 @@ async function getReferrerState(db, taskId) {
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testVisitMeasurementNimbus() {
+     resetServerRequests();
+@@ -268,8 +268,8 @@ add_task(
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testParsingMultiUrlVisitMeasurementNimbus() {
+     resetServerRequests();
+@@ -340,8 +340,8 @@ add_task(
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testReferrerMeasurementNimbus() {
+     resetServerRequests();
+@@ -447,8 +447,8 @@ add_task(
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testReferrerMeasurementParsingMultiTargetNimbus() {
+     resetServerRequests();
+@@ -517,8 +517,8 @@ add_task(
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testReferrerMeasurementUnknownBucketNotSetNimbus() {
+     resetServerRequests();
+@@ -595,8 +595,8 @@ add_task(
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testReferrerMeasurementUnknownBucketSet() {
+     resetServerRequests();
+@@ -694,8 +694,8 @@ add_task(
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testMultiReferrerMeasurementUnknownBucketNotSetNimbus() {
+     resetServerRequests();
+diff --git a/toolkit/components/dap/tests/xpcshell/test_dap_visit_counter.js b/toolkit/components/dap/tests/xpcshell/test_dap_visit_counter.js
+index bed282fdac..c6a9b82fba 100644
+--- a/toolkit/components/dap/tests/xpcshell/test_dap_visit_counter.js
++++ b/toolkit/components/dap/tests/xpcshell/test_dap_visit_counter.js
+@@ -124,8 +124,8 @@ async function getFreqCapCount(db) {
+ 
+ add_task(
+   {
+-    // Requires Normandy.
+-    skip_if: () => !AppConstants.MOZ_NORMANDY,
++    // Requires desktop Nimbus.
++    skip_if: () => AppConstants.MOZ_BUILD_APP != "browser",
+   },
+   async function testVisitCounterNimbus() {
+     const { cleanup } = await NimbusTestUtils.setupTest();
+diff --git a/toolkit/components/extensions/Extension.sys.mjs b/toolkit/components/extensions/Extension.sys.mjs
+index a4d103eefa..ee2e8ecb76 100644
+--- a/toolkit/components/extensions/Extension.sys.mjs
++++ b/toolkit/components/extensions/Extension.sys.mjs
+@@ -193,7 +193,6 @@ const PRIVILEGED_PERMS = new Set([
+   "activityLog",
+   "mozillaAddons",
+   "networkStatus",
+-  "normandyAddonStudy",
+   "telemetry",
+ ]);
+ 
+@@ -203,23 +202,12 @@ const PRIVILEGED_PERMS_ANDROID_ONLY = new Set([
+   "nativeMessaging",
+ ]);
+ 
+-const PRIVILEGED_PERMS_DESKTOP_ONLY = new Set(["normandyAddonStudy"]);
+-
+ if (AppConstants.platform == "android") {
+   for (const perm of PRIVILEGED_PERMS_ANDROID_ONLY) {
+     PRIVILEGED_PERMS.add(perm);
+   }
+ }
+ 
+-if (
+-  AppConstants.MOZ_APP_NAME != "firefox" ||
+-  AppConstants.platform == "android"
+-) {
+-  for (const perm of PRIVILEGED_PERMS_DESKTOP_ONLY) {
+-    PRIVILEGED_PERMS.delete(perm);
+-  }
+-}
+-
+ // Permissions that are not available in manifest version 2.
+ const PERMS_NOT_IN_MV2 = new Set([
+   // MV2 had a userScripts API, tied to "user_scripts" manifest key. In MV3 the
+diff --git a/toolkit/components/extensions/test/xpcshell/test_ext_permissions.js b/toolkit/components/extensions/test/xpcshell/test_ext_permissions.js
+index 2b768be412..182abcebe5 100644
+--- a/toolkit/components/extensions/test/xpcshell/test_ext_permissions.js
++++ b/toolkit/components/extensions/test/xpcshell/test_ext_permissions.js
+@@ -780,7 +780,6 @@ if (AppConstants.platform == "android") {
+     "identity",
+     "menus",
+     "menus.overrideContext",
+-    "normandyAddonStudy",
+     "search",
+     "tabGroups"
+   );
+diff --git a/toolkit/components/messaging-system/targeting/Targeting.sys.mjs b/toolkit/components/messaging-system/targeting/Targeting.sys.mjs
+index 010997f08e..501faa97e2 100644
+--- a/toolkit/components/messaging-system/targeting/Targeting.sys.mjs
++++ b/toolkit/components/messaging-system/targeting/Targeting.sys.mjs
+@@ -10,7 +10,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   ASRouterTargeting:
+     // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+     "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
+-  ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs",
+   ClientEnvironmentBase:
+     "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs",
+   FilterExpressions:
+@@ -40,7 +39,7 @@ const TargetingEnvironment = {
+   },
+ 
+   get userId() {
+-    return lazy.ClientEnvironment.userId;
++    return lazy.ClientEnvironmentBase.randomizationId;
+   },
+ 
+   get version() {
+diff --git a/toolkit/components/messaging-system/targeting/test/unit/test_targeting.js b/toolkit/components/messaging-system/targeting/test/unit/test_targeting.js
+index b5ea9214ff..ddf5253ae4 100644
+--- a/toolkit/components/messaging-system/targeting/test/unit/test_targeting.js
++++ b/toolkit/components/messaging-system/targeting/test/unit/test_targeting.js
+@@ -1,5 +1,5 @@
+-const { ClientEnvironment } = ChromeUtils.importESModule(
+-  "resource://normandy/lib/ClientEnvironment.sys.mjs"
++const { ClientEnvironmentBase } = ChromeUtils.importESModule(
++  "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs"
+ );
+ const { TargetingContext } = ChromeUtils.importESModule(
+   "resource://messaging-system/targeting/Targeting.sys.mjs"
+@@ -211,11 +211,11 @@ add_task(async function test_telemetry_event_error() {
+   Services.telemetry.clearEvents();
+ });
+ 
+-// Make sure that when using the Normandy-style ClientEnvironment context,
++// Make sure that when using the ClientEnvironment context,
+ // `liveTelemetry` works. `liveTelemetry` is a particularly tricky object to
+ // proxy, so it's useful to check specifically.
+ add_task(async function test_live_telemetry() {
+-  let ctx = { env: ClientEnvironment };
++  let ctx = { env: ClientEnvironmentBase };
+   let targeting = new TargetingContext();
+   // This shouldn't throw.
+   await targeting.eval("env.liveTelemetry.main", ctx);
+diff --git a/toolkit/components/moz.build b/toolkit/components/moz.build
+index 49b1992201..880166c6e7 100644
+--- a/toolkit/components/moz.build
++++ b/toolkit/components/moz.build
+@@ -132,7 +132,7 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] not in ("android", "windows"):
+     DIRS += ["aboutwebauthn"]
+ 
+ if CONFIG["MOZ_BUILD_APP"] == "browser":
+-    DIRS += ["messaging-system", "normandy"]
++    DIRS += ["messaging-system"]
+ 
+ 
+ DIRS += ["nimbus"]
+diff --git a/toolkit/components/nimbus/ExperimentAPI.sys.mjs b/toolkit/components/nimbus/ExperimentAPI.sys.mjs
+index 7dc4037ca5..10cb3193fc 100644
+--- a/toolkit/components/nimbus/ExperimentAPI.sys.mjs
++++ b/toolkit/components/nimbus/ExperimentAPI.sys.mjs
+@@ -13,7 +13,6 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  CleanupManager: "resource://normandy/lib/CleanupManager.sys.mjs",
+   ExperimentManager: "resource://nimbus/lib/ExperimentManager.sys.mjs",
+   FeatureManifest: "resource://nimbus/FeatureManifest.sys.mjs",
+   FirstStartup: "resource://gre/modules/FirstStartup.sys.mjs",
+@@ -216,8 +215,6 @@ export const ExperimentAPI = new (class {
+ 
+     this._onEnabledPrefChange = this._onEnabledPrefChange.bind(this);
+     this._annotateCrashReport = this._annotateCrashReport.bind(this);
+-    this._removeCrashReportAnnotator =
+-      this._removeCrashReportAnnotator.bind(this);
+ 
+     ChromeUtils.defineLazyGetter(this, "_remoteSettingsClient", function () {
+       return lazy.RemoteSettings(lazy.COLLECTION_ID);
+@@ -366,10 +363,6 @@ export const ExperimentAPI = new (class {
+     if (CRASHREPORTER_ENABLED) {
+       this.manager.store.on("update", this._annotateCrashReport);
+       this._annotateCrashReport();
+-
+-      lazy.CleanupManager.addCleanupHandler(
+-        ExperimentAPI._removeCrashReportAnnotator
+-      );
+     }
+ 
+     // Avoid registering these observers during shutdown as they may trigger
+@@ -456,7 +449,6 @@ export const ExperimentAPI = new (class {
+     this.#experimentLoader?.disable();
+     this.#experimentLoader = null;
+ 
+-    lazy.CleanupManager.removeCleanupHandler(this._removeCrashReportAnnotator);
+     this.#experimentManager?.store.off("update", this._annotateCrashReport);
+     this.#experimentManager = null;
+ 
+@@ -495,9 +487,7 @@ export const ExperimentAPI = new (class {
+     );
+ 
+     this.#studiesEnabled =
+-      this.#prefValues.studiesEnabled &&
+-      this.#prefValues.telemetryEnabled &&
+-      Services.policies.isAllowed("Shield");
++      this.#prefValues.studiesEnabled && this.#prefValues.telemetryEnabled;
+   }
+ 
+   get enabled() {
+@@ -583,12 +573,6 @@ export const ExperimentAPI = new (class {
+     );
+   }
+ 
+-  _removeCrashReportAnnotator() {
+-    if (this.#initializedPromise) {
+-      this.#experimentManager?.store.off("update", this._annotateCrashReport);
+-    }
+-  }
+-
+   /**
+    * Handle a pref change that may result in Nimbus being enabled or disabled.
+    */
+diff --git a/toolkit/components/nimbus/FeatureManifest.yaml b/toolkit/components/nimbus/FeatureManifest.yaml
+index 970b4d1823..889e73d61b 100644
+--- a/toolkit/components/nimbus/FeatureManifest.yaml
++++ b/toolkit/components/nimbus/FeatureManifest.yaml
+@@ -3557,18 +3557,6 @@ fxaAvatarMenuItem:
+           - mobile
+       type: string
+ 
+-legacyHeartbeat:
+-  description: Normandy Heartbeat exposed to Nimbus
+-  owner: beth@mozilla.com
+-  hasExposure: false
+-  schema:
+-    uri: "resource://normandy/schemas/LegacyHeartbeat.schema.json"
+-    path: "toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json"
+-  variables:
+-    survey:
+-      type: json
+-      description: The Heartbeat survey parameters.
+-
+ queryStripping:
+   description: Query parameter stripping anti-tracking feature.
+   owner: emz@mozilla.com
+diff --git a/toolkit/components/nimbus/lib/ExperimentManager.sys.mjs b/toolkit/components/nimbus/lib/ExperimentManager.sys.mjs
+index bf9073458a..8088daf32d 100644
+--- a/toolkit/components/nimbus/lib/ExperimentManager.sys.mjs
++++ b/toolkit/components/nimbus/lib/ExperimentManager.sys.mjs
+@@ -5,7 +5,8 @@
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs",
++  ClientEnvironmentBase:
++    "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs",
+   ClientID: "resource://gre/modules/ClientID.sys.mjs",
+   ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
+   ExperimentStore: "resource://nimbus/lib/ExperimentStore.sys.mjs",
+@@ -13,7 +14,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   NimbusEnrollments: "resource://nimbus/lib/Enrollments.sys.mjs",
+   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+   NimbusTelemetry: "resource://nimbus/lib/Telemetry.sys.mjs",
+-  NormandyUtils: "resource://normandy/lib/NormandyUtils.sys.mjs",
+   PrefFlipsFeature: "resource://nimbus/lib/PrefFlipsFeature.sys.mjs",
+   PrefUtils: "moz-src:///toolkit/modules/PrefUtils.sys.mjs",
+   EnrollmentsContext:
+@@ -502,7 +502,7 @@ export class ExperimentManager {
+   async getUserId(bucketConfig) {
+     let id;
+     if (bucketConfig.randomizationUnit === "normandy_id") {
+-      id = lazy.ClientEnvironment.userId;
++      id = lazy.ClientEnvironmentBase.randomizationId;
+     } else if (bucketConfig.randomizationUnit === "group_id") {
+       id = await lazy.ClientID.getProfileGroupID();
+     } else {
+@@ -1379,7 +1379,7 @@ export class ExperimentManager {
+     }
+ 
+     while (Object.keys(branchValues).length < branches.length + includeNot) {
+-      const id = lazy.NormandyUtils.generateUuid();
++      const id = Services.uuid.generateUUID().toString().slice(1, -1);
+       const enrolls = await lazy.Sampling.bucketSample(
+         [id, namespace],
+         start,
+@@ -1414,7 +1414,11 @@ export class ExperimentManager {
+    * @param {string} userId
+    * @returns {Promise<Branch>}
+    */
+-  async chooseBranch(slug, branches, userId = lazy.ClientEnvironment.userId) {
++  async chooseBranch(
++    slug,
++    branches,
++    userId = lazy.ClientEnvironmentBase.randomizationId
++  ) {
+     const ratios = branches.map(({ ratio = 1 }) => ratio);
+ 
+     // It's important that the input be:
+diff --git a/toolkit/components/nimbus/test/browser/browser_remotesettingsexperimentloader_force_enrollment.js b/toolkit/components/nimbus/test/browser/browser_remotesettingsexperimentloader_force_enrollment.js
+index 5acbeaa5a1..02ec3e9eb0 100644
+--- a/toolkit/components/nimbus/test/browser/browser_remotesettingsexperimentloader_force_enrollment.js
++++ b/toolkit/components/nimbus/test/browser/browser_remotesettingsexperimentloader_force_enrollment.js
+@@ -199,7 +199,7 @@ add_task(async function test_invalid_branch_schema() {
+         slug: "control",
+         features: [
+           {
+-            featureId: "legacyHeartbeat",
++            featureId: "prefFlips",
+             value: {
+               foo: "bar",
+             },
+diff --git a/toolkit/components/nimbus/test/unit/test_ExperimentManager_enroll.js b/toolkit/components/nimbus/test/unit/test_ExperimentManager_enroll.js
+index 8166fae481..b30d8da2c9 100644
+--- a/toolkit/components/nimbus/test/unit/test_ExperimentManager_enroll.js
++++ b/toolkit/components/nimbus/test/unit/test_ExperimentManager_enroll.js
+@@ -7,8 +7,8 @@ const { Sampling } = ChromeUtils.importESModule(
+ const { ClientID } = ChromeUtils.importESModule(
+   "resource://gre/modules/ClientID.sys.mjs"
+ );
+-const { ClientEnvironment } = ChromeUtils.importESModule(
+-  "resource://normandy/lib/ClientEnvironment.sys.mjs"
++const { ClientEnvironmentBase } = ChromeUtils.importESModule(
++  "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs"
+ );
+ const { ExperimentStore } = ChromeUtils.importESModule(
+   "resource://nimbus/lib/ExperimentStore.sys.mjs"
+@@ -565,7 +565,7 @@ add_task(async function test_sampling_check() {
+   const { sandbox, manager, cleanup } = await setupTest();
+ 
+   sandbox.stub(Sampling, "bucketSample").resolves(true);
+-  sandbox.replaceGetter(ClientEnvironment, "userId", () => 42);
++  sandbox.replaceGetter(ClientEnvironmentBase, "randomizationId", () => 42);
+ 
+   let recipe = NimbusTestUtils.factories.recipe("foo", { bucketConfig: null });
+ 
+diff --git a/toolkit/components/nimbus/test/unit/test_policy.js b/toolkit/components/nimbus/test/unit/test_policy.js
+index d92093127c..86f08a87c0 100644
+--- a/toolkit/components/nimbus/test/unit/test_policy.js
++++ b/toolkit/components/nimbus/test/unit/test_policy.js
+@@ -128,17 +128,6 @@ async function doTest({
+   await cleanup();
+ }
+ 
+-add_task(async function testDisableStudiesPolicy() {
+-  await doTest({
+-    policies: { DisableFirefoxStudies: true },
+-    labsEnabled: true,
+-    rolloutsEnabled: true,
+-    studiesEnabled: false,
+-    expectedEnrollments: ["rollout"],
+-    expectedOptIns: ["optin"],
+-  });
+-});
+-
+ add_task(async function testDisableRolloutPolicyCausesUnenrollments() {
+   await doTest({
+     policies: { DisableRemoteImprovements: true },
+diff --git a/toolkit/components/utils/ClientEnvironment.sys.mjs b/toolkit/components/utils/ClientEnvironment.sys.mjs
+index 86dd278a6b..f2a6a79afa 100644
+--- a/toolkit/components/utils/ClientEnvironment.sys.mjs
++++ b/toolkit/components/utils/ClientEnvironment.sys.mjs
+@@ -8,7 +8,6 @@ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+-  NormandyUtils: "resource://normandy/lib/NormandyUtils.sys.mjs",
+   Region: "resource://gre/modules/Region.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+   ShellService: "moz-src:///browser/components/shell/ShellService.sys.mjs",
+@@ -36,7 +35,7 @@ function getOsVersion() {
+ /**
+  * Create an object that provides general information about the client application.
+  *
+- * Components like Normandy RecipeRunner use this as part of the context for filter expressions,
++ * Components like Nimbus's targeting use this as part of the context for filter expressions,
+  * so avoid adding non-getter functions as attributes, as filter expressions
+  * cannot execute functions.
+  *
+@@ -125,7 +124,7 @@ export class ClientEnvironmentBase {
+   static get randomizationId() {
+     let id = Services.prefs.getCharPref("app.normandy.user_id", "");
+     if (!id) {
+-      id = lazy.NormandyUtils.generateUuid();
++      id = Services.uuid.generateUUID().toString().slice(1, -1);
+       Services.prefs.setCharPref("app.normandy.user_id", id);
+     }
+     return id;
+diff --git a/toolkit/components/utils/test/unit/test_ClientEnvironment.js b/toolkit/components/utils/test/unit/test_ClientEnvironment.js
+index af2bf94524..65ab8da74d 100644
+--- a/toolkit/components/utils/test/unit/test_ClientEnvironment.js
++++ b/toolkit/components/utils/test/unit/test_ClientEnvironment.js
+@@ -6,7 +6,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
+   ClientEnvironmentBase:
+     "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs",
+-  NormandyTestUtils: "resource://testing-common/NormandyTestUtils.sys.mjs",
+   Region: "resource://gre/modules/Region.sys.mjs",
+   RegionTestUtils: "resource://testing-common/RegionTestUtils.sys.mjs",
+   TelemetryController: "resource://gre/modules/TelemetryController.sys.mjs",
+@@ -149,8 +148,9 @@ add_task(
+   async function testRandomizationId() {
+     // Should generate an id if none is set
+     await Services.prefs.clearUserPref("app.normandy.user_id");
+-    Assert.ok(
+-      NormandyTestUtils.isUuid(ClientEnvironmentBase.randomizationId),
++    Assert.stringMatches(
++      ClientEnvironmentBase.randomizationId,
++      /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i,
+       "randomizationId should be available"
+     );
+ 
+diff --git a/toolkit/content/aboutSupport.js b/toolkit/content/aboutSupport.js
+index d6bbbf39d0..0e6fd61a1d 100644
+--- a/toolkit/content/aboutSupport.js
++++ b/toolkit/content/aboutSupport.js
+@@ -1635,21 +1635,7 @@ var snapshotFormatters = {
+   },
+ 
+   normandy(data) {
+-    if (!data) {
+-      return;
+-    }
+-
+-    const { prefRollouts, nimbusRollouts } = data;
+-    $.append(
+-      $("remote-features-tbody"),
+-      prefRollouts.map(({ slug, state }) =>
+-        $.new("tr", [
+-          $.new("td", [document.createTextNode(slug)]),
+-          $.new("td", [document.createTextNode(state)]),
+-        ])
+-      )
+-    );
+-
++    const { nimbusRollouts } = data;
+     $.append(
+       $("remote-features-tbody"),
+       nimbusRollouts.map(({ userFacingName, branch }) =>
+diff --git a/toolkit/content/aboutSupport.xhtml b/toolkit/content/aboutSupport.xhtml
+index c568422a91..27ae7e4b9a 100644
+--- a/toolkit/content/aboutSupport.xhtml
++++ b/toolkit/content/aboutSupport.xhtml
+@@ -344,7 +344,6 @@
+ 
+ #endif
+ 
+-#ifdef MOZ_NORMANDY
+       <!-- - - - - - - - - - - - - - - - - - - - - -->
+ 
+       <h2 class="major-section" id="remote-features" data-l10n-id="support-remote-features-title"/>
+@@ -359,7 +358,6 @@
+         </tbody>
+       </table>
+ 
+-#endif
+       <!-- - - - - - - - - - - - - - - - - - - - - -->
+ 
+       <h2 class="major-section" data-l10n-id="processes-title" id="remote-processes"/>
+diff --git a/toolkit/docs/index.rst b/toolkit/docs/index.rst
+index 027743931a..8e0d8c850d 100644
+--- a/toolkit/docs/index.rst
++++ b/toolkit/docs/index.rst
+@@ -16,7 +16,6 @@ This is the nascent documentation of the Toolkit code that is shared across Fire
+    crashreporter/crashreporter/index
+    internal-urls
+    search/index
+-   components/normandy/normandy/index
+    components/nimbus/docs/index
+    components/pictureinpicture/pictureinpicture/index
+    components/prompts/prompts/index
+diff --git a/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl b/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl
+index eb219155cc..4ae5d85dcf 100644
+--- a/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl
++++ b/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl
+@@ -450,12 +450,7 @@ support-remote-settings-sync-history-status = Status
+ support-remote-settings-sync-history-datetime = Date
+ support-remote-settings-sync-history-infos = Infos
+ 
+-## Normandy sections
+-
+-support-remote-experiments-title = Remote Experiments
+-support-remote-experiments-name = Name
+-support-remote-experiments-branch = Experiment Branch
+-support-remote-experiments-see-about-studies = See <a data-l10n-name="support-about-studies-link">about:studies</a> for more information, including how to disable individual experiments or to disable { -brand-short-name } from running this type of experiment in the future.
++## Remote features
+ 
+ support-remote-features-title = Remote Features
+ support-remote-features-name = Name
+diff --git a/toolkit/locales/jar.mn b/toolkit/locales/jar.mn
+index aebbbcf335..422866a044 100644
+--- a/toolkit/locales/jar.mn
++++ b/toolkit/locales/jar.mn
+@@ -14,7 +14,6 @@
+ 
+ @AB_CD@.jar:
+ % locale global @AB_CD@ %locale/@AB_CD@/global/
+-  locale/@AB_CD@/global/aboutStudies.properties         (%chrome/global/aboutStudies.properties)
+   locale/@AB_CD@/global/autocomplete.properties         (%chrome/global/autocomplete.properties)
+   locale/@AB_CD@/global/commonDialogs.properties        (%chrome/global/commonDialogs.properties)
+   locale/@AB_CD@/global/contentAreaCommands.properties  (%chrome/global/contentAreaCommands.properties)
+diff --git a/toolkit/modules/AppConstants.sys.mjs b/toolkit/modules/AppConstants.sys.mjs
+index 16c3fe4445..6c1d429452 100644
+--- a/toolkit/modules/AppConstants.sys.mjs
++++ b/toolkit/modules/AppConstants.sys.mjs
+@@ -123,8 +123,6 @@ export var AppConstants = Object.freeze({
+ 
+   MOZ_CRASHREPORTER: @MOZ_CRASHREPORTER_BOOL@,
+ 
+-  MOZ_NORMANDY: @MOZ_NORMANDY_BOOL@,
+-
+   MOZ_MAINTENANCE_SERVICE: @MOZ_MAINTENANCE_SERVICE_BOOL@,
+ 
+   MOZ_BACKGROUNDTASKS: @MOZ_BACKGROUNDTASKS_BOOL@,
+diff --git a/toolkit/modules/FirstStartup.sys.mjs b/toolkit/modules/FirstStartup.sys.mjs
+index 8fa592e63c..3f7ee3d2ea 100644
+--- a/toolkit/modules/FirstStartup.sys.mjs
++++ b/toolkit/modules/FirstStartup.sys.mjs
+@@ -9,7 +9,6 @@ const lazy = {};
+ ChromeUtils.defineESModuleGetters(lazy, {
+   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+   ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
+-  Normandy: "resource://normandy/Normandy.sys.mjs",
+   TaskScheduler: "resource://gre/modules/TaskScheduler.sys.mjs",
+ });
+ 
+@@ -31,7 +30,6 @@ export var FirstStartup = {
+   IN_PROGRESS: 1,
+   TIMED_OUT: 2,
+   SUCCESS: 3,
+-  UNSUPPORTED: 4,
+ 
+   _state: 0, // NOT_STARTED,
+   /**
+@@ -64,18 +62,8 @@ export var FirstStartup = {
+     let startingTime = ChromeUtils.now();
+     let initialized = false;
+ 
+-    let promises = [];
+-
+-    let normandyInitEndTime = null;
+-    let normandyInitPromise = null;
+-    if (AppConstants.MOZ_NORMANDY) {
+-      normandyInitPromise = lazy.Normandy.init({ runAsync: false }).finally(
+-        () => {
+-          normandyInitEndTime = ChromeUtils.now();
+-        }
+-      );
+-      promises.push(normandyInitPromise);
+-    }
++    let nimbusInitPromise = lazy.ExperimentAPI.init();
++    let promises = [nimbusInitPromise];
+ 
+     let deleteTasksEndTime = null;
+     if (AppConstants.MOZ_UPDATE_AGENT) {
+@@ -105,9 +93,9 @@ export var FirstStartup = {
+       false
+     );
+     let categoryTasksEndTime = null;
+-    if (CATEGORY_TASKS_ENABLED && AppConstants.MOZ_NORMANDY) {
++    if (CATEGORY_TASKS_ENABLED) {
+       promises.push(
+-        normandyInitPromise.finally(() => {
++        nimbusInitPromise.finally(() => {
+           return lazy.BrowserUtils.callModulesFromCategory({
+             categoryName: CATEGORY_NAME,
+             profileMarker: "first-startup-new-profile-tasks",
+@@ -119,57 +107,47 @@ export var FirstStartup = {
+       );
+     }
+ 
+-    if (promises.length) {
+-      Promise.allSettled(promises).then(() => (initialized = true));
+-
+-      this.elapsed = 0;
+-      Services.tm.spinEventLoopUntil("FirstStartup.sys.mjs:init", () => {
+-        this.elapsed = Math.ceil(ChromeUtils.now() - startingTime);
+-        if (this.elapsed >= timeout) {
+-          this._state = this.TIMED_OUT;
+-          return true;
+-        } else if (initialized) {
+-          this._state = this.SUCCESS;
+-          return true;
+-        }
+-        return false;
+-      });
+-    } else {
+-      this._state = this.UNSUPPORTED;
+-    }
+-
+-    if (AppConstants.MOZ_NORMANDY) {
+-      Glean.firstStartup.normandyInitTime.set(
+-        Math.ceil(normandyInitEndTime || ChromeUtils.now() - startingTime)
+-      );
+-
+-      const nimbusTimestamps =
+-        lazy.ExperimentAPI.getAndClearFirstStartupTimestamps();
+-
+-      Glean.firstStartup.nimbusStoreInitTime.set(
+-        Math.ceil(
+-          nimbusTimestamps?.storeInitEnd ?? ChromeUtils.now() - startingTime
+-        )
+-      );
++    Promise.allSettled(promises).then(() => (initialized = true));
++
++    this.elapsed = 0;
++    Services.tm.spinEventLoopUntil("FirstStartup.sys.mjs:init", () => {
++      this.elapsed = Math.ceil(ChromeUtils.now() - startingTime);
++      if (this.elapsed >= timeout) {
++        this._state = this.TIMED_OUT;
++        return true;
++      } else if (initialized) {
++        this._state = this.SUCCESS;
++        return true;
++      }
++      return false;
++    });
++
++    const nimbusTimestamps =
++      lazy.ExperimentAPI.getAndClearFirstStartupTimestamps();
++
++    Glean.firstStartup.nimbusStoreInitTime.set(
++      Math.ceil(
++        nimbusTimestamps?.storeInitEnd ?? ChromeUtils.now() - startingTime
++      )
++    );
+ 
+-      Glean.firstStartup.nimbusManagerInitTime.set(
+-        Math.ceil(
+-          nimbusTimestamps?.managerInitEnd ?? ChromeUtils.now() - startingTime
+-        )
+-      );
++    Glean.firstStartup.nimbusManagerInitTime.set(
++      Math.ceil(
++        nimbusTimestamps?.managerInitEnd ?? ChromeUtils.now() - startingTime
++      )
++    );
+ 
+-      Glean.firstStartup.nimbusLoaderInitTime.set(
+-        Math.ceil(
+-          nimbusTimestamps?.loaderInitEnd ?? ChromeUtils.now() - startingTime
+-        )
+-      );
++    Glean.firstStartup.nimbusLoaderInitTime.set(
++      Math.ceil(
++        nimbusTimestamps?.loaderInitEnd ?? ChromeUtils.now() - startingTime
++      )
++    );
+ 
+-      Glean.firstStartup.nimbusInitTime.set(
+-        Math.ceil(
+-          nimbusTimestamps?.nimbusInitEnd ?? ChromeUtils.now() - startingTime
+-        )
+-      );
+-    }
++    Glean.firstStartup.nimbusInitTime.set(
++      Math.ceil(
++        nimbusTimestamps?.nimbusInitEnd ?? ChromeUtils.now() - startingTime
++      )
++    );
+ 
+     if (AppConstants.MOZ_UPDATE_AGENT) {
+       Glean.firstStartup.deleteTasksTime.set(
+diff --git a/toolkit/modules/Troubleshoot.sys.mjs b/toolkit/modules/Troubleshoot.sys.mjs
+index d766d50cc0..a3942ce880 100644
+--- a/toolkit/modules/Troubleshoot.sys.mjs
++++ b/toolkit/modules/Troubleshoot.sys.mjs
+@@ -1001,38 +1001,13 @@ var dataProviders = {
+   },
+ 
+   async normandy(done) {
+-    if (!AppConstants.MOZ_NORMANDY) {
+-      done();
+-      return;
+-    }
+-
+-    const { PreferenceExperiments: NormandyPreferenceStudies } =
+-      ChromeUtils.importESModule(
+-        "resource://normandy/lib/PreferenceExperiments.sys.mjs"
+-      );
+-    const { AddonStudies: NormandyAddonStudies } = ChromeUtils.importESModule(
+-      "resource://normandy/lib/AddonStudies.sys.mjs"
+-    );
+-    const { PreferenceRollouts: NormandyPreferenceRollouts } =
+-      ChromeUtils.importESModule(
+-        "resource://normandy/lib/PreferenceRollouts.sys.mjs"
+-      );
+     const { ExperimentAPI } = ChromeUtils.importESModule(
+       "resource://nimbus/ExperimentAPI.sys.mjs"
+     );
+ 
+-    // Get Normandy data in parallel, and sort each group by slug.
+-    const [
+-      addonStudies,
+-      prefRollouts,
+-      prefStudies,
+-      nimbusExperiments,
+-      nimbusRollouts,
+-    ] = await Promise.all(
++    // Get Nimbus data in parallel, and sort each group by slug.
++    const [nimbusExperiments, nimbusRollouts] = await Promise.all(
+       [
+-        NormandyAddonStudies.getAllActive(),
+-        NormandyPreferenceRollouts.getAllActive(),
+-        NormandyPreferenceStudies.getAllActive(),
+         ExperimentAPI.manager.store
+           .ready()
+           .then(() => ExperimentAPI.manager.store.getAllActiveExperiments()),
+@@ -1050,9 +1025,6 @@ var dataProviders = {
+     );
+ 
+     done({
+-      addonStudies,
+-      prefRollouts,
+-      prefStudies,
+       nimbusExperiments,
+       nimbusRollouts,
+     });
+diff --git a/toolkit/modules/docs/FirstStartup.rst b/toolkit/modules/docs/FirstStartup.rst
+index 426c341daf..416ef5eafa 100644
+--- a/toolkit/modules/docs/FirstStartup.rst
++++ b/toolkit/modules/docs/FirstStartup.rst
+@@ -28,7 +28,7 @@ would be deferred until after UI startup already complete.
+ FirstStartup: Example use case
+ ==============================
+ 
+-An example use of the ``FirstStartup`` module is to invoke the Normandy client to download an experiment
++An example use of the ``FirstStartup`` module is to initialize Nimbus to download an experiment
+ that will be used to customize the first-run page that Firefox shows.
+ 
+ In this example, the first-run page would be loaded experimentally based on an attribution code provided
+@@ -37,7 +37,7 @@ by the Installer. The flow for this looks like:
+ 1. User clicks on download link containing an attribution (UTM) code(s).
+ 2. The download page serves a custom Windows Stub Installer with the appropriate attribution code embedded.
+ 3. The installer invokes Firefox with the `--first-startup` flag, which blocks the first window.
+-4. Normandy is run by ``FirstStartup`` and downloads a list of available experiments, or "recipes".
++4. Nimbus is initialized by ``FirstStartup`` and downloads a list of available experiments, or "recipes".
+ 5. Recipes are evaluated and filtered based on local information, such as the OS platform and the attribution codes.
+ 6. A recipe is found which matches the current attribution code, and appropriate data is made available to the first-run page.
+ 7. ``FirstStartup`` completes and unblocks, which causes Firefox to show the first window and load the appropriate first-run data.
+@@ -66,7 +66,3 @@ List of phases
+ ``FirstStartup.SUCCESS``
+ 
+   All startup tasks have completed successfully, and application startup may resume.
+-
+-``FirstStartup.UNSUPPORTED``
+-
+-  No startup tasks are supported, and `FirstStartup` exited.
+diff --git a/toolkit/modules/moz.build b/toolkit/modules/moz.build
+index 4f4a0b006d..3633fd38cb 100644
+--- a/toolkit/modules/moz.build
++++ b/toolkit/modules/moz.build
+@@ -328,7 +328,6 @@ for var in (
+     "MOZ_WEBRTC",
+     "MOZ_WMF_CDM",
+     "MOZ_CRASHREPORTER",
+-    "MOZ_NORMANDY",
+     "MOZ_MAINTENANCE_SERVICE",
+     "MOZ_BACKGROUNDTASKS",
+     "MOZ_UPDATE_AGENT",
+diff --git a/toolkit/modules/tests/browser/browser_Troubleshoot.js b/toolkit/modules/tests/browser/browser_Troubleshoot.js
+index f260d114a5..d5ef967e9b 100644
+--- a/toolkit/modules/tests/browser/browser_Troubleshoot.js
++++ b/toolkit/modules/tests/browser/browser_Troubleshoot.js
+@@ -9,24 +9,6 @@
+ const { Troubleshoot } = ChromeUtils.importESModule(
+   "resource://gre/modules/Troubleshoot.sys.mjs"
+ );
+-const { sinon } = ChromeUtils.importESModule(
+-  "resource://testing-common/Sinon.sys.mjs"
+-);
+-
+-const { PreferenceExperiments } = ChromeUtils.importESModule(
+-  "resource://normandy/lib/PreferenceExperiments.sys.mjs"
+-);
+-const { PreferenceRollouts } = ChromeUtils.importESModule(
+-  "resource://normandy/lib/PreferenceRollouts.sys.mjs"
+-);
+-const { AddonStudies } = ChromeUtils.importESModule(
+-  "resource://normandy/lib/AddonStudies.sys.mjs"
+-);
+-const { NormandyTestUtils } = ChromeUtils.importESModule(
+-  "resource://testing-common/NormandyTestUtils.sys.mjs"
+-);
+-
+-NormandyTestUtils.init({ Assert });
+ 
+ add_task(async function snapshotSchema() {
+   let snapshot = await Troubleshoot.snapshot();
+@@ -118,134 +100,6 @@ add_task(async function printingPreferences() {
+   prefs.forEach(p => Services.prefs.deleteBranch(p));
+ });
+ 
+-add_task(function normandy() {
+-  const {
+-    preferenceStudyFactory,
+-    branchedAddonStudyFactory,
+-    preferenceRolloutFactory,
+-  } = NormandyTestUtils.factories;
+-
+-  return NormandyTestUtils.decorate(
+-    PreferenceExperiments.withMockExperiments([
+-      preferenceStudyFactory({
+-        userFacingName: "Test Pref Study B",
+-        branch: "test-branch-pref",
+-      }),
+-      preferenceStudyFactory({
+-        userFacingName: "Test Pref Study A",
+-        branch: "test-branch-pref",
+-      }),
+-    ]),
+-    AddonStudies.withStudies([
+-      branchedAddonStudyFactory({
+-        userFacingName: "Test Addon Study B",
+-        branch: "test-branch-addon",
+-      }),
+-      branchedAddonStudyFactory({
+-        userFacingName: "Test Addon Study A",
+-        branch: "test-branch-addon",
+-      }),
+-    ]),
+-    PreferenceRollouts.withTestMock({
+-      rollouts: [
+-        preferenceRolloutFactory({
+-          statue: "ACTIVE",
+-          slug: "test-pref-rollout-b",
+-        }),
+-        preferenceRolloutFactory({
+-          statue: "ACTIVE",
+-          slug: "test-pref-rollout-a",
+-        }),
+-      ],
+-    }),
+-    async function testNormandyInfoInTroubleshooting({
+-      prefExperiments,
+-      addonStudies,
+-      prefRollouts,
+-    }) {
+-      let snapshot = await Troubleshoot.snapshot();
+-      let info = snapshot.normandy;
+-      // The order should be flipped, since each category is sorted by slug.
+-      Assert.deepEqual(
+-        info.prefStudies,
+-        [prefExperiments[1], prefExperiments[0]],
+-        "prefs studies should exist in the right order"
+-      );
+-      Assert.deepEqual(
+-        info.addonStudies,
+-        [addonStudies[1], addonStudies[0]],
+-        "addon studies should exist in the right order"
+-      );
+-      Assert.deepEqual(
+-        info.prefRollouts,
+-        [prefRollouts[1], prefRollouts[0]],
+-        "pref rollouts should exist in the right order"
+-      );
+-    }
+-  )();
+-});
+-
+-add_task(function normandyErrorHandling() {
+-  return NormandyTestUtils.decorate(
+-    NormandyTestUtils.withStub(PreferenceExperiments, "getAllActive", {
+-      returnValue: Promise.reject("Expected error - PreferenceExperiments"),
+-    }),
+-    NormandyTestUtils.withStub(AddonStudies, "getAllActive", {
+-      returnValue: Promise.reject("Expected error - AddonStudies"),
+-    }),
+-    NormandyTestUtils.withStub(PreferenceRollouts, "getAllActive", {
+-      returnValue: Promise.reject("Expected error - PreferenceRollouts"),
+-    }),
+-    async function testNormandyErrorHandling() {
+-      let consoleEndFn = TestUtils.listenForConsoleMessages();
+-      let snapshot = await Troubleshoot.snapshot();
+-      let info = snapshot.normandy;
+-      Assert.deepEqual(
+-        info.prefStudies,
+-        [],
+-        "prefs studies should be an empty list if there is an error"
+-      );
+-      Assert.deepEqual(
+-        info.addonStudies,
+-        [],
+-        "addon studies should be an empty list if there is an error"
+-      );
+-      Assert.deepEqual(
+-        info.prefRollouts,
+-        [],
+-        "pref rollouts should be an empty list if there is an error"
+-      );
+-      let msgs = await consoleEndFn();
+-      let expectedSet = new Set([
+-        /Expected error - PreferenceExperiments/,
+-        /Expected error - AddonStudies/,
+-        /Expected error - PreferenceRollouts/,
+-      ]);
+-
+-      for (let msg of msgs) {
+-        msg = msg.wrappedJSObject;
+-        if (msg.level != "error") {
+-          continue;
+-        }
+-
+-        let msgContents = msg.arguments[0];
+-        for (let expected of expectedSet) {
+-          if (expected.test(msgContents)) {
+-            expectedSet.delete(expected);
+-            break;
+-          }
+-        }
+-      }
+-
+-      Assert.equal(
+-        expectedSet.size,
+-        0,
+-        "Should have no messages left in the expected set"
+-      );
+-    }
+-  )();
+-});
+-
+ add_task(async function themes() {
+   let snapshot = await Troubleshoot.snapshot();
+   let foundTheme = false;
+@@ -1138,41 +992,8 @@ const SNAPSHOT_SCHEMA = {
+     },
+     normandy: {
+       type: "object",
+-      required: AppConstants.MOZ_NORMANDY,
++      required: true,
+       properties: {
+-        addonStudies: {
+-          type: "array",
+-          items: {
+-            type: "object",
+-            properties: {
+-              userFacingName: { type: "string", required: true },
+-              branch: { type: "string", required: true },
+-            },
+-          },
+-          required: true,
+-        },
+-        prefRollouts: {
+-          type: "array",
+-          items: {
+-            type: "object",
+-            properties: {
+-              slug: { type: "string", required: true },
+-              state: { type: "string", required: true },
+-            },
+-          },
+-          required: true,
+-        },
+-        prefStudies: {
+-          type: "array",
+-          items: {
+-            type: "object",
+-            properties: {
+-              userFacingName: { type: "string", required: true },
+-              branch: { type: "string", required: true },
+-            },
+-          },
+-          required: true,
+-        },
+         nimbusExperiments: {
+           type: "array",
+           items: {
+diff --git a/toolkit/modules/tests/xpcshell/test_firstStartup.js b/toolkit/modules/tests/xpcshell/test_firstStartup.js
+index ad192f8613..3fdd557522 100644
+--- a/toolkit/modules/tests/xpcshell/test_firstStartup.js
++++ b/toolkit/modules/tests/xpcshell/test_firstStartup.js
+@@ -29,41 +29,22 @@ add_task(async function test_success() {
+ 
+   await GleanPings.firstStartup.testSubmission(
+     () => {
+-      if (AppConstants.MOZ_NORMANDY || AppConstants.MOZ_UPDATE_AGENT) {
+-        Assert.equal(FirstStartup.state, FirstStartup.SUCCESS);
+-        Assert.ok(Glean.firstStartup.newProfile.testGetValue());
+-        Assert.equal(
+-          Glean.firstStartup.statusCode.testGetValue(),
+-          FirstStartup.SUCCESS
+-        );
+-
+-        if (AppConstants.MOZ_NORMANDY) {
+-          Assert.greater(Glean.firstStartup.normandyInitTime.testGetValue(), 0);
+-          Assert.greater(
+-            Glean.firstStartup.nimbusStoreInitTime.testGetValue(),
+-            0
+-          );
+-          Assert.greater(
+-            Glean.firstStartup.nimbusManagerInitTime.testGetValue(),
+-            0
+-          );
+-          Assert.greater(
+-            Glean.firstStartup.nimbusLoaderInitTime.testGetValue(),
+-            0
+-          );
+-          Assert.greater(Glean.firstStartup.nimbusInitTime.testGetValue(), 0);
+-        }
+-
+-        if (AppConstants.MOZ_UPDATE_AGENT) {
+-          Assert.greater(Glean.firstStartup.deleteTasksTime.testGetValue(), 0);
+-        }
+-      } else {
+-        Assert.equal(FirstStartup.state, FirstStartup.UNSUPPORTED);
+-        Assert.ok(Glean.firstStartup.newProfile.testGetValue());
+-        Assert.equal(
+-          Glean.firstStartup.statusCode.testGetValue(),
+-          FirstStartup.UNSUPPORTED
+-        );
++      Assert.equal(FirstStartup.state, FirstStartup.SUCCESS);
++      Assert.ok(Glean.firstStartup.newProfile.testGetValue());
++      Assert.equal(
++        Glean.firstStartup.statusCode.testGetValue(),
++        FirstStartup.SUCCESS
++      );
++      Assert.greater(Glean.firstStartup.nimbusStoreInitTime.testGetValue(), 0);
++      Assert.greater(
++        Glean.firstStartup.nimbusManagerInitTime.testGetValue(),
++        0
++      );
++      Assert.greater(Glean.firstStartup.nimbusLoaderInitTime.testGetValue(), 0);
++      Assert.greater(Glean.firstStartup.nimbusInitTime.testGetValue(), 0);
++
++      if (AppConstants.MOZ_UPDATE_AGENT) {
++        Assert.greater(Glean.firstStartup.deleteTasksTime.testGetValue(), 0);
+       }
+     },
+     () => FirstStartup.init(/* newProfile = */ true)
+@@ -77,35 +58,19 @@ add_task(async function test_timeout() {
+ 
+   await GleanPings.firstStartup.testSubmission(
+     () => {
+-      if (AppConstants.MOZ_NORMANDY || AppConstants.MOZ_UPDATE_AGENT) {
+-        Assert.equal(FirstStartup.state, FirstStartup.TIMED_OUT);
+-        Assert.greater(Glean.firstStartup.elapsed.testGetValue(), 0);
+-        Assert.ok(Glean.firstStartup.newProfile.testGetValue());
+-
+-        if (AppConstants.MOZ_NORMANDY) {
+-          Assert.greater(Glean.firstStartup.normandyInitTime.testGetValue(), 0);
+-          Assert.greater(
+-            Glean.firstStartup.nimbusStoreInitTime.testGetValue(),
+-            0
+-          );
+-          Assert.greater(
+-            Glean.firstStartup.nimbusManagerInitTime.testGetValue(),
+-            0
+-          );
+-          Assert.greater(
+-            Glean.firstStartup.nimbusLoaderInitTime.testGetValue(),
+-            0
+-          );
+-          Assert.greater(Glean.firstStartup.nimbusInitTime.testGetValue(), 0);
+-        }
+-
+-        if (AppConstants.MOZ_UPDATE_AGENT) {
+-          Assert.greater(Glean.firstStartup.deleteTasksTime.testGetValue(), 0);
+-        }
+-      } else {
+-        Assert.equal(FirstStartup.state, FirstStartup.UNSUPPORTED);
+-        Assert.equal(Glean.firstStartup.elapsed.testGetValue(), 0);
+-        Assert.ok(Glean.firstStartup.newProfile.testGetValue());
++      Assert.equal(FirstStartup.state, FirstStartup.TIMED_OUT);
++      Assert.greater(Glean.firstStartup.elapsed.testGetValue(), 0);
++      Assert.ok(Glean.firstStartup.newProfile.testGetValue());
++      Assert.greater(Glean.firstStartup.nimbusStoreInitTime.testGetValue(), 0);
++      Assert.greater(
++        Glean.firstStartup.nimbusManagerInitTime.testGetValue(),
++        0
++      );
++      Assert.greater(Glean.firstStartup.nimbusLoaderInitTime.testGetValue(), 0);
++      Assert.greater(Glean.firstStartup.nimbusInitTime.testGetValue(), 0);
++
++      if (AppConstants.MOZ_UPDATE_AGENT) {
++        Assert.greater(Glean.firstStartup.deleteTasksTime.testGetValue(), 0);
+       }
+     },
+     () => FirstStartup.init(/* newProfile = */ true)
+diff --git a/toolkit/modules/tests/xpcshell/test_firstStartup_categoryTasks.js b/toolkit/modules/tests/xpcshell/test_firstStartup_categoryTasks.js
+index 7ea0d5ade2..76f69e8c15 100644
+--- a/toolkit/modules/tests/xpcshell/test_firstStartup_categoryTasks.js
++++ b/toolkit/modules/tests/xpcshell/test_firstStartup_categoryTasks.js
+@@ -26,15 +26,10 @@ add_setup(function test_setup() {
+ /**
+  * Test that category tasks registered with the first-startup-new-profile
+  * category are invoked during FirstStartup initialization, and that they run
+- * after Normandy initialization completes. Verifies that the
++ * after Nimbus initialization completes. Verifies that the
+  * categoryTasksTime Glean metric is recorded.
+  */
+-add_task(async function test_categoryTasks_called_after_normandy() {
+-  if (!AppConstants.MOZ_NORMANDY) {
+-    info("Skipping test - MOZ_NORMANDY not enabled");
+-    return;
+-  }
+-
++add_task(async function test_categoryTasks_called_after_nimbus() {
+   updateAppInfo();
+   Services.prefs.setBoolPref(PREF_CATEGORY_TASKS, true);
+   FirstStartup.resetForTesting();
+@@ -49,16 +44,16 @@ add_task(async function test_categoryTasks_called_after_normandy() {
+   );
+   await catManUpdated;
+ 
+-  const { Normandy } = ChromeUtils.importESModule(
+-    "resource://normandy/Normandy.sys.mjs"
++  const { ExperimentAPI } = ChromeUtils.importESModule(
++    "resource://nimbus/ExperimentAPI.sys.mjs"
+   );
+   let sandbox = sinon.createSandbox();
+-  let normandyInitComplete = false;
+-  let originalInit = Normandy.init.bind(Normandy);
++  let nimbusInitComplete = false;
++  let originalInit = ExperimentAPI.init.bind(ExperimentAPI);
+ 
+-  sandbox.stub(Normandy, "init").callsFake(function (...args) {
++  sandbox.stub(ExperimentAPI, "init").callsFake(function (...args) {
+     return originalInit(...args).finally(() => {
+-      normandyInitComplete = true;
++      nimbusInitComplete = true;
+     });
+   });
+ 
+@@ -66,12 +61,12 @@ add_task(async function test_categoryTasks_called_after_normandy() {
+   let categoryTaskPromise = TestUtils.topicObserved(CATEGORY_TASK_TOPIC).then(
+     ([_subj, data]) => {
+       Assert.ok(
+-        Normandy.init.calledOnce,
+-        "Normandy.init should have been called"
++        ExperimentAPI.init.calledOnce,
++        "ExperimentAPI.init should have been called"
+       );
+       Assert.ok(
+-        normandyInitComplete,
+-        "Normandy init should be complete before category task starts"
++        nimbusInitComplete,
++        "Nimbus init should be complete before category task starts"
+       );
+       categoryTaskCalled = true;
+       return data;
+@@ -86,7 +81,6 @@ add_task(async function test_categoryTasks_called_after_normandy() {
+         Glean.firstStartup.statusCode.testGetValue(),
+         FirstStartup.SUCCESS
+       );
+-      Assert.greater(Glean.firstStartup.normandyInitTime.testGetValue(), 0);
+       Assert.greater(
+         Glean.firstStartup.categoryTasksTime.testGetValue(),
+         0,
+@@ -117,11 +111,6 @@ add_task(async function test_categoryTasks_called_after_normandy() {
+  * disabled, even when tasks are registered with the category.
+  */
+ add_task(async function test_categoryTasks_disabled_by_pref() {
+-  if (!AppConstants.MOZ_NORMANDY) {
+-    info("Skipping test - MOZ_NORMANDY not enabled");
+-    return;
+-  }
+-
+   updateAppInfo();
+   Services.prefs.setBoolPref(PREF_CATEGORY_TASKS, false);
+   FirstStartup.resetForTesting();
+diff --git a/tools/lint/codespell.yml b/tools/lint/codespell.yml
+index 4c506d0e46..e08b89043b 100644
+--- a/tools/lint/codespell.yml
++++ b/tools/lint/codespell.yml
+@@ -41,7 +41,6 @@ codespell:
+         - testing/mozbase/docs/
+         - testing/raptor/raptor/perfdocs/
+         - toolkit/components/extensions/docs/
+-        - toolkit/components/normandy/docs/
+         - toolkit/components/search/docs/
+         - toolkit/components/search/schema/
+         - toolkit/components/telemetry/docs/
+diff --git a/tools/lint/node-package-names.yml b/tools/lint/node-package-names.yml
+index 7c96ccec4f..212cbac667 100644
+--- a/tools/lint/node-package-names.yml
++++ b/tools/lint/node-package-names.yml
+@@ -9,7 +9,6 @@ node-package-names:
+         # properties.
+         # If they are third party packages. then they should be listed in
+         # ThirdPartyPaths.txt.
+-        - toolkit/components/normandy/actions/schemas/package.json
+         - tools/lint/eslint/eslint-plugin-mozilla/package.json
+         - devtools/client/shared/components/reps/package.json
+     extensions: ['json']
+diff --git a/tools/rewriting/ThirdPartyPaths.txt b/tools/rewriting/ThirdPartyPaths.txt
+index 9a91b20f9f..749ccc50ca 100644
+--- a/tools/rewriting/ThirdPartyPaths.txt
++++ b/tools/rewriting/ThirdPartyPaths.txt
+@@ -188,7 +188,6 @@ toolkit/components/contentanalysis/content_analysis/sdk/
+ toolkit/components/certviewer/content/vendor/
+ toolkit/components/jsoncpp/
+ toolkit/components/ml/vendor/
+-toolkit/components/normandy/vendor/
+ toolkit/components/passwordmgr/shared/PasswordRulesParser.sys.mjs
+ toolkit/components/protobuf/
+ toolkit/components/reader/readability/

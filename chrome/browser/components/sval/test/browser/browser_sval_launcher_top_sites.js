@@ -78,6 +78,21 @@ function site(n) {
 }
 
 /**
+ * Waits out a refresh already running. `TopSites.refresh` returns at once
+ * while one runs, and that one may have read history before the latest
+ * visits, so its notification says nothing about them.
+ */
+async function settledRefresh() {
+  if (TopSites._refreshing) {
+    await within(
+      TestUtils.topicObserved("topsites-refreshed"),
+      10_000,
+      "the refresh already running"
+    );
+  }
+}
+
+/**
  * Visits `count` sites, the first most, each past the five visits that make
  * a page a top site (`TopSites.getLinksWithDefaults`' frecency threshold),
  * and has the module read history again (`TopSites.refresh`).
@@ -93,6 +108,7 @@ async function visitSites(count) {
     );
   }
   await PlacesTestUtils.addVisits(visits);
+  await settledRefresh();
   TopSites.frecentCache.expire();
   await within(TopSites.refresh(), 10_000, "the top sites refreshing");
   const sites = (await TopSites.getSites()).map(s => s.url);
@@ -234,6 +250,7 @@ add_task(async function a_site_made_frequent_later_joins_the_launcher() {
   const later = "https://sval-later.example.com/";
   // The module's history cache answers for `LinksCache`'s expiration time;
   // expiring it stands for that time passing.
+  await settledRefresh();
   TopSites.frecentCache.expire();
   const refreshed = TestUtils.topicObserved("topsites-refreshed");
   await PlacesTestUtils.addVisits(

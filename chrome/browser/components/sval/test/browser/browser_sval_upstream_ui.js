@@ -60,7 +60,6 @@ add_task(async function support_links_lead_to_sval() {
     "browser.lna.warning.infoURL",
     "extensions.recommendations.themeRecommendationUrl",
     "pdfjs.commentLearnMoreUrl",
-    "app.normandy.shieldLearnMoreUrl",
     "toolkit.datacollection.infoURL",
   ]) {
     const url = shippedUrl(name);
@@ -97,10 +96,7 @@ add_task(async function the_profiler_has_no_button_and_no_panel() {
   }
 });
 
-const FIREFOX_TAB_MENU_ITEMS = [
-  "menu_openFirefoxView",
-  "historyRestoreLastSession",
-];
+const FIREFOX_TAB_MENU_ITEMS = ["historyRestoreLastSession"];
 
 add_task(async function firefox_tab_chrome_is_hidden() {
   for (const id of FIREFOX_TAB_MENU_ITEMS) {

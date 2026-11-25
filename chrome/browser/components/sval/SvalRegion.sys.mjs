@@ -7,8 +7,8 @@
  * Firefox asks a Mozilla server which country the user's IP address is in.
  * Sval does not make that request: its URL is blanked in app-sval-prefs.js.
  * It reads the region the user chose in their operating system's settings,
- * which is also right behind a VPN. Many features read the region, address
- * and card autofill among them, and an unknown region would leave those
+ * which is also right behind a VPN. Many features read the region, the
+ * search engines among them, and an unknown region would leave those
  * silently off.
  *
  * `Region._setHomeRegion` is Firefox's own path for a changed home region: it

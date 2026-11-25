@@ -156,11 +156,9 @@ export class SvalPanelRowMenu {
    * to a popupset Mozilla already ships.
    *
    * One item per possible command, shown or hidden per row kind on
-   * `popupshowing` (`#onShowing`) rather than rebuilt each time,
-   * as `browser/components/syncedtabs/TabListView.sys.mjs`'s
-   * `adjustContextMenu` toggles `hidden` on a fixed set, for the same
-   * reason: the menu's own `command` event is what runs the action, so there
-   * is nothing to rebuild.
+   * `popupshowing` (`#onShowing`) rather than rebuilt each time: the menu's
+   * own `command` event is what runs the action, so there is nothing to
+   * rebuild.
    *
    * @returns {Element} the `menupopup`.
    */
@@ -287,10 +285,9 @@ export class SvalPanelRowMenu {
    * `contextmenu`, and under the row for a key, as `SvalFavoritesMenu._onKey`
    * opens the Favorites menu's.
    *
-   * The row is selected before the menu opens, as
-   * `TabListView.handleContextMenu`'s `onSelectRow` does, so "New group" below
-   * files inside the row the menu is for rather than whatever the tree's
-   * selection happened to be already. A row of a selection keeps the
+   * The row is selected before the menu opens, so "New group" below files
+   * inside the row the menu is for rather than whatever the tree's selection
+   * happened to be already. A row of a selection keeps the
    * selection, and the menu acts on all of it (spec §10.5); any other row
    * clears it.
    *

@@ -920,21 +920,6 @@ Each entry gives:
 - **Upstream**: one bug, with the patch and the changed
   `test_check_clockskew_ignores_age`. Not submitted.
 
-### Nimbus reports its shutdown rejection when nothing awaits it
-
-- **Patch**: `patches/nimbus-ready-rejection-handled.patch`
-- **Mozilla bug**: none filed.
-- **Defect**: `SharedDataMap._checkIfShutdownStarted` rejects the readiness
-  promise when shutdown begins before the store has loaded, to release
-  callers of `ready()`. When no caller is waiting, the rejection goes
-  unhandled and is logged as "SharedDataMap: in shutdown". The fix attaches a
-  no-op handler to the promise, so a caller that awaits it still sees the
-  rejection.
-- **Evidence**: `sval --headless --screenshot` on a fresh profile, as the
-  release build's package start check runs it, logs the error every time
-  without the patch.
-- **Upstream**: one bug, with the patch. Not submitted.
-
 ### The hidden window's History menu throws on history changes after a window closes
 
 - **Patch**: `patches/hidden-history-menu-closes.patch`

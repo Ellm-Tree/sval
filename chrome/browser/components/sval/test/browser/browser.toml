@@ -617,13 +617,35 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_new_workspace.js"]
 
+["browser_sval_no_about_protections.js"]
+
+["browser_sval_no_address_card_autofill.js"]
+
 ["browser_sval_no_ai.js"]
+
+["browser_sval_no_backup.js"]
+
+["browser_sval_no_firefox_bridge.js"]
+
+["browser_sval_no_firefox_view.js"]
+
+["browser_sval_no_migration_wizard.js"]
 
 ["browser_sval_no_mozilla_links.js"]
 
 ["browser_sval_no_newtab_addon.js"]
 
+["browser_sval_no_nimbus_enrollment.js"]
+
+["browser_sval_no_normandy.js"]
+
+["browser_sval_no_password_manager_ui.js"]
+
 ["browser_sval_no_profile_reset.js"]
+
+["browser_sval_no_selectable_profiles.js"]
+
+["browser_sval_no_synced_tabs.js"]
 
 ["browser_sval_notification_bar.js"]
 

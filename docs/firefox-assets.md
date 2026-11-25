@@ -45,16 +45,11 @@ committed.
 | `browser/themes/shared/identity-block/trustpanel-graphic-enabled.svg` | Site information panel (padlock), tracking protection on | Lucide `shield-check`, in the panel's colour |
 | `browser/themes/shared/identity-block/trustpanel-graphic-disabled.svg` | Site information panel, protection off for the site | Lucide `shield-x`, in the panel's colour |
 | `browser/themes/shared/identity-block/trustpanel-graphic-warning.svg` | Site information panel, insecure connection | Lucide `shield-alert`, in the panel's colour |
-| `toolkit/components/satchel/megalist/content/icons/cpm-fox-illustration.svg` | about:logins with no saved passwords | Lucide `key-round` |
-| `browser/base/content/logos/lockwise.svg` | about:protections password card (Firefox Lockwise's logo) | Lucide `key-round` |
 | `browser/themes/shared/preferences/fox-ai.svg` | Settings, AI controls | Lucide `sparkles` |
 | `toolkit/themes/shared/extensions/line.svg` | about:addons badge on an extension Mozilla built (Firefox's logo) | Lucide `badge-check`; the badge's "built by Mozilla" text is true and stays |
-| `browser/components/firefoxview/content/history-empty.svg` | Sval View's empty history and recently closed lists, in about:firefoxview, which Sval keeps closed | Lucide `history` |
-| `browser/components/firefoxview/content/synced-tabs-empty.svg` | Sval View's tabs from other devices, in the closed about:firefoxview | Lucide `monitor-smartphone` |
-| `browser/components/firefoxview/content/synced-tabs-error.svg` | Sval View's tabs from other devices, in the closed about:firefoxview | Lucide `monitor-smartphone` |
+| `browser/components/firefoxview/content/history-empty.svg` | The sidebar's empty history list, which shows only while `sidebar.revamp` is on, and Sval locks it off | Lucide `history` |
 | `toolkit/themes/shared/illustrations/kit-*.svg` | Settings default-browser card, and the promo on about:pdf, which Sval keeps closed (Kit, Firefox's mascot) | Sval's app icon (`chrome://branding/content/about-logo.svg`) |
 | `browser/themes/shared/sidebar/firefox.svg` | Settings About and Languages icons | Sval's glyph (`sval-glyph.svg`) |
-| `browser/themes/shared/icons/firefox-view.svg` | Sval View's icon | Sval's glyph |
 | `browser/themes/shared/icons/window-firefox.svg` | Window icon in menus, and Settings' new windows heading | Lucide `app-window` |
 | `toolkit/themes/shared/illustrations/about-license.svg` | about:license | Lucide `scale` |
 | `browser/components/preferences/spell-check-promo.svg` | Settings, spelling | Lucide `spell-check` |
@@ -82,7 +77,7 @@ committed.
 | `browser/themes/addons/alpenglow/preview.svg` | about:addons themes | Kept: a colour preview |
 | `browser/themes/*/monitor-base.png`, `browser/themes/*/monitor-border.png`, `browser/themes/*/pageInfo.png` | Set as desktop background, Page Info | Kept: generic |
 | `browser/components/migration/content/brands/*.png` | Import from another browser | Kept: the other browsers' logos, nominative. Sval's import shows Chrome's, Edge's and Safari's from here, and adds Arc's and Firefox's own in `chrome/browser/components/sval/import-brands/`, also nominative: Firefox's is `browser/branding/official/default128.png`, copied unchanged, and names Firefox as the browser being imported from |
-| `browser/extensions/formautofill/content/third-party/*.svg` | Saved payment cards | Kept: card networks' logos, nominative |
+| `browser/extensions/formautofill/content/third-party/*.svg` | Saved payment cards | Removed (`remove-formautofill.delete`) |
 | `browser/extensions/webcompat/shims/*.svg` | Placeholders for blocked third-party embeds | Kept: the embedded sites' logos, nominative |
 | `devtools/client/themes/images/browsers/firefox.svg` | DevTools compatibility panel and responsive design mode | Kept: names Firefox as a browser a page targets, nominative |
 | `devtools/client/themes/images/aboutdebugging-fenix*.svg` | about:debugging, a connected Firefox for Android | Kept: names that browser, nominative |
@@ -100,23 +95,25 @@ committed.
 | `browser/components/aboutwelcome/**` | Onboarding and what's new | Removed (`remove-messaging.delete`) |
 | `browser/components/asrouter/**` | Firefox's messages | Removed (`remove-messaging.delete`) |
 | `browser/themes/shared/app-marketplace-icons/**` | Mobile app store badges | Removed (`remove-messaging.delete`) |
-| `browser/components/aboutlogins/content/icons/intro-illustration.svg` | A password-manager message | Messages off |
+| `browser/components/aboutlogins/content/icons/intro-illustration.svg` | A password-manager message | Removed (`remove-about-logins.delete`) |
+| `toolkit/components/satchel/megalist/content/icons/cpm-fox-illustration.svg` | The sidebar's password list with no saved passwords | Removed (`remove-about-logins.delete`) |
 | `browser/components/privatebrowsing/**` | about:privatebrowsing's promotions | Removed (`remove-private-browsing-promos.delete`) |
 | `browser/themes/shared/privatebrowsing/fox-tail.svg` | about:privatebrowsing | Sval's private page replaces it (`jar.mn` override) |
 | `browser/components/ipprotection/**` | Firefox's VPN | Locked off |
 | `browser/components/aiwindow/**`, `browser/components/genai/**`, `browser/themes/shared/icons/smart-window*.svg` | AI window, chatbot and link previews | Removed (`remove-ai.delete`) |
 | `toolkit/components/ml/**` | On-device AI models | Locked off (`browser.ml.enable`) |
 | `browser/themes/shared/fxa/**`, `browser/base/content/logos/fxa-logo.svg` | Mozilla accounts, sync, send tab to device | `identity.fxaccounts.enabled` locked off |
-| `browser/base/content/logos/monitor.svg`, `browser/base/content/logos/relay.svg`, `browser/base/content/logos/vpn*.svg` | about:protections and settings promos | Locked off; the Monitor card is off by Firefox's default |
+| `browser/base/content/logos/monitor.svg`, `browser/base/content/logos/relay.svg`, `browser/base/content/logos/vpn-promo-logo.svg` | Settings promos | Locked off |
+| `browser/base/content/logos/lockwise.svg`, `browser/base/content/logos/vpn.svg` | about:protections | Removed (`remove-about-protections.delete`) |
 | `browser/themes/shared/preferences/monitor-logo.svg`, `browser/themes/shared/preferences/relay-logo.svg`, `browser/themes/shared/preferences/vpn-logo.svg`, `browser/themes/shared/preferences/mozilla-16.svg`, `browser/themes/shared/preferences/mozilla-logo.svg`, `browser/themes/shared/preferences/thunderbird-color-16.svg`, `browser/themes/shared/preferences/solo-ai-logo.svg`, `browser/components/preferences/more-from-mozilla-qr-code-simple.svg` | Settings, More from Mozilla and account | `browser.preferences.moreFromMozilla` locked off; the account groups and chatbot providers are hidden (`settings-hide-removed-features.patch`) |
 | `browser/components/controlcenter/content/assets/*.svg` | Breach alerts in the site information panel, and its Nova graphics | Breach alerts locked off; `browser.nova.enabled` is off |
 | `browser/themes/shared/illustrations/tab-groups.svg` | Tab groups | Locked off |
 | `browser/themes/shared/sidebar/foxy.svg` | Vertical tabs pin promo | Vertical tabs locked off |
-| `browser/components/firefoxview/content/callout-tab-pickup*.svg` | Sval View's tab pickup, which needs sync | Accounts locked off |
+| `browser/components/firefoxview/content/callout-tab-pickup*.svg`, `browser/components/firefoxview/content/synced-tabs-e*.svg`, `browser/themes/shared/icons/firefox-view.svg` | Firefox View | Removed (`remove-firefox-view.delete`) |
 | `browser/themes/shared/profiler-popup-backdrop.png` | Profiler button | Locked off |
 | `browser/components/contentsharing/**` | Content sharing | `browser.contentsharing.enabled` off |
 | `toolkit/mozapps/defaultagent/**` | Default-browser notification | `default-browser-agent.enabled` locked off |
-| `toolkit/components/normandy/**` | Heartbeat surveys | Normandy off |
+| `toolkit/components/normandy/**` | Heartbeat surveys | Removed (`remove-normandy.delete`) |
 | `browser/fxr/**` | Firefox Reality | Not part of desktop |
 | `browser/installer/linux/app/flatpak/**` | The Flatpak package | Sval ships a tarball, a .deb and an .rpm (`packaging/linux/`) |
 | `other-licenses/7zstub/src/**` | 7-Zip's own icons and stubs, in the LZMA SDK source | Never built: the installer uses the prebuilt stub, in Sval's copy |

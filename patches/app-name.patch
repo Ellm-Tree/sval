@@ -2,7 +2,7 @@ Sval: Gecko's tooling takes the executable's name from MOZ_APP_NAME
 
 Sval's executable is sval (MOZ_APP_NAME), so that its process name and the
 Windows registrations keyed by the executable are not an installed
-Firefox's. Mozilla's tooling assumed the name is "firefox" in four places:
+Firefox's. Mozilla's tooling assumed the name is "firefox" in three places:
 
 - The artifact code looked for firefox/ in every package it unpacks. A
   package's top directory and its binaries are MOZ_APP_NAME
@@ -15,10 +15,6 @@ Firefox's. Mozilla's tooling assumed the name is "firefox" in four places:
 - The mochitest harness on Windows treated a live process as the browser
   only when its image was firefox.exe, so it could not find a sval.exe
   left running after a test.
-- Extension.sys.mjs took normandyAddonStudy off the privileged
-  permissions in any application not called firefox, so any extension
-  could have asked Sval for the API browser/components/extensions
-  provides. It keys on the build app, browser, as Firefox's is.
 
 diff --git a/python/mozbuild/mozbuild/artifacts.py b/python/mozbuild/mozbuild/artifacts.py
 index 5bb72e9392..c543ed5215 100644
@@ -70,16 +66,3 @@ index e18b27abf1..5d0070e5c6 100644
          finally:
              ctypes.windll.kernel32.CloseHandle(pHandle)
  
-diff --git a/toolkit/components/extensions/Extension.sys.mjs b/toolkit/components/extensions/Extension.sys.mjs
-index a4d103eefa..cfa1d58010 100644
---- a/toolkit/components/extensions/Extension.sys.mjs
-+++ b/toolkit/components/extensions/Extension.sys.mjs
-@@ -212,7 +212,7 @@ if (AppConstants.platform == "android") {
- }
- 
- if (
--  AppConstants.MOZ_APP_NAME != "firefox" ||
-+  AppConstants.MOZ_BUILD_APP != "browser" ||
-   AppConstants.platform == "android"
- ) {
-   for (const perm of PRIVILEGED_PERMS_DESKTOP_ONLY) {

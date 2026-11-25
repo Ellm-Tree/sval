@@ -30,7 +30,7 @@ nsresult nsToolkitProfileService::InitSvalDataDirectory() {
   NS_ENSURE_SUCCESS(rv, rv);
 
   RefPtr<nsToolkitProfile> profile = new nsToolkitProfile(
-      "default"_ns, rootDir, localDir, true, VoidCString(), false);
+      "default"_ns, rootDir, localDir, true, VoidCString());
 
   mNormalDefault = profile;
   mDedicatedProfile = profile;

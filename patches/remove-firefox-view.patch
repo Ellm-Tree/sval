@@ -1,0 +1,2307 @@
+Sval: Remove Firefox View
+
+Sval never built about:firefoxview and hid its button and menu item, so
+the window handler, the hidden tab it kept, its startup hooks, quick
+action, telemetry, prefs and tests only stood in other code's way. The
+open-tabs modules and the tab list that the split view's tab picker
+(about:opentabs) and the sidebar's history, bookmarks and open-tabs
+panels share stay in browser/components/firefoxview, with the strings
+those use.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 3a7ab02a0c..1b66c17f26 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -1616,7 +1616,6 @@ pref("services.sync.prefs.sync.browser.contentblocking.features.strict", true);
+ pref("services.sync.prefs.sync.browser.crashReports.unsubmittedCheck.autoSubmit2", true);
+ pref("services.sync.prefs.sync.browser.ctrlTab.sortByRecentlyUsed", true);
+ pref("services.sync.prefs.sync.browser.download.useDownloadDir", true);
+-pref("services.sync.prefs.sync.browser.firefox-view.feature-tour", true);
+ pref("services.sync.prefs.sync.browser.formfill.enable", true);
+ pref("services.sync.prefs.sync.browser.link.open_newwindow", true);
+ pref("services.sync.prefs.sync.browser.menu.showViewImageInfo", true);
+@@ -2930,12 +2929,6 @@ pref("svg.context-properties.content.allowed-domains", "profile.accounts.firefox
+ // Turn on interaction measurements
+ pref("browser.places.interactions.enabled", true);
+ 
+-// If the user has seen the Firefox View feature tour this value reflects
+-// the id of the last screen they saw and whether they completed the tour
+-pref("browser.firefox-view.feature-tour", "{\"screen\":\"FIREFOX_VIEW_SPOTLIGHT\",\"complete\":false}");
+-// Number of times the user visited about:firefoxview via the button/hidden tab in the past 30 days
+-pref("browser.firefox-view.button-clicks", "{\"count\":0,\"lastCountTime\":\"\"}");
+-
+ // Enables virtual list functionality in Firefox View.
+ pref("browser.firefox-view.virtual-list.enabled", true);
+ 
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index dc685144cd..c287254725 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -353,9 +353,6 @@
+                         hidden="true"
+                         data-l10n-id="menu-tools-fxa-re-auth"/>
+ 
+-              <menuitem id="menu_openFirefoxView"
+-                        hidden="true"
+-                        data-l10n-id="menu-tools-firefox-view"/>
+               <menuseparator id="devToolsSeparator"/>
+               <menu id="browserToolsMenu" data-l10n-id="menu-tools-browser-tools">
+                 <menupopup id="menuWebDeveloperPopup">
+diff --git a/browser/base/content/browser-menubar.js b/browser/base/content/browser-menubar.js
+index 0a021978fa..10e6168d3d 100644
+--- a/browser/base/content/browser-menubar.js
++++ b/browser/base/content/browser-menubar.js
+@@ -59,9 +59,6 @@ document.addEventListener(
+         case "sync-reauthitem":
+           gSync.openSignInAgainPage("menubar");
+           break;
+-        case "menu_openFirefoxView":
+-          FirefoxViewHandler.openTab();
+-          break;
+         case "hiddenUndoCloseWindow":
+           SessionWindowUI.undoCloseWindow(0);
+           break;
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index 40670cda16..14d74cfc5b 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -82,8 +82,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   SubDialog: "resource://gre/modules/SubDialog.sys.mjs",
+   SubDialogManager: "resource://gre/modules/SubDialog.sys.mjs",
+   TabCrashHandler: "resource:///modules/ContentCrashHandlers.sys.mjs",
+-  TabsSetupFlowManager:
+-    "resource:///modules/firefox-view-tabs-setup-manager.sys.mjs",
+   TelemetryEnvironment: "resource://gre/modules/TelemetryEnvironment.sys.mjs",
+   ToolbarContextMenu:
+     "moz-src:///browser/components/customizableui/ToolbarContextMenu.sys.mjs",
+@@ -660,7 +658,6 @@ var gPageIcons = {
+ var gInitialPages = [
+   "about:blank",
+   "about:home",
+-  "about:firefoxview",
+   "about:newtab",
+   "about:opentabs",
+   "about:privatebrowsing",
+@@ -4642,151 +4639,3 @@ var ConfirmationHint = {
+     }
+   },
+ };
+-
+-var FirefoxViewHandler = {
+-  tab: null,
+-  BUTTON_ID: "firefox-view-button",
+-  get button() {
+-    return document.getElementById(this.BUTTON_ID);
+-  },
+-  init() {
+-    CustomizableUI.addListener(this);
+-
+-    ChromeUtils.defineESModuleGetters(this, {
+-      SyncedTabs: "resource://services-sync/SyncedTabs.sys.mjs",
+-    });
+-  },
+-  uninit() {
+-    CustomizableUI.removeListener(this);
+-  },
+-  onWidgetRemoved(aWidgetId) {
+-    if (aWidgetId == this.BUTTON_ID && this.tab) {
+-      gBrowser.removeTab(this.tab);
+-    }
+-  },
+-  onWidgetAdded(aWidgetId) {
+-    if (aWidgetId === this.BUTTON_ID) {
+-      this.button.removeAttribute("open");
+-    }
+-  },
+-  openTab(section) {
+-    if (!CustomizableUI.getPlacementOfWidget(this.BUTTON_ID)) {
+-      CustomizableUI.addWidgetToArea(
+-        this.BUTTON_ID,
+-        CustomizableUI.AREA_TABSTRIP,
+-        CustomizableUI.getPlacementOfWidget("tabbrowser-tabs").position
+-      );
+-    }
+-    let viewURL = "about:firefoxview";
+-    if (section) {
+-      viewURL = `${viewURL}#${section}`;
+-    }
+-    // Need to account for navigation to Firefox View pages
+-    if (
+-      this.tab &&
+-      this.tab.linkedBrowser.currentURI.spec.split("#")[0] != viewURL
+-    ) {
+-      gBrowser.removeTab(this.tab);
+-      this.tab = null;
+-    }
+-    if (!this.tab) {
+-      this.tab = gBrowser.addTrustedTab(viewURL);
+-      this.tab.addEventListener("TabClose", this, { once: true });
+-      gBrowser.tabContainer.addEventListener("TabSelect", this);
+-      window.addEventListener("activate", this);
+-      gBrowser.hideTab(this.tab);
+-      this.button.setAttribute("aria-controls", this.tab.linkedPanel);
+-    }
+-    // we put this here to avoid a race condition that would occur
+-    // if this was called in response to "TabSelect"
+-    this._closeDeviceConnectedTab();
+-    gBrowser.selectedTab = this.tab;
+-  },
+-  openToolbarMouseEvent(event, section) {
+-    if (event?.type == "mousedown" && event?.button != 0) {
+-      return;
+-    }
+-    this.openTab(section);
+-  },
+-  handleEvent(e) {
+-    switch (e.type) {
+-      case "TabSelect": {
+-        const selected = e.target == this.tab;
+-        this.button?.toggleAttribute("open", selected);
+-        this.button?.setAttribute("aria-pressed", selected);
+-        this._recordViewIfTabSelected();
+-        this._onTabForegrounded();
+-        // If Fx View is opened, add temporary style to make first available tab focusable
+-        // When Fx View is closed, remove temporary -moz-user-focus style from first available tab
+-        gBrowser.visibleTabs[0].style.MozUserFocus =
+-          e.target == this.tab ? "normal" : "";
+-        break;
+-      }
+-      case "TabClose":
+-        this.tab = null;
+-        gBrowser.tabContainer.removeEventListener("TabSelect", this);
+-        this.button?.removeAttribute("aria-controls");
+-        break;
+-      case "activate":
+-        this._onTabForegrounded();
+-        break;
+-    }
+-  },
+-  _closeDeviceConnectedTab() {
+-    if (!TabsSetupFlowManager.didFxaTabOpen) {
+-      return;
+-    }
+-    // close the tab left behind after a user pairs a device and
+-    // is redirected back to the Firefox View tab
+-    const fxaRoot = Services.prefs.getCharPref(
+-      "identity.fxaccounts.remote.root"
+-    );
+-    const fxDeviceConnectedTab = gBrowser.tabs.find(tab =>
+-      tab.linkedBrowser.currentURI.displaySpec.startsWith(
+-        `${fxaRoot}pair/auth/complete`
+-      )
+-    );
+-
+-    if (!fxDeviceConnectedTab) {
+-      return;
+-    }
+-
+-    if (gBrowser.tabs.length <= 2) {
+-      // if its the only tab besides the Firefox View tab,
+-      // open a new tab first so the browser doesn't close
+-      gBrowser.addTrustedTab("about:newtab");
+-    }
+-    gBrowser.removeTab(fxDeviceConnectedTab);
+-    TabsSetupFlowManager.didFxaTabOpen = false;
+-  },
+-  _onTabForegrounded() {
+-    if (this.tab?.selected) {
+-      this.SyncedTabs.syncTabs();
+-    }
+-  },
+-  _recordViewIfTabSelected() {
+-    if (this.tab?.selected) {
+-      const PREF_NAME = "browser.firefox-view.button-clicks";
+-      const MAX_DAYS_COUNT = 30 * 24 * 60 * 60 * 1000;
+-      let buttonClicksData = JSON.parse(
+-        Services.prefs.getStringPref(
+-          PREF_NAME,
+-          '{"count":0,"lastCountTime":""}'
+-        )
+-      );
+-      let { count, lastCountTime } = buttonClicksData;
+-      // Record telemetry
+-      Glean.firefoxviewNext.tabSelectedToolbarbutton.record();
+-
+-      if (Math.round(Date.now()) - lastCountTime >= MAX_DAYS_COUNT) {
+-        // reset count every 30 days
+-        count = 0;
+-      } else {
+-        count++;
+-      }
+-      buttonClicksData.lastCountTime = Math.round(Date.now());
+-      buttonClicksData.count = count;
+-      Services.prefs.setStringPref(PREF_NAME, JSON.stringify(buttonClicksData));
+-    }
+-  },
+-};
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 8b9b37f5ee..f2ee8e91bc 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -78,7 +78,6 @@
+   "TabDialogBox",
+   "gDialogBox",
+   "ConfirmationHint",
+-  "FirefoxViewHandler",
+   "AMTelemetry",
+   "AboutNewTab",
+   "AboutReaderParent",
+@@ -129,7 +128,6 @@
+   "SubDialog",
+   "SubDialogManager",
+   "TabCrashHandler",
+-  "TabsSetupFlowManager",
+   "TelemetryEnvironment",
+   "TranslationsParent",
+   "UpdateUtils",
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index ce25976a0b..184d411714 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -59,7 +59,6 @@
+   <link rel="localization" href="browser/browser.ftl"/>
+   <link rel="localization" href="browser/browserContext.ftl"/>
+   <link rel="localization" href="browser/browserSets.ftl"/>
+-  <link rel="localization" href="browser/firefoxView.ftl"/>
+   <link rel="localization" href="browser/identityCredentialNotification.ftl" />
+   <link rel="localization" href="browser/menubar.ftl"/>
+   <link rel="localization" href="browser/openTabs.ftl"/>
+diff --git a/browser/base/content/macWindow.inc.xhtml b/browser/base/content/macWindow.inc.xhtml
+index 73340000c3..d7ff993ee9 100644
+--- a/browser/base/content/macWindow.inc.xhtml
++++ b/browser/base/content/macWindow.inc.xhtml
+@@ -11,7 +11,6 @@
+ <linkset>
+   <html:link rel="localization" href="branding/brand.ftl"/>
+   <html:link rel="localization" href="browser/browserSets.ftl"/>
+-  <html:link rel="localization" href="browser/firefoxView.ftl"/>
+   <html:link rel="localization" href="browser/menubar.ftl"/>
+   <html:link rel="localization" href="browser/screenshots.ftl"/>
+   <html:link rel="localization" href="toolkit/branding/brandings.ftl"/>
+diff --git a/browser/base/content/navigator-toolbox.js b/browser/base/content/navigator-toolbox.js
+index 512ba6c43b..55bdbfb3a9 100644
+--- a/browser/base/content/navigator-toolbox.js
++++ b/browser/base/content/navigator-toolbox.js
+@@ -39,7 +39,6 @@ document.addEventListener(
+ 
+     function onCommand(event) {
+       let element = event.target.closest(`
+-        #firefox-view-button,
+         .content-analysis-indicator,
+         #bookmarks-toolbar-button,
+         #PlacesToolbar,
+@@ -54,10 +53,6 @@ document.addEventListener(
+       }
+ 
+       switch (element.id) {
+-        case "firefox-view-button":
+-          FirefoxViewHandler.openTab();
+-          break;
+-
+         case "bookmarks-toolbar-button":
+           PlacesToolbarHelper.onPlaceholderCommand();
+           break;
+@@ -102,7 +97,6 @@ document.addEventListener(
+ 
+     function onMouseDown(event) {
+       let element = event.target.closest(`
+-        #firefox-view-button,
+         #alltabs-button,
+         #pageActionButton,
+         #downloads-button,
+@@ -115,10 +109,6 @@ document.addEventListener(
+       }
+ 
+       switch (element.id) {
+-        case "firefox-view-button":
+-          FirefoxViewHandler.openToolbarMouseEvent(event);
+-          break;
+-
+         case "alltabs-button":
+           gTabsPanel.showAllTabsPanel(event, "alltabs-button");
+           break;
+diff --git a/browser/base/content/nonbrowser-mac.js b/browser/base/content/nonbrowser-mac.js
+index 694fa05e8f..c3dd663cc5 100644
+--- a/browser/base/content/nonbrowser-mac.js
++++ b/browser/base/content/nonbrowser-mac.js
+@@ -41,7 +41,6 @@ var NonBrowserWindow = {
+       "Browser:BookmarkAllTabs",
+       "View:PageInfo",
+       "History:UndoCloseTab",
+-      "menu_openFirefoxView",
+     ];
+     var element;
+ 
+diff --git a/browser/base/content/test/keyboard/browser_toolbarKeyNav.js b/browser/base/content/test/keyboard/browser_toolbarKeyNav.js
+index 5ee19621eb..682c569854 100644
+--- a/browser/base/content/test/keyboard/browser_toolbarKeyNav.js
++++ b/browser/base/content/test/keyboard/browser_toolbarKeyNav.js
+@@ -111,10 +111,6 @@ function withNewBlankTab(taskFn) {
+   });
+ }
+ 
+-function removeFirefoxViewButton() {
+-  CustomizableUI.removeWidgetFromArea("firefox-view-button");
+-}
+-
+ const BOOKMARKS_COUNT = 100;
+ 
+ add_setup(async function () {
+@@ -699,49 +695,12 @@ add_task(async function testFirefoxViewButtonNavigation() {
+   // and the tabs-newtab-button is hidden.
+   await BrowserTestUtils.overflowTabs(registerCleanupFunction, window);
+ 
+-  // Assert that Firefox View button receives focus when tab navigating
+-  // forward from the end of web content.
+-  // Additionally, ensure that focus is not trapped between the
+-  // selected tab and the new-tab button.
+-  // Finally, assert that focus is restored to web content when
+-  // navigating backwards from the Firefox View button.
+-  await BrowserTestUtils.withNewTab(
+-    PERMISSIONS_PAGE,
+-    async function (aBrowser) {
+-      await SpecialPowers.spawn(aBrowser, [], async () => {
+-        content.document.querySelector("#camera").focus();
+-      });
+-
+-      await expectFocusAfterKey("Tab", "firefox-view-button");
+-      let selectedTab = document.querySelector("tab[selected]");
+-      await expectFocusAfterKey("Tab", selectedTab);
+-      await expectFocusAfterKey("Tab", "new-tab-button");
+-      await expectFocusAfterKey("Shift+Tab", selectedTab);
+-      await expectFocusAfterKey("Shift+Tab", "firefox-view-button");
+-
+-      // Moving from toolbar back into content
+-      EventUtils.synthesizeKey("KEY_Tab", { shiftKey: true });
+-      await SpecialPowers.spawn(aBrowser, [], async () => {
+-        let activeElement = content.document.activeElement;
+-        let expectedElement = content.document.querySelector("#camera");
+-        is(
+-          activeElement,
+-          expectedElement,
+-          "Focus should be returned to the 'camera' button"
+-        );
+-      });
+-    }
+-  );
+-
+-  // Assert that the selected tab receives focus before the new-tab button
+-  // if there is no Firefox View button.
++  // Assert that the selected tab receives focus before the new-tab button.
+   // Additionally, assert that navigating backwards from the selected tab
+   // restores focus to the last element in the web content.
+   await BrowserTestUtils.withNewTab(
+     PERMISSIONS_PAGE,
+     async function (aBrowser) {
+-      removeFirefoxViewButton();
+-
+       await SpecialPowers.spawn(aBrowser, [], async () => {
+         content.document.querySelector("#camera").focus();
+       });
+diff --git a/browser/base/content/test/sync/browser_fxa_web_channel.html b/browser/base/content/test/sync/browser_fxa_web_channel.html
+index d9a907f4ba..47c66bbdc6 100644
+--- a/browser/base/content/test/sync/browser_fxa_web_channel.html
++++ b/browser/base/content/test/sync/browser_fxa_web_channel.html
+@@ -27,9 +27,6 @@
+       case "delete":
+         test_delete();
+         break;
+-      case "firefox_view":
+-        test_firefox_view();
+-        break;
+     }
+   };
+ 
+@@ -137,23 +134,6 @@
+ 
+     window.dispatchEvent(event);
+   }
+-
+-  function test_firefox_view() {
+-    var event = new window.CustomEvent("WebChannelMessageToChrome", {
+-      detail: JSON.stringify({
+-        id: webChannelId,
+-        message: {
+-          command: "fxaccounts:firefox_view",
+-          data: {
+-            uid: "uid",
+-          },
+-          messageId: 5,
+-        },
+-      }),
+-    });
+-
+-    window.dispatchEvent(event);
+-  }
+ </script>
+ </body>
+ </html>
+diff --git a/browser/base/content/test/sync/browser_fxa_web_channel.js b/browser/base/content/test/sync/browser_fxa_web_channel.js
+index 05ec9a6348..fc5b904137 100644
+--- a/browser/base/content/test/sync/browser_fxa_web_channel.js
++++ b/browser/base/content/test/sync/browser_fxa_web_channel.js
+@@ -219,51 +219,6 @@ var gTests = [
+       );
+     },
+   },
+-  {
+-    desc: "fxa web channel - firefox_view messages should call the openFirefoxView helper",
+-    async run() {
+-      let wasCalled = false;
+-      let promiseMessageHandled = new Promise(resolve => {
+-        let openFirefoxView = browser => {
+-          wasCalled = true;
+-          Assert.ok(
+-            !!browser.documentGlobal,
+-            "openFirefoxView called with a browser argument"
+-          );
+-          Assert.equal(
+-            typeof browser.documentGlobal.FirefoxViewHandler.openTab,
+-            "function",
+-            "We can reach the openTab method"
+-          );
+-        };
+-
+-        let client = new FxAccountsWebChannel({
+-          content_uri: TEST_HTTP_PATH,
+-          channel_id: TEST_CHANNEL_ID,
+-          helpers: {
+-            openFirefoxView,
+-          },
+-        });
+-
+-        client._channel.send = (message, _context) => {
+-          Assert.equal(message.data.ok, true);
+-          client.tearDown();
+-          resolve();
+-        };
+-      });
+-
+-      await BrowserTestUtils.withNewTab(
+-        {
+-          gBrowser,
+-          url: TEST_BASE_URL + "?firefox_view",
+-        },
+-        async function () {
+-          await promiseMessageHandled;
+-        }
+-      );
+-      Assert.ok(wasCalled, "openFirefoxView did get called");
+-    },
+-  },
+ ]; // gTests
+ 
+ function makeObserver(aObserveTopic, aObserveFunc) {
+diff --git a/browser/components/AccountsGlue.sys.mjs b/browser/components/AccountsGlue.sys.mjs
+index 8ff63ea9fb..5d9bf2f09b 100644
+--- a/browser/components/AccountsGlue.sys.mjs
++++ b/browser/components/AccountsGlue.sys.mjs
+@@ -317,7 +317,7 @@ export const AccountsGlue = {
+ 
+     await closeTabsInWindows();
+ 
+-    let clickCallback = async (subject, topic) => {
++    let clickCallback = (subject, topic) => {
+       if (topic == "alertshow") {
+         // Keep track of the fact that we showed the notification to
+         // the user at least once
+@@ -329,18 +329,6 @@ export const AccountsGlue = {
+         // Reset the notification pending flag
+         lazy.CloseRemoteTab.hasPendingCloseTabNotification = false;
+       }
+-
+-      if (topic != "alertclickcallback") {
+-        return;
+-      }
+-      let win =
+-        lazy.BrowserWindowTracker.getTopWindow({ private: false }) ??
+-        (await lazy.BrowserWindowTracker.promiseOpenWindow());
+-      // We don't want to open a new tab, instead use the handler
+-      // to switch to the existing view
+-      if (win) {
+-        win.FirefoxViewHandler.openTab("recentlyclosed");
+-      }
+     };
+ 
+     // Reset the count only if there are no pending notifications
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index 5b40d5b714..6638745a8f 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -30,7 +30,6 @@ category browser-window-domcontentloaded-tabbrowser chrome://browser/content/tab
+ category browser-window-domcontentloaded resource:///modules/BrowserWindowTracker.sys.mjs BrowserWindowTracker.track
+ category browser-window-domcontentloaded moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs CustomizableUI.handleNewBrowserWindow
+ category browser-window-domcontentloaded chrome://browser/content/browser-addons.js gUnifiedExtensions.init
+-category browser-window-domcontentloaded chrome://browser/content/browser.js FirefoxViewHandler.init
+ 
+ category browser-window-load-before-sessionstore-init chrome://browser/content/browser-captivePortal.js CaptivePortalWatcher.init
+ category browser-window-load-before-sessionstore-init resource:///modules/ZoomUI.sys.mjs ZoomUI.init
+@@ -75,7 +74,6 @@ category browser-window-unload chrome://browser/content/browser-toolbarKeyNav.js
+ category browser-window-unload chrome://browser/content/browser.js#Win10TabletModeUpdater Win10TabletModeUpdater.uninit
+ category browser-window-unload chrome://browser/content/browser.js#CombinedStopReload CombinedStopReload.uninit
+ category browser-window-unload chrome://browser/content/browser-addons.js gUnifiedExtensions.uninit
+-category browser-window-unload chrome://browser/content/browser.js#FirefoxViewHandler FirefoxViewHandler.uninit
+ category browser-window-unload moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs NewTabPagePreloading.removePreloadedBrowser
+ 
+ # The category below is specific to Tabbrowser destruction. For consumers that need to uninitialize during
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 9a00518e56..40e9f99c23 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -295,7 +295,6 @@ let JSWINDOWACTORS = {
+       "chrome://browser/content/sidebar/sidebar-history.html",
+       "chrome://browser/content/sidebar/sidebar-customize.html",
+       "chrome://browser/content/sidebar/sidebar-opentabs.html",
+-      "about:firefoxview",
+       "about:opentabs",
+     ],
+     remoteTypes: ["parent", "privilegedabout"],
+diff --git a/browser/components/customizableui/CustomizableUI.sys.mjs b/browser/components/customizableui/CustomizableUI.sys.mjs
+index 12f67faebf..07ce6fb383 100644
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -346,10 +346,7 @@ var CustomizableUIInternal = {
+         type: CustomizableUI.TYPE_TOOLBAR,
+         overflowable: true,
+         defaultPlacements: navbarPlacements,
+-        verticalTabsDefaultPlacements: [
+-          "firefox-view-button",
+-          "alltabs-button",
+-        ],
++        verticalTabsDefaultPlacements: ["alltabs-button"],
+         defaultCollapsed: false,
+       },
+       true
+@@ -372,7 +369,6 @@ var CustomizableUIInternal = {
+       {
+         type: CustomizableUI.TYPE_TOOLBAR,
+         defaultPlacements: [
+-          "firefox-view-button",
+           "tabbrowser-tabs",
+           "new-tab-button",
+           "alltabs-button",
+@@ -723,18 +719,6 @@ var CustomizableUIInternal = {
+       }
+     }
+ 
+-    // Add firefox-view if not present
+-    if (currentVersion < 18) {
+-      let tabstripPlacements =
+-        gSavedState.placements[CustomizableUI.AREA_TABSTRIP];
+-      if (
+-        tabstripPlacements &&
+-        !tabstripPlacements.includes("firefox-view-button")
+-      ) {
+-        tabstripPlacements.unshift("firefox-view-button");
+-      }
+-    }
+-
+     // Unified Extensions addon button migration, which puts any browser action
+     // buttons in the overflow menu into the addons panel instead.
+     if (currentVersion < 19) {
+diff --git a/browser/components/customizableui/test/browser.toml b/browser/components/customizableui/test/browser.toml
+index 7d44fb720e..535b389871 100644
+--- a/browser/components/customizableui/test/browser.toml
++++ b/browser/components/customizableui/test/browser.toml
+@@ -38,15 +38,6 @@ tags = "fullscreen"
+ ["browser_1795260_searchbar_overflow_toolbar.js"]
+ tags = "overflowable-toolbar"
+ 
+-["browser_1856572_ensure_Fluent_works_in_customizeMode.js"]
+-# Bug 1856572: Causes a drag-drop native loop assertion failure on debug
+-# MacOS builds in browser_876926_customize_mode_wrapping.js
+-skip-if = [
+-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'",
+-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'",
+-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && debug",
+-]
+-
+ ["browser_1880230_hideInNonPrivateBrowsing.js"]
+ 
+ ["browser_2041653_non_removable_overflow_reset.js"]
+diff --git a/browser/components/customizableui/test/browser_vertical_tabs_customize_navbar.js b/browser/components/customizableui/test/browser_vertical_tabs_customize_navbar.js
+index d6ef80f26e..c380124c94 100644
+--- a/browser/components/customizableui/test/browser_vertical_tabs_customize_navbar.js
++++ b/browser/components/customizableui/test/browser_vertical_tabs_customize_navbar.js
+@@ -27,24 +27,14 @@ registerCleanupFunction(async () => {
+ add_task(async function () {
+   let defaultHorizontalAllTabsPlacement =
+     CustomizableUI.getPlacementOfWidget("alltabs-button");
+-  let defaultHorizontalFirefoxViewPlacement =
+-    CustomizableUI.getPlacementOfWidget("firefox-view-button");
+   is(
+     defaultHorizontalAllTabsPlacement.area,
+     tabsToolbar,
+     `alltabs-button is in the ${tabsToolbar}`
+   );
+-  is(
+-    defaultHorizontalFirefoxViewPlacement.area,
+-    tabsToolbar,
+-    `firefox-view-button is in the ${tabsToolbar}`
+-  );
+   info(
+     `alltabs-button is in its original default position ${defaultHorizontalAllTabsPlacement.position} for horizontal tabs mode`
+   );
+-  info(
+-    `firefox-view-button is in its original default position ${defaultHorizontalFirefoxViewPlacement.position} for horizontal tabs mode`
+-  );
+ 
+   await SpecialPowers.pushPrefEnv({
+     set: [["sidebar.verticalTabs", true]],
+@@ -63,67 +53,33 @@ add_task(async function () {
+ 
+   let defaultVerticalAllTabsPlacement =
+     CustomizableUI.getPlacementOfWidget("alltabs-button");
+-  let defaultVerticalFirefoxViewPlacement = CustomizableUI.getPlacementOfWidget(
+-    "firefox-view-button"
+-  );
+   is(
+     defaultVerticalAllTabsPlacement.area,
+     navBar,
+     `alltabs-button is in the ${navBar}`
+   );
+-  is(
+-    defaultVerticalFirefoxViewPlacement.area,
+-    navBar,
+-    `firefox-view-button is in the ${navBar}`
+-  );
+   info(
+     `alltabs-button is in its original default position ${defaultVerticalAllTabsPlacement.position} for vertical tabs mode`
+   );
+-  info(
+-    `firefox-view-button is in its original default position ${defaultVerticalFirefoxViewPlacement.position} for vertical tabs mode`
+-  );
+ 
+   let customAllTabsPosition = 1;
+-  let customFirefoxViewPosition = 2;
+   CustomizableUI.moveWidgetWithinArea("alltabs-button", customAllTabsPosition);
+-  CustomizableUI.moveWidgetWithinArea(
+-    "firefox-view-button",
+-    customFirefoxViewPosition
+-  );
+ 
+   await BrowserTestUtils.switchTab(gBrowser, nonCustomizingTab);
+   await finishedCustomizing;
+ 
+   let alltabsPlacement = CustomizableUI.getPlacementOfWidget("alltabs-button");
+-  let firefoxViewPlacement = CustomizableUI.getPlacementOfWidget(
+-    "firefox-view-button"
+-  );
+   is(alltabsPlacement.area, navBar, `alltabs-button is in the ${navBar}`);
+-  is(
+-    firefoxViewPlacement.area,
+-    navBar,
+-    `firefox-view-button is in the ${navBar}`
+-  );
+   isnot(
+     defaultVerticalAllTabsPlacement.position,
+     alltabsPlacement.position,
+     "alltabs-button has been moved from its default position"
+   );
+-  isnot(
+-    defaultVerticalFirefoxViewPlacement.position,
+-    firefoxViewPlacement.position,
+-    "firefox-view-button has been moved from its default position"
+-  );
+   is(
+     alltabsPlacement.position,
+     customAllTabsPosition,
+     "alltabs-button is in its new custom position"
+   );
+-  is(
+-    firefoxViewPlacement.position,
+-    customFirefoxViewPosition,
+-    "firefox-view-button is in its new custom position"
+-  );
+ 
+   await SpecialPowers.pushPrefEnv({
+     set: [["sidebar.verticalTabs", false]],
+@@ -131,29 +87,16 @@ add_task(async function () {
+ 
+   let horizontalAlltabsPlacement =
+     CustomizableUI.getPlacementOfWidget("alltabs-button");
+-  let horizontalFirefoxViewPlacement = CustomizableUI.getPlacementOfWidget(
+-    "firefox-view-button"
+-  );
+   is(
+     horizontalAlltabsPlacement.area,
+     tabsToolbar,
+     `alltabs-button is in the ${tabsToolbar}`
+   );
+-  is(
+-    horizontalFirefoxViewPlacement.area,
+-    tabsToolbar,
+-    `firefox-view-button is in the ${tabsToolbar}`
+-  );
+   is(
+     horizontalAlltabsPlacement.position,
+     defaultHorizontalAllTabsPlacement.position,
+     "alltabs-button is in its default horizontal mode position"
+   );
+-  is(
+-    horizontalFirefoxViewPlacement.position,
+-    defaultHorizontalFirefoxViewPlacement.position,
+-    "firefox-view-button is in its default horizontal mode position"
+-  );
+ 
+   // Switching from vertical to horizontal and back to vertical, the customization should be remembered
+   await SpecialPowers.pushPrefEnv({
+@@ -162,23 +105,10 @@ add_task(async function () {
+ 
+   let newAlltabsPlacement =
+     CustomizableUI.getPlacementOfWidget("alltabs-button");
+-  let newFirefoxViewPlacement = CustomizableUI.getPlacementOfWidget(
+-    "firefox-view-button"
+-  );
+   is(newAlltabsPlacement.area, navBar, `alltabs-button is in the ${navBar}`);
+-  is(
+-    newFirefoxViewPlacement.area,
+-    navBar,
+-    `firefox-view-button is in the ${navBar}`
+-  );
+   is(
+     newAlltabsPlacement.position,
+     customAllTabsPosition,
+     "alltabs-button is in its new custom position"
+   );
+-  is(
+-    newFirefoxViewPlacement.position,
+-    customFirefoxViewPosition,
+-    "firefox-view-button is in its new custom position"
+-  );
+ });
+diff --git a/browser/components/firefoxview/jar.mn b/browser/components/firefoxview/jar.mn
+index 8af402c8c6..3a0a702534 100644
+--- a/browser/components/firefoxview/jar.mn
++++ b/browser/components/firefoxview/jar.mn
+@@ -3,17 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ browser.jar:
+-    content/browser/firefoxview/card-container.css
+-    content/browser/firefoxview/card-container.mjs
+-    content/browser/firefoxview/firefoxview.mjs
+-    content/browser/firefoxview/history.css
+-    content/browser/firefoxview/history.mjs
+-    content/browser/firefoxview/opentabs.mjs
+-    content/browser/firefoxview/view-opentabs.css
+-    content/browser/firefoxview/syncedtabs.mjs
+-    content/browser/firefoxview/view-syncedtabs.css
+-    content/browser/firefoxview/recentbrowsing.mjs
+-    content/browser/firefoxview/firefoxview.css
+     content/browser/firefoxview/fxview-empty-state.css
+     content/browser/firefoxview/fxview-empty-state.mjs
+     content/browser/firefoxview/helpers.mjs
+@@ -21,17 +10,5 @@ browser.jar:
+     content/browser/firefoxview/fxview-tab-list.css
+     content/browser/firefoxview/fxview-tab-list.mjs
+     content/browser/firefoxview/fxview-tab-row.css
+-    content/browser/firefoxview/opentabs-tab-list.css
+-    content/browser/firefoxview/opentabs-tab-list.mjs
+-    content/browser/firefoxview/opentabs-tab-row.css
+-    content/browser/firefoxview/syncedtabs-tab-list.css
+-    content/browser/firefoxview/syncedtabs-tab-list.mjs
+-    content/browser/firefoxview/recentlyclosed.mjs
+-    content/browser/firefoxview/viewpage.mjs
+     content/browser/firefoxview/history-empty.svg (content/history-empty.svg)
+-    content/browser/firefoxview/synced-tabs-empty.svg (content/synced-tabs-empty.svg)
+-    content/browser/firefoxview/synced-tabs-error.svg (content/synced-tabs-error.svg)
+-    content/browser/callout-tab-pickup.svg (content/callout-tab-pickup.svg)
+-    content/browser/callout-tab-pickup-dark.svg (content/callout-tab-pickup-dark.svg)
+     content/browser/firefoxview/view-opentabs.svg (content/view-opentabs.svg)
+-    content/browser/firefoxview/view-recentlyclosed.svg (content/view-recentlyclosed.svg)
+diff --git a/browser/components/firefoxview/moz.build b/browser/components/firefoxview/moz.build
+index 808e38fc66..846b50a5eb 100644
+--- a/browser/components/firefoxview/moz.build
++++ b/browser/components/firefoxview/moz.build
+@@ -11,10 +11,4 @@ EXTRA_JS_MODULES += [
+     "*.sys.mjs",
+ ]
+ 
+-TESTING_JS_MODULES += [
+-    "tests/browser/FirefoxViewTestUtils.sys.mjs",
+-]
+-
+-BROWSER_CHROME_MANIFESTS += ["tests/browser/browser.toml"]
+-
+ MOCHITEST_CHROME_MANIFESTS += ["tests/chrome/chrome.toml"]
+diff --git a/browser/components/firefoxview/tests/chrome/chrome.toml b/browser/components/firefoxview/tests/chrome/chrome.toml
+index 3edeefd4a9..cecb069863 100644
+--- a/browser/components/firefoxview/tests/chrome/chrome.toml
++++ b/browser/components/firefoxview/tests/chrome/chrome.toml
+@@ -1,5 +1,3 @@
+ [DEFAULT]
+ 
+-["test_card_container.html"]
+-
+ ["test_fxview_tab_list.html"]
+diff --git a/browser/components/migration/MigrationUtils.sys.mjs b/browser/components/migration/MigrationUtils.sys.mjs
+index cec56dd578..c08f98b006 100644
+--- a/browser/components/migration/MigrationUtils.sys.mjs
++++ b/browser/components/migration/MigrationUtils.sys.mjs
+@@ -165,7 +165,6 @@ class MigrationUtils {
+         "about:preferences",
+         "about:settings",
+         "chrome://browser/content/migration/migration-dialog-window.html",
+-        "about:firefoxview",
+       ],
+       remoteTypes: ["parent", "privilegedabout"],
+     });
+diff --git a/browser/components/sessionstore/SessionStore.sys.mjs b/browser/components/sessionstore/SessionStore.sys.mjs
+index 1a0cd59d0f..62f317282b 100644
+--- a/browser/components/sessionstore/SessionStore.sys.mjs
++++ b/browser/components/sessionstore/SessionStore.sys.mjs
+@@ -3498,9 +3498,6 @@ var SessionStoreInternal = {
+     if (!isPrivateWindow && tabState.isPrivate) {
+       return;
+     }
+-    if (aTab == aWindow.FirefoxViewHandler.tab) {
+-      return;
+-    }
+     // Sval: a pin's page is no closed tab to reopen (SvalPinTab).
+     if (aTab.hasAttribute("sval-pin")) {
+       return;
+@@ -5804,9 +5801,6 @@ var SessionStoreInternal = {
+     // selected index counts only the tabs saved.
+     let pinsBeforeSelected = 0;
+     for (let tab of tabs) {
+-      if (tab == aWindow.FirefoxViewHandler.tab) {
+-        continue;
+-      }
+       if (tab.hasAttribute("sval-pin")) {
+         if (tab._tPos < tabbrowser.selectedTab._tPos) {
+           pinsBeforeSelected++;
+@@ -5834,13 +5828,6 @@ var SessionStoreInternal = {
+     if (tabbrowser.selectedTab.hasAttribute("sval-pin")) {
+       selectedIndex = 1;
+     }
+-    // We don't store the Firefox View tab in Session Store, so if it was the last selected "tab" when
+-    // a window is closed, point to the first item in the tab strip instead (it will never be the Firefox View tab,
+-    // since it's only inserted into the tab strip after it's selected).
+-    if (aWindow.FirefoxViewHandler.tab?.selected) {
+-      selectedIndex = 1;
+-      winData.title = tabbrowser.tabs[0].label;
+-    }
+     winData.selected = selectedIndex;
+ 
+     this._updateWindowFeatures(aWindow);
+diff --git a/browser/components/sessionstore/test/browser.toml b/browser/components/sessionstore/test/browser.toml
+index 74cd3662fc..58aae596c6 100644
+--- a/browser/components/sessionstore/test/browser.toml
++++ b/browser/components/sessionstore/test/browser.toml
+@@ -137,10 +137,6 @@ run-if = [
+ 
+ ["browser_dynamic_frames.js"]
+ 
+-["browser_firefoxView_restore.js"]
+-
+-["browser_firefoxView_selected_restore.js"]
+-
+ ["browser_focus_after_restore.js"]
+ tags = "os_integration"
+ 
+diff --git a/browser/components/sidebar/tests/marionette/test_initialize_vertical_tabs.py b/browser/components/sidebar/tests/marionette/test_initialize_vertical_tabs.py
+index ef9ca5b2c3..3d51a6bd55 100644
+--- a/browser/components/sidebar/tests/marionette/test_initialize_vertical_tabs.py
++++ b/browser/components/sidebar/tests/marionette/test_initialize_vertical_tabs.py
+@@ -132,7 +132,6 @@ class TestInitializeVerticalTabs(MarionetteTestCase):
+         self.assertEqual(
+             horiz_tab_ids,
+             [
+-                "firefox-view-button",
+                 "tabbrowser-tabs",
+                 "new-tab-button",
+                 "alltabs-button",
+diff --git a/browser/components/tabbrowser/content/browser-allTabsMenu.js b/browser/components/tabbrowser/content/browser-allTabsMenu.js
+index 8a606a08fb..acac018bbe 100644
+--- a/browser/components/tabbrowser/content/browser-allTabsMenu.js
++++ b/browser/components/tabbrowser/content/browser-allTabsMenu.js
+@@ -40,13 +40,6 @@ var gTabsPanel = {
+     this._initializedElements = true;
+   },
+ 
+-  hasHiddenTabsExcludingFxView() {
+-    // Exclude Firefox View, see Bug 1880138.
+-    return gBrowser.tabs.some(
+-      tab => tab.hidden && tab != FirefoxViewHandler.tab
+-    );
+-  },
+-
+   init() {
+     if (this._initialized) {
+       return;
+@@ -86,7 +79,7 @@ var gTabsPanel = {
+       document.getElementById("allTabsMenu-containerTabsButton").hidden =
+         !containersEnabled;
+ 
+-      const hasHiddenTabs = this.hasHiddenTabsExcludingFxView();
++      const hasHiddenTabs = gBrowser.tabs.some(tab => tab.hidden);
+       document.getElementById("allTabsMenu-hiddenTabsButton").hidden =
+         !hasHiddenTabs;
+       document.getElementById("allTabsMenu-hiddenTabsSeparator").hidden =
+@@ -176,7 +169,7 @@ var gTabsPanel = {
+     this.hiddenTabsPopup = new TabsPanel({
+       view: this.hiddenTabsView,
+       containerNode: this.hiddenTabsViewTabs,
+-      filterFn: tab => tab != FirefoxViewHandler.tab,
++      filterFn: () => true,
+       onlyHiddenTabs: true,
+     });
+ 
+diff --git a/browser/components/tabbrowser/content/opentabs-splitview.mjs b/browser/components/tabbrowser/content/opentabs-splitview.mjs
+index f83e3d1a91..66e9626cb5 100644
+--- a/browser/components/tabbrowser/content/opentabs-splitview.mjs
++++ b/browser/components/tabbrowser/content/opentabs-splitview.mjs
+@@ -171,10 +171,6 @@ class OpenTabsInSplitView extends MozLitElement {
+         rel="stylesheet"
+         href="chrome://browser/content/tabbrowser/opentabs-splitview.css"
+       />
+-      <link
+-        rel="stylesheet"
+-        href="chrome://browser/content/firefoxview/firefoxview.css"
+-      />
+       <div class="sticky-header">
+         <h3 data-l10n-id="opentabs-page-title"></h3>
+         <moz-input-search
+diff --git a/browser/components/tabbrowser/content/tab.js b/browser/components/tabbrowser/content/tab.js
+index a413d0a9e1..fbe973a1c8 100644
+--- a/browser/components/tabbrowser/content/tab.js
++++ b/browser/components/tabbrowser/content/tab.js
+@@ -211,9 +211,7 @@
+     }
+ 
+     get isOpen() {
+-      return (
+-        this.isConnected && !this.closing && this != FirefoxViewHandler.tab
+-      );
++      return this.isConnected && !this.closing;
+     }
+ 
+     get visible() {
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 0b42a01374..0341f3e772 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -1104,7 +1104,7 @@
+       aTab,
+       { telemetrySource = this.TabMetrics.METRIC_SOURCE.UNKNOWN } = {}
+     ) {
+-      if (aTab.pinned || aTab == FirefoxViewHandler.tab) {
++      if (aTab.pinned) {
+         return;
+       }
+ 
+@@ -4705,8 +4705,6 @@
+               ) + 1;
+           } else if (previousTab.visible) {
+             elementIndex = previousTab.elementIndex + 1;
+-          } else if (previousTab == FirefoxViewHandler.tab) {
+-            elementIndex = 0;
+           }
+ 
+           if (lastRelatedTab) {
+@@ -6025,23 +6023,10 @@
+           this.selectedTab = newTab;
+         } else {
+           allTabsUnloaded = true;
+-          // all tabs are unloaded - show Firefox View if it's present, otherwise open a new tab
+-          // Firefox View counts as present if its tab is already open, or if the button
+-          // is visible, so as to not do this in private browsing mode or if the user
+-          // has removed the button from their toolbar (bug 1946432, bug 1989429)
+-          let firefoxViewAvailable =
+-            FirefoxViewHandler.tab &&
+-            FirefoxViewHandler.button?.checkVisibility({
+-              checkVisibilityCSS: true,
+-              visibilityProperty: true,
+-            });
+-          if (firefoxViewAvailable) {
+-            FirefoxViewHandler.openTab("opentabs");
+-          } else {
+-            this.selectedTab = this.addTrustedTab(BROWSER_NEW_TAB_URL, {
+-              skipAnimation: true,
+-            });
+-          }
++          // all tabs are unloaded - open a new tab
++          this.selectedTab = this.addTrustedTab(BROWSER_NEW_TAB_URL, {
++            skipAnimation: true,
++          });
+         }
+       }
+       let memoryUsageBeforeUnload = await getTotalMemoryUsage();
+@@ -6101,10 +6086,6 @@
+       if (!aTab.selected) {
+         return null;
+       }
+-      if (FirefoxViewHandler.tab) {
+-        aExcludeTabs.push(FirefoxViewHandler.tab);
+-      }
+-
+       let excludeTabs = new Set(aExcludeTabs);
+ 
+       // If this tab has a successor, it should be selectable, since
+@@ -6598,7 +6579,7 @@
+     }
+ 
+     showTab(aTab) {
+-      if (!aTab.hidden || aTab == FirefoxViewHandler.tab) {
++      if (!aTab.hidden) {
+         return;
+       }
+       aTab.removeAttribute("hidden");
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser.toml b/browser/components/tabbrowser/test/browser/tabs/browser.toml
+index 0c2afdc359..13bb971bd1 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser.toml
++++ b/browser/components/tabbrowser/test/browser/tabs/browser.toml
+@@ -102,9 +102,6 @@ tags = "vertical-tabs"
+ 
+ ["browser_e10s_switchbrowser.js"]
+ 
+-["browser_exclude_fxview_hidden_tabs.js"]
+-tags = "vertical-tabs"
+-
+ ["browser_file_to_http_named_popup.js"]
+ 
+ ["browser_file_to_http_script_closable.js"]
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_ctrlTab.js b/browser/components/tabbrowser/test/browser/tabs/browser_ctrlTab.js
+index 27080d157d..0c1fdac407 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_ctrlTab.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_ctrlTab.js
+@@ -147,51 +147,6 @@ add_task(async function () {
+     );
+   }
+ 
+-  // eslint-disable-next-line no-lone-blocks
+-  {
+-    info("Bug 1731050: test hidden tabs");
+-    checkTabs(1);
+-    BrowserTestUtils.addTab(gBrowser);
+-    BrowserTestUtils.addTab(gBrowser);
+-    BrowserTestUtils.addTab(gBrowser);
+-    BrowserTestUtils.addTab(gBrowser);
+-    FirefoxViewHandler.tab = BrowserTestUtils.addTab(gBrowser);
+-
+-    gBrowser.hideTab(FirefoxViewHandler.tab);
+-    FirefoxViewHandler.openTab();
+-    selectTabs([1, 2, 3, 4, 3]);
+-    gBrowser.hideTab(gBrowser.tabs[4]);
+-    selectTabs([2]);
+-    gBrowser.hideTab(gBrowser.tabs[3]);
+-
+-    is(gBrowser.tabs[5].hidden, true, "Tab at index 5 is hidden");
+-    is(gBrowser.tabs[4].hidden, true, "Tab at index 4 is hidden");
+-    is(gBrowser.tabs[3].hidden, true, "Tab at index 3 is hidden");
+-    is(gBrowser.tabs[2].hidden, false, "Tab at index 2 is still shown");
+-    is(gBrowser.tabs[1].hidden, false, "Tab at index 1 is still shown");
+-    is(gBrowser.tabs[0].hidden, false, "Tab at index 0 is still shown");
+-
+-    await ctrlTabTest([], 1, 1);
+-    await ctrlTabTest([], 2, 0);
+-    gBrowser.showTab(gBrowser.tabs[4]);
+-    await ctrlTabTest([2], 3, 4);
+-    await ctrlTabTest([], 4, 4);
+-    gBrowser.showTab(gBrowser.tabs[3]);
+-    await ctrlTabTest([], 4, 3);
+-    await ctrlTabTest([], 6, 4);
+-    FirefoxViewHandler.openTab();
+-    // Fx View tab should be visible in the panel while selected.
+-    await ctrlTabTest([], 5, 1);
+-    // Fx View tab should no longer be visible.
+-    await ctrlTabTest([], 1, 4);
+-
+-    for (let i = 5; i > 0; i--) {
+-      await BrowserTestUtils.removeTab(gBrowser.tabs[i]);
+-    }
+-    FirefoxViewHandler.tab = null;
+-    info("End hidden tabs test");
+-  }
+-
+   {
+     info("Bug 1293692: Test asynchronous tab previews");
+ 
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload.js b/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload.js
+index 7ef6798f49..2bc41d5420 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload.js
+@@ -34,11 +34,6 @@ add_setup(async function () {
+     browser: gBrowser.selectedTab.linkedBrowser,
+     uriString: "http://mochi.test:8888/#originalTab",
+   });
+-  let originalTab = gBrowser.selectedTab;
+-  // switch to Firefox View tab to initialize it
+-  FirefoxViewHandler.openTab();
+-  // switch back to the original tab since tests expect this
+-  await BrowserTestUtils.switchTab(gBrowser, originalTab);
+ });
+ 
+ add_task(async function test_unload_selected_and_one_other_tab() {
+@@ -211,62 +206,6 @@ add_task(async function test_unload_selected_tab_switches_to_loaded_tab() {
+   await BrowserTestUtils.removeTab(tab1);
+ });
+ 
+-add_task(
+-  async function test_unload_selected_tab_with_no_others_loaded_switches_to_firefoxview() {
+-    await SpecialPowers.pushPrefEnv({
+-      set: [["browser.tabs.unloadTabInContextMenu", true]],
+-    });
+-
+-    let originalTab = gBrowser.selectedTab;
+-    let [tab1] = await addBrowserTabs(1);
+-
+-    let menuItemUnload = document.getElementById("context_unloadTab");
+-
+-    await BrowserTestUtils.switchTab(gBrowser, tab1);
+-    updateTabContextMenu(originalTab);
+-    ok(!menuItemUnload.hidden, "Unload Tab is visible");
+-    {
+-      let menu = await openTabMenuFor(originalTab);
+-      let menuHiddenPromise = BrowserTestUtils.waitForPopupEvent(
+-        menu,
+-        "hidden"
+-      );
+-      menu.activateItem(menuItemUnload);
+-      await menuHiddenPromise;
+-    }
+-    await TestUtils.waitForCondition(
+-      () => !originalTab.linkedPanel,
+-      "Wait for original tab to be unloaded"
+-    );
+-
+-    updateTabContextMenu(tab1);
+-    ok(!menuItemUnload.hidden, "Unload Tab is visible");
+-    {
+-      let menu = await openTabMenuFor(tab1);
+-      let menuHiddenPromise = BrowserTestUtils.waitForPopupEvent(
+-        menu,
+-        "hidden"
+-      );
+-      menu.activateItem(menuItemUnload);
+-      await menuHiddenPromise;
+-    }
+-    await TestUtils.waitForCondition(
+-      () => !tab1.linkedPanel,
+-      "Wait for Tab1 to be unloaded"
+-    );
+-
+-    is(
+-      gBrowser.selectedTab,
+-      FirefoxViewHandler.tab,
+-      "Should select Firefox View"
+-    );
+-
+-    await BrowserTestUtils.removeTab(tab1);
+-    // Switch back to the original tab so as not to mess up subsequent tests
+-    await BrowserTestUtils.switchTab(gBrowser, originalTab);
+-  }
+-);
+-
+ add_task(async function test_unload_all_tabs() {
+   await SpecialPowers.pushPrefEnv({
+     set: [["browser.tabs.unloadTabInContextMenu", true]],
+@@ -301,115 +240,13 @@ add_task(async function test_unload_all_tabs() {
+       !tab3.linkedPanel,
+     "Wait for all tabs to be unloaded"
+   );
+-  is(
+-    gBrowser.selectedTab,
+-    FirefoxViewHandler.tab,
+-    "Should select Firefox View tab"
+-  );
+-
+-  await BrowserTestUtils.removeTab(tab3);
+-  await BrowserTestUtils.removeTab(tab2);
+-  await BrowserTestUtils.removeTab(tab1);
+-});
+-
+-add_task(async function test_unload_all_tabs_no_firefox_view() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.tabs.unloadTabInContextMenu", true]],
+-  });
+-
+-  // Remove Firefox View tab and button from toolbar
+-  gBrowser.removeTab(FirefoxViewHandler.tab);
+-  const firefoxViewPlacement = CustomizableUI.getPlacementOfWidget(
+-    "firefox-view-button"
+-  );
+-  CustomizableUI.removeWidgetFromArea("firefox-view-button");
+-
+-  let originalTab = gBrowser.selectedTab;
+-  let [tab1, tab2, tab3] = await addBrowserTabs(3);
+-
+-  let menuItemUnload = document.getElementById("context_unloadTab");
+-
+-  await triggerClickOn(tab1, { ctrlKey: true });
+-  await triggerClickOn(tab2, { ctrlKey: true });
+-  await triggerClickOn(tab3, { ctrlKey: true });
+-  updateTabContextMenu(originalTab);
+-  ok(!menuItemUnload.hidden, "Unload Tab is visible");
+-  is(
+-    JSON.parse(menuItemUnload.getAttribute("data-l10n-args")).tabCount,
+-    4,
+-    "showing 4 tabs on menu item"
+-  );
+-  {
+-    let menu = await openTabMenuFor(originalTab);
+-    let menuHiddenPromise = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
+-    menu.activateItem(menuItemUnload);
+-    await menuHiddenPromise;
+-  }
+-  await TestUtils.waitForCondition(
+-    () =>
+-      !originalTab.linkedPanel &&
+-      !tab1.linkedPanel &&
+-      !tab2.linkedPanel &&
+-      !tab3.linkedPanel,
+-    "Wait for all tabs to be unloaded"
+-  );
+-  ok(
+-    !FirefoxViewHandler.tab,
+-    "Should not open Firefox View (since the button is not present)"
+-  );
+-
+   await BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-  // restore Firefox View since other tests expect it
+-  CustomizableUI.addWidgetToArea(
+-    "firefox-view-button",
+-    firefoxViewPlacement.area,
+-    firefoxViewPlacement.position
+-  );
+-  FirefoxViewHandler.openTab();
+ 
+   await BrowserTestUtils.removeTab(tab3);
+   await BrowserTestUtils.removeTab(tab2);
+   await BrowserTestUtils.removeTab(tab1);
+ });
+ 
+-add_task(async function test_unload_all_tabs_hidden_private_window() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.tabs.unloadTabInContextMenu", true]],
+-  });
+-
+-  // When unloading all tabs in a private window, the Firefox View button is
+-  // not present, so make sure we don't show Firefox View when unloading all tabs.
+-  let newWindow = await BrowserTestUtils.openNewBrowserWindow({
+-    private: true,
+-  });
+-
+-  let originalTab = newWindow.gBrowser.selectedTab;
+-  originalTab.focus();
+-  let menuItemUnload = newWindow.document.getElementById("context_unloadTab");
+-  ok(!menuItemUnload.hidden, "Unload Tab is visible");
+-  is(
+-    JSON.parse(menuItemUnload.getAttribute("data-l10n-args")).tabCount,
+-    1,
+-    "showing 1 tab on menu item"
+-  );
+-  {
+-    let menu = await openTabMenuFor(originalTab);
+-    let menuHiddenPromise = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
+-    menu.activateItem(menuItemUnload);
+-    await menuHiddenPromise;
+-  }
+-  await TestUtils.waitForCondition(
+-    () => !originalTab.linkedPanel,
+-    "Wait for tab to be unloaded"
+-  );
+-  ok(
+-    !newWindow.FirefoxViewHandler.tab,
+-    "Should not open Firefox View (since the button is hidden)"
+-  );
+-
+-  await BrowserTestUtils.closeWindow(newWindow);
+-});
+-
+ add_task(async function test_pref_off_does_not_show_unload_menu_item() {
+   await SpecialPowers.pushPrefEnv({
+     set: [["browser.tabs.unloadTabInContextMenu", false]],
+@@ -435,7 +272,3 @@ add_task(
+     await BrowserTestUtils.removeTab(tab1);
+   }
+ );
+-
+-add_task(async function test_cleanup() {
+-  await BrowserTestUtils.removeTab(FirefoxViewHandler.tab);
+-});
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_telemetry.js b/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_telemetry.js
+index d00c6260f5..2cf50caab6 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_telemetry.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_telemetry.js
+@@ -42,11 +42,6 @@ add_setup(async function () {
+     browser: gBrowser.selectedTab.linkedBrowser,
+     uriString: "http://mochi.test:8888/#originalTab",
+   });
+-  let originalTab = gBrowser.selectedTab;
+-  // switch to Firefox View tab to initialize it
+-  FirefoxViewHandler.openTab();
+-  // switch back to the original tab since tests expect this
+-  await BrowserTestUtils.switchTab(gBrowser, originalTab);
+ 
+   await SpecialPowers.pushPrefEnv({
+     set: [
+@@ -283,7 +278,3 @@ add_task(async function test_unload_all_tabs() {
+   await BrowserTestUtils.removeTab(tab2);
+   await BrowserTestUtils.removeTab(tab1);
+ });
+-
+-add_task(async function test_cleanup() {
+-  await BrowserTestUtils.removeTab(FirefoxViewHandler.tab);
+-});
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_with_beforeunload.js b/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_with_beforeunload.js
+index 73948ed0fa..1fbb7bb3db 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_with_beforeunload.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_multiselect_tabs_unload_with_beforeunload.js
+@@ -64,11 +64,6 @@ add_setup(async function () {
+     browser: gBrowser.selectedTab.linkedBrowser,
+     uriString: "http://mochi.test:8888/#originalTab",
+   });
+-  let originalTab = gBrowser.selectedTab;
+-  // switch to Firefox View tab to initialize it
+-  FirefoxViewHandler.openTab();
+-  // switch back to the original tab since tests expect this
+-  await BrowserTestUtils.switchTab(gBrowser, originalTab);
+ });
+ 
+ add_task(async function test_unload_selected_and_allow() {
+@@ -274,7 +269,3 @@ add_task(async function test_unload_multiple_and_allow() {
+   await BrowserTestUtils.removeTab(tab2);
+   await BrowserTestUtils.removeTab(tab1);
+ });
+-
+-add_task(async function test_cleanup() {
+-  await BrowserTestUtils.removeTab(FirefoxViewHandler.tab);
+-});
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_tab_groups_tab_interactions_telemetry.js b/browser/components/tabbrowser/test/browser/tabs/browser_tab_groups_tab_interactions_telemetry.js
+index 55558c9fb6..05fd88ee2e 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_tab_groups_tab_interactions_telemetry.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_tab_groups_tab_interactions_telemetry.js
+@@ -2,15 +2,6 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-const {
+-  openFirefoxViewTab,
+-  closeFirefoxViewTab,
+-  init: FirefoxViewTestUtilsInit,
+-} = ChromeUtils.importESModule(
+-  "resource://testing-common/FirefoxViewTestUtils.sys.mjs"
+-);
+-FirefoxViewTestUtilsInit(this);
+-
+ const { TabStateFlusher } = ChromeUtils.importESModule(
+   "resource:///modules/sessionstore/TabStateFlusher.sys.mjs"
+ );
+@@ -184,7 +175,6 @@ add_task(async function test_tabInteractionsBasic() {
+ add_task(async function test_tabInteractionsClose() {
+   let initialTab = window.gBrowser.tabs[0];
+   await resetTelemetry();
+-  FirefoxViewTestUtilsInit(this, window);
+ 
+   let tabs = await Promise.all(Array.from({ length: 5 }, () => addTab()));
+   let group = window.gBrowser.addTabGroup(tabs);
+@@ -216,19 +206,6 @@ add_task(async function test_tabInteractionsClose() {
+   window.document.getElementById("cmd_close").doCommand();
+   await assertMetricFoundFor("close_tab_other", 2);
+ 
+-  info(
+-    "Test that closing a tab via firefox view calls tab_interactions.close_tab_other"
+-  );
+-  await openFirefoxViewTab(window).then(async viewTab => {
+-    const openTabs = viewTab.linkedBrowser.contentDocument
+-      .querySelector("named-deck > view-recentbrowsing view-opentabs")
+-      .shadowRoot.querySelector("view-opentabs-card").tabList.rowEls;
+-    const tabElement = Array.from(openTabs).find(t => t.tabElement.group);
+-    tabElement.shadowRoot.querySelector("moz-button.dismiss-button").click();
+-    await assertMetricFoundFor("close_tab_other", 3);
+-  });
+-  await closeFirefoxViewTab(window);
+-
+   window.gBrowser.removeAllTabsBut(initialTab);
+   await resetTelemetry();
+ });
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_about_opentabs.js b/browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_about_opentabs.js
+index ec58a98f5b..a0b0f000ad 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_about_opentabs.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_tab_splitview_about_opentabs.js
+@@ -870,54 +870,6 @@ add_task(async function test_open_link_in_split_view_from_container() {
+   }
+ });
+ 
+-add_task(async function test_open_link_in_split_view_hidden_on_hidden_tab() {
+-  FirefoxViewHandler.openTab();
+-  let fxviewTab = FirefoxViewHandler.tab;
+-  await BrowserTestUtils.browserLoaded(
+-    fxviewTab.linkedBrowser,
+-    false,
+-    "about:firefoxview"
+-  );
+-
+-  ok(fxviewTab.hidden, "Firefox View tab is a hidden tab");
+-
+-  let browser = fxviewTab.linkedBrowser;
+-  let doc = browser.contentWindow.document;
+-
+-  let openTabs = doc.querySelector("view-opentabs[slot='opentabs']");
+-  await TestUtils.waitForCondition(
+-    () => openTabs.viewCards?.[0]?.tabList?.rowEls?.length,
+-    "Open tab rows rendered"
+-  );
+-
+-  let firstTabLink = openTabs.viewCards[0].tabList.rowEls[0].mainEl;
+-
+-  const contextMenu = document.getElementById("contentAreaContextMenu");
+-  let popupShown = BrowserTestUtils.waitForEvent(contextMenu, "popupshown");
+-  EventUtils.synthesizeMouseAtCenter(
+-    firstTabLink,
+-    { type: "contextmenu", button: 2 },
+-    browser.contentWindow
+-  );
+-  await popupShown;
+-
+-  let openLinkInSplitViewItem = contextMenu.querySelector(
+-    "#context-openlinkinsplitview"
+-  );
+-  ok(openLinkInSplitViewItem, "Open Link in Split View menu item exists");
+-  ok(
+-    !BrowserTestUtils.isVisible(openLinkInSplitViewItem),
+-    "Open Link in Split View menu item is hidden on a hidden tab"
+-  );
+-
+-  let popupHidden = BrowserTestUtils.waitForPopupEvent(contextMenu, "hidden");
+-  contextMenu.hidePopup();
+-  await popupHidden;
+-
+-  BrowserTestUtils.removeTab(fxviewTab);
+-  FirefoxViewHandler.tab = null;
+-});
+-
+ add_task(
+   async function test_open_link_in_split_view_hidden_when_in_split_view() {
+     const testPageUrl = httpURL("file_anchor_elements.html");
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_tabs_openURI_after_current.js b/browser/components/tabbrowser/test/browser/tabs/browser_tabs_openURI_after_current.js
+index f49845d152..a22d79c5ca 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_tabs_openURI_after_current.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_tabs_openURI_after_current.js
+@@ -3,16 +3,6 @@
+ 
+ "use strict";
+ 
+-const {
+-  openFirefoxViewTab,
+-  closeFirefoxViewTab,
+-  init: FirefoxViewTestUtilsInit,
+-} = ChromeUtils.importESModule(
+-  "resource://testing-common/FirefoxViewTestUtils.sys.mjs"
+-);
+-
+-FirefoxViewTestUtilsInit(this, window);
+-
+ let resetTelemetry = async () => {
+   await Services.fog.testFlushAllChildren();
+   Services.fog.testResetFOG();
+@@ -107,24 +97,6 @@ add_task(async function test_browser_tabs_openURI_after_current() {
+   );
+   BrowserTestUtils.removeTab(tabFromGroupedTab);
+ 
+-  info(
+-    "When active tab is Firefox View, external link should open at the end of the tab strip"
+-  );
+-  await openFirefoxViewTab(window);
+-  const tabFromFirefoxView = await openExternalLink();
+-  Assert.equal(
+-    gBrowser.selectedTab,
+-    tabFromFirefoxView,
+-    "new tab should be the active tab"
+-  );
+-  Assert.equal(
+-    tabFromFirefoxView,
+-    gBrowser.tabs.at(-1),
+-    "new tab should be the last tab in the tab strip"
+-  );
+-  BrowserTestUtils.removeTab(tabFromFirefoxView);
+-  closeFirefoxViewTab(window);
+-
+   info(
+     "When active tab is ungrouped and unpinned, external link should open right after it"
+   );
+diff --git a/browser/components/tabbrowser/test/browser/tabs/browser_visibleTabs.js b/browser/components/tabbrowser/test/browser/tabs/browser_visibleTabs.js
+index 226605ea75..bdbdcc6a11 100644
+--- a/browser/components/tabbrowser/test/browser/tabs/browser_visibleTabs.js
++++ b/browser/components/tabbrowser/test/browser/tabs/browser_visibleTabs.js
+@@ -14,8 +14,8 @@ add_task(async function () {
+ 
+   let testTab = BrowserTestUtils.addTab(gBrowser);
+ 
+-  let firefoxViewTab = BrowserTestUtils.addTab(gBrowser, "about:firefoxview");
+-  gBrowser.hideTab(firefoxViewTab);
++  let hiddenTab = BrowserTestUtils.addTab(gBrowser);
++  gBrowser.hideTab(hiddenTab);
+ 
+   let visible = gBrowser.visibleTabs;
+   is(visible.length, 3, "3 tabs should be visible");
+@@ -91,14 +91,14 @@ add_task(async function () {
+   is(gBrowser.selectedTab, testTab, "next to test tab again");
+ 
+   info("select a hidden tab thats selectable");
+-  gBrowser.selectedTab = firefoxViewTab;
++  gBrowser.selectedTab = hiddenTab;
+   gBrowser.tabContainer.advanceSelectedTab(1, true);
+   is(gBrowser.selectedTab, pinned, "next to first visible tab, the pinned tab");
+   gBrowser.tabContainer.advanceSelectedTab(1, true);
+   is(gBrowser.selectedTab, testTab, "next to second visible tab, the test tab");
+ 
+   info("again select a hidden tab thats selectable");
+-  gBrowser.selectedTab = firefoxViewTab;
++  gBrowser.selectedTab = hiddenTab;
+   gBrowser.tabContainer.advanceSelectedTab(-1, true);
+   is(gBrowser.selectedTab, testTab, "next to last visible tab, the test tab");
+   gBrowser.tabContainer.advanceSelectedTab(-1, true);
+@@ -154,7 +154,7 @@ add_task(async function () {
+   );
+ 
+   info("Close the selectable hidden tab");
+-  gBrowser.removeTab(firefoxViewTab);
++  gBrowser.removeTab(hiddenTab);
+ 
+   info(
+     "Close the last visible tab and make sure we still get a visible tab with browser.tabs.closeWindowWithLastTab = false"
+diff --git a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+index 5ea58e3f8a..924528bbbc 100644
+--- a/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
++++ b/browser/components/urlbar/QuickActionsLoaderDefault.sys.mjs
+@@ -118,14 +118,6 @@ const DEFAULT_ACTIONS = {
+       "https://support.mozilla.org/products/firefox?as=u&utm_source=inproduct"
+     ),
+   },
+-  firefoxview: {
+-    l10nCommands: ["quickactions-cmd-firefoxview"],
+-    icon: "chrome://browser/skin/firefox-view.svg",
+-    label: "quickactions-firefoxview",
+-    onPick: (_queryContext, controller) => {
+-      controller.browserWindow.FirefoxViewHandler.openTab();
+-    },
+-  },
+   inspect: {
+     l10nCommands: ["quickactions-cmd-inspector2"],
+     icon: "chrome://devtools/skin/images/open-inspector.svg",
+diff --git a/browser/components/urlbar/tests/browser-quickactions/browser_commands.js b/browser/components/urlbar/tests/browser-quickactions/browser_commands.js
+index 0050931cf4..841f75faa6 100644
+--- a/browser/components/urlbar/tests/browser-quickactions/browser_commands.js
++++ b/browser/components/urlbar/tests/browser-quickactions/browser_commands.js
+@@ -28,19 +28,6 @@ const LOAD_TYPE = {
+ };
+ 
+ let COMMANDS_TESTS = [
+-  {
+-    cmd: "open view",
+-    uri: "about:firefoxview",
+-    loadType: LOAD_TYPE.PRE_LOADED,
+-    testFun: async () => {
+-      await BrowserTestUtils.waitForCondition(() => {
+-        return (
+-          window.gBrowser.selectedBrowser.currentURI.spec == "about:firefoxview"
+-        );
+-      });
+-      return true;
+-    },
+-  },
+   {
+     cmd: "add-ons",
+     uri: "about:addons",
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index 4b31cc0db9..a06fdbbe3a 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -278,13 +278,6 @@ quickactions-cmd-downloads = downloads
+ quickactions-extensions = Manage extensions
+ quickactions-cmd-extensions2 = extensions, addons, add-ons
+ 
+-# Opens Firefox View
+-quickactions-firefoxview = Open { -firefoxview-brand-name }
+-# English is using "view" and "open view", since the feature name is
+-# "Firefox View". If you have translated the name in your language, you
+-# should use a word related to the existing translation.
+-quickactions-cmd-firefoxview = open { -firefoxview-brand-name }, { -firefoxview-brand-name }, open view, view
+-
+ # Opens SUMO home page
+ quickactions-help = { -brand-product-name } help
+ quickactions-cmd-help = help, support
+diff --git a/browser/locales/en-US/browser/firefoxView.ftl b/browser/locales/en-US/browser/firefoxView.ftl
+index 13a8ebee16..205806d6a2 100644
+--- a/browser/locales/en-US/browser/firefoxView.ftl
++++ b/browser/locales/en-US/browser/firefoxView.ftl
+@@ -2,141 +2,9 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-toolbar-button-firefox-view-2 =
+-  .label = { -firefoxview-brand-name }
+-  .tooltiptext = View recent browsing across windows and devices
+-
+-menu-tools-firefox-view =
+-  .label = { -firefoxview-brand-name }
+-  .accesskey = F
+-
+-firefoxview-page-title = { -firefoxview-brand-name }
+-
+-firefoxview-page-heading =
+-  .heading = { -firefoxview-brand-name }
+-
+-firefoxview-page-label =
+-  .label = { -firefoxview-brand-name }
+-
+ # Used instead of the localized relative time when a timestamp is within a minute or so of now
+ firefoxview-just-now-timestamp = Just now
+ 
+-firefoxview-syncedtabs-signin-header-2 = Your { -brand-product-name } on all your devices
+-firefoxview-syncedtabs-signin-description-2 = To see tabs you have open on your phone and other devices, sign in or sign up for an account. With an account, you can also sync your passwords, history, and more.
+-firefoxview-syncedtabs-signin-primarybutton-2 = Sign in
+-
+-firefoxview-syncedtabs-adddevice-header-2 = Grab tabs from anywhere
+-firefoxview-syncedtabs-adddevice-description-2 = Sign in to { -brand-product-name } on your phone or another computer to see tabs here. Learn how to <a data-l10n-name="url">connect additional devices</a>.
+-firefoxview-syncedtabs-adddevice-primarybutton = Try { -brand-product-name } for mobile
+-
+-firefoxview-tabpickup-synctabs-primarybutton = Sync open tabs
+-
+-firefoxview-syncedtabs-synctabs-header = Update your sync settings
+-firefoxview-syncedtabs-synctabs-description = To see tabs from other devices, you need to sync your open tabs.
+-
+-firefoxview-syncedtabs-loading-header = Sync in progress
+-firefoxview-syncedtabs-loading-description = When it’s done, you’ll see any tabs you have open on other devices. Check back soon.
+-
+-firefoxview-tabpickup-fxa-admin-disabled-header = Your organization has disabled sync
+-firefoxview-tabpickup-fxa-disabled-by-policy-description = { -brand-short-name } is not able to sync tabs between devices because your organization has disabled syncing.
+-
+-firefoxview-tabpickup-network-offline-header = Check your internet connection
+-firefoxview-tabpickup-network-offline-description = If you’re using a firewall or proxy, check that { -brand-short-name } has permission to access the web.
+-firefoxview-tabpickup-network-offline-primarybutton = Try again
+-
+-firefoxview-tabpickup-sync-error-header = We’re having trouble syncing
+-firefoxview-tabpickup-generic-sync-error-description = { -brand-short-name } can’t reach the syncing service right now. Try again in a few moments.
+-firefoxview-tabpickup-sync-error-primarybutton = Try again
+-
+-firefoxview-tabpickup-sync-disconnected-header = Turn on syncing to continue
+-firefoxview-tabpickup-sync-disconnected-description = To grab your tabs, you’ll need to allow syncing in { -brand-short-name }.
+-firefoxview-tabpickup-sync-disconnected-primarybutton = Turn on sync in settings
+-
+-firefoxview-tabpickup-password-locked-header = Enter your Primary Password to view tabs
+-firefoxview-tabpickup-password-locked-description = To grab your tabs, you’ll need to enter the Primary Password for { -brand-short-name }.
+-firefoxview-tabpickup-password-locked-link = Learn more
+-firefoxview-tabpickup-password-locked-primarybutton = Enter Primary Password
+-firefoxview-syncedtab-password-locked-link = <a data-l10n-name="syncedtab-password-locked-link">Learn more</a>
+-
+-firefoxview-tabpickup-signed-out-header = Sign in to reconnect
+-firefoxview-tabpickup-signed-out-description2 = To reconnect and grab your tabs, sign in to your account.
+-firefoxview-tabpickup-signed-out-primarybutton = Sign in
+-
+-# Variables:
+-#   $tabTitle (string) - Title of tab being dismissed
+-firefoxview-closed-tabs-dismiss-tab =
+-  .title = Dismiss { $tabTitle }
+-
+-# Variables:
+-#   $targetURI (string) - URL that will be opened in the new tab
+-firefoxview-tabs-list-tab-button =
+-  .title = Open { $targetURI } in a new tab
+-
+-firefoxview-collapse-button-show =
+-  .title = Show list
+-
+-firefoxview-collapse-button-hide =
+-  .title = Hide list
+-
+-firefoxview-overview-nav = Recent browsing
+-  .title = Recent browsing
+-firefoxview-overview-header = Recent browsing
+-  .title = Recent browsing
+-
+-## History in this context refers to browser history
+-
+-firefoxview-history-nav = History
+-  .title = History
+-firefoxview-history-header = History
+-firefoxview-history-context-delete = Delete from History
+-    .accesskey = D
+-firefoxview-history-context-forget-site = Forget About This Site…
+-    .accesskey = F
+-
+-## Open Tabs in this context refers to all open tabs in the browser
+-
+-firefoxview-opentabs-nav = Open tabs
+-  .title = Open tabs
+-firefoxview-opentabs-header = Open tabs
+-
+-## Recently closed tabs in this context refers to recently closed tabs from all windows
+-
+-firefoxview-recently-closed-nav = Recently closed tabs
+-  .title = Recently closed tabs
+-firefoxview-recently-closed-header = Recently closed tabs
+-
+-## Tabs from other devices refers in this context refers to synced tabs from other devices
+-
+-firefoxview-synced-tabs-nav = Tabs from other devices
+-  .title = Tabs from other devices
+-firefoxview-synced-tabs-header = Tabs from other devices
+-
+-##
+-
+-# Used for a link in collapsible cards, in the ’Recent browsing’ page of Firefox View
+-firefoxview-view-all-link = View all
+-
+-# Variables:
+-#   $winID (Number) - The index of the owner window for this set of tabs
+-firefoxview-opentabs-window-header =
+-  .title = Window { $winID }
+-
+-# Variables:
+-#   $winID (Number) - The index of the owner window (which is currently focused) for this set of tabs
+-firefoxview-opentabs-current-window-header =
+-  .title = Window { $winID } (Current)
+-
+-firefoxview-show-more = Show more
+-firefoxview-show-less = Show less
+-firefoxview-show-all = Show all
+-
+-firefoxview-search-text-box-clear-button =
+-  .title = Clear
+-
+-# Placeholder for the input field to search in recent browsing ("search" is a verb).
+-firefoxview-search-text-box-recentbrowsing =
+-  .placeholder = Search
+-
+ # Placeholder for the input field to search in history ("search" is a verb).
+ firefoxview-search-text-box-history =
+   .placeholder = Search history
+@@ -145,18 +13,6 @@ firefoxview-search-text-box-history =
+ firefoxview-search-text-box-bookmarks =
+   .placeholder = Search bookmarks
+ 
+-# Placeholder for the input field to search in recently closed tabs ("search" is a verb).
+-firefoxview-search-text-box-recentlyclosed =
+-  .placeholder = Search recently closed tabs
+-
+-# Placeholder for the input field to search in tabs from other devices ("search" is a verb).
+-firefoxview-search-text-box-tabs =
+-  .placeholder = Search tabs
+-
+-# Placeholder for the input field to search in open tabs ("search" is a verb).
+-firefoxview-search-text-box-opentabs =
+-  .placeholder = Search open tabs
+-
+ # "Search" is a noun (as in "Results of the search for")
+ # Variables:
+ #   $query (String) - The search query used for searching through browser history.
+@@ -174,14 +30,6 @@ firefoxview-search-results-count = { $count ->
+ #   $query (String) - The search query.
+ firefoxview-search-results-empty = No results for “{ $query }”
+ 
+-firefoxview-sort-history-by-date-label = Sort by date
+-firefoxview-sort-history-by-site-label = Sort by site
+-firefoxview-sort-open-tabs-by-recency-label = Sort by recent activity
+-firefoxview-sort-open-tabs-by-order-label = Sort by tab order
+-
+-## Variables:
+-##   $date (string) - Date to be formatted based on locale
+-
+ firefoxview-history-date-today = Today - { DATETIME($date, dateStyle: "full") }
+ firefoxview-history-date-yesterday = Yesterday - { DATETIME($date, dateStyle: "full") }
+ firefoxview-history-date-this-month = { DATETIME($date, dateStyle: "full") }
+@@ -192,61 +40,13 @@ firefoxview-history-date-prev-month = { DATETIME($date, month: "long", year: "nu
+ # For example, this would be the heading for all file:/// URLs in history.
+ firefoxview-history-site-localhost = (local files)
+ 
+-##
+-
+-firefoxview-show-all-history = Show all history
+-
+-## Message displayed in Firefox View when the user has no history data
+-
+ firefoxview-history-empty-header = Get back to where you’ve been
+ firefoxview-history-empty-description = As you browse, the pages you visit will be listed here.
+ firefoxview-history-empty-description-two = Protecting your privacy is at the heart of what we do. It’s why you can control the activity { -brand-short-name } remembers, in your <a data-l10n-name="history-settings-url">history settings</a>.
+ 
+-##
+-
+-# Button text for choosing a browser within the ’Import history from another browser’ banner
+-firefoxview-choose-browser-button = Choose browser
+-  .title = Choose browser
+-
+-## Message displayed in Firefox View when the user has chosen to never remember History
+-
+ firefoxview-dont-remember-history-empty-header-2 = You’re in control of what { -brand-short-name } remembers
+ firefoxview-dont-remember-history-empty-description-one = Right now, { -brand-short-name } does not remember your browsing activity. To change that, <a data-l10n-name="history-settings-url-two">update your history settings</a>.
+ 
+-##
+-
+-# This label is read by screen readers when focusing the close button for the "Import history from another browser" banner in Firefox View
+-firefoxview-import-history-close-button =
+-  .aria-label = Close
+-  .title = Close
+-
+-## Text displayed in a dismissable banner to import bookmarks/history from another browser
+-
+-firefoxview-import-history-header = Import history from another browser
+-firefoxview-import-history-description = Make { -brand-short-name } your go-to browser. Import browsing history, bookmarks, and more.
+-
+-## Message displayed in Firefox View when the user has no recently closed tabs data
+-
+-firefoxview-recentlyclosed-empty-header = Closed a tab too soon?
+-firefoxview-recentlyclosed-empty-description = Here you’ll find the tabs you recently closed, so you can reopen any of them quickly.
+-firefoxview-recentlyclosed-empty-description-two = To find tabs from longer ago, view your <a data-l10n-name="history-url">browsing history</a>.
+-
+-## This message is displayed below the name of another connected device when it doesn't have any open tabs.
+-
+-firefoxview-syncedtabs-device-notabs = No tabs open on this device
+-
+-firefoxview-syncedtabs-connect-another-device = Connect another device
+-
+-firefoxview-pinned-tabs =
+-  .title = Pinned Tabs
+-
+-firefoxview-tabs =
+-  .title = Tabs
+-
+-## These tooltips will be displayed when hovering over a pinned tab on the Open Tabs page
+-## Variables:
+-##  $tabTitle (string) - Title of pinned tab that will be opened when selected
+-
+ firefoxview-opentabs-pinned-tab =
+   .title = Switch to { $tabTitle }
+ 
+@@ -254,10 +54,6 @@ firefoxview-opentabs-pinned-tab =
+ firefoxview-opentabs-bookmarked-pinned-tab =
+   .title = Switch to (Bookmarked) { $tabTitle }
+ 
+-## These tooltips will be displayed when hovering over an unpinned Open Tab
+-## Variables:
+-##   $url (string) - URL of tab that will be opened when selected
+-
+ # This tooltip will be shown for an unpinned tab whose URL is currently bookmarked.
+ firefoxview-opentabs-bookmarked-tab =
+   .title = (Bookmarked) { $url }
+diff --git a/browser/modules/URILoadingHelper.sys.mjs b/browser/modules/URILoadingHelper.sys.mjs
+index ea66f9c8a9..2b4a7b5083 100644
+--- a/browser/modules/URILoadingHelper.sys.mjs
++++ b/browser/modules/URILoadingHelper.sys.mjs
+@@ -553,7 +553,7 @@ export const URILoadingHelper = {
+       // page. If a load request bounces off for the currently selected tab,
+       // we'll open a new tab instead.
+       let tab = w.gBrowser.getTabForBrowser(targetBrowser);
+-      if (tab == w.FirefoxViewHandler.tab) {
++      if (!tab) {
+         where = "tab";
+         targetBrowser = null;
+       } else if (
+diff --git a/browser/themes/shared/jar.inc.mn b/browser/themes/shared/jar.inc.mn
+index a099e6d232..e42e1880bb 100644
+--- a/browser/themes/shared/jar.inc.mn
++++ b/browser/themes/shared/jar.inc.mn
+@@ -206,7 +206,6 @@
+   skin/classic/browser/edit-cut.svg                   (../shared/icons/edit-cut.svg)
+   skin/classic/browser/edit-paste.svg                 (../shared/icons/edit-paste.svg)
+   skin/classic/browser/fingerprint.svg                (../shared/icons/fingerprint.svg)
+-  skin/classic/browser/firefox-view.svg               (../shared/icons/firefox-view.svg)
+   skin/classic/browser/flame.svg                      (../shared/icons/flame.svg)
+   skin/classic/browser/forget.svg                     (../shared/icons/forget.svg)
+   skin/classic/browser/forward.svg                    (../shared/icons/forward.svg)
+diff --git a/browser/themes/shared/tabbrowser/tabs.css b/browser/themes/shared/tabbrowser/tabs.css
+index 403aadd755..0cc81dc251 100644
+--- a/browser/themes/shared/tabbrowser/tabs.css
++++ b/browser/themes/shared/tabbrowser/tabs.css
+@@ -948,7 +948,6 @@ tab-split-view-wrapper[dragtarget] {
+ 
+ /* Keyboard focus outline */
+ 
+-#TabsToolbar #firefox-view-button:focus-visible > .toolbarbutton-icon,
+ #tabbrowser-tabs[tablist-has-focus] .tabbrowser-tab.tablist-keyboard-focus > .tab-stack > .tab-background {
+   outline: var(--focus-outline);
+   outline-offset: var(--focus-outline-inset);
+@@ -2544,29 +2543,7 @@ tab-group {
+   -moz-window-shadow: none;
+ }
+ 
+-/* Firefox View button and menu item */
+-
+-#TabsToolbar #firefox-view-button[open] > .toolbarbutton-icon {
+-  background-color: var(--tab-background-color-selected);
+-  box-shadow: var(--tab-selected-shadow);
+-  outline-color: var(--tab-selected-outline-color);
+-  color: var(--tab-selected-textcolor);
+-  color-scheme: var(--tab-selected-color-scheme);
+-
+-  /* The below lines are required for dark, light, and
+-      system themes to achieve the gradient border appearance */
+-  @media (not (prefers-contrast)) and (-moz-pref("browser.nova.enabled")) {
+-    :root:not([lwtheme]) & {
+-      border: 1px solid transparent;
+-      background:
+-        var(--tab-border-color-accent) border-box border-area,
+-        var(--tab-background-color-selected) padding-box;
+-    }
+-  }
+-}
+-
+-:root:not([privatebrowsingmode]) :is(toolbarbutton, toolbarpaletteitem),
+-:root[privatebrowsingmode] :is(toolbarbutton:not(#firefox-view-button), toolbarpaletteitem:not(#wrapper-firefox-view-button)) {
++:is(toolbarbutton, toolbarpaletteitem) {
+   ~ #tabbrowser-tabs[orient="horizontal"]::before {
+     display: flex;
+     content: "";
+@@ -2576,27 +2553,6 @@ tab-group {
+   }
+ }
+ 
+-:root[privatebrowsingmode] :is(#firefox-view-button, #menu_openFirefoxView) {
+-  display: none;
+-}
+-
+-toolbar:not(#TabsToolbar) #firefox-view-button {
+-  background-position: top 25% right 25%;
+-
+-  /* RTL notification dot */
+-  &:-moz-locale-dir(rtl) {
+-    background-position-x: left 25%;
+-  }
+-}
+-
+-:is(#widget-overflow-mainView, #widget-overflow-fixed-list) #firefox-view-button {
+-  background-position: top 25% left 22px;
+-
+-  &:-moz-locale-dir(rtl) {
+-    background-position-x: right 22px;
+-  }
+-}
+-
+ /* New tab button */
+ 
+ #tabs-newtab-button,
+diff --git a/browser/themes/shared/toolbarbutton-icons.css b/browser/themes/shared/toolbarbutton-icons.css
+index 2b3182eb0e..a1c805926f 100644
+--- a/browser/themes/shared/toolbarbutton-icons.css
++++ b/browser/themes/shared/toolbarbutton-icons.css
+@@ -295,10 +295,6 @@
+   list-style-image: url("chrome://browser/skin/import.svg");
+ }
+ 
+-#firefox-view-button {
+-  list-style-image: url("chrome://browser/skin/firefox-view.svg");
+-}
+-
+ .content-analysis-indicator {
+   -moz-context-properties: fill, stroke;
+   stroke: var(--toolbarbutton-icon-fill);
+diff --git a/dom/security/nsContentSecurityUtils.cpp b/dom/security/nsContentSecurityUtils.cpp
+index d03e91e614..db155d4624 100644
+--- a/dom/security/nsContentSecurityUtils.cpp
++++ b/dom/security/nsContentSecurityUtils.cpp
+@@ -1317,11 +1317,9 @@ static nsLiteralCString sStyleSrcUnsafeInlineAllowList[] = {
+ };
+ // img-src moz-remote-image:
+ static nsLiteralCString sImgSrcMozRemoteImageAllowList[] = {
+-    "about:firefoxview"_ns,
+     "about:preferences"_ns,
+     "about:processes"_ns,
+     "about:settings"_ns,
+-    "chrome://browser/content/firefoxview/firefoxview.html"_ns,
+     "chrome://browser/content/preferences/dialogs/applicationManager.xhtml"_ns,
+     "chrome://global/content/aboutProcesses.html"_ns,
+     "chrome://mozapps/content/handling/appChooser.xhtml"_ns,
+@@ -1331,7 +1329,6 @@ static nsLiteralCString sImgSrcDataBlobAllowList[] = {
+     "about:addons"_ns,
+     "about:debugging"_ns,
+     "about:devtools-toolbox"_ns,
+-    "about:firefoxview"_ns,
+     "about:home"_ns,
+     "about:newtab"_ns,
+     "about:opentabs"_ns,
+diff --git a/services/fxaccounts/FxAccountsCommon.sys.mjs b/services/fxaccounts/FxAccountsCommon.sys.mjs
+index a8b9bb1aa9..5d28ae9ea5 100644
+--- a/services/fxaccounts/FxAccountsCommon.sys.mjs
++++ b/services/fxaccounts/FxAccountsCommon.sys.mjs
+@@ -151,7 +151,6 @@ export let COMMAND_SYNC_PREFERENCES = "fxaccounts:sync_preferences";
+ export let COMMAND_CHANGE_PASSWORD = "fxaccounts:change_password";
+ export let COMMAND_FXA_STATUS = "fxaccounts:fxa_status";
+ export let COMMAND_PAIR_PREFERENCES = "fxaccounts:pair_preferences";
+-export let COMMAND_FIREFOX_VIEW = "fxaccounts:firefox_view";
+ 
+ // The pref branch where any prefs which relate to a specific account should
+ // be stored. This branch will be reset on account signout and signin.
+diff --git a/services/fxaccounts/FxAccountsWebChannel.sys.mjs b/services/fxaccounts/FxAccountsWebChannel.sys.mjs
+index cb4730117f..661ea835c2 100644
+--- a/services/fxaccounts/FxAccountsWebChannel.sys.mjs
++++ b/services/fxaccounts/FxAccountsWebChannel.sys.mjs
+@@ -27,7 +27,6 @@ import {
+   COMMAND_PAIR_DECLINE,
+   COMMAND_PAIR_COMPLETE,
+   COMMAND_PAIR_PREFERENCES,
+-  COMMAND_FIREFOX_VIEW,
+   COMMAND_OAUTH_FLOW_IS_ACTIVE,
+   COMMAND_OAUTH_FLOW_BEGIN,
+   OAUTH_CLIENT_ID,
+@@ -331,13 +330,6 @@ FxAccountsWebChannel.prototype = {
+           );
+         }
+         break;
+-      case COMMAND_FIREFOX_VIEW:
+-        this._helpers.openFirefoxView(browser, data.entryPoint);
+-        this._channel.send(
+-          { command, messageId: message.messageId, data: { ok: true } },
+-          sendingContext
+-        );
+-        break;
+       case COMMAND_CHANGE_PASSWORD:
+         await this._helpers.changePassword(data);
+         await this._channel.send(
+@@ -917,15 +909,6 @@ FxAccountsWebChannelHelpers.prototype = {
+     });
+   },
+ 
+-  /**
+-   * Open Firefox View in the browser's window
+-   *
+-   * @param {object} browser the browser in whose window we'll open Firefox View
+-   */
+-  openFirefoxView(browser) {
+-    browser.documentGlobal.FirefoxViewHandler.openTab("syncedtabs");
+-  },
+-
+   /**
+    * If a user signs in using a different account, the data from the
+    * previous account and the new account will be merged. Ask the user
+diff --git a/services/fxaccounts/tests/browser/browser_verify_remotetabs_notif.js b/services/fxaccounts/tests/browser/browser_verify_remotetabs_notif.js
+index 097d3bd4da..6c7fc60fbf 100644
+--- a/services/fxaccounts/tests/browser/browser_verify_remotetabs_notif.js
++++ b/services/fxaccounts/tests/browser/browser_verify_remotetabs_notif.js
+@@ -11,9 +11,6 @@ const { Observers } = ChromeUtils.importESModule(
+ // through the trains
+ const l10n = new Localization(["branding/brand.ftl", "browser/accounts.ftl"]);
+ 
+-// URL that opens up when a user clicks the "close tab" notification
+-const NOTIFICATION_CLICKED_URL = "about:firefoxview#recentlyclosed";
+-
+ add_task(async function test_closetab_notification() {
+   const URL_TO_CLOSE = "about:mozilla";
+   let payload = [
+@@ -45,7 +42,6 @@ add_task(async function test_closetab_notification() {
+   // Open a tab with the same url we'll be expecting from the close tab command payload
+   let tab = await BrowserTestUtils.openNewForegroundTab(gBrowser, URL_TO_CLOSE);
+   let tabClosedPromise = BrowserTestUtils.waitForTabClosing(tab);
+-  let waitForTabPromise = BrowserTestUtils.waitForNewTab(gBrowser);
+ 
+   // Send the notify, which will kick off the closing of the tab and notification
+   Observers.notify("fxaccounts:commands:close-uri", payload);
+@@ -54,17 +50,6 @@ add_task(async function test_closetab_notification() {
+   // Wait for the tab to close
+   await tabClosedPromise;
+   Assert.ok("Tab successfully closed");
+-
+-  // Test the tab that opened for "clicking" the notification shows
+-  // the recently closed list
+-  let notifTab = await waitForTabPromise;
+-  Assert.equal(
+-    notifTab.linkedBrowser.currentURI.spec,
+-    NOTIFICATION_CLICKED_URL
+-  );
+-
+-  // Cleanup the tab
+-  BrowserTestUtils.removeTab(notifTab);
+ });
+ 
+ add_task(async function test_closetab_multiple_urls_notification() {
+@@ -111,7 +96,6 @@ add_task(async function test_closetab_multiple_urls_notification() {
+     BrowserTestUtils.waitForTabClosing(tab1),
+     BrowserTestUtils.waitForTabClosing(tab2),
+   ]);
+-  let waitForTabPromise = BrowserTestUtils.waitForNewTab(gBrowser);
+ 
+   // Send the notify, which will kick off the closing of the tab and notification
+   Observers.notify("fxaccounts:commands:close-uri", payload);
+@@ -119,14 +103,4 @@ add_task(async function test_closetab_multiple_urls_notification() {
+ 
+   await tabClosedPromise;
+   Assert.ok("Multiple tabs successfully closed");
+-
+-  // Test the click after the notification
+-  let notifTab = await waitForTabPromise;
+-  Assert.equal(
+-    notifTab.linkedBrowser.currentURI.spec,
+-    NOTIFICATION_CLICKED_URL
+-  );
+-
+-  // Cleanup the tab
+-  BrowserTestUtils.removeTab(notifTab);
+ });
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index 18e93f7f7b..065f7170da 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -22,14 +22,8 @@ module.exports = [
+       "browser/components/contextualidentity/content/usercontext.css",
+       "browser/components/downloads/content/downloads.css",
+       "browser/components/enterprisepolicies/content/aboutPolicies.css",
+-      "browser/components/firefoxview/card-container.css",
+-      "browser/components/firefoxview/firefoxview.css",
+       "browser/components/firefoxview/fxview-empty-state.css",
+       "browser/components/firefoxview/fxview-tab-row.css",
+-      "browser/components/firefoxview/history.css",
+-      "browser/components/firefoxview/opentabs-tab-row.css",
+-      "browser/components/firefoxview/view-opentabs.css",
+-      "browser/components/firefoxview/view-syncedtabs.css",
+       "browser/components/places/content/clearDataForSite.css",
+       "browser/components/places/metadataViewer/interactionsViewer.css",
+       "browser/components/preferences/dialogs/sitePermissions.css",
+diff --git a/testing/mochitest/ignorePrefs.json b/testing/mochitest/ignorePrefs.json
+index 9ed0ac1828..8d0f3e928f 100644
+--- a/testing/mochitest/ignorePrefs.json
++++ b/testing/mochitest/ignorePrefs.json
+@@ -8,7 +8,6 @@
+   "browser.contextual-services.contextId",
+   "browser.contextual-services.contextId.timestamp-in-seconds",
+   "browser.download.lastDir",
+-  "browser.firefox-view.button-clicks",
+   "browser.newtabpage.activity-stream.discoverystream.endpointSpocsClear",
+   "browser.newtabpage.activity-stream.feeds.system.topsites",
+   "browser.newtabpage.activity-stream.feeds.topsites",
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index 8d0e503824..137878bb60 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -115,7 +115,6 @@ firefox_desktop_metrics = [
+     "browser/components/customkeys/metrics.yaml",
+     "browser/components/downloads/metrics.yaml",
+     "browser/components/extensions/metrics.yaml",
+-    "browser/components/firefoxview/metrics.yaml",
+     "browser/components/metrics.yaml",
+     "browser/components/migration/metrics.yaml",
+     "browser/components/places/metrics.yaml",
+diff --git a/toolkit/locales/en-US/toolkit/branding/brandings.ftl b/toolkit/locales/en-US/toolkit/branding/brandings.ftl
+index cb98681391..9ab2f32019 100644
+--- a/toolkit/locales/en-US/toolkit/branding/brandings.ftl
++++ b/toolkit/locales/en-US/toolkit/branding/brandings.ftl
+@@ -47,7 +47,3 @@
+ # ”Home" can be localized, “Firefox” must be treated as a brand
+ # and kept in English.
+ -firefox-home-brand-name = Sval Home
+-
+-# View" can be localized, “Firefox” must be treated as a brand
+-# and kept in English.
+--firefoxview-brand-name = Sval View
+diff --git a/toolkit/modules/BrowserUtils.sys.mjs b/toolkit/modules/BrowserUtils.sys.mjs
+index 0476aa06cf..5398c5ec2b 100644
+--- a/toolkit/modules/BrowserUtils.sys.mjs
++++ b/toolkit/modules/BrowserUtils.sys.mjs
+@@ -328,8 +328,7 @@ export var BrowserUtils = {
+   canFindInPage(location) {
+     return (
+       !location.startsWith("about:preferences") &&
+-      !location.startsWith("about:settings") &&
+-      !location.startsWith("about:firefoxview")
++      !location.startsWith("about:settings")
+     );
+   },
+ 
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index fa89b4a287..6f96ff8cfc 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -541,7 +541,6 @@ export interface Modules {
+   "resource:///modules/SharingUtils.sys.mjs": typeof import("resource:///modules/SharingUtils.sys.mjs"),
+   "resource:///modules/SiteDataManager.sys.mjs": typeof import("resource:///modules/SiteDataManager.sys.mjs"),
+   "resource:///modules/SitePermissions.sys.mjs": typeof import("resource:///modules/SitePermissions.sys.mjs"),
+-  "resource:///modules/SyncedTabsController.sys.mjs": typeof import("resource:///modules/SyncedTabsController.sys.mjs"),
+   "resource:///modules/TRRPerformance.sys.mjs": typeof import("resource:///modules/TRRPerformance.sys.mjs"),
+   "resource:///modules/ThemeVariableMap.sys.mjs": typeof import("resource:///modules/ThemeVariableMap.sys.mjs"),
+   "resource:///modules/TransientPrefs.sys.mjs": typeof import("resource:///modules/TransientPrefs.sys.mjs"),
+@@ -584,8 +583,6 @@ export interface Modules {
+   "resource:///modules/asrouter/ToolbarBadgeHub.sys.mjs": typeof import("resource:///modules/asrouter/ToolbarBadgeHub.sys.mjs"),
+   "resource:///modules/contentsharing/ContentSharingUtils.sys.mjs": typeof import("resource:///modules/contentsharing/ContentSharingUtils.sys.mjs"),
+   "resource:///modules/distribution.sys.mjs": typeof import("resource:///modules/distribution.sys.mjs"),
+-  "resource:///modules/firefox-view-synced-tabs-error-handler.sys.mjs": typeof import("resource:///modules/firefox-view-synced-tabs-error-handler.sys.mjs"),
+-  "resource:///modules/firefox-view-tabs-setup-manager.sys.mjs": typeof import("resource:///modules/firefox-view-tabs-setup-manager.sys.mjs"),
+   "resource:///modules/policies/BookmarksPolicies.sys.mjs": typeof import("resource:///modules/policies/BookmarksPolicies.sys.mjs"),
+   "resource:///modules/policies/Policies.sys.mjs": typeof import("resource:///modules/policies/Policies.sys.mjs"),
+   "resource:///modules/policies/ProxyPolicies.sys.mjs": typeof import("resource:///modules/policies/ProxyPolicies.sys.mjs"),
+@@ -1281,7 +1278,6 @@ export interface Modules {
+   "resource://testing-common/ExtensionTestCommon.sys.mjs": typeof import("resource://testing-common/ExtensionTestCommon.sys.mjs"),
+   "resource://testing-common/ExtensionXPCShellUtils.sys.mjs": typeof import("resource://testing-common/ExtensionXPCShellUtils.sys.mjs"),
+   "resource://testing-common/FileTestUtils.sys.mjs": typeof import("resource://testing-common/FileTestUtils.sys.mjs"),
+-  "resource://testing-common/FirefoxViewTestUtils.sys.mjs": typeof import("resource://testing-common/FirefoxViewTestUtils.sys.mjs"),
+   "resource://testing-common/FormHistoryTestUtils.sys.mjs": typeof import("resource://testing-common/FormHistoryTestUtils.sys.mjs"),
+   "resource://testing-common/GeolocationTestUtils.sys.mjs": typeof import("resource://testing-common/GeolocationTestUtils.sys.mjs"),
+   "resource://testing-common/HandlerServiceTestUtils.sys.mjs": typeof import("resource://testing-common/HandlerServiceTestUtils.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 8c1ced9d65..1092e379cd 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -76,9 +76,6 @@
+       "chrome://browser/content/asrouter/components/menu-message.mjs": [
+         "../../../browser/components/asrouter/content/components/menu-message/menu-message.mjs"
+       ],
+-      "chrome://browser/content/firefoxview/card-container.mjs": [
+-        "../../../browser/components/firefoxview/card-container.mjs"
+-      ],
+       "chrome://browser/content/firefoxview/chats-tab-list.mjs": [
+         "../../../browser/components/firefoxview/chats-tab-list.mjs"
+       ],
+@@ -94,30 +91,9 @@
+       "chrome://browser/content/firefoxview/helpers.mjs": [
+         "../../../browser/components/firefoxview/helpers.mjs"
+       ],
+-      "chrome://browser/content/firefoxview/history.mjs": [
+-        "../../../browser/components/firefoxview/history.mjs"
+-      ],
+-      "chrome://browser/content/firefoxview/opentabs-tab-list.mjs": [
+-        "../../../browser/components/firefoxview/opentabs-tab-list.mjs"
+-      ],
+-      "chrome://browser/content/firefoxview/opentabs.mjs": [
+-        "../../../browser/components/firefoxview/opentabs.mjs"
+-      ],
+-      "chrome://browser/content/firefoxview/recentbrowsing.mjs": [
+-        "../../../browser/components/firefoxview/recentbrowsing.mjs"
+-      ],
+-      "chrome://browser/content/firefoxview/recentlyclosed.mjs": [
+-        "../../../browser/components/firefoxview/recentlyclosed.mjs"
+-      ],
+       "chrome://browser/content/firefoxview/search-helpers.mjs": [
+         "../../../browser/components/firefoxview/search-helpers.mjs"
+       ],
+-      "chrome://browser/content/firefoxview/syncedtabs-tab-list.mjs": [
+-        "../../../browser/components/firefoxview/syncedtabs-tab-list.mjs"
+-      ],
+-      "chrome://browser/content/firefoxview/syncedtabs.mjs": [
+-        "../../../browser/components/firefoxview/syncedtabs.mjs"
+-      ],
+       "chrome://browser/content/genai/content/link-preview-card-onboarding.mjs": [
+         "../../../browser/components/genai/content/link-preview-card-onboarding.mjs"
+       ],
+@@ -1402,9 +1378,6 @@
+       "resource:///modules/SitePermissions.sys.mjs": [
+         "../../../browser/modules/SitePermissions.sys.mjs"
+       ],
+-      "resource:///modules/SyncedTabsController.sys.mjs": [
+-        "../../../browser/components/firefoxview/SyncedTabsController.sys.mjs"
+-      ],
+       "resource:///modules/TRRPerformance.sys.mjs": [
+         "../../../toolkit/components/doh/TRRPerformance.sys.mjs"
+       ],
+@@ -1537,12 +1510,6 @@
+       "resource:///modules/distribution.sys.mjs": [
+         "../../../browser/components/distribution.sys.mjs"
+       ],
+-      "resource:///modules/firefox-view-synced-tabs-error-handler.sys.mjs": [
+-        "../../../browser/components/firefoxview/firefox-view-synced-tabs-error-handler.sys.mjs"
+-      ],
+-      "resource:///modules/firefox-view-tabs-setup-manager.sys.mjs": [
+-        "../../../browser/components/firefoxview/firefox-view-tabs-setup-manager.sys.mjs"
+-      ],
+       "resource:///modules/policies/BookmarksPolicies.sys.mjs": [
+         "../../../browser/components/enterprisepolicies/helpers/BookmarksPolicies.sys.mjs"
+       ],
+@@ -7231,9 +7198,6 @@
+       "resource://testing-common/FileTestUtils.sys.mjs": [
+         "../../../testing/modules/FileTestUtils.sys.mjs"
+       ],
+-      "resource://testing-common/FirefoxViewTestUtils.sys.mjs": [
+-        "../../../browser/components/firefoxview/tests/browser/FirefoxViewTestUtils.sys.mjs"
+-      ],
+       "resource://testing-common/FormHistoryTestUtils.sys.mjs": [
+         "../../../toolkit/components/satchel/test/FormHistoryTestUtils.sys.mjs"
+       ],

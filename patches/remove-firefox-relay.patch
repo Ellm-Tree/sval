@@ -1,0 +1,1481 @@
+Sval: Remove Firefox Relay and the insecure field warning
+
+Firefox Relay's email masks are locked off (Sval spec §10.9), and with
+the password manager and address and card autofill gone nothing else
+offered them. Relay goes with what only it or those features used: its
+form history rows and the sign-up form detection that chose them, its
+doorhangers, setting, targeting attributes, glyph, prefs and strings,
+the password-saving setting its setting read, the address bar's
+password anchor, the insecure password field warning and its row, and
+the autocomplete actors' routing of a row's own fill message. Form
+history and the login storage stay.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 9c9d29eb1e..fee3639ee4 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -2380,12 +2380,6 @@ pref("browser.migrate.interactions.passwords", false);
+ 
+ pref("browser.migrate.preferences-entrypoint.enabled", true);
+ 
+-// "available"      - user can see feature offer.
+-// "offered"        - we have offered feature to user and they have not yet made a decision.
+-// "enabled"        - user opted in to the feature.
+-// "disabled"       - user opted out of the feature.
+-pref("signon.firefoxRelay.feature", "available");
+-
+ pref("signon.management.page.os-auth.locked.enabled", false);
+ 
+ pref("signon.passwordEditCapture.enabled", true);
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index 1ed944c7dc..132daee455 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -59,7 +59,6 @@
+   <link rel="localization" href="browser/browser.ftl"/>
+   <link rel="localization" href="browser/browserContext.ftl"/>
+   <link rel="localization" href="browser/browserSets.ftl"/>
+-  <link rel="localization" href="browser/firefoxRelay.ftl"/>
+   <link rel="localization" href="browser/firefoxView.ftl"/>
+   <link rel="localization" href="browser/identityCredentialNotification.ftl" />
+   <link rel="localization" href="browser/menubar.ftl"/>
+diff --git a/browser/base/content/navigator-toolbox.inc.xhtml b/browser/base/content/navigator-toolbox.inc.xhtml
+index a72f276da2..77a4540a7d 100644
+--- a/browser/base/content/navigator-toolbox.inc.xhtml
++++ b/browser/base/content/navigator-toolbox.inc.xhtml
+@@ -275,8 +275,6 @@
+                       data-l10n-id="urlbar-canvas-notification-anchor"/>
+               <image id="indexedDB-notification-icon" class="notification-anchor-icon indexedDB-icon" role="button"
+                       data-l10n-id="urlbar-indexed-db-notification-anchor"/>
+-              <image id="password-notification-icon" class="notification-anchor-icon" role="button"
+-                      data-l10n-id="urlbar-password-notification-anchor"/>
+               <image id="web-notifications-notification-icon" class="notification-anchor-icon desktop-notification-icon" role="button"
+                       data-l10n-id="urlbar-web-notification-anchor"/>
+               <image id="webRTC-shareDevices-notification-icon" class="notification-anchor-icon camera-icon" role="button"
+diff --git a/browser/base/content/popup-notifications.inc.xhtml b/browser/base/content/popup-notifications.inc.xhtml
+index fbab36fe31..7288a44ab3 100644
+--- a/browser/base/content/popup-notifications.inc.xhtml
++++ b/browser/base/content/popup-notifications.inc.xhtml
+@@ -220,46 +220,3 @@
+       </popupnotificationcontent>
+     </popupnotification>
+ 
+-    <popupnotification id="relay-integration-offer-notification" hidden="true">
+-      <popupnotificationcontent orient="vertical">
+-        <html:div>
+-          <html:p data-l10n-id="firefox-relay-offer-why-to-use-relay-1">
+-            <label class="firefox-relay-learn-more-url" is="text-link" data-l10n-name="firefox-relay-learn-more-url"/>
+-            <label class="firefox-fxa-and-relay-offer-domain" data-l10n-name="firefox-fxa-and-relay-offer-domain"/>
+-          </html:p>
+-          <html:p id="firefox-relay-offer-what-relay-provides" data-l10n-id="firefox-relay-offer-what-relay-provides" data-l10n-args='{"useremail": ""}'></html:p>
+-          <html:p id="firefox-relay-offer-legal-notice" data-l10n-id="firefox-relay-offer-legal-notice-1">
+-            <label class="firefox-fxa-and-relay-offer-tos-url" is="text-link" data-l10n-name="tos-url"/>
+-            <label class="firefox-fxa-and-relay-offer-privacy-url" is="text-link" data-l10n-name="privacy-url"/>
+-          </html:p>
+-        </html:div>
+-      </popupnotificationcontent>
+-    </popupnotification>
+-
+-    <popupnotification id="fxa-and-relay-integration-offer-with-domain-and-value-prop-notification" hidden="true">
+-      <popupnotificationcontent orient="vertical">
+-        <html:div>
+-          <html:p data-l10n-id="firefox-relay-and-fxa-popup-notification-first-sentence">
+-            <label class="firefox-relay-learn-more-url" is="text-link" data-l10n-name="firefox-relay-learn-more-url"/>
+-            <label class="firefox-fxa-and-relay-offer-domain" data-l10n-name="firefox-fxa-and-relay-offer-domain"/>
+-          </html:p>
+-          <html:p class="firefox-relay-offer-what-fxa-and-relay-provides" data-l10n-id="firefox-relay-and-fxa-popup-notification-second-sentence-with-domain-and-value-prop"></html:p>
+-        </html:div>
+-      </popupnotificationcontent>
+-    </popupnotification>
+-
+-    <popupnotification id="relay-integration-reuse-masks-notification" hidden="true">
+-      <popupnotificationcontent orient="vertical">
+-        <html:div>
+-          <html:p class="error-message"></html:p>
+-          <html:div class="reusable-relay-masks" />
+-        </html:div>
+-      </popupnotificationcontent>
+-    </popupnotification>
+-
+-    <template id="firefox-relay-header-with-domain-and-value-prop">
+-      <html:div class="relay-integration-header-variation">
+-        <html:p data-l10n-id="firefox-relay-and-fxa-popup-notification-header-with-domain"></html:p>
+-      </html:div>
+-    </template>
+-
+diff --git a/browser/base/content/test/contextMenu/browser_contextmenu_input.js b/browser/base/content/test/contextMenu/browser_contextmenu_input.js
+index 880d1b52a7..7e855d592a 100644
+--- a/browser/base/content/test/contextMenu/browser_contextmenu_input.js
++++ b/browser/base/content/test/contextMenu/browser_contextmenu_input.js
+@@ -205,87 +205,6 @@ add_task(async function test_password_input() {
+   await SpecialPowers.popPrefEnv();
+ });
+ 
+-add_task(async function firefox_relay_input() {
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["signon.firefoxRelay.feature", "enabled"]],
+-  });
+-
+-  await test_contextmenu(
+-    "#input_username",
+-    [
+-      "use-relay-mask",
+-      true,
+-      "---",
+-      null,
+-      "context-undo",
+-      false,
+-      "context-redo",
+-      false,
+-      "---",
+-      null,
+-      "context-cut",
+-      false,
+-      "context-copy",
+-      false,
+-      "context-paste",
+-      null, // ignore clipboard state
+-      "context-delete",
+-      false,
+-      "context-selectall",
+-      false,
+-      "---",
+-      null,
+-      ...askChatMenu,
+-      "---",
+-      null,
+-      "spell-check-enabled",
+-      true,
+-    ],
+-    {
+-      awaitOnMenuBuilt: {
+-        id: "context-ask-chat",
+-      },
+-    }
+-  );
+-
+-  await test_contextmenu(
+-    "#input_email",
+-    [
+-      "use-relay-mask",
+-      true,
+-      "---",
+-      null,
+-      "context-undo",
+-      false,
+-      "context-redo",
+-      false,
+-      "---",
+-      null,
+-      "context-cut",
+-      false,
+-      "context-copy",
+-      false,
+-      "context-paste",
+-      null, // ignore clipboard state
+-      "context-delete",
+-      false,
+-      "context-selectall",
+-      null,
+-      "---",
+-      null,
+-      ...askChatMenu,
+-    ],
+-    {
+-      skipFocusChange: true,
+-      awaitOnMenuBuilt: {
+-        id: "context-ask-chat",
+-      },
+-    }
+-  );
+-
+-  await SpecialPowers.popPrefEnv();
+-});
+-
+ add_task(async function test_tel_email_url_number_input() {
+   todo(
+     false,
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index 81d610c451..1ddeb71b22 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -43,10 +43,6 @@ const { PlacesUtils } = ChromeUtils.importESModule(
+   "resource://gre/modules/PlacesUtils.sys.mjs"
+ );
+ 
+-// eslint-disable-next-line mozilla/use-static-import
+-const { FirefoxRelay, RELAY_PROFILE_CACHE_INTERVAL } =
+-  ChromeUtils.importESModule("resource://gre/modules/FirefoxRelay.sys.mjs");
+-
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+@@ -427,16 +423,6 @@ export const QueryCache = {
+         },
+       }
+     ),
+-    relayProfileInfo: new CachedTargetingGetter(
+-      "getRelayProfileInfo",
+-      null,
+-      RELAY_PROFILE_CACHE_INTERVAL,
+-      {
+-        async getRelayProfileInfo() {
+-          return FirefoxRelay.getRelayProfileInfo();
+-        },
+-      }
+-    ),
+     crashData: new CachedTargetingGetter(
+       "getCrashData",
+       null,
+@@ -848,19 +834,6 @@ const TargetingGetters = {
+         )
+       : [];
+   },
+-  get relayProfileInfo() {
+-    return QueryCache.getters.relayProfileInfo.get();
+-  },
+-  get relayEmailMasksCount() {
+-    return QueryCache.getters.relayProfileInfo
+-      .get()
+-      .then(info => info?.masksCount || 0);
+-  },
+-  get isRelayFreeTier() {
+-    return QueryCache.getters.relayProfileInfo
+-      .get()
+-      .then(info => info !== null && !info.has_premium);
+-  },
+   get platformName() {
+     return AppConstants.platform;
+   },
+diff --git a/browser/components/asrouter/moz.build b/browser/components/asrouter/moz.build
+index b13057a6ff..e21827ce0b 100644
+--- a/browser/components/asrouter/moz.build
++++ b/browser/components/asrouter/moz.build
+@@ -2,8 +2,6 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-JAR_MANIFESTS += ["jar.mn"]
+-
+ with Files("**"):
+     BUG_COMPONENT = ("Firefox", "Messaging System")
+ 
+diff --git a/browser/components/preferences/config/passwords-autofill.mjs b/browser/components/preferences/config/passwords-autofill.mjs
+index f1601bc1a9..e09d21c9fe 100644
+--- a/browser/components/preferences/config/passwords-autofill.mjs
++++ b/browser/components/preferences/config/passwords-autofill.mjs
+@@ -15,18 +15,8 @@ Preferences.addAll([
+ 
+   // Passwords
+   { id: "signon.rememberSignons", type: "bool" },
+-  { id: "signon.firefoxRelay.feature", type: "string" },
+ ]);
+ 
+-Preferences.addSetting({
+-  id: "savePasswords",
+-  pref: "signon.rememberSignons",
+-  controllingExtensionInfo: {
+-    storeId: "services.passwordSavingEnabled",
+-    l10nId: "extension-controlling-password-saving",
+-  },
+-});
+-
+ Preferences.addSetting({
+   id: "allowWindowSSO",
+   pref: "network.http.windows-sso.enabled",
+diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
+index d5b429c4f1..bc8e5bd316 100644
+--- a/browser/components/preferences/config/privacy.mjs
++++ b/browser/components/preferences/config/privacy.mjs
+@@ -24,7 +24,6 @@ const lazy = XPCOMUtils.declareLazy({
+   DownloadUtils: "resource://gre/modules/DownloadUtils.sys.mjs",
+   ExtensionSettingsStore:
+     "resource://gre/modules/ExtensionSettingsStore.sys.mjs",
+-  FirefoxRelay: "resource://gre/modules/FirefoxRelay.sys.mjs",
+   Management: "resource://gre/modules/Extension.sys.mjs",
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+   SiteDataManager: "resource:///modules/SiteDataManager.sys.mjs",
+@@ -658,11 +657,6 @@ SettingGroupManager.registerGroups({
+           "search-l10n-ids": "global-privacy-control-search",
+         },
+       },
+-      {
+-        id: "relayIntegration",
+-        l10nId: "preferences-privacy-relay-available",
+-        supportPage: "firefox-relay-integration",
+-      },
+       {
+         id: "dntRemoval",
+         l10nId: "do-not-track-removal3",
+@@ -1935,37 +1929,6 @@ Preferences.addSetting({
+     return gpcFunctionalityEnabled.value;
+   },
+ });
+-Preferences.addSetting({
+-  id: "relayFeature",
+-  pref: "signon.firefoxRelay.feature",
+-});
+-Preferences.addSetting({
+-  id: "relayIntegration",
+-  deps: ["savePasswords", "relayFeature"],
+-  visible: () => {
+-    return lazy.FirefoxRelay.isAvailable;
+-  },
+-  disabled: ({ savePasswords, relayFeature }) => {
+-    return !savePasswords.value || relayFeature.pref.locked;
+-  },
+-  get() {
+-    return lazy.FirefoxRelay.isAvailable && !lazy.FirefoxRelay.isDisabled;
+-  },
+-  set(checked) {
+-    if (checked) {
+-      lazy.FirefoxRelay.markAsAvailable();
+-    } else {
+-      lazy.FirefoxRelay.markAsDisabled();
+-    }
+-  },
+-  onUserChange(checked) {
+-    if (checked) {
+-      Glean.relayIntegration.enabledPrefChange.record();
+-    } else {
+-      Glean.relayIntegration.disabledPrefChange.record();
+-    }
+-  },
+-});
+ Preferences.addSetting({
+   id: "dntHeaderEnabled",
+   pref: "privacy.donottrackheader.enabled",
+diff --git a/browser/components/preferences/privacy.js b/browser/components/preferences/privacy.js
+index e572f7b9f7..d9b1a4ae76 100644
+--- a/browser/components/preferences/privacy.js
++++ b/browser/components/preferences/privacy.js
+@@ -14,8 +14,8 @@ const { PRIVACY_SEGMENTATION_PREF } = ChromeUtils.importESModule(
+   "chrome://browser/content/preferences/config/permissions-data.mjs",
+   { global: "current" }
+ );
+-// Adds this pane's Windows sign-on setting, and the password-saving setting
+-// privacy.mjs's settings read, so it loads first.
++// Adds this pane's Windows sign-on setting, and the password-saving pref
++// privacy.mjs's warnings read, so it loads first.
+ ChromeUtils.importESModule(
+   "chrome://browser/content/preferences/config/passwords-autofill.mjs",
+   { global: "current" }
+diff --git a/browser/components/preferences/tests/privacy/browser_privacy_gpc.js b/browser/components/preferences/tests/privacy/browser_privacy_gpc.js
+index 79b9afafe9..ecb616a087 100644
+--- a/browser/components/preferences/tests/privacy/browser_privacy_gpc.js
++++ b/browser/components/preferences/tests/privacy/browser_privacy_gpc.js
+@@ -8,7 +8,6 @@
+ const FEATURE_PREF = "privacy.globalprivacycontrol.functionality.enabled";
+ const MODE_PREF = "privacy.globalprivacycontrol.enabled";
+ const DNT_PREF = "privacy.donottrackheader.enabled";
+-const RELAY_PREF = "signon.firefoxRelay.feature";
+ 
+ const SECTION_ID = "nonTechnicalPrivacyGroup";
+ const GPC_CHECKBOX_ID = "gpcEnabled";
+@@ -29,7 +28,6 @@ add_task(async function test_section_hidden_when_feature_flag_disabled() {
+     set: [
+       [FEATURE_PREF, false],
+       [MODE_PREF, false],
+-      [RELAY_PREF, undefined],
+     ],
+   });
+ 
+diff --git a/browser/locales/en-US/browser/browser.ftl b/browser/locales/en-US/browser/browser.ftl
+index dde88c4239..55f57222d5 100644
+--- a/browser/locales/en-US/browser/browser.ftl
++++ b/browser/locales/en-US/browser/browser.ftl
+@@ -60,8 +60,6 @@ urlbar-web-rtc-share-screen-notification-anchor =
+     .tooltiptext = Manage sharing your windows or screen with the site
+ urlbar-indexed-db-notification-anchor =
+     .tooltiptext = Open offline storage message panel
+-urlbar-password-notification-anchor =
+-    .tooltiptext = Open save password message panel
+ urlbar-web-rtc-share-devices-notification-anchor =
+     .tooltiptext = Manage sharing your camera and/or microphone with the site
+ # "Speakers" is used in a general sense that might include headphones or
+@@ -1340,17 +1338,6 @@ refresh-blocked-allow =
+     .label = Allow
+     .accesskey = A
+ 
+-## Firefox Relay integration
+-
+-firefox-relay-offer-why-to-use-relay = Our secure, easy-to-use masks protect your identity and prevent spam by hiding your email address.
+-
+-# Variables:
+-#  $useremail (String): user email that will receive messages
+-firefox-relay-offer-what-relay-provides = All emails sent to your email masks will be forwarded to <strong>{ $useremail }</strong> (unless you decide to block them).
+-
+-firefox-relay-offer-legal-notice = By clicking “Use email mask”, you agree to the <label data-l10n-name="tos-url">Terms of Service</label> and <label data-l10n-name="privacy-url">Privacy Notice</label>.
+-firefox-relay-offer-legal-notice-1 = By signing up and creating an email mask, you agree to the <label data-l10n-name="tos-url">Terms of Service</label> and <label data-l10n-name="privacy-url">Privacy Notice</label>.
+-
+ ## Add-on Pop-up Notifications
+ 
+ popup-notification-addon-install-unsigned =
+diff --git a/browser/locales/en-US/browser/confirmationHints.ftl b/browser/locales/en-US/browser/confirmationHints.ftl
+index 9b98019f14..94d636e3ae 100644
+--- a/browser/locales/en-US/browser/confirmationHints.ftl
++++ b/browser/locales/en-US/browser/confirmationHints.ftl
+@@ -13,8 +13,6 @@ confirmation-hint-password-updated = Password updated
+ confirmation-hint-pin-tab = Pinned!
+ confirmation-hint-pin-tab-description = Right-click the tab to unpin it.
+ confirmation-hint-send-to-device = Sent!
+-confirmation-hint-firefox-relay-mask-created = New mask created!
+-confirmation-hint-firefox-relay-mask-reused = Existing mask reused!
+ confirmation-hint-screenshot-copied = Screenshot copied!
+ # Variables:
+ #   $tabCount (Number): The number of duplicate tabs closed, at least 1.
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 0705a834c5..bde46f2afb 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -18,10 +18,6 @@ do-not-track-removal3 =
+ non-technical-privacy-heading =
+     .label = Additional protections
+ 
+-preferences-privacy-relay-available =
+-    .label = Suggest { -relay-brand-name } email masks
+-    .description = Hides your real email address to protect your inbox from spam.
+-
+ 
+ # Do not translate.
+ # "Global Privacy Control" or "GPC" are a web platform feature name and abbreviation
+diff --git a/browser/themes/shared/autocomplete.css b/browser/themes/shared/autocomplete.css
+index ecc5f78005..ae85844f67 100644
+--- a/browser/themes/shared/autocomplete.css
++++ b/browser/themes/shared/autocomplete.css
+@@ -12,11 +12,7 @@
+ 
+ /* Define the minimum width based on the style of result rows.
+    The order of the min-width rules below must be in increasing order. */
+-#PopupAutoComplete[resultstyles~="insecureWarning"]::part(content) {
+-  min-width: 22em;
+-}
+-
+-#PopupAutoComplete:is([resultstyles~="autofill"], [resultstyles~="insecureWarning"])::part(content) {
++#PopupAutoComplete[resultstyles~="autofill"]::part(content) {
+   min-width: 250px;
+ }
+ 
+@@ -50,24 +46,6 @@
+     margin-inline-start: 4px;
+   }
+ 
+-  &[originaltype="insecureWarning"] {
+-    height: auto;
+-
+-    & > .ac-title > .ac-text-overflow-container > .ac-title-text {
+-      text-overflow: initial;
+-      white-space: initial;
+-    }
+-
+-    & > .ac-title > label {
+-      margin-inline-start: 0;
+-    }
+-  }
+-
+-  &[originaltype="insecureWarning"] > .ac-site-icon {
+-    margin-inline-start: 0;
+-    display: initial;
+-  }
+-
+   &[originaltype="possible-username"] > .ac-site-icon,
+   > .two-line-wrapper > .ac-site-icon {
+     display: block;
+@@ -122,20 +100,6 @@
+     color: var(--text-color-deemphasized);
+   }
+ 
+-  &[originaltype="action"] > .two-line-wrapper {
+-    flex: 1;
+-  }
+-
+-  &[originaltype="action"] {
+-    text-align: center;
+-  }
+-
+-  /* The "Manage addresses"/"Manage payment methods" footer is always the last
+-     action row; align it to the start rather than centering it. */
+-  &[originaltype="action"]:last-child {
+-    text-align: start;
+-  }
+-
+   /* status items */
+   > .ac-status {
+     padding: var(--space-xsmall) var(--space-small);
+@@ -161,31 +125,6 @@
+       min-width: var(--icon-size-large);
+     }
+   }
+-
+-  /* Insecure field warning */
+-  &[originaltype="insecureWarning"] {
+-    background-color: var(--button-background-color-hover);
+-    color: inherit;
+-    border-bottom: 1px solid var(--panel-separator-color);
+-    padding-block: var(--space-xsmall);
+-
+-    &[selected]:active {
+-      background-color: var(--button-background-color-active);
+-      color: inherit;
+-    }
+-
+-    > .ac-title {
+-      font-size: 1em;
+-    }
+-
+-    > .ac-title .ac-emphasize-text-title {
+-      font-weight: var(--font-weight-heading);
+-    }
+-
+-    > .ac-site-icon {
+-      list-style-image: url(chrome://global/skin/icons/security-broken.svg);
+-    }
+-  }
+ }
+ 
+ /* Popup states */
+diff --git a/browser/themes/shared/browser-shared.css b/browser/themes/shared/browser-shared.css
+index 5dfcb8634e..c62a543128 100644
+--- a/browser/themes/shared/browser-shared.css
++++ b/browser/themes/shared/browser-shared.css
+@@ -984,106 +984,6 @@ popupnotificationcontent {
+   display: block;
+ }
+ 
+-/* Relay Integration */
+-
+-.relay-integration-header {
+-  display: flex;
+-  align-items: center;
+-  /* Font-size tokens are unset in platform contexts. */
+-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+-  font-size: 2em;
+-
+-  > div:nth-of-type(1) {
+-    width: var(--icon-size-xlarge);
+-    height: var(--icon-size-xlarge);
+-    background-image: url("chrome://browser/content/logos/relay.svg");
+-    background-repeat: no-repeat;
+-  }
+-
+-  > div:nth-of-type(2) {
+-    direction: ltr;
+-    margin-inline: var(--space-small);
+-
+-    > span:first-of-type {
+-      font-weight: var(--font-weight-bold);
+-    }
+-
+-    > span:last-of-type {
+-      font-weight: normal;
+-    }
+-  }
+-}
+-
+-.relay-integration-header-variation {
+-  display: flex;
+-  align-items: center;
+-  font-weight: var(--font-weight-heading);
+-  /* Font-size tokens are unset in platform contexts. */
+-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+-  font-size: 1.5em;
+-  margin: auto;
+-
+-  > p {
+-    margin-block: auto;
+-  }
+-}
+-
+-.popup-notification-description[popupid="relay-integration-offer-notification"] > div:first-of-type {
+-  font-weight: normal;
+-  display: grid;
+-  grid-template-columns: auto;
+-  grid-template-rows: auto auto auto auto;
+-}
+-
+-#relay-integration-reuse-masks-notification > popupnotificationcontent > div {
+-  font-weight: normal;
+-  display: grid;
+-  grid-template-columns: auto;
+-  grid-template-rows: auto auto auto auto;
+-}
+-
+-.reusable-relay-masks {
+-  display: flex;
+-  flex-direction: column;
+-
+-  > button {
+-    padding: var(--space-xsmall);
+-    margin: var(--space-xsmall);
+-    display: flex;
+-    flex-direction: row;
+-    justify-content: space-between;
+-
+-    > span:first-child {
+-      margin-inline-end: var(--space-xlarge);
+-    }
+-
+-    > span:last-child {
+-      opacity: var(--opacity-deemphasized-strong);
+-    }
+-  }
+-}
+-
+-@media -moz-pref("browser.nova.enabled") {
+-  .reusable-relay-masks {
+-    gap: var(--space-small);
+-
+-    > button {
+-      padding: var(--space-xsmall) var(--space-medium);
+-      margin: 0;
+-      align-items: center;
+-      min-height: var(--size-item-large);
+-      border-radius: var(--border-radius-circle);
+-      border: 1px solid var(--border-color-deemphasized);
+-      background-color: transparent;
+-
+-      &:hover {
+-        background-color: var(--button-background-color-hover);
+-        border-color: var(--border-color-selected);
+-      }
+-    }
+-  }
+-}
+-
+ /* History swipe navigation animation */
+ 
+ #historySwipeAnimationContainer {
+diff --git a/browser/themes/shared/notification-icons.css b/browser/themes/shared/notification-icons.css
+index 95063eee16..acf73e02c3 100644
+--- a/browser/themes/shared/notification-icons.css
++++ b/browser/themes/shared/notification-icons.css
+@@ -137,15 +137,6 @@
+   list-style-image: url(chrome://browser/skin/notification-icons/persistent-storage.svg);
+ }
+ 
+-#password-notification-icon {
+-  list-style-image: url(chrome://browser/skin/login.svg);
+-
+-  &[extraAttr="attention"] {
+-    fill: var(--toolbarbutton-icon-fill-attention);
+-    fill-opacity: 1;
+-  }
+-}
+-
+ .camera-icon {
+   list-style-image: url(chrome://browser/skin/notification-icons/camera.svg);
+ 
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index f7c75ccd32..03a3cb5e5d 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -1714,7 +1714,6 @@ export default [
+       "toolkit/components/extensions/parent/ext-browsingData.js",
+       "toolkit/components/passwordmgr/LoginHelper.sys.mjs",
+       "toolkit/components/pictureinpicture/PictureInPicture.sys.mjs",
+-      "toolkit/components/satchel/integrations/FirefoxRelay.sys.mjs",
+       "toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs",
+       "toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs",
+       "toolkit/components/telemetry/app/UsageReporting.sys.mjs",
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index bc12b8dca1..a23ff0d2af 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -2999,12 +2999,6 @@ pref("signon.includeOtherSubdomainsInLookup",     true);
+ // This temporarily prevents the primary password to reprompt for autocomplete.
+ pref("signon.masterPasswordReprompt.timeout_ms", 900000); // 15 Minutes
+ pref("signon.showAutoCompleteFooter",             false);
+-pref("signon.firefoxRelay.base_url", "https://relay.firefox.com/api/v1/");
+-pref("signon.firefoxRelay.learn_more_url", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/firefox-relay-integration");
+-pref("signon.firefoxRelay.manage_url", "https://relay.firefox.com/accounts/profile/?utm_medium=firefox-desktop&utm_source=modal&utm_campaign=limit&utm_content=manage-masks-global");
+-pref("signon.firefoxRelay.terms_of_service_url", "https://www.mozilla.org/%LOCALE%/about/legal/terms/subscription-services/");
+-pref("signon.firefoxRelay.privacy_policy_url", "https://www.mozilla.org/%LOCALE%/privacy/subscription-services/");
+-pref("signon.signupDetection.confidenceThreshold",     "0.75");
+ 
+ #ifdef NIGHTLY_BUILD
+   pref("signon.rustMirror.enabled", true);
+diff --git a/toolkit/actors/AutoCompleteChild.sys.mjs b/toolkit/actors/AutoCompleteChild.sys.mjs
+index 71e9a71a71..4b7f5aafb1 100644
+--- a/toolkit/actors/AutoCompleteChild.sys.mjs
++++ b/toolkit/actors/AutoCompleteChild.sys.mjs
+@@ -315,11 +315,7 @@ export class AutoCompleteChild extends JSWindowActorChild {
+     this.#ongoingSearches.clear();
+   }
+ 
+-  selectEntry() {
+-    // we don't need to pass the selected index to the parent process because
+-    // the selected index is maintained in the parent.
+-    this.sendAsyncMessage("AutoComplete:SelectEntry");
+-  }
++  selectEntry() {}
+ }
+ 
+ AutoCompleteChild.prototype.QueryInterface = ChromeUtils.generateQI([
+diff --git a/toolkit/actors/AutoCompleteParent.sys.mjs b/toolkit/actors/AutoCompleteParent.sys.mjs
+index 65f85a84fc..652978cd83 100644
+--- a/toolkit/actors/AutoCompleteParent.sys.mjs
++++ b/toolkit/actors/AutoCompleteParent.sys.mjs
+@@ -175,10 +175,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+             ? AutoCompleteResultView.getStyleAt(selectedIndex)
+             : "";
+ 
+-        // Normally preview is cleared after selecting/hovering on a different
+-        // entry. However, we also need to clear the preview when a pop is closed.
+-        this.clearAutoCompletePreview();
+-
+         this.sendAsyncMessage("AutoComplete:PopupClosed", {
+           selectedRowComment,
+           selectedRowStyle,
+@@ -306,18 +302,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+     }
+ 
+     switch (message.name) {
+-      // This is called when an autocomplete entry is selected by the users.
+-      // In the current design, when a selection is triggered from the parent
+-      // process (ex, select by mouse click), we still first send the "HandleEnter"
+-      // message to the child and then child send the "SelectEntry" message back
+-      // to the parent to indicate that an autocomplete entry is selected.
+-      case "AutoComplete:SelectEntry": {
+-        if (this.openedPopup) {
+-          this.selectAutoCompleteEntry(this.openedPopup.selectedIndex);
+-        }
+-        break;
+-      }
+-
+       case "AutoComplete:SetSelectedIndex": {
+         let { index } = message.data;
+         if (this.openedPopup) {
+@@ -350,10 +334,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+             selectedIndex,
+           });
+           this.notifyListeners();
+-
+-          this.notifyAutoCompletePopupOpened(
+-            JSON.stringify(inputElementIdentifier)
+-          );
+         }
+         break;
+       }
+@@ -489,102 +469,6 @@ export class AutoCompleteParent extends JSWindowActorParent {
+ 
+   stopSearch() {}
+ 
+-  // Hard-coded the mapping by using the message prefix to find the actor
+-  // to process a given message.
+-  #getActorByMessagePrefix(message) {
+-    const prefixToActor = [{ prefix: "FormAutofill", actor: "FormAutofill" }];
+-
+-    const name = prefixToActor.find(x => message.startsWith(x.prefix))?.actor;
+-    return this.browsingContext.currentWindowGlobal.getActor(name);
+-  }
+-
+-  /**
+-   * When an autocomplete popup is opened, we notify all the autocomplete
+-   * entry providers that have an entry displayed in this popup.
+-   *
+-   * @param {ElementIdentifier} elementId The element with which the autocomplete popup is associated
+-   */
+-  notifyAutoCompletePopupOpened(elementId) {
+-    const actors = new Set();
+-    for (const result of AutoCompleteResultView.results) {
+-      try {
+-        const { fillMessageName } = JSON.parse(result.comment);
+-        if (!fillMessageName) {
+-          continue;
+-        }
+-
+-        actors.add(this.#getActorByMessagePrefix(fillMessageName));
+-      } catch {}
+-    }
+-
+-    for (const actor of actors) {
+-      actor.onAutoCompletePopupOpened?.(elementId);
+-    }
+-  }
+-
+-  /**
+-   * Clear the autocomplete preview
+-   */
+-  clearAutoCompletePreview() {
+-    const selectedIndex = this.openedPopup?.selectedIndex;
+-    const result = AutoCompleteResultView.results[selectedIndex];
+-    if (!result) {
+-      return;
+-    }
+-
+-    const { fillMessageName, fillMessageData } = JSON.parse(
+-      result.comment || "{}"
+-    );
+-    if (!fillMessageName) {
+-      return;
+-    }
+-
+-    const actor = this.#getActorByMessagePrefix(fillMessageName);
+-    actor?.onAutoCompleteEntryClearPreview?.(fillMessageName, fillMessageData);
+-  }
+-
+-  /**
+-   * Show the autocomplete preview for the current selected entry.
+-   */
+-  previewAutoCompleteEntry() {
+-    const selectedIndex = this.openedPopup?.selectedIndex;
+-    const result = AutoCompleteResultView.results[selectedIndex];
+-    if (!result) {
+-      return;
+-    }
+-
+-    const { fillMessageName, fillMessageData } = JSON.parse(
+-      result.comment || "{}"
+-    );
+-    if (!fillMessageName) {
+-      return;
+-    }
+-
+-    const actor = this.#getActorByMessagePrefix(fillMessageName);
+-    actor?.onAutoCompleteEntryHovered?.(fillMessageName, fillMessageData);
+-  }
+-
+-  /**
+-   * When an autocomplete entry is selected, notify the actor that provides the entry
+-   */
+-  selectAutoCompleteEntry() {
+-    const selectedIndex = this.openedPopup?.selectedIndex;
+-    const result = AutoCompleteResultView.results[selectedIndex];
+-    if (!result) {
+-      return;
+-    }
+-
+-    const { fillMessageName, fillMessageData } = JSON.parse(
+-      result.comment || "{}"
+-    );
+-    if (!fillMessageName) {
+-      return;
+-    }
+-
+-    const actor = this.#getActorByMessagePrefix(fillMessageName);
+-    actor?.onAutoCompleteEntrySelected?.(fillMessageName, fillMessageData);
+-  }
+-
+   /**
+    * Sends a message to the browser that is requesting the input
+    * that the open popup should be focused.
+diff --git a/toolkit/components/autocomplete/docs/index.rst b/toolkit/components/autocomplete/docs/index.rst
+index 87d11bfb15..3d8bc18284 100644
+--- a/toolkit/components/autocomplete/docs/index.rst
++++ b/toolkit/components/autocomplete/docs/index.rst
+@@ -164,8 +164,6 @@ Result Object Fields:
+ The autocomplete popup supports around 10 or so different styles for rows to appear in, for example: "status" for status rows, and "autofill" for form fill items. Each style uses the label, image and comment in a different way. You can add more styles by adding an implementation to
+ :searchfox:`autocomplete-richlistitem.js <toolkit/content/widgets/autocomplete-richlistitem.js>` and then adding a corresponding reference within :searchfox:`autocomplete-popup.js <toolkit/content/widgets/autocomplete-popup.js>` to match.
+ 
+-By default, the "value" field will be filled into the textbox when the item is selected from the popup. However, if the comment field contains ``fillMessageName`` and ``fillMessageData`` properties, these can be used to send custom messages to the actor which implements the autocomplete. The message name must match the actor, for example a message name ``FormAutofill:SaveAddress`` would map to a FormAutofill actor. This allows custom actions to be performed when selecting items from the autocomplete popup. The actor's ``onAutoCompleteEntrySelected`` function will be used to implement this. This behaviour is used when you need a custom action to be performed when selecting an item. For example, to open a settings panel.
+-
+-The form fill item also supports previewing an item when the user hovers the mouse over an item or selects an item with the cursor keys without pressing enter. This operates in a similar way but uses the ``onAutoCompleteEntrySelected`` function.
++The "value" field is filled into the textbox when the item is selected from the popup.
+ 
+ A autofilled textbox is generally highlighted in yellow. This is done by setting the ``autofillstate`` property of the <input> element when the value is filled or previewed, and cleared when the user modifies the value.
+diff --git a/toolkit/components/passwordmgr/LoginHelper.sys.mjs b/toolkit/components/passwordmgr/LoginHelper.sys.mjs
+index e179a714e9..b79fc07c68 100644
+--- a/toolkit/components/passwordmgr/LoginHelper.sys.mjs
++++ b/toolkit/components/passwordmgr/LoginHelper.sys.mjs
+@@ -20,22 +20,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   NewPasswordModel: "resource://gre/modules/shared/NewPasswordModel.sys.mjs",
+ });
+ 
+-export class ParentAutocompleteOption {
+-  image;
+-  label;
+-  secondary;
+-  fillMessageName;
+-  fillMessageData;
+-
+-  constructor(image, label, secondary, fillMessageName, fillMessageData) {
+-    this.image = image;
+-    this.label = label;
+-    this.secondary = secondary;
+-    this.fillMessageName = fillMessageName;
+-    this.fillMessageData = fillMessageData;
+-  }
+-}
+-
+ /**
+  * A helper class to deal with CSV import rows.
+  */
+@@ -421,13 +405,6 @@ export const LoginHelper = {
+     // Watch for pref changes to update cached pref values.
+     Services.prefs.addObserver("signon.", () => this.updateSignonPrefs());
+     this.updateSignonPrefs();
+-
+-    // Watch for FXA Logout to reset signon.firefoxRelay to 'available'
+-    // Using hard-coded value for FxAccountsCommon.ONLOGOUT_NOTIFICATION because
+-    // importing FxAccountsCommon here caused hard-to-diagnose crash.
+-    Services.obs.addObserver(() => {
+-      Services.prefs.clearUserPref("signon.firefoxRelay.feature");
+-    }, "fxaccounts:onlogout");
+   },
+ 
+   updateSignonPrefs() {
+diff --git a/toolkit/components/passwordmgr/moz.build b/toolkit/components/passwordmgr/moz.build
+index 2e993342e2..fe449f0172 100644
+--- a/toolkit/components/passwordmgr/moz.build
++++ b/toolkit/components/passwordmgr/moz.build
+@@ -27,7 +27,6 @@ XPIDL_MODULE = "loginmgr"
+ EXTRA_JS_MODULES += [
+     "BreachAlertStore.sys.mjs",
+     "crypto-SDR.sys.mjs",
+-    "InsecurePasswordUtils.sys.mjs",
+     "LoginHelper.sys.mjs",
+     "LoginInfo.sys.mjs",
+     "LoginManager.shared.sys.mjs",
+diff --git a/toolkit/components/satchel/FormHistoryAutoComplete.sys.mjs b/toolkit/components/satchel/FormHistoryAutoComplete.sys.mjs
+index 8f1c5c7b3c..c04f6afb87 100644
+--- a/toolkit/components/satchel/FormHistoryAutoComplete.sys.mjs
++++ b/toolkit/components/satchel/FormHistoryAutoComplete.sys.mjs
+@@ -3,12 +3,11 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ /**
+- * This autocomplete result combines 3 arrays of entries, fixedEntries and
+- * externalEntries.
++ * This autocomplete result combines 2 arrays of entries, entries and
++ * fixedEntries.
+  * Entries are Form History entries, they can be removed.
+- * Fixed entries are "appended" to entries, they are used for datalist items,
+- * search suggestions and extra items from integrations.
+- * External entries are meant for integrations, like Firefox Relay.
++ * Fixed entries are "appended" to entries, they are used for datalist items
++ * and search suggestions.
+  * Internally entries and fixed entries are kept separated so we can
+  * reuse and filter them.
+  *
+@@ -32,7 +31,6 @@ export class FormHistoryAutoCompleteResult {
+   entries = null;
+   inputName = null;
+   #fixedEntries = [];
+-  externalEntries = [];
+ 
+   set fixedEntries(value) {
+     this.#fixedEntries = value;
+@@ -53,11 +51,7 @@ export class FormHistoryAutoCompleteResult {
+   }
+ 
+   getAt(index) {
+-    for (const group of [
+-      this.entries,
+-      this.#fixedEntries,
+-      this.externalEntries,
+-    ]) {
++    for (const group of [this.entries, this.#fixedEntries]) {
+       if (index < group.length) {
+         return group[index];
+       }
+@@ -91,11 +85,7 @@ export class FormHistoryAutoCompleteResult {
+   }
+ 
+   get matchCount() {
+-    return (
+-      this.entries.length +
+-      this.#fixedEntries.length +
+-      this.externalEntries.length
+-    );
++    return this.entries.length + this.#fixedEntries.length;
+   }
+ 
+   getValueAt(index) {
+diff --git a/toolkit/components/satchel/FormHistoryChild.sys.mjs b/toolkit/components/satchel/FormHistoryChild.sys.mjs
+index 2a7325d512..43cabebc03 100644
+--- a/toolkit/components/satchel/FormHistoryChild.sys.mjs
++++ b/toolkit/components/satchel/FormHistoryChild.sys.mjs
+@@ -10,8 +10,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   FormHistory: "resource://gre/modules/FormHistory.sys.mjs",
+   FormHistoryAutoCompleteResult:
+     "resource://gre/modules/FormHistoryAutoComplete.sys.mjs",
+-  FormScenarios: "resource://gre/modules/FormScenarios.sys.mjs",
+-  GenericAutocompleteItem: "resource://gre/modules/FillHelpers.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+ });
+ 
+@@ -132,11 +130,7 @@ export class FormHistoryChild extends JSWindowActorChild {
+    */
+   getAutoCompleteSearchOption(input) {
+     const inputName = FormHistoryChild.getInputName(input);
+-    const scenarioName = lazy.FormScenarios.detect({ input }).signUpForm
+-      ? "SignUpFormScenario"
+-      : "";
+-
+-    return { inputName, scenarioName };
++    return { inputName };
+   }
+ 
+   /**
+@@ -190,7 +184,6 @@ export class FormHistoryChild extends JSWindowActorChild {
+     }
+ 
+     const entries = records.formHistoryEntries;
+-    const externalEntries = records.externalEntries;
+ 
+     if (input?.maxLength > -1) {
+       acResult.entries = entries.filter(
+@@ -200,19 +193,6 @@ export class FormHistoryChild extends JSWindowActorChild {
+       acResult.entries = entries;
+     }
+ 
+-    acResult.externalEntries.push(
+-      ...externalEntries.map(
+-        entry =>
+-          new lazy.GenericAutocompleteItem(
+-            entry.image,
+-            entry.label,
+-            entry.secondary,
+-            entry.fillMessageName,
+-            entry.fillMessageData
+-          )
+-      )
+-    );
+-
+     acResult.removeDuplicateHistoryEntries();
+     return acResult;
+   }
+diff --git a/toolkit/components/satchel/FormHistoryParent.sys.mjs b/toolkit/components/satchel/FormHistoryParent.sys.mjs
+index 54abed8a57..cc5b5c030f 100644
+--- a/toolkit/components/satchel/FormHistoryParent.sys.mjs
++++ b/toolkit/components/satchel/FormHistoryParent.sys.mjs
+@@ -7,9 +7,7 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ const lazy = {};
+ 
+ ChromeUtils.defineESModuleGetters(lazy, {
+-  FirefoxRelay: "resource://gre/modules/FirefoxRelay.sys.mjs",
+   FormHistory: "resource://gre/modules/FormHistory.sys.mjs",
+-  LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
+ });
+ 
+ XPCOMUtils.defineLazyPreferenceGetter(
+@@ -62,18 +60,12 @@ export class FormHistoryParent extends JSWindowActorParent {
+     }
+   }
+ 
+-  get formOrigin() {
+-    return lazy.LoginHelper.getLoginOrigin(
+-      this.manager.documentPrincipal?.originNoSuffix
+-    );
+-  }
+-
+-  async #onAutoCompleteSearch({ searchString, params, scenarioName }) {
++  async #onAutoCompleteSearch({ searchString, params }) {
+     searchString = searchString.trim().toLowerCase();
+ 
+     // The search bar manages its own history and is not served here.
+     if (!lazy.FormHistory.isAllowedFieldname(params?.fieldname)) {
+-      return { formHistoryEntries: [], externalEntries: [] };
++      return { formHistoryEntries: [] };
+     }
+ 
+     let formHistoryPromise;
+@@ -97,20 +89,12 @@ export class FormHistoryParent extends JSWindowActorParent {
+       );
+     }
+ 
+-    const relayPromise = lazy.FirefoxRelay.autocompleteItemsAsync({
+-      origin: this.formOrigin,
+-      scenarioName,
+-      hasInput: !!searchString.length,
+-    });
+-    const [formHistoryEntries, externalEntries] = await Promise.all([
+-      formHistoryPromise,
+-      relayPromise,
+-    ]);
++    const formHistoryEntries = await formHistoryPromise;
+ 
+     this.previousSearchString = searchString;
+     this.previousSearchResult = formHistoryEntries;
+ 
+-    return { formHistoryEntries, externalEntries };
++    return { formHistoryEntries };
+   }
+ 
+   #onRemoveEntry({ inputName, value, guid }) {
+@@ -129,11 +113,11 @@ export class FormHistoryParent extends JSWindowActorParent {
+   }
+ 
+   async searchAutoCompleteEntries(searchString, data) {
+-    const { inputName, scenarioName } = data;
++    const { inputName } = data;
+     const params = {
+       fieldname: inputName,
+     };
+-    return this.#onAutoCompleteSearch({ searchString, params, scenarioName });
++    return this.#onAutoCompleteSearch({ searchString, params });
+   }
+ 
+   static canSearchIncrementally(searchString, previousSearchString) {
+diff --git a/toolkit/components/satchel/moz.build b/toolkit/components/satchel/moz.build
+index 73bac3b74a..cde518daa5 100644
+--- a/toolkit/components/satchel/moz.build
++++ b/toolkit/components/satchel/moz.build
+@@ -26,14 +26,9 @@ LOCAL_INCLUDES += [
+ JAR_MANIFESTS += ["jar.mn"]
+ 
+ EXTRA_JS_MODULES += [
+-    "FillHelpers.sys.mjs",
+     "FormHistory.sys.mjs",
+     "FormHistoryAutoComplete.sys.mjs",
+     "FormHistoryStartup.sys.mjs",
+-    "FormScenarios.sys.mjs",
+-    "integrations/FirefoxRelay.sys.mjs",
+-    "integrations/FirefoxRelayUtils.sys.mjs",
+-    "SignUpFormRuleset.sys.mjs",
+ ]
+ 
+ XPCOM_MANIFESTS += [
+diff --git a/toolkit/components/satchel/test/unit/xpcshell.toml b/toolkit/components/satchel/test/unit/xpcshell.toml
+index bd91b78fdd..af7b99d72a 100644
+--- a/toolkit/components/satchel/test/unit/xpcshell.toml
++++ b/toolkit/components/satchel/test/unit/xpcshell.toml
+@@ -42,6 +42,4 @@ run-if = [
+ 
+ ["test_history_sources.js"]
+ 
+-["test_isOriginInList.js"]
+-
+ ["test_notify.js"]
+diff --git a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+index 4adf1221c5..4f8d0f8d23 100644
+--- a/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
++++ b/toolkit/components/telemetry/app/TelemetryEnvironment.sys.mjs
+@@ -341,7 +341,6 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
+   ["signon.autofillForms", { what: RECORD_PREF_VALUE }],
+   ["signon.generation.enabled", { what: RECORD_PREF_VALUE }],
+   ["signon.rememberSignons", { what: RECORD_PREF_VALUE }],
+-  ["signon.firefoxRelay.feature", { what: RECORD_PREF_VALUE }],
+   [
+     "widget.content.gtk-high-contrast.enabled",
+     { what: RECORD_DEFAULTPREF_VALUE },
+diff --git a/toolkit/components/telemetry/docs/data/environment.rst b/toolkit/components/telemetry/docs/data/environment.rst
+index 189ca2a168..6cc7d97c36 100644
+--- a/toolkit/components/telemetry/docs/data/environment.rst
++++ b/toolkit/components/telemetry/docs/data/environment.rst
+@@ -447,8 +447,6 @@ The following is a partial list of `collected preferences <https://searchfox.org
+ 
+ - ``nimbus.qa.pref-2``: Used to monitor the results of pref-setting test experiments.
+ 
+-- ``signon.firefoxRelay.feature``: User choice regarding Firefox Relay integration with Firefox Password Manager. Can be one of undefined, "available", "offered", "enabled" or "disabled".
+-
+ - ``dom.popup_allowed_events``: Which events should allow popups. Only exposed with about:config.
+ 
+ - ``intl.ime.use_composition_events_for_insert_text``: Whether a set of composition events is fired when user inserts text without keyboard events nor composing state of a composition (only on Linux and macOS).
+diff --git a/toolkit/content/widgets/autocomplete-popup.js b/toolkit/content/widgets/autocomplete-popup.js
+index a903736be1..50a8da6d62 100644
+--- a/toolkit/content/widgets/autocomplete-popup.js
++++ b/toolkit/content/widgets/autocomplete-popup.js
+@@ -429,12 +429,7 @@
+ 
+           // The styles on the list which have different <content> structure and overrided
+           // _adjustAcItem() are unreusable.
+-          const UNREUSEABLE_STYLES = [
+-            "autofill",
+-            "action",
+-            "generic",
+-            "insecureWarning",
+-          ];
++          const UNREUSEABLE_STYLES = ["autofill"];
+           // Reuse the item when its style is exactly equal to the previous style or
+           // neither of their style are in the UNREUSEABLE_STYLES.
+           reusable =
+@@ -452,15 +447,6 @@
+             case "autofill":
+               options = { is: "autocomplete-autofill-richlistitem" };
+               break;
+-            case "action":
+-              options = { is: "autocomplete-action-richlistitem" };
+-              break;
+-            case "generic":
+-              options = { is: "autocomplete-two-line-richlistitem" };
+-              break;
+-            case "insecureWarning":
+-              options = { is: "autocomplete-richlistitem-insecure-warning" };
+-              break;
+             default:
+               options = { is: "autocomplete-richlistitem" };
+           }
+diff --git a/toolkit/content/widgets/autocomplete-richlistitem.js b/toolkit/content/widgets/autocomplete-richlistitem.js
+index 8c761c4fc2..8fe420db38 100644
+--- a/toolkit/content/widgets/autocomplete-richlistitem.js
++++ b/toolkit/content/widgets/autocomplete-richlistitem.js
+@@ -509,92 +509,6 @@
+     [Ci.nsIDOMXULSelectControlItemElement]
+   );
+ 
+-  class MozAutocompleteRichlistitemInsecureWarning
+-    extends MozElements.MozAutocompleteRichlistitem
+-  {
+-    constructor() {
+-      super();
+-
+-      this.addEventListener("click", event => {
+-        if (event.button != 0) {
+-          return;
+-        }
+-
+-        let comment = this.getAttribute("ac-comment");
+-        if (comment && JSON.parse(comment)?.noLearnMore) {
+-          return;
+-        }
+-
+-        let baseURL = Services.urlFormatter.formatURLPref(
+-          "app.support.baseURL"
+-        );
+-        window.openTrustedLinkIn(baseURL + "insecure-password", "tab", {
+-          relatedToCurrent: true,
+-        });
+-      });
+-    }
+-
+-    connectedCallback() {
+-      if (this.delayConnectedCallback()) {
+-        return;
+-      }
+-
+-      super.connectedCallback();
+-
+-      // Unlike other autocomplete items, the height of the insecure warning
+-      // increases by wrapping. So "forceHandleUnderflow" is for container to
+-      // recalculate an item's height and width.
+-      this.classList.add("forceHandleUnderflow");
+-    }
+-
+-    static get inheritedAttributes() {
+-      return {
+-        ".ac-type-icon": "selected,current,type",
+-        ".ac-site-icon": "src=image,selected,type",
+-        ".ac-title-text": "selected",
+-        ".ac-separator": "selected,type",
+-        ".ac-url": "selected",
+-        ".ac-url-text": "selected",
+-      };
+-    }
+-
+-    static get markup() {
+-      return `
+-      <image class="ac-type-icon"/>
+-      <image class="ac-site-icon"/>
+-      <vbox class="ac-title" align="left">
+-        <description class="ac-text-overflow-container">
+-          <description class="ac-title-text"/>
+-        </description>
+-      </vbox>
+-      <hbox class="ac-separator" align="center">
+-        <description class="ac-separator-text" value="—"/>
+-      </hbox>
+-      <hbox class="ac-url" align="center">
+-        <description class="ac-text-overflow-container">
+-          <description class="ac-url-text"/>
+-        </description>
+-      </hbox>
+-    `;
+-    }
+-
+-    get _learnMoreString() {
+-      if (!this.__learnMoreString) {
+-        this.__learnMoreString = Services.strings
+-          .createBundle("chrome://passwordmgr/locale/passwordmgr.properties")
+-          .GetStringFromName("insecureFieldWarningLearnMore");
+-      }
+-      return this.__learnMoreString;
+-    }
+-
+-    /**
+-     * Override _getSearchTokens to have the Learn More text emphasized
+-     */
+-    _getSearchTokens() {
+-      return [this._learnMoreString.toLowerCase()];
+-    }
+-  }
+-
+   class MozAutocompleteTwoLineRichlistitem extends MozElements.MozRichlistitem {
+     connectedCallback() {
+       if (this.delayConnectedCallback()) {
+@@ -644,15 +558,6 @@
+     handleOverUnderflow() {}
+   }
+ 
+-  // This type has an action that is triggered when activated. The comment
+-  // for that result should contain a fillMessageName which is the message to send.
+-  class MozAutocompleteActionRichlistitem extends MozAutocompleteTwoLineRichlistitem {
+-    constructor() {
+-      super();
+-      this.selectedByMouseOver = true;
+-    }
+-  }
+-
+   class MozAutocompleteAutoFillRichlistitem extends MozAutocompleteTwoLineRichlistitem {
+     constructor() {
+       super();
+@@ -677,26 +582,6 @@
+       this.querySelector(".ac-site-icon").collapsed =
+         this.getAttribute("ac-image") == "";
+     }
+-
+-    set selected(val) {
+-      if (val) {
+-        this.setAttribute("selected", "true");
+-      } else {
+-        this.removeAttribute("selected");
+-      }
+-
+-      setTimeout(() => {
+-        const { AutoCompleteParent } = ChromeUtils.importESModule(
+-          "resource://gre/actors/AutoCompleteParent.sys.mjs"
+-        );
+-        const actor = AutoCompleteParent.getCurrentActor();
+-        actor?.previewAutoCompleteEntry();
+-      }, 0);
+-    }
+-
+-    get selected() {
+-      return this.getAttribute("selected") == "true";
+-    }
+   }
+ 
+   customElements.define(
+@@ -707,22 +592,6 @@
+     }
+   );
+ 
+-  customElements.define(
+-    "autocomplete-richlistitem-insecure-warning",
+-    MozAutocompleteRichlistitemInsecureWarning,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+-
+-  customElements.define(
+-    "autocomplete-two-line-richlistitem",
+-    MozAutocompleteTwoLineRichlistitem,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+-
+   customElements.define(
+     "autocomplete-autofill-richlistitem",
+     MozAutocompleteAutoFillRichlistitem,
+@@ -730,12 +599,4 @@
+       extends: "richlistitem",
+     }
+   );
+-
+-  customElements.define(
+-    "autocomplete-action-richlistitem",
+-    MozAutocompleteActionRichlistitem,
+-    {
+-      extends: "richlistitem",
+-    }
+-  );
+ }
+diff --git a/toolkit/locales/en-US/chrome/passwordmgr/passwordmgr.properties b/toolkit/locales/en-US/chrome/passwordmgr/passwordmgr.properties
+index f74448030b..56334480cb 100644
+--- a/toolkit/locales/en-US/chrome/passwordmgr/passwordmgr.properties
++++ b/toolkit/locales/en-US/chrome/passwordmgr/passwordmgr.properties
+@@ -21,11 +21,6 @@ noUsername=No username
+ # String is used on the autocomplete row when the login origin is a domain match with the document origin
+ displaySameOrigin=From this website
+ 
+-# LOCALIZATION NOTE (insecureFieldWarningDescription2):
+-# %1$S will contain insecureFieldWarningLearnMore and look like a link to indicate that clicking will open a tab with support information.
+-insecureFieldWarningDescription2 = This connection is not secure. Logins entered here could be compromised. %1$S
+-insecureFieldWarningLearnMore = Learn More
+-
+ # LOCALIZATION NOTE (managePasswords.label):
+ # This label is used in the footer of login autocomplete menus.
+ managePasswords.label= Manage Passwords
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index c4c45b3e4d..1c605f2303 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -842,7 +842,6 @@ export interface Modules {
+   "resource://gre/modules/ExtensionUtils.sys.mjs": typeof import("resource://gre/modules/ExtensionUtils.sys.mjs"),
+   "resource://gre/modules/ExtensionWorkerChild.sys.mjs": typeof import("resource://gre/modules/ExtensionWorkerChild.sys.mjs"),
+   "resource://gre/modules/FileUtils.sys.mjs": typeof import("resource://gre/modules/FileUtils.sys.mjs"),
+-  "resource://gre/modules/FillHelpers.sys.mjs": typeof import("resource://gre/modules/FillHelpers.sys.mjs"),
+   "resource://gre/modules/FindBarContent.sys.mjs": typeof import("resource://gre/modules/FindBarContent.sys.mjs"),
+   "resource://gre/modules/FindContent.sys.mjs": typeof import("resource://gre/modules/FindContent.sys.mjs"),
+   "resource://gre/modules/Finder.sys.mjs": typeof import("resource://gre/modules/Finder.sys.mjs"),
+@@ -850,13 +849,11 @@ export interface Modules {
+   "resource://gre/modules/FinderIterator.sys.mjs": typeof import("resource://gre/modules/FinderIterator.sys.mjs"),
+   "resource://gre/modules/FinderParent.sys.mjs": typeof import("resource://gre/modules/FinderParent.sys.mjs"),
+   "resource://gre/modules/FinderSound.sys.mjs": typeof import("resource://gre/modules/FinderSound.sys.mjs"),
+-  "resource://gre/modules/FirefoxRelay.sys.mjs": typeof import("resource://gre/modules/FirefoxRelay.sys.mjs"),
+   "resource://gre/modules/FirstStartup.sys.mjs": typeof import("resource://gre/modules/FirstStartup.sys.mjs"),
+   "resource://gre/modules/ForgetAboutSite.sys.mjs": typeof import("resource://gre/modules/ForgetAboutSite.sys.mjs"),
+   "resource://gre/modules/FormHistory.sys.mjs": typeof import("resource://gre/modules/FormHistory.sys.mjs"),
+   "resource://gre/modules/FormHistoryAutoComplete.sys.mjs": typeof import("resource://gre/modules/FormHistoryAutoComplete.sys.mjs"),
+   "resource://gre/modules/FormLikeFactory.sys.mjs": typeof import("resource://gre/modules/FormLikeFactory.sys.mjs"),
+-  "resource://gre/modules/FormScenarios.sys.mjs": typeof import("resource://gre/modules/FormScenarios.sys.mjs"),
+   "resource://gre/modules/FxAccounts.sys.mjs": typeof import("resource://gre/modules/FxAccounts.sys.mjs"),
+   "resource://gre/modules/FxAccountsClient.sys.mjs": typeof import("resource://gre/modules/FxAccountsClient.sys.mjs"),
+   "resource://gre/modules/FxAccountsCommands.sys.mjs": typeof import("resource://gre/modules/FxAccountsCommands.sys.mjs"),
+@@ -898,7 +895,6 @@ export interface Modules {
+   "resource://gre/modules/IndexedDB.sys.mjs": typeof import("resource://gre/modules/IndexedDB.sys.mjs"),
+   "resource://gre/modules/InlineSpellChecker.sys.mjs": typeof import("resource://gre/modules/InlineSpellChecker.sys.mjs"),
+   "resource://gre/modules/InlineSpellCheckerContent.sys.mjs": typeof import("resource://gre/modules/InlineSpellCheckerContent.sys.mjs"),
+-  "resource://gre/modules/InsecurePasswordUtils.sys.mjs": typeof import("resource://gre/modules/InsecurePasswordUtils.sys.mjs"),
+   "resource://gre/modules/Integration.sys.mjs": typeof import("resource://gre/modules/Integration.sys.mjs"),
+   "resource://gre/modules/JSONFile.sys.mjs": typeof import("resource://gre/modules/JSONFile.sys.mjs"),
+   "resource://gre/modules/JsonSchema.sys.mjs": typeof import("resource://gre/modules/JsonSchema.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index abd8eff70d..fa73726406 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -5872,9 +5872,6 @@
+       "resource://gre/modules/FileUtils.sys.mjs": [
+         "../../../toolkit/modules/FileUtils.sys.mjs"
+       ],
+-      "resource://gre/modules/FillHelpers.sys.mjs": [
+-        "../../../toolkit/components/satchel/FillHelpers.sys.mjs"
+-      ],
+       "resource://gre/modules/FindBarContent.sys.mjs": [
+         "../../../toolkit/modules/FindBarContent.sys.mjs"
+       ],
+@@ -5896,12 +5893,6 @@
+       "resource://gre/modules/FinderSound.sys.mjs": [
+         "../../../toolkit/modules/FinderSound.sys.mjs"
+       ],
+-      "resource://gre/modules/FirefoxRelay.sys.mjs": [
+-        "../../../toolkit/components/satchel/integrations/FirefoxRelay.sys.mjs"
+-      ],
+-      "resource://gre/modules/FirefoxRelayUtils.sys.mjs": [
+-        "../../../toolkit/components/satchel/integrations/FirefoxRelayUtils.sys.mjs"
+-      ],
+       "resource://gre/modules/FirstStartup.sys.mjs": [
+         "../../../toolkit/modules/FirstStartup.sys.mjs"
+       ],
+@@ -5917,9 +5908,6 @@
+       "resource://gre/modules/FormLikeFactory.sys.mjs": [
+         "../../../toolkit/modules/FormLikeFactory.sys.mjs"
+       ],
+-      "resource://gre/modules/FormScenarios.sys.mjs": [
+-        "../../../toolkit/components/satchel/FormScenarios.sys.mjs"
+-      ],
+       "resource://gre/modules/FxAccounts.sys.mjs": [
+         "../../../services/fxaccounts/FxAccounts.sys.mjs"
+       ],
+@@ -6061,9 +6049,6 @@
+       "resource://gre/modules/InlineSpellCheckerContent.sys.mjs": [
+         "../../../toolkit/modules/InlineSpellCheckerContent.sys.mjs"
+       ],
+-      "resource://gre/modules/InsecurePasswordUtils.sys.mjs": [
+-        "../../../toolkit/components/passwordmgr/InsecurePasswordUtils.sys.mjs"
+-      ],
+       "resource://gre/modules/Integration.sys.mjs": [
+         "../../../toolkit/modules/Integration.sys.mjs"
+       ],
+@@ -6325,9 +6310,6 @@
+       "resource://gre/modules/ShortcutUtils.sys.mjs": [
+         "../../../toolkit/modules/ShortcutUtils.sys.mjs"
+       ],
+-      "resource://gre/modules/SignUpFormRuleset.sys.mjs": [
+-        "../../../toolkit/components/satchel/SignUpFormRuleset.sys.mjs"
+-      ],
+       "resource://gre/modules/SitePolicyUtils.sys.mjs": [
+         "../../../toolkit/components/enterprisepolicies/SitePolicyUtils.sys.mjs"
+       ],

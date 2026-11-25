@@ -5,8 +5,8 @@
  * The one console every part of Sval logs through.
  *
  * `console.createInstance` is Gecko's own pattern for a component log
- * (`dom/chrome-webidl/ConsoleInstance.webidl`; `BackupService.sys.mjs` and
- * `Sanitizer.sys.mjs` are the examples followed here). It gives three things a
+ * (`dom/chrome-webidl/ConsoleInstance.webidl`; `Sanitizer.sys.mjs` is the
+ * example followed here). It gives three things a
  * bare `console.error` cannot: one prefix applied by the platform rather than
  * written into every message, a level per call site, and a pref that turns
  * detail on without a build.

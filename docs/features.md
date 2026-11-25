@@ -335,7 +335,7 @@ control of what you see and what is sent to websites.
   Sval's commands. Commands act on your Workspaces and the tabs and Splits
   in them, as well as the Workspace panel, site settings, and agents. Others
   open a Settings page or one of Sval's own pages like Downloads or
-  Passwords, and some print or translate the page or restart Sval.
+  History, and some print or translate the page or restart Sval.
 - **Choose where a page opens.** Enter opens it in this tab, and Shift+Enter
   opens it in a new tab. ⌘⇧Enter (Ctrl+Shift+Enter) opens it in a new
   window, and ⌥Enter (Alt+Enter) opens it in a Split next to this tab.
@@ -410,8 +410,8 @@ control of what you see and what is sent to websites.
   page in a Peek downloads a file, a downloads button shows in the Peek, with
   a ring that fills in as the file downloads. In a
   Peek, the Launcher opens its tabs in your main window. The Launcher's
-  commands for Settings, Downloads, History, Extensions, and Passwords open
-  in your main window too. To reopen the Peek you closed last, press ⇧⌘T
+  commands for Settings, Downloads, History, and Extensions open in your
+  main window too. To reopen the Peek you closed last, press ⇧⌘T
   (Ctrl+Shift+T on Windows and Linux) in another Peek. A Peek you don't
   use closes after six hours. You can turn Peeks off, or change how long
   they stay open, in Settings › Links.

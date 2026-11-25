@@ -1,0 +1,3737 @@
+Sval: Remove Firefox's selectable profiles
+
+Selectable profiles let one install hold a group of profiles, switched
+from the File menu, the app menu and a selector window at startup. Sval
+keeps its data in one directory (one-data-directory.patch) and locked
+the feature off, so it goes whole: the component and its pages, menus,
+Settings sections, startup hook, actor, prompts, strings, prefs, the
+Firefox account sign-in warnings that offered another profile, the
+migrator that refreshed a profile in a group, the window title's
+profile name and the messaging targeting attributes. The profile
+manager's windows go with them: about:profiles, the -P profile
+selection dialog and its new profile wizard. In Gecko the
+MOZ_SELECTABLE_PROFILES define goes, and with it the profile service's
+selector flag, the selector launched at startup, its observer and the
+reset path for a profile in a group. A profile's store ID is read-only;
+the profile group datastore that holds Nimbus's enrollments, and the
+toolkit.profiles.storeID pref it reads, stay. The component's metrics
+file also defined profile.lock.failed_lock_count, which Telemetry
+records at startup, so that metric moves to toolkit/profile's.
+
+diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
+index 8804c4bcd1..96772547a0 100644
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -3024,12 +3024,6 @@ pref("browser.mailto.dualPrompt.onLocationChange", false);
+ pref("browser.mailto.dualPrompt.dismissNotNowMinutes", 525600); // one year
+ pref("browser.mailto.dualPrompt.dismissXClickMinutes", 1440); // one day
+ 
+-// Pref to enable the new profiles
+-pref("browser.profiles.enabled", true);
+-pref("browser.profiles.profile-name.updated", false);
+-// Whether to allow the user to merge profile data
+-pref("browser.profiles.sync.allow-danger-merge", false);
+-
+ pref("startup.homepage_override_url_nimbus", "");
+ // These prefs are referring to the Fx update version
+ pref("startup.homepage_override_nimbus_maxVersion", "");
+diff --git a/browser/base/content/appmenu-viewcache.inc.xhtml b/browser/base/content/appmenu-viewcache.inc.xhtml
+index d694a1aea2..a119d41a0b 100644
+--- a/browser/base/content/appmenu-viewcache.inc.xhtml
++++ b/browser/base/content/appmenu-viewcache.inc.xhtml
+@@ -29,15 +29,6 @@
+           </vbox>
+         </toolbarbutton>
+       </toolbaritem>
+-      <toolbarbutton id="appMenu-empty-profiles-button"
+-                     class="subviewbutton subviewbutton-nav"
+-                     closemenu="none"
+-                     data-l10n-id="appmenu-profiles-2"
+-                     hidden="true"/>
+-      <toolbarbutton id="appMenu-profiles-button"
+-                     class="subviewbutton subviewbutton-nav subviewbutton-iconic"
+-                     closemenu="none"
+-                     hidden="true"/>
+       <toolbarseparator id="appMenu-fxa-separator" class="proton-zap"/>
+       <toolbarbutton id="appMenu-new-tab-button2"
+                      class="subviewbutton"
+@@ -208,36 +199,6 @@
+                    />
+   </panelview>
+ 
+-  <panelview id="PanelUI-profiles"
+-             flex="1"
+-             has-custom-header="true">
+-    <box id="PanelUI-profiles-header"
+-         class="panel-header panel-header-with-additional-element">
+-      <toolbarbutton class="subviewbutton subviewbutton-iconic subviewbutton-back"
+-                     id="profiles-appmenu-back-button"
+-                     tabindex="0"
+-                     closemenu="none"
+-                     />
+-      <html:h1 id="profiles-header-title">
+-        <html:span id="profiles-header-content"></html:span>
+-      </html:h1>
+-      <toolbarbutton id="profiles-edit-this-profile-button"
+-                     class="subviewbutton subviewbutton-iconic"
+-                     data-l10n-id="appmenu-edit-profile"
+-                     />
+-    </box>
+-    <vbox class="panel-subview-body">
+-      <vbox id="current-profile">
+-        <box id="half-height-profile"></box>
+-        <image id="profile-icon-image"></image>
+-      </vbox>
+-      <html:h2 id="profiles-subtitle"
+-               class="subview-subheader"
+-               data-l10n-id="appmenu-other-profiles" />
+-      <vbox id="profiles-list"></vbox>
+-    </vbox>
+-  </panelview>
+-
+   <panelview id="appMenu-library-recentlyClosedTabs"/>
+   <panelview id="appMenu-library-recentlyClosedWindows"/>
+ 
+@@ -655,16 +616,6 @@
+               data-l10n-id="fxa-menu-sign-out"
+               hidden="true"/>
+       </vbox>
+-      <toolbarbutton id="PanelUI-fxa-menu-empty-profiles-button"
+-                     class="subviewbutton subviewbutton-nav"
+-                     closemenu="none"
+-                     data-l10n-id="appmenu-profiles-2"
+-                     hidden="true"/>
+-      <toolbarbutton id="PanelUI-fxa-menu-profiles-button"
+-                     class="subviewbutton subviewbutton-nav subviewbutton-iconic"
+-                     closemenu="none"
+-                     hidden="true"/>
+-      <toolbarseparator id="PanelUI-fxa-menu-profiles-separator" class="proton-zap" hidden="true"/>
+       <!-- My Services panel - visible if the user has any of the listed services below set up on their account-->
+       <vbox id="PanelUI-fxa-menu-services" hidden="true">
+         <toolbarseparator />
+diff --git a/browser/base/content/browser-init.js b/browser/base/content/browser-init.js
+index 2aadf3743c..f3a02356d9 100644
+--- a/browser/base/content/browser-init.js
++++ b/browser/base/content/browser-init.js
+@@ -1112,10 +1112,6 @@ var gBrowserInit = {
+       gGfxUtils.init();
+     });
+ 
+-    scheduleIdleTask(async () => {
+-      await gProfiles.init();
+-    });
+-
+     // This should always go last, since the idle tasks (except for the ones with
+     // timeouts) should execute in order. Note that this observer notification is
+     // not guaranteed to fire, since the window could close before we get here.
+diff --git a/browser/base/content/browser-menubar.inc.xhtml b/browser/base/content/browser-menubar.inc.xhtml
+index b5cddf54bb..dc685144cd 100644
+--- a/browser/base/content/browser-menubar.inc.xhtml
++++ b/browser/base/content/browser-menubar.inc.xhtml
+@@ -322,15 +322,6 @@
+     </menupopup>
+   </menu>
+ 
+-  <menu id="profiles-menu" data-l10n-id="menu-profiles-menu" hidden="true">
+-    <menupopup id="menu_ProfilesPopup">
+-      <!-- Profile list gets inserted here -->
+-      <menuitem id="menu_newProfile" class="menuitem-iconic" command="Profiles:CreateProfile" data-l10n-id="menu-profiles-new-profile" />
+-      <menuseparator id="profilesSeparator" />
+-      <menuitem id="menu_manageProfiles" command="Profiles:ManageProfiles" data-l10n-id="menu-profiles-manage-profiles" />
+-    </menupopup>
+-  </menu>
+-
+             <menu id="tools-menu" data-l10n-id="menu-tools">
+               <menupopup id="menu_ToolsPopup">
+               <menuitem id="menu_openDownloads"
+diff --git a/browser/base/content/browser-menubar.js b/browser/base/content/browser-menubar.js
+index ec89d0029c..0a021978fa 100644
+--- a/browser/base/content/browser-menubar.js
++++ b/browser/base/content/browser-menubar.js
+@@ -235,9 +235,6 @@ document.addEventListener(
+         case "menu_HelpPopup":
+           buildHelpMenu();
+           break;
+-        case "menu_ProfilesPopup":
+-          gProfiles.onPopupShowing(event);
+-          break;
+       }
+     });
+ 
+diff --git a/browser/base/content/browser-sets.inc.xhtml b/browser/base/content/browser-sets.inc.xhtml
+index 962eb151ed..19f93e547e 100644
+--- a/browser/base/content/browser-sets.inc.xhtml
++++ b/browser/base/content/browser-sets.inc.xhtml
+@@ -75,10 +75,6 @@
+       <observes element="Browser:Reload" attribute="disabled"/>
+     </command>
+     <command id="Browser:DuplicateTab" />
+-    <command id="Profiles:CreateProfile" />
+-    <command id="Profiles:ManageProfiles" />
+-    <command id="Profiles:LaunchProfile" />
+-    <command id="Profiles:MoveTabsToProfile" />
+ # NextTab/PrevTab are not currently used directly, but have a loyal following
+ # through the gesture support about:config prefs - see bug 1478626.
+     <command id="Browser:NextTab" />
+diff --git a/browser/base/content/browser-sets.js b/browser/base/content/browser-sets.js
+index 1fae6de3fd..001f12cd70 100644
+--- a/browser/base/content/browser-sets.js
++++ b/browser/base/content/browser-sets.js
+@@ -218,13 +218,6 @@ document.addEventListener(
+           case "Browser:OpenAboutContainers":
+             openPreferences("paneContainers");
+             break;
+-          // deliberate fallthrough
+-          case "Profiles:CreateProfile":
+-          case "Profiles:ManageProfiles":
+-          case "Profiles:LaunchProfile":
+-          case "Profiles:MoveTabsToProfile":
+-            gProfiles.handleCommand(event);
+-            break;
+           case "Tools:Search":
+             SearchUIUtils.webSearch(window);
+             break;
+diff --git a/browser/base/content/browser-sync.js b/browser/base/content/browser-sync.js
+index a20a7f870e..2dfbcfa332 100644
+--- a/browser/base/content/browser-sync.js
++++ b/browser/base/content/browser-sync.js
+@@ -1227,10 +1227,6 @@ var gSync = {
+       document,
+       "PanelUI-sign-out-separator"
+     );
+-    const emptyProfilesButton = PanelMultiView.getViewNode(
+-      document,
+-      "PanelUI-fxa-menu-empty-profiles-button"
+-    );
+     const sendTabButton = PanelMultiView.getViewNode(
+       document,
+       "PanelUI-fxa-menu-sendtab-button"
+@@ -1239,14 +1235,6 @@ var gSync = {
+       document,
+       "PanelUI-fxa-menu-sendtab-separator"
+     );
+-    const profilesButton = PanelMultiView.getViewNode(
+-      document,
+-      "PanelUI-fxa-menu-profiles-button"
+-    );
+-    const profilesSeparator = PanelMultiView.getViewNode(
+-      document,
+-      "PanelUI-fxa-menu-profiles-separator"
+-    );
+     const syncSetupEl = PanelMultiView.getViewNode(
+       document,
+       "PanelUI-fxa-menu-setup-sync-container"
+@@ -1326,20 +1314,11 @@ var gSync = {
+           }
+         }
+ 
+-        // Reposition profiles elements
+-        emptyProfilesButton.remove();
+-        profilesButton.remove();
+-        profilesSeparator.remove();
+         sendTabButton.remove();
+         sendTabSeparator.remove();
+ 
+-        profilesSeparator.hidden = true;
+-
+         signedInContainer.after(sendTabButton);
+         signedInContainer.after(sendTabSeparator);
+-        signedInContainer.after(profilesSeparator);
+-        signedInContainer.after(profilesButton);
+-        signedInContainer.after(emptyProfilesButton);
+ 
+         break;
+ 
+@@ -1388,17 +1367,6 @@ var gSync = {
+           syncSetupSeparator.setAttribute("hidden", "true");
+         }
+ 
+-        // Reposition profiles elements
+-        emptyProfilesButton.remove();
+-        profilesButton.remove();
+-        profilesSeparator.remove();
+-
+-        profilesSeparator.hidden = false;
+-
+-        fxaMenuAccountButtonEl.after(profilesSeparator);
+-        fxaMenuAccountButtonEl.after(profilesButton);
+-        fxaMenuAccountButtonEl.after(emptyProfilesButton);
+-
+         break;
+ 
+       default:
+diff --git a/browser/base/content/browser.js b/browser/base/content/browser.js
+index c03c042531..40670cda16 100644
+--- a/browser/base/content/browser.js
++++ b/browser/base/content/browser.js
+@@ -65,8 +65,6 @@ ChromeUtils.defineESModuleGetters(this, {
+     "resource:///modules/ReducedProtectionNotification.sys.mjs",
+   PrivateBrowsingUI: "moz-src:///browser/modules/PrivateBrowsingUI.sys.mjs",
+   ProcessHangMonitor: "resource:///modules/ProcessHangMonitor.sys.mjs",
+-  ProfilesDatastoreService:
+-    "moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs",
+   PromptUtils: "resource://gre/modules/PromptUtils.sys.mjs",
+   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
+   SafeBrowsing: "resource://gre/modules/SafeBrowsing.sys.mjs",
+@@ -74,8 +72,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   ScreenshotsUtils:
+     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
+   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+-  SelectableProfileService:
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
+   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
+   SessionWindowUI: "resource:///modules/sessionstore/SessionWindowUI.sys.mjs",
+@@ -279,12 +275,6 @@ XPCOMUtils.defineLazyScriptGetter(
+   "gSharedTabWarning",
+   "chrome://browser/content/browser-webrtc.js"
+ );
+-XPCOMUtils.defineLazyScriptGetter(
+-  this,
+-  "gProfiles",
+-  "chrome://browser/content/browser-profiles.js"
+-);
+-
+ // lazy service getters
+ 
+ XPCOMUtils.defineLazyServiceGetters(this, {
+diff --git a/browser/base/content/browser.js.globals b/browser/base/content/browser.js.globals
+index 5859e98164..8b9b37f5ee 100644
+--- a/browser/base/content/browser.js.globals
++++ b/browser/base/content/browser.js.globals
+@@ -189,7 +189,6 @@
+   "A11yUtils",
+   "gSharedTabWarning",
+   "gPageStyleMenu",
+-  "gProfiles",
+   "ContentPrefService2",
+   "classifierService",
+   "Favicons",
+@@ -221,9 +220,7 @@
+   "gFindBar",
+   "gFindBarInitialized",
+   "gFindBarPromise",
+-  "SelectableProfileService",
+   "ActionsProviderContextualSearch",
+   "ToolbarDropHandler",
+-  "ProfilesDatastoreService",
+   "gTrustPanelHandler"
+ ]
+diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
+index 132daee455..ce25976a0b 100644
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -82,7 +82,6 @@
+   <link rel="localization" href="toolkit/printing/printUI.ftl"/>
+   <link rel="localization" href="browser/sidebar.ftl"/>
+   <link rel="localization" href="browser/syncedTabs.ftl"/>
+-  <link rel="localization" href="browser/profiles.ftl"/>
+   <!-- Untranslated FTL files -->
+   <link rel="localization" href="preview/credentialChooser.ftl" />
+   <link rel="localization" href="preview/enUS-searchFeatures.ftl" />
+diff --git a/browser/base/content/main-popupset.inc.xhtml b/browser/base/content/main-popupset.inc.xhtml
+index 3cf95fa062..e1e8927360 100644
+--- a/browser/base/content/main-popupset.inc.xhtml
++++ b/browser/base/content/main-popupset.inc.xhtml
+@@ -80,7 +80,6 @@
+                   tbattr="tabbrowser-multiple-visible"/>
+         <menuitem id="context_openTabInWindow" data-lazy-l10n-id="move-to-new-window"
+                   tbattr="tabbrowser-multiple-visible"/>
+-        <menuseparator id="moveTabSeparator" hidden="true"/>
+       </menupopup>
+     </menu>
+     <menu id="context_reopenInContainer"
+diff --git a/browser/base/content/main-popupset.js b/browser/base/content/main-popupset.js
+index bdf2fbd609..339547aabc 100644
+--- a/browser/base/content/main-popupset.js
++++ b/browser/base/content/main-popupset.js
+@@ -550,9 +550,6 @@ document.addEventListener(
+         case "bhTooltip":
+           BookmarksEventHandler.fillInBHTooltip(event.target, event);
+           break;
+-        case "moveTabOptionsMenu":
+-          gProfiles.populateMoveTabMenu(event.target);
+-          break;
+       }
+     });
+ 
+diff --git a/browser/base/content/moz.build b/browser/base/content/moz.build
+index e47cdd705f..1aeb1eed17 100644
+--- a/browser/base/content/moz.build
++++ b/browser/base/content/moz.build
+@@ -143,9 +143,6 @@ with Files("browser-pageActions.js"):
+ with Files("browser-places.js"):
+     BUG_COMPONENT = ("Firefox", "Bookmarks & History")
+ 
+-with Files("browser-profiles.js"):
+-    BUG_COMPONENT = ("Toolkit", "Startup and Profile System")
+-
+ with Files("browser-safebrowsing.js"):
+     BUG_COMPONENT = ("Toolkit", "Safe Browsing")
+ 
+diff --git a/browser/base/content/test/static/browser_all_files_referenced.js b/browser/base/content/test/static/browser_all_files_referenced.js
+index d7673cdb0a..90fdf02de3 100644
+--- a/browser/base/content/test/static/browser_all_files_referenced.js
++++ b/browser/base/content/test/static/browser_all_files_referenced.js
+@@ -65,9 +65,6 @@ var gExceptionPaths = [
+   // The ONNX runtime picks files to run programmaticaly
+   "chrome://global/content/ml/",
+ 
+-  // The profile avatars are directly referenced.
+-  "chrome://browser/content/profiles/assets/",
+-
+   // The picture-in-picture add-on.
+   "resource://builtin-addons/pictureinpicture/",
+ 
+diff --git a/browser/base/content/test/sync/browser.toml b/browser/base/content/test/sync/browser.toml
+index d9b4235b89..d86b93bb9c 100644
+--- a/browser/base/content/test/sync/browser.toml
++++ b/browser/base/content/test/sync/browser.toml
+@@ -27,6 +27,5 @@ support-files = ["browser_fxa_web_channel.html"]
+ ["browser_signed_out_avatar_variants.js"]
+ 
+ ["browser_sync.js"]
+-support-files = ["!/browser/components/profiles/tests/browser/head.js"]
+ 
+ ["browser_synced_tabs_view.js"]
+diff --git a/browser/base/content/test/sync/browser_sync.js b/browser/base/content/test/sync/browser_sync.js
+index 6e57678732..9bf2d6195f 100644
+--- a/browser/base/content/test/sync/browser_sync.js
++++ b/browser/base/content/test/sync/browser_sync.js
+@@ -3,10 +3,6 @@
+ 
+ "use strict";
+ 
+-Services.scriptloader.loadSubScript(
+-  "chrome://mochitests/content/browser/browser/components/profiles/tests/browser/head.js",
+-  this
+-);
+ Services.scriptloader.loadSubScript(
+   "chrome://mochitests/content/browser/browser/components/customizableui/test/head.js",
+   this
+@@ -165,14 +161,6 @@ add_task(async function setupForPanelTests() {
+ add_task(async function test_ui_state_signedin() {
+   await BrowserTestUtils.openNewForegroundTab(gBrowser, "https://example.com/");
+ 
+-  // Setup profiles db
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.profiles.enabled", true]],
+-  });
+-  await initGroupDatabase();
+-  let profile = SelectableProfileService.currentProfile;
+-  Assert.ok(profile, "Should have a profile now");
+-
+   const relativeDateAnchor = new Date();
+ 
+   const sandbox = sinon.createSandbox();
+@@ -252,11 +240,6 @@ add_task(async function test_ui_state_signedin() {
+     visibleItems: [],
+   });
+ 
+-  await checkProfilesButtons(
+-    document.getElementById("fxa-manage-account-button"),
+-    true
+-  );
+-
+   checkFxAAvatar("signedin");
+   gSync.relativeTimeFormat = origRelativeTimeFormat;
+   await closeFxaPanel();
+@@ -269,8 +252,6 @@ add_task(async function test_ui_state_signedin() {
+     hideFxAText: true,
+   });
+ 
+-  // Ensure the profiles menuitem is not shown in the FxA panel when it is
+-  // displayed as a subpanel of the app menu.
+   let appMenuFxAStatusButton = document.getElementById("appMenu-fxa-label2");
+   appMenuFxAStatusButton.click();
+   let fxaView = PanelMultiView.getViewNode(document, "PanelUI-fxa");
+@@ -282,10 +263,6 @@ add_task(async function test_ui_state_signedin() {
+     BrowserTestUtils.isVisible(manageButton),
+     "expected manage button to be visible after opening"
+   );
+-  let profilesButton = fxaView.querySelector(
+-    "PanelUI-fxa-menu-profiles-button"
+-  );
+-  ok(!profilesButton, "expected profiles button to not be present");
+ 
+   await closeTabAndMainPanel();
+   sandbox.restore();
+@@ -403,14 +380,6 @@ add_task(async function test_ui_state_panel_open_after_syncing() {
+ add_task(async function test_ui_state_unconfigured() {
+   await BrowserTestUtils.openNewForegroundTab(gBrowser, "https://example.com/");
+ 
+-  // Setup profiles db
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.profiles.enabled", true]],
+-  });
+-  await initGroupDatabase();
+-  let profile = SelectableProfileService.currentProfile;
+-  Assert.ok(profile, "Should have a profile now");
+-
+   let state = {
+     status: UIState.STATUS_NOT_CONFIGURED,
+   };
+@@ -436,11 +405,6 @@ add_task(async function test_ui_state_unconfigured() {
+ 
+   await openFxaPanel();
+ 
+-  await checkProfilesButtons(
+-    document.getElementById("PanelUI-signedin-panel"),
+-    false
+-  );
+-
+   await closeFxaPanel();
+ });
+ 
+@@ -1217,40 +1181,6 @@ function isElementVisible(el) {
+   );
+ }
+ 
+-async function checkProfilesButtons(
+-  previousElementSibling,
+-  separatorVisible = false
+-) {
+-  const profilesButton = document.getElementById(
+-    "PanelUI-fxa-menu-profiles-button"
+-  );
+-  const emptyProfilesButton = document.getElementById(
+-    "PanelUI-fxa-menu-empty-profiles-button"
+-  );
+-  const profilesSeparator = document.getElementById(
+-    "PanelUI-fxa-menu-profiles-separator"
+-  );
+-
+-  ok(
+-    (profilesButton.hidden || emptyProfilesButton.hidden) &&
+-      !(profilesButton.hidden && emptyProfilesButton.hidden),
+-    "Only one of the profiles button is visible"
+-  );
+-
+-  is(
+-    !profilesSeparator.hidden,
+-    separatorVisible,
+-    "The profile separator is visible"
+-  );
+-
+-  is(
+-    previousElementSibling,
+-    emptyProfilesButton.previousElementSibling,
+-    "The profiles button is displayed after " +
+-      emptyProfilesButton.previousElementSibling.id
+-  );
+-}
+-
+ async function checkFxABadged() {
+   const button = document.getElementById("fxa-toolbar-menu-button");
+   await BrowserTestUtils.waitForCondition(() => {
+@@ -1425,22 +1355,11 @@ add_task(async function test_ui_state_signed_out_send_tab() {
+   gSync.updateAllUI(state);
+   await openFxaPanel();
+ 
+-  let profilesButton = PanelMultiView.getViewNode(
+-    document,
+-    "PanelUI-fxa-menu-profiles-button"
+-  );
+-
+   let sendTabButton = PanelMultiView.getViewNode(
+     document,
+     "PanelUI-fxa-menu-sendtab-button"
+   );
+ 
+-  Assert.equal(
+-    profilesButton.compareDocumentPosition(sendTabButton),
+-    4, // Equates to Node.DOCUMENT_POSITION_FOLLOWING (4)
+-    "Profiles button is above the send tab button"
+-  );
+-
+   Assert.equal(
+     sendTabButton.getAttribute("data-l10n-id"),
+     "fxa-menu-send-to-mobile",
+@@ -1467,14 +1386,6 @@ add_task(async function test_ui_state_signed_out_send_tab() {
+ });
+ 
+ add_task(async function test_ui_state_sync_disabled_send_tab() {
+-  // Setup profiles db
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.profiles.enabled", true]],
+-  });
+-  await initGroupDatabase();
+-  let profile = SelectableProfileService.currentProfile;
+-  Assert.ok(profile, "Should have a profile now");
+-
+   const relativeDateAnchor = new Date();
+ 
+   const sandbox = sinon.createSandbox();
+@@ -1537,14 +1448,6 @@ add_task(async function test_ui_state_sync_disabled_send_tab() {
+ });
+ 
+ add_task(async function test_ui_state_single_device_send_tab() {
+-  // Setup profiles db
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.profiles.enabled", true]],
+-  });
+-  await initGroupDatabase();
+-  let profile = SelectableProfileService.currentProfile;
+-  Assert.ok(profile, "Should have a profile now");
+-
+   const relativeDateAnchor = new Date();
+ 
+   const sandbox = sinon.createSandbox();
+diff --git a/browser/base/jar.mn b/browser/base/jar.mn
+index 417e9d729a..c51874965d 100644
+--- a/browser/base/jar.mn
++++ b/browser/base/jar.mn
+@@ -44,7 +44,6 @@ browser.jar:
+         content/browser/browser-menubar.js                  (content/browser-menubar.js)
+         content/browser/browser-pageActions.js              (content/browser-pageActions.js)
+         content/browser/browser-places.js                   (content/browser-places.js)
+-        content/browser/browser-profiles.js                 (content/browser-profiles.js)
+         content/browser/browser-safebrowsing.js             (content/browser-safebrowsing.js)
+         content/browser/browser-sets.js                     (content/browser-sets.js)
+         content/browser/browser-siteIdentity.js             (content/browser-siteIdentity.js)
+diff --git a/browser/components/BrowserComponents.manifest b/browser/components/BrowserComponents.manifest
+index f73404ffad..f2966b845c 100644
+--- a/browser/components/BrowserComponents.manifest
++++ b/browser/components/BrowserComponents.manifest
+@@ -93,7 +93,6 @@ category browser-first-window-ready resource://gre/modules/NewTabUtils.sys.mjs N
+ category browser-first-window-ready resource:///modules/PageActions.sys.mjs PageActions.init
+ category browser-first-window-ready moz-src:///toolkit/components/doh/DoHController.sys.mjs DoHController.init
+ category browser-first-window-ready moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs ProfilesDatastoreService.init
+-category browser-first-window-ready resource:///modules/profiles/SelectableProfileService.sys.mjs SelectableProfileService.init
+ category browser-first-window-ready moz-src:///browser/components/protections/ContentBlockingPrefs.sys.mjs ContentBlockingPrefs.init
+ category browser-first-window-ready moz-src:///browser/components/customizableui/SearchWidgetTracker.sys.mjs SearchWidgetTracker.init
+ #ifdef MOZ_SANDBOX
+diff --git a/browser/components/DesktopActorRegistry.sys.mjs b/browser/components/DesktopActorRegistry.sys.mjs
+index 591c98bd02..9a00518e56 100644
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -296,9 +296,6 @@ let JSWINDOWACTORS = {
+       "chrome://browser/content/sidebar/sidebar-customize.html",
+       "chrome://browser/content/sidebar/sidebar-opentabs.html",
+       "about:firefoxview",
+-      "about:editprofile",
+-      "about:deleteprofile",
+-      "about:newprofile",
+       "about:opentabs",
+     ],
+     remoteTypes: ["parent", "privilegedabout"],
+@@ -379,20 +376,6 @@ let JSWINDOWACTORS = {
+     allFrames: true,
+   },
+ 
+-  Profiles: {
+-    parent: {
+-      esModuleURI: "resource:///actors/ProfilesParent.sys.mjs",
+-    },
+-    child: {
+-      esModuleURI: "resource:///actors/ProfilesChild.sys.mjs",
+-      events: {
+-        DOMDocElementInserted: { wantUntrusted: true },
+-      },
+-    },
+-    matches: ["about:editprofile", "about:deleteprofile", "about:newprofile"],
+-    remoteTypes: ["privilegedabout"],
+-  },
+-
+   Prompt: {
+     parent: {
+       esModuleURI: "resource:///actors/PromptParent.sys.mjs",
+diff --git a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+index edd86068f4..ddec395dac 100644
+--- a/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
++++ b/browser/components/asrouter/modules/ASRouterTargeting.sys.mjs
+@@ -64,8 +64,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   Region: "resource://gre/modules/Region.sys.mjs",
+   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+-  SelectableProfileService:
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
+   TargetingContext: "resource://messaging-system/targeting/Targeting.sys.mjs",
+   TelemetryEnvironment: "resource://gre/modules/TelemetryEnvironment.sys.mjs",
+@@ -190,12 +188,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+       : 0;
+   }
+ );
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "profilesCreated",
+-  "browser.profiles.created",
+-  false
+-);
+ 
+ XPCOMUtils.defineLazyServiceGetters(lazy, {
+   AUS: [
+@@ -386,23 +378,6 @@ export const QueryCache = {
+       FRECENT_SITES_UPDATE_INTERVAL,
+       ClientID
+     ),
+-    profileGroupProfileCount: new CachedTargetingGetter(
+-      "getProfileGroupProfileCount",
+-      null,
+-      FRECENT_SITES_UPDATE_INTERVAL,
+-      {
+-        getProfileGroupProfileCount() {
+-          if (
+-            !Services.prefs.getBoolPref("browser.profiles.enabled", false) ||
+-            !Services.prefs.getBoolPref("browser.profiles.created", false)
+-          ) {
+-            return 0;
+-          }
+-
+-          return lazy.SelectableProfileService.getProfileCount();
+-        },
+-      }
+-    ),
+     crashData: new CachedTargetingGetter(
+       "getCrashData",
+       null,
+@@ -560,15 +535,6 @@ const TargetingGetters = {
+   get currentDate() {
+     return new Date();
+   },
+-  get canCreateSelectableProfiles() {
+-    if (!AppConstants.MOZ_SELECTABLE_PROFILES) {
+-      return false;
+-    }
+-    return lazy.SelectableProfileService?.isEnabled ?? false;
+-  },
+-  get hasSelectableProfiles() {
+-    return lazy.profilesCreated;
+-  },
+   get profileAgeCreated() {
+     return lazy.ProfileAge().then(times => times.created);
+   },
+@@ -1154,17 +1120,6 @@ const TargetingGetters = {
+     return QueryCache.getters.profileGroupId.get();
+   },
+ 
+-  get currentProfileId() {
+-    if (!lazy.SelectableProfileService.currentProfile) {
+-      return "";
+-    }
+-    return lazy.SelectableProfileService.currentProfile.id.toString();
+-  },
+-
+-  get profileGroupProfileCount() {
+-    return QueryCache.getters.profileGroupProfileCount.get();
+-  },
+-
+   get buildId() {
+     return parseInt(AppConstants.MOZ_BUILDID, 10);
+   },
+diff --git a/browser/components/enterprisepolicies/Policies.sys.mjs b/browser/components/enterprisepolicies/Policies.sys.mjs
+index 8e53754b15..13bb90c635 100644
+--- a/browser/components/enterprisepolicies/Policies.sys.mjs
++++ b/browser/components/enterprisepolicies/Policies.sys.mjs
+@@ -374,15 +374,6 @@ export var Policies = {
+         manager.disallowFeature("profileManagement");
+       }
+     },
+-    onBeforeUIStartup(manager, param) {
+-      if (param) {
+-        blockAboutPage(manager, "about:profiles");
+-        blockAboutPage(manager, "about:profilemanager");
+-        blockAboutPage(manager, "about:editprofile");
+-        blockAboutPage(manager, "about:deleteprofile");
+-        blockAboutPage(manager, "about:newprofile");
+-      }
+-    },
+   },
+ 
+   BlockAboutSupport: {
+diff --git a/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_reset.js b/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_reset.js
+index 9637351cc4..a04cd63b58 100644
+--- a/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_reset.js
++++ b/browser/components/enterprisepolicies/tests/browser/browser_policy_disable_profile_reset.js
+@@ -5,21 +5,6 @@
+ let { ResetProfile } = ChromeUtils.importESModule(
+   "resource://gre/modules/ResetProfile.sys.mjs"
+ );
+-Services.scriptloader.loadSubScript(
+-  "chrome://mochitests/content/browser/browser/components/profiles/tests/browser/head.js",
+-  this
+-);
+-
+-// For this test to work properly, this profile actually needs to be
+-// "reset-able", which requires that it be recognized by the toolkit profile
+-// service or the SelectableProfileService.
+-add_setup(async function () {
+-  await initGroupDatabase();
+-  Assert.ok(
+-    SelectableProfileService.currentProfile,
+-    "Should have a profile now"
+-  );
+-});
+ 
+ async function test_reset_disabled({ disabled }) {
+   is(
+diff --git a/browser/components/migration/MigrationUtils.sys.mjs b/browser/components/migration/MigrationUtils.sys.mjs
+index 29bffa68ce..cec56dd578 100644
+--- a/browser/components/migration/MigrationUtils.sys.mjs
++++ b/browser/components/migration/MigrationUtils.sys.mjs
+@@ -43,10 +43,7 @@ function getL10n() {
+   return gL10n;
+ }
+ 
+-const FIREFOX_REFRESH_MIGRATOR_KEYS = new Set([
+-  "firefox",
+-  "firefox-selectable-profile",
+-]);
++const FIREFOX_REFRESH_MIGRATOR_KEYS = new Set(["firefox"]);
+ 
+ const MIGRATOR_MODULES = Object.freeze({
+   EdgeProfileMigrator: {
+@@ -57,10 +54,6 @@ const MIGRATOR_MODULES = Object.freeze({
+     moduleURI: "resource:///modules/FirefoxProfileMigrator.sys.mjs",
+     platforms: ["linux", "macosx", "win"],
+   },
+-  FirefoxSelectableProfileMigrator: {
+-    moduleURI: "resource:///modules/FirefoxSelectableProfileMigrator.sys.mjs",
+-    platforms: ["linux", "macosx", "win"],
+-  },
+   SafariProfileMigrator: {
+     moduleURI: "resource:///modules/SafariProfileMigrator.sys.mjs",
+     platforms: ["macosx"],
+diff --git a/browser/components/migration/moz.build b/browser/components/migration/moz.build
+index f1f0587060..a7815e0ebb 100644
+--- a/browser/components/migration/moz.build
++++ b/browser/components/migration/moz.build
+@@ -25,7 +25,6 @@ EXTRA_JS_MODULES += [
+     "ChromeProfileMigrator.sys.mjs",
+     "FileMigrators.sys.mjs",
+     "FirefoxProfileMigrator.sys.mjs",
+-    "FirefoxSelectableProfileMigrator.sys.mjs",
+     "InternalTestingProfileMigrator.sys.mjs",
+     "MigrationUtils.sys.mjs",
+     "MigratorBase.sys.mjs",
+diff --git a/browser/components/migration/tests/marionette/test_refresh_firefox.py b/browser/components/migration/tests/marionette/test_refresh_firefox.py
+index eb5587db2a..f3c2b1d10a 100644
+--- a/browser/components/migration/tests/marionette/test_refresh_firefox.py
++++ b/browser/components/migration/tests/marionette/test_refresh_firefox.py
+@@ -754,190 +754,3 @@ class TestFirefoxRefresh(MarionetteTestCase):
+         self.checkFxA()
+         self.checkSync(False)
+ 
+-
+-class TestSelectableProfileFirefoxRefresh(TestFirefoxRefresh):
+-    def runAsync(self, script, *args, **kwargs):
+-        wrappedScript = """
+-            let args = Array.from(arguments);
+-            let outerResolve = args.pop();
+-            (async () => {
+-                try {
+-                    let fn = async () => {
+-
+-            """
+-        wrappedScript += f"{script}"
+-        wrappedScript += """
+-
+-                    };
+-                    let innerResults = await fn(args);
+-                    if (!Array.isArray(innerResults)) {
+-                        innerResults = [innerResults];
+-                    }
+-                    innerResults.unshift("OK");
+-                    return innerResults;
+-                } catch(ex) {
+-                    return ["ERROR", ex.name, ex.message, ex.stack];
+-                }
+-            })().then(outerResolve);
+-        """
+-
+-        results = self.runAsyncCode(wrappedScript, *args, **kwargs)
+-        self.assertEqual("OK", results[0], "something went wrong: " + str(results))
+-        del results[0]
+-        return results
+-
+-    def check_selectable_profile_service(self):
+-        pref_value = self.runCode(
+-            """
+-            return Services.prefs.getStringPref("toolkit.profiles.storeID", null);
+-        """,
+-            script_args=(self.marionette.instance.profile.profile,),
+-        )
+-
+-        self.assertEqual(pref_value, self.storeID)
+-
+-        [profile_path, profile_name, storeID, profile_count, profile_id] = (
+-            self.runAsync(
+-                """
+-                let profileCount = (await SelectableProfileService.getAllProfiles()).length;
+-                let profile = SelectableProfileService.currentProfile;
+-
+-                return [profile.path, profile.name, SelectableProfileService.storeID, profileCount, profile.id];
+-            """,
+-                script_args=(self.marionette.instance.profile.profile,),
+-            )
+-        )
+-
+-        self.assertNotEqual(
+-            profile_path, self.profile_path
+-        )  # The path should be different after migration
+-        self.assertEqual(profile_name, self.profile_name)
+-        self.assertEqual(storeID, self.storeID)
+-        self.assertEqual(profile_count, self.profile_count)
+-        self.assertEqual(profile_id, self.profile_id)
+-
+-    def doReset(self):
+-        profileName = "marionette-test-profile-" + str(int(time.time() * 1000))
+-        cleanup = PendingCleanup(profileName)
+-
+-        self.runCode(
+-            """
+-          // Ensure the current (temporary) profile is in profiles.ini:
+-          let profD = Services.dirsvc.get("ProfD", Ci.nsIFile);
+-          let profileName = arguments[1];
+-          let myProfile = global.profSvc.createProfile(profD, profileName, "pre-reset");
+-          global.profSvc.flush()
+-
+-          // Now add the reset parameters:
+-          let prefsToKeep = Array.from(Services.prefs.getChildList("marionette."));
+-          // Add all the modified preferences set from geckoinstance.py to avoid
+-          // non-local connections.
+-          prefsToKeep = prefsToKeep.concat(JSON.parse(
+-              Services.env.get("MOZ_MARIONETTE_REQUIRED_PREFS")));
+-          let prefObj = {};
+-          for (let pref of prefsToKeep) {
+-            prefObj[pref] = global.Preferences.get(pref);
+-          }
+-          Services.env.set("MOZ_MARIONETTE_PREF_STATE_ACROSS_RESTARTS", JSON.stringify(prefObj));
+-        """,
+-            script_args=(
+-                self.marionette.instance.profile.profile,
+-                profileName,
+-            ),
+-        )
+-        # restart so we can create some profiles
+-        self.marionette.restart(clean=False, in_app=True)
+-
+-        [profile_path, profile_name, storeID, profile_count, profile_id] = (
+-            self.runAsync(
+-                """
+-                let newProfile = await SelectableProfileService.createNewProfile(false, null, "tests");
+-
+-                let profileCount = (await SelectableProfileService.getAllProfiles()).length;
+-
+-                let profile = SelectableProfileService.currentProfile;
+-
+-                return [profile.path, profile.name, SelectableProfileService.storeID, profileCount, profile.id];
+-        """,
+-                script_args=(self.marionette.instance.profile.profile,),
+-            )
+-        )
+-
+-        self.profile_path = profile_path
+-        self.profile_name = profile_name
+-        self.storeID = storeID
+-        self.profile_count = profile_count
+-        self.profile_id = profile_id
+-
+-        self.runCode(
+-            """
+-          Services.env.set("SELECTABLE_PROFILE_RESET_PATH", SelectableProfileService?.currentProfile.path);
+-          Services.env.set("SELECTABLE_PROFILE_RESET_STORE_ID", SelectableProfileService?.storeID);
+-          Services.env.set("MOZ_RESET_PROFILE_RESTART", "1");
+-          Services.env.set("XRE_PROFILE_PATH", arguments[0]);
+-        """,
+-            script_args=(
+-                self.marionette.instance.profile.profile,
+-                profileName,
+-            ),
+-        )
+-
+-        profileLeafName = os.path.basename(
+-            os.path.normpath(self.marionette.instance.profile.profile)
+-        )
+-
+-        # Now restart the browser to get it reset:
+-        self.marionette.restart(clean=False, in_app=True)
+-        self.setUpScriptData()
+-
+-        # Determine the new profile path (we'll need to remove it when we're done)
+-        [cleanup.reset_profile_path, cleanup.reset_profile_local_path] = self.runCode(
+-            """
+-          let profD = Services.dirsvc.get("ProfD", Ci.nsIFile);
+-          let localD = Services.dirsvc.get("ProfLD", Ci.nsIFile);
+-          return [profD.path, localD.path];
+-        """
+-        )
+-
+-        # Determine the backup path
+-        cleanup.desktop_backup_path = self.runCode(
+-            """
+-          let container;
+-          try {
+-            container = Services.dirsvc.get("Desk", Ci.nsIFile);
+-          } catch (ex) {
+-            container = Services.dirsvc.get("Home", Ci.nsIFile);
+-          }
+-          let bundle = Services.strings.createBundle("chrome://mozapps/locale/profile/profileSelection.properties");
+-          let dirName = bundle.formatStringFromName("resetBackupDirectory", [Services.appinfo.name]);
+-          container.append(dirName);
+-          container.append(arguments[0]);
+-          return container.path;
+-        """,  # NOQA: E501
+-            script_args=(profileLeafName,),
+-        )
+-
+-        self.assertTrue(
+-            os.path.isdir(cleanup.reset_profile_path),
+-            "Reset profile path should be present",
+-        )
+-        self.assertTrue(
+-            os.path.isdir(cleanup.desktop_backup_path),
+-            "Backup profile path should be present",
+-        )
+-        self.assertIn(cleanup.profile_name_to_remove, cleanup.reset_profile_path)
+-        return cleanup
+-
+-    def checkProfile(self, has_migrated=False, expect_sync_user=True):
+-        self.checkPassword()
+-        self.checkBookmarkInMenu()
+-        self.checkHistory()
+-        self.checkFormHistory()
+-        self.checkCookie()
+-        self.checkFxA()
+-        self.checkSync(expect_sync_user)
+-        if has_migrated:
+-            self.checkBookmarkToolbarVisibility()
+-            self.checkSession()
+-            self.checkStartupMigrationStateCleared()
+-            self.checkRefreshPromptDisabled()
+diff --git a/browser/components/moz.build b/browser/components/moz.build
+index a4fc6ee9be..eb9abdbcc2 100644
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -64,9 +64,6 @@ DIRS += [
+ 
+ DIRS += ["build"]
+ 
+-if CONFIG["MOZ_SELECTABLE_PROFILES"]:
+-    DIRS += ["profiles"]
+-
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+     DIRS += [
+         "installerprefs",
+diff --git a/browser/components/preferences/config/account-sync.mjs b/browser/components/preferences/config/account-sync.mjs
+index f97eef269c..ff59e390b5 100644
+--- a/browser/components/preferences/config/account-sync.mjs
++++ b/browser/components/preferences/config/account-sync.mjs
+@@ -27,8 +27,6 @@ const XPCOMUtils = ChromeUtils.importESModule(
+ ).XPCOMUtils;
+ const lazy = XPCOMUtils.declareLazy({
+   Weave: "resource://services-sync/main.sys.mjs",
+-  SelectableProfileService:
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+ });
+ 
+ Preferences.addAll([
+@@ -677,124 +675,6 @@ Preferences.addSetting({
+   },
+ });
+ 
+-// Profiles section
+-
+-Preferences.addSetting({
+-  id: "profilesPane",
+-  onUserClick(e) {
+-    e.preventDefault();
+-    window.gotoPref("paneProfiles");
+-  },
+-});
+-Preferences.addSetting({
+-  id: "profilesSettings",
+-  visible() {
+-    return lazy.SelectableProfileService.isEnabled;
+-  },
+-  onUserClick: e => {
+-    e.preventDefault();
+-    window.gotoPref("profiles");
+-  },
+-});
+-Preferences.addSetting({
+-  id: "manageProfiles",
+-  onUserClick: e => {
+-    e.preventDefault();
+-    // Using the existing function for now, since privacy.js also calls it
+-    window.gMainPane.manageProfiles();
+-  },
+-});
+-Preferences.addSetting({
+-  id: "copyProfile",
+-  deps: ["copyProfileSelect"],
+-  disabled: ({ copyProfileSelect }) => !copyProfileSelect.value,
+-  onUserClick: (e, { copyProfileSelect }) => {
+-    e.preventDefault();
+-    lazy.SelectableProfileService.getProfile(copyProfileSelect.value).then(
+-      profile => {
+-        profile?.copyProfile();
+-        copyProfileSelect.config.set("");
+-      }
+-    );
+-  },
+-});
+-Preferences.addSetting({
+-  id: "copyProfileBox",
+-  visible: () => lazy.SelectableProfileService.initialized,
+-});
+-Preferences.addSetting({
+-  id: "copyProfileError",
+-  _hasError: false,
+-  setup(emitChange) {
+-    this.emitChange = emitChange;
+-  },
+-  visible() {
+-    return this._hasError;
+-  },
+-  setError(value) {
+-    this._hasError = !!value;
+-    this.emitChange();
+-  },
+-});
+-Preferences.addSetting(
+-  class ProfileList extends Preferences.AsyncSetting {
+-    static id = "profileList";
+-    static PROFILE_UPDATED_OBS = "sps-profiles-updated";
+-    setup() {
+-      Services.obs.addObserver(
+-        this.emitChange,
+-        ProfileList.PROFILE_UPDATED_OBS
+-      );
+-      return () => {
+-        Services.obs.removeObserver(
+-          this.emitChange,
+-          ProfileList.PROFILE_UPDATED_OBS
+-        );
+-      };
+-    }
+-
+-    async get() {
+-      let profiles = await lazy.SelectableProfileService.getAllProfiles();
+-      return profiles;
+-    }
+-  }
+-);
+-Preferences.addSetting({
+-  id: "copyProfileSelect",
+-  deps: ["profileList"],
+-  _selectedProfile: null,
+-  setup(emitChange) {
+-    this.emitChange = emitChange;
+-    document.l10n
+-      .formatValue("preferences-copy-profile-select")
+-      .then(result => (this.placeholderString = result));
+-  },
+-  get() {
+-    return this._selectedProfile;
+-  },
+-  set(inputVal) {
+-    this._selectedProfile = inputVal;
+-    this.emitChange();
+-  },
+-  getControlConfig(config, { profileList }) {
+-    config.options = profileList.value.map(profile => {
+-      return { controlAttrs: { label: profile.name }, value: profile.id };
+-    });
+-
+-    // Put the placeholder at the front of the list.
+-    config.options.unshift({
+-      controlAttrs: { label: this.placeholderString },
+-      value: "",
+-    });
+-
+-    return config;
+-  },
+-});
+-Preferences.addSetting({
+-  id: "copyProfileHeader",
+-  visible: () => lazy.SelectableProfileService.initialized,
+-});
+-
+ let accountsEnabled = Services.prefs.getBoolPref("identity.fxaccounts.enabled");
+ 
+ SettingGroupManager.registerGroups({
+@@ -1044,63 +924,6 @@ SettingGroupManager.registerGroups({
+       },
+     ],
+   },
+-  profilePane: {
+-    headingLevel: 2,
+-    id: "browserProfilesGroupPane",
+-    l10nId: "preferences-profiles-subpane-description",
+-    supportPage: "profile-management",
+-    items: [
+-      {
+-        id: "manageProfiles",
+-        control: "moz-box-button",
+-        l10nId: "preferences-manage-profiles-button",
+-      },
+-      {
+-        id: "copyProfileHeader",
+-        l10nId: "preferences-copy-profile-header",
+-        headingLevel: 2,
+-        supportPage: "profile-management",
+-        control: "moz-fieldset",
+-        items: [
+-          {
+-            id: "copyProfileBox",
+-            l10nId: "preferences-profile-to-copy",
+-            control: "moz-box-item",
+-            items: [
+-              {
+-                id: "copyProfileSelect",
+-                control: "moz-select",
+-                slot: "actions",
+-              },
+-              {
+-                id: "copyProfile",
+-                l10nId: "preferences-copy-profile-button",
+-                control: "moz-button",
+-                slot: "actions",
+-                controlAttrs: {
+-                  type: "primary",
+-                },
+-              },
+-            ],
+-          },
+-        ],
+-      },
+-    ],
+-  },
+-  profiles: {
+-    id: "profilesGroup",
+-    l10nId: "preferences-profiles-section-header",
+-    headingLevel: 2,
+-    supportPage: "profile-management",
+-    items: [
+-      {
+-        id: "profilesSettings",
+-        loadPane: "profiles",
+-        control: "moz-box-button",
+-        l10nId: "preferences-profiles-settings-button",
+-      },
+-    ],
+-  },
+ });
+ 
+ document.addEventListener(
+diff --git a/browser/components/preferences/config/permissions-data.mjs b/browser/components/preferences/config/permissions-data.mjs
+index ee64e6cbff..65673e5b7b 100644
+--- a/browser/components/preferences/config/permissions-data.mjs
++++ b/browser/components/preferences/config/permissions-data.mjs
+@@ -11,8 +11,6 @@ const XPCOMUtils = ChromeUtils.importESModule(
+ 
+ const lazy = XPCOMUtils.declareLazy({
+   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
+-  SelectableProfileService:
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+   AlertsServiceDND: () => {
+     try {
+       let alertsService = Cc["@mozilla.org/alerts-service;1"]
+@@ -318,14 +316,6 @@ Preferences.addSetting({
+     };
+   },
+ });
+-Preferences.addSetting({
+-  id: "preferencesPrivacyProfiles",
+-  visible: () => lazy.SelectableProfileService.isEnabled,
+-});
+-Preferences.addSetting({
+-  id: "privacyProfilesLink",
+-  onUserClick: () => window.gMainPane.manageProfiles(),
+-});
+ Preferences.addSetting({
+   id: "telemetryContainer",
+   deps: ["submitHealthReportBox"],
+@@ -567,27 +557,6 @@ SettingGroupManager.registerGroups({
+               target: "_blank",
+             },
+           },
+-          {
+-            id: "preferencesPrivacyProfiles",
+-            control: "moz-message-bar",
+-            l10nId: "data-collection-preferences-across-profiles",
+-            controlAttrs: {
+-              role: "status",
+-            },
+-            items: [
+-              {
+-                id: "privacyProfilesLink",
+-                control: "a",
+-                l10nId: "data-collection-profiles-link",
+-                slot: "support-link",
+-                controlAttrs: {
+-                  id: "dataCollectionViewProfiles",
+-                  target: "_blank",
+-                  href: "",
+-                },
+-              },
+-            ],
+-          },
+           {
+             id: "telemetryContainer",
+             control: "moz-message-bar",
+diff --git a/browser/components/preferences/main.inc.xhtml b/browser/components/preferences/main.inc.xhtml
+index f6badc31b6..413a85ec76 100644
+--- a/browser/components/preferences/main.inc.xhtml
++++ b/browser/components/preferences/main.inc.xhtml
+@@ -30,9 +30,6 @@
+ <!-- Data migration -->
+ <html:setting-group groupid="importBrowserData" id="dataMigrationGroup" data-category="paneGeneral" hidden="true" data-srd-migrated="" />
+ 
+-<!-- Profiles -->
+-<html:setting-group id="profilesGroup" groupid="profiles" data-category="paneGeneral" hidden="true" data-srd-migrated="" />
+-
+ <!-- Tab preferences -->
+ <html:setting-group data-category="paneGeneral" hidden="true" groupid="tabs" data-srd-migrated="" />
+ 
+diff --git a/browser/components/preferences/main.js b/browser/components/preferences/main.js
+index b0c2c5aa91..e620d4364c 100644
+--- a/browser/components/preferences/main.js
++++ b/browser/components/preferences/main.js
+@@ -618,8 +618,6 @@ var gMainPane = {
+     initSettingGroup("startup");
+     initSettingGroup("importBrowserData");
+     initSettingGroup("tabs");
+-    initSettingGroup("profiles");
+-    initSettingGroup("profilePane");
+ 
+     setEventListener("manageBrowserLanguagesButton", "command", function () {
+       gMainPane.showBrowserLanguagesSubDialog({ search: false });
+@@ -1350,19 +1348,6 @@ var gMainPane = {
+     }
+   },
+ 
+-  /**
+-   *  Shows a window dialog containing the profile selector page.
+-   */
+-  manageProfiles() {
+-    const win = window.browsingContext.topChromeWindow;
+-
+-    win.toOpenWindowByType(
+-      "about:profilemanager",
+-      "about:profilemanager",
+-      "chrome,extrachrome,menubar,resizable,scrollbars,status,toolbar,centerscreen"
+-    );
+-  },
+-
+   /**
+    * Shows a dialog in which the preferred language for web content may be set.
+    */
+diff --git a/browser/components/preferences/preferences.js b/browser/components/preferences/preferences.js
+index 87b6703c37..59c2e5066a 100644
+--- a/browser/components/preferences/preferences.js
++++ b/browser/components/preferences/preferences.js
+@@ -312,11 +312,6 @@ const CONFIG_PANES = Object.freeze({
+     module: "chrome://browser/content/preferences/config/languages.mjs",
+     visible: () => srdSectionEnabled("languages"),
+   },
+-  profiles: {
+-    parent: srdSectionEnabled("sync") ? "sync" : "general",
+-    l10nId: "preferences-profiles-group-header",
+-    groupIds: ["profilePane"],
+-  },
+   permissionsData: {
+     l10nId: "permissions-data-section",
+     iconSrc: "chrome://browser/skin/permissions.svg",
+@@ -383,7 +378,6 @@ const CONFIG_PANES = Object.freeze({
+       "pageNavigation",
+       "media",
+       "performance",
+-      "profiles",
+     ],
+     module: "chrome://browser/content/preferences/config/account-sync.mjs",
+     replaces: "sync",
+diff --git a/browser/components/preferences/preferences.xhtml b/browser/components/preferences/preferences.xhtml
+index d7c1ee2bc8..1ea1598d1a 100644
+--- a/browser/components/preferences/preferences.xhtml
++++ b/browser/components/preferences/preferences.xhtml
+@@ -67,7 +67,6 @@
+   <link rel="localization" href="security/certificates/certManager.ftl"/>
+   <link rel="localization" href="security/certificates/deviceManager.ftl"/>
+   <link rel="localization" href="toolkit/updates/history.ftl"/>
+-  <link rel="localization" href="toolkit/global/profileSelection.ftl"/>
+ 
+   <link rel="shortcut icon" href="chrome://global/skin/icons/settings.svg"/>
+ 
+@@ -188,7 +187,6 @@
+       <!-- Hidden sub-page entries (CSS display:none via .hidden-category).
+            These keep gotoPref() routing working for sub-pages that are
+            navigated to from within other panes. -->
+-      <html:moz-page-nav-button class="hidden-category" view="paneProfiles"/>
+       <html:moz-page-nav-button class="hidden-category" view="paneTranslations"/>
+ 
+       <!-- Footer links -->
+diff --git a/browser/components/preferences/privacy.js b/browser/components/preferences/privacy.js
+index 93661cf253..682941a614 100644
+--- a/browser/components/preferences/privacy.js
++++ b/browser/components/preferences/privacy.js
+@@ -66,8 +66,6 @@ ChromeUtils.defineESModuleGetters(this, {
+   AppUpdater: "resource://gre/modules/AppUpdater.sys.mjs",
+   DoHConfigController: "moz-src:///toolkit/components/doh/DoHConfig.sys.mjs",
+   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
+-  SelectableProfileService:
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+ });
+ 
+ const SANITIZE_ON_SHUTDOWN_MAPPINGS = {
+diff --git a/browser/components/preferences/tests/browser_bug731866.js b/browser/components/preferences/tests/browser_bug731866.js
+index 86de2e2d8f..eb15c3ccd0 100644
+--- a/browser/components/preferences/tests/browser_bug731866.js
++++ b/browser/components/preferences/tests/browser_bug731866.js
+@@ -4,7 +4,6 @@
+ const browserContainersGroupDisabled = !SpecialPowers.getBoolPref(
+   "privacy.userContext.ui.enabled"
+ );
+-const profilesGroupDisabled = !SelectableProfileService.isEnabled;
+ const updatePrefContainers = ["updatesCategory", "updateApp"];
+ const updateContainersGroupDisabled =
+   AppConstants.platform === "win" &&
+@@ -46,12 +45,6 @@ function checkElements(expectedPane) {
+       continue;
+     }
+ 
+-    // Profiles is only enabled in Nightly by default (bug 1947633)
+-    if (element.id === "profilesGroup" && profilesGroupDisabled) {
+-      is_element_hidden(element, "Disabled profilesGroup should be hidden");
+-      continue;
+-    }
+-
+     if (element.getAttribute("data-hidden-from-search") == "true") {
+       is_element_hidden(element, "Hidden from search element should be hidden");
+       continue;
+diff --git a/browser/components/preferences/tests/sync/browser_account_sync_visibility.js b/browser/components/preferences/tests/sync/browser_account_sync_visibility.js
+index d5defe82df..9cf8c966e5 100644
+--- a/browser/components/preferences/tests/sync/browser_account_sync_visibility.js
++++ b/browser/components/preferences/tests/sync/browser_account_sync_visibility.js
+@@ -341,36 +341,3 @@ add_task(async function testImportSectionHiddenWhenBlocked() {
+   // Reset the policy so it doesn't leak into other tests.
+   await setupPolicyEngineWithJson("");
+ });
+-
+-// Profiles section visibility test. Additional visibility tests in
+-// browser/components/profiles/tests/browser/browser_preferences.js
+-add_task(async function testProfilesSettingsHiddenWhenDisabled() {
+-  let { SelectableProfileService } = ChromeUtils.importESModule(
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs"
+-  );
+-
+-  await SpecialPowers.pushPrefEnv({
+-    set: [["browser.profiles.enabled", false]],
+-  });
+-
+-  await SelectableProfileService.uninit();
+-  await SelectableProfileService.init();
+-
+-  await openPreferencesViaOpenPreferencesAPI("paneSync", {
+-    leaveOpen: true,
+-  });
+-  let doc = gBrowser.contentDocument;
+-
+-  ok(
+-    !SelectableProfileService.isEnabled,
+-    "SelectableProfileService should not be enabled"
+-  );
+-
+-  let profilesSettings = doc.getElementById("profilesSettings");
+-  ok(
+-    BrowserTestUtils.isHidden(profilesSettings),
+-    "Profiles settings button is hidden when SelectableProfileService is disabled."
+-  );
+-
+-  BrowserTestUtils.removeTab(gBrowser.selectedTab);
+-});
+diff --git a/browser/components/prompts/PromptCollection.sys.mjs b/browser/components/prompts/PromptCollection.sys.mjs
+index 847ccd6301..6277f0bb4d 100644
+--- a/browser/components/prompts/PromptCollection.sys.mjs
++++ b/browser/components/prompts/PromptCollection.sys.mjs
+@@ -2,12 +2,6 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+-const lazy = {};
+-ChromeUtils.defineESModuleGetters(lazy, {
+-  SelectableProfileService:
+-    "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+-});
+-
+ /**
+  * Implements nsIPromptCollection
+  *
+@@ -100,9 +94,6 @@ export class PromptCollection {
+     let originNoSuffix =
+       browsingContext.embedderElement?.contentPrincipal.originNoSuffix;
+     const isPDFjs = originNoSuffix === "resource://pdf.js";
+-    const isProfilePage =
+-      originNoSuffix === "about:newprofile" ||
+-      originNoSuffix === "about:editprofile";
+ 
+     let title, message, leaveLabel, stayLabel, buttonFlags;
+     let args = {
+@@ -128,28 +119,6 @@ export class PromptCollection {
+         args.useTitle = true;
+         args.headerIconCSSValue =
+           "url('chrome://branding/content/document_pdf.svg')";
+-      } else if (isProfilePage) {
+-        title = this.stringBundles.dom.GetStringFromName(
+-          "OnBeforeUnloadAboutNewProfileTitle"
+-        );
+-        let defaultName = lazy.SelectableProfileService.currentProfile.name;
+-        message = this.stringBundles.dom.formatStringFromName(
+-          "OnBeforeUnloadAboutNewProfileMessage",
+-          [defaultName]
+-        );
+-        leaveLabel = this.stringBundles.dom.GetStringFromName(
+-          "OnBeforeUnloadAboutNewProfileLeaveButton"
+-        );
+-        stayLabel = this.stringBundles.dom.GetStringFromName(
+-          "OnBeforeUnloadAboutNewProfileStayButton"
+-        );
+-        buttonFlags =
+-          Ci.nsIPromptService.BUTTON_POS_0_DEFAULT |
+-          (Ci.nsIPromptService.BUTTON_TITLE_IS_STRING *
+-            Ci.nsIPromptService.BUTTON_POS_0) |
+-          (Ci.nsIPromptService.BUTTON_TITLE_IS_STRING *
+-            Ci.nsIPromptService.BUTTON_POS_1);
+-        args.useTitle = true;
+       } else {
+         title = this.stringBundles.dom.GetStringFromName("OnBeforeUnloadTitle");
+         message = this.stringBundles.dom.GetStringFromName(
+@@ -208,21 +177,6 @@ export class PromptCollection {
+         actor.sendAsyncMessage("PDFJS:Save");
+         await savePdfPromise;
+       }
+-      return buttonNumClicked !== 1;
+-    } else if (isProfilePage) {
+-      if (buttonNumClicked === 0) {
+-        Services.prefs.setBoolPref(
+-          "browser.profiles.profile-name.updated",
+-          true
+-        );
+-      }
+-      let gleanFn =
+-        originNoSuffix === "about:newprofile"
+-          ? "profilesNew"
+-          : "profilesExisting";
+-      let value = buttonNumClicked === 0 ? "leave" : "cancel";
+-      Glean[gleanFn].alert.record({ value });
+-
+       return buttonNumClicked !== 1;
+     }
+ 
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index ccf1b5103d..0b42a01374 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -1518,13 +1518,8 @@
+       let isTemporaryPrivateWindow =
+         docElement.getAttribute("privatebrowsingmode") == "temporary";
+ 
+-      let profileIdentifier =
+-        SelectableProfileService?.isEnabled &&
+-        SelectableProfileService.getCachedProfileCount() > 1 &&
+-        SelectableProfileService.currentProfile?.name.replace(/\0/g, "");
+       // Note that empty/falsy bits get filtered below.
+-
+-      let parts = [contentTitle, profileIdentifier];
++      let parts = [contentTitle];
+ 
+       // On macOS PB windows, add the private window suffix if we have a content
+       // title. We'll add the brand name and private window suffix for all other
+diff --git a/browser/components/urlbar/tests/browser-engagementTelemetry/browser_glean_telemetry_engagement_tips.js b/browser/components/urlbar/tests/browser-engagementTelemetry/browser_glean_telemetry_engagement_tips.js
+index b0c46a0c93..eba2b8b40a 100644
+--- a/browser/components/urlbar/tests/browser-engagementTelemetry/browser_glean_telemetry_engagement_tips.js
++++ b/browser/components/urlbar/tests/browser-engagementTelemetry/browser_glean_telemetry_engagement_tips.js
+@@ -11,8 +11,6 @@ Services.scriptloader.loadSubScript(
+ );
+ 
+ add_setup(async function () {
+-  await makeProfileResettable();
+-
+   await SpecialPowers.pushPrefEnv({
+     set: [["browser.urlbar.scotchBonnet.enableOverride", false]],
+   });
+diff --git a/browser/components/urlbar/tests/browser-tips/browser_interventions.js b/browser/components/urlbar/tests/browser-tips/browser_interventions.js
+index 562de723e3..7f3da62343 100644
+--- a/browser/components/urlbar/tests/browser-tips/browser_interventions.js
++++ b/browser/components/urlbar/tests/browser-tips/browser_interventions.js
+@@ -10,7 +10,6 @@ ChromeUtils.defineESModuleGetters(this, {
+ 
+ add_setup(async function () {
+   Services.telemetry.clearEvents();
+-  await makeProfileResettable();
+ 
+   await SpecialPowers.pushPrefEnv({
+     set: [["browser.urlbar.scotchBonnet.enableOverride", false]],
+diff --git a/browser/components/urlbar/tests/browser-tips/browser_updateRefresh.js b/browser/components/urlbar/tests/browser-tips/browser_updateRefresh.js
+index ac023a9134..5657ff3cbb 100644
+--- a/browser/components/urlbar/tests/browser-tips/browser_updateRefresh.js
++++ b/browser/components/urlbar/tests/browser-tips/browser_updateRefresh.js
+@@ -28,8 +28,6 @@ add_task(async function test() {
+     set: [["browser.urlbar.suggest.quickactions", false]],
+   });
+ 
+-  await makeProfileResettable();
+-
+   // Set up the "no updates" update state.
+   await initUpdate(params);
+   UrlbarProviderInterventions.checkForBrowserUpdate(true);
+diff --git a/browser/components/urlbar/tests/browser-tips/head.js b/browser/components/urlbar/tests/browser-tips/head.js
+index 01512b3f22..bebf9a747c 100644
+--- a/browser/components/urlbar/tests/browser-tips/head.js
++++ b/browser/components/urlbar/tests/browser-tips/head.js
+@@ -12,10 +12,6 @@ Services.scriptloader.loadSubScript(
+   "chrome://mochitests/content/browser/toolkit/mozapps/update/tests/browser/head.js",
+   this
+ );
+-Services.scriptloader.loadSubScript(
+-  "chrome://mochitests/content/browser/browser/components/profiles/tests/browser/head.js",
+-  this
+-);
+ 
+ ChromeUtils.defineESModuleGetters(this, {
+   HttpServer: "resource://testing-common/httpd.sys.mjs",
+@@ -400,17 +396,6 @@ async function awaitAppRestartRequest() {
+   );
+ }
+ 
+-/**
+- * Sets up the profile so that it can be reset.
+- */
+-async function makeProfileResettable() {
+-  await initGroupDatabase();
+-  Assert.ok(
+-    SelectableProfileService.currentProfile,
+-    "Should have a profile now"
+-  );
+-}
+-
+ /**
+  * Starts a search that should trigger a tip, picks the tip, and waits for the
+  * tip's action to happen.
+diff --git a/browser/locales/en-US/browser/appmenu.ftl b/browser/locales/en-US/browser/appmenu.ftl
+index 2b6b487bce..17ece0edc5 100644
+--- a/browser/locales/en-US/browser/appmenu.ftl
++++ b/browser/locales/en-US/browser/appmenu.ftl
+@@ -324,17 +324,3 @@ appmenu-services-header = My services
+ # with their own vendor name, since these tools are created and maintained by
+ # Mozilla.
+ appmenu-other-protection-header2 = Try other protection tools from Mozilla:
+-
+-## Profiles panel
+-
+-appmenu-profiles-2 =
+-    .label = Profiles
+-appmenu-other-profiles = Other profiles
+-appmenu-manage-profiles =
+-    .label = Manage profiles
+-appmenu-copy-profile =
+-    .label = Copy this profile
+-appmenu-create-profile =
+-    .label = New profile
+-appmenu-edit-profile =
+-    .aria-label = Edit profile
+diff --git a/browser/locales/en-US/browser/menubar.ftl b/browser/locales/en-US/browser/menubar.ftl
+index e3f7cc5b09..0a6e00b522 100644
+--- a/browser/locales/en-US/browser/menubar.ftl
++++ b/browser/locales/en-US/browser/menubar.ftl
+@@ -237,20 +237,6 @@ menu-bookmarks-other =
+ menu-bookmarks-mobile =
+     .label = Mobile Bookmarks
+ 
+-## Profiles Menu
+-
+-menu-profiles-menu =
+-    .label = Profiles
+-    .accesskey = P
+-menu-profiles-manage-profiles =
+-    .label = Manage Profiles
+-menu-profiles-new-profile =
+-    .label = New Profile
+-# Variables:
+-#  $profileName (String): the name of the users profile
+-menu-profiles-current =
+-    .label = { $profileName } (current)
+-
+ ## Tools Menu
+ 
+ menu-tools =
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 298619cabb..da2645a455 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -206,32 +206,6 @@ preferences-data-export-all-button =
+     .label = Export all { -brand-short-name } data
+     .description = Workspaces, Favorites, history and settings from this device, unencrypted
+ 
+-preferences-profiles-group-header =
+-    .heading = Profiles
+-preferences-profiles-subpane-description =
+-    .description = Each profile has separate browsing data and settings, including history, passwords, and more.
+-preferences-profiles-section-header =
+-    .label = Profiles
+-    .description = Each profile has separate browsing data and settings, including history, passwords, and more.
+-preferences-manage-profiles-button =
+-  .label = Manage Profiles
+-preferences-profiles-settings-button =
+-  .label = Settings
+-# This string labels the entire copy profile section in the profiles sub-pane.
+-preferences-copy-profile-header =
+-    .label = Copy an existing profile
+-    .description = The new profile will copy your settings, add-ons, history, and saved data like bookmarks and passwords — but not your account or sync info.
+-# This string sits next to the copy controls, both the copy-profile-select
+-# drop-down and the copy-profile-button, so that the user understands they
+-# need to first pick a profile to copy, and then click the copy button.
+-preferences-profile-to-copy =
+-  .label = Profile to copy
+-# This string is a placeholder that will be shown in a drop-down list of
+-# profiles. The user will select a profile, then click the copy button
+-# to make a copy of that profile.
+-preferences-copy-profile-select = Select profile
+-preferences-copy-profile-button = Copy
+-
+ tabs-browsing-section =
+   .heading = Tabs and browsing
+ 
+@@ -1855,9 +1829,6 @@ data-collection =
+     .description = We strive to provide you with choices and collect only the minimal data necessary to improve { -brand-product-name } for everyone.
+     .searchkeywords = telemetry
+ data-collection-link = View Privacy Notice
+-data-collection-preferences-across-profiles =
+-    .message = These settings apply to every { -brand-product-name } profile on this device.
+-data-collection-profiles-link = View all profiles
+ data-collection-health-report-telemetry-disabled =
+     .message = You’re no longer allowing { -vendor-short-name } to capture technical and interaction data. All past data will be deleted within 30 days.
+ data-collection-health-report =
+diff --git a/browser/locales/en-US/browser/sync.ftl b/browser/locales/en-US/browser/sync.ftl
+index 187e26fa9c..1ad0ebad9f 100644
+--- a/browser/locales/en-US/browser/sync.ftl
++++ b/browser/locales/en-US/browser/sync.ftl
+@@ -82,48 +82,3 @@ sync-setup-verify-heading = Are you sure you want to sign in to sync?
+ # Variables:
+ #   $email - Email address of a user previously signed into sync.
+ sync-setup-verify-description = A different user was previously signed in to sync on this computer. Signing in will merge this browser’s bookmarks, passwords and other settings with { $email }
+-
+-## Sync warning strings that support the browser profiles feature, these will be shown when the user might be merging data
+-
+-# Dialog 1 - different account signing in without option to merge
+-sync-profile-different-account-title = Account limit reached for this profile
+-sync-profile-different-account-header = This profile was previously synced to a different account
+-
+-# Variables:
+-#   $acctEmail (String) - Email of the account signing into sync.
+-sync-profile-different-account-description = To keep your data organized and secure, each { -brand-product-name } profile can only be synced to one account. To sign in using { $acctEmail }, create a new profile.
+-
+-# Dialog 1 - different account signing in with merge option
+-sync-profile-different-account-title-merge = Profile synced to different account
+-
+-# Variables:
+-#   $acctEmail (String) - Email of the account signing into sync.
+-#   $profileName (String) - Name of the current profile
+-sync-profile-different-account-description-merge = To keep your data organized and secure, we recommend creating a new profile to sign in using { $acctEmail }. If you choose to continue to sync on this profile, data from both accounts will be permanently merged on “{ $profileName }”.
+-
+-# Dialog 2 - account signed in on another profile without option to merge
+-sync-account-in-use-header = Account already in use
+-
+-# Variables:
+-#   $acctEmail (String) - Email of the account signing into sync.
+-#   $otherProfile (String) - Name of the other profile that is associated with the account
+-sync-account-in-use-header-merge = { $acctEmail } is already signed in to the “{ $otherProfile }” profile
+-sync-account-in-use-description = You can only associate this account with one profile on this computer.
+-
+-# Dialog 2 - account signed in on another profile with merge option
+-sync-account-already-signed-in-header = This account is signed in to another profile. Sync both profiles?
+-
+-# Variables:
+-#   $acctEmail (String) - Email of the account signing into sync.
+-#   $currentProfile (String): Name of the current profile signing in
+-#   $otherProfile (String): Name of the profile that is already signed in
+-sync-account-in-use-description-merge = { $acctEmail } is signed in to the “{ $otherProfile }” profile on this computer. Syncing the “{ $currentProfile }” profile will permanently combine data from both profiles, such as passwords and bookmarks.
+-
+-# Variables:
+-#   $profileName (String) - Name of the profile to switch to
+-sync-button-switch-profile = Switch to “{ $profileName }”
+-sync-button-create-profile = Create a new profile
+-sync-button-sync-and-merge = Sync and merge data
+-# Variables:
+-#   $profileName (String) - Name of the profile to switch to
+-sync-button-sync-profile = Sync “{ $profileName }”
+diff --git a/browser/themes/shared/browser-shared.css b/browser/themes/shared/browser-shared.css
+index c62a543128..238acc089b 100644
+--- a/browser/themes/shared/browser-shared.css
++++ b/browser/themes/shared/browser-shared.css
+@@ -479,20 +479,6 @@ body {
+   display: none;
+ }
+ 
+-/* Profiles menu */
+-
+-#menu_newProfile {
+-  --menuitem-icon: url(chrome://global/skin/icons/plus.svg);
+-}
+-
+-.menuitem-iconic-profile {
+-  --menuitem-icon-fill: var(--menu-profiles-theme-bg);
+-  -moz-context-properties: fill, stroke;
+-  /* Theme variables don't need to use design system colors. */
+-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+-  stroke: var(--menu-profiles-theme-fg);
+-}
+-
+ /* Navigation toolbar */
+ 
+ #nav-bar {
+diff --git a/browser/themes/shared/customizableui/panelUI-shared.css b/browser/themes/shared/customizableui/panelUI-shared.css
+index 0930d6a849..2306b75663 100644
+--- a/browser/themes/shared/customizableui/panelUI-shared.css
++++ b/browser/themes/shared/customizableui/panelUI-shared.css
+@@ -1231,21 +1231,6 @@ panelview .toolbarbutton-1,
+   }
+ }
+ 
+-#appMenu-profiles-button,
+-#PanelUI-fxa-menu-profiles-button {
+-  justify-content: space-between;
+-}
+-
+-/* Set the --appmenu-profiles-theme-bg and --appmenu-profiles-theme-fg
+- * variables inline on the toolbarbutton */
+-#appMenu-profiles-button.subviewbutton-iconic > .toolbarbutton-icon,
+-#PanelUI-fxa-menu-profiles-button.subviewbutton-iconic > .toolbarbutton-icon,
+-.subviewbutton-iconic.profile-item > .toolbarbutton-icon {
+-  -moz-context-properties: fill, stroke;
+-  fill: var(--appmenu-profiles-theme-bg);
+-  stroke: var(--appmenu-profiles-theme-fg);
+-}
+-
+ /* Adjust the Zoom toolbaritem padding to have its height the same as other toolbarbuttons,
+  * also in compact density and touch mode. */
+ #appMenu-zoom-controls {
+@@ -2078,72 +2063,6 @@ radiogroup:focus-visible > .subviewradio[focused="true"] {
+   position: relative;
+ }
+ 
+-/* ----- Profiles panels ----- */
+-
+-#profiles-header-content {
+-  max-width: 16em;
+-  white-space: nowrap;
+-  overflow: hidden;
+-  text-overflow: ellipsis;
+-}
+-
+-#profiles-edit-this-profile-button {
+-  list-style-image: url("chrome://global/skin/icons/edit-outline.svg");
+-  padding: var(--panel-header-back-icon-padding);
+-  margin: 0;
+-}
+-
+-#profiles-edit-this-profile-button > .toolbarbutton-text {
+-  display: none;
+-}
+-
+-#profiles-copy-profile-button {
+-  list-style-image: url("chrome://global/skin/icons/edit-copy.svg");
+-}
+-
+-#profiles-create-profile-button {
+-  list-style-image: url("chrome://global/skin/icons/plus.svg");
+-}
+-
+-#profile-icon-image {
+-  width: 90px;
+-  height: 90px;
+-  -moz-context-properties: fill, stroke;
+-  fill: var(--appmenu-profiles-theme-bg);
+-  stroke: var(--appmenu-profiles-theme-fg);
+-  border: 4px solid var(--panel-background-color);
+-  border-radius: var(--border-radius-circle);
+-}
+-
+-#current-profile {
+-  align-items: center;
+-  gap: var(--space-small);
+-  position: relative;
+-}
+-
+-#half-height-profile {
+-  background: var(--appmenu-profiles-theme-bg);
+-  width: 100%;
+-  height: 50%;
+-  z-index: -1;
+-  position: absolute;
+-  top: 0;
+-  border-block-end: 1px solid var(--card-border-color);
+-}
+-
+-#PanelUI-profiles > .panel-subview-body {
+-  padding-block-start: 0;
+-}
+-
+-/* ----- Profiles FxA panel ----- */
+-
+-/* Special case: hide the profiles menuitem if the FxA/Sync panel is shown as
+- * a submenu of the app menu, rather than anchored to the FxA/Sync toolbar
+- * button. */
+-#appMenu-popup panelmultiview[mainViewId="appMenu-mainView"] #PanelUI-fxa-menu-profiles-button {
+-  display: none;
+-}
+-
+ /* ----- Content Analysis indicator panel ----- */
+ 
+ #content-analysis-panel-container {
+diff --git a/dom/locales/en-US/chrome/dom/dom.properties b/dom/locales/en-US/chrome/dom/dom.properties
+index 762927adf0..4954f0a32c 100644
+--- a/dom/locales/en-US/chrome/dom/dom.properties
++++ b/dom/locales/en-US/chrome/dom/dom.properties
+@@ -24,11 +24,6 @@ OnBeforeUnloadStayButton=Stay on page
+ OnBeforeUnloadLeaveButton=Leave page
+ OnBeforeUnloadPDFjsTitle=Save PDF before leaving?
+ OnBeforeUnloadPDFjsMessage=Save this document to avoid losing your changes.
+-OnBeforeUnloadAboutNewProfileTitle=Leave without naming this profile?
+-# LOCALIZATION NOTE (OnBeforeUnloadAboutNewProfileMessage): %S is the default name of the profile, for example, "Profile 2".
+-OnBeforeUnloadAboutNewProfileMessage=If you leave now, this profile will be named %S. You can change this later.
+-OnBeforeUnloadAboutNewProfileLeaveButton=Leave
+-OnBeforeUnloadAboutNewProfileStayButton=Cancel
+ EmptyGetElementByIdParam=Empty string passed to getElementById().
+ SpeculationFailed2=An unbalanced tree was written using document.write() causing data from the network to be reparsed. More information: https://developer.mozilla.org/en-US/docs/Glossary/speculative_parsing
+ DocumentWriteIgnored=A call to document.write() from an asynchronously-loaded external script was ignored.
+diff --git a/eslint-file-globals.config.mjs b/eslint-file-globals.config.mjs
+index 1c259edaa8..317e2e56c7 100644
+--- a/eslint-file-globals.config.mjs
++++ b/eslint-file-globals.config.mjs
+@@ -98,7 +98,6 @@ export default [
+       "browser/base/content/browser-menubar.js",
+       "browser/base/content/browser-pagestyle.js",
+       "browser/base/content/browser-places.js",
+-      "browser/base/content/browser-profiles.js",
+       "browser/base/content/browser-safebrowsing.js",
+       "browser/base/content/browser-siteIdentity.js",
+       "browser/base/content/browser-sitePermissionPanel.js",
+@@ -361,9 +360,6 @@ export default [
+       "browser/base/content/aboutRestartRequired.js",
+       "browser/base/content/aboutTabCrashed.js",
+       "browser/components/customkeys/content/customkeys.js",
+-      "browser/components/profiles/content/delete-profile-card.mjs",
+-      "browser/components/profiles/content/edit-profile-card.mjs",
+-      "browser/components/profiles/content/new-profile-card.mjs",
+       "browser/components/protections/content/lockwise-card.mjs",
+       "browser/components/protections/content/monitor-card.mjs",
+       "browser/components/protections/content/protections.mjs",
+diff --git a/eslint-rollouts.config.mjs b/eslint-rollouts.config.mjs
+index 03a3cb5e5d..2d84d9b955 100644
+--- a/eslint-rollouts.config.mjs
++++ b/eslint-rollouts.config.mjs
+@@ -312,7 +312,6 @@ export default [
+       "browser/components/originattributes/test/browser/**",
+       "browser/components/preferences/**",
+       "browser/components/privatebrowsing/**",
+-      "browser/components/profiles/Profiles**",
+       "browser/components/protections/content/*card.mjs",
+       "browser/components/protocolhandler/WebProtocolHandlerRegistrar.sys.mjs",
+       "browser/components/resistfingerprinting/test/browser/head.js",
+@@ -428,7 +427,6 @@ export default [
+       "toolkit/mozapps/extensions/**",
+       "toolkit/mozapps/handling/**",
+       "toolkit/mozapps/update/**",
+-      "toolkit/profile/content/profileSelection.js",
+       "toolkit/profile/test/xpcshell/head.js",
+       "toolkit/profile/test/chrome/test_create_profile.xhtml",
+       "toolkit/themes/shared/design-system/config/tokens-config.js",
+diff --git a/services/fxaccounts/FxAccountsWebChannel.sys.mjs b/services/fxaccounts/FxAccountsWebChannel.sys.mjs
+index 9590673014..cb4730117f 100644
+--- a/services/fxaccounts/FxAccountsWebChannel.sys.mjs
++++ b/services/fxaccounts/FxAccountsWebChannel.sys.mjs
+@@ -52,16 +52,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   Weave: "resource://services-sync/main.sys.mjs",
+   WebChannel: "resource://gre/modules/WebChannel.sys.mjs",
+ });
+-ChromeUtils.defineLazyGetter(lazy, "SelectableProfileService", () => {
+-  try {
+-    // Only available in Firefox.
+-    return ChromeUtils.importESModule(
+-      "resource:///modules/profiles/SelectableProfileService.sys.mjs"
+-    ).SelectableProfileService;
+-  } catch (ex) {
+-    return null;
+-  }
+-});
+ ChromeUtils.defineLazyGetter(lazy, "fxAccounts", () => {
+   return ChromeUtils.importESModule(
+     "resource://gre/modules/FxAccounts.sys.mjs"
+@@ -95,13 +85,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
+   val => Services.io.newURI(val)
+ );
+ 
+-XPCOMUtils.defineLazyPreferenceGetter(
+-  lazy,
+-  "allowSyncMerge",
+-  "browser.profiles.sync.allow-danger-merge",
+-  false
+-);
+-
+ ChromeUtils.defineLazyGetter(lazy, "l10n", function () {
+   return new Localization(["browser/sync.ftl", "branding/brand.ftl"], true);
+ });
+@@ -319,51 +302,14 @@ FxAccountsWebChannel.prototype = {
+         );
+         break;
+       case COMMAND_CAN_LINK_ACCOUNT:
+-        {
+-          let response = { command, messageId: message.messageId };
+-          // If browser profiles are not enabled, then we use the old merge sync dialog
+-          if (!this._helpers._selectableProfilesEnabled()) {
+-            response.data = { ok: this._helpers.shouldAllowRelink(data) };
+-            this._channel.send(response, sendingContext);
+-            break;
+-          }
+-          // In the new sync warning, we give users a few more options to
+-          // control what they want to do with their sync data
+-          let result =
+-            await this._helpers.promptProfileSyncWarningIfNeeded(data);
+-          switch (result.action) {
+-            case "create-profile":
+-              lazy.SelectableProfileService.createNewProfile(
+-                true,
+-                null,
+-                "sync-warning"
+-              );
+-              response.data = { ok: false };
+-              break;
+-            case "switch-profile":
+-              lazy.SelectableProfileService.launchInstance(result.data);
+-              response.data = { ok: false };
+-              break;
+-            // Either no warning was shown, or user selected the continue option
+-            // to link the account
+-            case "continue":
+-              response.data = { ok: true };
+-              break;
+-            case "cancel":
+-              response.data = { ok: false };
+-              break;
+-            default:
+-              log.error(
+-                "Invalid FxAccountsWebChannel dialog response: ",
+-                result.action
+-              );
+-              response.data = { ok: false };
+-              break;
+-          }
+-          log.debug("FxAccountsWebChannel response", response);
+-          // Send the response based on what the user selected above
+-          this._channel.send(response, sendingContext);
+-        }
++        this._channel.send(
++          {
++            command,
++            messageId: message.messageId,
++            data: { ok: this._helpers.shouldAllowRelink(data) },
++          },
++          sendingContext
++        );
+         break;
+       case COMMAND_SYNC_PREFERENCES:
+         this._helpers.openSyncPreferences(browser, data.entryPoint);
+@@ -552,29 +498,6 @@ FxAccountsWebChannelHelpers.prototype = {
+     );
+   },
+ 
+-  /**
+-   * Checks if the user is potentially hitting an issue with the current
+-   * account they're logging into. Returns the choice of the user if shown
+-   *
+-   * @returns {string} - The corresponding option the user pressed. Can be either:
+-   * cancel, continue, switch-profile, or create-profile
+-   */
+-  async promptProfileSyncWarningIfNeeded(acctData) {
+-    // Was a previous account signed into this profile or is there another profile currently signed in
+-    // to the account we're signing into
+-    let profileLinkedWithAcct = acctData.uid
+-      ? await this._getProfileAssociatedWithAcct(acctData.uid)
+-      : null;
+-    if (this._needRelinkWarning(acctData) || profileLinkedWithAcct) {
+-      return this._promptForProfileSyncWarning(
+-        acctData.email,
+-        profileLinkedWithAcct
+-      );
+-    }
+-    // The user has no warnings needed and can continue signing in
+-    return { action: "continue" };
+-  },
+-
+   async _initializeSync() {
+     // A sync-specific hack - we want to ensure sync has been initialized
+     // before we set the signed-in user.
+@@ -1043,68 +966,6 @@ FxAccountsWebChannelHelpers.prototype = {
+     );
+   },
+ 
+-  // Does this install have multiple profiles available? The SelectableProfileService
+-  // being enabled isn't enough, because this doesn't tell us whether a new profile
+-  // as actually created!
+-  _selectableProfilesEnabled() {
+-    return (
+-      lazy.SelectableProfileService?.isEnabled &&
+-      lazy.SelectableProfileService?.hasCreatedSelectableProfiles()
+-    );
+-  },
+-
+-  // Get the current name of the profile the user is currently on
+-  _getCurrentProfileName() {
+-    return lazy.SelectableProfileService?.currentProfile?.name;
+-  },
+-
+-  async _getAllProfiles() {
+-    return await lazy.SelectableProfileService.getAllProfiles();
+-  },
+-
+-  /**
+-   * Checks if a profile is associated with the given account email.
+-   *
+-   * @param {string} acctUid - The uid of the account to check.
+-   * @returns {Promise<SelectableProfile|null>} - The profile associated with the account, or null if none.
+-   */
+-  async _getProfileAssociatedWithAcct(acctUid) {
+-    let profiles = await this._getAllProfiles();
+-    let currentProfileName = await this._getCurrentProfileName();
+-    for (let profile of profiles) {
+-      if (profile.name === currentProfileName) {
+-        continue; // Skip current profile
+-      }
+-
+-      let profilePath = profile.path;
+-      let signedInUserPath = PathUtils.join(profilePath, "signedInUser.json");
+-      let signedInUser = await this._readJSONFileAsync(signedInUserPath);
+-      if (
+-        signedInUser?.accountData &&
+-        signedInUser.accountData.uid === acctUid
+-      ) {
+-        // The account is signed into another profile
+-        return profile;
+-      }
+-    }
+-    return null;
+-  },
+-
+-  async _readJSONFileAsync(filePath) {
+-    try {
+-      let data = await IOUtils.readJSON(filePath);
+-      if (data && data.version !== 1) {
+-        throw new Error(
+-          `Unsupported signedInUser.json version: ${data.version}`
+-        );
+-      }
+-      return data;
+-    } catch (e) {
+-      // File not found or error reading/parsing
+-      return null;
+-    }
+-  },
+-
+   /**
+    * Show the user a warning dialog that the data from the previous account
+    * and the new account will be merged. _promptForSyncWarning should be
+@@ -1146,216 +1007,13 @@ FxAccountsWebChannelHelpers.prototype = {
+     );
+     this.emitSyncWarningDialogTelemetry(
+       { 0: "continue", 1: "cancel" },
+-      pressed,
+-      false // old dialog doesn't have other profiles
++      pressed
+     );
+     return pressed === 0; // 0 is the "continue" button
+   },
+ 
+-  /**
+-   * Similar to _promptForRelink but more offers more contextual warnings
+-   * to the user to support browser profiles.
+-   *
+-   * @returns {string} - The corresponding option the user pressed. Can be either:
+-   * cancel, continue, switch-profile, or create-profile
+-   */
+-  _promptForProfileSyncWarning(acctEmail, profileLinkedWithAcct) {
+-    let currentProfile = this._getCurrentProfileName();
+-    let title, heading, description, mergeLabel, switchLabel;
+-    if (profileLinkedWithAcct) {
+-      [title, heading, description, mergeLabel, switchLabel] =
+-        lazy.l10n.formatValuesSync([
+-          { id: "sync-account-in-use-header" },
+-          {
+-            id: lazy.allowSyncMerge
+-              ? "sync-account-already-signed-in-header"
+-              : "sync-account-in-use-header-merge",
+-            args: {
+-              acctEmail,
+-              otherProfile: profileLinkedWithAcct.name,
+-            },
+-          },
+-          {
+-            id: lazy.allowSyncMerge
+-              ? "sync-account-in-use-description-merge"
+-              : "sync-account-in-use-description",
+-            args: {
+-              acctEmail,
+-              currentProfile,
+-              otherProfile: profileLinkedWithAcct.name,
+-            },
+-          },
+-          {
+-            id: "sync-button-sync-profile",
+-            args: { profileName: currentProfile },
+-          },
+-          {
+-            id: "sync-button-switch-profile",
+-            args: { profileName: profileLinkedWithAcct.name },
+-          },
+-        ]);
+-    } else {
+-      // This current profile was previously associated with a different account
+-      [title, heading, description, mergeLabel, switchLabel] =
+-        lazy.l10n.formatValuesSync([
+-          {
+-            id: lazy.allowSyncMerge
+-              ? "sync-profile-different-account-title-merge"
+-              : "sync-profile-different-account-title",
+-          },
+-          {
+-            id: "sync-profile-different-account-header",
+-          },
+-          {
+-            id: lazy.allowSyncMerge
+-              ? "sync-profile-different-account-description-merge"
+-              : "sync-profile-different-account-description",
+-            args: {
+-              acctEmail,
+-              profileName: currentProfile,
+-            },
+-          },
+-          { id: "sync-button-sync-and-merge" },
+-          { id: "sync-button-create-profile" },
+-        ]);
+-    }
+-    let result = this.showWarningPrompt({
+-      title,
+-      body: `${heading}\n\n${description}`,
+-      btnLabel1: lazy.allowSyncMerge ? mergeLabel : switchLabel,
+-      btnLabel2: lazy.allowSyncMerge ? switchLabel : null,
+-      isAccountLoggedIntoAnotherProfile: !!profileLinkedWithAcct,
+-    });
+-
+-    // If the user chose to switch profiles, return the associated profile as well.
+-    if (result === "switch-profile") {
+-      return { action: result, data: profileLinkedWithAcct };
+-    }
+-
+-    // For all other actions, just return the action name.
+-    return { action: result };
+-  },
+-
+-  /**
+-   * Shows the user a warning prompt.
+-   *
+-   * @returns {string} - The corresponding option the user pressed. Can be either:
+-   * cancel, continue, switch-profile, or create-profile
+-   */
+-  showWarningPrompt({
+-    title,
+-    body,
+-    btnLabel1,
+-    btnLabel2,
+-    isAccountLoggedIntoAnotherProfile,
+-  }) {
+-    let ps = Services.prompt;
+-    let buttonFlags;
+-    let pressed;
+-    let actionMap = {};
+-
+-    if (lazy.allowSyncMerge) {
+-      // Merge allowed: two options + cancel
+-      buttonFlags =
+-        ps.BUTTON_POS_0 * ps.BUTTON_TITLE_IS_STRING +
+-        ps.BUTTON_POS_1 * ps.BUTTON_TITLE_IS_STRING +
+-        ps.BUTTON_POS_2 * ps.BUTTON_TITLE_CANCEL +
+-        ps.BUTTON_POS_2_DEFAULT;
+-
+-      // Define action map based on context
+-      if (isAccountLoggedIntoAnotherProfile) {
+-        // Account is associated with another profile
+-        actionMap = {
+-          0: "continue", // merge option
+-          1: "switch-profile",
+-          2: "cancel",
+-        };
+-      } else {
+-        // Profile was previously logged in with another account
+-        actionMap = {
+-          0: "continue", // merge option
+-          1: "create-profile",
+-          2: "cancel",
+-        };
+-      }
+-
+-      // Show the prompt
+-      pressed = ps.confirmEx(
+-        null,
+-        title,
+-        body,
+-        buttonFlags,
+-        btnLabel1,
+-        btnLabel2,
+-        null,
+-        null,
+-        {}
+-      );
+-    } else {
+-      // Merge not allowed: one option + cancel
+-      buttonFlags =
+-        ps.BUTTON_POS_0 * ps.BUTTON_TITLE_IS_STRING +
+-        ps.BUTTON_POS_1 * ps.BUTTON_TITLE_CANCEL +
+-        ps.BUTTON_POS_1_DEFAULT;
+-
+-      // Define action map based on context
+-      if (isAccountLoggedIntoAnotherProfile) {
+-        // Account is associated with another profile
+-        actionMap = {
+-          0: "switch-profile",
+-          1: "cancel",
+-        };
+-      } else {
+-        // Profile was previously logged in with another account
+-        actionMap = {
+-          0: "create-profile",
+-          1: "cancel",
+-        };
+-      }
+-
+-      // Show the prompt
+-      pressed = ps.confirmEx(
+-        null,
+-        title,
+-        body,
+-        buttonFlags,
+-        btnLabel1,
+-        null,
+-        null,
+-        null,
+-        {}
+-      );
+-    }
+-
+-    this.emitSyncWarningDialogTelemetry(
+-      actionMap,
+-      pressed,
+-      isAccountLoggedIntoAnotherProfile
+-    );
+-    return actionMap[pressed] || "unknown";
+-  },
+-
+-  emitSyncWarningDialogTelemetry(
+-    actionMap,
+-    pressed,
+-    isAccountLoggedIntoAnotherProfile
+-  ) {
+-    let variant;
+-
+-    if (!this._selectableProfilesEnabled()) {
+-      // Old merge dialog
+-      variant = "old-merge";
+-    } else if (isAccountLoggedIntoAnotherProfile) {
+-      // Sync warning dialog for profile already associated
+-      variant = lazy.allowSyncMerge
+-        ? "sync-warning-allow-merge"
+-        : "sync-warning";
+-    } else {
+-      // Sync warning dialog for a different account previously logged in
+-      variant = lazy.allowSyncMerge
+-        ? "merge-warning-allow-merge"
+-        : "merge-warning";
+-    }
++  emitSyncWarningDialogTelemetry(actionMap, pressed) {
++    let variant = "old-merge";
+ 
+     // Telemetry extra options
+     let extraOptions = {
+diff --git a/services/fxaccounts/tests/xpcshell/xpcshell.toml b/services/fxaccounts/tests/xpcshell/xpcshell.toml
+index 46b8c55e4d..6293e023cb 100644
+--- a/services/fxaccounts/tests/xpcshell/xpcshell.toml
++++ b/services/fxaccounts/tests/xpcshell/xpcshell.toml
+@@ -53,11 +53,6 @@ skip-if = [
+ 
+ ["test_storage_manager.js"]
+ 
+-["test_sync_warning_dialogs.js"]
+-skip-if = [
+-  "appname == 'thunderbird'",
+-]
+-
+ ["test_telemetry.js"]
+ 
+ ["test_web_channel.js"]
+diff --git a/stylelint-rollouts.config.js b/stylelint-rollouts.config.js
+index e427ce329d..18e93f7f7b 100644
+--- a/stylelint-rollouts.config.js
++++ b/stylelint-rollouts.config.js
+@@ -37,13 +37,6 @@ module.exports = [
+       "browser/components/preferences/widgets/placeholder-message/placeholder-message.css",
+       "browser/components/preferences/widgets/security-privacy/security-privacy-card/security-privacy-card.css",
+       "browser/components/preferences/widgets/sync-engine-list/sync-engines-list.css",
+-      "browser/components/profiles/content/avatar.css",
+-      "browser/components/profiles/content/edit-profile-card.css",
+-      "browser/components/profiles/content/profile-avatar-selector.css",
+-      "browser/components/profiles/content/profile-card.css",
+-      "browser/components/profiles/content/profile-selector.css",
+-      "browser/components/profiles/content/profiles-pages.css",
+-      "browser/components/profiles/content/profiles-theme-card.css",
+       "browser/components/protections/content/privacy-metrics-card.css",
+       "browser/components/protections/content/protections.css",
+       "browser/components/screenshots/overlay/overlay.css",
+@@ -230,7 +223,6 @@ module.exports = [
+       "toolkit/themes/shared/aboutLicense.css",
+       "toolkit/themes/shared/aboutNetError.css",
+       "toolkit/themes/shared/aboutNetworking.css",
+-      "toolkit/themes/shared/aboutProfiles.css",
+       "toolkit/themes/shared/aboutReader.css",
+       "toolkit/themes/shared/aboutServiceWorkers.css",
+       "toolkit/themes/shared/aboutSupport.css",
+@@ -250,7 +242,6 @@ module.exports = [
+       "toolkit/themes/shared/pictureinpicture/player.css",
+       "toolkit/themes/shared/pictureinpicture/texttracks.css",
+       "toolkit/themes/shared/profileDowngrade.css",
+-      "toolkit/themes/shared/profileSelection.css",
+       "toolkit/themes/shared/radio.css",
+       "toolkit/themes/shared/splitter.css",
+       "toolkit/themes/shared/tabbox.css",
+diff --git a/toolkit/components/glean/metrics_index.py b/toolkit/components/glean/metrics_index.py
+index e7d69a48c8..911ef2b137 100644
+--- a/toolkit/components/glean/metrics_index.py
++++ b/toolkit/components/glean/metrics_index.py
+@@ -122,7 +122,6 @@ firefox_desktop_metrics = [
+     "browser/components/migration/metrics.yaml",
+     "browser/components/places/metrics.yaml",
+     "browser/components/preferences/metrics.yaml",
+-    "browser/components/profiles/metrics.yaml",
+     "browser/components/protections/metrics.yaml",
+     "browser/components/protocolhandler/metrics.yaml",
+     "browser/components/screenshots/metrics.yaml",
+@@ -201,7 +200,6 @@ gecko_pings = [
+ # Pings that are sent by Firefox Desktop.
+ # Order is lexicographical, enforced by t/c/glean/tests/pytest/test_yaml_indices.py
+ firefox_desktop_pings = [
+-    "browser/components/profiles/pings.yaml",
+     "browser/components/search/pings.yaml",
+     "browser/components/urlbar/pings.yaml",
+     "browser/modules/pings.yaml",
+diff --git a/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs b/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
+index df1d2b8b7d..75f8e46254 100644
+--- a/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
++++ b/toolkit/components/nimbus/lib/TargetingContextRecorder.sys.mjs
+@@ -157,7 +157,6 @@ export const ATTRIBUTE_TRANSFORMS = Object.freeze({
+   ),
+   primaryResolution: pick("height", "width"),
+   profileAgeCreated: typeAssertions.quantity,
+-  profileGroupProfileCount: typeAssertions.quantity,
+   region: typeAssertions.string,
+   totalBookmarksCount: typeAssertions.quantity,
+   userMonthlyActivity: userMonthlyActivity =>
+@@ -221,7 +220,6 @@ export const PREFS = Object.freeze({
+   "browser.newtabpage.activity-stream.showSearch": PREF_BOOL,
+   "browser.newtabpage.activity-stream.showSponsoredTopSites": PREF_BOOL,
+   "browser.newtabpage.enabled": PREF_BOOL,
+-  "browser.profiles.created": PREF_BOOL,
+   "browser.startup.page": PREF_INT,
+   "browser.toolbars.bookmarks.visibility": PREF_STRING,
+   "browser.urlbar.lastUrlbarSearchSeconds": PREF_INT,
+diff --git a/toolkit/components/nimbus/metrics.yaml b/toolkit/components/nimbus/metrics.yaml
+index 7608545d14..853c7d6644 100644
+--- a/toolkit/components/nimbus/metrics.yaml
++++ b/toolkit/components/nimbus/metrics.yaml
+@@ -89,7 +89,6 @@ nimbus_targeting_environment:
+       - "browser.newtabpage.activity-stream.showSearch"
+       - "browser.newtabpage.activity-stream.showSponsoredTopSites"
+       - "browser.newtabpage.enabled"
+-      - "browser.profiles.created"
+       - "browser.startup.page"
+       - "browser.toolbars.bookmarks.visibility"
+       - "browser.urlbar.lastUrlbarSearchSeconds"
+@@ -147,7 +146,6 @@ nimbus_targeting_environment:
+       - "os"
+       - "primaryResolution"
+       - "profileAgeCreated"
+-      - "profileGroupProfileCount"
+       - "region"
+       - "totalBookmarksCount"
+       - "userMonthlyActivity"
+diff --git a/toolkit/components/nimbus/test/unit/head.js b/toolkit/components/nimbus/test/unit/head.js
+index 395308b15c..a124289944 100644
+--- a/toolkit/components/nimbus/test/unit/head.js
++++ b/toolkit/components/nimbus/test/unit/head.js
+@@ -3,7 +3,6 @@
+ /** @import {ExperimentManager, OptInEntry} from "../../lib/ExperimentManager.sys.mjs" */
+ 
+ /* import-globals-from ../../../../../toolkit/profile/test/xpcshell/head.js */
+-/* import-globals-from ../../../../../browser/components/profiles/tests/unit/head.js */
+ 
+ ChromeUtils.defineESModuleGetters(this, {
+   ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
+@@ -31,7 +30,14 @@ NimbusTestUtils.init(this);
+ add_setup(async function () {
+   do_get_profile();
+ 
+-  await initSelectableProfileService();
++  selectStartupProfile();
++  const { ProfilesDatastoreService: datastore } = ChromeUtils.importESModule(
++    "moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs"
++  );
++  datastore.overrideDirectoryService({
++    ProfD: getProfileService().currentProfile.rootDir,
++  });
++  await datastore.init();
+ 
+   // TODO(bug 1967779): require the ProfilesDatastoreService to be initialized
+   registerCleanupFunction(
+diff --git a/toolkit/components/nimbus/test/unit/shutdown/head.js b/toolkit/components/nimbus/test/unit/shutdown/head.js
+index f82bbb6573..3091b70202 100644
+--- a/toolkit/components/nimbus/test/unit/shutdown/head.js
++++ b/toolkit/components/nimbus/test/unit/shutdown/head.js
+@@ -1,6 +1,5 @@
+ /* import-globals-from ../head.js */
+ /* import-globals-from ../../../../../../toolkit/profile/test/xpcshell/head.js */
+-/* import-globals-from ../../../../../../browser/components/profiles/tests/unit/head.js */
+ 
+ function promiseGetRecipesBlocks(loader) {
+   const blocker = Promise.withResolvers();
+diff --git a/toolkit/components/nimbus/test/unit/shutdown/xpcshell.toml b/toolkit/components/nimbus/test/unit/shutdown/xpcshell.toml
+index a5c30968f6..22b53c353d 100644
+--- a/toolkit/components/nimbus/test/unit/shutdown/xpcshell.toml
++++ b/toolkit/components/nimbus/test/unit/shutdown/xpcshell.toml
+@@ -1,5 +1,5 @@
+ [DEFAULT]
+-head = "../../../../../../toolkit/profile/test/xpcshell/head.js ../../../../../../browser/components/profiles/tests/unit/head.js ../head.js ./head.js"
++head = "../../../../../../toolkit/profile/test/xpcshell/head.js ../head.js ./head.js"
+ tags = "nimbus"
+ firefox-appdir = "browser"
+ skip-if = [
+diff --git a/toolkit/components/nimbus/test/unit/xpcshell.toml b/toolkit/components/nimbus/test/unit/xpcshell.toml
+index b50742a9e8..bcc1ea986c 100644
+--- a/toolkit/components/nimbus/test/unit/xpcshell.toml
++++ b/toolkit/components/nimbus/test/unit/xpcshell.toml
+@@ -1,5 +1,5 @@
+ [DEFAULT]
+-head = "../../../../../toolkit/profile/test/xpcshell/head.js ../../../../../browser/components/profiles/tests/unit/head.js head.js"
++head = "../../../../../toolkit/profile/test/xpcshell/head.js head.js"
+ tags = "nimbus"
+ firefox-appdir = "browser"
+ support-files = ["reference_aboutwelcome_experiment_content.json"]
+diff --git a/toolkit/components/telemetry/core/Telemetry.cpp b/toolkit/components/telemetry/core/Telemetry.cpp
+index 1e83d34cd0..f056eaa5a4 100644
+--- a/toolkit/components/telemetry/core/Telemetry.cpp
++++ b/toolkit/components/telemetry/core/Telemetry.cpp
+@@ -21,8 +21,8 @@
+ #include "js/PropertyAndElement.h"  // JS_DefineElement, JS_DefineProperty
+ #include "mozilla/dom/ToJSValue.h"
+ #include "mozilla/dom/Promise.h"
+-#include "mozilla/glean/ProfilesMetrics.h"
+ #include "mozilla/glean/TelemetryMetrics.h"
++#include "mozilla/glean/ToolkitProfileMetrics.h"
+ #include "mozilla/Atomics.h"
+ #include "mozilla/Attributes.h"
+ #include "mozilla/BackgroundHangMonitor.h"
+diff --git a/toolkit/content/aboutSupport.xhtml b/toolkit/content/aboutSupport.xhtml
+index 27ae7e4b9a..e9f564af31 100644
+--- a/toolkit/content/aboutSupport.xhtml
++++ b/toolkit/content/aboutSupport.xhtml
+@@ -299,16 +299,6 @@
+             </td>
+           </tr>
+ 
+-#ifndef ANDROID
+-          <tr class="no-copy">
+-            <th class="column" data-l10n-id="app-basics-profiles"/>
+-
+-            <td>
+-              <a href="about:profiles">about:profiles</a>
+-            </td>
+-          </tr>
+-#endif
+-
+ #if defined(XP_WIN)
+           <tr>
+             <th class="column" data-l10n-id="app-basics-pointing-devices"/>
+diff --git a/toolkit/content/jar.mn b/toolkit/content/jar.mn
+index d5aedd09f6..03434782f5 100644
+--- a/toolkit/content/jar.mn
++++ b/toolkit/content/jar.mn
+@@ -18,9 +18,6 @@ toolkit.jar:
+    content/global/net-error-card.mjs
+    content/global/aboutNetworking.js
+    content/global/aboutNetworking.html
+-#ifndef ANDROID
+-   content/global/aboutProfiles.js
+-#endif
+    content/global/aboutServiceWorkers.js
+    content/global/aboutServiceWorkers.xhtml
+    content/global/aboutwebrtc/aboutWebrtc.css   (aboutwebrtc/aboutWebrtc.css)
+diff --git a/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl b/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl
+index 4ae5d85dcf..88bc56e9d9 100644
+--- a/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl
++++ b/toolkit/locales/en-US/toolkit/about/aboutSupport.ftl
+@@ -69,7 +69,6 @@ app-basics-memory-use = Memory Use
+ app-basics-performance = Performance
+ app-basics-service-workers = Registered Service Workers
+ app-basics-third-party = Third-party Modules
+-app-basics-profiles = Profiles
+ app-basics-launcher-process-status = Launcher Process
+ app-basics-multi-process-support = Multiprocess Windows
+ app-basics-fission-support = Fission Windows
+diff --git a/toolkit/modules/AppConstants.sys.mjs b/toolkit/modules/AppConstants.sys.mjs
+index 6c1d429452..2b186bb9f1 100644
+--- a/toolkit/modules/AppConstants.sys.mjs
++++ b/toolkit/modules/AppConstants.sys.mjs
+@@ -260,8 +260,6 @@ export var AppConstants = Object.freeze({
+ 
+   MOZ_SYSTEM_POLICIES: @MOZ_SYSTEM_POLICIES_BOOL@,
+ 
+-  MOZ_SELECTABLE_PROFILES: @MOZ_SELECTABLE_PROFILES_BOOL@,
+-
+   SQLITE_LIBRARY_FILENAME:
+ #ifdef MOZ_FOLD_LIBS
+   "@DLL_PREFIX@nss3@DLL_SUFFIX@",
+diff --git a/toolkit/modules/RemotePageAccessManager.sys.mjs b/toolkit/modules/RemotePageAccessManager.sys.mjs
+index 21c7bcdb80..01641b4cec 100644
+--- a/toolkit/modules/RemotePageAccessManager.sys.mjs
++++ b/toolkit/modules/RemotePageAccessManager.sys.mjs
+@@ -131,41 +131,6 @@ export let RemotePageAccessManager = {
+       RPMSendQuery: ["Browser:AddTRRExcludedDomain"],
+       RPMGetIntPref: ["network.trr.mode", "security.dialog_enable_delay"],
+     },
+-    "about:deleteprofile": {
+-      RPMSendQuery: ["Profiles:GetDeleteProfileContent"],
+-      RPMSendAsyncMessage: ["Profiles:CancelDelete", "Profiles:DeleteProfile"],
+-    },
+-    "about:editprofile": {
+-      RPMSendQuery: [
+-        "Profiles:GetEditProfileContent",
+-        "Profiles:UpdateProfileTheme",
+-        "Profiles:UpdateProfileAvatar",
+-        "Profiles:SetDesktopShortcut",
+-      ],
+-      RPMSendAsyncMessage: [
+-        "Profiles:UpdateProfileName",
+-        "Profiles:OpenDeletePage",
+-        "Profiles:CloseProfileTab",
+-        "Profiles:MoreThemes",
+-        "Profiles:PageHide",
+-      ],
+-    },
+-    "about:newprofile": {
+-      RPMSendQuery: [
+-        "Profiles:GetNewProfileContent",
+-        "Profiles:UpdateProfileTheme",
+-        "Profiles:UpdateProfileAvatar",
+-      ],
+-      RPMSendAsyncMessage: [
+-        "Profiles:UpdateProfileName",
+-        "Profiles:DeleteProfile",
+-        "Profiles:CloseProfileTab",
+-        "Profiles:MoreThemes",
+-        "Profiles:PageHide",
+-      ],
+-      RPMGetBoolPref: ["browser.profiles.profile-name.updated"],
+-      RPMGetFormatURLPref: ["app.support.baseURL"],
+-    },
+     "about:protections": {
+       RPMSendAsyncMessage: [
+         "OpenContentBlockingPreferences",
+diff --git a/toolkit/modules/ResetProfile.sys.mjs b/toolkit/modules/ResetProfile.sys.mjs
+index 07a7b89f2a..d587c984d6 100644
+--- a/toolkit/modules/ResetProfile.sys.mjs
++++ b/toolkit/modules/ResetProfile.sys.mjs
+@@ -24,26 +24,6 @@ ChromeUtils.defineLazyGetter(lazy, "MigrationUtils", () => {
+   return undefined;
+ });
+ 
+-// Bug 1958916. Migrate profiles code to toolkit
+-ChromeUtils.defineLazyGetter(lazy, "SelectableProfileService", () => {
+-  // SelectableProfileService is currently only available in browser builds.
+-  // Bug 1958916: Migratre browser/profiles code to toolkit
+-  if (AppConstants.MOZ_BUILD_APP != "browser") {
+-    return undefined;
+-  }
+-
+-  try {
+-    let { SelectableProfileService } = ChromeUtils.importESModule(
+-      // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+-      "resource:///modules/profiles/SelectableProfileService.sys.mjs"
+-    );
+-    return SelectableProfileService;
+-  } catch (e) {
+-    console.error(`Unable to load SelectableProfileService.sys.mjs: ${e}`);
+-  }
+-  return undefined;
+-});
+-
+ const MOZ_APP_NAME = AppConstants.MOZ_APP_NAME;
+ 
+ export var ResetProfile = {
+@@ -70,10 +50,6 @@ export var ResetProfile = {
+     }
+ 
+     // We also need to be using a profile the profile manager knows about.
+-    if (lazy.SelectableProfileService?.currentProfile) {
+-      return true;
+-    }
+-
+     let profileService = Cc[
+       "@mozilla.org/toolkit/profile-service;1"
+     ].getService(Ci.nsIToolkitProfileService);
+@@ -141,20 +117,6 @@ export var ResetProfile = {
+       );
+     }
+ 
+-    if (lazy.SelectableProfileService?.currentProfile) {
+-      Services.env.set(
+-        "SELECTABLE_PROFILE_RESET_PATH",
+-        lazy.SelectableProfileService?.currentProfile.path
+-      );
+-      Services.env.set(
+-        "SELECTABLE_PROFILE_RESET_STORE_ID",
+-        lazy.SelectableProfileService?.storeID
+-      );
+-      lazy.SelectableProfileService.setDefaultProfileForGroup().then(() =>
+-        doRestart()
+-      );
+-    } else {
+-      doRestart();
+-    }
++    doRestart();
+   },
+ };
+diff --git a/toolkit/modules/moz.build b/toolkit/modules/moz.build
+index 3633fd38cb..96ee806b7b 100644
+--- a/toolkit/modules/moz.build
++++ b/toolkit/modules/moz.build
+@@ -349,7 +349,6 @@ for var in (
+     "MOZ_GLEAN_ANDROID",
+     "MOZ_JXL",
+     "MOZ_SYSTEM_POLICIES",
+-    "MOZ_SELECTABLE_PROFILES",
+     "USE_LIBZ_RS",
+     "MOZ_ANDROID_CONTENT_SERVICE_ISOLATED_PROCESS",
+ ):
+diff --git a/toolkit/moz.configure b/toolkit/moz.configure
+index 04afa42a87..d362d36e3d 100644
+--- a/toolkit/moz.configure
++++ b/toolkit/moz.configure
+@@ -1095,13 +1095,6 @@ project_flag(
+     nargs=1,
+ )
+ 
+-# Profile Management
+-# ==============================================================
+-# Selectable profiles are enabled by default.
+-
+-set_define("MOZ_SELECTABLE_PROFILES", True)
+-set_config("MOZ_SELECTABLE_PROFILES", True)
+-
+ project_flag(
+     "MOZ_DEDICATED_PROFILES",
+     help="Enable dedicated profiles per install",
+diff --git a/toolkit/profile/ProfilesDatastoreService.sys.mjs b/toolkit/profile/ProfilesDatastoreService.sys.mjs
+index 480a915151..1818c04273 100644
+--- a/toolkit/profile/ProfilesDatastoreService.sys.mjs
++++ b/toolkit/profile/ProfilesDatastoreService.sys.mjs
+@@ -63,72 +63,6 @@ async function openDatastoreConnection(path) {
+   return connection;
+ }
+ 
+-/**
+- * Tests whether a profile can be deleted safely, i.e. whether it is the only
+- * profile in its profile store.
+- *
+- * @param {nsIToolkitProfile} profile The profile to test
+- * @returns {Promise<boolean>} True if the profile can be deleted safely
+- */
+-export async function canDeleteProfile(profile) {
+-  if (!profile.storeID) {
+-    // If there is no storeID then there can be no linked profiles.
+-    return true;
+-  }
+-
+-  let dbPath = getSharedProfilesStorePath(profile.storeID);
+-  if (!(await IOUtils.exists(dbPath))) {
+-    // If the database doesn't exist then there can be no linked profiles.
+-    return true;
+-  }
+-
+-  try {
+-    let connection = await openDatastoreConnection(dbPath);
+-
+-    try {
+-      let rows = await connection.executeCached(
+-        'SELECT COUNT(*) AS "count" FROM "Profiles";'
+-      );
+-
+-      let profileCount = rows[0]?.getResultByName("count") ?? 0;
+-
+-      // The database should only contain the profile being deleted.
+-      return profileCount <= 1;
+-    } finally {
+-      await connection.close();
+-    }
+-  } catch (e) {
+-    console.error(e);
+-    return true;
+-  }
+-}
+-
+-/**
+- * Attempts to delete a file but ignores any errors.
+- *
+- * @param {string} path The path to the file to delete
+- */
+-async function deleteFile(path) {
+-  try {
+-    await IOUtils.remove(path);
+-  } catch (e) {
+-    // Ignore errors
+-  }
+-}
+-
+-/**
+- * Attempts to delete the shared profiles store for the given store ID. No error
+- * will be thrown if deletion fails.
+- *
+- * @param {string} storeID The store ID
+- */
+-export async function deleteSharedProfilesStore(storeID) {
+-  let dbPath = getSharedProfilesStorePath(storeID);
+-  await deleteFile(dbPath);
+-  await deleteFile(dbPath + "-shm");
+-  await deleteFile(dbPath + "-wal");
+-}
+-
+ /**
+  * An API that allows access to the cross-profile SQLite database shared
+  * between a group of profiles. This database always exists, even if the
+@@ -334,13 +268,7 @@ class ProfilesDatastoreServiceClass {
+    *
+    * Changes to the datastore made by the current instance will trigger the
+    * "pds-datastore-changed" nsIObserver event; see `#datastoreChanged` for
+-   * details. These events are fired whether or not the multiple profiles
+-   * feature is enabled.
+-   *
+-   * If the multiple profiles feature is enabled, then changes to the datastore
+-   * made either by the current instance or another instance in the profile
+-   * group will trigger the "sps-profiles-updated" nsIObserver event. See
+-   * `SelectableProfileService.databaseChanged` for details.
++   * details.
+    */
+   notify() {
+     this.#notifyTask.arm();
+@@ -488,16 +416,6 @@ class ProfilesDatastoreServiceClass {
+     this.#initialized = true;
+   }
+ 
+-  async getStartupMigrationConnection() {
+-    if (!lazy.MigrationUtils?.isStartupMigration) {
+-      return null;
+-    }
+-
+-    this.#storeID = Services.env.get("SELECTABLE_PROFILE_RESET_STORE_ID");
+-    await this.#initConnection();
+-    return this.#connection;
+-  }
+-
+   async uninit() {
+     if (this.#initPromise) {
+       await this.#initPromise;
+diff --git a/toolkit/profile/jar.mn b/toolkit/profile/jar.mn
+index a508507be1..99abdc6537 100644
+--- a/toolkit/profile/jar.mn
++++ b/toolkit/profile/jar.mn
+@@ -3,10 +3,6 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ toolkit.jar:
+-  content/mozapps/profile/createProfileWizard.js  (content/createProfileWizard.js)
+-* content/mozapps/profile/createProfileWizard.xhtml (content/createProfileWizard.xhtml)
+-  content/mozapps/profile/profileSelection.js     (content/profileSelection.js)
+-* content/mozapps/profile/profileSelection.xhtml  (content/profileSelection.xhtml)
+ #ifdef MOZ_BLOCK_PROFILE_DOWNGRADE
+   content/mozapps/profile/profileDowngrade.js     (content/profileDowngrade.js)
+   content/mozapps/profile/profileDowngrade.xhtml  (content/profileDowngrade.xhtml)
+diff --git a/toolkit/profile/metrics.yaml b/toolkit/profile/metrics.yaml
+index 7ecb065e89..fe5cde1341 100644
+--- a/toolkit/profile/metrics.yaml
++++ b/toolkit/profile/metrics.yaml
+@@ -344,3 +344,22 @@ profiles:
+       - metrics
+       - first-startup
+       - new-profile
++
++profile.lock:
++  failed_lock_count:
++    type: quantity
++    unit: lock attempts
++    description: |
++      The number of failed profile lock attempts that occurred prior to
++      successfully locking the profile and starting the app.
++      Previously collected in the "main" ping's `simpleMeasurements`.
++    bugs:
++      - https://bugzilla.mozilla.org/show_bug.cgi?id=1972836
++    data_reviews:
++      - https://bugzilla.mozilla.org/show_bug.cgi?id=1972836
++    expires: never
++    data_sensitivity:
++      - interaction
++    notification_emails:
++      - dtownsend@mozilla.com
++      - jhirsch@mozilla.com
+diff --git a/toolkit/profile/moz.build b/toolkit/profile/moz.build
+index 84643fe7d8..afdc651217 100644
+--- a/toolkit/profile/moz.build
++++ b/toolkit/profile/moz.build
+@@ -4,8 +4,6 @@
+ 
+ SPHINX_TREES["/toolkit/profile"] = "docs"
+ 
+-MOCHITEST_CHROME_MANIFESTS += ["test/chrome/chrome.toml"]
+-
+ XPCSHELL_TESTS_MANIFESTS += ["test/xpcshell/xpcshell.toml"]
+ 
+ TEST_DIRS += ["test/gtest"]
+diff --git a/toolkit/profile/nsIToolkitProfile.idl b/toolkit/profile/nsIToolkitProfile.idl
+index 10be1a624b..896743f23a 100644
+--- a/toolkit/profile/nsIToolkitProfile.idl
++++ b/toolkit/profile/nsIToolkitProfile.idl
+@@ -68,15 +68,7 @@ interface nsIToolkitProfile : nsISupports
+     /**
+      * Identifier for the profile group datastore.
+      */
+-    attribute AUTF8String storeID;
+-
+-    /**
+-     * Whether to show the selectable profile selector window at startup for
+-     * the profile group associated to the nsIToolkitProfile instance.
+-     *
+-     * @throws NS_ERROR_FAILURE on set if storeID is null.
+-     */
+-    [infallible] attribute boolean showProfileSelector;
++    readonly attribute AUTF8String storeID;
+ 
+     /**
+      * Removes the profile from the registry of profiles.
+diff --git a/toolkit/profile/nsIToolkitProfileService.idl b/toolkit/profile/nsIToolkitProfileService.idl
+index 3dd5cdd94a..49468a6a10 100644
+--- a/toolkit/profile/nsIToolkitProfileService.idl
++++ b/toolkit/profile/nsIToolkitProfileService.idl
+@@ -43,12 +43,6 @@ interface nsIToolkitProfileService : nsISupports
+         createNewProfile = 1,
+     };
+ 
+-    cenum profileManagerResult: 8 {
+-        exit = 0,
+-        launchWithProfile = 1,
+-        restart = 2,
+-    };
+-
+     [infallible] attribute boolean startWithLastProfile;
+ 
+     [infallible] readonly attribute nsISimpleEnumerator /*nsIToolkitProfile*/ profiles;
+diff --git a/toolkit/profile/nsToolkitProfileService.cpp b/toolkit/profile/nsToolkitProfileService.cpp
+index 886da1468c..a850942c44 100644
+--- a/toolkit/profile/nsToolkitProfileService.cpp
++++ b/toolkit/profile/nsToolkitProfileService.cpp
+@@ -282,13 +282,11 @@ nsresult WriteFile(nsIFile* aFile, const nsCString& aData) {
+ 
+ nsToolkitProfile::nsToolkitProfile(const nsACString& aName, nsIFile* aRootDir,
+                                    nsIFile* aLocalDir, bool aFromDB,
+-                                   const nsACString& aStoreID = VoidCString(),
+-                                   bool aShowProfileSelector = false)
++                                   const nsACString& aStoreID = VoidCString())
+     : mName(aName),
+       mRootDir(aRootDir),
+       mLocalDir(aLocalDir),
+       mStoreID(aStoreID),
+-      mShowProfileSelector(aShowProfileSelector),
+       mLock(nullptr),
+       mIndex(0),
+       mSection("Profile") {
+@@ -318,8 +316,6 @@ nsToolkitProfile::nsToolkitProfile(const nsACString& aName, nsIFile* aRootDir,
+     if (!mStoreID.IsVoid()) {
+       db->SetString(mSection.get(), "StoreID",
+                     PromiseFlatCString(mStoreID).get());
+-      db->SetString(mSection.get(), "ShowSelector",
+-                    aShowProfileSelector ? "1" : "0");
+     }
+   }
+ }
+@@ -384,47 +380,6 @@ nsToolkitProfile::GetStoreID(nsACString& aResult) {
+   return NS_OK;
+ }
+ 
+-NS_IMETHODIMP
+-nsToolkitProfile::SetStoreID(const nsACString& aStoreID) {
+-#ifdef MOZ_SELECTABLE_PROFILES
+-  NS_ASSERTION(nsToolkitProfileService::gService, "Where did my service go?");
+-
+-  if (mStoreID.Equals(aStoreID)) {
+-    return NS_OK;
+-  }
+-
+-  nsresult rv;
+-  nsCOMPtr<nsIPrefBranch> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID);
+-
+-  if (!aStoreID.IsVoid()) {
+-    rv = nsToolkitProfileService::gService->mProfileDB.SetString(
+-        mSection.get(), "StoreID", PromiseFlatCString(aStoreID).get());
+-    NS_ENSURE_SUCCESS(rv, rv);
+-
+-    rv = nsToolkitProfileService::gService->mProfileDB.SetString(
+-        mSection.get(), "ShowSelector", mShowProfileSelector ? "1" : "0");
+-    NS_ENSURE_SUCCESS(rv, rv);
+-  } else {
+-    // If the string was not present in the ini file, just ignore the error.
+-    nsToolkitProfileService::gService->mProfileDB.DeleteString(mSection.get(),
+-                                                               "StoreID");
+-
+-    // We need a StoreID to show the profile selector, so if StoreID has been
+-    // removed, then remove ShowSelector also.
+-    mShowProfileSelector = false;
+-
+-    // If the string was not present in the ini file, just ignore the error.
+-    nsToolkitProfileService::gService->mProfileDB.DeleteString(mSection.get(),
+-                                                               "ShowSelector");
+-  }
+-  mStoreID = aStoreID;
+-
+-  return NS_OK;
+-#else
+-  return NS_ERROR_FAILURE;
+-#endif
+-}
+-
+ NS_IMETHODIMP
+ nsToolkitProfile::GetLocalDir(nsIFile** aResult) {
+   NS_ADDREF(*aResult = mLocalDir);
+@@ -468,45 +423,6 @@ nsToolkitProfile::SetName(const nsACString& aName) {
+   return NS_OK;
+ }
+ 
+-NS_IMETHODIMP
+-nsToolkitProfile::GetShowProfileSelector(bool* aShowProfileSelector) {
+-#ifdef MOZ_SELECTABLE_PROFILES
+-  *aShowProfileSelector = mShowProfileSelector;
+-#else
+-  *aShowProfileSelector = false;
+-#endif
+-  return NS_OK;
+-}
+-
+-NS_IMETHODIMP
+-nsToolkitProfile::SetShowProfileSelector(bool aShowProfileSelector) {
+-#ifdef MOZ_SELECTABLE_PROFILES
+-  NS_ASSERTION(nsToolkitProfileService::gService, "Where did my service go?");
+-
+-  // We need a StoreID to show the profile selector; bail out if it's missing.
+-  if (mStoreID.IsVoid()) {
+-    return NS_ERROR_FAILURE;
+-  }
+-
+-  if (mShowProfileSelector == aShowProfileSelector) {
+-    return NS_OK;
+-  }
+-
+-  nsresult rv = nsToolkitProfileService::gService->mProfileDB.SetString(
+-      mSection.get(), "ShowSelector", aShowProfileSelector ? "1" : "0");
+-  NS_ENSURE_SUCCESS(rv, rv);
+-
+-  mShowProfileSelector = aShowProfileSelector;
+-#  ifdef XP_WIN
+-  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+-  obs->NotifyObservers(nullptr, "profile-show-selector-changed", nullptr);
+-#  endif
+-  return NS_OK;
+-#else
+-  return NS_ERROR_FAILURE;
+-#endif
+-}
+-
+ nsresult nsToolkitProfile::RemoveInternal(bool aRemoveFiles,
+                                           bool aInBackground) {
+   NS_ASSERTION(nsToolkitProfileService::gService, "Whoa, my service is gone.");
+@@ -1234,7 +1150,6 @@ nsresult nsToolkitProfileService::Init() {
+     NS_ENSURE_SUCCESS(rv, rv);
+ 
+     nsCString storeID;
+-    bool showProfileSelector = false;
+ 
+     rv = mProfileDB.GetString(profileID.get(), "StoreID", storeID);
+ 
+@@ -1243,16 +1158,8 @@ nsresult nsToolkitProfileService::Init() {
+       storeID = VoidCString();
+     }
+ 
+-    // Only get the ShowSelector value if StoreID is nonempty.
+-    if (!storeID.IsVoid()) {
+-      rv = mProfileDB.GetString(profileID.get(), "ShowSelector", buffer);
+-      if (NS_SUCCEEDED(rv)) {
+-        showProfileSelector = buffer.EqualsLiteral("1");
+-      }
+-    }
+-
+-    currentProfile = new nsToolkitProfile(name, rootDir, localDir, true,
+-                                          storeID, showProfileSelector);
++    currentProfile =
++        new nsToolkitProfile(name, rootDir, localDir, true, storeID);
+ 
+     // If a user has modified the ini file path it may make for a valid profile
+     // path but not match what we would have serialised and so may not match
+@@ -1605,41 +1512,6 @@ nsresult nsToolkitProfileService::SelectStartupProfile(
+   nsresult rv;
+   const char* arg;
+ 
+-  // Use the profile specified in the environment variables. This is set if we
+-  // are resetting a selectable profile
+-  nsCOMPtr<nsIFile> resetDir = GetFileFromEnv("SELECTABLE_PROFILE_RESET_PATH");
+-  nsAutoCString storeID(PR_GetEnv("SELECTABLE_PROFILE_RESET_STORE_ID"));
+-  RefPtr<nsToolkitProfile> profile = GetProfileByStoreID(storeID);
+-  if (resetDir && profile) {
+-    // Clear out flags that we handled (or should have handled!) last startup.
+-    const char* dummy;
+-    CheckArg(*aArgc, aArgv, "p", &dummy);
+-    CheckArg(*aArgc, aArgv, "profile", &dummy);
+-    CheckArg(*aArgc, aArgv, "profilemanager");
+-
+-    // Because this is a selectable profile, the rootDir changes when profile
+-    // windows are focused. So we set the rootDir to the profile we are
+-    // resetting so it is the correct rootDir during the refresh.
+-    profile->SetRootDir(resetDir);
+-
+-    nsCOMPtr<nsIFile> localDir;
+-    rv = nsToolkitProfileService::gService->GetLocalDirFromRootDir(
+-        resetDir, getter_AddRefs(localDir));
+-    NS_ENSURE_SUCCESS(rv, rv);
+-
+-    // This has to be a profile reset
+-    mStartupReason = "profile-reset"_ns;
+-
+-    mCurrent = profile;
+-    resetDir.forget(aRootDir);
+-    localDir.forget(aLocalDir);
+-    NS_IF_ADDREF(*aProfile = profile);
+-    return NS_OK;
+-  }
+-  // Clear out the profile reset variables if no profile was found
+-  PR_SetEnv("SELECTABLE_PROFILE_RESET_PATH=");
+-  PR_SetEnv("SELECTABLE_PROFILE_RESET_STORE_ID=");
+-
+   // Use the profile specified in the environment variables (generally from an
+   // app initiated restart).
+   nsCOMPtr<nsIFile> lf = GetFileFromEnv("XRE_PROFILE_PATH");
+@@ -1697,11 +1569,7 @@ nsresult nsToolkitProfileService::SelectStartupProfile(
+       }
+     }
+ 
+-    if (EnvHasValue("XRE_RESTARTED_BY_PROFILE_MANAGER")) {
+-      mStartupReason = "profile-manager"_ns;
+-    } else if (EnvHasValue("XRE_RESTARTED_BY_PROFILE_SELECTOR")) {
+-      mStartupReason = "profile-selector"_ns;
+-    } else if (aIsResetting) {
++    if (aIsResetting) {
+       mStartupReason = "profile-reset"_ns;
+     } else {
+       mStartupReason = "restart"_ns;
+@@ -2563,15 +2431,6 @@ nsresult WriteProfileInfo(nsIFile* profilesDBFile, nsIFile* installDBFile,
+     changed = true;
+   }
+ 
+-  rv = profilesIni.GetString(iniSection.get(), "ShowSelector", oldValue);
+-  if (NS_FAILED(rv) ||
+-      !oldValue.Equals(profileInfo->mShowSelector ? "1" : "0")) {
+-    rv = profilesIni.SetString(iniSection.get(), "ShowSelector",
+-                               profileInfo->mShowSelector ? "1" : "0");
+-    NS_ENSURE_SUCCESS(rv, rv);
+-    changed = true;
+-  }
+-
+   profilesIni.GetString(iniSection.get(), "Path", oldValue);
+   if (NS_FAILED(rv) || !oldValue.Equals(profileInfo->mPath)) {
+     rv = profilesIni.SetString(iniSection.get(), "Path",
+@@ -2653,7 +2512,6 @@ nsToolkitProfileService::AsyncFlushCurrentProfile(JSContext* aCx,
+ 
+   UniquePtr<CurrentProfileData> profileData = MakeUnique<CurrentProfileData>();
+   profileData->mStoreID = mCurrent->mStoreID;
+-  profileData->mShowSelector = mCurrent->mShowProfileSelector;
+ 
+   GetProfileDescriptor(mCurrent, &profileData->mIsRelative, profileData->mPath);
+ 
+@@ -2997,15 +2855,6 @@ nsToolkitProfileService::GetLocalDirFromRootDir(nsIFile* aRootDir,
+   return NS_OK;
+ }
+ 
+-bool nsToolkitProfileService::HasShowProfileSelector() {
+-  for (RefPtr<nsToolkitProfile> profile : mProfiles) {
+-    if (profile->GetShowProfileSelector()) {
+-      return true;
+-    }
+-  }
+-  return false;
+-}
+-
+ already_AddRefed<nsToolkitProfileService> NS_GetToolkitProfileService() {
+   if (!nsToolkitProfileService::gService) {
+     nsToolkitProfileService::gService = new nsToolkitProfileService();
+diff --git a/toolkit/profile/nsToolkitProfileService.h b/toolkit/profile/nsToolkitProfileService.h
+index 367ec91f5d..82f5bff4a7 100644
+--- a/toolkit/profile/nsToolkitProfileService.h
++++ b/toolkit/profile/nsToolkitProfileService.h
+@@ -22,7 +22,6 @@ class nsStartupLock;
+ struct CurrentProfileData {
+   nsCString mPath;
+   nsCString mStoreID;
+-  bool mShowSelector;
+   bool mIsRelative;
+ };
+ 
+@@ -44,8 +43,8 @@ class nsToolkitProfile final
+   ~nsToolkitProfile() = default;
+ 
+   nsToolkitProfile(const nsACString& aName, nsIFile* aRootDir,
+-                   nsIFile* aLocalDir, bool aFromDB, const nsACString& aStoreID,
+-                   bool aShowProfileSelector);
++                   nsIFile* aLocalDir, bool aFromDB,
++                   const nsACString& aStoreID);
+ 
+   nsresult RemoveInternal(bool aRemoveFiles, bool aInBackground);
+ 
+@@ -55,7 +54,6 @@ class nsToolkitProfile final
+   nsCOMPtr<nsIFile> mRootDir;
+   nsCOMPtr<nsIFile> mLocalDir;
+   nsCString mStoreID;
+-  bool mShowProfileSelector;
+   nsIProfileLock* mLock;
+   uint32_t mIndex;
+   nsCString mSection;
+@@ -95,7 +93,6 @@ class nsToolkitProfileService final : public nsIToolkitProfileService,
+                                 bool* aWasDefaultSelection);
+   nsresult CreateResetProfile(nsIToolkitProfile** aNewProfile);
+   nsresult ApplyResetProfile(nsIToolkitProfile* aOldProfile);
+-  bool HasShowProfileSelector();
+   void UpdateCurrentProfile();
+   void CompleteStartup();
+ 
+diff --git a/toolkit/profile/test/xpcshell/test_async_flush.js b/toolkit/profile/test/xpcshell/test_async_flush.js
+index be5ae56a08..87d89f31d7 100644
+--- a/toolkit/profile/test/xpcshell/test_async_flush.js
++++ b/toolkit/profile/test/xpcshell/test_async_flush.js
+@@ -101,84 +101,4 @@ add_task(async () => {
+   let installData = readInstallsIni();
+   Assert.equal(profileData.installs[hash].default, defaultProfile.leafName);
+   Assert.equal(installData.installs[hash].default, defaultProfile.leafName);
+-
+-  if (AppConstants.MOZ_SELECTABLE_PROFILES) {
+-    // Set a store ID on the profile. Flushing will succeed because the profile path hasn't changed.
+-    service.currentProfile.storeID = "7126354jdf";
+-
+-    await service.asyncFlushCurrentProfile();
+-
+-    profileData = readProfilesIni();
+-    Assert.equal(profileData.profiles.length, 3, "Should have three profiles.");
+-
+-    found = profileData.profiles.find(p => p.name == "changedname");
+-    Assert.ok(found, "Should have found the current profile.");
+-    Assert.equal(found.path, defaultProfile.leafName);
+-    Assert.equal(found.storeID, "7126354jdf");
+-
+-    found = profileData.profiles.find(p => p.name == "other1");
+-    Assert.ok(found, "Should have found the other1 profile.");
+-    Assert.equal(found.path, other1.leafName);
+-    Assert.equal(found.storeID, null);
+-
+-    found = profileData.profiles.find(p => p.name == "other2");
+-    Assert.ok(found, "Should have found the other2 profile.");
+-    Assert.equal(found.path, other2.leafName);
+-    Assert.equal(found.storeID, null);
+-
+-    installData = readInstallsIni();
+-    Assert.equal(profileData.installs[hash].default, defaultProfile.leafName);
+-    Assert.equal(installData.installs[hash].default, defaultProfile.leafName);
+-
+-    // Change the profile path. Flushing will succeed because the store ID now matches.
+-    service.currentProfile.rootDir = newProfileDir;
+-
+-    await service.asyncFlushCurrentProfile();
+-
+-    profileData = readProfilesIni();
+-    Assert.equal(profileData.profiles.length, 3, "Should have three profiles.");
+-
+-    found = profileData.profiles.find(p => p.name == "changedname");
+-    Assert.ok(found, "Should have found the current profile.");
+-    Assert.equal(found.path, newProfileDir.leafName);
+-    Assert.equal(found.storeID, "7126354jdf");
+-
+-    found = profileData.profiles.find(p => p.name == "other1");
+-    Assert.ok(found, "Should have found the other1 profile.");
+-    Assert.equal(found.path, other1.leafName);
+-    Assert.equal(found.storeID, null);
+-
+-    found = profileData.profiles.find(p => p.name == "other2");
+-    Assert.ok(found, "Should have found the other2 profile.");
+-    Assert.equal(found.path, other2.leafName);
+-    Assert.equal(found.storeID, null);
+-
+-    installData = readInstallsIni();
+-    Assert.equal(profileData.installs[hash].default, newProfileDir.leafName);
+-    Assert.equal(installData.installs[hash].default, newProfileDir.leafName);
+-
+-    // Modify the on-disk data
+-    writeProfilesIni({
+-      profiles: [
+-        {
+-          name: "some other name",
+-          path: "some other directory",
+-          storeID: "7126354jdf",
+-        },
+-      ],
+-      installs: {
+-        [hash]: { default: "some other directory" },
+-      },
+-    });
+-
+-    await service.asyncFlushCurrentProfile();
+-
+-    profileData = readProfilesIni();
+-    Assert.equal(profileData.profiles.length, 1, "Should have one profile.");
+-
+-    found = profileData.profiles[0];
+-    Assert.ok(found, "Should have found the current profile.");
+-    Assert.equal(found.path, newProfileDir.leafName);
+-    Assert.equal(found.storeID, "7126354jdf");
+-  }
+ });
+diff --git a/toolkit/profile/test/xpcshell/xpcshell.toml b/toolkit/profile/test/xpcshell/xpcshell.toml
+index d5be81b978..0f2103f78e 100644
+--- a/toolkit/profile/test/xpcshell/xpcshell.toml
++++ b/toolkit/profile/test/xpcshell/xpcshell.toml
+@@ -9,12 +9,6 @@ run-if = ["os == 'mac'"]
+ 
+ ["test_async_flush.js"]
+ 
+-["test_async_flush_cp_path.js"]
+-
+-["test_async_flush_cp_storeID.js"]
+-
+-["test_async_flush_current_profile.js"]
+-
+ ["test_bad_ini.js"]
+ 
+ ["test_check_backup.js"]
+@@ -33,14 +27,10 @@ run-if = ["os == 'mac'"]
+ 
+ ["test_encrypted_databases_marker.js"]
+ 
+-["test_find_currentProfile.js"]
+-
+ ["test_fix_directory_case.js"]
+ 
+ ["test_ignore_legacy_directory.js"]
+ 
+-["test_ignore_storeID_pref.js"]
+-
+ ["test_invalid_descriptor.js"]
+ 
+ ["test_legacy_empty.js"]
+@@ -70,8 +60,6 @@ skip-if = [
+ 
+ ["test_remove_default.js"]
+ 
+-["test_restore_storeID.js"]
+-
+ ["test_select_backgroundtasks_ephemeral.js"]
+ 
+ ["test_select_backgroundtasks_not_ephemeral_create.js"]
+@@ -96,8 +84,6 @@ skip-if = [
+ 
+ ["test_select_profilemanager.js"]
+ 
+-["test_showselector.js"]
+-
+ ["test_single_profile_selected.js"]
+ skip-if = [
+   "devedition",
+@@ -136,8 +122,6 @@ skip-if = [
+ 
+ ["test_steal_inuse.js"]
+ 
+-["test_storeid.js"]
+-
+ ["test_unreadable_ini.js"]
+ 
+ ["test_unreadable_ini_createprofile.js"]
+@@ -148,8 +132,6 @@ skip-if = [
+ 
+ ["test_unreadable_ini_profilemanager.js"]
+ 
+-["test_update_paths.js"]
+-
+ ["test_update_selected_dedicated.js"]
+ 
+ ["test_update_unknown_dedicated.js"]
+diff --git a/toolkit/themes/shared/mozapps.inc.mn b/toolkit/themes/shared/mozapps.inc.mn
+index 5563112e05..acd7b59675 100644
+--- a/toolkit/themes/shared/mozapps.inc.mn
++++ b/toolkit/themes/shared/mozapps.inc.mn
+@@ -18,10 +18,8 @@
+   skin/classic/mozapps/extensions/category-sitepermission.svg  (../../shared/extensions/category-sitepermission.svg)
+   skin/classic/mozapps/extensions/extension.svg              (../../shared/extensions/extension.svg)
+   skin/classic/mozapps/extensions/line.svg                   (../../shared/extensions/line.svg)
+-  skin/classic/mozapps/aboutProfiles.css                     (../../shared/aboutProfiles.css)
+   skin/classic/mozapps/aboutServiceWorkers.css               (../../shared/aboutServiceWorkers.css)
+   skin/classic/mozapps/profileDowngrade.css                  (../../shared/profileDowngrade.css)
+-  skin/classic/mozapps/profileSelection.css                  (../../shared/profileSelection.css)
+ 
+ % override chrome://mozapps/skin/extensions/category-languages.svg        chrome://mozapps/skin/extensions/localeGeneric.svg
+ % override chrome://mozapps/skin/extensions/category-themes.svg           chrome://mozapps/skin/extensions/themeGeneric.svg
+diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
+index 9331550537..4f87872309 100644
+--- a/toolkit/xre/nsAppRunner.cpp
++++ b/toolkit/xre/nsAppRunner.cpp
+@@ -2353,21 +2353,17 @@ static void ReflectSkeletonUIPrefToRegistry(const char* aPref, void* aData) {
+   (void)aPref;
+   (void)aData;
+ 
+-  RefPtr<nsToolkitProfileService> mProfileSvc;
+-  mProfileSvc = NS_GetToolkitProfileService();
+-
+-  bool hasShowProfileSelector = mProfileSvc->HasShowProfileSelector();
+   bool skeletonUIPref = StaticPrefs::browser_startup_preXulSkeletonUI();
+   bool startupBlankWindowPref = StaticPrefs::browser_startup_blankWindow();
+   bool drawInTitlebar = LookAndFeel::DrawInTitlebar();
+   SKELETON_LOG(
+-      "ReflectSkeletonUIPrefToRegistry: hasShowProfileSelector %d, "
+-      "skeletonUIPref %d, startupBlankWindowPref %d, drawInTitlebar %d",
+-      hasShowProfileSelector ? 1 : 0, skeletonUIPref ? 1 : 0,
+-      startupBlankWindowPref ? 1 : 0, drawInTitlebar ? 1 : 0);
++      "ReflectSkeletonUIPrefToRegistry: skeletonUIPref %d, "
++      "startupBlankWindowPref %d, drawInTitlebar %d",
++      skeletonUIPref ? 1 : 0, startupBlankWindowPref ? 1 : 0,
++      drawInTitlebar ? 1 : 0);
+ 
+-  bool shouldBeEnabled = !hasShowProfileSelector && skeletonUIPref &&
+-                         startupBlankWindowPref && drawInTitlebar;
++  bool shouldBeEnabled =
++      skeletonUIPref && startupBlankWindowPref && drawInTitlebar;
+   SKELETON_LOG("ReflectSkeletonUIPrefToRegistry: shouldBeEnabled %d",
+                shouldBeEnabled ? 1 : 0);
+   if (shouldBeEnabled && Preferences::HasUserValue(kPrefThemeId)) {
+@@ -2400,31 +2396,6 @@ static void ReflectSkeletonUIPrefToRegistry(const char* aPref, void* aData) {
+ }
+ #  undef SKELETON_LOG
+ 
+-class ShowProfileSelectorObserver final : public nsIObserver {
+- public:
+-  NS_DECL_ISUPPORTS
+-  NS_DECL_NSIOBSERVER
+-
+-  ShowProfileSelectorObserver() {}
+-
+- protected:
+-  ~ShowProfileSelectorObserver() {}
+-};
+-
+-NS_IMPL_ISUPPORTS(ShowProfileSelectorObserver, nsIObserver);
+-
+-NS_IMETHODIMP
+-ShowProfileSelectorObserver::Observe(nsISupports* aSubject, const char* aTopic,
+-                                     const char16_t* aData) {
+-  (void)aSubject;
+-  (void)aData;
+-  if (!strcmp(aTopic, "profile-show-selector-changed")) {
+-    ReflectSkeletonUIPrefToRegistry(nullptr, nullptr);
+-  }
+-
+-  return NS_OK;
+-}
+-
+ #  if defined(MOZ_DEFAULT_BROWSER_AGENT)
+ 
+ static void SetupSkeletonUIPrefs() {
+@@ -2437,10 +2408,6 @@ static void SetupSkeletonUIPrefs() {
+   Preferences::RegisterCallback(
+       &ReflectSkeletonUIPrefToRegistry,
+       nsDependentCString(StaticPrefs::GetPrefName_browser_tabs_inTitlebar()));
+-  nsCOMPtr<nsIObserverService> obsService =
+-      mozilla::services::GetObserverService();
+-  nsCOMPtr<nsIObserver> obs = new ShowProfileSelectorObserver();
+-  obsService->AddObserver(obs, "profile-show-selector-changed", false);
+ }
+ 
+ #  endif  // defined(MOZ_DEFAULT_BROWSER_AGENT)
+@@ -3012,133 +2979,6 @@ static ReturnAbortOnError ProfileLockedDialog(nsIFile* aProfileDir,
+   }
+ }
+ 
+-static ReturnAbortOnError ShowProfileDialog(
+-    nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative,
+-    const char* aDialogURL, const char* aTelemetryEnvVar) {
+-  nsresult rv;
+-
+-  nsCOMPtr<nsIFile> profD, profLD;
+-  bool offline = false;
+-  int32_t dialogReturn;
+-
+-  // We aren't going to start this instance so we can unblock other instances
+-  // from starting up.
+-#if defined(MOZ_HAS_REMOTE)
+-  gStartupLock = nullptr;
+-#endif
+-
+-  {
+-    ScopedXPCOMStartup xpcom;
+-    rv = xpcom.Initialize();
+-    NS_ENSURE_SUCCESS(rv, rv);
+-
+-    rv = xpcom.SetWindowCreator(aNative);
+-    NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
+-
+-#ifdef XP_MACOSX
+-    InitializeMacApp();
+-    CommandLineServiceMac::SetupMacCommandLine(gRestartArgc, gRestartArgv,
+-                                               true);
+-#endif
+-
+-    {  // extra scoping is needed so we release these components before xpcom
+-       // shutdown
+-      nsCOMPtr<nsIWindowWatcher> windowWatcher(
+-          do_GetService(NS_WINDOWWATCHER_CONTRACTID));
+-      nsCOMPtr<nsIDialogParamBlock> ioParamBlock(
+-          do_CreateInstance(NS_DIALOGPARAMBLOCK_CONTRACTID));
+-      nsCOMPtr<nsIMutableArray> dlgArray(
+-          do_CreateInstance(NS_ARRAY_CONTRACTID));
+-      NS_ENSURE_TRUE(windowWatcher && ioParamBlock && dlgArray,
+-                     NS_ERROR_FAILURE);
+-
+-      ioParamBlock->SetObjects(dlgArray);
+-
+-      nsCOMPtr<nsIAppStartup> appStartup(components::AppStartup::Service());
+-      NS_ENSURE_TRUE(appStartup, NS_ERROR_FAILURE);
+-
+-      nsAutoCString features("centerscreen,chrome,modal,titlebar");
+-      // If we're launching a private browsing window make sure to set that
+-      // feature for the Profile Manager window as well, so it groups correctly
+-      // on the Windows taskbar.
+-      if (CheckArgExists("private-window") == ARG_FOUND) {
+-        features.AppendLiteral(",private");
+-      }
+-      nsCOMPtr<mozIDOMWindowProxy> newWindow;
+-      rv = windowWatcher->OpenWindow(nullptr, nsDependentCString(aDialogURL),
+-                                     u"_blank"_ns, features, ioParamBlock,
+-                                     getter_AddRefs(newWindow));
+-
+-      NS_ENSURE_SUCCESS_LOG(rv, rv);
+-
+-      rv = ioParamBlock->GetInt(0, &dialogReturn);
+-      if (NS_FAILED(rv) || dialogReturn == nsIToolkitProfileService::exit) {
+-        return NS_ERROR_ABORT;
+-      }
+-
+-      int32_t startOffline;
+-      rv = ioParamBlock->GetInt(1, &startOffline);
+-      offline = NS_SUCCEEDED(rv) && startOffline == 1;
+-
+-      rv = dlgArray->QueryElementAt(0, NS_GET_IID(nsIFile),
+-                                    getter_AddRefs(profD));
+-      NS_ENSURE_SUCCESS_LOG(rv, rv);
+-
+-      rv = dlgArray->QueryElementAt(1, NS_GET_IID(nsIFile),
+-                                    getter_AddRefs(profLD));
+-      NS_ENSURE_SUCCESS_LOG(rv, rv);
+-
+-      if (dialogReturn == nsIToolkitProfileService::launchWithProfile) {
+-        int32_t newArguments;
+-        rv = ioParamBlock->GetInt(2, &newArguments);
+-
+-        if (NS_SUCCEEDED(rv) && newArguments > 0) {
+-          char** newArgv = (char**)realloc(
+-              gRestartArgv, sizeof(char*) * (gRestartArgc + newArguments + 1));
+-          NS_ENSURE_TRUE(newArgv, NS_ERROR_OUT_OF_MEMORY);
+-
+-          gRestartArgv = newArgv;
+-
+-          for (auto i = 0; i < newArguments; i++) {
+-            char16_t* arg;
+-            ioParamBlock->GetString(i, &arg);
+-            gRestartArgv[gRestartArgc++] =
+-                strdup(NS_ConvertUTF16toUTF8(nsDependentString(arg)).get());
+-          }
+-
+-          gRestartArgv[gRestartArgc] = nullptr;
+-        }
+-      }
+-    }
+-  }
+-
+-  if (offline) {
+-    SaveToEnv("XRE_START_OFFLINE=1");
+-  }
+-
+-  // User requested that we restart back into the profile manager.
+-  if (dialogReturn == nsIToolkitProfileService::restart) {
+-    SaveToEnv("XRE_RESTART_TO_PROFILE_MANAGER=1");
+-  } else {
+-    MOZ_ASSERT(dialogReturn == nsIToolkitProfileService::launchWithProfile);
+-    SaveFileToEnv("XRE_PROFILE_PATH", profD);
+-    SaveFileToEnv("XRE_PROFILE_LOCAL_PATH", profLD);
+-  }
+-  SaveToEnv(aTelemetryEnvVar);
+-
+-  if (gRestartedByOS) {
+-    // Re-add this argument when actually starting the application.
+-    char** newArgv =
+-        (char**)realloc(gRestartArgv, sizeof(char*) * (gRestartArgc + 2));
+-    NS_ENSURE_TRUE(newArgv, NS_ERROR_OUT_OF_MEMORY);
+-    gRestartArgv = newArgv;
+-    gRestartArgv[gRestartArgc++] = const_cast<char*>("-os-restarted");
+-    gRestartArgv[gRestartArgc] = nullptr;
+-  }
+-
+-  return LaunchChild(false, true);
+-}
+-
+ static ReturnAbortOnError ShowProfileManager(
+     nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative) {
+   // Sval has one profile, its data directory, and no profile manager.
+@@ -3146,22 +2986,6 @@ static ReturnAbortOnError ShowProfileManager(
+              "Error: Sval has no profile manager. Use --profile <path> to "
+              "start on another directory.\n");
+   return NS_ERROR_ABORT;
+-
+-  static const char kProfileManagerURL[] =
+-      "chrome://mozapps/content/profile/profileSelection.xhtml";
+-  static const char kTelemetryEnv[] = "XRE_RESTARTED_BY_PROFILE_MANAGER=1";
+-
+-  return ShowProfileDialog(aProfileSvc, aNative, kProfileManagerURL,
+-                           kTelemetryEnv);
+-}
+-
+-static ReturnAbortOnError ShowProfileSelector(
+-    nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative) {
+-  static const char kProfileSelectorURL[] = "about:profilemanager";
+-  static const char kTelemetryEnv[] = "XRE_RESTARTED_BY_PROFILE_SELECTOR=1";
+-
+-  return ShowProfileDialog(aProfileSvc, aNative, kProfileSelectorURL,
+-                           kTelemetryEnv);
+ }
+ 
+ static bool gDoMigration = false;
+@@ -5506,9 +5330,6 @@ int XREMain::XRE_mainStartup(bool* aExitFlag,
+     if (!mProfileSvc->GetStartWithLastProfile()) {
+       // First check the old style profile manager
+       rv = ShowProfileManager(mProfileSvc, mNativeApp);
+-    } else if (profile && profile->GetShowProfileSelector()) {
+-      // Now check the new profile group selector
+-      rv = ShowProfileSelector(mProfileSvc, mNativeApp);
+     } else {
+       rv = NS_OK;
+     }
+@@ -5948,23 +5769,7 @@ nsresult XREMain::XRE_mainRun() {
+             rootDir->GetPath(path);
+             CopyUTF16toUTF8(path, aProfilePath);
+ 
+-            nsCString storeID;
+-            gResetOldProfile->GetStoreID(storeID);
+-            if (!storeID.IsVoid()) {
+-              aKey = "firefox-selectable-profile";
+-              // In the case that Firefox is launched with --reset-profile,
+-              // the storeID and path env variables won't be set, so we set
+-              // them here if we are in a profile with a storeID.
+-              nsAutoCString envStoreID("SELECTABLE_PROFILE_RESET_STORE_ID=");
+-              envStoreID.Append(storeID);
+-              SaveToEnv(envStoreID.get());
+-
+-              nsAutoCString envProfilePath("SELECTABLE_PROFILE_RESET_PATH=");
+-              envProfilePath.Append(aProfilePath);
+-              SaveToEnv(envProfilePath.get());
+-            } else {
+-              aKey = MOZ_APP_NAME;
+-            }
++            aKey = MOZ_APP_NAME;
+           }
+ #ifdef XP_MACOSX
+           // Necessary for migration wizard to be accessible.
+@@ -6122,7 +5927,6 @@ nsresult XREMain::XRE_mainRun() {
+     SaveToEnv("XRE_START_OFFLINE=");
+     SaveToEnv("XUL_APP_FILE=");
+     SaveToEnv("XRE_BINARY_PATH=");
+-    SaveToEnv("XRE_RESTARTED_BY_PROFILE_MANAGER=");
+ 
+     if (!AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed)) {
+ #ifdef XP_MACOSX
+diff --git a/tools/@types/generated/lib.gecko.modules.d.ts b/tools/@types/generated/lib.gecko.modules.d.ts
+index ff43a60b76..fa89b4a287 100644
+--- a/tools/@types/generated/lib.gecko.modules.d.ts
++++ b/tools/@types/generated/lib.gecko.modules.d.ts
+@@ -591,8 +591,6 @@ export interface Modules {
+   "resource:///modules/policies/ProxyPolicies.sys.mjs": typeof import("resource:///modules/policies/ProxyPolicies.sys.mjs"),
+   "resource:///modules/policies/WebsiteFilter.sys.mjs": typeof import("resource:///modules/policies/WebsiteFilter.sys.mjs"),
+   "resource:///modules/policies/schema.sys.mjs": typeof import("resource:///modules/policies/schema.sys.mjs"),
+-  "resource:///modules/profiles/SelectableProfile.sys.mjs": typeof import("resource:///modules/profiles/SelectableProfile.sys.mjs"),
+-  "resource:///modules/profiles/SelectableProfileService.sys.mjs": typeof import("resource:///modules/profiles/SelectableProfileService.sys.mjs"),
+   "resource:///modules/sessionstore/PageWireframes.sys.mjs": typeof import("resource:///modules/sessionstore/PageWireframes.sys.mjs"),
+   "resource:///modules/sessionstore/RecentlyClosedTabsAndWindowsMenuUtils.sys.mjs": typeof import("resource:///modules/sessionstore/RecentlyClosedTabsAndWindowsMenuUtils.sys.mjs"),
+   "resource:///modules/sessionstore/RunState.sys.mjs": typeof import("resource:///modules/sessionstore/RunState.sys.mjs"),
+diff --git a/tools/@types/generated/tspaths.json b/tools/@types/generated/tspaths.json
+index 76c0d33da1..8c1ced9d65 100644
+--- a/tools/@types/generated/tspaths.json
++++ b/tools/@types/generated/tspaths.json
+@@ -250,21 +250,6 @@
+       "chrome://browser/content/preferences/widgets/update-state.mjs": [
+         "../../../browser/components/preferences/widgets/update-state/update-state.mjs"
+       ],
+-      "chrome://browser/content/profiles/avatar.mjs": [
+-        "../../../browser/components/profiles/content/avatar.mjs"
+-      ],
+-      "chrome://browser/content/profiles/edit-profile-card.mjs": [
+-        "../../../browser/components/profiles/content/edit-profile-card.mjs"
+-      ],
+-      "chrome://browser/content/profiles/profile-avatar-selector.mjs": [
+-        "../../../browser/components/profiles/content/profile-avatar-selector.mjs"
+-      ],
+-      "chrome://browser/content/profiles/profile-card.mjs": [
+-        "../../../browser/components/profiles/content/profile-card.mjs"
+-      ],
+-      "chrome://browser/content/profiles/profiles-theme-card.mjs": [
+-        "../../../browser/components/profiles/content/profiles-theme-card.mjs"
+-      ],
+       "chrome://browser/content/screenshots/fileHelpers.mjs": [
+         "../../../browser/components/screenshots/fileHelpers.mjs"
+       ],
+@@ -1573,12 +1558,6 @@
+       "resource:///modules/policies/schema.sys.mjs": [
+         "../../../browser/components/enterprisepolicies/schemas/schema.sys.mjs"
+       ],
+-      "resource:///modules/profiles/SelectableProfile.sys.mjs": [
+-        "../../../browser/components/profiles/SelectableProfile.sys.mjs"
+-      ],
+-      "resource:///modules/profiles/SelectableProfileService.sys.mjs": [
+-        "../../../browser/components/profiles/SelectableProfileService.sys.mjs"
+-      ],
+       "resource:///modules/sessionstore/GlobalState.sys.mjs": [
+         "../../../browser/components/sessionstore/GlobalState.sys.mjs"
+       ],
+diff --git a/tools/@types/subs/AppConstants.sys.d.mts b/tools/@types/subs/AppConstants.sys.d.mts
+index 0d4c079997..3576a9cec0 100644
+--- a/tools/@types/subs/AppConstants.sys.d.mts
++++ b/tools/@types/subs/AppConstants.sys.d.mts
+@@ -166,8 +166,6 @@ export const AppConstants: Readonly<{
+ 
+   MOZ_SYSTEM_POLICIES: boolean;
+ 
+-  MOZ_SELECTABLE_PROFILES: boolean;
+-
+   SQLITE_LIBRARY_FILENAME: string;
+ 
+   // #ifdef MOZ_GECKOVIEW
