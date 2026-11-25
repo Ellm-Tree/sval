@@ -351,23 +351,32 @@ pub(crate) fn sync_expiring<S: StorageProvider>(
     )
 }
 
-/// What the passes over one document last read or wrote of this device's
-/// own file, one for each [`Target`].
+/// What the passes over one document last read or wrote of each file, one
+/// set for each [`Target`].
 ///
 /// Every pass reads its own file back before any peer's ([`sync_to`] says
-/// why), and that file is usually the one the last pass wrote or read. The
-/// same bytes always open and parse to the same document, so a pass that
-/// finds them takes what is kept here and still merges it as it would have.
-/// The path is derived from the key, so a file under another key never
-/// matches.
+/// why), and that file is usually the one the last pass wrote or read. A
+/// peer's file is usually the one the last pass read too, since a peer
+/// publishes far less often than this device passes. The same bytes always
+/// open and parse to the same document, so a pass that finds them takes what
+/// is kept here and still merges it as it would have. The path is derived
+/// from the key, so a file under another key never matches.
 #[derive(Debug, Default)]
-pub struct OwnCopies {
-    profile: Option<OwnCopy>,
-    shared: Option<OwnCopy>,
+pub struct FileCopies {
+    profile: TargetCopies,
+    shared: TargetCopies,
 }
 
-impl OwnCopies {
-    fn slot(&mut self, target: Target) -> &mut Option<OwnCopy> {
+/// [`FileCopies`] for one [`Target`]. Its peers are the ones the last pass
+/// read, by path, so a peer that has gone holds nothing here.
+#[derive(Debug, Default)]
+struct TargetCopies {
+    own: Option<OwnCopy>,
+    peers: PeerCopies,
+}
+
+impl FileCopies {
+    fn slot(&mut self, target: Target) -> &mut TargetCopies {
         match target {
             Target::Profile => &mut self.profile,
             Target::Shared => &mut self.shared,
@@ -375,12 +384,31 @@ impl OwnCopies {
     }
 
     fn take(&mut self, target: Target) -> Option<OwnCopy> {
-        self.slot(target).take()
+        self.slot(target).own.take()
     }
 
     fn put(&mut self, target: Target, copy: Option<OwnCopy>) {
-        *self.slot(target) = copy;
+        self.slot(target).own = copy;
     }
+
+    fn take_peers(&mut self, target: Target) -> PeerCopies {
+        std::mem::take(&mut self.slot(target).peers)
+    }
+
+    fn put_peers(&mut self, target: Target, peers: PeerCopies) {
+        self.slot(target).peers = peers;
+    }
+}
+
+type PeerCopies = std::collections::BTreeMap<String, PeerCopy>;
+
+/// One peer's file that opened, parsed and named its own writer: its sealed
+/// bytes, and the document they parse to with its foreign marks dropped,
+/// before anything a pass does to it with that pass's clock.
+#[derive(Debug)]
+struct PeerCopy {
+    sealed: Vec<u8>,
+    read: Document,
 }
 
 /// One own file: its sealed bytes and the JSON they open to, and, once a
@@ -522,15 +550,15 @@ pub fn sync_to<S: StorageProvider>(
         retention,
         target,
         clamp_from,
-        &mut OwnCopies::default(),
+        &mut FileCopies::default(),
     )
 }
 
-/// [`sync_to`], taking what `own_copies` remembers of this device's own file
-/// from the last pass over `doc` in place of decrypting and parsing the same
-/// bytes again, and leaving there what this pass read or wrote.
+/// [`sync_to`], taking what `copies` remembers of each file from the last
+/// pass over `doc` in place of decrypting and parsing the same bytes again,
+/// and leaving there what this pass read or wrote.
 ///
-/// A host keeps one [`OwnCopies`] beside each document it holds, for as long
+/// A host keeps one [`FileCopies`] beside each document it holds, for as long
 /// as it holds that document.
 #[expect(clippy::too_many_arguments)]
 pub fn sync_remembering<S: StorageProvider>(
@@ -543,7 +571,7 @@ pub fn sync_remembering<S: StorageProvider>(
     retention: Option<Timestamp>,
     target: Target,
     clamp_from: Option<Timestamp>,
-    own_copies: &mut OwnCopies,
+    copies: &mut FileCopies,
 ) -> Result<SyncReport, Error> {
     let mut report = SyncReport::default();
     let before = doc.nodes.clone();
@@ -571,7 +599,7 @@ pub fn sync_remembering<S: StorageProvider>(
     // writing loses nothing; the pass only loses the unchanged-state check.
     let mut refuse_write = false;
     let mut own_ids = std::collections::BTreeSet::new();
-    let remembered = own_copies.take(target).filter(|copy| copy.path == own_path);
+    let remembered = copies.take(target).filter(|copy| copy.path == own_path);
     let mut kept = None;
     match store.read(&own_path) {
         Ok(sealed) => {
@@ -650,6 +678,10 @@ pub fn sync_remembering<S: StorageProvider>(
     report.refused_write = refuse_write;
 
     let mut peers = Vec::new();
+    // A file that failed to read is never kept, so a pass that finds it
+    // again records the same problem in its report.
+    let mut remembered_peers = copies.take_peers(target);
+    let mut kept_peers = PeerCopies::new();
     for (path, writer) in store::peer_files(store, key, device, workspace)? {
         let peer = Source {
             path: &path,
@@ -663,6 +695,14 @@ pub fn sync_remembering<S: StorageProvider>(
                 continue;
             }
         };
+        if let Some(copy) = remembered_peers
+            .remove(&path)
+            .filter(|copy| copy.sealed == sealed)
+        {
+            peers.push(copy.read.clone());
+            kept_peers.insert(path, copy);
+            continue;
+        }
         let Some(json) = open_and_decode(&sealed, key, peer, &mut report) else {
             continue;
         };
@@ -670,9 +710,17 @@ pub fn sync_remembering<S: StorageProvider>(
             && written_by_its_path(&remote, peer, &mut report)
         {
             drop_foreign_marks(&mut remote, peer, target);
-            peers.push(remote);
+            peers.push(remote.clone());
+            kept_peers.insert(
+                path,
+                PeerCopy {
+                    sealed,
+                    read: remote,
+                },
+            );
         }
     }
+    copies.put_peers(target, kept_peers);
     let mut ahead = Vec::with_capacity(peers.len());
     for remote in &mut peers {
         ahead.push(
@@ -752,7 +800,7 @@ pub fn sync_remembering<S: StorageProvider>(
             read: None,
         });
     }
-    own_copies.put(target, kept);
+    copies.put(target, kept);
     report.own_watermark = doc.seen.get(&device).copied().unwrap_or(0);
 
     Ok(report)
@@ -3467,13 +3515,13 @@ mod tests {
 }
 
 #[cfg(test)]
-mod own_copy_tests {
+mod file_copy_tests {
     use super::*;
     use crate::store::MemoryStore;
     use crate::types::test_support::{base_doc, test_key, ws_of};
     use uuid::Uuid;
 
-    /// One pass over `doc`, remembering this device's own file in `own`, and
+    /// One pass over `doc`, remembering the files it reads in `own`, and
     /// what an observer can see of it: the whole document and the report.
     #[expect(clippy::too_many_arguments)]
     fn pass(
@@ -3484,7 +3532,7 @@ mod own_copy_tests {
         doc: &mut Document,
         now: Timestamp,
         clamp_from: Option<Timestamp>,
-        own: &mut OwnCopies,
+        own: &mut FileCopies,
     ) -> (String, String) {
         let report = sync_remembering(
             store,
@@ -3504,10 +3552,13 @@ mod own_copy_tests {
 
     /// Every step of a run: a first write, an unchanged pass, a clamp over a
     /// stamp from a clock that ran ahead, the pass after it, a peer's file,
-    /// a local edit and a last unchanged pass.
+    /// a local edit, a last unchanged pass, the peer's next file, one from a
+    /// peer whose clock runs ahead read by two passes, and a damaged peer
+    /// file read by two passes.
     fn run(remember: bool) -> Vec<(String, String)> {
         let store = MemoryStore::new();
-        let key = test_key();
+        // Fixed, so both runs name every file alike in their reports.
+        let key = Key::from_bytes(&[7; 32]).unwrap();
         let (me, peer) = (DeviceId::from_bytes([1; 16]), DeviceId::from_bytes([2; 16]));
         let mut doc = base_doc();
         let tab = doc.add_tab(
@@ -3518,10 +3569,10 @@ mod own_copy_tests {
             me,
             100,
         );
-        let mut kept = OwnCopies::default();
+        let mut kept = FileCopies::default();
         let mut steps = Vec::new();
         let mut step = |doc: &mut Document, now, clamp_from| {
-            let mut fresh = OwnCopies::default();
+            let mut fresh = FileCopies::default();
             let own = if remember { &mut kept } else { &mut fresh };
             steps.push(pass(&store, &key, me, "ws-1", doc, now, clamp_from, own));
         };
@@ -3532,7 +3583,7 @@ mod own_copy_tests {
         step(&mut doc, 140, Some(135));
         step(&mut doc, 150, None);
         let mut theirs = base_doc();
-        theirs.add_tab(
+        let theirs_tab = theirs.add_tab(
             ws_of(&theirs),
             "Theirs",
             "https://theirs.example",
@@ -3554,12 +3605,60 @@ mod own_copy_tests {
         step(&mut doc, 1_010, Some(800));
         doc.rename(tab, "Between", me, 850);
         step(&mut doc, 1_020, None);
+        theirs.rename(theirs_tab, "Theirs renamed", peer, 1_025);
+        theirs.stamp_write(peer, 1_030);
+        store::save_document(&store, &key, peer, "ws-1", &theirs).unwrap();
+        step(&mut doc, 1_040, None);
+        step(&mut doc, 1_050, None);
+        // A pass forgets a write stamped ahead of its clock, so a kept copy
+        // that carried what one pass did with its clock would differ on the
+        // next.
+        let ahead = 1_060 + CLOCK_AHEAD_MARGIN + 1_000;
+        theirs.rename(theirs_tab, "Theirs ahead", peer, ahead);
+        theirs.stamp_write(peer, ahead);
+        store::save_document(&store, &key, peer, "ws-1", &theirs).unwrap();
+        step(&mut doc, 1_060, None);
+        step(&mut doc, 1_070, None);
+        let damaged = DeviceId::from_bytes([3; 16]);
+        store
+            .write(&store::device_path(&key, "ws-1", damaged), b"damaged")
+            .unwrap();
+        step(&mut doc, 1_080, None);
+        step(&mut doc, 1_090, None);
         steps
     }
 
     #[test]
-    fn a_remembered_own_file_changes_no_pass() {
+    fn remembered_files_change_no_pass() {
         assert_eq!(run(true), run(false));
+    }
+
+    #[test]
+    fn a_peers_file_replaced_since_the_last_pass_is_read() {
+        let store = MemoryStore::new();
+        let key = test_key();
+        let (me, peer) = (DeviceId::from_bytes([1; 16]), DeviceId::from_bytes([2; 16]));
+        let mut theirs = base_doc();
+        let tab = theirs.add_tab(
+            ws_of(&theirs),
+            "Theirs",
+            "https://theirs.example",
+            Uuid::from_u128(2_000),
+            peer,
+            100,
+        );
+        theirs.stamp_write(peer, 105);
+        store::save_document(&store, &key, peer, "ws-1", &theirs).unwrap();
+        let mut doc = base_doc();
+        let mut own = FileCopies::default();
+        pass(&store, &key, me, "ws-1", &mut doc, 110, None, &mut own);
+
+        theirs.rename(tab, "Renamed", peer, 120);
+        theirs.stamp_write(peer, 125);
+        store::save_document(&store, &key, peer, "ws-1", &theirs).unwrap();
+        pass(&store, &key, me, "ws-1", &mut doc, 130, None, &mut own);
+
+        assert_eq!(doc.node(tab).unwrap().content.name, "Renamed");
     }
 
     #[test]
@@ -3576,7 +3675,7 @@ mod own_copy_tests {
             me,
             100,
         );
-        let mut own = OwnCopies::default();
+        let mut own = FileCopies::default();
         pass(&store, &key, me, "ws-1", &mut doc, 110, None, &mut own);
         pass(&store, &key, me, "ws-1", &mut doc, 120, None, &mut own);
 
@@ -3594,7 +3693,7 @@ mod own_copy_tests {
         let store = MemoryStore::new();
         let key = test_key();
         let me = DeviceId::from_bytes([1; 16]);
-        let mut own = OwnCopies::default();
+        let mut own = FileCopies::default();
         pass(
             &store,
             &key,

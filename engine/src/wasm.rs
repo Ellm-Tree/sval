@@ -59,7 +59,7 @@ use crate::host::{
     run_import_archived, run_restore, run_sync_to, seal_pairing_core,
 };
 use crate::ops::{apply_json, parse_device_id, parse_favorite_guid, parse_timestamp, remove};
-use crate::sync::{OwnCopies, Target};
+use crate::sync::{FileCopies, Target};
 use crate::types::Document;
 use crate::views::{archived_json, favorites_json, settings_json, shards_json, visits_json};
 use js_sys::{Array, Uint8Array};
@@ -240,21 +240,21 @@ impl SyncOutcome {
 /// timestamp it needs from the caller, because `wasm32-unknown-unknown` has
 /// no ambient clock or entropy source (see [`crate::types::Timestamp`]).
 #[wasm_bindgen]
-pub struct SvalDocument(Document, OwnCopies);
+pub struct SvalDocument(Document, FileCopies);
 
 #[wasm_bindgen]
 impl SvalDocument {
     /// A fresh, empty document.
     #[wasm_bindgen(constructor)]
     pub fn new() -> SvalDocument {
-        SvalDocument(Document::new(), OwnCopies::default())
+        SvalDocument(Document::new(), FileCopies::default())
     }
 
     /// Parses `json` as a full document.
     #[wasm_bindgen(js_name = loadJson)]
     pub fn load_json(json: &str) -> Result<SvalDocument, JsValue> {
         Document::from_json(json)
-            .map(|doc| SvalDocument(doc, OwnCopies::default()))
+            .map(|doc| SvalDocument(doc, FileCopies::default()))
             .map_err(to_js_err)
     }
 

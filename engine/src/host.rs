@@ -164,7 +164,7 @@ pub(crate) fn run_sync_expiring(
 ) -> Result<(JsSyncReport, Option<PathAndBytes>), Failure> {
     run_sync_to(
         doc,
-        &mut crate::sync::OwnCopies::default(),
+        &mut crate::sync::FileCopies::default(),
         key_bytes,
         device_id_bytes,
         workspace,
@@ -183,7 +183,7 @@ pub(crate) fn run_sync_expiring(
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn run_sync_to(
     doc: &mut Document,
-    own_copies: &mut crate::sync::OwnCopies,
+    copies: &mut crate::sync::FileCopies,
     key_bytes: &[u8],
     device_id_bytes: &[u8],
     workspace: &str,
@@ -200,7 +200,7 @@ pub(crate) fn run_sync_to(
     let clamp_from = clamp_from.map(parse_timestamp).transpose()?;
     let store = PreloadedStore::new(peer_files);
     let report = crate::sync::sync_remembering(
-        &store, &key, device, workspace, doc, now, retention, target, clamp_from, own_copies,
+        &store, &key, device, workspace, doc, now, retention, target, clamp_from, copies,
     )?;
     Ok((report.into(), store.into_written()))
 }
@@ -605,7 +605,7 @@ mod tests {
             let mut copy = doc.clone();
             let (_, write) = run_sync_to(
                 &mut copy,
-                &mut crate::sync::OwnCopies::default(),
+                &mut crate::sync::FileCopies::default(),
                 &key,
                 &[1; 16],
                 "ws-1",

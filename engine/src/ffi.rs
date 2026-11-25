@@ -355,8 +355,8 @@ fn id_strings(ids: &[NodeId]) -> Vec<String> {
 }
 
 /// The document a device holds, behind a lock because UniFFI objects are
-/// shared across threads, what its passes remember of this device's own
-/// file ([`crate::sync::OwnCopies`]), and its revisions. Every change to
+/// shared across threads, what its passes remember of the files they read
+/// ([`crate::sync::FileCopies`]), and its revisions. Every change to
 /// the document's nodes comes through [`SvalDocument::apply_batch`] or
 /// [`SvalDocument::sync`], each of which notes it under the document's lock,
 /// so a reader that reads the revision first never takes older nodes for a
@@ -364,7 +364,7 @@ fn id_strings(ids: &[NodeId]) -> Vec<String> {
 #[derive(uniffi::Object)]
 pub struct SvalDocument(
     Mutex<Document>,
-    Mutex<crate::sync::OwnCopies>,
+    Mutex<crate::sync::FileCopies>,
     Mutex<Revisions>,
 );
 
