@@ -55,10 +55,16 @@ add_task(async function the_button_opens_the_form() {
   const panel = document
     .getElementById("sval-panel-container")
     .getBoundingClientRect();
-  Assert.equal(
+  const tab = form.querySelector(".sval-feedback-tab").getBoundingClientRect();
+  Assert.greaterOrEqual(
     Math.round(box.left - panel.right),
     8,
-    "the popover sits 8px past the panel"
+    "the popover sits at least 8px past the panel"
+  );
+  Assert.greaterOrEqual(
+    Math.round(box.left - tab.right),
+    12,
+    "and a fillet's room past the tab"
   );
 
   Assert.ok(send.disabled, "an empty message can't be sent");
@@ -298,4 +304,69 @@ add_task(async function about_dialogs_link_opens_the_form() {
   link.click();
   const form = await feedbackShown();
   Assert.ok(formParts(form).context.hidden, "with no context");
+});
+
+/**
+ * Opens the form from the column's button with the toolbar in the panel and
+ * the panel on `side`, and checks the tab covers the button and the stem
+ * meets the box with room for its curve or none (`SvalStem`).
+ *
+ * @param {string} side
+ */
+async function checkTabOverColumnButton(side) {
+  await appDataInTemp();
+  atTaskEnd(() => discardFeedbackDraft());
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.sval.toolbar.inPanel", true],
+      // Firefox marks Home as taken out of `#nav-bar` once it moves
+      // (`BrowserUsageTelemetry`).
+      ["browser.engagement.home-button.has-removed", false],
+    ],
+  });
+  atTaskEnd(() => SpecialPowers.popPrefEnv());
+  await SvalPanel.placePanel(side);
+  atTaskEnd(() => SvalPanel.placePanel("left"));
+  SvalPanel._setPanelWidth(48);
+  atTaskEnd(() => SvalPanel._setPanelWidth(null));
+  const button = feedbackButton();
+  // The column's padding comes with its attribute, after the panel's width,
+  // and the panel slides to its side.
+  const panel = document.getElementById("sval-panel-container");
+  await TestUtils.waitForCondition(
+    () =>
+      panel.hasAttribute("sval-column") &&
+      !panel.getAnimations({ subtree: true }).length &&
+      BrowserTestUtils.isVisible(button) &&
+      button.getBoundingClientRect().width == 36,
+    "the button in the column"
+  );
+  button.click();
+  const form = await feedbackShown();
+  const b = button.getBoundingClientRect();
+  const tab = form.querySelector(".sval-feedback-tab").getBoundingClientRect();
+  const box = form.querySelector(".sval-feedback-box").getBoundingClientRect();
+  const middle = r => [(r.left + r.right) / 2, (r.top + r.bottom) / 2];
+  const [bx, by] = middle(b);
+  const [tx, ty] = middle(tab);
+  Assert.less(
+    Math.abs(tx - bx) + Math.abs(ty - by),
+    0.5,
+    `the tab stands over the button's middle on the ${side}`
+  );
+  Assert.greaterOrEqual(tab.width, b.width, "and covers it");
+  const neck = side == "left" ? box.left - tab.right : tab.left - box.right;
+  Assert.greaterOrEqual(
+    neck,
+    12,
+    `the box stands a fillet's room from the tab on the ${side}: ${neck}px`
+  );
+}
+
+add_task(async function the_tab_covers_the_columns_button_on_the_left() {
+  await checkTabOverColumnButton("left");
+});
+
+add_task(async function the_tab_covers_the_columns_button_on_the_right() {
+  await checkTabOverColumnButton("right");
 });

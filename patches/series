@@ -215,6 +215,7 @@ settings-doh-aliases.patch
 home-settings-in-preferences.patch
 settings-home-use-favorite.patch
 popups-anchor-in-sval-header.patch
+stem-popup-positioned.patch
 tab-strip-stays-hidden.patch
 addon-refusal-notification-id.patch
 header-popovers-slide.patch
@@ -424,3 +425,8 @@ topsites-refresh-on-rank-change.patch
 remove-newtab.patch
 remove-newtab.delete
 back-to-opener.patch
+panel-toolbar-events.patch
+panel-toolbar-keynav.patch
+panel-sets-overflow.patch
+macos-stacked-window-buttons.patch
+search-icon-retry.patch

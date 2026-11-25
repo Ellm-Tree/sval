@@ -12,64 +12,41 @@
 /* import-globals-from sval-panel.js */
 
 {
-  /**
-   * The flex `order` that puts the panel after everything else in `#browser`.
-   * Above that box's eight children, whose own values run 1 to 8; see
-   * `_applyPlacement`.
-   */
-  const PANEL_ORDER_LAST = "100";
-
   /** Whether Firefox's sidebar sits at the window's start (`SidebarController`). */
   const SIDEBAR_START_PREF = "sidebar.position_start";
+  const { IN_PANEL_PREF } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalHeader.sys.mjs"
+  );
+  const { SvalPanelToolbar } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs"
+  );
 
   Object.assign(SvalPanel, {
     /**
-     * Puts the panel on the side spec §5.6 records for this device.
-     *
-     * Three things about `#browser`, each measured on a running build rather
-     * than reasoned about, decide how this is done:
-     *
-     *  - Its children do not compute `order: 0`. They come out 1, 2, 3 … 8, one
-     *    per child, so any value up to the sibling count is no move at all.
-     *  - Those values do not follow the DOM. Moving the container to the end of
-     *    `#browser`, or removing and re-appending it, leaves it at `order: 1`
-     *    and leaves its box first.
-     *  - A rule in `sval-panel.css` does not change it either. The rest of that
-     *    rule lands while `order` stays 1. An inline value is what takes
-     *    effect, so that is where it goes.
-     *
-     * `#browser` has eight children, and a value above all of them keeps the
-     * panel last however many there are after the next ESR rebase.
-     * `browser_sval_panel_footer.js` asserts where the box ends up, not that this
-     * ran.
+     * Puts the panel on the side spec §5.6 records for this device:
+     * `sval-panel.css` places the box by `sval-placement`, over the order
+     * Firefox's sidebar writes on each of `#browser`'s children.
      */
     _applyPlacement() {
       const container = this._els.container;
       const placement = this._settings.placement;
       // Firefox's sidebar opens on the panel's other side, so the two never
-      // stack. `SidebarController.setPosition` runs as the pref changes and
-      // rewrites the order of every child of `#browser`, the panel's
-      // container's too, so the pref is set before the order below. The pref
-      // is every window's, so only the profile's side writes it: a window on
-      // a tree in memory keeps the side it opened with.
+      // stack. The pref is every window's, so only the profile's side writes
+      // it: a window on a tree in memory keeps the side it opened with.
       if (!this._inMemory) {
         Services.prefs.setBoolPref(SIDEBAR_START_PREF, placement === "right");
       }
       container.setAttribute("sval-placement", placement);
-      container.style.order = placement === "right" ? PANEL_ORDER_LAST : "";
-    },
-
-    /**
-     * Places the panel, and again once Firefox's sidebar has started:
-     * `SidebarController.startDelayedLoad` waits for the session store, which
-     * can be after this window's panel starts, and its `setPosition` writes
-     * every box's order.
-     */
-    _applyPlacementOnceSidebarStarts() {
-      this._applyPlacement();
-      window.SidebarController?.promiseInitialized.then(() =>
-        this._applyPlacement()
-      );
+      // Kept for the next window's first paint (`SvalWindow`), before this
+      // device's settings have loaded.
+      if (!this._inMemory) {
+        Services.xulStore.setValue(
+          document.documentURI,
+          container.id,
+          "sval-placement",
+          placement
+        );
+      }
     },
 
     /**
@@ -155,7 +132,7 @@
         if (drag && event.clientX !== drag.x) {
           drag.moved = true;
           const width = drag.width + drag.sign * (event.clientX - drag.x);
-          container.style.width = `${Math.max(0, width)}px`;
+          container.style.width = `${this._snapWidth(Math.max(0, width), null)}px`;
         }
       });
       // A press that never moved keeps no width: the panel stays on the
@@ -183,7 +160,8 @@
         const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
         if (step) {
           const by = (event.shiftKey ? 64 : 16) * step * widening();
-          container.style.width = `${container.getBoundingClientRect().width + by}px`;
+          const now = container.getBoundingClientRect().width;
+          container.style.width = `${this._snapWidth(now + by, by > 0)}px`;
           keep();
         } else if (event.key === "Home" || event.key === "End") {
           // The stylesheet's bounds clamp a width past them to the bound.
@@ -199,6 +177,34 @@
         event.preventDefault();
       });
       return edge;
+    },
+
+    /**
+     * The width the panel takes for `width`. With the toolbar in the panel,
+     * no width stands between the panel's narrowest, where it is one column,
+     * and the narrowest its toolbar's rows hold, as the toolbar measured it:
+     * the whole panel turns to the column at once. A width between snaps to the
+     * column as the panel narrows and to the rows as it widens, or, with no
+     * way given, to the nearer of the two.
+     *
+     * @param {number} width CSS pixels.
+     * @param {boolean|null} growing
+     * @returns {number}
+     */
+    _snapWidth(width, growing) {
+      const column = parseFloat(
+        window.getComputedStyle(this._els.container).minWidth
+      );
+      const rows = SvalPanelToolbar.rowsMinWidth(window);
+      if (
+        width <= column ||
+        width >= rows ||
+        !Services.prefs.getBoolPref(IN_PANEL_PREF, false)
+      ) {
+        return width;
+      }
+      const wider = growing ?? width - column > rows - width;
+      return wider ? rows : column;
     },
 
     /**
@@ -227,7 +233,7 @@
       }
       const width = this._settings.panelWidth;
       if (width) {
-        container.style.width = `${width}px`;
+        container.style.width = `${this._snapWidth(width, null)}px`;
       } else {
         container.style.removeProperty("width");
       }

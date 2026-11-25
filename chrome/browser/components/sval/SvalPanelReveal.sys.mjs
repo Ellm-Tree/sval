@@ -74,6 +74,20 @@ export const SvalPanelReveal = {
   dismiss(win) {
     reveals.get(win)?.hide();
   },
+
+  /**
+   * Slides the hidden panel in as the edge does, whether or not the edge is
+   * turned on: the toolbar in the panel (`SvalPanelToolbar`) has a prompt or
+   * a device in use to show there. It slides away as from the edge.
+   *
+   * @param {Window} win
+   * @param {object} options
+   * @param {boolean} options.instant Whether it is in at once, for a popup
+   *   about to open from a button in it.
+   */
+  show(win, { instant }) {
+    reveals.get(win)?.reveal({ force: true, instant });
+  },
 };
 
 /** One window's strip, and its panel while slid in. */
@@ -239,14 +253,34 @@ class Reveal {
           screen.left + screen.width - 1;
   }
 
-  reveal() {
+  /**
+   * @param {object} [options]
+   * @param {boolean} [options.force] Whether it slides in with the edge
+   *   turned off.
+   * @param {boolean} [options.instant] Whether it skips the slide.
+   */
+  reveal({ force = false, instant = false } = {}) {
     // The strip shows only while the panel is hidden and the pref is on
     // (`sval-header.css`, panel reveal), which a pointer resting on it
     // outlasts.
-    if (!this.collapsed || this.edge.hidden || this.container.hidden) {
+    if (
+      !this.collapsed ||
+      (this.edge.hidden && !force) ||
+      this.container.hidden ||
+      this.revealed
+    ) {
       return;
     }
-    this.container.setAttribute("sval-reveal", "shown");
+    if (instant) {
+      // A popup opening from a button in the panel is placed once, where
+      // the button is drawn as it opens.
+      this.container.style.transition = "none";
+      this.container.setAttribute("sval-reveal", "shown");
+      this.container.getBoundingClientRect();
+      this.container.style.removeProperty("transition");
+    } else {
+      this.container.setAttribute("sval-reveal", "shown");
+    }
     this.doc.addEventListener("popupshown", this);
     this.doc.addEventListener("popuphidden", this);
     this.doc.addEventListener("dragend", this);

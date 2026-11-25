@@ -62,12 +62,12 @@
    record of history, the split button, and the extensions, which belong to
    the window a page is kept in. */
 :root[svalpeek]
-  #nav-bar
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(#sval-panel-button, #sval-history-button, #split-view-button, #sval-private-badge, #unified-extensions-button, .unified-extensions-item) {
   display: none !important;
 }
 
-:root[svalpeek] #nav-bar {
+:root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) {
   gap: 6px;
 }
 
@@ -75,11 +75,11 @@
    (`SvalDownloadWorkspaces`, `DownloadsButton` autohiding it), alone in the
    records' pill, so it closes the pill too. Its panel lists only the
    Peek's, so the switch between workspaces has nothing to switch. */
-:root[svalpeek] #nav-bar:not([downloadsbuttonshown]) #downloads-button {
+:root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records):not([downloadsbuttonshown]) #downloads-button {
   display: none !important;
 }
 
-:root[svalpeek] #nav-bar #downloads-button {
+:root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #downloads-button {
   border-inline-end: 1px solid var(--sval-cluster-border);
   border-start-end-radius: 999px;
   border-end-end-radius: 999px;
@@ -103,27 +103,27 @@
 /* Firefox widens the address's base width by a button's room for each of the
    downloads and extensions buttons the row is not showing
    (`urlbar-searchbar.css`), room a Peek's row has no button to fill. */
-:root[svalpeek] #nav-bar #urlbar-container {
+:root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #urlbar-container {
   width: var(--urlbar-container-min-width);
 }
 
-:root[svalpeek] #nav-bar-customization-target {
+:root[svalpeek] :is(#nav-bar-customization-target, .sval-set-target) {
   min-width: auto !important;
 }
 
 /* The pill's outline reaches under the docked buttons by their exact width
    (`sval-header.css`), so they keep it: only the address gives way. */
-:root[svalpeek] #nav-bar-customization-target > :not(#urlbar-container) {
+:root[svalpeek] :is(#nav-bar-customization-target, .sval-set-target) > :not(#urlbar-container) {
   flex-shrink: 0;
 }
 
-:root[svalpeek] #nav-bar #back-button {
+:root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #back-button {
   margin-inline-start: 0 !important;
 }
 
 /* The pill reaches 3px past the favorite button (`--sval-dock-end-w`), so
    the button keeps that room before the open button's gap. */
-:root[svalpeek] #nav-bar #sval-favorite-button {
+:root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #sval-favorite-button {
   margin-inline-end: 3px !important;
 }
 
@@ -132,12 +132,12 @@
    `browser.css`). No Maximize: opening the page in a workspace is the way to
    keep it big. */
 @media not (-moz-platform: macos) {
-  :root[svalpeek] #nav-bar > .titlebar-buttonbox-container {
+  :root[svalpeek] :is(#nav-bar, .sval-set) > .titlebar-buttonbox-container {
     order: 1;
     margin-inline-end: 0;
   }
 
-  :root[svalpeek] #nav-bar {
+  :root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) {
     padding-inline-end: 0;
   }
 
@@ -147,7 +147,7 @@
 }
 
 @media (-moz-platform: macos) {
-  :root[svalpeek] #nav-bar {
+  :root[svalpeek] :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) {
     padding-inline-start: 14px;
   }
 }
@@ -157,12 +157,12 @@
     display: none !important;
   }
 
-  :root[svalpeek] #nav-bar > .titlebar-buttonbox-container {
+  :root[svalpeek] :is(#nav-bar, .sval-set) > .titlebar-buttonbox-container {
     margin-inline-start: 4px;
   }
 
   @media (-moz-gtk-csd-reversed-placement) {
-    :root[svalpeek] #nav-bar > .titlebar-buttonbox-container {
+    :root[svalpeek] :is(#nav-bar, .sval-set) > .titlebar-buttonbox-container {
       order: -1;
     }
   }

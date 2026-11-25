@@ -214,6 +214,19 @@ function checkGrows(popup, root) {
     return;
   }
 
+  // Each side of the content stands on its button's, in one straight edge,
+  // or a fillet's room from it, so the stem's foot curves into it
+  // (`SvalStem`, 12px fillets).
+  const width = px(getComputedStyle(part).width);
+  for (const room of [
+    face.left - content.left,
+    content.left + width - face.right,
+  ]) {
+    if (Math.abs(room) > TOLERANCE && room < 12 - TOLERANCE) {
+      Assert.ok(false, `the content steps ${room}px out from the stem`);
+    }
+  }
+
   checkSameFill(popup, root);
   for (const el of new Set([root, faceOf(root)])) {
     Assert.equal(
@@ -659,6 +672,31 @@ add_task(async function the_site_settings_grow_from_their_button() {
   });
 });
 
+add_task(async function the_protection_panel_grows_from_the_panels_address() {
+  await within(SvalPanel.started, 10_000, "the panel's startup");
+  await SpecialPowers.pushPrefEnv({
+    // Firefox marks Home as taken out of `#nav-bar` once it moves
+    // (`BrowserUsageTelemetry`), which the file puts back.
+    set: [
+      ["browser.sval.toolbar.inPanel", true],
+      ["browser.engagement.home-button.has-removed", false],
+    ],
+  });
+  atTaskEnd(() => SpecialPowers.popPrefEnv());
+  await BrowserTestUtils.withNewTab("https://example.com/", async () => {
+    const button = document.getElementById("sval-protection-button");
+    await TestUtils.waitForCondition(
+      () => button.checkVisibility(),
+      "Privacy and Security in the panel's address"
+    );
+    await whileOpen(
+      "sval-protection-panel",
+      () => button.click(),
+      (panel, root) => checkGrows(panel, root)
+    );
+  });
+});
+
 add_task(async function the_favorites_menu_grows_from_its_button() {
   const button = SvalPanel._els.favorites;
   const popup = SvalPanel._els.favoritesMenu;
@@ -1055,6 +1093,15 @@ add_task(async function a_press_on_a_popovers_shadow_closes_it() {
           );
           pressPopover(popup, Math.round(content.right) - 8, middle);
           Assert.equal(popup.state, "open", "a press on its content keeps it");
+          // `nsXULElement::Click` presses its element at the screen's corner.
+          popup.firstElementChild.dispatchEvent(
+            new MouseEvent("mousedown", { bubbles: true, button: 0 })
+          );
+          Assert.equal(
+            popup.state,
+            "open",
+            "and so does a press on its own element, wherever it says it was"
+          );
           if (OPAQUE_POPUPS) {
             return;
           }

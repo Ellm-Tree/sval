@@ -464,10 +464,20 @@ add_task(async function the_footer_sits_in_the_middle() {
   await untilRestored(tab);
   await playVideo(tab);
   await TestUtils.waitForCondition(() => !bar.hidden, "the controls show");
-  const footer = SvalPanel._els.footer.getBoundingClientRect();
+  // The middle of the footer's content, which stands nearer the page by its
+  // padding (`sval-panel.css`, the room at each side of the panel's content).
+  const footerEl = SvalPanel._els.footer;
+  const footer = footerEl.getBoundingClientRect();
+  const style = window.getComputedStyle(footerEl);
+  const middle =
+    (footer.left +
+      parseFloat(style.paddingLeft) +
+      footer.right -
+      parseFloat(style.paddingRight)) /
+    2;
   const own = bar.getBoundingClientRect();
   Assert.lessOrEqual(
-    Math.abs(own.left + own.width / 2 - (footer.left + footer.width / 2)),
+    Math.abs(own.left + own.width / 2 - middle),
     2,
     "centred in the footer"
   );

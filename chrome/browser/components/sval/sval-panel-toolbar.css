@@ -1,0 +1,696 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * The toolbar's sets (`SvalPanelToolbar`), which hold the header's widgets
+ * while the toolbar is in the Workspace panel (`SvalHeader.arrange`): each
+ * set is a toolbar area that draws one pill, and its widgets draw none of
+ * their own (`sval-header.css` paints its pills in `#nav-bar` alone). The
+ * sets stand in `#sval-panel-toolbar` at the panel's top, in their order,
+ * and the records' set in its footer. `SvalToolbarLayout` decides the rows:
+ * a break ends a row where it carries `sval-row-end`, and the toolbar
+ * carries the column, the joined pill and the Launcher key as attributes
+ * (panel toolbar widths spec, §3 and §4). In a Peek or a page's popup the
+ * sets stand side by side in the header row.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* ---------------------------------------------------------------- areas */
+
+/* The areas hold nothing while the toolbar is above the page, and
+   `#nav-bar` holds only what Firefox keeps there while it is in the panel. */
+:root:not([sval-toolbar-in-panel]) :is(#sval-panel-toolbar, #sval-panel-records),
+:root[sval-toolbar-in-panel] #nav-bar {
+  visibility: collapse;
+}
+
+/* In a Peek or a popup, the sets are the header row, each at its width
+   with every item: with no panel, there is no » to fold into. */
+#sval-toolbar-host > #sval-panel-toolbar {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+}
+
+/* The header row is gone: nothing above the page but the window's own
+   menu bar where the system draws one in the window. */
+:root[sval-toolbar-in-panel]
+  #navigator-toolbox:has(+ #browser > #sval-panel-container > #sval-panel-toolbar):not(
+    :has(> :not([hidden], [collapsed="true"], [autohide="true"], #nav-bar))
+  ) {
+  visibility: collapse;
+}
+
+/* With no row above it, the page keeps the gap it keeps at its sides and
+   foot from the window's top edge (`sval-header.css`, page frame). */
+:root[sval-toolbar-in-panel] #browser:has(> #sval-panel-container > #sval-panel-toolbar) > #tabbrowser-tabbox {
+  --sval-frame-top: 6px;
+}
+
+/* The toolbar stands above `.sval-panel`, which paints the panel's fill, so
+   the box paints it too while it is lifted over the page
+   (`sval-header.css`, panel slide and panel reveal). */
+:root[sval-toolbar-in-panel] #sval-panel-container[sval-overlay]:has(> #sval-panel-toolbar) {
+  background: var(--sidebar-background-color);
+}
+
+/* ---------------------------------------------------------------- box */
+
+/* Where the window row's pills stand, from the window's top and the panel's
+   outer edge. The hidden panel's corner takes its place from the row as
+   drawn (`SvalPanelToolbar.placeCorner`). */
+#browser {
+  --sval-window-row-top: 12px;
+  --sval-window-row-start: 12px;
+  /* Between the window's buttons and the toggle. */
+  --sval-lights-gap: 16px;
+}
+
+/* Sets lie side by side and a row ends only at a break that ends it, which
+   the layout places so that every row fits (`SvalToolbarLayout`): the box
+   never wraps on its own. Rows are 6px apart through the sets' own 3px
+   margins, so a break's empty line adds nothing. */
+#sval-panel-container > #sval-panel-toolbar {
+  --toolbarbutton-padding-inner: 6px;
+  flex: none;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  column-gap: 6px;
+  row-gap: 0;
+  position: relative;
+  /* The address pill's outline is drawn behind its field
+     (`sval-header.css`, `#urlbar-container::before`), which needs a
+     stacking context of the toolbar's own to stay over the panel. */
+  isolation: isolate;
+  /* The panel's width decides the rows, never the rows the panel's. */
+  contain: inline-size;
+  min-width: 0;
+  padding-block: calc(var(--sval-window-row-top) - 3px) 5px;
+  border-bottom: var(--border-width) solid var(--sval-hairline, rgb(var(--sval-palette-wash-dark) / 0.1)) !important;
+  -moz-window-dragging: drag;
+
+  > .sval-set {
+    margin-block: 3px;
+  }
+}
+
+.sval-set-break {
+  display: none;
+}
+
+#sval-panel-container > #sval-panel-toolbar > .sval-set-break[sval-row-end] {
+  display: block;
+  flex: 0 0 100%;
+  height: 0;
+}
+
+/* ---------------------------------------------------------------- sets */
+
+/* A set is a box the layout sizes, and the pill it draws: the box takes the
+   room its row gives it, which is the room `OverflowableToolbar` counts,
+   and the pill, its target, hugs the circles it shows. */
+.sval-set {
+  /* A 16px icon in a 28px circle, as in the header row, wherever the set
+     stands: the footer's records too. */
+  --toolbarbutton-padding-inner: 6px;
+  flex: none;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+  -moz-window-dragging: no-drag;
+
+  /* A set that gives items up shrinks from its width with all of them
+     (`SvalPanelToolbar.draw`) to what its row has, and its items leave as
+     its rules say (spec §2). Until the layout gives it that width, it keeps
+     the width of what it shows, so nothing leaves as a window opens. */
+  &[overfloworder][sval-sized] {
+    flex: 0 1 auto;
+  }
+}
+
+/* The pill: 28px circles inside a 36px pill, each sharing the centre of
+   the pill's rounded end through the 1px border and 3px padding, as the
+   header's clusters are (`sval-header.css`). » and Privacy and Security on
+   its own hold their button with no target. */
+.sval-set > .sval-set-target,
+.sval-set:is([data-set="overflow"], [data-set="shield"]) {
+  flex: none;
+  min-width: 0;
+  align-items: center;
+  gap: 0;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 3px;
+  border: 1px solid var(--sval-cluster-border);
+  border-radius: 999px;
+  background-color: var(--sval-cluster-bg);
+  box-shadow: var(--sval-cluster-shadow);
+}
+
+/* The pill's padding spaces its circles; a button keeps none of the
+   toolbar's own. */
+.sval-set > .sval-set-target > :is(.toolbarbutton-1, .unified-extensions-item),
+.sval-set > .sval-set-target > .unified-extensions-item > .unified-extensions-item-row-wrapper > .unified-extensions-item-action-button {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* A set with nothing to show takes no room (`SvalPanelToolbar.draw`), and
+   the private badge outside a private window (`sval-header.css`). */
+:root:not([privatebrowsingmode="temporary"]) .sval-set[data-set="badge"],
+.sval-set[sval-empty] {
+  display: none;
+}
+
+/* The address and the private badge draw no pill: the address draws its
+   field's, the badge its own. */
+.sval-set:is([data-set="address"], [data-set="badge"]) > .sval-set-target {
+  flex: 1;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* » shows while the sets have folded anything into its list (spec §2). */
+#sval-panel-toolbar:not([sval-folded]) > .sval-set[data-set="overflow"] {
+  display: none;
+}
+
+#sval-panel-overflow-button {
+  list-style-image: var(--sval-icon-more);
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ---------------------------------------------------------------- window row */
+
+/* The window's buttons start the window row on macOS, 4px further in than
+   the row's pills, where a pill's 1px border and 3px padding put its
+   circle; elsewhere they end it. */
+.sval-set[data-set="window"] {
+  padding-inline-start: calc(var(--sval-window-row-start) + 4px - 8px);
+
+  > .titlebar-buttonbox-container {
+    order: -1;
+    margin-inline-end: calc(var(--sval-lights-gap) - 4px);
+  }
+}
+
+@media not (-moz-platform: macos) {
+  .sval-set[data-set="window"] {
+    flex: 1;
+    padding-inline-start: 0;
+
+    > .titlebar-buttonbox-container {
+      order: 1;
+      margin-inline: auto 0;
+    }
+  }
+}
+
+/* A window row too narrow for both puts the toggle under the window's
+   buttons, each where the row starts them (`SvalToolbarLayout`). */
+#sval-panel-toolbar[sval-window-wrapped] > .sval-set[data-set="window"] {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  height: auto;
+
+  > .titlebar-buttonbox-container {
+    flex: 0 0 100%;
+    height: 36px;
+    margin-inline-end: 0;
+  }
+
+  /* The toggle's circle starts where the buttons do, past the 12px Firefox
+     puts before them (`browser.css`, osx) less its pill's 4px edge. */
+  > .sval-set-target {
+    margin-inline-start: 8px;
+  }
+}
+
+/* Navigation ends the window row while it stands there. */
+#sval-panel-container > #sval-panel-toolbar:not([sval-column]) > .sval-set-break:not([sval-row-end]) + .sval-set[data-set="nav"] {
+  margin-inline-start: auto;
+}
+
+/* ---------------------------------------------------------------- address */
+
+/* The address takes its row's whole width. It docks nothing (decision 0132
+   holds in the header row), so its outline reaches only past the shield.
+   `SvalPanelToolbar` reads its narrowest width from here. */
+.sval-set[data-set="address"] {
+  --sval-address-min-w: 64px;
+  --sval-dock-w: 4px;
+  --sval-dock-end-w: 0px;
+  flex: 1 1 100%;
+  height: auto;
+
+  > .sval-set-target > #urlbar-container {
+    flex: 1 1 0 !important;
+    min-width: 0;
+    max-width: none;
+    margin-inline-start: 4px !important;
+    /* The field takes the container's whole width as it breaks out of the
+       row (`UrlbarInput`'s `--urlbar-width`), so the container keeps none
+       of it for padding. */
+    padding-inline: 0 !important;
+  }
+
+  /* The pill's end glyph, the search's switch, stands as far in from its
+     end as the shield's does from its start: the shield's 6px of padding
+     past the dock's 4px. The switch's circle holds its 16px glyph 6px in. */
+  #urlbar:not([breakout-extend]) > .urlbar-input-container {
+    padding-inline-end: 4px;
+  }
+
+  #sval-urlbar-flip {
+    margin-inline-end: 0;
+  }
+
+  /* No docked button stands beside the pill here for it to pass under,
+     and at the header's `z-index: -1` a real macOS window draws a box the
+     field's size over all of it but its rim. */
+  > .sval-set-target > #urlbar-container::before {
+    z-index: 0;
+  }
+}
+
+/* The Launcher floats the field over the page with the panel hidden too. */
+:root[sval-toolbar-in-panel] #urlbar[sval-launcher-floating] {
+  visibility: visible;
+}
+
+#sval-panel-container > #sval-panel-toolbar[sval-no-key] :is(#sval-urlbar-key, #sval-launcher-key) {
+  display: none;
+}
+
+/* A click on the field floats the Launcher (`SvalPanelToolbar`). */
+#sval-panel-container > #sval-panel-toolbar #urlbar:not([focused]) .urlbar-input {
+  cursor: text;
+}
+
+/* ---------------------------------------------------------------- joined */
+
+/* Site controls and Page are one pill while both fit on a row: their
+   facing ends square off and their borders there clear, the gap between
+   them closes, and a 1×18px divider stands on the seam. Neither pill's box
+   changes size, so what the layout measured for each still holds. */
+#sval-panel-toolbar[sval-joined] {
+  > .sval-set[data-set="site"] > .sval-set-target {
+    border-inline-end-color: transparent;
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  > .sval-set[data-set="page"] {
+    margin-inline-start: -6px;
+  }
+
+  > .sval-set[data-set="page"] > .sval-set-target {
+    border-inline-start-color: transparent;
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    background-image: linear-gradient(var(--sval-cluster-border), var(--sval-cluster-border));
+    background-origin: border-box;
+    background-size: 1px 18px;
+    background-position: left center;
+    background-repeat: no-repeat;
+
+    &:-moz-locale-dir(rtl) {
+      background-position: right center;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- column */
+
+/* The narrowest panel is one column of circles, footer included (spec §4).
+   They start 3px into the panel's content at either side, so a 36px circle
+   stands in its middle and every set shares its start edge. */
+#sval-panel-container > #sval-panel-toolbar[sval-column] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  padding-inline: 3px;
+
+  > .sval-set-break {
+    display: none;
+  }
+
+  /* Each pill is one circle wide: the 28px circles in a 1px border and 3px
+     padding all round, as in a row. */
+  > .sval-set {
+    flex-direction: column;
+    align-items: flex-start;
+
+    > .sval-set-target {
+      flex-direction: column;
+      height: auto;
+      padding: 3px;
+    }
+  }
+
+  /* The window's buttons stand stacked, close over minimize over zoom, in a
+     vertical box (`macos-stacked-window-buttons.patch`), over the middle of
+     the column's circles. */
+  > .sval-set[data-set="window"] {
+    padding-inline-start: 0;
+
+    > .titlebar-buttonbox-container {
+      justify-content: center;
+      width: 36px;
+      margin: 0 0 6px;
+
+      > .titlebar-buttonbox {
+        writing-mode: vertical-lr;
+        margin: 0;
+      }
+    }
+  }
+
+  /* The address is one circle: the site's icon, which opens the Launcher.
+     Privacy and Security stands in its own circle above it
+     (`SvalPanelToolbar.placeShield`). */
+  > .sval-set[data-set="address"] {
+    --sval-dock-w: 0px;
+    flex: none;
+    overflow: clip;
+
+    > .sval-set-target {
+      padding: 0;
+    }
+
+    /* Drawn as the column's other circles are. */
+    > .sval-set-target > #urlbar-container::before {
+      background-color: var(--sval-cluster-bg);
+      border-color: var(--sval-cluster-border);
+      box-shadow: var(--sval-cluster-shadow);
+    }
+
+    /* A circle: as tall as it is wide, its field centred in it. */
+    > .sval-set-target > #urlbar-container {
+      flex: none !important;
+      width: 36px;
+      height: 36px;
+      margin-inline: 0 !important;
+      padding-block: 2px !important;
+    }
+
+    /* The circle is the Launcher's glass alone, which a click floats the
+       Launcher from, with the field's text and its switch in it. The
+       Launcher's card is the same field, floated whole. */
+    #urlbar:not([sval-launcher-floating]) {
+      .urlbar-input-container > :not(.searchmode-switcher) {
+        display: none;
+      }
+
+      /* The field is its circle, whatever width Firefox last measured
+         for it (`UrlbarInput`, `--urlbar-width`), which lags a resize.
+         It stands in the top layer, where a percentage is the window's. */
+      width: 36px !important;
+
+      .urlbar-input-container {
+        justify-content: center;
+        padding: 0 !important;
+      }
+
+      /* On a loaded page Firefox keeps the switch off the screen
+         (`UrlbarInput.setUnifiedSearchButtonAvailability`); the column
+         shows it, as the glass. */
+      .searchmode-switcher {
+        --button-padding: 0;
+        /* No room between the glass and the engine's name, which the
+           column never shows (`moz-button.css`, `.labelled`). */
+        --space-small: 0;
+        --button-min-height: 28px;
+        --button-border-radius: 999px;
+        --button-background-color-hover: var(--toolbarbutton-hover-background);
+        --button-background-color-active: var(--toolbarbutton-active-background);
+        position: static;
+        flex: none;
+        width: 28px;
+        height: 28px;
+        padding: 0 !important;
+      }
+
+      :is(.searchmode-switcher-title, .searchmode-switcher-dropmarker) {
+        display: none;
+      }
+    }
+  }
+
+  /* A pill that holds its button with no target stands it in its middle,
+     as a target's padding does. */
+  > .sval-set:is([data-set="overflow"], [data-set="shield"]) {
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* One circle as the column's others are, whatever label or count the
+     shield carries in the address. */
+  > .sval-set[data-set="shield"] > #sval-protection-button {
+    justify-content: center;
+    width: 28px;
+    margin: 0;
+    padding: 0;
+
+    > :is(.sval-prot-label-word, .sval-prot-count) {
+      display: none;
+    }
+  }
+}
+
+/* Out of the address, Privacy and Security still shows only while the
+   address does (`sval-protection.css`). */
+#sval-panel-toolbar:has(#urlbar:is([pageproxystate="invalid"]:not([persistsearchterms]), [breakout-extend])) > .sval-set[data-set="shield"] {
+  display: none;
+}
+
+/* Rows take the room the panel's content has at each side
+   (`sval-panel.css`), so they line up with the tree. */
+#sval-panel-container:not([sval-column]) > #sval-panel-toolbar {
+  padding-inline: var(--sval-panel-start) var(--sval-panel-end);
+}
+
+/* On the window's left, the window's buttons keep the small space from its
+   edge, inside the extra 3px the content takes on that side. */
+@media (-moz-platform: macos) {
+  #sval-panel-container:not([sval-column], [sval-placement="right"]) > #sval-panel-toolbar > .sval-set[data-set="window"] {
+    margin-inline-start: calc(var(--space-small) - var(--sval-panel-start));
+  }
+}
+
+/* The page's frame leaves 6px between the panel and the page
+   (`sval-header.css`, page frame), so the column's content takes 6px on the
+   window's side: a circle in its middle stands as far from the window's
+   edge as from the page, on either side and in either text direction. */
+#sval-panel-container[sval-column] {
+  box-sizing: border-box;
+  padding-inline-start: 6px;
+
+  &[sval-placement="right"] {
+    padding-inline: 0 6px;
+  }
+}
+
+/* The footer's records stand in the column too, under Favorites, where
+   the toolbar's circles stand. */
+#sval-panel-container[sval-column] .sval-favorites-bar:has(> #sval-panel-records) {
+  flex-direction: column;
+  align-self: stretch;
+  align-items: flex-start;
+  gap: 6px;
+  padding-inline: 0;
+
+  > #sval-panel-records {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-inline-start: 0;
+
+    > .sval-set-target {
+      flex-direction: column;
+      height: auto;
+      padding: 3px;
+    }
+  }
+}
+
+/* A panel too narrow for the labels of New tab, New group and Favorites
+   shows their icons alone (`SvalPanelToolbar.labelledRowsWidth`), as the
+   column does; each label stays the button's accessible name. */
+#sval-panel-container[sval-short-labels]:not([sval-column]) {
+  :is(.sval-panel-header > .sval-newtab, .sval-favorites) > .sval-label {
+    position: absolute;
+    flex: none;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sval-panel-header > .sval-newtab {
+    justify-content: center;
+  }
+
+  .sval-favorites::after {
+    display: none;
+  }
+}
+
+/* The column's footer stands its circles where the toolbar stands its
+   own, 3px in. */
+#sval-panel-container[sval-column] .sval-panel-footer {
+  align-items: flex-start;
+  padding-inline: 3px;
+
+  > .sval-feedback-button {
+    box-sizing: border-box;
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    border: 1px solid var(--sval-cluster-border);
+    background-color: var(--sval-cluster-bg);
+    box-shadow: var(--sval-cluster-shadow);
+  }
+}
+
+/* Favorites with its star alone is one circle in its pill, as the
+   toolbar's buttons are: 28px in 36px, through a 1px border and 3px of
+   padding. */
+#sval-panel-container:is([sval-column], [sval-short-labels]) .sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
+  flex: none;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 36px;
+  min-width: 0;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--sval-cluster-border);
+  border-radius: 999px;
+  background-color: var(--sval-cluster-bg);
+  box-shadow: var(--sval-cluster-shadow);
+}
+
+/* A ringed button in the footer washes the 28px circle inside its ring on
+   hover and press, as the toolbar's buttons wash their icons
+   (`toolbarbuttons.css`). */
+#sval-panel-container[sval-column] .sval-panel-footer > .sval-feedback-button,
+#sval-panel-container:is([sval-column], [sval-short-labels]) .sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
+  &:hover {
+    background: radial-gradient(circle, var(--toolbarbutton-hover-background) 14px, transparent 14px) var(--sval-cluster-bg);
+  }
+
+  &:hover:active,
+  &[aria-expanded="true"] {
+    background: radial-gradient(circle, var(--toolbarbutton-active-background) 14px, transparent 14px) var(--sval-cluster-bg);
+  }
+}
+
+/* ---------------------------------------------------------------- footer */
+
+/* The records join Favorites in the footer: one pill at the row's end.
+   Favorites keeps its star as the records shrink beside it. */
+.sval-favorites-bar > #sval-panel-records {
+  margin-inline-start: auto;
+}
+
+/* Its star and its chevron stay whole, with the gaps around its label, as the
+   records give up their buttons beside it (`sval-panel.css`, Favorites). */
+.sval-favorites-bar:has(> #sval-panel-records) > .sval-favorites {
+  min-width: calc(2 * var(--space-xsmall) + 2 * var(--size-item-small) + 2 * var(--space-small));
+}
+
+/* A private window's row holds the records alone, at its end. */
+.sval-favorites-bar > .sval-favorites[hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- hidden panel */
+
+/* What reaches the page while the panel is hidden: in the page's top corner
+   on the panel's side, the window's buttons and the panel's toggle, then the
+   live chip; and the loading line along the page's top. The panel slid in
+   over the page stands in their place. */
+#sval-panel-corner,
+#sval-page-load-line {
+  display: none;
+}
+
+:root[sval-toolbar-in-panel]:not([inDOMFullscreen])
+  #browser:has(> #sval-panel-container[sval-collapsed]:not([sval-reveal="shown"]))
+  > :is(#sval-panel-corner, #sval-page-load-line) {
+  display: flex;
+}
+
+#sval-panel-corner {
+  --toolbarbutton-padding-inner: 6px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  -moz-window-dragging: no-drag;
+
+  > #sval-live-chip[hidden] {
+    display: none;
+  }
+}
+
+/* A pill as the toolbar's are (`sval-header.css`): the toggle's 28px
+   circle in the 36px pill, sharing the centre of its rounded end. */
+.sval-corner-pill {
+  align-items: center;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 3px;
+  border: 1px solid var(--sval-cluster-border);
+  border-radius: 999px;
+  background-color: var(--sidebar-background-color);
+  box-shadow: var(--sval-float-box-shadow);
+
+  > .titlebar-buttonbox-container {
+    margin-inline-end: var(--sval-lights-gap);
+  }
+}
+
+#sval-panel-corner-button {
+  margin: 0;
+  padding: 0;
+}
+
+#sval-live-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 999px;
+  background-color: var(--sval-live-bg);
+  color: var(--sval-live-ink);
+  fill: currentColor;
+  -moz-context-properties: fill;
+  box-shadow: 0 6px 18px rgba(3, 5, 26, 0.4);
+
+  > * {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+#sval-page-load-line {
+  inset-inline: 0;
+  top: 0;
+  z-index: 4;
+}

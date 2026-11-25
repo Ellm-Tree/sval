@@ -201,6 +201,8 @@ add_task(async function an_install_opens_the_panel_with_its_message() {
     browser_action: { default_area: "menupanel" },
   });
   const widgetId = `${makeWidgetId(id)}-browser-action`;
+  // Firefox keeps a removed extension's placement for its return.
+  registerCleanupFunction(() => CustomizableUI.removeWidgetFromArea(widgetId));
 
   let shown = extensionsPanelShown();
   await installFromFile(xpi, id);

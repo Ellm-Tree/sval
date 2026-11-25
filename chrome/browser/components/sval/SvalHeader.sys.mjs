@@ -13,6 +13,15 @@
  * customisation is therefore closed, and the order is put back at every
  * startup through `CustomizableUI`, which costs no patch against its default
  * placements.
+ *
+ * The same widgets can stand in the Workspace panel instead
+ * ({@link IN_PANEL_PREF}), in sets: each group the panel draws as one pill
+ * is a toolbar area of its own ({@link SET_AREAS}), as Firefox's
+ * `#vertical-tabs` is the tab strip's in its sidebar, so `CustomizableUI`
+ * moves the widgets between them, keeps where they are, and builds them there
+ * in each new window; `#nav-bar` stays in its toolbox, empty. Every window
+ * hosts every set (`SvalPanelToolbar`), because placements are the same in
+ * every window.
  */
 
 import {
@@ -29,6 +38,7 @@ import {
   scopeForURI,
 } from "moz-src:///browser/components/sval/SvalSite.sys.mjs";
 import { SvalLoadLine } from "moz-src:///browser/components/sval/SvalLoadLine.sys.mjs";
+import { SvalSearchFlip } from "moz-src:///browser/components/sval/SvalSearchFlip.sys.mjs";
 import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { SvalScope } from "moz-src:///browser/components/sval/SvalScope.sys.mjs";
 import { SvalStem } from "moz-src:///browser/components/sval/SvalStem.sys.mjs";
@@ -88,6 +98,61 @@ export const URLBAR_KEY_ID = "sval-urlbar-key";
 // panel open on it in place of the app menu button, which the header does not
 // draw; their patches name it by this id.
 export const PANEL_BUTTON_ID = "sval-panel-button";
+
+/** Whether this device draws the header's widgets in the Workspace panel. */
+export const IN_PANEL_PREF = "browser.sval.toolbar.inPanel";
+/** The box at the Workspace panel's top that holds the sets' rows. */
+export const PANEL_TOOLBAR_ID = "sval-panel-toolbar";
+/** The set in the Workspace panel's footer, for the records. */
+export const RECORDS_AREA = "sval-panel-records";
+
+/**
+ * The toolbar's sets in the Workspace panel, each a toolbar area that draws
+ * one pill (panel toolbar widths spec, §2), by `SvalToolbarLayout`'s names.
+ */
+export const SET_AREAS = Object.freeze({
+  window: "sval-set-window",
+  nav: "sval-set-nav",
+  badge: "sval-set-badge",
+  address: "sval-set-address",
+  site: "sval-set-site",
+  page: "sval-set-page",
+  tools: "sval-set-tools",
+  records: RECORDS_AREA,
+});
+
+/**
+ * Marks {@link MARKUP_FIXED_WIDGETS} removable in `doc`, each once it has a
+ * placement. One with none yet, as in a new profile, stays fixed for
+ * Firefox to place itself (`CustomizableUIInternal.buildArea` puts a fixed
+ * widget it finds in the toolbar); marked removable, it would go to the
+ * palette instead, where Firefox's code that reads it fails.
+ *
+ * @param {Document} doc A browser window's document.
+ */
+function freeMarkupWidgets(doc) {
+  for (const id of MARKUP_FIXED_WIDGETS) {
+    if (CustomizableUI.getPlacementOfWidget(id)) {
+      doc.getElementById(id)?.setAttribute("removable", "true");
+    }
+  }
+}
+
+/**
+ * The header's widgets Firefox's markup marks `removable="false"`. Each is
+ * marked removable in every window before `CustomizableUI` builds its
+ * toolbars, as `CustomizableUIInternal.handleNewBrowserWindow` marks the tab
+ * strip for the vertical tab strip, so it can move between `#nav-bar` and
+ * the panel's sets (`CustomizableUIInternal.canWidgetMoveToArea`). Nothing
+ * offers to remove one: the context menus' layout items are hidden.
+ */
+const MARKUP_FIXED_WIDGETS = [
+  "back-button",
+  "forward-button",
+  "stop-reload-button",
+  "urlbar-container",
+  "unified-extensions-button",
+];
 export const PRIVATE_BADGE_ID = "sval-private-badge";
 export const HISTORY_BUTTON_ID = "sval-history-button";
 export { JAVASCRIPT_BUTTON_ID };
@@ -500,11 +565,12 @@ export function onViewMenuShowing(event) {
 
 /**
  * The popovers that grow from the button that opened them (messages spec
- * §9.4, `SvalStem`): the header's notices, extensions, downloads,
+ * §9.4, `SvalStem`): the header's », notices, extensions, downloads,
  * site-settings and Privacy and Security panels, each reaching 32px past its
  * button.
  */
 const STEM_HOSTS = new Set([
+  "widget-overflow",
   NOTICES_PANEL_ID,
   PROTECTION_PANEL_ID,
   "unified-extensions-panel",
@@ -724,6 +790,118 @@ export function headerPlacements(current, keep) {
     ? [EXTENSIONS_BUTTON_ID]
     : [];
   return [...HEADER_WIDGETS, ...kept, ...extensions, ...RECORD_WIDGETS];
+}
+
+/** The areas the header's widgets stand in. */
+const HEADER_AREAS = [CustomizableUI.AREA_NAVBAR, ...Object.values(SET_AREAS)];
+
+/**
+ * Each set's widgets, in order. The tools set also takes every pinned
+ * extension button, between Split and the extensions button.
+ */
+export const SET_WIDGETS = Object.freeze({
+  window: [PANEL_BUTTON_ID],
+  nav: ["back-button", "forward-button", "stop-reload-button", "home-button"],
+  badge: [PRIVATE_BADGE_ID],
+  address: ["urlbar-container"],
+  site: [
+    LIVE_ID,
+    LOCATION_BUTTON_ID,
+    MEDIA_BUTTON_ID,
+    JAVASCRIPT_BUTTON_ID,
+    REMOVE_BUTTON_ID,
+    SNIP_BUTTON_ID,
+    COLORSHIFT_BUTTON_ID,
+    CLEAN_ADDRESS_BUTTON_ID,
+    SITE_MENU_BUTTON_ID,
+  ],
+  page: [TRANSLATE_BUTTON_ID, READER_BUTTON_ID, FAVORITE_BUTTON_ID],
+  tools: [SPLIT_BUTTON_ID, EXTENSIONS_BUTTON_ID],
+  records: RECORD_WIDGETS.filter(id => id !== PRIVATE_BADGE_ID),
+});
+
+/**
+ * What each set gives up as it runs out of room (panel toolbar widths spec,
+ * §2): `leave` names the items that may leave in rows, first to leave
+ * first, and `column` those that may leave in the column, where it differs;
+ * no other item leaves. A pinned extension's button leaves before them, to
+ * the Extensions panel. They go to the toolbar's », or with `hides` out of
+ * sight, where the site menu, which offers each of them, reaches them.
+ */
+export const SET_OVERFLOW = Object.freeze({
+  nav: {
+    leave: ["home-button", "forward-button", "stop-reload-button"],
+    column: ["home-button"],
+  },
+  site: {
+    hides: true,
+    leave: [
+      CLEAN_ADDRESS_BUTTON_ID,
+      COLORSHIFT_BUTTON_ID,
+      SNIP_BUTTON_ID,
+      REMOVE_BUTTON_ID,
+      JAVASCRIPT_BUTTON_ID,
+      MEDIA_BUTTON_ID,
+    ],
+  },
+  page: {
+    leave: [READER_BUTTON_ID, FAVORITE_BUTTON_ID, TRANSLATE_BUTTON_ID],
+  },
+  tools: { leave: [SPLIT_BUTTON_ID] },
+  records: { leave: [HISTORY_BUTTON_ID, "downloads-button"] },
+});
+
+/**
+ * Where each of the header's widgets stands, given where they stand now.
+ * Above the page, everything is in `#nav-bar` as {@link headerPlacements}
+ * orders it, and the sets are empty. In the panel, each widget is in its
+ * set ({@link SET_WIDGETS}), pinned extension buttons in the tools set
+ * before the extensions button, and `#nav-bar` keeps only the widgets
+ * Firefox will not let go of.
+ *
+ * @param {{[area: string]: string[]}} current Each area's widget ids.
+ * @param {boolean} inPanel
+ * @param {(id: string) => boolean} keep Whether a widget outside Sval's list
+ *   stays: an extension's button, or one that cannot be removed.
+ * @param {(id: string) => boolean} isExtension
+ * @returns {{[area: string]: string[]}}
+ */
+export function arrangement(current, inPanel, keep, isExtension) {
+  const all = HEADER_AREAS.flatMap(area => current[area] ?? []);
+  const header = headerPlacements(all, keep);
+  const wanted = Object.fromEntries(
+    Object.values(SET_AREAS).map(area => [area, []])
+  );
+  if (!inPanel) {
+    wanted[CustomizableUI.AREA_NAVBAR] = header;
+    return wanted;
+  }
+  const setOf = new Map(
+    Object.entries(SET_WIDGETS).flatMap(([set, ids]) =>
+      ids.map(id => [id, SET_AREAS[set]])
+    )
+  );
+  const tools = SET_AREAS.tools;
+  wanted[CustomizableUI.AREA_NAVBAR] = [];
+  for (const id of header) {
+    if (setOf.has(id)) {
+      wanted[setOf.get(id)].push(id);
+    } else if (isExtension(id)) {
+      wanted[tools].push(id);
+    } else {
+      wanted[CustomizableUI.AREA_NAVBAR].push(id);
+    }
+  }
+  // Split leads the tools set and the extensions button ends it; the pinned
+  // buttons keep their order between.
+  wanted[tools] = [
+    ...wanted[tools].filter(id => id === SPLIT_BUTTON_ID),
+    ...wanted[tools].filter(
+      id => id !== SPLIT_BUTTON_ID && id !== EXTENSIONS_BUTTON_ID
+    ),
+    ...wanted[tools].filter(id => id === EXTENSIONS_BUTTON_ID),
+  ];
+  return wanted;
 }
 
 /**
@@ -968,6 +1146,14 @@ export const SvalHeader = {
       return;
     }
     this._initialized = true;
+    for (const [set, area] of Object.entries(SET_AREAS)) {
+      CustomizableUI.registerArea(area, {
+        type: CustomizableUI.TYPE_TOOLBAR,
+        overflowable: set in SET_OVERFLOW,
+        defaultPlacements: [],
+        defaultCollapsed: false,
+      });
+    }
     SvalThemes.start();
     SvalExtensionCompat.start();
     SvalUpdateDelay.start();
@@ -977,7 +1163,7 @@ export const SvalHeader = {
       type: "button",
       label: "Workspaces",
       tooltiptext: "Show or hide Workspaces",
-      removable: false,
+      removable: true,
       overflows: false,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCommand(event) {
@@ -989,7 +1175,7 @@ export const SvalHeader = {
       type: "button",
       label: "JavaScript",
       tooltiptext: "JavaScript",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCommand(event) {
         toggleJavascript(event.target.documentGlobal);
@@ -998,7 +1184,7 @@ export const SvalHeader = {
     CustomizableUI.createWidget({
       id: LIVE_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild(doc) {
         const item = doc.createXULElement("toolbaritem");
@@ -1042,14 +1228,14 @@ export const SvalHeader = {
     CustomizableUI.createWidget({
       id: LOCATION_BUTTON_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild: buildLocationButton,
     });
     CustomizableUI.createWidget({
       id: TRANSLATE_BUTTON_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild: buildTranslateButton,
     });
@@ -1058,7 +1244,7 @@ export const SvalHeader = {
       type: "button",
       label: "Video and audio",
       tooltiptext: "Video and audio",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCommand(event) {
         SvalSiteControls.toggleMedia(event.target.documentGlobal);
@@ -1073,7 +1259,7 @@ export const SvalHeader = {
         type: "button",
         label,
         tooltiptext: label,
-        removable: false,
+        removable: true,
         defaultArea: CustomizableUI.AREA_NAVBAR,
         onCommand(event) {
           SvalSiteControls.toggleMode(
@@ -1090,7 +1276,7 @@ export const SvalHeader = {
       type: "button",
       label: "Colorshift",
       tooltiptext: "Colorshift",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCommand(event) {
         const win = event.target.documentGlobal;
@@ -1105,7 +1291,7 @@ export const SvalHeader = {
       type: "button",
       label: CLEAN_ADDRESS_NAME,
       tooltiptext: CLEAN_ADDRESS_NAME,
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCommand(event) {
         lazy.copyCleanAddress(event.target.documentGlobal);
@@ -1116,7 +1302,7 @@ export const SvalHeader = {
       type: "button",
       label: "Site settings",
       tooltiptext: "Site settings",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCommand(event) {
         const win = event.target.documentGlobal;
@@ -1128,7 +1314,7 @@ export const SvalHeader = {
     CustomizableUI.createWidget({
       id: READER_BUTTON_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild: buildReaderButton,
     });
@@ -1137,7 +1323,7 @@ export const SvalHeader = {
       type: "button",
       label: "Favorite",
       tooltiptext: "Add to Favorites",
-      removable: false,
+      removable: true,
       // A private window keeps nothing, so it offers no favorite to keep.
       onCreated(node) {
         node.hidden = lazy.PrivateBrowsingUtils.isWindowPrivate(
@@ -1156,21 +1342,21 @@ export const SvalHeader = {
     CustomizableUI.createWidget({
       id: SPLIT_BUTTON_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild: buildSplitButton,
     });
     CustomizableUI.createWidget({
       id: HISTORY_BUTTON_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild: buildHistoryButton,
     });
     CustomizableUI.createWidget({
       id: PRIVATE_BADGE_ID,
       type: "custom",
-      removable: false,
+      removable: true,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild(doc) {
         const item = doc.createXULElement("toolbaritem");
@@ -1191,7 +1377,7 @@ export const SvalHeader = {
       type: "button",
       label: "Notices",
       tooltiptext: "Notices",
-      removable: false,
+      removable: true,
       overflows: false,
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onCreated(node) {
@@ -1210,7 +1396,7 @@ export const SvalHeader = {
     // change that notified has finished, since a move to another area
     // notifies its removal before it places the widget there.
     const arrangeLater = area => {
-      if (area === CustomizableUI.AREA_NAVBAR && !this._arranging) {
+      if (HEADER_AREAS.includes(area) && !this._arranging) {
         Services.tm.dispatchToMainThread(() => this.arrange());
       }
     };
@@ -1225,13 +1411,14 @@ export const SvalHeader = {
       },
       onWidgetAfterDOMChange: markOverflow,
       onWidgetAdded: (id, area) => {
-        if (area === CustomizableUI.AREA_NAVBAR) {
+        if (HEADER_AREAS.includes(area)) {
           this.arrange();
         }
       },
       onWidgetRemoved: (id, area) => arrangeLater(area),
       onWidgetMoved: (id, area) => arrangeLater(area),
     });
+    Services.prefs.addObserver(IN_PANEL_PREF, () => this.arrange());
   },
 
   /**
@@ -1243,37 +1430,59 @@ export const SvalHeader = {
    * profile's first window, or one after a reset, draws Firefox's order first.
    */
   arrange() {
-    const area = CustomizableUI.AREA_NAVBAR;
     if (this._arranging) {
       return;
     }
+    // An extension that is not running keeps its button's placement for
+    // when it starts, and has no button to move until then.
+    const live = id =>
+      !CustomizableUI.isWebExtensionWidget(id) ||
+      CustomizableUI.getWidget(id)?.provider === CustomizableUI.PROVIDER_API;
     let current;
     try {
-      current = CustomizableUI.getWidgetIdsInArea(area);
+      current = Object.fromEntries(
+        HEADER_AREAS.map(area => [
+          area,
+          CustomizableUI.getWidgetIdsInArea(area).filter(live),
+        ])
+      );
     } catch {
       // Not restored yet; the first window's `startWindow` arranges it.
       return;
     }
-    const wanted = headerPlacements(
+    const wanted = arrangement(
       current,
+      Services.prefs.getBoolPref(IN_PANEL_PREF, false),
       id =>
         CustomizableUI.isWebExtensionWidget(id) ||
-        !CustomizableUI.isWidgetRemovable(id)
+        !CustomizableUI.isWidgetRemovable(id),
+      id => CustomizableUI.isWebExtensionWidget(id)
     );
-    if (wanted.join() === current.join()) {
+    if (
+      HEADER_AREAS.every(area => wanted[area].join() === current[area].join())
+    ) {
       return;
     }
     this._arranging = true;
+    // Firefox placed any it found fixed since the window opened.
+    for (const win of CustomizableUI.windows) {
+      freeMarkupWidgets(win.document);
+    }
     CustomizableUI.beginBatchUpdate();
     try {
-      for (const id of current) {
-        if (!wanted.includes(id)) {
-          CustomizableUI.removeWidgetFromArea(id);
+      const placed = new Set(Object.values(wanted).flat());
+      for (const ids of Object.values(current)) {
+        for (const id of ids) {
+          if (!placed.has(id)) {
+            CustomizableUI.removeWidgetFromArea(id);
+          }
         }
       }
-      wanted.forEach((id, position) =>
-        CustomizableUI.addWidgetToArea(id, area, position)
-      );
+      for (const area of HEADER_AREAS) {
+        wanted[area].forEach((id, position) =>
+          CustomizableUI.addWidgetToArea(id, area, position)
+        );
+      }
     } finally {
       CustomizableUI.endBatchUpdate();
       this._arranging = false;
@@ -1297,6 +1506,7 @@ export const SvalHeader = {
     this.init();
     SvalThemes.mount(win);
     const doc = win.document;
+    freeMarkupWidgets(doc);
     doc
       .getElementById("cmd_CustomizeToolbars")
       ?.setAttribute("disabled", "true");
@@ -1357,6 +1567,7 @@ export const SvalHeader = {
     SvalProtectionButton.startWindow(win);
     SvalSiteControls.startWindow(win);
     SvalLoadLine.startWindow(win);
+    SvalSearchFlip.startWindow(win);
     SvalSiteStylePanel.startWindow(win);
     SvalNoticesButton.startWindow(win);
     SvalExtensionNotices.startWindow(win);

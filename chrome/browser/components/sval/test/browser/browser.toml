@@ -647,6 +647,10 @@ run-if = ["os == 'win'", "os == 'mac'"]
 
 ["browser_sval_panel_selection.js"]
 
+["browser_sval_panel_toolbar.js"]
+
+["browser_sval_panel_toolbar_widths.js"]
+
 ["browser_sval_panel_undo.js"]
 
 ["browser_sval_peek.js"]
@@ -779,6 +783,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_scriptlets.js"]
 
 ["browser_sval_scroll_anchor_resize.js"]
+
+["browser_sval_search_icon_retry.js"]
 
 ["browser_sval_search_keywords.js"]
 

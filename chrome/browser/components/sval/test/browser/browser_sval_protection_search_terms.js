@@ -153,3 +153,226 @@ add_task(async function shield_stays_on_a_results_page() {
   gURLBar.handleRevert();
   BrowserTestUtils.removeTab(tab);
 });
+
+const { FLIP_ID } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalSearchFlip.sys.mjs"
+);
+const { FLOATING } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalLauncher.sys.mjs"
+);
+
+/**
+ * Searches from the address bar in a new tab, and waits for the results
+ * page to show the search with its switch.
+ *
+ * @returns {Promise<Tab>}
+ */
+async function searchInNewTab() {
+  const tab = await within(
+    BrowserTestUtils.openNewForegroundTab(gBrowser),
+    10_000,
+    "the new tab"
+  );
+  const loaded = BrowserTestUtils.browserLoaded(tab.linkedBrowser, false, url =>
+    url.startsWith(RESULTS_BASE)
+  );
+  gURLBar.focus();
+  await UrlbarTestUtils.promiseAutocompleteResultPopup({
+    window,
+    waitForFocus,
+    value: "foof",
+    fireInputEvent: true,
+  });
+  EventUtils.synthesizeKey("KEY_Enter");
+  await within(loaded, 10_000, "the results page's load");
+  await pageReady(tab.linkedBrowser, tab.linkedBrowser.currentURI.spec);
+  gURLBar.blur();
+  const flip = document.getElementById(FLIP_ID);
+  await within(
+    TestUtils.waitForCondition(
+      () => gURLBar.hasAttribute("persistsearchterms") && !flip.hidden
+    ),
+    5_000,
+    "the bar showing the search, with its switch"
+  );
+  return tab;
+}
+
+/**
+ * Opens the Launcher, with Open Location's key or command.
+ */
+async function openLauncher() {
+  const shown = UrlbarTestUtils.promisePopupOpen(window, () =>
+    document.getElementById("Browser:OpenLocation").doCommand()
+  );
+  await within(shown, 10_000, "the Launcher's list");
+  await within(
+    TestUtils.waitForCondition(() => gURLBar.hasAttribute(FLOATING)),
+    5_000,
+    "the Launcher floating"
+  );
+}
+
+/** Closes the Launcher with Escape. */
+async function escapeLauncher() {
+  EventUtils.synthesizeKey("KEY_Escape");
+  await within(
+    TestUtils.waitForCondition(() => !gURLBar.hasAttribute(FLOATING)),
+    5_000,
+    "the Launcher closing"
+  );
+}
+
+add_task(async function the_search_switches_to_the_address_and_back() {
+  const tab = await searchInNewTab();
+  const flip = document.getElementById(FLIP_ID);
+  is(flip.dataset.side, "search", "the switch offers the address");
+  ok(
+    document.getElementById("sval-launcher-key").checkVisibility(),
+    "the Launcher's key shows beside the search"
+  );
+
+  flip.click();
+  await within(
+    TestUtils.waitForCondition(
+      () => !gURLBar.hasAttribute("persistsearchterms")
+    ),
+    5_000,
+    "the bar showing the address"
+  );
+  is(
+    gURLBar.getAttribute("pageproxystate"),
+    "valid",
+    "the bar shows the page's address"
+  );
+  is(flip.dataset.side, "address", "the switch offers the search");
+  ok(!flip.hidden, "and stays to switch back");
+
+  flip.click();
+  await within(
+    TestUtils.waitForCondition(() =>
+      gURLBar.hasAttribute("persistsearchterms")
+    ),
+    5_000,
+    "the bar showing the search again"
+  );
+  is(gURLBar.value, "foof", "the search is back");
+  is(flip.dataset.side, "search", "and the switch offers the address again");
+
+  gURLBar.handleRevert();
+  BrowserTestUtils.removeTab(tab);
+});
+
+add_task(async function the_launcher_switches_and_escape_keeps_the_side() {
+  const tab = await searchInNewTab();
+  const flip = document.getElementById(FLIP_ID);
+
+  await openLauncher();
+  ok(!flip.hidden, "the Launcher offers the switch");
+  is(flip.dataset.side, "search", "from the search to the address");
+  await escapeLauncher();
+  ok(
+    gURLBar.hasAttribute("persistsearchterms"),
+    "Escape leaves the bar showing the search"
+  );
+  is(gURLBar.value, "foof", "the search itself");
+  ok(!flip.hidden, "with its switch");
+
+  await openLauncher();
+  flip.click();
+  await within(
+    TestUtils.waitForCondition(() => flip.dataset.side === "address"),
+    5_000,
+    "the Launcher switching to the address"
+  );
+  ok(gURLBar.hasAttribute(FLOATING), "the Launcher stays open");
+  is(
+    gURLBar.getAttribute("pageproxystate"),
+    "valid",
+    "the Launcher shows the page's address"
+  );
+  await escapeLauncher();
+  is(
+    gURLBar.getAttribute("pageproxystate"),
+    "valid",
+    "Escape leaves the bar showing the address asked for"
+  );
+  ok(!flip.hidden, "with the switch back to the search");
+
+  await openLauncher();
+  flip.click();
+  await within(
+    TestUtils.waitForCondition(() =>
+      gURLBar.hasAttribute("persistsearchterms")
+    ),
+    5_000,
+    "the Launcher switching back to the search"
+  );
+  is(gURLBar.value, "foof", "the search is back in the Launcher");
+  await escapeLauncher();
+  ok(
+    gURLBar.hasAttribute("persistsearchterms"),
+    "and stays once the Launcher closes"
+  );
+
+  gURLBar.handleRevert();
+  BrowserTestUtils.removeTab(tab);
+});
+
+add_task(async function the_results_page_shows_its_engines_icon() {
+  const tab = await searchInNewTab();
+  atTaskEnd(() => {
+    gURLBar.handleRevert();
+    BrowserTestUtils.removeTab(tab);
+  });
+  const engine = gURLBar.querySelector(".searchmode-switcher");
+  await within(
+    TestUtils.waitForCondition(() =>
+      engine.getAttribute("iconsrc")?.startsWith("data:")
+    ),
+    5_000,
+    "the engine's icon"
+  );
+  const icon = engine.shadowRoot.querySelector("img");
+  Assert.equal(
+    getComputedStyle(icon).content,
+    "normal",
+    "the field at rest draws the engine's icon, as the Launcher does"
+  );
+  const glyph = button()
+    .querySelector(".sval-prot-glyph")
+    .getBoundingClientRect();
+  const drawn = icon.getBoundingClientRect();
+  Assert.equal(drawn.width, glyph.width, "at the shield's size");
+  Assert.equal(
+    engine.getBoundingClientRect().left,
+    button().getBoundingClientRect().right,
+    "in a button beside the shield's, as a pill's buttons stand"
+  );
+});
+
+add_task(async function the_panels_engine_button_opens_the_picker() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.sval.toolbar.inPanel", true],
+      // Firefox marks Home as taken out of `#nav-bar` once it moves
+      // (`BrowserUsageTelemetry`).
+      ["browser.engagement.home-button.has-removed", false],
+    ],
+  });
+  atTaskEnd(() => SpecialPowers.popPrefEnv());
+  const tab = await searchInNewTab();
+  atTaskEnd(() => {
+    gURLBar.handleRevert();
+    BrowserTestUtils.removeTab(tab);
+  });
+  const engine = gURLBar.querySelector(".searchmode-switcher");
+  const picker = gURLBar.querySelector(".searchmode-switcher-panel");
+  const shown = BrowserTestUtils.waitForPopupEvent(picker, "shown");
+  EventUtils.synthesizeMouseAtCenter(engine, {});
+  await within(shown, 5_000, "the engine picker");
+  ok(!gURLBar.hasAttribute(FLOATING), "and the Launcher stays closed");
+  const hidden = BrowserTestUtils.waitForPopupEvent(picker, "hidden");
+  picker.hidePopup();
+  await within(hidden, 5_000, "the engine picker closing");
+});

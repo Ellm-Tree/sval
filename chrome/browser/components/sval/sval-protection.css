@@ -430,11 +430,13 @@
   position: relative;
 }
 
-/* The shield is drawn at the 16px of the header's other icons. */
+/* The shield stands in the 16px of the header's other icons, drawn at its
+   own 18px (`.sval-prot-glyph`): its outline leaves more of its box empty
+   than theirs, and at 18px still fits in the 16px. */
 #sval-protection-button > .sval-prot-shield {
   width: 16px;
   height: 16px;
-  mask-size: 16px;
+  mask-size: 18px;
 }
 
 .sval-prot-prompt-anchor {
@@ -466,7 +468,7 @@
 #sval-protection-button[sval-breach] > .sval-prot-shield {
   mask-image: var(--sval-glyph), radial-gradient(circle at 100% 0, transparent 6px, #000 6.5px);
   mask-size:
-    16px,
+    18px,
     100% 100%;
   mask-position:
     center,
@@ -517,7 +519,7 @@
   > .sval-prot-shield {
     mask-image: var(--sval-glyph), linear-gradient(#000, #000), var(--sval-count-cut);
     mask-size:
-      16px,
+      18px,
       100% 100%,
       var(--sval-count-cut-w) 17px;
     mask-position:
@@ -569,7 +571,7 @@
 
     &:is(:dir(ltr), :dir(rtl)) > .sval-prot-shield {
       mask-image: var(--sval-glyph);
-      mask-size: 16px;
+      mask-size: 18px;
       mask-position: center;
       mask-composite: add;
     }

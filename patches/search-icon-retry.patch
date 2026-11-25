@@ -1,0 +1,28 @@
+Sval: Look a search engine icon up again after a miss
+
+ConfigSearchEngine.getIconURL kept the promise of an icon lookup that
+found no attachment, so an engine whose icon was missing at startup
+showed the glass for the whole session, even once the icon could be
+read.
+
+diff --git a/toolkit/components/search/ConfigSearchEngine.sys.mjs b/toolkit/components/search/ConfigSearchEngine.sys.mjs
+index b64314285b..079421d923 100644
+--- a/toolkit/components/search/ConfigSearchEngine.sys.mjs
++++ b/toolkit/components/search/ConfigSearchEngine.sys.mjs
+@@ -633,7 +633,15 @@ export class ConfigSearchEngine extends SearchEngine {
+     }
+ 
+     let record = availableRecords.find(r => r.imageSize == width);
+-    let promise = ConfigSearchEngine.iconHandler.createIconURL(record);
++    let promise = ConfigSearchEngine.iconHandler
++      .createIconURL(record)
++      .then(url => {
++        // An icon not found yet is looked up again next time.
++        if (!url && this.#blobURLPromises.get(width) == promise) {
++          this.#blobURLPromises.delete(width);
++        }
++        return url;
++      });
+     this.#blobURLPromises.set(width, promise);
+     return promise;
+   }

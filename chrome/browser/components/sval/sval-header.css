@@ -44,7 +44,10 @@
 
   --sval-cluster-bg: rgb(var(--sval-palette-wash-light) / 0.28);
   --sval-cluster-border: rgb(var(--sval-palette-wash-dark) / 0.1);
-  --sval-cluster-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* None inside a pill: an icon's round wash is centred between the pill's
+     top and bottom borders, and a highlight along one side thickens that
+     border to the eye, so the wash looks pushed toward it. */
+  --sval-cluster-shadow: none;
   --sval-pill-bg: rgba(6, 10, 46, 0.72);
   --sval-pill-border-alpha: 0.34;
   --sval-pill-border: rgb(var(--sval-palette-wash-dark) / var(--sval-pill-border-alpha));
@@ -260,7 +263,7 @@
     --panel-border-color: rgb(var(--sval-palette-wash-light) / 0.14);
     --sval-cluster-bg: rgba(255, 255, 255, 0.5);
     --sval-cluster-border: rgb(var(--sval-palette-wash-light) / 0.14);
-    --sval-cluster-shadow: 0 1px 2px rgb(var(--sval-palette-wash-light) / 0.08);
+    --sval-cluster-shadow: 0 0 2px rgb(var(--sval-palette-wash-light) / 0.08);
     --sval-pill-border-alpha: 0.28;
     --sval-pill-border: rgb(var(--sval-palette-wash-light) / var(--sval-pill-border-alpha));
     --sval-pill-shadow: var(--sval-float-box-shadow);
@@ -318,7 +321,7 @@
       --panel-border-color: rgb(var(--sval-palette-wash-light) / 0.14);
 
       --sval-cluster-border: rgb(var(--sval-palette-wash-light) / 0.14);
-      --sval-cluster-shadow: 0 1px 2px rgb(var(--sval-palette-wash-light) / 0.08);
+      --sval-cluster-shadow: 0 0 2px rgb(var(--sval-palette-wash-light) / 0.08);
       --sval-pill-bg: #ffffff;
       --sval-pill-border-alpha: 0.28;
       --sval-pill-border: rgb(var(--sval-palette-wash-light) / var(--sval-pill-border-alpha));
@@ -430,7 +433,7 @@
 
 /* ---------------------------------------------------------------- clusters */
 
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(
     #sval-panel-button,
     #downloads-button,
@@ -442,7 +445,7 @@
     #stop-reload-button,
     #home-button
   ),
-#nav-bar-customization-target > .unified-extensions-item {
+:is(#nav-bar-customization-target, .sval-set-target) > .unified-extensions-item {
   align-self: center;
 }
 
@@ -457,13 +460,13 @@
   margin: 0;
 }
 
-#nav-bar .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
   border-radius: 999px;
   transition: background-color 160ms var(--sval-ease);
 }
 
 /* Left pill: the panel toggle alone. */
-#sval-panel-button {
+#nav-bar #sval-panel-button {
   border-inline: 1px solid var(--sval-cluster-border);
   border-radius: 999px;
   position: relative;
@@ -471,12 +474,12 @@
 
 /* A toggle is on while its panel or sidebar shows, which `aria-pressed`
    carries (`SvalHeader`), in the pressed look (header signals spec §1). */
-#nav-bar :is(#sval-panel-button, #sval-history-button)[aria-pressed="true"] > .toolbarbutton-icon {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#sval-panel-button, #sval-history-button)[aria-pressed="true"] > .toolbarbutton-icon {
   background-color: var(--sval-on-bg);
   fill: var(--sval-on-ink);
 }
 
-#nav-bar :is(#sval-panel-button, #sval-history-button)[aria-pressed="true"]:hover > .toolbarbutton-icon {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#sval-panel-button, #sval-history-button)[aria-pressed="true"]:hover > .toolbarbutton-icon {
   background-color: var(--sval-on-hover);
 }
 
@@ -734,7 +737,7 @@
   margin-inline-start: 8px;
 }
 
-#unified-extensions-button {
+#nav-bar #unified-extensions-button {
   border-inline-end: 1px solid var(--sval-cluster-border);
   border-start-end-radius: 999px;
   border-end-end-radius: 999px;
@@ -763,7 +766,7 @@
  * field's own background is clear until it breaks out into the suggestions
  * card.
  */
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(
     #back-button,
     #forward-button,
@@ -787,7 +790,7 @@
   align-self: center;
 }
 
-#nav-bar #stop-reload-button > .toolbarbutton-1 {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #stop-reload-button > .toolbarbutton-1 {
   padding: 0;
   margin: 0;
 }
@@ -906,7 +909,7 @@
   background-image: none;
 }
 
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(
     #sval-media-button,
     #sval-javascript-button,
@@ -933,7 +936,7 @@
   border-block: 1px solid var(--sval-cluster-border);
 }
 
-#nav-bar :is(#reader-mode-button, #sval-favorite-button) > .toolbarbutton-icon {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#reader-mode-button, #sval-favorite-button) > .toolbarbutton-icon {
   width: 28px;
   height: 28px;
   padding: 6px;
@@ -1012,7 +1015,7 @@
 }
 
 /* A disabled button dims its icon only. */
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(
     #back-button,
     #forward-button,
@@ -1027,14 +1030,15 @@
     #sval-clean-address-button,
     #sval-site-menu-button
   )[disabled],
-#nav-bar :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-disabled="true"] {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
+  :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-disabled="true"] {
   opacity: 1;
   fill-opacity: 0.45;
 }
 
 /* A button that can't be used stays focusable, so its description can say
    why, but it never looks pressable. */
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(#sval-media-button, #sval-javascript-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-disabled="true"]
   > .toolbarbutton-icon {
   background-color: transparent !important;
@@ -1220,6 +1224,24 @@
   margin: 0 !important;
 }
 
+/* At rest, as on a search's results page, the engine's button is one of
+   the field's 28px buttons round a 16px icon, as the shield and the
+   search's switch are, and stands beside the shield as a toolbar pill's
+   buttons stand beside each other (`sval-protection.css`, button). Its
+   label, the engine's name, shows only in a search mode. */
+#urlbar:not([focused], [sval-launcher-floating], [searchmode]) .searchmode-switcher {
+  --button-padding: 0 6px;
+  --icon-size: 16px;
+
+  &::part(button) {
+    gap: 0;
+  }
+}
+
+#urlbar[pageproxystate="invalid"]:not([focused], [sval-launcher-floating], [searchmode]) #sval-protection-button {
+  margin-inline-end: 0;
+}
+
 #urlbar .urlbar-go-button {
   content: var(--sval-icon-go);
   box-sizing: border-box;
@@ -1317,7 +1339,7 @@
   /* `#stop-reload-button[animate]` plays Firefox's sprites between the two
    * marks over either button's icon, and clears the icon's fill while one
    * plays. The stop-to-reload sprite starts on the stop mark. */
-  #nav-bar #stop-reload-button > :is(#reload-button, #reload-button[displaystop] + #stop-button) {
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #stop-reload-button > :is(#reload-button, #reload-button[displaystop] + #stop-button) {
     > .toolbarbutton-animatable-box {
       display: none;
     }
@@ -1327,7 +1349,7 @@
     }
   }
 
-  #nav-bar #stop-reload-button > #reload-button[displaystop] + #stop-button {
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #stop-reload-button > #reload-button[displaystop] + #stop-button {
     &:not(:hover, :focus-visible) {
       list-style-image: var(--sval-icon-reload) !important;
 
@@ -1348,7 +1370,7 @@
   list-style-image: var(--sval-icon-home) !important;
 }
 
-#sval-panel-button {
+:is(#sval-panel-button, #sval-panel-corner-button) {
   list-style-image: var(--sval-icon-panel);
 }
 
@@ -1370,7 +1392,7 @@
 
 /* Media playing on the page takes the live fill, the 26px chip the live
    devices draw (header signals spec §1). */
-#nav-bar #sval-media-button[sval-playing] > .toolbarbutton-icon {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #sval-media-button[sval-playing] > .toolbarbutton-icon {
   width: 26px;
   height: 26px;
   margin: 1px;
@@ -1381,7 +1403,7 @@
   fill: var(--sval-live-ink);
 }
 
-#nav-bar #sval-media-button[sval-playing]:hover > .toolbarbutton-icon {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #sval-media-button[sval-playing]:hover > .toolbarbutton-icon {
   background-color: var(--sval-live-hover);
 }
 
@@ -1389,7 +1411,7 @@
    dot while the site asks, the live fill while the tab uses location, as a
    camera's cell has it, and the crossed glyph once the page was refused
    (header signals spec §1). */
-#nav-bar #sval-location-button {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #sval-location-button {
   width: 28px;
   outline: none;
 
@@ -1422,7 +1444,7 @@
    (`urlbar-searchbar.css`) draw the code as a badge, which the filled chip
    makes redundant. The cell takes the chip's width plus the cluster's edges
    it draws, in place of the fixed width `.urlbar-page-action` gives it. */
-#nav-bar #translations-button {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #translations-button {
   width: auto;
   outline: none;
 }
@@ -1457,7 +1479,7 @@
   }
 }
 
-#nav-bar #translations-button-icon {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #translations-button-icon {
   width: 16px;
   height: 16px;
   margin: 0;
@@ -1467,12 +1489,12 @@
   fill-opacity: 1;
 }
 
-#nav-bar #translations-button-circle-arrows {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #translations-button-circle-arrows {
   margin: 0;
   fill: currentColor;
 }
 
-#nav-bar #translations-button-locale {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #translations-button-locale {
   height: auto;
   min-width: 0;
   margin: 0;
@@ -1507,7 +1529,7 @@
   list-style-image: var(--sval-icon-clean-address);
 }
 
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(
     #sval-remove-button[aria-pressed="true"],
     #sval-snip-button[aria-pressed="true"],
@@ -1519,7 +1541,7 @@
   fill: var(--sval-on-ink);
 }
 
-#nav-bar
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
   :is(
     #sval-remove-button[aria-pressed="true"],
     #sval-snip-button[aria-pressed="true"],
@@ -1535,9 +1557,9 @@
 }
 
 /* A camera, microphone or screen in use: one 26px cell each, solid, then a
-   1×16px divider before the media button. The cluster's padding reset is
-   `#nav-bar`-scoped, so this is too, to keep the divider's gap. */
-#nav-bar #sval-live-devices {
+   1×16px divider before the media button. Scoped as the cluster's padding
+   reset is, to keep the divider's gap. */
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) #sval-live-devices {
   display: flex;
   align-items: center;
   padding-inline-end: 7px !important;
@@ -1680,6 +1702,55 @@
   list-style-image: var(--sval-icon-storage);
 }
 
+.sval-header-glyph[data-icon="link"] {
+  list-style-image: var(--sval-icon-link);
+}
+
+.sval-header-glyph[data-icon="search"] {
+  list-style-image: var(--sval-icon-search);
+}
+
+/* ---------------------------------------------------------------- search flip */
+
+/* `SvalSearchFlip` switches a results page's field between its search and
+   its address, both ways, in place of Firefox's one-way button. */
+#urlbar-revert-button-container {
+  display: none !important;
+}
+
+#sval-urlbar-flip {
+  appearance: none;
+  flex: none;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 2px 0 0;
+  padding: 1px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+
+  &:hover {
+    background-color: var(--toolbarbutton-hover-background);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sval-focus);
+    outline-offset: -2px;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* The field turns over about its middle as it switches. */
+#urlbar .urlbar-input-box {
+  transform-origin: center;
+  backface-visibility: hidden;
+}
+
 .sval-live-asks:hover .sval-live-ask {
   background-color: var(--sval-wash);
 }
@@ -1764,7 +1835,7 @@
    of its own shape in the icon beneath it with a mask, as the dot does, so
    it reads on every window colour. `--sval-count-end` is the chip's end
    from the icon's end. */
-#nav-bar :is(#sval-remove-button, #sval-snip-button, #sval-site-menu-button)[sval-count] {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#sval-remove-button, #sval-snip-button, #sval-site-menu-button)[sval-count] {
   --sval-count-end: 0px;
   --sval-count-cut: radial-gradient(circle closest-side, #000 calc(100% - 0.5px), transparent 100%);
   --sval-count-cut-w: 17px;
@@ -1822,7 +1893,7 @@
    while it is pinned and on Site settings otherwise. It marks a state, so it
    never takes the accent the look-at-me dot keeps. A count on the button
    takes its place. */
-#nav-bar :is(#sval-site-menu-button, #sval-colorshift-button)[sval-styled]:not([sval-count]) {
+:is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#sval-site-menu-button, #sval-colorshift-button)[sval-styled]:not([sval-count]) {
   position: relative;
 
   &::after {
@@ -1839,13 +1910,13 @@
 }
 
 @media (forced-colors) {
-  #nav-bar :is(#sval-site-menu-button, #sval-colorshift-button)[sval-styled]:not([sval-count])::after {
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#sval-site-menu-button, #sval-colorshift-button)[sval-styled]:not([sval-count])::after {
     background-color: ButtonText;
   }
 }
 
 @media (forced-colors) {
-  #nav-bar :is(#sval-remove-button, #sval-snip-button, #sval-site-menu-button)[sval-count]::after {
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) :is(#sval-remove-button, #sval-snip-button, #sval-site-menu-button)[sval-count]::after {
     background-color: ButtonText;
     color: ButtonFace;
   }
@@ -2258,7 +2329,7 @@ button.sval-notice-row {
   background: var(--toolbar-background-color);
 
   > .browserSidebarContainer.deck-selected {
-    inset: 0 6px 6px;
+    inset: var(--sval-frame-top, 0) 6px 6px;
     border-radius: 8px;
     overflow: clip;
 
@@ -2379,8 +2450,8 @@ button.sval-notice-row {
 }
 
 :root:not([inDOMFullscreen]) #tabbrowser-tabpanels[splitview]:has(> .split-view-panel-active) {
-  /* No top gap, as for a page on its own (page frame, above). */
-  padding: 0 6px 6px;
+  /* The top gap of a page on its own (page frame, above). */
+  padding: var(--sval-frame-top, 0) 6px 6px;
   background: var(--toolbar-background-color);
 
   > .split-view-panel.split-view-panel-active {
@@ -3052,7 +3123,7 @@ screenshots-buttons {
 
   #navigator-toolbox,
   #urlbar-container::before,
-  #nav-bar .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records) .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
     transition: none;
   }
 }
@@ -3121,7 +3192,7 @@ screenshots-buttons {
 
   /* The pressed look's chip takes the tokens' system colours; hovered, it
      keeps them and takes a Canvas ring inside. */
-  #nav-bar
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
     :is(
       :is(#sval-panel-button, #sval-history-button, #sval-remove-button, #sval-snip-button, #sval-colorshift-button)[aria-pressed="true"],
       #reader-mode-button[readeractive]
@@ -3134,7 +3205,7 @@ screenshots-buttons {
     fill: ButtonFace;
   }
 
-  #nav-bar
+  :is(#nav-bar, #sval-panel-toolbar, #sval-panel-records)
     :is(
       #sval-panel-button,
       #sval-location-button,
@@ -3156,7 +3227,7 @@ screenshots-buttons {
       #stop-reload-button,
       #home-button
     ),
-  #nav-bar-customization-target > .unified-extensions-item {
+  :is(#nav-bar-customization-target, .sval-set-target) > .unified-extensions-item {
     background: transparent;
     box-shadow: none;
     border-color: ButtonText;

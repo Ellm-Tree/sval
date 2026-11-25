@@ -425,6 +425,8 @@ head = "tabs_head.js"
 
 ["test_sval_test_wait.js"]
 
+["test_sval_toolbar_layout.js"]
+
 ["test_sval_tracker_owners.js"]
 
 ["test_sval_update_delay.js"]

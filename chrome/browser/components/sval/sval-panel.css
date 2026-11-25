@@ -54,6 +54,47 @@
   container: sval-panel / inline-size;
 }
 
+/* The panel's side. Firefox's sidebar writes an inline `order` on each of
+   `#browser`'s children, reversed while the sidebar stands at the end
+   (`SidebarController.setPosition`), which would carry the panel across the
+   window; the panel keeps its side over it. */
+#browser > #sval-panel-container {
+  order: -1 !important;
+
+  &[sval-placement="right"] {
+    order: 1000 !important;
+  }
+}
+
+/* The room at each side of the panel's content. The page's frame leaves
+   6px between the panel and the page (`sval-header.css`, page frame), so
+   the content stands 3px nearer the page: the room from the window's edge
+   to the content is the room from the content to the page. A full-screen
+   window frames no page, and at 48px the content takes equal room at both
+   sides; the toolbar's column sets its own (`sval-panel-toolbar.css`,
+   column). */
+#sval-panel-container > * {
+  --sval-panel-start: calc(var(--space-small) + 3px);
+  --sval-panel-end: calc(var(--space-small) - 3px);
+}
+
+#sval-panel-container[sval-placement="right"] > * {
+  --sval-panel-start: calc(var(--space-small) - 3px);
+  --sval-panel-end: calc(var(--space-small) + 3px);
+}
+
+:root[inFullscreen] #sval-panel-container > * {
+  --sval-panel-start: var(--space-small);
+  --sval-panel-end: var(--space-small);
+}
+
+@container sval-panel (max-width: 72px) {
+  #sval-panel-container > * {
+    --sval-panel-start: var(--space-small);
+    --sval-panel-end: var(--space-small);
+  }
+}
+
 /* Beside the page's frame (`sval-header.css`, page frame) the panel needs no
    edge. A full-screen window shows the page unframed, so there the panel
    takes an edge of its own. */
@@ -259,7 +300,8 @@
  * with the menu font, which can leave them fractional. */
 .sval-switcher-bar,
 .sval-favorites-bar {
-  --sval-bar-inline: round(var(--space-small), 1px);
+  --sval-bar-start: round(var(--sval-panel-start), 1px);
+  --sval-bar-end: round(var(--sval-panel-end), 1px);
 }
 
 .sval-switcher-bar {
@@ -268,7 +310,9 @@
   align-items: center;
   gap: var(--space-xxsmall);
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  padding: var(--space-small) var(--sval-bar-inline) var(--space-xsmall);
+  padding-block: var(--space-small) var(--space-xsmall);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding-inline: var(--sval-bar-start) var(--sval-bar-end);
 }
 
 .sval-switcher-bar[hidden],
@@ -405,26 +449,51 @@
   &[data-folded] > :is(.sval-strip-track, .sval-strip-caption, .sval-strip-dots, .sval-strip-line) {
     display: none;
   }
+
+  /* Folded, the label row stands as far above the hairline as below the
+     line over it. */
+  &[data-folded] > .sval-strip-label {
+    margin-block-end: calc(var(--space-small) - 4px);
+  }
 }
 
 /* The strip's name, the Workspace you're in while it is folded, and the
-   button that folds it. The column at 72px and below has no room for it. */
+   button that folds it. The column at 72px and below has no room for it.
+   The Workspace's name comes first: it takes the row's room, and the
+   strip's name shows before it only while the whole of both fit. Laid out
+   from the end, the Workspace's name starts the first line, and the
+   strip's name wraps onto a second line, out of sight, when it has no room
+   beside it. The fold button stands apart at the row's end. */
 .sval-strip-label {
+  position: relative;
   height: 24px;
   margin: 0 0 -2px;
-  padding-inline-start: 6px;
+  padding-inline: 6px 30px;
   display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-start;
   align-items: center;
-  gap: 6px;
+  column-gap: 6px;
+  overflow: hidden;
 
   .sval-strip[data-layout="column"] > & {
     display: none;
   }
+
+  > .sval-strip-fold {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+  }
 }
 
 .sval-strip-heading {
-  flex: 1;
+  order: 1;
   min-width: 0;
+  height: 24px;
+  line-height: 24px;
   overflow: hidden;
   color: var(--text-color-deemphasized);
   font-size: 12px;
@@ -437,7 +506,7 @@
 .sval-strip-peek {
   display: none;
   min-width: 0;
-  max-width: 65%;
+  height: 24px;
   align-items: center;
   gap: 6px;
   font-size: 13px;
@@ -1040,7 +1109,9 @@
   display: flex;
   align-items: center;
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  padding: var(--space-xsmall) var(--sval-bar-inline);
+  padding-block: var(--space-xsmall);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding-inline: var(--sval-bar-start) var(--sval-bar-end);
 }
 
 .sval-favorites-bar[hidden] {
@@ -1222,7 +1293,7 @@ menupopup:not([sval-stem]) {
   display: flex;
   align-items: center;
   gap: var(--space-xxsmall);
-  margin-inline: var(--space-small);
+  margin-inline: var(--sval-panel-start) var(--sval-panel-end);
   padding-block-end: var(--space-small);
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
   border-block-end: 1px solid var(--sval-section-hairline);
@@ -1287,7 +1358,7 @@ menupopup:not([sval-stem]) {
   box-sizing: border-box;
   /* Fixed height: arrow keys step row by row. */
   height: var(--sval-row-h);
-  margin-inline: var(--space-small);
+  margin-inline: var(--sval-panel-start) var(--sval-panel-end);
   padding-inline: calc(var(--space-xsmall) + var(--sval-row-depth, 0) * var(--sval-indent)) var(--space-xxsmall);
   border-radius: var(--border-radius-medium);
   outline: none;
@@ -2911,8 +2982,8 @@ browser[sval-agent-layer] {
 
 .sval-drop-line {
   position: absolute;
-  inset-inline-start: calc(var(--space-small) + var(--space-xsmall) + var(--sval-drop-depth, 0) * var(--sval-indent));
-  inset-inline-end: var(--space-small);
+  inset-inline-start: calc(var(--sval-panel-start) + var(--space-xsmall) + var(--sval-drop-depth, 0) * var(--sval-indent));
+  inset-inline-end: var(--sval-panel-end);
   border-top: var(--focus-outline-width) solid var(--color-accent-primary);
   translate: 0 -50%;
   pointer-events: none;
@@ -3043,12 +3114,16 @@ browser[sval-agent-layer] {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-small);
-  padding: var(--space-small);
+  padding-block: var(--space-small);
+  padding-inline: var(--sval-panel-start) var(--sval-panel-end);
   border-top: var(--border-width) solid var(--sval-hairline);
 
-  /* Favorites take the footer's first line, the rest the line under it. */
+  /* Favorites take the footer's first line, the rest the line under it.
+     The line is the footer's width: what it holds shrinks, never past the
+     panel's edge. */
   > .sval-favorites-bar {
     flex: 1 0 100%;
+    min-width: 0;
     padding: 0;
   }
 }
@@ -3501,7 +3576,8 @@ browser[sval-agent-layer] {
   justify-content: center;
   gap: 6px 12px;
   min-height: 48px;
-  margin: var(--space-small);
+  margin-block: var(--space-small);
+  margin-inline: var(--sval-panel-start) var(--sval-panel-end);
   padding: 5px 6px 5px 16px;
   border: 1px solid var(--sval-popup-edge, var(--sval-cluster-border));
   border-radius: 24px;
@@ -3671,9 +3747,18 @@ browser[sval-agent-layer] {
     justify-content: center;
   }
 
+  /* One line: a wrapping column takes its tallest item's height and sends
+   * the rest into a column beside it, past the panel's edge. */
   .sval-panel-footer {
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: center;
+
+    /* Its own height: a basis of the footer's whole length would size the
+     * footer by Favorites alone, and push the rest out of the window. */
+    > .sval-favorites-bar {
+      flex: none;
+    }
   }
 
   .sval-feedback-button {

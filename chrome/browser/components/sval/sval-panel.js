@@ -509,7 +509,7 @@ var SvalPanel = {
       // in `_start`, and the layer is drawn on the first render.
       this._modules.SvalAgentControl.useSettings(this._settings);
       this._build(container);
-      this._applyPlacementOnceSidebarStarts();
+      this._applyPlacement();
       await this._start();
       if (this._engine) {
         this._modules.SvalWebDriver.deleteLeftWorkspaces(
@@ -655,6 +655,8 @@ var SvalPanel = {
         SvalCritical: "moz-src:///browser/components/sval/SvalCritical.sys.mjs",
         SvalFeedbackForm:
           "moz-src:///browser/components/sval/SvalFeedbackForm.sys.mjs",
+        SvalPanelToolbar:
+          "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs",
         LEVEL_PREF: "moz-src:///browser/components/sval/SvalBlocking.sys.mjs",
         SvalEngine: "moz-src:///browser/components/sval/SvalEngine.sys.mjs",
         SvalFavorites:
@@ -848,7 +850,13 @@ var SvalPanel = {
     };
 
     this.undo.dismiss();
-    container.textContent = "";
+    // Only what this build makes: the toolbar's areas share the container
+    // (`SvalPanelToolbar`), and `CustomizableUI` owns them.
+    for (const child of container.querySelectorAll(
+      ":scope > :is(.sval-panel, .sval-panel-resizer)"
+    )) {
+      child.remove();
+    }
 
     const root = make("div", { class: "sval-panel" });
 
@@ -896,6 +904,12 @@ var SvalPanel = {
     favorites.append(favoritesLabel);
     const favoritesBar = make("div", { class: "sval-favorites-bar" });
     favoritesBar.append(favorites);
+    // The records' toolbar area, which holds Downloads, History and the
+    // notices while the toolbar is in the panel.
+    const records = this._modules.SvalPanelToolbar.recordsArea(document);
+    if (records) {
+      favoritesBar.append(records);
+    }
     favoritesBar.hidden = this._inMemory;
 
     const header = make("div", { class: "sval-panel-header sval-edge-above" });

@@ -304,6 +304,10 @@ add_task(async function the_bookmarks_toolbar_never_shows() {
   // The toolbar context menu and View › Toolbars list exactly the toolbars
   // carrying a name (`ToolbarContextMenu.onViewToolbarsPopupShowing`).
   Assert.ok(!bar.hasAttribute("toolbarname"), "no menu lists the toolbar");
+  Assert.ok(
+    !bar.hasAttribute("data-l10n-id"),
+    "nor names it again when the language changes"
+  );
   Assert.equal(
     document.getElementById("viewBookmarksToolbarKb").getAttribute("disabled"),
     "true",

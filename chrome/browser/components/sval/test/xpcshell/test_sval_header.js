@@ -4,9 +4,14 @@
 "use strict";
 
 const {
+  EXTENSIONS_BUTTON_ID,
   HEADER_WIDGETS,
   RECORD_WIDGETS,
+  SET_AREAS,
+  SET_WIDGETS,
+  SPLIT_BUTTON_ID,
   addressTail,
+  arrangement,
   displayDomain,
   headerPlacements,
   tailChunks,
@@ -130,4 +135,43 @@ add_task(function the_tail_splits_at_its_punctuation() {
   ]);
   Assert.deepEqual(tailChunks("/dir/"), ["/dir", "/"]);
   Assert.deepEqual(tailChunks(""), []);
+});
+
+/**
+ * In the Workspace panel, each widget stands in its set, pinned extension
+ * buttons in the tools set between Split and the extensions button, and
+ * `#nav-bar` keeps only what cannot leave it. Above the page, the sets are
+ * empty.
+ */
+add_task(function each_widget_stands_in_its_set() {
+  const pinned = "ext-a-browser-action";
+  const stuck = "vertical-spacer";
+  const current = {
+    "nav-bar": [
+      ...HEADER_WIDGETS,
+      pinned,
+      stuck,
+      EXTENSIONS_BUTTON_ID,
+      ...RECORD_WIDGETS,
+    ],
+  };
+  const keep = id => id === pinned || id === stuck;
+  const isExtension = id => id === pinned;
+
+  const inPanel = arrangement(current, true, keep, isExtension);
+  for (const [set, ids] of Object.entries(SET_WIDGETS)) {
+    const want =
+      set === "tools" ? [SPLIT_BUTTON_ID, pinned, EXTENSIONS_BUTTON_ID] : ids;
+    Assert.deepEqual(inPanel[SET_AREAS[set]], want, `the ${set} set`);
+  }
+  Assert.deepEqual(inPanel["nav-bar"], [stuck], "#nav-bar keeps what stays");
+
+  const above = arrangement(inPanel, false, keep, isExtension);
+  for (const area of Object.values(SET_AREAS)) {
+    Assert.deepEqual(above[area], [], `${area} is empty above the page`);
+  }
+  Assert.ok(
+    above["nav-bar"].includes(pinned) && above["nav-bar"].includes(stuck),
+    "#nav-bar takes every widget back"
+  );
 });

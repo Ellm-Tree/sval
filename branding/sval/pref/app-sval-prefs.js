@@ -524,6 +524,9 @@ pref("browser.sval.home.favorites", true);
 // at the window's edge on its side (SvalPanelReveal). Device-local, as the
 // panel's side is, since it answers to this device's screen.
 pref("browser.sval.panel.revealAtEdge", true);
+// The header's controls drawn at the Workspace panel's top, with no header
+// above the page (SvalPanelToolbar). Device-local, as the panel's side is.
+pref("browser.sval.toolbar.inPanel", false);
 // Archiving idle tabs (idle-tab archive spec §5), both synced: how long a
 // tab goes unused before Sval archives it, one of 12h, 24h, 7d, 30d and
 // never; and how many days the Archive keeps it, 7, 30 or 90.

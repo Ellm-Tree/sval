@@ -1,0 +1,350 @@
+Sval: let several overflowable toolbars share one overflow button, hide what overflows, and order their own items
+
+The toolbar in the Workspace panel is a set of pills, each a toolbar of
+its own that gives items up as the panel narrows. They share one overflow
+button and panel, so only the first toolbar wires the button; a pill whose
+items are reached another way hides them in a list never shown
+(`overflowhides`); each pill names the items that may leave it, in order
+(`overfloworder`), since the same widget leaves the header row by other
+rules, and names different items for different layouts, so an item its
+order no longer lets leave comes back first; and in the panel's narrowest
+layout each pill gives up all it may (`overflowall`). A pill takes an item
+back once the item fits beside what the pill shows, which holds whichever
+layout sent it out. A pill checks again as its order or `overflowall`
+changes, and as it narrows with the panel, neither of which resizes the
+window.
+
+diff --git a/browser/components/customizableui/CustomizableUI.sys.mjs b/browser/components/customizableui/CustomizableUI.sys.mjs
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -7334,6 +7334,15 @@ function XULWidgetSingleWrapper(aWidgetId, aNode, aDocument) {
+   Object.freeze(this);
+ }
+ 
++/**
++ * The overflow buttons an OverflowableToolbar has wired, since several
++ * toolbars can share one button and its panel: the first to start answers
++ * its clicks and drags, and the others list their items in its panel.
++ *
++ * @type {WeakSet<Element>}
++ */
++const gWiredOverflowButtons = new WeakSet();
++
+ /**
+  * OverflowableToolbar is a class that gives a <xul:toolbar> the ability to send
+  * toolbar items that are "overflowable" to lists in separate panels if and
+@@ -7359,6 +7368,28 @@ function XULWidgetSingleWrapper(aWidgetId, aNode, aDocument) {
+  * only the nav-bar (CustomizableUI.AREA_NAVBAR) makes use of this class.
+  */
+ class OverflowableToolbar {
++  /**
++   * Whether this toolbar answers its overflow button's clicks and drags.
++   *
++   * @type {boolean}
++   */
++  #wiresButton = false;
++
++  /**
++   * Each overflowed item's width when it left, which a toolbar with its own
++   * `overfloworder` needs free to take it back.
++   *
++   * @type {Map<string, number>}
++   */
++  #overflowedWidths = new Map();
++
++  /**
++   * Checks again as the toolbar's `overfloworder` or `overflowall` changes.
++   *
++   * @type {MutationObserver|null}
++   */
++  #orderObserver = null;
++
+   /**
+    * The OverflowableToolbar class is constructed during browser window
+    * creation, but to optimize for window painting, we defer most work until
+@@ -7550,15 +7581,22 @@ class OverflowableToolbar {
+       "default-overflowbutton"
+     );
+     this.#defaultListButton = doc.getElementById(defaultListButton);
+-    this.#defaultListButton.addEventListener("mousedown", this);
+-    this.#defaultListButton.addEventListener("keypress", this);
+-    this.#defaultListButton.addEventListener("dragover", this);
+-    this.#defaultListButton.addEventListener("dragend", this);
+-
++    // A toolbar with `overflowhides` keeps what overflows out of sight in its
++    // list, and its button only anchors what those items open.
++    this.#wiresButton =
++      this.#toolbar.getAttribute("overflowhides") != "true" &&
++      !gWiredOverflowButtons.has(this.#defaultListButton);
+     let panelId = this.#toolbar.getAttribute("default-overflowpanel");
+-    this.#defaultListPanel = doc.getElementById(panelId);
+-    this.#defaultListPanel.addEventListener("popuphiding", this);
+-    CustomizableUIInternal.addPanelCloseListeners(this.#defaultListPanel);
++    this.#defaultListPanel = panelId ? doc.getElementById(panelId) : null;
++    if (this.#wiresButton) {
++      gWiredOverflowButtons.add(this.#defaultListButton);
++      this.#defaultListButton.addEventListener("mousedown", this);
++      this.#defaultListButton.addEventListener("keypress", this);
++      this.#defaultListButton.addEventListener("dragover", this);
++      this.#defaultListButton.addEventListener("dragend", this);
++      this.#defaultListPanel.addEventListener("popuphiding", this);
++      CustomizableUIInternal.addPanelCloseListeners(this.#defaultListPanel);
++    }
+ 
+     CustomizableUI.addListener(this);
+ 
+@@ -7570,6 +7608,15 @@ class OverflowableToolbar {
+     for (let child of this.#target.children) {
+       this.#itemResizeObserver.observe(child);
+     }
++    // A toolbar that shares its row can narrow with no window resize.
++    this.#itemResizeObserver.observe(this.#toolbar);
++    // What may leave can change with no resize at all.
++    this.#orderObserver = new window.MutationObserver(() =>
++      Services.tm.dispatchToMainThread(() => this.#checkOverflow())
++    );
++    this.#orderObserver.observe(this.#toolbar, {
++      attributeFilter: ["overfloworder", "overflowall"],
++    });
+ 
+     this.#checkOverflow();
+ 
+@@ -7596,14 +7643,18 @@ class OverflowableToolbar {
+     window.removeEventListener("resize", this);
+     window.gNavToolbox.removeEventListener("customizationstarting", this);
+     window.gNavToolbox.removeEventListener("aftercustomization", this);
+-    this.#defaultListButton.removeEventListener("mousedown", this);
+-    this.#defaultListButton.removeEventListener("keypress", this);
+-    this.#defaultListButton.removeEventListener("dragover", this);
+-    this.#defaultListButton.removeEventListener("dragend", this);
+-    this.#defaultListPanel.removeEventListener("popuphiding", this);
++    if (this.#wiresButton) {
++      gWiredOverflowButtons.delete(this.#defaultListButton);
++      this.#defaultListButton.removeEventListener("mousedown", this);
++      this.#defaultListButton.removeEventListener("keypress", this);
++      this.#defaultListButton.removeEventListener("dragover", this);
++      this.#defaultListButton.removeEventListener("dragend", this);
++      this.#defaultListPanel.removeEventListener("popuphiding", this);
++      CustomizableUIInternal.removePanelCloseListeners(this.#defaultListPanel);
++    }
+ 
+     CustomizableUI.removeListener(this);
+-    CustomizableUIInternal.removePanelCloseListeners(this.#defaultListPanel);
++    this.#orderObserver?.disconnect();
+     this.#itemResizeObserver.disconnect();
+   }
+ 
+@@ -7822,21 +7873,26 @@ class OverflowableToolbar {
+     let webExtList = this.#webExtList;
+ 
+     // Items leave from the end of the row, except that one with a lower
+-    // overflowpriority leaves before one with a higher (0 without one).
+-    let priority = node => parseInt(node.getAttribute("overflowpriority")) || 0;
++    // overflowpriority leaves before one with a higher (0 without one), and
++    // in the order the toolbar's own `overfloworder` gives.
++    let leaves = node => this.#mayLeave(node);
++    let order = this.#toolbar.getAttribute("overfloworder")?.split(" ");
++    let priority = order
++      ? node => order.indexOf(node.id)
++      : node => parseInt(node.getAttribute("overflowpriority")) || 0;
+     let candidates = Array.from(this.#target.children)
+       .reverse()
+       .sort((a, b) => priority(a) - priority(b));
+-    let placements = gPlacements.get(this.#toolbar.id);
+     for (let child of candidates) {
+       if (!isOverflowing) {
+         break;
+       }
+ 
+-      if (child.getAttribute("overflows") != "false") {
++      if (leaves(child)) {
+         this.#overflowedInfo.set(child.id, targetContentWidth);
+         let { width: childWidth } =
+           win.windowUtils.getBoundsWithoutFlushing(child);
++        this.#overflowedWidths.set(child.id, childWidth);
+         if (!childWidth) {
+           this.#hiddenOverflowedNodes.add(child);
+         }
+@@ -7858,10 +7914,10 @@ class OverflowableToolbar {
+           webExtList.insertBefore(child, webExtList.firstElementChild);
+         } else {
+           child.setAttribute("cui-anchorid", this.#defaultListButton.id);
+-          // The panel lists the items in the row's order.
+-          let index = placements.indexOf(child.id);
+-          let next = Array.from(this.#defaultList.children).find(
+-            node => placements.indexOf(node.id) > index
++          // The panel lists the items in the row's order, and in the
++          // order of the toolbars that share it.
++          let next = Array.from(this.#defaultList.children).find(node =>
++            this.#comesAfter(node, child)
+           );
+           this.#defaultList.insertBefore(child, next ?? null);
+           if (!CustomizableUI.isSpecialWidget(child.id) && childWidth) {
+@@ -7958,10 +8014,72 @@ class OverflowableToolbar {
+       Math.max(targetWidth, targetChildrenWidth)
+     );
+     totalAvailWidth = Math.ceil(totalAvailWidth);
+-    let isOverflowing = targetContentWidth > totalAvailWidth;
++    // A toolbar with `overflowall` gives up every item that may leave it,
++    // whatever room it has.
++    let isOverflowing =
++      targetContentWidth > totalAvailWidth ||
++      this.#toolbar.hasAttribute("overflowall");
+     return { isOverflowing, targetContentWidth, totalAvailWidth };
+   }
+ 
++  /**
++   * Whether the widget `aId` is placed in this toolbar, or is one of its
++   * own items with no placement.
++   *
++   * @param {string} aId
++   * @returns {boolean}
++   */
++  #placedHere(aId) {
++    let area = CustomizableUI.getPlacementOfWidget(aId)?.area;
++    return !area || area == this.#toolbar.id;
++  }
++
++  /**
++   * Whether `aNode` stands after `aOther` in their toolbars: by position
++   * in one toolbar, or by the toolbars' own order in the document.
++   *
++   * @param {Element} aNode
++   * @param {Element} aOther
++   * @returns {boolean}
++   */
++  #comesAfter(aNode, aOther) {
++    let node = CustomizableUI.getPlacementOfWidget(aNode.id);
++    let other = CustomizableUI.getPlacementOfWidget(aOther.id);
++    if (!node || !other) {
++      return false;
++    }
++    if (node.area == other.area) {
++      return node.position > other.position;
++    }
++    let doc = this.#toolbar.ownerDocument;
++    let area = doc.getElementById(node.area);
++    let otherArea = doc.getElementById(other.area);
++    return !!(
++      area &&
++      otherArea &&
++      otherArea.compareDocumentPosition(area) &
++        doc.defaultView.Node.DOCUMENT_POSITION_FOLLOWING
++    );
++  }
++
++  /**
++   * Whether `aNode` may leave this toolbar for an overflow list. A toolbar's
++   * own `overfloworder` names the items that may leave it, after any
++   * extension's button; no other item leaves.
++   *
++   * @param {Element} aNode
++   * @returns {boolean}
++   */
++  #mayLeave(aNode) {
++    let order = this.#toolbar.getAttribute("overfloworder")?.split(" ");
++    if (!order) {
++      return aNode.getAttribute("overflows") != "false";
++    }
++    return (
++      CustomizableUI.isWebExtensionWidget(aNode.id) || order.includes(aNode.id)
++    );
++  }
++
+   /**
+    * Tries to move toolbar items back to the toolbar from the overflow panel.
+    *
+@@ -7976,10 +8094,17 @@ class OverflowableToolbar {
+    *        we can avoid flushing layout by providing it and/or caching it.
+    *        Note that if `shouldMoveAllItems` is true, we never need the width
+    *        anyway, and this value is ignored.
++   * @param {boolean} [onlyThoseThatStay=false]
++   *        Whether to move back only the items the toolbar's `overfloworder`
++   *        does not let leave, whatever the room.
+    * @returns {Promise<undefined>}
+    *   Resolves once moving of items has completed.
+    */
+-  async #moveItemsBackToTheirOrigin(shouldMoveAllItems, totalAvailWidth) {
++  async #moveItemsBackToTheirOrigin(
++    shouldMoveAllItems,
++    totalAvailWidth,
++    onlyThoseThatStay = false
++  ) {
+     lazy.log.debug(
+       `Attempting to move ${shouldMoveAllItems ? "all" : "some"} items back`
+     );
+@@ -7999,8 +8124,9 @@ class OverflowableToolbar {
+       // the cache if that is the case.
+       let child = lazy.PanelMultiView.getViewNode(doc, childID);
+ 
+-      if (!child) {
++      if (!child || !this.#placedHere(childID)) {
+         this.#overflowedInfo.delete(childID);
++        this.#overflowedWidths.delete(childID);
+         continue;
+       }
+ 
+@@ -8008,7 +8134,27 @@ class OverflowableToolbar {
+         `Considering moving ${child.id} back, minSize: ${minSize}`
+       );
+ 
+-      if (!shouldMoveAllItems && minSize) {
++      // Only items the toolbar's order no longer lets leave, whatever room.
++      if (onlyThoseThatStay && this.#mayLeave(child)) {
++        continue;
++      }
++
++      // A toolbar with its own `overfloworder` takes an item back once it
++      // fits beside what the toolbar shows now.
++      if (
++        !shouldMoveAllItems &&
++        !onlyThoseThatStay &&
++        this.#toolbar.hasAttribute("overfloworder")
++      ) {
++        let room = await this.#getOverflowInfo();
++        if (win.closed || this.#checkOverflowHandle != checkOverflowHandle) {
++          return;
++        }
++        let needs = this.#overflowedWidths.get(childID) ?? 0;
++        if (room.targetContentWidth + needs > room.totalAvailWidth) {
++          break;
++        }
++      } else if (!shouldMoveAllItems && !onlyThoseThatStay && minSize) {
+         if (!totalAvailWidth) {
+           ({ totalAvailWidth } = await this.#getOverflowInfo());
+ 
+@@ -8029,6 +8175,7 @@ class OverflowableToolbar {
+ 
+       lazy.log.debug(`Moving ${child.id} back`);
+       this.#overflowedInfo.delete(child.id);
++      this.#overflowedWidths.delete(child.id);
+       this.#hiddenOverflowedNodes.delete(child);
+       let beforeNodeIndex = placements.indexOf(child.id) + 1;
+       // If this is a skipintoolbarset item, meaning it doesn't occur in the placements list,
+@@ -8111,6 +8258,11 @@ class OverflowableToolbar {
+     let checkOverflowHandle = (this.#checkOverflowHandle = {});
+ 
+     lazy.log.debug("Checking overflow");
++    // An item the toolbar's order no longer lets leave comes back first.
++    await this.#moveItemsBackToTheirOrigin(false, undefined, true);
++    if (win.closed || this.#checkOverflowHandle != checkOverflowHandle) {
++      return;
++    }
+     let { isOverflowing, totalAvailWidth } = await this.#getOverflowInfo();
+     if (win.closed || this.#checkOverflowHandle != checkOverflowHandle) {
+       return;
+@@ -8308,6 +8460,14 @@ class OverflowableToolbar {
+     ) {
+       return;
+     }
++    // An overflow list another toolbar shares, or the Extensions panel that
++    // is one, takes widgets placed elsewhere: they are not this toolbar's
++    // to bring back.
++    if (!this.#placedHere(aNode.id)) {
++      this.#overflowedInfo.delete(aNode.id);
++      this.#overflowedWidths.delete(aNode.id);
++      return;
++    }
+ 
+     let nowOverflowed = this.#isOverflowList(aNode.parentNode);
+     let wasOverflowed = this.#overflowedInfo.has(aNode.id);

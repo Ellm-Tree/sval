@@ -1017,6 +1017,59 @@
     <section data-sval-pane="svalPanelSide" class="sval-settings">
       <section class="sval-card" aria-labelledby="sval-workspace-look-heading">
         <h2 id="sval-workspace-look-heading">Workspace appearance</h2>
+        <!-- `SvalPanelToolbar.IN_PANEL_PREF`. -->
+        <h3 id="sval-toolbar-heading">Toolbar</h3>
+        <div
+          class="sval-pick-cards"
+          role="radiogroup"
+          aria-labelledby="sval-toolbar-heading"
+        >
+          <label class="sval-pick-card">
+            <input
+              type="radio"
+              name="sval-toolbar"
+              value="above"
+              aria-describedby="sval-toolbar-above-note"
+            />
+            <span class="sval-pick-words">
+              <span class="sval-pick-label">Above the page</span>
+              <span id="sval-toolbar-above-note" class="sval-pick-note"
+                >The address bar and its buttons sit in a row across the top of
+                the window.</span
+              >
+            </span>
+            <span
+              class="sval-pick-preview"
+              data-toolbar="above"
+              aria-hidden="true"
+              ><span class="sval-pv-header"></span
+              ><span class="sval-pv-side"></span
+            ></span>
+          </label>
+          <label class="sval-pick-card">
+            <input
+              type="radio"
+              name="sval-toolbar"
+              value="panel"
+              aria-describedby="sval-toolbar-panel-note"
+            />
+            <span class="sval-pick-words">
+              <span class="sval-pick-label">In the Workspace panel</span>
+              <span id="sval-toolbar-panel-note" class="sval-pick-note"
+                >The address bar and its buttons sit at the top of the Workspace
+                panel, and the page runs from the top of the window to the
+                bottom.</span
+              >
+            </span>
+            <span
+              class="sval-pick-preview"
+              data-toolbar="panel"
+              aria-hidden="true"
+              ><span class="sval-pv-side"
+                ><span class="sval-pv-rows"></span></span
+            ></span>
+          </label>
+        </div>
         <h3 id="sval-side-heading">Workspace panel side</h3>
         <div
           class="sval-segments"
@@ -1065,15 +1118,23 @@
         </label>
         <!-- `SvalPanelReveal.REVEAL_PREF`. -->
         <label class="sval-switch-row">
-          <span class="sval-lead"
-            >Show the hidden Workspace panel when you hold the pointer at the
-            edge of the window</span
-          >
+          <span class="sval-fp-words">
+            <span id="sval-panel-reveal-label" class="sval-links-label"
+              >Show the hidden Workspace panel when you hold the pointer at the
+              edge of the window</span
+            >
+            <span id="sval-panel-reveal-note" class="sval-agents-note" hidden=""
+              >Holding the pointer at the edge is also how you reach the toolbar
+              with the mouse while the Workspace panel is hidden.</span
+            >
+          </span>
           <input
             id="sval-panel-reveal"
             class="sval-switch"
             type="checkbox"
             role="switch"
+            aria-labelledby="sval-panel-reveal-label"
+            aria-describedby="sval-panel-reveal-note"
           />
         </label>
         <h3 id="sval-switcher-heading">Workspace switcher</h3>

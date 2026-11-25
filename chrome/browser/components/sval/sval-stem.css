@@ -263,16 +263,16 @@
       }
     }
 
-    /* The room left in the window, which `SvalStem` measures, for a popover
-       above or below its button. The content keeps `popup.css`'s clip, so
-       its corners stay whole; a popover with more to show scrolls what it
-       holds. */
+    /* The room left in the window, which `SvalStem` measures. The content
+       keeps `popup.css`'s clip, so its corners stay whole; a popover with
+       more to show scrolls what it holds. */
     &:is(:not([sval-stem-side]), [sval-stem-side="bottom"], [sval-stem-side="top"])::part(content) {
       max-height: var(--sval-stem-room);
       min-width: calc(var(--sval-stem-w) + 2 * var(--sval-stem-hang));
     }
 
     &:is([sval-stem-side="left"], [sval-stem-side="right"])::part(content) {
+      max-height: var(--sval-stem-room);
       min-height: calc(var(--sval-stem-w) + 2 * var(--sval-stem-hang));
     }
   }
@@ -300,6 +300,12 @@
     menupopup[sval-stem-host][sval-stem]:not(#sval-stem-weight) menupopup {
       --panel-border-color: var(--sval-popup-edge);
     }
+  }
+
+  /* Unseen until the stem is placed (`SvalStem`), so the popover never
+     shows where Gecko first put it before it moves into the window. */
+  [sval-stem-host][sval-stem-pending]:not(#sval-stem-weight) {
+    opacity: 0 !important;
   }
 
   [sval-stem-host][sval-stem="placed"]:not(#sval-stem-weight) {

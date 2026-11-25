@@ -35,7 +35,8 @@
 }
 
 /* The Launcher's key, while the field is empty and waits for it (launcher
-   spec §8). */
+   spec §8), or shows a results page's search, as the address beside it
+   shows it (`SvalHeader`). */
 #sval-launcher-key {
   align-self: center;
   margin-inline: 4px 8px;
@@ -43,7 +44,7 @@
 
 #sval-launcher-key[hidden],
 #urlbar:is([focused], [sval-launcher-floating]) #sval-launcher-key,
-#urlbar .urlbar-input-container:not(:has(.urlbar-input:placeholder-shown)) > #sval-launcher-key {
+#urlbar:not([persistsearchterms]) .urlbar-input-container:not(:has(.urlbar-input:placeholder-shown)) > #sval-launcher-key {
   display: none;
 }
 
@@ -420,7 +421,10 @@
   display: none;
   position: absolute;
   inset-block: 0;
-  inset-inline: 0 12px;
+  /* Clear of the pill's rounded start, which reaches `--sval-dock-w` before
+     the field: past the docked buttons in the header, a few pixels in the
+     Workspace panel. */
+  inset-inline: max(0px, var(--sval-control-h) / 2 - var(--sval-dock-w, 0px)) 12px;
   align-items: center;
   overflow: hidden;
   color: var(--toolbar-field-text-color);

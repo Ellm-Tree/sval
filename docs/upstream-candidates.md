@@ -21,6 +21,23 @@ Each entry gives:
 
 ## Sval's own fixes
 
+### A search engine's icon missing once stays missing for the session
+
+- **Patch**: `patches/search-icon-retry.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `ConfigSearchEngine.getIconURL` keeps the promise of each
+  icon lookup per size, including one whose attachment
+  `ConfigSearchEngineIconHandler.createIconURL` could not find and resolved
+  null. Every later call returns that null, so the address bar's search
+  button (`SearchModeSwitcher.updateSearchIcon`) shows the glass for the
+  rest of the session, unless the icon handler's idle update replaces it.
+- **Evidence**: on a profile whose engine icon was missing at startup, the
+  Launcher and the address showed the glass while the same engine's
+  `getIconURL` gave its icon in a new process.
+  `browser_sval_search_icon_retry.js` fails without the fix.
+- **Upstream**: a small patch to `getIconURL` and a unit test in
+  `toolkit/components/search/tests/xpcshell`. Not submitted.
+
 ### A page that gets narrower loses the reader's place
 
 - **Patch**: `patches/scroll-anchor-on-resize.patch`

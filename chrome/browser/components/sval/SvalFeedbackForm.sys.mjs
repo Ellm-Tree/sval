@@ -17,7 +17,10 @@
  */
 
 import { htmlElement } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
-import { SvalStem } from "moz-src:///browser/components/sval/SvalStem.sys.mjs";
+import {
+  STEM_FILLET,
+  SvalStem,
+} from "moz-src:///browser/components/sval/SvalStem.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -43,6 +46,7 @@ const HELP_COMMAND_ID = "Sval:SendFeedback";
 
 /** How far the tab reaches past the button on its outer side (to-code). */
 const TAB_REACH = 4;
+/** The tab's least height, which the 28px button and its reach make. */
 const TAB_HEIGHT = 36;
 /** Between the panel's edge and the popover's. */
 const POPOVER_GAP = 8;
@@ -985,8 +989,11 @@ class FeedbackForm {
 
   /**
    * Places the popover beside the panel, its tab over the button (to-code,
-   * Button): the box starts 8px past the panel's edge, the tab reaches 4px
-   * past the button's outer side, and the box's foot is the tab's.
+   * Button): the tab is centred on the button and reaches at least 4px past
+   * it, the box starts 8px past the panel's edge and at least a fillet's
+   * room past the tab, so the stem between them always curves
+   * (`SvalStem`), and the box's foot is the tab's. The button is larger in
+   * the narrowest panel (`sval-panel.css`).
    */
   place() {
     const anchor = buttonIn(this.win);
@@ -996,17 +1003,22 @@ class FeedbackForm {
     }
     const b = anchor.getBoundingClientRect();
     const panel = container.getBoundingClientRect();
-    const width = this.win.innerWidth;
+    // The viewport to the fraction of a pixel, where `innerWidth` and
+    // `innerHeight` round, so the tab lands on the button exactly.
+    const view = this.doc.documentElement.getBoundingClientRect();
+    const width = view.width;
     const right = panel.left + panel.width / 2 > width / 2;
-    const tabBottom = b.top + b.height / 2 + TAB_HEIGHT / 2;
+    const size = Math.max(TAB_HEIGHT, b.width + 2 * TAB_REACH);
+    const half = size / 2;
+    const centre = b.left + b.width / 2;
+    const tabBottom = b.top + b.height / 2 + half;
     const style = this.root.style;
-    style.setProperty(
-      "--sval-feedback-bottom",
-      `${this.win.innerHeight - tabBottom}px`
-    );
+    style.setProperty("--sval-feedback-bottom", `${view.height - tabBottom}px`);
+    style.setProperty("--sval-feedback-tab", `${size}px`);
     if (right) {
-      const tabStart = width - (b.right + TAB_REACH);
-      const boxEdge = width - (panel.left - POPOVER_GAP);
+      const tabStart = width - (centre + half);
+      const boxEdge =
+        width - Math.min(panel.left - POPOVER_GAP, centre - half - STEM_FILLET);
       style.setProperty("--sval-feedback-start", `${tabStart}px`);
       style.setProperty("--sval-feedback-reach", `${boxEdge - tabStart}px`);
       style.setProperty(
@@ -1014,8 +1026,11 @@ class FeedbackForm {
         `${width - boxEdge - EDGE_ROOM}px`
       );
     } else {
-      const tabStart = b.left - TAB_REACH;
-      const boxEdge = panel.right + POPOVER_GAP;
+      const tabStart = centre - half;
+      const boxEdge = Math.max(
+        panel.right + POPOVER_GAP,
+        centre + half + STEM_FILLET
+      );
       style.setProperty("--sval-feedback-start", `${tabStart}px`);
       style.setProperty("--sval-feedback-reach", `${boxEdge - tabStart}px`);
       style.setProperty(
@@ -1024,15 +1039,13 @@ class FeedbackForm {
       );
     }
     this.root.dataset.side = right ? "right" : "left";
-    // The tab: a pill over the button, from 4px past its outer side, whose
-    // stem grows sideways to the box.
-    const end = right ? b.right + TAB_REACH : b.left - TAB_REACH;
-    const half = TAB_HEIGHT / 2;
+    // The tab: a pill centred over the button, whose stem grows sideways to
+    // the box.
     SvalStem.drawIn(this.root, {
       face: {
-        left: right ? end - TAB_HEIGHT : end,
-        right: right ? end : end + TAB_HEIGHT,
-        top: tabBottom - TAB_HEIGHT,
+        left: centre - half,
+        right: centre + half,
+        top: tabBottom - size,
         bottom: tabBottom,
       },
       faceRadii: right

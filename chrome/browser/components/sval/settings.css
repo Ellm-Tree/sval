@@ -867,6 +867,49 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   line-height: 1.4;
 }
 
+/* Where the toolbar sits, drawn still: a window with the header across its
+   top beside the Workspace panel, or the panel alone with the toolbar's
+   rows at its top. */
+.sval-pick-preview[data-toolbar] {
+  .sval-pv-header {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 9px;
+    border-bottom: 1px solid var(--sval-border);
+    background: color-mix(in srgb, var(--sval-ink-muted) 25%, transparent);
+  }
+
+  .sval-pv-side {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    border-inline-end: 1px solid var(--sval-border);
+    background: color-mix(in srgb, var(--sval-ink-muted) 12%, transparent);
+  }
+
+  .sval-pv-header + .sval-pv-side {
+    top: 10px;
+  }
+
+  .sval-pv-rows {
+    position: absolute;
+    inset-inline: 3px;
+    top: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: linear-gradient(
+      var(--sval-accent) 0 3px,
+      transparent 3px 5px,
+      color-mix(in srgb, var(--sval-ink-muted) 45%, transparent) 5px 9px,
+      transparent 9px 11px,
+      color-mix(in srgb, var(--sval-ink-muted) 45%, transparent) 11px
+    );
+  }
+}
+
 /* The preview: the switcher choice at a fortieth of its size, its colours
    standing for Workspaces'. */
 .sval-pick-preview {

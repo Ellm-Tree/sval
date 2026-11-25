@@ -19,6 +19,8 @@
     addressTail: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
     displayDomain: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
     fitAddress: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
+    IN_PANEL_PREF:
+      "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs",
     tailChunks: "moz-src:///browser/components/sval/SvalHeader.sys.mjs",
     LAUNCHER_PREFS:
       "moz-src:///browser/components/sval/SvalLauncherPrefs.sys.mjs",
@@ -139,6 +141,7 @@
       );
       showPinsLines();
       lifetime.pref(lazy.PINS_LINES_PREF, showPinsLines);
+      this._initToolbar(lifetime);
       this._initSwitcher(lifetime);
       // The Launcher's sections, which settings sync can move too.
       const drawSections = () =>
@@ -151,6 +154,34 @@
       for (const name of Object.values(lazy.LAUNCHER_PREFS)) {
         lifetime.pref(name, drawSections);
       }
+    },
+
+    /**
+     * Wires where the toolbar sits: above the page, or in the Workspace
+     * panel. With it in the panel, the edge's switch says it is also the
+     * mouse's way to the toolbar.
+     *
+     * @param {SvalScope} lifetime Ends as the page goes.
+     */
+    _initToolbar(lifetime) {
+      const note = document.getElementById("sval-panel-reveal-note");
+      const show = () => {
+        const inPanel = Services.prefs.getBoolPref(lazy.IN_PANEL_PREF, false);
+        this._selectRadio("sval-toolbar", inPanel ? "panel" : "above");
+        note.hidden = !inPanel;
+      };
+      for (const radio of document.querySelectorAll(
+        'input[name="sval-toolbar"]'
+      )) {
+        radio.addEventListener("change", () =>
+          Services.prefs.setBoolPref(
+            lazy.IN_PANEL_PREF,
+            radio.value === "panel"
+          )
+        );
+      }
+      show();
+      lifetime.pref(lazy.IN_PANEL_PREF, show);
     },
 
     /**
@@ -203,7 +234,7 @@
      */
     _drawSwitcherPreviews() {
       const previews = Array.from(
-        document.querySelectorAll(".sval-pick-preview"),
+        document.querySelectorAll(".sval-pick-preview[data-preview]"),
         box => ({ box, draw: this._buildSwitcherPreview(box) })
       );
       const still = window.matchMedia("(prefers-reduced-motion: reduce)");

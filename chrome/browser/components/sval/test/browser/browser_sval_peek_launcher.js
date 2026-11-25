@@ -105,6 +105,37 @@ async function runFromLauncher(win, id) {
 }
 
 /**
+ * Runs Privacy and Security from `win`'s Launcher and waits for its panel.
+ * A panel that never opens names where it and its button stood.
+ *
+ * @param {Window} win
+ * @returns {Promise<Element>} The open panel.
+ */
+async function sitePanelFromLauncher(win) {
+  const doc = win.document;
+  const panel = doc.getElementById("sval-protection-panel");
+  const shown = BrowserTestUtils.waitForPopupEvent(panel, "shown");
+  await runFromLauncher(win, "site-privacy");
+  await within(shown, 10_000, "Privacy and Security opening").catch(error => {
+    const now = doc.getElementById("sval-protection-panel");
+    const button = doc.getElementById("sval-protection-button");
+    const stood = {
+      samePanel: now === panel,
+      state: now?.state,
+      attributes: now && [...now.attributes].map(a => `${a.name}=${a.value}`),
+      button: button?.getBoundingClientRect(),
+      buttonShows: button?.checkVisibility(),
+      buttonIn: button?.parentNode?.id,
+      floating: win.gURLBar.hasAttribute("sval-launcher-floating"),
+      focused: doc.activeElement?.id || doc.activeElement?.localName,
+      active: Services.focus.activeWindow === win,
+    };
+    throw new Error(`${error.message}: ${JSON.stringify(stood)}`);
+  });
+  return panel;
+}
+
+/**
  * Waits until the ordinary window shows `url` and is in front.
  *
  * @param {string} url
@@ -172,10 +203,7 @@ add_task(async function a_peek_lists_no_unloading_commands() {
 
 add_task(async function a_peeks_site_panel_opens_from_the_launcher() {
   const win = await aPeek();
-  const panel = win.document.getElementById("sval-protection-panel");
-  const shown = BrowserTestUtils.waitForPopupEvent(panel, "shown");
-  await runFromLauncher(win, "site-privacy");
-  await within(shown, 10_000, "Privacy and Security opening");
+  const panel = await sitePanelFromLauncher(win);
   const hidden = BrowserTestUtils.waitForPopupEvent(panel, "hidden");
   panel.hidePopup();
   await within(hidden, 10_000, "Privacy and Security closing");
@@ -292,10 +320,7 @@ add_task(async function a_peeks_empty_launcher_lists_recent_tabs() {
 /** A command a Peek ran is listed there again. */
 add_task(async function a_peek_lists_a_command_again_after_running_it() {
   const win = await aPeek();
-  const panel = win.document.getElementById("sval-protection-panel");
-  const shown = BrowserTestUtils.waitForPopupEvent(panel, "shown");
-  await runFromLauncher(win, "site-privacy");
-  await within(shown, 10_000, "Privacy and Security opening");
+  const panel = await sitePanelFromLauncher(win);
   const hidden = BrowserTestUtils.waitForPopupEvent(panel, "hidden");
   panel.hidePopup();
   await within(hidden, 10_000, "Privacy and Security closing");

@@ -1,0 +1,79 @@
+Sval: let toolbars made at runtime join toolbar keyboard navigation
+
+Sval's Workspace panel holds the toolbar's widgets in toolbar areas of its
+own, made at runtime outside #navigator-toolbox, and a corner toolbar
+stands in for the hidden panel. ToolbarKeyboardNavigator only knows the
+toolbars it lists by id, so those areas had no tab stop and their buttons
+could not be reached from the keyboard. addToolbar() gives a toolbar the
+same handling as the listed ones.
+
+diff --git a/browser/base/content/browser-toolbarKeyNav.js b/browser/base/content/browser-toolbarKeyNav.js
+index 5b27fe275d..2a167bdf44 100644
+--- a/browser/base/content/browser-toolbarKeyNav.js
++++ b/browser/base/content/browser-toolbarKeyNav.js
+@@ -114,25 +114,43 @@ ToolbarKeyboardNavigator = {
+     }
+     this._initialized = true;
+     for (let id of this.kToolbars) {
+-      let toolbar = document.getElementById(id);
+-      // When enabled, no toolbar buttons should themselves be tabbable.
+-      // We manage toolbar focus completely. This attribute ensures that CSS
+-      // doesn't set -moz-user-focus: normal.
+-      toolbar.setAttribute("keyNav", "true");
+-      this._initTabStops(toolbar);
+-      toolbar.addEventListener("keydown", this);
+-      toolbar.addEventListener("keypress", this);
++      this._initToolbar(document.getElementById(id));
++    }
++    for (let toolbar of this._addedToolbars) {
++      this._initToolbar(toolbar);
+     }
+     CustomizableUI.addListener(this);
+   },
+ 
++  // Sval: toolbars of its own, made at runtime outside the toolbox.
++  _addedToolbars: [],
++
++  addToolbar(aToolbar) {
++    this._addedToolbars.push(aToolbar);
++    if (this._initialized) {
++      this._initToolbar(aToolbar);
++    }
++  },
++
++  _initToolbar(toolbar) {
++    // When enabled, no toolbar buttons should themselves be tabbable.
++    // We manage toolbar focus completely. This attribute ensures that CSS
++    // doesn't set -moz-user-focus: normal.
++    toolbar.setAttribute("keyNav", "true");
++    this._initTabStops(toolbar);
++    toolbar.addEventListener("keydown", this);
++    toolbar.addEventListener("keypress", this);
++  },
++
+   uninit() {
+     if (!this._initialized) {
+       return;
+     }
+     this._initialized = false;
+-    for (let id of this.kToolbars) {
+-      let toolbar = document.getElementById(id);
++    for (let toolbar of [
++      ...this.kToolbars.map(id => document.getElementById(id)),
++      ...this._addedToolbars,
++    ]) {
+       for (let stop of toolbar.getElementsByTagName("toolbartabstop")) {
+         stop.removeEventListener("focus", this);
+       }
+@@ -145,7 +163,10 @@ ToolbarKeyboardNavigator = {
+ 
+   // CustomizableUI event handler
+   onWidgetAdded(aWidgetId, aArea) {
+-    if (!this.kToolbars.includes(aArea)) {
++    if (
++      !this.kToolbars.includes(aArea) &&
++      !this._addedToolbars.some(toolbar => toolbar.id == aArea)
++    ) {
+       return;
+     }
+     let widget = document.getElementById(aWidgetId);

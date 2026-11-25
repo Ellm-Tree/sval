@@ -119,6 +119,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   CustomizableUI:
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+  SvalPanelToolbar:
+    "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs",
   SvalPrivateJars: "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs",
   SvalSiteData: "moz-src:///browser/components/sval/SvalSiteData.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
@@ -429,7 +431,7 @@ function headerGlyph(doc, name) {
 }
 
 /** The live cell's name for each kind it shows. */
-const KIND_NAMES = {
+export const KIND_NAMES = {
   camera: "Camera",
   microphone: "Microphone",
   screen: "Screen",
@@ -3376,6 +3378,7 @@ export const SvalSiteControls = {
    * @returns {Element|null}
    */
   promptAnchor(win, anchor, fallback) {
+    lazy.SvalPanelToolbar.beforePrompt(win);
     const control = controls.get(win);
     const answer = control ? control.promptAnchor(anchor, fallback) : fallback;
     const drawn = element =>

@@ -57,6 +57,7 @@ import {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SvalLauncher: "moz-src:///browser/components/sval/SvalLauncher.sys.mjs",
   workspaceName:
     "moz-src:///browser/components/sval/SvalWorkspaceEntries.sys.mjs",
   SvalWindowWorkspace:
@@ -671,7 +672,11 @@ export const COMMANDS = [
     keyId: null,
     available: win =>
       !!lazy.SvalProtectionButton.forWindow(win) && !!lazy.stateOf(win),
-    run: win => lazy.SvalProtectionButton.forWindow(win)?.open({ focus: true }),
+    // From the shield, which stands in the field the Launcher floats.
+    run: async win => {
+      await lazy.SvalLauncher.whenDocked(win);
+      lazy.SvalProtectionButton.forWindow(win)?.open({ focus: true });
+    },
   },
   {
     id: "site-settings",

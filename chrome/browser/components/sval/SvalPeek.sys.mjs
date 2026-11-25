@@ -1346,8 +1346,11 @@ function checkAllIdle() {
  */
 function buildHeader(win) {
   const doc = win.document;
-  const navbar = doc.getElementById("nav-bar");
-  const target = doc.getElementById("nav-bar-customization-target");
+  // The toolbar holding the address: `#nav-bar` above the page, or the
+  // Workspace panel's area when the header's widgets stand there
+  // (`SvalHeader`), which a Peek draws as its header row.
+  const target = doc.getElementById("urlbar-container").parentNode;
+  const navbar = target.parentNode;
 
   const tag = htmlElement(doc, "button", { id: "sval-peek-tag" });
   tag.type = "button";
@@ -1367,6 +1370,8 @@ function buildHeader(win) {
       });
     }
   });
+  // Not the toolbar's widgets, so `CustomizableUI` leaves them be.
+  tag.setAttribute("skipintoolbarset", "true");
   navbar.insertBefore(tag, target);
 
   const group = htmlElement(doc, "div", { id: "sval-peek-open" });
@@ -1397,6 +1402,7 @@ function buildHeader(win) {
     )
   );
   group.append(main, divider, more);
+  group.setAttribute("skipintoolbarset", "true");
   target.after(group);
 
   const popups = doc.getElementById("mainPopupSet");

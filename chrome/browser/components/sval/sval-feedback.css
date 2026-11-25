@@ -10,8 +10,9 @@
  * three as one shape (`sval-stem.css`). The tab and the shape take no
  * pointer, so the button under the tab still closes the popover.
  *
- * `SvalFeedbackForm.place` sets, in px: `--sval-feedback-start` from the
- * window's edge on the panel's side to the tab's outer end,
+ * `SvalFeedbackForm.place` sets, in px: `--sval-feedback-tab` the tab's
+ * size, `--sval-feedback-start` from the window's edge on the panel's side
+ * to the tab's outer end,
  * `--sval-feedback-reach` from there to the box, `--sval-feedback-bottom`
  * from the window's foot to the tab's, and `--sval-feedback-room` the width
  * the box may take.
@@ -69,18 +70,16 @@
   position: absolute;
   bottom: 0;
   left: 0;
-  width: 36px;
-  height: 36px;
+  width: var(--sval-feedback-tab);
+  height: var(--sval-feedback-tab);
 
-  /* The button's icon, drawn again over the tab that covers it. */
+  /* The button's icon, drawn again over the tab that covers it, in the
+     middle of both. */
   &::before {
     content: "";
     position: absolute;
-    top: 9px;
-    left: 9px;
-    width: 18px;
-    height: 18px;
-    background: var(--sval-icon-feedback) center / contain no-repeat;
+    inset: 0;
+    background: var(--sval-icon-feedback) center / 18px no-repeat;
     -moz-context-properties: fill;
     fill: var(--sval-text);
   }
@@ -88,11 +87,6 @@
   [data-side="right"] > & {
     left: auto;
     right: 0;
-
-    &::before {
-      left: auto;
-      right: 9px;
-    }
   }
 }
 

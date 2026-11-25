@@ -43,6 +43,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLauncherCommands:
     "moz-src:///browser/components/sval/SvalLauncherCommands.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+  SvalPanelToolbar:
+    "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs",
+  SvalSearchFlip: "moz-src:///browser/components/sval/SvalSearchFlip.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   LAUNCHER_KEY: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
@@ -224,6 +227,29 @@ function prepare(win) {
     SvalLauncher.close(win, { focusPage: true });
   });
   doc.getElementById("browser").append(scrim);
+  // A press anywhere else in the window ends the float too: the scrim
+  // covers the page alone, and much of the chrome takes no focus from the
+  // field, which would leave the float open with its view closed. A popup
+  // opened from the field, such as the search-mode switcher's list, is the
+  // Launcher's own.
+  win.addEventListener(
+    "mousedown",
+    event => {
+      // Retargeted to the host, which `contains` sees, where a click
+      // lands in a shadow tree such as the engine button's.
+      const { target } = event;
+      if (
+        !urlbar.hasAttribute(FLOATING) ||
+        urlbar.contains(target) ||
+        target === scrim ||
+        target.closest?.("panel, menupopup")
+      ) {
+        return;
+      }
+      SvalLauncher.close(win, { focusPage: true });
+    },
+    true
+  );
 
   // Drawn by `sval-launcher.css` in the toolbar's pill while the field
   // floats; the field itself keeps the address for screen readers.
@@ -439,7 +465,15 @@ export const SvalLauncher = {
       .getElementById("Browser:OpenLocation")
       ?.addEventListener("command", event => {
         event.stopImmediatePropagation();
-        SvalLauncher.open(win, { floating: true, event });
+        const open = () => SvalLauncher.open(win, { floating: true, event });
+        // A field in a hidden or moving Workspace panel floats once it has
+        // broken out of its row (`SvalPanelToolbar`).
+        const wait = lazy.SvalPanelToolbar.whenFloatable(win);
+        if (wait) {
+          wait.then(open);
+        } else {
+          open();
+        }
       });
     mounted.add(win);
     // The field wrote Firefox's placeholder while the window parsed
@@ -495,6 +529,30 @@ export const SvalLauncher = {
   },
 
   /**
+   * Resolves once the field stands in the toolbar, where the floating card
+   * hides the buttons inside it (`sval-launcher.css`): at once for a docked
+   * field, and when the card's fade ends for one closing.
+   *
+   * @param {Window} win
+   * @returns {Promise<void>}
+   */
+  whenDocked(win) {
+    const urlbar = win.gURLBar;
+    if (!urlbar.hasAttribute(FLOATING)) {
+      return Promise.resolve();
+    }
+    return new Promise(resolve => {
+      const observer = new win.MutationObserver(() => {
+        if (!urlbar.hasAttribute(FLOATING)) {
+          observer.disconnect();
+          resolve();
+        }
+      });
+      observer.observe(urlbar, { attributeFilter: [FLOATING] });
+    });
+  },
+
+  /**
    * Returns a floating field to the toolbar, the card fading out as it goes.
    *
    * @param {Window} win
@@ -527,7 +585,7 @@ export const SvalLauncher = {
     );
     if (focusPage) {
       urlbar.view.close();
-      urlbar.handleRevert();
+      lazy.SvalSearchFlip.revert(win);
       win.gBrowser.selectedBrowser.focus();
     }
   },

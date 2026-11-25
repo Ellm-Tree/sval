@@ -1,0 +1,164 @@
+Sval: stack the macOS window buttons when their box stands vertically
+
+The Workspace panel's narrowest layout is one column 48px wide, and the
+window's close, minimize and zoom buttons stand in it, one over another.
+A window-button box laid out in a vertical writing mode takes the
+buttons' row turned on its side, and the window places each button down
+that box: Gecko already places the close button through the frame
+view's _closeButtonOrigin, and minimize and zoom, which otherwise follow
+it in a row, get the same through _collapseButtonOrigin and
+_zoomButtonOrigin. A box laid out horizontally keeps the system's row.
+
+diff --git a/widget/cocoa/nsCocoaWindow.mm b/widget/cocoa/nsCocoaWindow.mm
+index ff3bb8e938..4a85414eba 100644
+--- a/widget/cocoa/nsCocoaWindow.mm
++++ b/widget/cocoa/nsCocoaWindow.mm
+@@ -8088,9 +8088,41 @@ LayoutDeviceIntPoint nsCocoaWindow::GetNativeLockedPoint() {
+ 
+ @interface NSView (FrameViewMethodSwizzling)
+ - (NSPoint)FrameView__closeButtonOrigin;
++- (NSPoint)FrameView__collapseButtonOrigin;
++- (NSPoint)FrameView__zoomButtonOrigin;
+ - (CGFloat)FrameView__titlebarHeight;
+ @end
+ 
++// The window buttons stand stacked, close over minimize over zoom, when the
++// chrome lays their box out taller than it is wide, as a vertical writing
++// mode does (WindowButtonsSize in nsNativeThemeCocoa.mm). Each button's
++// origin is in non-flipped window coordinates, the box's spare height shared
++// between the gaps.
++static bool StackedWindowButtonOrigin(NSWindow* aWindow, int aIndex,
++                                      NSPoint* aOrigin) {
++  if (![aWindow isKindOfClass:[ToolbarWindow class]]) {
++    return false;
++  }
++  auto* win = static_cast<ToolbarWindow*>(aWindow);
++  if (!win.drawsContentsIntoWindowFrame ||
++      (win.styleMask & NSWindowStyleMaskFullScreen) ||
++      !(win.styleMask & NSWindowStyleMaskTitled)) {
++    return false;
++  }
++  const NSRect buttonsRect = win.windowButtonsRect;
++  if (NSIsEmptyRect(buttonsRect) ||
++      buttonsRect.size.height <= buttonsRect.size.width) {
++    return false;
++  }
++  const CGFloat button =
++      [win standardWindowButton:NSWindowCloseButton].frame.size.height;
++  const CGFloat step = (buttonsRect.size.height - button) / 2;
++  *aOrigin = NSMakePoint(buttonsRect.origin.x, buttonsRect.origin.y +
++                                                   buttonsRect.size.height -
++                                                   button - aIndex * step);
++  return true;
++}
++
+ @implementation NSView (FrameViewMethodSwizzling)
+ 
+ - (NSPoint)FrameView__closeButtonOrigin {
+@@ -8109,6 +8141,10 @@ LayoutDeviceIntPoint nsCocoaWindow::GetNativeLockedPoint() {
+       // making them invisible.
+       return NSMakePoint(buttonsRect.origin.x, win.frame.size.height);
+     }
++    NSPoint stacked;
++    if (StackedWindowButtonOrigin(win, 0, &stacked)) {
++      return stacked;
++    }
+     if (win.windowTitlebarLayoutDirection ==
+         NSUserInterfaceLayoutDirectionRightToLeft) {
+       // We're in RTL mode, which means that the close button is the rightmost
+@@ -8123,6 +8159,22 @@ LayoutDeviceIntPoint nsCocoaWindow::GetNativeLockedPoint() {
+   return self.FrameView__closeButtonOrigin;
+ }
+ 
++- (NSPoint)FrameView__collapseButtonOrigin {
++  NSPoint stacked;
++  if (StackedWindowButtonOrigin(self.window, 1, &stacked)) {
++    return stacked;
++  }
++  return self.FrameView__collapseButtonOrigin;
++}
++
++- (NSPoint)FrameView__zoomButtonOrigin {
++  NSPoint stacked;
++  if (StackedWindowButtonOrigin(self.window, 2, &stacked)) {
++    return stacked;
++  }
++  return self.FrameView__zoomButtonOrigin;
++}
++
+ - (CGFloat)FrameView__titlebarHeight {
+   // XXX: Shouldn't this be [super FrameView__titlebarHeight]?
+   CGFloat height = [self FrameView__titlebarHeight];
+@@ -8179,6 +8231,11 @@ static NSMutableSet* gSwizzledFrameViewClasses = nil;
+       [NSView class], @selector(FrameView__closeButtonOrigin));
+   MOZ_RUNINIT static IMP our_titlebarHeight = class_getMethodImplementation(
+       [NSView class], @selector(FrameView__titlebarHeight));
++  MOZ_RUNINIT static IMP our_collapseButtonOrigin =
++      class_getMethodImplementation([NSView class],
++                                    @selector(FrameView__collapseButtonOrigin));
++  MOZ_RUNINIT static IMP our_zoomButtonOrigin = class_getMethodImplementation(
++      [NSView class], @selector(FrameView__zoomButtonOrigin));
+ 
+   if (![gSwizzledFrameViewClasses containsObject:frameViewClass]) {
+     // Either of these methods might be implemented in both a subclass of
+@@ -8193,6 +8250,23 @@ static NSMutableSet* gSwizzledFrameViewClasses = nil;
+                                 @selector(FrameView__closeButtonOrigin));
+     }
+ 
++    // Minimize and zoom follow close in a row on their own, and need their
++    // own places when the buttons stand stacked.
++    IMP _collapseButtonOrigin = class_getMethodImplementation(
++        frameViewClass, @selector(_collapseButtonOrigin));
++    if (_collapseButtonOrigin &&
++        _collapseButtonOrigin != our_collapseButtonOrigin) {
++      nsToolkit::SwizzleMethods(frameViewClass,
++                                @selector(_collapseButtonOrigin),
++                                @selector(FrameView__collapseButtonOrigin));
++    }
++    IMP _zoomButtonOrigin = class_getMethodImplementation(
++        frameViewClass, @selector(_zoomButtonOrigin));
++    if (_zoomButtonOrigin && _zoomButtonOrigin != our_zoomButtonOrigin) {
++      nsToolkit::SwizzleMethods(frameViewClass, @selector(_zoomButtonOrigin),
++                                @selector(FrameView__zoomButtonOrigin));
++    }
++
+     // Override _titlebarHeight so that the floating titlebar doesn't clip the
+     // bottom of the window buttons which we move down with our override of
+     // _closeButtonOrigin.
+diff --git a/widget/cocoa/nsNativeThemeCocoa.mm b/widget/cocoa/nsNativeThemeCocoa.mm
+index ea919696e6..964531bcf4 100644
+--- a/widget/cocoa/nsNativeThemeCocoa.mm
++++ b/widget/cocoa/nsNativeThemeCocoa.mm
+@@ -202,11 +202,22 @@ static NSWindow* NativeWindowForFrame(nsIFrame* aFrame,
+   return (NSWindow*)topLevelWidget->GetNativeData(NS_NATIVE_WINDOW);
+ }
+ 
++// A box laid out in a vertical writing mode holds the buttons stacked, close
++// over minimize over zoom (StackedWindowButtonOrigin in nsCocoaWindow.mm), so
++// it takes their row's size turned on its side.
++static NSSize WindowButtonsBoxSize(nsIFrame* aFrame, NSSize aButtons) {
++  const bool stacked = aFrame->GetWritingMode().IsVertical();
++  if (stacked != (aButtons.height > aButtons.width)) {
++    return NSSize{aButtons.height, aButtons.width};
++  }
++  return aButtons;
++}
++
+ static NSSize WindowButtonsSize(nsIFrame* aFrame) {
+   NSWindow* window = NativeWindowForFrame(aFrame);
+   if (!window) {
+     // Return fallback values.
+-    return NSSize{54, 16};
++    return WindowButtonsBoxSize(aFrame, NSSize{54, 16});
+   }
+ 
+   NSRect buttonBox = NSZeroRect;
+@@ -223,7 +234,7 @@ static NSSize WindowButtonsSize(nsIFrame* aFrame) {
+   if (zoomButton) {
+     buttonBox = NSUnionRect(buttonBox, [zoomButton frame]);
+   }
+-  return buttonBox.size;
++  return WindowButtonsBoxSize(aFrame, buttonBox.size);
+ }
+ 
+ static BOOL FrameIsInActiveWindow(nsIFrame* aFrame) {

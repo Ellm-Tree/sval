@@ -164,6 +164,22 @@ control of what you see and what is sent to websites.
   Workspace panel. To stop the Workspace panel sliding in at the edge, go
   to Settings › Appearance › Workspace appearance. Turn off Show the hidden
   Workspace panel when you hold the pointer at the edge of the window.
+- **Put the toolbar in the Workspace panel.** To give the page the full
+  height of the window, choose In the Workspace panel in Settings ›
+  Appearance › Workspace appearance. The address bar and its buttons move to
+  the top of the Workspace panel, and Downloads, History, and notices move to
+  the bottom next to Favorites. Clicking the address opens the Launcher.
+  As you narrow the Workspace panel, buttons that no longer fit move into
+  the More tools button, and you reach the site controls from the site
+  settings menu. At the narrowest width, the Workspace panel shows one
+  column of buttons with the window's buttons stacked at the top. While the
+  Workspace panel is hidden, the page's top corner keeps the
+  window's buttons and a Workspaces button that shows the Workspace panel
+  again. An icon appears next to the Workspaces button while a site uses
+  your camera, microphone, or screen. A line along the top edge shows the
+  page loading, and a site that asks for a permission slides the Workspace
+  panel in until you answer. Press Tab to reach the toolbar's buttons, and
+  the arrow keys to move between them.
 - **Select several rows.** ⌘-click (Ctrl-click on Windows and Linux) rows to
   select them, or Shift-click to select every row in between. You can then
   close the selected tabs, move them to a group or a Workspace, make a new
@@ -301,18 +317,18 @@ control of what you see and what is sent to websites.
   lists matching open tabs from every Workspace, pins and Favorites, Sval's
   commands, history, and search suggestions. A tab from another Workspace
   shows that Workspace's name and emoji in its color. You can reorder the
-  sections, and choose how many results each shows, in Settings › Search and
+  sections and choose how many results each shows in Settings › Search and
   Launcher.
   With nothing typed, the Launcher and the home page's search field list the
   tabs you used most recently under Recent tabs. The sites you visit most
   follow under Frequent sites, except any you already have open in a tab.
   The address bar shows the Launcher's key at its right end when there's
   room.
-- **Commands.** Type a few letters, like "new wor" or "split", to run one of
-  Sval's commands. There are commands for Workspaces, tabs, Splits, the
-  Workspace panel, site settings, agents, and Settings pages. Others open
-  Downloads, History, Extensions, or Passwords, print or translate the page,
-  or restart Sval.
+- **Commands.** Type a few letters like "new wor" or "split" to run one of
+  Sval's commands. Commands act on your Workspaces and the tabs and Splits
+  in them, as well as the Workspace panel, site settings, and agents. Others
+  open a Settings page or one of Sval's own pages like Downloads or
+  Passwords, and some print or translate the page or restart Sval.
 - **Choose where a page opens.** Enter opens it in this tab, and Shift+Enter
   opens it in a new tab. ⌘⇧Enter (Ctrl+Shift+Enter) opens it in a new
   window, and ⌥Enter (Alt+Enter) opens it in a Split next to this tab.
@@ -335,6 +351,10 @@ control of what you see and what is sent to websites.
   `accounts.google.com`. When a site's name starts with another site's
   name, the address bar still shows the real ending, so you can tell whose
   site you're on.
+- **Your search on its results page.** On the results page of a search you
+  made, the address bar shows what you searched for. Click the link button
+  at its end to see the page's address, and click the search button there to
+  bring your search back. The address bar turns over as it switches.
 - **Loading line.** While a page loads, a line grows along the bottom of the
   address bar as the page comes in. Once the page has loaded, the line
   reaches the end and fades. Peek windows and the Quick Peek bar show the same line.

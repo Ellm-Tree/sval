@@ -156,7 +156,7 @@ Object.assign(SvalPanel, {
         )
       )
     );
-    this._applyPlacementOnceSidebarStarts();
+    this._applyPlacement();
     this._hideSwitcher();
     this.drawIndicator();
     // A profile whose windows are all private never reaches `_start`, and

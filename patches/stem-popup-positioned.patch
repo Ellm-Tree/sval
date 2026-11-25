@@ -1,0 +1,25 @@
+Sval: Tell a stemmed popup each time it moves
+
+A popover joined to its button by a stem (SvalStem) redraws the stem
+from where the popover stands, so it must hear every move Gecko makes,
+following its anchor included. Gecko sends popuppositioned to arrow
+panels alone; a popup marked sval-stem-host gets it too.
+
+diff --git a/layout/xul/nsXULPopupManager.cpp b/layout/xul/nsXULPopupManager.cpp
+index 9e1bbffe78..6d88f25ccc 100644
+--- a/layout/xul/nsXULPopupManager.cpp
++++ b/layout/xul/nsXULPopupManager.cpp
+@@ -2883,9 +2883,11 @@ nsXULPopupHidingEvent::Run() {
+ }
+ 
+ bool nsXULPopupPositionedEvent::DispatchIfNeeded(Element* aPopup) {
+-  // The popuppositioned event only fires on arrow panels for now.
++  // The popuppositioned event fires on arrow panels, and on any popup that
++  // draws itself joined to its anchor and so redraws on every move.
+   if (aPopup->AttrValueIs(kNameSpaceID_None, nsGkAtoms::type, nsGkAtoms::arrow,
+-                          eCaseMatters)) {
++                          eCaseMatters) ||
++      aPopup->HasAttribute(u"sval-stem-host"_ns)) {
+     nsCOMPtr<nsIRunnable> event =
+         MakeAndAddRef<nsXULPopupPositionedEvent>(aPopup);
+     aPopup->OwnerDoc()->Dispatch(event.forget());

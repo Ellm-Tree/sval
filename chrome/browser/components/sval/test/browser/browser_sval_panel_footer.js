@@ -24,6 +24,8 @@ const { SvalTestDeny } = ChromeUtils.importESModule(
   "resource://testing-common/SvalTestDeny.sys.mjs"
 );
 
+add_setup(() => failOnConsoleErrors());
+
 /**
  * The window's own panel on a fresh workspace, sharing a folder of the
  * task's own that a pass has reached.
@@ -618,8 +620,7 @@ add_task(
 
 /**
  * Spec §5.6: placement is device-local, and both sides have to work. Asserted
- * on the box's own position, because the property that moves it is one a
- * declaration alone does not change (see `_applyPlacement`).
+ * on the box's own position.
  */
 add_task(async function placement_puts_the_panel_on_either_side() {
   const { settings } = await withFreshPanel();
@@ -668,6 +669,67 @@ add_task(async function placement_puts_the_panel_on_either_side() {
     content.getBoundingClientRect().left,
     "and back again"
   );
+});
+
+/**
+ * A new window draws the panel on the device's side from its first paint,
+ * before this device's settings have loaded into it.
+ */
+add_task(async function a_new_window_opens_with_the_panel_on_its_side() {
+  const { settings } = await withFreshPanel();
+  settings.placement = "right";
+  SvalPanel._applyPlacement();
+  atTaskEnd(() => {
+    settings.placement = "left";
+    SvalPanel._applyPlacement();
+  });
+  let before = null;
+  const observe = win => {
+    before = win.document
+      .getElementById("sval-panel-container")
+      ?.getAttribute("sval-placement");
+  };
+  Services.obs.addObserver(observe, "browser-window-before-show");
+  atTaskEnd(() =>
+    Services.obs.removeObserver(observe, "browser-window-before-show")
+  );
+  const win = await within(
+    BrowserTestUtils.openNewBrowserWindow(),
+    20_000,
+    "a new window"
+  );
+  atTaskEnd(() =>
+    within(BrowserTestUtils.closeWindow(win), 10_000, "the new window closing")
+  );
+  Assert.equal(
+    before,
+    "right",
+    "the panel stands right before the window shows"
+  );
+});
+
+/**
+ * Firefox's sidebar reorders every box in the window as it starts and as its
+ * side changes (`SidebarController.setPosition`), reversing them while it
+ * stands at the end. The panel stays on its own side through that, with no
+ * second placement after it.
+ */
+add_task(async function the_sidebar_reordering_leaves_the_panel_in_place() {
+  await withFreshPanel();
+  const container = document.getElementById("sval-panel-container");
+  const content = document.getElementById("tabbrowser-tabbox");
+  const panelLeft = () =>
+    container.getBoundingClientRect().left <
+    content.getBoundingClientRect().left;
+  await TestUtils.waitForCondition(panelLeft, "the panel on the left");
+  // The panel on the left puts the sidebar at the end (`_applyPlacement`),
+  // where its reorder reverses the boxes.
+  Assert.ok(
+    !Services.prefs.getBoolPref("sidebar.position_start"),
+    "the sidebar stands at the end"
+  );
+  SidebarController.setPosition();
+  Assert.ok(panelLeft(), "the panel stays on the left");
 });
 
 /**

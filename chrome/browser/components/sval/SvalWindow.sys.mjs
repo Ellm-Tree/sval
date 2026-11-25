@@ -22,6 +22,7 @@ import { SvalHistorySidebar } from "moz-src:///browser/components/sval/SvalHisto
 import { SvalLauncher } from "moz-src:///browser/components/sval/SvalLauncher.sys.mjs";
 import { LAUNCHER_FTL } from "moz-src:///browser/components/sval/SvalLauncherTabs.sys.mjs";
 import { SvalPanelReveal } from "moz-src:///browser/components/sval/SvalPanelReveal.sys.mjs";
+import { SvalPanelToolbar } from "moz-src:///browser/components/sval/SvalPanelToolbar.sys.mjs";
 import { SvalQuickPeek } from "moz-src:///browser/components/sval/SvalQuickPeek.sys.mjs";
 import { SvalRestore } from "moz-src:///browser/components/sval/SvalRestore.sys.mjs";
 import { SvalPeek } from "moz-src:///browser/components/sval/SvalPeek.sys.mjs";
@@ -35,6 +36,8 @@ import { SPLIT_MAX_PANES } from "moz-src:///browser/components/sval/SvalPanelMod
 import { SvalWindowWorkspace } from "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs";
 
 const PANEL_CSS = "chrome://browser/content/sval/sval-panel.css";
+/** The panel's side on its container, which `sval-panel.css` places it by. */
+const PLACEMENT_ATTR = "sval-placement";
 /**
  * The panel's scripts. `sval-panel.js` declares `SvalPanel`, and each of the
  * others adds the methods of one part of the panel to it, so it comes first.
@@ -69,7 +72,8 @@ const BOOKMARKS_TOOLBAR_PREF = "browser.toolbars.bookmarks.visibility";
  * row above the page would show the same links twice. Its pref is locked to
  * "never". The toolbar context menu and View › Toolbars list every toolbar
  * carrying `toolbarname` (`ToolbarContextMenu.onViewToolbarsPopupShowing`),
- * so taking that attribute away takes it out of both, and its keyboard
+ * so taking that attribute away takes it out of both, with the Fluent id
+ * that sets it again when the language changes, and its keyboard
  * shortcut is disabled. Its entries in the bookmarks button's menu and the app
  * menu are hidden in `sval-panel.css`, because the app menu's is cloned from a
  * template later than this runs.
@@ -83,7 +87,10 @@ function removeBookmarksToolbar(doc) {
     .getDefaultBranch("")
     .setCharPref(BOOKMARKS_TOOLBAR_PREF, "never");
   Services.prefs.lockPref(BOOKMARKS_TOOLBAR_PREF);
-  doc.getElementById("PersonalToolbar")?.removeAttribute("toolbarname");
+  const bar = doc.getElementById("PersonalToolbar");
+  for (const name of ["data-l10n-id", "data-l10n-attrs", "toolbarname"]) {
+    bar?.removeAttribute(name);
+  }
   doc
     .getElementById("viewBookmarksToolbarKb")
     ?.setAttribute("disabled", "true");
@@ -386,6 +393,16 @@ export const SvalWindow = {
 
       const container = doc.createXULElement("vbox");
       container.id = "sval-panel-container";
+      // The side the panel stood on last, kept for the window's first paint:
+      // this device's settings arrive later (`SvalPanel._applyPlacement`).
+      const side = Services.xulStore.getValue(
+        doc.documentURI,
+        container.id,
+        PLACEMENT_ATTR
+      );
+      if (side) {
+        container.setAttribute(PLACEMENT_ATTR, side);
+      }
       doc.getElementById("browser").prepend(container);
 
       for (const url of PANEL_SCRIPTS) {
@@ -409,6 +426,9 @@ export const SvalWindow = {
     win.MozXULElement.insertFTLIfNeeded(LAUNCHER_FTL);
     SvalHistorySidebar.mount(win);
     SvalHeader.mount(win);
+    // After the header registers the areas it hosts, and in every window,
+    // since the header's widgets stand in them in every window.
+    SvalPanelToolbar.mount(win);
     SvalLauncher.mount(win);
     SvalTabSwitcher.mount(win);
     SvalShortcuts.startWindow(win);
@@ -450,6 +470,7 @@ export const SvalWindow = {
         SvalPeek.startWindow(win);
       } else {
         win.SvalPanel.init();
+        win.SvalPanel.started.then(() => SvalPanelToolbar.startWindow(win));
       }
       SvalHeader.startWindow(win);
     };

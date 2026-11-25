@@ -17,6 +17,10 @@
  *   do; without it, it is at least as wide as its button and keeps the place
  *   Gecko gives it, as the Workspace panel's menus do;
  * - `sval-stem-off`: it opens with no stem this time.
+ * A popover whose button stands inside an element carrying
+ * `sval-stem-beside` opens beside the button, on the side facing the
+ * window's middle, in place of its own. A pill marked `sval-stem-face` that
+ * a button stands alone in is the face the stem grows from.
  * The button it grows from is the toolbarbutton around its anchor, as
  * `panel.js` marks `[open]`, or the anchor itself; the face is that
  * button's icon or badge stack, or the whole button. The button carries
@@ -37,7 +41,7 @@ const STEM_CSS = "chrome://browser/content/sval/sval-stem.css";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** The concave fillets' radius where the stem meets the content (§9.4). */
-const STEM_FILLET = 12;
+export const STEM_FILLET = 12;
 
 /** The edge's width (`sval-stem.css`). */
 const STEM_EDGE = 1;
@@ -357,15 +361,17 @@ function facePath(face, radii, inset, side) {
  * @param {{left: number, top: number, right: number, bottom: number}} rects.content
  * @param {object} side One of {@link SIDES}.
  * @param {number} snap
- * @returns {?object} Null where the content is not beyond the face's side,
- *   or not across from it.
+ * @returns {?object} Null where the content stands on another side of the
+ *   face, or not across from it.
  */
 function layOut({ face, content }, side, snap) {
-  const faceShape = turnRect(face, side.unmap);
-  const body = turnRect(content, side.unmap);
-  if (body.top < faceShape.bottom) {
+  if (!onSide({ face, content }, side)) {
     return null;
   }
+  const faceShape = turnRect(face, side.unmap);
+  const body = turnRect(content, side.unmap);
+  // A content edge that reaches into the face is put on the face's edge.
+  body.top = Math.max(body.top, faceShape.bottom);
   for (const end of ["left", "right"]) {
     if (Math.abs(body[end] - faceShape[end]) < snap) {
       body[end] = faceShape[end];
@@ -384,6 +390,25 @@ function layOut({ face, content }, side, snap) {
     right: rooms.right >= STEM_FILLET ? STEM_FILLET : 0,
   };
   return { face: faceShape, body, stem, rooms, fillets };
+}
+
+/**
+ * Whether `content` stands on `side` of `face`. A content edge that reaches
+ * into the face still does, short of where the stem's margins put it by
+ * however its window was rounded or moved; one past the face's middle
+ * stands on another side, where Gecko flipped it.
+ *
+ * @param {object} rects
+ * @param {{left: number, top: number, right: number, bottom: number}} rects.face
+ * @param {{left: number, top: number, right: number, bottom: number}} rects.content
+ * @param {object} side One of {@link SIDES}.
+ * @returns {boolean}
+ */
+function onSide({ face, content }, side) {
+  const faceShape = turnRect(face, side.unmap);
+  return (
+    turnRect(content, side.unmap).top >= (faceShape.top + faceShape.bottom) / 2
+  );
 }
 
 /**
@@ -459,14 +484,19 @@ function buttonOf(popup) {
 
 /**
  * @param {Element} button
- * @returns {Element} The part of `button` drawn as a pill: a toolbarbutton's
- *   icon or badge stack, or the whole of any other button.
+ * @returns {Element} The part of `button` drawn as a pill: the pill around
+ *   it where the button stands alone in one, which marks itself
+ *   `sval-stem-face`; else a toolbarbutton's icon or badge stack, or the
+ *   whole of any other button.
  */
 function faceOf(button) {
+  const pill = button.parentElement;
   return (
+    (pill?.hasAttribute("sval-stem-face") ? pill : null) ??
     button.querySelector(
       ":scope > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack)"
-    ) ?? button
+    ) ??
+    button
   );
 }
 
@@ -499,6 +529,22 @@ function outlineOf(popup) {
   return svg;
 }
 
+/**
+ * Draws `popup` as itself while it keeps its button and the stem's room.
+ *
+ * @param {Element} popup
+ */
+function unplace(popup) {
+  for (const path of popup.shadowRoot?.querySelectorAll(
+    '[part~="sval-stem-outline"] > path'
+  ) ?? []) {
+    path.removeAttribute("d");
+  }
+  faceOf(popup._svalStemButton).removeAttribute("sval-stem-anchor");
+  popup.setAttribute("sval-stem", "");
+  popup.removeAttribute("sval-stem-pending");
+}
+
 function detach(popup) {
   const button = popup._svalStemButton;
   popup._svalStemButton = null;
@@ -506,8 +552,9 @@ function detach(popup) {
   popup._svalStemTab = null;
   popup._svalStemObserver?.disconnect();
   popup._svalStemObserver = null;
-  popup.style.removeProperty("margin-left");
-  popup.style.removeProperty("margin-right");
+  for (const side of ["left", "right", "top", "bottom"]) {
+    popup.style.removeProperty(`margin-${side}`);
+  }
   for (const path of popup.shadowRoot?.querySelectorAll(
     '[part~="sval-stem-outline"] > path'
   ) ?? []) {
@@ -518,6 +565,8 @@ function detach(popup) {
     faceOf(button).removeAttribute("sval-stem-anchor");
   }
   popup.removeAttribute("sval-stem");
+  popup.removeAttribute("sval-stem-pending");
+  popup._svalStemSettling = false;
   for (const name of STEM_PROPERTIES) {
     popup.style.removeProperty(name);
   }
@@ -538,98 +587,163 @@ function shadowReach(popup, win) {
 }
 
 /**
+ * @param {Window} win
+ * @param {{above: number, below: number}} margin A popup's window past its
+ *   content above and below it.
+ * @returns {{top: number, bottom: number}} Where the popup's content may
+ *   stand on the screen with its whole window on the screen's available
+ *   height.
+ */
+function screenRoom(win, margin) {
+  return {
+    top: win.screen.availTop + margin.above,
+    bottom: win.screen.availTop + win.screen.availHeight - margin.below,
+  };
+}
+
+/** The least room between a popover's content and its window's edge. */
+const WINDOW_INSET = 8;
+
+/**
+ * @param {Element} popup
+ * @param {Window} win
+ * @returns {number} How far inside its window's edges `popup`'s content
+ *   stands: past its shadow's reach, and never nearer than
+ *   {@link WINDOW_INSET}.
+ */
+function edgeInset(popup, win) {
+  return Math.max(WINDOW_INSET, shadowReach(popup, win));
+}
+
+/**
  * Moves `popup` along its button's edge until its content stands
- * `shadowReach` inside `win`'s sides, so its shadow fades out within the
- * window and does not end at its edge. The content never stands further in
- * than its button's own side, which the stem joins: a button nearer the
- * edge than that takes the content's side in line with its own. Gecko keeps
- * a chrome popup on the screen alone (`nsMenuPopupFrame::GetConstraintRect`),
- * widened by its input region margin, so a popover that reaches past its
- * button runs off a window that stops short of the screen's edge. Gecko
- * adds a popup's left margin to its place and takes its right margin away
+ * {@link edgeInset} inside `win`'s sides, so its shadow fades out within the
+ * window and does not end at its edge: across for a popover above or below
+ * its button, up and down for one beside it. The content never stands
+ * further in than its button's own side, which the stem joins: a button
+ * nearer the edge than that takes the content's side in line with its own.
+ * Gecko keeps a chrome popup on the screen alone
+ * (`nsMenuPopupFrame::GetConstraintRect`), widened by its input region
+ * margin, so a popover that reaches past its button runs off a window that
+ * stops short of the screen's edge. Gecko adds a popup's left and top
+ * margins to its place and takes its right and bottom margins away
  * whichever side it is aligned by
- * (`nsMenuPopupFrame::AdjustPositionForAnchorAlign`), so moving both by one
- * length moves the popup by that length. A popover wider than the window
- * keeps its left edge in.
+ * (`nsMenuPopupFrame::AdjustPositionForAnchorAlign`), so moving both of an
+ * axis by one length moves the popup by that length. A popover longer than
+ * the window keeps its start edge in.
  *
  * @param {Element} popup
  * @param {Window} win The popup's browser window.
- * @param {{left: number, right: number}} content The popup's content on the
- *   screen.
- * @param {{left: number, right: number}} face The button on the screen.
+ * @param {{left: number, right: number, top: number, bottom: number}} content
+ *   The popup's content on the screen.
+ * @param {{left: number, right: number, top: number, bottom: number}} face
+ *   The button on the screen.
+ * @param {boolean} vertical Whether it moves up and down.
+ * @param {{above: number, below: number}} around The popup's window past its
+ *   content above and below it.
  * @returns {boolean} Whether the popup moved.
  */
-function keepInWindow(popup, win, content, face) {
-  const reach = shadowReach(popup, win);
-  const left = Math.min(win.mozInnerScreenX + reach, face.left);
-  const right = Math.max(
-    win.mozInnerScreenX + win.innerWidth - reach,
-    face.right
-  );
+function keepInWindow(popup, win, content, face, vertical, around) {
+  const [start, end, margin, marginEnd] = vertical
+    ? ["top", "bottom", "marginTop", "marginBottom"]
+    : ["left", "right", "marginLeft", "marginRight"];
+  const origin = vertical ? win.mozInnerScreenY : win.mozInnerScreenX;
+  const size = vertical ? win.innerHeight : win.innerWidth;
+  const reach = edgeInset(popup, win);
+  let low = origin + reach;
+  let high = origin + size - reach;
+  if (vertical) {
+    // macOS keeps a popup's window below the menu bar, at the screen's
+    // available top, moving the window without its frame, which would
+    // part the stem from its button: the whole window stands on the
+    // screen's available height.
+    const screen = screenRoom(win, around);
+    low = Math.max(low, screen.top);
+    high = Math.min(high, screen.bottom);
+  }
+  low = Math.min(low, face[start]);
+  high = Math.max(high, face[end]);
+  // A content side short of a fillet's room from its button's side
+  // (`layOut`) would step out from the stem: it stands on the button's.
+  if (face[start] - low < STEM_FILLET) {
+    low = face[start];
+  }
+  if (high - face[end] < STEM_FILLET) {
+    high = face[end];
+  }
   const dpr = win.devicePixelRatio;
   // Gecko places a popup on whole device pixels (`nsMenuPopupFrame::GetRects`).
   const slack = 0.5 / dpr;
   let by = 0;
-  if (content.right > right + slack) {
-    by = -Math.ceil((content.right - right) * dpr) / dpr;
+  if (content[end] > high + slack) {
+    by = -Math.ceil((content[end] - high) * dpr) / dpr;
   }
-  if (content.left + by < left - slack) {
-    by = Math.ceil((left - content.left) * dpr) / dpr;
+  if (content[start] + by < low - slack) {
+    by = Math.ceil((low - content[start]) * dpr) / dpr;
   }
   if (!by) {
     return false;
   }
-  if (!popup._svalStemMargins) {
+  popup._svalStemMargins ??= {};
+  if (!popup._svalStemMargins[margin]) {
     const style = win.getComputedStyle(popup);
-    popup._svalStemMargins = {
-      left: parseFloat(style.marginLeft),
-      right: parseFloat(style.marginRight),
+    popup._svalStemMargins[margin] = {
+      start: parseFloat(style[margin]),
+      end: parseFloat(style[marginEnd]),
       by: 0,
     };
   }
-  const margins = popup._svalStemMargins;
+  const margins = popup._svalStemMargins[margin];
   margins.by += by;
-  popup.style.marginLeft = `${margins.left + margins.by}px`;
-  popup.style.marginRight = `${margins.right - margins.by}px`;
+  popup.style[margin] = `${margins.start + margins.by}px`;
+  popup.style[marginEnd] = `${margins.end - margins.by}px`;
   return true;
 }
 
 /**
  * Bounds the height of `popup`'s content to the room between its edge on
- * the far side from its button and `shadowReach` inside `win`'s foot, or
- * top for a popover over its button, and its content scrolls within that
- * (`sval-stem.css`). Gecko keeps a chrome popup on the screen alone
- * (`nsMenuPopupFrame::GetConstraintRect`), so a popover under its button
- * runs past a window that stops short of the screen's foot. The bound is
- * set at `popupshowing` from where the content starts at the nearest, a
- * fillet past the pill, so a menu, which gets no `popuppositioned`, is
- * bounded in its first paint; placing the stem sets it again from where the
- * content stands. A popover beside its button keeps `popup.css`'s bound.
+ * the far side from its button and {@link edgeInset} inside `win`'s foot, or
+ * top for a popover over its button, or to the window's height less that
+ * inset at each end for one beside its button, and its content scrolls
+ * within that (`sval-stem.css`). Gecko keeps a chrome popup on the screen
+ * alone (`nsMenuPopupFrame::GetConstraintRect`), so a popover runs past a
+ * window that stops short of the screen's edge. The bound is set at
+ * `popupshowing` from where the content starts at the nearest, a fillet
+ * past the pill, so the content is bounded in its first layout; placing
+ * the stem sets it again from where the content stands.
  *
  * @param {Element} popup
  * @param {Window} win The popup's browser window.
  * @param {{top: number, bottom: number}} content The popup's content on the
  *   screen: its top under its button, its bottom over it.
+ * @param {{above: number, below: number}} [margin] The popup's window past
+ *   its content above and below it, where it is known.
  */
-function keepInRoom(popup, win, content) {
+function keepInRoom(popup, win, content, margin = { above: 0, below: 0 }) {
   const side = sideOf(popup);
-  if (side !== "top" && side !== "bottom") {
-    return;
-  }
   // The bound replaces `popup.css`'s, which keeps the content within a
   // popup Gecko has shrunk to the screen, so the screen's edge bounds it too.
-  const reach = shadowReach(popup, win);
-  const room =
-    side === "bottom"
-      ? Math.min(
-          win.mozInnerScreenY + win.innerHeight,
-          win.screen.availTop + win.screen.availHeight
-        ) -
-        reach -
-        content.top
-      : content.bottom -
-        Math.max(win.mozInnerScreenY, win.screen.availTop) -
-        reach;
+  const reach = edgeInset(popup, win);
+  let top = Math.max(win.mozInnerScreenY, win.screen.availTop) + reach;
+  let bottom =
+    Math.min(
+      win.mozInnerScreenY + win.innerHeight,
+      win.screen.availTop + win.screen.availHeight
+    ) - reach;
+  if (side === "left" || side === "right") {
+    // Its whole window on the screen ({@link keepInWindow}).
+    const screen = screenRoom(win, margin);
+    top = Math.max(top, screen.top);
+    bottom = Math.min(bottom, screen.bottom);
+  }
+  const room = {
+    bottom: bottom - content.top,
+    top: content.bottom - top,
+    // Beside its button, it moves along the button's edge to stand in the
+    // window ({@link keepInWindow}): the window's whole height is its room.
+    left: bottom - top,
+    right: bottom - top,
+  }[side];
   const value = `${Math.max(0, Math.floor(room))}px`;
   if (popup.style.getPropertyValue("--sval-stem-room") !== value) {
     popup.style.setProperty("--sval-stem-room", value);
@@ -650,11 +764,13 @@ function keepInRoom(popup, win, content) {
  * @param {boolean} [traceOnly] Whether only to trace the path again where
  *   the popup stands, without moving it or bounding its content, whose size
  *   would change again within the resize observer's own callback.
+ * @returns {boolean} Whether it is open and stands where it is drawn,
+ *   with nothing left to move.
  */
 function place(popup, traceOnly = false) {
   const button = popup._svalStemButton;
   if (!button) {
-    return;
+    return false;
   }
   const win = button.documentGlobal;
   const faceEl = faceOf(button);
@@ -671,7 +787,7 @@ function place(popup, traceOnly = false) {
     top: win.mozInnerScreenY + frame.top,
     width: frame.width,
   });
-  // An arrow panel's first `popuppositioned` comes before its window is
+  // A stem host's first `popuppositioned` comes before its window is
   // shown (`nsXULPopupPositionedEvent::Run`), so the stem placed there is in
   // the window's first paint; `popupshown` comes after that paint, and after
   // any opening transition. The frame stands at the place `GetRects` chose,
@@ -686,17 +802,21 @@ function place(popup, traceOnly = false) {
   // placed by the window.
   let box = popup.getOuterScreenRect();
   const framed = atFrame();
+  // Whether the popup's window stands where its frame does: until it
+  // does, what shows on the screen is where it stood before.
+  let settled = true;
   if (
     !box.width ||
     Math.abs(box.left - framed.left) > 1 ||
     Math.abs(box.top - framed.top) > 1
   ) {
     box = framed;
+    settled = false;
   }
   const part = popup.shadowRoot?.querySelector('[part~="content"]');
   const outline = outlineOf(popup);
   if (!box.width || !part || !outline) {
-    return;
+    return false;
   }
   const contentOf = () => {
     const r = part.getBoundingClientRect();
@@ -713,16 +833,21 @@ function place(popup, traceOnly = false) {
   const side = SIDES[sideName];
   const along = sideName === "top" || sideName === "bottom";
   let content = contentOf();
-  if (!traceOnly && along && keepInWindow(popup, win, content, face)) {
+  const margin = () => ({
+    above: content.top - box.top,
+    below: box.top + frame.height - content.bottom,
+  });
+  if (!traceOnly && keepInWindow(popup, win, content, face, !along, margin())) {
     // Reading the frame's rect reflows the popup, which moves its frame
     // (`nsMenuPopupFrame::PerformMove`); its window follows at the next
     // paint, so the stem is placed by the frame.
+    settled = false;
     frame = popup.getBoundingClientRect();
     box = atFrame();
     content = contentOf();
   }
   if (!traceOnly) {
-    keepInRoom(popup, win, content);
+    keepInRoom(popup, win, content, margin());
   }
   // In the popup's window, whose top left is the box's. Gecko places the
   // window on whole device pixels (`nsMenuPopupFrame::GetRects`) and the
@@ -739,14 +864,19 @@ function place(popup, traceOnly = false) {
     top: rect.top - box.top,
     bottom: rect.bottom - box.top,
   });
-  const layout = layOut(
-    { face: inWindow(face), content: inWindow(content) },
-    side,
-    1 / win.devicePixelRatio
-  );
-  if (!layout) {
+  const rects = { face: inWindow(face), content: inWindow(content) };
+  // Opened on another side, it has nothing to grow from and lets go.
+  if (!onSide(rects, side)) {
     detach(popup);
-    return;
+    return false;
+  }
+  const layout = layOut(rects, side, 1 / win.devicePixelRatio);
+  // Not across from its button, which moved: it shows as itself until
+  // Gecko moves it after the button (`popuppositioned`) and the stem
+  // reaches again.
+  if (!layout) {
+    unplace(popup);
+    return false;
   }
   const px = value => `${value}px`;
   for (const end of ["left", "right"]) {
@@ -784,18 +914,141 @@ function place(popup, traceOnly = false) {
   button.setAttribute("sval-stem", sideName);
   faceEl.setAttribute("sval-stem-anchor", sideName);
   popup.setAttribute("sval-stem", "placed");
+  if (popup.hasAttribute("sval-stem-pending")) {
+    revealOnceSettled(popup, win);
+  }
+  return settled && popup.state === "open";
+}
+
+/**
+ * The longest a popover stays unseen for its place to settle, in frames: a
+ * window follows its frame at the next paint, a popover moved into the
+ * window moves once more, and one that fills its rows as it opens is placed
+ * again for its new size.
+ */
+const SETTLE_FRAMES = 12;
+
+/** How many frames running a popover stands still before it shows. */
+const STILL_FRAMES = 2;
+
+/**
+ * Places `popup` again each frame until it is open, its window stands where
+ * its frame does, and nothing has moved it for {@link STILL_FRAMES} frames
+ * running, then shows it; past {@link SETTLE_FRAMES} it shows wherever it
+ * stands.
+ *
+ * @param {Element} popup
+ * @param {Window} win The popup's browser window.
+ */
+function revealOnceSettled(popup, win) {
+  if (popup._svalStemSettling) {
+    return;
+  }
+  popup._svalStemSettling = true;
+  let frames = 0;
+  let still = 0;
+  const reveal = () => {
+    popup._svalStemSettling = false;
+    popup.removeAttribute("sval-stem-pending");
+  };
+  const check = () => {
+    if (!popup.hasAttribute("sval-stem-pending")) {
+      popup._svalStemSettling = false;
+      return;
+    }
+    still = place(popup) ? still + 1 : 0;
+    if (still >= STILL_FRAMES || ++frames > SETTLE_FRAMES) {
+      reveal();
+    } else {
+      win.requestAnimationFrame(check);
+    }
+  };
+  win.requestAnimationFrame(check);
 }
 
 /** @param {Event} event `popupshown` or `popuppositioned`. */
 function onPlaced(event) {
-  place(event.target);
+  const popup = event.target;
+  place(popup);
+  // Shown and still unplaced: a popover that draws no stem draws as itself.
+  if (
+    event.type === "popupshown" &&
+    popup.getAttribute("sval-stem") !== "placed"
+  ) {
+    popup.removeAttribute("sval-stem-pending");
+  }
+}
+
+/**
+ * Turns a popover to open beside its button, inside an ancestor carrying
+ * `sval-stem-beside`, whatever side the popover names, as from a column of
+ * buttons a popover above or below one would cover the next. It opens
+ * toward the window's middle, wherever the column stands and whatever the
+ * text's direction. Gecko takes a new anchoring while the popup is still
+ * showing (`nsMenuPopupFrame::MoveToAnchor`).
+ *
+ * @param {Element} popup
+ * @param {Window} win The popup's browser window.
+ */
+function turnBeside(popup, win) {
+  if (!popup.anchorNode.closest("[sval-stem-beside]")) {
+    return;
+  }
+  const { left, right } = popup.anchorNode.getBoundingClientRect();
+  const beside = left + right < win.innerWidth ? "right" : "left";
+  const named = popup.getAttribute("sval-stem-side");
+  if (named === beside) {
+    return;
+  }
+  popup.setAttribute("sval-stem-side", beside);
+  popup._svalStemTurned = true;
+  popup._svalStemNamed = named;
+  // Gecko's `start` and `end` follow the anchor's direction.
+  const rtl = win.getComputedStyle(popup.anchorNode).direction === "rtl";
+  popup.moveToAnchor(
+    popup.anchorNode,
+    (beside === "right") !== rtl ? "end_before" : "start_before"
+  );
+}
+
+/**
+ * Turns a popover that would open below its button to open above it, where
+ * the window has more room above the button than below, as Gecko flips a
+ * popup only against the screen's edge (`nsMenuPopupFrame::SetPopupPosition`)
+ * and a button near the window's foot would get a popover squeezed into
+ * what is left of the window. Gecko takes a new anchoring while the popup is
+ * still showing (`nsMenuPopupFrame::MoveToAnchor`) and keeps it as it opens.
+ * The popover keeps the end of its button it lines up with; it is kept in
+ * the window afterwards ({@link keepInWindow}). A popover that names its
+ * side keeps it.
+ *
+ * @param {Element} popup
+ * @param {Window} win The popup's browser window.
+ * @param {DOMRect} face The button's face in the window.
+ */
+function turnToRoom(popup, win, face) {
+  if (
+    popup.hasAttribute("sval-stem-side") ||
+    !popup.hasAttribute("sval-stem-hang")
+  ) {
+    return;
+  }
+  const below = win.innerHeight - face.bottom;
+  const above = face.top;
+  if (above <= below) {
+    return;
+  }
+  popup.setAttribute("sval-stem-side", "top");
+  popup._svalStemTurned = true;
+  const end = face.left + face.width / 2 > win.innerWidth / 2;
+  popup.moveToAnchor(popup.anchorNode, end ? "before_end" : "before_start");
 }
 
 /**
  * `popupshowing`: marks the popover and its button before Gecko positions
  * the popover, so `sval-stem.css` has already made room for the stem. The
  * popover's content is watched for a change of size, which moves its edge:
- * a menu gets no `popuppositioned`
+ * `popuppositioned` comes in a task of its own
  * (`nsXULPopupPositionedEvent::DispatchIfNeeded`), and a resize observer is
  * heard after layout and before the paint, so the path is traced again in
  * the same frame.
@@ -823,6 +1076,8 @@ function onShowing(event) {
     ? (popup.anchorNode.firstElementChild ?? popup.anchorNode)
     : popup.anchorNode;
   const anchor = anchorEl.getBoundingClientRect();
+  turnBeside(popup, win);
+  turnToRoom(popup, win, face);
   const side = sideOf(popup);
   const across = side === "top" || side === "bottom";
   popup._svalStemButton = button;
@@ -846,6 +1101,16 @@ function onShowing(event) {
     bottom: win.mozInnerScreenY + face.top - STEM_FILLET,
   });
   popup.setAttribute("sval-stem", "");
+  // Gecko moves it after its button, as it does an arrow panel
+  // (`nsMenuPopupFrame::ShouldFollowAnchor`), and each move places the stem
+  // again (`popuppositioned`).
+  if (!popup.hasAttribute("followanchor")) {
+    popup.setAttribute("followanchor", "true");
+  }
+  // Unseen until placed, so its first paint is where it stays.
+  if (outlineOf(popup)) {
+    popup.setAttribute("sval-stem-pending", "");
+  }
   button.setAttribute("sval-stem", side);
   faceEl.setAttribute("sval-stem-anchor", side);
   if (side === "bottom") {
@@ -888,6 +1153,11 @@ function onShowing(event) {
  * and never reaches the button, so it does not open it again. A `noautohide`
  * popover, which a press outside leaves open, closes only on the button.
  *
+ * A press on one of the popover's own elements is on its content, wherever
+ * it says it was: `nsXULElement::Click`, which accessibility's press action
+ * calls, sends a press at the screen's corner. Only a press on the popover
+ * itself, its margin and stem, is placed by where it was.
+ *
  * @param {MouseEvent} event
  */
 function onPress(event) {
@@ -896,7 +1166,7 @@ function onPress(event) {
   }
   const popup = event.target.closest?.("panel, menupopup");
   const button = popup?._svalStemButton;
-  if (!button || popup.state !== "open") {
+  if (!button || popup.state !== "open" || event.target !== popup) {
     return;
   }
   const win = button.documentGlobal;
@@ -974,8 +1244,20 @@ export const SvalStem = {
     win.addEventListener(
       "popuphiding",
       event => {
-        if (event.target._svalStemButton) {
-          detach(event.target);
+        const popup = event.target;
+        if (popup._svalStemButton) {
+          detach(popup);
+        }
+        // The turn was for this opening; the next asks the room again, from
+        // the side the popover names.
+        if (popup._svalStemTurned) {
+          popup._svalStemTurned = false;
+          if (popup._svalStemNamed) {
+            popup.setAttribute("sval-stem-side", popup._svalStemNamed);
+          } else {
+            popup.removeAttribute("sval-stem-side");
+          }
+          popup._svalStemNamed = null;
         }
       },
       true

@@ -1,0 +1,33 @@
+Sval: give the Workspace panel's toolbar areas the toolbox's listeners
+
+Sval can draw the toolbar's widgets in toolbar areas of its own in the
+Workspace panel, outside #navigator-toolbox. The toolbox's listeners
+answer many of those widgets' clicks and keys (the extensions button,
+Downloads, Home, Reader View, Split and others), so an area marked
+sval-toolbox-events gets the same listeners.
+
+diff --git a/browser/base/content/navigator-toolbox.js b/browser/base/content/navigator-toolbox.js
+index beb9129228..1f6dd70d71 100644
+--- a/browser/base/content/navigator-toolbox.js
++++ b/browser/base/content/navigator-toolbox.js
+@@ -517,6 +517,20 @@ document.addEventListener(
+     navigatorToolbox.addEventListener("drop", onDragAndDrop);
+     widgetOverflow.addEventListener("drop", onDragAndDrop);
+ 
++    // Sval: the Workspace panel's toolbar areas hold the toolbar's widgets
++    // outside the toolbox, so they listen as the toolbox does.
++    for (const area of document.querySelectorAll("[sval-toolbox-events]")) {
++      area.addEventListener("popupshowing", onPopupShowing);
++      area.addEventListener("command", onCommand);
++      area.addEventListener("mousedown", onMouseDown);
++      area.addEventListener("mouseup", onMouseUp);
++      area.addEventListener("click", onClick);
++      area.addEventListener("keypress", onKeyPress, { capture: true });
++      for (const type of ["dragenter", "dragover", "dragleave", "drop"]) {
++        area.addEventListener(type, onDragAndDrop);
++      }
++    }
++
+     document
+       .getElementById("identity-box")
+       .addEventListener("dragstart", event => {

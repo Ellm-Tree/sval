@@ -126,7 +126,7 @@ SPDX-FileCopyrightText = "2026 Lucide Icons and Contributors"
 SPDX-License-Identifier = "ISC"
 
 # The header's Lucide icons that Lucide derives from Feather (arrow-left,
-# arrow-right, x, search, arrow-up-right, mic-off, monitor,
+# arrow-right, x, search, link, arrow-up-right, mic-off, monitor,
 # database), which Lucide's license puts under Feather's MIT license.
 [[annotations]]
 path = [
