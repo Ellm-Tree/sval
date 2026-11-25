@@ -3374,6 +3374,26 @@ toolbar .unified-extensions-item > .sval-site-line {
   padding: 4px 0 0;
 }
 
+/* An extension the user turned off for the selected tab's page
+   (`updateButton`, extension-workspaces-js.patch): its button and its row in
+   the extensions menu show it off. The row's Run on switch, pin and menu
+   stay as they are. */
+:is(toolbarbutton, .unified-extensions-item)[sval-site-off] :is(.toolbarbutton-icon, .unified-extensions-item-icon),
+.unified-extensions-item[data-sval-site-off] .unified-extensions-item-icon {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+.unified-extensions-item[data-sval-site-off] :is(.unified-extensions-item-name, .sval-site-message) {
+  opacity: 0.6;
+}
+
+/* An extension's toolbar button in a window whose Workspace its pin or
+   the extension leaves out (SvalExtensionWorkspaces.applyToWindow). */
+[sval-workspace-hidden] {
+  display: none !important;
+}
+
 /* An extension's pin in its row of the extensions menu
    (`SvalExtensionsMenu`), drawn as the site menu's pin
    (`sval-protection.css`, `.sval-site-pin`) in the menu's colours, so

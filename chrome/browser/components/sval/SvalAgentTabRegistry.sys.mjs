@@ -14,7 +14,9 @@
  * (`svalAgentTab`, which content processes read, and which only this module
  * writes, from the same answer, each time the tree changes; site-tools spec
  * §3.1). Whether agent access is on is the gate's own question: with no
- * gate open, no agent can act anywhere.
+ * gate open, no agent can act anywhere. From the same walk it writes each
+ * tab's Workspace (`svalWorkspace`), which decides the extensions that reach
+ * the tab's pages (extension Workspaces spec §1.4).
  *
  * A tab that could be an agent's waits for its node: a load that starts in
  * such a tab before the tree holds it is held until the window's tab
@@ -46,6 +48,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   PictureInPicture: "resource://gre/modules/PictureInPicture.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
+  SvalExtensionWorkspaces:
+    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   fullWindowShowing: "moz-src:///browser/components/sval/SvalAgentTabs.sys.mjs",
   isPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
@@ -415,6 +419,7 @@ function mark(browser) {
   if (!bc?.browserId) {
     return;
   }
+  markWorkspace(browser, bc);
   const home = agentHomeOf(browser);
   markControl(browser, bc, !!home && !isUserInControl(bc.browserId));
   const was = marked.get(bc.browserId) ?? null;
@@ -433,6 +438,26 @@ function mark(browser) {
     }
   } catch (err) {
     SvalLog.warn(`an agent tab's mark was not set: ${SvalLog.errorName(err)}`);
+  }
+}
+
+/**
+ * Sets `bc`'s `svalWorkspace` to the Workspace of `browser`'s tab
+ * (`SvalExtensionWorkspaces.workspaceOf`), empty for none. Gecko carries it
+ * across a replacement of the context.
+ *
+ * @param {object} browser A `<browser>`.
+ * @param {BrowsingContext} bc Its top-level browsing context.
+ */
+function markWorkspace(browser, bc) {
+  const workspace = lazy.SvalExtensionWorkspaces.workspaceOf(browser) ?? "";
+  if (bc.svalWorkspace === workspace) {
+    return;
+  }
+  try {
+    bc.svalWorkspace = workspace;
+  } catch (err) {
+    SvalLog.warn(`a tab's Workspace was not marked: ${SvalLog.errorName(err)}`);
   }
 }
 
@@ -528,6 +553,8 @@ function markAll() {
   }
 }
 onTree(markAll);
+// A tab the tree does not hold yet is in the Workspace its window shows.
+Services.obs.addObserver(markAll, "sval-window-workspace-shown");
 // The tabs that went in before this module was first asked about one.
 Services.tm.dispatchToMainThread(markAll);
 Services.obs.addObserver((subject, topic, data) => {

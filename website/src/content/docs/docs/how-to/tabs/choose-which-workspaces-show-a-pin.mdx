@@ -4,6 +4,8 @@ description: Show a pin in every Workspace, or only in the ones you pick.
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 A pin shows in every Workspace until you pick the Workspaces it should show
 in.
@@ -14,9 +16,21 @@ Your Roon pin belongs in Home, and you don't want it in Work.
 
 ## Steps
 
+<Until v="0.1.0-rc.11">
+
 1. In the pins row, right-click the pin, then point to **Show in**.
 2. Check each Workspace the pin should show in, and uncheck the others.
 3. Close the menu.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+1. In the pins row, right-click the pin, then point to **Show the pin in**.
+2. Check each Workspace the pin should show in, and uncheck the others.
+3. Close the menu.
+
+</Since>
 
 The pin leaves the pins row in every Workspace you unchecked.
 
@@ -28,8 +42,20 @@ The pin leaves the pins row in every Workspace you unchecked.
   later.
 - If you close the menu with nothing checked, the pin stays where it was.
 
+<Until v="0.1.0-rc.11">
+
 - What you choose for a pin folder applies to every pin inside the pin
   folder. A pin inside a pin folder has no Show in of its own.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- What you choose for a pin folder applies to every pin inside the pin
+  folder, so a pin inside a pin folder has no Workspaces of its own to
+  choose.
+
+</Since>
 - When you drag one pin onto another to make a pin folder, the pin folder
   shows in every Workspace either pin showed in.
 
@@ -38,7 +64,17 @@ The pin leaves the pins row in every Workspace you unchecked.
 - Your choice of Workspaces for a pin syncs to your other devices.
 - When you delete a Workspace, Sval takes that Workspace out of every pin's
   list. A pin left with no Workspaces shows in every Workspace.
+<Until v="0.1.0-rc.11">
+
 - Show in never lists agent Workspaces.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- The menu never lists agent Workspaces.
+
+</Since>
 - In a Workspace that doesn't show the pin, <kbd>⌘1</kbd> to <kbd>⌘9</kbd> skip that pin.
 
 ## Related pages

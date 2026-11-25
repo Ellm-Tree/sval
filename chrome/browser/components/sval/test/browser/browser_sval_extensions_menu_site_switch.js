@@ -324,14 +324,20 @@ add_task(async function test_no_origin_controls_items() {
   await openLoaded(COM);
   const panel = await openMenu();
   const menu = document.getElementById("unified-extensions-context-menu");
-  const before = menu.children.length;
+  // Firefox's items, without Sval's Pin to Toolbar in, which the menu's
+  // first opening adds (`SvalExtensionsMenu.updateShowIn`).
+  const firefoxItems = () =>
+    [...menu.children].filter(
+      el => !el.classList.contains("sval-extension-show-in")
+    ).length;
+  const before = firefoxItems();
   const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
   EventUtils.synthesizeMouseAtCenter(
     rowOf(panel).querySelector(".unified-extensions-item-menu-button"),
     {}
   );
   await within(shown, 10_000, "the row's menu opening");
-  Assert.equal(menu.children.length, before, "no site access items added");
+  Assert.equal(firefoxItems(), before, "no site access items added");
   const hidden = BrowserTestUtils.waitForPopupEvent(menu, "hidden");
   menu.hidePopup();
   await within(hidden, 10_000, "the row's menu closing");

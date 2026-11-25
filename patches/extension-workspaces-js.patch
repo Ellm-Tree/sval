@@ -1,0 +1,194 @@
+Sval: extension JS honours the Workspaces an extension is available in
+
+A tab's host-permission data, activeTab, captures, find and navigation
+events ask the policy whether the tab's Workspace is one the extension
+is available in, as they ask about its site. In a window whose
+Workspace leaves the extension out, the extensions menu leaves it out,
+its menu items go and its shortcuts do nothing. An extension's context
+menus gain Show in, the Workspaces its pinned button shows in.
+
+diff --git a/browser/base/content/browser-addons.js b/browser/base/content/browser-addons.js
+index 5ca49b0fa8..f074145301 100644
+--- a/browser/base/content/browser-addons.js
++++ b/browser/base/content/browser-addons.js
+@@ -19,6 +19,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+   PERMISSION_L10N: "resource://gre/modules/ExtensionPermissionMessages.sys.mjs",
+   SITEPERMS_ADDON_TYPE:
+     "resource://gre/modules/addons/siteperms-addon-utils.sys.mjs",
++  SvalExtensionWorkspaces:
++    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
+   SvalExtensionsMenu:
+     "moz-src:///browser/components/sval/SvalExtensionsMenu.sys.mjs",
+   getSitePermsInstallPromptStringIds:
+@@ -2288,7 +2290,9 @@ var gUnifiedExtensions = {
+         extension.isHidden ||
+         // NOTE: policy.canAccessWindow() sounds generic, but it really only
+         // enforces private browsing access.
+-        (!skipPBMCheck && !policy.canAccessWindow(window))
++        (!skipPBMCheck && !policy.canAccessWindow(window)) ||
++        // Sval: nor one this window's Workspace leaves out.
++        !lazy.SvalExtensionWorkspaces.availableInWindow(policy.id, window)
+       ) {
+         return false;
+       }
+@@ -2886,6 +2890,8 @@ var gUnifiedExtensions = {
+ 
+     // Sval: the row's site switch takes the place of the site access items
+     // ExtensionsUI.originControlsMenu would add here.
++    // Sval: where the extension is pinned, the Workspaces its button shows in.
++    lazy.SvalExtensionsMenu.updateShowIn(menu, id, widgetId, pinButton);
+ 
+     const browserAction = this.browserActionFor(WebExtensionPolicy.getByID(id));
+     if (browserAction) {
+diff --git a/browser/components/customizableui/ToolbarContextMenu.sys.mjs b/browser/components/customizableui/ToolbarContextMenu.sys.mjs
+index ebf1dce855..8367289de0 100644
+--- a/browser/components/customizableui/ToolbarContextMenu.sys.mjs
++++ b/browser/components/customizableui/ToolbarContextMenu.sys.mjs
+@@ -11,6 +11,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
+     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
+   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
++  SvalExtensionsMenu:
++    "moz-src:///browser/components/sval/SvalExtensionsMenu.sys.mjs",
+ });
+ 
+ XPCOMUtils.defineLazyPreferenceGetter(
+@@ -515,6 +517,13 @@ export var ToolbarContextMenu = {
+       // Sval: the extensions menu's site switch takes the place of the site
+       // access items ExtensionsUI.originControlsMenu would add here.
+     }
++    // Sval: where the extension is pinned, the Workspaces its button shows in.
++    lazy.SvalExtensionsMenu.updateShowIn(
++      popup,
++      addon?.id,
++      this._getWidgetId(popup),
++      pinToToolbar
++    );
+   },
+ 
+   /**
+diff --git a/browser/components/extensions/parent/ext-menus.js b/browser/components/extensions/parent/ext-menus.js
+index 7ef5d11006..80ad9dde8e 100644
+--- a/browser/components/extensions/parent/ext-menus.js
++++ b/browser/components/extensions/parent/ext-menus.js
+@@ -8,6 +8,8 @@ ChromeUtils.defineESModuleGetters(this, {
+   ExtensionMenus: "resource://gre/modules/ExtensionMenus.sys.mjs",
+   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
++  SvalExtensionWorkspaces:
++    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
+ });
+ 
+ var { DefaultMap, ExtensionError, parseMatchPatterns } = ExtensionUtils;
+@@ -108,6 +110,16 @@ var gMenuBuilder = {
+   },
+ 
+   canAccessContext(extension, contextData) {
++    // Sval: an extension puts no item in a menu of a window whose Workspace
++    // it is not available in.
++    if (
++      !SvalExtensionWorkspaces.availableInWindow(
++        extension.id,
++        contextData.menu.documentGlobal
++      )
++    ) {
++      return false;
++    }
+     if (!extension.privateBrowsingAllowed) {
+       let nativeTab = contextData.tab;
+       if (
+diff --git a/toolkit/components/extensions/ExtensionShortcuts.sys.mjs b/toolkit/components/extensions/ExtensionShortcuts.sys.mjs
+index c000b1276a..a53e690726 100644
+--- a/toolkit/components/extensions/ExtensionShortcuts.sys.mjs
++++ b/toolkit/components/extensions/ExtensionShortcuts.sys.mjs
+@@ -13,6 +13,8 @@ const lazy = XPCOMUtils.declareLazy({
+     "resource://gre/modules/ExtensionSettingsStore.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
++  SvalExtensionWorkspaces:
++    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
+   global: () => lazy.ExtensionParent.apiManager.global,
+ });
+ 
+@@ -453,6 +455,16 @@ export class ExtensionShortcuts {
+     // We remove all references to the key elements when the extension is shutdown,
+     // therefore the listeners for these elements will be garbage collected.
+     keyElement.addEventListener("command", event => {
++      // Sval: an extension does nothing in a window whose Workspace it is
++      // not available in.
++      if (
++        !lazy.SvalExtensionWorkspaces.availableInWindow(
++          this.extension.id,
++          event.target.documentGlobal
++        )
++      ) {
++        return;
++      }
+       let action;
+       let _execute_action =
+         this.extension.manifestVersion < 3
+diff --git a/toolkit/components/extensions/parent/ext-tabs-base.js b/toolkit/components/extensions/parent/ext-tabs-base.js
+index 2ce94d5368..d0a07a1547 100644
+--- a/toolkit/components/extensions/parent/ext-tabs-base.js
++++ b/toolkit/components/extensions/parent/ext-tabs-base.js
+@@ -6,6 +6,8 @@
+ ChromeUtils.defineESModuleGetters(this, {
+   ExtensionDocumentId: "resource://gre/modules/ExtensionDocumentId.sys.mjs",
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
++  SvalExtensionWorkspaces:
++    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
+ });
+ 
+ XPCOMUtils.defineLazyPreferenceGetter(
+@@ -235,13 +237,31 @@ class TabBase {
+     return !this.svalBlocked && this.extension.allowedOrigins.matches(this._uri);
+   }
+ 
++  /**
++   * @property {boolean} svalWorkspaceBlocked
++   *        Sval: true if the tab is in a Workspace the extension is not
++   *        available in.
++   *        @readonly
++   */
++  get svalWorkspaceBlocked() {
++    // Asked of the chrome, which sets each tab's SvalWorkspace from the same
++    // answer, so a tab not yet loaded, with no browsing context, has one.
++    return this.extension.policy.blockedInWorkspace(
++      SvalExtensionWorkspaces.workspaceOf(this.browser) ?? ""
++    );
++  }
++
+   /**
+    * @property {boolean} svalBlocked
+    *        Sval: true if the user turned the extension off on the site of the
+-   *        tab's top-level document.
++   *        tab's top-level document, or the tab is in a Workspace the
++   *        extension is not available in.
+    *        @readonly
+    */
+   get svalBlocked() {
++    if (this.svalWorkspaceBlocked) {
++      return true;
++    }
+     // The page's principal names its site where its URL has none, as for an
+     // about:blank or blob: page a site made.
+     let principal = this.browser.contentPrincipal;
+diff --git a/toolkit/components/extensions/parent/ext-webNavigation.js b/toolkit/components/extensions/parent/ext-webNavigation.js
+index 7bc313d8cb..213f6b600c 100644
+--- a/toolkit/components/extensions/parent/ext-webNavigation.js
++++ b/toolkit/components/extensions/parent/ext-webNavigation.js
+@@ -178,10 +178,12 @@ this.webNavigation = class extends ExtensionAPIPersistent {
+         try {
+           svalHost = new URL(data.url).hostname;
+         } catch {}
++        let svalTab = tabManager.getWrapper(tab);
+         if (
+           data.frameId === 0
+-            ? extension.policy.blockedOnTopSite(svalHost)
+-            : tabManager.getWrapper(tab).svalBlocked
++            ? extension.policy.blockedOnTopSite(svalHost) ||
++              svalTab.svalWorkspaceBlocked
++            : svalTab.svalBlocked
+         ) {
+           return;
+         }

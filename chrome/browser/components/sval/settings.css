@@ -3655,6 +3655,48 @@ sval-segments-default {
   font-weight: 500;
 }
 
+/* The Workspaces an extension is available in (`settings-extensions.js`),
+   as the export dialog lists Workspaces (`import.css`), under the row's
+   words. */
+.sval-site-row:has(> .sval-im-windows) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sval-im-windows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sval-im-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sval-ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sval-im-emoji {
+  flex: none;
+  width: 20px;
+  font-size: 15px;
+  text-align: center;
+}
+
+/* The heading over an extension's listed sites (`settings-extensions.js`),
+   which says which way they go. */
+.sval-site-list-head {
+  margin: 0;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--sval-border-subtle);
+}
+
 /* The site menu's choice pill (`sval-choice-pill` in `settings-ui.js`). */
 sval-choice-pill {
   display: flex;

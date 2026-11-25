@@ -90,6 +90,7 @@ MOZ_SRC_FILES += [
     "SvalExtensionNotices.sys.mjs",
     "SvalExtensionSites.sys.mjs",
     "SvalExtensionsMenu.sys.mjs",
+    "SvalExtensionWorkspaces.sys.mjs",
     "SvalExternalLinks.sys.mjs",
     "SvalFavoriteIcons.sys.mjs",
     "SvalFavorites.sys.mjs",

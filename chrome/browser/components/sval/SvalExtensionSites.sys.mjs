@@ -13,16 +13,31 @@
  * extension's policy holds its names, `~name` for one it runs on
  * (`WebExtensionPolicy.blockedSites`), and Gecko takes the entry of the most
  * specific name above the tab's top-level host.
+ *
+ * Each extension also has a default for every site (extension Workspaces
+ * spec §3): on, or off where `DEFAULT_BRANCH` and its id hold "off". A name
+ * no switch above decides takes the default, and an extension off by default
+ * has `*` in its policy, a name above every host. Its policy also holds the
+ * Workspaces it is available in (`SvalExtensionWorkspaces.policyEntries`).
  */
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   Management: "resource://gre/modules/Extension.sys.mjs",
+  AVAILABLE_BRANCH:
+    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
+  SvalExtensionWorkspaces:
+    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
   mostSpecificRule: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
+  onTree: "moz-src:///browser/components/sval/SvalTreeSnapshot.sys.mjs",
   scopeChain: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
 });
 
 export const SITE_BRANCH = "browser.sval.extensions.offOn.";
+export const DEFAULT_BRANCH = "browser.sval.extensions.siteDefault.";
+
+/** The name above every host in a policy's list, for an extension off by default. */
+const EVERY_SITE = "*";
 
 /** Marks an entry, in a pref's list and in a policy's names, as "on". */
 const ON = "~";
@@ -75,10 +90,24 @@ function apply(policy) {
   }
   pending.set(
     policy.id,
-    policy.extension?.updateBlockedSites
+    (policy.extension?.updateBlockedSites
       ? policy.extension.updateBlockedSites(blocked)
       : Promise.resolve((policy.blockedSites = blocked))
+    ).then(() => redrawButtons(policy))
   );
+}
+
+/**
+ * Redraws the extension's toolbar button in every browser window, which
+ * shows it off where its policy now holds the selected tab's page
+ * (`updateButton`, extension-workspaces-js.patch).
+ *
+ * @param {WebExtensionPolicy} policy
+ */
+function redrawButtons(policy) {
+  for (const win of Services.wm.getEnumerator("navigator:browser")) {
+    win.gUnifiedExtensions?.browserActionFor(policy)?.updateWindow(win);
+  }
 }
 
 function applyAll() {
@@ -110,10 +139,42 @@ export const SvalExtensionSites = {
    *   specific name above it, on where none has one.
    */
   isOff(id, host) {
-    return (
-      lazy.mostSpecificRule(host, name => this.ruleFor(id, name))?.rule ===
-      "off"
-    );
+    const rule = lazy.mostSpecificRule(host, name => this.ruleFor(id, name));
+    return rule ? rule.rule === "off" : this.offByDefault(id);
+  },
+
+  /**
+   * @param {string} id
+   * @returns {boolean} Whether `id` is off on every site no switch decides.
+   */
+  offByDefault(id) {
+    return Services.prefs.getStringPref(DEFAULT_BRANCH + id, "") === "off";
+  },
+
+  /**
+   * Sets `id`'s default for every site, and takes away each switch of its
+   * that the default makes redundant, the broadest names first, so a host's
+   * switch is judged against its site's as it stands.
+   *
+   * @param {string} id
+   * @param {boolean} off
+   * @returns {Promise<void>} Settles once every process has the change.
+   */
+  setOffByDefault(id, off) {
+    if (off) {
+      Services.prefs.setStringPref(DEFAULT_BRANCH + id, "off");
+    } else {
+      Services.prefs.clearUserPref(DEFAULT_BRANCH + id);
+    }
+    const named = names()
+      .filter(name => this.ruleFor(id, name))
+      .sort((a, b) => a.split(".").length - b.split(".").length);
+    for (const name of named) {
+      if ((this.ruleFor(id, name) === "off") === this.inheritedOff(id, name)) {
+        this.setOff(id, name, this.inheritedOff(id, name));
+      }
+    }
+    return Promise.resolve(pending.get(id)).then(() => {});
   },
 
   /**
@@ -124,7 +185,7 @@ export const SvalExtensionSites = {
    */
   inheritedOff(id, name) {
     const above = lazy.scopeChain(name)[1];
-    return above !== undefined && this.isOff(id, above);
+    return above === undefined ? this.offByDefault(id) : this.isOff(id, above);
   },
 
   /**
@@ -182,6 +243,17 @@ export const SvalExtensionSites = {
   },
 
   /**
+   * @param {string} id
+   * @returns {string[]} The sites and hosts `id` is on at by a switch of
+   *   their own, sorted.
+   */
+  sitesOn(id) {
+    return names()
+      .filter(name => readEntries(name).includes(ON + id))
+      .sort();
+  },
+
+  /**
    * @param {string} name
    * @returns {string[]} The ids off on `name` by a switch of its own.
    */
@@ -203,10 +275,14 @@ export const SvalExtensionSites = {
   /**
    * @param {string} id
    * @returns {string[]} The names the extension's policy holds, sorted: each
-   *   name it is off on, and `~name` for each it is on at.
+   *   name it is off on, `~name` for each it is on at, `*` when it is off by
+   *   default, and its Workspaces' entries.
    */
   blockedSitesFor(id) {
-    const held = [];
+    const held = lazy.SvalExtensionWorkspaces.policyEntries(id);
+    if (this.offByDefault(id)) {
+      held.push(EVERY_SITE);
+    }
     for (const name of names()) {
       const rule = this.ruleFor(id, name);
       if (rule) {
@@ -241,6 +317,63 @@ export const SvalExtensionSites = {
     }
   },
 
+  /**
+   * @param {string} id
+   * @param {object} browser A tab's `<browser>`.
+   * @returns {boolean} Whether `id` reaches nothing in the tab's web page:
+   *   its Workspace is outside the extension's, or the extension is off on
+   *   its host. False for a page of no web site.
+   */
+  blockedInTab(id, browser) {
+    // An extension reaches only web pages, so no other page's answer turns.
+    if (
+      !browser.currentURI?.schemeIs("http") &&
+      !browser.currentURI?.schemeIs("https")
+    ) {
+      return false;
+    }
+    if (
+      !lazy.SvalExtensionWorkspaces.isAvailableIn(
+        id,
+        lazy.SvalExtensionWorkspaces.workspaceOf(browser)
+      )
+    ) {
+      return true;
+    }
+    return this.isOff(id, browser.currentURI.host);
+  },
+
+  /**
+   * Runs `change`, then reloads every loaded tab whose answer for `id` it
+   * turned, so scripts the extension put there go and scripts it may now
+   * put there run.
+   *
+   * @param {string} id
+   * @param {() => (Promise<*>|*)} change
+   * @returns {Promise<void>}
+   */
+  async changeAndReload(id, change) {
+    const tabs = [];
+    for (const win of Services.wm.getEnumerator("navigator:browser")) {
+      for (const tab of win.gBrowser?.tabs ?? []) {
+        // A tab not yet loaded loads afresh when it is selected.
+        if (tab.linkedPanel) {
+          tabs.push([tab, this.blockedInTab(id, tab.linkedBrowser)]);
+        }
+      }
+    }
+    await change();
+    await Promise.resolve(pending.get(id));
+    for (const [tab, was] of tabs) {
+      if (
+        tab.linkedBrowser &&
+        this.blockedInTab(id, tab.linkedBrowser) !== was
+      ) {
+        tab.documentGlobal.gBrowser.reloadTab(tab);
+      }
+    }
+  },
+
   /** Keeps every running extension's policy holding its sites. Idempotent. */
   start() {
     if (started) {
@@ -248,6 +381,10 @@ export const SvalExtensionSites = {
     }
     started = true;
     Services.prefs.addObserver(SITE_BRANCH, applyAll);
+    Services.prefs.addObserver(DEFAULT_BRANCH, applyAll);
+    Services.prefs.addObserver(lazy.AVAILABLE_BRANCH, applyAll);
+    // A Workspace gone from the tree leaves the scopes that named it.
+    lazy.onTree(applyAll);
     lazy.Management.on("ready", (_kind, extension) => apply(extension.policy));
     applyAll();
   },

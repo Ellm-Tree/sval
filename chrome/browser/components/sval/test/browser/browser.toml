@@ -416,6 +416,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_extension_update_wait.js"]
 
+["browser_sval_extension_workspaces.js"]
+
 ["browser_sval_extensions_menu_page_action.js"]
 
 ["browser_sval_extensions_menu_pinned.js"]

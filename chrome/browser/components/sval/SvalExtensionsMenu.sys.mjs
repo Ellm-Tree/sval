@@ -17,6 +17,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SvalExtensionSites:
     "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
+  SvalExtensionWorkspaces:
+    "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   scopeOf: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   ScopeDropdown: "moz-src:///browser/components/sval/SvalScopeMenu.sys.mjs",
@@ -232,10 +234,16 @@ function addPin(win, list, row) {
   const widgetId = row.dataset.widgetId || row.id;
   const placement = widgetId && CustomizableUI.getPlacementOfWidget(widgetId);
   const menuButton = row.querySelector(".unified-extensions-item-menu-button");
-  if (!placement || !menuButton) {
+  const id = idOf(row);
+  if (!placement || !menuButton || !id) {
     return;
   }
-  const pinned = placement.area !== CustomizableUI.AREA_ADDONS;
+  const scopes = lazy.SvalExtensionWorkspaces;
+  const ws = scopes.workspaceOfWindow(win);
+  const onToolbar = placement.area !== CustomizableUI.AREA_ADDONS;
+  // A button on the toolbar of other Workspaces alone reads as unpinned in
+  // this window, and pinning it here adds this Workspace (spec §2.4).
+  const pinned = onToolbar && scopes.pinShowsIn(id, ws);
   const doc = win.document;
   const title = pinned ? "Unpin from the toolbar" : "Pin to the toolbar";
   const pin = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
@@ -249,10 +257,14 @@ function addPin(win, list, row) {
   pin.append(glyph);
   pin.addEventListener("click", () => {
     const { gUnifiedExtensions } = win;
-    if (!pinned) {
-      gUnifiedExtensions._maybeMoveWidgetNodeBack(widgetId);
+    if (onToolbar && !pinned) {
+      scopes.setPinScope(id, [...(scopes.pinScope(id) ?? []), ws]);
+    } else {
+      if (!pinned) {
+        gUnifiedExtensions._maybeMoveWidgetNodeBack(widgetId);
+      }
+      gUnifiedExtensions.pinToToolbar(widgetId, !pinned);
     }
-    gUnifiedExtensions.pinToToolbar(widgetId, !pinned);
     const view = list.closest("panelview") ?? list;
     SvalExtensionsMenu.listPinned(win, list);
     SvalExtensionsMenu.addSwitches(win, view);
@@ -261,7 +273,157 @@ function addPin(win, list, row) {
   menuButton.before(pin);
 }
 
+/**
+ * Fills the "Show in" submenu of a pinned extension's context menu (spec
+ * §2.2): Select all, Deselect all, and a checkbox per Workspace the
+ * extension is available in, ticked where its button shows. The items leave
+ * the menu open while the user ticks.
+ *
+ * @param {Element} popup The submenu's `menupopup`.
+ * @param {string} id The extension's id.
+ */
+function fillShowIn(popup, id) {
+  const doc = popup.ownerDocument;
+  const scopes = lazy.SvalExtensionWorkspaces;
+  const offered = scopes
+    .offered()
+    .filter(each => scopes.isAvailableIn(id, each.id));
+  const scope = scopes.pinScope(id);
+  popup.replaceChildren();
+  const item = (label, command) => {
+    const el = doc.createXULElement("menuitem");
+    el.setAttribute("label", label);
+    el.setAttribute("closemenu", "none");
+    el.dataset.showIn = command;
+    return el;
+  };
+  popup.append(
+    item("Select all", "all"),
+    item("Deselect all", "none"),
+    doc.createXULElement("menuseparator")
+  );
+  for (const { id: ws, name, emoji } of offered) {
+    const box = item(emoji ? `${emoji} ${name}` : name, "workspace");
+    box.setAttribute("type", "checkbox");
+    box.setAttribute("autocheck", "false");
+    box.dataset.workspace = ws;
+    if (!scope || scope.includes(ws)) {
+      box.setAttribute("checked", "true");
+    }
+    popup.append(box);
+  }
+}
+
+/**
+ * Writes what a "Show in" submenu holds: every Workspace ticked is every
+ * Workspace, none ticked drops the change, as a pin's does
+ * (`SvalPinsModel.scopeFor`).
+ *
+ * @param {Element} popup
+ * @param {string} id
+ */
+function applyShowIn(popup, id) {
+  const boxes = [...popup.querySelectorAll("[data-workspace]")];
+  const ticked = boxes
+    .filter(box => box.getAttribute("checked") === "true")
+    .map(box => box.dataset.workspace);
+  if (!ticked.length) {
+    return;
+  }
+  lazy.SvalExtensionWorkspaces.setPinScope(
+    id,
+    ticked.length === boxes.length ? null : ticked
+  );
+}
+
+/**
+ * Shows `row` off, or on again: an extension off for the selected tab's page
+ * shows greyed, and its row's button does nothing. A pinned extension's row
+ * is Sval's own (`listPinned`), so its button is disabled here; a row
+ * Firefox draws takes its state from the browser action
+ * (`updateButton`, extension-off-shows-off.patch).
+ *
+ * @param {Element} row
+ * @param {boolean} off
+ */
+function markOff(row, off) {
+  row.toggleAttribute("data-sval-site-off", off);
+  if (row.dataset.widgetId) {
+    const action = row.querySelector(".unified-extensions-item-action-button");
+    if (action) {
+      action.disabled = off;
+    }
+  }
+}
+
 export const SvalExtensionsMenu = {
+  /**
+   * Gives an extension's context menu, its row's in the extensions menu or
+   * its toolbar button's, a "Show in" submenu after `after` while the
+   * extension is pinned (spec §2.2), and hides it otherwise.
+   *
+   * @param {Element} menu The context menu's `menupopup`.
+   * @param {?string} id The extension's id, if the menu is an extension's.
+   * @param {?string} widgetId Its toolbar button's widget id.
+   * @param {?Element} after The menu's Pin to Toolbar item.
+   */
+  updateShowIn(menu, id, widgetId, after) {
+    const doc = menu.ownerDocument;
+    let showIn = menu.querySelector(":scope > .sval-extension-show-in");
+    if (!showIn && after) {
+      showIn = doc.createXULElement("menu");
+      showIn.className = "sval-extension-show-in";
+      showIn.setAttribute("label", "Pin to Toolbar in");
+      const popup = doc.createXULElement("menupopup");
+      popup.addEventListener("popupshowing", event => {
+        if (event.target === popup) {
+          fillShowIn(popup, showIn.dataset.extensionId);
+        }
+      });
+      popup.addEventListener("command", event => {
+        const item = event.target;
+        const boxes = popup.querySelectorAll("[data-workspace]");
+        const command = item.dataset.showIn;
+        if (command === "workspace") {
+          if (item.getAttribute("checked") === "true") {
+            item.removeAttribute("checked");
+          } else {
+            item.setAttribute("checked", "true");
+          }
+        } else if (command === "all" || command === "none") {
+          for (const box of boxes) {
+            if (command === "all") {
+              box.setAttribute("checked", "true");
+            } else {
+              box.removeAttribute("checked");
+            }
+          }
+        }
+        // Each pick is written as it is made: macOS draws the menu natively
+        // and may fire an item's command after the menu has hidden.
+        applyShowIn(popup, showIn.dataset.extensionId);
+      });
+      showIn.append(popup);
+      after.after(showIn);
+    }
+    if (!showIn) {
+      return;
+    }
+    const area =
+      widgetId && CustomizableUI.getPlacementOfWidget(widgetId)?.area;
+    const pinned = !!area && area !== CustomizableUI.AREA_ADDONS;
+    const offered = id
+      ? lazy.SvalExtensionWorkspaces.offered().filter(each =>
+          lazy.SvalExtensionWorkspaces.isAvailableIn(id, each.id)
+        )
+      : [];
+    // One Workspace leaves nothing to choose.
+    showIn.hidden = !id || !pinned || offered.length < 2;
+    if (id) {
+      showIn.dataset.extensionId = id;
+    }
+  },
+
   /**
    * Gives `list` a row for each extension of `win` whose toolbar button is
    * outside the menu, among the rows already there by name. A row names its
@@ -309,6 +471,14 @@ export const SvalExtensionsMenu = {
       action.disabled = false;
       action.addEventListener("command", event => {
         event.stopPropagation();
+        if (
+          lazy.SvalExtensionSites.blockedInTab(
+            policy.id,
+            win.gBrowser.selectedBrowser
+          )
+        ) {
+          return;
+        }
         const panel = action.closest("panel");
         const trigger = () =>
           gUnifiedExtensions.browserActionFor(policy)?.triggerAction(win);
@@ -365,7 +535,7 @@ export const SvalExtensionsMenu = {
         kept.push(policy.name);
       }
       switches++;
-      row.toggleAttribute("data-sval-site-off", off);
+      markOff(row, off);
       const can = capabilitiesOn(
         policy,
         win.gBrowser.selectedBrowser.currentURI
@@ -377,7 +547,7 @@ export const SvalExtensionsMenu = {
       toggle.label = `Run on ${site}`;
       toggle.setAttribute("title", `Run ${policy.name} on ${site}`);
       toggle.addEventListener("toggle", () => {
-        row.toggleAttribute("data-sval-site-off", !toggle.pressed);
+        markOff(row, !toggle.pressed);
         showCapabilities(row, toggle.pressed ? can : [], site);
         lazy.SvalExtensionSites.setOff(id, at, !toggle.pressed)
           .then(() => lazy.SvalExtensionSites.reloadSite(at))

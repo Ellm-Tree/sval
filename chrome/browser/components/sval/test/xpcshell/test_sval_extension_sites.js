@@ -13,9 +13,10 @@ const { AddonTestUtils } = ChromeUtils.importESModule(
 const { ExtensionTestUtils } = ChromeUtils.importESModule(
   "resource://testing-common/ExtensionXPCShellUtils.sys.mjs"
 );
-const { SITE_BRANCH, SvalExtensionSites } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs"
-);
+const { DEFAULT_BRANCH, SITE_BRANCH, SvalExtensionSites } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs"
+  );
 const { SvalSettingsRegistry } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalSettingsRegistry.sys.mjs"
 );
@@ -34,8 +35,10 @@ const A = "a@tests.sval.app";
 const B = "b@tests.sval.app";
 
 function clearAll() {
-  for (const name of Services.prefs.getChildList(SITE_BRANCH)) {
-    Services.prefs.clearUserPref(name);
+  for (const branch of [SITE_BRANCH, DEFAULT_BRANCH]) {
+    for (const name of Services.prefs.getChildList(branch)) {
+      Services.prefs.clearUserPref(name);
+    }
   }
 }
 
@@ -217,6 +220,108 @@ add_task(async function test_content_scripts_follow_the_top_level_host() {
   clearAll();
 });
 
+add_task(async function test_off_by_default_runs_only_where_switched_on() {
+  const extension = ExtensionTestUtils.loadExtension({
+    manifest: { browser_specific_settings: { gecko: { id: A } } },
+    useAddonManager: "permanent",
+  });
+  await extension.startup();
+  const policy = WebExtensionPolicy.getByID(A);
+
+  await SvalExtensionSites.setOffByDefault(A, true);
+  Assert.ok(SvalExtensionSites.isOff(A, "example.com"), "off where no switch");
+  Assert.ok(!SvalExtensionSites.isOff(B, "example.com"), "per extension");
+  Assert.deepEqual([...policy.blockedSites], ["*"]);
+  Assert.ok(policy.blockedOnTopSite("example.com"), "Gecko holds it off");
+  Assert.ok(!policy.blockedOnTopSite(""), "a page with no host is never off");
+
+  await SvalExtensionSites.setOff(A, "example.com", false);
+  Assert.equal(SvalExtensionSites.ruleFor(A, "example.com"), "on");
+  Assert.deepEqual(SvalExtensionSites.sitesOn(A), ["example.com"]);
+  Assert.ok(!SvalExtensionSites.isOff(A, "app.example.com"));
+  Assert.ok(!policy.blockedOnTopSite("app.example.com"), "runs on the site");
+  Assert.ok(policy.blockedOnTopSite("example.org"), "and nowhere else");
+  await extension.unload();
+  clearAll();
+});
+
+add_task(async function test_changing_the_default_drops_redundant_switches() {
+  await SvalExtensionSites.setOff(A, "example.com", true);
+  await SvalExtensionSites.setOff(A, "app.example.com", false);
+  await SvalExtensionSites.setOff(A, "example.org", true);
+
+  await SvalExtensionSites.setOffByDefault(A, true);
+  Assert.equal(
+    SvalExtensionSites.ruleFor(A, "example.com"),
+    undefined,
+    "a site switched off matches the default"
+  );
+  Assert.equal(SvalExtensionSites.ruleFor(A, "example.org"), undefined);
+  Assert.equal(
+    SvalExtensionSites.ruleFor(A, "app.example.com"),
+    "on",
+    "the host switched on stays the exception"
+  );
+  Assert.ok(SvalExtensionSites.isOff(A, "example.com"));
+  Assert.ok(!SvalExtensionSites.isOff(A, "app.example.com"));
+  Assert.equal(
+    Services.prefs.getStringPref(DEFAULT_BRANCH + A),
+    "off",
+    "one pref per extension"
+  );
+
+  await SvalExtensionSites.setOffByDefault(A, false);
+  Assert.equal(
+    SvalExtensionSites.ruleFor(A, "app.example.com"),
+    undefined,
+    "on by default takes the host's switch away"
+  );
+  Assert.ok(!Services.prefs.prefHasUserValue(DEFAULT_BRANCH + A));
+  clearAll();
+});
+
 add_task(function test_sync_branch_listed() {
   Assert.ok(SvalSettingsRegistry.SYNCED_BRANCHES.includes(SITE_BRANCH));
+  Assert.ok(SvalSettingsRegistry.SYNCED_BRANCHES.includes(DEFAULT_BRANCH));
+});
+
+add_task(async function test_off_by_default_keeps_content_scripts_out() {
+  const server = AddonTestUtils.createHttpServer({
+    hosts: ["off.example.com", "on.example.com"],
+  });
+  server.registerPathHandler("/page", (request, response) => {
+    response.setHeader("Content-Type", "text/html");
+    response.write("<p>page</p>");
+  });
+  const extension = ExtensionTestUtils.loadExtension({
+    manifest: {
+      browser_specific_settings: { gecko: { id: A } },
+      content_scripts: [
+        { matches: ["http://*.example.com/*"], js: ["ran.js"] },
+      ],
+    },
+    files: { "ran.js": "browser.test.sendMessage('ran', location.host)" },
+    useAddonManager: "permanent",
+  });
+  await extension.startup();
+  await SvalExtensionSites.setOffByDefault(A, true);
+  await SvalExtensionSites.setOff(A, "on.example.com", false);
+
+  // Each page's scripts run before its load ends, so the first message names
+  // the first page that ran one.
+  const off = await ExtensionTestUtils.loadContentPage(
+    "http://off.example.com/page"
+  );
+  await off.close();
+  const on = await ExtensionTestUtils.loadContentPage(
+    "http://on.example.com/page"
+  );
+  Assert.equal(
+    await extension.awaitMessage("ran"),
+    "on.example.com",
+    "nothing ran on a site the default holds off, and the site switched on runs it"
+  );
+  await on.close();
+  await extension.unload();
+  clearAll();
 });

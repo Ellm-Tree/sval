@@ -194,6 +194,7 @@ export class SvalWindowWorkspace {
   setShown(id) {
     this.#id = id;
     this.remember(id);
+    Services.obs.notifyObservers(this.#win, "sval-window-workspace-shown");
   }
 
   /**

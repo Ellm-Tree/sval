@@ -86,6 +86,7 @@ import { SvalThemes } from "moz-src:///browser/components/sval/SvalThemes.sys.mj
 import { SvalReloadMenu } from "moz-src:///browser/components/sval/SvalReloadMenu.sys.mjs";
 import { SvalUpdateDelay } from "moz-src:///browser/components/sval/SvalUpdateDelay.sys.mjs";
 import { SvalExtensionSites } from "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs";
+import { SvalExtensionWorkspaces } from "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs";
 import { CustomizableUI } from "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs";
 
 const lazy = {};
@@ -1167,6 +1168,7 @@ export const SvalHeader = {
     SvalExtensionCompat.start();
     SvalUpdateDelay.start();
     SvalExtensionSites.start();
+    SvalExtensionWorkspaces.start();
     CustomizableUI.createWidget({
       id: PANEL_BUTTON_ID,
       type: "button",

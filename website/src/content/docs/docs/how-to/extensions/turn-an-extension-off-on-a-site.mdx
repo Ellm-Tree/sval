@@ -4,6 +4,8 @@ description: Stop an extension from reading or changing anything on one site, an
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 Each extension has a switch for each site. When you turn an extension off
 on a site, the extension can't read or change anything in tabs showing
@@ -27,8 +29,19 @@ see or change anything on the site.
 
 1. Open Settings › Extensions.
 2. Under Installed, select the extension's name.
-3. Under Sites where this extension is off, type the site in **Turn it off on a site**.
-4. Select **Turn off**.
+<Until v="0.1.0-rc.11">
+
+3. Under Sites where this extension is off, type the site in the Turn it off on a site field.
+4. Select Turn off.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+3. Under Sites this extension runs on, type the site in **Add a site**.
+4. Select **Add**.
+
+</Since>
 
 ## Details
 

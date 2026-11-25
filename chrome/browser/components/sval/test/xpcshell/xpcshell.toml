@@ -104,6 +104,8 @@ requesttimeoutfactor = 2
 
 ["test_sval_extension_sites.js"]
 
+["test_sval_extension_workspaces.js"]
+
 ["test_sval_favorite_icons.js"]
 
 ["test_sval_favorites_store.js"]

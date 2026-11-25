@@ -4,6 +4,8 @@ description: What each part of the Workspace panel does, from the Favorites butt
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
 
 Each Workspace keeps your tabs, groups, Splits, and pins. The Workspace
 panel shows them down one side of the window. This page goes through the
@@ -228,25 +230,57 @@ moves with it.
 - **Back to saved page.** The pin goes back to its saved page.
 - **Save current page as this pin.** From now on, the pin goes back to this
   page. Both entries are dimmed when you're on the saved page.
+<Until v="0.1.0-rc.11">
+
 - **Show in.** This picks the Workspaces that show the pin. **Select all** and
   **Deselect all** are there too.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **Show the pin in.** This picks the Workspaces that show the pin.
+  **Select all** and **Deselect all** are there too.
+
+</Since>
 
 - **Move to Folder.** The submenu lists the folders in the pins row. Move to
   Folder shows only when the row has a folder.
 - **Rename…** This changes the pin's name.
 - **Edit address…** This changes the address the pin goes back to.
 - **Move to Favorites.** The pin leaves the pins row and goes to the end of
-  your Favorites. Sval forgets the pin's Show in choice. If the pin's page is
-  open, the page becomes a tab at the top of the list of tabs. You can undo
-  this from the Undo message.
+  your Favorites. Sval forgets which Workspaces you chose for the pin. If
+  the pin's page is open, the page becomes a tab at the top of the list of
+  tabs. You can undo this from the Undo message.
 - **Delete.** Sval deletes the pin. You can undo this from the Undo
   message.
 
+<Until v="0.1.0-rc.11">
+
 A pin inside a pinned folder has no Show in or Move to Favorites.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+A pin inside a pinned folder has no **Show the pin in** or **Move to Favorites**.
+
+</Since>
 
 When you right-click a pinned folder's tile, you get these:
 
+<Until v="0.1.0-rc.11">
+
 - **Show in.** This picks the Workspaces that show the folder and its pins.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **Show the folder in.** This picks the Workspaces that show the folder
+  and its pins.
+
+</Since>
 - **Rename…** This changes the folder's name.
 - **Move Contents to Row.** The folder's pins go in the pins row where the
   folder was, and Sval deletes the folder.

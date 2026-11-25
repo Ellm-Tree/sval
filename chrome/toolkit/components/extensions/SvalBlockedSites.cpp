@@ -37,17 +37,63 @@ bool SvalHostInSites(const AtomSet& aSites, const nsACString& aHost) {
     }
     int32_t dot = host.FindChar('.');
     if (dot < 0) {
-      return false;
+      break;
     }
     host.Cut(0, dot + 1);
+  }
+  return aSites.Contains("*"_ns);
+}
+
+static constexpr char16_t kWorkspaceMark = u'%';
+
+bool SvalHasWorkspaces(const nsTArray<nsString>& aSites) {
+  for (const nsString& entry : aSites) {
+    if (!entry.IsEmpty() && entry.First() == kWorkspaceMark) {
+      return true;
+    }
   }
   return false;
 }
 
-// A content principal's host; false for any other principal.
+bool SvalWorkspaceBlocked(const AtomSet& aSites, const nsACString& aWorkspace) {
+  return !aSites.Contains("%"_ns + aWorkspace);
+}
+
+static void WorkspaceOf(dom::BrowsingContext* aContext,
+                        nsACString& aWorkspace) {
+  aWorkspace.Truncate();
+  if (aContext) {
+    aContext->Top()->GetSvalWorkspace(aWorkspace);
+  }
+}
+
+void SvalWorkspaceOfLoad(nsILoadInfo* aLoadInfo, nsACString& aWorkspace) {
+  uint64_t id = 0;
+  if (aLoadInfo) {
+    id = aLoadInfo->GetFrameBrowsingContextID();
+    if (!id) {
+      id = aLoadInfo->GetAssociatedBrowsingContextID();
+    }
+    if (!id) {
+      id = aLoadInfo->GetBrowsingContextID();
+    }
+  }
+  RefPtr<dom::BrowsingContext> context = dom::BrowsingContext::Get(id);
+  WorkspaceOf(context, aWorkspace);
+}
+
+void SvalWorkspaceOfWindow(nsPIDOMWindowOuter* aWindow,
+                           nsACString& aWorkspace) {
+  WorkspaceOf(aWindow ? aWindow->GetBrowsingContext() : nullptr, aWorkspace);
+}
+
+// A web page's host; false for any other principal. A site rule names a web
+// site, so an extension's own page, which has a content principal of its
+// own, is on no site.
 static bool HostOf(nsIPrincipal* aPrincipal, nsACString& aHost) {
   aHost.Truncate();
   return aPrincipal && aPrincipal->GetIsContentPrincipal() &&
+         (aPrincipal->SchemeIs("http") || aPrincipal->SchemeIs("https")) &&
          NS_SUCCEEDED(aPrincipal->GetAsciiHost(aHost)) && !aHost.IsEmpty();
 }
 

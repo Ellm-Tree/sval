@@ -431,3 +431,6 @@ panel-sets-overflow.patch
 macos-stacked-window-buttons.patch
 search-icon-retry.patch
 mac-battery-on-ac-charging.patch
+extension-workspaces.patch
+extension-workspaces-js.patch
+extension-off-shows-off.patch

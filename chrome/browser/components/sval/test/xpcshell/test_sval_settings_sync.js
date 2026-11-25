@@ -22,8 +22,17 @@ const { SvalSettingsRegistry } = ChromeUtils.importESModule(
 const { SITE_BRANCH } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalSiteProtections.sys.mjs"
 );
-const { SITE_BRANCH: EXTENSION_SITE_BRANCH } = ChromeUtils.importESModule(
+const {
+  SITE_BRANCH: EXTENSION_SITE_BRANCH,
+  DEFAULT_BRANCH: EXTENSION_DEFAULT_BRANCH,
+} = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs"
+);
+const {
+  AVAILABLE_BRANCH: EXTENSION_WORKSPACES_BRANCH,
+  PIN_BRANCH: EXTENSION_PIN_BRANCH,
+} = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs"
 );
 const { SITE_BRANCH: JAVASCRIPT_BRANCH } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalJavascript.sys.mjs"
@@ -1056,6 +1065,18 @@ const ENTRY_CHOICES = [
   [
     [EXTENSION_SITE_BRANCH + "example.net", JSON.stringify(["a@example"])],
     [EXTENSION_SITE_BRANCH + "example.org", JSON.stringify(["b@example"])],
+  ],
+  [
+    [EXTENSION_DEFAULT_BRANCH + "a@example", "off"],
+    [EXTENSION_DEFAULT_BRANCH + "b@example", "off"],
+  ],
+  [
+    [EXTENSION_WORKSPACES_BRANCH + "a@example", JSON.stringify(["w1"])],
+    [EXTENSION_WORKSPACES_BRANCH + "b@example", JSON.stringify(["w2"])],
+  ],
+  [
+    [EXTENSION_PIN_BRANCH + "a@example", JSON.stringify(["w1"])],
+    [EXTENSION_PIN_BRANCH + "b@example", JSON.stringify(["w2"])],
   ],
   [
     [JAVASCRIPT_BRANCH + "example.net", "block"],

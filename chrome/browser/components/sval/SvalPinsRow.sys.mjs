@@ -155,7 +155,7 @@ export function tidySeparators(menu) {
 export function showInMenu(doc) {
   const menu = doc.createXULElement("menu");
   menu.dataset.command = "showIn";
-  menu.setAttribute("label", "Show in");
+  menu.setAttribute("label", "Show the pin in");
   const popup = doc.createXULElement("menupopup");
   menu.append(popup);
   return { menu, popup };
@@ -1632,6 +1632,12 @@ export class SvalPinsRow {
     for (const el of menu.querySelectorAll(":scope > [data-command]")) {
       el.hidden = !show[el.dataset.command];
     }
+    menu
+      .querySelector(':scope > [data-command="showIn"]')
+      ?.setAttribute(
+        "label",
+        folder ? "Show the folder in" : "Show the pin in"
+      );
     for (const command of ["reset", "saveCurrent"]) {
       menu
         .querySelector(`[data-command="${command}"]`)

@@ -1,0 +1,216 @@
+Sval: an extension reaches nothing in a tab of a Workspace it leaves out
+
+Each tab's top-level browsing context carries the Workspace it is in
+(SvalWorkspace), which only the parent sets. A policy's blockedSites
+names the Workspaces the extension is available in, each as "%id", and
+"*" as a name above every host, for an extension off on every site by
+default. Content-script matching and ChannelWrapper refuse the extension
+in a tab whose Workspace has no entry, wherever they refuse it on a
+blocked site.
+
+diff --git a/docshell/base/BrowsingContext.h b/docshell/base/BrowsingContext.h
+index 6ab9727fef..2f64229efc 100644
+--- a/docshell/base/BrowsingContext.h
++++ b/docshell/base/BrowsingContext.h
+@@ -179,6 +179,11 @@ struct EmbedderColorSchemes {
+    * contexts only (SvalAgentInControl.cpp). */                                \
+   FIELD(SvalAgentInControl, bool,                                              \
+         {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
++  /* Sval: the id of the Workspace this tab is in, empty for none, which       \
++   * decides which extensions reach its pages. Set by the parent on top        \
++   * level browsing contexts only. */                                          \
++  FIELD(SvalWorkspace, nsCString,                                              \
++        {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})                     \
+   /* Whether there's more than 1 tab / toplevel browsing context in this       \
+    * parent window. Used to determine if a given BC is allowed to resize       \
+    * and/or move the window or not. */                                         \
+@@ -1261,6 +1266,7 @@ class BrowsingContext : public nsILoadContext,
+   }
+   bool SvalFocusEmulated() { return GetSvalFocusEmulated(); }
+   bool SvalAgentInControl() { return GetSvalAgentInControl(); }
++  void GetSvalWorkspace(nsACString& aId) const { aId = GetSvalWorkspace(); }
+   // Sval: whether an agent controls the tab aWindow's page is in.
+   static bool SvalAgentControls(nsGlobalWindowInner* aWindow);
+   bool HasSiblings() { return GetHasSiblings(); }
+diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
+index 46d310f53a..1aa5081326 100644
+--- a/docshell/base/CanonicalBrowsingContext.cpp
++++ b/docshell/base/CanonicalBrowsingContext.cpp
+@@ -314,6 +314,7 @@ void CanonicalBrowsingContext::ReplacedBy(
+   txn.SetSvalKeepLinksSite(GetSvalKeepLinksSite());
+   txn.SetSvalFocusEmulated(GetSvalFocusEmulated());
+   txn.SetSvalAgentInControl(GetSvalAgentInControl());
++  txn.SetSvalWorkspace(GetSvalWorkspace());
+   txn.SetIsCaptivePortalTab(GetIsCaptivePortalTab());
+   txn.SetHasSiblings(GetHasSiblings());
+   txn.SetTopLevelCreatedByWebContent(GetTopLevelCreatedByWebContent());
+diff --git a/dom/chrome-webidl/BrowsingContext.webidl b/dom/chrome-webidl/BrowsingContext.webidl
+index d77bd58be7..331af48ea3 100644
+--- a/dom/chrome-webidl/BrowsingContext.webidl
++++ b/dom/chrome-webidl/BrowsingContext.webidl
+@@ -180,6 +180,10 @@ interface BrowsingContext {
+   // input reaches its pages (SvalAgentInControl.cpp).
+   [SetterThrows] attribute boolean svalAgentInControl;
+ 
++  // Sval: the id of the Workspace this tab is in, empty for none, which
++  // decides which extensions reach its pages.
++  [SetterThrows] attribute UTF8String svalWorkspace;
++
+   /**
+    * Sets whether this is BC has siblings **at the toplevel** (e.g. in a tabbed
+    * browser environment). Used to determine if web content can resize the top
+diff --git a/dom/chrome-webidl/WebExtensionPolicy.webidl b/dom/chrome-webidl/WebExtensionPolicy.webidl
+index cb401b3834..0d52852c12 100644
+--- a/dom/chrome-webidl/WebExtensionPolicy.webidl
++++ b/dom/chrome-webidl/WebExtensionPolicy.webidl
+@@ -156,7 +156,9 @@ interface WebExtensionPolicy {
+    * The sites and hosts on which the extension reaches nothing in a tab
+    * whose top-level document is on one of them, each covering the names
+    * under it. A host written "~host" is one it runs on under such a name.
+-   * The entry of the most specific name decides.
++   * The entry of the most specific name decides, and "*" is a name above
++   * every host. An entry "%id" names a Workspace the extension is available
++   * in.
+    */
+   [Cached, Frozen, Pure]
+   attribute sequence<DOMString> blockedSites;
+@@ -167,6 +169,12 @@ interface WebExtensionPolicy {
+    */
+   boolean blockedOnTopSite(UTF8String host);
+ 
++  /**
++   * True if blockedSites names Workspaces, each as "%id", and none is
++   * `workspace`, the Workspace of a tab, empty for none.
++   */
++  boolean blockedInWorkspace(UTF8String workspace);
++
+   /**
+    * True if this extension has recommended state.
+    */
+diff --git a/toolkit/components/extensions/WebExtensionContentScript.h b/toolkit/components/extensions/WebExtensionContentScript.h
+index 5df337efa6..76c8f94f10 100644
+--- a/toolkit/components/extensions/WebExtensionContentScript.h
++++ b/toolkit/components/extensions/WebExtensionContentScript.h
+@@ -68,6 +68,8 @@ class MOZ_STACK_CLASS DocInfo final {
+   // top-level document, otherwise its partition key's site. Empty where there
+   // is none.
+   void TopLevelHost(nsACString& aHost) const;
++  // The Workspace of the tab: its top-level browsing context's SvalWorkspace.
++  void Workspace(nsACString& aWorkspace) const;
+   bool IsSameOriginWithTop() const;
+   bool ShouldMatchActiveTabPermission() const;
+ 
+diff --git a/toolkit/components/extensions/WebExtensionPolicy.cpp b/toolkit/components/extensions/WebExtensionPolicy.cpp
+index 0ae3e0ba52..5228633878 100644
+--- a/toolkit/components/extensions/WebExtensionPolicy.cpp
++++ b/toolkit/components/extensions/WebExtensionPolicy.cpp
+@@ -223,6 +223,7 @@ WebExtensionPolicyCore::WebExtensionPolicyCore(GlobalObject& aGlobal,
+       mIgnoreQuarantine(aInit.mIsPrivileged || aInit.mIgnoreQuarantine),
+       mBlockedSites(new AtomSet(aInit.mBlockedSites)),
+       mHasBlockedSites(!aInit.mBlockedSites.IsEmpty()),
++      mHasWorkspaces(SvalHasWorkspaces(aInit.mBlockedSites)),
+       mHasRecommendedState(aInit.mHasRecommendedState),
+       mPermissions(new AtomSet(aInit.mPermissions)) {
+   // In practice this is not necessary, but in tests where the uuid
+@@ -344,10 +345,21 @@ bool WebExtensionPolicyCore::BlockedOnTopSite(const nsACString& aHost) const {
+   return mHasBlockedSites && SvalHostInSites(*mBlockedSites, aHost);
+ }
+ 
++bool WebExtensionPolicyCore::BlockedInWorkspace(
++    const nsACString& aWorkspace) const {
++  AutoReadLock lock(mLock);
++  return mHasWorkspaces && SvalWorkspaceBlocked(*mBlockedSites, aWorkspace);
++}
++
+ bool WebExtensionPolicyCore::BlockedOnDoc(const DocInfo& aDoc) const {
+   nsAutoCString host;
+   aDoc.TopLevelHost(host);
+-  return BlockedOnTopSite(host);
++  if (BlockedOnTopSite(host)) {
++    return true;
++  }
++  nsAutoCString workspace;
++  aDoc.Workspace(workspace);
++  return BlockedInWorkspace(workspace);
+ }
+ 
+ bool WebExtensionPolicyCore::PrivateBrowsingAllowed() const {
+@@ -1261,6 +1273,17 @@ void DocInfo::TopLevelHost(nsACString& aHost) const {
+   mObj.match(Matcher{aHost});
+ }
+ 
++void DocInfo::Workspace(nsACString& aWorkspace) const {
++  struct Matcher {
++    nsACString& mWorkspace;
++    void operator()(Window aWin) { SvalWorkspaceOfWindow(aWin, mWorkspace); }
++    void operator()(LoadInfo aLoadInfo) {
++      SvalWorkspaceOfLoad(aLoadInfo, mWorkspace);
++    }
++  };
++  mObj.match(Matcher{aWorkspace});
++}
++
+ bool DocInfo::IsTopLevelOpaqueAboutBlank() const {
+   if (mIsTopLevelOpaqueAboutBlank.isNothing()) {
+     struct Matcher {
+diff --git a/toolkit/components/extensions/WebExtensionPolicy.h b/toolkit/components/extensions/WebExtensionPolicy.h
+index 1644dfc603..fcc8ad8710 100644
+--- a/toolkit/components/extensions/WebExtensionPolicy.h
++++ b/toolkit/components/extensions/WebExtensionPolicy.h
+@@ -13,6 +13,7 @@
+ #include "mozilla/dom/WebExtensionPolicyBinding.h"
+ #include "mozilla/dom/WindowProxyHolder.h"
+ #include "mozilla/extensions/MatchPattern.h"
++#include "mozilla/extensions/SvalBlockedSites.h"
+ 
+ #include "jspubtd.h"
+ 
+@@ -153,8 +154,11 @@ class WebExtensionPolicyCore final {
+     AutoWriteLock lock(mLock);
+     mBlockedSites = std::move(sites);
+     mHasBlockedSites = !aSites.IsEmpty();
++    mHasWorkspaces = SvalHasWorkspaces(aSites);
+   }
+   bool BlockedOnTopSite(const nsACString& aHost) const MOZ_EXCLUDES(mLock);
++  bool BlockedInWorkspace(const nsACString& aWorkspace) const
++      MOZ_EXCLUDES(mLock);
+   bool BlockedOnDoc(const DocInfo& aDoc) const;
+ 
+   Maybe<dom::ExtensionGuardSource> CheckGuarded(const URLInfo& aURI) const
+@@ -223,6 +227,7 @@ class WebExtensionPolicyCore final {
+   bool mIgnoreQuarantine MOZ_GUARDED_BY(mLock);
+   RefPtr<AtomSet> mBlockedSites MOZ_GUARDED_BY(mLock);
+   bool mHasBlockedSites MOZ_GUARDED_BY(mLock);
++  bool mHasWorkspaces MOZ_GUARDED_BY(mLock);
+   bool mHasRecommendedState MOZ_GUARDED_BY(mLock);
+   RefPtr<AtomSet> mPermissions MOZ_GUARDED_BY(mLock);
+   RefPtr<MatchPatternSetCore> mHostPermissions MOZ_GUARDED_BY(mLock);
+@@ -370,6 +375,9 @@ class WebExtensionPolicy final : public nsISupports, public nsWrapperCache {
+   bool BlockedOnTopSite(const nsACString& aHost) const {
+     return mCore->BlockedOnTopSite(aHost);
+   }
++  bool BlockedInWorkspace(const nsACString& aWorkspace) const {
++    return mCore->BlockedInWorkspace(aWorkspace);
++  }
+   bool BlockedOnDoc(const DocInfo& aDoc) const {
+     return mCore->BlockedOnDoc(aDoc);
+   }
+diff --git a/toolkit/components/extensions/webrequest/ChannelWrapper.cpp b/toolkit/components/extensions/webrequest/ChannelWrapper.cpp
+index ac1df07005..52e6e90591 100644
+--- a/toolkit/components/extensions/webrequest/ChannelWrapper.cpp
++++ b/toolkit/components/extensions/webrequest/ChannelWrapper.cpp
+@@ -704,7 +704,13 @@ bool ChannelWrapper::BlockedFor(const WebExtensionPolicy& aExtension) const {
+     (void)loadInfo->GetCookieJarSettings(getter_AddRefs(settings));
+     SvalTopLevelHost(loadInfo, settings, host);
+   }
+-  return aExtension.BlockedOnTopSite(host);
++  if (aExtension.BlockedOnTopSite(host)) {
++    return true;
++  }
++  nsAutoCString workspace;
++  nsCOMPtr<nsILoadInfo> loadInfo = GetLoadInfo();
++  SvalWorkspaceOfLoad(loadInfo, workspace);
++  return aExtension.BlockedInWorkspace(workspace);
+ }
+ 
+ int64_t NormalizeFrameID(nsILoadInfo* aLoadInfo, uint64_t bcID) {

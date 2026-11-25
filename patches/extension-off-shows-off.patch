@@ -1,0 +1,95 @@
+Sval: an extension off for a page shows off there and does nothing
+
+An extension the user turned off for the selected tab's page, by its
+site's switch, the default for every site or the tab's Workspace, keeps
+its button greyed and disabled there, and its button, shortcut and menu
+item trigger nothing (isShownForTab), and its tooltip says so. Only a
+web page is on a site: an extension's own page is never held off.
+
+diff --git a/browser/components/extensions/parent/ext-browserAction.js b/browser/components/extensions/parent/ext-browserAction.js
+index b8cd2c219d..f24a62d33c 100644
+--- a/browser/components/extensions/parent/ext-browserAction.js
++++ b/browser/components/extensions/parent/ext-browserAction.js
+@@ -847,6 +847,13 @@ this.browserAction = class extends ExtensionAPIPersistent {
+       hasPopup: !!tabData.popup,
+     });
+ 
++    // Sval: off for the selected tab's page, the button shows off, says so
++    // and does nothing.
++    let selectedBrowser = node.documentGlobal.gBrowser.selectedBrowser;
++    let svalOff = !!this.extension.tabManager.getWrapper(
++      node.documentGlobal.gBrowser.selectedTab
++    )?.svalBlocked;
++
+     let callback = () => {
+       // This is set on the node so that it looks good in the toolbar.
+       node.toggleAttribute("attention", attention);
+@@ -857,7 +864,18 @@ this.browserAction = class extends ExtensionAPIPersistent {
+           ? "origin-controls-toolbar-button-quarantined"
+           : "origin-controls-toolbar-button-permission-needed";
+       }
+-      node.ownerDocument.l10n.setAttributes(button, msgId, { extensionTitle });
++      if (svalOff) {
++        // Sval's own words, while Fluent's attributes are off the button.
++        let offText = `${this.extension.name} is turned off on ${selectedBrowser.currentURI.host}`;
++        button.removeAttribute("data-l10n-id");
++        button.removeAttribute("data-l10n-args");
++        button.setAttribute("label", offText);
++        button.setAttribute("tooltiptext", offText);
++      } else {
++        node.ownerDocument.l10n.setAttributes(button, msgId, {
++          extensionTitle,
++        });
++      }
+ 
+       button.querySelector(".unified-extensions-item-name").textContent =
+         this.extension?.name;
+@@ -886,7 +904,8 @@ this.browserAction = class extends ExtensionAPIPersistent {
+         button.removeAttribute("badge");
+       }
+ 
+-      if (tabData.enabled) {
++      node.toggleAttribute("sval-site-off", svalOff);
++      if (tabData.enabled && !svalOff) {
+         button.removeAttribute("disabled");
+       } else {
+         button.setAttribute("disabled", "true");
+diff --git a/toolkit/components/extensions/ExtensionActions.sys.mjs b/toolkit/components/extensions/ExtensionActions.sys.mjs
+index 958b92ead5..41b9745f89 100644
+--- a/toolkit/components/extensions/ExtensionActions.sys.mjs
++++ b/toolkit/components/extensions/ExtensionActions.sys.mjs
+@@ -482,6 +482,11 @@ export class PageActionBase extends PanelActionBase {
+   //        The tab to be checked
+   // @return boolean
+   isShownForTab(tab) {
++    // Sval: an extension the user turned off for the tab's page does
++    // nothing there, from its button, its shortcut or its menu.
++    if (tab && this.extension.tabManager?.getWrapper(tab)?.svalBlocked) {
++      return false;
++    }
+     let tabData = this.getContextData(tab);
+ 
+     // If there is a "show" value, return it. Can be due to show(), hide() or empty show_matches.
+diff --git a/toolkit/components/extensions/parent/ext-tabs-base.js b/toolkit/components/extensions/parent/ext-tabs-base.js
+index d0a07a1547..114c439212 100644
+--- a/toolkit/components/extensions/parent/ext-tabs-base.js
++++ b/toolkit/components/extensions/parent/ext-tabs-base.js
+@@ -266,13 +266,13 @@ class TabBase {
+     // about:blank or blob: page a site made.
+     let principal = this.browser.contentPrincipal;
+     principal = principal?.precursorPrincipal ?? principal;
+-    let host;
+-    try {
+-      host = (principal?.isContentPrincipal ? principal.URI : this._uri).host;
+-    } catch {
++    let uri = principal?.isContentPrincipal ? principal.URI : this._uri;
++    // A site rule names a web site, and the default for every site covers
++    // web pages alone: never an extension's own page.
++    if (!uri?.schemeIs("http") && !uri?.schemeIs("https")) {
+       return false;
+     }
+-    return this.extension.policy.blockedOnTopSite(host);
++    return this.extension.policy.blockedOnTopSite(uri.host);
+   }
+ 
+   /**

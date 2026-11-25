@@ -808,8 +808,20 @@ control of what you see and what is sent to websites.
   containers, so it refuses to install themes and extensions that use
   containers. It turns off any container extension you already have.
 - **Pin extensions from the extensions menu.** Each extension in the menu
-  has a pin. Pin an extension to put its button on the toolbar. The
-  extension stays listed in the menu, where you can unpin it.
+  has a pin that puts the extension's button on the toolbar, and the
+  extension stays listed in the menu, where you can unpin it. From a pinned
+  extension's Pin to Toolbar in menu, you choose the Workspaces where the
+  extension's button shows on the toolbar.
+- **Keep an extension to some Workspaces.** On an extension's page in
+  Settings, you choose the Workspaces the extension is available in.
+  Anywhere else the extension can't read or change the pages in your tabs,
+  and you won't see its button or menu items or use its shortcuts. The extension still runs in
+  the background and still reaches what isn't in a tab, such as your
+  history and bookmarks.
+- **Turn an extension on for only some sites.** Each extension is on for all
+  sites or off for all sites, and its site switches are the exceptions. An
+  extension like a developer tool can stay off everywhere until you turn it
+  on for the site you're working on.
 
 ## Agents
 

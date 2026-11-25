@@ -37,6 +37,12 @@
       "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
     SITE_BRANCH:
       "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
+    DEFAULT_BRANCH:
+      "moz-src:///browser/components/sval/SvalExtensionSites.sys.mjs",
+    AVAILABLE_BRANCH:
+      "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
+    SvalExtensionWorkspaces:
+      "moz-src:///browser/components/sval/SvalExtensionWorkspaces.sys.mjs",
     siteOfEntry: "moz-src:///browser/components/sval/SvalSite.sys.mjs",
   });
   const { DEFAULT_WAIT_DAYS, MAX_WAIT_DAYS, WAIT_PREF } =
@@ -339,6 +345,8 @@
       lazy.ExtensionPermissions.addListener(permissions);
       lifetime.add(() => lazy.ExtensionPermissions.removeListener(permissions));
       lifetime.pref(lazy.SITE_BRANCH, redraw);
+      lifetime.pref(lazy.DEFAULT_BRANCH, redraw);
+      lifetime.pref(lazy.AVAILABLE_BRANCH, redraw);
       window.addEventListener("pagehide", () => lifetime.end());
 
       if (
@@ -874,7 +882,7 @@
           ui._sitePageRow(
             "extension-private",
             "Run in private windows",
-            "Required, so it can't be changed",
+            `${addon.name} needs to run in private windows`,
             ui._sitePageValue("extension-private", "Always")
           )
         );
@@ -901,10 +909,15 @@
           ui._sitePageRow(
             "extension-private",
             this._label(input, "Run in private windows"),
-            "It can see what you do in private windows",
+            `${addon.name} can see what you do in private windows`,
             input
           )
         );
+      }
+
+      const workspaces = this._workspacesRow(addon);
+      if (workspaces) {
+        rows.push(workspaces);
       }
 
       const waiting = lazy.SvalUpdateDelay.waiting(addon.id);
@@ -951,19 +964,86 @@
             className: "sval-button",
             dataset: { svalKey: "page-options" },
           },
-          "Options"
+          "Open"
         );
         button.addEventListener("click", () => this.openOptions(addon));
         rows.push(
-          ui._sitePageRow(
-            "extension-options",
-            "Its own settings",
-            "Open in a new tab",
-            button
-          )
+          ui._sitePageRow("extension-options", "Extension Settings", "", button)
         );
       }
       return this._card("general", "Extension", ...rows);
+    },
+
+    /**
+     * The Workspaces the extension is available in (extension Workspaces
+     * spec §1.9), checked in a list. Every one checked is every Workspace,
+     * a Workspace made later included.
+     *
+     * @param {object} addon
+     * @returns {?Element} None before any Workspace is known.
+     */
+    _workspacesRow(addon) {
+      const ui = this._ui;
+      const scopes = lazy.SvalExtensionWorkspaces;
+      const offered = scopes.offered();
+      if (!offered.length) {
+        return null;
+      }
+      const ids = offered.map(each => each.id);
+      const scope = scopes.availableIn(addon.id) ?? ids;
+      // The export dialog's list of Workspaces (`export.js`): a checkbox,
+      // the Workspace's emoji and its name on each line.
+      const list = ui._el("ul", {
+        className: "sval-im-windows",
+        ariaLabel: "Run in these Workspaces",
+      });
+      for (const { id, name, emoji } of offered) {
+        const on = scope.includes(id);
+        const box = ui._el("input", {
+          type: "checkbox",
+          checked: on,
+          // The last Workspace left can't be unchecked, so the scope never
+          // names none.
+          disabled: ui._privateWindow || (on && scope.length === 1),
+          dataset: { svalKey: `page-workspace-${id}` },
+        });
+        box.addEventListener("change", () => {
+          const next = box.checked
+            ? [...scope, id]
+            : scope.filter(each => each !== id);
+          lazy.SvalExtensionSites.changeAndReload(addon.id, () =>
+            scopes.setAvailableIn(
+              addon.id,
+              next.length === ids.length ? null : next
+            )
+          ).catch(err =>
+            lazy.SvalLog.warn(
+              `an extension's Workspaces did not apply: ${lazy.SvalLog.errorName(err)}`
+            )
+          );
+        });
+        list.append(
+          ui._el(
+            "li",
+            { className: "sval-im-window" },
+            ui._el(
+              "label",
+              { className: "sval-im-check" },
+              box,
+              ...(emoji
+                ? [ui._el("span", { className: "sval-im-emoji" }, emoji)]
+                : []),
+              name
+            )
+          )
+        );
+      }
+      return ui._sitePageRow(
+        "extension-workspaces",
+        "Run in these Workspaces",
+        `${addon.name} can read and change the pages in your tabs only in the Workspaces you check`,
+        list
+      );
     },
 
     /**
@@ -1079,26 +1159,56 @@
     },
 
     /**
-     * The sites the extension is off on, each with its switch, and a field
-     * that turns it off on one more (`SvalExtensionSites`). A switch is saved
-     * and synced, so a private window lists the sites alone.
+     * The extension's default for all sites, the sites that are its
+     * exceptions, each with its switch, and a field that adds one
+     * (`SvalExtensionSites`; extension Workspaces spec §3.6). A switch is
+     * saved and synced, so a private window lists the sites alone.
      *
      * @param {object} addon
      * @returns {Element}
      */
     _sitesCard(addon) {
       const ui = this._ui;
+      const sites = lazy.SvalExtensionSites;
+      const offByDefault = sites.offByDefault(addon.id);
+      const exceptions = offByDefault
+        ? sites.sitesOn(addon.id)
+        : sites.sitesOff(addon.id);
+      const title = "Sites this extension runs on";
+      // The heading says which way the listed sites go against the switch.
+      const listHead = exceptions.length
+        ? [
+            ui._el(
+              "p",
+              {
+                className: "sval-site-row-label sval-site-list-head",
+                dataset: { svalKey: "sites-list-head" },
+              },
+              offByDefault ? "Only these sites" : "Except these sites"
+            ),
+          ]
+        : [];
       if (ui._privateWindow) {
-        const sites = lazy.SvalExtensionSites.sitesOff(addon.id);
         return this._card(
           "sites",
-          "Sites where this extension is off",
-          ...sites.map((site, i) => {
+          title,
+          ui._sitePageRow(
+            "extension-sites-default",
+            "Run on every site",
+            "",
+            ui._sitePageValue(
+              "extension-sites-default",
+              offByDefault ? "Off" : "On",
+              offByDefault ? "off" : "on"
+            )
+          ),
+          ...listHead,
+          ...exceptions.map((site, i) => {
             const row = ui._sitePageRow(
               `extension-site-${i}`,
               site,
               "",
-              ui._sitePageValue(`extension-site-${i}`, "Off", "off")
+              ui._el("span")
             );
             row.dataset.extensionSite = site;
             return row;
@@ -1110,20 +1220,44 @@
           )
         );
       }
+      const warn = err =>
+        lazy.SvalLog.warn(
+          `an extension's site switch did not apply: ${lazy.SvalLog.errorName(err)}`
+        );
       const switchOff = (site, off) =>
-        lazy.SvalExtensionSites.setOff(addon.id, site, off)
-          .then(() => lazy.SvalExtensionSites.reloadSite(site))
-          .catch(err =>
-            lazy.SvalLog.warn(
-              `an extension's site switch did not apply: ${lazy.SvalLog.errorName(err)}`
-            )
-          );
-      const rows = lazy.SvalExtensionSites.sitesOff(addon.id).map((site, i) => {
+        sites
+          .setOff(addon.id, site, off)
+          .then(() => sites.reloadSite(site))
+          .catch(warn);
+      const every = ui._el("input", {
+        type: "checkbox",
+        className: "sval-switch",
+        role: "switch",
+        checked: !offByDefault,
+        dataset: { svalKey: "sites-default" },
+      });
+      every.addEventListener("change", () =>
+        sites
+          .changeAndReload(addon.id, () =>
+            sites.setOffByDefault(addon.id, !every.checked)
+          )
+          .catch(warn)
+      );
+      const rows = [
+        ui._sitePageRow(
+          "extension-sites-default",
+          this._label(every, "Run on every site"),
+          "",
+          every
+        ),
+        ...listHead,
+      ];
+      exceptions.forEach((site, i) => {
         const input = ui._el("input", {
           type: "checkbox",
           className: "sval-switch",
           role: "switch",
-          checked: false,
+          checked: offByDefault,
           dataset: { svalKey: `sites-${i}` },
         });
         input.addEventListener("change", () => switchOff(site, !input.checked));
@@ -1134,7 +1268,7 @@
           input
         );
         row.dataset.extensionSite = site;
-        return row;
+        rows.push(row);
       });
       const entry = ui._el("input", {
         type: "text",
@@ -1150,19 +1284,19 @@
           className: "sval-button",
           dataset: { svalKey: "sites-add" },
         },
-        "Turn off"
+        "Add"
       );
-      const turnOff = () => {
+      const addSite = () => {
         const { site } = lazy.siteOfEntry(entry.value);
         entry.toggleAttribute("aria-invalid", !site);
         if (site) {
-          switchOff(site, true);
+          switchOff(site, !offByDefault);
         }
       };
-      add.addEventListener("click", turnOff);
+      add.addEventListener("click", addSite);
       entry.addEventListener("keydown", event => {
         if (event.key === "Enter") {
-          turnOff();
+          addSite();
         }
       });
       const controls = ui._el(
@@ -1174,12 +1308,12 @@
       rows.push(
         ui._sitePageRow(
           "extension-sites-entry",
-          this._label(entry, "Turn it off on a site"),
+          this._label(entry, "Add a site"),
           "",
           controls
         )
       );
-      return this._card("sites", "Sites where this extension is off", ...rows);
+      return this._card("sites", title, ...rows);
     },
 
     /**

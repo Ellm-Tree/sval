@@ -4,6 +4,8 @@ description: What each extension control does, from the extensions menu to an ex
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
 
 Sval runs Manifest V2 and Manifest V3 extensions from addons.mozilla.org.
 With the controls below, you install extensions, turn them on and off, and
@@ -44,6 +46,23 @@ chooses what the switches cover: that address alone, or
 
 In private windows, the menu doesn't show what an extension can do or the
 Run on switch.
+
+<Since v="0.1.0-rc.11">
+
+The menu leaves out an extension that you keep to other Workspaces.
+
+### An extension's menu
+
+An extension's menu opens when you right-click the extension's button or
+select the menu button on the extension's row in the extensions menu.
+
+- **Pin to Toolbar in.** The toolbar shows the extension's button in each
+  Workspace you check, and **Select all** or **Deselect all** checks every
+  Workspace or none. This choice appears while the extension is pinned and can run in
+  more than one Workspace, and closing the menu with every Workspace
+  unchecked leaves your choice as it was.
+
+</Since>
 
 ### Notices in the extensions menu
 
@@ -99,15 +118,31 @@ Selecting an extension's name in Settings › Extensions opens its page.
 - **On.** This switch turns the extension on or off. It also shows the
   extension's version.
 - **Run in private windows.** The extension runs in private windows, where
-  it can see what you do. For an extension that can't run in private
-  windows, this shows **Never**. For an extension that has to run there,
-  it shows **Always**.
-- **Update waiting.** This shows when Sval is holding an update. It gives
-  the update's version and the date Sval will install the update.
-  **Update now** installs the update straight away.
+  it can see what you do. This shows **Never** for an extension that can't
+  run in private windows and **Always** for one that has to run there.
+- **Update waiting.** While Sval holds an update, this gives the update's
+  version and the date Sval will install the update, and **Update now**
+  installs the update straight away.
+<Until v="0.1.0-rc.11">
+
 - **Its own settings.** This shows while the extension is on, if the
   extension has settings of its own. **Options** opens those settings in a
   new tab.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **Available in.** Each of your Workspaces has a checkbox, and the
+  extension reaches tabs only in the Workspaces you check. With every
+  Workspace checked, a Workspace you add later gets the extension too, and
+  the last one checked can't be unchecked. Your choice syncs to your other
+  devices.
+- **Extension Settings.** This shows while the extension is on, if the
+  extension has settings of its own. **Open** opens those settings in a
+  new tab.
+
+</Since>
 
 ### Permissions
 
@@ -115,6 +150,8 @@ The list says what the extension can do. It uses the words of the prompt
 you saw when you installed the extension. Each optional permission has a
 switch, marked **Optional**. When an extension asks for no permissions, the
 list says **It asks for no permissions**.
+
+<Until v="0.1.0-rc.11">
 
 ### Sites where this extension is off
 
@@ -124,6 +161,24 @@ list says **It asks for no permissions**.
   off** turns the extension off on that site.
 
 Your switches sync to your other devices.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+### Sites this extension runs on
+
+- **Run on every site.** With this switch on, the extension runs on every
+  site except the ones listed under Except these sites. With the switch
+  off, the extension runs only on the sites listed under Only these sites.
+- **A listed site.** Each site has its own switch, and turning the switch
+  takes the site off the list.
+- **Add a site.** This field takes a site's address, and **Add** puts the
+  site on the list.
+
+Your switches sync to your other devices.
+
+</Since>
 
 ### Remove
 

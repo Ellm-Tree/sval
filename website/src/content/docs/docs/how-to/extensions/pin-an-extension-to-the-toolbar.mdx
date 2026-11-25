@@ -3,6 +3,8 @@ title: Pin an extension to the toolbar
 description: Put an extension's button on the toolbar, or take it off again.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+
 When an extension has a button, you'll find the button in the extensions
 menu. Pin the extension to put its button on the toolbar as well.
 
@@ -24,6 +26,25 @@ button.
 - You can pin only an extension that has a button.
 - When you install an extension, the extensions menu tells you it was
   added and offers **Pin to toolbar**.
+
+<Since v="0.1.0-rc.11">
+
+## Show a pinned extension in some Workspaces
+
+You can show a pinned extension's button on the toolbar in only the
+Workspaces you choose.
+
+1. On the toolbar, right-click the extension's button.
+2. Select **Pin to Toolbar in**.
+3. Check each Workspace you want the button in, and uncheck the others.
+
+In a Workspace you leave out, the extensions menu shows the extension as
+unpinned, and selecting **Pin to the toolbar** there adds that Workspace.
+Unpinning the extension makes Sval forget your Workspaces, so the button
+comes back in every Workspace the next time you pin the extension. Your
+choice syncs to your other devices.
+
+</Since>
 
 ## Related pages
 

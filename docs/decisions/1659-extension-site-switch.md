@@ -17,7 +17,9 @@ empty.
 ## Decision
 
 - Each extension has an on/off switch for each site, a site being `siteOf`'s
-  registrable domain. Every extension starts on everywhere.
+  registrable domain. Each extension is on everywhere until a switch turns
+  it off, or off everywhere until a switch turns it on, as its default for
+  all sites says (decision 2625).
 - The switch is for the site in the address bar. Off, the extension reaches
   nothing in a tab whose top-level document is on the site: no content
   script in any frame, no request the tab makes in webRequest,
