@@ -147,6 +147,10 @@ def markers(thread):
         names[name] += 1
         data = row[schema["data"]] if len(row) > schema["data"] else None
         text = data.get("name", "") if isinstance(data, dict) else ""
+        # A payload field whose schema format is "unique-string" holds an
+        # index into the thread's string table.
+        if isinstance(text, int):
+            text = strings[text]
         if NOTABLE.search(name) or NOTABLE.search(text):
             notable[f"{name}: {text}" if text else name] += 1
     return names, notable
