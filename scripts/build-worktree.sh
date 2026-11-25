@@ -22,6 +22,11 @@
 set -euo pipefail
 
 WT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# The whole setup holds one light build slot (scripts/build-slot.py), and the
+# build.sh it runs builds under it.
+if [[ " ${SVAL_BUILD_SLOT_HELD:-} " != *" light "* ]] && python3 -c 'import fcntl' 2>/dev/null; then
+  exec python3 -I "$WT/scripts/build-slot.py" light bash "${BASH_SOURCE[0]}" "$@"
+fi
 # The main checkout is the parent of the common git directory.
 COMMON="$(cd "$(git -C "$WT" rev-parse --git-common-dir)" && pwd -P)"
 MAIN="$(dirname "$COMMON")"

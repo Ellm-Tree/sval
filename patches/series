@@ -434,3 +434,4 @@ mac-battery-on-ac-charging.patch
 extension-workspaces.patch
 extension-workspaces-js.patch
 extension-off-shows-off.patch
+mac-dmg-helper-name.patch

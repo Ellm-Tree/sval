@@ -1055,14 +1055,14 @@ index cf555564a8..9728c76662 100644
 +# matches any part of it. So an application other than Firefox names each of
 +# its helpers after itself, in a name that contains no Firefox helper's name.
 +# Firefox keeps Mozilla's names, which an artifact build on Mozilla's packages
-+# looks for.
-+@depends(moz_app_name)
-+def helper_names(app_name):
++# looks for. Mozilla's macOS updater is org.mozilla.updater.
++@depends(moz_app_name, target)
++def helper_names(app_name, target):
 +    mozilla = {
 +        "child": "plugin-container",
 +        "crash-helper": "crashhelper",
 +        "crash-reporter": "crashreporter",
-+        "update": "updater",
++        "update": "org.mozilla.updater" if target.os == "OSX" else "updater",
 +        "update-service": "maintenanceservice",
 +        "update-service-installer": "maintenanceservice_installer",
 +        "private-browsing": "private_browsing",

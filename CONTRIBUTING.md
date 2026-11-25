@@ -227,6 +227,7 @@ a comment. Brand art is reserved (`branding/sval/LICENSE`).
     ./scripts/network-contact-test.sh # every host Sval contacts is on the list
     ./scripts/new-worktree.sh [--no-build] <topic> # a worktree with its own build; warns when the disk is low
     ./scripts/build-worktree.sh     # give a --no-build worktree its build tree
+    python3 -I scripts/build-slot.py --status # who holds the build slots builds wait for
     ./scripts/reclaim-dev.sh        # list merged worktrees, stale ~/.mozbuild state and gone builds macOS still opens links in; --apply removes them
     ./scripts/perf.sh               # profile startup, page loads and tabs; rank Sval's functions by CPU time
     ./scripts/perf-panel.sh         # time the Workspace panel's steps with thousands of tabs

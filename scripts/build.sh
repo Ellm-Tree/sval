@@ -8,6 +8,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$REPO_ROOT/build/firefox"
 
+# A build waits for a build slot (scripts/build-slot.py): the heavy one for a
+# Gecko compile, a light one otherwise. SVAL_FASTER=1 rebuilds the front end
+# in seconds, which no slot is worth. MozillaBuild's Python on Windows has no
+# fcntl, and CI runs one job per Windows runner.
+slot=light
+[[ "${SVAL_MODE:-artifact}" == gecko ]] && slot=heavy
+if [[ "${SVAL_FASTER:-0}" != "1" && " ${SVAL_BUILD_SLOT_HELD:-} " != *" $slot "* ]] &&
+  python3 -c 'import fcntl' 2>/dev/null; then
+  exec python3 -I "$REPO_ROOT/scripts/build-slot.py" "$slot" bash "${BASH_SOURCE[0]}" "$@"
+fi
+
 if [[ ! -f "$SRC/mach" ]]; then
   echo "error: no upstream checkout at $SRC — run scripts/fetch-upstream.sh first" >&2
   exit 1
