@@ -1980,7 +1980,8 @@ panel[type="arrow"] {
 /* The notices popover (`SvalNoticesButton`, messages spec §5): each notice
    a 32px tile, its sentence and its buttons, and a dismissed one a 44px row
    that runs its main action. */
-#sval-notices-panel {
+#sval-notices-panel,
+#sval-battery-saver-panel {
   --button-border-radius: 999px;
   --button-background-color-primary: var(--sval-action);
   --button-background-color-primary-hover: var(--sval-action);
@@ -2020,6 +2021,18 @@ panel[type="arrow"] {
     -moz-context-properties: fill;
     fill: var(--sval-accent);
   }
+}
+
+.sval-battery-saver-tile::before {
+  background-image: url("chrome://browser/content/profiles/assets/20_leaf.svg");
+  -moz-context-properties: fill, stroke;
+  fill: transparent;
+  stroke: var(--sval-accent);
+}
+
+.sval-battery-saver-heading {
+  margin: 0;
+  font: 600 13px/1.4 var(--sval-font);
 }
 
 .sval-notice-body {
@@ -2703,6 +2716,35 @@ split-view-footer {
   margin-inline-start: 8px !important;
 
   list-style-image: var(--sval-icon-split);
+}
+
+/* The Battery Saver button (`SvalBatterySaver`): a pill of its own, as the
+   split button is, shown while Battery Saver is on. Firefox's leaf draws its
+   disc in `context-fill` and the leaf in `context-stroke`, so the disc is
+   left out and the leaf takes the icon's colour. */
+#nav-bar #sval-battery-saver-button {
+  align-self: center;
+  background-color: var(--sval-cluster-bg);
+  border: 1px solid var(--sval-cluster-border);
+  border-radius: 999px;
+  box-shadow: var(--sval-cluster-shadow);
+  padding: 1px 2px;
+  margin: 0;
+  margin-inline-start: 8px !important;
+}
+
+#sval-battery-saver-button {
+  list-style-image: url("chrome://browser/content/profiles/assets/20_leaf.svg");
+
+  > .toolbarbutton-icon {
+    -moz-context-properties: fill, stroke;
+    fill: transparent;
+    stroke: var(--toolbarbutton-icon-fill);
+  }
+
+  &:is(:hover, [open]) > .toolbarbutton-icon {
+    background: var(--sval-wash);
+  }
 }
 
 /* ---------------------------------------------------------------- status panel */

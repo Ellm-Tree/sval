@@ -4,6 +4,7 @@ description: Why switching Workspaces doesn't reload your pages, and when Sval f
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
 
 A sleeping tab has given back the memory its page used. The tab keeps its
 place in the Workspace and its history. When you select the tab, the page loads
@@ -24,6 +25,14 @@ to sleep. Three hours is long enough to come back from a meeting and find
 the Workspace as it was. It's also short enough that the Workspaces you
 left during the day give their memory back. If your computer runs low on
 memory, Sval can put those tabs to sleep sooner.
+
+<Since v="0.1.0-rc.11">
+
+While [Battery Saver](/docs/how-to/tabs/use-battery-saver/) is on, Sval
+puts a Workspace's tabs to sleep after the Workspace has been out of sight
+for 30 minutes.
+
+</Since>
 
 ## What stays awake
 

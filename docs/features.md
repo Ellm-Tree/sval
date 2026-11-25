@@ -268,6 +268,13 @@ control of what you see and what is sent to websites.
   puts its tabs to sleep once you've been away for three hours, or sooner if
   your computer runs low on memory. It doesn't put a tab to sleep while it's
   playing sound or holding text you typed.
+- **Battery Saver.** When you unplug your laptop, Sval draws fewer frames
+  on a fast screen, slows tabs in the background, and puts a Workspace to
+  sleep 30 minutes after you leave it. While Battery Saver is on, a leaf
+  button next to the address bar offers Turn Off for Now, which lasts until
+  you next plug in or unplug. Tools › Battery Saver switches Battery Saver
+  off or on the same way, and Settings › General sets when Battery Saver
+  turns on.
 - **Pause what's playing.** A pause button shows next to a tab, a collapsed
   group, or a Workspace in the switcher while it's playing sound. Click it
   to pause the video or music, and click again to play it. Point at it to

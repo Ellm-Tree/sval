@@ -9,7 +9,6 @@ const {
   RECORD_WIDGETS,
   SET_AREAS,
   SET_WIDGETS,
-  SPLIT_BUTTON_ID,
   addressTail,
   arrangement,
   displayDomain,
@@ -139,7 +138,7 @@ add_task(function the_tail_splits_at_its_punctuation() {
 
 /**
  * In the Workspace panel, each widget stands in its set, pinned extension
- * buttons in the tools set between Split and the extensions button, and
+ * buttons in the tools set just before the extensions button, and
  * `#nav-bar` keeps only what cannot leave it. Above the page, the sets are
  * empty.
  */
@@ -161,7 +160,9 @@ add_task(function each_widget_stands_in_its_set() {
   const inPanel = arrangement(current, true, keep, isExtension);
   for (const [set, ids] of Object.entries(SET_WIDGETS)) {
     const want =
-      set === "tools" ? [SPLIT_BUTTON_ID, pinned, EXTENSIONS_BUTTON_ID] : ids;
+      set === "tools"
+        ? [...ids.slice(0, -1), pinned, EXTENSIONS_BUTTON_ID]
+        : ids;
     Assert.deepEqual(inPanel[SET_AREAS[set]], want, `the ${set} set`);
   }
   Assert.deepEqual(inPanel["nav-bar"], [stuck], "#nav-bar keeps what stays");

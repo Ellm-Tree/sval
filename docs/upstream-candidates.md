@@ -38,6 +38,24 @@ Each entry gives:
 - **Upstream**: a small patch to `getIconURL` and a unit test in
   `toolkit/components/search/tests/xpcshell`. Not submitted.
 
+### A Mac on AC power reads as running on battery
+
+- **Patch**: `patches/mac-battery-on-ac-charging.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `MacPowerInformationService::HandleChange` sets the battery's
+  `charging` from `kIOPSIsChargingKey` alone. macOS reports that key false
+  on a Mac that is plugged in with a full battery, or one Optimized Battery
+  Charging holds below full, so `BatteryManager.charging` reads false on AC
+  power. Windows (`ACLineStatus`) and UPower (Full and PendingCharge) count
+  AC power as charging. The fix also counts a power source whose
+  `kIOPSPowerSourceStateKey` is `kIOPSACPowerValue`.
+- **Evidence**: found reading `HandleChange`. Battery Saver
+  (`SvalBatterySaver`) turns on while `charging` is false, so without the
+  fix it would turn on for a plugged-in Mac with a full battery. No test
+  covers it, because a test cannot change the Mac's power source.
+- **Upstream**: file a bug in Core :: DOM: Device Interfaces with the patch.
+  Not submitted.
+
 ### A page that gets narrower loses the reader's place
 
 - **Patch**: `patches/scroll-anchor-on-resize.patch`

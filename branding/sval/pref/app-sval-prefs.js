@@ -486,6 +486,10 @@ pref("browser.sval.sync.background.enabled", true);
 // the host with the path, query and fragment after it, muted. The field
 // itself keeps the full address.
 pref("browser.sval.urlbar.display", "domain");
+
+// When Battery Saver is on (`SvalBatterySaver`): "unplugged", while the
+// computer runs on battery; "always"; "never".
+pref("browser.sval.batterySaver.mode", "unplugged");
 pref("browser.urlbar.trimHttps", true); // upstream: false
 
 // The Launcher's sections after the row Enter takes, in order, and how many

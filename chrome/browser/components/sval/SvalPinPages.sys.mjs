@@ -20,7 +20,7 @@
  *   it has none. It never navigates a page it already has.
  * - **Leaving a workspace** leaves its pages loaded as a switch leaves its
  *   tabs (spec §10.7), until the workspace has been out of sight for
- *   `HIDDEN_WORKSPACE_UNLOAD_MS`: then each is discarded, keeping its place
+ *   `hiddenWorkspaceUnloadMs()`: then each is discarded, keeping its place
  *   and its history, and one Firefox will not discard (typed text, a call)
  *   or one playing sound stays loaded. Coming back, or launching, shows the
  *   pin looked at after every tab (`onViewed`), as a tab's last-active time
@@ -42,7 +42,7 @@ import { SvalLog } from "moz-src:///browser/components/sval/SvalLog.sys.mjs";
 import { SvalClock } from "moz-src:///browser/components/sval/SvalClock.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 import {
-  HIDDEN_WORKSPACE_UNLOAD_MS,
+  hiddenWorkspaceUnloadMs,
   PAGE_ANSWER_MS,
 } from "moz-src:///browser/components/sval/SvalTabs.sys.mjs";
 import {
@@ -575,7 +575,7 @@ export class SvalPinPages {
 
   /**
    * Unloads the pages of workspaces the window left
-   * `HIDDEN_WORKSPACE_UNLOAD_MS` ago or more, keeping where each was (§5,
+   * `hiddenWorkspaceUnloadMs()` ago or more, keeping where each was (§5,
    * spec §10.7). A page Firefox will not unload, one the user typed into, or
    * one playing sound stays loaded.
    *
@@ -584,11 +584,12 @@ export class SvalPinPages {
    */
   async parkIdle(now = SvalClock.now()) {
     const win = this.#window;
+    const unloadMs = hiddenWorkspaceUnloadMs();
     for (const page of [...this.#pages.values()]) {
       const { tab } = page;
       if (
         page.parkedAt == null ||
-        now - page.parkedAt < HIDDEN_WORKSPACE_UNLOAD_MS ||
+        now - page.parkedAt < unloadMs ||
         tab.closing ||
         tab.selected ||
         tab.soundPlaying ||

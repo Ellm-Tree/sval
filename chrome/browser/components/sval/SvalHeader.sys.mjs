@@ -75,6 +75,11 @@ import {
   NOTICES_BUTTON_ID,
   NOTICES_PANEL_ID,
 } from "moz-src:///browser/components/sval/SvalNoticesButton.sys.mjs";
+import {
+  SvalBatterySaver,
+  BUTTON_ID as BATTERY_SAVER_BUTTON_ID,
+  PANEL_ID as BATTERY_SAVER_PANEL_ID,
+} from "moz-src:///browser/components/sval/SvalBatterySaver.sys.mjs";
 import { SvalExtensionCompat } from "moz-src:///browser/components/sval/SvalExtensionCompat.sys.mjs";
 import { SvalExtensionNotices } from "moz-src:///browser/components/sval/SvalExtensionNotices.sys.mjs";
 import { SvalThemes } from "moz-src:///browser/components/sval/SvalThemes.sys.mjs";
@@ -175,7 +180,8 @@ export const TRANSLATE_BUTTON_ID = "translations-button";
  * View, and the favorite button) act on the selected tab's page, so they
  * close the address pill. The
  * split button follows on its own, shown while the selected tab is in a
- * split.
+ * split, then the Battery Saver button, on its own, shown while Battery
+ * Saver is on (`SvalBatterySaver`).
  *
  * A row too narrow for its widgets moves them into the overflow panel in
  * {@link OVERFLOW_ORDER}, passing over each one marked `overflows="false"`.
@@ -200,6 +206,7 @@ export const HEADER_WIDGETS = [
   READER_BUTTON_ID,
   FAVORITE_BUTTON_ID,
   SPLIT_BUTTON_ID,
+  BATTERY_SAVER_BUTTON_ID,
 ];
 
 export const EXTENSIONS_BUTTON_ID = "unified-extensions-button";
@@ -234,6 +241,7 @@ export const RECORD_WIDGETS = [
  * on a button widget only, so a custom widget's builder sets it on its node.
  */
 export const OVERFLOW_ORDER = [
+  BATTERY_SAVER_BUTTON_ID,
   SPLIT_BUTTON_ID,
   HISTORY_BUTTON_ID,
   "downloads-button",
@@ -572,6 +580,7 @@ export function onViewMenuShowing(event) {
 const STEM_HOSTS = new Set([
   "widget-overflow",
   NOTICES_PANEL_ID,
+  BATTERY_SAVER_PANEL_ID,
   PROTECTION_PANEL_ID,
   "unified-extensions-panel",
   "downloadsPanel",
@@ -816,7 +825,7 @@ export const SET_WIDGETS = Object.freeze({
     SITE_MENU_BUTTON_ID,
   ],
   page: [TRANSLATE_BUTTON_ID, READER_BUTTON_ID, FAVORITE_BUTTON_ID],
-  tools: [SPLIT_BUTTON_ID, EXTENSIONS_BUTTON_ID],
+  tools: [SPLIT_BUTTON_ID, BATTERY_SAVER_BUTTON_ID, EXTENSIONS_BUTTON_ID],
   records: RECORD_WIDGETS.filter(id => id !== PRIVATE_BADGE_ID),
 });
 
@@ -847,7 +856,7 @@ export const SET_OVERFLOW = Object.freeze({
   page: {
     leave: [READER_BUTTON_ID, FAVORITE_BUTTON_ID, TRANSLATE_BUTTON_ID],
   },
-  tools: { leave: [SPLIT_BUTTON_ID] },
+  tools: { leave: [BATTERY_SAVER_BUTTON_ID, SPLIT_BUTTON_ID] },
   records: { leave: [HISTORY_BUTTON_ID, "downloads-button"] },
 });
 
@@ -1346,6 +1355,24 @@ export const SvalHeader = {
       defaultArea: CustomizableUI.AREA_NAVBAR,
       onBuild: buildSplitButton,
     });
+    // Hidden until `SvalBatterySaver` finds Battery Saver on.
+    CustomizableUI.createWidget({
+      id: BATTERY_SAVER_BUTTON_ID,
+      type: "button",
+      label: "Battery Saver",
+      tooltiptext: "Battery Saver",
+      removable: true,
+      defaultArea: CustomizableUI.AREA_NAVBAR,
+      onCreated(node) {
+        node.hidden = !SvalBatterySaver.active;
+      },
+      onCommand(event) {
+        const win = event.target.documentGlobal;
+        SvalBatterySaver.open(win, {
+          focus: event.inputSource === win.MouseEvent.MOZ_SOURCE_KEYBOARD,
+        });
+      },
+    });
     CustomizableUI.createWidget({
       id: HISTORY_BUTTON_ID,
       type: "custom",
@@ -1570,6 +1597,7 @@ export const SvalHeader = {
     SvalSearchFlip.startWindow(win);
     SvalSiteStylePanel.startWindow(win);
     SvalNoticesButton.startWindow(win);
+    SvalBatterySaver.startWindow(win);
     SvalExtensionNotices.startWindow(win);
     const doc = win.document;
     // The toggle names its key as the user sees it, which settings can

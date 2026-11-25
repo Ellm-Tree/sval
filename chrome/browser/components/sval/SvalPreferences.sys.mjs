@@ -39,6 +39,7 @@ const PANE_SCRIPTS = [
   "chrome://browser/content/sval/settings-site-defaults.js",
   "chrome://browser/content/sval/settings-archive.js",
   "chrome://browser/content/sval/settings-warnings.js",
+  "chrome://browser/content/sval/settings-battery-saver.js",
   "chrome://browser/content/sval/settings-favorites.js",
   "chrome://browser/content/sval/settings-keyboard.js",
   "chrome://browser/content/sval/settings-extensions.js",

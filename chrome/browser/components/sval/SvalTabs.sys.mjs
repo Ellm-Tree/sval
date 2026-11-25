@@ -127,6 +127,10 @@ async function removeNodes(engine, settings, nodes, ids) {
 }
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  BATTERY_SAVER_UNLOAD_MS:
+    "moz-src:///browser/components/sval/SvalBatterySaver.sys.mjs",
+  SvalBatterySaver:
+    "moz-src:///browser/components/sval/SvalBatterySaver.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
   isPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
@@ -199,6 +203,19 @@ const DEFAULT_POLL_MS = 5000;
  * abandoned workspaces give their memory back (spec §10.7).
  */
 export const HIDDEN_WORKSPACE_UNLOAD_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * How long a page stays loaded in a workspace no window shows:
+ * {@link HIDDEN_WORKSPACE_UNLOAD_MS}, or Battery Saver's shorter time while
+ * Battery Saver is on (`SvalBatterySaver`).
+ *
+ * @returns {number} milliseconds.
+ */
+export function hiddenWorkspaceUnloadMs() {
+  return lazy.SvalBatterySaver.active
+    ? lazy.BATTERY_SAVER_UNLOAD_MS
+    : HIDDEN_WORKSPACE_UNLOAD_MS;
+}
 
 /** How often a window looks for pages hidden that long. */
 const IDLE_SWEEP_MS = 10 * 60 * 1000;
@@ -3169,7 +3186,7 @@ class SvalTabObserver {
    * A tab holding a page is hidden (`hideForWorkspace`) and keeps running,
    * so a workspace the user comes back to is as they left it;
    * {@link releaseIdle} lets it go once its workspace has been out of sight
-   * for {@link HIDDEN_WORKSPACE_UNLOAD_MS}, and Firefox's `TabUnloader` may
+   * for {@link hiddenWorkspaceUnloadMs}, and Firefox's `TabUnloader` may
    * discard it sooner under memory pressure. A tab holding no page has
    * nothing to keep, so it leaves the window at once.
    *
@@ -3219,7 +3236,7 @@ class SvalTabObserver {
 
   /**
    * Lets go of the tabs of workspaces this window has not shown for
-   * {@link HIDDEN_WORKSPACE_UNLOAD_MS}, as a switch once did: each leaves the
+   * {@link hiddenWorkspaceUnloadMs}, as a switch once did: each leaves the
    * window, its node staying in the document, unless what it holds keeps it
    * loaded ({@link SvalTabs.discard}). A tab playing sound stays, as Firefox's
    * `TabUnloader` weighs one (`isPlayingMedia`): the user can hear it. A tab
@@ -3233,6 +3250,7 @@ class SvalTabObserver {
    * @returns {Promise<{released: string[], loaded: string[]}>}
    */
   async releaseIdle(now = this.#now()) {
+    const unloadMs = hiddenWorkspaceUnloadMs();
     const hidden = [];
     for (const tab of this.#adapter.tabsOf(this.#window)) {
       if (
@@ -3250,7 +3268,7 @@ class SvalTabObserver {
       tab =>
         this.#adapter.isLoaded(tab) &&
         (!!this.#adapter.isPlayingSound?.(tab) ||
-          now - this.#hiddenSince.get(tab) < HIDDEN_WORKSPACE_UNLOAD_MS)
+          now - this.#hiddenSince.get(tab) < unloadMs)
     );
   }
 

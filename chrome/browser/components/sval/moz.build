@@ -55,6 +55,7 @@ MOZ_SRC_FILES += [
     "SvalArchive.sys.mjs",
     "SvalBackToOpener.sys.mjs",
     "SvalBackupKey.sys.mjs",
+    "SvalBatterySaver.sys.mjs",
     "SvalBlocking.sys.mjs",
     "SvalBlockingLists.sys.mjs",
     "SvalBytes.sys.mjs",

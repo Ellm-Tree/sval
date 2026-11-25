@@ -16,8 +16,12 @@
 # difference. The harness drives the browser through Marionette, which draws
 # the address bar's remote-control cue (`gRemoteControl`), a button no window
 # of a person's has, so a test would measure a fuller row than theirs.
+# Battery Saver would follow the test machine's own power source, which
+# changes the frame rate, background timers and when hidden Workspaces
+# sleep; the file that tests it sets the mode for itself.
 [DEFAULT]
 prefs = [
+  "browser.sval.batterySaver.mode=never",
   "browser.chrome.disableRemoteControlCueForTests=true",
   "browser.sval.firstRun.enabled=false",
   "browser.sval.sync.background.enabled=false",
@@ -313,6 +317,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_background_peer_workspace.js"]
 
 ["browser_sval_backup_key.js"]
+
+["browser_sval_battery_saver.js"]
 
 ["browser_sval_blocking_engine.js"]
 

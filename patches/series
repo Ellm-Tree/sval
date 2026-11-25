@@ -430,3 +430,4 @@ panel-toolbar-keynav.patch
 panel-sets-overflow.patch
 macos-stacked-window-buttons.patch
 search-icon-retry.patch
+mac-battery-on-ac-charging.patch

@@ -1,0 +1,27 @@
+Sval: report a Mac on AC power as charging
+
+The battery API reads only kIOPSIsChargingKey, which is false on a Mac that
+is plugged in with a full battery, or one Optimized Battery Charging holds
+below full, so a plugged-in Mac reads as running on battery. Battery Saver
+turns on by itself only on battery. The power source's
+kIOPSPowerSourceStateKey says whether it draws from AC, as Windows' and
+UPower's battery backends already count.
+
+diff --git a/hal/cocoa/CocoaBattery.cpp b/hal/cocoa/CocoaBattery.cpp
+index 50e2c1ee46..59dc5be0a6 100644
+--- a/hal/cocoa/CocoaBattery.cpp
++++ b/hal/cocoa/CocoaBattery.cpp
+@@ -262,6 +262,13 @@ void MacPowerInformationService::HandleChange(void* aContext) {
+     if (::CFDictionaryGetValueIfPresent(currPowerSourceDesc,
+                                         CFSTR(kIOPSIsChargingKey), &cfRef)) {
+       charging = ::CFBooleanGetValue((CFBooleanRef)cfRef);
++      // A full battery, or one held by Optimized Battery Charging, is not
++      // charging while the Mac is on AC power.
++      if (!charging && ::CFDictionaryGetValueIfPresent(
++                           currPowerSourceDesc,
++                           CFSTR(kIOPSPowerSourceStateKey), &cfRef)) {
++        charging = ::CFEqual(cfRef, CFSTR(kIOPSACPowerValue));
++      }
+ 
+       // Get an estimate of how long it's going to take until we're fully
+       // charged. This key is optional.

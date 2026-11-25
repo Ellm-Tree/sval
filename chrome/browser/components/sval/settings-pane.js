@@ -110,6 +110,12 @@
       before: 'setting-group[groupid="importBrowserData"]',
     },
     {
+      // Battery Saver, after the Warnings below it in this list.
+      id: "svalBatterySaver",
+      category: "paneSync",
+      after: 'setting-group[groupid="defaultBrowserSync"]',
+    },
+    {
       // Firefox's quit and many-tabs warnings, after the default browser
       // and what a launch does.
       id: "svalWarnings",
@@ -275,6 +281,11 @@
     window.initSettingGroup(window.SvalArchiveSettings.GROUP_ID);
     window.SvalWarningsSettings.register();
     window.initSettingGroup(window.SvalWarningsSettings.GROUP_ID);
+    window.SvalBatterySaverSettings.register();
+    window.initSettingGroup(window.SvalBatterySaverSettings.GROUP_ID);
+    window.SvalBatterySaverSettings.ready().catch(err =>
+      window.SvalSettings.log(`showing Battery Saver failed: ${err?.name}`)
+    );
     window.SvalCookiesSettings.register();
     window.initSettingGroup(window.SvalCookiesSettings.GROUP_ID);
     window.SvalSiteDefaultsSettings.register();
@@ -464,12 +475,17 @@
       .getElementById("category-privacy")
       ?.setAttribute("iconsrc", iconURL("privacy"));
 
-    // Privacy and protection is Firefox's category, so Sval's sections in it
-    // reach `SvalSettings` here rather than through a module of Sval's.
+    // Privacy and protection and General are Firefox's categories, so Sval's
+    // sections in them are reached here rather than through a module of
+    // Sval's.
     document.addEventListener("paneshown", event => {
       const { category, subcategory } = event.detail;
       if (category === "panePrivacy" && PRIVACY_SECTIONS.has(subcategory)) {
         window.SvalSettings.showPane("privacy", subcategory);
+      } else if (category === "paneSync" && subcategory === "batterySaver") {
+        window.SvalBatterySaverSettings.show().catch(err =>
+          window.SvalSettings.log(`showing Battery Saver failed: ${err?.name}`)
+        );
       }
     });
 

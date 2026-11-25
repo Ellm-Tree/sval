@@ -420,6 +420,7 @@ browser.jar:
     content/browser/sval/settings-site-defaults.js (settings-site-defaults.js)
     content/browser/sval/settings-archive.js  (settings-archive.js)
     content/browser/sval/settings-warnings.js (settings-warnings.js)
+    content/browser/sval/settings-battery-saver.js (settings-battery-saver.js)
     content/browser/sval/settings-keyboard.js (settings-keyboard.js)
     content/browser/sval/settings-extensions.js (settings-extensions.js)
     content/browser/sval/settings-favorites.js (settings-favorites.js)
