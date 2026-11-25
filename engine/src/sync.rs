@@ -770,19 +770,22 @@ pub fn sync_remembering<S: StorageProvider>(
         .copied()
         .collect();
 
-    let published = |doc: &Document| {
-        let mut view = doc.clone();
-        if target == Target::Shared {
-            view.nodes.retain(|_, node| !node.content.local);
-            // When this copy began is a fact about this copy (decision 2232).
-            view.began_at = 0;
-            view.earlier_to = 0;
+    fn published(doc: &Document, target: Target) -> std::borrow::Cow<'_, Document> {
+        match target {
+            Target::Profile => std::borrow::Cow::Borrowed(doc),
+            Target::Shared => {
+                let mut view = doc.clone();
+                view.nodes.retain(|_, node| !node.content.local);
+                // When this copy began is a fact about this copy (decision 2232).
+                view.began_at = 0;
+                view.earlier_to = 0;
+                std::borrow::Cow::Owned(view)
+            }
         }
-        view
-    };
+    }
     let unchanged = match &own_snapshot {
         Some(snapshot) => {
-            published(doc).shared_state_json().ok().as_deref() == Some(snapshot.as_str())
+            published(doc, target).shared_state_json().ok().as_deref() == Some(snapshot.as_str())
         }
         None => false,
     };
@@ -791,7 +794,7 @@ pub fn sync_remembering<S: StorageProvider>(
         // local was last written here, and a watermark that covers that write
         // is what lets each peer read its absence as a delete (spec §5.4).
         doc.stamp_write(device, now);
-        let (json, sealed) = store::seal_document(key, &own_path, &published(doc))?;
+        let (json, sealed) = store::seal_document(key, &own_path, &published(doc, target))?;
         store.write(&own_path, &sealed)?;
         kept = Some(OwnCopy {
             path: own_path,
