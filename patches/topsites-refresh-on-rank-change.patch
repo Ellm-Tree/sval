@@ -7,8 +7,12 @@ never joined it until a restart. Places fires pages-rank-changed after
 every visit and frecency recalculation, which is the change the list
 follows.
 
+Every visit starts a refresh, so the list keeps its previous sites
+while one runs, and a reader in that window gets them instead of an
+empty list.
+
 diff --git a/browser/components/topsites/TopSites.sys.mjs b/browser/components/topsites/TopSites.sys.mjs
-index 6f15cd406d..6bcc0c3aab 100644
+index 6f15cd406d..a8e6ae9483 100644
 --- a/browser/components/topsites/TopSites.sys.mjs
 +++ b/browser/components/topsites/TopSites.sys.mjs
 @@ -160,7 +160,13 @@ class _TopSites {
@@ -56,3 +60,15 @@ index 6f15cd406d..6bcc0c3aab 100644
          case "history-cleared":
            this.frecentCache.expire();
            this.refresh();
+@@ -589,8 +609,9 @@ class _TopSites {
+ 
+   // eslint-disable-next-line max-statements
+   async getLinksWithDefaults() {
+-    // Clear the previous sites.
+-    this.#sites = [];
++    // Sval: the previous sites stay readable until the new list replaces
++    // them, because every visit starts a refresh and `getSites` would answer
++    // an empty list while one runs.
+ 
+     const numItems =
+       Services.prefs.getIntPref(TOP_SITES_ROWS_PREF, 1) *

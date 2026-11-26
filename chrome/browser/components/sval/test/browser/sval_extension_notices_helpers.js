@@ -13,8 +13,14 @@
 
 // The panel's notices live for the whole process, outside Known Good state,
 // and the files that share these helpers count them, so each starts with
-// none.
+// none. A task that fails leaves its notices unanswered, which would show in
+// the panel of every file after it, so each file ends with none too.
 add_setup(function startWithoutNotices() {
+  clearNotices();
+  registerCleanupFunction(clearNotices);
+});
+
+function clearNotices() {
   const { noticeLines, removeNotice } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalAppNotices.sys.mjs"
   );
@@ -26,7 +32,7 @@ add_setup(function startWithoutNotices() {
   );
   const left = noticeLines(window).map(line => line.key);
   if (left.length) {
-    info(`notices an earlier file left: ${left.join(", ")}`);
+    info(`notices left: ${left.join(", ")}`);
   }
   for (const key of left) {
     removeNotice(key);
@@ -35,7 +41,7 @@ add_setup(function startWithoutNotices() {
   ExtensionsUI.sideloaded.clear();
   ExtensionsUI.updates.clear();
   ExtensionsUI.emit("change");
-});
+}
 
 const extensionsButton = (win = window) =>
   win.document.getElementById("unified-extensions-button");

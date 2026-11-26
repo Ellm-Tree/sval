@@ -143,8 +143,11 @@ function render(win, state, lines) {
       drawn?.dataset.signature === signature(line) ? drawn : drawBar(win, line)
     );
   }
-  for (const [key, bar] of state.bars) {
-    if (bars.get(key) !== bar) {
+  // The container is the record of what is drawn, so a bar `state.bars` has
+  // lost, as a ViewShowing with no ViewHiding before it loses one, goes too.
+  const kept = new Set(bars.values());
+  for (const bar of container.querySelectorAll(`:scope > .${BAR_CLASS}`)) {
+    if (!kept.has(bar)) {
       bar.remove();
     }
   }
@@ -159,7 +162,11 @@ function render(win, state, lines) {
 }
 
 function onViewShowing(win, event) {
-  if (event.target.id !== VIEW_ID) {
+  // `PanelMultiView.#openView` awaits before it dispatches ViewShowing, so a
+  // panel hidden in that wait has dispatched ViewHiding already and detached
+  // the view (`#closeLatestView`). Drawing then would mark the notices seen
+  // in a panel nobody sees.
+  if (event.target.id !== VIEW_ID || !event.target.panelMultiView) {
     return;
   }
   const state = stateFor(win);

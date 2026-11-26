@@ -54,8 +54,8 @@ async function secondWindow() {
 /**
  * Loads the extension under test, with a toolbar button and a content
  * script that marks every page of example.com, and a control extension
- * whose script marks every page later, so a page without the first mark
- * once the second shows was kept from the extension.
+ * whose script marks every page, so a check of a page kept from the first
+ * is made once the page's content scripts have run (`scriptKept`).
  *
  * @returns {Promise<object>}
  */
@@ -112,11 +112,43 @@ function widgetIdOf() {
 }
 
 /**
+ * Resolves once the content script under test has marked `bc`'s page.
+ *
  * @param {BrowsingContext} bc
- * @returns {Promise<boolean>} Whether the content script under test ran in
- *   `bc`, read once the control's script has run there.
+ * @returns {Promise<void>}
  */
-async function scriptRan(bc) {
+function scriptRuns(bc) {
+  return within(
+    SpecialPowers.spawn(bc, [], () => {
+      const root = content.document.documentElement;
+      if (root.hasAttribute("data-sval-cs")) {
+        return undefined;
+      }
+      return new Promise(resolve => {
+        new content.MutationObserver((records, observer) => {
+          observer.disconnect();
+          resolve();
+        }).observe(root, { attributeFilter: ["data-sval-cs"] });
+      });
+    }),
+    10_000,
+    "the extension's script marking the page"
+  );
+}
+
+/**
+ * Gecko orders content scripts within one extension alone
+ * (`gPendingScriptBlockers` in ExtensionContent.sys.mjs), and each
+ * extension's injection waits for its own compile, so the control's mark
+ * can come before the other extension's. Its matcher, which decides
+ * injection, says whether the page is kept from it for good.
+ *
+ * @param {BrowsingContext} bc
+ * @returns {Promise<boolean>} Whether the content script under test is
+ *   kept from `bc`'s page: its matcher refuses the page, and it has not
+ *   marked the page once the control's script has.
+ */
+async function scriptKept(bc) {
   await within(
     SpecialPowers.spawn(bc, [], () => {
       const root = content.document.documentElement;
@@ -133,9 +165,14 @@ async function scriptRan(bc) {
     10_000,
     "the control's script marking the page"
   );
-  return SpecialPowers.spawn(bc, [], () =>
-    content.document.documentElement.hasAttribute("data-sval-cs")
-  );
+  return SpecialPowers.spawn(bc, [ID], id => {
+    const matched = content.WebExtensionPolicy.getByID(id).contentScripts.some(
+      script => script.matchesWindowGlobal(content.windowGlobalChild)
+    );
+    return (
+      !matched && !content.document.documentElement.hasAttribute("data-sval-cs")
+    );
+  });
 }
 
 /**
@@ -162,12 +199,12 @@ add_task(async function test_kept_to_one_workspace() {
     workspace,
     "the tab carries its Workspace"
   );
-  Assert.ok(await scriptRan(there.linkedBrowser.browsingContext));
+  await scriptRuns(there.linkedBrowser.browsingContext);
 
   const tab = await openPageIn(window);
   Assert.equal(tab.linkedBrowser.browsingContext.svalWorkspace, here);
   Assert.ok(
-    !(await scriptRan(tab.linkedBrowser.browsingContext)),
+    await scriptKept(tab.linkedBrowser.browsingContext),
     "nothing ran in the other Workspace's tab"
   );
 
@@ -184,7 +221,7 @@ add_task(async function test_kept_to_one_workspace() {
 add_task(async function test_scope_change_reloads_the_tabs_it_turns() {
   await loadExtensions();
   const tab = await openPageIn(window);
-  Assert.ok(await scriptRan(tab.linkedBrowser.browsingContext));
+  await scriptRuns(tab.linkedBrowser.browsingContext);
   const { workspace } = await secondWindow();
   const reloaded = BrowserTestUtils.browserLoaded(tab.linkedBrowser);
   await SvalExtensionSites.changeAndReload(ID, () =>
@@ -192,7 +229,7 @@ add_task(async function test_scope_change_reloads_the_tabs_it_turns() {
   );
   await within(reloaded, 10_000, "the tab reloading");
   Assert.ok(
-    !(await scriptRan(tab.linkedBrowser.browsingContext)),
+    await scriptKept(tab.linkedBrowser.browsingContext),
     "the reloaded page is kept from it"
   );
 });

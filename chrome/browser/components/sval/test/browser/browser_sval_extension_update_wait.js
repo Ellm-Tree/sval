@@ -37,8 +37,10 @@ async function installExtension() {
     useAddonManager: "temporary",
   });
   await extension.startup();
-  atTaskEnd(() => SvalUpdateDelay.forget(ID));
-  return extension;
+  atTaskEnd(async () => {
+    SvalUpdateDelay.forget(ID);
+    await extension.unload();
+  });
 }
 
 /** Holds version 2.0 for the extension, first seen now. */
@@ -101,14 +103,13 @@ add_task(async function test_wait_setting_writes_pref() {
 });
 
 add_task(async function test_no_row_without_wait() {
-  const extension = await installExtension();
+  await installExtension();
   const ui = await openExtensionPage();
   Assert.ok(!ui.waitingRow(), "no update waits, so no row");
-  await extension.unload();
 });
 
 add_task(async function test_waiting_row_shows() {
-  const extension = await installExtension();
+  await installExtension();
   holdUpdate();
   const ui = await openExtensionPage();
   Assert.ok(ui.waitingRow(), "the held update shows");
@@ -116,22 +117,34 @@ add_task(async function test_waiting_row_shows() {
     ui.waitingRow().querySelector('[data-sval-key="page-update-now"]'),
     "with Update now"
   );
-  await extension.unload();
 });
 
 // The harness's update server answers no check, so Update now fails here;
 // test_sval_update_delay_background.js covers an update installed or none
 // offered.
 add_task(async function test_update_now_failed_check_keeps_row() {
-  const extension = await installExtension();
+  await installExtension();
   holdUpdate();
   const ui = await openExtensionPage();
+  const cards = ui.byId("sval-extension-cards");
+  const failed = new Promise(resolve => {
+    const observer = new MutationObserver(() => {
+      if (ui.waitingRow()?.dataset.state === "failed") {
+        observer.disconnect();
+        resolve();
+      }
+    });
+    observer.observe(cards, {
+      subtree: true,
+      childList: true,
+      attributeFilter: ["data-state"],
+    });
+  });
   ui.waitingRow().querySelector('[data-sval-key="page-update-now"]').click();
-  await TestUtils.waitForCondition(
-    () => ui.waitingRow()?.dataset.state === "failed",
-    "the row says the update did not install"
-  );
+  // The outcome waits on a request to the harness's HTTP server, which
+  // AddonUpdateChecker bounds at 60 s. The bound gives that request the
+  // seconds a loaded machine takes, inside half the file's limit.
+  await within(failed, 20_000, "the row saying the update did not install");
   Assert.ok(ui.waitingRow(), "the update still waits");
   Assert.equal(SvalUpdateDelay.waiting(ID)?.version, "2.0");
-  await extension.unload();
 });

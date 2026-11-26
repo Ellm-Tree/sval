@@ -12,37 +12,60 @@ import XCTest
 /// times, and any other path answers at once.
 private final class PageServer: @unchecked Sendable {
     private let listener: NWListener
-    private let queue = DispatchQueue(label: "app.sval.ios.tests.pages")
+    /// Known once the listener is ready. Before then the listener reports
+    /// port 0, where a load is refused.
+    let port: UInt16
 
-    init() throws {
-        listener = try NWListener(using: .tcp, on: .any)
-        listener.newConnectionHandler = { [queue] connection in
-            connection.start(queue: queue)
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, _ in
-                let request = String(decoding: data ?? Data(), as: UTF8.self)
-                let slow = request.hasPrefix("GET /slow ")
-                let part = 5000, parts = slow ? 40 : 1
-                let head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(part * parts)\r\n"
-                    + "Connection: close\r\n\r\n"
-                connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
-                func send(_ n: Int) {
-                    let first = n == 0 ? "<!doctype html><title>Page</title><p>" : ""
-                    let body = first + String(repeating: "x", count: part - first.utf8.count)
-                    queue.asyncAfter(deadline: .now() + (slow ? 0.04 : 0)) {
-                        connection.send(content: Data(body.utf8), completion: .contentProcessed { _ in
-                            if n == parts - 1 { connection.cancel() } else { send(n + 1) }
-                        })
-                    }
-                }
-                send(0)
-            }
-        }
-        listener.start(queue: queue)
+    private init(listener: NWListener, port: UInt16) {
+        self.listener = listener
+        self.port = port
     }
 
-    var port: UInt16? { listener.port?.rawValue }
+    static func start() async throws -> PageServer {
+        let listener = try NWListener(using: .tcp, on: .any)
+        let queue = DispatchQueue(label: "app.sval.ios.tests.pages")
+        let port: UInt16 = try await withCheckedThrowingContinuation { continuation in
+            // Called on `queue` alone, and cleared once it has answered.
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(returning: listener.port?.rawValue ?? 0)
+                case .failed(let error):
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(throwing: error)
+                default: break
+                }
+            }
+            listener.newConnectionHandler = { PageServer.serve($0, on: queue) }
+            listener.start(queue: queue)
+        }
+        return PageServer(listener: listener, port: port)
+    }
 
     func stop() { listener.cancel() }
+
+    private static func serve(_ connection: NWConnection, on queue: DispatchQueue) {
+        connection.start(queue: queue)
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, _ in
+            let request = String(decoding: data ?? Data(), as: UTF8.self)
+            let slow = request.hasPrefix("GET /slow ")
+            let part = 5000, parts = slow ? 40 : 1
+            let head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(part * parts)\r\n"
+                + "Connection: close\r\n\r\n"
+            connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
+            func send(_ n: Int) {
+                let first = n == 0 ? "<!doctype html><title>Page</title><p>" : ""
+                let body = first + String(repeating: "x", count: part - first.utf8.count)
+                queue.asyncAfter(deadline: .now() + (slow ? 0.04 : 0)) {
+                    connection.send(content: Data(body.utf8), completion: .contentProcessed { _ in
+                        if n == parts - 1 { connection.cancel() } else { send(n + 1) }
+                    })
+                }
+            }
+            send(0)
+        }
+    }
 }
 
 /// Counts each write of a browser's bar facts once tracking starts.
@@ -74,7 +97,7 @@ final class BarFactsTests: AppModelTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        let server = try PageServer()
+        let server = try await PageServer.start()
         self.server = server
         addTeardownBlock { server.stop() }
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -85,13 +108,12 @@ final class BarFactsTests: AppModelTestCase {
     }
 
     private func page(_ host: String, _ path: String = "/page") throws -> URL {
-        try XCTUnwrap(URL(string: "http://\(host):\(try XCTUnwrap(server.port))\(path)"))
+        try XCTUnwrap(URL(string: "http://\(host):\(server.port)\(path)"))
     }
 
     /// Launches the phone and loads `url` in a new tab in front.
     private func launchedShowing(_ url: URL) async throws -> AppModel {
         let model = try await harness.launch()
-        try await harness.until("the server listens") { self.server.port != nil }
         await model.browser.open(url)
         let view = try XCTUnwrap(model.browser.currentPage())
         view.frame = window.bounds
@@ -269,7 +291,6 @@ final class BarFactsTests: AppModelTestCase {
     /// its shield.
     func testAPrivateProtectionsChangeShowsAtOnce() async throws {
         let model = try await harness.launch()
-        try await harness.until("the server listens") { self.server.port != nil }
         let browser = model.browser!
         let shown = await model.showPrivateSession()
         XCTAssertTrue(shown)

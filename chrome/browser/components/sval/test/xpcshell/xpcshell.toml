@@ -107,6 +107,10 @@ requesttimeoutfactor = 2
 ["test_sval_extension_sites.js"]
 
 ["test_sval_extension_workspaces.js"]
+# The test's server answers http alone. HTTPS-First tries https first and
+# falls back with a second load, and `ContentPage.loadURL` resolves when the
+# failed try stops, so that second load races the test's next one.
+prefs = ["dom.security.https_first=false"]
 
 ["test_sval_favorite_icons.js"]
 

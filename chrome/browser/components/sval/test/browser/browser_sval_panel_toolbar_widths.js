@@ -238,8 +238,10 @@ function assertDrawn(win, width, side) {
 /**
  * Waits for `win`'s sets to have given up what their room no longer holds:
  * `OverflowableToolbar` checks in a task after the resize it answers, so a
- * set narrows a moment before its items leave. A set that never settles
- * fails here.
+ * set narrows a moment before its items leave. An item that leaves draws the
+ * toolbar again in a task of its own (`SvalPanelToolbar`'s `refit`), which
+ * hides a column's set left showing nothing. A set that never settles fails
+ * here.
  *
  * @param {Window} win
  * @param {number} width
@@ -247,26 +249,30 @@ function assertDrawn(win, width, side) {
 async function settled(win, width) {
   const doc = win.document;
   const panel = box(doc.getElementById("sval-panel-container"));
-  await TestUtils.waitForCondition(
-    () =>
-      [
-        ...doc.querySelectorAll(`#${PANEL_TOOLBAR_ID} > .sval-set`),
-        doc.getElementById(RECORDS_AREA),
-      ]
-        .filter(el => el.checkVisibility())
-        .every(el => {
-          const pill = box(el);
-          const target = el.querySelector(":scope > .sval-set-target");
-          return (
-            pill.right <= panel.right + 0.5 &&
-            [...(target?.children ?? [])].every(item => {
-              const b = box(item);
-              return !b.width || b.right <= pill.right + 0.5;
-            })
-          );
-        }),
-    `the toolbar settling at ${width}px`
-  );
+  // Either edge, since a set overflows toward its end, the left in
+  // right-to-left text.
+  const inside = (inner, outer) =>
+    inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5;
+  await TestUtils.waitForCondition(() => {
+    const column = SvalPanelToolbar.drawnLayout(win)?.column;
+    return [
+      ...doc.querySelectorAll(`#${PANEL_TOOLBAR_ID} > .sval-set`),
+      doc.getElementById(RECORDS_AREA),
+    ]
+      .filter(el => el.checkVisibility())
+      .every(el => {
+        const pill = box(el);
+        const target = el.querySelector(":scope > .sval-set-target");
+        const shown = [...(target?.children ?? [])].filter(
+          item => box(item).width
+        );
+        return (
+          inside(pill, panel) &&
+          shown.every(item => inside(box(item), pill)) &&
+          !(column && target && !shown.length)
+        );
+      });
+  }, `the toolbar settling at ${width}px`);
 }
 
 /**

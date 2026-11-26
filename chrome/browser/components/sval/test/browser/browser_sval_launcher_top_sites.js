@@ -241,21 +241,30 @@ add_task(async function a_site_open_in_a_tab_is_left_out() {
 
 /**
  * A page the user visits often after the list was first read joins it while
- * the browser runs: each visit has the module read the list again
- * (`topsites-refresh-on-rank-change.patch`).
+ * the browser runs: Places' rank change after each visit has the module read
+ * the list again (`topsites-refresh-on-rank-change.patch`).
  */
 add_task(async function a_site_made_frequent_later_joins_the_launcher() {
   await onlyThisTab();
   await visitSites(2);
   const later = "https://sval-later.example.com/";
-  // The module's history cache answers for `LinksCache`'s expiration time;
-  // expiring it stands for that time passing.
-  await settledRefresh();
-  TopSites.frecentCache.expire();
-  const refreshed = TestUtils.topicObserved("topsites-refreshed");
   await PlacesTestUtils.addVisits(
     Array(15).fill({ uri: later, title: "Later" })
   );
+  // Places announces the visits' rank change before it commits them
+  // (`InsertVisitedURIs::Run`), so the refresh that change starts may read
+  // history without them, and any read fills the module's cache. Every
+  // frecency and refresh settles before the cache expires, so the refresh
+  // the rank change below starts is the one that reads history.
+  await Cc["@mozilla.org/places/frecency-recalculator;1"]
+    .getService(Ci.nsIObserver)
+    .wrappedJSObject.recalculateAnyOutdatedFrecencies();
+  await settledRefresh();
+  // The module's history cache answers for `LinksCache`'s expiration time;
+  // expiring it stands for that time passing.
+  TopSites.frecentCache.expire();
+  const refreshed = TestUtils.topicObserved("topsites-refreshed");
+  PlacesObservers.notifyListeners([new PlacesRanking()]);
   await within(refreshed, 10_000, "the top sites refreshing after the visits");
   Assert.ok(
     (await TopSites.getSites()).some(s => s.url === later),

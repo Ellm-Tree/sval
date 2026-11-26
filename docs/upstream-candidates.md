@@ -2049,6 +2049,24 @@ Each entry gives:
 - **Upstream**: the patch calls `_cleanup_old_logs` from both writers.
   mozilla-central's `resourcehandler.py` has the same code.
 
+### about:support never fills in when the free disk space cannot be read
+
+- **Patch**: `patches/troubleshoot-disk-space-unreadable.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `Troubleshoot.snapshot` catches a provider's synchronous throw,
+  but the `application` provider is async. When `nsIFile.diskSpaceAvailable`
+  throws, which it does when `statfs` on the profile's path fails
+  (`nsLocalFile::GetDiskInfo`), the rejection goes unhandled, the provider
+  never calls back and the snapshot never resolves. about:support, Report
+  Broken Site and anything else that awaits the snapshot wait forever.
+- **Evidence**: a local run of `browser_sval_removed_pages.js` failed on an
+  uncaught `NS_ERROR_FAILURE [nsIFile.diskSpaceAvailable]` from
+  `Troubleshoot.sys.mjs` as it opened about:support. The patch reads the
+  free space in a try of its own, as the provider reads its other optional
+  fields. No test forces `statfs` to fail.
+- **Upstream**: the same patch, or a `snapshot` that also catches an async
+  provider's rejection. Not submitted.
+
 ## Backports carried until the pin reaches them
 
 Mozilla has fixed these upstream. They stay listed only so the patch or pref is

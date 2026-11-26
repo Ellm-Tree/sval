@@ -72,9 +72,17 @@ async function panelWithFolder(path) {
 async function openSettings(section) {
   closeSettings();
   const tab = expectOpened(SvalPanel.openSettingsPage(section));
+  // The page marks itself ready once Sval's panes are in and bound
+  // (`settings-pane.js`). The step loads a new tab's whole settings page,
+  // its panes' markup and their stylesheet, so it is bounded as a page's
+  // load is (`pageReady`).
   await TestUtils.waitForCondition(
-    () => tab.linkedBrowser.contentWindow?.SvalSettings?._els,
-    "about:preferences loaded with Sval's panes"
+    () =>
+      tab.linkedBrowser.contentDocument?.documentElement?.dataset
+        .svalSettings === "ready",
+    "about:preferences loaded with Sval's panes",
+    100,
+    100
   );
   registerCleanupFunction(() => {
     if (tab.parentNode) {
