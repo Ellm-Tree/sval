@@ -326,6 +326,7 @@ site-style-painting.patch
 site-style-svg-images.patch
 agent-tab-device-prompts.patch
 ctrl-tab-switcher.patch
+ctrl-tab-carousel.patch
 tab-hover-preview-anchor.patch
 tab-hover-preview-stale-popups.patch
 quick-peek-click.patch

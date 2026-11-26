@@ -976,24 +976,27 @@ so a terminal in a web page can use it.
   row in the Workspace has focus, Alt+← and Alt+→ move its pane.
 - **Recent tabs:** ⌃Tab (Ctrl+Tab) switches to the tab you used last in this
   Workspace. With three or more tabs and opened pins in the Workspace, keep
-  holding ⌃ (Ctrl) and a grid opens over the page with all of them, the most
-  recently used first. Sval remembers that order when it restarts.
-  The grid has a heading that names the Workspace, and a footer that shows
-  some of the keys you can press and what each one does. Each tab whose page
-  has loaded since Sval started shows a picture of that page, even once Sval
-  puts the tab to sleep. A tab whose page hasn't loaded since then shows its
-  icon and site. A pin's page shows the pin icon, and a tab in a group shows
-  the group's name in its color. Press Tab or the arrow keys to choose a tab,
-  then let go of ⌃ (Ctrl) to switch to it. Clicking a tab in the grid switches
-  to it too. While the grid is open, ⌃\` (Ctrl+\`) moves the choice back one
-  tab, as ⌃⇧Tab (Ctrl+Shift+Tab) does. Here \` means the key above Tab,
-  whatever character that key shows. With the grid closed, the page gets ⌃\`
-  (Ctrl+\`). Escape closes the grid and keeps you on the tab you're on. ⌃W
-  (Ctrl+W) or Delete closes the chosen tab. Sval keeps the pictures in memory
-  and never saves them to disk. While the grid isn't open, ⌃⇧Tab
-  (Ctrl+Shift+Tab) goes to the previous tab in the Workspace. You can turn off
-  recently used order in Settings › Keyboard shortcuts, and ⌃Tab (Ctrl+Tab)
-  then goes to the next tab in the Workspace.
+  holding ⌃ (Ctrl) and a carousel of them opens over the page, the most
+  recently used first. Sval remembers that order when it restarts. A Split
+  shows as one card with its pages side by side. The carousel has a heading
+  that names the Workspace, and a footer that shows some of the keys you can
+  press and what each one does. Each tab whose page has loaded since Sval
+  started shows a picture of that page, even once Sval puts the tab to sleep.
+  A tab whose page hasn't loaded since then shows its icon and site. A pin's
+  page shows the pin icon, and a tab in a group shows the group's name in its
+  color. Press Tab to choose a tab, then let go of ⌃ (Ctrl) to switch to it.
+  Scrolling with your mouse or swiping with two fingers slides through the
+  carousel and keeps it open when you let go of ⌃ (Ctrl), so you press Enter
+  to switch. Clicking a card switches to its tab at any time. While the
+  carousel is open, ⌃\` (Ctrl+\`) moves the choice back one tab, as ⌃⇧Tab
+  (Ctrl+Shift+Tab) does. Here \` means the key above Tab, whatever character
+  that key shows. With the carousel closed, the page gets ⌃\` (Ctrl+\`).
+  Escape closes the carousel and keeps you on the tab you're on. ⌃W (Ctrl+W)
+  or Delete closes the chosen tab, or every page of a chosen Split. Sval keeps
+  the pictures in memory and never saves them to disk. While the carousel
+  isn't open, ⌃⇧Tab (Ctrl+Shift+Tab) goes to the previous tab in the
+  Workspace. You can turn off recently used order in Settings › Keyboard
+  shortcuts, and ⌃Tab (Ctrl+Tab) then goes to the next tab in the Workspace.
 - **Swipe to switch Workspaces:** swipe sideways with two fingers over the
   Workspace panel, or scroll sideways with your mouse. The window goes to the
   next or previous Workspace in the switcher's list. Hold Shift to scroll sideways

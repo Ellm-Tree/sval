@@ -422,6 +422,8 @@ head = "shared_folder_head.js"
 
 ["test_sval_tab_icons.js"]
 
+["test_sval_tab_switcher_place.js"]
+
 ["test_sval_tabs.js"]
 head = "tabs_head.js"
 

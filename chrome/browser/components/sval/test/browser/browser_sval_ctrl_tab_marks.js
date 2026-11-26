@@ -26,6 +26,28 @@ Services.scriptloader.loadSubScript(
 
 add_setup(pinsSetup);
 
+/** @returns {Element} The caption under the carousel. */
+function caption() {
+  return document.querySelector(".sval-switcher-caption");
+}
+
+/**
+ * Steps the switcher with Ctrl+Tab until `option` is selected.
+ *
+ * @param {Element} option
+ */
+async function selectOption(option) {
+  const count = switcherOptions().length;
+  for (
+    let i = 0;
+    i < count && option.getAttribute("aria-selected") !== "true";
+    i++
+  ) {
+    EventUtils.synthesizeKey("KEY_Tab", { ctrlKey: true });
+  }
+  Assert.equal(option.getAttribute("aria-selected"), "true", "it is selected");
+}
+
 add_task(async function a_pin_and_a_grouped_tab_are_marked() {
   const { engine, home, work } = pinsFixture;
   const now = Date.now();
@@ -71,9 +93,10 @@ add_task(async function a_pin_and_a_grouped_tab_are_marked() {
   const pinned = options.filter(option => "pin" in option.dataset);
   Assert.equal(pinned.length, 1, "one card is the pin's");
   Assert.equal(optionTitle(pinned[0]), PAGE2_TITLE, "the page shown");
+  await selectOption(pinned[0]);
   Assert.ok(
-    pinned[0].querySelector(".sval-mark[data-mark=pin]"),
-    "marked with the pin glyph"
+    caption().querySelector(".sval-mark[data-mark=pin]"),
+    "its caption carries the pin glyph"
   );
   Assert.ok(
     pinned[0].getAttribute("aria-description"),
@@ -87,7 +110,8 @@ add_task(async function a_pin_and_a_grouped_tab_are_marked() {
     "each of the group's tabs is marked with the group"
   );
   for (const option of grouped) {
-    const chip = option.querySelector(".sval-chip");
+    await selectOption(option);
+    const chip = caption().querySelector(".sval-chip");
     Assert.equal(chip?.dataset.color, "purple", "in the group's colour");
     Assert.equal(
       chip.querySelector(".sval-chip-name").textContent,
@@ -100,10 +124,12 @@ add_task(async function a_pin_and_a_grouped_tab_are_marked() {
       "which a screen reader hears"
     );
   }
+  const plain = options.find(
+    option => !grouped.includes(option) && !pinned.includes(option)
+  );
+  await selectOption(plain);
   Assert.ok(
-    options
-      .filter(option => !grouped.includes(option) && !pinned.includes(option))
-      .every(option => !option.querySelector(".sval-chip, .sval-mark")),
+    !caption().querySelector(".sval-chip, .sval-mark"),
     "a tab outside a group carries no mark"
   );
 

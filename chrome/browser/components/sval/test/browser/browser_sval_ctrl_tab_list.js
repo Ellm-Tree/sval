@@ -124,10 +124,16 @@ add_task(async function every_tab_of_the_workspace_and_no_other() {
   );
 
   const list = document.getElementById("sval-tab-switcher-list");
-  Assert.lessOrEqual(
-    list.scrollWidth,
-    list.clientWidth,
-    "the grid fits its width and never scrolls sideways"
+  const area = gBrowser.tabbox.getBoundingClientRect();
+  const card = document
+    .querySelector(".sval-switcher-card")
+    .getBoundingClientRect();
+  Assert.ok(
+    card.left >= area.left &&
+      card.right <= area.right &&
+      card.top >= area.top &&
+      card.bottom <= area.bottom,
+    "the card fits over the page"
   );
   Assert.equal(document.activeElement, list, "the list has focus");
   const accessible = await accessibleOf(list);

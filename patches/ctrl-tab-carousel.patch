@@ -1,0 +1,34 @@
+Sval: Ctrl+Tab's carousel latches open and closes a Split whole
+
+A wheel or a swipe over Sval's Ctrl+Tab carousel (SvalTabSwitcher.sys.mjs)
+latches it open, so ctrlTab's keyup for Ctrl picks only while it is not
+latched. The carousel shows a Split as one card standing for its panes,
+so closing the card closes every pane.
+
+diff --git a/browser/components/tabbrowser/content/browser-ctrlTab.js b/browser/components/tabbrowser/content/browser-ctrlTab.js
+index 05150ddf4f..067d0e63b8 100644
+--- a/browser/components/tabbrowser/content/browser-ctrlTab.js
++++ b/browser/components/tabbrowser/content/browser-ctrlTab.js
+@@ -104,8 +104,10 @@ var ctrlTab = {
+   },
+ 
+   remove: function ctrlTab_remove(aTab) {
++    // Sval: a Split's card closes every pane. removeTabs animates unless
++    // told not to, where removeTab does not.
+     if (aTab) {
+-      gBrowser.removeTab(aTab);
++      gBrowser.removeTabs(this.view.tabsOf(aTab), { animate: false });
+     }
+   },
+ 
+@@ -345,7 +347,9 @@ var ctrlTab = {
+         if (event.keyCode === event.DOM_VK_CONTROL) {
+           document.removeEventListener("keyup", this, { mozSystemGroup: true });
+ 
+-          if (this.isOpen) {
++          // Sval: a wheel or a swipe latches the switcher open, so letting
++          // Ctrl go picks nothing.
++          if (this.isOpen && !this.view.latched) {
+             this.pick();
+           }
+         }

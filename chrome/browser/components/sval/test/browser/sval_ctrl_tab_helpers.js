@@ -47,7 +47,7 @@ function switcherOptions() {
  * @returns {string} The title the option shows.
  */
 function optionTitle(option) {
-  return option.querySelector(".sval-switcher-title").textContent;
+  return option.getAttribute("aria-label");
 }
 
 /** @returns {string|null} The title of the option selected. */

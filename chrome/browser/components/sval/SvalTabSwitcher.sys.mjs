@@ -6,22 +6,31 @@
  * drawn by Sval (`ctrl-tab-switcher.patch`). `ctrlTab` keeps the window's
  * tabs in order of use, leaving out the hidden ones, which are other
  * workspaces' (`ctrlTab.attachTab`), and decides what each key does. This
- * draws that list as a grid of previews centred over the page, every tab of
- * it, and hands each key and click back to `ctrlTab`.
+ * draws that list as a carousel of overlapping previews over the page, the
+ * selected one in the middle, and hands each key and click back to
+ * `ctrlTab`.
  *
+ * - **A Split is one card.** Its panes stand side by side in the card, in
+ *   the order the window shows them, and the list holds one of its tabs for
+ *   it: the pane used last, which picking the card selects.
+ * - **The carousel pans.** A wheel or a two-finger swipe slides it either
+ *   way, and latches the switcher open: letting Ctrl go then picks
+ *   nothing, and Return or a click picks.
  * - **Previews stay in memory.** A loaded tab's is drawn from its page
  *   (`PageThumbs.captureTabPreviewThumbnail`, the capture Firefox's tab hover
  *   preview makes) once its page has loaded, as the user leaves the tab, and
- *   as it scrolls into view here, so a window of hundreds of tabs opens at
- *   once. The last one drawn is kept, as a JPEG in memory, for as long as the
- *   tab shows the same document, so a tab unloaded since still shows its
- *   page. Nothing is written to disk (`CONTRIBUTING.md` rule 10): Sval turns
- *   thumbnail storage off (`browser.pagethumbnails.capturing_disabled`),
- *   which is where Firefox's panel finds an unloaded tab's picture. A tab
- *   Sval restored and nobody has opened since (`SvalRestore`) has never been
- *   drawn, and shows its favicon and site instead.
- * - **The grid is a listbox** whose options are the tabs, named by their
- *   titles, with focus on the list and the selection its active descendant.
+ *   as its card comes near the middle here, so a window of hundreds of tabs
+ *   opens at once. The last one drawn is kept, as a JPEG in memory, for as
+ *   long as the tab shows the same document, so a tab unloaded since still
+ *   shows its page. Nothing is written to disk (`CONTRIBUTING.md` rule 10):
+ *   Sval turns thumbnail storage off
+ *   (`browser.pagethumbnails.capturing_disabled`), which is where Firefox's
+ *   panel finds an unloaded tab's picture. A tab Sval restored and nobody
+ *   has opened since (`SvalRestore`) has never been drawn, and shows its
+ *   favicon and site instead.
+ * - **The carousel is a listbox** whose options are the cards, named by
+ *   their titles, with focus on the list and the selection its active
+ *   descendant.
  *
  * **No title or address is ever logged** (`CONTRIBUTING.md` rule 10).
  */
@@ -36,7 +45,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   GROUP: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
-  shadeScrollEdges: "moz-src:///browser/components/sval/SvalDom.sys.mjs",
+  SPLIT: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
   shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   switcherItemOf: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
   ancestorIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
@@ -64,17 +73,42 @@ const KEPT_QUALITY = 0.85;
 /** The longest a tab's drawing waits for the window to be idle. */
 const IDLE_DRAW_MS = 2000;
 
-/** A preview's size in CSS pixels, 16:10. */
-const PREVIEW_WIDTH = 224;
-const PREVIEW_HEIGHT = 140;
-/** The space between items, and around them inside the card. */
-const GAP = 12;
-const CARD_PADDING = 16;
+/**
+ * A whole card's preview in CSS pixels, 16:10: the size the largest card
+ * shows. A Split's pane takes its share of the width.
+ */
+const PREVIEW_WIDTH = 448;
+const PREVIEW_HEIGHT = 280;
+
 /** The least room the card leaves around it over the page. */
 const CARD_MARGIN = 24;
-/** The list's padding, room for the selected item's ring at its edges. */
-const LIST_PADDING = 4;
+const CARD_PADDING = 16;
+/** A card's width as a share of the carousel's, and its bounds in pixels. */
+const TILE_SHARE = 0.4;
+const TILE_MIN = 160;
+const TILE_MAX = 560;
+/** The carousel's height for a card's, room for the middle card's ring. */
+const STAGE_HEIGHT = 1.12;
 
+/** Where the cards beside the middle one stand: see {@link tilePlace}. */
+const NEAR = 0.62;
+const FAR = 0.17;
+const TURN_DEG = 50;
+const SHRINK = 0.18;
+const SHADE = 0.35;
+/** How many cards each side of the middle one are drawn. */
+const REACH = 7;
+
+/**
+ * How fast the carousel catches up with where it is going: the time it
+ * takes to close two-thirds of the distance.
+ */
+const EASE_MS = 70;
+/** A wheel's travel per card, and a line's travel where it scrolls lines. */
+const WHEEL_PX_PER_CARD = 90;
+const WHEEL_LINE_PX = 30;
+/** How long a still wheel waits before the carousel settles on a card. */
+const SETTLE_MS = 140;
 /**
  * Each tab's last preview, as an object URL of its window, and the document
  * it was drawn from (its inner window id). An address the page changes for
@@ -124,8 +158,20 @@ function forget(tab) {
 }
 
 /**
- * Draws a loaded tab's page at a preview's size, and keeps a copy for
- * when the tab has unloaded ({@link kept}).
+ * The tabs a card shows: a Split's panes in the order the window shows them
+ * (`MozTabSplitViewWrapper.tabs`), or the tab alone.
+ *
+ * @param {Element} tab
+ * @returns {Element[]}
+ */
+function panesOf(tab) {
+  const panes = tab.splitview?.tabs.filter(pane => !pane.closing);
+  return panes?.length > 1 ? panes : [tab];
+}
+
+/**
+ * Draws a loaded tab's page at its pane's size in a card, and keeps a copy
+ * for when the tab has unloaded ({@link kept}).
  *
  * @param {Element} tab
  * @returns {Promise<Element|null>} the drawing, or null when the page moved
@@ -136,7 +182,10 @@ export async function draw(tab) {
   const browser = tab.linkedBrowser;
   const shown = documentOf(tab);
   const canvas = win.document.createElementNS(HTML_NS, "canvas");
-  canvas.width = Math.round(PREVIEW_WIDTH * win.devicePixelRatio);
+  // The capture takes the page's full width at the canvas's shape, so a
+  // pane's drawing is as narrow as the pane's share of the card.
+  const share = panesOf(tab).length;
+  canvas.width = Math.round((PREVIEW_WIDTH / share) * win.devicePixelRatio);
   canvas.height = Math.round(PREVIEW_HEIGHT * win.devicePixelRatio);
   try {
     await lazy.PageThumbs.captureTabPreviewThumbnail(browser, canvas);
@@ -220,6 +269,33 @@ function isLoaded(tab) {
 }
 
 /**
+ * Where a card stands in the carousel, `offset` cards from the middle,
+ * fractions included while it pans. The first card each side stands
+ * `NEAR` of a card's width from the middle, and each further one `FAR`
+ * more, so the cards overlap more the further out they are. A card turns
+ * toward the middle, shrinks and darkens as it leaves it, all of it by the
+ * time it is one card out.
+ *
+ * @param {number} offset
+ * @returns {{x: number, turn: number, scale: number, shade: number,
+ *   depth: number, shown: boolean}} `x` in card widths, `turn` in degrees,
+ *   `depth` the stacking order, the middle card's highest.
+ */
+export function tilePlace(offset) {
+  const distance = Math.abs(offset);
+  const sign = Math.sign(offset);
+  const near = Math.min(distance, 1);
+  return {
+    x: sign * (near * NEAR + Math.max(0, distance - 1) * FAR),
+    turn: sign * near * TURN_DEG,
+    scale: 1 - near * SHRINK,
+    shade: near * SHADE,
+    depth: 1000 - Math.round(distance * 10),
+    shown: distance <= REACH,
+  };
+}
+
+/**
  * One window's switcher, made by its `ctrlTab` (`ctrl-tab-switcher.patch`).
  */
 export class SvalTabSwitcher {
@@ -228,17 +304,28 @@ export class SvalTabSwitcher {
   #root = null;
   #card = null;
   #heading = null;
-  #scroller = null;
   #list = null;
+  #caption = null;
+  #footer = null;
+  /** One tab per card, which stands for the card in `ctrlTab`'s calls. */
   #tabs = [];
+  /** Each card's panes, in step with `#tabs`. */
+  #panes = [];
   #items = [];
   #index = 0;
-  #columns = 1;
   #shown = false;
   #prevFocus = null;
-  #observer = null;
-  #pointer = null;
   #listeners = null;
+  /** Where the carousel's middle is, in cards, and where it is going. */
+  #pos = 0;
+  #target = 0;
+  #frame = 0;
+  #frameAt = 0;
+  /** The cards drawn at the last paint, by index. */
+  #painted = new Set();
+  #tileWidth = TILE_MIN;
+  #latched = false;
+  #settle = 0;
 
   /**
    * @param {Window} win A browser window.
@@ -287,19 +374,40 @@ export class SvalTabSwitcher {
     return this.#shown;
   }
 
+  /**
+   * Whether a wheel or a swipe has latched the switcher open, so letting
+   * Ctrl go picks nothing (`ctrlTab.handleEvent`'s keyup).
+   */
+  get latched() {
+    return this.#latched;
+  }
+
   /** The tab the switcher has selected, or null. */
   get selectedTab() {
     return this.#tabs[this.#index] ?? null;
   }
 
   /**
+   * The tabs a card stands for, which closing it closes
+   * (`ctrlTab.remove`): a Split's panes, or the tab alone.
+   *
+   * @param {Element} tab A tab of the list.
+   * @returns {Element[]}
+   */
+  tabsOf(tab) {
+    const index = this.#tabs.indexOf(tab);
+    return index < 0 ? [tab] : [...this.#panes[index]];
+  }
+
+  /**
    * What Ctrl+Tab lists (`ctrlTab.tabList`): the tabs `ctrlTab` keeps, and
    * the pages of the shown workspace's pins, which are hidden tabs it leaves
-   * out (`SvalPinPages`), most recently used first. `ctrlTab` files a tab
-   * opening in the background second, so tabs a launch restores would stand
-   * in the reverse of their restore order; sorting by `lastAccessed`, which
-   * a restored tab takes from when this device last looked at it
-   * (`SvalRestore`), puts them in order of use.
+   * out (`SvalPinPages`), most recently used first, with each Split's panes
+   * as one, the pane used last. `ctrlTab` files a tab opening in the
+   * background second, so tabs a launch restores would stand in the reverse
+   * of their restore order; sorting by `lastAccessed`, which a restored tab
+   * takes from when this device last looked at it (`SvalRestore`), puts
+   * them in order of use.
    *
    * @param {Element[]} used `ctrlTab`'s own list.
    * @returns {Element[]}
@@ -310,7 +418,20 @@ export class SvalTabSwitcher {
     for (const tab of pins) {
       tabs.add(tab);
     }
-    return [...tabs].sort((a, b) => b.lastAccessed - a.lastAccessed);
+    const splits = new Set();
+    return [...tabs]
+      .sort((a, b) => b.lastAccessed - a.lastAccessed)
+      .filter(tab => {
+        const split = tab.splitview;
+        if (!split) {
+          return true;
+        }
+        if (splits.has(split)) {
+          return false;
+        }
+        splits.add(split);
+        return true;
+      });
   }
 
   /**
@@ -322,12 +443,13 @@ export class SvalTabSwitcher {
    */
   prepare(tabs, index) {
     this.#tabs = [...tabs];
+    this.#panes = this.#tabs.map(panesOf);
     this.#index = Math.min(index, this.#tabs.length - 1);
+    this.#pos = this.#target = this.#index;
   }
 
   /**
-   * Moves the selection by `delta`. A step of one wraps around the ends, as
-   * Ctrl+Tab does; a row's step stops at them.
+   * Moves the selection by `delta`, around the ends as Ctrl+Tab does.
    *
    * @param {number} delta
    * @returns {Element|null} The tab now selected.
@@ -338,12 +460,15 @@ export class SvalTabSwitcher {
       return null;
     }
     let index = this.#index + delta;
-    if (Math.abs(delta) === 1) {
-      index = (index + count) % count;
-    } else if (index < 0 || index >= count) {
-      return this.selectedTab;
+    if (index < 0 || index >= count) {
+      index = ((index % count) + count) % count;
+      // Past an end the carousel comes round from the other side, one
+      // card out, rather than panning across every card between.
+      this.#pos = index - Math.sign(delta);
     }
+    this.#target = index;
     this.#select(index);
+    this.#animate();
     return this.selectedTab;
   }
 
@@ -355,21 +480,21 @@ export class SvalTabSwitcher {
     const win = this.#win;
     const doc = win.document;
     this.#build();
-    this.#items = this.#tabs.map((tab, i) => this.#item(tab, i));
+    this.#items = this.#tabs.map((tab, i) => this.#item(i));
     this.#list.replaceChildren(...this.#items);
     this.#shown = true;
-    this.#pointer = null;
+    this.#latched = false;
+    this.#painted.clear();
+    this.#fillFooter();
     this.#heading.firstChild.textContent = this.#headingText();
-    // Shown before it is placed: placing measures the grid.
+    // Shown before it is placed: placing measures the card.
     this.#root.hidden = false;
     doc.documentElement.toggleAttribute(OPEN_ATTRIBUTE, true);
+    this.#pos = this.#target = this.#index;
     this.#place();
     this.#prevFocus = doc.commandDispatcher.focusedElement;
     this.#list.focus();
     this.#select(this.#index);
-    for (const item of this.#items) {
-      this.#observer.observe(item);
-    }
     // Ctrl's release goes to whatever app is in front once the window loses
     // it, so leaving the window cancels, and a resize places it again.
     this.#listeners = new win.AbortController();
@@ -378,6 +503,14 @@ export class SvalTabSwitcher {
       signal,
     });
     win.addEventListener("resize", () => this.#place(), { signal });
+    // Every wheel in the window pans the carousel while it shows, wherever
+    // the pointer is, and none reaches the Workspace panel, whose sideways
+    // swipe would switch Workspaces under the carousel.
+    win.addEventListener("wheel", event => this.#onWheel(event), {
+      signal,
+      capture: true,
+      passive: false,
+    });
   }
 
   /** Takes the switcher away, and gives focus back to where it was. */
@@ -386,15 +519,20 @@ export class SvalTabSwitcher {
       return;
     }
     this.#shown = false;
+    this.#latched = false;
     this.#listeners.abort();
     this.#listeners = null;
-    this.#observer.disconnect();
+    this.#win.cancelAnimationFrame(this.#frame);
+    this.#frame = 0;
+    this.#win.clearTimeout(this.#settle);
     const hadFocus = this.#root.contains(this.#win.document.activeElement);
     this.#root.hidden = true;
     this.#win.document.documentElement.removeAttribute(OPEN_ATTRIBUTE);
     this.#list.replaceChildren();
     this.#list.removeAttribute("aria-activedescendant");
+    this.#caption.replaceChildren();
     this.#items = [];
+    this.#painted.clear();
     const prev = this.#prevFocus;
     this.#prevFocus = null;
     if (!hadFocus) {
@@ -409,28 +547,46 @@ export class SvalTabSwitcher {
 
   /**
    * Takes a closing tab out of the list, keeping the selection on the same
-   * place in it.
+   * place in it. A Split's pane leaves its card, which keeps its other
+   * panes.
    *
    * @param {Element} tab
    */
   removeTab(tab) {
-    const index = this.#tabs.indexOf(tab);
+    const index = this.#panes.findIndex(panes => panes.includes(tab));
     if (index < 0) {
       return;
     }
+    const rest = this.#panes[index].filter(pane => pane !== tab);
+    if (rest.length) {
+      this.#panes[index] = rest;
+      if (this.#tabs[index] === tab) {
+        this.#tabs[index] = rest[0];
+      }
+      if (this.#shown) {
+        this.#redraw(index);
+      }
+      return;
+    }
     this.#tabs.splice(index, 1);
+    this.#panes.splice(index, 1);
     if (this.#shown) {
       const [item] = this.#items.splice(index, 1);
-      this.#observer.unobserve(item);
       item.remove();
       this.#items.forEach((el, i) => (el.dataset.index = i));
+      this.#painted.clear();
     }
     const next = Math.min(
       index < this.#index ? this.#index - 1 : this.#index,
       this.#tabs.length - 1
     );
+    if (index < this.#index) {
+      this.#pos -= 1;
+    }
+    this.#target = next;
     if (this.#shown) {
       this.#select(next);
+      this.#paint();
       // `TabClose` comes before the tab that takes the closing one's place
       // is selected (`_endRemoveTab`), and selecting it may focus its page.
       if (tab.selected) {
@@ -442,6 +598,7 @@ export class SvalTabSwitcher {
       }
     } else {
       this.#index = next;
+      this.#pos = next;
     }
   }
 
@@ -451,13 +608,17 @@ export class SvalTabSwitcher {
    * @param {Element} tab
    */
   updateTab(tab) {
-    const item = this.#items[this.#tabs.indexOf(tab)];
+    const index = this.#panes.findIndex(panes => panes.includes(tab));
+    const item = this.#items[index];
     if (!item) {
       return;
     }
-    item.querySelector(".sval-switcher-title").textContent = this.#titleOf(tab);
+    item.setAttribute("aria-label", this.#nameOf(index));
     if (item.hasAttribute("data-seen")) {
-      this.#fillIcons(item, tab);
+      this.#fillIcons(item, index);
+    }
+    if (index === this.#index) {
+      this.#fillCaption();
     }
   }
 
@@ -480,10 +641,10 @@ export class SvalTabSwitcher {
 
     const card = doc.createElementNS(HTML_NS, "div");
     card.className = "sval-switcher-card";
-    // The card's fixed top edge, and the list's accessible name in full,
-    // which the edge may cut short.
+    // The card's top edge, and the list's accessible name in full, which
+    // the edge may cut short.
     const heading = doc.createElementNS(HTML_NS, "div");
-    heading.className = "sval-switcher-heading sval-edge-above";
+    heading.className = "sval-switcher-heading";
     heading.id = `${LIST_ID}-heading`;
     heading.append(doc.createElementNS(HTML_NS, "span"));
     heading.firstChild.className = "sval-switcher-heading-text";
@@ -494,25 +655,13 @@ export class SvalTabSwitcher {
     list.setAttribute("aria-orientation", "horizontal");
     list.tabIndex = 0;
     list.addEventListener("keydown", event => this.#onKeyDown(event));
-    // The switcher can open under a still pointer, which must not take the
-    // selection from the keys, so the pointer selects only once it has moved
-    // from where the first event found it.
-    list.addEventListener("mousemove", event => {
-      const at = `${event.screenX},${event.screenY}`;
-      const moved = this.#pointer !== null && this.#pointer !== at;
-      this.#pointer = at;
-      const item = moved && event.target.closest?.(".sval-switcher-item");
-      if (item) {
-        this.#select(Number(item.dataset.index), { scroll: false });
-      }
-    });
     list.addEventListener("click", event => {
       const tab = this.#tabOf(event);
       if (tab && event.button === 0) {
         this.#ctrlTab.pick(tab);
       }
     });
-    // A middle click closes the tab, as on a tab. Control and a click is a
+    // A middle click closes the card, as on a tab. Control and a click is a
     // right click on macOS, and Control is held while the switcher shows.
     list.addEventListener("auxclick", event => {
       const tab = this.#tabOf(event);
@@ -531,65 +680,41 @@ export class SvalTabSwitcher {
     });
     list.addEventListener("contextmenu", event => event.preventDefault());
 
-    // The grid scrolls between the heading and the footer, which cast a
-    // shadow over the tiles past them as the Workspace panel's header and
-    // footer do over its rows.
-    const scroller = doc.createElementNS(HTML_NS, "div");
-    scroller.className = "sval-switcher-scroller";
-    const marker = () => {
-      const node = doc.createElementNS(HTML_NS, "div");
-      node.className = "sval-switcher-edge";
-      node.setAttribute("aria-hidden", "true");
-      return node;
-    };
-    const topMarker = marker();
-    const bottomMarker = marker();
-    scroller.append(topMarker, list, bottomMarker);
-    const footer = this.#footer(doc);
+    // The middle card's title, under the carousel. The option's own name
+    // says the same to a screen reader.
+    const caption = doc.createElementNS(HTML_NS, "div");
+    caption.className = "sval-switcher-caption";
+    caption.setAttribute("aria-hidden", "true");
+    const footer = doc.createElementNS(HTML_NS, "div");
+    footer.className = "sval-switcher-footer";
+    footer.setAttribute("aria-hidden", "true");
 
-    card.append(heading, scroller, footer);
+    card.append(heading, list, caption, footer);
     root.append(card);
     doc.getElementById("browser").append(root);
     this.#root = root;
     this.#card = card;
     this.#heading = heading;
-    this.#scroller = scroller;
     this.#list = list;
-    lazy.shadeScrollEdges(scroller, {
-      topMarker,
-      bottomMarker,
-      top: heading,
-      bottom: footer,
-    });
-    this.#observer = new this.#win.IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            this.#observer.unobserve(entry.target);
-            this.#reveal(entry.target);
-          }
-        }
-      },
-      { root: scroller }
-    );
+    this.#caption = caption;
+    this.#footer = footer;
   }
 
   /**
-   * The card's fixed bottom edge: the keys the switcher answers, each with
-   * what it does, spelled as the platform spells keys (`shortcutText`). It
-   * repeats what the keys do for the eye alone; a screen reader meets the
-   * list's own keys.
-   *
-   * @param {Document} doc
-   * @returns {Element}
+   * The card's bottom edge: the keys the switcher answers, each with what it
+   * does, spelled as the platform spells keys (`shortcutText`). It repeats
+   * what the keys do for the eye alone; a screen reader meets the list's
+   * own keys. Once latched, Return picks where letting Ctrl go did, and the
+   * close key's label names what the selected card is.
    */
-  #footer(doc) {
-    const footer = doc.createElementNS(HTML_NS, "div");
-    footer.className = "sval-switcher-footer sval-edge-below";
-    footer.setAttribute("aria-hidden", "true");
+  #fillFooter() {
+    const doc = this.#win.document;
     const control = Services.strings
       .createBundle("chrome://global-platform/locale/platformKeys.properties")
       .GetStringFromName("VK_CONTROL");
+    // Named as the panel's Split row menu names closing every pane.
+    const panes = this.#panes[this.#index]?.length ?? 1;
+    const close = { 1: "Close tab", 2: "Close Both" }[panes] ?? "Close All";
     const pairs = [
       [
         null,
@@ -597,15 +722,13 @@ export class SvalTabSwitcher {
         "Next",
       ],
       [null, lazy.shortcutText({ modifiers: "control", key: "`" }), "Previous"],
-      ["Release", control, "Switch"],
+      this.#latched
+        ? [null, lazy.shortcutText({ keycode: "VK_RETURN" }), "Switch"]
+        : ["Release", control, "Switch"],
       [null, lazy.shortcutText({ keycode: "VK_ESCAPE" }), "Cancel"],
-      [
-        null,
-        lazy.shortcutText({ modifiers: "control", key: "W" }),
-        "Close tab",
-      ],
+      [null, lazy.shortcutText({ modifiers: "control", key: "W" }), close],
     ];
-    for (const [before, key, does] of pairs) {
+    const nodes = pairs.map(([before, key, does]) => {
       const pair = doc.createElementNS(HTML_NS, "span");
       pair.className = "sval-switcher-pair";
       if (before) {
@@ -618,16 +741,14 @@ export class SvalTabSwitcher {
       label.className = "sval-switcher-does";
       label.textContent = does;
       pair.append(cap, label);
-      footer.append(pair);
-    }
-    return footer;
+      return pair;
+    });
+    this.#footer.replaceChildren(...nodes);
   }
 
   /**
-   * Places the switcher over the content area and sizes its grid to it: as
-   * many columns as there are tabs, up to as many as fit the window's width.
-   * The list scrolls down when its rows are taller than the window, and is
-   * as wide as its columns and its scrollbar, so it never scrolls sideways.
+   * Places the switcher over the content area and sizes its cards to it: a
+   * share of its width, as tall as the height left over the page allows.
    */
   #place() {
     const area = this.#win.gBrowser.tabbox.getBoundingClientRect();
@@ -637,30 +758,27 @@ export class SvalTabSwitcher {
       width: `${area.width}px`,
       height: `${area.height}px`,
     });
-    const scroller = this.#scroller;
-    // The scroller keeps its scrollbar's room whether it scrolls or not
-    // (`scrollbar-gutter`), and an overlay scrollbar takes none.
-    const gutter = scroller.offsetWidth - scroller.clientWidth;
-    const inset = 2 * (CARD_MARGIN + CARD_PADDING + LIST_PADDING);
-    const room = Math.max(0, area.width - inset - gutter);
-    const item = Math.min(PREVIEW_WIDTH, room);
-    const fit = Math.floor((room + GAP) / (item + GAP));
-    const columns = Math.max(1, Math.min(fit, this.#tabs.length));
-    this.#columns = columns;
+    const stage = Math.max(0, area.width - 2 * (CARD_MARGIN + CARD_PADDING));
+    // What the card holds besides the carousel (its padding, its heading,
+    // its caption and its footer) comes off the height the carousel may
+    // take.
+    const framing = this.#card.offsetHeight - this.#list.offsetHeight;
+    const room = Math.max(0, area.height - 2 * CARD_MARGIN - framing);
+    const ratio = PREVIEW_WIDTH / PREVIEW_HEIGHT;
+    const width = Math.max(
+      TILE_MIN,
+      Math.min(TILE_MAX, stage * TILE_SHARE, (room / STAGE_HEIGHT) * ratio)
+    );
+    this.#tileWidth = width;
     const style = this.#card.style;
-    style.setProperty("--sval-switcher-columns", columns);
-    style.setProperty("--sval-switcher-item-width", `${item}px`);
+    style.setProperty("--sval-switcher-width", `${stage}px`);
+    style.setProperty("--sval-switcher-tile-width", `${width}px`);
+    style.setProperty("--sval-switcher-tile-height", `${width / ratio}px`);
     style.setProperty(
-      "--sval-switcher-width",
-      `${columns * item + (columns - 1) * GAP + 2 * LIST_PADDING + gutter}px`
+      "--sval-switcher-stage-height",
+      `${(width / ratio) * STAGE_HEIGHT}px`
     );
-    // What the card holds besides the scroller (its padding, its heading
-    // and its footer) comes off the height the scroller may take.
-    const framing = this.#card.offsetHeight - scroller.offsetHeight;
-    style.setProperty(
-      "--sval-switcher-room",
-      `${Math.max(0, area.height - 2 * CARD_MARGIN - framing)}px`
-    );
+    this.#paint();
   }
 
   /**
@@ -680,76 +798,107 @@ export class SvalTabSwitcher {
   }
 
   /**
-   * One tab's option: its preview, then its favicon and title. The preview
-   * and icons are filled once the option scrolls into view ({@link #reveal}).
+   * One card's option: a preview for each of its panes. The previews and
+   * icons are filled once the card comes near the middle ({@link #reveal}).
    *
-   * @param {Element} tab
    * @param {number} index
    * @returns {Element}
    */
-  #item(tab, index) {
+  #item(index) {
     const doc = this.#win.document;
     const el = (tag, className) => {
       const node = doc.createElementNS(HTML_NS, tag);
       node.className = className;
       return node;
     };
+    const tab = this.#tabs[index];
+    const panes = this.#panes[index];
     const item = el("div", "sval-switcher-item");
     item.id = `${LIST_ID}-${index}`;
     item.dataset.index = index;
+    item.hidden = true;
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", "false");
+    item.setAttribute("aria-label", this.#nameOf(index));
 
-    // The title names the option; the preview repeats what it shows.
-    const preview = el("div", "sval-switcher-preview");
-    preview.setAttribute("aria-hidden", "true");
-    const shown = keptPreview(tab);
-    if (shown) {
-      const img = el("img", "sval-switcher-picture");
-      img.setAttribute("alt", "");
-      img.src = shown;
-      preview.append(img);
-      preview.dataset.preview = "snapshot";
-    } else {
-      const placeholder = el("div", "sval-switcher-placeholder");
-      const siteIcon = el("img", "sval-switcher-icon");
-      siteIcon.setAttribute("alt", "");
-      const site = el("span", "sval-switcher-site");
-      site.textContent =
-        this.#win.SvalPanel?.tabPlaceholder(this.#urlOf(tab)) ?? "";
-      placeholder.append(siteIcon, site);
-      preview.append(placeholder);
-      preview.dataset.preview = "placeholder";
+    const tile = el("div", "sval-switcher-tile");
+    tile.setAttribute("aria-hidden", "true");
+    for (const pane of panes) {
+      const preview = el("div", "sval-switcher-preview");
+      const shown = keptPreview(pane);
+      if (shown) {
+        const img = el("img", "sval-switcher-picture");
+        img.setAttribute("alt", "");
+        img.src = shown;
+        preview.append(img);
+        preview.dataset.preview = "snapshot";
+      } else {
+        const placeholder = el("div", "sval-switcher-placeholder");
+        const siteIcon = el("img", "sval-switcher-icon");
+        siteIcon.setAttribute("alt", "");
+        const site = el("span", "sval-switcher-site");
+        site.textContent =
+          this.#win.SvalPanel?.tabPlaceholder(this.#urlOf(pane)) ?? "";
+        placeholder.append(siteIcon, site);
+        preview.append(placeholder);
+        preview.dataset.preview = "placeholder";
+      }
+      tile.append(preview);
     }
-
-    const caption = el("div", "sval-switcher-caption");
-    const icon = el("img", "sval-switcher-icon");
-    icon.setAttribute("alt", "");
-    const title = el("span", "sval-switcher-title");
-    title.textContent = this.#titleOf(tab);
-    caption.append(icon, title);
+    if (panes.length > 1) {
+      item.dataset.split = "";
+    }
     // A pin's page and a tab in a group carry the marks the Launcher's rows
-    // draw for them: the pin glyph, and the group's chip in its colour. The
-    // option's description says the same to a screen reader.
+    // draw for them, in the caption; the option's description says the same
+    // to a screen reader.
     if (lazy.isPin(tab)) {
-      const mark = el("span", "sval-mark");
-      mark.dataset.mark = "pin";
-      mark.setAttribute("aria-hidden", "true");
-      caption.append(mark);
       item.setAttribute("aria-description", "Pin");
       item.dataset.pin = "";
     } else {
       const group = this.#groupOf(tab);
       if (group) {
-        const chip = lazy.chipElement(doc, group);
-        chip.setAttribute("aria-hidden", "true");
-        caption.append(chip);
         item.setAttribute("aria-description", group.name);
         item.dataset.group = group.id;
       }
     }
-    item.append(preview, caption);
+    item.append(tile);
     return item;
+  }
+
+  /**
+   * Draws a card again after its panes changed, in its place.
+   *
+   * @param {number} index
+   */
+  #redraw(index) {
+    const old = this.#items[index];
+    const item = this.#item(index);
+    this.#items[index] = item;
+    old.replaceWith(item);
+    this.#painted.delete(index);
+    if (index === this.#index) {
+      this.#select(index);
+    }
+    this.#paint();
+  }
+
+  /**
+   * What a card is called: a tab as its row in the panel calls it, a Split
+   * by its name, or by its panes' titles when it has none, as the panel's
+   * Split row is named.
+   *
+   * @param {number} index
+   * @returns {string}
+   */
+  #nameOf(index) {
+    const panes = this.#panes[index];
+    if (panes.length === 1) {
+      return this.#titleOf(panes[0]);
+    }
+    return (
+      this.#splitName(panes[0]) ||
+      `Split View: ${panes.map(pane => this.#titleOf(pane)).join(", ")}`
+    );
   }
 
   /**
@@ -763,6 +912,21 @@ export class SvalTabSwitcher {
     const nodes = this.#win.SvalPanel?.nodes;
     const id = nodes && lazy.SvalTabs.nodeIdOf(tab);
     return (id && nodes[id]?.appearance?.label) || tab.label;
+  }
+
+  /**
+   * The name the user gave the Split a pane is in, or "".
+   *
+   * @param {Element} pane
+   * @returns {string}
+   */
+  #splitName(pane) {
+    const nodes = this.#win.SvalPanel?.nodes;
+    const id = nodes && lazy.SvalTabs.nodeIdOf(pane);
+    const split =
+      id &&
+      lazy.ancestorIds(nodes, id).find(a => nodes[a]?.kind === lazy.SPLIT);
+    return (split && nodes[split].content?.name) || "";
   }
 
   /**
@@ -793,54 +957,122 @@ export class SvalTabSwitcher {
   }
 
   /**
-   * An option scrolled into view: its icons, and a loaded tab's preview.
+   * The caption under the carousel, for the selected card: each pane's icon
+   * and title, a pin's glyph or a group's chip after a tab's, and a named
+   * Split's name before its panes.
+   */
+  #fillCaption() {
+    const doc = this.#win.document;
+    const el = (tag, className) => {
+      const node = doc.createElementNS(HTML_NS, tag);
+      node.className = className;
+      return node;
+    };
+    const panes = this.#panes[this.#index];
+    if (!panes) {
+      this.#caption.replaceChildren();
+      return;
+    }
+    const parts = [];
+    const name = panes.length > 1 && this.#splitName(panes[0]);
+    if (name) {
+      const named = el("span", "sval-switcher-split-name");
+      named.textContent = name;
+      parts.push(named);
+    }
+    for (const pane of panes) {
+      const part = el("span", "sval-switcher-caption-pane");
+      const icon = el("img", "sval-switcher-icon");
+      icon.setAttribute("alt", "");
+      this.#fillIcon(icon, pane);
+      const title = el("span", "sval-switcher-title");
+      title.textContent = this.#titleOf(pane);
+      part.append(icon, title);
+      parts.push(part);
+    }
+    const tab = this.#tabs[this.#index];
+    if (panes.length === 1) {
+      if (lazy.isPin(tab)) {
+        const mark = el("span", "sval-mark");
+        mark.dataset.mark = "pin";
+        parts.push(mark);
+      } else {
+        const group = this.#groupOf(tab);
+        if (group) {
+          parts.push(lazy.chipElement(doc, group));
+        }
+      }
+    }
+    this.#caption.toggleAttribute("data-split", panes.length > 1);
+    this.#caption.replaceChildren(...parts);
+  }
+
+  /**
+   * A card come near the middle: its icons, and its loaded panes' previews.
    *
    * @param {Element} item
    */
   #reveal(item) {
-    const tab = this.#tabs[Number(item.dataset.index)];
-    if (!tab) {
+    const index = Number(item.dataset.index);
+    const panes = this.#panes[index];
+    if (!panes) {
       return;
     }
     item.setAttribute("data-seen", "");
-    this.#fillIcons(item, tab);
-    if (isLoaded(tab)) {
-      this.#capture(item, tab);
-    }
+    this.#fillIcons(item, index);
+    const previews = item.querySelectorAll(".sval-switcher-preview");
+    panes.forEach((pane, i) => {
+      if (isLoaded(pane)) {
+        this.#capture(previews[i], pane);
+      }
+    });
   }
 
   /**
-   * Fills an option's icons as the tab's row in the panel fills its own
+   * Fills a card's placeholder icons, one per pane.
+   *
+   * @param {Element} item
+   * @param {number} index
+   */
+  #fillIcons(item, index) {
+    const previews = item.querySelectorAll(".sval-switcher-preview");
+    this.#panes[index].forEach((pane, i) => {
+      const img = previews[i]?.querySelector(".sval-switcher-icon");
+      if (img) {
+        this.#fillIcon(img, pane);
+      }
+    });
+  }
+
+  /**
+   * Fills an icon as the tab's row in the panel fills its own
    * (`SvalPanel.fillTabIcon`), which finds an icon for a tab that has not
    * loaded; a window with no panel has the tab's own.
    *
-   * @param {Element} item
+   * @param {Element} img
    * @param {Element} tab
    */
-  #fillIcons(item, tab) {
+  #fillIcon(img, tab) {
     const panel = this.#win.SvalPanel;
     const id = lazy.SvalTabs.nodeIdOf(tab);
-    for (const img of item.querySelectorAll(".sval-switcher-icon")) {
-      if (panel && id) {
-        panel.fillTabIcon(img, id, this.#urlOf(tab));
-      } else if (tab.image) {
-        img.setAttribute("src", tab.image);
-      }
+    if (panel && id) {
+      panel.fillTabIcon(img, id, this.#urlOf(tab));
+    } else if (tab.image) {
+      img.setAttribute("src", tab.image);
     }
   }
 
   /**
-   * Draws a loaded tab's page into its option, in memory.
+   * Draws a loaded tab's page into its preview, in memory.
    *
-   * @param {Element} item
+   * @param {Element} preview
    * @param {Element} tab
    */
-  async #capture(item, tab) {
+  async #capture(preview, tab) {
     const canvas = await draw(tab);
-    if (!canvas || !item.isConnected) {
+    if (!canvas || !preview.isConnected) {
       return;
     }
-    const preview = item.querySelector(".sval-switcher-preview");
     preview.replaceChildren(canvas);
     preview.dataset.preview = "snapshot";
   }
@@ -857,7 +1089,7 @@ export class SvalTabSwitcher {
 
   /**
    * @param {Event} event A pointer event on the list.
-   * @returns {Element|null} The tab of the option it is on.
+   * @returns {Element|null} The tab of the card it is on.
    */
   #tabOf(event) {
     const item = event.target.closest?.(".sval-switcher-item");
@@ -866,27 +1098,157 @@ export class SvalTabSwitcher {
 
   /**
    * @param {number} index
-   * @param {object} [options]
-   * @param {boolean} [options.scroll] Whether to scroll the option into
-   *   view, which the pointer's own moves do not need.
    */
-  #select(index, { scroll = true } = {}) {
+  #select(index) {
+    const before = this.#index;
     this.#index = index;
     if (!this.#shown) {
       return;
     }
-    for (const item of this.#list.querySelectorAll("[aria-selected=true]")) {
-      item.setAttribute("aria-selected", "false");
-    }
+    this.#items[before]?.setAttribute("aria-selected", "false");
     const item = this.#items[index];
     if (!item) {
       return;
     }
     item.setAttribute("aria-selected", "true");
     this.#list.setAttribute("aria-activedescendant", item.id);
-    if (scroll) {
-      item.scrollIntoView({ block: "nearest", inline: "nearest" });
+    this.#fillCaption();
+    // The close key's label names what the card holds.
+    if ((this.#panes[before]?.length ?? 1) !== this.#panes[index].length) {
+      this.#fillFooter();
     }
+  }
+
+  /** Moves the carousel toward where it is going, a frame at a time. */
+  #animate() {
+    if (!this.#shown || this.#frame) {
+      return;
+    }
+    this.#frameAt = 0;
+    this.#frame = this.#win.requestAnimationFrame(now => this.#tick(now));
+  }
+
+  /**
+   * One frame of the carousel's travel: it closes the same share of the
+   * distance left in each slice of time, so it slows as it arrives, and
+   * keeps up with a target that moves on while it travels.
+   *
+   * @param {number} now
+   */
+  #tick(now) {
+    this.#frame = 0;
+    const elapsed = this.#frameAt ? now - this.#frameAt : 16;
+    this.#frameAt = now;
+    const still = this.#win.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const gap = this.#target - this.#pos;
+    if (still || Math.abs(gap) < 0.002) {
+      this.#pos = this.#target;
+    } else {
+      this.#pos += gap * (1 - Math.exp(-elapsed / EASE_MS));
+    }
+    this.#paint();
+    if (this.#pos !== this.#target) {
+      this.#frame = this.#win.requestAnimationFrame(t => this.#tick(t));
+    }
+  }
+
+  /**
+   * Stands each card near the middle where {@link tilePlace} puts it, and
+   * hides the cards drawn last time that have gone out of reach.
+   */
+  #paint() {
+    if (!this.#shown) {
+      return;
+    }
+    const rtl = this.#win.getComputedStyle(this.#list).direction === "rtl";
+    const side = rtl ? -1 : 1;
+    const width = this.#tileWidth;
+    const low = Math.max(0, Math.floor(this.#pos - REACH));
+    const high = Math.min(this.#items.length - 1, Math.ceil(this.#pos + REACH));
+    const painted = new Set();
+    for (let i = low; i <= high; i++) {
+      const item = this.#items[i];
+      const place = tilePlace(i - this.#pos);
+      if (!place.shown) {
+        continue;
+      }
+      painted.add(i);
+      item.hidden = false;
+      item.style.transform =
+        `translateX(${side * place.x * width}px) ` +
+        `rotateY(${-side * place.turn}deg) scale(${place.scale})`;
+      item.style.zIndex = place.depth;
+      item.style.setProperty("--sval-switcher-shade", place.shade);
+      if (!item.hasAttribute("data-seen")) {
+        this.#reveal(item);
+      }
+    }
+    for (const i of this.#painted) {
+      if (!painted.has(i) && this.#items[i]) {
+        this.#items[i].hidden = true;
+      }
+    }
+    this.#painted = painted;
+  }
+
+  /**
+   * Keeps the switcher open when Ctrl is let go (`latched`), once the user
+   * has moved through it with a wheel or a swipe.
+   */
+  #latch() {
+    if (!this.#latched) {
+      this.#latched = true;
+      this.#fillFooter();
+    }
+  }
+
+  /**
+   * A wheel or a two-finger swipe anywhere in the window slides the
+   * carousel: across or down, whichever the gesture moves more, a positive
+   * delta toward the older tabs, as a positive `deltaX` goes Forward in
+   * Firefox's page swipe (`browser.gesture.swipe.right`). Momentum after
+   * the fingers lift slides it on. The carousel stops at its ends, and
+   * settles on the nearest card once the wheel is still. The first one
+   * latches the switcher open.
+   *
+   * @param {WheelEvent} event
+   */
+  #onWheel(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.#tabs.length) {
+      return;
+    }
+    this.#latch();
+    const unit =
+      {
+        [event.DOM_DELTA_PIXEL]: 1,
+        [event.DOM_DELTA_LINE]: WHEEL_LINE_PX,
+      }[event.deltaMode] ?? WHEEL_PX_PER_CARD;
+    const rtl = this.#win.getComputedStyle(this.#list).direction === "rtl";
+    const dx = event.deltaX * unit * (rtl ? -1 : 1);
+    const dy = event.deltaY * unit;
+    const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+    const last = this.#tabs.length - 1;
+    this.#target = Math.max(
+      0,
+      Math.min(last, this.#target + delta / WHEEL_PX_PER_CARD)
+    );
+    const index = Math.round(this.#target);
+    if (index !== this.#index) {
+      this.#select(index);
+    }
+    this.#animate();
+    this.#win.clearTimeout(this.#settle);
+    this.#settle = this.#win.setTimeout(() => {
+      this.#target = this.#index;
+      this.#animate();
+      if (this.selectedTab) {
+        this.#win.gBrowser.warmupTab(this.selectedTab);
+      }
+    }, SETTLE_MS);
   }
 
   /**
@@ -896,21 +1258,8 @@ export class SvalTabSwitcher {
    * @param {KeyboardEvent} event
    */
   #onKeyDown(event) {
-    const rtl = this.#win.getComputedStyle(this.#list).direction === "rtl";
     const ctrlTab = this.#ctrlTab;
     switch (event.key) {
-      case "ArrowRight":
-        ctrlTab.advanceFocus(!rtl);
-        break;
-      case "ArrowLeft":
-        ctrlTab.advanceFocus(rtl);
-        break;
-      case "ArrowDown":
-        ctrlTab.advanceFocus(true, this.#columns);
-        break;
-      case "ArrowUp":
-        ctrlTab.advanceFocus(false, this.#columns);
-        break;
       case "Tab":
         // Ctrl+Tab is `ctrlTab.onKeyDown`'s. Tab alone keeps focus here.
         if (event.ctrlKey) {

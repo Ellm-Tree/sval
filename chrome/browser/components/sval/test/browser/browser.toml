@@ -374,6 +374,10 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_ctrl_tab_marks.js"]
 
+["browser_sval_ctrl_tab_splits.js"]
+
+["browser_sval_ctrl_tab_wheel.js"]
+
 ["browser_sval_default_browser_prompt.js"]
 
 ["browser_sval_device_workspaces.js"]

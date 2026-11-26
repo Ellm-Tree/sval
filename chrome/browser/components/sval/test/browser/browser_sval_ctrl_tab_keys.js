@@ -8,9 +8,9 @@
 
 /**
  * The Ctrl+Tab switcher's keys and clicks (`SvalTabSwitcher`, keyed by
- * Firefox's `ctrlTab`): Ctrl+Tab and Ctrl+Shift+Tab step through the tabs and
- * the arrows move, letting Ctrl go picks, Escape cancels, Ctrl+W and Delete
- * close the selected tab, and a click picks.
+ * Firefox's `ctrlTab`): Ctrl+Tab and Ctrl+Shift+Tab step through the tabs,
+ * letting Ctrl go picks, Escape cancels, Ctrl+W and Delete close the
+ * selected tab, and a click picks.
  */
 
 Services.scriptloader.loadSubScript(
@@ -45,11 +45,11 @@ add_task(async function ctrl_tab_steps_and_letting_go_picks() {
   );
   EventUtils.synthesizeKey("KEY_Tab", { ctrlKey: true, shiftKey: true });
   Assert.equal(selectedTitle(), "C", "Ctrl+Shift+Tab steps back");
-  EventUtils.synthesizeKey("KEY_ArrowRight", { ctrlKey: true });
-  EventUtils.synthesizeKey("KEY_ArrowRight", { ctrlKey: true });
-  Assert.equal(selectedTitle(), "A", "the right arrow steps on");
-  EventUtils.synthesizeKey("KEY_ArrowLeft", { ctrlKey: true });
-  Assert.equal(selectedTitle(), "B", "and the left arrow back");
+  EventUtils.synthesizeKey("KEY_Tab", { ctrlKey: true });
+  EventUtils.synthesizeKey("KEY_Tab", { ctrlKey: true });
+  Assert.equal(selectedTitle(), "A", "Ctrl+Tab steps on");
+  EventUtils.synthesizeKey("`", { ctrlKey: true, code: "Backquote" });
+  Assert.equal(selectedTitle(), "B", "and Ctrl and the key above Tab back");
 
   await releaseCtrl();
   Assert.ok(!switcherShown(), "letting Ctrl go closes the switcher");
@@ -167,7 +167,7 @@ add_task(
   }
 );
 
-add_task(async function the_heading_and_footer_frame_the_tiles_that_scroll() {
+add_task(async function only_the_cards_near_the_middle_are_drawn() {
   await lettered(3);
   for (let i = 0; i < 60; i++) {
     BrowserTestUtils.addTab(gBrowser, titledPage(`Many ${i}`), {
@@ -175,10 +175,7 @@ add_task(async function the_heading_and_footer_frame_the_tiles_that_scroll() {
     });
   }
   await holdCtrlTab();
-  const card = document.querySelector(".sval-switcher-card");
-  const heading = card.querySelector(".sval-switcher-heading");
-  const scroller = card.querySelector(".sval-switcher-scroller");
-  const footer = card.querySelector(".sval-switcher-footer");
+  const footer = document.querySelector(".sval-switcher-footer");
   Assert.equal(
     footer.getAttribute("aria-hidden"),
     "true",
@@ -189,32 +186,18 @@ add_task(async function the_heading_and_footer_frame_the_tiles_that_scroll() {
     5,
     "it shows five keys"
   );
-  Assert.greater(
-    scroller.scrollHeight,
-    scroller.clientHeight,
-    "the tiles run past the card"
+  const options = switcherOptions();
+  Assert.equal(
+    options.length,
+    gBrowser.visibleTabs.length,
+    "every tab has a card"
   );
-  scroller.scrollTop = 0;
-  await TestUtils.waitForCondition(
-    () =>
-      footer.hasAttribute("sval-over-rows") &&
-      !heading.hasAttribute("sval-over-rows"),
-    "at the top, the footer shading the tiles below it"
-  );
+  const drawn = options.filter(option => !option.hidden);
+  Assert.greater(drawn.length, 2, "the cards around the middle are drawn");
+  Assert.less(drawn.length, 20, "and the cards far from it are not");
   Assert.ok(
-    footer.hasAttribute("sval-over-rows"),
-    "at the top, the footer shades the tiles below"
-  );
-  scroller.scrollTop = scroller.scrollHeight;
-  await TestUtils.waitForCondition(
-    () =>
-      heading.hasAttribute("sval-over-rows") &&
-      !footer.hasAttribute("sval-over-rows"),
-    "at the bottom, the heading shading the tiles above it"
-  );
-  Assert.ok(
-    heading.hasAttribute("sval-over-rows"),
-    "at the bottom, the heading shades the tiles above"
+    drawn.includes(options[1]),
+    "the selected card is among those drawn"
   );
   EventUtils.synthesizeKey("KEY_Escape");
   await TestUtils.waitForCondition(
