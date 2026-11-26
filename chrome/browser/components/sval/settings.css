@@ -2453,6 +2453,35 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   }
 }
 
+/* The SMB dialog's fields, one column the width of the dialog, inset as its
+   title is. */
+.sval-pane .sval-smb-fields {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px 0;
+
+  > .sval-step-label {
+    margin-block: 14px 6px;
+
+    &:first-child {
+      margin-block-start: 0;
+    }
+  }
+
+  > input.sval-field {
+    box-sizing: border-box;
+    width: 100%;
+  }
+}
+
+.sval-pane .sval-smb-note {
+  margin-block-start: 20px;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
 .sval-modal-actions {
   display: flex;
   align-items: center;

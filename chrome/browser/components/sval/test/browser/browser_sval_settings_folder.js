@@ -143,7 +143,18 @@ add_task(async function stop_syncing_keeps_the_workspaces() {
   ui.settings._describeStorage();
   Assert.ok(!ui.els.storageStop.hidden, "Stop syncing is offered");
 
+  const doc = ui.page.document;
+  const chosen = device.settings.sharedFolder;
   ui.els.storageStop.click();
+  Assert.ok(doc.getElementById("sval-stop-dialog").open, "Sval asks first");
+  doc.getElementById("sval-stop-dialog-cancel").click();
+  Assert.equal(
+    device.settings.sharedFolder,
+    chosen,
+    "and Cancel keeps syncing"
+  );
+  ui.els.storageStop.click();
+  doc.getElementById("sval-stop-dialog-confirm").click();
   await TestUtils.waitForCondition(
     () => ui.els.storageStop.hidden,
     "the page redrew once syncing stopped"

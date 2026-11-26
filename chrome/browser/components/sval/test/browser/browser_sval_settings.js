@@ -129,6 +129,78 @@ add_task(async function a_folder_sval_cannot_reach_yet_is_kept_and_explained() {
 });
 
 /**
+ * A folder on a server is chosen from the server dialog (desktop connectors
+ * spec §4): its password is kept with the sync key, the page names the folder
+ * without the username, and a server that does not answer leaves the choice
+ * kept and explained, as an unmounted share's is.
+ */
+add_task(async function a_folder_on_a_server_is_chosen_with_its_password() {
+  const { SvalRemoteFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs"
+  );
+  await within(SvalPanel.started, 40_000, "the panel's startup");
+  const device = await panelOnAFolder("server");
+  atTaskEnd(() => SvalRemoteFolder.keepOnly(null));
+  const ui = await openSvalSettings();
+  const byId = id => ui.page.document.getElementById(id);
+  byId("sval-storage-smb").click();
+  Assert.ok(byId("sval-server-dialog").open, "the dialog asks");
+  // Nothing listens on loopback's port 9, so the server never answers.
+  byId("sval-server-host").value = "127.0.0.1:9";
+  byId("sval-server-share").value = "Shared";
+  byId("sval-server-folder").value = "Sval";
+  byId("sval-server-user").value = "me";
+  byId("sval-server-password").value = "hunter2";
+  byId("sval-server-form").requestSubmit();
+  const root = "smb://me@127.0.0.1:9/Shared/Sval";
+  await TestUtils.waitForCondition(
+    () => ui.els.storageStatus.textContent,
+    "the page said something about the folder"
+  );
+  Assert.ok(!byId("sval-server-dialog").open, "the dialog closed");
+  Assert.equal(device.settings.sharedFolder, root, "the choice is kept");
+  Assert.deepEqual(
+    await SvalRemoteFolder.authFor(root),
+    { password: "hunter2" },
+    "with its password"
+  );
+  Assert.equal(
+    byId("sval-server-password").value,
+    "",
+    "which the page no longer holds"
+  );
+  Assert.ok(
+    ui.els.storageStatus.hasAttribute("data-unreachable"),
+    "the page says it can't reach the folder yet"
+  );
+  Assert.equal(
+    ui.els.folderPath.textContent,
+    "smb://127.0.0.1:9/Shared/Sval",
+    "and names it without the username"
+  );
+  Assert.ok(
+    byId("sval-folder-reveal").hidden,
+    "with nothing on this computer to show"
+  );
+  Assert.equal(
+    byId("sval-storage").dataset.via,
+    "smb",
+    "and says it syncs through an SMB server"
+  );
+
+  byId("sval-storage-smb").click();
+  Assert.equal(
+    byId("sval-server-host").value,
+    "127.0.0.1:9",
+    "the dialog opens on the folder in use"
+  );
+  Assert.equal(byId("sval-server-user").value, "me");
+  Assert.equal(byId("sval-server-password").value, "", "without its password");
+  byId("sval-server-cancel").click();
+  Assert.ok(!byId("sval-server-dialog").open, "Cancel closes it");
+});
+
+/**
  * This page's contract is that the panel's words come back for it to render,
  * so the user is never left with a page that says nothing after answering
  * the picker. The panel it asks is a window's whose startup failed, so it

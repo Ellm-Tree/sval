@@ -61,11 +61,21 @@ Object.assign(SvalPanel, {
     // A user who picks the folder Sval keeps its files in means the folder
     // that holds it (spec §6.4). The engine decides by the name, as every
     // device does, and the path is split here, where its separators are known.
-    if (
-      path !== null &&
-      (await this._engine.isTopDirName(PathUtils.filename(path)))
-    ) {
-      path = PathUtils.parent(path);
+    const { SvalRemoteFolder } = this._modules;
+    const remote = SvalRemoteFolder.isRemoteRoot(path);
+    if (path !== null) {
+      const name = remote
+        ? SvalRemoteFolder.remoteFilename(path)
+        : PathUtils.filename(path);
+      if (name !== null && (await this._engine.isTopDirName(name))) {
+        const parent = remote
+          ? SvalRemoteFolder.remoteParent(path)
+          : PathUtils.parent(path);
+        if (remote) {
+          await SvalRemoteFolder.moveSignIn(path, parent);
+        }
+        path = parent;
+      }
     }
     let found = null;
     if (
@@ -136,6 +146,9 @@ Object.assign(SvalPanel, {
       };
     }
     this._settings.sharedFolder = path;
+    // A sign-in is kept only for the folder in use: one kept for a folder
+    // left would be a password Sval holds for nothing.
+    await SvalRemoteFolder.keepOnly(remote ? path : null);
     const shared = this.sharedRootSetting();
     this._engine.setSharedRoot(shared);
     // What was known belonged to the folder just left, and the next step to

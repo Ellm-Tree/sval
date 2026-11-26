@@ -74,8 +74,9 @@ add_task(async function storage_says_when_the_sync_key_is_in_the_profile() {
 });
 
 /**
- * A Mac that syncs is told to look for the Keychain item by name, so the
- * name Settings gives is the one the system store holds the secret under.
+ * A Mac is told, before it asks, which Keychain item an SMB password goes
+ * in, so the name Settings gives is the one the system store holds the
+ * secret under.
  */
 add_task(async function the_keychain_line_names_the_item_sval_stores() {
   const { MemoryKeyStore } = ChromeUtils.importESModule(
@@ -101,9 +102,9 @@ add_task(async function the_keychain_line_names_the_item_sval_stores() {
   Assert.equal(labels.length, 1, "the system store holds one item");
 
   const ui = await openSvalSettings("storage");
-  const line = ui.page.document.getElementById("sval-storage-keychain");
+  const line = ui.page.document.getElementById("sval-smb-keychain");
   Assert.ok(
-    line.textContent.replace(/\s+/g, " ").includes(`"${labels[0]}"`),
+    line.message.includes(`"${labels[0]}"`),
     "Settings names the item the system store holds"
   );
 });

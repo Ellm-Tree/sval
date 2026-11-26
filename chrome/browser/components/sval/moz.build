@@ -199,6 +199,7 @@ MOZ_SRC_FILES += [
     "SvalRegion.sys.mjs",
     "SvalReleaseCandidates.sys.mjs",
     "SvalReloadMenu.sys.mjs",
+    "SvalRemoteFolder.sys.mjs",
     "SvalReport.sys.mjs",
     "SvalRestore.sys.mjs",
     "SvalScope.sys.mjs",

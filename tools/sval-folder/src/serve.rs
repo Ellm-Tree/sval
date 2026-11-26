@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 /// accepts a helper that speaks its own version or the one before, whatever
 /// its build, so the version moves only for a change an older helper cannot
 /// speak, on both sides at once.
-pub const HELLO: u64 = 1;
+pub const HELLO: u64 = 2;
 
 /// The build of Sval this helper was packaged with. The packaged build sets
 /// `SVAL_BUILD_ID` to Sval's build id, and any other build reports the crate

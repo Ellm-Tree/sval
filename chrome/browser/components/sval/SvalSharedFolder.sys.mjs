@@ -47,6 +47,8 @@ const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   Subprocess: "resource://gre/modules/Subprocess.sys.mjs",
+  SvalRemoteFolder:
+    "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs",
 });
 
 /** How long one shared step may take before Sval stops waiting for it. */
@@ -69,7 +71,7 @@ export const MAX_BATCH = 64;
  * it only for a change an older helper cannot speak, on both sides at once
  * (`HELLO` in `tools/sval-folder/src/serve.rs`).
  */
-export const HELPER_HELLO = 1;
+export const HELPER_HELLO = 2;
 
 /**
  * Whether a helper whose handshake says `hello` speaks this browser's
@@ -120,12 +122,14 @@ const REASONS = new Set([
 
 /**
  * What a user can do about a shared folder that is not reachable, from the
- * helper's reason and the error name it reported. Only a denied access is
- * told apart among I/O errors: every other one is "offline".
+ * helper's reason and the error name it reported. Among I/O errors only a
+ * denied access, and a remote folder's refused sign-in
+ * (`RemoteError::name` in `tools/sval-folder/src/remote/mod.rs`), are told
+ * apart: every other one is "offline".
  *
  * @param {string} reason A helper's reason.
  * @param {string} [error] The error name the helper reported, if any.
- * @returns {"offline"|"gone"|"denied"|"own-file"|"too-large"}
+ * @returns {"offline"|"gone"|"denied"|"sign-in"|"own-file"|"too-large"}
  */
 export function folderProblem(reason, error) {
   switch (reason) {
@@ -134,7 +138,10 @@ export function folderProblem(reason, error) {
     case "no-sval-dir":
       return "gone";
     case "io-error":
-      return error === "NotAllowedError" ? "denied" : "offline";
+      if (error === "NotAllowedError") {
+        return "denied";
+      }
+      return error === "SignInError" ? "sign-in" : "offline";
     case "own-file-unreadable":
       return "own-file";
     case "too-large":
@@ -670,6 +677,13 @@ export const SvalSharedFolder = {
     const asked = { files: [] };
     let result;
     try {
+      // A remote folder's sign-in travels with each request, so a helper
+      // started afresh needs nothing kept by the one before
+      // (`SvalRemoteFolder`).
+      if (lazy.SvalRemoteFolder.isRemoteRoot(request.root)) {
+        const auth = await lazy.SvalRemoteFolder.authFor(request.root);
+        request = { ...request, auth: auth ?? {} };
+      }
       result = await this._ask(asked, request, deadline, extra);
     } catch (err) {
       SvalLog.warn(

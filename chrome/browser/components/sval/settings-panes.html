@@ -544,16 +544,11 @@
           profile.
         </p>
 
-        <!-- Shown on a Mac that syncs: the Keychain may ask before Sval reads
-             the key, and the user has to know what that prompt is for. -->
-        <p id="sval-storage-keychain" hidden="hidden">
-          Sval keeps what unlocks your sync key in your Mac's Keychain, as
-          "<span id="sval-storage-keychain-item">Sval secrets</span>". If your
-          Mac asks, choose Always Allow, or Sval stops syncing.
-        </p>
-
         <div class="sval-actions">
           <button id="sval-storage-choose" class="sval-button"></button>
+          <!-- A folder on an SMB server, which Sval signs in to itself
+               (desktop connectors spec §4). -->
+          <button id="sval-storage-smb" class="sval-button"></button>
           <button
             id="sval-folder-reveal"
             class="sval-button"
@@ -570,7 +565,7 @@
                profile (local-copy spec §4.5). -->
           <button
             id="sval-storage-stop"
-            class="sval-button sval-button-quiet"
+            class="sval-button sval-button-danger"
             hidden="hidden"
           >
             Stop syncing
@@ -584,6 +579,129 @@
           aria-live="polite"
         ></p>
         <div id="sval-storage-result-actions" class="sval-result-actions"></div>
+
+        <!-- Stopping always confirms, as removing an extension does. -->
+        <dialog
+          id="sval-stop-dialog"
+          class="sval-modal"
+          aria-labelledby="sval-stop-dialog-title"
+          aria-describedby="sval-stop-dialog-body"
+        >
+          <h2 id="sval-stop-dialog-title" class="sval-modal-title">
+            Stop syncing?
+          </h2>
+          <p id="sval-stop-dialog-body" class="sval-modal-body">
+            Your Workspaces and tabs will remain, but this device will no longer
+            sync with your other devices.
+          </p>
+          <div class="sval-modal-actions">
+            <button
+              id="sval-stop-dialog-cancel"
+              class="sval-button"
+              type="button"
+              autofocus="autofocus"
+            >
+              Cancel
+            </button>
+            <button
+              id="sval-stop-dialog-confirm"
+              class="sval-button sval-button-danger"
+              type="button"
+            >
+              Stop syncing
+            </button>
+          </div>
+        </dialog>
+
+        <!-- The password is kept with the sync key (`SvalRemoteFolder`), so a
+             Mac asks for the Keychain as Connect saves it: the note says so
+             before that, on a Mac alone. -->
+        <dialog
+          id="sval-server-dialog"
+          class="sval-modal"
+          aria-labelledby="sval-server-dialog-title"
+        >
+          <h2 id="sval-server-dialog-title" class="sval-modal-title">
+            Connect to an SMB server
+          </h2>
+          <form id="sval-server-form" method="dialog">
+            <div class="sval-smb-fields">
+              <label class="sval-step-label" for="sval-server-host"
+                >Server address</label
+              >
+              <input
+                id="sval-server-host"
+                class="sval-field"
+                type="text"
+                required="required"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="nas.local"
+              />
+              <label class="sval-step-label" for="sval-server-share"
+                >Share</label
+              >
+              <input
+                id="sval-server-share"
+                class="sval-field"
+                type="text"
+                required="required"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="Shared"
+              />
+              <label class="sval-step-label" for="sval-server-folder"
+                >Folder in the share (optional)</label
+              >
+              <input
+                id="sval-server-folder"
+                class="sval-field"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="Sval"
+              />
+              <label class="sval-step-label" for="sval-server-user"
+                >Username</label
+              >
+              <input
+                id="sval-server-user"
+                class="sval-field"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <label class="sval-step-label" for="sval-server-password"
+                >Password</label
+              >
+              <input
+                id="sval-server-password"
+                class="sval-field"
+                type="password"
+                autocomplete="off"
+              />
+              <moz-message-bar
+                id="sval-smb-keychain"
+                class="sval-smb-note"
+                type="warning"
+                hidden="hidden"
+              ></moz-message-bar>
+            </div>
+            <div class="sval-modal-actions">
+              <button id="sval-server-cancel" class="sval-button" type="button">
+                Cancel
+              </button>
+              <button
+                id="sval-server-connect"
+                class="sval-button"
+                data-tone="primary"
+                type="submit"
+              >
+                Connect
+              </button>
+            </div>
+          </form>
+        </dialog>
 
         <!-- The sync readout and the one control that asks for a pass (spec
              §6.4). The detail and its buttons are the panel's sync

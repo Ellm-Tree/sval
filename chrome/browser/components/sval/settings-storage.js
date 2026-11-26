@@ -22,6 +22,8 @@
     FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
     SvalIdentity: "moz-src:///browser/components/sval/SvalIdentity.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+    SvalRemoteFolder:
+      "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs",
     SvalSecretStore:
       "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
   });
@@ -68,8 +70,7 @@
       Object.assign(this._els, {
         storageText: byId("sval-storage-text"),
         storageKeyring: byId("sval-storage-keyring"),
-        storageKeychain: byId("sval-storage-keychain"),
-        storageKeychainItem: byId("sval-storage-keychain-item"),
+        smbKeychain: byId("sval-smb-keychain"),
         syncAdvanced: byId("sval-sync-advanced"),
         syncRow: byId("sval-sync-row"),
         keyActions: byId("sval-key-actions"),
@@ -89,20 +90,55 @@
         folderName: byId("sval-folder-name"),
         folderPath: byId("sval-folder-path"),
         folderReveal: byId("sval-folder-reveal"),
+        storageSmb: byId("sval-storage-smb"),
+        stopDialog: byId("sval-stop-dialog"),
+        stopCancel: byId("sval-stop-dialog-cancel"),
+        stopConfirm: byId("sval-stop-dialog-confirm"),
+        storageSection: byId("sval-storage"),
+        serverDialog: byId("sval-server-dialog"),
+        serverForm: byId("sval-server-form"),
+        serverHost: byId("sval-server-host"),
+        serverShare: byId("sval-server-share"),
+        serverFolder: byId("sval-server-folder"),
+        serverUser: byId("sval-server-user"),
+        serverPassword: byId("sval-server-password"),
+        serverCancel: byId("sval-server-cancel"),
       });
       this._els.folderReveal.textContent = revealLabel();
-      this._els.storageKeychainItem.textContent =
-        lazy.SvalSecretStore.userLabel();
+      this._els.smbKeychain.message =
+        `If your Mac asks whether Sval can access ` +
+        `"${lazy.SvalSecretStore.userLabel()}" after you select Connect, ` +
+        `choose Always Allow.`;
       this._els.storageChoose.addEventListener("click", () =>
         this.chooseFolder()
       );
+      this._els.storageSmb.addEventListener("click", () =>
+        this.chooseServerFolder()
+      );
+      this._els.serverCancel.addEventListener("click", () =>
+        this._els.serverDialog.close()
+      );
+      this._els.serverForm.addEventListener("submit", event => {
+        event.preventDefault();
+        this._connectServerFolder();
+      });
       this._els.folderReveal.addEventListener("click", () =>
         this.revealFolder()
       );
       this._els.storageReuse.addEventListener("click", () =>
         this.useFolderAgain()
       );
-      this._els.storageStop.addEventListener("click", () => this.stopSyncing());
+      this._els.storageStop.addEventListener("click", () => {
+        this._els.stopDialog.showModal();
+        this._els.stopCancel.focus();
+      });
+      this._els.stopCancel.addEventListener("click", () =>
+        this._els.stopDialog.close()
+      );
+      this._els.stopConfirm.addEventListener("click", () => {
+        this._els.stopDialog.close();
+        this.stopSyncing();
+      });
       this._els.backupSave.addEventListener("click", () => this.saveBackup());
       this._els.setUpAgain.addEventListener("click", () =>
         this.setUpSyncAgain()
@@ -133,6 +169,7 @@
         // panel starts with its window, and this page is in one. The controls
         // are withheld until then, so none is offered only to fail.
         this._els.storageChoose.hidden = true;
+        this._els.storageSmb.hidden = true;
         this._els.storageReuse.hidden = true;
         this._els.storageStop.hidden = true;
         this._els.folderReveal.hidden = true;
@@ -147,12 +184,15 @@
       // re-entered on every window `focus`: a page that found no panel once and
       // finds one now has to offer the control again.
       this._els.storageChoose.hidden = false;
+      this._els.storageSmb.hidden = false;
       const chosen = panel.sharedRootSetting();
       const unreachable =
         chosen && panel.syncState.folderState === "unreachable";
       this._els.storageReuse.hidden = !unreachable;
       this._els.storageStop.hidden = !chosen;
-      this._els.folderReveal.hidden = !chosen || unreachable;
+      const remote = lazy.SvalRemoteFolder.isRemoteRoot(chosen);
+      // A remote folder is on no disk of this computer's to show.
+      this._els.folderReveal.hidden = !chosen || unreachable || remote;
       this._els.folderField.hidden = !chosen;
       this._els.syncRow.hidden = !chosen;
       this._els.folderField.classList.toggle("sval-unreachable", !!unreachable);
@@ -167,10 +207,12 @@
         this._setText(
           this._els.storageText,
           "Sval saves your Workspaces on this device only. To sync them, " +
-            "choose a folder your devices share."
+            "choose a folder your devices share or connect to an SMB server."
         );
         this._setText(this._els.storageChoose, "Choose folder…");
+        this._setText(this._els.storageSmb, "Connect to SMB server…");
         this._els.storageChoose.dataset.tone = "primary";
+        delete this._els.storageSection.dataset.via;
         return;
       }
       delete this._els.storageChoose.dataset.tone;
@@ -178,8 +220,27 @@
         this._els.folderName,
         lazy.SvalPanelModel.friendlyFolderName(chosen)
       );
-      this._setText(this._els.folderPath, chosen);
-      this._els.folderField.title = chosen;
+      const place = remote
+        ? lazy.SvalRemoteFolder.remoteFolderPlace(chosen)
+        : chosen;
+      this._setText(this._els.folderPath, place);
+      this._els.folderField.title = place;
+      // An SMB folder and a folder on this computer are two ways to sync, so
+      // each has its own button: the one in use changes it, and the other
+      // switches to the other way.
+      this._els.storageSection.dataset.via = remote ? "smb" : "folder";
+      if (remote) {
+        this._setText(this._els.storageSmb, "Edit connection…");
+        this._setText(this._els.storageChoose, "Choose folder…");
+        this._setText(
+          this._els.storageText,
+          unreachable
+            ? "Sval can't reach this SMB server. Your Workspaces are still on this device."
+            : "Sval syncs your Workspaces through a folder on this SMB server."
+        );
+        return;
+      }
+      this._setText(this._els.storageSmb, "Connect to SMB server…");
       if (unreachable) {
         this._setText(
           this._els.storageText,
@@ -206,10 +267,11 @@
         panel.syncState.keyState === lazy.SvalIdentity.SYNC_KEY_STATES.present;
       this._els.syncAdvanced.hidden = !panel?.sharedRootSetting?.();
       this._els.keyActions.hidden = !syncs;
-      this._els.storageKeychain.hidden =
+      // The Keychain asks as Connect saves the password, so the dialog says
+      // so first, on a Mac whose secrets the system store keeps or will.
+      this._els.smbKeychain.hidden =
         lazy.AppConstants.platform !== "macosx" ||
-        backend !== lazy.SvalSecretStore.BACKENDS.system ||
-        !panel?.sharedRootSetting?.();
+        backend === lazy.SvalSecretStore.BACKENDS.profile;
       this._els.backupMissing.hidden = !syncs || !!panel.settings?.backupSaved;
     },
 
@@ -334,8 +396,8 @@
      * Asks the user for the folder Sval syncs through, then has the panel share
      * through it.
      *
-     * Spec §6.4's v1 provider is a plain local folder, so this is the whole
-     * picker: `nsIFilePicker` in `modeGetFolder`, the same call
+     * A folder on this computer, through `nsIFilePicker` in `modeGetFolder`,
+     * the same call
      * `toolkit/content/widgets/moz-input-folder/moz-input-folder.mjs` and the
      * profile migrators make.
      *
@@ -375,6 +437,66 @@
         return;
       }
       await this._useFolder(panel, picker.file.path);
+    },
+
+    /**
+     * Asks where a folder on an SMB server is, and the sign-in for it, filled
+     * in with the folder in use when it is one.
+     */
+    chooseServerFolder() {
+      if (this._privateOnly) {
+        return;
+      }
+      const els = this._els;
+      const current = lazy.SvalRemoteFolder.parseSmbRoot(
+        this.panel?.sharedRootSetting() ?? null
+      );
+      let server = current?.host ?? "";
+      if (current && current.port !== 445) {
+        server += `:${current.port}`;
+      }
+      els.serverHost.value = server;
+      els.serverShare.value = current?.share ?? "";
+      els.serverFolder.value = current?.folder ?? "";
+      els.serverUser.value = current?.username ?? "";
+      els.serverPassword.value = "";
+      els.serverDialog.showModal();
+      (current ? els.serverPassword : els.serverHost).focus();
+    },
+
+    /**
+     * Keeps the password the server dialog was given, and has the panel
+     * share through the folder it names.
+     */
+    async _connectServerFolder() {
+      const els = this._els;
+      const panel = this.panel;
+      const root = lazy.SvalRemoteFolder.smbRoot({
+        server: els.serverHost.value,
+        share: els.serverShare.value,
+        folder: els.serverFolder.value,
+        username: els.serverUser.value,
+      });
+      if (!root || !panel) {
+        els.serverHost.focus();
+        return;
+      }
+      const password = els.serverPassword.value;
+      els.serverPassword.value = "";
+      els.serverDialog.close();
+      try {
+        await lazy.SvalRemoteFolder.keepPassword(root, password);
+      } catch (err) {
+        lazy.SvalLog.warn(
+          `keeping the server's password failed: ${lazy.SvalLog.errorName(err)}`
+        );
+        this._showStorageReport({
+          message:
+            "Sval couldn't save the password, so your sync folder didn't change.",
+        });
+        return;
+      }
+      await this._useFolder(panel, root);
     },
 
     /**

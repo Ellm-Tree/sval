@@ -464,11 +464,16 @@ control of what you see and what is sent to websites.
 
 ## Sync
 
-- **No account.** Sval syncs through any folder you choose. That can be a
-  cloud folder like iCloud Drive, Dropbox, or OneDrive, a network drive, or
-  even a USB drive. Sval doesn't run a sync service, so your data stays yours.
-  You can choose the folder you sync through or the "sval" folder inside it.
+- **No account.** Sval syncs through any folder you choose, such as a cloud
+  folder like iCloud Drive, Dropbox, or OneDrive, a network drive, or even a
+  USB drive. Sval doesn't run a sync service, so your data stays yours. You
+  can choose the folder you sync through or the "sval" folder inside it and
   Sval finds the same files either way.
+- **SMB servers.** Sval can sync through a folder on an SMB file server like
+  a NAS without you connecting to the server first. In Settings › Sync and
+  devices, select Connect to SMB server and type the server address and share with
+  the username and password that sign you in. Sval keeps the password with
+  your sync key.
 - **End-to-end encrypted.** Everything in the folder is encrypted with a key
   that only your devices have. Your cloud provider can't read any of it.
 - **What syncs.** Sval syncs your tabs, Workspaces, groups, Favorites,

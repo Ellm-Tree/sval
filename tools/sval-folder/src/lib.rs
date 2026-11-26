@@ -11,6 +11,7 @@ pub mod frame;
 pub mod links;
 pub mod ops;
 pub mod paths;
+pub mod remote;
 pub mod serve;
 #[cfg(test)]
 mod test_dir;

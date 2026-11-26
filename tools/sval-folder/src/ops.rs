@@ -14,7 +14,9 @@
 use crate::errors::{error_name, Failure};
 use crate::links::is_link;
 use crate::paths::{is_contained, is_root, join};
+use crate::remote::{auth_for, Location};
 use serde_json::{json, Map, Value};
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -172,7 +174,10 @@ fn batch<'a, T>(
 /// The request in `value`, if it is one this helper will act on.
 fn parse(value: &Value) -> Option<Request<'_>> {
     let id = value.get("id")?.as_str().filter(|id| is_id(id))?;
-    let root = value.get("root")?.as_str().filter(|root| is_root(root))?;
+    let root = value
+        .get("root")?
+        .as_str()
+        .filter(|root| is_root(root) || Location::parse(root).is_some())?;
     let require_top = match value.get("requireTop")? {
         Value::Null => None,
         Value::String(top) if is_contained(top) => Some(top.as_str()),
@@ -307,6 +312,8 @@ pub struct Folder {
     /// What `crosses_link` asks of each directory: `is_link`. Only a test
     /// replaces it.
     pub(crate) linked_dir: fn(&Path) -> io::Result<bool>,
+    /// The remote folders' connections and the bytes read from them.
+    pub(crate) remote: RefCell<remote::RemoteState>,
 }
 
 impl Folder {
@@ -314,6 +321,7 @@ impl Folder {
         Folder {
             request_dir,
             linked_dir: is_link,
+            remote: RefCell::default(),
         }
     }
 
@@ -345,6 +353,19 @@ impl Folder {
                 Ok(bytes) => payloads.push(bytes),
                 Err(err) => return unreachable("io-error", Some(error_name(&err))),
             }
+        }
+        if let Some(location) = Location::parse(request.root) {
+            let Some(auth) = auth_for(&location, value) else {
+                return unreachable("io-error", Some("SignInError"));
+            };
+            return remote::perform(
+                &mut self.remote.borrow_mut(),
+                &request,
+                &location,
+                &auth,
+                &payloads,
+                &self.request_dir,
+            );
         }
         let root = Path::new(request.root);
         match fs::metadata(root) {
@@ -822,6 +843,8 @@ fn list_names(target: &Path, holding: Option<&str>) -> Result<Value, Failure> {
     }
     Ok(Value::Object(answer))
 }
+
+mod remote;
 
 #[cfg(test)]
 mod tests;

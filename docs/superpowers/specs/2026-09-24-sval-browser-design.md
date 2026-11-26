@@ -1051,12 +1051,14 @@ helper's in `2026-10-26-native-shared-folder-helper-design.md`.
 replaces a whole file, so this is what prevents a crash mid-write from leaving a
 truncated file for other devices to read.
 
-### 6.4 v1 scope: local folder only
+### 6.4 v1 scope: a folder
 
-**v1 ships the provider interface with exactly one implementation: a local
-folder.** The user points Sval at any directory — including `~/Dropbox`,
+**v1 ships the provider interface with one implementation: a folder.** The user
+points Sval at any directory — including `~/Dropbox`,
 `~/Library/Mobile Documents`, or an SMB mount — and gets working cross-device sync
-at that provider's latency.
+at that provider's latency. Sval also reaches a folder on an SMB share with
+nothing mounted, and the shared-folder helper does it (decision 2650,
+`2026-11-25-desktop-connectors-design.md`).
 
 **This device's copy always lives in the profile.** Workspaces exist and persist
 from the first launch with nothing configured, which is what makes them the

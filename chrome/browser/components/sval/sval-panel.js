@@ -723,6 +723,8 @@ var SvalPanel = {
         SvalIdentity: "moz-src:///browser/components/sval/SvalIdentity.sys.mjs",
         SvalSecretStore:
           "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
+        SvalRemoteFolder:
+          "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs",
         SvalSerialQueue:
           "moz-src:///browser/components/sval/SvalSerialQueue.sys.mjs",
         SvalBackupKey:

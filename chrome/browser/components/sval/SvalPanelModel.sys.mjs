@@ -19,6 +19,10 @@
 import { agentBrandOf } from "moz-src:///browser/components/sval/SvalAgentBrands.sys.mjs";
 import { colorOf } from "moz-src:///browser/components/sval/SvalColor.sys.mjs";
 import {
+  isRemoteRoot,
+  remoteFolderName,
+} from "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs";
+import {
   GROUP,
   SPLIT,
   TAB,
@@ -3268,6 +3272,9 @@ const CLOUD_STORAGE_NAMES = [
  * @returns {string}
  */
 export function friendlyFolderName(path) {
+  if (isRemoteRoot(path)) {
+    return remoteFolderName(path);
+  }
   const parts = String(path)
     .split(/[\\/]+/)
     .filter(Boolean);
@@ -3644,6 +3651,17 @@ export function syncIndicator({
       "Can't access sync folder",
       "",
       choose
+    );
+  }
+  if (problem === "sign-in") {
+    return indicator(
+      "folder-sign-in",
+      "warning",
+      "moon-warning",
+      "Can't sign in to sync folder",
+      "Can't sign in to sync folder",
+      "",
+      [{ label: "Settings", command: "openStorageSettings" }]
     );
   }
   if (unpairedDevice) {

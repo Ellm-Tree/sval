@@ -294,6 +294,8 @@ head = "panel_model_head.js"
 
 ["test_sval_release_candidates.js"]
 
+["test_sval_remote_folder.js"]
+
 ["test_sval_report.js"]
 
 ["test_sval_restore.js"]
