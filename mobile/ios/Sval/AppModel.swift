@@ -410,6 +410,12 @@ struct WorkspaceSections {
 
     /// Every Workspace, in the strip's order.
     var ordered: [OutlineRow] {
-        (own.map { [$0] } ?? []) + people + devices + agents.flatMap(\.rows)
+        swipes + agents.flatMap(\.rows)
+    }
+
+    /// The Workspaces the bar's swipe steps through: the strip's order
+    /// without the agents', which are each agent's to drive.
+    var swipes: [OutlineRow] {
+        (own.map { [$0] } ?? []) + people + devices
     }
 }

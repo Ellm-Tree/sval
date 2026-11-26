@@ -4,10 +4,10 @@
 import SwiftUI
 
 /// Every Workspace as a tile, in a strip at the foot of the Workspace
-/// sheet, where the thumb is: this phone's own first, then the user's in
-/// the synced order, the other devices' under Devices, each agent's under
-/// the agent's name, then New (14b1, 14b3). A tap switches Workspace and
-/// leaves the sheet open on it.
+/// sheet, where the thumb is: this phone's own held at the start, then
+/// the user's in the synced order, the other devices' under Devices,
+/// each agent's under the agent's name, then New (14b1, 14b3). A tap
+/// switches Workspace and leaves the sheet open on it.
 struct WorkspaceStrip: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearance) private var scheme
@@ -48,14 +48,18 @@ struct WorkspaceStrip: View {
         let sections = model.workspaceSections
         let own = sections.own, people = sections.people, devices = sections.devices, agents = sections.agents
         HStack(alignment: .bottom, spacing: 0) {
+            // Held outside the scrolling run, as the Private tile is at the
+            // other end, so this phone's own stays in reach.
+            if let own {
+                tile(own)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, tight ? 6 : 0)
+                pinnedDivider
+            }
         ScrollViewReader { reader in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .bottom, spacing: tight ? 10 : 2) {
-                    if let own {
-                        group(label: nil, [own], reorders: false)
-                        divider
-                    }
-                    group(label: nil, people, reorders: true)
+                    group(label: people.isEmpty ? nil : "Workspaces", glyph: nil, people, reorders: true)
                     if !devices.isEmpty {
                         divider
                         group(label: "Devices", glyph: "device-phone", devices, reorders: false)
@@ -88,11 +92,7 @@ struct WorkspaceStrip: View {
         }
             // Held outside the scrolling run, so it shows however many
             // Workspaces there are (13a1).
-            VStack(spacing: 5) {
-                theme.divider.frame(width: 1, height: tileSize)
-                if !tight { nameRoom }
-            }
-            .padding(.bottom, 6)
+            pinnedDivider
             privateTile
                 .padding(.horizontal, 8)
                 .padding(.vertical, tight ? 6 : 0)
@@ -140,8 +140,15 @@ struct WorkspaceStrip: View {
         Task { await model.moveWorkspace(workspace.id, before: before, after: after) }
     }
 
-    /// Each agent once, in the order its first Workspace comes. One agent
-    /// app paired on two devices is two agents.
+    /// The line between the scrolling run and a tile held at its end.
+    private var pinnedDivider: some View {
+        VStack(spacing: 5) {
+            theme.divider.frame(width: 1, height: tileSize)
+            if !tight { nameRoom }
+        }
+        .padding(.bottom, 6)
+    }
+
     private var divider: some View {
         VStack(spacing: 5) {
             theme.divider.frame(width: 1, height: tileSize)
@@ -162,17 +169,19 @@ struct WorkspaceStrip: View {
     }
 
     /// `glyph` is the heading's mark, the one its tiles wear, as the
-    /// desktop's menu headings wear it.
-    private func group(label: String?, glyph: String = "agent-robot", _ workspaces: [OutlineRow], reorders: Bool) -> some View {
+    /// desktop's menu headings wear it. The user's own tiles wear none.
+    private func group(label: String?, glyph: String?, _ workspaces: [OutlineRow], reorders: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Group {
                 if let label {
                     HStack(spacing: 6) {
-                        Image(glyph)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 10, height: 10)
-                            .foregroundStyle(theme.muted)
+                        if let glyph {
+                            Image(glyph)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 10, height: 10)
+                                .foregroundStyle(theme.muted)
+                        }
                         Text(label)
                             .font(.system(.caption2, weight: .semibold))
                             .foregroundStyle(theme.muted)

@@ -23,6 +23,23 @@ final class BarSwipeTests: XCTestCase {
         XCTAssertNil(BarSwipeSession.next(in: [order[0]], from: "w1", offset: -10))
     }
 
+    func testASwipeFromAWorkspaceOutsideTheOrderGoesToAnEnd() {
+        XCTAssertEqual(BarSwipeSession.next(in: order, from: "agent", offset: -10)?.id, "w1")
+        XCTAssertEqual(BarSwipeSession.next(in: order, from: "agent", offset: 10)?.id, "w3")
+        XCTAssertEqual(BarSwipeSession.next(in: [order[0]], from: "agent", offset: -10)?.id, "w1")
+    }
+
+    /// The swipe starts at this phone's own Workspace and leaves out the
+    /// agents', which the strip shows.
+    func testTheSwipeTakesThePhonesOwnFirstAndNoAgents() {
+        let row = { (id: String) in TreeLinesTests.row(id, nil, .workspace) }
+        let sections = WorkspaceSections(
+            own: row("own"), people: [row("p1"), row("p2")], devices: [row("d1")],
+            agents: [(name: "Claude", rows: [row("a1")])])
+        XCTAssertEqual(sections.swipes.map(\.id), ["own", "p1", "p2", "d1"])
+        XCTAssertEqual(sections.ordered.map(\.id), ["own", "p1", "p2", "d1", "a1"])
+    }
+
     func testLettingGoPastAThirdSwitches() {
         XCTAssertFalse(BarSwipeSession.switches(offset: -110, predicted: -110, width: 400))
         XCTAssertTrue(BarSwipeSession.switches(offset: -130, predicted: -130, width: 400))

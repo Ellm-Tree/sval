@@ -225,6 +225,9 @@ do.
   tabs keep neither.
 - **Switch tabs from the address bar.** Hold the address bar and slide to
   move through your tabs.
+- **Switch Workspaces from the address bar.** Swipe the address bar sideways
+  to go to the next or previous Workspace. Your iPhone's own Workspace comes
+  first, and the swipe skips each agent's Workspace.
 - **Hide the keyboard.** In Sval's own sheets and setup screens, the
   keyboard button above the keyboard puts the keyboard away.
 - **Search suggestions.** As you type in the address bar, the iPhone app

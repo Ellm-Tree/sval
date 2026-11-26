@@ -674,14 +674,19 @@ final class BarSwipeSession {
     func target(in model: AppModel) -> OutlineRow? {
         if let swipingTo { return swipingTo }
         guard offset != 0 else { return nil }
-        return Self.next(in: model.workspaces, from: model.browser.workspaceId, offset: offset)
+        return Self.next(in: model.workspaceSections.swipes, from: model.browser.workspaceId, offset: offset)
     }
 
     /// The Workspace a swipe of `offset` would switch to: the next one for
     /// a swipe left, the one before for a swipe right, wrapping at the ends
-    /// as the desktop's panel swipe does.
+    /// as the desktop's panel swipe does. From a Workspace outside `order`,
+    /// an agent's, a swipe left goes to the first and a swipe right to the
+    /// last.
     static func next(in order: [OutlineRow], from current: String?, offset: CGFloat) -> OutlineRow? {
-        guard order.count > 1, let index = order.firstIndex(where: { $0.id == current }) else { return nil }
+        guard let index = order.firstIndex(where: { $0.id == current }) else {
+            return offset < 0 ? order.first : order.last
+        }
+        guard order.count > 1 else { return nil }
         let step = offset < 0 ? 1 : -1
         return order[(index + step + order.count) % order.count]
     }
@@ -731,7 +736,7 @@ private struct SwipeHUDLayer: View {
 
     var body: some View {
         if let target = session.target(in: model), abs(session.offset) > 12 {
-            let order = model.workspaces
+            let order = model.workspaceSections.swipes
             WorkspaceSwipeHUD(
                 target: target, index: order.firstIndex { $0.id == target.id } ?? 0, count: order.count)
                 .padding(.bottom, barHeight + Browser.overBarGap)
