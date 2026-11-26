@@ -402,7 +402,7 @@ struct PickCard: View {
                 }
             if atTop { Spacer(minLength: 0) }
         }
-        .padding(.bottom, atTop ? 0 : bottomRoom + 8)
+        .padding(.bottom, atTop ? 0 : bottomRoom + Browser.overBarGap)
         .padding(.top, atTop ? 8 : 0)
     }
 

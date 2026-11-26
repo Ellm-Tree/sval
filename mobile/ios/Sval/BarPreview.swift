@@ -4,7 +4,7 @@
 import SwiftUI
 
 /// Another Workspace's bar as it slides in under a swipe: the same glass
-/// capsules, folded as far as the bar beside it, over that Workspace's
+/// capsules, folded as the bar beside it is, over that Workspace's
 /// colour, with its emoji where the Workspace button sits.
 struct BarPreview: View {
     @Environment(AppModel.self) private var model
@@ -37,10 +37,10 @@ struct BarPreview: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
             } else {
-                // Folded as far as the bar it stands beside.
-                GlassFold(progress: model.browser.fold.value) { at, t, shape in
+                // Folded as the bar it stands beside is.
+                GlassFold(folded: model.browser.fold.folded) { at, folded, shape in
                     ZStack(alignment: .topLeading) {
-                        GlassEffectContainer(spacing: 3) {
+                        GlassEffectContainer(spacing: 6) {
                             ZStack(alignment: .topLeading) {
                                 ForEach(at.indices, id: \.self) { index in
                                     Color.clear
@@ -53,14 +53,14 @@ struct BarPreview: View {
                         mark(size: 22 * shape.scale)
                             .frame(width: 48, height: 48)
                             .offset(x: at[3].midX - 24, y: at[3].midY - 24)
-                            .opacity(1 - foldStep(0, 0.35, t))
+                            .opacity(folded ? 0 : 1)
                         Circle().fill(layer).frame(width: 24, height: 24)
                             .overlay {
                                 mark(size: 13)
                                     .foregroundStyle(BarColors.ink(on: layer, dark: scheme == .dark))
                             }
                             .offset(x: at[1].maxX - 30, y: at[1].midY - 12)
-                            .opacity(foldStep(0.65, 1, t))
+                            .opacity(folded ? 1 : 0)
                     }
                 }
                 .padding(.bottom, 24)

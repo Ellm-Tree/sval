@@ -318,9 +318,20 @@ enum Motion {
     /// The bar folding or opening, and the walkthrough's ring moving
     /// along the bar.
     static let glide = Animation.smooth(duration: 0.4)
-    /// A split pane sliding out of the tray once a swipe or a step has
-    /// picked the next one: fast away, slow to settle.
-    static let paneSlide = Animation.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)
+    /// The bar or a split pane going where a swipe let go of it, at the
+    /// speed the finger left it with (`releaseVelocity`).
+    static func page(velocity: Double) -> Animation {
+        .interpolatingSpring(duration: 0.3, bounce: 0, initialVelocity: velocity)
+    }
+
+    /// A finger's `speed` along the swipe, in points a second, as a
+    /// spring's initial velocity from `from` to `to`: Apple measures it in
+    /// the animated change, so a second at that speed covers `speed`
+    /// divided by the distance left. Negative while the finger heads away.
+    static func releaseVelocity(_ speed: CGFloat, from: CGFloat, to: CGFloat) -> Double {
+        let left = to - from
+        return left == 0 ? 0 : Double(speed / left)
+    }
 }
 
 /// Sval's typefaces, scaled with Dynamic Type from the text style each

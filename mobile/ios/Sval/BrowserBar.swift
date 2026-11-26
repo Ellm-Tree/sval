@@ -67,8 +67,8 @@ struct BrowserBar: View {
     }
 
     /// The upright bar. Its controls are built here, once for each change
-    /// of what the bar shows, and `FoldingBar` places them at each step of
-    /// the fold, so a page's scrolling builds none of them again.
+    /// of what the bar shows, and `FoldingBar` places them open or folded,
+    /// so a fold builds none of them again.
     private var upright: some View {
         let shape = BarShape(typeSize, line: addressLine)
         let k = shape.scale

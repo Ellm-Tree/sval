@@ -312,6 +312,9 @@ final class Browser {
     /// above it.
     static let barRoom = 48.0 + 24.0
     static let sidewaysBarRoom = 44.0 + 8.0
+    /// The gap between the bar's top and a strip, card or indicator shown
+    /// over the page just above it.
+    static let overBarGap = 8.0
 
     /// When each tab was last brought to the front on this phone.
     var usedAtSnapshot: [String: Double] { usedAt }
@@ -731,7 +734,7 @@ final class Browser {
         let tabs = Set(model.rows.lazy.filter { $0.kind == .tab }.map(\.id))
         usedAt = usedAt.filter { tabs.contains($0.key) }
         UserDefaults.standard.set(usedAt.filter { !model.isPrivate($0.key) }, forKey: Self.usedKey)
-        if openingBar { fold.foldBar(to: 0) } else { fold.endRun() }
+        if openingBar { fold.open() } else { fold.endRun() }
         if let workspace = model.workspace(of: id) ?? Self.pinParts(id)?.workspace {
             frontTabs[workspace] = id
             UserDefaults.standard.set(frontTabs.filter { !model.isPrivate($0.key) }, forKey: Self.frontKey)
@@ -772,7 +775,7 @@ final class Browser {
         currentTabId = nil
         UserDefaults.standard.removeObject(forKey: Self.currentKey)
         workspaceId = id
-        if openingBar { fold.foldBar(to: 0) } else { fold.endRun() }
+        if openingBar { fold.open() } else { fold.endRun() }
         refreshState()
     }
 

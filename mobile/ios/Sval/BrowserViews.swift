@@ -119,7 +119,7 @@ struct BrowserView: View {
             }
             ScrubLayer(session: scrubs, theme: theme, colors: BarColors(token: token, dark: scheme == .dark),
                        sideInset: sideInset, barHeight: barHeight)
-            SwipeHUDLayer(session: swipe)
+            SwipeHUDLayer(session: swipe, barHeight: barHeight)
             if let id = mediaCard {
                 Color.clear
                     .contentShape(.rect)
@@ -130,7 +130,7 @@ struct BrowserView: View {
                     // and the escape gesture closes it.
                     .accessibilityAddTraits(.isModal)
                     .accessibilityAction(.escape) { withAnimation(Motion.overlay) { mediaCard = nil } }
-                    .padding(.bottom, barHeight + 8)
+                    .padding(.bottom, barHeight + Browser.overBarGap)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
             }
             pickCard
@@ -559,15 +559,18 @@ struct BrowserView: View {
         let item = ended.items[ended.index]
         withAnimation(reduceMotion ? Motion.reduced : .smooth(duration: 0.22)) {
             scrubs.close()
-            guard switching, !item.holds(browser.currentTabId) else { return }
-            switch item {
-            case .pin(let pin, _): browser.selectPin(pin)
-            case .tab(let row, _): browser.select(row.id)
-            case .split(let split, let panes, _):
-                let ids = panes.map(\.id)
-                if let id = browser.focusedPane(of: split.id, among: ids) ?? ids.first { browser.select(id) }
-            case .workspace(let row): browser.showWorkspace(row.id)
-            }
+        }
+        // The page is a web view swapped in at once, so the switch sits
+        // outside the strip's animation: the bar and the views around the
+        // page change with it.
+        guard switching, !item.holds(browser.currentTabId) else { return }
+        switch item {
+        case .pin(let pin, _): browser.selectPin(pin)
+        case .tab(let row, _): browser.select(row.id)
+        case .split(let split, let panes, _):
+            let ids = panes.map(\.id)
+            if let id = browser.focusedPane(of: split.id, among: ids) ?? ids.first { browser.select(id) }
+        case .workspace(let row): browser.showWorkspace(row.id)
         }
     }
 
@@ -604,8 +607,11 @@ struct BrowserView: View {
                 guard swipe.swipingTo == nil else { return }
                 let far = BarSwipeSession.switches(offset: swipe.offset, predicted: drag.predictedEndTranslation.width,
                                                    width: barFrame.width)
+                let speed = drag.velocity.width
                 guard far, let target = swipe.target(in: model) else {
-                    withAnimation(.smooth(duration: 0.2)) { swipe.offset = 0 }
+                    withAnimation(Motion.page(velocity: Motion.releaseVelocity(speed, from: swipe.offset, to: 0))) {
+                        swipe.offset = 0
+                    }
                     return
                 }
                 swipe.swipes += 1
@@ -615,8 +621,9 @@ struct BrowserView: View {
                     return
                 }
                 swipe.swipingTo = target
-                withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) {
-                    swipe.offset = swipe.offset < 0 ? -barFrame.width : barFrame.width
+                let to = swipe.offset < 0 ? -barFrame.width : barFrame.width
+                withAnimation(Motion.page(velocity: Motion.releaseVelocity(speed, from: swipe.offset, to: to))) {
+                    swipe.offset = to
                 } completion: {
                     var instant = Transaction()
                     instant.disablesAnimations = true
@@ -696,17 +703,20 @@ private struct SwipingBar<G: Gesture>: ViewModifier {
     }
 }
 
-/// While the bar is swiped, the Workspace the swipe would switch to.
+/// While the bar is swiped, the Workspace the swipe would switch to, just
+/// above the bar. The bar's measured height places it, so it keeps to the
+/// bar's top however the bar is laid out.
 private struct SwipeHUDLayer: View {
     @Environment(AppModel.self) private var model
     let session: BarSwipeSession
+    let barHeight: CGFloat
 
     var body: some View {
         if let target = session.target(in: model), abs(session.offset) > 12 {
             let order = model.workspaces
             WorkspaceSwipeHUD(
                 target: target, index: order.firstIndex { $0.id == target.id } ?? 0, count: order.count)
-                .padding(.bottom, 164)
+                .padding(.bottom, barHeight + Browser.overBarGap)
         }
     }
 }
@@ -726,7 +736,7 @@ private struct ScrubLayer: View {
             TabScrubStrip(scrub: scrub, theme: theme, colors: colors)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { session.stripFrame = $0 }
                 .padding(.horizontal, 12 + sideInset)
-                .padding(.bottom, barHeight + 8)
+                .padding(.bottom, barHeight + Browser.overBarGap)
                 .transition(reduceMotion ? .opacity
                     : .opacity.combined(with: .scale(scale: 0.4, anchor: .bottom)))
         }
@@ -734,14 +744,14 @@ private struct ScrubLayer: View {
 }
 
 /// The walkthrough's light on the bar, while the bar is open. It reads
-/// the fold's phase itself, so the screen around it never reads the fold.
+/// the fold itself, so the screen around it never reads the fold.
 private struct OpenBarSpotlight: View {
     @Environment(AppModel.self) private var model
     let size: CGSize
     let capsule: Int
 
     var body: some View {
-        if model.browser.fold.phase == .open {
+        if !model.browser.fold.folded {
             BarSpotlight(size: size, capsule: capsule)
                 .transition(.opacity)
         }

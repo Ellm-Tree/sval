@@ -3,9 +3,9 @@
 
 import SwiftUI
 
-/// The upright bar's four capsules at any point of their fold into the
-/// pill, laid out frame by frame from `progress`, so the whole bar follows
-/// one value and a fold turned partway goes back from where it is. The
+/// The upright bar's four capsules, open or folded into the pill. It has
+/// no animatable data, so a fold redraws it once and SwiftUI animates each
+/// capsule's frame from one layout to the other. The
 /// geometry is round 6's Glass Merging demo, which Design made the
 /// reference: at rest, Back and Forward (80pt), the address, then New Tab
 /// and the Workspace button as 48pt circles, 8pt from the sides and 6pt
@@ -17,20 +17,15 @@ import SwiftUI
 /// ([`BarShape`]): the address across the top, as tall as its text, and
 /// under it Back and Forward at the start and New Tab and the Workspace
 /// button at the end. Its pill is as tall as the address and wider.
-struct GlassFold<Content: View>: View, Animatable {
+struct GlassFold<Content: View>: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     /// A line of the address's text, which is `.subheadline`.
     @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = 20
-    var progress: Double
-    let content: ([CGRect], Double, BarShape) -> Content
+    let folded: Bool
+    let content: ([CGRect], Bool, BarShape) -> Content
 
-    var animatableData: Double {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    init(progress: Double, @ViewBuilder content: @escaping ([CGRect], Double, BarShape) -> Content) {
-        self.progress = progress
+    init(folded: Bool, @ViewBuilder content: @escaping ([CGRect], Bool, BarShape) -> Content) {
+        self.folded = folded
         self.content = content
     }
 
@@ -59,13 +54,9 @@ struct GlassFold<Content: View>: View, Animatable {
     var body: some View {
         let shape = BarShape(typeSize, line: line)
         GeometryReader { geometry in
-            let t = min(1, max(0, progress))
-            let at = zip(Self.rest(width: geometry.size.width, shape: shape),
-                         Self.folded(width: geometry.size.width, shape: shape)).map { a, b in
-                CGRect(x: a.minX + (b.minX - a.minX) * t, y: a.minY + (b.minY - a.minY) * t,
-                       width: a.width + (b.width - a.width) * t, height: a.height + (b.height - a.height) * t)
-            }
-            content(at, t, shape)
+            let width = geometry.size.width
+            content(folded ? Self.folded(width: width, shape: shape) : Self.rest(width: width, shape: shape),
+                    folded, shape)
         }
         .frame(height: shape.height)
     }
@@ -105,13 +96,6 @@ struct BarShape: Equatable {
 func workspaceGlass(_ color: Color?, interactive: Bool = true) -> Glass {
     let glass = color.map { Glass.regular.tint($0.opacity(BarColors.glassTint)) } ?? .regular
     return interactive ? glass.interactive() : glass
-}
-
-/// How far along the fold a part has gone, as the demo's `sm`: 0 before
-/// `a`, 1 after `b`, easing between.
-func foldStep(_ a: Double, _ b: Double, _ x: Double) -> Double {
-    let u = min(1, max(0, (x - a) / (b - a)))
-    return u * u * (3 - 2 * u)
 }
 
 extension View {

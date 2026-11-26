@@ -207,7 +207,8 @@ final class Page: NSObject, WKNavigationDelegate {
     private let scriptAllowed: @MainActor (WKNavigationAction, WKWebView) -> Bool
     private var observations: [NSKeyValueObservation] = []
     private var pending: Task<Void, Never>?
-    private var onScroll: (@MainActor (String, ScrollReport) -> Void)?
+    /// The scroll view's delegate, which the scroll view holds weakly.
+    private var scroll: PageScroll?
 
     /// How long a page's address and title must hold before the tree records
     /// them: a load passes through redirects and changes its title as it goes.
@@ -385,24 +386,20 @@ final class Page: NSObject, WKNavigationDelegate {
             MainActor.assumeIsolated { onState() }
         })
         // The bar folds as the user scrolls down and comes back as they
-        // scroll up or reach the end (`BarFold.pageScrolled`). Offsets the
-        // page sets itself, as a load or an anchor does, are left alone.
-        observations.append(view.scrollView.observe(\.contentOffset, options: [.old, .new]) { [tabId] scroll, change in
-            MainActor.assumeIsolated {
-                guard scroll.isTracking || scroll.isDecelerating,
-                      let old = change.oldValue?.y, let new = change.newValue?.y, new != old else { return }
-                let end = scroll.contentSize.height + scroll.adjustedContentInset.bottom - scroll.bounds.height
-                let top = -scroll.adjustedContentInset.top
-                onScroll(tabId, new >= end - 1 ? .atEnd
-                    : .moved(by: new - old, atTop: new <= top, held: scroll.isTracking))
+        // scroll up or reach the end (`BarFold.pageScrolled`). A page's
+        // background is set as it loads, so the spinner's colour is chosen
+        // as a drag begins.
+        scroll = PageScroll { [weak self, tabId] report in
+            if report == .touched, let self {
+                view.scrollView.refreshControl?.tintColor = spinnerColor()
             }
-        })
-        self.onScroll = onScroll
+            onScroll(tabId, report)
+        }
+        view.scrollView.delegate = scroll
         // The bar floats over the page's foot: the 48pt capsules 24pt above
         // the screen's edge. WebKit keeps fixed and sticky elements clear
         // of it.
         view.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: Browser.barRoom, right: 0)
-        view.scrollView.panGestureRecognizer.addTarget(self, action: #selector(panned(_:)))
         let refresh = PullRefresh()
         refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
         view.scrollView.refreshControl = refresh
@@ -444,19 +441,6 @@ final class Page: NSObject, WKNavigationDelegate {
         } else {
             lift([.hold])
             view.reload()
-        }
-    }
-
-    /// A finger on the page, or lifted from it, which the bar's fold
-    /// needs beside the offsets: a held finger keeps a part-folded bar
-    /// where it is.
-    @objc private func panned(_ pan: UIPanGestureRecognizer) {
-        switch pan.state {
-        case .began:
-            onScroll?(tabId, .touched)
-            view.scrollView.refreshControl?.tintColor = spinnerColor()
-        case .ended, .cancelled, .failed: onScroll?(tabId, .released)
-        default: break
         }
     }
 

@@ -12,7 +12,6 @@ struct WorkspaceStrip: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearance) private var scheme
     @Environment(\.sheetTint) private var sheetTint
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let onNew: () -> Void
     /// The Private tile asks to open the session, add a tab to it, or
@@ -206,9 +205,7 @@ struct WorkspaceStrip: View {
         let playing = model.tabs(in: workspace.id).contains { browser.playingTabs.contains($0.id) }
         return Button {
             guard !current else { return }
-            withAnimation(reduceMotion ? nil : Motion.disclose) {
-                browser.showWorkspace(workspace.id)
-            }
+            browser.showWorkspace(workspace.id)
         } label: {
             VStack(spacing: 5) {
                 WorkspaceTile(workspace: workspace, size: tileSize, radius: radius)

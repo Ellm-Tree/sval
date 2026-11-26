@@ -644,7 +644,7 @@ struct PaneTray: View {
         guard !reduceMotion else { return withAnimation(Motion.disclose) { browser.select(target) } }
         browser.paneSlideTarget = target
         let width = browser.focusedSlotWidth + 8
-        withAnimation(Motion.paneSlide) {
+        withAnimation(Motion.page(velocity: 0)) {
             browser.paneSlide = direction > 0 ? -width : width
         } completion: { finish(target) }
     }
@@ -665,11 +665,17 @@ struct PaneTray: View {
                 let width = browser.focusedSlotWidth + 8
                 let moved = drag.translation.width * Self.reach
                 let velocity = (drag.predictedEndTranslation.width - drag.translation.width) * Self.reach
+                // At the ends the slide moves at a quarter of the finger's
+                // pace, so the pane lets go at the pace it was moving.
+                let speed = drag.velocity.width * Self.reach * (browser.paneSlideTarget == nil ? 0.25 : 1)
+                let from = browser.paneSlide
                 let direction = moved < 0 ? 1 : -1
                 guard let target = browser.paneStep(direction),
                       abs(moved) > browser.focusedSlotWidth * 0.3 || abs(velocity) > 120 && velocity.sign == moved.sign
                 else {
-                    withAnimation(.spring(duration: 0.3)) { browser.paneSlide = 0 } completion: {
+                    withAnimation(Motion.page(velocity: Motion.releaseVelocity(speed, from: from, to: 0))) {
+                        browser.paneSlide = 0
+                    } completion: {
                         browser.paneSlideTarget = nil
                     }
                     return
@@ -678,8 +684,9 @@ struct PaneTray: View {
                     withAnimation(Motion.disclose) { browser.select(target) }
                     return
                 }
-                withAnimation(Motion.paneSlide) {
-                    browser.paneSlide = direction > 0 ? -width : width
+                let to = direction > 0 ? -width : width
+                withAnimation(Motion.page(velocity: Motion.releaseVelocity(speed, from: from, to: to))) {
+                    browser.paneSlide = to
                 } completion: { finish(target) }
             }
     }
