@@ -425,6 +425,25 @@ export const SvalExtensionsMenu = {
   },
 
   /**
+   * Lists the open menu's extensions again after a pin or an unpin moved a
+   * button out of the menu's list or into it, as the row's own Pin to
+   * Toolbar does (`gUnifiedExtensions.onPinToToolbarChange`).
+   *
+   * @param {Window} win A browser window.
+   */
+  redrawOpen(win) {
+    const { gUnifiedExtensions } = win;
+    const list = win.document.querySelector(
+      "#unified-extensions-view .unified-extensions-list"
+    );
+    if (list && gUnifiedExtensions._panel?.state === "open") {
+      this.listPinned(win, list);
+      this.addSwitches(win, gUnifiedExtensions._panel);
+      this.addPageActions(win, gUnifiedExtensions._panel);
+    }
+  },
+
+  /**
    * Gives `list` a row for each extension of `win` whose toolbar button is
    * outside the menu, among the rows already there by name. A row names its
    * button in `data-widget-id`, which the row's menu pins and unpins by.

@@ -2,17 +2,16 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * Settings and the add-ons page as one place: Settings' links to add-ons
- * open it in Settings' own tab, and the add-ons page leads back to Settings
- * in that tab, so the tab's Back and Forward move between them.
+ * Settings is where extensions are managed. Every way Firefox opens the
+ * add-ons page goes through `BrowserAddonUI.openAddonsMgr`, which Sval's
+ * patch hands to `openInSettings`: the Tools menu, an extension's Manage
+ * Extension, an install's prompt, an extension asking for its options or
+ * its shortcuts. Each lands on the matching place in Settings' Extensions
+ * or Keyboard shortcuts category. The kinds of add-on Settings doesn't list
+ * (dictionaries, language packs, plugins) keep the add-ons page.
  *
- * Firefox opens add-ons from Settings with `BrowserAddonUI.openAddonsMgr`,
- * which selects a tab already showing add-ons or opens one
- * (`switchToTabHavingURI`), and the add-ons page opens Settings the same way
- * (`openAboutSettingsInTab`). Sval takes the plain click first and loads the
- * other page in the tab instead. A click with a modifier, which asks for a
- * new tab, is left to Firefox. Routes from outside Settings (the Tools menu,
- * an extension's Manage, an install's prompt) keep Firefox's tab choice.
+ * The add-ons page, reached by its address, gets a row that leads back to
+ * Settings in its tab, so the tab's Back and Forward move between them.
  */
 
 import { SvalChromePages } from "moz-src:///browser/components/sval/SvalChromePages.sys.mjs";
@@ -22,18 +21,50 @@ import {
   htmlElement,
 } from "moz-src:///browser/components/sval/SvalDom.sys.mjs";
 
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  SvalPeek: "moz-src:///browser/components/sval/SvalPeek.sys.mjs",
+});
+
 const ADDONS_URL = "about:addons";
 const SETTINGS_URL = "about:preferences";
 
-/**
- * The view each browser asked for on its way to add-ons, applied once the
- * page announces itself (`EM-loaded`, `gViewController.notifyEMLoaded`).
- *
- * @type {WeakMap<Element, string>}
- */
-const pendingViews = new WeakMap();
-
 let started = false;
+
+/**
+ * The Settings place that shows what an add-ons view shows.
+ *
+ * @param {string} [view] An add-ons view id, `addons://detail/<id>`.
+ * @returns {?string} The pane, with its section after a dash, as
+ *   `openPreferences` takes it, or null for a view Settings doesn't hold.
+ */
+export function settingsPaneFor(view) {
+  const [, kind = "", param = "", sub = ""] =
+    /^addons:\/\/([^/]*)\/?([^/]*)\/?(.*)$/.exec(view ?? "") ?? [];
+  const extension = (id, card) =>
+    `paneSvalExtensions-extension?${new URLSearchParams(card ? { id, card } : { id })}`;
+  switch (kind) {
+    case "":
+    case "discover":
+    case "updates":
+    case "search":
+      return "paneSvalExtensions";
+    case "list":
+      return ["extension", "theme"].includes(param)
+        ? "paneSvalExtensions"
+        : null;
+    case "detail":
+      return extension(
+        decodeURIComponent(param),
+        { preferences: "settings", permissions: "permissions" }[sub]
+      );
+    case "shortcuts":
+      return param === "shortcuts"
+        ? "paneSvalKeyboard"
+        : extension(decodeURIComponent(param), "shortcuts");
+  }
+  return null;
+}
 
 /**
  * @param {MouseEvent} event
@@ -47,24 +78,6 @@ function isPlainClick(event) {
     !event.shiftKey &&
     !event.altKey
   );
-}
-
-/**
- * The view a click in Settings asks add-ons for, or null for a click on no
- * link to add-ons. Firefox's one is a setting's "manage" link
- * (`setting-control`'s `navigateToAddons`); the Extensions category opens
- * add-ons through `openInTab` itself.
- *
- * @param {MouseEvent} event
- * @returns {string|null}
- */
-function settingsLinkView(event) {
-  for (const node of event.composedPath()) {
-    if (node.matches?.("a[data-l10n-name='addons-link']")) {
-      return "addons://list/extension";
-    }
-  }
-  return null;
 }
 
 /** @param {Window} win A page in a tab. */
@@ -201,63 +214,46 @@ function mountAddonsPage(doc) {
   );
 }
 
-/** @param {Document} doc The preferences page, as its root is inserted. */
-function mountSettingsPage(doc) {
-  const win = doc.defaultView;
-  // Before Firefox's own handlers on the button and in `setting-control`,
-  // which open add-ons through `openAddonsMgr`.
-  doc.addEventListener(
-    "click",
-    event => {
-      if (!isPlainClick(event)) {
-        return;
-      }
-      const view = settingsLinkView(event);
-      if (view === null) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      SvalAddonsNav.openInTab(win, view);
-    },
-    { capture: true }
-  );
-}
-
-const loadedObserver = {
-  observe(emWindow) {
-    const browser = browserOf(emWindow);
-    const view = browser && pendingViews.get(browser);
-    if (!view) {
-      return;
-    }
-    pendingViews.delete(browser);
-    emWindow.loadView(view);
-  },
-};
-
 export const SvalAddonsNav = {
   /**
-   * Loads add-ons in the tab showing `win`, at `view` when one is given.
+   * Opens the Settings place that holds `view`, as `openAddonsMgr` would
+   * open the add-ons page at it.
    *
-   * @param {Window} win A page in a tab, Settings.
-   * @param {string} [view] An add-ons view id, `addons://list/extension`.
+   * @param {Window} win A browser window.
+   * @param {string} [view] An add-ons view id.
+   * @returns {?Promise<?Window>} Settings' page once it has loaded, which
+   *   `openAddonsMgr`'s callers take as the add-ons page, or null for a
+   *   view Settings doesn't hold.
    */
-  openInTab(win, view = "") {
-    if (view) {
-      pendingViews.set(browserOf(win), view);
+  openInSettings(win, view) {
+    const pane = settingsPaneFor(view);
+    if (!pane) {
+      return null;
     }
-    win.location.href = ADDONS_URL;
+    return win.openPreferences(pane).then(async () => {
+      // A first window `openPreferences` opened is still starting.
+      const browser = lazy.SvalPeek.settingsWindow()?.gBrowser?.selectedBrowser;
+      if (!browser) {
+        return null;
+      }
+      if (browser.contentDocument?.readyState !== "complete") {
+        await new Promise(resolve =>
+          browser.addEventListener("load", resolve, {
+            capture: true,
+            once: true,
+          })
+        );
+      }
+      return browser.contentWindow;
+    });
   },
 
-  /** Watches Settings and the add-ons page. Idempotent. */
+  /** Watches the add-ons page. Idempotent. */
   start() {
     if (started) {
       return;
     }
     started = true;
     SvalChromePages.on(url => url.startsWith(ADDONS_URL), mountAddonsPage);
-    SvalChromePages.on(SvalPreferences.isPreferencesURL, mountSettingsPage);
-    Services.obs.addObserver(loadedObserver, "EM-loaded");
   },
 };

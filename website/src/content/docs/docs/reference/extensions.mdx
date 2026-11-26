@@ -99,8 +99,18 @@ The list shows every extension by name, with its description.
   time you turn it on.
 - **Install from file…** Sval installs an extension from a file on your
   computer.
+<Until v="0.1.0-rc.11">
+
 - **Open the full extensions page.** The add-ons page opens in the same
   tab.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **Find more extensions.** addons.mozilla.org opens in a new tab.
+
+</Since>
 
 ### Installing from websites
 
@@ -113,10 +123,29 @@ The list shows every extension by name, with its description.
 
 Selecting an extension's name in Settings › Extensions opens its page.
 
+<Since v="0.1.0-rc.11">
+
+The top of the page shows the extension's description and then the author
+and version, the date the extension last updated on this device and the
+homepage.
+
+</Since>
+
 ### Extension
+
+<Until v="0.1.0-rc.11">
 
 - **On.** This switch turns the extension on or off. It also shows the
   extension's version.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **On.** This switch turns the extension on or off.
+
+</Since>
+
 - **Run in private windows.** The extension runs in private windows, where
   it can see what you do. This shows **Never** for an extension that can't
   run in private windows and **Always** for one that has to run there.
@@ -133,14 +162,26 @@ Selecting an extension's name in Settings › Extensions opens its page.
 
 <Since v="0.1.0-rc.11">
 
-- **Available in.** Each of your Workspaces has a checkbox, and the
-  extension reaches tabs only in the Workspaces you check. With every
+- **Run in these Workspaces.** Each of your Workspaces has a checkbox, and
+  the extension reaches tabs only in the Workspaces you check. With every
   Workspace checked, a Workspace you add later gets the extension too, and
   the last one checked can't be unchecked. Your choice syncs to your other
   devices.
-- **Extension Settings.** This shows while the extension is on, if the
-  extension has settings of its own. **Open** opens those settings in a
-  new tab.
+- **Update this extension automatically.** With this switch on, Sval
+  installs the extension's updates after the wait set in Extension updates.
+  With the switch off, Sval leaves the updates for you to install.
+- **Look for a newer version of this extension.** **Check now** looks for
+  a newer version and installs one it finds straight away, without the
+  wait. The row shows only when no update is waiting.
+
+### Extension Settings
+
+This card shows while the extension is on, if the extension has settings
+of its own. Opening the card shows the extension's settings page inside
+the card, and Sval opens the card when the extension asks to show its
+settings. An extension whose settings open in a tab of their own gets an
+**Extension Settings** row with an **Open** button in the Extension card
+instead.
 
 </Since>
 
@@ -166,25 +207,58 @@ Your switches sync to your other devices.
 
 <Since v="0.1.0-rc.11">
 
-### Sites this extension runs on
+### Sites *extension name* runs on
 
-- **Run on every site.** With this switch on, the extension runs on every
-  site except the ones listed under Except these sites. With the switch
-  off, the extension runs only on the sites listed under Only these sites.
-- **A listed site.** Each site has its own switch, and turning the switch
-  takes the site off the list.
-- **Add a site.** This field takes a site's address, and **Add** puts the
-  site on the list.
+The menu at the top of the card sets where the extension runs:
 
-Your switches sync to your other devices.
+- **Every site.** The extension runs on every site. Choosing this empties
+  the list of sites.
+- **Every site except these.** The extension runs on every site but the
+  ones in the list.
+- **Only these sites.** The extension runs only on the sites in the list.
+
+With either of the last two chosen, the card lists the sites, and the ✕
+next to a site takes the site off the list. **Add** puts the address typed
+in the field below onto the list.
+
+Your choices sync to your other devices.
 
 </Since>
+
+<Since v="0.1.0-rc.11">
+
+### Keyboard shortcuts for this extension
+
+This card shows when the extension has commands, each with its shortcut.
+
+- **Change.** Press the new shortcut. Sval refuses a shortcut that Sval or
+  another extension already uses, and says which one in the field.
+- **Clear.** The command loses its shortcut and reads **None**.
+- **Reset.** The command gets the extension's own shortcut back. This
+  button shows only for a shortcut you've changed.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 ### Remove
 
 - **Remove.** A dialog asks you to confirm. Then Sval deletes the
   extension and its data from this device. When Sval can't remove an
   extension, this card doesn't show.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+### Removing the extension
+
+The **Remove** button at the bottom of the page carries the extension's
+name. Sval asks you to confirm, then deletes the extension and its data
+from this device. The button doesn't show for an extension Sval can't
+remove.
+
+</Since>
 
 ## Settings › Sites
 
@@ -194,8 +268,20 @@ can reach the site, each with a switch for that site.
 ## Settings › Keyboard shortcuts
 
 Each extension with shortcuts has its own group that lists its shortcuts.
+
+<Until v="0.1.0-rc.11">
+
 **Change in the extensions page** opens the page where you change those
 shortcuts.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+**Change** opens the extension's page at its Keyboard shortcuts for this
+extension card, where the shortcuts change.
+
+</Since>
 
 ## Extensions Sval doesn't install
 

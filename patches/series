@@ -472,3 +472,4 @@ remove-migration-wizard.delete
 sval-fullscreen-menubar-shift.patch
 search-remove-app-engine.patch
 prompt-no-own-origin.patch
+addons-open-in-settings.patch

@@ -9,8 +9,9 @@
 
 /**
  * Settings' Extensions category (decision 1479): the list and its switch, an
- * extension's page with its switches, options and Remove, extensions'
- * shortcuts in Keyboard shortcuts, and search finding the category.
+ * extension's page with its switches, its own settings page and Remove,
+ * extensions' shortcuts in Keyboard shortcuts and on each extension's page,
+ * and search finding the category.
  */
 
 Services.scriptloader.loadSubScript(
@@ -224,14 +225,24 @@ add_task(async function an_extensions_page_changes_what_it_may_do() {
     "its switch grants it"
   );
 
-  const opened = BrowserTestUtils.waitForNewTab(
-    gBrowser,
-    url => url.startsWith("moz-extension:") && url.endsWith("/options.html"),
-    true
+  const settingsCard = () =>
+    permissions.querySelector('[data-extension-card="settings"]');
+  Assert.ok(
+    !settingsCard().querySelector("details").open,
+    "the extension's own settings start collapsed"
   );
-  permissions.querySelector('[data-sval-key="page-options"]').click();
-  BrowserTestUtils.removeTab(
-    await within(opened, 10_000, "the options tab opening")
+  // The extension's reload above replaces the card, collapsed again, so
+  // each check opens the card as it is and finds its page.
+  await TestUtils.waitForCondition(
+    () =>
+      (settingsCard().querySelector("details").open ||
+        !settingsCard().querySelector("summary").click()) &&
+      permissions
+        .querySelector(
+          '[data-extension-card="settings"] inline-options-browser browser'
+        )
+        ?.browsingContext?.currentURI?.spec.endsWith("/options.html"),
+    "the extension's own settings page shows in its card"
   );
 
   ui.byId("sval-extension-back").click();
@@ -303,6 +314,47 @@ add_task(async function extensions_shortcuts_are_in_keyboard_shortcuts() {
     "with its key"
   );
   Assert.ok(!row.querySelector("button"), "read-only");
+
+  card.querySelector(`[data-sval-key="keys-change:${ID}"]`).click();
+  const editable = await TestUtils.waitForCondition(
+    () =>
+      ui.byId("sval-extension-page").checkVisibility() &&
+      ui
+        .byId("sval-extension-cards")
+        .querySelector(
+          '[data-extension-card="shortcuts"] [data-command="do-nothing"]'
+        ),
+    "Change leads to the extension's own shortcuts"
+  );
+  Assert.equal(
+    ui.page.document.activeElement,
+    editable.closest("section").querySelector(".sval-site-card-title"),
+    "with the focus on that card"
+  );
+  const commands = WebExtensionPolicy.getByID(ID).extension.shortcuts;
+  editable.querySelector('[data-action="clear"]').click();
+  await TestUtils.waitForCondition(
+    async () =>
+      !(await commands.allCommands()).find(c => c.name === "do-nothing")
+        .shortcut,
+    "Clear takes the shortcut away"
+  );
+  const reset = await TestUtils.waitForCondition(
+    () =>
+      ui
+        .byId("sval-extension-cards")
+        .querySelector(
+          '[data-command="do-nothing"] [data-action="reset"]:not([hidden])'
+        ),
+    "and Reset is offered"
+  );
+  reset.click();
+  await TestUtils.waitForCondition(
+    async () =>
+      (await commands.allCommands()).find(c => c.name === "do-nothing")
+        .shortcut,
+    "Reset puts the extension's own shortcut back"
+  );
   await extension.unload();
 });
 

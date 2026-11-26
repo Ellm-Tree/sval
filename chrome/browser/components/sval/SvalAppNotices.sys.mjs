@@ -32,6 +32,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   CustomizableUI:
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
+  SvalExtensionsMenu:
+    "moz-src:///browser/components/sval/SvalExtensionsMenu.sys.mjs",
 });
 ChromeUtils.defineLazyGetter(
   lazy,
@@ -196,6 +198,7 @@ function pinAction(win, addonId, answer) {
     run: () => {
       gUnifiedExtensions._maybeMoveWidgetNodeBack(widgetId);
       gUnifiedExtensions.pinToToolbar(widgetId, true);
+      lazy.SvalExtensionsMenu.redrawOpen(win);
       answer();
     },
   };

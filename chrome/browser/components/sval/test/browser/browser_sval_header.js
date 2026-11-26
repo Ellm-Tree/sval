@@ -376,15 +376,17 @@ add_task(async function a_private_window_wears_the_private_header() {
 });
 
 add_task(async function the_theme_list_shows_extensions_instead() {
-  await BrowserTestUtils.withNewTab("about:blank", async () => {
-    const win = await within(
-      BrowserAddonUI.openAddonsMgr("addons://list/theme"),
-      20_000,
-      "the add-ons manager's opening"
+  await BrowserTestUtils.withNewTab("about:addons", async browser => {
+    await TestUtils.waitForCondition(
+      () => browser.contentWindow?.gViewController?.currentViewId,
+      "the add-ons page shows a view"
     );
+    const win = browser.contentWindow;
+    await within(win.promiseInitialized, 10_000, "the add-ons page's start");
+    win.loadView("addons://list/theme");
     await TestUtils.waitForCondition(
       () =>
-        win.document.querySelector("#category-extension")?.selected ||
+        win.gViewController.currentViewId === "addons://list/extension" &&
         win.document.querySelector("addon-list")?.getAttribute("type") ===
           "extension",
       "the extensions list is shown"

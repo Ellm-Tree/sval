@@ -4,14 +4,15 @@
 "use strict";
 
 /**
- * The add-ons page in Sval's design (`SvalPageStyle`), and the way between
- * it and Settings in one tab (`SvalAddonsNav`).
+ * The add-ons page in Sval's design (`SvalPageStyle`), Firefox's ways into
+ * it opening Settings instead, and the way from the page back to Settings
+ * in its tab (`SvalAddonsNav`).
  */
 
 ChromeUtils.defineESModuleGetters(this, {
   PAGE_SHEET: "moz-src:///browser/components/sval/SvalPageStyle.sys.mjs",
   sheetsFor: "moz-src:///browser/components/sval/SvalPageStyle.sys.mjs",
-  SvalAddonsNav: "moz-src:///browser/components/sval/SvalAddonsNav.sys.mjs",
+  settingsPaneFor: "moz-src:///browser/components/sval/SvalAddonsNav.sys.mjs",
 });
 
 /**
@@ -63,15 +64,69 @@ add_task(function only_the_restyled_pages_take_sheets() {
   Assert.deepEqual(sheetsFor("https://example.com/"), [], "a site takes none");
 });
 
-add_task(async function settings_opens_add_ons_in_its_tab_and_back() {
+add_task(function add_ons_views_have_places_in_settings() {
+  Assert.equal(settingsPaneFor(undefined), "paneSvalExtensions");
+  Assert.equal(
+    settingsPaneFor("addons://list/extension"),
+    "paneSvalExtensions"
+  );
+  Assert.equal(settingsPaneFor("addons://discover/"), "paneSvalExtensions");
+  Assert.equal(
+    settingsPaneFor("addons://detail/a%40b"),
+    "paneSvalExtensions-extension?id=a%40b"
+  );
+  Assert.equal(
+    settingsPaneFor("addons://detail/a%40b/preferences"),
+    "paneSvalExtensions-extension?id=a%40b&card=settings"
+  );
+  Assert.equal(
+    settingsPaneFor("addons://shortcuts/a%40b"),
+    "paneSvalExtensions-extension?id=a%40b&card=shortcuts"
+  );
+  Assert.equal(
+    settingsPaneFor("addons://shortcuts/shortcuts"),
+    "paneSvalKeyboard"
+  );
+  Assert.equal(
+    settingsPaneFor("addons://list/dictionary"),
+    null,
+    "dictionaries keep the add-ons page"
+  );
+});
+
+add_task(async function the_add_ons_manager_opens_settings() {
+  await BrowserTestUtils.withNewTab("about:blank", async blank => {
+    const page = await within(
+      BrowserAddonUI.openAddonsMgr("addons://list/extension"),
+      20_000,
+      "the add-ons manager's opening"
+    );
+    const browser = page.docShell.chromeEventHandler;
+    const tab = gBrowser.getTabForBrowser(browser);
+    if (browser !== blank) {
+      expectOpened(tab);
+    }
+    await settingsReady(browser);
+    Assert.equal(page, browser.contentWindow, "its callers get Settings' page");
+    await TestUtils.waitForCondition(
+      () =>
+        page.document
+          .querySelector('[data-sval-pane="svalExtensions"]')
+          ?.checkVisibility(),
+      "on the Extensions category"
+    );
+    if (browser !== blank) {
+      BrowserTestUtils.removeTab(tab);
+    }
+  });
+});
+
+add_task(async function the_add_ons_page_leads_back_to_settings_in_its_tab() {
   await BrowserTestUtils.withNewTab("about:preferences", async browser => {
     const tabs = gBrowser.tabs.length;
-    const settings = await settingsReady(browser);
-    await showPane(settings, "svalExtensions");
-    settings.document.getElementById("sval-extensions-full").click();
-
+    await settingsReady(browser);
+    BrowserTestUtils.startLoadingURIString(browser, "about:addons");
     const addons = await addonsReady(browser);
-    Assert.equal(gBrowser.tabs.length, tabs, "no tab opened for add-ons");
     Assert.ok(browser.canGoBack, "Back leads to Settings");
 
     const crumb = addons.document.getElementById("sval-addons-crumb");
@@ -84,39 +139,5 @@ add_task(async function settings_opens_add_ons_in_its_tab_and_back() {
     await settingsReady(browser);
     Assert.equal(gBrowser.tabs.length, tabs, "Settings came back in the tab");
     Assert.ok(browser.canGoForward, "and the history went back to it");
-  });
-});
-
-add_task(async function settings_can_ask_add_ons_for_a_view() {
-  await BrowserTestUtils.withNewTab("about:preferences", async browser => {
-    const settings = await settingsReady(browser);
-    SvalAddonsNav.openInTab(settings, "addons://list/plugin");
-    const addons = await addonsReady(browser);
-    await TestUtils.waitForCondition(
-      () => addons.gViewController.currentViewId === "addons://list/plugin",
-      "the asked-for view shows"
-    );
-  });
-});
-
-add_task(async function add_ons_from_elsewhere_lead_to_settings_in_the_tab() {
-  await BrowserTestUtils.withNewTab("about:blank", async blank => {
-    const addons = await within(
-      BrowserAddonUI.openAddonsMgr("addons://list/extension"),
-      20_000,
-      "the add-ons manager's opening"
-    );
-    const tab = gBrowser.getTabForBrowser(addons.docShell.chromeEventHandler);
-    if (tab.linkedBrowser !== blank) {
-      expectOpened(tab);
-    }
-    const tabs = gBrowser.tabs.length;
-    addons.document.getElementById("sval-addons-crumb").click();
-    await settingsReady(tab.linkedBrowser);
-    Assert.equal(gBrowser.selectedTab, tab, "Settings loaded in the tab");
-    Assert.equal(gBrowser.tabs.length, tabs, "and opened no other");
-    if (tab.linkedBrowser !== blank) {
-      BrowserTestUtils.removeTab(tab);
-    }
   });
 });

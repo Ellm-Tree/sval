@@ -14,8 +14,8 @@ stay away from every other site you visit.
 
 1. Open Settings › Extensions.
 2. Under Installed, select the extension's name.
-3. Turn off **Run on every site**.
-4. In **Add a site**, type the site's address.
+3. In the menu at the top of the Sites card, choose **Only these sites**.
+4. Type the site's address in the field under the list.
 5. Select **Add**.
 
 Sval reloads the tabs whose pages the extension can now reach, or can no
@@ -25,9 +25,9 @@ longer reach.
 
 - The **Run on** switch in the extensions menu also turns the extension on
   for the site you're on.
-- When you turn Run on every site on or off, Sval drops each listed site
-  that now matches the switch. A site where you'd turned the extension off
-  stays off when you turn the switch off.
+- Choosing **Only these sites** empties a list of sites the extension was
+  off on, since the extension is now off on them anyway. Choosing **Every
+  site** empties the list too.
 - Your choice syncs to your other devices.
 
 ## Related pages

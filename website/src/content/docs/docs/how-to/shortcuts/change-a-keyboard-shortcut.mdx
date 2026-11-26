@@ -4,6 +4,8 @@ description: Give a command a new shortcut, give one to a command that has none,
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 Sval lists every shortcut in Settings › Keyboard shortcuts. You can change
 most shortcuts. You can also give a shortcut to a command that starts with
@@ -50,8 +52,21 @@ The row reads None.
   even after you change them.
 - Menus and button tooltips show the shortcut as you set it.
 - Shortcuts you change apply on this device only.
+
+<Until v="0.1.0-rc.11">
+
 - Shortcuts for extensions are at the end of the list. To change one,
   select **Change in the extensions page**.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- Shortcuts for extensions are at the end of the list. Selecting
+  **Change** in an extension's group opens the extension's page at its
+  shortcuts, where you change them.
+
+</Since>
 
 ## If something goes wrong
 

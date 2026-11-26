@@ -230,6 +230,12 @@ add_task(async function an_install_opens_the_panel_with_its_message() {
     "the extension's button is pinned to the header"
   );
   Assert.equal(extensionsPanel().state, "open", "the panel stays open");
+  Assert.ok(
+    extensionsPanel().querySelector(
+      `.unified-extensions-list > [data-widget-id="${widgetId}"]`
+    ),
+    "and lists the pinned extension"
+  );
   await closeExtensionsPanel();
 
   shown = extensionsPanelShown();
@@ -413,10 +419,9 @@ add_task(async function firefoxs_sideload_alert_keeps_its_action() {
   entry.click();
   await hidden;
   const prompt = await prompted;
-  Assert.equal(
-    gBrowser.currentURI.spec,
-    "about:addons",
-    "Firefox's prompt shows over about:addons"
+  Assert.ok(
+    gBrowser.currentURI.spec.startsWith("about:preferences#svalExtensions"),
+    "Firefox's prompt shows over Settings' Extensions"
   );
   Assert.ok(
     (await AddonManager.getAddonByID(id)).seen,

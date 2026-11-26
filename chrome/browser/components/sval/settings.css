@@ -3718,14 +3718,6 @@ sval-segments-default {
   text-align: center;
 }
 
-/* The heading over an extension's listed sites (`settings-extensions.js`),
-   which says which way they go. */
-.sval-site-list-head {
-  margin: 0;
-  padding-block-start: 12px;
-  border-block-start: 1px solid var(--sval-border-subtle);
-}
-
 /* The site menu's choice pill (`sval-choice-pill` in `settings-ui.js`). */
 sval-choice-pill {
   display: flex;
@@ -4359,8 +4351,67 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   gap: 16px;
 }
 
-.sval-keys-extensions > .sval-keys-foot {
-  margin-block-start: 0;
+/* An extension's card in Keyboard shortcuts: its name, and the button to
+   the extension's page, where its shortcuts change. */
+.sval-keys-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+/* An extension's facts under its description: each name over its value,
+   side by side while the page is wide enough. */
+.sval-extension-facts:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0;
+
+  > .sval-extension-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  dt {
+    color: var(--sval-ink-muted);
+    font-size: var(--settings-note-size);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--sval-ink);
+    overflow-wrap: anywhere;
+  }
+}
+
+/* The Extension Settings card is its disclosure alone, so the summary is
+   the card's title and takes no rule above it. */
+.sval-card.sval-extension-options-card > .sval-advanced {
+  border-block-start: none;
+
+  > .sval-advanced-summary {
+    padding-block: 0;
+  }
+}
+
+/* The extension's own settings page, in about:addons' frame for it
+   (`.addon-inline-options` in `aboutaddons.css`), which sets its height to
+   the page's. The least height is that rule's, which leaves room for the
+   page's prompts, and its grid is that rule's, for the reason it gives. */
+.sval-extension-options {
+  margin-block-start: 12px;
+
+  & browser {
+    display: grid;
+    width: 100%;
+    min-height: 250px;
+    background-color: Canvas;
+    border-radius: 8px;
+  }
 }
 
 /* An extension's page: a site to turn the extension off on, and its button. */

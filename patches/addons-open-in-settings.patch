@@ -1,0 +1,68 @@
+Sval: Open extensions' places in Settings
+
+Settings' Extensions category holds everything about:addons' extension
+views show, so BrowserAddonUI.openAddonsMgr hands those views to
+SvalAddonsNav.openInSettings. Settings shows an extension's options page
+in a remote browser, which nsFrameLoader allows in about:addons, as
+Thunderbird allows it in its about:preferences. The add-ons shortcut
+editor's key reader is exported for Settings' shortcut fields, which
+check keys as it does.
+
+diff --git a/browser/base/content/browser-addons.js b/browser/base/content/browser-addons.js
+index f074145301..0b851c6ce0 100644
+--- a/browser/base/content/browser-addons.js
++++ b/browser/base/content/browser-addons.js
+@@ -1960,6 +1960,13 @@ var BrowserAddonUI = {
+    *                    view id.
+    */
+   openAddonsMgr(aView, { selectTabByViewId = false } = {}) {
++    // Sval: extensions are managed in Settings.
++    const inSettings = ChromeUtils.importESModule(
++      "moz-src:///browser/components/sval/SvalAddonsNav.sys.mjs"
++    ).SvalAddonsNav.openInSettings(window, aView);
++    if (inSettings) {
++      return inSettings;
++    }
+     return new Promise(resolve => {
+       let emWindow;
+       let browserWindow;
+diff --git a/dom/base/nsFrameLoader.cpp b/dom/base/nsFrameLoader.cpp
+index 0b5aa4cab2..8f6e43a702 100644
+--- a/dom/base/nsFrameLoader.cpp
++++ b/dom/base/nsFrameLoader.cpp
+@@ -2589,8 +2589,7 @@ bool nsFrameLoader::TryRemoteBrowserInternal() {
+     if (parentDocShell->ItemType() != nsIDocShellTreeItem::typeChrome) {
+       // Allow three exceptions to this rule :
+       // - about:addons so it can load remote extension options pages
+-      // - about:preferences (in Thunderbird only) so it can load remote
+-      //     extension options pages for FileLink providers
++      // - about:preferences so it can load remote extension options pages
+       // - DevTools webext panels if DevTools is loaded in a content frame
+       // - DevTools Network Monitor, which uses content frame for HTML request
+       // previews
+@@ -2614,10 +2613,11 @@ bool nsFrameLoader::TryRemoteBrowserInternal() {
+         const nsLiteralCString kAllowedURIs[] = {
+             "about:addons"_ns,
+             "chrome://mozapps/content/extensions/aboutaddons.html"_ns,
++            "about:preferences"_ns,
++            "about:settings"_ns,
+ #ifdef MOZ_THUNDERBIRD
+             "about:3pane"_ns,
+             "about:message"_ns,
+-            "about:preferences"_ns,
+ #endif
+             "chrome://browser/content/webext-panels.xhtml"_ns,
+             "chrome://devtools/content/netmonitor/index.html"_ns,
+diff --git a/toolkit/mozapps/extensions/content/components/addon-shortcuts.mjs b/toolkit/mozapps/extensions/content/components/addon-shortcuts.mjs
+index f098566f0b..3fc75d4665 100644
+--- a/toolkit/mozapps/extensions/content/components/addon-shortcuts.mjs
++++ b/toolkit/mozapps/extensions/content/components/addon-shortcuts.mjs
+@@ -359,7 +359,7 @@ function onFocus(e) {
+   }
+ }
+ 
+-function getShortcutForEvent(e) {
++export function getShortcutForEvent(e) {
+   let modifierMap;
+ 
+   if (AppConstants.platform == "macosx") {

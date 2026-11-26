@@ -419,7 +419,7 @@ do.
 - **Full-strength ad blockers.** Sval runs Manifest V2 and V3 extensions, so
   uBlock Origin and other blockers work at full strength.
 - **Settings › Extensions** lists every extension with an on/off switch. Each
-  extension has a page for its permissions, private windows, and options.
+  extension's page holds its permissions, updates, shortcuts and settings.
 - **Extension buttons for a page.** When an extension has a button for the
   page you're on, the extensions button shows a dot.
 - **Extension updates wait a week**, so Mozilla has time to catch a harmful

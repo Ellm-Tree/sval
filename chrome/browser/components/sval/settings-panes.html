@@ -2115,7 +2115,7 @@
         </button>
       </div>
       <!-- Extensions' commands, drawn by `settings-extensions.js`. They
-           change in the add-ons page, whose editor checks a key against
+           change in each extension's page, which checks a key against
            every extension's (`ExtensionShortcutKeyMap`). -->
       <div
         id="sval-keys-extensions"
@@ -2126,15 +2126,6 @@
           Your extensions add these shortcuts.
         </p>
         <div id="sval-keys-extensions-list" class="sval-keys-list"></div>
-        <div class="sval-keys-foot">
-          <button
-            id="sval-keys-extensions-change"
-            class="sval-button"
-            type="button"
-          >
-            Change in the extensions page
-          </button>
-        </div>
       </div>
     </section>
 
@@ -2179,6 +2170,13 @@
           ></h1>
         </header>
         <p id="sval-extension-description" class="sval-site-nothing"></p>
+        <!-- Who made the extension, its version, when it last changed and
+             its homepage (`_drawFacts`). -->
+        <dl
+          id="sval-extension-facts"
+          class="sval-extension-facts"
+          hidden="hidden"
+        ></dl>
         <div id="sval-extension-cards" class="sval-site-cards"></div>
       </section>
 
@@ -2214,8 +2212,8 @@
           >
             Install from file…
           </button>
-          <button id="sval-extensions-full" class="sval-link" type="button">
-            Open the full extensions page
+          <button id="sval-extensions-find" class="sval-link" type="button">
+            Find more extensions
           </button>
         </div>
       </section>

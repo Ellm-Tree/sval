@@ -62,14 +62,79 @@ add_task(async function test_extension_page_lists_sites_off() {
   const row = () =>
     sitesCard(doc).querySelector('[data-extension-site="example.com"]');
   Assert.ok(row(), "the site it is off on is listed");
-  const toggle = row().querySelector("input.sval-switch");
-  Assert.ok(!toggle.checked, "with its switch off");
-  toggle.click();
+  row().querySelector("button.sval-agent-remove").click();
   await until(
     () => !SvalExtensionSites.isOff(ID, "example.com"),
-    "the switch turning the extension on there"
+    "removing the site turning the extension on there"
   );
   await until(() => !row(), "and the site leaving the list");
+});
+
+/**
+ * Picks `mode` in the sites card's choice, as its menu item does.
+ *
+ * @param {Document} doc
+ * @param {string} mode
+ */
+function choose(doc, mode) {
+  const pill = sitesCard(doc).querySelector("[data-sval-key='sites-mode']");
+  pill.value = mode;
+  pill.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+const entryOf = doc =>
+  sitesCard(doc)?.querySelector("input[data-sval-key='sites-entry']");
+
+add_task(async function test_every_site_shows_no_list() {
+  await loadExtension();
+  const { page } = await openAt(EXTENSION_PAGE);
+  const doc = page.document;
+  await until(() => sitesCard(doc), "the sites card showing");
+  is(
+    sitesCard(doc).querySelector("[data-sval-key='sites-mode']").value,
+    "every",
+    "an extension runs on every site by default"
+  );
+  ok(!entryOf(doc), "with no list of sites");
+});
+
+add_task(async function test_choosing_every_site_clears_the_list() {
+  await loadExtension();
+  await SvalExtensionSites.setOff(ID, "example.com", true);
+  const { page } = await openAt(EXTENSION_PAGE);
+  const doc = page.document;
+  await until(entryOf.bind(null, doc), "the list of sites showing");
+  is(
+    sitesCard(doc).querySelector("[data-sval-key='sites-mode']").value,
+    "except",
+    "a site it is off on reads as an exception"
+  );
+  choose(doc, "every");
+  await until(
+    () => !SvalExtensionSites.sitesOff(ID).length,
+    "Every site turning the extension back on everywhere"
+  );
+  await until(() => !entryOf(doc), "and the list going");
+});
+
+add_task(async function test_only_these_sites_adds_a_site_it_runs_on() {
+  await loadExtension();
+  atTaskEnd(() => SvalExtensionSites.setOffByDefault(ID, false));
+  const { page } = await openAt(EXTENSION_PAGE);
+  const doc = page.document;
+  await until(() => sitesCard(doc), "the sites card showing");
+  choose(doc, "only");
+  await until(
+    () => SvalExtensionSites.offByDefault(ID),
+    "Only these sites turning the extension off by default"
+  );
+  await until(entryOf.bind(null, doc), "the field for a site showing");
+  entryOf(doc).value = "example.net";
+  sitesCard(doc).querySelector("[data-sval-key='sites-add']").click();
+  await until(
+    () => !SvalExtensionSites.isOff(ID, "example.net"),
+    "the added site turning the extension on there"
+  );
 });
 
 add_task(async function test_extension_page_adds_site() {
@@ -77,9 +142,9 @@ add_task(async function test_extension_page_adds_site() {
   const { page } = await openAt(EXTENSION_PAGE);
   const doc = page.document;
   await until(() => sitesCard(doc), "the sites card showing");
-  const entry = sitesCard(doc).querySelector(
-    "input[data-sval-key='sites-entry']"
-  );
+  choose(doc, "except");
+  await until(entryOf.bind(null, doc), "the field for a site showing");
+  const entry = entryOf(doc);
   entry.value = "www.example.org";
   sitesCard(doc).querySelector("[data-sval-key='sites-add']").click();
   await until(
