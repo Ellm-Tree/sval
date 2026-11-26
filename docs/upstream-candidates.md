@@ -2067,6 +2067,25 @@ Each entry gives:
 - **Upstream**: the same patch, or a `snapshot` that also catches an async
   provider's rejection. Not submitted.
 
+### A tab moved in from another window and selected can stay blank
+
+- **Patch**: `patches/adopt-tab-selects-before-swap.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `adoptTab` with `selectTab` swaps the page into a new
+  background tab and then selects it. With no tab switcher running,
+  `_swapBrowserDocShells` sets the page inactive, which stops its layers,
+  and the selection starts them again in the same turn. When the stop's
+  `MozLayerTreeCleared` lands after the switcher has seen the page's layers,
+  the switcher ignores it, since `renderLayers` is true, and the page stays
+  blank with `renderLayers` true and `hasLayers` false.
+- **Evidence**: `browser_sval_agent_on_peeks_and_quick_peeks.js` timed out
+  in CI waiting for the moved page's layers, in that state. Read at the
+  swap's `EndSwapDocShells`, the page's `renderLayers` is false without the
+  patch, every time.
+- **Upstream**: the patch selects the new tab before the swap, so the tab
+  switcher carries the page's state across (`onSwapDocShells`). Dropping a
+  dragged tab into another window takes the same path.
+
 ## Backports carried until the pin reaches them
 
 Mozilla has fixed these upstream. They stay listed only so the patch or pref is

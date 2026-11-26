@@ -1,0 +1,38 @@
+Sval: a tab moved in from another window keeps rendering
+
+adoptTab swapped the page into a background tab, which stops it
+rendering, and then selected the tab, which starts it again. A stop
+whose layers clear after the start leaves the page blank in its new
+window. Selecting the tab before the swap lets the tab switcher carry
+the page's state across, so it renders all through the move.
+
+diff --git a/browser/components/tabbrowser/content/tabbrowser.js b/browser/components/tabbrowser/content/tabbrowser.js
+index 0341f3e772..93b90726d1 100644
+--- a/browser/components/tabbrowser/content/tabbrowser.js
++++ b/browser/components/tabbrowser/content/tabbrowser.js
+@@ -7394,16 +7394,21 @@
+ 
+       aTab.container.tabDragAndDrop.finishAnimateTabMove();
+ 
++      // Sval: a tab selected before the swap keeps the page rendering through
++      // it, as the tab switcher carries the page's state across
++      // (`onSwapDocShells`). Swapped into a background tab, the page stops
++      // rendering and selecting the tab restarts it, and a stop whose layers
++      // clear after the restart leaves the page blank.
++      if (selectTab) {
++        this.selectedTab = newTab;
++      }
++
+       if (!this.swapBrowsersAndCloseOther(newTab, aTab)) {
+         // Swapping wasn't permitted. Bail out.
+         this.removeTab(newTab);
+         return null;
+       }
+ 
+-      if (selectTab) {
+-        this.selectedTab = newTab;
+-      }
+-
+       if (tabInGroup) {
+         Glean.tabgroup.tabInteractions.remove_other_window.add();
+       }

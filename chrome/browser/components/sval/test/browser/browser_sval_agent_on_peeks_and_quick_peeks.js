@@ -32,7 +32,23 @@ add_task(async function a_link_from_another_app_moves_into_the_workspace() {
   const url = titledRed("From an app");
   const win = await linkFromAnotherApp(url);
   await shows(win.gBrowser.selectedBrowser, url, "the peek");
+  // A shown page that stops rendering as it moves and starts again can lose
+  // its layers to the stop, which leaves it blank. The listener reads the
+  // page as the move lands in this window, before anything after the swap
+  // selects its tab.
+  let rendersAsItLands;
+  const swapped = BrowserTestUtils.waitForEvent(
+    window,
+    "EndSwapDocShells",
+    true,
+    event => {
+      rendersAsItLands = event.originalTarget.renderLayers;
+      return true;
+    }
+  );
   const tab = await movedInShows(win, url);
+  await within(swapped, 10_000, "the page's move");
+  Assert.ok(rendersAsItLands, "the page renders all through its move");
   const id = await nodeOfTab(tab);
   Assert.equal(
     SvalPanel.nodes[id]?.placement.parent,

@@ -473,4 +473,5 @@ sval-fullscreen-menubar-shift.patch
 search-remove-app-engine.patch
 prompt-no-own-origin.patch
 addons-open-in-settings.patch
+adopt-tab-selects-before-swap.patch
 troubleshoot-disk-space-unreadable.patch
