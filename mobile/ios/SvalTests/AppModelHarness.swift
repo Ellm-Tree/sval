@@ -129,6 +129,12 @@ final class AppHarness {
         // land after the next launch read the folder. An app that ends
         // lands nothing after.
         await model.browser.statesWritten()
+        // The model and its browser hold each other, so without this the
+        // pages outlive the quit, each with its web content process, and
+        // those of every earlier test pile up through a run. An app that
+        // ends frees its pages.
+        for page in model.browser.pages.values { page.close() }
+        model.browser.pages.removeAll()
         folder.cutOff()
         try await until("the passes end") { !model.syncing }
         self.model = nil
