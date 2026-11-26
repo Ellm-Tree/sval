@@ -1,0 +1,226 @@
+Sval: remove a search engine Sval ships for good
+
+Firefox only hides an application provided engine on removal, because the
+configuration lists it again at every load. Sval's configuration is its own,
+so the search service keeps the ids the user removed and leaves them out of
+the configuration it loads. Settings gives every engine row a remove button,
+disabled for a default engine.
+
+diff --git a/browser/components/preferences/config/search.mjs b/browser/components/preferences/config/search.mjs
+index 1446fe75c1..3b8fdf514a 100644
+--- a/browser/components/preferences/config/search.mjs
++++ b/browser/components/preferences/config/search.mjs
+@@ -871,64 +871,75 @@ Preferences.addSetting(
+      *
+      * @param {SearchEngine} engine
+      *   The engine to add settings for.
++     * @returns {SettingControlConfig[]}
+      */
+     handleDeletionOptions(engine) {
+-      /** @type {SettingControlConfig} */
+-      let deletionOptions;
++      /** @type {SettingControlConfig[]} */
++      let deletionOptions = [];
+       if (engine instanceof lazy.ConfigSearchEngine) {
+         let toggleId = `toggleEngine-${engine.id}`;
+         maybeMakeSetting(ToggleSetting(toggleId, engine));
+ 
+-        deletionOptions = {
++        deletionOptions.push({
+           id: toggleId,
+           l10nId: "search-enable-engine",
+           control: "moz-toggle",
+           slot: "actions",
+-        };
+-      } else {
+-        let deletionId = `deleteEngine-${engine.id}`;
+-        maybeMakeSetting({
+-          id: deletionId,
+-          async onUserClick() {
+-            let [body, removeLabel] = await document.l10n.formatValues([
+-              "remove-engine-confirmation",
+-              "remove-engine-remove",
+-            ]);
+-
+-            let button = Services.prompt.confirmExBC(
+-              window.browsingContext,
+-              Services.prompt.MODAL_TYPE_CONTENT,
+-              null,
+-              body,
+-              (Services.prompt.BUTTON_TITLE_IS_STRING *
+-                Services.prompt.BUTTON_POS_0) |
+-                (Services.prompt.BUTTON_TITLE_CANCEL *
+-                  Services.prompt.BUTTON_POS_1),
+-              removeLabel,
+-              null,
+-              null,
+-              null,
+-              {}
+-            );
+-
+-            if (button == 0) {
+-              await lazy.SearchService.removeEngine(
+-                engine,
+-                lazy.SearchService.CHANGE_REASON.USER
+-              );
+-            }
+-          },
+         });
+-
+-        deletionOptions = {
+-          id: deletionId,
+-          l10nId: "search-delete-engine",
+-          control: "moz-button",
+-          iconSrc: "chrome://global/skin/icons/delete.svg",
+-          slot: "actions",
+-        };
+       }
+ 
++      // Sval: every engine can be removed, the ones Sval ships included. A
++      // default engine's button is disabled, so a removal never changes the
++      // default behind the user's back.
++      let deletionId = `deleteEngine-${engine.id}`;
++      maybeMakeSetting({
++        id: deletionId,
++        deps: ["defaultEngineNormal", "defaultPrivateEngine"],
++        disabled: () =>
++          lazy.SearchService.defaultEngine == engine ||
++          lazy.SearchService.defaultPrivateEngine == engine,
++        async onUserClick() {
++          let [body, removeLabel] = await document.l10n.formatValues([
++            {
++              id: "search-remove-engine-confirmation",
++              args: { name: engine.name },
++            },
++            "remove-engine-remove",
++          ]);
++
++          let button = Services.prompt.confirmExBC(
++            window.browsingContext,
++            Services.prompt.MODAL_TYPE_CONTENT,
++            null,
++            body,
++            (Services.prompt.BUTTON_TITLE_IS_STRING *
++              Services.prompt.BUTTON_POS_0) |
++              (Services.prompt.BUTTON_TITLE_CANCEL *
++                Services.prompt.BUTTON_POS_1),
++            removeLabel,
++            null,
++            null,
++            null,
++            {}
++          );
++
++          if (button == 0) {
++            await lazy.SearchService.removeEngine(
++              engine,
++              lazy.SearchService.CHANGE_REASON.USER
++            );
++          }
++        },
++      });
++
++      deletionOptions.push({
++        id: deletionId,
++        l10nId: "search-delete-engine",
++        control: "moz-button",
++        iconSrc: "chrome://global/skin/icons/close.svg",
++        slot: "actions",
++      });
++
+       return deletionOptions;
+     }
+ 
+@@ -991,7 +1002,7 @@ Preferences.addSetting(
+         // and an outlink icon, but they should not have a toggle or a delete
+         // button.
+         if (!(engine instanceof lazy.AddonSearchEngine)) {
+-          config.items.push(this.handleDeletionOptions(engine));
++          config.items.push(...this.handleDeletionOptions(engine));
+         } else {
+           maybeMakeSetting({
+             id: outlinkId,
+diff --git a/browser/locales/en-US/browser/preferences/preferences.ftl b/browser/locales/en-US/browser/preferences/preferences.ftl
+index 0598023b2a..273639e815 100644
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -1121,7 +1121,7 @@ update-search-engine-success =
+ search-edit-engine-2 =
+     .title = Edit search engine
+ search-delete-engine =
+-    .title = Delete search engine
++    .title = Remove search engine
+ search-enable-engine =
+     .title = Enable search engine
+ search-outlink-to-extensions-page =
+@@ -1167,6 +1167,9 @@ search-keyword-warning-bookmark = You have chosen a keyword that is currently in
+ edit-engine-name-warning-duplicate = There already is a search engine with the name “{ $name }”. Please choose another name.
+ 
+ remove-engine-confirmation = Are you sure you want to remove this search engine?
++# Variables:
++#   $name (string) - The name of the search engine to remove.
++search-remove-engine-confirmation = Are you sure you want to remove { $name }?
+ remove-engine-remove = Remove
+ remove-addon-engine-alert = To remove this search engine, remove the associated add-on.
+ 
+diff --git a/toolkit/components/search/SearchService.sys.mjs b/toolkit/components/search/SearchService.sys.mjs
+index 2d0f0d1d9b..56dd365337 100644
+--- a/toolkit/components/search/SearchService.sys.mjs
++++ b/toolkit/components/search/SearchService.sys.mjs
+@@ -82,6 +82,10 @@ const RECONFIG_IDLE_TIME_SEC = 5 * 60;
+ // install engines they are using.
+ const ENGINES_SEEN_KEY = "contextual-engines-seen";
+ 
++// Sval: the ids of the application provided engines the user removed. The
++// configuration lists them again at every load, so the removal is kept here.
++const REMOVED_APP_ENGINES_KEY = "sval-removed-app-engines";
++
+ // Value we store to indicate prompt should not be shown.
+ const DONT_SHOW_PROMPT = -1;
+ 
+@@ -856,8 +860,9 @@ export const SearchService = new (class SearchService {
+   }
+ 
+   /**
+-   * Removes the search engine. If the search engine is installed in a global
+-   * location, this will just hide the engine. If the engine is in the user's
++   * Removes the search engine. An application provided engine is removed and
++   * stays out of the engine list at every later load. Any other engine
++   * installed in a global location is hidden. If the engine is in the user's
+    * profile directory, it will be removed from disk.
+    *
+    * @param {SearchEngine} engine
+@@ -913,7 +918,15 @@ export const SearchService = new (class SearchService {
+ 
+     let userInstalled =
+       engineToRemove instanceof lazy.UserInstalledConfigEngine;
+-    if (engineToRemove.inMemory && !userInstalled) {
++    let appProvided = engineToRemove instanceof lazy.AppProvidedConfigEngine;
++    if (appProvided) {
++      let removed =
++        this._settings.getMetaDataAttribute(REMOVED_APP_ENGINES_KEY) ?? [];
++      this._settings.setMetaDataAttribute(REMOVED_APP_ENGINES_KEY, [
++        ...new Set([...removed, engineToRemove.id]),
++      ]);
++    }
++    if (engineToRemove.inMemory && !userInstalled && !appProvided) {
+       // Just hide it (the "hidden" setter will notify) and remove its alias to
+       // avoid future conflicts with other engines.
+       engineToRemove.hidden = true;
+@@ -2815,9 +2828,15 @@ export const SearchService = new (class SearchService {
+       this._settings.setMetaDataAttribute(key, value);
+     }
+ 
+-    return this.#engineSelector.fetchEngineConfiguration(
++    let refinedConfig = await this.#engineSelector.fetchEngineConfiguration(
+       searchEngineSelectorProperties
+     );
++    let removed =
++      this._settings.getMetaDataAttribute(REMOVED_APP_ENGINES_KEY) ?? [];
++    refinedConfig.engines = refinedConfig.engines.filter(
++      config => !removed.includes(config.identifier)
++    );
++    return refinedConfig;
+   }
+ 
+   #setDefaultFromSelector(refinedConfig) {

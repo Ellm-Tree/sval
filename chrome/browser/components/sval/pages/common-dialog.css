@@ -42,6 +42,13 @@
   margin-bottom: 4px;
 }
 
+/* `adjustableTitle.js` adds the origin row to every embedded dialog, and
+   `commonDialog.js` leaves out `headertitle` for a question Sval itself asks
+   (prompt-no-own-origin.patch), which has no origin to name. */
+:root:not([headertitle]) #titleContainer {
+  display: none;
+}
+
 /* `adjustableTitle.js` fills the icon's box with the canvas colour, which
    shows as a square on the dialog's tinted surface. */
 #titleContainer .titleIcon {

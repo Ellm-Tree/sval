@@ -392,6 +392,9 @@ do.
   you're a subscriber without revealing who you are.
 - **Add your own.** Add your own search engine if the one you want isn't
   listed.
+- **Remove any engine.** You can remove any search engine you don't use in
+  Settings › Search and Launcher, and that includes the ones Sval comes
+  with.
 
 ## Passwords
 

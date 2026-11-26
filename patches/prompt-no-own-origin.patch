@@ -1,0 +1,38 @@
+Sval: name no origin on a question Sval itself asks
+
+A tab-modal prompt names the site that asks above its text. For a prompt
+the browser's own pages open, such as a confirmation in Settings, that row
+read as the browser's name and icon, which says nothing the user doesn't
+know. Sval's common-dialog.css hides the row when there is no origin.
+
+diff --git a/toolkit/components/prompts/content/commonDialog.js b/toolkit/components/prompts/content/commonDialog.js
+index 71108e6d35..832ac54ca5 100644
+--- a/toolkit/components/prompts/content/commonDialog.js
++++ b/toolkit/components/prompts/content/commonDialog.js
+@@ -49,8 +49,9 @@ function commonDialogOnLoad() {
+       if (promptPrincipal.isNullPrincipal) {
+         title = { l10nId: "common-dialog-title-null" };
+       } else if (promptPrincipal.isSystemPrincipal) {
+-        title = { l10nId: "common-dialog-title-system" };
+-        root.style.setProperty("--icon-url", CommonDialog.DEFAULT_APP_ICON_CSS);
++        // Sval: the origin row names who asks, and a question the browser
++        // itself asks has nobody else to name.
++        title = null;
+       } else if (promptPrincipal.addonPolicy) {
+         title.raw = promptPrincipal.addonPolicy.name;
+       } else if (promptPrincipal.isContentPrincipal) {
+@@ -75,9 +76,11 @@ function commonDialogOnLoad() {
+     root.style.setProperty("--icon-url", args.headerIconCSSValue);
+   }
+   // Fade and crop potentially long raw titles, e.g., origins and hostnames.
+-  title.shouldUseMaskFade =
+-    !useTitle && title.raw && (args.authOrigin || promptPrincipal);
+-  root.setAttribute("headertitle", JSON.stringify(title));
++  if (title) {
++    title.shouldUseMaskFade =
++      !useTitle && title.raw && (args.authOrigin || promptPrincipal);
++    root.setAttribute("headertitle", JSON.stringify(title));
++  }
+   if (args.isInsecureAuth) {
+     dialog.setAttribute("insecureauth", "true");
+   }

@@ -303,6 +303,8 @@ head = "tabs_head.js"
 
 ["test_sval_scope.js"]
 
+["test_sval_search_engine_removal.js"]
+
 ["test_sval_secret_store.js"]
 
 ["test_sval_secure_dns.js"]

@@ -470,3 +470,5 @@ remove-about-protections.delete
 remove-migration-wizard.patch
 remove-migration-wizard.delete
 sval-fullscreen-menubar-shift.patch
+search-remove-app-engine.patch
+prompt-no-own-origin.patch
