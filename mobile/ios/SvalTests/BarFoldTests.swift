@@ -114,13 +114,12 @@ final class BarFoldTests: XCTestCase {
         XCTAssertEqual(fold.value, 0.6, accuracy: 1e-9, "no settle while the finger is down")
     }
 
-    func testKeepFoldPutsTheFoldBackAtOnce() {
+    func testEndingTheRunStartsTheNextPageAfresh() {
         let fold = BarFold()
-        fold.keepFold(0.4)
-        XCTAssertEqual(fold.value, 0.4)
-        XCTAssertEqual(fold.phase, .partway)
-        drag(fold, 10)
-        XCTAssertEqual(fold.value, 0.4 + 10 / distance, accuracy: 1e-9, "a kept fold partway moves on at once")
+        drag(fold, 60)
+        fold.endRun()
+        drag(fold, 60)
+        XCTAssertEqual(fold.value, 0, "the run before the switch doesn't count toward the start")
     }
 
     /// A reader of the phase is told when the fold starts and when it

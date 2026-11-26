@@ -99,11 +99,11 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
                 }
             }
             if scrubbing == .tabs && t == 0 {
-                liftedAddress(address, t: t, buttons: buttons, dot: dot, scale: k)
+                lifted(address) { addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k) }
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
             }
             if scrubbing == .workspaces && t == 0 {
-                liftedWorkspaceButton(at[3])
+                lifted(at[3]) { workspaceLabel }
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
             }
             // Media playing, in this tab or another, rides above the bar in
@@ -140,29 +140,15 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
             .offset(x: frame.minX, y: frame.minY)
     }
 
-    /// The address lifted over the bar while it is held for a scrub, grown
-    /// past the buttons beside it. It is drawn outside the bar's glass
-    /// container, which would merge its glass with theirs where they
-    /// overlap, and it takes no touches, so the hold under it carries on.
-    private func liftedAddress(_ address: CGRect, t: Double, buttons: Double, dot: Double, scale k: Double) -> some View {
-        let grown: CGFloat = 1.15
-        let lifted = address.insetBy(dx: -address.width * (grown - 1) / 2, dy: -address.height * (grown - 1) / 2)
-        return addressCapsule(address, t: t, buttons: buttons, dot: dot, scale: k)
-            .scaleEffect(grown)
-            .frame(width: lifted.width, height: lifted.height)
-            .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)
-            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-            .offset(x: lifted.minX, y: lifted.minY)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-
-    /// The Workspace button lifted over the bar while it is held for a
-    /// scrub, drawn as `liftedAddress` is.
-    private func liftedWorkspaceButton(_ frame: CGRect) -> some View {
+    /// The address, or the Workspace button, lifted over the bar while it
+    /// is held for a scrub, grown past the buttons beside it from its
+    /// capsule at `frame`. It is drawn outside the bar's glass container,
+    /// which would merge its glass with theirs where they overlap, and it
+    /// takes no touches, so the hold under it carries on.
+    private func lifted<Content: View>(_ frame: CGRect, @ViewBuilder content: () -> Content) -> some View {
         let grown: CGFloat = 1.15
         let lifted = frame.insetBy(dx: -frame.width * (grown - 1) / 2, dy: -frame.height * (grown - 1) / 2)
-        return workspaceLabel
+        return content()
             .scaleEffect(grown)
             .frame(width: lifted.width, height: lifted.height)
             .glassEffect(workspaceGlass(layer, interactive: false), in: .capsule)

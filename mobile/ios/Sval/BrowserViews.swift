@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
+import Observation
 import SwiftUI
 import WebKit
 
@@ -24,11 +25,10 @@ struct BrowserView: View {
     @State private var mediaCard: String?
     /// What the address field is open for: the tab in front or a new tab.
     @State private var entering: Entry?
-    /// How far the bar has been swiped toward another Workspace.
-    @State private var swipe: CGFloat = 0
-    @State private var barHeight: CGFloat = 100
-    @State private var barWidth: CGFloat = 393
+    /// The bar's swipe toward another Workspace.
+    @State private var swipe = BarSwipeSession()
     @State private var barFrame: CGRect = .zero
+    private var barHeight: CGFloat { barFrame.height }
     @AppStorage(Walkthrough.doneKey) private var walkthroughDone = false
     /// The walkthrough's page, which the page and the bar's light share.
     @State private var walkthroughPage = 0
@@ -37,20 +37,9 @@ struct BrowserView: View {
     /// What iOS keeps clear round the screen, as the browser's own
     /// geometry reports it.
     @State private var safeArea = EdgeInsets()
-    /// The Workspace a finished swipe is sliding to.
-    @State private var swipingTo: OutlineRow?
-    /// How many swipes have switched Workspace, which taps as each does.
-    @State private var swipes = 0
     /// The scrub through the Workspace's tabs while the address is held,
     /// or through the Workspaces while the Workspace button is.
-    @State private var scrub: TabScrub?
-    /// Runs the strip on while the finger rests near the screen's edge.
-    @State private var scrubRun: Task<Void, Never>?
-    /// Where the finger is during a scrub, which the edge run reads.
-    @State private var scrubFinger: CGPoint?
-    /// The strip's frame on screen, and whether the finger has been on it.
-    @State private var stripFrame: CGRect = .zero
-    @State private var scrubEntered = false
+    @State private var scrubs = ScrubSession()
     /// Whether the Workspace shows as the upright sheet; sideways it is
     /// the panel.
     @State private var sheetShown = false
@@ -102,7 +91,7 @@ struct BrowserView: View {
                 .ignoresSafeArea(.container, edges: .bottom)
                 .overlay {
                     // The page steps back while the strip is up.
-                    Color.black.opacity(scrub == nil ? 0 : 0.25)
+                    Color.black.opacity(scrubs.isOpen ? 0.25 : 0)
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                 }
@@ -113,24 +102,11 @@ struct BrowserView: View {
                     // The Launcher's field grows out of the bar, which
                     // steps aside while it's open.
                     .opacity(entering == nil ? 1 : 0)
-                    .offset(x: reduceMotion ? 0 : swipe)
-                    .overlay {
-                        // The next Workspace's bar, coming in beside this one.
-                        if let target = swipeTarget, !reduceMotion {
-                            BarPreview(workspace: target)
-                                .offset(x: swipe + (swipe < 0 ? barWidth : -barWidth))
-                        }
-                    }
-                    // Anywhere on the bar: a drag that moves sideways
-                    // switches Workspace, and a touch that doesn't move
-                    // stays a tap on the button under it.
-                    .modifier(BarSwipe(gesture: workspaceSwipe, yields: trayInBar, isEnabled: scrub == nil))
-                    .sensoryFeedback(.selection, trigger: swipes)
-                    .modifier(ScrubFeedback(index: scrub?.index))
+                    .modifier(SwipingBar(session: swipe, width: barFrame.width, gesture: workspaceSwipe, yields: trayInBar,
+                                         isEnabled: !scrubs.isOpen))
+                    .modifier(ScrubFeedback(session: scrubs))
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
-                        barHeight = $0.height
                         toasts.barHeight = $0.height
-                        barWidth = $0.width
                         barFrame = $0
                     }
             }
@@ -141,22 +117,12 @@ struct BrowserView: View {
                 OpenBarSpotlight(size: CGSize(width: barFrame.width, height: barHeight), capsule: capsule)
                     .transition(.opacity)
             }
-            if let scrub {
-                TabScrubStrip(scrub: scrub, theme: theme, colors: BarColors(token: token, dark: scheme == .dark))
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stripFrame = $0 }
-                    .padding(.horizontal, 12 + sideInset)
-                    .padding(.bottom, barHeight + 8)
-                    .transition(reduceMotion ? .opacity
-                        : .opacity.combined(with: .scale(scale: 0.4, anchor: .bottom)))
-            }
-            if let target = swipeTarget, abs(swipe) > 12 {
-                let order = model.workspaces
-                WorkspaceSwipeHUD(
-                    target: target, index: order.firstIndex { $0.id == target.id } ?? 0, count: order.count)
-                    .padding(.bottom, 164)
-            }
+            ScrubLayer(session: scrubs, theme: theme, colors: BarColors(token: token, dark: scheme == .dark),
+                       sideInset: sideInset, barHeight: barHeight)
+            SwipeHUDLayer(session: swipe)
             if let id = mediaCard {
-                Color.black.opacity(0.001)
+                Color.clear
+                    .contentShape(.rect)
                     .ignoresSafeArea()
                     .onTapGesture { withAnimation(Motion.overlay) { mediaCard = nil } }
                 MediaCard(tabId: id) { withAnimation(Motion.overlay) { mediaCard = nil } }
@@ -349,7 +315,6 @@ struct BrowserView: View {
     @ViewBuilder private var pickCard: some View {
         if let picking {
             PickCard(pick: picking, bottomRoom: barHeight, onCancel: { self.picking = nil }, onRemove: { remove(picking) })
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
         }
     }
 
@@ -548,18 +513,6 @@ struct BrowserView: View {
 
     // MARK: Swiping between Workspaces
 
-    /// The Workspace a swipe of the bar would switch to: the next one for a
-    /// swipe left, the one before for a swipe right, wrapping at the ends as
-    /// the desktop's panel swipe does.
-    private var swipeTarget: OutlineRow? {
-        if let swipingTo { return swipingTo }
-        guard swipe != 0 else { return nil }
-        let order = model.workspaces
-        guard order.count > 1, let index = order.firstIndex(where: { $0.id == browser.workspaceId }) else { return nil }
-        let step = swipe < 0 ? 1 : -1
-        return order[(index + step + order.count) % order.count]
-    }
-
     /// Whether the sideways bar holds a split's tray, whose own swipe the
     /// Workspace swipe must not take (12d).
     private var trayInBar: Bool {
@@ -571,7 +524,7 @@ struct BrowserView: View {
     private func scrubbed(_ phase: ScrubPhase) {
         switch phase {
         case .began(let kind):
-            guard scrub == nil, let workspace = browser.workspaceId else { return }
+            guard !scrubs.isOpen, let workspace = browser.workspaceId else { return }
             let opened: TabScrub
             switch kind {
             case .tabs:
@@ -586,26 +539,13 @@ struct BrowserView: View {
                 guard !browser.privateInFront, items.count > 1 else { return }
                 opened = TabScrub(kind: kind, items: items, start: items.firstIndex { $0.id == workspace } ?? 0)
             }
-            scrubEntered = false
             withAnimation(reduceMotion ? Motion.reduced : .spring(duration: 0.3, bounce: 0.2)) {
-                scrub = opened
+                scrubs.open(opened)
             }
             runAtEdges()
         case .moved(let point):
-            guard scrub != nil else { return }
-            scrubFinger = point
-            // A finger that has been on the strip and leaves it above or
-            // below, or one that drags down off the address, lets go
-            // without switching. Its sides meet the screen's edges, where
-            // the strip runs on.
-            if stripFrame.contains(point) { scrubEntered = true }
-            let left = scrubEntered && (point.y < stripFrame.minY - 4 || point.y > stripFrame.maxY + 4)
-            let down = scrub?.origin.map { point.y > $0.y + 36 } ?? false
-            if left || down {
-                endScrub(switching: false)
-                return
-            }
-            scrub?.move(to: point)
+            guard scrubs.isOpen else { return }
+            if !scrubs.move(to: point) { endScrub(switching: false) }
         case .ended:
             endScrub(switching: true)
         }
@@ -614,13 +554,11 @@ struct BrowserView: View {
     /// Takes the strip away, going to the page or Workspace under the
     /// finger unless the scrub was let go.
     private func endScrub(switching: Bool) {
-        scrubRun?.cancel()
-        scrubRun = nil
-        scrubFinger = nil
-        guard let ended = scrub else { return }
+        scrubs.stopRun()
+        guard let ended = scrubs.scrub else { return }
         let item = ended.items[ended.index]
         withAnimation(reduceMotion ? Motion.reduced : .smooth(duration: 0.22)) {
-            scrub = nil
+            scrubs.close()
             guard switching, !item.holds(browser.currentTabId) else { return }
             switch item {
             case .pin(let pin, _): browser.selectPin(pin)
@@ -637,18 +575,18 @@ struct BrowserView: View {
     /// on toward that end, faster the nearer the finger is to the edge, since
     /// the screen is narrower than a long Workspace's slide.
     private func runAtEdges() {
-        scrubRun?.cancel()
-        scrubRun = Task { @MainActor in
+        scrubs.run?.cancel()
+        scrubs.run = Task { @MainActor in
             let tick = 1.0 / 60
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(tick))
-                guard !Task.isCancelled, scrub != nil, let finger = scrubFinger else { continue }
+                guard !Task.isCancelled, scrubs.isOpen, let finger = scrubs.finger else { continue }
                 let inLeft = (barFrame.minX + TabScrub.edge - finger.x) / TabScrub.edge
                 let inRight = (finger.x - (barFrame.maxX - TabScrub.edge)) / TabScrub.edge
                 let depth = min(max(inLeft, inRight, 0), 1)
                 guard depth > 0 else { continue }
                 let rate = TabScrub.slowest + (TabScrub.fastest - TabScrub.slowest) * Double(depth * depth)
-                scrub?.run((inRight > 0 ? 1 : -1) * rate * tick)
+                scrubs.runOn((inRight > 0 ? 1 : -1) * rate * tick)
             }
         }
     }
@@ -658,41 +596,140 @@ struct BrowserView: View {
             .onChanged { drag in
                 // The private session is one Workspace, so the swipe does
                 // nothing there (13b).
-                guard swipingTo == nil, !browser.privateInFront,
+                guard swipe.swipingTo == nil, !browser.privateInFront,
                       abs(drag.translation.width) > abs(drag.translation.height) else { return }
-                swipe = drag.translation.width
+                swipe.offset = drag.translation.width
             }
             .onEnded { drag in
-                guard swipingTo == nil else { return }
-                let far = abs(swipe) > barWidth * 0.3
-                    || (abs(drag.predictedEndTranslation.width) > barWidth * 0.6
-                        && drag.predictedEndTranslation.width.sign == swipe.sign)
-                guard far, let target = swipeTarget else {
-                    withAnimation(.smooth(duration: 0.2)) { swipe = 0 }
+                guard swipe.swipingTo == nil else { return }
+                let far = BarSwipeSession.switches(offset: swipe.offset, predicted: drag.predictedEndTranslation.width,
+                                                   width: barFrame.width)
+                guard far, let target = swipe.target(in: model) else {
+                    withAnimation(.smooth(duration: 0.2)) { swipe.offset = 0 }
                     return
                 }
-                swipes += 1
+                swipe.swipes += 1
                 guard !reduceMotion else {
-                    swipe = 0
+                    swipe.offset = 0
                     browser.showWorkspace(target.id)
                     return
                 }
-                swipingTo = target
+                swipe.swipingTo = target
                 withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) {
-                    swipe = swipe < 0 ? -barWidth : barWidth
+                    swipe.offset = swipe.offset < 0 ? -barFrame.width : barFrame.width
                 } completion: {
                     var instant = Transaction()
                     instant.disablesAnimations = true
                     withTransaction(instant) {
                         // The bar that slid in is the one that stays.
-                        let fold = browser.fold.value
-                        browser.showWorkspace(target.id)
-                        browser.fold.keepFold(fold)
-                        swipe = 0
-                        swipingTo = nil
+                        browser.showWorkspace(target.id, openingBar: false)
+                        swipe.offset = 0
+                        swipe.swipingTo = nil
                     }
                 }
             }
+    }
+}
+
+/// The bar's Workspace swipe under way. The bar's offset, the next
+/// Workspace's bar beside it and the swipe's indicator read it, so a touch
+/// sample redraws them and leaves the screen around them be.
+@MainActor
+@Observable
+final class BarSwipeSession {
+    /// How far the bar has been swiped toward another Workspace.
+    var offset: CGFloat = 0
+    /// The Workspace a finished swipe is sliding to.
+    var swipingTo: OutlineRow?
+    /// How many swipes have switched Workspace, which taps as each does.
+    var swipes = 0
+
+    /// The Workspace the swipe would switch to, or the one a finished
+    /// swipe is sliding to.
+    func target(in model: AppModel) -> OutlineRow? {
+        if let swipingTo { return swipingTo }
+        guard offset != 0 else { return nil }
+        return Self.next(in: model.workspaces, from: model.browser.workspaceId, offset: offset)
+    }
+
+    /// The Workspace a swipe of `offset` would switch to: the next one for
+    /// a swipe left, the one before for a swipe right, wrapping at the ends
+    /// as the desktop's panel swipe does.
+    static func next(in order: [OutlineRow], from current: String?, offset: CGFloat) -> OutlineRow? {
+        guard order.count > 1, let index = order.firstIndex(where: { $0.id == current }) else { return nil }
+        let step = offset < 0 ? 1 : -1
+        return order[(index + step + order.count) % order.count]
+    }
+
+    /// Whether a swipe let go at `offset`, and heading for `predicted`,
+    /// switches: once past 30% of the bar's `width`, or a flick headed past
+    /// 60% of it the same way.
+    static func switches(offset: CGFloat, predicted: CGFloat, width: CGFloat) -> Bool {
+        abs(offset) > width * 0.3 || (abs(predicted) > width * 0.6 && predicted.sign == offset.sign)
+    }
+}
+
+/// The bar following a Workspace swipe, with the next Workspace's bar
+/// coming in beside it. Anywhere on the bar, a drag that moves sideways
+/// switches Workspace, and a touch that doesn't move stays a tap on the
+/// button under it.
+private struct SwipingBar<G: Gesture>: ViewModifier {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let session: BarSwipeSession
+    let width: CGFloat
+    let gesture: G
+    let yields: Bool
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: reduceMotion ? 0 : session.offset)
+            .overlay {
+                if let target = session.target(in: model), !reduceMotion {
+                    BarPreview(workspace: target)
+                        .offset(x: session.offset + (session.offset < 0 ? width : -width))
+                }
+            }
+            .modifier(BarSwipe(gesture: gesture, yields: yields, isEnabled: isEnabled))
+            .sensoryFeedback(.selection, trigger: session.swipes)
+    }
+}
+
+/// While the bar is swiped, the Workspace the swipe would switch to.
+private struct SwipeHUDLayer: View {
+    @Environment(AppModel.self) private var model
+    let session: BarSwipeSession
+
+    var body: some View {
+        if let target = session.target(in: model), abs(session.offset) > 12 {
+            let order = model.workspaces
+            WorkspaceSwipeHUD(
+                target: target, index: order.firstIndex { $0.id == target.id } ?? 0, count: order.count)
+                .padding(.bottom, 164)
+        }
+    }
+}
+
+/// The strip over the bar while a scrub is under way. It alone reads the
+/// scrub's steps, so a step redraws it and leaves the screen be.
+private struct ScrubLayer: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let session: ScrubSession
+    let theme: Theme
+    let colors: BarColors
+    let sideInset: CGFloat
+    let barHeight: CGFloat
+
+    var body: some View {
+        if let scrub = session.scrub {
+            TabScrubStrip(scrub: scrub, theme: theme, colors: colors)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { session.stripFrame = $0 }
+                .padding(.horizontal, 12 + sideInset)
+                .padding(.bottom, barHeight + 8)
+                .transition(reduceMotion ? .opacity
+                    : .opacity.combined(with: .scale(scale: 0.4, anchor: .bottom)))
+        }
     }
 }
 
@@ -713,7 +750,9 @@ private struct OpenBarSpotlight: View {
 
 /// The bar's Workspace swipe: ahead of the buttons under it, so a drag
 /// that starts on one still switches, unless the bar holds a control
-/// with a swipe of its own, which then goes first.
+/// with a swipe of its own, which then goes first. Both attachments stay
+/// in place and one is switched off, so the bar under them keeps its
+/// identity, and its state, as a tray comes and goes.
 private struct BarSwipe<G: Gesture>: ViewModifier {
     let gesture: G
     let yields: Bool
@@ -721,10 +760,8 @@ private struct BarSwipe<G: Gesture>: ViewModifier {
     let isEnabled: Bool
 
     func body(content: Content) -> some View {
-        if yields {
-            content.gesture(gesture, isEnabled: isEnabled)
-        } else {
-            content.highPriorityGesture(gesture, isEnabled: isEnabled)
-        }
+        content
+            .highPriorityGesture(gesture, isEnabled: isEnabled && !yields)
+            .gesture(gesture, isEnabled: isEnabled && yields)
     }
 }

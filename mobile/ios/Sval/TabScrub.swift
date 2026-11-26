@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
 // Copyright 2026 Ellm Tree, Inc.
 
+import Observation
 import SwiftUI
 
 /// What a scrub moves through: the Workspace's tabs, from a hold on the
@@ -477,14 +478,71 @@ struct ScrubPlace: View {
 }
 
 /// The scrub's taps: a firm one as the strip opens, and a light one at
-/// each page the finger moves onto.
+/// each page the finger moves onto. The modifier reads the steps itself,
+/// so the view it modifies doesn't.
 struct ScrubFeedback: ViewModifier {
-    /// The page under the finger, while a scrub is under way.
-    let index: Int?
+    let session: ScrubSession
 
     func body(content: Content) -> some View {
-        content
+        let index = session.scrub?.index
+        return content
             .sensoryFeedback(.impact(weight: .medium), trigger: index != nil) { _, held in held }
             .sensoryFeedback(.selection, trigger: index) { old, new in old != nil && new != nil }
+    }
+}
+
+/// The scrub under way on the main screen. The strip reads `scrub`, which
+/// changes at each step; the screen around it reads `isOpen` alone, which
+/// changes as the strip opens and closes, so a step redraws the strip and
+/// leaves the screen be.
+@MainActor
+@Observable
+final class ScrubSession {
+    private(set) var scrub: TabScrub?
+    private(set) var isOpen = false
+    /// Where the finger is, which the edge run reads.
+    @ObservationIgnored private(set) var finger: CGPoint?
+    /// The strip's frame on screen.
+    @ObservationIgnored var stripFrame: CGRect = .zero
+    /// Whether the finger has been on the strip.
+    @ObservationIgnored private var entered = false
+    /// Runs the strip on while the finger rests near the screen's edge.
+    @ObservationIgnored var run: Task<Void, Never>?
+
+    func open(_ scrub: TabScrub) {
+        entered = false
+        self.scrub = scrub
+        isOpen = true
+    }
+
+    /// The finger at `point`. A finger that has been on the strip and
+    /// leaves it above or below, or one that drags down off the address,
+    /// lets go without switching, and this returns false. The strip's
+    /// sides meet the screen's edges, where it runs on.
+    func move(to point: CGPoint) -> Bool {
+        finger = point
+        if stripFrame.contains(point) { entered = true }
+        let left = entered && (point.y < stripFrame.minY - 4 || point.y > stripFrame.maxY + 4)
+        let down = scrub?.origin.map { point.y > $0.y + 36 } ?? false
+        if left || down { return false }
+        scrub?.move(to: point)
+        return true
+    }
+
+    /// Runs the strip `pages` on, toward the end the finger rests at.
+    func runOn(_ pages: Double) {
+        scrub?.run(pages)
+    }
+
+    /// Stops the edge run and forgets the finger, ahead of `close`.
+    func stopRun() {
+        run?.cancel()
+        run = nil
+        finger = nil
+    }
+
+    func close() {
+        scrub = nil
+        isOpen = false
     }
 }

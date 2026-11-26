@@ -687,7 +687,10 @@ final class Browser {
         pages[currentTabId ?? ""]?.view
     }
 
-    func select(_ id: String) {
+    /// Brings tab `id` to the front. The bar opens, unless `openingBar` is
+    /// false, as for a Workspace swipe, whose bar that slid in stays as it
+    /// is folded.
+    func select(_ id: String, openingBar: Bool = true) {
         if id != currentTabId, !media.isEmpty || pages.values.contains(where: { $0.inPictureInPicture }) {
             mediaLog("tab \(Self.tag(id)) to the front, from \(Self.tag(currentTabId))")
         }
@@ -728,7 +731,7 @@ final class Browser {
         let tabs = Set(model.rows.lazy.filter { $0.kind == .tab }.map(\.id))
         usedAt = usedAt.filter { tabs.contains($0.key) }
         UserDefaults.standard.set(usedAt.filter { !model.isPrivate($0.key) }, forKey: Self.usedKey)
-        fold.foldBar(to: 0)
+        if openingBar { fold.foldBar(to: 0) } else { fold.endRun() }
         if let workspace = model.workspace(of: id) ?? Self.pinParts(id)?.workspace {
             frontTabs[workspace] = id
             UserDefaults.standard.set(frontTabs.filter { !model.isPrivate($0.key) }, forKey: Self.frontKey)
@@ -750,16 +753,17 @@ final class Browser {
     }
 
     /// Shows Workspace `id` with the tab it last had in front, or its first
-    /// tab, or nothing when it has none.
-    func showWorkspace(_ id: String) {
+    /// tab, or nothing when it has none. The bar opens unless `openingBar`
+    /// is false (`select`).
+    func showWorkspace(_ id: String, openingBar: Bool = true) {
         guard id != workspaceId else { return }
         if let front = frontTabs[id], pin(for: front) != nil {
-            select(front)
+            select(front, openingBar: openingBar)
             return
         }
         let tabs = model.tabs(in: id)
         if let tab = frontTabs[id].flatMap({ front in tabs.first { $0.id == front } }) ?? tabs.first {
-            select(tab.id)
+            select(tab.id, openingBar: openingBar)
             return
         }
         if let previous = workspaceId {
@@ -768,7 +772,7 @@ final class Browser {
         currentTabId = nil
         UserDefaults.standard.removeObject(forKey: Self.currentKey)
         workspaceId = id
-        fold.foldBar(to: 0)
+        if openingBar { fold.foldBar(to: 0) } else { fold.endRun() }
         refreshState()
     }
 

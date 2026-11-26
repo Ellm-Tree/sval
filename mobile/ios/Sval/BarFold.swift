@@ -102,11 +102,11 @@ final class BarFold {
         foldBar(to: 0)
     }
 
-    /// Puts the fold back as it was, at once, as when a Workspace swipe
-    /// ends on the bar that slid in.
-    func keepFold(_ fold: Double) {
+    /// Forgets the scroll toward a fold and leaves the bar where it is, as
+    /// when a Workspace swipe brings another page under the bar that slid
+    /// in: that page's scrolling starts its own run.
+    func endRun() {
         run = 0
-        value = fold
     }
 
     func foldBar(to end: Double) {
