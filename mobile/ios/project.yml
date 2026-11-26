@@ -98,6 +98,14 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Sval
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: Sval connects to the server on your network that holds your shared folder.
+        # iOS ends the app when it asks for a protected resource whose
+        # purpose string is missing. A page reaches each of these through
+        # WebKit: a file input's Take Photo or Video, getUserMedia, the
+        # Geolocation API, and the image menu's Add to Photos.
+        INFOPLIST_KEY_NSCameraUsageDescription: Sval uses your camera when a website asks to take a photo or start a video call.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Sval uses your microphone when a website asks to record audio or start a call.
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Sval shares your location with a website you allow.
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: Sval saves the images you choose to your photo library.
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         TARGETED_DEVICE_FAMILY: "1,2"
