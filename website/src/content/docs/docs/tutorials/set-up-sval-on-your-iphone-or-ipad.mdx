@@ -1,0 +1,86 @@
+---
+title: Set up Sval on your iPhone or iPad
+description: Install Sval on your iPhone or iPad, choose a sync folder, and start syncing your Workspaces.
+since: ios-0.1.0
+---
+
+import Screenshot from "../../../../components/Screenshot.astro";
+
+In this tutorial you install Sval on your iPhone or iPad and choose the
+folder it syncs through. Sval needs no account. If the folder already holds
+your Workspaces, your iPhone or iPad joins them. If the folder is empty,
+your iPhone or iPad starts the sync and your other devices join it later.
+Sval needs iOS 26 or later on an iPhone, and iPadOS 26 or later on an iPad.
+
+## Install Sval
+
+1. On your iPhone or iPad, open the App Store.
+2. Search for Sval, then install Sval.
+3. Open Sval. The first screen reads "Your Workspaces. Now in your
+   pocket."
+4. Select **Choose Your Folder**.
+
+<Screenshot name="docs-iphone-welcome" frame="rounded" maxWidth={320} alt="Sval's first screen, with Choose Your Folder and Not Now at the bottom" />
+
+To browse without syncing, select **Not Now**, and set up sync later from
+Settings.
+
+## Choose where to sync
+
+On Where's your Sval folder?, select one of these:
+
+- **iCloud Drive.** Choose a folder in iCloud Drive, then select Open.
+- **Dropbox.** Select **Sign In to Dropbox** and sign in. Go to your
+  folder, then select **Use This Folder**.
+- **A server on your network.** Type the server's address, the share, your
+  user name, and your password, then select **Connect**.
+
+## If the folder already holds your Workspaces
+
+Sval shows Enter the pairing code, and the code comes from a device that
+already syncs through this folder.
+
+1. On a computer, show a code as
+   [Sync another device with this one](/docs/how-to/sync/sync-another-device/#show-the-code-on-the-device-that-syncs)
+   describes. On another iPhone or iPad, select the Workspace
+   button, then **Settings**, then **Sync with Another Device**.
+2. On the device you're setting up, type the code, then select **Join**.
+
+<Screenshot name="docs-iphone-join-code" frame="rounded" maxWidth={320} alt="Enter the pairing code, with a code typed in the field and Join below the field" />
+
+Keep Sval open while the code travels through the folder, which can take a
+minute or two. If you saved the folder's backup key, select
+**Use the Backup Key Instead** and type the key in place of a code.
+
+## If the folder is empty
+
+1. On Start syncing here, select **Start Syncing**.
+2. On Back up your sync key, select **Save…** and keep the key in your
+   password manager.
+3. Select **Continue**.
+
+<Screenshot name="docs-iphone-start-sync" frame="rounded" maxWidth={320} alt="Start syncing here, which says the folder holds no Sval Workspaces yet, with Start Syncing at the bottom" />
+
+To add another device, choose this folder on that device. This device shows
+the code for it under **Sync with Another Device** in Settings, and you type
+that code on the other device.
+
+## Start browsing
+
+1. On You're in., select **Start Browsing**. Sval opens on this device's
+   own Workspace and shows you around the bar.
+2. On each page, select **Next**.
+3. On You're All Set, select **Start Browsing**. The Launcher opens for a
+   new tab.
+4. Type codeberg.org, then select **Go** on the keyboard.
+
+The Codeberg page opens in this device's Workspace. Once another device
+joins the folder, this device's Workspace and the Codeberg tab show there
+too.
+
+## Next steps
+
+- [Switch tabs by sliding on the address](/docs/how-to/iphone-and-ipad/switch-tabs-by-sliding-on-the-address/)
+- [Switch Workspaces](/docs/how-to/iphone-and-ipad/switch-workspaces/)
+- [Sval for iPhone and iPad](/docs/reference/iphone-and-ipad/)
+- [How sync works](/docs/explanation/sync/)

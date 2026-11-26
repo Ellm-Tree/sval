@@ -1,0 +1,51 @@
+---
+title: Search from the Launcher
+description: Type in the Launcher to search the web, open an address, or go to an open tab, a Favorite, or a page from your history.
+since: ios-0.1.0
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+As you type in the Launcher, Sval finds your matching tabs
+and history and lists the searches your search engine suggests.
+
+You want the Postgres docs page you read on your computer yesterday, and
+you remember only the word "vacuum".
+
+## Steps
+
+1. In the bar at the bottom of the screen, select the address. To start
+   in a new tab, select **New Tab** instead.
+2. Type a word from the page's title or address.
+3. Select a row from the list above the field.
+
+<Screenshot name="docs-iphone-launcher" frame="rounded" maxWidth={320} alt="The Launcher with yosemite typed, listing search suggestions, History, and a row that searches for yosemite" />
+
+## What the list shows
+
+The row nearest the field searches for what you typed, or opens the
+address you typed. Above that row, the Launcher groups what it found:
+
+- **Open tabs.** Select **Switch to Tab** to go to the tab.
+- **Pins and Favorites** and **History.** Select a row to open the page.
+- **Search suggestions.** Your search engine suggests searches for what
+  you typed. Select one to search for it.
+
+## Details
+
+- The Launcher searches with the search engine you chose on your computer,
+  and follows the Launcher settings you chose there, from the sections it
+  shows to their order.
+- Before you type, the Launcher lists tabs you closed recently, your recent
+  tabs, and your pins.
+- A private tab gets no search suggestions, and the Launcher lists only
+  private tabs under Private tabs.
+- Sval sends nothing to your search engine for a single character or
+  for what looks like an address.
+- Type "private" to find **New Private Tab**.
+
+## Related pages
+
+- [Go to an open tab from the Launcher](/docs/how-to/launcher/go-to-an-open-tab-from-the-launcher/)
+- [Change your search engine](/docs/how-to/search/change-your-search-engine/)
+- [Sval for iPhone and iPad](/docs/reference/iphone-and-ipad/)

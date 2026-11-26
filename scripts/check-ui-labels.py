@@ -12,7 +12,8 @@ that renames a control fails here until its docs page follows (decision
 
 Sval writes most of its labels in its own JS and HTML, and keeps Firefox's
 elsewhere, so the strings searched are every file under chrome/, branding/
-and patches/, and Firefox's en-US strings in the build tree. A label passes
+and patches/, the iPhone app's Swift under mobile/ios/Sval/, and Firefox's
+en-US strings in the build tree. A label passes
 if its text appears in any of them with whitespace collapsed, which HTML's
 line wrapping needs.
 
@@ -30,7 +31,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 DOCS = REPO / "website/src/content/docs"
 FIREFOX = pathlib.Path(os.environ.get("SVAL_FIREFOX_TREE", REPO / "build/firefox"))
 FIREFOX_STRINGS = ["browser/locales/en-US", "toolkit/locales/en-US", "browser/branding"]
-SOURCE_SUFFIXES = {".js", ".mjs", ".html", ".xhtml", ".ftl", ".patch", ".dtd", ".properties"}
+SOURCE_SUFFIXES = {".js", ".mjs", ".html", ".xhtml", ".ftl", ".patch", ".dtd", ".properties", ".swift"}
 
 STEP_RE = re.compile(r"^\s*\d+\.\s")
 BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
@@ -70,7 +71,7 @@ PLACEABLE_RE = re.compile(r"\{ *(-[\w-]+) *\}")
 
 
 def corpus():
-    roots = [REPO / "chrome", REPO / "branding", REPO / "patches"]
+    roots = [REPO / "chrome", REPO / "branding", REPO / "patches", REPO / "mobile/ios/Sval"]
     roots += [FIREFOX / sub for sub in FIREFOX_STRINGS]
     texts = []
     for root in roots:
@@ -86,6 +87,9 @@ def corpus():
             terms.update(TERM_RE.findall(ftl.read_text(encoding="utf-8", errors="replace")))
     text = "\n".join(texts)
     text = PLACEABLE_RE.sub(lambda m: terms.get(m.group(1), m.group(0)), text)
+    # The iPhone app names the device it runs on, and its docs are written
+    # for an iPhone.
+    text = text.replace("\\(UIDevice.current.model)", "iPhone")
     return normalize(text)
 
 

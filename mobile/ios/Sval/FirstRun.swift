@@ -221,7 +221,7 @@ private struct FolderSteps: View {
                 .padding(.horizontal, FirstRunStyle.textInset)
                 .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
-            Text("Pick the folder your computer syncs to.")
+            Text("Pick the folder your other devices sync to, or an empty one.")
                 .font(.system(.body))
                 .foregroundStyle(FirstRunStyle.lead)
                 .padding(.horizontal, FirstRunStyle.textInset)
@@ -686,7 +686,7 @@ private struct CodeStep: View {
                 .accessibilityAddTraits(.isHeader)
             Text(backup
                  ? "Type the 52-character key you saved when you set up sync. Spaces and dashes don't matter."
-                 : "On your computer, open Settings › Sync and devices › Sync with another device › This device shows a code.")
+                 : "On a computer, open Settings › Sync and devices › Sync with another device › This device shows a code. On an iPhone or iPad, open Settings › Sync with Another Device.")
                 .font(.system(.subheadline))
                 .foregroundStyle(FirstRunStyle.lead)
                 .padding(.horizontal, FirstRunStyle.textInset)
@@ -837,11 +837,11 @@ private struct JoiningView: View {
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 2) {
                 line(folder.map { "Folder found: \($0)" } ?? "Folder found", done: true)
-                line(waiting ? "Waiting for your computer's code to reach this folder" : "Checking the code", done: false)
+                line(waiting ? "Waiting for the code to reach this folder" : "Checking the code", done: false)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if waiting {
-                Text("Keep Sval open. Your computer's code reaches this \(UIDevice.current.model) through the folder you chose. If your computer syncs to a different folder, cancel and choose that folder.")
+                Text("Keep Sval open. The code reaches this \(UIDevice.current.model) through the folder you chose. If your other device syncs to a different folder, cancel and choose that folder.")
                     .font(.system(.subheadline))
                     .foregroundStyle(FirstRunStyle.muted)
                     .multilineTextAlignment(.center)

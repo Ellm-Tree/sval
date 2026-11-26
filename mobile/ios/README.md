@@ -101,6 +101,11 @@ only maintainers can push one.
 3. Once the release's text says the build is ready to submit, select **Add
    for Review** in App Store Connect, then **Submit to App Review**.
 4. Once Apple approves the version, select **Release This Version**.
+5. Within a day, the website's scheduled rebuild opens the docs gated on
+   `ios-<version>`. To open them at once, dispatch `website.yml` on `main`.
+   Then the website build fails on every pull request until a pull
+   request removes those gates (`docs/writing-style.md`, "Website text
+   for an unreleased feature"), so open that pull request straight away.
 
 Between steps 2 and 3, CI's `ios-build.yml` builds the tag's commit,
 unsigned, in about twenty minutes once the Mac runner is free. Within five
@@ -189,6 +194,34 @@ The time is UTC, and the status bar shows it in the Mac's time zone:
 screenshot is saved as `<device>-<height in pixels>-<shot>.png`. The sample
 Workspaces' tabs load live sites, so check every screenshot for a banner
 or popup before you upload it.
+
+## Docs screenshots
+
+`SvalUITests/DocsShots` stages the website docs' iPhone and iPad
+screenshots on the sample Workspaces. It skips unless
+`TEST_RUNNER_SVAL_DOCS_SHOTS` names a folder, so other test runs pass over
+it. Each screenshot is saved as `docs-iphone-<shot>.png` or
+`docs-ipad-<shot>.png`, the name a docs page gives the Screenshot
+component. An iPad makes only the shots where its screen differs from an
+iPhone's.
+
+Run it on the CI Mac runner with the `ios-docs-shots` workflow. It runs
+only on dispatch, so push the branch, then dispatch the workflow on it:
+
+    POST /api/v1/repos/Sval/sval/actions/workflows/ios-docs-shots.yml/dispatches
+    {"ref": "<branch>"}
+
+The run builds the app, sets the status bar as for the App Store
+screenshots, and runs `DocsShots` on an iPhone 17 Pro simulator, then on a
+13-inch iPad Pro. The run's page in Forgejo keeps the screenshots for a
+week as the artifact `ios-docs-shots`, which holds `ios-docs-shots.tgz`.
+
+To put a screenshot on the site, copy the PNG to `website/screenshots/`,
+then run `node scripts/screenshots.mjs` in `website/`. The script makes
+the AVIF and WebP sizes and the screenshot's entry in the site's list of
+screenshots. Commit all three. The sample
+Workspaces' tabs load live sites, so check every screenshot for a banner
+or popup first.
 
 ## Launch options
 

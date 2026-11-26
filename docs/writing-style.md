@@ -265,9 +265,19 @@ The gates are in `website/src/lib/`.
 - **A link in the header or footer** to gated text or a gated page gets
   `since: "1.0.0-rc.9"` in its entry in the nav config, in
   `website/src/config/`.
+- **An iPhone feature** is gated on the iPhone app's version, with an
+  `ios-` prefix: `since: ios-0.2.0`, `<Since v="ios-0.2.0">`. The iPhone
+  app's versions are its own, apart from the desktop's
+  (`mobile/ios/README.md`, "Release the iPhone app"). Its gate opens once
+  the App Store offers that version or a later one, and the site's daily
+  rebuild opens it within a day of the release. Until the App Store has a
+  first version, every iPhone page is gated on `ios-0.1.0`, so the site
+  says nothing about the iPhone app before anyone can install it.
 - **Preview** with `npm run dev` in `website/`. It shows every gate, marked.
 - **A gate whose release is out** fails the pull request's website build.
-  Take the gate out, and the `<Until>` text with it.
+  Take the gate out, and the `<Until>` text with it. For a desktop release
+  or an iPhone release alike, open that pull request as soon as the
+  release is out.
 
 ## Release notes
 
