@@ -200,6 +200,262 @@ add_task(async function a_folder_on_a_server_is_chosen_with_its_password() {
   Assert.ok(!byId("sval-server-dialog").open, "Cancel closes it");
 });
 
+add_task(async function a_dropbox_folder_is_chosen_after_signing_in() {
+  const { SvalRemoteFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs"
+  );
+  const { SvalDropbox } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalDropbox.sys.mjs"
+  );
+  const { SvalSharedFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs"
+  );
+  await within(SvalPanel.started, 40_000, "the panel's startup");
+  const device = await panelOnAFolder("dropbox");
+  atTaskEnd(() => SvalRemoteFolder.keepOnly(null));
+
+  // Dropbox is never reached: the sign-in gives a token, the browser lists
+  // made-up folders, and every other request finds no network.
+  const signIn = SvalDropbox.signIn;
+  SvalDropbox.signIn = async () => "token";
+  const run = SvalSharedFolder._run;
+  const listed = [];
+  const FOLDERS = { "dropbox:/": ["Apps", "Photos"], "dropbox:/Apps": [] };
+  SvalSharedFolder._run = async request => {
+    if (request.op === "listFolders") {
+      listed.push(request);
+      return { reachable: true, folders: FOLDERS[request.root] };
+    }
+    return { reachable: false, reason: "io-error", error: "NetworkError" };
+  };
+  atTaskEnd(() => {
+    SvalDropbox.signIn = signIn;
+    SvalSharedFolder._run = run;
+  });
+
+  const ui = await openSvalSettings();
+  const byId = id => ui.page.document.getElementById(id);
+  const rows = () => byId("sval-dropbox-folders").querySelectorAll("button");
+  byId("sval-storage-dropbox").click();
+  await TestUtils.waitForCondition(
+    () => rows().length === 2,
+    "the Dropbox's folders are listed"
+  );
+  Assert.ok(byId("sval-dropbox-dialog").open, "in the folder browser");
+  Assert.deepEqual(
+    listed[0].auth,
+    { refreshToken: "token" },
+    "signed in with the new token"
+  );
+  Assert.ok(byId("sval-dropbox-up").disabled, "with nothing above the root");
+
+  rows()[0].click();
+  await TestUtils.waitForCondition(
+    () => listed.length === 2 && !byId("sval-dropbox-use").disabled,
+    "Apps is listed"
+  );
+  Assert.equal(listed[1].root, "dropbox:/Apps");
+  Assert.equal(rows().length, 0, "and holds no folders");
+  Assert.ok(!byId("sval-dropbox-up").disabled, "with a way back up");
+
+  byId("sval-dropbox-use").click();
+  Assert.ok(
+    !byId("sval-storage-working").hidden,
+    "the card shows it's working"
+  );
+  Assert.ok(byId("sval-storage-dropbox").disabled, "and holds its buttons");
+  await TestUtils.waitForCondition(
+    () => ui.els.storageStatus.textContent,
+    "the page said something about the folder"
+  );
+  Assert.ok(byId("sval-storage-working").hidden, "until the panel answers");
+  Assert.ok(!byId("sval-storage-dropbox").disabled);
+  Assert.ok(!byId("sval-dropbox-dialog").open, "the dialog closed");
+  Assert.equal(
+    device.settings.sharedFolder,
+    "dropbox:/Apps",
+    "the choice is kept"
+  );
+  Assert.deepEqual(
+    await SvalRemoteFolder.authFor("dropbox:/Apps"),
+    { refreshToken: "token" },
+    "with its sign-in"
+  );
+  Assert.equal(byId("sval-storage").dataset.via, "dropbox");
+  Assert.equal(ui.els.folderPath.textContent, "Dropbox/Apps");
+  Assert.ok(byId("sval-folder-reveal").hidden, "nothing to show on disk");
+
+  SvalDropbox.signIn = async () => {
+    throw new Error("a kept sign-in needs no new one");
+  };
+  byId("sval-storage-dropbox").click();
+  await TestUtils.waitForCondition(
+    () => listed.length === 3,
+    "the browser opens again"
+  );
+  Assert.equal(listed[2].root, "dropbox:/Apps", "on the folder in use");
+  byId("sval-dropbox-cancel").click();
+  Assert.ok(!byId("sval-dropbox-dialog").open, "Cancel closes it");
+});
+
+/**
+ * Stands in for Dropbox for one task: `signIn` replaces the sign-in, and
+ * `list` answers the browser's listings. Every other helper request finds
+ * no network.
+ *
+ * @param {object} stubs
+ * @param {Function} stubs.signIn Replaces `SvalDropbox.signIn`.
+ * @param {Function} [stubs.list] Answers a `listFolders` request.
+ * @returns {object[]} the `listFolders` requests made.
+ */
+function stubDropbox({
+  signIn,
+  list = () => ({ reachable: true, folders: [] }),
+}) {
+  const { SvalDropbox } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalDropbox.sys.mjs"
+  );
+  const { SvalSharedFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs"
+  );
+  const real = { signIn: SvalDropbox.signIn, run: SvalSharedFolder._run };
+  const listed = [];
+  SvalDropbox.signIn = signIn;
+  SvalSharedFolder._run = async request => {
+    if (request.op === "listFolders") {
+      listed.push(request);
+      return list(request);
+    }
+    return { reachable: false, reason: "io-error", error: "NetworkError" };
+  };
+  atTaskEnd(() => {
+    SvalDropbox.signIn = real.signIn;
+    SvalSharedFolder._run = real.run;
+  });
+  return listed;
+}
+
+function cancelled() {
+  const err = new Error("cancelled");
+  err.name = "SignInCancelled";
+  return err;
+}
+
+add_task(
+  async function a_failed_dropbox_sign_in_says_so_and_a_given_up_one_does_not() {
+    await panelOnAFolder("dropbox-fails");
+    let failure = cancelled();
+    const listed = stubDropbox({
+      signIn: async () => {
+        throw failure;
+      },
+    });
+    const ui = await openSvalSettings();
+    const byId = id => ui.page.document.getElementById(id);
+    const button = byId("sval-storage-dropbox");
+
+    button.click();
+    await TestUtils.waitForCondition(
+      () => !button.disabled,
+      "the sign-in ends"
+    );
+    Assert.ok(!byId("sval-dropbox-dialog").open, "nothing opens");
+    Assert.equal(ui.els.storageStatus.textContent, "", "nor is anything said");
+
+    failure = new Error("Dropbox refused the sign-in: 400");
+    button.click();
+    await TestUtils.waitForCondition(
+      () => ui.els.storageStatus.textContent,
+      "the page says the sign-in failed"
+    );
+    Assert.ok(!byId("sval-dropbox-dialog").open);
+    Assert.equal(listed.length, 0, "and nothing was listed");
+  }
+);
+
+add_task(async function a_token_dropbox_no_longer_takes_is_replaced() {
+  await panelOnAFolder("dropbox-stale");
+  const tokens = ["first", "second"];
+  const listed = stubDropbox({
+    signIn: async () => tokens.shift(),
+    list: request =>
+      request.auth.refreshToken === "first"
+        ? { reachable: false, reason: "io-error", error: "SignInError" }
+        : { reachable: true, folders: ["Apps"] },
+  });
+  const ui = await openSvalSettings();
+  const byId = id => ui.page.document.getElementById(id);
+  byId("sval-storage-dropbox").click();
+  await TestUtils.waitForCondition(
+    () => byId("sval-dropbox-folders").querySelectorAll("button").length === 1,
+    "the folders are listed after signing in again"
+  );
+  Assert.deepEqual(
+    listed.map(request => request.auth.refreshToken),
+    ["first", "second"],
+    "the listing is asked again with the new token"
+  );
+  Assert.ok(!byId("sval-dropbox-use").disabled);
+  byId("sval-dropbox-cancel").click();
+});
+
+add_task(async function an_unreachable_dropbox_holds_use_this_folder() {
+  await panelOnAFolder("dropbox-offline");
+  stubDropbox({
+    signIn: async () => "token",
+    list: () => ({
+      reachable: false,
+      reason: "io-error",
+      error: "NetworkError",
+    }),
+  });
+  const ui = await openSvalSettings();
+  const byId = id => ui.page.document.getElementById(id);
+  byId("sval-storage-dropbox").click();
+  const status = byId("sval-dropbox-status");
+  await TestUtils.waitForCondition(
+    () => byId("sval-dropbox-dialog").open && status.textContent,
+    "the browser says it can't list"
+  );
+  Assert.ok(byId("sval-dropbox-use").disabled, "with no folder to use");
+  Assert.equal(
+    byId("sval-dropbox-folders").children.length,
+    0,
+    "and none listed"
+  );
+  byId("sval-dropbox-cancel").click();
+});
+
+add_task(async function closing_dropboxs_page_gives_up_the_sign_in() {
+  const { SvalDropbox } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalDropbox.sys.mjs"
+  );
+  const real = { open: SvalDropbox._openPage, watch: SvalDropbox._watchPage };
+  let page = null;
+  SvalDropbox._openPage = () => {
+    page = Services.ww.openWindow(
+      null,
+      "about:blank",
+      "_blank",
+      "chrome,dialog=no",
+      null
+    );
+    return page;
+  };
+  SvalDropbox._watchPage = false;
+  atTaskEnd(() => {
+    SvalDropbox._openPage = real.open;
+    SvalDropbox._watchPage = real.watch;
+  });
+  const signedIn = SvalDropbox.signIn();
+  await TestUtils.waitForCondition(() => page, "Dropbox's page opens");
+  page.close();
+  await Assert.rejects(
+    within(signedIn, 10_000, "the sign-in"),
+    err => err.name === "SignInCancelled"
+  );
+});
+
 /**
  * This page's contract is that the panel's words come back for it to render,
  * so the user is never left with a page that says nothing after answering

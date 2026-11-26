@@ -541,6 +541,7 @@ browser.jar:
     content/browser/sval/import-brands/orion.png (import-brands/orion.png)
     content/browser/sval/import-brands/vivaldi.png (import-brands/vivaldi.png)
     content/browser/sval/import-brands/zen.png (import-brands/zen.png)
+    content/browser/sval/sync-services/dropbox.svg (sync-services/dropbox.svg)
     content/browser/sval/password-managers/1password.png (password-managers/1password.png)
     content/browser/sval/password-managers/bitwarden.png (password-managers/bitwarden.png)
     content/browser/sval/password-managers/dashlane.png (password-managers/dashlane.png)

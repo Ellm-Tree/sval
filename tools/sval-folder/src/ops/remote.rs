@@ -180,6 +180,7 @@ pub(super) fn perform(
                 Err(err) => failed(err),
             })
         }
+        Op::ListFolders => Ok(list_folders(state.stores.get(location, auth))),
     };
     done.unwrap_or_else(|Failure(name)| unreachable("io-error", Some(name)))
 }
@@ -425,6 +426,22 @@ fn remove_dir(store: &mut (dyn Store + Send), path: &str) -> Value {
         }
     }
     json!({ "reachable": true, "removed": !kept_any })
+}
+
+/// The folders in the root, at most `MAX_ENTRIES`. A link is passed over.
+fn list_folders(store: &mut (dyn Store + Send)) -> Value {
+    let listed = match store.list("") {
+        Ok(listed) => listed,
+        Err(err) => return failed(err),
+    };
+    let mut folders: Vec<String> = listed
+        .into_iter()
+        .filter(|child| child.kind == Kind::Dir)
+        .map(|child| child.name)
+        .collect();
+    folders.truncate(MAX_ENTRIES);
+    folders.sort_by(|a, b| utf16_cmp(a, b));
+    json!({ "reachable": true, "folders": folders })
 }
 
 /// The names in `path`, at most `MAX_ENTRIES`, reading none of them; with

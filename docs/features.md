@@ -245,6 +245,8 @@ do.
   doesn't run a sync service, so your data stays yours.
 - **SMB servers.** Sval can sync through a folder on an SMB file server, such
   as a NAS, without you connecting to the server first.
+- **Dropbox.** Sval can sync through a folder in your Dropbox without the
+  Dropbox app running.
 - **End-to-end encrypted.** Everything in the folder is encrypted with a key
   that only your devices have. Your cloud provider can't read any of it.
 - **What syncs.** Your Workspaces sync with their tabs and groups, and so do

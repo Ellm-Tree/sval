@@ -97,6 +97,8 @@ enum Op<'a> {
     RemoveDir(&'a str),
     ListNames(&'a str, Option<&'a str>),
     MakeDir(&'a str),
+    /// The folders in the root itself, for choosing one inside it.
+    ListFolders,
 }
 
 struct Request<'a> {
@@ -201,6 +203,7 @@ fn parse(value: &Value) -> Option<Request<'_>> {
             Op::ListNames(path()?, holding)
         }
         "makeDir" => Op::MakeDir(path()?),
+        "listFolders" => Op::ListFolders,
         _ => return None,
     };
     let wanted = match &op {
@@ -493,6 +496,7 @@ impl Folder {
                 }
                 Ok(json!({ "reachable": true }))
             }
+            Op::ListFolders => list_folders(Path::new(root)),
         }
     }
 
@@ -842,6 +846,19 @@ fn list_names(target: &Path, holding: Option<&str>) -> Result<Value, Failure> {
         answer.insert("holding".into(), json!(holders));
     }
     Ok(Value::Object(answer))
+}
+
+/// The directories in `target`, at most `MAX_ENTRIES`, passing a link over.
+fn list_folders(target: &Path) -> Result<Value, Failure> {
+    let mut folders = Vec::new();
+    for (name, child) in children(target)? {
+        if !is_link(&child)? && child.is_dir() {
+            folders.push(name);
+        }
+    }
+    folders.truncate(MAX_ENTRIES);
+    folders.sort_by(|a, b| utf16_cmp(a, b));
+    Ok(json!({ "reachable": true, "folders": folders }))
 }
 
 mod remote;

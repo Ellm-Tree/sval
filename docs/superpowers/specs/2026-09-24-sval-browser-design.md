@@ -147,7 +147,7 @@ change, not a redesign.
 | Split view | In v1. Two to four tabs side by side in one window (`2026-10-18-split-view-design.md`). |
 | Tiling beyond a split | Post-v1. |
 | Command palette | In v1 as the Launcher: the address bar, grown into one place to find tabs, pins, Favorites, commands, history and the web (`2026-10-22-launcher-design.md`). |
-| Cloud provider APIs (Drive, OneDrive, Dropbox) | Post-v1. See §6.4. |
+| Cloud provider APIs (Drive, OneDrive) | Post-v1. See §6.4. Dropbox and SMB are reached directly (decision 2650). |
 | Mobile (iOS, Android) | v2 fast-follow. Designed for now. See §11. |
 | Linux | **In v1.** It ships as a tarball, a .deb and an .rpm (decision 0094). See §12. |
 | Inline Hide My Email | Post-v1. See §7.5. |
@@ -2251,6 +2251,11 @@ contacted only when the user keeps the shared folder in Dropbox (mobile spec
 loaded: from the address the page names, which can be on another host, else
 from the site's `/favicon.ico`, and never from an address the page's blocking
 lists block.
+
+**On the desktop**, Dropbox's sign-in and API hosts (`www.dropbox.com`,
+`api.dropboxapi.com`, `content.dropboxapi.com`) are contacted only when the
+user signs in to Dropbox to keep the shared folder there (desktop connectors
+spec §3, decision 2650).
 
 
 ## 11. Mobile (v2 fast-follow, designed for now)

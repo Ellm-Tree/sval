@@ -686,6 +686,114 @@ body {
   overflow-wrap: anywhere;
 }
 
+.sval-fr-folder-ways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* The SMB and Dropbox panels take the folder zone's place, and the
+ * footer's, while one is open: each has its own Cancel and its own way on. */
+section[data-connecting] :is(.sval-fr-folder-zone, .sval-fr-actions) {
+  display: none;
+}
+
+.sval-fr-connect:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: rgb(var(--sval-palette-wash-light) / 0.16);
+}
+
+.sval-fr-connect-heading {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sval-fr-smb-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  > .sval-fr-label:not(:first-child) {
+    margin-block-start: 8px;
+  }
+}
+
+.sval-fr-input {
+  appearance: none;
+  height: 40px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--ink-500);
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  color: var(--text-strong);
+  caret-color: var(--sval-neon);
+  font: 15px var(--sval-font);
+
+  &::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.sval-fr-connect-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sval-fr-dropbox-where {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sval-fr-dropbox-place {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font: 13px/1.4 var(--sval-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sval-fr-dropbox-folders {
+  height: 200px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.sval-fr-dropbox-status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+
+  &:empty {
+    display: none;
+  }
+}
+
+.sval-fr-keychain {
+  margin: 0;
+}
+
 .sval-fr .sval-fr-content button.sval-fr-use-backup {
   align-self: flex-start;
   height: 32px;
@@ -1167,6 +1275,36 @@ section[data-join="landed"] .sval-fr-join::before {
   animation: none;
 }
 
+/* The join step's line while a folder is set up: the join line's spinner,
+   without its card. */
+.sval-fr-working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  color: var(--text-body);
+  font-size: 14px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &::before {
+    content: "";
+    flex: none;
+    width: 18px;
+    height: 18px;
+    background: center / contain no-repeat var(--sval-icon-loading);
+    -moz-context-properties: fill;
+    fill: var(--sval-neon);
+    animation: sval-fr-spin 1s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+}
+
 @keyframes sval-fr-spin {
   to {
     transform: rotate(1turn);
@@ -1230,7 +1368,8 @@ section[data-join="landed"] .sval-fr-join::before {
   }
 }
 
-.sval-fr button.sval-fr-choose-folder {
+/* The three ways to name the other device's folder, alike. */
+.sval-fr .sval-fr-folder-ways > button {
   flex: none;
   height: 44px;
   padding: 0 20px;
@@ -1240,6 +1379,42 @@ section[data-join="landed"] .sval-fr-join::before {
   width: 16px;
   height: 16px;
   fill: #ffffff;
+}
+
+.sval-fr-brand {
+  width: 16px;
+  height: 16px;
+}
+
+.sval-fr .sval-fr-connect-actions > button,
+.sval-fr .sval-fr-dropbox-where > button {
+  flex: none;
+  height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+}
+
+/* A folder in the Dropbox panel's list is a row, its whole width
+ * clickable. */
+.sval-fr button.sval-fr-dropbox-folder {
+  justify-content: flex-start;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 6px;
+  color: var(--text-body);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+
+  > .sval-fr-glyph {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: var(--text-body);
+  }
 }
 
 /* ---------------------------------------------------------------- footer */

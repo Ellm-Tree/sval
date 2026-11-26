@@ -4,8 +4,9 @@
 "use strict";
 
 /**
- * A folder on an SMB server (`SvalRemoteFolder`): the root Sval keeps for
- * it, the names it is shown by, and the password kept with the sync key.
+ * A folder on an SMB server or in Dropbox (`SvalRemoteFolder`): the root
+ * Sval keeps for it, the names it is shown by, and the sign-in kept with the
+ * sync key.
  */
 
 const { tempPath } = ChromeUtils.importESModule(
@@ -90,6 +91,28 @@ add_task(function the_folder_above_is_its_parent() {
   Assert.equal(SvalRemoteFolder.remoteParent("smb://nas/s"), null);
 });
 
+add_task(function a_dropbox_folder_is_named_from_its_root() {
+  const root = SvalRemoteFolder.dropboxRoot("Apps/Sval Sync");
+  Assert.equal(root, "dropbox:/Apps/Sval%20Sync");
+  Assert.deepEqual(SvalRemoteFolder.parseDropboxRoot(root), {
+    folder: "Apps/Sval Sync",
+  });
+  Assert.ok(SvalRemoteFolder.isRemoteRoot(root));
+  Assert.equal(friendlyFolderName(root), "Sval Sync");
+  Assert.equal(
+    SvalRemoteFolder.remoteFolderPlace(root),
+    "Dropbox/Apps/Sval Sync"
+  );
+  Assert.equal(SvalRemoteFolder.remoteParent(root), "dropbox:/Apps");
+  Assert.equal(SvalRemoteFolder.remoteFilename(root), "Sval Sync");
+
+  const top = SvalRemoteFolder.dropboxRoot("");
+  Assert.equal(top, "dropbox:/");
+  Assert.equal(SvalRemoteFolder.remoteFolderPlace(top), "Dropbox");
+  Assert.equal(SvalRemoteFolder.remoteParent(top), null);
+  Assert.equal(SvalRemoteFolder.parseDropboxRoot("/Users/me/Dropbox"), null);
+});
+
 add_task(function a_refused_sign_in_is_its_own_problem() {
   Assert.equal(folderProblem("io-error", "SignInError"), "sign-in");
   Assert.equal(folderProblem("io-error", "NetworkError"), "offline");
@@ -107,8 +130,8 @@ add_task(async function a_password_is_kept_only_for_the_folder_in_use() {
   const a = "smb://u@nas/s/a";
   const b = "smb://u@nas/s/b";
   Assert.equal(await SvalRemoteFolder.authFor(a), null, "none at first");
-  await SvalRemoteFolder.keepPassword(a, "pa");
-  await SvalRemoteFolder.keepPassword(b, "pb");
+  await SvalRemoteFolder.keepSignIn(a, { password: "pa" });
+  await SvalRemoteFolder.keepSignIn(b, { refreshToken: "tb" });
   Assert.deepEqual(await SvalRemoteFolder.authFor(a), { password: "pa" });
   Assert.equal(
     await SvalRemoteFolder.authFor("/Volumes/s"),
@@ -119,14 +142,14 @@ add_task(async function a_password_is_kept_only_for_the_folder_in_use() {
   SvalRemoteFolder._reset();
   Assert.deepEqual(
     await SvalRemoteFolder.authFor(b),
-    { password: "pb" },
+    { refreshToken: "tb" },
     "read back from the secret store"
   );
 
   await SvalRemoteFolder.moveSignIn(b, "smb://u@nas/s");
   Assert.equal(await SvalRemoteFolder.authFor(b), null);
   Assert.deepEqual(await SvalRemoteFolder.authFor("smb://u@nas/s"), {
-    password: "pb",
+    refreshToken: "tb",
   });
 
   await SvalRemoteFolder.keepOnly("smb://u@nas/s");

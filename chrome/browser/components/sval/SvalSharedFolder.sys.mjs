@@ -607,6 +607,24 @@ export const SvalSharedFolder = {
   },
 
   /**
+   * The folders in `root` itself, for choosing one inside a remote folder
+   * before it is the one in use.
+   *
+   * @param {object} request
+   * @param {string} request.root The folder to list.
+   * @param {object} request.auth The sign-in for it (`SvalRemoteFolder`).
+   * @param {number} request.deadline When the helper must have answered.
+   * @returns {Promise<object>} `{ reachable: true, folders }`, or the
+   *   helper's unreachable answer.
+   */
+  listFolders({ root, auth, deadline }) {
+    return this._run(
+      { op: "listFolders", root, auth, requireTop: null },
+      deadline
+    );
+  },
+
+  /**
    * Makes `path`, a directory under `root`. `root` itself is never made: a
    * folder that is not there answers "missing".
    *
@@ -680,7 +698,8 @@ export const SvalSharedFolder = {
       // A remote folder's sign-in travels with each request, so a helper
       // started afresh needs nothing kept by the one before
       // (`SvalRemoteFolder`).
-      if (lazy.SvalRemoteFolder.isRemoteRoot(request.root)) {
+      // A request that names its own, for a folder not yet chosen, keeps it.
+      if (lazy.SvalRemoteFolder.isRemoteRoot(request.root) && !request.auth) {
         const auth = await lazy.SvalRemoteFolder.authFor(request.root);
         request = { ...request, auth: auth ?? {} };
       }

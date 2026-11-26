@@ -725,6 +725,9 @@ var SvalPanel = {
           "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
         SvalRemoteFolder:
           "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs",
+        SvalDropbox: "moz-src:///browser/components/sval/SvalDropbox.sys.mjs",
+        SvalSharedFolder:
+          "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs",
         SvalSerialQueue:
           "moz-src:///browser/components/sval/SvalSerialQueue.sys.mjs",
         SvalBackupKey:

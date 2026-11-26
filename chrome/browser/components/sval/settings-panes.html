@@ -536,6 +536,18 @@
           </span>
         </div>
 
+        <!-- While a choice of folder takes effect: saving its sign-in, which
+             a Mac may ask about, and the first pass through it. -->
+        <p
+          id="sval-storage-working"
+          class="sval-storage-working"
+          role="status"
+          hidden="hidden"
+        >
+          <span class="sval-site-spinner" aria-hidden="true"></span>
+          <span id="sval-storage-working-text"></span>
+        </p>
+
         <!-- Shown on a machine with no keyring, where the sync key is kept in
              the profile (key-storage spec, "What each system store does to
              sval"). -->
@@ -549,6 +561,16 @@
           <!-- A folder on an SMB server, which Sval signs in to itself
                (desktop connectors spec §4). -->
           <button id="sval-storage-smb" class="sval-button"></button>
+          <!-- A folder in the user's Dropbox, which Sval signs in to itself
+               (desktop connectors spec §3). -->
+          <button id="sval-storage-dropbox" class="sval-button">
+            <img
+              class="sval-button-brand"
+              src="chrome://browser/content/sval/sync-services/dropbox.svg"
+              alt=""
+            />
+            <span id="sval-storage-dropbox-label"></span>
+          </button>
           <button
             id="sval-folder-reveal"
             class="sval-button"
@@ -609,6 +631,56 @@
               type="button"
             >
               Stop syncing
+            </button>
+          </div>
+        </dialog>
+
+        <!-- Sval's own folder browser: no system picker sees a Dropbox. The
+             token is kept with the sync key as Use this folder chooses it, so
+             a Mac asks for the Keychain then, and the note says so first. -->
+        <dialog
+          id="sval-dropbox-dialog"
+          class="sval-modal"
+          aria-labelledby="sval-dropbox-dialog-title"
+        >
+          <h2 id="sval-dropbox-dialog-title" class="sval-modal-title">
+            Choose a Dropbox folder
+          </h2>
+          <div class="sval-dropbox-browser">
+            <div class="sval-dropbox-where">
+              <button id="sval-dropbox-up" class="sval-button" type="button">
+                Back
+              </button>
+              <span id="sval-dropbox-place" class="sval-dropbox-place"></span>
+            </div>
+            <ul
+              id="sval-dropbox-folders"
+              class="sval-dropbox-folders"
+              aria-labelledby="sval-dropbox-place"
+            ></ul>
+            <p
+              id="sval-dropbox-status"
+              class="sval-dropbox-status"
+              role="status"
+            ></p>
+            <moz-message-bar
+              id="sval-dropbox-keychain"
+              class="sval-smb-note"
+              type="warning"
+              hidden="hidden"
+            ></moz-message-bar>
+          </div>
+          <div class="sval-modal-actions">
+            <button id="sval-dropbox-cancel" class="sval-button" type="button">
+              Cancel
+            </button>
+            <button
+              id="sval-dropbox-use"
+              class="sval-button"
+              data-tone="primary"
+              type="button"
+            >
+              Use this folder
             </button>
           </div>
         </dialog>

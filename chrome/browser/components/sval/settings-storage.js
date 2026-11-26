@@ -20,13 +20,19 @@
   ChromeUtils.defineESModuleGetters(lazy, {
     AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
     FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
+    SvalDropbox: "moz-src:///browser/components/sval/SvalDropbox.sys.mjs",
     SvalIdentity: "moz-src:///browser/components/sval/SvalIdentity.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     SvalRemoteFolder:
       "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs",
     SvalSecretStore:
       "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
+    SvalSharedFolder:
+      "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs",
   });
+
+  /** How long the Dropbox browser waits for a folder's listing. */
+  const LISTING_MS = 20_000;
   // `SvalPanelModel.sys.mjs` exports functions rather than one object of that
   // name, so it is imported as a namespace.
   ChromeUtils.defineLazyGetter(lazy, "SvalPanelModel", () =>
@@ -60,6 +66,16 @@
      * chosen, so it never sits beside a line saying the workspaces sync.
      */
     _statusFolder: null,
+
+    /** The control that had focus when a choice of folder started. */
+    _workingFrom: null,
+
+    /**
+     * The Dropbox browser's state while its dialog is open: the refresh
+     * token it lists with, and the folder it shows, `/`-separated and empty
+     * for the root of the Dropbox.
+     */
+    _dropbox: null,
 
     /**
      * Finds and wires the Sync card and the Sync key card.
@@ -103,12 +119,44 @@
         serverUser: byId("sval-server-user"),
         serverPassword: byId("sval-server-password"),
         serverCancel: byId("sval-server-cancel"),
+        storageDropbox: byId("sval-storage-dropbox"),
+        storageDropboxLabel: byId("sval-storage-dropbox-label"),
+        dropboxDialog: byId("sval-dropbox-dialog"),
+        dropboxUp: byId("sval-dropbox-up"),
+        dropboxPlace: byId("sval-dropbox-place"),
+        dropboxFolders: byId("sval-dropbox-folders"),
+        dropboxStatus: byId("sval-dropbox-status"),
+        dropboxKeychain: byId("sval-dropbox-keychain"),
+        dropboxCancel: byId("sval-dropbox-cancel"),
+        dropboxUse: byId("sval-dropbox-use"),
+        storageWorking: byId("sval-storage-working"),
+        storageWorkingText: byId("sval-storage-working-text"),
       });
       this._els.folderReveal.textContent = revealLabel();
       this._els.smbKeychain.message =
         `If your Mac asks whether Sval can access ` +
         `"${lazy.SvalSecretStore.userLabel()}" after you select Connect, ` +
         `choose Always Allow.`;
+      this._els.dropboxKeychain.message =
+        `If your Mac asks whether Sval can access ` +
+        `"${lazy.SvalSecretStore.userLabel()}" after you select Use this ` +
+        `folder, choose Always Allow.`;
+      this._els.storageDropbox.addEventListener("click", () =>
+        this.chooseDropboxFolder()
+      );
+      this._els.dropboxUp.addEventListener("click", () => {
+        const folder = this._dropbox?.folder ?? "";
+        this._browseDropbox(folder.split("/").slice(0, -1).join("/"));
+      });
+      this._els.dropboxCancel.addEventListener("click", () =>
+        this._els.dropboxDialog.close()
+      );
+      this._els.dropboxDialog.addEventListener("close", () => {
+        this._dropbox = null;
+      });
+      this._els.dropboxUse.addEventListener("click", () =>
+        this._useDropboxFolder()
+      );
       this._els.storageChoose.addEventListener("click", () =>
         this.chooseFolder()
       );
@@ -170,6 +218,7 @@
         // are withheld until then, so none is offered only to fail.
         this._els.storageChoose.hidden = true;
         this._els.storageSmb.hidden = true;
+        this._els.storageDropbox.hidden = true;
         this._els.storageReuse.hidden = true;
         this._els.storageStop.hidden = true;
         this._els.folderReveal.hidden = true;
@@ -185,6 +234,7 @@
       // finds one now has to offer the control again.
       this._els.storageChoose.hidden = false;
       this._els.storageSmb.hidden = false;
+      this._els.storageDropbox.hidden = false;
       const chosen = panel.sharedRootSetting();
       const unreachable =
         chosen && panel.syncState.folderState === "unreachable";
@@ -207,10 +257,12 @@
         this._setText(
           this._els.storageText,
           "Sval saves your Workspaces on this device only. To sync them, " +
-            "choose a folder your devices share or connect to an SMB server."
+            "choose a folder your devices share, or connect to an SMB server " +
+            "or to Dropbox."
         );
         this._setText(this._els.storageChoose, "Choose folder…");
         this._setText(this._els.storageSmb, "Connect to SMB server…");
+        this._setText(this._els.storageDropboxLabel, "Connect to Dropbox…");
         this._els.storageChoose.dataset.tone = "primary";
         delete this._els.storageSection.dataset.via;
         return;
@@ -225,10 +277,32 @@
         : chosen;
       this._setText(this._els.folderPath, place);
       this._els.folderField.title = place;
-      // An SMB folder and a folder on this computer are two ways to sync, so
-      // each has its own button: the one in use changes it, and the other
-      // switches to the other way.
-      this._els.storageSection.dataset.via = remote ? "smb" : "folder";
+      // A folder on this computer, an SMB folder and a Dropbox folder are
+      // three ways to sync, so each has its own button: the one in use
+      // changes it, and the others switch to another way.
+      const dropbox = !!lazy.SvalRemoteFolder.parseDropboxRoot(chosen);
+      let via = "folder";
+      if (dropbox) {
+        via = "dropbox";
+      } else if (remote) {
+        via = "smb";
+      }
+      this._els.storageSection.dataset.via = via;
+      this._setText(
+        this._els.storageDropboxLabel,
+        dropbox ? "Change Dropbox folder…" : "Connect to Dropbox…"
+      );
+      if (dropbox) {
+        this._setText(this._els.storageSmb, "Connect to SMB server…");
+        this._setText(this._els.storageChoose, "Choose folder…");
+        this._setText(
+          this._els.storageText,
+          unreachable
+            ? "Sval can't reach Dropbox. Your Workspaces are still on this device."
+            : "Sval syncs your Workspaces through a folder in your Dropbox."
+        );
+        return;
+      }
       if (remote) {
         this._setText(this._els.storageSmb, "Edit connection…");
         this._setText(this._els.storageChoose, "Choose folder…");
@@ -272,6 +346,7 @@
       this._els.smbKeychain.hidden =
         lazy.AppConstants.platform !== "macosx" ||
         backend === lazy.SvalSecretStore.BACKENDS.profile;
+      this._els.dropboxKeychain.hidden = this._els.smbKeychain.hidden;
       this._els.backupMissing.hidden = !syncs || !!panel.settings?.backupSaved;
     },
 
@@ -484,12 +559,14 @@
       const password = els.serverPassword.value;
       els.serverPassword.value = "";
       els.serverDialog.close();
+      this._setWorking(root);
       try {
-        await lazy.SvalRemoteFolder.keepPassword(root, password);
+        await lazy.SvalRemoteFolder.keepSignIn(root, { password });
       } catch (err) {
         lazy.SvalLog.warn(
           `keeping the server's password failed: ${lazy.SvalLog.errorName(err)}`
         );
+        this._setWorking(null);
         this._showStorageReport({
           message:
             "Sval couldn't save the password, so your sync folder didn't change.",
@@ -500,13 +577,214 @@
     },
 
     /**
+     * Opens the Dropbox browser at the Dropbox folder in use, signed in as it
+     * is, or signs in to Dropbox first and opens it at the Dropbox's root.
+     */
+    async chooseDropboxFolder() {
+      if (this._privateOnly || !this.panel) {
+        return;
+      }
+      const chosen = this.panel.sharedRootSetting();
+      const current = lazy.SvalRemoteFolder.parseDropboxRoot(chosen);
+      const kept = current
+        ? await lazy.SvalRemoteFolder.authFor(chosen).catch(() => null)
+        : null;
+      let token = kept?.refreshToken;
+      if (!token) {
+        token = await this._signInToDropbox();
+        if (!token) {
+          return;
+        }
+      }
+      this._dropbox = { token, folder: current?.folder ?? "" };
+      this._els.dropboxDialog.showModal();
+      await this._browseDropbox(this._dropbox.folder);
+    },
+
+    /**
+     * Signs in to Dropbox in a page of its own (`SvalDropbox`).
+     *
+     * @returns {Promise<?string>} the refresh token, or null when the user
+     *   gave up or Dropbox refused.
+     */
+    async _signInToDropbox() {
+      this._els.storageDropbox.disabled = true;
+      try {
+        return await lazy.SvalDropbox.signIn();
+      } catch (err) {
+        if (err?.name !== "SignInCancelled") {
+          lazy.SvalLog.warn(
+            `signing in to Dropbox failed: ${lazy.SvalLog.errorName(err)}`
+          );
+          this._showStorageReport({
+            message: "Sval couldn't sign in to Dropbox.",
+          });
+        }
+        return null;
+      } finally {
+        this._els.storageDropbox.disabled = false;
+      }
+    },
+
+    /**
+     * Shows the folders in `folder` of the user's Dropbox. A token Dropbox
+     * no longer accepts is replaced by signing in again.
+     *
+     * @param {string} folder `/`-separated, empty for the Dropbox's root.
+     */
+    async _browseDropbox(folder) {
+      const els = this._els;
+      const state = this._dropbox;
+      if (!state) {
+        return;
+      }
+      state.folder = folder;
+      const root = lazy.SvalRemoteFolder.dropboxRoot(folder);
+      els.dropboxPlace.textContent =
+        lazy.SvalRemoteFolder.remoteFolderPlace(root);
+      els.dropboxUp.disabled = !folder;
+      els.dropboxUse.disabled = true;
+      els.dropboxFolders.replaceChildren();
+      els.dropboxStatus.textContent = "Loading folders…";
+      const list = () =>
+        lazy.SvalSharedFolder.listFolders({
+          root,
+          auth: { refreshToken: state.token },
+          deadline: Date.now() + LISTING_MS,
+        });
+      let answer = await list();
+      if (answer.error === "SignInError" && this._dropbox === state) {
+        const token = await this._signInToDropbox();
+        if (!token) {
+          els.dropboxDialog.close();
+          return;
+        }
+        state.token = token;
+        answer = await list();
+      }
+      // A later click, or a closed dialog, has moved on from this listing.
+      if (this._dropbox !== state || state.folder !== folder) {
+        return;
+      }
+      if (!answer.reachable) {
+        els.dropboxStatus.textContent =
+          answer.error === "SignInError"
+            ? "Dropbox didn't accept Sval's sign-in."
+            : "Sval can't reach Dropbox. Check your internet connection.";
+        return;
+      }
+      els.dropboxStatus.textContent = answer.folders.length
+        ? ""
+        : "This folder has no folders in it.";
+      for (const name of answer.folders) {
+        const row = document.createElement("li");
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "sval-dropbox-folder";
+        const icon = document.createElement("span");
+        icon.className = "sval-icon sval-icon-folder";
+        icon.setAttribute("aria-hidden", "true");
+        open.append(icon, name);
+        open.addEventListener("click", () =>
+          this._browseDropbox(folder ? `${folder}/${name}` : name)
+        );
+        row.append(open);
+        els.dropboxFolders.append(row);
+      }
+      els.dropboxUse.disabled = false;
+    },
+
+    /**
+     * Keeps the Dropbox sign-in for the folder the browser shows, and has the
+     * panel share through it.
+     */
+    async _useDropboxFolder() {
+      const state = this._dropbox;
+      const panel = this.panel;
+      if (!state || !panel) {
+        return;
+      }
+      const root = lazy.SvalRemoteFolder.dropboxRoot(state.folder);
+      this._els.dropboxDialog.close();
+      this._setWorking(root);
+      try {
+        await lazy.SvalRemoteFolder.keepSignIn(root, {
+          refreshToken: state.token,
+        });
+      } catch (err) {
+        lazy.SvalLog.warn(
+          `keeping the Dropbox sign-in failed: ${lazy.SvalLog.errorName(err)}`
+        );
+        this._setWorking(null);
+        this._showStorageReport({
+          message:
+            "Sval couldn't save the Dropbox sign-in, so your sync folder didn't change.",
+        });
+        return;
+      }
+      await this._useFolder(panel, root);
+    },
+
+    /**
+     * Shows that a choice of folder is taking effect, and holds the card's
+     * buttons until it has: saving a sign-in may wait on the Keychain, and
+     * the first pass through a remote folder reads it over the network.
+     *
+     * @param {?string} path The folder being chosen, or null once done.
+     */
+    _setWorking(path) {
+      const els = this._els;
+      const working = path !== null;
+      // Holding the buttons blurs the one that started this on some
+      // platforms: focus goes back to it once they are free.
+      if (working) {
+        this._workingFrom ??= document.activeElement;
+      }
+      for (const button of [
+        els.storageChoose,
+        els.storageSmb,
+        els.storageDropbox,
+        els.storageReuse,
+        els.storageStop,
+      ]) {
+        button.disabled = working;
+      }
+      if (working) {
+        els.storageSection.setAttribute("aria-busy", "true");
+      } else {
+        els.storageSection.removeAttribute("aria-busy");
+      }
+      els.storageWorking.hidden = !working;
+      if (!working) {
+        const from = this._workingFrom;
+        this._workingFrom = null;
+        const lost =
+          !document.activeElement || document.activeElement === document.body;
+        if (lost && from?.isConnected && !from.disabled) {
+          from.focus();
+        }
+        return;
+      }
+      let where = "this folder";
+      if (lazy.SvalRemoteFolder.parseDropboxRoot(path)) {
+        where = "Dropbox";
+      } else if (lazy.SvalRemoteFolder.isRemoteRoot(path)) {
+        where = "the SMB server";
+      }
+      this._setText(
+        els.storageWorkingText,
+        `Setting up sync through ${where}…`
+      );
+    },
+
+    /**
      * Has the panel share through `path`, and shows what it answered.
      *
      * @param {object} panel The window's `SvalPanel`.
      * @param {string} path The folder the user chose.
      */
     async _useFolder(panel, path) {
-      this._els.storageChoose.disabled = true;
+      this._setWorking(path);
       this._showStorageReport({ message: null });
 
       let report;
@@ -519,7 +797,7 @@
         report = { reached: false, message: "Couldn't change the folder." };
       }
 
-      this._els.storageChoose.disabled = false;
+      this._setWorking(null);
       // The panel's own words, verbatim. See this file's top comment.
       this._showStorageReport(report, () => this._useFolder(panel, path));
       // What a pass said of the last folder says nothing about this one.

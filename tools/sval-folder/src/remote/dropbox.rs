@@ -20,9 +20,24 @@ use std::time::{Duration, Instant};
 /// app signs in with PKCE and holds no secret.
 pub const APP_KEY: &str = "94ncbej3k9vjzo7";
 
-const TOKEN_URL: &str = "https://api.dropboxapi.com/oauth2/token";
-const RPC_URL: &str = "https://api.dropboxapi.com/2/files/";
-const CONTENT_URL: &str = "https://content.dropboxapi.com/2/files/";
+/// Where each kind of call goes. Dropbox's own, except in tests, which
+/// answer from a local server.
+#[derive(Clone)]
+struct Endpoints {
+    token: String,
+    rpc: String,
+    content: String,
+}
+
+impl Endpoints {
+    fn dropbox() -> Self {
+        Endpoints {
+            token: "https://api.dropboxapi.com/oauth2/token".into(),
+            rpc: "https://api.dropboxapi.com/2/files/".into(),
+            content: "https://content.dropboxapi.com/2/files/".into(),
+        }
+    }
+}
 
 /// How long one call may take. Under the request's own 20 s deadline, so a
 /// Dropbox that has stopped answering fails the request with an answer.
@@ -42,6 +57,7 @@ const MAX_JSON_BYTES: u64 = 16 * 1024 * 1024;
 
 pub struct DropboxStore {
     agent: ureq::Agent,
+    ends: Endpoints,
     refresh_token: String,
     /// The access token and when to renew it, once one is had.
     access: Option<(String, Instant)>,
@@ -147,9 +163,13 @@ fn summary(response: &mut ureq::http::Response<ureq::Body>) -> CallError {
 }
 
 /// The access token for `refresh_token`, and how long it holds.
-fn refresh(agent: &ureq::Agent, refresh_token: &str) -> Result<(String, Duration)> {
+fn refresh(
+    agent: &ureq::Agent,
+    ends: &Endpoints,
+    refresh_token: &str,
+) -> Result<(String, Duration)> {
     let mut response = agent
-        .post(TOKEN_URL)
+        .post(&ends.token)
         .send_form([
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
@@ -171,9 +191,15 @@ fn refresh(agent: &ureq::Agent, refresh_token: &str) -> Result<(String, Duration
     Ok((token.to_owned(), Duration::from_secs(lasts)))
 }
 
-fn download(agent: &ureq::Agent, token: &str, path: &str, limit: u64) -> Result<Vec<u8>> {
+fn download(
+    agent: &ureq::Agent,
+    ends: &Endpoints,
+    token: &str,
+    path: &str,
+    limit: u64,
+) -> Result<Vec<u8>> {
     let mut response = agent
-        .post(format!("{CONTENT_URL}download"))
+        .post(format!("{}download", ends.content))
         .header("Authorization", format!("Bearer {token}"))
         .header("Dropbox-API-Arg", header_json(&json!({ "path": path })))
         .send_empty()
@@ -202,8 +228,13 @@ fn download(agent: &ureq::Agent, token: &str, path: &str, limit: u64) -> Result<
 
 impl DropboxStore {
     pub fn new(refresh_token: &str, root: &str) -> Self {
+        Self::at(Endpoints::dropbox(), refresh_token, root)
+    }
+
+    fn at(ends: Endpoints, refresh_token: &str, root: &str) -> Self {
         DropboxStore {
             agent: agent(),
+            ends,
             refresh_token: refresh_token.to_owned(),
             access: None,
             root: root.to_owned(),
@@ -227,7 +258,7 @@ impl DropboxStore {
         match &self.access {
             Some((token, until)) if !stale && Instant::now() < *until => Ok(token.clone()),
             _ => {
-                let (token, lasts) = refresh(&self.agent, &self.refresh_token)?;
+                let (token, lasts) = refresh(&self.agent, &self.ends, &self.refresh_token)?;
                 let until = Instant::now() + lasts.saturating_sub(TOKEN_MARGIN);
                 self.access = Some((token.clone(), until));
                 Ok(token)
@@ -243,7 +274,7 @@ impl DropboxStore {
             let token = self.token(stale)?;
             let mut response = self
                 .agent
-                .post(format!("{RPC_URL}{name}"))
+                .post(format!("{}{name}", self.ends.rpc))
                 .header("Authorization", format!("Bearer {token}"))
                 .header("Content-Type", "application/json")
                 .send(arg.to_string())
@@ -340,13 +371,15 @@ impl Store for DropboxStore {
             .iter()
             .map(|&(path, limit)| (self.full(path), limit))
             .collect();
-        let (agent, token) = (&self.agent, token.as_str());
+        let (agent, ends, token) = (&self.agent, &self.ends, token.as_str());
         let mut out = Vec::with_capacity(full.len());
         for chunk in full.chunks(PARALLEL_DOWNLOADS) {
             std::thread::scope(|scope| {
                 let running: Vec<_> = chunk
                     .iter()
-                    .map(|(path, limit)| scope.spawn(move || download(agent, token, path, *limit)))
+                    .map(|(path, limit)| {
+                        scope.spawn(move || download(agent, ends, token, path, *limit))
+                    })
                     .collect();
                 for thread in running {
                     out.push(thread.join().unwrap_or(Err(RemoteError::Other)));
@@ -365,7 +398,7 @@ impl Store for DropboxStore {
             let token = self.token(stale)?;
             let response = self
                 .agent
-                .post(format!("{CONTENT_URL}upload"))
+                .post(format!("{}upload", self.ends.content))
                 .header("Authorization", format!("Bearer {token}"))
                 .header("Dropbox-API-Arg", header_json(&arg))
                 .header("Content-Type", "application/octet-stream")
@@ -426,30 +459,4 @@ impl Store for DropboxStore {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn writes_paths_as_dropbox_does() {
-        let at = |root: &str, path: &str| DropboxStore::new("t", root).full(path);
-        assert_eq!(at("", ""), "");
-        assert_eq!(at("Sval", "sval/ws"), "/Sval/sval/ws");
-        assert_eq!(at("", "sval"), "/sval");
-    }
-
-    #[test]
-    fn a_header_argument_is_ascii() {
-        assert_eq!(
-            header_json(&json!({ "path": "/Café 🐱" })),
-            "{\"path\":\"/Caf\\u00e9 \\ud83d\\udc31\"}"
-        );
-    }
-
-    #[test]
-    fn a_status_names_its_failure() {
-        assert_eq!(status_error(401), RemoteError::SignIn);
-        assert_eq!(status_error(403), RemoteError::Denied);
-        assert_eq!(status_error(429), RemoteError::Unreachable);
-        assert_eq!(status_error(503), RemoteError::Unreachable);
-    }
-}
+mod tests;

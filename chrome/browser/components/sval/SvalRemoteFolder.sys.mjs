@@ -3,12 +3,13 @@
 
 /**
  * A shared folder Sval reaches over the network itself, with no help from
- * the operating system: a folder on an SMB share (desktop connectors spec
- * §2). The chosen folder is kept as a root string the helper reads
- * (`Location` in `tools/sval-folder/src/remote/mod.rs`):
- * `smb://[user@]host[:port]/share/folder...`, each segment percent-encoded.
+ * the operating system: a folder on an SMB share or in the user's Dropbox
+ * (desktop connectors spec §2). The chosen folder is kept as a root string
+ * the helper reads (`Location` in `tools/sval-folder/src/remote/mod.rs`):
+ * `smb://[user@]host[:port]/share/folder...` or `dropbox:/folder...`, each
+ * segment percent-encoded.
  *
- * **The password is kept with the sync key** (`SvalSecretStore`), never in
+ * **The password or token is kept with the sync key** (`SvalSecretStore`), never in
  * the root or the settings file, and goes to the helper in each request's
  * `auth`. One secret holds the sign-ins of the roots chosen, by root, so a
  * failed change of folder leaves the folder in use signed in.
@@ -26,6 +27,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 export const SIGN_INS_SECRET = "shared-folder-sign-ins";
 
 const SMB = "smb://";
+const DROPBOX = "dropbox:/";
 
 /**
  * The sign-ins read from the secret store, by root, kept for the run: each
@@ -42,7 +44,46 @@ let signIns = null;
  * @returns {boolean}
  */
 export function isRemoteRoot(root) {
-  return typeof root === "string" && root.startsWith(SMB);
+  return (
+    typeof root === "string" &&
+    (root.startsWith(SMB) || root.startsWith(DROPBOX))
+  );
+}
+
+/**
+ * The folder of a Dropbox root, `/`-separated and empty for the root of the
+ * user's Dropbox, or null when `root` is not one.
+ *
+ * @param {string} root
+ * @returns {?{folder: string}}
+ */
+export function parseDropboxRoot(root) {
+  if (typeof root !== "string" || !root.startsWith(DROPBOX)) {
+    return null;
+  }
+  try {
+    const folder = root
+      .slice(DROPBOX.length)
+      .split("/")
+      .filter(Boolean)
+      .map(decodeURIComponent)
+      .join("/");
+    return { folder };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The root for a folder in the user's Dropbox.
+ *
+ * @param {string} folder `/`-separated, empty for the root of the Dropbox.
+ * @returns {string}
+ */
+export function dropboxRoot(folder) {
+  return (
+    DROPBOX + folder.split("/").filter(Boolean).map(encodeSegment).join("/")
+  );
 }
 
 function encodeSegment(segment) {
@@ -140,6 +181,10 @@ export function smbRoot({ server, share, folder = "", username = "" }) {
  * @returns {string}
  */
 export function remoteFolderName(root) {
+  const dropbox = parseDropboxRoot(root);
+  if (dropbox) {
+    return dropbox.folder.split("/").at(-1) || "Dropbox";
+  }
   const smb = parseSmbRoot(root);
   if (!smb) {
     return root;
@@ -149,12 +194,16 @@ export function remoteFolderName(root) {
 
 /**
  * Where the folder is, as the user would type it to find it again:
- * `smb://server/share/folder`, without the username.
+ * `smb://server/share/folder`, without the username, or `Dropbox/folder`.
  *
  * @param {string} root
  * @returns {string}
  */
 export function remoteFolderPlace(root) {
+  const dropbox = parseDropboxRoot(root);
+  if (dropbox) {
+    return ["Dropbox", dropbox.folder].filter(Boolean).join("/");
+  }
   const smb = parseSmbRoot(root);
   if (!smb) {
     return root;
@@ -171,6 +220,10 @@ export function remoteFolderPlace(root) {
  * @returns {string|null}
  */
 export function remoteFilename(root) {
+  const dropbox = parseDropboxRoot(root);
+  if (dropbox) {
+    return dropbox.folder.split("/").at(-1) || null;
+  }
   const smb = parseSmbRoot(root);
   return smb?.folder ? smb.folder.split("/").at(-1) : null;
 }
@@ -183,6 +236,12 @@ export function remoteFilename(root) {
  * @returns {string|null}
  */
 export function remoteParent(root) {
+  const dropbox = parseDropboxRoot(root);
+  if (dropbox) {
+    return dropbox.folder
+      ? dropboxRoot(dropbox.folder.split("/").slice(0, -1).join("/"))
+      : null;
+  }
   const smb = parseSmbRoot(root);
   if (!smb?.folder) {
     return null;
@@ -209,7 +268,9 @@ async function readSignIns() {
     }
     signIns = new Map(
       Object.entries(stored ?? {}).filter(
-        ([, auth]) => typeof auth?.password === "string"
+        ([, auth]) =>
+          typeof auth?.password === "string" ||
+          typeof auth?.refreshToken === "string"
       )
     );
   }
@@ -232,6 +293,8 @@ export const SvalRemoteFolder = {
   isRemoteRoot,
   parseSmbRoot,
   smbRoot,
+  parseDropboxRoot,
+  dropboxRoot,
   remoteFolderName,
   remoteFolderPlace,
   remoteFilename,
@@ -242,7 +305,7 @@ export const SvalRemoteFolder = {
    * one with no sign-in kept.
    *
    * @param {string} root
-   * @returns {Promise<?{password: string}>}
+   * @returns {Promise<?{password: string}|{refreshToken: string}>}
    */
   async authFor(root) {
     if (!isRemoteRoot(root)) {
@@ -252,14 +315,15 @@ export const SvalRemoteFolder = {
   },
 
   /**
-   * Keeps `password` as the sign-in for the SMB folder at `root`.
+   * Keeps `auth` as the sign-in for the folder at `root`: `{ password }` for
+   * an SMB folder, `{ refreshToken }` for a Dropbox one.
    *
    * @param {string} root
-   * @param {string} password
+   * @param {{password: string}|{refreshToken: string}} auth
    */
-  async keepPassword(root, password) {
+  async keepSignIn(root, auth) {
     const map = new Map(await readSignIns());
-    map.set(root, { password });
+    map.set(root, auth);
     await writeSignIns(map);
   },
 

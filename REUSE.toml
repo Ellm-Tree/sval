@@ -338,6 +338,14 @@ path = [
 SPDX-FileCopyrightText = ["AgileBits Inc.", "Bitwarden Inc.", "Dashlane SAS", "Apple Inc.", "KeePassXC Team", "LastPass US LP", "Nord Security", "Proton AG"]
 SPDX-License-Identifier = "LicenseRef-third-party-logos"
 
+# Dropbox's glyph, on the button that syncs through a Dropbox folder so the
+# user knows which service it signs in to (nominative use). Simple Icons'
+# drawing of it is CC0; the mark itself is Dropbox's trademark.
+[[annotations]]
+path = "chrome/browser/components/sval/sync-services/dropbox.svg"
+SPDX-FileCopyrightText = "Dropbox, Inc."
+SPDX-License-Identifier = "LicenseRef-third-party-logos"
+
 # The marks of agent apps and model makers, on an agent's Workspace so the
 # user knows which app works there and on which model (nominative use).
 # LobeHub's drawings of them (scripts/generate-agent-brands.py) are MIT; the

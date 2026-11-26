@@ -415,6 +415,16 @@ fn list_names_says_which_hold_an_entry() {
 }
 
 #[test]
+fn list_folders_names_only_the_roots_folders() {
+    let f = Fixture::new("folders");
+    f.remote().put("b/doc.json", b"1");
+    f.remote().put("a/doc.json", b"2");
+    f.remote().put("loose.txt", b"3");
+    let answer = f.ask(json!({ "op": "listFolders" }));
+    assert_eq!(answer, json!({ "reachable": true, "folders": ["a", "b"] }));
+}
+
+#[test]
 fn make_dir_makes_each_directory_on_the_way() {
     let f = Fixture::new("make-dir");
     let answer = f.ask(json!({ "op": "makeDir", "path": "sval/ws/abc" }));

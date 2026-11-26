@@ -1,6 +1,6 @@
 # A shared folder on an SMB share or in Dropbox, with nothing mounted
 
-**Status:** SMB built; Dropbox designed. Decision 2650.
+**Status:** Built. Decision 2650.
 **Date:** 2026-11-25
 **Author:** John Postlethwait
 **Builds on:** decision 1437 (the shared-folder helper is a native program),
@@ -94,33 +94,46 @@ invalid request.
 
 - **Sign-in is OAuth 2 with PKCE** against Sval's Dropbox app, the iPhone
   app's (`DropboxApp` in `mobile/ios/Sval/Shared.swift`), so Sval holds no
-  secret. The browser opens Dropbox's authorize page in a tab and catches the
-  redirect to `db-<app key>://2/token`, which Dropbox accepts without the app
-  listing it. The tab never loads it.
-- **The browser trades the code for a refresh token** and keeps the token
+  secret (`SvalDropbox.sys.mjs`). The browser opens Dropbox's authorize page
+  in a Peek. Once the user allows Sval, Dropbox answers with a 302 to
+  `db-<app key>://2/token`, which it accepts without the app listing it.
+  Gecko drops a redirect to a scheme no app handles
+  (`nsExtProtocolChannel::OpenURL`), so while a sign-in is under way Sval
+  reads each response in `http-on-examine-response`, cancels the one that
+  redirects there, takes the code from its address and closes the Peek.
+  The sign-in logs each of the Peek's loads, and warns with them when the
+  Peek closes, or sits for 15 seconds, without the redirect.
+- **The browser trades the code for a refresh token** at
+  `api.dropboxapi.com/oauth2/token`, without cookies, and keeps the token
   with the sync key. The helper turns it into access tokens.
-- **The user picks the folder** from their Dropbox folders, listed through
-  the helper, as on the iPhone.
+- **The user picks the folder** in a folder browser of Sval's own, as on the
+  iPhone: the helper's `listFolders` names the folders in a remote root,
+  with the sign-in the request carries, before the folder is the one in use.
+  A token Dropbox no longer takes is replaced by signing in again.
 - Sval contacts `www.dropbox.com` to sign in, and `api.dropboxapi.com` and
   `content.dropboxapi.com` to sync (spec §10.9).
 
 ## 4. Choosing a remote folder
 
-A folder on this computer and an SMB server are two ways to sync, so Settings'
-Sync card offers each with a button of its own: Choose folder… opens the
-system folder picker, and Connect to SMB server… opens a dialog with the
-server's address, the share, the folder in the share, the username and the
-password. Connect keeps the password and chooses the folder as a picked one is
-chosen. The way in use changes from its own button, Change… or Edit
-connection…, and the other button switches to the other way.
+A folder on this computer, an SMB server and Dropbox are three ways to sync,
+so Settings' Sync card offers each with a button of its own: Choose folder…
+opens the system folder picker, Connect to SMB server… opens a dialog with
+the server's address, the share, the folder in the share, the username and
+the password, and Connect to Dropbox…, with Dropbox's glyph, signs in and
+opens the Dropbox folder browser. Connect, or Use this folder, keeps the
+sign-in and chooses the folder as a picked one is chosen. The way in use
+changes from its own button, Change…, Edit connection… or Change Dropbox
+folder…, and the other buttons switch to another way.
 
-On a Mac the dialog says before Connect that the password goes in the
-Keychain item Sval's secrets live in, and that the Mac asks whether Sval may
-use it.
+On a Mac each dialog says, in one line before the button that saves the
+sign-in, that the Mac may ask whether Sval can use the Keychain item Sval's
+secrets live in.
 
-While Sval syncs through an SMB server, the card says so, names the folder,
-and shows `smb://server/share/folder` without the username. A remote folder
-has no Show in Finder button. The dialog opens filled in with the folder in
+First run's step for joining another device offers the same three ways.
+
+While Sval syncs through an SMB server or Dropbox, the card says so, names
+the folder, and shows `smb://server/share/folder` without the username, or
+`Dropbox/folder`. A remote folder has no Show in Finder button. The dialog opens filled in with the folder in
 use, with the password empty.
 
 A sign-in is kept only for the folder in use. Choosing another folder, or

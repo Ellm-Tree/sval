@@ -309,6 +309,18 @@ fn a_write_refuses_a_directory_and_a_file_too_large() {
 }
 
 #[test]
+fn list_folders_names_only_the_roots_folders() {
+    let f = Fixture::new("folders");
+    fs::create_dir_all(f.at("b")).unwrap();
+    fs::create_dir_all(f.at("a")).unwrap();
+    f.put("loose.txt", b"x");
+    assert_eq!(
+        f.ask(json!({ "op": "listFolders" })),
+        json!({ "reachable": true, "folders": ["a", "b"] })
+    );
+}
+
+#[test]
 fn list_names_names_a_directory_and_reads_nothing() {
     let f = Fixture::new("names");
     let list =

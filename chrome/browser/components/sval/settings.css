@@ -2482,6 +2482,104 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   }
 }
 
+.sval-pane .sval-storage-working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  color: var(--sval-ink);
+  font-size: var(--settings-note-size);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* A service's mark before its name, as the password managers' are in first
+   run. */
+.sval-pane button.sval-button:has(> .sval-button-brand) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sval-pane .sval-button-brand {
+  width: 16px;
+  height: 16px;
+}
+
+/* The Dropbox folder browser: where it is, then the folders there, one per
+   row, inset as the dialog's title is. */
+.sval-pane .sval-dropbox-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px 0;
+  min-width: min(420px, 80vw);
+}
+
+.sval-pane .sval-dropbox-where {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sval-pane .sval-dropbox-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sval-ink-muted);
+}
+
+.sval-pane .sval-dropbox-folders {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--sval-border);
+  border-radius: 8px;
+}
+
+.sval-pane .sval-dropbox-folder {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sval-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--sval-tint);
+  }
+
+  > .sval-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.sval-pane .sval-dropbox-status {
+  margin: 0;
+  color: var(--sval-ink-muted);
+  font-size: var(--settings-small-size);
+
+  &:empty {
+    display: none;
+  }
+}
+
 .sval-modal-actions {
   display: flex;
   align-items: center;

@@ -13,6 +13,9 @@
 /* import-globals-from sval-panel.js */
 
 Object.assign(SvalPanel, {
+  /** How long first run's Dropbox panel waits for a folder's listing. */
+  _firstRunListingMs: 20_000,
+
   /** Whether this window's first run dialog is open (`_runFirstRun`). */
   _firstRunInFlight: false,
 
@@ -436,6 +439,19 @@ Object.assign(SvalPanel, {
       // Only a joining device chooses a folder in first run, and it takes
       // its sync key from pairing, so none is made here.
       useFolder: path => this.chooseSharedFolder(path),
+      // An SMB or Dropbox folder, as Settings › Sync and devices connects
+      // to one (`settings-storage.js`).
+      keepSignIn: (root, auth) =>
+        this._modules.SvalRemoteFolder.keepSignIn(root, auth),
+      signInFor: root => this._modules.SvalRemoteFolder.authFor(root),
+      signInToDropbox: () => this._modules.SvalDropbox.signIn(),
+      listDropboxFolders: (root, refreshToken) =>
+        this._modules.SvalSharedFolder.listFolders({
+          root,
+          auth: { refreshToken },
+          deadline: Date.now() + this._firstRunListingMs,
+        }),
+      keychainAsks: () => this._firstRunKeychainAsks(),
       claim: code => this._firstRunClaim(code),
       stopClaim: async () => this._firstRunStopClaim(),
       recoverKey: () => this._firstRunRecover(),
@@ -643,6 +659,21 @@ Object.assign(SvalPanel, {
           `sval was not made the default browser: ${this._modules.SvalLog.errorName(err)}`
         )
       );
+  },
+
+  /**
+   * Whether saving a folder's sign-in may make the Keychain ask the user:
+   * on a Mac whose secrets the system store keeps or will.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async _firstRunKeychainAsks() {
+    const { AppConstants, SvalSecretStore } = this._modules;
+    if (AppConstants.platform !== "macosx") {
+      return false;
+    }
+    const backend = await SvalSecretStore.backend().catch(() => null);
+    return backend !== SvalSecretStore.BACKENDS.profile;
   },
 
   /**

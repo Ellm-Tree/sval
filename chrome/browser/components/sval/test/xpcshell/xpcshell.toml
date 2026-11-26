@@ -90,6 +90,8 @@ requesttimeoutfactor = 2
 
 ["test_sval_data_directory.js"]
 
+["test_sval_dropbox.js"]
+
 ["test_sval_element_candidates.js"]
 
 ["test_sval_element_rules.js"]
