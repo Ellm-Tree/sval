@@ -71,16 +71,17 @@ that matches wins. A line under the heading says whether the rules sync.
 ## A Peek
 
 - **Peek.** This button sits before the address bar and counts the Peeks
-  you have open. When you have more than one, the button opens a list of
-  your Peeks. From the list, you can switch to a Peek, close one, or select
-  **Close all peeks**. When you point to the button, it says when the Peek
-  closes.
+  you have open, and pointing to it tells you when the Peek closes. When you
+  have more than one Peek, the button opens a list where you can switch to a
+  Peek, close one, or select **Close all peeks**.
 - The button after the address bar moves the page into the Workspace of
   the window you used last. The page becomes a tab at the end of that
   Workspace's list, and the Peek closes. When no window shows that
   Workspace, Shift-click opens the Workspace in a new window.
 - The arrow next to that button lists your other Workspaces. Next to each
   one, **Open in New Window** opens that Workspace in a new window.
+- <kbd>⇧⌘T</kbd> (<kbd>Ctrl+Shift+T</kbd> on Windows and Linux) in a Peek
+  reopens the Peek you closed last.
 
 In the menu bar, **File › New Peek Window** opens an empty Peek. The Peek
 is signed in as the Workspace you opened it from. Its shortcut is <kbd>⌥⌘N</kbd> (<kbd>Ctrl+Alt+N</kbd> on

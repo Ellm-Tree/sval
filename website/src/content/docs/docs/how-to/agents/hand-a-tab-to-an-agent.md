@@ -12,7 +12,8 @@ hand Claude Code the tab than paste the address.
 ## Steps
 
 1. In the Workspace, right-click the tab, then choose **Move to Workspace**.
-2. Under **Agent Workspaces**, choose the agent.
+2. Under **Agent Workspaces**, choose the agent's app, then the agent's
+   Workspace.
 3. In the dialog, select **Hand Over**.
 
 The tab moves to the agent's Workspace, and the agent can read it and act

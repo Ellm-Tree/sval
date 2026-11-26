@@ -1,0 +1,47 @@
+---
+title: Make a Workspace see-through
+description: Let your desktop show through the window around the page, in the Workspace's color.
+---
+
+import Screenshot from "../../../../../components/Screenshot.astro";
+
+A see-through Workspace lets your desktop show through the whole window
+around the page, tinted with the Workspace's color. The page itself stays
+solid.
+
+You keep a photo of the coast as your desktop picture, and you'd like to
+see some of it around your Home Workspace's tabs.
+
+<Screenshot name="docs-workspace-see-through" frame="rounded" alt="A see-through Home Workspace on a Mac. The purple desktop shows through the Workspace panel and the toolbar around a Wikipedia article." />
+
+## Steps
+
+1. Above your tabs, right-click the Workspace's name.
+2. Choose **Edit…**.
+3. Under **Color**, drag **Transparency** to the right.
+4. Select **Save**.
+
+## Details
+
+- Transparency works on a Mac, on Windows 11, and on Linux on Wayland, in
+  GNOME 51 and later or KDE Plasma 6.7 and later. On Windows 10, and on
+  Linux desktops that can't blur what's behind a window, the window stays
+  solid and the dialog has no Transparency.
+- A Workspace with **No color** can be see-through too, in Sval's own
+  window color.
+- The window keeps at least a third of its color, so the Workspace's color
+  always shows. Sval picks text that reads on that color alone, so a very
+  light or very dark window behind Sval's window can make the text harder
+  to read.
+- On a Mac, turning on System Settings › Accessibility › Display › Reduce
+  transparency makes the window solid and hides Transparency. On Windows,
+  turning off Transparency effects in the Windows Colors settings does the
+  same, and on Linux so does your desktop's high contrast
+  setting.
+- The New Workspace dialog has Transparency too, so you can set it when
+  you make a Workspace.
+
+## Related pages
+
+- [Change a Workspace's name, color, or emoji](/docs/how-to/workspaces/change-a-workspace-name-color-or-emoji/)
+- [Workspace settings and controls](/docs/reference/workspaces/)

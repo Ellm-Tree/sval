@@ -3,6 +3,8 @@ title: What Sval keeps private
 description: What Sval keeps on your computer, every service it contacts and why, and what it does against tracking and fingerprinting.
 ---
 
+import Since from "../../../../components/docs/Since.astro";
+
 Sval sends no usage data. It contacts only the services named on this
 page. A test launches a fresh install of Sval and records every connection
 Sval makes. The test fails on any host that isn't on Sval's list.
@@ -34,6 +36,16 @@ Cookies and site data stay on the device. Sval never syncs them.
 
 Choices you make in a private window last until you close the window.
 They never sync.
+
+<Since v="0.1.0-rc.11">
+
+A private window's title never shows the page's title, so your Dock or
+taskbar and other apps can't show what you have open there. When the
+window closes, Sval cancels its unfinished downloads. The files you
+downloaded there stay on your computer unless you have Sval delete them,
+in Settings › Privacy and protection.
+
+</Since>
 
 ## What Sval writes about itself
 

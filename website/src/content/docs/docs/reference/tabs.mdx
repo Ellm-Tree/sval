@@ -130,6 +130,20 @@ What happens depends on where you drop a row on another row.
   depending on which half you drop it on. It never makes a group or a
   Split.
 
+## Closing a tab
+
+When you close the tab you're looking at, Sval shows the tab or pin in the
+same Workspace that you looked at before it. Close that tab too, and Sval
+goes back one more step through the tabs and pins you've looked at there.
+
+<Since v="0.1.0-rc.11">
+
+When a link opens a page in a new tab, Back closes the new tab and takes
+you to the tab or pin that holds the link. If you've followed links in the
+new tab, Back goes through those pages first.
+
+</Since>
+
 ## The Undo message
 
 After you close several tabs, or delete a group, a pin, or a Workspace, a
@@ -156,12 +170,16 @@ narrower. Double-clicking the edge puts back the default width.
 
 ## A tab's menu
 
-<Screenshot name="docs-tab-menu" frame="rounded" maxWidth={260} alt="A tab’s menu in the Workspace panel: New tab, Rename, Move up and down, Move to group, Move to Workspace, Pin, Add to Favorites, Copy Markdown Link, Create Split, Add to Split, Put to Sleep, Keep Awake, and Close, with their shortcuts" />
+<Screenshot name="docs-tab-menu" frame="rounded" maxWidth={216} alt="A tab’s menu in the Workspace panel: New tab, Rename, Move up dimmed, Move down, Move to group, Move to Workspace, Pin, Pin to This Workspace, Add to Favorites, Copy Markdown Link, Colorshift This Site…, Create Split, Add to Split, Put to Sleep, Keep Awake, and Close, with their shortcuts" />
 
 - **New tab.** A new tab opens.
-- **Rename.** A dialog asks for the tab's new name.
+- **Rename.** A dialog asks for the tab's new name. The tab keeps that
+  name as you browse, on every device.
+- **Remove Name.** The tab shows its page's title again. This shows only
+  on a tab you've renamed.
 - **Move up** and **Move down**. The tab moves one row.
 - **Move to group.** The submenu lists the groups the tab can go into.
+  **New group…** at the end of the submenu puts the tab in a new group.
 - **Move to Workspace.** The submenu lists your other Workspaces.
 - **Pin.** The tab becomes a pin at the end of the pins row.
   **Pin to This Workspace** pins the tab in this Workspace and no other.
@@ -244,8 +262,8 @@ moves with it.
 
 </Since>
 
-- **Move to Folder.** The submenu lists the folders in the pins row. Move to
-  Folder shows only when the row has a folder.
+- **Move to Pin Folder.** The submenu lists the pin folders in the pins
+  row, and Move to Pin Folder shows only when the row has one.
 - **Rename…** This changes the pin's name.
 - **Edit address…** This changes the address the pin goes back to.
 - **Move to Favorites.** The pin leaves the pins row and goes to the end of
@@ -257,17 +275,17 @@ moves with it.
 
 <Until v="0.1.0-rc.11">
 
-A pin inside a pinned folder has no Show in or Move to Favorites.
+A pin inside a pin folder has no Show in or Move to Favorites.
 
 </Until>
 
 <Since v="0.1.0-rc.11">
 
-A pin inside a pinned folder has no **Show the pin in** or **Move to Favorites**.
+A pin inside a pin folder has no **Show the pin in** or **Move to Favorites**.
 
 </Since>
 
-When you right-click a pinned folder's tile, you get these:
+When you right-click a pin folder's tile, you get these:
 
 <Until v="0.1.0-rc.11">
 
@@ -289,6 +307,13 @@ When you right-click a pinned folder's tile, you get these:
 - **Delete.** Sval deletes the folder and its pins. You can undo this from
   the Undo message.
 
+## A page's menu
+
+- **Email** and an address. This shows when you right-click an email
+  address you've selected on a page and the address isn't a link. A new
+  message to that address opens in the app or site you've chosen for
+  email.
+
 ## The Quick Peek bar
 
 The bar at the top of a Quick Peek shows the page's address. It also shows these:
@@ -301,6 +326,17 @@ The bar at the top of a Quick Peek shows the page's address. It also shows these
 - The close button closes the Quick Peek, as Escape does.
 
 ## Settings › Appearance › Workspace appearance
+
+<Since v="0.1.0-rc.11">
+
+- **Toolbar.** With **Above the page**, the address bar and its buttons
+  sit in a row across the top of the window. This is the default. With
+  **In the Workspace panel**, they sit at the top of the Workspace panel,
+  and the page runs the full height of the window. See
+  [Put the toolbar in the Workspace panel](/docs/how-to/tabs/put-the-toolbar-in-the-workspace-panel/).
+
+</Since>
+
 
 - **Workspace panel side.** Choose Left or Right to put the Workspace
   panel on that side of every window. Each device keeps its own choice.

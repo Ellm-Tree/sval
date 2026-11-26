@@ -61,8 +61,22 @@ could read your Workspaces, so keep the code to yourself.
 
 ## What syncs
 
-Sval syncs your tabs, Workspaces, groups, Favorites, history, and settings,
-including your choices for each site and your blocking setup.
+Sval syncs your Workspaces with their tabs and groups, along with your
+Favorites, history, and settings, which include your choices for each site
+and your blocking setup. New history goes to your sync folder at most once
+every 10 minutes, so it reaches your other devices later than your tabs do.
+History you delete leaves your sync folder at the next sync.
+
+Sval keeps a tab where you're using it when another device would take it
+from you:
+
+- A tab in a call stays off your other devices while it uses your camera,
+  microphone, or screen. That way another device can't end the call, and
+  the tab syncs again once the call ends.
+- When you close a tab on one device while another device shows it, the
+  other device keeps the tab open. The tab then comes back on the device
+  where you closed it. The same goes for a tab with a video in
+  picture-in-picture.
 
 Some things stay on each device:
 

@@ -13,7 +13,8 @@ at a time. You make, change, and remove Workspaces with the controls below.
 <Screenshot name="home-switcher-crop" frame="crop-tl" alt="The Workspace switcher open over the Workspace panel, listing Work, Ceramics Shop and Claude" />
 
 The switcher sits at the top of the Workspace panel. It shows the emoji, name, and
-color of the Workspace you're in. That color also tints the window. The
+color of the Workspace you're in. That color also tints the window, and the
+home page shows that color rising over a starry night sky. The
 window's title starts with the Workspace's emoji and name.
 
 - **Isolated.** This shows next to the name when the Workspace keeps its
@@ -127,6 +128,10 @@ right-click a Workspace, the Workspace menu opens for it.
 
 <Screenshot name="docs-workspace-menu" frame="rounded" maxWidth={200} alt="The menu for the Work Workspace: Edit…, Isolate Workspace…, and Delete Workspace…" />
 
+- **Stop Agent.** In an agent's Workspace, Sval stops the agent until you
+  choose **Resume Agent**, which takes Stop Agent's place in the menu.
+- **Permissions…**, after the app's name. This opens the app's page in
+  Settings › Agents, and shows only in an agent's Workspace.
 - **Pause Media.** Sval pauses the media playing in the Workspace's tabs.
   Sound that can't be paused is muted. This entry shows only while a tab
   has media or sound. It reads **Play Media**, **Mute**, or **Unmute** when
@@ -148,10 +153,21 @@ is the Workspace menu for the Workspace you're in.
 
 - **Name.** This field is required.
 - **Emoji.** The emoji picker opens. A new Workspace starts with a random
-  emoji. **No emoji** in the picker removes the emoji.
-- **Color.** This offers **Sval Default**, Red, Orange, Yellow, Green,
-  Cyan, Blue, Purple, Pink, Gray, and Black. The dialog takes on the color you
+  emoji, and **No emoji** in the picker removes it.
+- **Color.** The top row runs from **No color** through the dark version
+  of each of the ten colors to **Custom color** at its end. The row below
+  holds the light versions, where White takes Black's place. If you pick
+  the version that matches your computer's light or dark appearance, the
+  color changes when the appearance does. The dialog takes on the color you
   pick, as the window will.
+- **Custom color.** A color wheel opens under the circles. The direction
+  from the center sets the hue, and the distance from the center sets how
+  strong the color is. **Shade**, next to the wheel, sets how light or dark
+  the color is.
+- **Transparency.** This lets your desktop show through the window around
+  the page, and shows only on a computer where the window can be
+  see-through. [Make a Workspace see-through](/docs/how-to/workspaces/make-a-workspace-see-through/)
+  says where that is.
 - **Isolate this Workspace.** The new Workspace gets its own cookies and
   sign-ins. This box is unchecked unless you check it.
 - **Create.** Sval makes the Workspace and switches the window to it.
@@ -161,6 +177,8 @@ is the Workspace menu for the Workspace you're in.
 The Edit Workspace dialog has the same **Name**, **Emoji**, and **Color** as
 the New Workspace dialog. They start with the Workspace's current name,
 emoji, and color.
+
+<Screenshot name="docs-color-picker" frame="rounded" maxWidth={460} alt="The Edit Workspace dialog for Home with Custom color open: the color wheel, Shade at Light 85%, and Transparency at 65%" />
 
 - **Archive idle tabs.** This sets how long this Workspace's tabs can go
   unused before Sval archives them: **Use Default**, 12 Hours, 24 Hours,

@@ -4,6 +4,8 @@ description: Sval's own keyboard shortcuts on macOS, Windows, and Linux, the bro
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
 
 Sval has shortcuts of its own for the Launcher, the Workspace panel, pins, Splits,
 Favorites, and Peeks. Sval also changes some everyday shortcuts.
@@ -108,11 +110,44 @@ pin 1 to 9 go to tabs instead.
 | Colorshift this site | None | None |
 
 - **New tab.** The new tab opens at the top of the Workspace's list.
+<Until v="0.1.0-rc.11">
+
 - **Recent tabs.** You switch to the tab you used last in this Workspace. With
   three or more tabs in the Workspace, holding <kbd>⌃</kbd> (Ctrl) opens a
-  grid of every tab over the page, the most recently used first. The grid has
-  a heading that names the Workspace, and a footer that shows some of the keys
-  you can press and what each one does. <kbd>Tab</kbd> and the arrow keys move
+  grid of every tab over the page, the most recently used first.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **Recent tabs.** You switch to the tab or opened pin you used last in this
+  Workspace. With three or more tabs and opened pins in the Workspace,
+  holding <kbd>⌃</kbd> (Ctrl) opens a carousel of all of them over the page,
+  the most recently used first. Sval keeps that order when it restarts.
+- **The Recent tabs carousel.** The carousel has a heading that names the
+  Workspace, and a footer that shows some of the keys you can press and what
+  each one does. A Split shows as one card with its pages side by side.
+  <kbd>Tab</kbd> moves the choice through the carousel, and letting go of
+  <kbd>⌃</kbd> (Ctrl) switches to the chosen tab. Scrolling with your mouse
+  or swiping with two fingers slides through the carousel and keeps it open
+  when you let go of <kbd>⌃</kbd> (Ctrl), so you press <kbd>Enter</kbd> to
+  switch. A click on a card switches to its tab. While the carousel is open,
+  <kbd>⌃\`</kbd> (<kbd>Ctrl+\`</kbd>) moves the choice back one tab, as
+  <kbd>⌃⇧Tab</kbd> (<kbd>Ctrl+Shift+Tab</kbd>) does. Here \` means the key
+  above <kbd>Tab</kbd>. With the carousel closed, the page gets
+  <kbd>⌃\`</kbd> (<kbd>Ctrl+\`</kbd>). <kbd>Esc</kbd> closes the carousel
+  and leaves you on the tab you're on. <kbd>⌃W</kbd> (Ctrl+W) closes the
+  chosen tab, or every page of a chosen Split. When recently used order is
+  turned off, <kbd>⌃Tab</kbd> (Ctrl+Tab) goes to the next tab in the
+  Workspace.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
+- **The Recent tabs grid.** The grid has a heading that names the Workspace,
+  and a footer that shows some of the keys you can press and what each one
+  does. <kbd>Tab</kbd> and the arrow keys move
   the choice through the grid. While the grid is open, <kbd>⌃\`</kbd>
   (<kbd>Ctrl+\`</kbd>) moves the choice back one tab, as <kbd>⌃⇧Tab</kbd>
   (<kbd>Ctrl+Shift+Tab</kbd>) does. Here \` means the key above
@@ -122,6 +157,9 @@ pin 1 to 9 go to tabs instead.
   leaves you on the tab you're on. <kbd>⌃W</kbd> (Ctrl+W) closes the chosen
   tab. When recently used order is turned off, <kbd>⌃Tab</kbd> (Ctrl+Tab) goes
   to the next tab in the Workspace.
+
+</Until>
+
 - **New window.** The new window shows the next Workspace in your list.
 - **Reopen Last Closed Tab.** If the last thing you closed was a window,
   the window comes back. Otherwise, you get back the tab you closed last
@@ -177,6 +215,16 @@ pin 1 to 9 go to tabs instead.
 | Clear recent history | <kbd>⇧⌘⌫</kbd> | <kbd>Ctrl+Shift+Delete</kbd> | <kbd>Ctrl+Shift+Delete</kbd> |
 | Developer tools | <kbd>⌥⌘I</kbd> | <kbd>Ctrl+Shift+I</kbd> or <kbd>F12</kbd> | <kbd>Ctrl+Shift+I</kbd> or <kbd>F12</kbd> |
 | Quit | <kbd>⌘Q</kbd> | <kbd>Ctrl+Shift+Q</kbd> | <kbd>Ctrl+Q</kbd> |
+
+<Since v="0.1.0-rc.11">
+
+- **Full screen.** <kbd>Esc</kbd> leaves full screen too, unless something
+  else needs the key first: a page that uses <kbd>Esc</kbd>, an open menu,
+  or the address bar's list. While a page loads, <kbd>Esc</kbd> stops the
+  load instead. In the Launcher, **Enter full screen** and **Exit full
+  screen** do what the shortcut does.
+
+</Since>
 
 - Only on macOS does the Inspector in the developer tools have a key of
   its own: <kbd>⌥⌘C</kbd>. <kbd>⇧⌘C</kbd> (Ctrl+Shift+C) copies the page's

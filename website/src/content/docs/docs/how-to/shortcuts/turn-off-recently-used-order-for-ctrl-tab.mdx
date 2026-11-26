@@ -4,6 +4,8 @@ description: Make Ctrl+Tab go to the next tab in the Workspace instead of the on
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 <kbd>⌃Tab</kbd> (<kbd>Ctrl+Tab</kbd> on Windows and Linux) switches to the tab you used last in
 this Workspace. You can make the shortcut go to the next tab in the Workspace
@@ -22,11 +24,43 @@ switch off, <kbd>⌃Tab</kbd> goes to the next tab in the Workspace.
 
 ## Details
 
+<Until v="0.1.0-rc.11">
+
 - With the switch on, keep holding <kbd>⌃</kbd> (Ctrl) after <kbd>⌃Tab</kbd> to see a grid of every tab in the Workspace, the most recently used first. The grid opens when the Workspace has three or more tabs. Press Tab again to go further back through the grid.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- With the switch on, keep holding <kbd>⌃</kbd> (Ctrl) after
+  <kbd>⌃Tab</kbd> to see a carousel of the Workspace's tabs and opened
+  pins, the most recently used first. The carousel opens once the
+  Workspace has three or more of them, and Sval keeps their order when it
+  restarts. Press Tab again to go further back, or scroll to slide through
+  the carousel.
+- While the carousel is open, <kbd>⌃\`</kbd> (<kbd>Ctrl+\`</kbd>) moves
+  the choice back one tab. Here \` means the key above <kbd>Tab</kbd>.
+- With the switch on or off, <kbd>⌃⇧Tab</kbd>
+  (<kbd>Ctrl+Shift+Tab</kbd>) goes to the previous tab in the Workspace
+  while the carousel isn't open.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
+- While the grid is open, <kbd>⌃\`</kbd> (<kbd>Ctrl+\`</kbd>) moves the
+  choice back one tab. Here \` means the key above <kbd>Tab</kbd>.
 - With the switch on or off, <kbd>⌃⇧Tab</kbd> (<kbd>Ctrl+Shift+Tab</kbd>) goes to the previous tab in the Workspace while the grid isn't open.
+
+</Until>
+
 - The setting syncs to your other devices.
 
+<Until v="0.1.0-rc.11">
+
 <Screenshot name="docs-ctrl-tab" alt="The Ctrl+Tab grid over the page, headed Recent tabs in Work. Each tab shows a preview of its page, and a tab in a group also shows the group's name. The grid's keys are listed along the bottom." />
+
+</Until>
 
 ## Related pages
 

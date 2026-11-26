@@ -4,6 +4,8 @@ description: Browse in a window that keeps nothing once you close it.
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 A private window keeps nothing after you close it. Each private window is a
 session of its own.
@@ -38,7 +40,29 @@ In the menu bar, **File › New Private Window** does the same.
   Workspaces, no Favorites, and no pins.
 - Tabs and groups work as in any window.
 - You can't move a tab into or out of a private window.
+<Until v="0.1.0-rc.11">
+
 - Files you download stay on your computer.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- The Downloads list shows only the files you downloaded in that window.
+  When the window closes, Sval cancels any download that hasn't finished.
+  The files you downloaded stay on your computer unless you turn on
+  **Delete files downloaded in a private window when that window closes**
+  in Settings › Privacy and protection.
+- The window's title never shows the page's title, so your Dock or taskbar
+  and other apps don't show what you have open.
+- Sites can't show notifications from a private window, because a
+  notification stays on your screen after the window closes. To allow
+  them, turn on **Show website notifications from private windows** in
+  Settings › Privacy and protection.
+- A Peek you open from a private window is private too, and closes with
+  the window.
+
+</Since>
 
 - When a tab showing a website crashes in a private window, Sval keeps no
   crash report of that crash. While a private window is open, Sval also

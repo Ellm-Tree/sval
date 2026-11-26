@@ -19,6 +19,14 @@ page lists the same rows and answers the same keys.
 The address bar sits in the toolbar. While you're not typing, the address
 bar shows the page's address the way you chose in Settings › Appearance › Address bar.
 
+<Since v="0.1.0-rc.11">
+
+On the results page of a search you made, the address bar shows what you
+searched for. The link button at its end shows the page's address, and the
+search button there brings your search back.
+
+</Since>
+
 - The site name is shown without "www.". The rest of the address is
   dimmed.
 - When the address doesn't fit, Sval drops whole parts from the left, so
@@ -27,6 +35,13 @@ bar shows the page's address the way you chose in Settings › Appearance › Ad
   right end.
 - When you click the address bar, or reach it with <kbd>F6</kbd>, the list opens right
   there in the toolbar.
+- A line grows along the bottom of the address bar as a page loads, then
+  fades once the page has loaded. Peek windows and the Quick Peek bar show
+  the same line.
+- Right-clicking the Reload button offers **Reload**, **Hard reload**, and
+  **Clear site cache and reload**. Hard reload reloads past the cache.
+
+<Screenshot name="docs-reload-menu" frame="rounded" maxWidth={290} alt="The Reload button's menu: Reload, Hard reload, and Clear site cache and reload" />
 
 ## Opening the Launcher
 
@@ -50,6 +65,16 @@ Windows and Linux. In the menu bar, **File › Launcher…** opens it too.
 
 </Since>
 - The field reads "Search, go to a tab, or run a command" until you type.
+
+<Since v="0.1.0-rc.11">
+
+- When you open the Launcher on a page, two buttons sit at the end of the
+  field. **Copy Address** copies the page's whole address, and **Copy
+  Clean Address** copies it without its tracking parameters.
+
+<Screenshot name="docs-launcher-copy" frame="rounded" maxWidth={600} alt="The Launcher opened on a Wikipedia page, with the Copy Address and Copy Clean Address buttons at the end of the field. Recent tabs and Frequent sites are listed below." />
+
+</Since>
 
 ## Sections
 
@@ -117,6 +142,10 @@ apply to the tab you're on are left out. The commands are:
   Duplicate tab, Archive this tab, Reopen closed tab, Mute tab, Unmute tab,
   and Reader view.
 
+- **Rename this tab** and **Remove this tab’s name** are in the Tabs group
+  too. The first gives the tab a name of your own, and the second shows the
+  page's title again.
+
 <Since v="0.1.0-rc.11">
 
 - **Copy clean address** is in the Tabs group too. It copies the page's
@@ -125,7 +154,19 @@ apply to the tab you're on are left out. The commands are:
 </Since>
 
 - **Splits:** Split with…, Close Split, and Swap panes.
+<Until v="0.1.0-rc.11">
+
 - **The window:** Show or hide the Workspace panel.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **The window:** Show or hide the Workspace panel, Enter full screen, and
+  Exit full screen.
+
+</Since>
+
 - **The site:** Privacy and Security, Site settings, Colorshift this site,
   Clear site data, and Block JavaScript or Allow JavaScript.
 - **Agents:** Give Workspace back and Agent access settings.
@@ -175,8 +216,9 @@ that fits. These settings sync to your other devices.
 ## Settings › Appearance › Address bar
 
 - **Site name.** You see the site alone. This is the default.
-- **Site and path.** You also see the path, without anything after a ? or
-  #.
+- **Site and path.** You also see the path, without anything after a ?.
+  When a site like the Azure portal puts the page's path after a #, you
+  see that path too.
 - **Full address.** You see the whole address after the site name.
 
 An example under the choices shows how each one looks.
@@ -188,6 +230,15 @@ next to the address bar. Selecting the button, or pressing <kbd>⌥⌘R</kbd>, o
 page in Reader View. On Windows the key is <kbd>F9</kbd>, and on Linux it's <kbd>Ctrl+Alt+R</kbd>.
 
 ## Narrow windows
+
+<Since v="0.1.0-rc.11">
+
+With the toolbar in the Workspace panel, the buttons that don't fit go
+into the **More tools** button in place of the » menu. See
+[Put the toolbar in the Workspace panel](/docs/how-to/tabs/put-the-toolbar-in-the-workspace-panel/).
+
+</Since>
+
 
 As you make a window narrower, the toolbar moves its buttons into the »
 menu one at a time. They go in this order: Split View, History, Downloads, Reader View,

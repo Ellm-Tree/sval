@@ -3,6 +3,10 @@ title: Allow or block a site for an agent
 description: Answer Sval when an agent wants a new site, or set a rule for a site in the agent's permissions.
 ---
 
+import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 Each agent has its own rules for sites. Sval asks you the first time an
 agent opens a site, and your answer becomes a rule for that site. You can
 also set rules yourself before the agent gets there.
@@ -29,6 +33,20 @@ If you haven't changed the agent's default, each answer does this:
 
 ## Add a rule in Settings
 
+<Until v="0.1.0-rc.11">
+
+1. Open Settings › Agents.
+2. Under Paired agents, select **Permissions** next to the agent.
+3. Under Site rules, select **Add site**.
+4. Type the site, or paste an address from the agent's tab.
+5. Choose a level: **Blocked**, **Read only**, **Ask before writes**, or
+   **Full**.
+6. Select **Add**.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
 1. Open Settings › Agents.
 2. Under Paired agents, select **Permissions** next to the agent.
 3. Under Sites with their own rules, select **Add site**.
@@ -37,7 +55,25 @@ If you haven't changed the agent's default, each answer does this:
    **Full**.
 6. Select **Add**.
 
+</Since>
+
 ## Change or remove a rule
+
+<Until v="0.1.0-rc.11">
+
+1. Open the agent's **Permissions** page.
+2. In the site's row, choose another level under Access.
+
+To remove a rule, select **Remove rule** at the end of the rule's row. A site
+then follows the default for sites with no rule. An address follows the
+rule for its whole site, or that default when the site has no rule. If you
+change your mind, select **Undo**.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+<Screenshot name="docs-agent-site-rules" frame="rounded" maxWidth={600} alt="Claude Code's page in Settings › Agents. Every site is set to Read only. Under Sites with their own rules, airbnb.com is set to Ask before writes and ebay.co.uk to Read only." />
 
 1. Open the agent's **Permissions** page.
 2. Select the site's row. The row opens to show the rule's settings.
@@ -47,6 +83,8 @@ To remove a rule, open the site's row and select **Remove rule**, and the
 site then follows Every site. An address follows the rule for its whole
 site, or Every site when the site has no rule of its own. If you change
 your mind, **Undo** puts the rule back.
+
+</Since>
 
 ## Details
 
@@ -58,11 +96,25 @@ your mind, **Undo** puts the rule back.
     agent clicks, types, or submits.
   - **Full.** The agent clicks, types, and submits on its own, without
     asking.
+
+<Until v="0.1.0-rc.11">
+
+- **Default for sites with no rule.** This setting starts at **Ask on
+  first visit**, and you can change it to any level. Sites with no rule
+  then get that level without Sval asking you.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
 - **Every site.** This setting starts at **Ask on first visit**, and you
   can change it to any level. Sites with no rule of their own then get that
   level without Sval asking you.
 - A site's rule changes only the settings you set in it, so a site whose
   Access is **Same as every site** keeps the level that Every site sets.
+
+</Since>
+
 - Even with a default level set, Sval asks you before an agent opens a
   service on this computer or a device on your local network.
 - On an address like `nas.example.com`, you choose whether the rule
@@ -71,9 +123,24 @@ your mind, **Undo** puts the rule back.
 - When Sval asks before writes, it lists what the page is about to send.
   Choose **Always allow writes** to set the site to Full, or **Always deny
   writes** to set the site to Read only.
+
+<Until v="0.1.0-rc.11">
+
+- The rules table has a column each for Downloads, Uploads, Console, and
+  Apps, and every column starts at Ask. Sval asks you before an agent first
+  downloads or uploads a file on a site, and before it first uses the
+  console or opens an app there.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
 - Each site's rule has a setting for downloads, one for uploads, one for
   the console, and one for apps. Each of them starts at Ask, so Sval asks
   you the first time an agent needs that permission on the site.
+
+</Since>
+
 - When Sval asks about a download or an upload, **Allow** and **Deny**
   answer only that once. The **Always** choices save a rule for the site.
 - Sval remembers your answer about a site's console.
@@ -83,14 +150,37 @@ your mind, **Undo** puts the rule back.
 - An upload rule never covers a hidden file, or any file inside a hidden
   folder, such as the keys and passwords your home folder keeps. Sval asks
   you about each of those files every time.
+
+<Until v="0.1.0-rc.11">
+
+- Once a site asks to open an app, the Apps column lists that app.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
 - Once a site asks to open an app, the site's rule lists that app under Apps.
+
+</Since>
+
 - Rules belong to the app, so every session of the app follows them.
 - Sval keeps the rules on this device.
 
 ## If something goes wrong
 
+<Until v="0.1.0-rc.11">
+
+- **already has a rule.** The site has a rule already. Select **Show it**
+  to find it in the table.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
 - **already has a rule.** The site has a rule already. Select **Show it**
   to find it in the list.
+
+</Since>
 - **Enter a site like ebay.co.uk, or paste an address.** Sval couldn't read
   what you typed as a site.
 

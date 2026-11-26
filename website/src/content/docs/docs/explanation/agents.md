@@ -16,7 +16,9 @@ you had to approve the app again for each folder it runs in, a new session
 would only look broken.
 
 The app stays approved until you unpair it. Deleting one of the app's
-Workspaces doesn't change that.
+Workspaces doesn't change that. If Sval ever asks you to approve the app
+again, the question says that the app keeps the permissions and
+Workspaces you gave it.
 
 ## A Workspace for each session
 
@@ -86,12 +88,19 @@ reach past the page:
 - It can't see or act in a tab outside its own Workspace.
 - It can't run its own scripts in a page, act inside frames, or open a
   file chooser. It sends files only through Sval's upload question.
-- It can't write to your clipboard from its pages.
+- It can't write to your clipboard from its pages, except for up to 5
+  seconds after the agent's last click or key press. That gap holds even
+  if you take control or turn off agent access in those seconds.
 - It can't read a page's title or address on a site it isn't allowed to
   read.
 - It can't complete a check that asks whether you're human. Sval asks you
   to take control and complete the check yourself.
 - It can't change its own rules or turn off Be polite. Only you can.
+
+An agent's screenshots show visited links in their visited color, as your
+own screen does. A page can show an agent a list of links and ask which
+ones look visited, and the answer can reveal sites you visited in your
+other Workspaces.
 
 ## Sval doesn't hide the agent
 

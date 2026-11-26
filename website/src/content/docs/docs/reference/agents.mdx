@@ -4,6 +4,8 @@ description: What each agent control does, from Settings › Agents to the card 
 ---
 
 import Screenshot from "../../../../components/Screenshot.astro";
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
 
 An agent is an AI app on your computer that browses in Sval. Each session
 of the app works in a Workspace of its own. The session follows the rules
@@ -73,6 +75,44 @@ permissions.
 
 ## An agent's page
 
+<Until v="0.1.0-rc.11">
+
+- **Default for sites with no rule.** This is the access the agent gets
+  on a site that has no rule of its own.
+  - **Ask on first visit:** Sval asks you the first time the agent opens a
+    site, and your answer becomes a site rule. This is the default.
+  - **Blocked:** the agent can't open the site.
+  - **Read only:** the agent reads pages. It never clicks, types, or
+    submits.
+  - **Ask before writes:** the agent reads freely. Sval asks you before
+    the agent clicks, types, or submits.
+  - **Full:** the agent clicks, types, and submits on its own, without
+    asking.
+
+  Sval asks before the agent opens a service on this computer or a device
+  on your local network. That holds for every default except Blocked.
+- **Site tools.** This setting shows while sites are allowed to offer tools.
+  **Off** hides every site's tools from this agent, and **Ask** has Sval ask
+  you before every tool call. **On** follows the site's access level
+  and runs tools you've already allowed without asking.
+- **Site rules.** The list has a rule for each site, with a search box and
+  a filter, and **Add site** adds a rule. Each row has these columns:
+  - **Access:** Default, or one of the levels above.
+  - **Downloads**, **Uploads**, and **Console:** Ask, Allow, or Deny. An
+    upload rule names the folders the agent can upload files from.
+  - **Apps:** Ask, Deny, or a list of the apps the site has asked to open.
+    Each app in the list has its own answer.
+  - **Site tools:** this column shows while the agent's Site tools setting
+    is On or Ask.
+  - **Remove rule:** Sval removes the row's rule. **Undo** puts the rule
+    back.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+<Screenshot name="docs-agent-site-rules" frame="rounded" maxWidth={600} alt="Claude Code's page in Settings › Agents. Every site is set to Read only. Under Sites with their own rules, airbnb.com is set to Ask before writes and ebay.co.uk to Read only." />
+
 - **Every site.** This is the access the agent gets on a site that has no
   rule of its own.
   - **Ask on first visit:** the default, where Sval asks you the first time
@@ -106,6 +146,9 @@ permissions.
     is On or Ask.
   - **Remove rule:** Sval removes the site's rule. **Undo** puts the rule
     back.
+
+</Since>
+
 - **Unpair.** Sval disconnects the agent and deletes its permissions.
 
 ## Settings › Agents › Advanced › WebDriver
@@ -178,9 +221,17 @@ answer covers that address or the whole site.
 
 ## The Workspace panel and the Launcher
 
+<Screenshot name="docs-agent-workspace-menu" frame="rounded" alt="The Workspaces list open to Agent Workspaces, then Claude Code, then the Workspace Find the top restaurants in Lisbon. The Workspace's menu holds Stop Agent and Claude Code Permissions…, below Open in New Window." />
+
 - **Agent Workspaces.** In the Workspaces list, this heading lists
    the agents' Workspaces after your own. In a tab's
   **Move to Workspace** menu, the same heading lists agent Workspaces you
   can hand the tab to.
+- In the Workspaces list, an agent Workspace's menu starts with
+  **Stop Agent**, which reads **Resume Agent** while the agent is stopped.
+  Next comes one item, the app's name followed by **Permissions…**, which
+  opens the app's page in Settings › Agents.
 - In the Launcher, **Give Workspace back** returns a Workspace you took
   control of. **Agent access settings** opens Settings › Agents.
+- Settings always opens in one of your own windows, even when you choose
+  it from the menu bar of an agent's window.

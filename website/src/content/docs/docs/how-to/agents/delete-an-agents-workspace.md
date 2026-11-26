@@ -13,7 +13,8 @@ tabs anymore.
 ## Delete one Workspace
 
 1. Above your tabs, select the current Workspace's name.
-2. Under **Agent Workspaces**, right-click the agent.
+2. Under **Agent Workspaces**, point to the agent's app, then to the
+   agent's Workspace.
 3. Choose **Delete Workspace…**.
 4. In the dialog, select **Delete Workspace**.
 
