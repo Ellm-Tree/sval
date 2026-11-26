@@ -117,3 +117,9 @@ pref("browser.tabs.loadBookmarksInTabs", true);            // upstream: false
 // and history buttons (SvalHeader.sys.mjs), so it shows before the first
 // download too.
 pref("browser.download.autohideButton", false);            // upstream: true
+
+// ---------------------------------------------------------------- window
+
+// Escape leaves full screen on every platform through SvalFullScreen.sys.mjs,
+// so Gecko's macOS-only handling of it would end full screen twice.
+pref("browser.fullscreen.exit_on_escape", false);          // upstream: true (macOS)

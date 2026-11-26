@@ -27,6 +27,7 @@ accessible/tests/browser/relations/browser_relations_general_002.js  # covers a1
 accessible/tests/browser/relations/browser_shadow_dom_and_custom_elements.js  # covers a11y-shadow-host-prune
 accessible/tests/browser/tree/browser_shadowdom.js  # covers a11y-shadow-host-prune
 accessible/tests/mochitest/treeupdate/test_shadow_slots.html  # covers a11y-shadow-host-prune
+browser/base/content/test/fullscreen/browser_fullscreen_newwindow.js  # covers sval-fullscreen-menubar-shift
 browser/base/content/test/general/browser_minimize.js  # covers agent-page-shown-while-hidden
 browser/base/content/test/general/browser_windowactivation.js  # covers agent-window-in-background
 browser/base/content/test/menubar/browser_file_close_tabs.js  # covers sval-menu-bar

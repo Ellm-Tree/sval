@@ -17,6 +17,8 @@
   --sval-icon-previous: url("chrome://browser/content/sval/icons/arrow-left.svg");
   --sval-icon-panel: url("chrome://browser/content/sval/icons/panel-left.svg");
   --sval-icon-panel-on-left: url("chrome://browser/content/sval/icons/panel-left.svg");
+  --sval-icon-full-screen: url("chrome://browser/content/sval/icons/maximize.svg");
+  --sval-icon-exit-full-screen: url("chrome://browser/content/sval/icons/minimize.svg");
   --sval-icon-panel-on-right: url("chrome://browser/content/sval/icons/panel-right.svg");
   --sval-icon-split: url("chrome://browser/content/sval/header-icons/split.svg");
   --sval-icon-pin: url("chrome://browser/content/sval/icons/pin.svg");

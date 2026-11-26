@@ -335,7 +335,11 @@ control of what you see and what is sent to websites.
   Sval's commands. Commands act on your Workspaces and the tabs and Splits
   in them, as well as the Workspace panel, site settings, and agents. Others
   open a Settings page or one of Sval's own pages like Downloads or
-  History, and some print or translate the page or restart Sval.
+  History, and some print or translate the page or restart Sval. "Enter
+  full screen" and "Exit full screen" do what ⌃⌘F (F11 on Windows and
+  Linux) does. Esc leaves full screen too, unless something else needs
+  it first: a page that uses Esc, an open menu, or the address bar's list.
+  While a page loads, Esc stops the load.
 - **Choose where a page opens.** Enter opens it in this tab, and Shift+Enter
   opens it in a new tab. ⌘⇧Enter (Ctrl+Shift+Enter) opens it in a new
   window, and ⌥Enter (Alt+Enter) opens it in a Split next to this tab.

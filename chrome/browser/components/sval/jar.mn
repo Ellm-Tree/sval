@@ -462,6 +462,8 @@ browser.jar:
     content/browser/sval/icons/copy.svg       (icons/copy.svg)
     content/browser/sval/icons/folder.svg     (icons/folder.svg)
     content/browser/sval/icons/mouse-pointer-2.svg (icons/mouse-pointer-2.svg)
+    content/browser/sval/icons/maximize.svg   (icons/maximize.svg)
+    content/browser/sval/icons/minimize.svg   (icons/minimize.svg)
     content/browser/sval/icons/panel-left.svg (icons/panel-left.svg)
     content/browser/sval/icons/panel-right.svg (icons/panel-right.svg)
     content/browser/sval/icons/app-window.svg (icons/app-window.svg)

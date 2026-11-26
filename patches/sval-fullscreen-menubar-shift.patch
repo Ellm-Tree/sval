@@ -1,0 +1,20 @@
+Sval: move the panel and page down with the toolbar under the macOS menu bar
+
+In a full-screen window, macOS slides its menu bar and title bar over the
+window's top edge, and `FullScreen.shiftMacToolbarDown` moves the toolbox
+below them. Sval lays the Workspace panel and the page out in `#browser`,
+below the toolbox, so they take the same shift, or the toolbar covers their
+top edge.
+
+diff --git a/browser/base/content/browser-fullScreenAndPointerLock.js b/browser/base/content/browser-fullScreenAndPointerLock.js
+index d0d3b6fc57..ef83486343 100644
+--- a/browser/base/content/browser-fullScreenAndPointerLock.js
++++ b/browser/base/content/browser-fullScreenAndPointerLock.js
+@@ -503,6 +503,7 @@ var FullScreen = {
+     let translate = shiftSize > 0 ? `0 ${shiftSize}px` : "";
+     gNavToolbox.classList.toggle("fullscreen-floating-toolbox", shiftSize > 0);
+     gNavToolbox.style.translate = translate;
++    document.getElementById("browser").style.translate = translate;
+     gURLBar.style.translate = gURLBar.hasAttribute("breakout") ? translate : "";
+     let searchbar = document.getElementById("searchbar-new");
+     if (searchbar) {

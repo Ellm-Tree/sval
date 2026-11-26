@@ -33,6 +33,8 @@ export const ICONS = Object.freeze({
   // Sval's commands, in the header, the Launcher and the menus.
   panel: "icons/panel-left.svg",
   "panel-on-left": "icons/panel-left.svg",
+  "full-screen": "icons/maximize.svg",
+  "exit-full-screen": "icons/minimize.svg",
   "panel-on-right": "icons/panel-right.svg",
   split: "header-icons/split.svg",
   pin: "icons/pin.svg",

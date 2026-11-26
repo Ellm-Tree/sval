@@ -253,9 +253,9 @@ SPDX-License-Identifier = "MIT"
 # The icons that Lucide derives from Feather (arrow-left, check,
 # chevron-down, chevron-right, chevron-up, alert-circle, help-circle,
 # message-circle, more-horizontal, sidebar, plus, search, download,
-# external-link, link, moon and x, as Feather names them), which Lucide's
-# license puts under Feather's MIT license. Each stroke is set to
-# `context-fill`.
+# external-link, link, maximize, minimize, moon and x, as Feather names
+# them), which Lucide's license puts under Feather's MIT license. Each
+# stroke is set to `context-fill`.
 [[annotations]]
 path = [
   "chrome/browser/components/sval/icons/arrow-left.svg",
@@ -269,7 +269,9 @@ path = [
   "chrome/browser/components/sval/icons/ellipsis.svg",
   "chrome/browser/components/sval/icons/external-link.svg",
   "chrome/browser/components/sval/icons/link.svg",
+  "chrome/browser/components/sval/icons/maximize.svg",
   "chrome/browser/components/sval/icons/message-circle.svg",
+  "chrome/browser/components/sval/icons/minimize.svg",
   "chrome/browser/components/sval/icons/moon.svg",
   "chrome/browser/components/sval/icons/panel-left.svg",
   "chrome/browser/components/sval/icons/plus.svg",

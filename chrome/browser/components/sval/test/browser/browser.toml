@@ -484,6 +484,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_fp_speech_voices.js"]
 
+["browser_sval_fullscreen.js"]
+
 ["browser_sval_header.js"]
 
 ["browser_sval_header_overflow.js"]

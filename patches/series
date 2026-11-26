@@ -468,3 +468,4 @@ remove-about-protections.patch
 remove-about-protections.delete
 remove-migration-wizard.patch
 remove-migration-wizard.delete
+sval-fullscreen-menubar-shift.patch

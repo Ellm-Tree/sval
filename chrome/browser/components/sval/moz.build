@@ -106,6 +106,7 @@ MOZ_SRC_FILES += [
     "SvalFirstRunModel.sys.mjs",
     "SvalFolderUpkeep.sys.mjs",
     "SvalForgetSite.sys.mjs",
+    "SvalFullScreen.sys.mjs",
     "SvalHeader.sys.mjs",
     "SvalHeadless.sys.mjs",
     "SvalHistorySidebar.sys.mjs",

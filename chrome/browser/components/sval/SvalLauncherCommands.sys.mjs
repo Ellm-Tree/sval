@@ -663,6 +663,27 @@ export const COMMANDS = [
     run: win => win.SvalPanel.toggleFromKey(),
   },
 
+  // The window. One `<key>` both enters and leaves full screen;
+  // `key_exitFullScreen` is a disabled twin the menu shows.
+  {
+    id: "enter-full-screen",
+    l10nId: "launcher-command-enter-full-screen",
+    icon: "full-screen",
+    synonymsL10nId: "launcher-command-enter-full-screen-synonyms",
+    keyId: "key_enterFullScreen",
+    available: win => !win.fullScreen,
+    run: win => doCommand(win, "View:FullScreen"),
+  },
+  {
+    id: "exit-full-screen",
+    l10nId: "launcher-command-exit-full-screen",
+    icon: "exit-full-screen",
+    synonymsL10nId: "launcher-command-exit-full-screen-synonyms",
+    keyId: "key_enterFullScreen",
+    available: win => win.fullScreen,
+    run: win => doCommand(win, "View:FullScreen"),
+  },
+
   // This site.
   {
     id: "site-privacy",

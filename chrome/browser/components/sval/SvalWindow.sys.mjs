@@ -14,6 +14,7 @@
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtils.sys.mjs";
 import { SvalEmailMenu } from "moz-src:///browser/components/sval/SvalEmailMenu.sys.mjs";
+import { SvalFullScreen } from "moz-src:///browser/components/sval/SvalFullScreen.sys.mjs";
 import { SvalFavorites } from "moz-src:///browser/components/sval/SvalFavorites.sys.mjs";
 import { SvalFeedbackForm } from "moz-src:///browser/components/sval/SvalFeedbackForm.sys.mjs";
 import { SvalFirefox } from "moz-src:///browser/components/sval/SvalFirefox.sys.mjs";
@@ -421,6 +422,7 @@ export const SvalWindow = {
     SvalFavorites.mount(win);
     SvalQuickPeek.mountLinkItem(win);
     SvalEmailMenu.mount(win);
+    SvalFullScreen.mount(win);
     // The address bar's view words Sval's rows from the window's own
     // localization (`UrlbarView`'s `L10nCache` on `document.l10n`).
     win.MozXULElement.insertFTLIfNeeded(LAUNCHER_FTL);
