@@ -115,7 +115,7 @@ struct NewPrivateTabButton: View {
 /// drawn.
 struct CloseCircle: View {
     var label = "Close"
-    var diameter: CGFloat = 44
+    var diameter: CGFloat = RowMetrics.target
     /// The circle's glass: in the Workspace's colour where the card is.
     var glass: Glass = .regular.interactive()
     let action: () -> Void
@@ -123,13 +123,13 @@ struct CloseCircle: View {
     var body: some View {
         Button(role: .close, action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: diameter < 44 ? 14 : 17, weight: .semibold))
+                .font(.system(size: diameter < RowMetrics.target ? 14 : Glyph.control, weight: .semibold))
                 .frame(width: diameter, height: diameter)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
         .glassEffect(glass, in: .circle)
-        .contentShape(.circle.inset(by: min(0, (diameter - 44) / 2)))
+        .contentShape(.circle.inset(by: min(0, (diameter - RowMetrics.target) / 2)))
         .accessibilityLabel(label)
     }
 }
@@ -154,7 +154,7 @@ struct RowAccessory: View {
                 Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: 15))
                     .foregroundStyle(accent)
-                    .frame(width: 44, height: 44)
+                    .frame(width: RowMetrics.target, height: RowMetrics.target)
                     .contentShape(.rect)
             }
             .buttonStyle(.borderless)
@@ -162,9 +162,9 @@ struct RowAccessory: View {
         } else if !editing {
             Button(action: onClose) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Glyph.mark)
                     .foregroundStyle(ink)
-                    .frame(width: 44, height: 44)
+                    .frame(width: RowMetrics.target, height: RowMetrics.target)
                     .contentShape(.rect)
             }
             .buttonStyle(.borderless)
@@ -199,7 +199,7 @@ struct Chevron: View {
 
     var body: some View {
         Image(systemName: "chevron.right")
-            .font(.system(size: 13, weight: .semibold))
+            .font(Glyph.mark)
             .foregroundStyle(color)
             .rotationEffect(.degrees(open == true ? 90 : 0))
             .accessibilityHidden(true)
@@ -240,8 +240,8 @@ struct DestinationRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 11) {
-                Image(systemName: icon).font(.system(size: 16)).frame(width: 20).opacity(0.85)
+            HStack(spacing: Space.rowGap) {
+                Image(systemName: icon).font(.system(size: Glyph.row)).frame(width: Glyph.slot).opacity(0.85)
                 Text(text).font(.system(.body)).lineLimit(1)
                 Spacer(minLength: 4)
                 if current {
@@ -268,8 +268,8 @@ struct NewDestinationRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 11) {
-                Image(systemName: "folder.badge.plus").font(.system(size: 16)).frame(width: 20)
+            HStack(spacing: Space.rowGap) {
+                Image(systemName: "folder.badge.plus").font(.system(size: Glyph.row)).frame(width: Glyph.slot)
                 Text(text).font(.system(.body, weight: .medium))
                 Spacer()
             }
@@ -284,7 +284,7 @@ struct NewDestinationRow: View {
 
 extension View {
     /// A fill in a rounded rectangle, edged with a line on the same corner.
-    func well(_ fill: some ShapeStyle, edge: some ShapeStyle, radius: CGFloat, lineWidth: CGFloat = 1) -> some View {
+    func well(_ fill: some ShapeStyle, edge: some ShapeStyle, radius: CGFloat, lineWidth: CGFloat = Stroke.hairline) -> some View {
         background(fill, in: .rect(cornerRadius: radius))
             .overlay { RoundedRectangle(cornerRadius: radius).strokeBorder(edge, lineWidth: lineWidth) }
     }
@@ -293,11 +293,11 @@ extension View {
     /// screen's sides: the media card and the element picker's card.
     func glassCard(_ colors: BarColors) -> some View {
         foregroundStyle(colors.ink)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, Space.glassInset)
             .padding(.top, 14)
             .padding(.bottom, 12)
             .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .rect(cornerRadius: Radius.card))
-            .padding(.horizontal, 10)
+            .padding(.horizontal, BarShape.side)
     }
 }
 
@@ -316,9 +316,9 @@ struct ClosingCapsule<Content: View>: View {
             Button(action: onClose) {
                 Label(closeLabel, systemImage: "xmark")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: Glyph.control, weight: .medium))
                     .foregroundStyle(colors.ink.opacity(0.75))
-                    .frame(width: 44, height: 44)
+                    .frame(width: RowMetrics.target, height: RowMetrics.target)
                     .contentShape(.rect)
             }
         }

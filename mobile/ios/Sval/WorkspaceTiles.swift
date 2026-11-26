@@ -23,7 +23,7 @@ struct WorkspaceTile: View {
 
     var body: some View {
         if let workspace, model.isPrivate(workspace.id) {
-            PrivateTile(size: size, radius: radius ?? size * Radius.tileFactor)
+            PrivateTile(size: size, radius: radius ?? Radius.tile(size))
         } else {
             tile
         }
@@ -36,12 +36,12 @@ struct WorkspaceTile: View {
         // tile's fill.
         let surface = Theme(scheme, tint: sheetTint)
         let background = fill ?? tint?.tile(dark: dark) ?? surface.cell
-        let corner = radius ?? size * Radius.tileFactor
+        let corner = radius ?? Radius.tile(size)
         return RoundedRectangle(cornerRadius: corner)
             .fill(background)
             .overlay {
                 RoundedRectangle(cornerRadius: corner)
-                    .strokeBorder(surface.tileRing, lineWidth: 1.5)
+                    .strokeBorder(surface.tileRing, lineWidth: Stroke.ring)
             }
             .overlay {
                 if let image = workspace.flatMap(model.markImage) {
@@ -95,10 +95,10 @@ struct PrivateTile: View {
     var radius: CGFloat?
 
     var body: some View {
-        let corner = radius ?? size * Radius.tileFactor
+        let corner = radius ?? Radius.tile(size)
         RoundedRectangle(cornerRadius: corner)
             .fill(Theme.privateViolet)
-            .overlay { RoundedRectangle(cornerRadius: corner).strokeBorder(Theme.privateEdge.opacity(0.6), lineWidth: 1.5) }
+            .overlay { RoundedRectangle(cornerRadius: corner).strokeBorder(Theme.privateEdge.opacity(0.6), lineWidth: Stroke.ring) }
             .overlay {
                 Image("private").resizable().scaledToFit()
                     .frame(width: size * 0.52, height: size * 0.52)

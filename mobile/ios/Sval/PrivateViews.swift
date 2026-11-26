@@ -8,7 +8,7 @@ import SwiftUI
 struct PrivateBackdrop: View {
     var body: some View {
         RadialGradient(colors: [Color(hex: 0x2A1660), Theme.privateNight], center: .top, startRadius: 0, endRadius: 700)
-            .overlay { Image("starfield").resizable().scaledToFill().opacity(0.7) }
+            .overlay { Image("starfield").resizable().scaledToFill().opacity(Dim.starfield) }
             .ignoresSafeArea()
     }
 }
@@ -33,7 +33,7 @@ struct EmptyHome: View {
         // (`--grad-night`, `--g-nh`).
         let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: Palette.navy)
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: NoticePage.spacing) {
                 Image(isPrivate ? "mark-private" : (theme.dark ? "mark" : "mark-light"))
                     .resizable().scaledToFit()
                     .frame(width: 108, height: 108)
@@ -49,17 +49,17 @@ struct EmptyHome: View {
                         }
                     }
                     .accessibilityHidden(true)
-                HStack(spacing: 10) {
+                HStack(spacing: Space.rowGap) {
                     Group {
                         if isPrivate {
-                            PrivateTile(size: 36)
+                            PrivateTile(size: Tile.heading)
                         } else {
-                            WorkspaceTile(workspace: workspace, size: 36)
+                            WorkspaceTile(workspace: workspace, size: Tile.heading)
                         }
                     }
                     .accessibilityHidden(true)
                     Text(isPrivate ? "Private Workspace" : workspace.map(WorkspaceTile.name) ?? "")
-                        .font(SvalFont.outfit(28, .bold, relativeTo: .title))
+                        .font(SvalFont.title(.title))
                         .foregroundStyle(theme.text)
                         .lineLimit(2)
                         .accessibilityAddTraits(.isHeader)
@@ -74,12 +74,12 @@ struct EmptyHome: View {
                 if isPrivate {
                     Label("Websites and your network may still see where you go.", systemImage: "exclamationmark.triangle.fill")
                         .font(.system(.subheadline))
-                        .lineSpacing(3)
+                        .lineSpacing(Space.noticeLeading)
                         .foregroundStyle(theme.body)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .well(Theme.privateNight.opacity(0.55), edge: Theme.privateEdge.opacity(0.24), radius: 14)
+                        .well(Theme.privateNight.opacity(0.55), edge: Theme.privateEdge.opacity(0.24), radius: Radius.well)
                 }
                 Button("New Tab", systemImage: "plus", action: onNewTab)
                     .buttonStyle(.glassProminent)
@@ -87,9 +87,9 @@ struct EmptyHome: View {
                     .controlSize(.large)
                     .padding(.top, 8)
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 48)
-            .frame(maxWidth: 520)
+            .padding(.horizontal, NoticePage.side)
+            .padding(.vertical, NoticePage.ends)
+            .frame(maxWidth: NoticePage.width)
             .frame(maxWidth: .infinity)
             .containerRelativeFrame(.vertical, alignment: .center)
         }
@@ -117,7 +117,7 @@ struct HomeField: View {
         ground
             .overlay {
                 if dark {
-                    Image("starfield").resizable().scaledToFill().opacity(0.7)
+                    Image("starfield").resizable().scaledToFill().opacity(Dim.starfield)
                 } else {
                     Image("starfield").renderingMode(.template).resizable().scaledToFill()
                         .foregroundStyle(glow.opacity(0.45))
@@ -136,7 +136,7 @@ struct PrivateCoverView: View {
             PrivateBackdrop()
             VStack(spacing: 12) {
                 Image("mark-private").resizable().scaledToFit().frame(width: 52, height: 52)
-                Text("Private").font(SvalFont.outfit(17, .semibold, relativeTo: .headline)).foregroundStyle(.white)
+                Text("Private").font(SvalFont.title(.headline, .semibold)).foregroundStyle(.white)
             }
         }
     }

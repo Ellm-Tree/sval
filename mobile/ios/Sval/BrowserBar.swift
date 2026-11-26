@@ -22,7 +22,7 @@ struct BrowserBar: View {
     @Environment(\.verticalSizeClass) private var verticalSize
     /// A line of the address's text, which is `.subheadline`, as
     /// `GlassFold` sizes the bar by it.
-    @ScaledMetric(relativeTo: .subheadline) private var addressLine: CGFloat = 20
+    @ScaledMetric(relativeTo: .subheadline) private var addressLine: CGFloat = BarShape.line
 
     let facts: BarFacts
     let colors: BarColors
@@ -93,13 +93,13 @@ struct BrowserBar: View {
             speaker: frontMedia.map(speaker),
             progress: ProgressLine(line: $line, shown: $lineShown, colors: colors),
             openBar: { browser.fold.openBar() })
-            .padding(.bottom, 24)
+            .padding(.bottom, BarShape.foot)
     }
 
     /// Another tab's media beside the folded pill: its site's icon.
     private func otherMediaButton(_ media: String) -> some View {
         Button { actions.media(media) } label: {
-            Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: 26) } }
+            Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: Tile.row) } }
                 .frame(width: 48, height: 48)
         }
         .glassEffect(workspaceGlass(layer), in: .circle)
@@ -117,7 +117,7 @@ struct BrowserBar: View {
             Button {
                 if !heldForScrub { actions.address() }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: BarShape.labelGap) {
                     if facts.javaScriptOff {
                         Image("javascript-off").resizable().frame(width: 15, height: 15).foregroundStyle(colors.muted)
                             .accessibilityLabel("JavaScript off")
@@ -178,7 +178,7 @@ struct BrowserBar: View {
     /// Workspace's name beside its emoji. It doesn't fold.
     private var sideways: some View {
         GlassEffectContainer(spacing: 3) {
-            HStack(spacing: 6) {
+            HStack(spacing: BarShape.gap) {
                 HStack(spacing: 0) {
                     navButton("Back", "back", size: 22, frame: 40, enabled: facts.canGoBack) { browser.goBack() }
                     navButton("Forward", "forward", size: 22, frame: 40, enabled: facts.canGoForward) { browser.goForward() }
@@ -197,22 +197,22 @@ struct BrowserBar: View {
                 }
                 if frontMedia == nil, let media = otherMedia {
                     CompactMediaButton(tabId: media, colors: colors) { actions.media(media) }
-                        .frame(width: 44, height: 44)
+                        .frame(width: RowMetrics.target, height: RowMetrics.target)
                         .glassEffect(workspaceGlass(layer), in: .circle)
                 }
-                newTabButton(size: 22, frame: 44)
+                newTabButton(size: 22, frame: RowMetrics.target)
                     .glassCapsule(layer)
-                workspaceButton(size: 44, named: true)
+                workspaceButton(size: RowMetrics.target, named: true)
                     .glassCapsule(layer)
             }
         }
         .foregroundStyle(colors.ink)
         .overlay(alignment: .top) {
-            BarNotices(colors: colors, asks: facts.asks).offset(y: -52)
+            BarNotices(colors: colors, asks: facts.asks).offset(y: BarNotices.rise)
         }
         // Clear of the screen's rounded corners.
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
+        .padding(.horizontal, BarShape.side)
+        .padding(.bottom, BarShape.sidewaysFoot)
     }
 
     // MARK: Parts
@@ -270,7 +270,7 @@ struct BrowserBar: View {
                 // badge inside the shield's slot.
                 .overlay(alignment: .bottomTrailing) {
                     if facts.denied {
-                        Badge(diameter: 13, fill: colors.badge, ring: colors.badge, ringWidth: 1) {
+                        Badge(diameter: 13, fill: colors.badge, ring: colors.badge, ringWidth: Stroke.hairline) {
                             Image(systemName: "speaker.slash")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(colors.ink)
@@ -318,7 +318,7 @@ struct BrowserBar: View {
                 // A 48pt target, the capsule's height, round the 40pt glyph.
                 .contentShape(.rect.inset(by: -4))
         }
-        .opacity(enabled ? 1 : 0.35)
+        .opacity(enabled ? 1 : Dim.disabled)
         .disabled(!enabled)
         .accessibilityLabel(label)
         .accessibilityShowsLargeContentViewer()
@@ -360,7 +360,7 @@ struct BrowserBar: View {
     }
 
     private func workspaceLabel(size: CGFloat, named: Bool, scale k: Double) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: BarShape.labelGap) {
             workspaceMark(size: 22 * k)
                 .overlay(alignment: .bottomTrailing) {
                     Text(countText)
@@ -379,7 +379,7 @@ struct BrowserBar: View {
                 Text(isPrivateSession ? "Private" : workspace.map(WorkspaceTile.name) ?? "Sval")
                     .font(.system(.body, weight: .semibold))
                     .lineLimit(1)
-                    .padding(.leading, 6)
+                    .padding(.leading, BarShape.labelGap)
             }
         }
         .padding(.horizontal, named ? 12 : 0)
@@ -430,10 +430,14 @@ struct BarNotices: View {
     let asks: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Browser.overBarGap) {
             DownloadCapsule(colors: colors)
             if asks { MediaAsk(colors: colors) }
         }
-        .alignmentGuide(.top) { $0[.bottom] - 44 }
+        .alignmentGuide(.top) { $0[.bottom] - RowMetrics.target }
     }
+
+    /// The offset that sets the notices' foot `Browser.overBarGap` above
+    /// the top they are aligned to.
+    static let rise = -(RowMetrics.target + Browser.overBarGap)
 }

@@ -194,7 +194,7 @@ struct DownloadCapsule: View {
         if let item = shown.last {
             let title = shown.count > 1 ? "\(item.name) and \(shown.count - 1) more" : item.name
             ClosingCapsule(colors: colors, closeLabel: "Cancel \(item.name)", onClose: { downloads.cancel(item) }) {
-                HStack(spacing: 10) {
+                HStack(spacing: Space.rowGap) {
                     Gauge(value: item.fraction) { EmptyView() }
                         .gaugeStyle(.accessoryCircularCapacity)
                         .tint(colors.ink)
@@ -205,9 +205,9 @@ struct DownloadCapsule: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .padding(.leading, 14)
+                .padding(.leading, Space.glassInset)
                 .padding(.trailing, 10)
-                .frame(minHeight: 44)
+                .frame(minHeight: RowMetrics.target)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Downloading \(title)")
                 .accessibilityValue(Text(item.fraction, format: .percent.precision(.fractionLength(0))))
@@ -286,10 +286,10 @@ struct TabNotice<Actions: View>: View {
         let theme = Theme(scheme, tint: model.tint(of: workspace))
         let glow = theme.tint?.swatch(dark: theme.dark) ?? Color(hex: Palette.navy)
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: NoticePage.spacing) {
                 NoticeMark(symbol: symbol, theme: theme)
                 Text(title)
-                    .font(SvalFont.outfit(22, .bold, relativeTo: .title2))
+                    .font(SvalFont.title(.title2))
                     .foregroundStyle(theme.text)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
@@ -301,7 +301,7 @@ struct TabNotice<Actions: View>: View {
                         .multilineTextAlignment(.center)
                 }
                 NoticeAddress(address: address, theme: theme)
-                HStack(spacing: 10) {
+                HStack(spacing: Space.buttons) {
                     actions
                     if let row {
                         Button("Close Tab", systemImage: "xmark", role: .destructive) {
@@ -313,9 +313,9 @@ struct TabNotice<Actions: View>: View {
                 .buttonStyle(.glass)
                 .padding(.top, 4)
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 48)
-            .frame(maxWidth: 520)
+            .padding(.horizontal, NoticePage.side)
+            .padding(.vertical, NoticePage.ends)
+            .frame(maxWidth: NoticePage.width)
             .frame(maxWidth: .infinity)
             .containerRelativeFrame(.vertical, alignment: .center)
         }
@@ -330,6 +330,19 @@ struct TabNotice<Actions: View>: View {
     }
 }
 
+/// The frame of a page that stands in for a tab or a Workspace's home: a
+/// column of text centred on the screen.
+enum NoticePage {
+    /// The column from the screen's sides.
+    static let side: CGFloat = 28
+    /// The column's room above and below it.
+    static let ends: CGFloat = 48
+    /// The column's widest, on an iPad or a phone held sideways.
+    static let width: CGFloat = 520
+    /// The column's parts from each other.
+    static let spacing: CGFloat = 16
+}
+
 /// A notice page's symbol, in a well at the head of the page.
 struct NoticeMark: View {
     let symbol: String
@@ -340,7 +353,7 @@ struct NoticeMark: View {
             .font(.system(size: 30, weight: .medium))
             .foregroundStyle(theme.body)
             .frame(width: 68, height: 68)
-            .well(theme.well, edge: theme.divider, radius: 20)
+            .well(theme.well, edge: theme.divider, radius: Radius.tile(68))
             .accessibilityHidden(true)
     }
 }
@@ -352,12 +365,12 @@ struct NoticeAddress: View {
 
     var body: some View {
         Text(address)
-            .font(SvalFont.mono(13, relativeTo: .footnote))
+            .font(SvalFont.code(.footnote))
             .foregroundStyle(theme.body)
             .lineLimit(3)
             .textSelection(.enabled)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(theme.well, in: .rect(cornerRadius: 12))
+            .background(theme.well, in: .rect(cornerRadius: Radius.well))
     }
 }

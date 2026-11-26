@@ -27,7 +27,7 @@ struct PaneMark: View {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(focused ? colors.accent : .clear)
                     .overlay {
-                        if !focused { RoundedRectangle(cornerRadius: 3).strokeBorder(colors.muted, lineWidth: 1.5) }
+                        if !focused { RoundedRectangle(cornerRadius: 3).strokeBorder(colors.muted, lineWidth: Stroke.ring) }
                     }
                     .frame(width: sideways ? 9 : 15, height: sideways ? 15 : 9)
             }

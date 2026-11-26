@@ -49,12 +49,16 @@ struct CompactMediaButton: View {
         Button(action: onTap) {
             Group {
                 if let row = model.row(tabId) {
-                    SiteTile(row: row, size: 28)
-                        .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(colors.edge, lineWidth: 1) }
-                        .overlay(alignment: .bottomTrailing) { MediaBadge(colors: colors).offset(x: 5, y: 5) }
+                    SiteTile(row: row, size: Tile.row)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: Radius.tile(Tile.row)).strokeBorder(colors.edge, lineWidth: Stroke.hairline)
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            MediaBadge(colors: colors).offset(x: MediaBadge.offset, y: MediaBadge.offset)
+                        }
                 }
             }
-            .frame(width: 44, height: 44)
+            .frame(width: RowMetrics.target, height: RowMetrics.target)
             .contentShape(.rect)
         }
         .accessibilityLabel("Video and Audio")
@@ -65,8 +69,11 @@ struct CompactMediaButton: View {
 private struct MediaBadge: View {
     let colors: BarColors
 
+    /// How far the badge sits out past its tile's corner.
+    static let offset: CGFloat = 5
+
     var body: some View {
-        Badge(diameter: 16, fill: colors.badge, ring: colors.badge, ringWidth: 1) {
+        Badge(diameter: Tile.badge, fill: colors.badge, ring: colors.badge, ringWidth: Stroke.hairline) {
             Image(systemName: "speaker.wave.2.fill")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(colors.accent)
@@ -113,15 +120,15 @@ struct MediaCard: View {
         let row = model.row(tabId)
         let front = tabId == browser.currentTabId
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
+            HStack(spacing: Space.rowGap) {
                 // Another tab's media: its title goes to that tab.
                 Button {
                     onClose()
                     browser.select(tabId)
                 } label: {
-                    HStack(spacing: 12) {
-                        if let row { SiteTile(row: row, size: 44) }
-                        VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Space.rowGap) {
+                        if let row { SiteTile(row: row, size: Tile.large) }
+                        VStack(alignment: .leading, spacing: Space.lines) {
                             Text(title(row))
                                 .font(.system(.body, weight: .semibold))
                                 .lineLimit(1)
@@ -175,7 +182,7 @@ struct MediaCard: View {
                     Spacer()
                     Text(MediaInfo.clock(duration))
                 }
-                .font(SvalFont.mono(11, relativeTo: .caption2))
+                .font(SvalFont.code(.caption2))
                 .foregroundStyle(colors.muted)
             }
         } else if info?.live == true {
@@ -200,7 +207,7 @@ struct MediaCard: View {
             Button { browser.media(tabId, "toggle") } label: {
                 Image(systemName: paused ? "play.fill" : "pause.fill")
                     .font(.system(size: 26))
-                    .frame(width: 44, height: 44)
+                    .frame(width: RowMetrics.target, height: RowMetrics.target)
             }
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.circle)
@@ -226,11 +233,11 @@ struct MediaCard: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 20))
-                .frame(width: 44, height: 44)
+                .frame(width: RowMetrics.target, height: RowMetrics.target)
                 .contentShape(.rect)
         }
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.35)
+        .opacity(enabled ? 1 : Dim.disabled)
         .accessibilityLabel(label)
     }
 }
@@ -247,19 +254,24 @@ struct NowPlayingCapsule: View {
     /// The page's Media Session title, read when its media starts or stops.
     @State private var sessionTitle = ""
 
+    /// The capsule's least height, which the bar's notices rise above.
+    static let height: CGFloat = 52
+
     var body: some View {
         let browser: Browser = model.browser
         let row = model.row(tabId)
         let playing = browser.playingTabs.contains(tabId)
         let title = sessionTitle.isEmpty ? row.map { $0.title.isEmpty ? ($0.url ?? "") : $0.title } ?? "" : sessionTitle
-        HStack(spacing: 10) {
+        HStack(spacing: Space.rowGap) {
             Button(action: onOpen) {
-                HStack(spacing: 10) {
+                HStack(spacing: Space.rowGap) {
                     if let row {
                         SiteTile(row: row, size: 32)
-                            .overlay(alignment: .bottomTrailing) { MediaBadge(colors: colors).offset(x: 4, y: 4) }
+                            .overlay(alignment: .bottomTrailing) {
+                                MediaBadge(colors: colors).offset(x: MediaBadge.offset, y: MediaBadge.offset)
+                            }
                     }
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: Space.lines) {
                         Text(title)
                             .font(.system(.subheadline, weight: .semibold))
                             .lineLimit(1)
@@ -276,16 +288,16 @@ struct NowPlayingCapsule: View {
             .accessibilityElement(children: .combine)
             Button { browser.media(tabId, "toggle") } label: {
                 Image(systemName: playing ? "pause.fill" : "play.fill")
-                    .font(.system(size: 18))
-                    .frame(width: 44, height: 44)
+                    .font(.system(size: Glyph.control))
+                    .frame(width: RowMetrics.target, height: RowMetrics.target)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(playing ? "Pause" : "Play")
             Button { Task { await browser.stopMedia(tabId) } } label: {
                 Image(systemName: "stop.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 44, height: 44)
+                    .font(.system(size: Glyph.control, weight: .semibold))
+                    .frame(width: RowMetrics.target, height: RowMetrics.target)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -293,7 +305,7 @@ struct NowPlayingCapsule: View {
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .frame(minHeight: 52)
+        .frame(minHeight: Self.height)
         .foregroundStyle(colors.ink)
         .glassCapsule(colors.layer)
         .task(id: "\(tabId) \(playing)") {
@@ -321,9 +333,9 @@ struct MediaAsk: View {
             } label: {
                 Label("Allow Video and Audio", systemImage: "speaker.slash")
                     .font(.system(.subheadline, weight: .semibold))
-                    .padding(.leading, 14)
+                    .padding(.leading, Space.glassInset)
                     .padding(.trailing, 10)
-                    .frame(minHeight: 44)
+                    .frame(minHeight: RowMetrics.target)
                     .contentShape(.rect)
             } primaryAction: {
                 browser.allowMediaForVisit()

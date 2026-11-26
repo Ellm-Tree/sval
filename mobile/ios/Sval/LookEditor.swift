@@ -193,7 +193,7 @@ struct LookEditor: View {
     private func emojiTile(_ look: Look) -> some View {
         EmojiField(emoji: $emoji, placeholder: "", size: 32)
             .frame(width: 64, height: 64)
-            .background(look.field, in: .rect(cornerRadius: 18))
+            .background(look.field, in: .rect(cornerRadius: Radius.tile(64)))
             .overlay {
                 if emoji.isEmpty {
                     Image(systemName: "face.smiling")
@@ -202,7 +202,9 @@ struct LookEditor: View {
                         .allowsHitTesting(false)
                 }
             }
-            .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(look.ring, lineWidth: 1.5).allowsHitTesting(false) }
+            .overlay {
+                RoundedRectangle(cornerRadius: Radius.tile(64)).strokeBorder(look.ring, lineWidth: Stroke.ring).allowsHitTesting(false)
+            }
             .overlay(alignment: .bottomTrailing) {
                 Image(systemName: "pencil")
                     .font(.system(size: 11, weight: .bold))

@@ -76,14 +76,14 @@ struct WorkspaceSheet: View {
                     if typeSize.isAccessibilitySize, !editing {
                         title(inBar: false)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, Space.sheetSide)
                             .padding(.bottom, 10)
                     }
                     if isPrivateSession {
                         privateNotice
                     } else if !panel {
                         PinsRow(onOpened: { close() })
-                        theme.divider.frame(height: 1).padding(.horizontal, 16)
+                        theme.divider.frame(height: 1).padding(.horizontal, Space.sheetSide)
                     }
                     Group {
                         if layout == .grid { grid } else { list }

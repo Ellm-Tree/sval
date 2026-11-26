@@ -52,14 +52,16 @@ final class ListMetricsTests: XCTestCase {
     ])
 
     /// Each line 56pt tall, one under the other, with `strip` between the
-    /// sections as the list's room around a coloured group leaves.
+    /// sections as the list's room around a coloured group leaves, in a
+    /// 400pt list whose cells end at their section's trailing inset.
     private func spots(strip: CGFloat = 0) -> [ListSpot] {
         var y: CGFloat = 0
         var out: [ListSpot] = []
         for section in TreeLines.list(tree, workspace: "w1", collapsed: ["g2"]) {
             if !out.isEmpty { y += strip }
+            let width = 400 - ListMetrics.sectionTrailing(section)
             for line in section.lines {
-                out.append(ListSpot(line: line, frame: CGRect(x: 0, y: y, width: 400, height: 56)))
+                out.append(ListSpot(line: line, frame: CGRect(x: 0, y: y, width: width, height: 56)))
                 y += 56
             }
         }
@@ -150,9 +152,53 @@ final class ListMetricsTests: XCTestCase {
         XCTAssertEqual(place.indent, 48)
         XCTAssertEqual(place.blocks.map(\.level), [0, 1])
         XCTAssertEqual(place.cardInset, 6)
-        XCTAssertEqual(place.trailing, 12)
+        XCTAssertEqual(place.trailing, 6)
         XCTAssertEqual(place.cardLeading, 48)
         XCTAssertEqual(RowPlace(TreeLine(id: "t", depth: 1, panes: nil, tints: [nil, "red"])).blocks.map(\.level), [1],
                        "a plain group draws no block")
+    }
+
+    /// A section's cells end at the sheet's margin, or inside the nested
+    /// group at its card, so their swipe actions end inside them.
+    func testCellsEndAtTheirGroupsCard() {
+        let sections = TreeLines.list(OutlineIndex(rows), workspace: "w1", collapsed: [])
+        XCTAssertEqual(sections.map(\.id), ["w1#0", "g1#0", "g2#0", "g1#1", "w1#1"])
+        let margin = ListMetrics.inset
+        XCTAssertEqual(sections.map(ListMetrics.sectionTrailing), [margin, margin, margin + 6, margin, margin])
+    }
+
+    /// Separators run only between two tab or split rows of a section:
+    /// never below a group's own row or above one, never after a section's
+    /// last row, and never against the row in front.
+    func testSeparatorsRunOnlyBetweenRows() {
+        let sections = TreeLines.list(OutlineIndex(rows), workspace: "w1", collapsed: [])
+        func below(_ front: String?) -> [[Bool]] {
+            sections.map { section in
+                section.lines.indices.map { index in
+                    ListMetrics.separatesBelow(section.lines, at: index) { $0.id == front }
+                }
+            }
+        }
+        // w1#0: t1; g1#0: g1's row, t2; g2#0: g2's row, t3; g1#1: t4; w1#1: t5.
+        XCTAssertEqual(sections.map { $0.lines.map(\.id) }, [["t1"], ["g1", "t2"], ["g2", "t3"], ["t4"], ["t5"]])
+        XCTAssertEqual(below(nil), [[false], [false, false], [false, false], [false], [false]])
+        let flat = [TreeLine(id: "a", depth: 1, panes: nil), TreeLine(id: "b", depth: 1, panes: nil),
+                    TreeLine(id: "c", depth: 1, panes: ["p1", "p2"]), TreeLine(id: "d", depth: 1, panes: nil)]
+        XCTAssertEqual(flat.indices.map { ListMetrics.separatesBelow(flat, at: $0) { _ in false } },
+                       [true, true, true, false])
+        XCTAssertEqual(flat.indices.map { ListMetrics.separatesBelow(flat, at: $0) { $0.id == "b" } },
+                       [false, false, true, false], "none against the row in front")
+    }
+
+    /// A row's highlight keeps to its group's card: from the front card's
+    /// leading edge, or the sheet's margin outside any coloured group, to
+    /// the cell's end, which the section sets.
+    func testARowsBackgroundKeepsToItsGroupsCard() {
+        let nested = RowPlace(TreeLine(id: "t3", depth: 2, panes: nil, tints: ["blue", "red"])).backgroundInsets
+        XCTAssertEqual(nested.leading, ListMetrics.inset + 48)
+        XCTAssertEqual(nested.trailing, 0)
+        let plain = RowPlace(TreeLine(id: "t1", depth: 0, panes: nil)).backgroundInsets
+        XCTAssertEqual(plain.leading, ListMetrics.inset)
+        XCTAssertEqual(plain.trailing, 0)
     }
 }

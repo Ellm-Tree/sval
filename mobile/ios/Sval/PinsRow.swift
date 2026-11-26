@@ -54,7 +54,7 @@ struct PinsRow: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Space.sheetSide)
                     .padding(.vertical, 10)
                 }
                 .onScrollGeometryChange(for: [CGFloat].self) {
@@ -104,7 +104,7 @@ struct PinsRow: View {
         let pages = max(1, Int((scroll[1] / max(scroll[2], 1)).rounded(.up)))
         let travel = max(scroll[1] - scroll[2], 1)
         let current = min(pages - 1, max(0, Int((scroll[0] / travel * CGFloat(pages - 1)).rounded())))
-        return PageDots(count: pages, current: current, on: theme.accent, off: theme.muted.opacity(0.45))
+        return PageDots(count: pages, current: current, on: theme.accent, off: theme.muted.opacity(Dim.pageDot))
             .animation(reduceMotion ? nil : .easeOut(duration: 0.28), value: current)
             .accessibilityHidden(true)
     }
@@ -184,7 +184,7 @@ struct PinsRow: View {
         .draggable(pin.id) {
             SiteTile(url: pin.url, name: pin.name, size: tileSize / 2)
                 .frame(width: tileSize, height: tileSize)
-                .background(theme.cell, in: .rect(cornerRadius: 16))
+                .background(theme.cell, in: .rect(cornerRadius: Radius.tile(tileSize)))
         }
         .dropDestination(for: String.self) { ids, _ in drop(ids.first, on: pin) } isTargeted: { targeted(pin, $0) }
     }
@@ -291,7 +291,8 @@ struct PinsRow: View {
     private func tile<Content: View>(selected: Bool, @ViewBuilder _ content: () -> Content) -> some View {
         content()
             .frame(width: tileSize, height: tileSize)
-            .well(theme.cell, edge: selected ? theme.accent : theme.divider, radius: 16, lineWidth: selected ? 2 : 1)
+            .well(theme.cell, edge: selected ? theme.accent : theme.divider, radius: Radius.tile(tileSize),
+                  lineWidth: selected ? Stroke.selected : Stroke.hairline)
             .contentShape(.rect)
     }
 
@@ -366,7 +367,7 @@ private struct PinFolderList: View {
                     Label {
                         Text(pin.name).lineLimit(1)
                     } icon: {
-                        SiteTile(url: pin.url, name: pin.name, size: 28)
+                        SiteTile(url: pin.url, name: pin.name, size: Tile.row)
                     }
                 }
                 .foregroundStyle(theme.text)

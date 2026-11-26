@@ -7,7 +7,7 @@ import UIKit
 /// The list's measures.
 enum ListMetrics {
     /// The room between the sheet's edge and a row, on each side.
-    static let inset: CGFloat = 16
+    static let inset = Space.sheetSide
     /// Each group level's step inward.
     static let indent: CGFloat = 24
     /// How far each nested coloured block ends inside its parent's.
@@ -24,6 +24,26 @@ enum ListMetrics {
         }
         if outer(sections[index])?.top == true { return true }
         return index > 0 && outer(sections[index - 1])?.bottom == true
+    }
+
+    /// Whether the line at `index` draws a separator below it: only between
+    /// two tab or split rows of one section, neither of them the row in
+    /// front, whose card stands apart. A group's own row, and the last row
+    /// of a section, draw none.
+    static func separatesBelow(_ lines: [TreeLine], at index: Int, isFront: (TreeLine) -> Bool) -> Bool {
+        guard lines.indices.contains(index), lines.indices.contains(index + 1) else { return false }
+        let row = lines[index], next = lines[index + 1]
+        return row.group == nil && next.group == nil && !isFront(row) && !isFront(next)
+    }
+
+    /// How far a section's cells end inside the list's trailing side: at
+    /// the sheet's margin, or the innermost coloured block's card, so the
+    /// system's swipe actions, which the cell lays out, end inside it.
+    /// Every line in a section is inside the same groups, so it holds for
+    /// each of them. A cell keeps the list's leading side, so a swiped row
+    /// slides out to the sheet's edge.
+    static func sectionTrailing(_ section: TreeSection) -> CGFloat {
+        inset + RowPlace.cardInset(blocks: section.layers.filter { $0.tint.flatMap(WorkspaceTint.init(rawValue:)) != nil }.count)
     }
 
     /// How much a lifted row and what it carries fade in place, as the
@@ -62,7 +82,7 @@ enum ListMetrics {
                             expanded: spot.line.group?.open == true)
         let place = RowPlace(spot.line)
         let leading = spot.line.panes == nil ? place.indent : place.cardLeading
-        let width = spot.frame.width - 2 * inset - leading - place.trailing
+        let width = spot.frame.width - inset - leading - place.trailing
         let kind = index.dropIntent(id, over: over, x: point.x - spot.frame.minX - inset - leading,
                                     y: y * desktopRow / height, w: width, h: desktopRow, makesGroups: makesGroups)
         switch kind {
@@ -138,16 +158,26 @@ struct RowPlace {
         }
     }
 
-    /// How far the innermost block's card ends inside the row's trailing
-    /// edge, which the row's own content stays inside.
-    var cardInset: CGFloat { CGFloat(max(blocks.count - 1, 0)) * ListMetrics.nestTrailing }
+    /// How far the innermost block's card ends inside the outermost one's,
+    /// where the row's cell ends (`ListMetrics.sectionTrailing`).
+    var cardInset: CGFloat { Self.cardInset(blocks: blocks.count) }
 
-    /// How far the row's own target ends inside its trailing edge.
-    var trailing: CGFloat { CGFloat(blocks.count) * ListMetrics.nestTrailing }
+    static func cardInset(blocks: Int) -> CGFloat { CGFloat(max(blocks - 1, 0)) * ListMetrics.nestTrailing }
+
+    /// How far the row's own target ends inside its cell's trailing edge:
+    /// clear of its coloured block's edge, as a nested block is.
+    var trailing: CGFloat { blocks.isEmpty ? 0 : ListMetrics.nestTrailing }
 
     /// Where a card nested inside the innermost block starts, as a split's
     /// or the front row's.
     var cardLeading: CGFloat { blocks.last.map { CGFloat($0.level) * ListMetrics.indent + ListMetrics.indent } ?? 0 }
+
+    /// The cell's background: from the front row's card at the leading
+    /// edge to the cell's end, which is the innermost block's edge, so the
+    /// press highlight stays on the group's card.
+    var backgroundInsets: NSDirectionalEdgeInsets {
+        NSDirectionalEdgeInsets(top: 0, leading: ListMetrics.inset + cardLeading, bottom: 0, trailing: 0)
+    }
 
     /// The row's text and muted text: on a coloured group's block, solved
     /// on the innermost block (`sval-panel.css`, `data-sval-fill`), else
@@ -176,7 +206,7 @@ struct FrontCard: View {
                     .fill(GroupBlock.color(last.tint, dark: theme.dark, surface: theme.sheetLightness,
                                            blockDir: theme.blockDir, selected: true))
                     .padding(.leading, place.cardLeading)
-                    .padding(.trailing, CGFloat(place.blocks.count) * ListMetrics.nestTrailing)
+                    .padding(.trailing, place.trailing)
                     .padding(.vertical, WorkspaceSheet.cardGap)
             } else {
                 RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner).fill(theme.accentWash)
@@ -203,14 +233,14 @@ struct RowDropMark: View {
         ZStack {
             if marked {
                 RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner)
-                    .strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .strokeBorder(color, style: StrokeStyle(lineWidth: Stroke.ring, dash: Stroke.dash))
             }
             if let hover = dropState.hover, hover.id == id,
                hover.writes || hover.halves.map({ $0.group || $0.splits }) == true {
                 if hover.kind == .into {
                     RoundedRectangle(cornerRadius: WorkspaceSheet.cardCorner)
                         .fill(color.opacity(0.3))
-                        .strokeBorder(color, lineWidth: 1.5)
+                        .strokeBorder(color, lineWidth: Stroke.ring)
                 } else if let halves = hover.halves {
                     DropHalvesMark(halves: halves, onSplit: hover.kind != .newGroup, color: color,
                                    muted: theme.muted, cover: theme.sheet)
@@ -223,6 +253,15 @@ struct RowDropMark: View {
     }
 }
 
+/// Whether a list row's cell has its swipe actions open. The cell's
+/// configuration state sets it; the row reads it, so the row redraws
+/// without a new content configuration.
+@MainActor
+@Observable
+final class CellSwipe {
+    var open = false
+}
+
 /// A tab's row in the list. The collection view's cell is the button: its
 /// tap, menu, swipe and drag are the system's.
 struct TreeTabRow: View {
@@ -230,6 +269,8 @@ struct TreeTabRow: View {
     /// The tab's row, read here so a change to it redraws this row alone.
     let box: RowBox
     let line: TreeLine
+    /// While the swipe actions show, they stand in for the row's ×.
+    let swipe: CellSwipe
     let theme: Theme
     let editing: Bool
     let ticked: Bool
@@ -247,16 +288,16 @@ struct TreeTabRow: View {
         let muted = browser.mutedTabs.contains(row.id)
         let place = RowPlace(line)
         let ink = place.ink(theme)
-        HStack(spacing: 10) {
+        HStack(spacing: Space.rowGap) {
             if editing {
                 SelectionTick(ticked: ticked, tick: theme.action, off: ink.muted)
             }
-            SiteTile(row: row, size: 28)
-                .opacity(elsewhere ? 0.55 : 1)
+            SiteTile(row: row, size: Tile.row)
+                .opacity(elsewhere ? Dim.elsewhere : 1)
             // The title, and under it the page's site as the bar shows
             // it: a title alone can be the same on many pages, and the
             // site tells them apart (Teevan et al., CHI 2009).
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(row.displayTitle)
                     .font(.system(.body, weight: front ? .semibold : .regular))
                     .foregroundStyle(elsewhere ? ink.muted : ink.text)
@@ -269,21 +310,27 @@ struct TreeTabRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // The list's separator starts under the title.
+            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
             if elsewhere {
                 Image(systemName: "laptopcomputer")
-                    .font(.system(size: 14))
+                    .font(Glyph.status)
                     .foregroundStyle(ink.muted)
                     .frame(width: 36, height: 36)
                     .accessibilityLabel("Can't open on \(UIDevice.current.model)")
             }
             // Every row closes from its ×, which a playing tab's speaker
             // takes the place of (14b1).
-            RowAccessory(playing: playing, muted: muted, editing: editing, title: row.displayTitle,
-                         ink: ink.muted, accent: theme.accent,
-                         onMute: { browser.toggleMute(row.id) }, onClose: onClose)
+            if !swipe.open {
+                RowAccessory(playing: playing, muted: muted, editing: editing, title: row.displayTitle,
+                             ink: ink.muted, accent: theme.accent,
+                             onMute: { browser.toggleMute(row.id) }, onClose: onClose)
+            }
         }
-        .padding(.leading, 12 + place.indent)
-        .padding(.trailing, 2 + place.cardInset)
+        // The list's separator ends where the row's own content does.
+        .alignmentGuide(.listRowSeparatorTrailing) { $0[.trailing] }
+        .padding(.leading, Space.rowInset + place.indent)
+        .padding(.trailing, 2)
         .rowHeight(RowMetrics.tab)
         .background { FrontCard(place: place, front: front, theme: theme) }
         .opacity(dimmed ? ListMetrics.dimmed : 1)
@@ -321,7 +368,7 @@ struct TreeGroupRow: View {
         let row = box.row
         let place = RowPlace(line)
         let ink = place.ink(theme)
-        HStack(spacing: 10) {
+        HStack(spacing: Space.rowGap) {
             Chevron(open: header.open, color: ink.muted)
                 .frame(width: 14)
             GroupMark(row: row, open: header.open, theme: theme)
@@ -336,8 +383,7 @@ struct TreeGroupRow: View {
                 .foregroundStyle(ink.muted)
                 .padding(.trailing, 10)
         }
-        .padding(.leading, 12 + place.indent)
-        .padding(.trailing, place.cardInset)
+        .padding(.leading, Space.rowInset + place.indent)
         .rowHeight(RowMetrics.group)
         .opacity(dimmed ? ListMetrics.dimmed : 1)
         .overlay {
@@ -357,6 +403,8 @@ struct TreeSplitRow: View {
     let split: RowBox
     let panes: [RowBox]
     let line: TreeLine
+    /// While the swipe actions show, the split's count steps aside for them.
+    let swipe: CellSwipe
     let theme: Theme
     let marked: Bool
     let dimmed: Bool
@@ -373,11 +421,14 @@ struct TreeSplitRow: View {
         // and ends 6pt inside its group's card. The tray, which starts at
         // the glyph's left edge, keeps the same room to the card's right
         // edge as to its left.
-        let trailing = place.trailing + (12 + place.indent + 1 - place.cardLeading)
+        let trailing = place.trailing + (Space.rowInset + place.indent + 1 - place.cardLeading)
         SplitRow(split: split, panes: panes, indent: place.indent, trailing: trailing,
-                 countTrailing: 10 + place.cardInset, group: place.blocks.last?.tint, onOpen: onOpen) { pane in
+                 countTrailing: 10, countShown: !swipe.open, group: place.blocks.last?.tint,
+                 onOpen: onOpen) { pane in
             MenuItems(sections: menu(pane, split, panes))
         }
+        // The list's separator ends where the tray does.
+        .alignmentGuide(.listRowSeparatorTrailing) { $0[.trailing] - trailing }
         .background { FrontCard(place: place, front: front, theme: theme) }
         .opacity(dimmed ? ListMetrics.dimmed : 1)
         .overlay {
@@ -398,12 +449,12 @@ struct GroupMark: View {
     var body: some View {
         let tint = row.color.flatMap(WorkspaceTint.init(rawValue:))
         if let emoji = row.emoji, !emoji.isEmpty {
-            Text(emoji).font(.system(size: 20)).accessibilityIgnoresInvertColors().frame(width: 28)
+            Text(emoji).font(.system(size: 20)).accessibilityIgnoresInvertColors().frame(width: Tile.row)
         } else {
             Image(systemName: open ? "folder" : "folder.fill")
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(tint?.swatch(dark: theme.dark) ?? theme.body)
-                .frame(width: 28)
+                .frame(width: Tile.row)
         }
     }
 }

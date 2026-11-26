@@ -17,7 +17,7 @@ struct WorkspaceSwipeHUD: View {
     var body: some View {
         let colors = BarColors(token: model.tint(of: target), dark: scheme == .dark)
         VStack(spacing: 8) {
-            HStack(spacing: 10) {
+            HStack(spacing: Space.rowGap) {
                 WorkspaceTile(workspace: target, size: 32)
                 Text(WorkspaceTile.name(target))
                     .font(.system(.body, weight: .semibold))
@@ -25,12 +25,12 @@ struct WorkspaceSwipeHUD: View {
                     .lineLimit(1)
             }
             if count <= 12 {
-                PageDots(count: count, current: index, on: colors.ink, off: colors.muted.opacity(0.5), height: 6)
+                PageDots(count: count, current: index, on: colors.ink, off: colors.muted.opacity(Dim.pageDot), height: 6)
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, Space.glassInset)
         .padding(.vertical, 12)
-        .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .rect(cornerRadius: 22))
+        .glassEffect(workspaceGlass(colors.layer, interactive: false), in: .rect(cornerRadius: Radius.card))
         .accessibilityHidden(true)
     }
 }

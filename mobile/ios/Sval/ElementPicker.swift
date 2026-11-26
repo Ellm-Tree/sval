@@ -409,7 +409,7 @@ struct PickCard: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Space.lines) {
                     Text(pick.stop?.name ?? "Tap what you want to remove")
                         .font(.system(.body, weight: .semibold))
                     if let stop = pick.stop {

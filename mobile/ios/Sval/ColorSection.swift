@@ -131,7 +131,7 @@ struct ColorSection: View {
         let selected = color == nil
         return row(selected, action: { pick(nil) }) {
             ZStack {
-                Circle().strokeBorder(Color(hex: sheet.ring), lineWidth: 1.5)
+                Circle().strokeBorder(Color(hex: sheet.ring), lineWidth: Stroke.ring)
                 Rectangle()
                     .fill(Color(hex: sheet.ring))
                     .frame(width: 1.5, height: 36)
@@ -153,10 +153,10 @@ struct ColorSection: View {
             Group {
                 if let fill {
                     Capsule().fill(Color(hex: fill))
-                        .overlay { Capsule().strokeBorder(Color(hex: sheet.ring), lineWidth: 1.5) }
+                        .overlay { Capsule().strokeBorder(Color(hex: sheet.ring), lineWidth: Stroke.ring) }
                 } else {
                     Capsule()
-                        .strokeBorder(Color(hex: sheet.cellSecondary), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                        .strokeBorder(Color(hex: sheet.cellSecondary), style: StrokeStyle(lineWidth: Stroke.ring, dash: Stroke.dash))
                         .overlay {
                             Image(systemName: "plus")
                                 .font(.system(size: 14, weight: .semibold))
@@ -167,7 +167,7 @@ struct ColorSection: View {
             .frame(width: 52, height: 32)
             .modifier(Chosen(selected: selected, shape: Capsule(), sheet: sheet))
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text("Custom").foregroundStyle(Color(hex: sheet.cellText))
                 if custom == nil {
                     Text("Choose hue, intensity and shade")
@@ -215,7 +215,7 @@ struct ColorSection: View {
         return Button { pick(stored) } label: {
             Circle()
                 .fill(fill.map { Color(hex: $0) } ?? .clear)
-                .overlay { Circle().strokeBorder(Color(hex: sheet.ring), lineWidth: 1.5) }
+                .overlay { Circle().strokeBorder(Color(hex: sheet.ring), lineWidth: Stroke.ring) }
                 .frame(width: 36, height: 36)
                 .modifier(Chosen(selected: selected, shape: Circle(), sheet: sheet))
                 .frame(width: 66, height: 46)

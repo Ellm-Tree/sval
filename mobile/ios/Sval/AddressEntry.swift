@@ -180,7 +180,7 @@ struct AddressEntry: View {
             }
         } label: {
             LauncherRow(title: page.title.isEmpty ? host : page.title, subtitle: host, colors: colors) {
-                SiteTile(url: page.url, name: page.title, size: 28)
+                SiteTile(url: page.url, name: page.title, size: Tile.row)
             }
         }
         // As Shift+Delete removes a history row on the desktop: every visit
@@ -206,11 +206,11 @@ struct AddressEntry: View {
             }
         } label: {
             LauncherRow(title: kept.name.isEmpty ? host : kept.name, subtitle: host, colors: colors) {
-                SiteTile(url: kept.url, name: kept.name, size: 28)
+                SiteTile(url: kept.url, name: kept.name, size: Tile.row)
             } trailing: {
                 if kept.pin != nil {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: 12))
+                        .font(Glyph.status)
                         .foregroundStyle(colors.muted)
                         .accessibilityLabel("Pinned")
                 }
@@ -351,16 +351,16 @@ struct AddressEntry: View {
             Task { await model.showPrivateSession() }
         } label: {
             LauncherRow(title: "New Private Tab", subtitle: "Nothing in it is saved or synced", colors: colors) {
-                PrivateTile(size: 28, radius: 8)
+                PrivateTile(size: Tile.row)
             }
         }
     }
 
     private func searchRow(_ query: String) -> some View {
         Button { go() } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Space.rowGap) {
                 Image(systemName: Address.isSearch(query) ? "magnifyingglass" : "globe")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: Glyph.row, weight: .semibold))
                     .frame(width: 28, height: 28)
                 Text(Address.isSearch(query) ? "Search for “\(query)”" : query)
                     .font(.system(.body, weight: .medium))
@@ -368,9 +368,9 @@ struct AddressEntry: View {
                 Spacer()
             }
             .foregroundStyle(colors.ink)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .frame(minHeight: RowMetrics.suggestion)
-            .background(theme.accentWash, in: .rect(cornerRadius: 14))
+            .background(theme.accentWash, in: .rect(cornerRadius: Radius.well))
             .contentShape(.rect)
         }
     }
@@ -380,9 +380,9 @@ struct AddressEntry: View {
         Button {
             if let url = SearchEngine(settings: model.settings).search(suggestion) { open(url) }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: Space.rowGap) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: Glyph.row, weight: .semibold))
                     .frame(width: 28, height: 28)
                     .accessibilityHidden(true)
                 Text(suggestion)
@@ -391,7 +391,7 @@ struct AddressEntry: View {
                 Spacer()
             }
             .foregroundStyle(colors.ink)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .rowHeight(RowMetrics.suggestion)
             .contentShape(.rect)
         }
@@ -402,7 +402,7 @@ struct AddressEntry: View {
     private func caption(_ title: String) -> some View {
         SectionCaption(title, color: colors.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .padding(.top, 6)
             .padding(.bottom, 2)
     }
@@ -419,7 +419,7 @@ struct AddressEntry: View {
             browser.select(tab.id)
         } label: {
             LauncherRow(title: tab.title.isEmpty ? host : tab.title, subtitle: subtitle, colors: colors) {
-                SiteTile(row: tab, size: 28)
+                SiteTile(row: tab, size: Tile.row)
             } trailing: {
                 LauncherRow<EmptyView, EmptyView>.action("Switch to Tab", colors: colors)
             }
@@ -436,7 +436,7 @@ struct AddressEntry: View {
             Task { await browser.reopen(entry) }
         } label: {
             LauncherRow(title: entry.row.title.isEmpty ? host : entry.row.title, subtitle: host, colors: colors) {
-                SiteTile(row: entry.row, size: 28)
+                SiteTile(row: entry.row, size: Tile.row)
             } trailing: {
                 LauncherRow<EmptyView, EmptyView>.action("Reopen", colors: colors)
             }
@@ -458,18 +458,18 @@ struct AddressEntry: View {
     /// round Close beside it.
     private var field: some View {
         GlassEffectContainer(spacing: 6) {
-            HStack(spacing: 6) {
+            HStack(spacing: BarShape.gap) {
                 HStack(spacing: 2) {
                     if !newTab, let url = address {
                         ShareLink(item: url) {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 17, weight: .medium))
-                                .frame(width: 44, height: 48)
+                                .font(.system(size: Glyph.control, weight: .medium))
+                                .frame(width: RowMetrics.target, height: BarShape.standard.address)
                         }
                         .accessibilityLabel("Share")
                         CopyButton(title: "Copy Address", text: url.absoluteString, localOnly: browser.inPrivate, url: url,
-                                   glyphFrame: CGSize(width: 44, height: 48))
-                            .font(.system(size: 17, weight: .medium))
+                                   glyphFrame: CGSize(width: RowMetrics.target, height: BarShape.standard.address))
+                            .font(.system(size: Glyph.control, weight: .medium))
                     }
                     TextField("Search or enter address", text: $text, selection: $selection)
                         .font(.system(.callout))
@@ -484,13 +484,13 @@ struct AddressEntry: View {
                         Button { text = "" } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(colors.muted)
-                                .frame(width: 44, height: 48)
+                                .frame(width: RowMetrics.target, height: BarShape.standard.address)
                         }
                         .accessibilityLabel("Clear")
                     }
                 }
                 .padding(.horizontal, 4)
-                .frame(minHeight: 48)
+                .frame(minHeight: BarShape.standard.address)
                 .glassCapsule(layer)
                 CloseCircle(label: "Cancel", diameter: 48, glass: workspaceGlass(layer), action: onDone)
             }
@@ -534,9 +534,9 @@ private struct LauncherRow<Tile: View, Trailing: View>: View {
         // At the accessibility sizes the row's action goes under its site,
         // so the title has the row's width.
         let stacked = typeSize.isAccessibilitySize
-        HStack(spacing: 12) {
+        HStack(spacing: Space.rowGap) {
             tile()
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(title)
                     .font(.system(.body, weight: .medium))
                     .foregroundStyle(colors.ink)
@@ -550,7 +550,7 @@ private struct LauncherRow<Tile: View, Trailing: View>: View {
             Spacer(minLength: 4)
             if !stacked { trailing() }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Space.rowInset)
         .rowHeight(RowMetrics.suggestion)
         .contentShape(.rect)
     }
@@ -602,9 +602,9 @@ struct SiteTile: View {
                     .scaledToFit()
                     // Smart Invert leaves pictures as they are.
                     .accessibilityIgnoresInvertColors()
-                    .clipShape(.rect(cornerRadius: size * 0.22))
+                    .clipShape(.rect(cornerRadius: Radius.tile(size)))
             } else {
-                RoundedRectangle(cornerRadius: size * 0.25)
+                RoundedRectangle(cornerRadius: Radius.tile(size))
                     .fill(theme.well)
                     .overlay {
                         Text(letter)

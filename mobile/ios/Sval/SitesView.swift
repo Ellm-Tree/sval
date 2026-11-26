@@ -31,7 +31,7 @@ struct SitesView: View {
                         Label {
                             Text(name).lineLimit(1).truncationMode(.middle)
                         } icon: {
-                            SiteTile(url: nil, name: name, size: 28)
+                            SiteTile(url: nil, name: name, size: Tile.row)
                         }
                     }
                     .swipeActions {

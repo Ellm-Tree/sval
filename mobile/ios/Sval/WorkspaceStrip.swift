@@ -36,7 +36,7 @@ struct WorkspaceStrip: View {
 
     /// At the accessibility sizes the tiles are larger in place of names.
     private var tileSize: CGFloat { large ? 64 : compact ? 40 : 46 }
-    private var radius: CGFloat { large ? 18 : compact ? 12 : 14 }
+    private var radius: CGFloat { Radius.tile(tileSize) }
 
     /// The Workspace whose delete the strip is asking about.
     @State private var deleting: OutlineRow?
@@ -212,7 +212,7 @@ struct WorkspaceStrip: View {
                     .padding(2)
                     .overlay {
                         if current {
-                            RoundedRectangle(cornerRadius: radius + 2).strokeBorder(theme.accent, lineWidth: 2)
+                            RoundedRectangle(cornerRadius: radius + 2).strokeBorder(theme.accent, lineWidth: Stroke.selected)
                         }
                     }
                     .padding(-2)
@@ -254,7 +254,7 @@ struct WorkspaceStrip: View {
             Label { Text(WorkspaceTile.name(workspace)) } icon: {
                 // The viewer draws outside the strip's environment, and the
                 // tile reads the model from it.
-                WorkspaceTile(workspace: workspace, size: 46, radius: 14).environment(model)
+                WorkspaceTile(workspace: workspace, size: 46).environment(model)
             }
         }
         .accessibilityValue([playing ? "Playing" : nil, workspace.isolated ? "Isolated" : nil].compactMap { $0 }.joined(separator: ", "))
@@ -264,7 +264,7 @@ struct WorkspaceStrip: View {
     /// A mark at a tile's corner, ringed in the sheet colour.
     private func badge<Content: View>(fill: Color, @ViewBuilder _ content: () -> Content) -> some View {
         let mark = content()
-        return Badge(diameter: 18, fill: fill, ring: theme.sheet) { mark }
+        return Badge(diameter: Tile.badge, fill: fill, ring: theme.sheet) { mark }
             .accessibilityHidden(true)
     }
 
@@ -315,7 +315,7 @@ struct WorkspaceStrip: View {
         Button(action: onNew) {
             VStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: radius)
-                    .strokeBorder(theme.tileRing, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .strokeBorder(theme.tileRing, style: StrokeStyle(lineWidth: Stroke.ring, dash: Stroke.dash))
                     .overlay { Image(systemName: "plus").font(.system(size: 18, weight: .medium)) }
                     .frame(width: tileSize, height: tileSize)
                 if !tight {
@@ -348,7 +348,7 @@ private struct Reorder: ViewModifier {
                 .draggable(workspace.id) {
                     // The lift draws its preview outside the strip's
                     // environment, and the tile reads the model from it.
-                    WorkspaceTile(workspace: workspace, size: 46, radius: 14)
+                    WorkspaceTile(workspace: workspace, size: 46)
                         .environment(model)
                 }
                 .dropDestination(for: String.self) { ids, _ in

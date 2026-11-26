@@ -729,7 +729,7 @@ final class WalkthroughTests: XCTestCase {
         startEditing()
         labelled("Swift").tap()
         XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 5), "a tap ticks Swift")
-        swipeOpen(labelled("Swift"))
+        swipeOpen(cell("Swift"))
         let close = app.collectionViews.buttons["Close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5), "Swift's swipe offers Close")
         close.tap()

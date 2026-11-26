@@ -14,11 +14,11 @@ extension WorkspaceSheet {
         Button {
             if let workspace, workspace.agent == nil, !isPrivateSession { look = .edit(workspace) }
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: Space.rowGap) {
                 WorkspaceTile(workspace: workspace, size: inBar ? 34 : 56, fill: theme.cell)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(workspace.map(WorkspaceTile.name) ?? "")
-                        .font(SvalFont.outfit(17, .bold, relativeTo: .headline))
+                        .font(SvalFont.title(.headline))
                         .lineLimit(inBar ? 1 : 2)
                     Text(summary)
                         .font(.system(.caption))
@@ -215,18 +215,18 @@ extension WorkspaceSheet {
     /// The notice the private session always shows, which can't be
     /// dismissed (13c, the desktop's private window notice).
     var privateNotice: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Space.rowGap) {
             Image("private").resizable().scaledToFit().frame(width: 18, height: 18)
             Text("Nothing in this private Workspace is saved or synced.")
                 .font(.system(panel ? .footnote : .subheadline))
-                .lineSpacing(3)
+                .lineSpacing(Space.noticeLeading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, panel ? 12 : 14)
         .padding(.vertical, panel ? 8 : 10)
-        .background(Theme.privateViolet, in: .rect(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .background(Theme.privateViolet, in: .rect(cornerRadius: Radius.well))
+        .padding(.horizontal, Space.sheetSide)
         .padding(.bottom, 8)
         .accessibilityElement(children: .combine)
     }
@@ -243,9 +243,9 @@ extension WorkspaceSheet {
             if let id = lastWorkspace?.id { browser.showWorkspace(id) }
             close()
         } label: {
-            HStack(spacing: 12) {
-                WorkspaceTile(workspace: lastWorkspace, size: 36)
-                VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: Space.rowGap) {
+                WorkspaceTile(workspace: lastWorkspace, size: Tile.heading)
+                VStack(alignment: .leading, spacing: Space.lines) {
                     Text("Back to \(lastWorkspace.map(WorkspaceTile.name) ?? "your Workspaces")")
                         .font(.system(.body, weight: .semibold))
                     Text("Your private tabs stay open")
@@ -256,12 +256,12 @@ extension WorkspaceSheet {
                 Spacer(minLength: 4)
                 Chevron(color: theme.muted)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .frame(minHeight: 56)
-            .background(theme.well, in: .rect(cornerRadius: 16))
+            .background(theme.well, in: .rect(cornerRadius: Radius.well))
             .contentShape(.rect)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Space.sheetSide)
         .padding(.vertical, 8)
         .overlay(alignment: .top) { theme.divider.frame(height: 1) }
     }

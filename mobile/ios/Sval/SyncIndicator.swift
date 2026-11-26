@@ -175,7 +175,7 @@ struct SyncProblemBadge: View {
         let theme = Theme(scheme, tint: sheetTint)
         TimelineView(.periodic(from: .now, by: 30)) { context in
             if model.stage == .ready, SyncIndicator(model, now: context.date).icon == .warning {
-                Badge(diameter: 17, fill: theme.warning, ring: ring, ringWidth: 1) {
+                Badge(diameter: Tile.badge, fill: theme.warning, ring: ring, ringWidth: Stroke.hairline) {
                     Image("badge-bang").resizable()
                         .foregroundStyle(theme.warningInk)
                         .frame(width: 14, height: 14)

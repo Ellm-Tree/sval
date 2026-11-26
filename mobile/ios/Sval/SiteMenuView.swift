@@ -84,7 +84,7 @@ struct SiteMenuView: View {
                             Label {
                                 Text("Video and Audio")
                             } icon: {
-                                Image("media").resizable().frame(width: 20, height: 20).foregroundStyle(theme.muted)
+                                Image("media").resizable().frame(width: Glyph.slot, height: Glyph.slot).foregroundStyle(theme.muted)
                             }
                         }
                         // A rule names the site and syncs, so a private
@@ -123,14 +123,14 @@ struct SiteMenuView: View {
     private var zoomRow: some View {
         HStack(spacing: 0) {
             Button { setZoom(PageZoom.step(zoom, by: -1)) } label: {
-                Image(systemName: "minus").frame(maxWidth: .infinity, minHeight: 44)
+                Image(systemName: "minus").frame(maxWidth: .infinity, minHeight: RowMetrics.target)
             }
             .accessibilityLabel("Zoom Out")
             .disabled(zoom <= PageZoom.steps[0])
             Button { setZoom(1) } label: {
                 Text("\(Int((zoom * 100).rounded()))%")
                     .monospacedDigit()
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: RowMetrics.target)
             }
             .accessibilityLabel("Zoom")
             .accessibilityValue("\(Int((zoom * 100).rounded()))%")
@@ -138,7 +138,7 @@ struct SiteMenuView: View {
                 setZoom(PageZoom.step(zoom, by: direction == .increment ? 1 : -1))
             }
             Button { setZoom(PageZoom.step(zoom, by: 1)) } label: {
-                Image(systemName: "plus").frame(maxWidth: .infinity, minHeight: 44)
+                Image(systemName: "plus").frame(maxWidth: .infinity, minHeight: RowMetrics.target)
             }
             .accessibilityLabel("Zoom In")
             .disabled(zoom >= PageZoom.steps[PageZoom.steps.count - 1])
@@ -155,16 +155,16 @@ struct SiteMenuView: View {
     }
 
     private func header(title: String, protections: Bool?) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.rowGap) {
             Image(protections == false ? "pr-shield-off" : (protections == nil ? "sc-shield-plain" : "pr-shield"))
                 .resizable()
                 .frame(width: 22, height: 22)
                 .foregroundStyle(protections == false ? theme.muted : theme.text)
                 .frame(width: 46, height: 46)
-                .well(theme.well, edge: theme.divider, radius: 14)
-            VStack(alignment: .leading, spacing: 2) {
+                .well(theme.well, edge: theme.divider, radius: Radius.tile(46))
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(title)
-                    .font(SvalFont.outfit(20, .bold, relativeTo: .title3))
+                    .font(SvalFont.title(.title3))
                     .titleLines()
                 Text(protections == nil ? "Not a website. Protections don't apply."
                      : (protections! ? "Protections on" : "Protections off for this site"))
@@ -179,14 +179,14 @@ struct SiteMenuView: View {
     private func toggleRow(icon: String, title: String, detail: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Label {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Space.lines) {
                     Text(title).font(.system(.body))
                     Text(detail)
                         .font(.system(.footnote))
                         .foregroundStyle(theme.muted)
                 }
             } icon: {
-                Image(icon).resizable().frame(width: 20, height: 20).foregroundStyle(theme.muted)
+                Image(icon).resizable().frame(width: Glyph.slot, height: Glyph.slot).foregroundStyle(theme.muted)
             }
         }
         .tint(theme.action)
@@ -242,7 +242,7 @@ struct SiteMenuView: View {
             DisclosureGroup(isExpanded: $rulesShown) {
                 ForEach(removals) { removal in
                     HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: Space.lines) {
                             Text(removal.shown)
                                 .font(.system(.footnote).monospaced())
                                 .lineLimit(2)
@@ -257,27 +257,27 @@ struct SiteMenuView: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 20))
                                     .foregroundStyle(theme.muted)
-                                    .frame(width: 44, height: 44)
+                                    .frame(width: RowMetrics.target, height: RowMetrics.target)
                             }
                             .buttonStyle(.borderless)
                             .accessibilityLabel("Delete Rule")
                         }
                     }
-                    .frame(minHeight: 44)
+                    .frame(minHeight: RowMetrics.target)
                 }
             } label: {
-                HStack(spacing: 12) {
+                HStack(spacing: Space.rowGap) {
                     Image(systemName: "list.bullet")
-                        .font(.system(size: 17))
+                        .font(.system(size: Glyph.row))
                         .foregroundStyle(theme.muted)
-                        .frame(width: 20, height: 20)
+                        .frame(width: Glyph.slot, height: Glyph.slot)
                     Text("Removed from This Site").font(.system(.body))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text("\(removals.count)")
                         .monospacedDigit()
                         .foregroundStyle(theme.muted)
                 }
-                .frame(minHeight: 44)
+                .frame(minHeight: RowMetrics.target)
             }
             .tint(theme.muted)
             .task(id: rulesShown ? removals.map(\.line) : []) {
@@ -321,12 +321,12 @@ struct SiteMenuView: View {
     }
 
     private func pageLabel(icon: String, title: String, detail: String?, chevron: Bool) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.rowGap) {
             Image(systemName: icon)
-                .font(.system(size: 17))
+                .font(.system(size: Glyph.row))
                 .foregroundStyle(theme.muted)
-                .frame(width: 20, height: 20)
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: Glyph.slot, height: Glyph.slot)
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(title).font(.system(.body))
                 if let detail {
                     Text(detail)
@@ -340,7 +340,7 @@ struct SiteMenuView: View {
             }
         }
         .foregroundStyle(theme.text)
-        .frame(minHeight: 44)
+        .frame(minHeight: RowMetrics.target)
         .contentShape(.rect)
     }
 

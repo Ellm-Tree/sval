@@ -116,7 +116,7 @@ struct LicensesView: View {
         NavigationLink {
             LicenseDetail(entry: entry, texts: entry.texts.map { texts[$0] }, open: open, onDone: onDone)
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(entry.id)
                 if let license = entry.license {
                     Text(license)
@@ -157,7 +157,7 @@ private struct LicenseDetail: View {
                 if let copyright = entry.copyright { Text(copyright) }
                 if let description = entry.description { Text(description) }
                 if let source = entry.source, let url = URL(string: source) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Space.lines) {
                         Text("Source")
                             .font(.footnote)
                             .foregroundStyle(theme.muted)

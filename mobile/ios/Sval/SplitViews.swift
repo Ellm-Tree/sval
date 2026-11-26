@@ -57,6 +57,9 @@ struct SplitRow<Menu: View>: View {
     var trailing: CGFloat = 8
     /// Where the pane count ends, as a group's count does.
     var countTrailing: CGFloat = 10
+    /// Whether the pane count shows: the list's swipe actions take its
+    /// place while they are open.
+    var countShown = true
     /// The coloured group the split sits in, whose colour the tray takes.
     let group: WorkspaceTint?
     /// Opens the split at a pane, or at its last-focused pane for nil.
@@ -82,7 +85,7 @@ struct SplitRow<Menu: View>: View {
             // A List row with several buttons needs them borderless, or a
             // tap anywhere runs them all.
             Button { onOpen(nil) } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: Space.rowGap) {
                     Image("split").resizable()
                         .frame(width: 20, height: 20)
                         .frame(width: 22)
@@ -93,10 +96,14 @@ struct SplitRow<Menu: View>: View {
                         .foregroundStyle(named ? theme.text : theme.muted)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("\(panes.count)")
-                        .font(.system(.subheadline))
-                        .monospacedDigit()
-                        .foregroundStyle(theme.muted)
+                        // The tree's separator starts under the name.
+                        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+                    if countShown {
+                        Text("\(panes.count)")
+                            .font(.system(.subheadline))
+                            .monospacedDigit()
+                            .foregroundStyle(theme.muted)
+                    }
                 }
                 .padding(.trailing, countTrailing)
                 .frame(minHeight: 24)
@@ -108,7 +115,7 @@ struct SplitRow<Menu: View>: View {
                 .padding(.leading, 1)
                 .padding(.trailing, trailing)
         }
-        .padding(.leading, 12 + indent)
+        .padding(.leading, Space.rowInset + indent)
         .padding(.vertical, 6 + WorkspaceSheet.cardGap)
         .frame(minHeight: 84)
     }
@@ -122,10 +129,10 @@ struct SplitRow<Menu: View>: View {
                     tile(pane, colors: colors, titled: titled || pane.id == lastViewed)
                 }
             }
-            .padding(2)
-            .frame(width: geometry.size.width, height: 44, alignment: .leading)
+            .padding(Space.trayInset)
+            .frame(width: geometry.size.width, height: RowMetrics.target, alignment: .leading)
         }
-        .frame(height: 44)
+        .frame(height: RowMetrics.target)
         .well(colors.tray, edge: colors.border, radius: Radius.tray)
     }
 
@@ -136,11 +143,11 @@ struct SplitRow<Menu: View>: View {
             HStack(spacing: 8) {
                 if pane.awaitsPick {
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(theme.muted, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                        .strokeBorder(theme.muted, style: StrokeStyle(lineWidth: Stroke.ring, dash: [3, 2]))
                         .frame(width: 20, height: 20)
-                        .overlay { Image(systemName: "plus").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.muted) }
+                        .overlay { Image(systemName: "plus").font(Glyph.placeholder).foregroundStyle(theme.muted) }
                 } else {
-                    SiteTile(row: pane, size: 20).opacity(loaded || focused ? 1 : 0.7)
+                    SiteTile(row: pane, size: Tile.pane).opacity(loaded || focused ? 1 : Dim.offstage)
                 }
                 if titled {
                     Text(pane.awaitsPick ? "Choose a page" : title(pane))
@@ -153,13 +160,13 @@ struct SplitRow<Menu: View>: View {
             .padding(.leading, 8)
             .padding(.trailing, titled ? 10 : 8)
             .frame(maxWidth: titled ? .infinity : 40, maxHeight: .infinity)
-            .background(colors.cell, in: .rect(cornerRadius: 10))
+            .background(colors.cell, in: .rect(cornerRadius: Radius.tray - Space.trayInset))
             .overlay(alignment: .bottom) {
                 if focused {
-                    Capsule().fill(theme.accent).frame(height: 4).padding(.horizontal, 8).offset(y: 1)
+                    Capsule().fill(theme.accent).frame(height: Stroke.underline).padding(.horizontal, 8).offset(y: 1)
                 }
             }
-            .contentShape(.rect(cornerRadius: 10))
+            .contentShape(.rect(cornerRadius: Radius.tray - Space.trayInset))
         }
         .buttonStyle(.borderless)
         .contextMenu { menu(pane) }
@@ -297,14 +304,17 @@ struct SplitStage: View {
             if focused {
                 // A light ring outside a dark one, so the focused pane's
                 // edge shows on a light page and a dark one alike.
+                let ring: CGFloat = 3
                 ZStack {
-                    RoundedRectangle(cornerRadius: Radius.pane).strokeBorder(theme.accent, lineWidth: 3)
-                    RoundedRectangle(cornerRadius: 13).strokeBorder(Color(hex: Palette.ink950), lineWidth: 2).padding(3)
+                    RoundedRectangle(cornerRadius: Radius.pane).strokeBorder(theme.accent, lineWidth: ring)
+                    RoundedRectangle(cornerRadius: Radius.pane - ring)
+                        .strokeBorder(Color(hex: Palette.ink950), lineWidth: 2)
+                        .padding(ring)
                 }
                 .allowsHitTesting(false)
             } else {
                 RoundedRectangle(cornerRadius: Radius.pane)
-                    .strokeBorder(theme.dark ? theme.divider : theme.line, lineWidth: 1)
+                    .strokeBorder(theme.dark ? theme.divider : theme.line, lineWidth: Stroke.hairline)
                     .allowsHitTesting(false)
             }
         }
@@ -485,7 +495,7 @@ struct PickPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Choose a page for this pane")
-                    .font(SvalFont.outfit(20, .bold, relativeTo: .title3))
+                    .font(SvalFont.title(.title3))
                 Text("You can also type an address in the address bar.")
                     .font(.system(.subheadline))
                     .foregroundStyle(theme.body)
@@ -496,15 +506,15 @@ struct PickPage: View {
                         .padding(.top, 14)
                     ForEach(candidates(in: workspace.id), id: \.id) { tab in
                         Button { pick(tab) } label: {
-                            HStack(spacing: 10) {
-                                SiteTile(row: tab, size: 22)
+                            HStack(spacing: Space.rowGap) {
+                                SiteTile(row: tab, size: Tile.row)
                                 Text(tab.displayTitle)
                                     .font(.system(.body))
                                     .lineLimit(1)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 48)
+                            .padding(.horizontal, Space.rowInset)
+                            .frame(minHeight: RowMetrics.chooser)
                             .contentShape(.rect)
                         }
                     }
@@ -568,14 +578,14 @@ struct PaneTray: View {
                     paneTile(pane, colors: colors)
                 }
             }
-            .padding(2)
+            .padding(Space.trayInset)
             .background {
                 if let glass {
                     RoundedRectangle(cornerRadius: Radius.tray).fill(.clear)
                         .glassEffect(workspaceGlass(glass.layer, interactive: false), in: .rect(cornerRadius: Radius.tray))
                 } else {
                     RoundedRectangle(cornerRadius: Radius.tray).fill(colors.tray)
-                        .overlay { RoundedRectangle(cornerRadius: Radius.tray).strokeBorder(colors.border, lineWidth: 1) }
+                        .overlay { RoundedRectangle(cornerRadius: Radius.tray).strokeBorder(colors.border, lineWidth: Stroke.hairline) }
                 }
             }
             .contentShape(.rect)
@@ -601,23 +611,23 @@ struct PaneTray: View {
         return Button { if !focused { browser.select(pane.id) } } label: {
             Group {
                 if pane.awaitsPick {
-                    Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(glass?.muted ?? theme.muted)
+                    Image(systemName: "plus").font(Glyph.placeholder).foregroundStyle(glass?.muted ?? theme.muted)
                 } else {
-                    SiteTile(row: pane, size: 20).opacity(shown ? 1 : 0.55)
+                    SiteTile(row: pane, size: Tile.pane).opacity(shown ? 1 : Dim.offstage)
                 }
             }
             .frame(width: tile, height: tile)
-            .background(shown ? glass?.rule ?? colors.cell : .clear, in: .rect(cornerRadius: 9))
+            .background(shown ? glass?.rule ?? colors.cell : .clear, in: .rect(cornerRadius: Radius.tray - Space.trayInset))
             // The two panes in view are ringed with a dashed line, and the
             // focused one, which the bar acts on, has a thick bar under it.
             .overlay {
                 if shown {
-                    RoundedRectangle(cornerRadius: 9)
-                        .strokeBorder(accent, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    RoundedRectangle(cornerRadius: Radius.tray - Space.trayInset)
+                        .strokeBorder(accent, style: StrokeStyle(lineWidth: Stroke.ring, dash: Stroke.dash))
                 }
             }
             .overlay(alignment: .bottom) {
-                if focused { Capsule().fill(accent).frame(height: 4).padding(.horizontal, 5).offset(y: 1) }
+                if focused { Capsule().fill(accent).frame(height: Stroke.underline).padding(.horizontal, 5).offset(y: 1) }
             }
             .contentShape(.rect)
         }
@@ -629,13 +639,13 @@ struct PaneTray: View {
     private func stepButton(_ direction: Int) -> some View {
         Button { step(direction) } label: {
             Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: Glyph.control, weight: .semibold))
                 .foregroundStyle(theme.muted)
-                .frame(width: 44, height: 44)
+                .frame(width: RowMetrics.target, height: RowMetrics.target)
                 .contentShape(.rect)
         }
         .disabled(browser.paneStep(direction) == nil)
-        .opacity(browser.paneStep(direction) == nil ? 0.35 : 1)
+        .opacity(browser.paneStep(direction) == nil ? Dim.disabled : 1)
         .accessibilityLabel(direction < 0 ? "Previous Pane" : "Next Pane")
     }
 
@@ -723,13 +733,13 @@ struct SplitWithSheet: View {
                         Task { await model.split(target, with: row) }
                         dismiss()
                     } label: {
-                        HStack(spacing: 11) {
+                        HStack(spacing: Space.rowGap) {
                             if row.kind == .split {
                                 Image(systemName: "rectangle.split.2x1")
-                                    .font(.system(size: 16))
-                                    .frame(width: 22)
+                                    .font(.system(size: Glyph.row))
+                                    .frame(width: Tile.row)
                             } else {
-                                SiteTile(row: row, size: 22)
+                                SiteTile(row: row, size: Tile.row)
                             }
                             Text(name(row))
                                 .font(.system(.body))

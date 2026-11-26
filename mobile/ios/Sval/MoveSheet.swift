@@ -114,8 +114,8 @@ struct MoveSheet: View {
         let open = openWorkspaces.contains(workspace.id)
         return HStack(spacing: 0) {
             Button { Task { await move(to: workspace) } } label: {
-                HStack(spacing: 11) {
-                    WorkspaceTile(workspace: workspace, size: 28)
+                HStack(spacing: Space.rowGap) {
+                    WorkspaceTile(workspace: workspace, size: Tile.row)
                     Text(WorkspaceTile.name(workspace))
                         .font(.system(.body, weight: .medium))
                         .lineLimit(1)
@@ -138,7 +138,7 @@ struct MoveSheet: View {
                     }
                 } label: {
                     Chevron(open: open, color: theme.muted)
-                        .frame(width: 44, height: RowMetrics.chooser)
+                        .frame(width: RowMetrics.target, height: RowMetrics.chooser)
                         .contentShape(.rect)
                 }
                 .accessibilityLabel("Groups in \(WorkspaceTile.name(workspace))")

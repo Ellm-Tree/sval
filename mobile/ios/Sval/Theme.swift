@@ -222,12 +222,103 @@ enum Radius {
     static let picture: CGFloat = 14
     /// A split's tray of page tiles, in the tree and in the bar.
     static let tray: CGFloat = 12
+    /// A well holding text or a row: an address, a warning, a key.
+    static let well: CGFloat = 14
     /// A Workspace's or site's tile, as a share of its size.
     static let tileFactor: CGFloat = 0.28
+
+    /// The corner of a tile `size` across, or of a ring drawn around one.
+    static func tile(_ size: CGFloat) -> CGFloat { size * tileFactor }
+}
+
+/// The room Sval's surfaces keep between and around their parts.
+enum Space {
+    /// A sheet's content from the sheet's sides.
+    static let sheetSide: CGFloat = 16
+    /// A row's content from the leading edge of the row's card.
+    static let rowInset: CGFloat = 12
+    /// A row's title to its subtitle.
+    static let lines: CGFloat = 2
+    /// A row's tile or glyph to the text beside it.
+    static let rowGap: CGFloat = 12
+    /// Glass buttons side by side.
+    static let buttons: CGFloat = 10
+    /// The text in a floating glass card or capsule from its sides.
+    static let glassInset: CGFloat = 14
+    /// The leading of a notice's subheadline and footnote text.
+    static let noticeLeading: CGFloat = 3
+    /// A split's tray around its tiles.
+    static let trayInset: CGFloat = 2
+}
+
+/// The line widths Sval's surfaces share.
+enum Stroke {
+    /// The edge of a card, a well or a tray.
+    static let hairline: CGFloat = 1
+    /// A tile's ring, a mark's outline and a dashed placeholder.
+    static let ring: CGFloat = 1.5
+    /// The ring of the tile in front.
+    static let selected: CGFloat = 2
+    /// A dashed outline's dash and gap.
+    static let dash: [CGFloat] = [4, 3]
+    /// The bar under the focused pane of a split.
+    static let underline: CGFloat = 4
+}
+
+/// How far Sval fades what it shows in a passing state.
+enum Dim {
+    /// The starfield behind first run and the private pages.
+    static let starfield = 0.7
+    /// A tab open on another device, which this phone can't show.
+    static let elsewhere = 0.4
+    /// A control that can't act now.
+    static let disabled = 0.35
+    /// A pane of a split that isn't in view.
+    static let offstage = 0.55
+    /// The ground under text laid over a page's picture.
+    static let overPicture = 0.85
+    /// A page dot that isn't the current one, in the muted ink.
+    static let pageDot = 0.5
+}
+
+/// The sizes of a site's or Workspace's tile by where it shows.
+enum Tile {
+    /// In a row of a sheet or the Launcher.
+    static let row: CGFloat = 28
+    /// In a card's or the scrub's title strip.
+    static let strip: CGFloat = 16
+    /// A pane's tile in a split's tray.
+    static let pane: CGFloat = 20
+    /// Alone on a card with no picture, and in the media card.
+    static let large: CGFloat = 44
+    /// Beside a page's or a row's title.
+    static let heading: CGFloat = 36
+    /// A badge at a tile's corner, across.
+    static let badge: CGFloat = 17
+}
+
+/// The fixed sizes of SF Symbols that sit in a slot of their own.
+enum Glyph {
+    /// A trailing ×, a chevron, a card bar's mark.
+    static let mark = Font.system(size: 13, weight: .semibold)
+    /// A mark beside a toast's or a drop half's subheadline text.
+    static let besideCaption = Font.system(size: 15, weight: .semibold)
+    /// A row's leading glyph, at body text's size.
+    static let row: CGFloat = 17
+    /// The glyph of a control with a 44pt target, on glass or a card.
+    static let control: CGFloat = 17
+    /// A status mark at a row's trailing end.
+    static let status = Font.system(size: 13)
+    /// The plus on a pane that waits for a page.
+    static let placeholder = Font.system(size: 12, weight: .semibold)
+    /// The width a row's leading glyph takes when the row has no tile.
+    static let slot: CGFloat = 20
 }
 
 /// The heights Sval's rows share, each at least the 44pt target.
 enum RowMetrics {
+    /// The least side of anything a finger taps (HIG, Buttons).
+    static let target: CGFloat = 44
     /// A row in a chooser sheet: Move to…, Split With….
     static let chooser: CGFloat = 50
     /// A suggestion in the Launcher, with its site under its title.
@@ -278,7 +369,7 @@ private struct SheetTitleMode: ViewModifier {
                     ToolbarItem(placement: .principal) { Color.clear.accessibilityHidden(true) }
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Space.lines) {
                         Text(title)
                             .font(.system(.title3, weight: .bold))
                             .accessibilityAddTraits(.isHeader)
@@ -288,7 +379,7 @@ private struct SheetTitleMode: ViewModifier {
                     }
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Space.sheetSide)
                     .padding(.bottom, 8)
                 }
         } else {
@@ -312,7 +403,9 @@ enum Motion {
     /// control or a colour changing, a picture fading in.
     static let disclose = Animation.easeOut(duration: 0.15)
     /// A card, toast or step coming and going over the page.
-    static let overlay = Animation.easeOut(duration: 0.2)
+    static let overlay = Animation.easeOut(duration: overlayDuration)
+    /// `overlay`'s length, for a UIKit animation of the same kind.
+    static let overlayDuration = 0.2
     /// The short fade a moving panel or scrub becomes under Reduce Motion.
     static let reduced = Animation.easeOut(duration: 0.12)
     /// The bar folding or opening, and the walkthrough's ring moving
@@ -344,6 +437,33 @@ enum SvalFont {
 
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
         .custom("JetBrains Mono", size: size, relativeTo: style).weight(weight)
+    }
+
+    /// JetBrains Mono at `style`'s size.
+    static func code(_ style: Font.TextStyle, _ weight: Font.Weight = .regular) -> Font {
+        mono(size(of: style), weight, relativeTo: style)
+    }
+
+    /// Outfit at `style`'s size.
+    static func title(_ style: Font.TextStyle, _ weight: Font.Weight = .bold) -> Font {
+        outfit(size(of: style), weight, relativeTo: style)
+    }
+
+    /// `style`'s size at the default text size, from the HIG's iOS Dynamic
+    /// Type table (Typography, Large).
+    static func size(of style: Font.TextStyle) -> CGFloat {
+        switch style {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        default: 17
+        }
     }
 }
 

@@ -55,9 +55,9 @@ private struct DeviceHomeRest: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: NoticePage.spacing) {
                 WorkspaceTile(workspace: workspace, size: 64)
-                FirstRunStyle.headline("Your \(UIDevice.current.model)'s Workspace", size: 28)
+                FirstRunStyle.headline("Your \(UIDevice.current.model)'s Workspace")
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text(WalkthroughPages.purpose)
@@ -71,9 +71,9 @@ private struct DeviceHomeRest: View {
                 .controlSize(.large)
                 .padding(.top, 8)
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, NoticePage.side)
             .padding(.vertical, 72)
-            .frame(maxWidth: 520)
+            .frame(maxWidth: NoticePage.width)
             .frame(maxWidth: .infinity)
             .containerRelativeFrame(.vertical, alignment: .center)
         }
@@ -107,10 +107,10 @@ private struct WalkthroughPages: View {
                     Button("Skip", action: onSkip)
                         .font(.system(.body, weight: .semibold))
                         .foregroundStyle(FirstRunStyle.cyan)
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minWidth: RowMetrics.target, minHeight: RowMetrics.target)
                 }
             }
-            .frame(minHeight: 44)
+            .frame(minHeight: RowMetrics.target)
             .padding(.horizontal, 20)
             WalkthroughMark(pull: offset - rest)
                 .padding(.top, 60)
@@ -118,8 +118,8 @@ private struct WalkthroughPages: View {
                 LazyHStack(spacing: 0) {
                     ForEach(0..<Walkthrough.pages, id: \.self) { index in
                         content(index)
-                            .padding(.horizontal, 28)
-                            .frame(maxWidth: 520)
+                            .padding(.horizontal, NoticePage.side)
+                            .frame(maxWidth: NoticePage.width)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .containerRelativeFrame([.horizontal, .vertical])
                             .id(index)
@@ -135,10 +135,10 @@ private struct WalkthroughPages: View {
                 if phase == .idle { rest = offset }
             }
             footer
-                .padding(.horizontal, 28)
+                .padding(.horizontal, NoticePage.side)
                 .padding(.top, 12)
                 .padding(.bottom, 24)
-                .frame(maxWidth: 520)
+                .frame(maxWidth: NoticePage.width)
         }
         // The bar covers the page's foot.
         .padding(.bottom, verticalSize == .compact ? Browser.sidewaysBarRoom : Browser.barRoom)
@@ -184,7 +184,7 @@ private struct WalkthroughPages: View {
         Text(text)
             .font(.system(.body))
             .foregroundStyle(FirstRunStyle.lead)
-            .lineSpacing(3)
+            .lineSpacing(Space.noticeLeading)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -236,7 +236,7 @@ private struct WalkthroughMark: View {
 struct BarSpotlight: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = 20
+    @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = BarShape.line
     let size: CGSize
     let capsule: Int
     @State private var pulsing = false

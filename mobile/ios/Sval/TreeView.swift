@@ -503,7 +503,7 @@ struct TreeView: UIViewRepresentable {
                 }
                 closing = id
                 let off = (dx > 0 ? 1 : -1) * (view.bounds.width)
-                UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+                UIView.animate(withDuration: Motion.overlayDuration, delay: 0, options: .curveEaseOut) {
                     cell.transform = CGAffineTransform(translationX: off, y: 0)
                     cell.alpha = 0
                 } completion: { [weak self] _ in
@@ -627,10 +627,11 @@ struct TreeView: UIViewRepresentable {
 
         private func preview(at path: IndexPath, in view: UICollectionView) -> UIDragPreviewParameters? {
             if isList, let cell = view.cellForItem(at: path) {
-                // The row's own rounded shape, inside the sheet's margins.
+                // The row's own rounded shape, inside the sheet's margin;
+                // the cell ends at the trailing one.
                 let parameters = UIDragPreviewParameters()
-                parameters.visiblePath = UIBezierPath(
-                    roundedRect: cell.bounds.insetBy(dx: ListMetrics.inset, dy: 0), cornerRadius: WorkspaceSheet.cardCorner)
+                parameters.visiblePath = UIBezierPath(roundedRect: Self.rowShape(cell.bounds),
+                                                      cornerRadius: WorkspaceSheet.cardCorner)
                 parameters.backgroundColor = UIColor(theme.sheet)
                 return parameters
             }
@@ -927,18 +928,26 @@ struct TreeView: UIViewRepresentable {
 // MARK: The list
 
 extension TreeView.Coordinator {
-    /// A list section: the system's plain list, without separators, with
-    /// the room above a coloured group and below it, and the section's
-    /// coloured blocks behind its rows.
+    /// A list section: the system's plain list, with its separators only
+    /// between two tab or split rows, the room above a coloured group and
+    /// below it, and the section's coloured blocks behind its rows.
     fileprivate func listLayout(section index: Int, environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection? {
         guard sections.indices.contains(index) else { return nil }
         var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
-        configuration.showsSeparators = false
+        configuration.showsSeparators = true
+        configuration.itemSeparatorHandler = { [weak self] path, resolved in
+            var separator = resolved
+            separator.topSeparatorVisibility = .hidden
+            separator.bottomSeparatorVisibility = self?.separatesBelow(path) == true ? .visible : .hidden
+            if let self { separator.color = UIColor(self.theme.divider) }
+            return separator
+        }
         configuration.backgroundColor = .clear
         configuration.trailingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipeActions(at: path) }
         let layout = NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
         let gap = ListMetrics.gapAbove(sections, index) ? ListMetrics.gap : 0
-        layout.contentInsets = NSDirectionalEdgeInsets(top: gap, leading: 0, bottom: 0, trailing: 0)
+        layout.contentInsets = NSDirectionalEdgeInsets(top: gap, leading: 0, bottom: 0,
+                                                       trailing: ListMetrics.sectionTrailing(sections[index]))
         let layers = sections[index].layers
         if ListBox.draws(layers) {
             let kind = ListBox.kind(layers, groups: sections[index].groups, dimmed: state?.dimmed ?? [], theme: theme)
@@ -964,19 +973,21 @@ extension TreeView.Coordinator {
         let scheme: ColorScheme = parent.scheme
         let token: String? = parent.tint
         let marked = state.marked.contains(id), dimmed = state.dimmed.contains(id)
+        let swipe = CellSwipe()
         if let header = line.group {
             cell.contentConfiguration = UIHostingConfiguration {
                 TreeGroupRow(box: box, line: line, header: header, theme: theme, marked: marked, dimmed: dimmed,
                              dropState: dropState)
                     .treeCell(model, scheme: scheme, token: token)
             }
-            .margins(.horizontal, ListMetrics.inset)
+            .margins(.leading, ListMetrics.inset)
+            .margins(.trailing, 0)
             .margins(.vertical, 0)
         } else if let panes = line.panes {
             let boxes = panes.compactMap(model.treeStore.box)
             let actions = parent.actions
             cell.contentConfiguration = UIHostingConfiguration {
-                TreeSplitRow(model: model, split: box, panes: boxes, line: line, theme: theme, marked: marked,
+                TreeSplitRow(model: model, split: box, panes: boxes, line: line, swipe: swipe, theme: theme, marked: marked,
                              dimmed: dimmed, dropState: dropState,
                              onOpen: { pane in
                                  let split = box.row.id
@@ -986,29 +997,50 @@ extension TreeView.Coordinator {
                              menu: actions.paneMenu)
                     .treeCell(model, scheme: scheme, token: token)
             }
-            .margins(.horizontal, ListMetrics.inset)
+            .margins(.leading, ListMetrics.inset)
+            .margins(.trailing, 0)
             .margins(.vertical, 0)
         } else {
             let ticked = state.ticked.contains(id), editing = state.editing
             cell.contentConfiguration = UIHostingConfiguration {
-                TreeTabRow(model: model, box: box, line: line, theme: theme, editing: editing, ticked: ticked,
+                TreeTabRow(model: model, box: box, line: line, swipe: swipe, theme: theme, editing: editing, ticked: ticked,
                            marked: marked, dimmed: dimmed, dropState: dropState,
                            onClose: { [weak self] in self?.close(id) })
                     .treeCell(model, scheme: scheme, token: token)
             }
-            .margins(.horizontal, ListMetrics.inset)
+            .margins(.leading, ListMetrics.inset)
+            .margins(.trailing, 0)
             .margins(.vertical, 0)
         }
-        // The system's press highlight, in the row's rounded shape inside
-        // the sheet's margins; the row's block lies behind it.
-        cell.configurationUpdateHandler = { cell, state in
-            var background = UIBackgroundConfiguration.listCell().updated(for: state)
-            if !state.isHighlighted { background.backgroundColor = .clear }
+        // The system's press highlight, in the row's rounded shape on its
+        // group's card; the row's block lies behind it. A group's own row
+        // keeps the sheet's margins, since its block starts at its level.
+        let insets = line.group == nil ? RowPlace(line).backgroundInsets
+            : NSDirectionalEdgeInsets(top: 0, leading: ListMetrics.inset, bottom: 0, trailing: 0)
+        cell.configurationUpdateHandler = { [weak self] cell, state in
+            // A swiped row shows as a card pushed aside, in the press
+            // highlight's fill; the row in front has its own card.
+            var shown = state
+            if state.isSwiped, self?.isFront(line) == false { shown.isHighlighted = true }
+            var background = UIBackgroundConfiguration.listCell().updated(for: shown)
+            if !shown.isHighlighted { background.backgroundColor = .clear }
             background.cornerRadius = WorkspaceSheet.cardCorner
-            background.backgroundInsets = NSDirectionalEdgeInsets(top: 0, leading: ListMetrics.inset, bottom: 0,
-                                                                  trailing: ListMetrics.inset)
+            background.backgroundInsets = insets
             cell.backgroundConfiguration = background
+            if swipe.open != state.isSwiped { swipe.open = state.isSwiped }
         }
+    }
+
+    /// Whether the row at `path` draws a separator below it.
+    fileprivate func separatesBelow(_ path: IndexPath) -> Bool {
+        guard sections.indices.contains(path.section) else { return false }
+        return ListMetrics.separatesBelow(sections[path.section].lines, at: path.item, isFront: isFront)
+    }
+
+    /// Whether `line` is the row in front: its tab, or a pane of its split.
+    fileprivate func isFront(_ line: TreeLine) -> Bool {
+        guard let front = parent.model.browser.currentTabId else { return false }
+        return line.panes?.contains(front) ?? (TreeLines.rowId(of: line.id) == front)
     }
 
     fileprivate func configurePins(_ cell: UICollectionViewCell) {
@@ -1025,35 +1057,50 @@ extension TreeView.Coordinator {
 
     /// A row's swipe: Close, which a full swipe runs, and Move to…; a
     /// split's closes all its panes and takes no full swipe. A group's row
-    /// has none.
+    /// has none. Each action shows its symbol alone, in the colour its
+    /// style gives it.
     fileprivate func swipeActions(at path: IndexPath) -> UISwipeActionsConfiguration? {
         guard let id = dataSource.itemIdentifier(for: path), let line = lines[id], line.group == nil,
               let row = parent.model.row(TreeLines.rowId(of: id)) else { return nil }
         let actions = parent.actions
-        let move = UIContextualAction(style: .normal, title: "Move to…") { _, _, done in
+        let move = UIContextualAction(style: .normal, title: nil) { _, _, done in
             actions.move(row)
             done(true)
         }
-        move.image = UIImage(systemName: "folder")
-        move.backgroundColor = UIColor(theme.action)
+        move.image = Self.swipeImage("folder.fill", named: "Move to…")
         guard let panes = line.panes else {
-            let close = UIContextualAction(style: .destructive, title: "Close") { _, _, done in
+            let close = UIContextualAction(style: .destructive, title: nil) { _, _, done in
                 actions.close(row)
                 done(true)
             }
-            close.image = UIImage(systemName: "xmark")
+            close.image = Self.swipeImage("xmark", named: "Close")
             return UISwipeActionsConfiguration(actions: [close, move])
         }
         let paneRows = panes.compactMap(parent.model.row)
-        let close = UIContextualAction(style: .destructive, title: paneRows.count == 2 ? "Close Both" : "Close All") {
-            _, _, done in
+        let close = UIContextualAction(style: .destructive, title: nil) { _, _, done in
             actions.closeSplit(row, paneRows)
             done(true)
         }
-        close.image = UIImage(systemName: "xmark")
+        close.image = Self.swipeImage("xmark", named: paneRows.count == 2 ? "Close Both" : "Close All")
         let configuration = UISwipeActionsConfiguration(actions: [close, move])
         configuration.performsFirstActionWithFullSwipe = false
         return configuration
+    }
+
+    /// A list row's shape in its cell: inside the sheet's leading margin,
+    /// to the cell's trailing end, which the section sets at the row's card.
+    fileprivate static func rowShape(_ bounds: CGRect) -> CGRect {
+        CGRect(x: bounds.minX + ListMetrics.inset, y: bounds.minY, width: bounds.width - ListMetrics.inset,
+               height: bounds.height)
+    }
+
+    /// A swipe action's symbol, carrying the name VoiceOver reads for an
+    /// action with no title. The symbol is copied first, so the name stays
+    /// on this action's image.
+    private static func swipeImage(_ symbol: String, named name: String) -> UIImage? {
+        let image = UIImage(systemName: symbol)?.withRenderingMode(.alwaysTemplate)
+        image?.accessibilityLabel = name
+        return image
     }
 
     /// A row's long-press menu, built when it opens: a tab's or a group's.
@@ -1097,7 +1144,7 @@ extension TreeView.Coordinator {
         if kind != .into {
             let place = RowPlace(spot.line)
             let leading = spot.line.panes == nil ? place.indent : place.cardLeading
-            let width = spot.frame.width - 2 * ListMetrics.inset - leading - place.trailing
+            let width = spot.frame.width - ListMetrics.inset - leading - place.trailing
             let row = ListMetrics.desktopRow
             let split = model.dropIntent(id, over: over, x: width - 1, y: row / 2, w: width, h: row)
             hover.halves = DropHalves(groups: model.makesGroups(in: parent.workspace),
@@ -1150,7 +1197,7 @@ extension TreeView.Coordinator {
             Diagnostics.log("sheet: dropped in the list, \(kind)")
             if let item = coordinator.items.first, let path = coordinator.destinationIndexPath,
                let cell = view.cellForItem(at: path) {
-                coordinator.drop(item.dragItem, intoItemAt: path, rect: cell.bounds.insetBy(dx: ListMetrics.inset, dy: 0))
+                coordinator.drop(item.dragItem, intoItemAt: path, rect: Self.rowShape(cell.bounds))
             }
             parent.actions.drop(plan)
         case nil:

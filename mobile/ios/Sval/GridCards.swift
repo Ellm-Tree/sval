@@ -33,7 +33,7 @@ struct GridCard: View {
             .overlay(alignment: .top) {
                 CardBar(theme: theme, title: row.displayTitle, bold: front, dim: elsewhere,
                         closeLabel: "Close \(row.displayTitle)", onClose: onClose) {
-                    SiteTile(row: row, size: 16).opacity(elsewhere ? 0.4 : 1)
+                    SiteTile(row: row, size: Tile.strip).opacity(elsewhere ? Dim.elsewhere : 1)
                 }
             }
             .overlay(alignment: .bottomLeading) {
@@ -78,7 +78,7 @@ struct GridCard: View {
     private func mediaButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: Glyph.control, weight: .semibold))
                 .foregroundStyle(theme.accent)
                 .frame(width: 38, height: 38)
                 .background(theme.cell, in: .circle)
@@ -118,7 +118,7 @@ struct CardBar<Icon: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: onClose) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Glyph.mark)
                     .foregroundStyle(theme.muted)
                     .frame(width: 36, height: GridMetrics.bar)
                     .contentShape(.rect)
@@ -163,12 +163,15 @@ struct GridSplitCard: View {
                     // The split's mark goes first, so the card reads as a
                     // split however far its title is cut.
                     Image(systemName: SplitPicture.symbol(sideways: sideways))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(Glyph.mark)
                         .foregroundStyle(theme.muted)
                     HStack(spacing: -5) {
                         ForEach(panes, id: \.id) { pane in
-                            SiteTile(row: pane, size: 16)
-                                .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(theme.sheet, lineWidth: 1.5) }
+                            SiteTile(row: pane, size: Tile.strip)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: Radius.tile(Tile.strip))
+                                        .strokeBorder(theme.sheet, lineWidth: Stroke.ring)
+                                }
                         }
                     }
                     .padding(.trailing, 2)
@@ -227,7 +230,7 @@ struct GridGroupHeader: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if !open {
                     HStack(spacing: -6) {
-                        ForEach(icons.map(\.row), id: \.id) { tab in SiteTile(row: tab, size: 20) }
+                        ForEach(icons.map(\.row), id: \.id) { tab in SiteTile(row: tab, size: Tile.pane) }
                     }
                     .padding(.trailing, 6)
                 }
@@ -237,7 +240,7 @@ struct GridGroupHeader: View {
                     .foregroundStyle(theme.muted)
                 Chevron(open: open, color: theme.muted)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .frame(maxHeight: .infinity)
             .contentShape(.rect)
         }
@@ -250,7 +253,7 @@ struct GridGroupHeader: View {
 
     private func tile(_ tint: WorkspaceTint?, size: CGFloat) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.29).fill(theme.cell)
+            RoundedRectangle(cornerRadius: Radius.tile(size)).fill(theme.cell)
             if let emoji = group.emoji, !emoji.isEmpty {
                 Text(emoji).font(.system(size: size * 0.57)).accessibilityIgnoresInvertColors()
             } else {
@@ -287,7 +290,7 @@ struct CardPicture: View {
                         .transition(.opacity.animation(Motion.disclose))
                 } else {
                     VStack(spacing: 8) {
-                        SiteTile(row: row, size: 44).opacity(elsewhere ? 0.4 : 1)
+                        SiteTile(row: row, size: Tile.large).opacity(elsewhere ? Dim.elsewhere : 1)
                         if let site = row.site {
                             Text(site)
                                 .font(.system(.footnote))
@@ -303,7 +306,7 @@ struct CardPicture: View {
                                 .background(theme.well, in: .capsule)
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Space.rowInset)
                     .frame(maxHeight: .infinity)
                     .padding(.top, top)
                 }
@@ -359,7 +362,7 @@ struct SplitPicture: View {
             }
             .clipShape(.rect(cornerRadius: 6))
             .overlay {
-                RoundedRectangle(cornerRadius: 6).strokeBorder(theme.dark ? theme.divider : theme.line, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 6).strokeBorder(theme.dark ? theme.divider : theme.line, lineWidth: Stroke.hairline)
             }
     }
 }
@@ -386,6 +389,6 @@ extension View {
     /// A card's corners and its 1pt ring, around the picture and bar.
     func cardFrame(_ theme: Theme) -> some View {
         clipShape(.rect(cornerRadius: Radius.picture))
-            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(theme.divider, lineWidth: 1) }
+            .overlay { RoundedRectangle(cornerRadius: Radius.picture).strokeBorder(theme.divider, lineWidth: Stroke.hairline) }
     }
 }

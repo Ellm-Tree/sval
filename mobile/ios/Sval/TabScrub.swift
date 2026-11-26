@@ -187,6 +187,13 @@ struct TabScrubStrip: View {
     let theme: Theme
     let colors: BarColors
 
+    /// The header's and caption's text from the screen's sides.
+    private static let side: CGFloat = 24
+    /// The header's height, one line of its title.
+    private static let headerHeight: CGFloat = 30
+    /// The band's edges above and below the cards.
+    private static let bandEdge = 0.7
+
     private struct Placed {
         let position: Int
         let item: ScrubItem
@@ -263,7 +270,7 @@ struct TabScrubStrip: View {
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(theme.text)
                     .lineLimit(1)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, Self.side)
                 ScrubPlace(count: scrub.items.count, current: scrub.index, ink: theme.text)
             }
             .padding(.top, 10)
@@ -272,10 +279,10 @@ struct TabScrubStrip: View {
             .background(surface)
         }
         .frame(maxWidth: .infinity)
-        .clipShape(.rect(cornerRadius: 36))
+        .clipShape(.rect(cornerRadius: Radius.sheet))
         // Clear glass in the bar's tint, so the page shows through the
         // cards' row as it does through the bar.
-        .glassEffect(.clear.tint(colors.layer.opacity(BarColors.glassTint)), in: .rect(cornerRadius: 36))
+        .glassEffect(.clear.tint(colors.layer.opacity(BarColors.glassTint)), in: .rect(cornerRadius: Radius.sheet))
         .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.12), value: scrub.index)
         .accessibilityHidden(true)
     }
@@ -283,7 +290,7 @@ struct TabScrubStrip: View {
     /// The header's and footer's ground: the Workspace sheet's rows', so
     /// their text reads in the sheet's colours over any page.
     private var surface: some View {
-        theme.cell.opacity(0.85)
+        theme.cell.opacity(Dim.overPicture)
     }
 
     /// Behind the cards, the front card's group's colour, muted, edged
@@ -291,8 +298,8 @@ struct TabScrubStrip: View {
     @ViewBuilder private var band: some View {
         if let bandTint {
             bandTint.opacity(0.28)
-                .overlay(alignment: .top) { bandTint.opacity(0.7).frame(height: 1.5) }
-                .overlay(alignment: .bottom) { bandTint.opacity(0.7).frame(height: 1.5) }
+                .overlay(alignment: .top) { bandTint.opacity(Self.bandEdge).frame(height: Stroke.ring) }
+                .overlay(alignment: .bottom) { bandTint.opacity(Self.bandEdge).frame(height: Stroke.ring) }
         }
     }
 
@@ -303,8 +310,8 @@ struct TabScrubStrip: View {
                 .font(.system(.title2, weight: .semibold))
                 .foregroundStyle(theme.text)
                 .lineLimit(1)
-                .frame(height: 30)
-                .padding(.horizontal, 24)
+                .frame(height: Self.headerHeight)
+                .padding(.horizontal, Self.side)
         } else {
             groupName
         }
@@ -325,7 +332,7 @@ struct TabScrubStrip: View {
                     ForEach(Array(panes.enumerated()), id: \.offset) { at, pane in
                         if at > 0, at == panes.count - 1 { fixed("&") }
                         HStack(spacing: 0) {
-                            SiteTile(row: pane, size: 16).padding(.trailing, 4)
+                            SiteTile(row: pane, size: Tile.strip).padding(.trailing, 4)
                             Text(pane.displayTitle)
                             if at < panes.count - 2 { fixed(",") }
                         }
@@ -337,8 +344,8 @@ struct TabScrubStrip: View {
         } else {
             HStack(spacing: 4) {
                 switch scrub.items[scrub.index] {
-                case .tab(let row, _): SiteTile(row: row, size: 16)
-                case .pin(let pin, _): SiteTile(url: pin.url, name: pin.name, size: 16)
+                case .tab(let row, _): SiteTile(row: row, size: Tile.strip)
+                case .pin(let pin, _): SiteTile(url: pin.url, name: pin.name, size: Tile.strip)
                 case .split, .workspace: EmptyView()
                 }
                 Text(footerText)
@@ -396,8 +403,8 @@ struct TabScrubStrip: View {
             }
         }
         .font(.system(.title2, weight: .semibold))
-        .frame(height: 30)
-        .padding(.horizontal, 24)
+        .frame(height: Self.headerHeight)
+        .padding(.horizontal, Self.side)
     }
 
     /// The front Workspace's colour, or the front card's group's, if it
@@ -439,7 +446,7 @@ struct TabScrubStrip: View {
                     Image(uiImage: picture).resizable().scaledToFill()
                         .accessibilityIgnoresInvertColors()
                 } else {
-                    SiteTile(url: pin.url, name: pin.name, size: 44)
+                    SiteTile(url: pin.url, name: pin.name, size: Tile.large)
                         .frame(maxHeight: .infinity)
                 }
             }

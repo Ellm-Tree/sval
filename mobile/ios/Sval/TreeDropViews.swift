@@ -31,6 +31,11 @@ struct DropHalvesMark: View {
     /// Split, the glyph above each.
     var compact = false
 
+    /// The cover's room around the halves.
+    private static let inset: CGFloat = 4
+    /// A half's corner, concentric with the cover's.
+    private static let halfCorner = WorkspaceSheet.cardCorner - inset
+
     private var splitLabel: String {
         if compact { return "Split" }
         return switch halves.split {
@@ -44,7 +49,7 @@ struct DropHalvesMark: View {
     private func half(_ label: String, icon: String, active: Bool, enabled: Bool) -> some View {
         let layout = compact ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 6))
         return layout {
-            Image(systemName: icon).font(.system(size: 15, weight: .semibold))
+            Image(systemName: icon).font(Glyph.besideCaption)
             Text(label)
                 .font(.system(.subheadline, weight: .semibold))
                 .lineLimit(1)
@@ -56,12 +61,12 @@ struct DropHalvesMark: View {
         // held over it.
         .padding(.bottom, compact ? 10 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: compact ? .bottom : .center)
-        .background(active && enabled ? color : .clear, in: .rect(cornerRadius: 10))
+        .background(active && enabled ? color : .clear, in: .rect(cornerRadius: Self.halfCorner))
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(enabled ? color : muted, style: StrokeStyle(lineWidth: 1.5, dash: enabled ? [] : [4, 3]))
+            RoundedRectangle(cornerRadius: Self.halfCorner)
+                .strokeBorder(enabled ? color : muted, style: StrokeStyle(lineWidth: Stroke.ring, dash: enabled ? [] : Stroke.dash))
         }
-        .opacity(enabled ? 1 : 0.6)
+        .opacity(enabled ? 1 : Dim.disabled)
     }
 
     var body: some View {
@@ -71,8 +76,8 @@ struct DropHalvesMark: View {
             }
             half(splitLabel, icon: "rectangle.split.2x1", active: onSplit, enabled: halves.splits)
         }
-        .padding(4)
-        .background(cover.opacity(0.85), in: .rect(cornerRadius: 12))
+        .padding(Self.inset)
+        .background(cover.opacity(Dim.overPicture), in: .rect(cornerRadius: WorkspaceSheet.cardCorner))
         .accessibilityElement(children: .combine)
     }
 }

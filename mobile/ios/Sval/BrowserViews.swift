@@ -483,10 +483,10 @@ struct BrowserView: View {
     /// never brings one to the front; this shows only when one is already
     /// there, as when another device changed the front tab's address.
     private func elsewhere(_ row: OutlineRow, address: String, theme: Theme) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: NoticePage.spacing) {
             NoticeMark(symbol: "laptopcomputer", theme: theme)
             Text("Sval on \(UIDevice.current.model) can't open this tab")
-                .font(SvalFont.outfit(22, .bold, relativeTo: .title2))
+                .font(SvalFont.title(.title2))
                 .foregroundStyle(theme.text)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
@@ -495,7 +495,7 @@ struct BrowserView: View {
                 .foregroundStyle(theme.body)
                 .multilineTextAlignment(.center)
             NoticeAddress(address: address, theme: theme)
-            HStack(spacing: 10) {
+            HStack(spacing: Space.buttons) {
                 CopyButton(title: "Copy Address", text: address, localOnly: browser.inPrivate)
                     .foregroundStyle(theme.text)
                 Button("Close Tab", systemImage: "xmark", role: .destructive) {
@@ -506,7 +506,9 @@ struct BrowserView: View {
             .buttonStyle(.glass)
             .padding(.top, 4)
         }
-        .padding(32)
+        .padding(.horizontal, NoticePage.side)
+        .padding(.vertical, NoticePage.ends)
+        .frame(maxWidth: NoticePage.width)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.sheet)
     }

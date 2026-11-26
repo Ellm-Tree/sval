@@ -37,6 +37,8 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
 
     /// The Workspace colour the capsules' glass is tinted with.
     private var layer: Color { colors.layer }
+    /// How far the rider stands above the bar's top.
+    private static var riderRise: CGFloat { NowPlayingCapsule.height + Browser.overBarGap }
 
     var body: some View {
         let folded = model.browser.fold.folded
@@ -47,7 +49,7 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
         // another tab's now-playing capsule while that shows.
         .overlay(alignment: .top) {
             BarNotices(colors: colors, asks: facts.asks)
-                .offset(y: facts.otherMedia != nil && !folded ? -112 : -52)
+                .offset(y: facts.otherMedia != nil && !folded ? BarNotices.rise - Self.riderRise : BarNotices.rise)
         }
     }
 
@@ -101,11 +103,11 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
             if let rider, !folded {
                 rider
                     .frame(width: at[3].maxX - 8)
-                    .offset(x: 8, y: -60)
+                    .offset(x: 8, y: -Self.riderRise)
             }
             if let otherMedia, folded {
                 otherMedia
-                    .offset(x: address.maxX + 6, y: address.minY)
+                    .offset(x: address.maxX + BarShape.gap, y: address.minY)
             }
         }
         .foregroundStyle(colors.ink)

@@ -201,11 +201,11 @@ struct ToastView: View {
 
     var body: some View {
         let ink = colors.ink
-        HStack(spacing: 12) {
+        HStack(spacing: Space.rowGap) {
             if let icon = toast.icon {
                 Image(icon).resizable().frame(width: 18, height: 18).foregroundStyle(ink)
             } else if let symbol = toast.symbol {
-                Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(ink)
+                Image(systemName: symbol).font(Glyph.besideCaption).foregroundStyle(ink)
             }
             Text(toast.text)
                 .font(.system(.subheadline, weight: .medium))
@@ -224,9 +224,9 @@ struct ToastView: View {
             }
         }
         .frame(minHeight: 48)
-        .padding(.horizontal, 18)
+        .padding(.horizontal, Space.glassInset)
         .glassEffect(workspaceGlass(colors.layer, interactive: !toast.notice), in: .capsule)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, BarShape.side)
         .modifier(ToastAccess(notice: toast.notice, onDone: onDone))
     }
 }

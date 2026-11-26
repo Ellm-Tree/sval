@@ -20,7 +20,7 @@ import SwiftUI
 struct GlassFold<Content: View>: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     /// A line of the address's text, which is `.subheadline`.
-    @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = 20
+    @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = BarShape.line
     let folded: Bool
     let content: ([CGRect], Bool, BarShape) -> Content
 
@@ -74,6 +74,20 @@ struct BarShape: Equatable {
     var control = 48.0
 
     static let standard = BarShape()
+
+    /// A line of the address's subheadline text, before Dynamic Type
+    /// scales it.
+    static let line: CGFloat = 20
+    /// The gap between capsules side by side.
+    static let gap: CGFloat = 6
+    /// A mark to the label beside it inside one capsule.
+    static let labelGap: CGFloat = 6
+    /// The bar from the screen's sides, clear of its rounded corners.
+    static let side: CGFloat = 20
+    /// The upright bar's foot above the screen's edge.
+    static let foot = 24.0
+    /// The sideways bar's foot above the screen's edge.
+    static let sidewaysFoot = 8.0
 
     init() {}
 

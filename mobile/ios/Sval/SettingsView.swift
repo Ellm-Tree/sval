@@ -175,9 +175,9 @@ struct SettingsView: View {
     private var syncRow: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let sync = SyncIndicator(model, now: context.date)
-            HStack(alignment: .top, spacing: 12) {
-                SyncMoon(icon: sync.icon, size: 28, ring: theme.cell)
-                VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .top, spacing: Space.rowGap) {
+                SyncMoon(icon: sync.icon, size: Tile.row, ring: theme.cell)
+                VStack(alignment: .leading, spacing: Space.lines) {
                     Text(sync.title)
                         .font(.system(.body, weight: .semibold))
                     if !sync.detail.isEmpty {
@@ -252,7 +252,7 @@ private struct FolderDetail: View {
         Form {
             Section {
                 Text(place.full)
-                    .font(SvalFont.mono(15, relativeTo: .callout))
+                    .font(SvalFont.code(.callout))
                     .textSelection(.enabled)
             } header: {
                 SectionCaption("Address", color: theme.muted)

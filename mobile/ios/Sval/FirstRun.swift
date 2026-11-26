@@ -52,7 +52,7 @@ struct NightSky: View {
             colors: [Color(hex: Palette.navy), Color(hex: Palette.ink950)],
             center: UnitPoint(x: 0.5, y: 0.22), startRadius: 0, endRadius: 520)
             .overlay {
-                Image("starfield").resizable().scaledToFill().opacity(0.7)
+                Image("starfield").resizable().scaledToFill().opacity(Dim.starfield)
             }
             .ignoresSafeArea()
             .accessibilityHidden(true)
@@ -66,11 +66,27 @@ enum FirstRunStyle {
     private static let theme = Theme(.dark)
     static var lead: Color { theme.body }
     static var muted: Color { theme.muted }
+    /// A field's prompt.
+    static var prompt: Color { muted.opacity(0.7) }
     static var cyan: Color { theme.accent }
     static let field = Color(hex: 0x0C1446)
     static let well = Color(hex: Palette.night)
     static var warning: Color { theme.warning }
     static var danger: Color { theme.dangerText }
+    /// The tick on a step that is done.
+    static let done = Color(hex: 0x5EE08A)
+    /// A tick, warning or error mark beside a step's text.
+    static let statusGlyph = Font.system(size: 15)
+
+    /// A step's content from the screen's sides, and its foot above the
+    /// screen's edge.
+    static let side: CGFloat = 20
+    /// A step's headline below the step bar.
+    static let top: CGFloat = 24
+    /// A step's text inset from the edge of its lists and wells.
+    static let textInset: CGFloat = 4
+    /// A step's parts from each other.
+    static let stack: CGFloat = 12
 
     static func headline(_ text: String, size: CGFloat = 30) -> some View {
         Text(text)
@@ -115,14 +131,14 @@ private struct StepBar: View {
                             Text("Back").font(.system(.body))
                         }
                         .foregroundStyle(FirstRunStyle.cyan)
-                        .frame(minHeight: 44)
+                        .frame(minHeight: RowMetrics.target)
                     }
                     Spacer()
                 }
             }
         }
         .padding(.horizontal, 8)
-        .frame(minHeight: 44)
+        .frame(minHeight: RowMetrics.target)
         // Back as a navigation bar's is: VoiceOver's escape gesture takes it.
         .accessibilityAction(.escape) { onBack?() }
     }
@@ -191,24 +207,24 @@ private struct FolderSteps: View {
                     model.settingUp = false
                 }
                 .foregroundStyle(FirstRunStyle.cyan)
-                .frame(minHeight: 44)
+                .frame(minHeight: RowMetrics.target)
             }
         }
         .padding(.horizontal, 28)
-        .padding(.bottom, 20)
+        .padding(.bottom, FirstRunStyle.side)
     }
 
     private var choose: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             StepBar(step: 0) { step = .welcome }
             FirstRunStyle.headline("Where's your Sval folder?")
-                .padding(.horizontal, 4)
-                .padding(.top, 24)
+                .padding(.horizontal, FirstRunStyle.textInset)
+                .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
             Text("Pick the folder your computer syncs to.")
                 .font(.system(.body))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
                 .padding(.bottom, 14)
             List {
                 Section {
@@ -228,21 +244,21 @@ private struct FolderSteps: View {
                 WarningBox(title: message, detail: "")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
     }
 
     private func option(icon: String, title: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: Space.rowGap) {
                 Image(systemName: icon)
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(.white)
                     .frame(width: 48, height: 48)
                     .background(LinearGradient(colors: [Color(hex: 0x2FD0FF), Color(hex: 0x1557E0)],
                                                startPoint: .top, endPoint: .bottom),
-                                in: .rect(cornerRadius: 14))
-                VStack(alignment: .leading, spacing: 3) {
+                                in: .rect(cornerRadius: Radius.tile(48)))
+                VStack(alignment: .leading, spacing: Space.lines) {
                     Text(title).font(.system(.body, weight: .semibold))
                     Text(detail)
                         .font(.system(.subheadline))
@@ -292,12 +308,12 @@ private struct ServerStep: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             StepBar(step: 1, onBack: onBack)
             Form {
                 Section {
                     FirstRunStyle.headline("Connect to your server")
-                        .padding(.top, 24)
+                        .padding(.top, FirstRunStyle.top)
                         .accessibilityAddTraits(.isHeader)
                     if let failure { problem(failure) }
                 }
@@ -336,8 +352,8 @@ private struct ServerStep: View {
         }
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
         .onAppear { if host.isEmpty { serverFocused = true } }
     }
 
@@ -346,8 +362,8 @@ private struct ServerStep: View {
     }
 
     private func field(_ label: String, _ prompt: String, text: Binding<String>, mono: Bool = false, ringed: Bool) -> some View {
-        TextField("", text: text, prompt: Text(prompt).foregroundStyle(FirstRunStyle.muted.opacity(0.7)))
-            .font(mono ? SvalFont.mono(16, relativeTo: .body) : .system(.body))
+        TextField("", text: text, prompt: Text(prompt).foregroundStyle(FirstRunStyle.prompt))
+            .font(mono ? SvalFont.code(.body) : .system(.body))
             .modifier(FieldRow(label: label, ringed: ringed))
     }
 
@@ -392,24 +408,24 @@ private struct DropboxStep: View {
     @State private var failure: Error?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             StepBar(step: 1, onBack: back)
             if browser == nil { signIn } else { chooser }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
     }
 
     private var signIn: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             FirstRunStyle.headline("Sign in to Dropbox")
-                .padding(.horizontal, 4)
-                .padding(.top, 24)
+                .padding(.horizontal, FirstRunStyle.textInset)
+                .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
             Text("Dropbox asks you to let Sval read and change your files. Sval reads and writes only the folder you choose next.")
                 .font(.system(.body))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
             if let failure { problem(failure) }
             Spacer()
             FirstRunStyle.primary("Sign In to Dropbox", busy: working, action: startSignIn)
@@ -418,15 +434,15 @@ private struct DropboxStep: View {
     }
 
     private var chooser: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             FirstRunStyle.headline("Choose your Sval folder")
-                .padding(.horizontal, 4)
-                .padding(.top, 24)
+                .padding(.horizontal, FirstRunStyle.textInset)
+                .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
             Text((["Dropbox"] + path.split(separator: "/").map(String.init)).joined(separator: " › "))
                 .font(.system(.subheadline, weight: .medium))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
             if let failure { problem(failure) }
             List {
                 Section {
@@ -434,13 +450,13 @@ private struct DropboxStep: View {
                         Text("No folders here")
                             .font(.system(.subheadline))
                             .foregroundStyle(FirstRunStyle.muted)
-                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .frame(maxWidth: .infinity, minHeight: RowMetrics.chooser)
                     }
                     ForEach(folders, id: \.self) { folder in
                         Button { open(folder) } label: {
-                            HStack(spacing: 12) {
+                            HStack(spacing: Space.rowGap) {
                                 Image(systemName: "folder")
-                                    .font(.system(size: 17))
+                                    .font(.system(size: Glyph.row))
                                     .foregroundStyle(FirstRunStyle.cyan)
                                 Text(folder.split(separator: "/").last.map(String.init) ?? folder)
                                     .font(.system(.body))
@@ -448,7 +464,7 @@ private struct DropboxStep: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 Chevron(color: FirstRunStyle.muted)
                             }
-                            .frame(minHeight: 44)
+                            .frame(minHeight: RowMetrics.target)
                             .contentShape(.rect)
                         }
                     }
@@ -555,7 +571,7 @@ private struct FieldRow: ViewModifier {
                 .foregroundStyle(.white)
                 .tint(FirstRunStyle.cyan)
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: RowMetrics.target)
         .listRowBackground(ringed ? FirstRunStyle.warning.opacity(0.18) : FirstRunStyle.field)
         .accessibilityElement(children: .combine)
     }
@@ -577,24 +593,24 @@ private struct StartStep: View {
     }
 
     private var start: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             StepBar(step: 2) { model.leaveFolder(startOver: false) }
             FirstRunStyle.headline("Start syncing here")
-                .padding(.horizontal, 4)
-                .padding(.top, 24)
+                .padding(.horizontal, FirstRunStyle.textInset)
+                .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
             Text("This folder doesn't hold any Sval Workspaces yet. Sval on this \(UIDevice.current.model) can start syncing to this folder. Your other devices can then join this folder.")
                 .font(.system(.subheadline))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
             if let message = model.message {
                 WarningBox(title: message, detail: "")
             }
             Spacer()
             FirstRunStyle.primary("Start Syncing") { model.startSync() }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
     }
 }
 
@@ -605,25 +621,25 @@ private struct BackupStep: View {
     let backup: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             StepBar(step: 2, onBack: nil)
             FirstRunStyle.headline("Back up your sync key")
-                .padding(.horizontal, 4)
-                .padding(.top, 24)
+                .padding(.horizontal, FirstRunStyle.textInset)
+                .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
             Text("Keep it in your password manager. With this key, a new device can open your Workspaces in this folder, even if you lose this \(UIDevice.current.model).")
                 .font(.system(.subheadline))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
             Text(backup)
-                .font(SvalFont.mono(17, .medium, relativeTo: .body))
+                .font(SvalFont.code(.body, .medium))
                 .textSelection(.enabled)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(FirstRunStyle.well, in: .rect(cornerRadius: 16))
+                .background(FirstRunStyle.well, in: .rect(cornerRadius: Radius.well))
                 .accessibilityLabel("Backup key")
-            HStack(spacing: 10) {
+            HStack(spacing: Space.buttons) {
                 CopyButton(title: "Copy", text: backup, secret: true)
                 ShareLink(item: backup) { Label("Save…", systemImage: "square.and.arrow.up") }
             }
@@ -632,8 +648,8 @@ private struct BackupStep: View {
             Spacer()
             FirstRunStyle.primary("Continue") { Task { await model.finishStart() } }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
     }
 }
 
@@ -661,28 +677,28 @@ private struct CodeStep: View {
     }
 
     private var entry: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: FirstRunStyle.stack) {
             StepBar(step: 2) { model.leaveFolder(startOver: false) }
             FirstRunStyle.headline(backup ? "Enter the backup key" : "Enter the pairing code")
-                .padding(.horizontal, 4)
-                .padding(.top, 24)
+                .padding(.horizontal, FirstRunStyle.textInset)
+                .padding(.top, FirstRunStyle.top)
                 .accessibilityAddTraits(.isHeader)
             Text(backup
                  ? "Type the 52-character key you saved when you set up sync. Spaces and dashes don't matter."
                  : "On your computer, open Settings › Sync and devices › Sync with another device › This device shows a code.")
                 .font(.system(.subheadline))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
             if backup { keyField } else { codeField }
             if let failure, let message = failure.errorDescription {
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .top, spacing: Space.rowGap) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
+                        .font(FirstRunStyle.statusGlyph)
                         .foregroundStyle(FirstRunStyle.danger)
                     Text(message)
                         .font(.system(.subheadline))
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
                 .accessibilityElement(children: .combine)
             }
             Button(backup ? "Use a Pairing Code Instead" : "Use the Backup Key Instead") {
@@ -692,14 +708,14 @@ private struct CodeStep: View {
             }
             .font(.system(.subheadline, weight: .semibold))
             .foregroundStyle(FirstRunStyle.cyan)
-            .padding(.horizontal, 4)
-            .frame(minHeight: 44)
+            .padding(.horizontal, FirstRunStyle.textInset)
+            .frame(minHeight: RowMetrics.target)
             Spacer()
             FirstRunStyle.primary("Join", action: join)
                 .disabled(!ready)
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
         .onAppear { focused = true }
     }
 
@@ -711,8 +727,8 @@ private struct CodeStep: View {
     /// character it followed.
     private var codeField: some View {
         TextField("", text: $code, selection: $selection,
-                  prompt: Text("XXXX-XXXX-XXXX").foregroundStyle(FirstRunStyle.muted.opacity(0.5)))
-            .font(SvalFont.mono(22, .semibold, relativeTo: .title3))
+                  prompt: Text("XXXX-XXXX-XXXX").foregroundStyle(FirstRunStyle.prompt))
+            .font(SvalFont.code(.title2, .semibold))
             .multilineTextAlignment(.center)
             .keyboardType(.asciiCapable)
             .textInputAutocapitalization(.characters)
@@ -754,7 +770,7 @@ private struct CodeStep: View {
     private var keyField: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextField("", text: $code, axis: .vertical)
-                .font(SvalFont.mono(17, .medium, relativeTo: .body))
+                .font(SvalFont.code(.body, .medium))
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
                 .submitLabel(.join)
@@ -772,7 +788,7 @@ private struct CodeStep: View {
             Text("\(bare.count) of 52")
                 .font(.system(.footnote))
                 .foregroundStyle(FirstRunStyle.muted)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
         }
         .padding(.top, 8)
     }
@@ -832,27 +848,27 @@ private struct JoiningView: View {
             Button("Cancel", action: onCancel)
                 .font(.system(.body, weight: .semibold))
                 .foregroundStyle(FirstRunStyle.cyan)
-                .frame(minHeight: 44)
+                .frame(minHeight: RowMetrics.target)
         }
         .padding(.horizontal, 36)
-        .padding(.bottom, 20)
+        .padding(.bottom, FirstRunStyle.side)
     }
 
     private func line(_ text: String, done: Bool) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.rowGap) {
             if done {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x5EE08A))
-                    .frame(width: 20)
+                    .font(FirstRunStyle.statusGlyph.weight(.bold))
+                    .foregroundStyle(FirstRunStyle.done)
+                    .frame(width: Glyph.slot)
             } else {
-                ProgressView().tint(FirstRunStyle.cyan).frame(width: 20)
+                ProgressView().tint(FirstRunStyle.cyan).frame(width: Glyph.slot)
             }
             Text(text)
                 .font(.system(.body))
                 .foregroundStyle(done ? .white : FirstRunStyle.lead)
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: RowMetrics.target)
     }
 }
 
@@ -870,13 +886,13 @@ private struct ArrivalStep: View {
         let reading = model.lastSynced == nil
         VStack(alignment: .leading, spacing: 10) {
             FirstRunStyle.headline("You're in.", size: 40)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
                 .padding(.top, 60)
                 .accessibilityAddTraits(.isHeader)
             Text(reading ? "Reading your Workspaces from the folder…" : "Your Workspaces are arriving from the folder.")
                 .font(.system(.body))
                 .foregroundStyle(FirstRunStyle.lead)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, FirstRunStyle.textInset)
                 .padding(.bottom, 12)
             if workspaces.isEmpty {
                 ProgressView().tint(FirstRunStyle.cyan).frame(maxWidth: .infinity)
@@ -887,13 +903,13 @@ private struct ArrivalStep: View {
                             row(workspace)
                         }
                         if reading {
-                            HStack(spacing: 12) {
-                                ProgressView().tint(FirstRunStyle.cyan).frame(width: 36)
+                            HStack(spacing: Space.rowGap) {
+                                ProgressView().tint(FirstRunStyle.cyan).frame(width: Tile.heading)
                                 Text("Reading the folder…")
                                     .font(.system(.body))
                                     .foregroundStyle(FirstRunStyle.lead)
                             }
-                            .frame(minHeight: 50)
+                            .frame(minHeight: RowMetrics.chooser)
                         }
                     }
                     .listRowBackground(FirstRunStyle.field)
@@ -910,15 +926,15 @@ private struct ArrivalStep: View {
             }
             .disabled(model.ownWorkspace == nil)
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, FirstRunStyle.side)
+        .padding(.bottom, FirstRunStyle.side)
     }
 
     private func row(_ workspace: OutlineRow) -> some View {
         let count = model.tabs(in: workspace.id).count
-        return HStack(spacing: 12) {
-            WorkspaceTile(workspace: workspace, size: 36, radius: 10)
-            VStack(alignment: .leading, spacing: 1) {
+        return HStack(spacing: Space.rowGap) {
+            WorkspaceTile(workspace: workspace, size: Tile.heading)
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(WorkspaceTile.name(workspace))
                     .font(.system(.body, weight: .medium))
                     .lineLimit(1)
@@ -934,10 +950,10 @@ private struct ArrivalStep: View {
                 .monospacedDigit()
                 .foregroundStyle(FirstRunStyle.muted)
             Image(systemName: "checkmark")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color(hex: 0x5EE08A))
+                .font(FirstRunStyle.statusGlyph.weight(.bold))
+                .foregroundStyle(FirstRunStyle.done)
         }
-        .frame(minHeight: 50)
+        .frame(minHeight: RowMetrics.chooser)
         .accessibilityElement(children: .combine)
     }
 }
@@ -948,11 +964,11 @@ private struct WarningBox: View {
     let detail: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Space.rowGap) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 15))
+                .font(FirstRunStyle.statusGlyph)
                 .foregroundStyle(FirstRunStyle.warning)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Space.lines) {
                 Text(title).font(.system(.subheadline, weight: .semibold))
                 if !detail.isEmpty {
                     Text(detail)
@@ -964,7 +980,7 @@ private struct WarningBox: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .well(FirstRunStyle.warning.opacity(0.10), edge: FirstRunStyle.warning.opacity(0.30), radius: 14)
+        .well(FirstRunStyle.warning.opacity(0.10), edge: FirstRunStyle.warning.opacity(0.30), radius: Radius.well)
         .accessibilityElement(children: .combine)
     }
 }
@@ -975,6 +991,7 @@ private extension View {
     func codeField(failed: Bool) -> some View {
         padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .well(FirstRunStyle.well, edge: failed ? FirstRunStyle.danger : FirstRunStyle.cyan, radius: 16, lineWidth: 2)
+            .well(FirstRunStyle.well, edge: failed ? FirstRunStyle.danger : FirstRunStyle.cyan, radius: Radius.well,
+                  lineWidth: 2)
     }
 }

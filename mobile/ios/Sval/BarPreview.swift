@@ -19,23 +19,24 @@ struct BarPreview: View {
         Group {
             if verticalSize == .compact {
                 GlassEffectContainer(spacing: 3) {
-                    HStack(spacing: 6) {
-                        Color.clear.frame(width: 80, height: 44).glassCapsule(layer)
-                        Color.clear.frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44).glassCapsule(layer)
-                        Color.clear.frame(width: 44, height: 44).glassCapsule(layer)
-                        HStack(spacing: 6) {
+                    HStack(spacing: BarShape.gap) {
+                        Color.clear.frame(width: 80, height: RowMetrics.target).glassCapsule(layer)
+                        Color.clear.frame(maxWidth: .infinity, minHeight: RowMetrics.target, maxHeight: RowMetrics.target)
+                            .glassCapsule(layer)
+                        Color.clear.frame(width: RowMetrics.target, height: RowMetrics.target).glassCapsule(layer)
+                        HStack(spacing: BarShape.labelGap) {
                             mark(size: 22)
                             Text(WorkspaceTile.name(workspace))
                                 .font(.system(.body, weight: .semibold))
                                 .lineLimit(1)
                         }
                         .padding(.horizontal, 12)
-                        .frame(minHeight: 44)
+                        .frame(minHeight: RowMetrics.target)
                         .glassCapsule(layer)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 8)
+                .padding(.horizontal, BarShape.side)
+                .padding(.bottom, BarShape.sidewaysFoot)
             } else {
                 // Folded as the bar it stands beside is.
                 GlassFold(folded: model.browser.fold.folded) { at, folded, shape in
@@ -63,7 +64,7 @@ struct BarPreview: View {
                             .opacity(folded ? 1 : 0)
                     }
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, BarShape.foot)
             }
         }
         .foregroundStyle(colors.ink)

@@ -125,13 +125,13 @@ struct FavoritesView: View {
 
     private func favoriteRow(_ item: Favorite) -> some View {
         Button { open(item) } label: {
-            HStack(spacing: 10) {
-                SiteTile(url: item.url, name: item.name, size: 22)
+            HStack(spacing: Space.rowGap) {
+                SiteTile(url: item.url, name: item.name, size: Tile.row)
                 Text(Self.name(item))
                     .titleLines()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .rowHeight(48)
             .contentShape(.rect)
         }
@@ -139,7 +139,6 @@ struct FavoritesView: View {
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { delete(item) } label: { Label("Delete", systemImage: "trash") }
             Button { moving = item } label: { Label("Move to…", systemImage: "folder") }
-                .tint(theme.action)
         }
         .contextMenu {
             if item.url.map(AppModel.opensHere) ?? false {
@@ -159,11 +158,11 @@ struct FavoritesView: View {
 
     private func folderRow(_ item: Favorite) -> some View {
         NavigationLink(value: SheetPage.favorites(folder: item.id)) {
-            HStack(spacing: 10) {
+            HStack(spacing: Space.rowGap) {
                 Image(systemName: "folder")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: Glyph.row, weight: .medium))
                     .foregroundStyle(theme.body)
-                    .frame(width: 22)
+                    .frame(width: Tile.row)
                 Text(Self.name(item))
                     .font(.system(.body, weight: .semibold))
                     .titleLines()
@@ -173,7 +172,7 @@ struct FavoritesView: View {
                     .monospacedDigit()
                     .foregroundStyle(theme.muted)
             }
-            .padding(.leading, 12)
+            .padding(.leading, Space.rowInset)
             .rowHeight(48)
         }
         .contextMenu {
@@ -194,14 +193,13 @@ struct FavoritesView: View {
     private func separatorRow(_ item: Favorite) -> some View {
         theme.divider
             .frame(height: 1)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Space.rowInset)
             .frame(maxWidth: .infinity, minHeight: 17)
             .contentShape(.rect)
             .accessibilityLabel("Separator")
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 Button(role: .destructive) { delete(item) } label: { Label("Delete", systemImage: "trash") }
                 Button { moving = item } label: { Label("Move to…", systemImage: "folder") }
-                    .tint(theme.action)
             }
             .contextMenu {
                 Button("Move to…", systemImage: "folder") { moving = item }
@@ -343,7 +341,7 @@ struct FavoriteEditor: View {
             Form {
                 Section {
                     TextField(isAddress ? "Address" : "Name", text: $text, axis: isAddress ? .vertical : .horizontal)
-                        .font(isAddress ? SvalFont.mono(16, relativeTo: .callout) : .body)
+                        .font(isAddress ? SvalFont.code(.callout) : .body)
                         .keyboardType(isAddress ? .URL : .default)
                         .textInputAutocapitalization(isAddress ? .never : .sentences)
                         .autocorrectionDisabled(isAddress)

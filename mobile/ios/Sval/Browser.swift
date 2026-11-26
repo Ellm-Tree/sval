@@ -308,10 +308,9 @@ final class Browser {
     }
 
     /// The room the open bar covers at the page's foot: upright, the 48pt
-    /// capsules 24pt above the screen's edge; sideways, 44pt capsules 8pt
-    /// above it.
-    static let barRoom = 48.0 + 24.0
-    static let sidewaysBarRoom = 44.0 + 8.0
+    /// capsules above their foot; sideways, the 44pt capsules above theirs.
+    static let barRoom: Double = BarShape.standard.address + BarShape.foot
+    static let sidewaysBarRoom: Double = RowMetrics.target + BarShape.sidewaysFoot
     /// The gap between the bar's top and a strip, card or indicator shown
     /// over the page just above it.
     static let overBarGap = 8.0
