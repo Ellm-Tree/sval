@@ -494,43 +494,106 @@ final class ListBox: UICollectionReusableView {
         layers.contains { $0.tint.flatMap(WorkspaceTint.init(rawValue:)) != nil }
     }
 
-    private var layers: [(tint: WorkspaceTint?, top: Bool, bottom: Bool, dimmed: Bool)] = []
+    /// One group around a section, as its kind spells it.
+    struct Layer: Equatable {
+        var tint: WorkspaceTint?
+        var top: Bool
+        var bottom: Bool
+        var dimmed = false
+    }
+
+    /// A coloured group's block in a box `size` big: its frame, and the
+    /// corners rounded where the group starts or ends.
+    struct Block: Equatable {
+        var tint: WorkspaceTint
+        var dimmed: Bool
+        var frame: CGRect
+        var corners: CACornerMask
+    }
+
+    /// The blocks of `layers` in a box `size` big, outermost first, so each
+    /// nested block sits over its parent's.
+    static func blocks(_ layers: [Layer], size: CGSize) -> [Block] {
+        var blocks: [Block] = []
+        for (level, layer) in layers.enumerated() {
+            guard let tint = layer.tint else { continue }
+            let nested = blocks.count
+            let top = nested > 0 && layer.top ? WorkspaceSheet.cardGap : 0
+            let bottom = nested > 0 && layer.bottom ? WorkspaceSheet.cardGap : 0
+            let leading = ListMetrics.inset + CGFloat(level) * ListMetrics.indent
+            let trailing = ListMetrics.inset + CGFloat(nested) * ListMetrics.nestTrailing
+            let frame = CGRect(x: leading, y: top, width: size.width - leading - trailing,
+                               height: size.height - top - bottom)
+            blocks.append(Block(tint: tint, dimmed: layer.dimmed, frame: frame, corners: .rounding(top: layer.top, bottom: layer.bottom)))
+        }
+        return blocks
+    }
+
+    static func layers(ofKind kind: String?) -> [Layer] {
+        let spec = kind?.split(separator: "|").dropFirst().first ?? ""
+        return spec.split(separator: ",").map { part in
+            let bits = part.split(separator: ":")
+            return Layer(tint: WorkspaceTint(rawValue: String(bits[0])), top: bits[1] == "1", bottom: bits[2] == "1",
+                         dimmed: bits[3] == "1")
+        }
+    }
+
+    private var layers: [Layer] = []
+    /// One plain view per block, its background filled and rounded by Core
+    /// Animation. A box drawn in `draw(_:)` is drawn into a bitmap of its
+    /// whole section at the screen's scale (`CALayer.contentsScale`).
+    private var pieces: [UIView] = []
 
     override func apply(_ attributes: UICollectionViewLayoutAttributes) {
         super.apply(attributes)
         backgroundColor = .clear
         isUserInteractionEnabled = false
-        contentMode = .redraw
-        let spec = attributes.representedElementKind?.split(separator: "|").dropFirst().first ?? ""
-        layers = spec.split(separator: ",").map { part in
-            let bits = part.split(separator: ":")
-            return (WorkspaceTint(rawValue: String(bits[0])), bits[1] == "1", bits[2] == "1", bits[3] == "1")
+        layers = Self.layers(ofKind: attributes.representedElementKind)
+        let blocks = Self.blocks(layers, size: attributes.size)
+        while pieces.count < blocks.count {
+            let piece = UIView()
+            piece.isUserInteractionEnabled = false
+            piece.layer.cornerRadius = WorkspaceSheet.cardCorner
+            // `UIBezierPath(roundedRect:byRoundingCorners:cornerRadii:)`,
+            // which drew the blocks, starts its corners at the continuous
+            // curve's expansion factor.
+            piece.layer.cornerCurve = .continuous
+            addSubview(piece)
+            pieces.append(piece)
         }
-        setNeedsDisplay()
+        while pieces.count > blocks.count { pieces.removeLast().removeFromSuperview() }
+        if let theme = Self.theme {
+            for (piece, block) in zip(pieces, blocks) {
+                piece.backgroundColor = UIColor(GroupBlock.color(block.tint, dark: theme.dark, surface: theme.sheetLightness,
+                                                                 blockDir: theme.blockDir))
+                    .withAlphaComponent(block.dimmed ? ListMetrics.dimmed : 1)
+                piece.layer.maskedCorners = block.corners
+            }
+        }
+        // Placed here, inside the collection view's animation of the box's
+        // frame, the blocks move with the box.
+        place(blocks)
     }
 
-    override func draw(_ rect: CGRect) {
-        guard let theme = Self.theme else { return }
-        let corner = WorkspaceSheet.cardCorner
-        var nested = 0
-        for (level, layer) in layers.enumerated() {
-            guard let tint = layer.tint else { continue }
-            defer { nested += 1 }
-            let top = nested > 0 && layer.top ? WorkspaceSheet.cardGap : 0
-            let bottom = nested > 0 && layer.bottom ? WorkspaceSheet.cardGap : 0
-            let leading = ListMetrics.inset + CGFloat(level) * ListMetrics.indent
-            let trailing = ListMetrics.inset + CGFloat(nested) * ListMetrics.nestTrailing
-            let frame = CGRect(x: leading, y: top, width: bounds.width - leading - trailing,
-                               height: bounds.height - top - bottom)
-            var corners: UIRectCorner = []
-            if layer.top { corners.formUnion([.topLeft, .topRight]) }
-            if layer.bottom { corners.formUnion([.bottomLeft, .bottomRight]) }
-            let path = UIBezierPath(roundedRect: frame, byRoundingCorners: corners,
-                                    cornerRadii: CGSize(width: corner, height: corner))
-            UIColor(GroupBlock.color(tint, dark: theme.dark, surface: theme.sheetLightness, blockDir: theme.blockDir))
-                .withAlphaComponent(layer.dimmed ? ListMetrics.dimmed : 1)
-                .setFill()
-            path.fill()
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        place(Self.blocks(layers, size: bounds.size))
+    }
+
+    private func place(_ blocks: [Block]) {
+        for (piece, block) in zip(pieces, blocks) where piece.frame != block.frame {
+            piece.frame = block.frame
         }
+    }
+}
+
+extension CACornerMask {
+    /// The top two corners where `top`, and the bottom two where `bottom`,
+    /// in a view's coordinates, whose y grows downward.
+    static func rounding(top: Bool, bottom: Bool) -> CACornerMask {
+        var corners: CACornerMask = []
+        if top { corners.formUnion([.layerMinXMinYCorner, .layerMaxXMinYCorner]) }
+        if bottom { corners.formUnion([.layerMinXMaxYCorner, .layerMaxXMaxYCorner]) }
+        return corners
     }
 }
