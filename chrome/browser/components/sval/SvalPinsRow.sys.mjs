@@ -1364,8 +1364,10 @@ export class SvalPinsRow {
       className: "sval-pins-popover-grid",
     });
     const selected = this.#pages.selectedGuid;
-    for (const item of level.items) {
+    const entries = [];
+    for (const [index, item] of level.items.entries()) {
       const cell = htmlElement(doc, "div", { className: "sval-pin-slot" });
+      entries.push({ el: cell, item, index });
       const tile = htmlElement(doc, "button", { className: "sval-pin" });
       tile.type = "button";
       tile.dataset.guid = item.guid;
@@ -1377,6 +1379,7 @@ export class SvalPinsRow {
         event.dataTransfer.setData(PIN_DRAG_TYPE, item.guid);
         event.dataTransfer.effectAllowed = "move";
         this.#drag = { pin: item.guid, kind: item.kind };
+        cell.setAttribute("data-dragging", "true");
       });
       tile.addEventListener("dragend", () => this.dragEnded());
       if (item.kind === "folder") {
@@ -1425,8 +1428,93 @@ export class SvalPinsRow {
         tiles[Math.max(0, Math.min(tiles.length - 1, at + step))]?.focus();
       }
     });
-    box.append(head, grid);
+    const line = htmlElement(doc, "div", { className: "sval-pins-drop-line" });
+    line.hidden = true;
+    box.append(head, grid, line);
     panel.append(box);
+    // A pin dragged within the grid moves among the popover's pins as it
+    // moves along the row (pins-root spec §5).
+    const place = event =>
+      dropPlaceAmong(entries, level.items.length, event, {
+        pin: this.#drag?.pin ?? null,
+        kind: this.#drag?.kind ?? null,
+        tab: false,
+      });
+    const clear = () => showDropMarker(grid, line, box, null);
+    grid.addEventListener("dragover", event => {
+      if (
+        !event.dataTransfer?.types?.includes(PIN_DRAG_TYPE) ||
+        !this.#drag?.pin
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      showDropMarker(grid, line, box, place(event));
+    });
+    // A drag crossing from one tile to the next fires `dragleave` too, so
+    // the marker goes only once the pointer is outside the box.
+    box.addEventListener("dragleave", event => {
+      const rect = box.getBoundingClientRect();
+      if (
+        event.clientX < rect.left ||
+        event.clientX >= rect.right ||
+        event.clientY < rect.top ||
+        event.clientY >= rect.bottom
+      ) {
+        clear();
+      }
+    });
+    grid.addEventListener("drop", async event => {
+      const guid = event.dataTransfer?.types?.includes(PIN_DRAG_TYPE)
+        ? this.#drag?.pin
+        : null;
+      if (!guid) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const at = place(event);
+      clear();
+      this.#drag = null;
+      try {
+        await this.#dropPin(guid, at, {
+          parentGuid: level.folder?.guid ?? lazy.PINS_ROOT,
+          ...neighboursAt(level.items, at.index, guid),
+        });
+      } catch (err) {
+        SvalLog.warn(`pins: a drop was not moved: ${SvalLog.errorName(err)}`);
+      }
+      await this.refresh();
+      this.#redrawPopover(panel, state);
+    });
+  }
+
+  /**
+   * Draws the popover `state` again from the row's last read, after a drop
+   * in it moved its pins. It closes when a pin folder it shows is gone.
+   *
+   * @param {Element} panel
+   * @param {object} state
+   */
+  #redrawPopover(panel, state) {
+    if (this.#popover !== state || panel.state !== "open") {
+      return;
+    }
+    for (const level of state.stack) {
+      if (!level.folder) {
+        level.items = this.#drawn.hidden;
+        continue;
+      }
+      const folder = folderIn(this.#slots, level.folder.guid);
+      if (!folder) {
+        this.#closePopover();
+        return;
+      }
+      level.folder = folder;
+      level.items = pinsAndFolders(folder);
+    }
+    this.#drawPopover(panel);
   }
 
   // ------------------------------------------------------------------ menu
@@ -1857,9 +1945,15 @@ export class SvalPinsRow {
    * redraw can take that row out of the panel before its `dragend`.
    */
   dragEnded() {
-    for (const el of this.#linesEl.querySelectorAll("[data-dragging]")) {
+    const popover = this.#window.document.getElementById(POPOVER_ID);
+    for (const el of [
+      ...this.#linesEl.querySelectorAll("[data-dragging]"),
+      ...(popover?.querySelectorAll("[data-dragging], [data-drop-into]") ?? []),
+    ]) {
       el.removeAttribute("data-dragging");
+      el.removeAttribute("data-drop-into");
     }
+    popover?.querySelector(".sval-pins-drop-line")?.setAttribute("hidden", "");
     this.#drag = null;
     this.#dropLine.hidden = true;
     this.#block.removeAttribute("data-drop-over");
@@ -1876,57 +1970,19 @@ export class SvalPinsRow {
    *   Element|null}}
    */
   #dropPlace(event) {
-    const slotEls = [...this.#linesEl.querySelectorAll(".sval-pin-slot")];
-    let best = {
-      index: this.#slots.length,
-      folder: null,
-      onto: null,
-      el: null,
-      before: true,
-    };
-    const pin = this.#drag?.pin ?? null;
-    // A pin folder dragged only moves along the row.
-    const pinDrag = !!pin && this.#drag.kind !== "folder";
-    let bestDistance = Infinity;
-    for (const el of slotEls) {
+    const entries = [];
+    for (const el of this.#linesEl.querySelectorAll(".sval-pin-slot")) {
       const tile = el.querySelector(".sval-pin");
-      const slot = this.#slotByKey(tile?.dataset.key ?? "");
-      if (!slot) {
-        continue;
-      }
-      const rect = el.getBoundingClientRect();
-      if (event.clientY < rect.top || event.clientY > rect.bottom) {
-        continue;
-      }
-      const index = this.#slots.indexOf(slot);
-      const third = rect.width / 3;
-      const middle =
-        event.clientX > rect.left + third && event.clientX < rect.right - third;
-      if (middle && slot.guid !== pin) {
-        if (slot.kind === "folder" && (pinDrag || this.#draggedTab())) {
-          return { index, folder: slot, onto: null, el, before: true };
-        }
-        if (slot.kind !== "folder" && pinDrag) {
-          return { index, folder: null, onto: slot, el, before: true };
-        }
-      }
-      const mid = rect.left + rect.width / 2;
-      const before = event.clientX < mid;
-      const distance = Math.abs(
-        event.clientX - (before ? rect.left : rect.right)
-      );
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = {
-          index: before ? index : index + 1,
-          folder: null,
-          onto: null,
-          el,
-          before,
-        };
+      const item = this.#slotByKey(tile?.dataset.key ?? "");
+      if (item) {
+        entries.push({ el, item, index: this.#slots.indexOf(item) });
       }
     }
-    return best;
+    return dropPlaceAmong(entries, this.#slots.length, event, {
+      pin: this.#drag?.pin ?? null,
+      kind: this.#drag?.kind ?? null,
+      tab: !!this.#draggedTab(),
+    });
   }
 
   #onDragOver(event) {
@@ -1940,26 +1996,12 @@ export class SvalPinsRow {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     this.#block.setAttribute("data-drop-over", "true");
-    const place = this.#dropPlace(event);
-    for (const el of this.#linesEl.querySelectorAll("[data-drop-into]")) {
-      el.removeAttribute("data-drop-into");
-    }
-    if (place.folder || place.onto) {
-      place.el.setAttribute("data-drop-into", "true");
-      this.#dropLine.hidden = true;
-      return;
-    }
-    if (!place.el) {
-      this.#dropLine.hidden = true;
-      return;
-    }
-    const rect = place.el.getBoundingClientRect();
-    const host = this.#block.getBoundingClientRect();
-    const x = (place.before ? rect.left - 2 : rect.right + 2) - host.left - 1;
-    this.#dropLine.style.insetInlineStart = `${x}px`;
-    this.#dropLine.style.top = `${rect.top - host.top}px`;
-    this.#dropLine.style.height = `${rect.height}px`;
-    this.#dropLine.hidden = false;
+    showDropMarker(
+      this.#linesEl,
+      this.#dropLine,
+      this.#block,
+      this.#dropPlace(event)
+    );
   }
 
   async #onDrop(event) {
@@ -1976,16 +2018,7 @@ export class SvalPinsRow {
     event.stopPropagation();
     this.#dropLine.hidden = true;
     const slots = this.#slots;
-    const neighbours = (index, except) => {
-      const others = slots.filter(slot => slot.guid !== except);
-      const at = slots
-        .slice(0, index)
-        .filter(slot => slot.guid !== except).length;
-      return {
-        afterGuid: others[at - 1]?.guid ?? null,
-        beforeGuid: others[at]?.guid ?? null,
-      };
-    };
+    const neighbours = (index, except) => neighboursAt(slots, index, except);
     for (const el of this.#linesEl.querySelectorAll("[data-drop-into]")) {
       el.removeAttribute("data-drop-into");
     }
@@ -2013,13 +2046,15 @@ export class SvalPinsRow {
    * Drops the pin `guid`, from the row or a pin folder's popover, where
    * `place` says (pins-root spec §5): into a pin folder, onto a pin to make a
    * pin folder of the two once the Create Pin Folder dialog names it, or
-   * into the row between `where`'s pins. Cancelling the dialog leaves both
-   * pins as they were. A pin moved along the row is not taken back by Undo;
-   * one taken out of a pin folder is.
+   * into the row or the pin folder `where.parentGuid` between `where`'s
+   * pins. Cancelling the dialog leaves both pins as they were. A pin moved
+   * within the row or its pin folder is not taken back by Undo; one taken
+   * out of a pin folder is.
    *
    * @param {string} guid
-   * @param {object} place As {@link #dropPlace} answers it.
-   * @param {{afterGuid: string|null, beforeGuid: string|null}} where
+   * @param {object} place As {@link dropPlaceAmong} answers it.
+   * @param {{parentGuid?: string, afterGuid: string|null, beforeGuid:
+   *   string|null}} where
    */
   async #dropPin(guid, place, where) {
     const store = lazy.SvalFavoritesStore.readyInstance;
@@ -2047,7 +2082,8 @@ export class SvalPinsRow {
       return;
     }
     await store.movePin(guid, where, {
-      undoable: store.get(guid)?.parentGuid !== lazy.PINS_ROOT,
+      undoable:
+        store.get(guid)?.parentGuid !== (where.parentGuid ?? lazy.PINS_ROOT),
     });
   }
 
@@ -2154,4 +2190,142 @@ function pinsAndFolders(folder) {
   return (folder.children ?? []).filter(
     child => child.kind === "folder" || !!child.url
   );
+}
+
+/**
+ * The pin folder `guid` among `slots` and the pin folders they hold.
+ *
+ * @param {object[]} slots
+ * @param {string} guid
+ * @returns {object|null}
+ */
+function folderIn(slots, guid) {
+  for (const slot of slots) {
+    if (slot.kind !== "folder") {
+      continue;
+    }
+    if (slot.guid === guid) {
+      return slot;
+    }
+    const inner = folderIn(slot.children ?? [], guid);
+    if (inner) {
+      return inner;
+    }
+  }
+  return null;
+}
+
+/**
+ * Where a drop at the pointer lands among the pin tiles `entries`, in the
+ * row or a popover's grid (pins-root spec §5): into a pin folder tile's
+ * middle, onto a pin's middle to make a pin folder of the two, or before the
+ * index the gap nearest the pointer opens on, in the pointer's line.
+ *
+ * @param {{el: Element, item: object, index: number}[]} entries
+ * @param {number} end The index past the last item.
+ * @param {DragEvent} event
+ * @param {{pin: string|null, kind: string|null, tab: boolean}} drag The
+ *   pin dragged and its kind, and whether a pinnable tab is dragged.
+ * @returns {{index: number, folder: object|null, onto: object|null, el:
+ *   Element|null, before: boolean}}
+ */
+function dropPlaceAmong(entries, end, event, { pin, kind, tab }) {
+  let best = { index: end, folder: null, onto: null, el: null, before: true };
+  // A pin folder dragged only moves among its siblings.
+  const pinDrag = !!pin && kind !== "folder";
+  let bestDistance = Infinity;
+  for (const { el, item, index } of entries) {
+    const rect = el.getBoundingClientRect();
+    if (event.clientY < rect.top || event.clientY > rect.bottom) {
+      continue;
+    }
+    const third = rect.width / 3;
+    const middle =
+      event.clientX > rect.left + third && event.clientX < rect.right - third;
+    if (middle && item.guid !== pin) {
+      if (item.kind === "folder" && (pinDrag || tab)) {
+        return { index, folder: item, onto: null, el, before: true };
+      }
+      if (item.kind !== "folder" && pinDrag) {
+        return { index, folder: null, onto: item, el, before: true };
+      }
+    }
+    const before = event.clientX < rect.left + rect.width / 2;
+    const distance = Math.abs(
+      event.clientX - (before ? rect.left : rect.right)
+    );
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = {
+        index: before ? index : index + 1,
+        folder: null,
+        onto: null,
+        el,
+        before,
+      };
+    }
+  }
+  return best;
+}
+
+/**
+ * Marks where the drop `at` lands among the tiles in `container`: the tile
+ * it drops into, or the gap `line` stands in, placed against `host`. Each
+ * `dragover` repeats the same place while the pointer rests, so only a
+ * change is written, and the marker is never redrawn in between.
+ *
+ * @param {Element} container
+ * @param {Element} line
+ * @param {Element} host The line's containing block.
+ * @param {object|null} at As {@link dropPlaceAmong} answers it, or null to
+ *   clear the marker.
+ */
+function showDropMarker(container, line, host, at) {
+  const into = at?.folder || at?.onto ? at.el : null;
+  for (const el of container.querySelectorAll("[data-drop-into]")) {
+    if (el !== into) {
+      el.removeAttribute("data-drop-into");
+    }
+  }
+  if (into) {
+    if (!into.hasAttribute("data-drop-into")) {
+      into.setAttribute("data-drop-into", "true");
+    }
+    line.hidden = true;
+    return;
+  }
+  if (!at?.el) {
+    line.hidden = true;
+    return;
+  }
+  const rect = at.el.getBoundingClientRect();
+  const box = host.getBoundingClientRect();
+  const x = (at.before ? rect.left - 2 : rect.right + 2) - box.left - 1;
+  const set = (prop, value) => {
+    if (line.style[prop] !== value) {
+      line.style[prop] = value;
+    }
+  };
+  set("insetInlineStart", `${x}px`);
+  set("top", `${rect.top - box.top}px`);
+  set("height", `${rect.height}px`);
+  line.hidden = false;
+}
+
+/**
+ * The pins either side of a drop before `index` among `items`, with the
+ * dragged pin `except` left out.
+ *
+ * @param {object[]} items
+ * @param {number} index
+ * @param {string|null} except
+ * @returns {{afterGuid: string|null, beforeGuid: string|null}}
+ */
+function neighboursAt(items, index, except) {
+  const others = items.filter(item => item.guid !== except);
+  const at = items.slice(0, index).filter(item => item.guid !== except).length;
+  return {
+    afterGuid: others[at - 1]?.guid ?? null,
+    beforeGuid: others[at]?.guid ?? null,
+  };
 }

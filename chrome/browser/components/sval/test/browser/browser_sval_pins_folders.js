@@ -516,3 +516,52 @@ add_task(async function a_pin_dragged_out_of_the_popover_reaches_the_row() {
   );
   Assert.ok(!store.get(folder), "the pin folder left with one pin goes");
 });
+
+/**
+ * A pin dragged within a pin folder's popover moves among its pins as a pin
+ * moves along the row: the line marks the gap, the pin lands in it, and the
+ * popover stays open on the new order.
+ */
+add_task(async function a_pin_dragged_within_its_popover_moves_there() {
+  const { store } = pinsFixture;
+  const { folder, a, b, panel } = await openPinFolderBesideF();
+  const tile = guid => panel.querySelector(`button[data-guid="${guid}"]`);
+  const dataTransfer = new DataTransfer();
+  const send = (type, element, at) => {
+    const rect = element.getBoundingClientRect();
+    element.dispatchEvent(
+      new DragEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + rect.width * at,
+        clientY: rect.top + rect.height / 2,
+        dataTransfer,
+      })
+    );
+  };
+  const source = tile(b);
+  send("dragstart", source, 0.5);
+  send("dragover", tile(a), 0.1);
+  Assert.ok(
+    !panel.querySelector(".sval-pins-drop-line").hidden,
+    "the line marks the gap before A"
+  );
+  send("drop", tile(a), 0.1);
+  send("dragend", source, 0.5);
+  await TestUtils.waitForCondition(
+    () =>
+      store
+        .children(folder)
+        .map(row => row.guid)
+        .join() === [b, a].join(),
+    "B moves before A in the pin folder"
+  );
+  await TestUtils.waitForCondition(
+    () =>
+      [...panel.querySelectorAll("button[data-guid]")]
+        .map(el => el.dataset.guid)
+        .join() === [b, a].join(),
+    "the popover shows the new order"
+  );
+  Assert.equal(panel.state, "open", "the popover stays open");
+});

@@ -4,6 +4,7 @@ description: Keep a site you use all day as an icon at the top of the Workspace 
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
 
 A pin keeps a site as an icon in the row at the top of the Workspace
 panel. The pin's page stays where you left it while you work in other
@@ -53,6 +54,13 @@ folder.
 - To make an empty pin folder, right-click the pins row next to the pins,
   then choose **New Pin Folder…**. The pin folder goes at the end of the
   row.
+
+<Since v="0.1.0-rc.11">
+
+- To change the order of the pins in a pin folder, select the pin folder's
+  tile, then drag a pin to a new spot.
+
+</Since>
 
 When you move a pin out of a pin folder and one pin or none is left, Sval
 removes the pin folder. If one pin is left, that pin takes the pin folder's
