@@ -858,7 +858,7 @@ pub(crate) fn apply_op(
             Ok(Applied::added(id))
         }
         Op::MovePinsToRoot => {
-            let moved = crate::pins::move_pins_to_root(doc, by, now);
+            let moved = crate::pins::move_pins_to_root(doc, by);
             Ok(Applied::changed(moved))
         }
         Op::SetPinScope { id, scope } => {

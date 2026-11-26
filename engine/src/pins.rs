@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::store::DeviceId;
 use crate::tree::{children, move_node};
-use crate::types::{Document, FAVORITE_NAMESPACE, NodeId, PINS_GUID, Timestamp, favorite_id};
+use crate::types::{Document, FAVORITE_NAMESPACE, Node, NodeId, PINS_GUID, Timestamp, favorite_id};
 
 /// The guid of the pins row's copy of the favorite or folder whose guid is
 /// `guid`: twelve URL-safe base64 characters of a UUIDv5 of it, so every
@@ -44,9 +44,17 @@ pub fn pin_copy_guid(guid: &str) -> String {
 /// takes the scope the marked node held, since a pin inside a folder has
 /// none of its own (pins spec §7).
 ///
+/// Each write is stamped one past the newest stamp of the node it rewrites,
+/// never with the clock (an exception to the engine's rule 10). A device
+/// can run the pass long after a peer did, on a copy older than the peer's.
+/// A clock stamp would let that device's rewrite of the old state beat
+/// every edit the peer made to its row since, and would make a copy the
+/// peer deleted news again. Stamps read from the document also keep two
+/// devices' passes alike.
+///
 /// Returns whether anything changed. A no-op with no node marked, or with
 /// no pins root to move into.
-pub fn move_pins_to_root(doc: &mut Document, by: DeviceId, now: Timestamp) -> bool {
+pub fn move_pins_to_root(doc: &mut Document, by: DeviceId) -> bool {
     let root = favorite_id(PINS_GUID);
     if doc.node(root).is_none() {
         return false;
@@ -73,24 +81,43 @@ pub fn move_pins_to_root(doc: &mut Document, by: DeviceId, now: Timestamp) -> bo
     for (_, id) in &marked {
         let last = children(doc, root).last().copied();
         if inside.contains(id) {
-            copy_into(doc, *id, root, last, by, now);
-        } else {
+            copy_into(doc, *id, root, last, by);
+        } else if let Some(at) = doc.node(*id).map(after_newest) {
             // A refused move leaves the node where it is, still a favorite.
-            let _ = move_node(doc, *id, root, last, None, by, now);
+            let _ = move_node(doc, *id, root, last, None, by, at);
         }
     }
     for id in &set {
+        let Some(at) = doc.node(*id).map(after_newest) else {
+            continue;
+        };
         if let Some(node) = doc.node_mut(*id) {
             node.lifecycle.pinned = false;
             node.lifecycle.home_order = None;
             if inside.contains(id) {
                 node.lifecycle.pin_scope = None;
             }
-            node.lifecycle_at = now;
+            node.lifecycle_at = at;
             node.lifecycle_by = Some(by);
         }
     }
     true
+}
+
+/// One past the newest of `node`'s fact stamps, the stamp the pass writes
+/// over that node with.
+fn after_newest(node: &Node) -> Timestamp {
+    [
+        node.content_at,
+        node.placement_at,
+        node.lifecycle_at,
+        node.appearance_at,
+        node.touched_at,
+    ]
+    .into_iter()
+    .max()
+    .unwrap_or_default()
+        + 1
 }
 
 /// Whether a strict ancestor of `id` is in `marked`. The walk stops at a
@@ -109,18 +136,12 @@ fn has_marked_ancestor(doc: &Document, id: NodeId, marked: &BTreeSet<NodeId>) ->
 
 /// Copies `id` and everything in it under `parent`, after `before`, each
 /// copy at the [`pin_copy_guid`] of what it copies, with its content and
-/// the scope of the node it copies.
-fn copy_into(
-    doc: &mut Document,
-    id: NodeId,
-    parent: NodeId,
-    before: Option<NodeId>,
-    by: DeviceId,
-    now: Timestamp,
-) {
+/// the scope of the node it copies, stamped [`after_newest`] that node.
+fn copy_into(doc: &mut Document, id: NodeId, parent: NodeId, before: Option<NodeId>, by: DeviceId) {
     let Some(node) = doc.node(id) else {
         return;
     };
+    let now = after_newest(node);
     let Some(guid) = node.content.guid.clone() else {
         return;
     };
@@ -148,7 +169,7 @@ fn copy_into(
     }
     let mut last = None;
     for child in children(doc, id) {
-        copy_into(doc, child, copy, last, by, now);
+        copy_into(doc, child, copy, last, by);
         last = children(doc, copy).last().copied();
     }
 }
@@ -156,6 +177,30 @@ fn copy_into(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::NodeKind;
+    use crate::types::test_support::dev_a;
+
+    /// The pass's stamp is past every fact of the node it rewrites, so it
+    /// never meets that node's own state in a tie.
+    #[test]
+    fn the_pass_stamps_past_the_nodes_newest_fact() {
+        let mut doc = Document::new();
+        let id = doc.add_favorite(
+            NodeKind::Folder,
+            PINS_GUID,
+            None,
+            None,
+            None,
+            "",
+            None,
+            dev_a(),
+            5,
+        );
+        let node = doc.node_mut(id).unwrap();
+        node.placement_at = 40;
+        node.lifecycle_at = 30;
+        assert_eq!(after_newest(doc.node(id).unwrap()), 41);
+    }
 
     /// The copy's guid is a fixed function of the guid it copies, so every
     /// device mints the same one, and it is a guid a host accepts.

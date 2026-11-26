@@ -813,7 +813,7 @@ fn the_pass_moves_each_kind_of_pin_into_the_pins_root_in_row_order() {
     let mut doc = with_roots(dev_a());
     marked_profile(&mut doc, dev_a());
 
-    assert!(crate::pins::move_pins_to_root(&mut doc, dev_a(), 20));
+    assert!(crate::pins::move_pins_to_root(&mut doc, dev_a()));
 
     assert_moved(&doc);
 }
@@ -822,10 +822,10 @@ fn the_pass_moves_each_kind_of_pin_into_the_pins_root_in_row_order() {
 fn a_second_pass_changes_nothing() {
     let mut doc = with_roots(dev_a());
     marked_profile(&mut doc, dev_a());
-    crate::pins::move_pins_to_root(&mut doc, dev_a(), 20);
+    crate::pins::move_pins_to_root(&mut doc, dev_a());
     let once = doc.to_json().unwrap();
 
-    assert!(!crate::pins::move_pins_to_root(&mut doc, dev_a(), 30));
+    assert!(!crate::pins::move_pins_to_root(&mut doc, dev_a()));
 
     assert_eq!(doc.to_json().unwrap(), once);
 }
@@ -855,7 +855,7 @@ fn without_a_pins_root_the_pass_changes_nothing() {
     mark_pinned(&mut doc, a, &row_keys()[0], dev_a(), 11);
     let before = doc.to_json().unwrap();
 
-    assert!(!crate::pins::move_pins_to_root(&mut doc, dev_a(), 20));
+    assert!(!crate::pins::move_pins_to_root(&mut doc, dev_a()));
 
     assert_eq!(doc.to_json().unwrap(), before);
 }
@@ -871,11 +871,96 @@ fn two_devices_running_the_pass_at_once_merge_to_one_row() {
     b.seen.insert(dev_a(), 12);
     a.seen.insert(dev_b(), 13);
 
-    crate::pins::move_pins_to_root(&mut a, dev_a(), 100);
+    crate::pins::move_pins_to_root(&mut a, dev_a());
     a.stamp_write(dev_a(), 101);
-    crate::pins::move_pins_to_root(&mut b, dev_b(), 110);
+    crate::pins::move_pins_to_root(&mut b, dev_b());
     b.stamp_write(dev_b(), 111);
 
     let doc = read_both_ways(&a, &b);
     assert_moved(&doc);
+}
+
+/// A device that moves its pins later than a peer did, from a copy of the
+/// document older than the peer's, keeps the edits the peer made to its
+/// row after its own pass: the pass rewrites state a peer may have changed
+/// since, so its writes must lose to them.
+#[test]
+fn a_late_pass_on_a_stale_device_keeps_a_peers_later_pin_edits() {
+    let (mut a, b) = two_peers(5);
+    marked_profile(&mut a, dev_a());
+    a.stamp_write(dev_a(), 12);
+    let mut b = read_both_ways(&b, &a);
+    b.stamp_write(dev_b(), 13);
+    b.seen.insert(dev_a(), 12);
+    a.seen.insert(dev_b(), 13);
+
+    crate::pins::move_pins_to_root(&mut a, dev_a());
+    let pin_a = favorite_id("pinAAAAAAAAA");
+    let pin_b = favorite_id("pinBBBBBBBBB");
+    let copy = favorite_id(&crate::pins::pin_copy_guid("pinXXXXXXXXX"));
+    a.set_pin_scope(pin_a, scope(&["home"]), dev_a(), 200);
+    a.set_pin_scope(copy, scope(&["work"]), dev_a(), 205);
+    crate::tree::move_node(
+        &mut a,
+        pin_b,
+        favorite_id(TOOLBAR),
+        None,
+        None,
+        dev_a(),
+        210,
+    )
+    .unwrap();
+    a.stamp_write(dev_a(), 300);
+
+    // B never saw A's pass, and runs its own once it updates, later.
+    crate::pins::move_pins_to_root(&mut b, dev_b());
+    b.stamp_write(dev_b(), 401);
+
+    let doc = read_both_ways(&a, &b);
+    assert_eq!(
+        doc.node(pin_a).unwrap().lifecycle.pin_scope,
+        scope(&["home"])
+    );
+    assert_eq!(
+        doc.node(copy).unwrap().lifecycle.pin_scope,
+        scope(&["work"])
+    );
+    assert_eq!(
+        doc.node(pin_b).unwrap().placement.parent,
+        Some(favorite_id(TOOLBAR))
+    );
+}
+
+/// The pass's writes beat the state they rewrite, so a peer still holding
+/// the marked profile takes the moves.
+#[test]
+fn the_pass_wins_over_the_marked_profile_it_rewrites() {
+    let (mut a, b) = two_peers(5);
+    marked_profile(&mut a, dev_a());
+    // Each node's newest stamp is its placement, so the pass's moves must
+    // be stamped past it to land.
+    for guid in ["folderFFFFFF", "pinBBBBBBBBB", "pinAAAAAAAAA"] {
+        a.node_mut(favorite_id(guid)).unwrap().placement_at = 20;
+    }
+    a.stamp_write(dev_a(), 21);
+    let mut b = read_both_ways(&b, &a);
+    b.stamp_write(dev_b(), 22);
+    b.seen.insert(dev_a(), 21);
+    a.seen.insert(dev_b(), 22);
+
+    crate::pins::move_pins_to_root(&mut a, dev_a());
+    a.stamp_write(dev_a(), 101);
+
+    let doc = read_both_ways(&a, &b);
+    for guid in ["folderFFFFFF", "pinBBBBBBBBB", "pinAAAAAAAAA"] {
+        let node = doc.node(favorite_id(guid)).unwrap();
+        assert_eq!(
+            node.placement.parent,
+            Some(favorite_id(PINS_GUID)),
+            "{guid}"
+        );
+        assert!(!node.lifecycle.pinned, "{guid} keeps no mark");
+    }
+    let x = doc.node(favorite_id("pinXXXXXXXXX")).unwrap();
+    assert!(!x.lifecycle.pinned, "X keeps no mark");
 }
