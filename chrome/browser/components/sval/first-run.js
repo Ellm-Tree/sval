@@ -326,7 +326,7 @@ const STRINGS = Object.freeze({
     workspace: {
       heading: "Name your first Workspace",
       body: "A Workspace holds the tabs and groups for whatever you're working on.",
-      name: "Personal",
+      name: SvalFirstRunModel.FIRST_WORKSPACE_NAME,
     },
     search: {
       heading: "Choose a search engine",

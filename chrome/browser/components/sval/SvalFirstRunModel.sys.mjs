@@ -102,6 +102,12 @@ export const SvalFirstRunModel = Object.freeze({
   STEPS,
 
   /**
+   * The name the Workspace step offers, and the one the first Workspace
+   * takes when the user leaves first run without that step's answer.
+   */
+  FIRST_WORKSPACE_NAME: "Default Workspace",
+
+  /**
    * The new path's steps whose Continue records the answer and whose write
    * waits for the new path's end. Both settings sync last-writer-wins
    * (first-run spec §2): a new device that turns back to join its other

@@ -20,6 +20,7 @@ do.
   questions.
 - **Your first Workspace.** If you're new to Sval and don't import
   anything, you name your first Workspace and choose its color and emoji.
+  If you skip setup, Sval names it "Default Workspace" and gives it an emoji.
 - **Your answers.** Sval asks for your search engine and your password
   manager, and asks how much to block if you're new to Sval. Then you choose
   which side of the window the Workspace panel goes on, whether AI apps can

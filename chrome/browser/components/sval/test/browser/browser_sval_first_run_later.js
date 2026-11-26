@@ -73,8 +73,12 @@ add_task(async function skip_setup_makes_one_workspace_and_asks_once() {
   Assert.equal(workspaces.length, 1, "one workspace was made");
   Assert.equal(
     SvalPanel.nodes[workspaces[0]].content.name,
-    "",
-    "unnamed, since the Workspace step was never continued through"
+    SvalPanel._modules.SvalFirstRunModel.FIRST_WORKSPACE_NAME,
+    "named as the Workspace step offers, which was never continued through"
+  );
+  Assert.ok(
+    SvalTree.appearanceOf(SvalPanel.nodes, workspaces[0]).emoji,
+    "with an emoji"
   );
   Assert.equal(
     SvalWindowWorkspace.of(window).id,

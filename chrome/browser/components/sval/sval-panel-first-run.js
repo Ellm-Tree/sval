@@ -201,6 +201,7 @@ Object.assign(SvalPanel, {
       return;
     }
     try {
+      await this._nameUnfilledFirstWorkspace();
       await this._workspace.adoptOrCreate();
     } catch (err) {
       SvalLog.warn(
@@ -274,10 +275,12 @@ Object.assign(SvalPanel, {
     const fillsWorkspace = plan.some(entry =>
       entry.windows?.some(choice => choice.import)
     );
-    const made =
-      !fillsWorkspace && answers.workspace
-        ? SvalPanelModel.chosenContainer(true, answers.workspace)
-        : null;
+    const made = fillsWorkspace
+      ? null
+      : SvalPanelModel.chosenContainer(
+          true,
+          answers.workspace ?? this._defaultFirstWorkspace()
+        );
     const id = await this._workspace.createOwn(
       made,
       made ? own => this._chosenAppearanceOps(own, made) : undefined
@@ -301,6 +304,53 @@ Object.assign(SvalPanel, {
       ? this._emptyUnnamedWorkspace(this._firstRunReuse)
       : null;
     return this._runImport(plan, { reuseWorkspace: reuse, onProgress });
+  },
+
+  /**
+   * What the first Workspace is made with when the user leaves first run
+   * without the Workspace step's answer: that step's own starting fields.
+   *
+   * @returns {{name: string, color: null, emoji: string}}
+   */
+  _defaultFirstWorkspace() {
+    const { EMOJI_GROUPS, drawableEmojiGroups, SvalFirstRunModel } =
+      this._modules;
+    return {
+      name: SvalFirstRunModel.FIRST_WORKSPACE_NAME,
+      color: null,
+      emoji:
+        this._modules.SvalPanelModel.randomWorkspaceEmoji(
+          drawableEmojiGroups(EMOJI_GROUPS, document)
+        ) ?? "",
+    };
+  },
+
+  /**
+   * Gives first run's Workspace the defaults when the import it was kept
+   * unnamed for brought no window into it. Only first run's import fills
+   * that Workspace, so once the dialog closes it is named for good.
+   */
+  async _nameUnfilledFirstWorkspace() {
+    const { SvalClock, SvalPanelModel } = this._modules;
+    const id =
+      this._firstRunReuse && this._emptyUnnamedWorkspace(this._firstRunReuse);
+    this._firstRunReuse = null;
+    if (!id) {
+      return;
+    }
+    const made = SvalPanelModel.chosenContainer(
+      true,
+      this._defaultFirstWorkspace()
+    );
+    await this._engine.mutate({
+      kind: "batch",
+      ops: [
+        { kind: "rename", id, name: made.name },
+        ...this._chosenAppearanceOps(id, made),
+      ],
+      now: SvalClock.now(),
+    });
+    await this.refresh();
   },
 
   /**
