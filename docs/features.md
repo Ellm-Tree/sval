@@ -225,6 +225,8 @@ do.
   tabs keep neither.
 - **Switch tabs from the address bar.** Hold the address bar and slide to
   move through your tabs.
+- **Hide the keyboard.** In Sval's own sheets and setup screens, the
+  keyboard button above the keyboard puts the keyboard away.
 - **Search suggestions.** As you type in the address bar, the iPhone app
   shows suggestions from your search engine, following the search settings
   you chose on your computer. A private tab gets no suggestions.

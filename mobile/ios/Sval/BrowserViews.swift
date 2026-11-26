@@ -29,6 +29,12 @@ struct BrowserView: View {
     @State private var swipe = BarSwipeSession()
     @State private var barFrame: CGRect = .zero
     private var barHeight: CGFloat { barFrame.height }
+    /// How much of the screen's foot the keyboard covers.
+    @State private var keyboardHeight: CGFloat = 0
+    /// Whether the bar gives its room to the page while a field on the
+    /// page has the keyboard. A strip shorter than the bar, as a hardware
+    /// keyboard's shortcuts are, takes less room than the bar would give.
+    private var barYields: Bool { entering == nil && keyboardHeight > barHeight }
     @AppStorage(Walkthrough.doneKey) private var walkthroughDone = false
     /// The walkthrough's page, which the page and the bar's light share.
     @State private var walkthroughPage = 0
@@ -102,6 +108,10 @@ struct BrowserView: View {
                     // The Launcher's field grows out of the bar, which
                     // steps aside while it's open.
                     .opacity(entering == nil ? 1 : 0)
+                    .opacity(barYields ? 0 : 1)
+                    .allowsHitTesting(!barYields)
+                    .accessibilityHidden(barYields)
+                    .animation(reduceMotion ? Motion.reduced : Motion.overlay, value: barYields)
                     .modifier(SwipingBar(session: swipe, width: barFrame.width, gesture: workspaceSwipe, yields: trayInBar,
                                          isEnabled: !scrubs.isOpen))
                     .modifier(ScrubFeedback(session: scrubs))
@@ -168,6 +178,12 @@ struct BrowserView: View {
                 .presentationDetents([.large])
         }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { safeArea = $0 }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) {
+            keyboardHeight = Keyboard.height($0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardHeight = 0
+        }
         .ignoresSafeArea(.container, edges: .bottom)
         .overlay(alignment: .leading) {
             // Sideways, a sheet at 4/5 would leave the tree two rows, so the

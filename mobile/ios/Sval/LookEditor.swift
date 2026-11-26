@@ -161,6 +161,7 @@ struct LookEditor: View {
             .tint(look.ink)
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
+            .hidesKeyboard()
             .navigationTitle(title)
             .sheetTitleMode(title)
             .toolbar {

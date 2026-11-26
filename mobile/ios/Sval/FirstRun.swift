@@ -347,6 +347,7 @@ private struct ServerStep: View {
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .scrollEdgeFade()
+            .hidesKeyboard()
             FirstRunStyle.primary(failure == nil ? "Connect" : "Try Again", busy: working, action: connect)
                 .disabled(working || host.trimmingCharacters(in: .whitespaces).isEmpty || share.trimmingCharacters(in: .whitespaces).isEmpty)
         }
@@ -716,6 +717,7 @@ private struct CodeStep: View {
         }
         .padding(.horizontal, FirstRunStyle.side)
         .padding(.bottom, FirstRunStyle.side)
+        .hidesKeyboard()
         .onAppear { focused = true }
     }
 

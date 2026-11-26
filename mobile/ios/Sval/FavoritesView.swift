@@ -358,6 +358,7 @@ struct FavoriteEditor: View {
             }
             .foregroundStyle(theme.text)
             .sheetGround()
+            .hidesKeyboard()
             .navigationTitle(title)
             .sheetTitleMode(title)
             .toolbar {
