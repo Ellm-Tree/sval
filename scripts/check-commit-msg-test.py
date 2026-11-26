@@ -72,6 +72,9 @@ class Subjects(unittest.TestCase):
             "fix (sync): keep the row",
             "fix(sync): The sync row shows its state",
             "WIP: Add the sync row",
+            "perf(ios): Redraw only the bar's fold while a page scrolls",
+            "fix(read-profile): Read a marker's name stored as a string index",
+            "improve(ios): Draw the sheet's list in the grid's collection view",
         ]:
             with self.subTest(subject=subject):
                 self.assertTrue(check.problems(subject, title=True))
@@ -86,6 +89,8 @@ class Subjects(unittest.TestCase):
             "build(deps): update dependency serde to v1.0.300",
             "security(deps): update dependency mozilla-firefox/firefox",
             'Revert "fix: Keep pinned tabs in their group"',
+            "refactor(ios): Draw the grid from one list of lines",
+            "test(peek): Read the reopened Peek's page before loading another",
         ]:
             with self.subTest(subject=subject):
                 self.assertEqual(check.problems(subject, title=True), [])
@@ -93,6 +98,7 @@ class Subjects(unittest.TestCase):
     def test_commit_takes_a_type(self):
         self.assertEqual(check.problems("fix(sync): Keep pinned tabs"), [])
         self.assertTrue(check.problems("fix(sync): Pinned tabs stay"))
+        self.assertEqual(check.problems("perf(ios): Redraw only the bar"), [])
 
     def test_file_skips_comments(self):
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:

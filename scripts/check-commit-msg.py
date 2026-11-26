@@ -10,7 +10,8 @@ type from TYPES with an optional scope ("fix(sync): ", "ci: "), or an area
 ("Settings: "). A pull request title must carry a type, because its merge
 commit's type sorts the change in scripts/release-notes-draft.py. A subject
 that opens on a noun ("The installer keeps...", "Pins are left out...") fails
-on its first word. Whether the body says why is for review.
+on its first word, and a feat, improve, fix or perf title that opens on a
+verb from MECHANISM_VERBS fails too. Whether the body says why is for review.
 
     python3 scripts/check-commit-msg.py                 # the branch's commits
     python3 scripts/check-commit-msg.py --base <rev>    # against another base
@@ -79,6 +80,16 @@ VERBS = frozenset("""
     upgrade use validate verify wait warn watch widen wire wrap write
 """.split())
 
+# Verbs that name what code does. A title of a type a user notices names what
+# the user sees instead ("Show", "Keep", "Cut"), and CONTRIBUTING.md's "Commit
+# messages" section says why. Commit subjects inside a branch may use them.
+MECHANISM_VERBS = frozenset(
+    "cache call draw inline parse read redraw refactor render reuse rewrite wire".split()
+)
+
+# The types whose titles a user notices.
+USER_TYPES = ("feat", "improve", "fix", "perf")
+
 
 def problems(subject, title=False):
     """The rules subject breaks, as messages; empty when it passes. A pull
@@ -110,6 +121,11 @@ def problems(subject, title=False):
         found.append(
             f"it opens on {word!r}, which is not an imperative verb in VERBS; "
             "name the change (\"Fix\", \"Add\", \"Remove\"), never the state it leaves"
+        )
+    elif title and typed and typed["type"] in USER_TYPES and word.lower() in MECHANISM_VERBS:
+        found.append(
+            f"it opens on {word!r}, which names what the code does; "
+            "name what a user sees or feels change"
         )
     return found
 

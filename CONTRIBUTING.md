@@ -176,11 +176,31 @@ the subject says it all.
 
 A merge request's title must carry a type: the title becomes the merge
 commit's subject, and `scripts/release-notes-draft.py` groups each release's
-changes by that type. A commit inside a merge request may leave the type out, or name only
+changes by that type. The title is how anyone outside the code learns what
+changed, so it says what is different about Sval for whoever notices it, and
+leaves how the code does it to the body. A reader who sees only the title
+knows what changed in Sval:
+
+- `feat`, `improve` and `fix` name what a user sees or can do, in the words
+  of Sval's UI. A fix names the bug as the user saw it.
+- `perf` names what got faster or smaller, and where a user would feel it.
+- `test`, `build`, `ci` and `chore` name what changes for the people working
+  on Sval: a test that stops failing, a build that gets faster.
+- None of them names a class, a view, a layer, a pass, a draw call or other
+  internals, and none puts a vague word where the technical term would go.
+
+| Instead of | Write |
+|---|---|
+| perf(ios): Build the tree's group boxes from layers | perf(ios): Cut the Workspace sheet's memory for large groups |
+| perf(sync): Reuse each peer's file a pass last read | perf(sync): Use less CPU on each sync while other devices are idle |
+| fix(read-profile): Read a marker's name stored as a string index | fix(read-profile): Show marker names from every profile |
+
+A commit inside a merge request may leave the type out, or name only
 its area (`ci-image.sh: prune ...`). `scripts/check-commit-msg.py` checks the
 type, the verb, the 72-character limit and the trailing period, as the
-`commit-msg` hook and in CI. A real imperative verb missing from its `VERBS`
-list belongs there.
+`commit-msg` hook and in CI, and fails a `feat`, `improve`, `fix` or `perf`
+title that opens on a verb naming what code does, such as "Redraw" or
+"Read". A real imperative verb missing from its `VERBS` list belongs there.
 
 ### License notices
 

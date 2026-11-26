@@ -11,6 +11,19 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__forgejo__create_pull_request|mcp__forgejo__edit_pull_request",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "You check a pull request title for the Sval browser repository before an agent sets it. The tool call's input is:\n\n$ARGUMENTS\n\nIf the input has no \"title\" field, reply {\"ok\": true}.\n\nOtherwise judge only the title, by this rule from CONTRIBUTING.md. The title says what is different about Sval for whoever notices it, and leaves how the code does it to the body. A reader who sees only the title must know what changed in Sval.\n- feat, improve and fix titles name what a user sees or can do. A fix names the bug as the user saw it.\n- perf titles name what got faster or smaller, and where a user would feel it.\n- test, build, ci, chore, docs and refactor titles name what changes for the people working on Sval or reading the docs.\n- No title names classes, views, layers, passes, draw calls, bitmaps, indexes or other internals, and none swaps a vague everyday word in for the technical term (\"picture\", \"ink\", \"boxes from layers\").\n\nFails: \"perf(ios): Build the tree's group boxes from layers\", \"perf(sync): Reuse each peer's file a pass last read\", \"fix(read-profile): Read a marker's name stored as a string index\".\nPasses: \"perf(ios): Cut the Workspace sheet's memory for large groups\", \"fix(sync): Keep pinned tabs in their group\", \"feat(search): Remove any search engine from Settings\", \"ci: Require a Conventional Commits type on pull request titles\".\n\nPass a title that a user or developer would understand, even if you could word it better. Fail only a title that describes the code's mechanism, or one whose meaning a reader could not work out.\n\nReply with JSON only: {\"ok\": true}, or {\"ok\": false, \"reason\": \"<why the title fails, and a rewritten title that names the effect, from the input's body when it has one>\"}.",
+            "continueOnBlock": true,
+            "timeout": 30
+          }
+        ]
+      }
     ]
   },
   "attribution": {
