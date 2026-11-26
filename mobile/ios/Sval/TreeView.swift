@@ -656,6 +656,9 @@ struct TreeView: UIViewRepresentable {
             if isList { return listDropUpdate(session, dragged: id, in: view) }
             let point = session.location(in: view)
             let overPath = view.indexPathForItem(at: point)
+            // Written before any return: a drop reads it ahead of a card's
+            // middle or side, so a finger over a card must find it nil.
+            placed = overPath == nil ? empty(at: point, in: view, dragged: id) : nil
             if let over = overPath, let overId = dataSource.itemIdentifier(for: over), overId != id,
                let cell = view.cellForItem(at: over) as? GridCell {
                 let at = cell.convert(point, from: view)
@@ -694,7 +697,6 @@ struct TreeView: UIViewRepresentable {
                 latched = nil
             }
             if parent.dropState.hover != nil { parent.dropState.hover = nil }
-            placed = overPath == nil ? empty(at: point, in: view, dragged: id) : nil
             if placed != nil { return UICollectionViewDropProposal(operation: .move, intent: .unspecified) }
             guard let path else { return UICollectionViewDropProposal(operation: .forbidden) }
             if dataSource.itemIdentifier(for: path) == id, lastLanding != nil {

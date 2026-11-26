@@ -15,6 +15,22 @@ struct WorkspaceButtonBounds: PreferenceKey {
     }
 }
 
+/// Where the iPad's Workspace popover points. Only regular width and
+/// height show the Workspace as a popover (`BrowserView.placeWorkspace`),
+/// so elsewhere the button publishes nothing, and its moves under a fold
+/// or a swipe leave the root's popover overlay alone.
+private struct WorkspaceButtonAnchor: ViewModifier {
+    let publishes: Bool
+
+    func body(content: Content) -> some View {
+        if publishes {
+            content.anchorPreference(key: WorkspaceButtonBounds.self, value: .bounds) { $0 }
+        } else {
+            content
+        }
+    }
+}
+
 struct BrowserBar: View {
     @Environment(\.horizontalSizeClass) private var horizontalSize
     @Environment(AppModel.self) private var model
@@ -347,8 +363,7 @@ struct BrowserBar: View {
         .contextMenu {
             if isPrivateSession { privateMenu }
         }
-        // Where the iPad's Workspace popover points.
-        .anchorPreference(key: WorkspaceButtonBounds.self, value: .bounds) { $0 }
+        .modifier(WorkspaceButtonAnchor(publishes: horizontalSize == .regular && verticalSize == .regular))
         .accessibilityLabel(isPrivateSession
             ? (tabCount == 1 ? "Private, 1 tab" : "Private, \(tabCount) tabs")
             : "\(workspace.map(WorkspaceTile.name) ?? "Workspace"), \(tabCount) tabs")
