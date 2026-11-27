@@ -21,7 +21,6 @@
     AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
     FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
     SvalDropbox: "moz-src:///browser/components/sval/SvalDropbox.sys.mjs",
-    SvalIdentity: "moz-src:///browser/components/sval/SvalIdentity.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
     SvalRemoteFolder:
       "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs",
@@ -29,6 +28,7 @@
       "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
     SvalSharedFolder:
       "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs",
+    openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
   });
 
   /** How long the Dropbox browser waits for a folder's listing. */
@@ -60,12 +60,21 @@
 
   const SvalStorageSettings = {
     /**
-     * The folder the sentence in `#sval-storage-status` is about, when that
-     * sentence reports a folder Sval could not reach; otherwise null.
-     * `_describeStorage` withdraws it once that folder answers or another is
-     * chosen, so it never sits beside a line saying the workspaces sync.
+     * The page state `#sval-storage-status`'s line was written in. A line
+     * answers an act in the state it found, so `_drawSyncPage` withdraws it
+     * once the state moves on, and it never sits beside a state it
+     * contradicts.
      */
-    _statusFolder: null,
+    _statusState: null,
+
+    /** The folder being chosen, while it is, for `syncPage`. */
+    _working: null,
+
+    /** Whether the key store is the profile's file, as last read. */
+    _keyInProfile: false,
+
+    /** `syncPage`'s last answer, as drawn. */
+    _page: null,
 
     /** The control that had focus when a choice of folder started. */
     _workingFrom: null,
@@ -84,29 +93,28 @@
      */
     _initStorage(byId) {
       Object.assign(this._els, {
-        storageText: byId("sval-storage-text"),
         storageKeyring: byId("sval-storage-keyring"),
         smbKeychain: byId("sval-smb-keychain"),
         syncAdvanced: byId("sval-sync-advanced"),
-        syncRow: byId("sval-sync-row"),
-        keyActions: byId("sval-key-actions"),
-        keyStatus: byId("sval-key-status"),
+        syncState: byId("sval-sync-state"),
+        syncStatus: byId("sval-sync-status"),
+        syncLast: byId("sval-sync-last"),
+        syncButtons: byId("sval-sync-buttons"),
+        locationChoices: byId("sval-location-choices"),
+        locationDialog: byId("sval-location-dialog"),
+        storageChange: byId("sval-storage-change"),
         backupMissing: byId("sval-backup-missing"),
-        backupSave: byId("sval-backup-save"),
         setUpAgain: byId("sval-set-up-again"),
-        keyResultActions: byId("sval-key-result-actions"),
-        restoreForm: byId("sval-restore-form"),
-        restoreCode: byId("sval-restore-code"),
         storageChoose: byId("sval-storage-choose"),
-        storageReuse: byId("sval-storage-reuse"),
         storageStop: byId("sval-storage-stop"),
+        stopTitle: byId("sval-stop-dialog-title"),
+        stopBody: byId("sval-stop-dialog-body"),
         storageStatus: byId("sval-storage-status"),
         storageResultActions: byId("sval-storage-result-actions"),
         folderField: byId("sval-folder-field"),
         folderName: byId("sval-folder-name"),
         folderPath: byId("sval-folder-path"),
         folderReveal: byId("sval-folder-reveal"),
-        storageSmb: byId("sval-storage-smb"),
         stopDialog: byId("sval-stop-dialog"),
         stopCancel: byId("sval-stop-dialog-cancel"),
         stopConfirm: byId("sval-stop-dialog-confirm"),
@@ -120,7 +128,6 @@
         serverPassword: byId("sval-server-password"),
         serverCancel: byId("sval-server-cancel"),
         storageDropbox: byId("sval-storage-dropbox"),
-        storageDropboxLabel: byId("sval-storage-dropbox-label"),
         dropboxDialog: byId("sval-dropbox-dialog"),
         dropboxUp: byId("sval-dropbox-up"),
         dropboxPlace: byId("sval-dropbox-place"),
@@ -133,16 +140,26 @@
         storageWorkingText: byId("sval-storage-working-text"),
       });
       this._els.folderReveal.textContent = revealLabel();
-      this._els.smbKeychain.message =
-        `If your Mac asks whether Sval can access ` +
-        `"${lazy.SvalSecretStore.userLabel()}" after you select Connect, ` +
-        `choose Always Allow.`;
-      this._els.dropboxKeychain.message =
-        `If your Mac asks whether Sval can access ` +
-        `"${lazy.SvalSecretStore.userLabel()}" after you select Use this ` +
-        `folder, choose Always Allow.`;
-      this._els.storageDropbox.addEventListener("click", () =>
-        this.chooseDropboxFolder()
+      // The Keychain asks as the sign-in is saved, so the dialog says so
+      // first.
+      const keychainNote =
+        `When macOS asks whether Sval can access ` +
+        `“${lazy.SvalSecretStore.userLabel()}”, choose Always Allow.`;
+      this._els.smbKeychain.message = keychainNote;
+      this._els.dropboxKeychain.message = keychainNote;
+      // Every control the page state offers runs through one place. The Sync
+      // card holds its dialogs, so one listener there hears them too.
+      for (const holder of [this._els.storageSection, this._els.syncAdvanced]) {
+        holder.addEventListener("click", event => {
+          const command = event.target.closest("button[data-command]")?.dataset
+            .command;
+          if (command) {
+            this.runSyncCommand(command);
+          }
+        });
+      }
+      byId("sval-location-dialog-cancel").addEventListener("click", () =>
+        this._els.locationDialog.close()
       );
       this._els.dropboxUp.addEventListener("click", () => {
         const folder = this._dropbox?.folder ?? "";
@@ -157,28 +174,12 @@
       this._els.dropboxUse.addEventListener("click", () =>
         this._useDropboxFolder()
       );
-      this._els.storageChoose.addEventListener("click", () =>
-        this.chooseFolder()
-      );
-      this._els.storageSmb.addEventListener("click", () =>
-        this.chooseServerFolder()
-      );
       this._els.serverCancel.addEventListener("click", () =>
         this._els.serverDialog.close()
       );
       this._els.serverForm.addEventListener("submit", event => {
         event.preventDefault();
         this._connectServerFolder();
-      });
-      this._els.folderReveal.addEventListener("click", () =>
-        this.revealFolder()
-      );
-      this._els.storageReuse.addEventListener("click", () =>
-        this.useFolderAgain()
-      );
-      this._els.storageStop.addEventListener("click", () => {
-        this._els.stopDialog.showModal();
-        this._els.stopCancel.focus();
       });
       this._els.stopCancel.addEventListener("click", () =>
         this._els.stopDialog.close()
@@ -187,173 +188,191 @@
         this._els.stopDialog.close();
         this.stopSyncing();
       });
-      this._els.backupSave.addEventListener("click", () => this.saveBackup());
-      this._els.setUpAgain.addEventListener("click", () =>
-        this.setUpSyncAgain()
-      );
-      this._els.restoreForm.addEventListener("submit", event => {
-        event.preventDefault();
-        this.restoreFromBackup();
-      });
     },
 
     /**
-     * Shows the sync folder, if any, and labels the buttons that change it.
-     *
-     * This device's copy always lives in the profile (local-copy spec §4.1), so
-     * this never says nothing is saved. Syncing is the folder being shared, so
-     * there is no switch for it.
+     * Draws the Sync card, the Devices card's offer and the Advanced key
+     * card from one `SvalPanelModel.syncPage`, which decides every word and
+     * control. Nothing here decides one of its own.
      *
      * Redrawn on focus and after every pass, because the folder is the
      * profile's: a second window's page can change it, and a pass can find it
      * gone or back.
      */
-    _describeStorage() {
-      this._describeKeyring();
+    _drawSyncPage() {
       const panel = this.panel;
-      const settings = panel?.settings;
-      if (!settings) {
-        // No window of this profile is running Sval yet. That passes: a
-        // panel starts with its window, and this page is in one. The controls
-        // are withheld until then, so none is offered only to fail.
-        this._els.storageChoose.hidden = true;
-        this._els.storageSmb.hidden = true;
-        this._els.storageDropbox.hidden = true;
-        this._els.storageReuse.hidden = true;
-        this._els.storageStop.hidden = true;
-        this._els.folderReveal.hidden = true;
-        this._els.folderField.hidden = true;
-        this._els.syncRow.hidden = true;
-        this._setText(this._els.storageText, "");
-        this._showStorageReport({ message: null });
-        this._statusFolder = null;
-        return;
+      const els = this._els;
+      const page = lazy.SvalPanelModel.syncPage({
+        indicator: panel ? panel.indicatorState() : null,
+        privateOnly: this._privateOnly,
+        sharedRoot: panel?.sharedRootSetting() ?? null,
+        backupSaved: !!panel?.settings?.backupSaved,
+        keyInProfile: this._keyInProfile,
+        working: this._working,
+        pairing: !!this._offer || !!this._claims?.looking,
+        outcome: this._syncOutcome,
+      });
+      this._page = page;
+      if (this._statusState !== null && this._statusState !== page.scope) {
+        this._clearStorageReport();
       }
-      // Un-hidden here rather than only in the markup, because this method is
-      // re-entered on every window `focus`: a page that found no panel once and
-      // finds one now has to offer the control again.
-      this._els.storageChoose.hidden = false;
-      this._els.storageSmb.hidden = false;
-      this._els.storageDropbox.hidden = false;
-      const chosen = panel.sharedRootSetting();
-      const unreachable =
-        chosen && panel.syncState.folderState === "unreachable";
-      this._els.storageReuse.hidden = !unreachable;
-      this._els.storageStop.hidden = !chosen;
-      const remote = lazy.SvalRemoteFolder.isRemoteRoot(chosen);
-      // A remote folder is on no disk of this computer's to show.
-      this._els.folderReveal.hidden = !chosen || unreachable || remote;
-      this._els.folderField.hidden = !chosen;
-      this._els.syncRow.hidden = !chosen;
-      this._els.folderField.classList.toggle("sval-unreachable", !!unreachable);
-      if (
-        this._statusFolder !== null &&
-        (chosen !== this._statusFolder ||
-          panel.syncState.folderState === "reached")
-      ) {
-        this._showStorageReport({ message: null });
+      els.storageSection.dataset.state = page.state;
+      els.syncState.dataset.icon = page.icon;
+
+      if (els.syncState.dataset.state !== page.tone) {
+        els.syncState.dataset.state = page.tone;
+        // A new state arrives with a small settle, unless the user asked for
+        // less motion.
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          els.syncState.querySelector(".sval-sync-words")?.animate(
+            [
+              { opacity: 0, transform: "translateY(2px)" },
+              { opacity: 1, transform: "none" },
+            ],
+            { duration: 240, easing: "cubic-bezier(0.22, 0.8, 0.24, 1)" }
+          );
+        }
       }
-      if (!chosen) {
-        this._setText(
-          this._els.storageText,
-          "Sval saves your Workspaces on this device only. To sync them, " +
-            "choose a folder your devices share, or connect to an SMB server " +
-            "or to Dropbox."
+      // Unchanged text is left alone: this redraws on every pass the panel's
+      // poll runs, and assigning `textContent` replaces the text node whether
+      // or not the words moved, which costs a paint.
+      this._setText(els.syncStatus, page.title);
+      this._setText(els.syncLast, page.detail);
+
+      els.storageWorking.hidden = page.working === null;
+      this._setText(els.storageWorkingText, page.working ?? "");
+      els.storageSection.toggleAttribute("aria-busy", page.working !== null);
+
+      els.locationChoices.hidden = !page.choices;
+      for (const choice of [
+        ...els.locationChoices.querySelectorAll("button"),
+        ...els.locationDialog.querySelectorAll("button[data-command]"),
+      ]) {
+        choice.disabled = page.locked;
+      }
+      els.folderField.hidden = !page.location;
+      if (page.location) {
+        this._setText(els.folderName, page.location.name);
+        this._setText(els.folderPath, page.location.place);
+        els.folderField.title = page.location.place;
+        els.folderField.dataset.via = page.location.via;
+      }
+      els.folderReveal.hidden = !page.reveal;
+      els.storageChange.hidden = !page.change;
+      els.storageChange.disabled = page.locked;
+      els.storageStop.hidden = !page.stop;
+      els.storageStop.disabled = page.locked;
+      if (page.stop) {
+        this._setText(els.storageStop, page.stop.label);
+        this._setText(els.stopTitle, page.stop.title);
+        this._setText(els.stopBody, page.stop.body);
+      }
+      els.backupMissing.hidden = !page.backupNote;
+
+      const actions = [page.primary, ...page.secondary].filter(Boolean);
+      const actionsKey = JSON.stringify([actions, page.locked]);
+      if (this._shownSyncActions !== actionsKey) {
+        this._shownSyncActions = actionsKey;
+        els.syncButtons.replaceChildren(
+          ...actions.map((action, index) => {
+            const button = document.createElement("button");
+            button.className =
+              index === 0 && action === page.primary
+                ? "sval-button sval-button-primary"
+                : "sval-button";
+            button.dataset.command = action.command;
+            button.textContent = action.label;
+            button.disabled = !!action.disabled || page.working !== null;
+            return button;
+          })
         );
-        this._setText(this._els.storageChoose, "Choose folder…");
-        this._setText(this._els.storageSmb, "Connect to SMB server…");
-        this._setText(this._els.storageDropboxLabel, "Connect to Dropbox…");
-        this._els.storageChoose.dataset.tone = "primary";
-        delete this._els.storageSection.dataset.via;
-        return;
       }
-      delete this._els.storageChoose.dataset.tone;
-      this._setText(
-        this._els.folderName,
-        lazy.SvalPanelModel.friendlyFolderName(chosen)
-      );
-      const place = remote
-        ? lazy.SvalRemoteFolder.remoteFolderPlace(chosen)
-        : chosen;
-      this._setText(this._els.folderPath, place);
-      this._els.folderField.title = place;
-      // A folder on this computer, an SMB folder and a Dropbox folder are
-      // three ways to sync, so each has its own button: the one in use
-      // changes it, and the others switch to another way.
-      const dropbox = !!lazy.SvalRemoteFolder.parseDropboxRoot(chosen);
-      let via = "folder";
-      if (dropbox) {
-        via = "dropbox";
-      } else if (remote) {
-        via = "smb";
-      }
-      this._els.storageSection.dataset.via = via;
-      this._setText(
-        this._els.storageDropboxLabel,
-        dropbox ? "Change Dropbox folder…" : "Connect to Dropbox…"
-      );
-      if (dropbox) {
-        this._setText(this._els.storageSmb, "Connect to SMB server…");
-        this._setText(this._els.storageChoose, "Choose folder…");
-        this._setText(
-          this._els.storageText,
-          unreachable
-            ? "Sval can't reach Dropbox. Your Workspaces are still on this device."
-            : "Sval syncs your Workspaces through a folder in your Dropbox."
-        );
-        return;
-      }
-      if (remote) {
-        this._setText(this._els.storageSmb, "Edit connection…");
-        this._setText(this._els.storageChoose, "Choose folder…");
-        this._setText(
-          this._els.storageText,
-          unreachable
-            ? "Sval can't reach this SMB server. Your Workspaces are still on this device."
-            : "Sval syncs your Workspaces through a folder on this SMB server."
-        );
-        return;
-      }
-      this._setText(this._els.storageSmb, "Connect to SMB server…");
-      if (unreachable) {
-        this._setText(
-          this._els.storageText,
-          "Sval can't find its files in this folder. Your Workspaces are still on this device."
-        );
-        this._setText(this._els.storageChoose, "Choose another…");
-        return;
-      }
-      this._setText(this._els.storageText, "");
-      this._setText(this._els.storageChoose, "Change…");
+
+      els.pairingStart.hidden = !page.addDevice;
+      els.syncAdvanced.hidden = !page.advanced;
+      els.storageKeyring.hidden = !page.keyringNote;
+      this._describeFolder();
     },
 
     /**
-     * Says when the sync key is kept in the profile, which is a machine with
-     * no keyring.
+     * Runs one of the page's controls, as `syncPage` names them.
+     *
+     * @param {string} command
      */
-    async _describeKeyring() {
+    async runSyncCommand(command) {
+      const via = this._page?.location?.via;
+      switch (command) {
+        case "chooseLocal":
+          this._els.locationDialog.close();
+          return this.chooseFolder();
+        case "chooseSmb":
+          this._els.locationDialog.close();
+          return this.chooseServerFolder();
+        case "chooseDropbox":
+          this._els.locationDialog.close();
+          return this.chooseDropboxFolder();
+        case "chooseInUse":
+          return this.runSyncCommand(
+            { smb: "chooseSmb", dropbox: "chooseDropbox" }[via] ?? "chooseLocal"
+          );
+        case "changeLocation":
+          this._els.locationDialog.showModal();
+          return undefined;
+        case "reveal":
+          return this.revealFolder();
+        case "useFolderAgain":
+          return this.useFolderAgain();
+        case "syncNow":
+          return this.syncNow();
+        case "enterCode":
+          return this.enterCode();
+        case "restore":
+          return this.askForBackup();
+        case "startOver":
+          return this.setUpSyncAgain();
+        case "saveBackup":
+          return this.saveBackup();
+        case "stop":
+          this._els.stopDialog.showModal();
+          this._els.stopCancel.focus();
+          return undefined;
+      }
+      // The panel's own commands, as the footer runs them.
+      const panelCommand = {
+        retryKey: "retrySyncKey",
+        dismissOthers: "dismissOtherWorkspaces",
+        checkForUpdate: "checkForUpdate",
+        showCritical: "reopenCritical",
+      }[command];
+      if (panelCommand) {
+        await this.panel?.run(panelCommand, null);
+        this._drawSyncPage();
+      }
+      return undefined;
+    },
+
+    /**
+     * Reads which store keeps the sync key, for the notes that depend on it,
+     * and redraws when that changed.
+     */
+    async _readKeyStore() {
       const backend = await lazy.SvalSecretStore.backend().catch(() => null);
-      this._els.storageKeyring.hidden =
-        backend !== lazy.SvalSecretStore.BACKENDS.profile;
-      const panel = this.panel;
-      const syncs =
-        !!panel?.sharedRootSetting?.() &&
-        panel.syncState.keyState === lazy.SvalIdentity.SYNC_KEY_STATES.present;
-      this._els.syncAdvanced.hidden = !panel?.sharedRootSetting?.();
-      this._els.keyActions.hidden = !syncs;
+      const inProfile = backend === lazy.SvalSecretStore.BACKENDS.profile;
       // The Keychain asks as Connect saves the password, so the dialog says
       // so first, on a Mac whose secrets the system store keeps or will.
       this._els.smbKeychain.hidden =
-        lazy.AppConstants.platform !== "macosx" ||
-        backend === lazy.SvalSecretStore.BACKENDS.profile;
+        lazy.AppConstants.platform !== "macosx" || inProfile;
       this._els.dropboxKeychain.hidden = this._els.smbKeychain.hidden;
-      this._els.backupMissing.hidden = !syncs || !!panel.settings?.backupSaved;
+      if (inProfile !== this._keyInProfile) {
+        this._keyInProfile = inProfile;
+        this._drawSyncPage();
+      }
     },
 
     /** Shows the sync key's backup, through the panel that owns the key. */
     async saveBackup() {
       await this.panel?.offerBackup();
-      this._describeKeyring();
+      this._drawSyncPage();
     },
 
     /**
@@ -369,102 +388,150 @@
       try {
         const result = await panel.setUpSyncAgain();
         if (result.done) {
-          this._showResult(this._els.keyStatus, this._els.keyResultActions, {
-            status: "success",
-            reason: "set-up",
-            text:
-              "Sync is set up on this device. Give your other devices a " +
-              "code to sync with it.",
-            action: { label: "Show Code…", command: "offerCode" },
+          this._showStorageReport({
+            line: {
+              status: "success",
+              reason: "set-up",
+              text: `This ${lazy.SvalPanelModel.computerNoun(
+                lazy.AppConstants.platform
+              )} has a new sync key. Add each other device again.`,
+              action: { label: "Add a device…", command: "offerCode" },
+            },
           });
         } else if (result.failure) {
-          this._showResult(
-            this._els.keyStatus,
-            this._els.keyResultActions,
-            lazy.SvalPanelModel.pairingLine(
-              result,
-              lazy.AppConstants.platform,
-              "Setup"
-            ),
-            { retry: () => this.setUpSyncAgain() }
+          this._showStorageReport(
+            {
+              line: lazy.SvalPanelModel.pairingLine(
+                result,
+                lazy.AppConstants.platform,
+                "Setup"
+              ),
+            },
+            () => this.setUpSyncAgain()
           );
         }
       } finally {
         this._els.setUpAgain.disabled = false;
-        this._describeKeyring();
       }
     },
 
     /**
-     * Writes a plain sentence on the sync key's status line.
-     *
-     * @param {string} text
+     * Restore from a backup…: one dialog with the backup key's field. The
+     * dialog stays up while the key is tried on the folder, and says there
+     * why a key was refused; a key that restored closes it, and the Sync card
+     * says so (key-storage spec, "Backup and recovery").
      */
-    _keySays(text) {
-      this._showResult(this._els.keyStatus, this._els.keyResultActions, null, {
-        text,
+    async askForBackup() {
+      const name = this._page?.location?.name;
+      if (!this.panel || !name) {
+        return;
+      }
+      await lazy.openSvalDialog(window.browsingContext.topChromeWindow, {
+        icon: "key",
+        state: "restore",
+        title: "Restore from a backup",
+        body: `Paste the backup key. Sval checks the backup key against ${name}.`,
+        field: {
+          label: "Backup key",
+          validate: text =>
+            lazy.SvalPanelModel.fromBackupCode(text)
+              ? ""
+              : "A backup key has 52 letters and numbers.",
+        },
+        primary: "Restore",
+        onButton: (id, dialog) => {
+          if (id === "ok") {
+            this._restoreIn(dialog);
+          }
+          return id === "ok";
+        },
       });
     },
 
-    /** Takes the sync key back from the typed backup. */
-    async restoreFromBackup() {
+    /**
+     * Tries the key typed in the backup dialog `dialog` on the folder.
+     *
+     * @param {object} dialog The dialog's handle (`openSvalDialog`'s
+     *   `onButton`).
+     */
+    async _restoreIn(dialog) {
       const panel = this.panel;
       if (!panel) {
         return;
       }
-      this._keySays("Checking the key…");
-      const result = await panel.restoreFromBackup(this._els.restoreCode.value);
-      if (result.restored || result.failure) {
-        // The key was tried on the folder, so this is a result line (messages
-        // spec §7); the sentences before that are about what was typed.
-        this._showResult(
-          this._els.keyStatus,
-          this._els.keyResultActions,
-          result.restored
-            ? { status: "success", text: result.message, action: null }
-            : lazy.SvalPanelModel.pairingLine(
-                result,
-                lazy.AppConstants.platform,
-                "Restore"
-              ),
-          { retry: () => this.restoreFromBackup() }
-        );
-      } else {
-        this._keySays(result.message ?? "");
-      }
-      this._els.restoreCode.setAttribute(
-        "aria-invalid",
-        String(!result.restored && !!result.message)
-      );
+      dialog.setButton("ok", { disabled: true });
+      dialog.update({ warning: "Checking the backup key…", state: "checking" });
+      const result = await panel.restoreFromBackup(dialog.value());
       if (result.restored) {
-        this._els.restoreCode.value = "";
+        dialog.close();
+        this._showStorageReport({
+          line: {
+            status: "success",
+            reason: "restored",
+            text: result.message,
+            action: null,
+          },
+        });
+        return;
       }
+      dialog.setButton("ok", { disabled: false });
+      // A key tried on the folder fails with a join's line (messages spec
+      // §7); one refused before that says what was typed.
+      dialog.update({
+        state: result.failure ?? result.refused,
+        warning: result.failure
+          ? lazy.SvalPanelModel.pairingLine(
+              result,
+              lazy.AppConstants.platform,
+              "Restore"
+            ).text
+          : result.message,
+      });
     },
 
     /**
-     * Shows the panel's sentence about a folder change, and remembers which
-     * folder it is about when it says that folder cannot be reached or is too
-     * large to sync, so `_describeStorage` can withdraw it when the folder
-     * syncs.
+     * Shows how an act on the card ended: the panel's sentence or result
+     * line, in the state the page is in once it ended. `_drawSyncPage`
+     * withdraws it when that state moves on.
      *
      * @param {object} report A `{ message, unreachable, line }` answer from
      *   the panel.
      * @param {Function} [retry] What the line's Try Again or Allow Access runs.
      */
     _showStorageReport(report, retry = null) {
+      this._drawSyncPage();
+      // A key the store refused is the card's state, and said once, there.
+      if (
+        report.line?.reason === "key-sealed" &&
+        this._page.state === "key-sealed"
+      ) {
+        report = { message: null };
+      }
+      delete this._els.storageStatus.dataset.outcome;
+      const said = !!(report.line ?? report.message);
       this._showResult(
         this._els.storageStatus,
         this._els.storageResultActions,
         report.line ?? null,
         { text: report.message ?? "", retry }
       );
-      this._statusFolder = report.unreachable
-        ? (this.panel?.sharedRootSetting() ?? null)
-        : null;
+      this._statusState = said ? this._page.scope : null;
       this._els.storageStatus.toggleAttribute(
         "data-unreachable",
         !!report.unreachable
       );
+    },
+
+    /** Withdraws the card's status line. */
+    _clearStorageReport() {
+      this._statusState = null;
+      this._showResult(
+        this._els.storageStatus,
+        this._els.storageResultActions,
+        null
+      );
+      this._els.storageStatus.removeAttribute("data-unreachable");
+      delete this._els.storageStatus.dataset.outcome;
     },
 
     /**
@@ -486,7 +553,7 @@
       }
       const panel = this.panel;
       if (!panel) {
-        this._describeStorage();
+        this._drawSyncPage();
         return;
       }
 
@@ -569,7 +636,7 @@
         this._setWorking(null);
         this._showStorageReport({
           message:
-            "Sval couldn't save the password, so your sync folder didn't change.",
+            "Sval couldn't save the password. The sync folder didn't change.",
         });
         return;
       }
@@ -675,7 +742,7 @@
       }
       els.dropboxStatus.textContent = answer.folders.length
         ? ""
-        : "This folder has no folders in it.";
+        : "No folders inside.";
       for (const name of answer.folders) {
         const row = document.createElement("li");
         const open = document.createElement("button");
@@ -718,7 +785,7 @@
         this._setWorking(null);
         this._showStorageReport({
           message:
-            "Sval couldn't save the Dropbox sign-in, so your sync folder didn't change.",
+            "Sval couldn't save the Dropbox sign-in. The sync folder didn't change.",
         });
         return;
       }
@@ -733,48 +800,23 @@
      * @param {?string} path The folder being chosen, or null once done.
      */
     _setWorking(path) {
-      const els = this._els;
       const working = path !== null;
       // Holding the buttons blurs the one that started this on some
       // platforms: focus goes back to it once they are free.
       if (working) {
         this._workingFrom ??= document.activeElement;
       }
-      for (const button of [
-        els.storageChoose,
-        els.storageSmb,
-        els.storageDropbox,
-        els.storageReuse,
-        els.storageStop,
-      ]) {
-        button.disabled = working;
-      }
-      if (working) {
-        els.storageSection.setAttribute("aria-busy", "true");
-      } else {
-        els.storageSection.removeAttribute("aria-busy");
-      }
-      els.storageWorking.hidden = !working;
+      this._working = path;
+      this._drawSyncPage();
       if (!working) {
         const from = this._workingFrom;
         this._workingFrom = null;
         const lost =
           !document.activeElement || document.activeElement === document.body;
-        if (lost && from?.isConnected && !from.disabled) {
+        if (lost && from?.isConnected && !from.disabled && !from.hidden) {
           from.focus();
         }
-        return;
       }
-      let where = "this folder";
-      if (lazy.SvalRemoteFolder.parseDropboxRoot(path)) {
-        where = "Dropbox";
-      } else if (lazy.SvalRemoteFolder.isRemoteRoot(path)) {
-        where = "the SMB server";
-      }
-      this._setText(
-        els.storageWorkingText,
-        `Setting up sync through ${where}…`
-      );
     },
 
     /**
@@ -794,18 +836,17 @@
         lazy.SvalLog.warn(
           `changing the sync folder failed: ${lazy.SvalLog.errorName(err)}`
         );
-        report = { reached: false, message: "Couldn't change the folder." };
+        report = {
+          reached: false,
+          message: "Sval couldn't change the sync folder.",
+        };
       }
 
+      // What a pass said of the last folder says nothing about this one.
+      this._syncOutcome = null;
       this._setWorking(null);
       // The panel's own words, verbatim. See this file's top comment.
       this._showStorageReport(report, () => this._useFolder(panel, path));
-      // What a pass said of the last folder says nothing about this one.
-      this._syncOutcome = null;
-      this._describeStorage();
-      this._describeSync();
-      // Syncing with another device needs this same folder.
-      this._describeFolder();
     },
 
     /**
@@ -823,7 +864,7 @@
         lazy.SvalLog.warn(
           `revealing the sync folder failed: ${lazy.SvalLog.errorName(err)}`
         );
-        this._showStorageReport({ message: "Couldn't open the folder." });
+        this._showStorageReport({ message: "Sval couldn't open the folder." });
       }
     },
 
@@ -841,16 +882,13 @@
       }
       const panel = this.panel;
       if (!panel) {
-        this._describeStorage();
+        this._drawSyncPage();
         return;
       }
-      this._els.storageReuse.disabled = true;
+      this._setWorking(panel.sharedRootSetting());
       const report = await panel.useFolderAgain();
-      this._els.storageReuse.disabled = false;
+      this._setWorking(null);
       this._showStorageReport(report);
-      this._describeStorage();
-      this._describeSync();
-      this._describeFolder();
     },
 
     /** Stops sharing. Every workspace stays on this device. */
@@ -860,17 +898,14 @@
       }
       const panel = this.panel;
       if (!panel) {
-        this._describeStorage();
+        this._drawSyncPage();
         return;
       }
       this._els.storageStop.disabled = true;
       const report = await panel.chooseSharedFolder(null);
       this._els.storageStop.disabled = false;
-      this._showStorageReport(report);
       this._syncOutcome = null;
-      this._describeStorage();
-      this._describeSync();
-      this._describeFolder();
+      this._showStorageReport(report);
     },
   };
 

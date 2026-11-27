@@ -56,9 +56,10 @@ const DIALOG_URL = "chrome://browser/content/sval/sval-dialog.xhtml";
  * @param {string} [options.extra] A third answer's label, set apart at the
  *   start of the row.
  * @param {(page: object) => void} [options.onOpen] Called once the dialog
- *   shows, with the page's handle: `update({ title, body, warning })`,
- *   `setButton(id, { label, disabled })` and `close()`, so the opener can
- *   change a dialog that is still up.
+ *   shows, with the page's handle: `update({ title, body, warning, state })`,
+ *   `setButton(id, { label, disabled })`, `value()` for the field's untrimmed
+ *   value, and `close()`, so the opener can change a dialog that is still up
+ *   and act on its field in place.
  * @param {(id: string, page: object) => boolean} [options.onButton] Called
  *   for a press of `ok` or `extra` before it answers. Returning true keeps
  *   the dialog up, for a button that acts in place.

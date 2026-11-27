@@ -110,18 +110,13 @@ add_task(async function settings_shows_no_last_synced_text_with_no_folder() {
     "none",
     "no shared folder is chosen"
   );
-  Assert.equal(
-    ui.els.syncLast.textContent,
-    "",
-    "the page says nothing about when sval last synced"
+  Assert.equal(ui.state, "no-folder", "the page says sync is off");
+  Assert.notEqual(
+    ui.els.syncStatus.textContent,
+    NOT_SYNCED,
+    "and nothing about when sval last synced"
   );
-
-  await syncFromSettings(ui);
-  Assert.equal(
-    ui.els.syncLast.textContent,
-    "",
-    "and a pass changes nothing about that, because it reached no folder"
-  );
+  Assert.ok(!ui.els.syncNow, "nor offers a pass, which would reach no folder");
   Assert.ok(
     SvalPanel._els.syncRow.hidden,
     "and the panel's footer has no sync indicator (messages spec §3)"
@@ -141,7 +136,7 @@ add_task(async function a_background_pass_redraws_this_pages_timestamp() {
   await aFolderNotYetSynced(device);
   const ui = await openSvalSettings();
   Assert.equal(
-    ui.els.syncLast.textContent,
+    ui.els.syncStatus.textContent,
     NOT_SYNCED,
     "the page has nothing to report before the pass under test"
   );
@@ -151,12 +146,12 @@ add_task(async function a_background_pass_redraws_this_pages_timestamp() {
   // step (`SHARED_INTERVAL_MS`), past what a task may wait.
   Assert.equal(await SvalPanel.syncWithFolder(), "reached");
   await TestUtils.waitForCondition(
-    () => ui.els.syncLast.textContent === JUST_NOW,
+    () => ui.els.syncStatus.textContent === JUST_NOW,
     "a pass this page did not ask for redrew it anyway"
   );
   Assert.equal(
     SvalPanel._els.indicator.title,
-    ui.els.syncLast.textContent,
+    ui.els.syncStatus.textContent,
     "saying the same thing the panel says, because it is the same signal"
   );
 
@@ -332,8 +327,9 @@ add_task(async function settings_says_when_the_last_sync_finished() {
   const device = await panelOnAFolder("stamp", { shared: true });
 
   let ui = await openSvalSettings();
-  Assert.ok(
-    ui.els.syncLast.textContent,
+  Assert.equal(
+    ui.els.syncStatus.textContent,
+    SvalPanel._els.indicator.title,
     "the page says where the last pass got to as soon as it is opened"
   );
   await closeSvalSettings(ui);
@@ -341,7 +337,7 @@ add_task(async function settings_says_when_the_last_sync_finished() {
   await aFolderNotYetSynced(device);
   ui = await openSvalSettings();
   Assert.equal(
-    ui.els.syncLast.textContent,
+    ui.els.syncStatus.textContent,
     NOT_SYNCED,
     "and has the same nothing to report as the panel when there is none"
   );
@@ -349,7 +345,7 @@ add_task(async function settings_says_when_the_last_sync_finished() {
   await syncFromSettings(ui);
 
   Assert.equal(
-    ui.els.syncLast.textContent,
+    ui.els.syncStatus.textContent,
     JUST_NOW,
     "and after the pass it says so beside the button that asked for it"
   );

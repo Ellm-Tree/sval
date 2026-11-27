@@ -88,31 +88,45 @@ add_task(async function the_storage_section_follows_the_folder_while_open() {
   const shared = await device.folder("shared");
   await SvalPanel.chooseSharedFolder(shared);
   const ui = await openSvalSettings();
-  Assert.ok(ui.els.storageReuse.hidden, "nothing to recover while it answers");
+  Assert.equal(ui.state, "synced");
+  Assert.ok(!ui.els.storageReuse, "nothing to recover while it answers");
 
   const away = `${shared}-away`;
   await IOUtils.move(shared, away);
   // A background pass would run its shared step within thirty seconds; the
   // test asks for one now.
   await SvalPanel.syncWithFolder();
+  Assert.equal(SvalPanel.syncState.folderProblem, "gone");
+  Assert.equal(ui.state, "synced", "the page waits as the footer does");
+  outageWaitedOut();
   await TestUtils.waitForCondition(
-    () => !ui.els.storageReuse.hidden,
-    "the open page offers the way back after the next pass"
+    () => ui.state === "folder-gone" && ui.els.storageReuse,
+    "then offers the way back"
+  );
+  Assert.equal(
+    ui.command("chooseInUse"),
+    ui.els.syncButtons.querySelector(".sval-button-primary"),
+    "with choosing the folder again first"
+  );
+  Assert.ok(
+    BrowserTestUtils.isHidden(ui.els.storageChange) &&
+      BrowserTestUtils.isHidden(ui.els.folderReveal),
+    "and nothing else that would act on a folder that isn't there"
   );
 
   await IOUtils.move(away, shared);
   await SvalPanel.syncWithFolder();
   await TestUtils.waitForCondition(
-    () => ui.els.storageReuse.hidden,
+    () => ui.state === "synced" && !ui.els.storageReuse,
     "and withdraws it when the folder returns"
   );
 });
 
 /**
- * The readout's Choose Folder opens the folder picker, as the pairing line's
- * does, since the page is already where the footer's would lead.
+ * A folder Sval may not open offers another, through the same three ways a
+ * first choice offers.
  */
-add_task(async function the_readouts_choose_folder_opens_the_picker() {
+add_task(async function a_denied_folder_offers_another() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
   await panelOnAFolder("readout-choose", { shared: true });
   await aFolderDenied();
@@ -124,24 +138,30 @@ add_task(async function the_readouts_choose_folder_opens_the_picker() {
   });
   try {
     const ui = await openSvalSettings();
-    const choose = ui.page.document.querySelector(
-      '#sval-sync-actions [data-command="chooseSharedFolder"]'
+    Assert.equal(
+      ui.state,
+      "folder-denied",
+      "the page says what the footer does"
     );
-    Assert.ok(choose?.textContent, "the button is there");
+    const choose = ui.command("changeLocation");
+    Assert.ok(choose && !choose.disabled, "and offers another folder");
     choose.click();
+    const dialog = ui.page.document.getElementById("sval-location-dialog");
+    Assert.ok(dialog.open, "asking where to sync");
+    dialog.querySelector('button[data-command="chooseLocal"]').click();
     await within(shown, 10_000, "the folder picker");
   } finally {
     MockFilePicker.showCallback = null;
   }
 });
 
-/** Stop syncing keeps every workspace and goes back to offering a folder. */
+/** Stop using this folder keeps every workspace and offers a folder again. */
 add_task(async function stop_syncing_keeps_the_workspaces() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
   const device = await panelOnAFolder("stop", { shared: true });
   const ui = await openSvalSettings();
-  ui.settings._describeStorage();
-  Assert.ok(!ui.els.storageStop.hidden, "Stop syncing is offered");
+  ui.settings._drawSyncPage();
+  Assert.ok(!ui.els.storageStop.hidden, "Stop using this folder is offered");
 
   const doc = ui.page.document;
   const chosen = device.settings.sharedFolder;
@@ -162,10 +182,10 @@ add_task(async function stop_syncing_keeps_the_workspaces() {
   Assert.equal(device.settings.sharedFolder, null, "the setting is none");
   Assert.equal(device.engine.sharedRoot, null, "the engine shares nowhere");
   Assert.equal(SvalPanel.syncState.folderState, "none");
-  Assert.equal(
-    ui.els.storageChoose.dataset.tone,
-    "primary",
-    "and the card offers choosing a folder first"
+  Assert.equal(ui.state, "no-folder", "the card says sync is off");
+  Assert.ok(
+    BrowserTestUtils.isVisible(ui.els.storageChoose),
+    "and offers the ways to choose a folder"
   );
   for (const id of [device.workspace, device.tab]) {
     Assert.ok(id in (await nodes(device.engine)), `the task's ${id} is kept`);
@@ -182,11 +202,8 @@ add_task(async function sync_now_leaves_a_gone_folder_to_the_indicator() {
   const device = await panelOnAFolder("unavailable", { shared: true });
   const ui = await openSvalSettings();
   await syncFromSettings(ui);
-  Assert.equal(ui.els.syncStatus.textContent, "");
-  Assert.equal(
-    ui.page.document.getElementById("sval-sync-state").dataset.state,
-    "synced"
-  );
+  Assert.equal(ui.state, "synced");
+  Assert.equal(ui.els.syncState.dataset.state, "synced");
 
   await keyCopyIn(
     device.settings.sharedFolder,
@@ -197,9 +214,8 @@ add_task(async function sync_now_leaves_a_gone_folder_to_the_indicator() {
   });
   await syncFromSettings(ui);
   Assert.equal(SvalPanel.syncState.folderProblem, "gone", "the folder is gone");
-  const shown = ui.page.document.getElementById("sval-sync-state");
-  Assert.equal(ui.els.syncStatus.textContent, "", "and nothing says so yet");
-  Assert.equal(shown.dataset.state, "synced");
+  Assert.equal(ui.state, "synced", "and nothing says so yet");
+  Assert.equal(ui.els.storageStatus.textContent, "", "anywhere on the card");
 });
 
 /**
@@ -229,23 +245,35 @@ add_task(
     await SvalSharedFolder._whenIdle();
     Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
     Assert.deepEqual(await IOUtils.getChildren(later), [], "nothing written");
-    ui.settings._describeStorage();
-    Assert.ok(!ui.els.storageReuse.hidden, "Use this folder again is offered");
+    outageWaitedOut();
+    await TestUtils.waitForCondition(
+      () => ui.els.storageReuse,
+      "Set up this folder again is offered once the footer says so too"
+    );
+    Assert.equal(
+      ui.els.storageStatus.textContent,
+      "",
+      "in place of the sentence the state replaced"
+    );
     ui.els.storageReuse.click();
     await TestUtils.waitForCondition(
-      () => ui.els.storageStatus.textContent === "",
-      "the open page withdrew the sentence once the folder answered"
+      () => ui.state === "synced",
+      "the open page shows the folder syncing once it answered"
     );
     Assert.equal(SvalPanel.syncState.folderState, "reached");
     Assert.equal(ui.els.folderPath.textContent, later);
-    Assert.equal(ui.els.storageText.textContent, "");
+    Assert.equal(ui.els.storageStatus.textContent, "", "with nothing to add");
 
     const reuse = await device.folder("reuse-clears");
     await SvalPanel.chooseSharedFolder(reuse);
     await keyCopyIn(reuse, "the step that reached the folder left the key");
     await IOUtils.remove(PathUtils.join(reuse, "sval"), { recursive: true });
     await SvalPanel.syncWithFolder();
-    ui.settings._describeStorage();
+    outageWaitedOut();
+    await TestUtils.waitForCondition(
+      () => ui.els.storageReuse,
+      "the gone folder offers to be set up again"
+    );
     await IOUtils.remove(reuse, { recursive: true });
     ui.els.storageReuse.click();
     await TestUtils.waitForCondition(

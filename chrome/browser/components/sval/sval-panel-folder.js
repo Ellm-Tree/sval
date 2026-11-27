@@ -41,8 +41,10 @@ Object.assign(SvalPanel, {
    * @param {object} [options]
    * @param {boolean} [options.mint] Whether this is a device setting up to
    *   share on its own, rather than joining another's.
-   * @returns {Promise<object>} `{ reached, message, unreachable, problem,
-   *   keyStoreRefused, line }`, where `message` is the settings page's sentence
+   * @returns {Promise<object>} `{ reached, joining, message, unreachable,
+   *   problem, keyStoreRefused, line }`, where `joining` marks a folder that
+   *   holds another key's workspaces, chosen with no key to wait for one
+   *   (key-storage spec, "Becoming a syncing device"), `message` is the settings page's sentence
    *   when there is something to say, `unreachable` marks one that says the
    *   folder cannot be reached, `keyStoreRefused` one where the system store
    *   would not answer when the sync key was being made, and `line`, a
@@ -77,34 +79,42 @@ Object.assign(SvalPanel, {
         path = parent;
       }
     }
+    const { SYNC_KEY_STATES } = this._modules.SvalIdentity;
+    const keyState = this.syncState.keyState;
+    const keyGone =
+      keyState === SYNC_KEY_STATES.missing ||
+      keyState === SYNC_KEY_STATES.different;
     let found = null;
+    let joining = false;
+    let startFresh = false;
     if (
       mint &&
       path !== null &&
-      this.syncState.keyState ===
-        this._modules.SvalIdentity.SYNC_KEY_STATES.none
+      (keyState === SYNC_KEY_STATES.none || keyGone)
     ) {
       // A folder that already holds Sval workspaces belongs to the user's other
       // devices, and a new key would put a second set beside theirs. When
       // this user's own sealed copy is there, Sval was installed here before,
-      // and that key joins them with nothing asked. Otherwise the user is
-      // told how to join. A folder that does not answer is set up anyway; a
-      // later pass finds them.
-      const occupied = (await this._engine.otherWorkspaces(path))?.length;
+      // and that key joins them with nothing asked. Otherwise the folder is
+      // chosen with no key, as first run's join step chooses one, and the
+      // device waits for a code or a backup. A folder that does not answer
+      // is set up anyway on a device that never synced; a later pass finds
+      // what it holds.
+      //
+      // A device whose key is gone holds no key to tell whose workspaces are
+      // whose, so every directory there counts (`otherWorkspaces`). A folder
+      // that answered with none holds nothing any key opens, so the device
+      // starts over there with a new key, as Start over does: no code or
+      // backup could apply.
+      const listed = await this._engine.otherWorkspaces(path);
+      const occupied = !!listed?.length;
       found = occupied ? await this._keyInFolder(path) : null;
-      if (occupied && !found) {
-        return {
-          reached: false,
-          otherWorkspaces: true,
-          message:
-            "This folder already has Sval Workspaces. To sync with them, " +
-            'choose "Sync with another device" in Settings, then type the ' +
-            "code that a device using them shows.",
-        };
-      }
+      joining = keyState === SYNC_KEY_STATES.none && occupied && !found;
+      startFresh = keyGone && listed !== null && !occupied;
     }
     if (
       !found &&
+      !joining &&
       mint &&
       path !== null &&
       this.syncState.keyState ===
@@ -124,8 +134,8 @@ Object.assign(SvalPanel, {
           keyStoreRefused:
             err instanceof this._modules.SvalSecretStore.UnreadableError,
           message:
-            "Sval couldn't save a sync key on this device, so the folder " +
-            "didn't change.",
+            `Sval couldn't save a sync key on ${this._thisComputer()}. ` +
+            "The sync folder didn't change.",
         };
       }
       this.syncState.setKeyState(
@@ -136,7 +146,7 @@ Object.assign(SvalPanel, {
     }
     // A key found in the folder is joined even when the folder is the one
     // already chosen, so Try Again after a failed join tries the join again.
-    if (!found && path === this.sharedRootSetting()) {
+    if (!found && !startFresh && path === this.sharedRootSetting()) {
       if (path !== null && this.syncState.folderState === "unreachable") {
         return this.useFolderAgain();
       }
@@ -161,6 +171,9 @@ Object.assign(SvalPanel, {
       // it unavailable, and the settings page offers to make it again.
       await this._engine.markSharedRoot();
     }
+    if (startFresh) {
+      return this._startFreshIn();
+    }
     if (found) {
       const joined = await this.adoptKey(found);
       if (joined.adopted) {
@@ -168,8 +181,8 @@ Object.assign(SvalPanel, {
           reached: true,
           joined: true,
           message:
-            "Sval found your sync key in this folder, from when it was " +
-            "installed here before, and is syncing your Workspaces.",
+            "Sval found your sync key from an earlier install. Your " +
+            "Workspaces are syncing again.",
         };
       }
       // Choosing a folder sets sync up on this device, so a join that fails
@@ -196,17 +209,23 @@ Object.assign(SvalPanel, {
         this._modules.SvalIdentity.SYNC_KEY_STATES.none
     ) {
       if ((await this._engine.otherWorkspaces(shared)) !== null) {
-        return { reached: true, message: null };
+        return { reached: true, joining, message: null };
       }
       return {
         reached: false,
         unreachable: true,
-        message: "Can't reach this folder yet. Sval syncs when it's back.",
+        message: this._folderNotYet(),
       };
     }
-    await this.syncWithFolder();
+    const answer = await this.syncWithFolder();
     if (shared === null || this.syncState.folderState === "reached") {
       return { reached: true, message: null };
+    }
+    // An engine that shares nowhere, because the key it would read the folder
+    // with is lost or locked, asked the folder nothing. The indicator says
+    // why sync is off.
+    if (answer === "none") {
+      return { reached: false, message: null };
     }
     if (this.syncState.folderState === "too-large") {
       return {
@@ -220,8 +239,49 @@ Object.assign(SvalPanel, {
       reached: false,
       unreachable: true,
       problem: this.syncState.folderProblem,
-      message: "Can't reach this folder yet. Sval syncs when it's back.",
+      message: this._folderNotYet(),
     };
+  },
+
+  /**
+   * Starts sync in the chosen folder, which holds no workspaces under any
+   * key, on a device whose own key is gone: a new key through the same
+   * publish-then-persist adoption Start over uses (`setUpSyncAgain`), with
+   * nothing to retire, and its backup offered as for a first key
+   * (key-storage spec, "Becoming a syncing device").
+   *
+   * @returns {Promise<object>} as {@link chooseSharedFolder}.
+   */
+  async _startFreshIn() {
+    const fresh = new Uint8Array(32);
+    crypto.getRandomValues(fresh);
+    const joined = await this.adoptKey(fresh);
+    if (joined.adopted) {
+      this._settings.backupSaved = false;
+      await this._flushSettings();
+      this._offerBackupLater();
+      return { reached: true, startedFresh: true, message: null };
+    }
+    const line = this._modules.SvalPanelModel.pairingLine(
+      joined,
+      this._modules.AppConstants.platform,
+      "Setup"
+    );
+    return {
+      reached: false,
+      message: line.text,
+      line,
+      failure: joined.failure,
+      problem: joined.problem,
+    };
+  },
+
+  /** @returns {string} What a folder chosen and not reached yet says. */
+  _folderNotYet() {
+    return (
+      "Sval can't reach the folder yet. Sval syncs once the folder is " +
+      "reachable."
+    );
   },
 
   /**
@@ -315,7 +375,10 @@ Object.assign(SvalPanel, {
       return { reached: false, message: null };
     }
     await this._engine.markSharedRoot();
-    await this.syncWithFolder();
+    // An answer of "none" asked the folder nothing, as in `chooseSharedFolder`.
+    if ((await this.syncWithFolder()) === "none") {
+      return { reached: false, message: null };
+    }
     if (this.syncState.folderState === "too-large") {
       return {
         reached: false,
@@ -329,7 +392,7 @@ Object.assign(SvalPanel, {
       : {
           reached: false,
           unreachable: true,
-          message: "Still can't reach this folder.",
+          message: "Sval still can't reach the sync folder.",
         };
   },
 
@@ -488,15 +551,26 @@ Object.assign(SvalPanel, {
     const answer = await this._modules.openSvalDialog(window, {
       icon: "key",
       tone: "danger",
-      title: "Set up sync again with a new sync key?",
+      title: "Start over with a new sync key?",
       body:
-        "Sval makes a new sync key and publishes this device's Workspaces " +
-        "under it. Your other devices stop syncing until you give each one " +
-        "a new code. Sval removes the old files from your sync folder, so the " +
-        "old key can't read them anymore.",
-      primary: "Set up sync again",
+        `Sval makes a new sync key for ${this._thisComputer()}. Other ` +
+        "devices stop syncing until you add each device again. If " +
+        `${this._thisComputer()} still has the old sync key, Sval deletes ` +
+        "the old sync key's files from the sync folder.",
+      primary: "Start over",
     });
     return answer.ok;
+  },
+
+  /**
+   * What the words call this computer: `this Mac`, `this PC` or `this
+   * computer`.
+   *
+   * @returns {string}
+   */
+  _thisComputer() {
+    const { AppConstants, SvalPanelModel } = this._modules;
+    return `this ${SvalPanelModel.computerNoun(AppConstants.platform)}`;
   },
 
   /**
@@ -574,14 +648,14 @@ Object.assign(SvalPanel, {
       return {
         restored: false,
         refused: "not-a-key",
-        message: "That isn't a sync key backup. Check what you typed.",
+        message: "The text isn't a backup key. Check the backup key.",
       };
     }
     if (!this._engine || !this.sharedRootSetting()) {
       return {
         restored: false,
         refused: "no-folder",
-        message: "Choose your sync folder first.",
+        message: "Choose the sync folder first.",
       };
     }
     const opens = await this._engine
@@ -591,19 +665,27 @@ Object.assign(SvalPanel, {
       return {
         restored: false,
         refused: "unreachable",
-        message: "Can't reach your sync folder. Try again when it's back.",
+        message:
+          "Sval can't reach the sync folder. Try again once the sync folder " +
+          "is reachable.",
       };
     }
     if (!opens) {
       return {
         restored: false,
         refused: "mismatch",
-        message: "That key doesn't match the Workspaces in this folder.",
+        message:
+          "The backup key doesn't match the Workspaces in the sync folder.",
       };
     }
     const result = await this.adoptKey(keyBytes);
     if (result.adopted) {
-      return { restored: true, message: "Done. Both devices are synced." };
+      return {
+        restored: true,
+        message: `Sval restored the sync key. This ${this._modules.SvalPanelModel.computerNoun(
+          this._modules.AppConstants.platform
+        )} is syncing again.`,
+      };
     }
     const line = SvalPanelModel.pairingLine(
       result,

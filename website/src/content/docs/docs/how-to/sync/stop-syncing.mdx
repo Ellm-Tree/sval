@@ -3,6 +3,9 @@ title: Stop syncing on this device
 description: Keep your Workspaces on this device only, and stop using the sync folder.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 When you stop syncing, this device stops using the sync folder. Your Workspaces stay on
 the device as they are.
 
@@ -11,18 +14,47 @@ before you wipe it.
 
 ## Steps
 
+<Since v="0.1.0-rc.11">
+
+1. Open Settings › Sync and devices.
+2. Under Sync, select **Stop Syncing**.
+3. In the dialog, select **Stop syncing**.
+
+The Sync card says "Sync is off" and offers the ways to choose a folder.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
 1. Open Settings › Sync and devices.
 2. Under Sync, select **Stop syncing**.
 
 The Sync card reads "Sval saves your Workspaces on this device only. To sync
 them, choose a folder your devices share."
 
+</Until>
+
 ## Details
+
+<Since v="0.1.0-rc.11">
+
+- Sval keeps every Workspace on this computer and forgets the sign-in for an
+  SMB server or Dropbox.
+- Your other devices keep syncing with each other through the folder.
+- This computer keeps the sync key. To sync again, choose the same folder
+  with **A folder on this computer…**.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 - Sval doesn't ask first. It keeps every Workspace on this device.
 - Your other devices go on syncing with each other through the folder.
 - This device keeps its sync key. To sync again, choose the same folder
   with **Choose folder…**.
+
+</Until>
+
 - Stopping sync doesn't stop a device you no longer have from reading the
   folder. To shut a lost device out, see
   [Set up sync again with a new key](/docs/how-to/sync/set-up-sync-again/).

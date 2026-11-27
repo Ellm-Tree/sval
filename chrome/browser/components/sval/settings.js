@@ -182,21 +182,20 @@
       );
     },
 
-    /** Says why storage, syncing and pairing are unavailable, and turns them off. */
+    /**
+     * Turns off storage, syncing and pairing, which have nothing to act on.
+     * The Sync card's state says why (`SvalPanelModel.syncPage`).
+     */
     _showPrivateOnly() {
       const section = document.querySelector('[data-sval-pane="svalSync"]');
       if (!section) {
         return;
       }
-      // Disabled rather than `inert`, which would hide the note below from
+      // Disabled rather than `inert`, which would hide the card's state from
       // a screen reader too.
       for (const control of section.querySelectorAll("button, input")) {
         control.disabled = true;
       }
-      const note = document.createElement("p");
-      note.className = "sval-lead sval-private-only";
-      note.textContent = "Off while every window is private.";
-      section.querySelector("h1").after(note);
     },
 
     init() {
@@ -284,9 +283,8 @@
      * secret store and the panel.
      */
     _describeFolderState() {
-      this._describeStorage();
-      this._describeFolder();
-      this._describeSync();
+      this._drawSyncPage();
+      this._readKeyStore();
       this._describeAnswers();
     },
 
@@ -380,16 +378,24 @@
             `showing Secure DNS failed: ${lazy.SvalLog.errorName(err)}`
           )
         );
-      } else if (section === "offer") {
-        this.choosePath("offer");
-        this._els.offerStart.focus();
-      } else if (section === "claim") {
-        this.choosePath("claim", 2);
-        this._els.claimCode.focus();
-      } else if (section === "storage") {
-        (this._els.storageReuse.hidden
-          ? this._els.storageChoose
-          : this._els.storageReuse
+      } else if (section === "offer" && this._page?.addDevice) {
+        this._els.pairingOpen.focus();
+      } else if (
+        section === "claim" &&
+        this._page?.primary?.command === "enterCode"
+      ) {
+        this.runSyncCommand("enterCode");
+      } else if (
+        section === "storage" ||
+        section === "offer" ||
+        section === "claim"
+      ) {
+        // The state's own way forward, else the folder's.
+        (
+          this._els.syncButtons.querySelector("button") ??
+          (this._els.storageChange.hidden
+            ? this._els.storageChoose
+            : this._els.storageChange)
         ).focus();
       } else if (section === "top" || first) {
         document

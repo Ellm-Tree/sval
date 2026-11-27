@@ -176,6 +176,175 @@ add_task(async function a_missing_key_is_named_and_pairing_restores_it() {
 });
 
 /**
+ * A device whose sync key is gone asks no folder anything, so choosing a
+ * folder it can reach, or making the chosen one again, never says the folder
+ * can't be reached. The indicator says why sync is off.
+ */
+add_task(async function a_missing_key_never_calls_a_folder_unreachable() {
+  const { win, panel, storedKey } = await startingWithoutTheKey();
+  const chosen = await makeTempDir("sval-chosen");
+  // Workspaces under a key this device doesn't hold, and no sealed copy of
+  // any key: nothing here is this device's to read or to start over in.
+  await peerPublishing(chosen, randomBytes(32), "Under another key");
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+
+  const report = await panel.chooseSharedFolder(chosen, { mint: true });
+  Assert.equal(panel.sharedRootSetting(), chosen, "the folder is chosen");
+  Assert.ok(!report.unreachable, "and is not called unreachable");
+  Assert.equal(report.message, null, "with no line about the folder");
+  Assert.equal(await storedKey(), null, "no key was made");
+
+  const again = await panel.useFolderAgain();
+  Assert.ok(!again.unreachable, "making it again calls it unreachable neither");
+  Assert.equal(again.message, null, "and has no line about the folder");
+
+  const { indicator, syncActions } = syncRowOf(win);
+  Assert.equal(indicator.dataset.state, "key-gone", "sync is off");
+  Assert.ok(
+    syncActions.querySelector('[data-command="pairAgain"]'),
+    "with the way back"
+  );
+});
+
+/**
+ * Opens Settings › Sync and devices in `win`, as the indicator's click does,
+ * and waits for the page's script.
+ *
+ * @param {Window} win
+ * @returns {Promise<object>} `{ tab, page }`.
+ */
+async function settingsIn(win) {
+  const tab = expectOpened(win.SvalPanel.openSettingsPage());
+  await TestUtils.waitForCondition(
+    () => tab.linkedBrowser.contentWindow?.SvalSettings?._page,
+    "the settings page draws its Sync card"
+  );
+  return { tab, page: tab.linkedBrowser.contentWindow };
+}
+
+/**
+ * The Sync card's state and the commands its buttons run, read as drawn.
+ *
+ * @param {Window} page The settings page.
+ * @returns {object} `{ state, commands }`.
+ */
+function syncCardOf(page) {
+  page.SvalSettings._drawSyncPage();
+  const doc = page.document;
+  return {
+    state: doc.getElementById("sval-storage").dataset.state,
+    commands: [...doc.querySelectorAll("#sval-sync-buttons button")].map(
+      button => button.dataset.command
+    ),
+  };
+}
+
+/**
+ * A device whose key is gone that chooses an empty folder starts sync there:
+ * the folder holds nothing any key opens, so no code or backup could apply.
+ * Sval makes a new key, syncs this device's Workspaces into the folder and
+ * offers the backup, as a first setup does.
+ */
+add_task(async function a_missing_key_starts_over_in_an_empty_folder() {
+  const { win, panel, ourKey, storedKey } = await startingWithoutTheKey();
+  const empty = await makeTempDir("sval-empty");
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+
+  const report = await panel.chooseSharedFolder(empty, { mint: true });
+  Assert.ok(report.reached, `the folder is set up: ${report.message}`);
+  const stored = await storedKey();
+  Assert.equal(stored?.length, 32, "a new key is stored");
+  Assert.notDeepEqual(asArray(stored), asArray(ourKey), "and the key is new");
+  Assert.equal(
+    panel.syncState.keyState,
+    SvalIdentity.SYNC_KEY_STATES.present,
+    "and the device holds the key"
+  );
+  await pressInDialog(win, ".sval-backup-done");
+  Assert.equal(
+    panel.syncState.folderState,
+    "reached",
+    "sync reaches the folder"
+  );
+  Assert.ok(
+    (await IOUtils.getChildren(PathUtils.join(empty, "sval", "ws"))).length,
+    "with this device's Workspaces in it"
+  );
+
+  const { tab, page } = await settingsIn(win);
+  const card = syncCardOf(page);
+  Assert.equal(card.state, "synced", "the Sync card shows the folder syncing");
+  Assert.ok(!card.commands.includes("enterCode"), "with no code to enter");
+  BrowserTestUtils.removeTab(tab);
+});
+
+/**
+ * A device whose other secrets are sealed under another build's system
+ * secret can save no new key, since replacing that secret would leave them
+ * unopenable. The Sync card says the saved key can't be unlocked, as its one
+ * state, with no result line under it.
+ */
+add_task(async function a_key_the_store_refuses_is_the_cards_one_state() {
+  const { win, panel, storedKey } = await startingWithoutTheKey();
+  const secrets = secretsFile();
+  const original = await IOUtils.read(secrets);
+  atTaskEnd(() => IOUtils.write(secrets, original));
+  const file = await IOUtils.readJSON(secrets);
+  file.label = "Sval secrets (another build)";
+  file.secrets["another sign-in"] = file.secrets["another sign-in"] ?? "AAAA";
+  await IOUtils.writeJSON(secrets, file);
+  const sealed = await IOUtils.read(secrets);
+  const empty = await makeTempDir("sval-empty-sealed");
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+
+  const { tab, page } = await settingsIn(win);
+  await page.SvalSettings._useFolder(panel, empty);
+  Assert.equal(await storedKey(), null, "no key was saved");
+  Assert.deepEqual(
+    asArray(await IOUtils.read(secrets)),
+    asArray(sealed),
+    "and the secrets sealed under the other build are left as they were"
+  );
+  const card = syncCardOf(page);
+  Assert.equal(card.state, "key-sealed", "the Sync card says why");
+  const status = page.document.getElementById("sval-storage-status");
+  Assert.ok(
+    !status.dataset.status && !status.textContent,
+    "with no result line under it"
+  );
+  Assert.equal(
+    panel.syncIndicator().state,
+    "key-sealed",
+    "and the footer says the same"
+  );
+  BrowserTestUtils.removeTab(tab);
+});
+
+/**
+ * A device whose key is gone that chooses a folder holding the old key's
+ * files stays off: the files need the old key, which a code, a backup or the
+ * sealed copy brings back.
+ */
+add_task(async function a_missing_key_stays_off_in_a_folder_with_its_files() {
+  const { win, panel, storedKey } = await startingWithoutTheKey();
+  const shared = panel.sharedRootSetting();
+  // The sealed copy would bring the key back with nothing asked; without it
+  // the folder holds only files the missing key reads.
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+  await IOUtils.remove(PathUtils.join(shared, "sval", "keys"), {
+    recursive: true,
+    ignoreAbsent: true,
+  });
+  await panel.chooseSharedFolder(shared, { mint: true });
+  Assert.equal(await storedKey(), null, "no key was made");
+  const { tab, page } = await settingsIn(win);
+  const card = syncCardOf(page);
+  Assert.equal(card.state, "key-gone", "the Sync card says sync is off");
+  Assert.equal(card.commands[0], "enterCode", "and offers a code first");
+  BrowserTestUtils.removeTab(tab);
+});
+
+/**
  * A store that will not answer stops only syncing. Its button reads it again,
  * and a key that reads starts the shared passes without a restart.
  */
@@ -201,6 +370,32 @@ add_task(async function an_unreadable_key_is_tried_again_without_a_restart() {
   await TestUtils.waitForCondition(
     () => peer.id in panel.nodes,
     "Try again brought the folder in"
+  );
+});
+
+/**
+ * Starting over with a new sync key works on a device whose key is gone:
+ * there is no old key to retire, and the device syncs under the new one.
+ */
+add_task(async function starting_over_works_with_the_key_missing() {
+  const { win, panel, ourKey, storedKey } = await startingWithoutTheKey();
+  const pending = panel.setUpSyncAgain();
+  await pressInDialog(win, '.sval-dialog-actions button[data-button="ok"]');
+  const result = await within(pending, 30_000, "starting over");
+  Assert.ok(result.done, `it started over: ${result.failure}`);
+  const stored = await storedKey();
+  Assert.equal(stored?.length, 32, "a new key is stored");
+  Assert.notDeepEqual(asArray(stored), asArray(ourKey), "and it is new");
+  Assert.equal(
+    panel.syncState.keyState,
+    SvalIdentity.SYNC_KEY_STATES.present,
+    "and the device syncs with it"
+  );
+  await pressInDialog(win, ".sval-backup-done");
+  Assert.notEqual(
+    syncRowOf(win).indicator.dataset.state,
+    "key-gone",
+    "so the indicator no longer says sync is off"
   );
 });
 
@@ -544,8 +739,8 @@ add_task(async function installing_again_finds_the_key_in_the_folder() {
     SvalSecretStore.keyStore = realStore;
   }
   Assert.ok(
-    refused.otherWorkspaces,
-    "another user's copy opens nothing, so the folder is not set up"
+    refused.joining,
+    "another user's copy opens nothing, so the folder waits for a key"
   );
 
   const joined = await panel.chooseSharedFolder(root, { mint: true });
@@ -651,7 +846,7 @@ add_task(async function a_key_in_icloud_keychain_joins_a_new_mac() {
 
   SvalICloudKeychain.read = () => randomBytes(32);
   Assert.ok(
-    (await panel.chooseSharedFolder(root, { mint: true })).otherWorkspaces,
+    (await panel.chooseSharedFolder(root, { mint: true })).joining,
     "a key that opens nothing here is not taken"
   );
 

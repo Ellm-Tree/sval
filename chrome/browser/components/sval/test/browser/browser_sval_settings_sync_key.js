@@ -50,11 +50,11 @@ Services.scriptloader.loadSubScript(
  * "What each system store does to Sval").
  */
 add_task(async function storage_says_when_the_sync_key_is_in_the_profile() {
-  await svalKeys();
+  await panelOnAFolder("keyring", { shared: true });
   const ui = await openSvalSettings("storage");
   const line = ui.page.document.getElementById("sval-storage-keyring");
 
-  await ui.settings._describeKeyring();
+  await ui.settings._readKeyStore();
   Assert.ok(line.hidden, "a machine with a keyring is told nothing");
 
   const realPath = SvalSecretStore.path;
@@ -65,11 +65,12 @@ add_task(async function storage_says_when_the_sync_key_is_in_the_profile() {
       label: "sval secrets test",
       secrets: {},
     });
-    await ui.settings._describeKeyring();
+    await ui.settings._readKeyStore();
     Assert.ok(!line.hidden, "one with no keyring is told where the key is");
   } finally {
     await IOUtils.remove(SvalSecretStore.path, { ignoreAbsent: true });
     SvalSecretStore.path = realPath;
+    await ui.settings._readKeyStore();
   }
 });
 
@@ -104,7 +105,7 @@ add_task(async function the_keychain_line_names_the_item_sval_stores() {
   const ui = await openSvalSettings("storage");
   const line = ui.page.document.getElementById("sval-smb-keychain");
   Assert.ok(
-    line.message.includes(`"${labels[0]}"`),
+    line.message.includes(`“${labels[0]}”`),
     "Settings names the item the system store holds"
   );
 });
@@ -297,8 +298,9 @@ async function workspaceDirs(shared) {
 
 /**
  * A device setting up to share makes no key for a folder that already holds
- * Sval workspaces, and says how to sync with them instead; an empty folder
- * gets a key (key-storage spec, "Becoming a syncing device").
+ * Sval workspaces: it chooses the folder and waits for a key from a code or
+ * a backup, and the page says so. An empty folder gets a key (key-storage
+ * spec, "Becoming a syncing device").
  */
 add_task(async function a_folder_with_sval_workspaces_mints_no_key() {
   const { folder } = await panelOnAFolder("mint-check");
@@ -306,12 +308,11 @@ add_task(async function a_folder_with_sval_workspaces_mints_no_key() {
   await anotherKeysWorkspaces(occupied);
   const win = await aWindowThatNeverShared();
 
-  const before = win.SvalPanel.sharedRootSetting();
-  const refused = await win.SvalPanel.chooseSharedFolder(occupied, {
+  const joining = await win.SvalPanel.chooseSharedFolder(occupied, {
     mint: true,
   });
-  Assert.ok(refused.otherWorkspaces, "the folder's workspaces are named");
-  Assert.ok(refused.message, "and the way to join them is said");
+  Assert.ok(joining.joining, "the folder is chosen to join");
+  Assert.equal(joining.message, null, "with nothing for a line to say");
   Assert.equal(
     (await SvalIdentity.syncKey()).state,
     SvalIdentity.SYNC_KEY_STATES.none,
@@ -319,9 +320,48 @@ add_task(async function a_folder_with_sval_workspaces_mints_no_key() {
   );
   Assert.equal(
     win.SvalPanel.sharedRootSetting(),
-    before,
-    "the folder is unset"
+    occupied,
+    "the folder is chosen"
   );
+  Assert.equal(
+    win.SvalPanel.syncIndicator().state,
+    "joining",
+    "and the device waits for its key"
+  );
+
+  const ui = await openSvalSettings();
+  ui.settings._drawSyncPage();
+  Assert.equal(ui.state, "joining", "the page says what the footer does");
+  assertOnlyPageControls(ui, {
+    primary: "enterCode",
+    secondary: ["restore"],
+    shown: [
+      "sval-folder-field",
+      "sval-folder-reveal",
+      "sval-storage-change",
+      "sval-storage-stop",
+    ],
+  });
+  const chrome = ui.page.browsingContext.topChromeWindow;
+  ui.command("enterCode").click();
+  let asked = await svalDialogAsking(chrome, "enter-code");
+  Assert.equal(
+    asked.doc.activeElement,
+    asked.input,
+    "Enter code… opens a dialog with the code field focused"
+  );
+  asked.cancel.click();
+  await svalDialogClosed(chrome, asked, "Cancel closes the dialog");
+  ui.command("restore").click();
+  asked = await svalDialogAsking(chrome, "restore");
+  Assert.equal(
+    asked.doc.activeElement,
+    asked.input,
+    "and Restore from a backup… a dialog with the backup key's field"
+  );
+  asked.cancel.click();
+  await svalDialogClosed(chrome, asked, "which Cancel closes");
+  BrowserTestUtils.removeTab(ui.tab);
 
   const empty = await folder("empty");
   const offered = backupOffered(win);
@@ -332,6 +372,19 @@ add_task(async function a_folder_with_sval_workspaces_mints_no_key() {
     "an empty folder gets a key"
   );
   await within(offered, 10_000, "and its backup is offered");
+  Assert.equal(
+    win.SvalPanel.syncState.folderState,
+    "reached",
+    "and sync reaches the folder"
+  );
+  const after = await openSvalSettings();
+  after.settings._drawSyncPage();
+  Assert.equal(after.state, "synced", "the Sync card shows the folder syncing");
+  Assert.ok(
+    !after.els.syncButtons.querySelector('[data-command="enterCode"]'),
+    "with no code to enter"
+  );
+  BrowserTestUtils.removeTab(after.tab);
 });
 
 /**
@@ -505,31 +558,72 @@ async function setUpAgainFromSettings(ui, answer) {
     await answerSvalDialog(window, answer);
   }
   await within(pressed, 45_000, "Set Up Sync Again");
-  const status = byId("sval-key-status");
+  const status = byId("sval-storage-status");
   return {
     reason: status.dataset.reason,
     status: status.dataset.status,
-    buttons: [...byId("sval-key-result-actions").children].map(
+    buttons: [...byId("sval-storage-result-actions").children].map(
       each => each.dataset.command
     ),
   };
 }
 
 /**
- * Set Up Sync Again says how it went under the sync key (messages spec §7):
- * on success, a line and the way to show another device a code; on failure,
- * the join line with "Setup failed:"; on a declined confirmation, nothing.
+ * Asserts that an error's result line and its button are drawn as one
+ * rounded, tinted box, with neither piece painting a box of its own.
+ *
+ * @param {Element} status The `.sval-status-line`.
+ * @param {Element} actions Its `.sval-result-actions`.
+ */
+function assertOneResultBox(status, actions) {
+  const box = status.parentElement;
+  Assert.ok(
+    box.classList.contains("sval-result") && actions.parentElement === box,
+    "the result line and its button share one container"
+  );
+  const win = box.documentGlobal;
+  const style = win.getComputedStyle(box);
+  Assert.notEqual(
+    style.backgroundColor,
+    "rgba(0, 0, 0, 0)",
+    "which is the tinted box"
+  );
+  Assert.notEqual(style.borderTopLeftRadius, "0px", "with rounded corners");
+  for (const piece of [status, actions]) {
+    const own = win.getComputedStyle(piece);
+    Assert.equal(
+      own.backgroundColor,
+      "rgba(0, 0, 0, 0)",
+      `${piece.id || piece.className} paints no box of its own`
+    );
+    const outer = box.getBoundingClientRect();
+    const inner = piece.getBoundingClientRect();
+    Assert.ok(
+      inner.top >= outer.top &&
+        inner.bottom <= outer.bottom &&
+        inner.left >= outer.left &&
+        inner.right <= outer.right,
+      `${piece.id || piece.className} lies inside the box`
+    );
+  }
+}
+
+/**
+ * Start over with a new sync key says how it went on the Sync card (messages
+ * spec §7): on success, a line and the way to add another device; on
+ * failure, the join line with "Setup failed:"; on a declined confirmation,
+ * nothing.
  */
 add_task(async function set_up_sync_again_says_how_it_went() {
   await panelOnAFolder("set-up-again", { shared: true });
   const shared = SvalPanel.sharedRootSetting();
   const ui = await openSvalSettings();
   const byId = id => ui.page.document.getElementById(id);
-  const status = byId("sval-key-status");
-  const actions = byId("sval-key-result-actions");
+  const status = byId("sval-storage-status");
+  const actions = byId("sval-storage-result-actions");
   Assert.ok(
-    byId("sval-set-up-again").textContent.trim(),
-    "Set up sync again is offered"
+    !byId("sval-sync-advanced").hidden && !byId("sval-set-up-again").hidden,
+    "Start over is offered under Advanced"
   );
 
   let offered = backupOffered(window);
@@ -549,6 +643,7 @@ add_task(async function set_up_sync_again_says_how_it_went() {
     status: "error",
     buttons: ["tryAgain"],
   });
+  assertOneResultBox(status, actions);
   await SvalTestDeny.allow(sval);
 
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
@@ -558,13 +653,14 @@ add_task(async function set_up_sync_again_says_how_it_went() {
     status: "error",
     buttons: ["chooseSharedFolder"],
   });
-  const said = status.textContent;
-
-  // Declining leaves what was said before.
+  // Declining leaves what was said before: here, once the folder is chosen
+  // again and the page has moved on from the line about there being none.
   await SvalPanel.chooseSharedFolder(shared);
+  const said = status.textContent;
+  Assert.equal(said, "", "the line went with the state it was about");
   Assert.equal(
     (await setUpAgainFromSettings(ui, "cancel")).reason,
-    "no-folder",
+    "",
     "a declined confirmation says nothing new"
   );
   Assert.equal(status.textContent, said, "in the same words");
@@ -574,7 +670,7 @@ add_task(async function set_up_sync_again_says_how_it_went() {
   await within(offered, 10_000, "the new key's backup");
   const paneShown = TestUtils.waitForCondition(
     () => byId("sval-devices").dataset.path === "offer",
-    "Show Code… opens the offering side"
+    "Add a device… opens the offering side"
   );
   actions.firstElementChild.click();
   await within(paneShown, 10_000, "the offering side");
@@ -607,16 +703,16 @@ add_task(async function a_key_store_failure_names_the_store() {
     "Setup"
   );
   Assert.equal(
-    byId("sval-key-status").dataset.reason,
+    byId("sval-storage-status").dataset.reason,
     "key-store",
     "the line is the key store's"
   );
   Assert.equal(
-    byId("sval-key-status").textContent,
+    byId("sval-storage-status").textContent,
     line.text,
     "naming this platform's store"
   );
-  const buttons = [...byId("sval-key-result-actions").children];
+  const buttons = [...byId("sval-storage-result-actions").children];
   Assert.deepEqual(
     buttons.map(each => [each.dataset.command, each.textContent]),
     [["tryAgain", line.action.label]],
@@ -626,16 +722,17 @@ add_task(async function a_key_store_failure_names_the_store() {
 });
 
 /**
- * A restore from a backup says it worked when it did, and "Restore failed:"
- * with the pairing line's button when the key fitted and the join did not:
- * here the folder refuses this device's file in the key's directory.
+ * A restore from a backup, on a device waiting for its key, says it worked
+ * when it did, and "Restore failed:" with the pairing line's button when the
+ * key fitted and the join did not: here the folder refuses this device's
+ * file in the key's directory.
  */
 add_task(async function a_restore_says_how_it_went() {
   const { backupCode } = ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
   );
-  await panelOnAFolder("restore", { shared: true });
-  const shared = SvalPanel.sharedRootSetting();
+  const { folder } = await panelOnAFolder("restore");
+  const shared = await folder("restore-shared");
   const theirKey = randomBytes(32);
   const them = new SvalEngine({
     root: shared,
@@ -655,41 +752,60 @@ add_task(async function a_restore_says_how_it_went() {
     PathUtils.join(shared, ...wrote.split("/"))
   );
 
+  const win = await aWindowThatNeverShared();
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+  Assert.ok(
+    (await win.SvalPanel.chooseSharedFolder(shared, { mint: true })).joining,
+    "the device chooses their folder to join"
+  );
+
   const ui = await openSvalSettings();
-  const byId = id => ui.page.document.getElementById(id);
-  const status = byId("sval-key-status");
-  const actions = byId("sval-key-result-actions");
-  const code = byId("sval-restore-code");
+  const chrome = ui.page.browsingContext.topChromeWindow;
+  const status = ui.els.storageStatus;
+  ui.settings._drawSyncPage();
+  Assert.equal(ui.state, "joining");
+  ui.command("restore").click();
+  const asked = await svalDialogAsking(chrome, "restore");
+  atTaskEnd(async () => {
+    if (chrome.gDialogBox.dialog === asked.dialog) {
+      asked.cancel.click();
+      await svalDialogClosed(chrome, asked, "the backup's dialog closing");
+    }
+  });
+  Assert.equal(asked.doc.activeElement, asked.input, "with the field focused");
+
+  submitInDialog(asked, "not a key");
+  Assert.equal(
+    asked.input.getAttribute("aria-invalid"),
+    "true",
+    "a typing mistake is refused on the field"
+  );
+  Assert.equal(asked.form.dataset.state, "restore", "before any key is tried");
 
   atTaskEnd(() => SvalTestDeny.allow(theirDir));
   await SvalTestDeny.write(theirDir);
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
-  code.value = backupCode(theirKey);
-  await within(ui.settings.restoreFromBackup(), 45_000, "the restore");
-  Assert.equal(
-    status.dataset.reason,
-    "folder",
-    "the folder could not be reached"
+  submitInDialog(asked, backupCode(theirKey));
+  await TestUtils.waitForCondition(
+    () => asked.form.dataset.state === "folder",
+    "the dialog says the folder could not be reached"
   );
-  Assert.equal(status.dataset.status, "error");
-  Assert.deepEqual(
-    [...actions.children].map(each => each.dataset.command),
-    ["tryAgain"]
-  );
+  Assert.ok(!asked.ok.disabled, "with Restore there to try again");
 
   await SvalTestDeny.allow(theirDir);
   await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
-  actions.firstElementChild.click();
+  asked.ok.click();
+  await svalDialogClosed(
+    chrome,
+    asked,
+    "a key that restored closes the dialog"
+  );
   await TestUtils.waitForCondition(
     () => status.dataset.status === "success",
-    "Try Again restores again"
+    "and the Sync card says the key is back"
   );
-  Assert.equal(actions.childElementCount, 0, "with nothing to press");
-
-  code.value = "not a key";
-  await within(ui.settings.restoreFromBackup(), 10_000, "the restore");
-  Assert.ok(!("status" in status.dataset), "a typing mistake has no glyph");
-  Assert.equal(code.getAttribute("aria-invalid"), "true", "on the field");
+  Assert.equal(status.dataset.reason, "restored");
+  Assert.notEqual(ui.state, "joining", "and the device has its key");
   BrowserTestUtils.removeTab(ui.tab);
 });
 
@@ -708,7 +824,7 @@ add_task(async function send_report_opens_the_form_from_settings() {
   const failed = await aWindowThatFailedToStart();
   Assert.equal(ui.settings.panel, failed.SvalPanel, "the page asks it");
   const byId = id => ui.page.document.getElementById(id);
-  const actions = byId("sval-key-result-actions");
+  const actions = byId("sval-storage-result-actions");
   await setUpAgainFromSettings(ui, null);
   const button = actions.querySelector("button");
   Assert.equal(button.dataset.command, "sendReport");

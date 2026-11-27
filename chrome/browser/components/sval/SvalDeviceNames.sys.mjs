@@ -96,6 +96,20 @@ export const SvalDeviceNames = {
   },
 
   /**
+   * The names of every other device that has published one, in the order
+   * a person reads a list.
+   *
+   * @returns {string[]}
+   */
+  others() {
+    const own = current?.engine.deviceIdHex;
+    return [...names]
+      .filter(([device]) => device !== own)
+      .map(([, name]) => name)
+      .sort((a, b) => a.localeCompare(b));
+  },
+
+  /**
    * Whether the device with hex id `device` is a `"phone"` or a `"tablet"`,
    * or null when it has not said.
    *

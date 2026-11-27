@@ -25,6 +25,14 @@ title: t
 3. Select **About Sval**.
 4. Open Settings › Fake Pane › Qzxv Row.
 5. Open Settings › Fake Pane shows the rows.
+
+<Until v="9.9.9">
+
+1. Select **Retired Galaxy Button**, a name the release before this one had.
+
+</Until>
+
+1. Select **Back Again Galaxy**.
 """
 
 
@@ -46,7 +54,9 @@ class Labels(unittest.TestCase):
             )
             self.assertEqual(run.returncode, 1)
             flagged = [line.split('"')[1] for line in run.stdout.splitlines()]
-            self.assertEqual(flagged, ["Move to Galaxy", "Qzxv Row"])
+            self.assertEqual(
+                flagged, ["Move to Galaxy", "Qzxv Row", "Back Again Galaxy"]
+            )
 
 
 if __name__ == "__main__":

@@ -36,6 +36,8 @@ SOURCE_SUFFIXES = {".js", ".mjs", ".html", ".xhtml", ".ftl", ".patch", ".dtd", "
 STEP_RE = re.compile(r"^\s*\d+\.\s")
 BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
 PATH_RE = re.compile(r"Settings(?:\s*›\s*[^›,.;:\n\"\[\]()]+)+")
+UNTIL_OPEN_RE = re.compile(r"^\s*<Until\b")
+UNTIL_CLOSE_RE = re.compile(r"^\s*</Until>")
 
 
 def normalize(text):
@@ -44,8 +46,16 @@ def normalize(text):
 
 def labels(page):
     """Yield (line number, label, is last part of a path) for each control
-    the page names."""
+    the page names. Text in an `<Until>` block describes the release before
+    the one that renamed its controls, so its names are not this build's."""
+    retired = False
     for number, line in enumerate(page.read_text(encoding="utf-8").splitlines(), 1):
+        if UNTIL_OPEN_RE.match(line):
+            retired = True
+        elif UNTIL_CLOSE_RE.match(line):
+            retired = False
+        if retired:
+            continue
         if STEP_RE.match(line):
             for match in BOLD_RE.finditer(line):
                 yield number, normalize(match.group(1)), False

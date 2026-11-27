@@ -227,6 +227,34 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   margin-block-start: var(--space-xlarge);
 }
 
+/* A category's Advanced drawn as one card: the summary is the card's head
+   and the settings it holds sit inside the same card. */
+.sval-settings > .sval-advanced-card {
+  border: 1px solid var(--sval-border);
+  border-radius: 20px;
+  background: var(--sval-card);
+  box-shadow: var(--sval-shadow);
+}
+
+.sval-settings > .sval-advanced-card > .sval-advanced-summary {
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+.sval-settings > .sval-advanced-card > .sval-advanced-body {
+  gap: 12px;
+  margin-block-start: 0;
+  padding: 16px var(--card-padding-inline) var(--card-padding-block);
+  border-block-start: 1px solid var(--sval-border-subtle);
+}
+
+.sval-advanced-card h3 {
+  color: var(--sval-ink);
+  font-size: var(--settings-text-size);
+  font-weight: 600;
+}
+
 .sval-card .sval-advanced {
   border-block-start: 1px solid var(--sval-border-subtle);
 }
@@ -494,16 +522,46 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   background: var(--sval-sunken);
 }
 
-.sval-folder-field.sval-unreachable {
+.sval-folder-names {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sval-folder-label {
+  color: var(--sval-ink-muted);
+  font-size: var(--settings-small-size);
+}
+
+/* The folder's own buttons, at the field's end. */
+.sval-folder-field > .sval-actions {
+  flex: none;
+}
+
+/* A folder whose state says Sval can't use it right now. */
+#sval-storage:is([data-state="folder-gone"], [data-state="folder-denied"], [data-state="key-gone"], [data-state="key-sealed"]) .sval-folder-field {
   border-style: dashed;
   border-color: var(--sval-problem);
 }
 
-.sval-folder-names {
+.sval-backup-missing {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.sval-backup-missing[hidden] {
+  display: none;
+}
+
+.sval-device-list {
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--sval-ink);
 }
 
 .sval-folder-name {
@@ -535,73 +593,138 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   color: var(--sval-accent);
 }
 
-.sval-unreachable .sval-icon-folder {
+#sval-storage:is([data-state="folder-gone"], [data-state="folder-denied"], [data-state="key-gone"], [data-state="key-sealed"]) .sval-icon-folder {
   background-image: var(--sval-icon-error);
   color: var(--sval-problem);
 }
 
-/* The sync readout: one state, its icon, and the last-synced words. */
-
-.sval-sync-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
+/* The Sync card's state as one row: the footer's icon, the title and its
+   detail, then the state's buttons, which wrap under the words on a narrow
+   card. */
 
 .sval-sync-state {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   min-height: 40px;
 }
 
+.sval-sync-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.sval-sync-row-actions > #sval-sync-buttons {
+  display: contents;
+}
+
+/* The footer's sync icon (`syncIndicator`'s `icon`): Sval's moon with its
+   orbit, the satellite circling while a pass runs, and the footer's badge
+   on a state that needs a look. */
 .sval-sync-icon {
+  position: relative;
   width: 40px;
   height: 40px;
   border-radius: 999px;
   background-color: var(--sval-tint);
-  background-size: 20px;
   color: var(--sval-accent);
   transition:
     background-color var(--sval-dur) var(--sval-ease),
     color var(--sval-dur) var(--sval-ease);
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    background: center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+
+  &::before {
+    background-image: var(--sval-icon-sync-moon);
+  }
+
+  &::after {
+    background-image: var(--sval-icon-sync-moon-syncing);
+  }
 }
 
-.sval-sync-state[data-state="synced"] .sval-sync-icon {
-  background-image: var(--sval-icon-success);
+.sval-sync-state[data-icon="moon-off"] .sval-sync-icon {
+  color: var(--sval-ink-muted);
+
+  &::before {
+    background-image: var(--sval-icon-sync-moon-off);
+  }
+
+  &::after {
+    content: none;
+  }
 }
 
-.sval-sync-state[data-state="syncing"] .sval-sync-icon {
-  background-image: var(--sval-icon-syncing);
-  animation: sval-spin 1s linear infinite;
+.sval-sync-state[data-icon="moon-syncing"] .sval-sync-icon::after {
+  animation: sval-sync-orbit 2.4s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation-play-state: paused;
+  }
+}
+
+.sval-sync-state[data-icon="moon-offline"] .sval-sync-icon {
+  color: var(--sval-ink-muted);
+}
+
+.sval-sync-state:is([data-icon="moon-offline"], [data-icon="moon-warning"], [data-icon="moon-error"]) .sval-sync-icon::after {
+  inset: auto -2px -2px auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--sval-card);
+  background-size: 12px;
+  fill: var(--sval-card);
+}
+
+.sval-sync-state[data-icon="moon-offline"] .sval-sync-icon::after {
+  background-color: var(--sval-ink-muted);
+  background-image: var(--sval-icon-sync-offline);
+}
+
+.sval-sync-state[data-icon="moon-warning"] .sval-sync-icon::after {
+  background-color: var(--sval-problem);
+  background-image: var(--sval-icon-sync-warning);
+}
+
+.sval-sync-state[data-icon="moon-error"] .sval-sync-icon::after {
+  background-color: var(--sval-problem);
+  background-image: var(--sval-icon-sync-error);
 }
 
 .sval-sync-state[data-state="problem"] .sval-sync-icon {
-  background-image: var(--sval-icon-error);
   background-color: var(--sval-problem-tint);
   color: var(--sval-problem);
-}
-
-.sval-sync-state[data-state="local"] .sval-sync-icon {
-  background-image: var(--sval-icon-folder);
-  color: var(--sval-ink-muted);
-}
-
-.sval-sync-state[data-state="waiting"] .sval-sync-icon {
-  background-image: var(--sval-icon-sync);
-  color: var(--sval-ink-muted);
 }
 
 .sval-sync-state[data-state="idle"] .sval-sync-icon {
   visibility: hidden;
 }
 
+@keyframes sval-sync-orbit {
+  to {
+    rotate: 1turn;
+  }
+}
+
 .sval-sync-words {
   display: flex;
+  flex: 1 1 12em;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   animation: sval-arrive var(--sval-dur) var(--sval-ease);
 }
 
@@ -632,14 +755,7 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   font-size: var(--settings-note-size);
 }
 
-.sval-sync-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-block-start: 6px;
-}
-
-.sval-sync-actions:empty {
+#sval-sync-buttons:empty {
   display: none;
 }
 
@@ -688,20 +804,17 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
   display: none;
 }
 
-/* An error with a button sits in a tinted well, with the button inside. */
-.sval-status-line[data-status="error"]:has(+ .sval-result-actions:not(:empty)) {
-  margin-block-start: 8px;
-  padding: 10px 12px 0;
-  border-start-start-radius: 10px;
-  border-start-end-radius: 10px;
-  background: var(--sval-result-error-tint);
+/* A result line and its button are one `.sval-result`, so the parent's gap
+   never falls between them. An error with a button sits in one tinted
+   well, with the button inside. An empty one leaves the layout and keeps
+   its live region in the accessibility tree. */
+.sval-result:has(> .sval-status-line:empty) {
+  display: contents;
 }
 
-.sval-status-line[data-status="error"] + .sval-result-actions:not(:empty) {
-  margin-block-start: 0;
-  padding: 8px 12px 10px 38px;
-  border-end-start-radius: 10px;
-  border-end-end-radius: 10px;
+.sval-result:has(> .sval-status-line[data-status="error"]):has(> .sval-result-actions:not(:empty)) {
+  padding: 10px 12px;
+  border-radius: 10px;
   background: var(--sval-result-error-tint);
 }
 
@@ -1193,6 +1306,11 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
     background-color var(--sval-dur) var(--sval-ease);
 }
 
+/* The state's one primary choice. */
+.sval-pane button.sval-choice[data-tone="primary"] {
+  border-color: var(--sval-accent);
+}
+
 .sval-pane button.sval-choice:hover:not(:disabled) {
   border-color: var(--sval-accent);
   background: var(--sval-tint);
@@ -1206,12 +1324,6 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 .sval-choice-detail {
   color: var(--sval-ink-muted);
   font-size: var(--settings-note-size);
-}
-
-/* The device flow's precondition unmet: shown, and out of reach. */
-.sval-unmet {
-  opacity: 0.5;
-  pointer-events: none;
 }
 
 .sval-flow-head {
@@ -2497,7 +2609,8 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
 
 /* A service's mark before its name, as the password managers' are in first
    run. */
-.sval-pane button.sval-button:has(> .sval-button-brand) {
+.sval-pane button.sval-button:has(> .sval-button-brand),
+.sval-pane .sval-choice-title:has(> .sval-button-brand) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2641,10 +2754,6 @@ setting-pane .sval-pane-section:not(:has(> .sval-settings > :not([hidden], dialo
     background: Highlight;
     color: HighlightText;
   }
-}
-
-.sval-private-only {
-  color: var(--sval-ink-muted);
 }
 
 /* Protections: the fingerprinting card. */

@@ -1216,6 +1216,68 @@ async function dialogShown(dialog, what) {
 }
 
 /**
+ * Waits for Sval's own dialog (`SvalDialog.sys.mjs`) asking `state` in
+ * `win`, and returns its parts.
+ *
+ * @param {Window} win The browser window it opens in.
+ * @param {string} state The dialog's `data-state`, naming its question.
+ * @returns {Promise<object>} `{ dialog, doc, form, input, ok, cancel,
+ *   warning }`, where `form` is the page's `.sval-dialog`.
+ */
+async function svalDialogAsking(win, state) {
+  let dialog;
+  await TestUtils.waitForCondition(() => {
+    dialog = win.gDialogBox.dialog;
+    return (
+      !dialog?._isClosing &&
+      dialog?._frame?.contentDocument?.querySelector(
+        `.sval-dialog[data-state="${state}"]`
+      )
+    );
+  }, `Sval's dialog asks ${state}`);
+  await dialogShown(dialog, `the ${state} dialog's load`);
+  const doc = dialog._frame.contentDocument;
+  return {
+    dialog,
+    doc,
+    form: doc.querySelector(".sval-dialog"),
+    input: doc.querySelector(".sval-dialog-input"),
+    ok: doc.querySelector(".sval-dialog-actions .primary"),
+    cancel: doc.querySelector('.sval-dialog-actions [data-button="cancel"]'),
+    warning: doc.getElementById("sval-dialog-warning"),
+  };
+}
+
+/**
+ * Types `text` into a dialog's field, as the user does, and presses its
+ * primary button.
+ *
+ * @param {object} asked `svalDialogAsking`'s result.
+ * @param {string} text
+ */
+function submitInDialog(asked, text) {
+  asked.input.value = text;
+  asked.input.dispatchEvent(
+    new asked.doc.defaultView.Event("input", { bubbles: true })
+  );
+  asked.ok.click();
+}
+
+/**
+ * Waits for `asked`'s dialog to close.
+ *
+ * @param {Window} win The browser window it opened in.
+ * @param {object} asked `svalDialogAsking`'s result.
+ * @param {string} what Names the wait in a failure.
+ */
+async function svalDialogClosed(win, asked, what) {
+  await TestUtils.waitForCondition(
+    () => win.gDialogBox.dialog !== asked.dialog,
+    what
+  );
+}
+
+/**
  * Closes `dialog`, a page's `<dialog>`, with `act`, and waits for its close
  * event. `close()` drops `open` at once and fires "close" from an
  * `AsyncEventDispatcher` (`HTMLDialogElement::Close`), and the page's close
@@ -3052,7 +3114,8 @@ function paintedOver(top, under) {
  * workspace and what earlier tasks made, so a task asserts on `workspace`.
  * A shared folder this chooses is put back, through `chooseSharedFolder`,
  * when the task ends: the settings store keeps it across files, which Known
- * Good state does not put back.
+ * Good state does not put back. The window goes back to the workspace it
+ * showed then too.
  *
  * @param {string} label Distinguishes this task's temporary paths.
  * @param {object} [options]
@@ -3111,6 +3174,19 @@ async function panelOnAFolder(label, { shared = false } = {}) {
     now: Date.now(),
   });
   expectWorkspaceTabs();
+  // The window goes back to the workspace it showed. Left on this task's,
+  // its tab outlives the task as the window's one visible tab, and at the
+  // file's end Known Good attaches the profile's observer to a document
+  // that lacks the tab's node, which closes the tab as an orphan while
+  // Mozilla's end-of-file check (`checkWindowsState`) removes tabs.
+  const shownBefore = SvalWindowWorkspace.of(window).id;
+  atTaskEnd(async () => {
+    await within(
+      SvalWindowWorkspace.of(window).switchTo(shownBefore),
+      10_000,
+      "the switch back to the workspace shown before"
+    );
+  });
   Assert.ok(
     await within(
       SvalWindowWorkspace.of(window).switchTo(workspace),
@@ -3219,41 +3295,159 @@ async function openSvalSettings(section) {
     "the sweep's helper exiting"
   );
   const byId = id => page.document.getElementById(id);
+  const command = name =>
+    page.document.querySelector(
+      `#sval-sync-buttons button[data-command="${name}"]`
+    );
   return {
     tab,
     page,
     settings: page.SvalSettings,
     els: {
-      storageText: byId("sval-storage-text"),
+      storage: byId("sval-storage"),
       storageChoose: byId("sval-storage-choose"),
-      storageReuse: byId("sval-storage-reuse"),
+      storageChange: byId("sval-storage-change"),
       storageStop: byId("sval-storage-stop"),
       storageStatus: byId("sval-storage-status"),
       storageResultActions: byId("sval-storage-result-actions"),
+      folderField: byId("sval-folder-field"),
       folderPath: byId("sval-folder-path"),
       folderReveal: byId("sval-folder-reveal"),
-      syncNow: byId("sval-sync-now"),
+      syncButtons: byId("sval-sync-buttons"),
+      syncState: byId("sval-sync-state"),
       syncLast: byId("sval-sync-last"),
       syncStatus: byId("sval-sync-status"),
       heading: byId("sval-settings-heading"),
-      claimCode: byId("sval-claim-code"),
+      // The Sync card draws its buttons for the state it is in, so these
+      // are found as they are asked for.
+      get syncNow() {
+        return command("syncNow");
+      },
+      get storageReuse() {
+        return command("useFolderAgain");
+      },
+    },
+    /** The Sync card's button running `name`, or null. */
+    command,
+    /** The page state the Sync card shows (`SvalPanelModel.syncPage`). */
+    get state() {
+      return byId("sval-storage").dataset.state;
     },
   };
 }
 
+/** Every part of the Sync and devices page whose showing depends on state. */
+const SYNC_PAGE_PARTS = [
+  "sval-location-choices",
+  "sval-folder-field",
+  "sval-folder-reveal",
+  "sval-storage-change",
+  "sval-storage-stop",
+  "sval-backup-missing",
+  "sval-storage-working",
+  "sval-pairing-start",
+  "sval-path-offer-steps",
+  "sval-sync-advanced",
+];
+
 /**
- * Presses the page's "Sync now" and waits for the pass to have come back.
+ * Asserts that the Sync and devices page shows only its state's parts and
+ * buttons, and that no two of its parts disagree: the Sync card's state is
+ * the footer's, and a line under it was written in that state.
  *
- * The button disables itself inside the click and re-enables itself when
- * the pass is done, so its state is the page's own word that the pass has
- * finished. A click while it is disabled does nothing.
+ * @param {object} ui `openSvalSettings`'s or `openSettings`'s result: what
+ *   is read is its `page`.
+ * @param {object} expected
+ * @param {?string} expected.primary The primary button's command, or null.
+ * @param {string[]} [expected.secondary] The other buttons' commands.
+ * @param {string[]} expected.shown The ids of `SYNC_PAGE_PARTS` that show.
+ */
+function assertOnlyPageControls(ui, { primary, secondary = [], shown }) {
+  const doc = ui.page.document;
+  const settings = ui.page.SvalSettings;
+  const state = doc.getElementById("sval-storage").dataset.state;
+  const status = doc.getElementById("sval-storage-status");
+  Assert.deepEqual(
+    SYNC_PAGE_PARTS.filter(id =>
+      BrowserTestUtils.isVisible(doc.getElementById(id))
+    ),
+    SYNC_PAGE_PARTS.filter(id => shown.includes(id)),
+    `${state} shows only its own parts`
+  );
+  const buttons = [
+    ...doc.getElementById("sval-sync-buttons").querySelectorAll("button"),
+  ];
+  Assert.deepEqual(
+    buttons.map(button => button.dataset.command),
+    [primary, ...secondary].filter(Boolean),
+    `and its own buttons`
+  );
+  const card = doc.getElementById("sval-storage");
+  Assert.equal(
+    card.querySelectorAll(".sval-button-primary").length,
+    primary ? 1 : 0,
+    "with one primary at most"
+  );
+  // The state, its buttons and Stop Syncing are one row, primary first and
+  // Stop Syncing last.
+  const row = doc.getElementById("sval-sync-state");
+  const stop = doc.getElementById("sval-storage-stop");
+  const inRow = [...row.querySelectorAll("button")].filter(button =>
+    BrowserTestUtils.isVisible(button)
+  );
+  Assert.deepEqual(
+    inRow.map(button => button.dataset.command),
+    [primary, ...secondary, shown.includes(stop.id) ? "stop" : null].filter(
+      Boolean
+    ),
+    "in the state's row"
+  );
+  if (primary) {
+    Assert.ok(
+      inRow[0].classList.contains("sval-button-primary"),
+      "the primary first"
+    );
+  }
+  const footer = settings.panel?.syncIndicator();
+  if (footer && settings._page.location) {
+    Assert.equal(state, footer.state, "saying what the footer says");
+  }
+  Assert.ok(
+    !status.textContent || settings._statusState === settings._page.scope,
+    "beside no line from another state"
+  );
+}
+
+/**
+ * Moves the start of the folder outage in progress back past the wait the
+ * footer gives one before it shows (decision 0032), as three minutes of it
+ * would, and has every window and page redraw for it.
+ */
+function outageWaitedOut() {
+  const { FOLDER_UNAVAILABLE_AFTER_MS } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
+  );
+  const state = SvalPanel.syncState;
+  Assert.notEqual(state.unreachableSince, null, "the folder is away");
+  state.unreachableSince -= FOLDER_UNAVAILABLE_AFTER_MS;
+  SvalPanel._drawSyncState();
+}
+
+/**
+ * Presses the page's "Sync now", or the Try again a folder that can't be
+ * reached offers in its place, and waits for the pass to have come back.
+ * The page holds its outcome while the pass runs.
  *
  * @param {object} ui `openSvalSettings`'s result.
  */
 async function syncFromSettings(ui) {
+  await TestUtils.waitForCondition(
+    () => ui.els.syncNow && !ui.els.syncNow.disabled,
+    "the page offers a pass"
+  );
   ui.els.syncNow.click();
   await TestUtils.waitForCondition(
-    () => !ui.els.syncNow.disabled,
+    () => !ui.settings._syncOutcome,
     "the pass the page asked for came back"
   );
 }

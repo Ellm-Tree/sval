@@ -38,6 +38,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalPairing: "moz-src:///browser/components/sval/SvalPairing.sys.mjs",
+  SvalSecretStore: "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
   SvalSyncState: "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
 });
 // A namespace, because the module exports functions and no object of its
@@ -301,9 +302,14 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
     }
   }
   if (storeError) {
+    // A store that holds no system secret this build can open for the
+    // profile's other secrets refuses every key, so the page says that in
+    // place of the state the key's absence put it in.
+    const sealed = storeError instanceof lazy.SvalSecretStore.LostError;
+    lazy.SvalSyncState.of(engine).setKeySealed(sealed);
     return {
       outcome: "published",
-      failure: "key-store",
+      failure: sealed ? "key-sealed" : "key-store",
       reason: `the key did not save: ${storeError?.message ?? storeError}`,
     };
   }
@@ -370,7 +376,9 @@ export const SvalKeyJoin = {
    *   known), `"published"` (it did, and the key did not save; the profile
    *   stays on its own key and the same code tries again). `failure` names
    *   what stopped a join that did not finish, for the line Settings shows:
-   *   `"no-folder"`, `"folder"`, `"key-store"` or `"own-unreadable"`.
+   *   `"no-folder"`, `"folder"`, `"key-store"`, `"key-sealed"` (the key
+   *   store cannot open the profile's other secrets, so no key saves) or
+   *   `"own-unreadable"`.
    *   `problem` names why a `"folder"` failure did not reach the folder, as
    *   `SvalSharedFolder.folderProblem` does, or is null when no pass said.
    *   `reason` says the same for the log. `report` is the pass that followed

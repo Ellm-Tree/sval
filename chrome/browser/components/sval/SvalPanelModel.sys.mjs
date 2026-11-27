@@ -20,7 +20,9 @@ import { agentBrandOf } from "moz-src:///browser/components/sval/SvalAgentBrands
 import { colorOf } from "moz-src:///browser/components/sval/SvalColor.sys.mjs";
 import {
   isRemoteRoot,
+  parseDropboxRoot,
   remoteFolderName,
+  remoteFolderPlace,
 } from "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs";
 import {
   GROUP,
@@ -2946,6 +2948,26 @@ const KEY_STORE_NEED = {
 };
 
 /**
+ * What says the key store refused a sync key because the system secret
+ * that opens the profile's other secrets is gone or is another build's
+ * (`SvalSecretStore.LostError`). The store gave access, so nothing here asks
+ * for it.
+ *
+ * @param {string} platform `AppConstants.platform`.
+ * @returns {string}
+ */
+function keySealedSentence(platform) {
+  return `Sval can't unlock the saved sync key on this ${computerNoun(platform)}.`;
+}
+
+/** The name of the store each platform keeps the system secret in. */
+const KEY_STORE_ITEM = {
+  macosx: "Keychain",
+  win: "Windows Credential Manager",
+  linux: "keyring",
+};
+
+/**
  * The line Settings shows after joining another device, Set Up Sync Again or
  * a restore from a backup, and the one button that acts on it (messages spec §7). The
  * key store's button is the indicator's (spec §3, `keyStoreRetryLabel`).
@@ -2970,7 +2992,7 @@ export function pairingLine(result, platform, verb = "Join") {
     return {
       status: "success",
       reason: "joined",
-      text: "Joined. Your devices are syncing.",
+      text: `This ${computerNoun(platform)} has the sync key and is syncing again.`,
       action: null,
     };
   }
@@ -2996,6 +3018,11 @@ export function pairingLine(result, platform, verb = "Join") {
           command: "tryAgain",
         },
       };
+    case "key-sealed":
+      return {
+        ...failed("key-sealed", keySealedSentence(platform)),
+        action: null,
+      };
     case "no-folder":
       return {
         ...failed("no-folder", "choose a sync folder first."),
@@ -3005,7 +3032,7 @@ export function pairingLine(result, platform, verb = "Join") {
       return {
         ...failed(
           "own-unreadable",
-          "Sval can't read this device's Workspaces."
+          `Sval can't read the Workspaces on this ${computerNoun(platform)}.`
         ),
         action: { label: "Send Report…", command: "sendReport" },
       };
@@ -3422,14 +3449,34 @@ export const LOCAL_CAUSE_TEXT = {
   disk: "There's a problem with your disk.",
 };
 
+/**
+ * What the words call this computer on each platform, so a sentence names
+ * the computer the user holds.
+ *
+ * @param {string} platform `AppConstants.platform`.
+ * @returns {string} `"Mac"`, `"PC"` or `"computer"`.
+ */
+export function computerNoun(platform) {
+  return { macosx: "Mac", win: "PC" }[platform] ?? "computer";
+}
+
+/**
+ * @param {string} text
+ * @returns {string} `text` with its first letter upper case, for a phrase
+ *   that starts a sentence.
+ */
+function capitalized(text) {
+  return text[0].toUpperCase() + text.slice(1);
+}
+
 /** The key store's detail sentence on each platform (spec §3). */
 const KEY_ACCESS_DETAIL = {
   macosx:
-    "Sval needs Keychain access to sync. Choose Always Allow when your Mac asks.",
+    "Sval needs Keychain access to sync. Choose Always Allow when macOS asks.",
   win:
     "Sval can't reach Windows Credential Manager. Try again, or restart " +
-    "your computer.",
-  linux: "Sval needs your keyring to sync. Unlock it when asked.",
+    "this PC.",
+  linux: "Sval needs the keyring to sync. Unlock the keyring when asked.",
 };
 
 /**
@@ -3446,8 +3493,8 @@ function keyStoreRetryLabel(platform) {
 
 /** Spec §3: the window kinds whose tabs are never saved or synced. */
 const UNSAVED_WINDOW_DETAIL = {
-  private: "Private window. Tabs here aren't saved or synced.",
-  automated: "Automated window. Tabs here aren't saved or synced.",
+  private: "Tabs in private windows aren't saved or synced.",
+  automated: "Tabs in automated windows aren't saved or synced.",
 };
 
 /**
@@ -3455,21 +3502,22 @@ const UNSAVED_WINDOW_DETAIL = {
  * stop it (decision 1714).
  *
  * @param {Array<string|null>} names As `syncIndicator`'s `harmedByClock`.
+ * @param {string} platform `AppConstants.platform`.
  * @returns {string}
  */
-function clockHarmDetail(names) {
-  const cost =
-    "are replacing yours and tabs you close can come back. Set the correct " +
-    "time on";
+function clockHarmDetail(names, platform) {
+  const mine = `this ${computerNoun(platform)}`;
   if (names.length === 1) {
-    return names[0]
-      ? `${names[0]}'s clock is set ahead, so its changes ${cost} ${names[0]} to fix this.`
-      : `One of your devices has its clock set ahead, so its changes ${cost} that device to fix this.`;
+    const who = names[0] ?? "A device";
+    const fix = names[0]
+      ? `Set the correct time on ${names[0]}.`
+      : "Set the correct time on the device.";
+    return `${who}'s clock is set ahead. Changes from ${names[0] ?? "the device"} are replacing changes from ${mine}, and closed tabs can come back. ${fix}`;
   }
   const who = names.every(Boolean)
     ? new Intl.ListFormat("en-US", { type: "conjunction" }).format(names)
-    : "Some of your devices";
-  return `${who} have their clocks set ahead, so their changes ${cost} each of them to fix this.`;
+    : "Some devices";
+  return `${who} have clocks set ahead. Changes from the devices are replacing changes from ${mine}, and closed tabs can come back. Set the correct time on each device.`;
 }
 
 /**
@@ -3477,22 +3525,20 @@ function clockHarmDetail(names) {
  * than this build reads (spec §5.5), and what fixes it.
  *
  * @param {Array<string|null>} names As `syncIndicator`'s `newerSchema`.
+ * @param {string} platform `AppConstants.platform`.
  * @returns {string}
  */
-function newerSchemaDetail(names) {
-  const fix = "Update Sval on this computer to sync with";
-  if (names.length === 1) {
-    return names[0]
-      ? `${names[0]} is running a newer version of Sval, so this computer can't read what ${names[0]} syncs. ${fix} ${names[0]}.`
-      : `One of your devices is running a newer version of Sval, so this computer can't read what that device syncs. ${fix} that device.`;
+function newerSchemaDetail(names, platform) {
+  const mine = `this ${computerNoun(platform)}`;
+  const fix = `Update Sval on ${mine}.`;
+  if (names.length === 1 && names[0]) {
+    return `${names[0]} is running a newer version of Sval. ${capitalized(mine)} can't read Workspaces from ${names[0]}. ${fix}`;
   }
-  if (names.every(Boolean)) {
-    const who = new Intl.ListFormat("en-US", { type: "conjunction" }).format(
-      names
-    );
-    return `${who} are running a newer version of Sval, so this computer can't read what those devices sync. ${fix} those devices.`;
-  }
-  return `Some of your devices are running a newer version of Sval, so this computer can't read what those devices sync. ${fix} those devices.`;
+  const many = names.length > 1 && names.every(Boolean);
+  const who = many
+    ? new Intl.ListFormat("en-US", { type: "conjunction" }).format(names)
+    : "Another device";
+  return `${who} ${many ? "are" : "is"} running a newer version of Sval. ${capitalized(mine)} can't read Workspaces from the newer version. ${fix}`;
 }
 
 function indicator(
@@ -3515,6 +3561,32 @@ function indicator(
     dismissible: false,
     detailShown: false,
   };
+}
+
+/**
+ * The one name of the act that takes a sync key from another device's code,
+ * on the footer and in Settings alike.
+ */
+const ENTER_CODE = "Enter code…";
+
+/** A device with a sync folder and no sync key yet. */
+const JOINING_TITLE = "Waiting for the sync key";
+
+/** Another key's Workspaces in the sync folder. */
+const UNPAIRED_TITLE = "Another device is using the sync folder";
+
+/**
+ * What a device whose title is {@link UNPAIRED_TITLE} does about it.
+ *
+ * @param {string} computer `this Mac`, as {@link computerNoun} names it.
+ * @returns {string}
+ */
+function unpairedDetail(computer) {
+  return (
+    "The other device has a different sync key. On the other device, go " +
+    "to Settings › Sync and devices › Add a device. Then enter the code on " +
+    `${computer}.`
+  );
 }
 
 /**
@@ -3541,6 +3613,8 @@ function indicator(
  * @param {string|null} state.keyState One of `SvalIdentity.SYNC_KEY_STATES`,
  *   compared by value: the sync worker loads this module, and
  *   `SvalIdentity`'s lazy getters cannot load there.
+ * @param {boolean} [state.keySealed] The key store refused the last sync
+ *   key saved, as `SvalSyncState.keySealed`.
  * @param {string} state.platform `AppConstants.platform`.
  * @param {boolean} state.unpairedDevice And not dismissed.
  * @param {Array<string|null>} [state.newerSchema] The names of the other
@@ -3568,6 +3642,7 @@ export function syncIndicator({
   folder,
   lastSynced,
   keyState,
+  keySealed = false,
   platform,
   unpairedDevice,
   newerSchema = [],
@@ -3605,9 +3680,21 @@ export function syncIndicator({
   const problem = folder?.problem ?? null;
   const waited = showsFolderNotice(folder?.since ?? null, now);
   const choose = [{ label: "Choose Folder…", command: "chooseSharedFolder" }];
+  const computer = `this ${computerNoun(platform)}`;
 
+  if ((keyState === "missing" || keyState === "different") && keySealed) {
+    const detail = keySealedSentence(platform);
+    return indicator(
+      "key-sealed",
+      "error",
+      "moon-error",
+      "Sync is off",
+      detail,
+      detail
+    );
+  }
   if (keyState === "missing" || keyState === "different") {
-    const detail = "Sync is off on this device.";
+    const detail = `Sync is off on ${computer}.`;
     return indicator(
       "key-gone",
       "error",
@@ -3615,12 +3702,27 @@ export function syncIndicator({
       "Sync is off",
       detail,
       detail,
-      [{ label: "Reconnect…", command: "pairAgain" }]
+      [{ label: ENTER_CODE, command: "pairAgain" }]
+    );
+  }
+  // A folder chosen to join other devices with, by first run's join step or
+  // as an occupied folder in Settings, and no key yet. No shared step runs,
+  // so no pass can say anything about the folder.
+  if (keyState === "none") {
+    const detail = `${capitalized(computer)} needs the sync key.`;
+    return indicator(
+      "joining",
+      "warning",
+      "moon-warning",
+      JOINING_TITLE,
+      detail,
+      detail,
+      [{ label: ENTER_CODE, command: "pairAgain" }]
     );
   }
   if (problem === "too-large") {
     const detail =
-      "Your sync folder is too large to sync. Choose a different folder.";
+      "The sync folder is too large to sync. Choose a different folder.";
     return indicator(
       "too-large",
       "error",
@@ -3665,19 +3767,15 @@ export function syncIndicator({
     );
   }
   if (unpairedDevice) {
-    const detail =
-      "Your sync folder has Workspaces from a device that isn't syncing " +
-      'with this one. To sync them, choose "Sync with another device" on ' +
-      "that device and enter the code it shows here.";
     const shown = indicator(
       "unpaired-device",
       "warning",
       "moon-warning",
-      "Pair your other device",
-      detail,
-      detail,
+      UNPAIRED_TITLE,
+      unpairedDetail(computer),
+      unpairedDetail(computer),
       [
-        { label: "Enter Code…", command: "pairAgain" },
+        { label: ENTER_CODE, command: "pairAgain" },
         { label: "✕", command: "dismissOtherWorkspaces" },
       ]
     );
@@ -3687,9 +3785,9 @@ export function syncIndicator({
   }
   if (newerSchema.length || newerSchemaOwn) {
     const detail = newerSchema.length
-      ? newerSchemaDetail(newerSchema)
-      : "A newer version of Sval saved this computer's Workspaces. Update " +
-        "Sval on this computer to keep syncing.";
+      ? newerSchemaDetail(newerSchema, platform)
+      : `A newer Sval saved the Workspaces on ${computer}. Update Sval on ` +
+        `${computer} to keep syncing.`;
     // The detail names the devices, which the footer's one-line label has no
     // room for.
     const shown = indicator(
@@ -3698,7 +3796,7 @@ export function syncIndicator({
       "moon-warning",
       newerSchema.length
         ? "Can't sync with another device"
-        : "Can't sync this computer",
+        : `Can't sync ${computer}`,
       detail,
       detail,
       [{ label: "Check for Updates…", command: "checkForUpdate" }]
@@ -3711,9 +3809,9 @@ export function syncIndicator({
       "clock-harm",
       "warning",
       "moon-warning",
-      "Sync problem",
-      clockHarmDetail(harmedByClock),
-      clockHarmDetail(harmedByClock)
+      "A device's clock is set ahead",
+      clockHarmDetail(harmedByClock, platform),
+      clockHarmDetail(harmedByClock, platform)
     );
     shown.detailShown = true;
     return shown;
@@ -3760,4 +3858,355 @@ export function syncIndicator({
   }
   const text = lastSyncedText(lastSynced, now);
   return indicator("synced", "synced", "moon", "", text, text);
+}
+
+/** Settings' title for the key store's state, on each platform. */
+const KEY_ACCESS_TITLE = {
+  macosx: "Sync needs Keychain access",
+  win: "Sync needs Credential Manager access",
+  linux: "Sync needs the keyring",
+};
+
+/** Settings' detail under {@link KEY_ACCESS_TITLE}, which says the rest. */
+const KEY_ACCESS_STEP = {
+  macosx: "Choose Always Allow when macOS asks.",
+  win: "Try again, or restart this PC.",
+  linux: "Unlock the keyring when asked.",
+};
+
+/**
+ * Settings › Sync and devices as one state: what its Sync card says, which
+ * of its controls show, and what each does (messages spec §3). Everything the
+ * page draws about sync comes from here, so no two parts of it can disagree.
+ *
+ * **The footer's answer is the page's.** `syncIndicator` decides which state
+ * holds, with its order and its waits, and this names the page's words and
+ * controls for it. The window kind is the profile's normal one: the page
+ * describes the profile's sync, whichever window's panel it reads.
+ *
+ * @param {object} input
+ * @param {object|null} input.indicator `SvalPanel.indicatorState()`, or null
+ *   when no window of the profile runs Sval.
+ * @param {boolean} input.privateOnly Every window is private.
+ * @param {string|null} input.sharedRoot `SvalPanel.sharedRootSetting()`.
+ * @param {boolean} input.backupSaved The sync key's backup has been saved.
+ * @param {boolean} input.keyInProfile The key store is the profile's file.
+ * @param {string|null} input.working The folder being chosen, while it is.
+ * @param {boolean} input.pairing A code is shown, or one is being looked for.
+ * @param {string|null} input.outcome How a Sync now pressed on the page is
+ *   going: `"syncing"` while it runs, else null.
+ * @returns {object} `{ state, tone, icon, title, detail, location, choices,
+ *   reveal, change, stop, locked, primary, secondary, backupNote,
+ *   addDevice, advanced, keyringNote, working, scope }`, where `scope` names
+ *   the states a result line stays beside. `icon` is the footer's
+ *   indicator icon for the state, `moon-off` where the footer shows none.
+ *   `location` is `{ via, name,
+ *   place }` or null; `stop` is `{ label, title, body }` for the button and
+ *   dialog that stop syncing, or null; `primary` is `{ label, command }` or
+ *   null, and `secondary` a list of them; `working` is the line said while a
+ *   folder is chosen, or null; `locked` holds every control that changes the
+ *   folder.
+ */
+export function syncPage(input) {
+  const page = pageFor(input);
+  // A line under the card answers an act in the state it found. A first pass
+  // that ends moves a healthy folder from syncing to synced, which says
+  // nothing new about that act, so the two share a scope.
+  page.scope =
+    page.state === "syncing" || page.state === "synced"
+      ? "healthy"
+      : page.state;
+  return page;
+}
+
+/**
+ * {@link syncPage}'s answer, but its `scope`.
+ *
+ * @param {object} input As {@link syncPage} takes.
+ * @returns {object}
+ */
+function pageFor(input) {
+  const {
+    indicator: state,
+    privateOnly,
+    sharedRoot,
+    backupSaved,
+    keyInProfile,
+    working = null,
+    pairing = false,
+    outcome = null,
+  } = input;
+  const page = {
+    state: "",
+    tone: "local",
+    icon: "moon-off",
+    title: "",
+    detail: "",
+    location: null,
+    choices: false,
+    reveal: false,
+    change: false,
+    stop: null,
+    locked: working !== null || pairing,
+    primary: null,
+    secondary: [],
+    backupNote: false,
+    addDevice: false,
+    advanced: false,
+    keyringNote: false,
+    working: null,
+  };
+  if (privateOnly) {
+    return {
+      ...page,
+      state: "private-only",
+      title: "Sync is off while every window is private",
+      locked: true,
+    };
+  }
+  if (!state) {
+    return {
+      ...page,
+      state: "not-ready",
+      title: "Sync settings appear once Sval has opened a window",
+    };
+  }
+  if (working !== null) {
+    page.working = `Setting up sync with ${friendlyFolderName(working)}…`;
+  }
+  const computer = `this ${computerNoun(state.platform)}`;
+  const shown = syncIndicator({ ...state, window: "normal" });
+  if (shown?.state === "critical") {
+    return {
+      ...page,
+      state: "critical",
+      tone: "problem",
+      icon: shown.icon,
+      title: shown.label,
+      primary: { label: "Show details", command: "showCritical" },
+    };
+  }
+  if (!sharedRoot || !shown) {
+    return {
+      ...page,
+      state: "no-folder",
+      title: "Sync is off",
+      detail:
+        `Your Workspaces are on ${computer} only. To sync, choose a folder ` +
+        "every device can reach.",
+      choices: true,
+    };
+  }
+
+  let via = "folder";
+  if (parseDropboxRoot(sharedRoot)) {
+    via = "dropbox";
+  } else if (isRemoteRoot(sharedRoot)) {
+    via = "smb";
+  }
+  const name = friendlyFolderName(sharedRoot);
+  const keyPresent = state.keyState === "present";
+  Object.assign(page, {
+    state: shown.state,
+    icon: shown.icon,
+    location: {
+      via,
+      name,
+      place: via === "folder" ? sharedRoot : remoteFolderPlace(sharedRoot),
+    },
+    reveal: via === "folder",
+    change: true,
+    stop: {
+      label: "Stop Syncing",
+      title: `Stop syncing with ${name}?`,
+      body:
+        `Your Workspaces stay on ${computer}. ${capitalized(computer)} ` +
+        "stops syncing until you choose a sync folder again." +
+        ({
+          smb: " Sval also forgets the sign-in for the SMB server.",
+          dropbox: " Sval also forgets the Dropbox sign-in.",
+        }[via] ?? ""),
+    },
+    backupNote: keyPresent && !backupSaved,
+    addDevice: keyPresent,
+    advanced: keyPresent,
+    keyringNote: keyPresent && keyInProfile,
+  });
+  const act = (label, command) => ({ label, command });
+  const syncNow = act("Sync now", "syncNow");
+  const enterCode = act(ENTER_CODE, "enterCode");
+  const restore = act("Restore from a backup…", "restore");
+  const chooseAnother = act("Choose another folder…", "changeLocation");
+  const Computer = capitalized(computer);
+
+  switch (shown.state) {
+    case "syncing":
+      Object.assign(page, { tone: "syncing", title: "Syncing…" });
+      break;
+    case "synced":
+      Object.assign(page, {
+        tone: state.lastSynced === null ? "waiting" : "synced",
+        title: shown.tooltip,
+        primary: syncNow,
+      });
+      break;
+    case "offline":
+    case "offline-never-synced": {
+      const stay = `Your Workspaces stay on ${computer}.`;
+      Object.assign(page, {
+        tone: "waiting",
+        title: `Can't reach ${name}`,
+        detail:
+          shown.state === "offline"
+            ? `Last synced ${state.formatTime(state.lastSynced)}. ${stay} ` +
+              `Sval syncs again once ${name} is reachable.`
+            : `${stay} Sval syncs once ${name} is reachable.`,
+        reveal: false,
+        primary: act("Try again", "syncNow"),
+      });
+      break;
+    }
+    case "folder-gone":
+      Object.assign(page, {
+        tone: "problem",
+        title: `Sval can't find ${name}`,
+        detail:
+          `Sval's files are missing from ${name}. If you moved ${name}, ` +
+          `choose the folder in the new place. Otherwise, set up ${name} ` +
+          "again.",
+        reveal: false,
+        change: false,
+        primary: act("Choose folder…", "chooseInUse"),
+        secondary: [act("Set up folder again", "useFolderAgain")],
+      });
+      break;
+    case "folder-denied":
+      Object.assign(page, {
+        tone: "problem",
+        title: `Sval can't open ${name}`,
+        detail: `Sval needs permission to read and write ${name}.`,
+        change: false,
+        primary: chooseAnother,
+      });
+      break;
+    case "folder-sign-in":
+      Object.assign(
+        page,
+        { tone: "problem", change: false },
+        via === "dropbox"
+          ? {
+              title: "Sign in to Dropbox again",
+              detail:
+                `Dropbox stopped accepting Sval's sign-in. ${Computer} ` +
+                "can't sync until you sign in to Dropbox again.",
+              primary: act("Sign in to Dropbox…", "chooseDropbox"),
+            }
+          : {
+              title: "The SMB server didn't accept the sign-in",
+              detail: "Check the username and password for the SMB server.",
+              primary: act("Edit connection…", "chooseSmb"),
+            }
+      );
+      break;
+    case "too-large":
+      Object.assign(page, {
+        tone: "problem",
+        title: "Sync stopped",
+        detail:
+          `The files in ${name} are too large to sync. Choose a different ` +
+          "folder.",
+        change: false,
+        primary: chooseAnother,
+      });
+      break;
+    case "key-gone":
+      Object.assign(page, {
+        tone: "problem",
+        title: `Sync is off on ${computer}`,
+        detail:
+          `${Computer} has no sync key for the Workspaces in ${name}. ` +
+          `Your Workspaces are safe on ${computer}.`,
+        change: false,
+        primary: enterCode,
+        secondary: [
+          restore,
+          act("Start over with a new sync key…", "startOver"),
+        ],
+      });
+      break;
+    case "key-sealed":
+      Object.assign(page, {
+        tone: "problem",
+        title: `Sval can't unlock the saved sync key on ${computer}`,
+        detail:
+          `The ${KEY_STORE_ITEM[state.platform] ?? KEY_STORE_ITEM.linux} ` +
+          `item that opens what Sval saved on ${computer} is missing or ` +
+          `belongs to another copy of Sval, so sync is off on ${computer}.`,
+        change: false,
+      });
+      break;
+    case "key-unreadable": {
+      const platform =
+        state.platform in KEY_ACCESS_TITLE ? state.platform : "linux";
+      Object.assign(page, {
+        tone: "problem",
+        title: KEY_ACCESS_TITLE[platform],
+        detail: KEY_ACCESS_STEP[platform],
+        change: false,
+        primary: act("Try again", "retryKey"),
+      });
+      break;
+    }
+    case "joining":
+      Object.assign(page, {
+        tone: "waiting",
+        title: JOINING_TITLE,
+        detail: `${Computer} needs the sync key for ${name}.`,
+        primary: enterCode,
+        secondary: [restore],
+      });
+      break;
+    case "unpaired-device":
+      Object.assign(page, {
+        tone: "problem",
+        title: `Another device is using ${name}`,
+        detail: unpairedDetail(computer),
+        primary: enterCode,
+        secondary: [act("Dismiss", "dismissOthers")],
+      });
+      break;
+    case "newer-schema":
+      Object.assign(page, {
+        tone: "problem",
+        title: shown.label,
+        detail: shown.detail,
+        primary: act("Check for updates…", "checkForUpdate"),
+        secondary: [syncNow],
+      });
+      break;
+    case "clock-harm":
+      Object.assign(page, {
+        tone: "problem",
+        title: shown.label,
+        detail: shown.detail,
+        primary: syncNow,
+      });
+      break;
+  }
+  // A pass asked for here runs: the state it will answer is not known yet.
+  if (outcome === "syncing") {
+    if (page.primary?.command === "syncNow") {
+      Object.assign(page, {
+        tone: "syncing",
+        icon: "moon-syncing",
+        title: "Syncing…",
+        detail: "",
+      });
+    }
+    const running = action =>
+      action.command === "syncNow" ? { ...action, disabled: true } : action;
+    page.primary = page.primary && running(page.primary);
+    page.secondary = page.secondary.map(running);
+  }
+  return page;
 }

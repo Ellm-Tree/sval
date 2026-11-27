@@ -366,6 +366,32 @@ add_task(function sync_key_gone() {
   }
 });
 
+add_task(function sync_key_store_refusing_keys() {
+  const got = indicatorFor({ keyState: "missing", keySealed: true });
+  Assert.deepEqual(shape(got), {
+    state: "key-sealed",
+    severity: "error",
+    icon: "moon-error",
+    said: { label: true, tooltip: true, detail: true },
+    commands: [],
+  });
+  const line = SvalPanelModel.pairingLine(
+    { adopted: false, failure: "key-sealed" },
+    "macosx",
+    "Setup"
+  );
+  Assert.deepEqual(lineShape(line), {
+    status: "error",
+    reason: "key-sealed",
+    said: true,
+    command: null,
+  });
+  Assert.ok(
+    line.text.endsWith(got.detail),
+    "the line says what the indicator says"
+  );
+});
+
 add_task(function windows_that_do_not_sync() {
   const details = new Set();
   for (const window of ["private", "automated"]) {
@@ -387,6 +413,36 @@ add_task(function windows_that_do_not_sync() {
     }
   }
   Assert.equal(details.size, 2, "each kind of window has its own detail");
+});
+
+/**
+ * A folder chosen with no sync key yet waits for one: no pass can say
+ * anything about the folder, so the indicator says what will.
+ */
+add_task(function a_folder_with_no_key_waits_for_one() {
+  const got = indicatorFor({ keyState: "none" });
+  Assert.deepEqual(shape(got), {
+    state: "joining",
+    severity: "warning",
+    icon: "moon-warning",
+    said: { label: true, tooltip: true, detail: true },
+    commands: ["pairAgain"],
+  });
+  Assert.equal(
+    indicatorFor({ keyState: "missing" }).state,
+    "key-gone",
+    "a key that went is not one never had"
+  );
+  Assert.equal(
+    indicatorFor({ keyState: "none", sharing: false }),
+    null,
+    "and with no folder there is nothing to wait for"
+  );
+  Assert.equal(
+    indicatorFor({ keyState: "missing" }).actions[0].label,
+    got.actions[0].label,
+    "both name the act that takes a code the same"
+  );
 });
 
 add_task(function critical_dialog_dismissed() {
@@ -544,4 +600,456 @@ add_task(function row_index_finds_a_row_or_the_split_holding_a_pane() {
   Assert.equal(rowIndexIn(drawn, "t"), 2);
   Assert.equal(rowIndexIn(drawn, "gone"), -1);
   Assert.equal(rowIndexIn(drawn, null), -1);
+});
+
+/** A folder on this computer, an SMB folder and a Dropbox folder. */
+const LOCAL_ROOT =
+  "/Users/someone/Library/Mobile Documents/com~apple~CloudDocs/Sval";
+const SMB_ROOT = "smb://someone@nas.local/Shared/Server";
+const DROPBOX_ROOT = "dropbox:/Sval";
+
+/**
+ * The Sync page for a healthy device syncing through a folder on this
+ * computer, with what a task is about overridden.
+ *
+ * @param {object} [indicator] Overrides of `indicatorState()`'s answer.
+ * @param {object} [page] Overrides of the page's own inputs.
+ * @returns {object} `syncPage`'s answer.
+ */
+function pageFor(indicator = {}, page = {}) {
+  return SvalPanelModel.syncPage({
+    indicator: {
+      window: "normal",
+      sharing: true,
+      firstPassDone: true,
+      folder: { problem: null, since: null },
+      lastSynced: NOW - 5000,
+      keyState: "present",
+      platform: "macosx",
+      unpairedDevice: false,
+      critical: null,
+      now: NOW,
+      formatTime,
+      ...indicator,
+    },
+    privateOnly: false,
+    sharedRoot: LOCAL_ROOT,
+    backupSaved: true,
+    keyInProfile: false,
+    working: null,
+    pairing: false,
+    outcome: null,
+    ...page,
+  });
+}
+
+/**
+ * What a page shows: its state and icon, whether it says a title and a
+ * detail, which controls show, and the commands its buttons run. Its words
+ * are not part of it.
+ *
+ * @param {object} got A page from syncPage.
+ * @returns {object}
+ */
+function pageShape(got) {
+  return {
+    state: got.state,
+    tone: got.tone,
+    said: { title: !!got.title, detail: !!got.detail },
+    via: got.location?.via ?? null,
+    shows: [
+      "choices",
+      "reveal",
+      "change",
+      "stop",
+      "backupNote",
+      "addDevice",
+      "advanced",
+      "keyringNote",
+    ].filter(name => got[name]),
+    primary: got.primary?.command ?? null,
+    secondary: got.secondary.map(action => action.command),
+  };
+}
+
+const ADVANCED = ["addDevice", "advanced"];
+const LONG_OFFLINE = { problem: "offline", since: LONG_AGO };
+
+add_task(function sync_page_with_no_folder_offers_the_ways_to_sync() {
+  for (const got of [
+    pageFor({ sharing: false }, { sharedRoot: null }),
+    pageFor({}, { sharedRoot: null }),
+  ]) {
+    Assert.deepEqual(pageShape(got), {
+      state: "no-folder",
+      tone: "local",
+      said: { title: true, detail: true },
+      via: null,
+      shows: ["choices"],
+      primary: null,
+      secondary: [],
+    });
+  }
+});
+
+add_task(function sync_page_before_sval_runs_and_while_private() {
+  Assert.deepEqual(pageShape(SvalPanelModel.syncPage({ indicator: null })), {
+    state: "not-ready",
+    tone: "local",
+    said: { title: true, detail: false },
+    via: null,
+    shows: [],
+    primary: null,
+    secondary: [],
+  });
+  Assert.deepEqual(pageShape(pageFor({}, { privateOnly: true })), {
+    state: "private-only",
+    tone: "local",
+    said: { title: true, detail: false },
+    via: null,
+    shows: [],
+    primary: null,
+    secondary: [],
+  });
+});
+
+add_task(function sync_page_synced() {
+  const got = pageFor();
+  Assert.deepEqual(pageShape(got), {
+    state: "synced",
+    tone: "synced",
+    said: { title: true, detail: false },
+    via: "folder",
+    shows: ["reveal", "change", "stop", ...ADVANCED],
+    primary: "syncNow",
+    secondary: [],
+  });
+  Assert.equal(
+    got.title,
+    indicatorFor().tooltip,
+    "the title is the footer's last-synced time"
+  );
+  Assert.equal(
+    pageFor({ lastSynced: null }).tone,
+    "waiting",
+    "a folder never synced waits"
+  );
+  Assert.deepEqual(
+    pageShape(pageFor({}, { backupSaved: false })).shows,
+    ["reveal", "change", "stop", "backupNote", ...ADVANCED],
+    "a key with no backup says so"
+  );
+  Assert.ok(
+    pageFor({}, { keyInProfile: true }).keyringNote,
+    "a key kept in the profile says so"
+  );
+});
+
+add_task(function sync_page_first_pass_and_sync_now() {
+  Assert.deepEqual(pageShape(pageFor({ firstPassDone: false })), {
+    state: "syncing",
+    tone: "syncing",
+    said: { title: true, detail: false },
+    via: "folder",
+    shows: ["reveal", "change", "stop", ...ADVANCED],
+    primary: null,
+    secondary: [],
+  });
+  const running = pageFor({}, { outcome: "syncing" });
+  Assert.equal(running.tone, "syncing", "a pass asked for shows as running");
+  Assert.ok(running.primary.disabled, "and its button waits for it");
+});
+
+add_task(function sync_page_offline_waits_as_the_footer_does() {
+  Assert.equal(
+    pageFor({ folder: { problem: "offline", since: NOW - 1000 } }).state,
+    "synced",
+    "a blip says nothing, as the footer says nothing"
+  );
+  for (const [sharedRoot, via] of [
+    [LOCAL_ROOT, "folder"],
+    [SMB_ROOT, "smb"],
+    [DROPBOX_ROOT, "dropbox"],
+  ]) {
+    Assert.deepEqual(
+      pageShape(pageFor({ folder: LONG_OFFLINE }, { sharedRoot })),
+      {
+        state: "offline",
+        tone: "waiting",
+        said: { title: true, detail: true },
+        via,
+        shows: ["change", "stop", ...ADVANCED],
+        primary: "syncNow",
+        secondary: [],
+      },
+      via
+    );
+  }
+  Assert.equal(
+    pageFor({ folder: LONG_OFFLINE, lastSynced: null }).state,
+    "offline-never-synced"
+  );
+  const titles = new Set(
+    [LOCAL_ROOT, SMB_ROOT, DROPBOX_ROOT].map(
+      sharedRoot => pageFor({ folder: LONG_OFFLINE }, { sharedRoot }).title
+    )
+  );
+  Assert.equal(titles.size, 3, "each way says what it can't reach");
+});
+
+add_task(function sync_page_folder_problems() {
+  Assert.deepEqual(
+    pageShape(pageFor({ folder: { problem: "gone", since: LONG_AGO } })),
+    {
+      state: "folder-gone",
+      tone: "problem",
+      said: { title: true, detail: true },
+      via: "folder",
+      shows: ["stop", ...ADVANCED],
+      primary: "chooseInUse",
+      secondary: ["useFolderAgain"],
+    }
+  );
+  Assert.deepEqual(
+    pageShape(pageFor({ folder: { problem: "denied", since: NOW } })),
+    {
+      state: "folder-denied",
+      tone: "problem",
+      said: { title: true, detail: true },
+      via: "folder",
+      shows: ["reveal", "stop", ...ADVANCED],
+      primary: "changeLocation",
+      secondary: [],
+    }
+  );
+  Assert.deepEqual(
+    pageShape(pageFor({ folder: { problem: "too-large", since: NOW } })),
+    {
+      state: "too-large",
+      tone: "problem",
+      said: { title: true, detail: true },
+      via: "folder",
+      shows: ["reveal", "stop", ...ADVANCED],
+      primary: "changeLocation",
+      secondary: [],
+    }
+  );
+});
+
+add_task(function sync_page_sign_in_is_fixed_where_it_is_kept() {
+  const signIn = { folder: { problem: "sign-in", since: NOW } };
+  Assert.deepEqual(pageShape(pageFor(signIn, { sharedRoot: SMB_ROOT })), {
+    state: "folder-sign-in",
+    tone: "problem",
+    said: { title: true, detail: true },
+    via: "smb",
+    shows: ["stop", ...ADVANCED],
+    primary: "chooseSmb",
+    secondary: [],
+  });
+  Assert.deepEqual(pageShape(pageFor(signIn, { sharedRoot: DROPBOX_ROOT })), {
+    state: "folder-sign-in",
+    tone: "problem",
+    said: { title: true, detail: true },
+    via: "dropbox",
+    shows: ["stop", ...ADVANCED],
+    primary: "chooseDropbox",
+    secondary: [],
+  });
+});
+
+add_task(function sync_page_remote_folders_have_no_finder() {
+  for (const [sharedRoot, via] of [
+    [SMB_ROOT, "smb"],
+    [DROPBOX_ROOT, "dropbox"],
+  ]) {
+    const got = pageFor({}, { sharedRoot });
+    Assert.deepEqual(
+      pageShape(got).shows,
+      ["change", "stop", ...ADVANCED],
+      via
+    );
+    Assert.equal(got.location.via, via);
+    Assert.ok(!got.location.place.includes("someone@"), "with no username");
+  }
+});
+
+add_task(function sync_page_with_the_key_gone() {
+  for (const keyState of ["missing", "different"]) {
+    Assert.deepEqual(
+      pageShape(pageFor({ keyState }, { backupSaved: false })),
+      {
+        state: "key-gone",
+        tone: "problem",
+        said: { title: true, detail: true },
+        via: "folder",
+        shows: ["reveal", "stop"],
+        primary: "enterCode",
+        secondary: ["restore", "startOver"],
+      },
+      keyState
+    );
+  }
+  const gone = pageFor({ keyState: "missing" });
+  Assert.ok(
+    gone.title.includes(SvalPanelModel.computerNoun("macosx")) &&
+      gone.detail.includes(gone.location.name),
+    "naming the Mac and the folder"
+  );
+});
+
+/**
+ * A key the store refused because the profile's other secrets are sealed
+ * under a system secret this build cannot open is the page's one state: no
+ * code, backup or new key can be saved, so none is offered.
+ */
+add_task(function sync_page_with_the_key_store_refusing_keys() {
+  for (const keyState of ["missing", "different"]) {
+    Assert.deepEqual(
+      pageShape(pageFor({ keyState, keySealed: true })),
+      {
+        state: "key-sealed",
+        tone: "problem",
+        said: { title: true, detail: true },
+        via: "folder",
+        shows: ["reveal", "stop"],
+        primary: null,
+        secondary: [],
+      },
+      keyState
+    );
+  }
+  for (const platform of ["macosx", "win", "linux"]) {
+    const got = pageFor({ keyState: "missing", keySealed: true, platform });
+    Assert.ok(
+      got.title.includes(SvalPanelModel.computerNoun(platform)),
+      `${platform}: the title names the computer`
+    );
+  }
+  Assert.equal(
+    pageFor({ keyState: "present", keySealed: true }).state,
+    "synced",
+    "a key present is no refusal"
+  );
+});
+
+add_task(function sync_page_names_the_folder_and_the_computer() {
+  const synced = pageFor();
+  Assert.ok(
+    synced.stop.title.includes(synced.location.name),
+    "stopping names the folder it stops syncing with"
+  );
+  for (const [platform, noun] of [
+    ["macosx", "Mac"],
+    ["win", "PC"],
+    ["linux", "computer"],
+  ]) {
+    Assert.equal(SvalPanelModel.computerNoun(platform), noun, platform);
+    Assert.ok(
+      pageFor({ platform }).stop.body.includes(`this ${noun}`),
+      `the stop dialog names this ${noun}`
+    );
+  }
+  Assert.ok(
+    pageFor({}, { sharedRoot: SMB_ROOT }).stop.body.includes("SMB"),
+    "and the sign-in Sval forgets"
+  );
+});
+
+add_task(function sync_page_with_the_key_store_refusing() {
+  const titles = new Set();
+  for (const platform of ["macosx", "win", "linux"]) {
+    const got = pageFor({ keyState: "unreadable", platform });
+    Assert.deepEqual(
+      pageShape(got),
+      {
+        state: "key-unreadable",
+        tone: "problem",
+        said: { title: true, detail: true },
+        via: "folder",
+        shows: ["reveal", "stop"],
+        primary: "retryKey",
+        secondary: [],
+      },
+      platform
+    );
+    titles.add(got.title);
+  }
+  Assert.equal(titles.size, 3, "each platform names its own store");
+});
+
+add_task(function sync_page_joining() {
+  Assert.deepEqual(pageShape(pageFor({ keyState: "none" })), {
+    state: "joining",
+    tone: "waiting",
+    said: { title: true, detail: true },
+    via: "folder",
+    shows: ["reveal", "change", "stop"],
+    primary: "enterCode",
+    secondary: ["restore"],
+  });
+});
+
+add_task(function sync_page_footer_warnings() {
+  Assert.deepEqual(pageShape(pageFor({ unpairedDevice: true })), {
+    state: "unpaired-device",
+    tone: "problem",
+    said: { title: true, detail: true },
+    via: "folder",
+    shows: ["reveal", "change", "stop", ...ADVANCED],
+    primary: "enterCode",
+    secondary: ["dismissOthers"],
+  });
+  Assert.deepEqual(pageShape(pageFor({ newerSchema: ["Laptop"] })), {
+    state: "newer-schema",
+    tone: "problem",
+    said: { title: true, detail: true },
+    via: "folder",
+    shows: ["reveal", "change", "stop", ...ADVANCED],
+    primary: "checkForUpdate",
+    secondary: ["syncNow"],
+  });
+  Assert.deepEqual(pageShape(pageFor({ harmedByClock: ["Laptop"] })), {
+    state: "clock-harm",
+    tone: "problem",
+    said: { title: true, detail: true },
+    via: "folder",
+    shows: ["reveal", "change", "stop", ...ADVANCED],
+    primary: "syncNow",
+    secondary: [],
+  });
+});
+
+add_task(function sync_page_critical() {
+  for (const sharedRoot of [LOCAL_ROOT, null]) {
+    Assert.deepEqual(
+      pageShape(pageFor({ critical: { title: "t" } }, { sharedRoot })),
+      {
+        state: "critical",
+        tone: "problem",
+        said: { title: true, detail: false },
+        via: null,
+        shows: [],
+        primary: "showCritical",
+        secondary: [],
+      },
+      String(sharedRoot)
+    );
+  }
+});
+
+add_task(function sync_page_while_a_folder_or_a_code_is_in_hand() {
+  const working = pageFor({}, { working: DROPBOX_ROOT });
+  Assert.ok(working.working, "choosing a folder says so");
+  Assert.ok(working.locked, "and holds the folder's controls");
+  Assert.ok(pageFor({}, { pairing: true }).locked, "as a live code does");
+  Assert.ok(!pageFor().locked, "and nothing else does");
+});
+
+add_task(function sync_page_describes_the_profile_from_any_window() {
+  Assert.equal(
+    pageFor({ window: "automated" }).state,
+    "synced",
+    "an automated window's panel answers for the profile"
+  );
 });

@@ -247,22 +247,30 @@ do.
   as a NAS, without you connecting to the server first.
 - **Dropbox.** Sval can sync through a folder in your Dropbox without the
   Dropbox app running.
-- **End-to-end encrypted.** Everything in the folder is encrypted with a key
-  that only your devices have. Your cloud provider can't read any of it.
-- **What syncs.** Your Workspaces sync with their tabs and groups, and so do
-  your Favorites, your history, and your settings, from your choices for each
-  site to your blocking setup. History reaches your other devices a little
-  later than tabs do, and history you delete leaves your sync folder too.
-- **Tabs in use stay put.** A tab in a call stays off your other devices until
-  the call ends. A tab another device is showing stays open on that device
-  when you close the tab here.
+- **End-to-end encrypted.** Sval encrypts everything in the sync folder with
+  a key only your devices have. Your cloud provider can't read the folder.
+- **What syncs.** Your Workspaces sync with the Workspaces' tabs and groups.
+  Your Favorites, your history, and your settings sync too, from choices for
+  each site to the blocking setup. History reaches other devices a little
+  later than tabs do, and history you delete leaves the sync folder too.
+- **Tabs in use stay put.** A tab in a call stays off other devices until the
+  call ends. A tab another device is showing stays open on the other device
+  when you close the tab on this device.
 - **Adding a device.** When you first set up Sval on the new device, choose
-  the folder your other devices sync to. To add a device later, go to
-  Settings › Sync and devices › Sync with another device for a one-time code.
-- **Back up your sync key.** Sval offers to back up the key when it makes
-  it. If you lose every device, set up Sval on a new one, choose your sync
-  folder, and select "Restore with your backup key". Your Workspaces come
-  back from the folder.
+  the folder your other devices are syncing with. To add a device later,
+  start on a device that is syncing. Go to Settings › Sync and devices › Add
+  a device…. On the new device, enter the one-time code.
+- **One place for sync.** Settings › Sync and devices says how sync is going
+  in the words the sync indicator uses. The page offers only the buttons that
+  help in the current state. A device that lost the sync key offers Enter
+  code…, Restore from a backup…, and Start over with a new sync key…. Sval
+  keeps the sync key locked with an item in the Keychain, Windows Credential
+  Manager or keyring. When that item is missing or belongs to another copy of
+  Sval, Settings says Sval can't unlock the saved sync key.
+- **Back up your sync key.** Sval offers to back up the sync key when Sval
+  makes the key. If you lose every device, set up Sval on a new device.
+  Choose "I use Sval on another device", then the sync folder, then "Restore
+  from a backup". Your Workspaces come back from the sync folder.
 
 ## Import and export
 

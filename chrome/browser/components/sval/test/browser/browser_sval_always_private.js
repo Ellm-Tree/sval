@@ -132,16 +132,23 @@ add_task(async function settings_says_nothing_is_saved() {
       "the settings page started"
     );
     const page = tab.linkedBrowser.contentWindow;
-    const notes = page.document.querySelectorAll(".sval-private-only");
-    Assert.equal(notes.length, 1, "the Sync and devices pane says why");
+    Assert.equal(
+      page.document.getElementById("sval-storage").dataset.state,
+      "private-only",
+      "the Sync and devices pane says why"
+    );
     for (const id of [
       "sval-pairing-open",
-      "sval-offer-start",
-      "sval-claim-submit",
-      "sval-sync-now",
+      "sval-offer-copy",
+      "sval-storage-choose",
     ]) {
       Assert.ok(page.document.getElementById(id).disabled, `${id} is off`);
     }
+    Assert.equal(
+      page.document.getElementById("sval-sync-buttons").childElementCount,
+      0,
+      "and nothing offers a pass"
+    );
     Assert.equal(page.SvalSettings.panel, null, "and there is no saved panel");
   } finally {
     BrowserTestUtils.removeTab(tab);

@@ -13,7 +13,7 @@
  * file loads this with `loadSubScript` into its own scope.
  */
 
-/* exported SvalEngine, SvalIdentity, SvalSecretStore, SvalLocalSettings, SvalSharedFolder, SvalPanelModel, SYNC_DOCUMENT, shownReason, asArray, directoryOf, thisDevice, peerPublishing, openSettingsPage, showACode, anotherRequest, submitCode, joinWithCode, offerAndClaim, folderAway */
+/* exported SvalEngine, SvalIdentity, SvalSecretStore, SvalLocalSettings, SvalSharedFolder, SvalPanelModel, SYNC_DOCUMENT, shownReason, asArray, directoryOf, thisDevice, peerPublishing, openSettingsPage, showACode, anotherRequest, codeDialog, submitCode, joinWithCode, lookEnded, offerAndClaim, folderAway */
 
 const { SvalEngine } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalEngine.sys.mjs"
@@ -168,29 +168,24 @@ async function openSettingsPage(section) {
   return {
     ...ui,
     els: {
-      offerStart: byId("sval-offer-start"),
+      ...ui.els,
+      pairingOpen: byId("sval-pairing-open"),
       offerCode: byId("sval-offer-code"),
       offerStatus: byId("sval-offer-status"),
       offerCountdown: byId("sval-offer-countdown"),
       offerWithdraw: byId("sval-offer-withdraw"),
-      claimForm: byId("sval-claim-form"),
-      claimCode: byId("sval-claim-code"),
-      claimSubmit: byId("sval-claim-submit"),
-      claimStop: byId("sval-claim-stop"),
-      claimStatus: byId("sval-claim-status"),
-      claimActions: byId("sval-claim-actions"),
     },
   };
 }
 
 /**
- * Presses "Show a code" and waits for one.
+ * Presses Add a device… and waits for the code it shows.
  *
  * @param {object} ui What `openSettingsPage` returned.
  * @returns {Promise<string>} the code on screen.
  */
 async function showACode(ui) {
-  ui.els.offerStart.click();
+  ui.els.pairingOpen.click();
   await TestUtils.waitForCondition(
     () => ui.els.offerCode.value,
     "a code appeared on the offering side"
@@ -214,45 +209,91 @@ function anotherRequest(root) {
 }
 
 /**
- * Types `typed` into the settings page's claim field and presses Look for
- * code, as a person does.
+ * Opens the Enter code dialog on the page `ui`. A page whose state offers
+ * Enter code… opens it from the `claim` address; these tasks are about the
+ * claim itself, from whichever state the page is in, so a page that offers
+ * none opens it as the button does.
  *
- * @param {object} ui What `openSettingsPage` returned.
- * @param {string} typed
+ * @param {object} ui What `openSettingsPage("claim")` returned.
+ * @returns {Promise<object>} `svalDialogAsking`'s result.
  */
-function submitCode(ui, typed) {
-  ui.els.claimCode.value = typed;
-  ui.els.claimCode.dispatchEvent(new ui.page.Event("input", { bubbles: true }));
-  ui.els.claimSubmit.click();
+async function codeDialog(ui) {
+  if (!ui.settings._codeDialog) {
+    ui.settings.enterCode();
+  }
+  const win = ui.page.browsingContext.topChromeWindow;
+  const asked = await svalDialogAsking(win, "enter-code");
+  // The dialog is the window's, and outlives the page: a task's next window
+  // dialog would queue behind it.
+  atTaskEnd(async () => {
+    if (win.gDialogBox.dialog === asked.dialog) {
+      asked.cancel.click();
+      await svalDialogClosed(win, asked, "the Enter code dialog closing");
+    }
+  });
+  return asked;
 }
 
 /**
- * Types `code` into a settings page of its own and waits for the look to end
- * in a join's outcome, a wrong code or a folder it cannot read.
+ * Types `typed` into the Enter code dialog and presses Enter code, as a
+ * person does.
+ *
+ * @param {object} asked `codeDialog`'s result.
+ * @param {string} typed
+ */
+function submitCode(asked, typed) {
+  submitInDialog(asked, typed);
+}
+
+/** The dialog states in which a look for a code has ended without a join. */
+const LOOK_ENDED = ["no-match", "unreadable"];
+
+/**
+ * Types `code` into the Enter code dialog of a settings page of its own and
+ * waits for the look to end in a join's outcome, a wrong code or a folder it
+ * cannot read.
  *
  * @param {string} code
- * @returns {Promise<object>} `{ ui, outcome, said }`: the page, which the
- *   caller closes, the join's `outcome` (absent when there was no join),
- *   and the status line's `data-said`.
+ * @returns {Promise<object>} `{ ui, asked, outcome, said }`: the page,
+ *   which the caller closes, the dialog, still up unless the join landed,
+ *   the join's `outcome` (absent when there was no join), and what the page
+ *   said, as a result line's reason or the dialog's state.
  */
 async function joinWithCode(code) {
   const ui = await openSettingsPage("claim");
-  submitCode(ui, code);
-  const status = ui.els.claimStatus;
+  const asked = await codeDialog(ui);
+  submitCode(asked, code);
+  return { ui, asked, ...(await lookEnded(ui, asked)) };
+}
+
+/**
+ * Waits for the look the Enter code dialog `asked` started to end.
+ *
+ * @param {object} ui What `openSettingsPage` returned.
+ * @param {object} asked `codeDialog`'s result.
+ * @returns {Promise<object>} `{ outcome, said }`, as `joinWithCode`.
+ */
+async function lookEnded(ui, asked) {
+  // A join that landed closes the dialog and says so on the Sync card.
+  const landed = ui.els.storageStatus;
+  const card = ui.els.storage;
   // A claim's Argon2id and the join after it take seconds on a loaded
   // machine, past waitForCondition's default budget.
   await TestUtils.waitForCondition(
     () =>
-      status.dataset.outcome ||
-      ["no-match", "unreadable"].includes(status.dataset.said),
+      landed.dataset.outcome ||
+      card.dataset.joinOutcome ||
+      LOOK_ENDED.includes(asked.form.dataset.state),
     "the look for the code ended",
     250,
     120
   );
+  if (landed.dataset.outcome) {
+    return { outcome: landed.dataset.outcome, said: landed.dataset.reason };
+  }
   return {
-    ui,
-    outcome: status.dataset.outcome,
-    said: status.dataset.said,
+    outcome: card.dataset.joinOutcome,
+    said: asked.form.dataset.state,
   };
 }
 

@@ -45,21 +45,34 @@ add_task(async function two_engines_one_folder_and_a_code() {
   );
 
   const ui = await openSettingsPage("claim");
-  submitCode(ui, code.toLowerCase().replace(/-/g, " "));
+  const asked = await codeDialog(ui);
+  Assert.equal(
+    asked.doc.activeElement,
+    asked.input,
+    "the dialog opens with the code field focused"
+  );
+  submitCode(asked, code.toLowerCase().replace(/-/g, " "));
 
   // A claim's Argon2id and the adoption after it take seconds on a loaded
   // machine, past waitForCondition's default budget.
+  // A join that lands closes Enter code and says so on the Sync card.
+  const landed = ui.els.storageStatus;
   await TestUtils.waitForCondition(
-    () => ui.els.claimStatus.dataset.outcome,
+    () => landed.dataset.outcome,
     "the page reported an outcome from the panel",
     250,
     80
   );
-  Assert.equal(ui.els.claimStatus.dataset.outcome, "adopted", "it joined");
-  Assert.equal(ui.els.claimStatus.dataset.said, "joined", "it says so");
-  Assert.equal(ui.els.claimStatus.dataset.status, "success", "as a success");
+  await svalDialogClosed(
+    ui.page.browsingContext.topChromeWindow,
+    asked,
+    "the dialog closes"
+  );
+  Assert.equal(landed.dataset.outcome, "adopted", "it joined");
+  Assert.equal(landed.dataset.reason, "joined", "it says so");
+  Assert.equal(landed.dataset.status, "success", "as a success");
   Assert.equal(
-    ui.els.claimActions.childElementCount,
+    ui.els.storageResultActions.childElementCount,
     0,
     "with no button to press"
   );
@@ -91,6 +104,7 @@ add_task(async function two_engines_one_folder_and_a_code() {
 add_task(async function a_malformed_code_is_refused_before_any_argon2_work() {
   await thisDevice("shape");
   const ui = await openSettingsPage("claim");
+  const asked = await codeDialog(ui);
 
   for (const typed of [
     "ABCD-EFGH-JKM", // eleven characters
@@ -99,25 +113,32 @@ add_task(async function a_malformed_code_is_refused_before_any_argon2_work() {
     "ABCD-EFGH-JKM!", // nor is punctuation
     "", // nothing at all
   ]) {
-    submitCode(ui, typed);
+    submitCode(asked, typed);
     Assert.equal(
-      ui.els.claimStatus.dataset.said,
-      "malformed",
+      asked.input.getAttribute("aria-invalid"),
+      "true",
       `"${typed}" is refused as not looking like a code, never as wrong`
     );
-    Assert.ok(
-      ui.els.claimStop.hidden && !ui.els.claimSubmit.disabled,
+    Assert.equal(
+      asked.form.dataset.state,
+      "enter-code",
       "and the folder is not looked at"
     );
   }
 
   // A check that refused every code would pass every assertion above.
-  submitCode(ui, "ABCD-EFGH-JKMN");
+  submitCode(asked, "ABCD-EFGH-JKMN");
   await TestUtils.waitForCondition(
-    () => ui.els.claimStatus.dataset.said === "waiting",
+    () => asked.form.dataset.state === "waiting",
     "a well-formed code is put to the folder"
   );
-  ui.els.claimStop.click();
+  asked.cancel.click();
+  await svalDialogClosed(
+    ui.page.browsingContext.topChromeWindow,
+    asked,
+    "Cancel closes the dialog"
+  );
+  Assert.ok(!ui.settings._claims.looking, "and stops the look");
   BrowserTestUtils.removeTab(ui.tab);
 });
 
@@ -132,29 +153,28 @@ add_task(async function a_malformed_code_is_refused_before_any_argon2_work() {
 add_task(async function waiting_is_never_rendered_as_a_wrong_code() {
   const us = await thisDevice("waiting");
   const ui = await openSettingsPage("claim");
-  submitCode(ui, "ABCD-EFGH-JKMN");
+  const asked = await codeDialog(ui);
+  submitCode(asked, "ABCD-EFGH-JKMN");
   await TestUtils.waitForCondition(
-    () => ui.els.claimStatus.dataset.said === "waiting",
-    "with no offer in the folder, the page says none has arrived"
+    () => asked.form.dataset.state === "waiting",
+    "with no offer in the folder, the dialog says none has arrived"
   );
   Assert.ok(
-    ui.els.claimSubmit.disabled,
-    "and the page is still looking, so the code cannot be sent again"
+    asked.ok.disabled,
+    "and Sval is still looking, so the code cannot be sent again"
   );
-  Assert.ok(!ui.els.claimStop.hidden, "and there is a way to stop");
+  Assert.ok(!asked.cancel.disabled, "and Cancel stops the look");
 
   // An offer this code does not open arrives before the next look.
   await SvalSharedFolder._whenIdle();
   await SvalPairing.offer(us.root, randomBytes(32));
   await TestUtils.waitForCondition(
-    () => ui.els.claimStatus.dataset.said === "no-match",
+    () => asked.form.dataset.state === "no-match",
     "the next look reports a live offer this code does not open as wrong",
     250,
     80
   );
-  Assert.ok(
-    !ui.els.claimSubmit.disabled && ui.els.claimStop.hidden,
-    "and the page stops looking"
-  );
+  Assert.ok(!asked.ok.disabled, "and Sval stops looking");
+  Assert.ok(!ui.settings._claims.looking);
   BrowserTestUtils.removeTab(ui.tab);
 });

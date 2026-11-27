@@ -3,6 +3,9 @@ title: Back up your sync key
 description: Save a copy of the key that unlocks your synced Workspaces, and restore it from that copy.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 Your sync key unlocks everything in your sync folder. Nobody can recover
 your sync key for you, so Sval offers to back up the key when it makes it.
 
@@ -11,6 +14,22 @@ read your Workspaces in the sync folder again.
 
 ## Save a backup
 
+<Since v="0.1.0-rc.11">
+
+1. Open Settings › Sync and devices.
+2. Open **Advanced**.
+3. Under Sync key, select **Save a backup…**.
+4. Select **Copy**, then paste the key into a secure note in your password
+   manager.
+5. Select **Done**.
+
+Until you save a backup, the Sync card says "You haven't saved a backup of
+your sync key" and offers **Save a backup…**.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
 1. Open Settings › Sync and devices.
 2. Open **Advanced**.
 3. Under Sync key, select **Save a backup**.
@@ -18,12 +37,29 @@ read your Workspaces in the sync folder again.
    manager.
 5. Select **Done**.
 
+</Until>
+
 Sval shows the same dialog when you first choose a sync folder.
 
 ## Restore on a new device
 
 You lost your laptop, and you didn't use Sval on any other device. Set up
 Sval on your new device:
+
+<Since v="0.1.0-rc.11">
+
+1. Open Sval. The Welcome to Sval dialog opens.
+2. In the introduction, select **Skip**.
+3. On Is this your first time using Sval?, select **I use Sval on another
+   device**, then **Continue**.
+4. Select **Choose folder…**, then choose your sync folder.
+5. Select **Continue**.
+6. Select **Restore from a backup**.
+7. In **Backup key**, paste the key, then select **Continue**.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 1. Open Sval. The Welcome to Sval dialog opens.
 2. In the introduction, select **Skip**.
@@ -34,11 +70,30 @@ Sval on your new device:
 6. Select **Restore with your backup key**.
 7. In **Backup key**, paste the key, then select **Continue**.
 
+</Until>
+
 The step reads "Your tabs and settings are here." Select **Continue** on
 each of the next steps, then **Start browsing**. Sval shows your
 Workspaces.
 
 ## Restore in Settings
+
+<Since v="0.1.0-rc.11">
+
+Use these steps on a computer whose Sync card says "Sync is off" or
+"Waiting for the sync key".
+
+1. On the computer, go to Settings › Sync and devices.
+2. Under Sync, select **Restore from a backup…**.
+3. In **Backup key**, paste the key.
+4. Select **Restore**.
+
+When the key matches the Workspaces in the sync folder, the dialog closes.
+The Sync card says Sval restored the sync key.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 Use these steps on a device you've already set up, with its sync folder
 chosen.
@@ -50,6 +105,8 @@ chosen.
 
 When the key matches the Workspaces in your sync folder, the line under
 the field reads **Done. Both devices are synced.**
+
+</Until>
 
 ## Details
 

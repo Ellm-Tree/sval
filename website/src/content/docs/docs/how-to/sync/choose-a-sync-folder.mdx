@@ -4,6 +4,8 @@ description: Turn on sync by choosing a folder your devices share, or move sync 
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 Sval syncs through a folder you choose. Your devices read and write the
 same folder. Sval encrypts everything it puts there.
@@ -16,6 +18,23 @@ Drive that both computers can reach.
 
 ## Steps
 
+<Since v="0.1.0-rc.11">
+
+1. Open Settings › Sync and devices.
+2. Under Sync, select **A folder on this computer…**.
+3. In the folder picker, choose a folder every device can reach, like a
+   folder in iCloud Drive, Dropbox, OneDrive, or on a network drive.
+4. On a Mac, if macOS asks whether Sval can use "Sval secrets", choose
+   **Always Allow**.
+
+The Sync card says when Sval last synced and shows the folder's name and
+place, and Sval offers to
+[back up your sync key](/docs/how-to/sync/back-up-your-sync-key/).
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
 1. Open Settings › Sync and devices.
 2. Under Sync, select **Choose folder…**.
 3. In the folder picker, choose a folder your other devices can reach, like
@@ -23,15 +42,29 @@ Drive that both computers can reach.
 4. On a Mac, if macOS asks whether Sval can use "Sval secrets", choose
    **Always Allow**.
 
-The Sync card shows the folder's name and where the folder is. A line
-under that says when Sval last synced. Sval then offers to back up your sync key.
-See [Back up your sync key](/docs/how-to/sync/back-up-your-sync-key/).
+The Sync card shows the folder's name and where the folder is, with a line
+under that saying when Sval last synced. Sval then offers to back up your
+sync key. See [Back up your sync key](/docs/how-to/sync/back-up-your-sync-key/).
+
+</Until>
 
 ## Move sync to another folder
+
+<Since v="0.1.0-rc.11">
+
+1. Open Settings › Sync and devices.
+2. Under Sync, select **Change…**.
+3. Select **A folder on this computer…**, then choose the new folder.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 1. Open Settings › Sync and devices.
 2. Under Sync, select **Change…**.
 3. Choose the new folder.
+
+</Until>
 
 Choose the same new folder on each of your other devices. Each device keeps
 syncing with the ones that use the same folder.
@@ -53,6 +86,27 @@ syncing with the ones that use the same folder.
 
 ## If something goes wrong
 
+<Since v="0.1.0-rc.11">
+
+- **Waiting for the sync key.** Another device is syncing with the folder
+  under a sync key this computer doesn't have yet. Select **Enter code…**,
+  or see
+  [Sync another device with this one](/docs/how-to/sync/sync-another-device/).
+- **Sval couldn't save a sync key on this Mac.** Choose the folder again.
+  When macOS asks, select **Always Allow** so Sval can keep the key in the
+  Keychain.
+- **Sval can't reach the folder yet.** Sval keeps the folder you chose and
+  syncs once the folder is reachable, so reconnect the network drive or USB
+  drive, or check that the cloud service is running.
+- **Sval can't find** the folder. The folder moved or the folder's drive
+  isn't connected, so reconnect the drive and select **Set up folder again**.
+  If you moved the folder then select **Choose folder…** and pick the folder
+  in the new place.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
 - **This folder already has Sval Workspaces.** Another of your devices
   already syncs through this folder. To sync with that device, follow
   [Sync another device with this one](/docs/how-to/sync/sync-another-device/)
@@ -66,6 +120,8 @@ syncing with the ones that use the same folder.
 - **Sval can't find its files in this folder.** The folder moved, or its
   drive isn't connected. Reconnect the drive, then select **Use this folder
   again**, or select **Choose another…**.
+
+</Until>
 
 ## Related pages
 

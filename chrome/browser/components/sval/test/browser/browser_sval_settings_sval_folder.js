@@ -69,26 +69,21 @@ add_task(async function a_deleted_sval_folder_is_not_recreated_until_asked() {
     "the other device finds it unreachable too"
   );
 
+  outageWaitedOut();
   const ui = await openSvalSettings("storage");
-  Assert.ok(
-    ui.els.storageText.textContent,
-    "the card says Sval can't find its files"
-  );
+  Assert.equal(ui.state, "folder-gone", "the card says Sval can't find it");
   Assert.equal(ui.els.folderPath.textContent, shared, "in the folder named");
-  Assert.ok(!ui.els.storageReuse.hidden, "Use this folder again is offered");
-  Assert.ok(
-    !ui.els.storageChoose.hidden && !("tone" in ui.els.storageChoose.dataset),
-    "beside choosing another"
-  );
+  Assert.ok(ui.els.storageReuse, "Set up this folder again is offered");
+  Assert.ok(ui.command("chooseInUse"), "beside choosing the folder again");
   Assert.equal(
     ui.page.document.activeElement,
-    ui.els.storageReuse,
-    "and has the caret"
+    ui.command("chooseInUse"),
+    "which has the caret"
   );
 
   ui.els.storageReuse.click();
   await TestUtils.waitForCondition(
-    () => ui.els.storageReuse.hidden,
+    () => ui.state === "synced",
     "the page redrew once the folder was reached"
   );
   Assert.ok(
@@ -142,15 +137,13 @@ add_task(async function a_chosen_folder_without_sval_waits_to_be_confirmed() {
   Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
   Assert.deepEqual(await IOUtils.getChildren(shared), [], "nothing written");
 
+  outageWaitedOut();
   const ui = await openSvalSettings("storage");
-  Assert.ok(
-    ui.els.storageText.textContent,
-    "the card says Sval can't find its files"
-  );
-  Assert.ok(!ui.els.storageReuse.hidden, "Use this folder again is offered");
+  Assert.equal(ui.state, "folder-gone", "the card says Sval can't find it");
+  Assert.ok(ui.els.storageReuse, "Set up this folder again is offered");
   ui.els.storageReuse.click();
   await TestUtils.waitForCondition(
-    () => ui.els.storageReuse.hidden,
+    () => ui.state === "synced",
     "the page redrew once the folder was reached"
   );
   Assert.equal(SvalPanel.syncState.folderState, "reached");
@@ -168,9 +161,12 @@ add_task(async function a_chosen_folder_without_sval_waits_to_be_confirmed() {
   Assert.equal(await SvalPanel.syncWithFolder(), "unreachable");
   await SvalSharedFolder._whenIdle();
   MockFilePicker.useDirectory(shared);
-  ui.els.storageChoose.click();
+  ui.els.storageChange.click();
+  ui.page.document
+    .querySelector('#sval-location-dialog button[data-command="chooseLocal"]')
+    .click();
   await TestUtils.waitForCondition(
-    () => ui.els.storageReuse.hidden,
+    () => SvalPanel.syncState.folderState === "reached",
     "choosing the same folder again confirms it"
   );
   Assert.equal(SvalPanel.syncState.folderState, "reached");
@@ -304,7 +300,7 @@ add_task(async function sync_now_while_sval_uses_the_folder_syncs() {
     deadline: Date.now() + 20_000,
   });
   await syncFromSettings(ui);
-  Assert.equal(ui.els.syncStatus.textContent, "", "nothing is said");
+  Assert.equal(ui.els.storageStatus.textContent, "", "nothing is said");
   Assert.equal(state(), "synced", "and the folder synced");
   await within(other, 20_000, "the other request");
 });

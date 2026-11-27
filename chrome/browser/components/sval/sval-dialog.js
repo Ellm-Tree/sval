@@ -62,9 +62,13 @@ const SvalDialogPage = {
     const page = {
       update: text => {
         Object.assign(args, text);
+        if (args.state) {
+          form.dataset.state = String(args.state);
+        }
         this._text(form, args);
         this._fit();
       },
+      value: () => input?.value ?? "",
       setButton: (id, { label, disabled }) => {
         const button = buttons.get(id);
         if (!button) {

@@ -30,15 +30,31 @@
 /* import-globals-from ../../sval-panel.js */
 
 const MockFilePicker = SpecialPowers.MockFilePicker;
-const { ON_THIS_DEVICE_ONLY } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
-);
 const { SvalIdentity } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalIdentity.sys.mjs"
 );
 const { SvalTestDeny } = ChromeUtils.importESModule(
   "resource://testing-common/SvalTestDeny.sys.mjs"
 );
+
+/**
+ * Picks one way to sync from the Sync card's Change… dialog, as a user with a
+ * folder chosen does.
+ *
+ * @param {object} ui `openSvalSettings`'s result.
+ * @param {string} command `"chooseLocal"`, `"chooseSmb"` or `"chooseDropbox"`.
+ */
+async function changeTheWay(ui, command) {
+  const dialog = ui.page.document.getElementById("sval-location-dialog");
+  Assert.ok(
+    BrowserTestUtils.isVisible(ui.els.storageChange),
+    "the folder can be changed"
+  );
+  ui.els.storageChange.click();
+  Assert.ok(dialog.open, "Change… asks where to sync");
+  dialog.querySelector(`button[data-command="${command}"]`).click();
+  Assert.ok(!dialog.open, "and closes once a way is picked");
+}
 
 add_setup(async function () {
   // The real picker cannot be driven from a test.
@@ -56,10 +72,10 @@ add_task(async function choosing_a_folder_in_settings_publishes_there() {
   const destination = await device.folder("to");
 
   const ui = await openSvalSettings();
-  Assert.equal(
-    ui.els.storageChoose.dataset.tone,
-    "primary",
-    "with no folder chosen the page offers one"
+  Assert.equal(ui.state, "no-folder", "with no folder chosen");
+  Assert.ok(
+    BrowserTestUtils.isVisible(ui.els.storageChoose),
+    "the page offers the ways to choose one"
   );
   Assert.ok(ui.els.storageStop.hidden, "and offers nothing to stop");
 
@@ -96,11 +112,14 @@ add_task(async function choosing_a_folder_in_settings_publishes_there() {
     "the chosen folder received this device's document"
   );
   Assert.equal(ui.els.storageStatus.textContent, "", "with nothing to report");
+  Assert.equal(ui.state, "synced", "the page says the folder syncs");
   Assert.ok(
-    !("tone" in ui.els.storageChoose.dataset) && ui.els.storageReuse.hidden,
-    "the button changes the folder that is reached"
+    BrowserTestUtils.isHidden(ui.els.storageChoose) &&
+      BrowserTestUtils.isVisible(ui.els.storageChange) &&
+      !ui.els.storageReuse,
+    "and offers to change the folder that is reached"
   );
-  Assert.ok(!ui.els.storageStop.hidden, "and Stop syncing is offered");
+  Assert.ok(!ui.els.storageStop.hidden, "and to stop using it");
 });
 
 /**
@@ -125,7 +144,7 @@ add_task(async function a_folder_sval_cannot_reach_yet_is_kept_and_explained() {
   Assert.equal(ui.els.folderPath.textContent, missing, "and names it");
   Assert.equal(device.settings.sharedFolder, missing, "the choice is kept");
   Assert.equal(SvalPanel.syncState.folderState, "unreachable");
-  Assert.ok(!ui.els.storageChoose.disabled, "and the button works again");
+  Assert.ok(!ui.els.storageChange.disabled, "and the folder can change again");
 });
 
 /**
@@ -183,12 +202,12 @@ add_task(async function a_folder_on_a_server_is_chosen_with_its_password() {
     "with nothing on this computer to show"
   );
   Assert.equal(
-    byId("sval-storage").dataset.via,
+    byId("sval-folder-field").dataset.via,
     "smb",
     "and says it syncs through an SMB server"
   );
 
-  byId("sval-storage-smb").click();
+  await changeTheWay(ui, "chooseSmb");
   Assert.equal(
     byId("sval-server-host").value,
     "127.0.0.1:9",
@@ -281,14 +300,14 @@ add_task(async function a_dropbox_folder_is_chosen_after_signing_in() {
     { refreshToken: "token" },
     "with its sign-in"
   );
-  Assert.equal(byId("sval-storage").dataset.via, "dropbox");
+  Assert.equal(byId("sval-folder-field").dataset.via, "dropbox");
   Assert.equal(ui.els.folderPath.textContent, "Dropbox/Apps");
   Assert.ok(byId("sval-folder-reveal").hidden, "nothing to show on disk");
 
   SvalDropbox.signIn = async () => {
     throw new Error("a kept sign-in needs no new one");
   };
-  byId("sval-storage-dropbox").click();
+  await changeTheWay(ui, "chooseDropbox");
   await TestUtils.waitForCondition(
     () => listed.length === 3,
     "the browser opens again"
@@ -506,7 +525,7 @@ add_task(async function choosing_a_folder_with_no_engine_says_so() {
       "and the setting is unchanged: a stored root nothing has published to " +
         "is a folder the user has been told holds their workspaces and does not"
     );
-    ui.settings._describeStorage();
+    ui.settings._drawSyncPage();
     Assert.ok(
       ui.els.storageStatus.textContent,
       "and the sentence survives the page redrawing around it"
@@ -525,11 +544,11 @@ add_task(async function choosing_a_folder_with_no_engine_says_so() {
 });
 
 /**
- * `_describeStorage` runs on every window `focus` as well as at open, so the
- * lead paragraph is not a live region: announcing the whole explanation each
- * time is what the status line beside it exists to avoid. The control is
- * withheld only where no window of the profile runs a panel with a settings
- * store, which the harness's own window always does.
+ * `_drawSyncPage` runs on every window `focus` as well as at open, so the
+ * state's detail is not a live region: announcing the whole explanation each
+ * time is what the title and the status line exist to avoid. The ways to
+ * choose a folder are withheld only where no window of the profile runs a
+ * panel with a settings store, which the harness's own window always does.
  */
 add_task(async function the_storage_section_announces_only_its_outcome() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
@@ -537,23 +556,24 @@ add_task(async function the_storage_section_announces_only_its_outcome() {
   const ui = await openSvalSettings();
 
   Assert.ok(
-    !ui.els.storageText.hasAttribute("aria-live"),
-    "the section's lead is not announced on every redraw"
+    !ui.els.syncLast.hasAttribute("aria-live"),
+    "the state's detail is not announced on every redraw"
   );
   Assert.equal(
     ui.els.storageStatus.getAttribute("aria-live"),
     "polite",
-    "the line that reports an outcome is the one that is"
+    "the line that reports an outcome is"
   );
 
-  ui.settings._describeStorage();
+  ui.settings._drawSyncPage();
+  Assert.equal(ui.state, "no-folder");
   Assert.ok(
-    !ui.els.storageChoose.hidden,
-    "the control is offered while there is a panel to change it"
+    BrowserTestUtils.isVisible(ui.els.storageChoose),
+    "the ways to choose a folder are offered while a panel can"
   );
   Assert.ok(
-    ui.els.storageText.textContent && ui.settings._els.folderField.hidden,
-    "beside a sentence that says the workspaces are on this device only"
+    ui.els.syncLast.textContent && ui.els.folderField.hidden,
+    "beside a state that says the workspaces are on this device only"
   );
 });
 
@@ -597,26 +617,22 @@ add_task(async function settings_reaches_sval_through_the_profile() {
       "the page asks the panel that is running, not the window it is in"
     );
 
-    ui.settings._describeStorage();
-    Assert.ok(
-      ui.els.storageText.textContent && ui.settings._els.folderField.hidden,
+    ui.settings._drawSyncPage();
+    Assert.equal(
+      ui.state,
+      "no-folder",
       "it says the workspaces are on this device only"
     );
+    Assert.ok(ui.els.folderField.hidden, "naming no folder");
     Assert.ok(
-      !ui.els.storageChoose.hidden,
+      BrowserTestUtils.isVisible(ui.els.storageChoose),
       "and offers the control that chooses a folder"
     );
+    Assert.ok(!ui.els.syncNow, "with no pass to run");
     Assert.equal(
       ui.els.storageStatus.textContent,
       "",
-      "with nothing explaining a state the user is not in"
-    );
-
-    await syncFromSettings(ui);
-    Assert.equal(
-      ui.els.syncStatus.textContent,
-      ON_THIS_DEVICE_ONLY,
-      "the button beside it runs a real pass from here"
+      "and nothing explaining a state the user is not in"
     );
 
     MockFilePicker.useDirectory(destination);
@@ -668,10 +684,12 @@ add_task(async function opening_settings_plainly_lands_on_the_page() {
     "opening settings with no section named focuses the page itself"
   );
 
+  // With no folder there is no code to enter, so the caret goes to the way
+  // forward the state offers.
   ui.settings.focusSection("claim");
   await TestUtils.waitForCondition(
-    () => ui.page.document.activeElement === ui.els.claimCode,
-    "and a named section still takes the caret: pairing does not regress"
+    () => ui.page.document.activeElement === ui.els.storageChoose,
+    "and a named section still takes the caret"
   );
 
   ui.settings.focusSection("");

@@ -246,11 +246,11 @@ add_task(async function a_failed_join_changes_nothing_and_can_be_retried() {
 
   await SvalTestDeny.write(them.directory);
   atTaskEnd(() => SvalTestDeny.allow(them.directory));
-  const { ui, outcome, said } = await joinWithCode(code);
+  const { ui, asked, outcome, said } = await joinWithCode(code);
   Assert.equal(outcome, "unchanged", "the join did not happen");
   Assert.equal(said, "folder", "and the folder is said to be what stopped it");
-  const retry = ui.els.claimActions.querySelector("button");
-  Assert.ok(retry, "with a way to try again");
+  const retry = asked.ok;
+  Assert.ok(!retry.disabled, "with Enter code there to try again");
 
   Assert.ok(
     !(them.id in (await nodes(us.engine))),
@@ -285,7 +285,7 @@ add_task(async function a_failed_join_changes_nothing_and_can_be_retried() {
   await SvalTestDeny.allow(them.directory);
   retry.click();
   await TestUtils.waitForCondition(
-    () => ui.els.claimStatus.dataset.outcome === "adopted",
+    () => ui.els.storageStatus.dataset.outcome === "adopted",
     "Try Again joins with the same code",
     250,
     120
@@ -330,7 +330,7 @@ add_task(async function a_key_that_did_not_save_says_so_and_can_be_retried() {
   const secrets = secretsFile();
   await SvalTestDeny.read(secrets);
   atTaskEnd(() => SvalTestDeny.allow(secrets));
-  const { ui, outcome, said } = await joinWithCode(code);
+  const { ui, asked, outcome, said } = await joinWithCode(code);
   await SvalTestDeny.allow(secrets);
   Assert.equal(outcome, "published", "the outcome says which half happened");
   Assert.equal(said, "key-store", "and that the key store refused the key");
@@ -357,11 +357,11 @@ add_task(async function a_key_that_did_not_save_says_so_and_can_be_retried() {
   );
   Assert.ok(await IOUtils.exists(path), "the same code can finish the job");
 
-  const retry = ui.els.claimActions.querySelector("button");
-  Assert.ok(retry, "the page offers to try again");
+  const retry = asked.ok;
+  Assert.ok(!retry.disabled, "the dialog offers to try again");
   retry.click();
   await TestUtils.waitForCondition(
-    () => ui.els.claimStatus.dataset.outcome === "adopted",
+    () => ui.els.storageStatus.dataset.outcome === "adopted",
     "the retry joins",
     250,
     120

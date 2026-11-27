@@ -409,6 +409,7 @@ Object.assign(SvalPanel, {
       folder: { problem: sync.folderProblem, since: sync.unreachableSince },
       lastSynced: sync.lastSynced,
       keyState: sync.keyState,
+      keySealed: sync.keySealed,
       platform: AppConstants.platform,
       // Only what was found in the folder now chosen: a list from a folder
       // since left says nothing about this one.

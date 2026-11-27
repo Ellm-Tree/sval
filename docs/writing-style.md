@@ -49,17 +49,33 @@ friend.
   a verb, since it doesn't say which: "open a link in a Quick Peek".
 - **Name things the way the UI names them**, and give the path to a setting:
   Settings › Links.
-- **Say exactly what you mean.** No "this" or "them" without a clear noun
-  before it, and no internal names, pref names or jargon a user wouldn't
-  know.
-- **Repeat the noun only when "it" is unclear.** When "it" could point to
-  two things, or a sentence piles them up, name the thing again. Don't chain possessives either: "the
-  pin's saved page's address" is two sentences.
+- **Say exactly what you mean.** No internal names, pref names or jargon a
+  user wouldn't know.
+- **Name the thing every time.** No "it", "its", "they", "them", "their",
+  "that", "these", "those", "here", "there" or "one" standing in for a
+  device, folder, Workspace, site, setting or code. "This" is allowed only
+  directly before its noun, for the object on screen: "this Workspace".
+  Don't chain possessives either: "the pin's saved page's address" is two
+  sentences.
 
   | Instead of | Write |
   |---|---|
-  | Its parts are listed here from top to bottom, then its menus and settings. | This page goes through the Workspace panel from top to bottom, then its menus and settings. |
-  | **Save current page as this pin** makes the page it shows its saved page. | **Save current page as this pin.** From now on, the pin goes back to this page. |
+  | Its parts are listed here from top to bottom, then its menus and settings. | This page goes through the Workspace panel from top to bottom, then the Workspace panel's menus and settings. |
+  | **Save current page as this pin** makes the page it shows its saved page. | **Save current page as this pin.** From now on, the pin goes back to the current page. |
+  | On that device, choose Add a device… to show a code. | On the Mac that is syncing, choose Add a device… to show a code. |
+
+- **Describe what is happening now.** A state that is going on is written
+  in the present progressive: "a device that is syncing", "the folder is
+  unreachable". The habitual present ("a device that syncs") states a
+  capability, so the reader can't tell which device is meant. "Already" is
+  no stand-in for a state.
+- **An instruction starts with where.** Write "On <device>, go to <path>"
+  before the action, so the reader is on the right screen before reading
+  what to do.
+
+  | Instead of | Write |
+  |---|---|
+  | Get a code from a device that already syncs. | On a device that is currently syncing to this location, go to Settings › Sync and devices › Add a device. |
 
 - **Make the reader's thing the subject.** Start a page with what the
   reader works with, like a Workspace, a tab, or a site. The control that

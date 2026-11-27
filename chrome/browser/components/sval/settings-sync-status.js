@@ -2,10 +2,10 @@
  * Copyright 2026 Ellm Tree, Inc. */
 
 /**
- * The Sync and devices pane's sync readout, in its Sync card: the state,
- * Sync now and the sync indicator's actions; this device's name, in its Your
- * devices card; and the result lines (messages spec §9.6) every card of the pane
- * writes, with what their one button does.
+ * The Sync and devices pane's Sync now and its redraw on the panel's sync
+ * state; the device names, in its Devices card; and the result lines
+ * (messages spec §9.6) every card of the pane writes, with what their one
+ * button does.
  *
  * `SvalPreferences` loads this as a classic script after `settings.js`; it
  * adds its methods to `SvalSettings`.
@@ -18,6 +18,11 @@
   ChromeUtils.defineESModuleGetters(lazy, {
     DEVICE_NAME_PREF:
       "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
+    DEVICE_NAMES_TOPIC:
+      "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
+    SvalDeviceNames:
+      "moz-src:///browser/components/sval/SvalDeviceNames.sys.mjs",
+    SvalSyncState: "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
     SvalFeedbackForm:
       "moz-src:///browser/components/sval/SvalFeedbackForm.sys.mjs",
     SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
@@ -32,54 +37,28 @@
     )
   );
 
-  /** The indicator severities the readout draws as a problem. */
-  const PROBLEM_SEVERITIES = new Set([
-    "critical",
-    "error",
-    "warning",
-    "offline",
-  ]);
-
   const SvalSyncStatusSettings = {
     /**
-     * What the last "Sync now" pressed here came back with: null before one,
-     * `"syncing"` while it runs, then `"done"` when the pass came back or
-     * `"failed"`. The readout shows it until the panel's own state moves on.
+     * `"syncing"` while a Sync now pressed here runs, else null. The page's
+     * state says the rest, as the footer does.
      */
     _syncOutcome: null,
 
-    /**
-     * The engine's last pass when `_syncOutcome` was settled. The panel's
-     * signal fires on every redraw of its last-synced line, which includes
-     * each redraw of its rows and each poll the engine skipped; only a pass
-     * that came back since says anything newer than the outcome does.
-     */
-    _syncOutcomePass: null,
-
-    /** The readout's buttons as drawn, as JSON; see `_describeSync`. */
+    /** The Sync card's buttons as drawn, as JSON; see `_drawSyncPage`. */
     _shownSyncActions: null,
 
     /**
-     * Finds and wires the sync readout and this device's name.
+     * Finds and wires this device's name and the other devices', and
+     * redraws the page whenever the panel's sync state moves.
      *
      * @param {Function} byId Finds one of the page's elements by id.
      * @param {SvalScope} lifetime Ends as the page goes.
      */
     _initSyncStatus(byId, lifetime) {
       Object.assign(this._els, {
-        syncState: byId("sval-sync-state"),
-        syncNow: byId("sval-sync-now"),
-        syncLast: byId("sval-sync-last"),
-        syncStatus: byId("sval-sync-status"),
-        syncActions: byId("sval-sync-actions"),
         deviceName: byId("sval-device-name"),
-      });
-      this._els.syncNow.addEventListener("click", () => this.syncNow());
-      this._els.syncActions.addEventListener("click", event => {
-        const command = event.target.closest("button")?.dataset.command;
-        if (command) {
-          this.runSyncAction(command);
-        }
+        deviceOthers: byId("sval-device-others"),
+        deviceList: byId("sval-device-list"),
       });
       // A name equal to the computer's is stored as none, so it follows the
       // computer's if that changes.
@@ -92,130 +71,26 @@
         this._describeDeviceName();
       });
       // The panel's own signal, so a pass this page did not ask for still moves
-      // the readout: spec §6.4 keeps the last-synced time in view, and §10.8
-      // shows it beside the button.
-      lifetime.topic(lazy.SvalPanelModel.SYNC_STATE_TOPIC, () => {
-        // A pass that came back is newer news than how the last one asked for
-        // here ended. A tab's title changing redraws the panel too, and that
-        // is no news about the folder.
-        if (
-          this._syncOutcome !== "syncing" &&
-          this.panel?.syncState.lastPass !== this._syncOutcomePass
-        ) {
-          this._syncOutcome = null;
-        }
-        this._describeSync();
-        this._describeStorage();
-      });
+      // the page: spec §6.4 keeps the last-synced time in view.
+      lifetime.topic(lazy.SvalPanelModel.SYNC_STATE_TOPIC, () =>
+        this._drawSyncPage()
+      );
+      // A change the passes do not bring, such as a key put right in another
+      // window.
+      lifetime.topic(lazy.SvalSyncState.CHANGED_TOPIC, () =>
+        this._drawSyncPage()
+      );
       lifetime.pref(lazy.DEVICE_NAME_PREF, () => this._describeDeviceName());
-    },
-
-    /**
-     * The sync readout: one state, a short reason when there is a problem, and
-     * the detail sentence and buttons of the panel's sync indicator (messages
-     * spec §3), which the indicator's click leads here to read.
-     *
-     * **The panel's state, from the panel's own clock.**
-     * `SvalPanel.syncIndicator` is what the footer draws, so the two never
-     * disagree. A pass asked for
-     * here says how it ended until the next pass comes back. Redrawn on focus
-     * and after a pass, when the panel redraws its indicator: neither ticks,
-     * because a pass is what changes the answer.
-     */
-    _describeSync() {
-      const panel = this.panel;
-      let state = "idle";
-      let label = "";
-      let detail = "";
-      let actions = [];
-      if (panel) {
-        const shown = panel.syncIndicator();
-        detail = shown?.detail ?? "";
-        actions = shown?.actions ?? [];
-        if (this._syncOutcome === "syncing") {
-          state = "syncing";
-          label = "Syncing…";
-        } else if (this._syncOutcome === "failed") {
-          state = "problem";
-          label = "Couldn't sync";
-        } else if (!shown) {
-          state = "local";
-          label = lazy.SvalPanelModel.ON_THIS_DEVICE_ONLY;
-        } else if (shown.severity === "off") {
-          state = "local";
-        } else if (PROBLEM_SEVERITIES.has(shown.severity)) {
-          state = "problem";
-          label = shown.label;
-        } else {
-          state = panel.syncState.lastSynced === null ? "waiting" : "synced";
-        }
-      }
-      if (this._els.syncState.dataset.state !== state) {
-        this._els.syncState.dataset.state = state;
-        // A new state arrives with a small settle, unless the user asked for
-        // less motion.
-        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          this._els.syncState.querySelector(".sval-sync-words")?.animate(
-            [
-              { opacity: 0, transform: "translateY(2px)" },
-              { opacity: 1, transform: "none" },
-            ],
-            { duration: 240, easing: "cubic-bezier(0.22, 0.8, 0.24, 1)" }
-          );
-        }
-      }
-      // Unchanged text is left alone: this redraws on every pass the panel's
-      // poll runs, and assigning `textContent` replaces the text node whether
-      // or not the words moved, which costs a paint. See
-      // `SvalPanel.drawIndicator`.
-      this._els.syncState.dataset.outcome = this._syncOutcome ?? "";
-      this._setText(this._els.syncStatus, label);
-      this._setText(this._els.syncLast, detail);
-      const actionsKey = JSON.stringify(actions);
-      if (this._shownSyncActions !== actionsKey) {
-        this._shownSyncActions = actionsKey;
-        this._els.syncActions.replaceChildren(
-          ...actions.map(action => {
-            const button = document.createElement("button");
-            button.className = "sval-button";
-            button.dataset.command = action.command;
-            // The footer draws its dismiss action as a bare ✕; here it is
-            // a button among buttons, so it says what it does.
-            button.textContent =
-              action.command === "dismissOtherWorkspaces"
-                ? "Dismiss"
-                : action.label;
-            return button;
-          })
-        );
-      }
-    },
-
-    /**
-     * Runs one of the sync indicator's actions through the panel's own
-     * command, as the footer's button would, and redraws the readout. The
-     * panel's Choose Folder opens this page at the folder; here, where the
-     * folder already is, it opens the picker, as a result line's does.
-     *
-     * @param {string} command
-     */
-    async runSyncAction(command) {
-      if (command === "chooseSharedFolder") {
-        await this._runResultAction(command, null, null);
-      } else {
-        await this.panel?.run(command, null);
-      }
-      this._describeSync();
+      lifetime.topic(lazy.DEVICE_NAMES_TOPIC, () => this._describeDeviceName());
     },
 
     /**
      * Asks the panel for one sync pass.
      *
      * **The pass is the panel's, and so is what it found at the folder.** A
-     * pass that came back hands the readout to the panel's indicator, which
-     * decides whether the folder's state is shown and when (messages spec
-     * §3). The readout says itself only that the pass is running or that it
-     * failed.
+     * pass that came back hands the card to the panel's state, which decides
+     * whether the folder's state is shown and when (messages spec §3). The
+     * page says itself only that the pass is running, or that it failed.
      */
     async syncNow() {
       if (this._privateOnly) {
@@ -225,34 +100,43 @@
       if (!panel) {
         // Nothing in this profile holds the engine a pass needs, so the page
         // redraws rather than reporting a refusal.
-        this._describeStorage();
+        this._drawSyncPage();
         return;
       }
 
-      this._els.syncNow.disabled = true;
       this._syncOutcome = "syncing";
-      this._describeSync();
+      this._drawSyncPage();
 
-      let shared = null;
-      let outcome;
+      let failed = false;
       try {
         // Waits for the shared folder, whatever the interval: someone pressing
         // the button asked what the folder says now.
-        shared = await panel.syncWithFolder();
-        outcome = shared === null ? "failed" : "done";
+        failed = (await panel.syncWithFolder()) === null;
       } catch (err) {
-        outcome = "failed";
+        failed = true;
         lazy.SvalLog.error(
           `a sync pass asked for in settings failed: ${lazy.describeError(err)}`
         );
       }
-      this._els.syncNow.disabled = false;
-      this._syncOutcome = outcome;
-      this._syncOutcomePass = panel.syncState.lastPass;
-      this._describeSync();
+      this._syncOutcome = null;
+      this._showStorageReport(
+        failed
+          ? {
+              line: {
+                status: "error",
+                reason: "sync-failed",
+                text: "Sval couldn't sync.",
+                action: null,
+              },
+            }
+          : { message: null }
+      );
     },
 
-    /** This device's name: the one the user set, else the computer's. */
+    /**
+     * This device's name, the one the user set or else the computer's, and
+     * the names the other devices published.
+     */
     _describeDeviceName() {
       const computer = lazy.computerName();
       this._els.deviceName.placeholder = computer;
@@ -263,6 +147,20 @@
         this._els.deviceName.value =
           Services.prefs.getStringPref(lazy.DEVICE_NAME_PREF, "") || computer;
       }
+      const others = lazy.SvalDeviceNames.others();
+      this._els.deviceOthers.hidden = !others.length;
+      const shown = [...this._els.deviceList.children].map(
+        item => item.textContent
+      );
+      if (shown.join("\n") !== others.join("\n")) {
+        this._els.deviceList.replaceChildren(
+          ...others.map(name => {
+            const item = document.createElement("li");
+            item.textContent = name;
+            return item;
+          })
+        );
+      }
     },
 
     /**
@@ -271,7 +169,8 @@
      * status and clears the button.
      *
      * @param {Element} textEl A `.sval-status-line`.
-     * @param {Element} actionsEl The `.sval-result-actions` after it.
+     * @param {Element} actionsEl The `.sval-result-actions` after it, in
+     *   the same `.sval-result`.
      * @param {object|null} line `{ status, reason, text, action }`, as
      *   `SvalPanelModel.pairingLine` answers.
      * @param {object} [options]
@@ -322,7 +221,7 @@
           return;
         case "offerCode":
           this.choosePath("offer");
-          this.focusSection("offer");
+          this.beginOffer();
           return;
         case "sendReport":
           await this._sendReport(button, text);

@@ -8,12 +8,11 @@
 /* import-globals-from sval_preferences_helpers.js */
 
 /**
- * Sval's Sync and Agents categories of about:preferences (spec §10.8): the
- * sync folder's field changes and reveals the folder, the sync readout says
- * one state at a time beside it, the device flow shows only the path the
- * user chose, and without a folder sends the user to the Sync card, and
- * agent access is the
- * pref and says why it could not start.
+ * Sval's Sync and Agents categories of about:preferences (spec §10.8): in
+ * each state the Sync and devices page can be brought to, it shows that
+ * state's parts and buttons alone, saying what the footer says; the sync
+ * folder's field changes and reveals the folder; Add a device shows only its
+ * own steps; and agent access is the pref and says why it could not start.
  */
 
 Services.scriptloader.loadSubScript(
@@ -59,11 +58,24 @@ add_task(async function the_folder_field_shows_changes_and_reveals() {
     "named as the panel names it"
   );
   Assert.equal(ui.byId("sval-folder-path").textContent, icloud);
-  Assert.ok(
-    !("tone" in ui.byId("sval-storage-choose").dataset),
-    "the folder's button changes it"
+  await TestUtils.waitForCondition(
+    () => ui.byId("sval-storage").dataset.state === "synced",
+    "the folder syncs"
   );
-  Assert.ok(ui.byId("sval-storage-reuse").hidden, "the folder is reached");
+  assertOnlyPageControls(ui, {
+    primary: "syncNow",
+    shown: [
+      "sval-folder-field",
+      "sval-folder-reveal",
+      "sval-storage-change",
+      "sval-storage-stop",
+      "sval-backup-missing",
+      "sval-pairing-start",
+      "sval-sync-advanced",
+    ].filter(
+      id => id !== "sval-backup-missing" || !SvalPanel.settings.backupSaved
+    ),
+  });
 
   // Revealing opens the system's file manager, outside the browser.
   const revealed = [];
@@ -73,7 +85,10 @@ add_task(async function the_folder_field_shows_changes_and_reveals() {
 
   const other = await makeTempDir("sval-other");
   MockFilePicker.useDirectory(other);
-  ui.byId("sval-storage-choose").click();
+  ui.byId("sval-storage-change").click();
+  ui.page.document
+    .querySelector('#sval-location-dialog button[data-command="chooseLocal"]')
+    .click();
   await TestUtils.waitForCondition(
     () => SvalPanel.sharedRootSetting() === other,
     "Change… makes the picked folder the shared one"
@@ -93,22 +108,27 @@ add_task(async function the_sync_readout_says_one_state() {
   );
   const ui = await openSettings();
   const state = ui.byId("sval-sync-state");
+  const syncNow = () =>
+    ui.page.document.querySelector(
+      '#sval-sync-buttons button[data-command="syncNow"]'
+    );
+  const status = ui.byId("sval-storage-status");
   Assert.equal(state.dataset.state, "synced");
   Assert.equal(
-    ui.byId("sval-sync-last").textContent,
-    SvalPanel.syncIndicator().detail,
+    ui.byId("sval-sync-status").textContent,
+    SvalPanel.syncIndicator().tooltip,
     "it says what the footer's indicator says"
   );
 
-  ui.byId("sval-sync-now").click();
+  syncNow().click();
   Assert.equal(state.dataset.state, "syncing", "pressing Sync now syncs");
-  Assert.ok(ui.byId("sval-sync-status").textContent, "and says so");
+  Assert.ok(syncNow().disabled, "and holds the button while it does");
   await TestUtils.waitForCondition(
-    () => !ui.byId("sval-sync-now").disabled,
+    () => !ui.settings._syncOutcome,
     "the pass came back"
   );
   Assert.equal(state.dataset.state, "synced", "then says it synced");
-  Assert.equal(ui.byId("sval-sync-status").textContent, "");
+  Assert.equal(status.textContent, "", "with nothing more to say");
 
   // A pass fails when it cannot save this device's copy in the profile, as
   // a directory that refuses a new file makes it fail.
@@ -128,20 +148,18 @@ add_task(async function the_sync_readout_says_one_state() {
     id: crypto.randomUUID(),
     now: Date.now(),
   });
-  ui.byId("sval-sync-now").click();
+  syncNow().click();
   await TestUtils.waitForCondition(
-    () => state.dataset.state === "problem",
-    "a pass that failed is a problem"
+    () => status.dataset.reason === "sync-failed",
+    "a pass that failed says so"
   );
-  Assert.equal(state.dataset.outcome, "failed", "the pass failed");
-  const said = ui.byId("sval-sync-status").textContent;
-  Assert.ok(said, "and the readout says so");
+  Assert.equal(status.dataset.status, "error", "as an error");
+  const said = status.textContent;
   // The panel redraws its rows whenever a tab changes, and a redraw runs no
-  // pass: what the last one said stays until another comes back.
+  // pass: what the last one said stays until the state moves on.
   SvalPanel.render();
-  Assert.equal(state.dataset.outcome, "failed");
   Assert.equal(
-    ui.byId("sval-sync-status").textContent,
+    status.textContent,
     said,
     "and the panel redrawing leaves it said"
   );
@@ -161,9 +179,11 @@ add_task(async function an_unreadable_own_file_shows_no_fault() {
   await SvalTestDeny.read(own);
   atTaskEnd(() => SvalTestDeny.allow(own));
   const ui = await openSettings();
-  ui.byId("sval-sync-now").click();
+  ui.page.document
+    .querySelector('#sval-sync-buttons button[data-command="syncNow"]')
+    .click();
   await TestUtils.waitForCondition(
-    () => !ui.byId("sval-sync-now").disabled,
+    () => !ui.settings._syncOutcome,
     "the pass came back"
   );
   Assert.equal(
@@ -172,16 +192,29 @@ add_task(async function an_unreadable_own_file_shows_no_fault() {
     "the read was refused"
   );
   Assert.equal(SvalPanel.syncIndicator().severity, "synced");
-  Assert.equal(ui.byId("sval-sync-state").dataset.state, "synced");
-  Assert.equal(ui.byId("sval-sync-status").textContent, "");
+  Assert.equal(ui.byId("sval-storage").dataset.state, "synced");
+  Assert.equal(ui.byId("sval-storage-status").textContent, "");
 });
 
 /**
- * The readout says what the footer's indicator says, with its buttons
- * (messages spec §3).
+ * A device whose sync key is gone says sync is off once, and offers only the
+ * ways to get the key back: nothing that changes the folder, syncs it, or
+ * gives another device a key this one lacks (messages spec §3, key-storage
+ * spec "Starting up").
  */
-add_task(async function the_sync_readout_carries_the_indicators_detail() {
-  await panelWithFolder(await makeTempDir("sval-shared"));
+add_task(async function a_gone_key_offers_only_the_ways_back() {
+  const shared = await makeTempDir("sval-shared");
+  await panelWithFolder(shared);
+  // With no sealed copy of the key in the folder, Enter code's Next has none
+  // to find and asks for the code (key-storage spec, "Installing again").
+  const { SvalSharedFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs"
+  );
+  await within(SvalSharedFolder._whenIdle(), 45_000, "the helper's exit");
+  await IOUtils.remove(PathUtils.join(shared, "sval", "keys"), {
+    recursive: true,
+    ignoreAbsent: true,
+  });
   // A sync key gone from the store is missing once the panel reads it again,
   // as the indicator's Allow Access does.
   const key = await SvalSecretStore.read("sync key");
@@ -202,24 +235,59 @@ add_task(async function the_sync_readout_carries_the_indicators_detail() {
     SvalIdentity.SYNC_KEY_STATES.missing
   );
 
-  const ui = await openSettings();
+  // The footer's Enter code… opens the page at the same act.
   const shown = SvalPanel.syncIndicator();
-  Assert.equal(ui.byId("sval-sync-state").dataset.state, "problem");
-  Assert.equal(ui.byId("sval-sync-status").textContent, shown.label);
-  Assert.equal(ui.byId("sval-sync-last").textContent, shown.detail);
-  Assert.deepEqual(
-    [...ui.byId("sval-sync-actions").children].map(button => [
-      button.textContent,
-      button.dataset.command,
-    ]),
-    shown.actions.map(action => [action.label, action.command]),
-    "with the footer's button"
-  );
+  Assert.equal(shown.state, "key-gone");
   Assert.deepEqual(
     shown.actions.map(action => action.command),
     ["pairAgain"],
-    "which pairs again"
+    "the footer offers to enter a code"
   );
+  const ui = await openSettings("claim");
+  await TestUtils.waitForCondition(
+    () => !paneOf(ui.page, "svalSync").hidden,
+    "the Sync and devices pane is showing"
+  );
+  ui.settings._drawSyncPage();
+  const primary = () =>
+    ui.page.document.querySelector("#sval-sync-buttons .sval-button-primary");
+  Assert.equal(ui.byId("sval-storage").dataset.state, "key-gone");
+  Assert.equal(
+    primary()?.textContent,
+    shown.actions[0].label,
+    "the page's way back has the footer's name"
+  );
+  // The footer's button opens Enter code's dialog at once, with the field
+  // ready: Sval finds no copy of the key in the folder to join with first.
+  const win = ui.page.browsingContext.topChromeWindow;
+  let asked = await svalDialogAsking(win, "enter-code");
+  Assert.equal(
+    asked.doc.activeElement,
+    asked.input,
+    "the dialog opens with the code field focused"
+  );
+  asked.cancel.click();
+  await svalDialogClosed(win, asked, "Cancel closes the dialog");
+  assertOnlyPageControls(ui, {
+    primary: "enterCode",
+    secondary: ["restore", "startOver"],
+    shown: ["sval-folder-field", "sval-folder-reveal", "sval-storage-stop"],
+  });
+
+  // The page's own button opens the same dialog.
+  primary().click();
+  asked = await svalDialogAsking(win, "enter-code");
+  asked.cancel.click();
+  await svalDialogClosed(win, asked, "and Cancel closes it again");
+
+  // Restore from a backup… is one dialog too.
+  ui.page.document
+    .querySelector('#sval-sync-buttons button[data-command="restore"]')
+    .click();
+  asked = await svalDialogAsking(win, "restore");
+  Assert.equal(asked.doc.activeElement, asked.input, "with its field focused");
+  asked.cancel.click();
+  await svalDialogClosed(win, asked, "and Cancel closes the backup's dialog");
 
   await putBack();
   Assert.equal(
@@ -227,44 +295,160 @@ add_task(async function the_sync_readout_carries_the_indicators_detail() {
     SvalIdentity.SYNC_KEY_STATES.present
   );
   await TestUtils.waitForCondition(
-    () => !ui.byId("sval-sync-actions").childElementCount,
-    "and none once the state has passed"
+    () => ui.byId("sval-storage").dataset.state === "synced",
+    "and the page moves on once the key is back"
+  );
+  Assert.ok(
+    !ui.page.document.querySelector(
+      '#sval-sync-buttons button[data-command="enterCode"]'
+    ),
+    "with no way back left to offer"
   );
 });
 
 /**
- * A Sync now that finds the folder unreachable, while the indicator already
- * says so, shows the indicator's words alone.
+ * A folder that went away is said once, by the state, when the footer says
+ * it: a Sync now that finds it gone adds no failure of its own.
  */
-add_task(async function an_unreachable_folder_is_said_once() {
+add_task(async function a_gone_folder_is_said_once() {
   const shared = await makeTempDir("sval-shared");
   await panelWithFolder(shared);
   const away = `${shared}-away`;
   await IOUtils.move(shared, away);
   atTaskEnd(() => IOUtils.move(away, shared));
   const ui = await openSettings();
-  ui.byId("sval-sync-now").click();
+  const status = ui.byId("sval-storage-status");
+  ui.page.document
+    .querySelector('#sval-sync-buttons button[data-command="syncNow"]')
+    .click();
   await TestUtils.waitForCondition(
-    () => !ui.byId("sval-sync-now").disabled,
+    () => !ui.settings._syncOutcome,
     "the pass came back"
   );
+  Assert.equal(SvalPanel.syncState.folderProblem, "gone", "the folder is gone");
+  Assert.equal(status.textContent, "", "the pass adds no failure of its own");
   Assert.equal(
-    SvalPanel.syncState.folderState,
-    "unreachable",
-    "the folder is gone"
+    ui.byId("sval-storage").dataset.state,
+    "synced",
+    "and the page waits as the footer does"
   );
-  const shown = SvalPanel.syncIndicator();
-  Assert.notEqual(
-    ui.byId("sval-sync-state").dataset.outcome,
-    "failed",
-    "the pass adds no failure of its own"
+
+  outageWaitedOut();
+  await TestUtils.waitForCondition(
+    () => ui.byId("sval-storage").dataset.state === "folder-gone",
+    "then says it once the footer does"
   );
-  Assert.equal(ui.byId("sval-sync-status").textContent, shown.label);
-  Assert.equal(
-    ui.byId("sval-sync-last").textContent,
-    shown.detail,
-    "and the reason is said once"
+  assertOnlyPageControls(ui, {
+    primary: "chooseInUse",
+    secondary: ["useFolderAgain"],
+    shown: [
+      "sval-folder-field",
+      "sval-storage-stop",
+      "sval-pairing-start",
+      "sval-sync-advanced",
+      ...(SvalPanel.settings.backupSaved ? [] : ["sval-backup-missing"]),
+    ],
+  });
+  Assert.equal(status.textContent, "", "still with no line beside it");
+});
+
+/**
+ * Stands in for the shared folder for one task: every request the helper
+ * gets is answered `answer`.
+ *
+ * @param {object} answer A `SvalSharedFolder` answer.
+ */
+function everyFolderRequestAnswers(answer) {
+  const { SvalSharedFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalSharedFolder.sys.mjs"
   );
+  const run = SvalSharedFolder._run;
+  SvalSharedFolder._run = async () => answer;
+  atTaskEnd(() => {
+    SvalSharedFolder._run = run;
+  });
+}
+
+/**
+ * A folder that does not answer, on this computer or an SMB server, keeps
+ * the device's Workspaces and offers to try again, naming what it can't
+ * reach; a remote one has nothing on this computer to show.
+ */
+add_task(async function an_unreachable_folder_offers_to_try_again() {
+  const { SvalRemoteFolder } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/sval/SvalRemoteFolder.sys.mjs"
+  );
+  const local = await makeTempDir("sval-shared");
+  await panelWithFolder(local);
+  everyFolderRequestAnswers({
+    reachable: false,
+    reason: "io-error",
+    error: "NetworkError",
+  });
+  const smb = "smb://me@127.0.0.1:9/Shared/Sval";
+  for (const [root, reveal] of [
+    [local, true],
+    [smb, false],
+  ]) {
+    if (root === smb) {
+      await SvalRemoteFolder.keepSignIn(smb, { password: "hunter2" });
+      await SvalPanel.chooseSharedFolder(smb, { mint: true });
+    }
+    await SvalPanel.syncWithFolder();
+    Assert.equal(SvalPanel.syncState.folderProblem, "offline");
+    outageWaitedOut();
+    const ui = await openSettings();
+    // A server never reached has no last-synced time to give.
+    Assert.equal(
+      ui.byId("sval-storage").dataset.state,
+      root === smb ? "offline-never-synced" : "offline",
+      root
+    );
+    Assert.equal(
+      ui.byId("sval-folder-field").dataset.via,
+      reveal ? "folder" : "smb"
+    );
+    assertOnlyPageControls(ui, {
+      primary: "syncNow",
+      shown: [
+        "sval-folder-field",
+        "sval-storage-change",
+        "sval-storage-stop",
+        "sval-pairing-start",
+        "sval-sync-advanced",
+        ...(SvalPanel.settings.backupSaved ? [] : ["sval-backup-missing"]),
+      ],
+    });
+    closeSettings();
+  }
+});
+
+/**
+ * A folder too large to read stops sync and offers another folder, and
+ * nothing that would act on the folder as if it synced.
+ */
+add_task(async function a_folder_too_large_offers_another() {
+  await panelWithFolder(await makeTempDir("sval-shared"));
+  everyFolderRequestAnswers({
+    reachable: false,
+    reason: "too-large",
+    error: "ResponseTooLarge",
+  });
+  await SvalPanel.syncWithFolder();
+  Assert.equal(SvalPanel.syncState.folderState, "too-large");
+  const ui = await openSettings();
+  Assert.equal(ui.byId("sval-storage").dataset.state, "too-large");
+  assertOnlyPageControls(ui, {
+    primary: "changeLocation",
+    shown: [
+      "sval-folder-field",
+      "sval-folder-reveal",
+      "sval-storage-stop",
+      "sval-pairing-start",
+      "sval-sync-advanced",
+      ...(SvalPanel.settings.backupSaved ? [] : ["sval-backup-missing"]),
+    ],
+  });
 });
 
 add_task(async function the_device_flow_shows_only_the_chosen_path() {
@@ -276,70 +460,37 @@ add_task(async function the_device_flow_shows_only_the_chosen_path() {
     "the Sync and devices pane is showing"
   );
   const open = ui.byId("sval-pairing-open");
-  const chooser = ui.byId("sval-pairing-choose");
   const offer = ui.byId("sval-path-offer-steps");
-  const claim = ui.byId("sval-path-claim-steps");
   const visible = el => !el.hidden && el.getBoundingClientRect().height > 0;
   const focused = () => ui.page.document.activeElement;
-  const stepsShown = steps =>
-    [...steps.querySelectorAll(".sval-step")]
-      .filter(step => !step.hidden)
-      .map(step => step.dataset.step);
 
-  Assert.ok(visible(open), "the devices card offers to sync another device");
-  Assert.ok(!visible(chooser), "and shows no flow until asked");
-  Assert.ok(!visible(offer) && !visible(claim), "nor any steps");
+  Assert.ok(visible(open), "the devices card offers to add a device");
+  Assert.ok(!visible(offer), "and shows no code until asked");
 
   open.click();
-  Assert.ok(visible(chooser), "then it asks which device shows the code");
+  Assert.ok(visible(offer), "Add a device… opens in the devices card");
   Assert.equal(open.getAttribute("aria-expanded"), "true");
-  Assert.ok(
-    ui.byId("sval-this-device").contains(chooser),
-    "in the devices card"
-  );
+  Assert.ok(ui.byId("sval-this-device").contains(offer), "in the devices card");
   Assert.ok(!visible(open), "in place of the button that opened it");
-  const back = ui.byId("sval-choose-back").getBoundingClientRect();
-  const heading = ui
-    .byId("sval-pairing-choose-heading")
-    .getBoundingClientRect();
-  Assert.equal(
-    Math.round(back.left),
-    Math.round(heading.left),
-    "with Back in line with the question"
+  await TestUtils.waitForCondition(
+    () => visible(ui.byId("sval-offer-live")),
+    "and shows the code at once, with no step before it"
   );
-  Assert.equal(focused(), ui.byId("sval-path-offer"), "at the first choice");
+  Assert.equal(focused(), ui.byId("sval-offer-code"), "with the caret there");
 
-  ui.byId("sval-path-offer").click();
-  Assert.ok(visible(offer), "choosing to show a code shows that path");
-  Assert.ok(!visible(chooser) && !visible(claim), "and only that path");
-  Assert.ok(visible(ui.byId("sval-offer-start")), "at its first step");
-  Assert.ok(!visible(ui.byId("sval-offer-live")), "one step at a time");
-  Assert.deepEqual(stepsShown(offer), ["1"], "at step one");
-  Assert.ok(ui.byId("sval-offer-progress").textContent, "which it counts");
-
-  ui.byId("sval-offer-back").click();
-  Assert.ok(visible(chooser), "Back returns to the question");
-  Assert.equal(focused(), ui.byId("sval-path-offer"), "at the path left");
-
-  ui.byId("sval-choose-back").click();
-  Assert.ok(!visible(chooser), "and its own Back closes the flow");
+  ui.byId("sval-offer-withdraw").click();
+  await TestUtils.waitForCondition(
+    () => !visible(offer),
+    "Cancel code closes Add a device"
+  );
   Assert.equal(open.getAttribute("aria-expanded"), "false");
   Assert.equal(focused(), open, "with the caret on the button that opened it");
-
-  open.click();
-  ui.byId("sval-path-claim").click();
-  Assert.ok(visible(claim) && !visible(offer) && !visible(chooser));
-  Assert.ok(!visible(ui.byId("sval-claim-code")), "the code waits its turn");
-  ui.byId("sval-claim-next").click();
-  // Next looks in the folder for this user's own key before asking for a
-  // code, so the code step follows that look.
-  await TestUtils.waitForCondition(
-    () => visible(ui.byId("sval-claim-code")),
-    "and comes at step two"
+  Assert.ok(
+    !ui.page.document.querySelector(
+      '#sval-sync-buttons button[data-command="enterCode"]'
+    ),
+    "and a device that syncs is offered no code to enter"
   );
-  Assert.deepEqual(stepsShown(claim), ["2"]);
-  Assert.ok(ui.byId("sval-claim-progress").textContent, "which it counts");
-  Assert.equal(focused(), ui.byId("sval-claim-code"), "with the caret in it");
 });
 
 /**
@@ -360,46 +511,72 @@ add_task(async function the_sync_card_holds_the_folder_and_its_state() {
     "the Sync and devices pane is showing"
   );
   const card = ui.byId("sval-storage");
-  for (const id of ["sval-folder-field", "sval-sync-state", "sval-sync-now"]) {
-    Assert.ok(card.contains(ui.byId(id)), `the Sync card holds #${id}`);
-    Assert.ok(ui.byId(id).checkVisibility(), `and shows #${id}`);
+  const syncNow = ui.page.document.querySelector(
+    '#sval-sync-buttons button[data-command="syncNow"]'
+  );
+  for (const el of [
+    ui.byId("sval-folder-field"),
+    ui.byId("sval-sync-state"),
+    syncNow,
+  ]) {
+    Assert.ok(card.contains(el), `the Sync card holds #${el.id || "Sync now"}`);
+    Assert.ok(el.checkVisibility(), `and shows it`);
   }
 
-  // The page offers the key's actions once it has read where the key is
-  // kept (`_describeKeyring`), after the pane shows.
-  await TestUtils.waitForCondition(
-    () => !ui.byId("sval-key-actions").hidden,
-    "the key's actions are drawn"
-  );
   const advanced = ui.byId("sval-sync-advanced");
+  Assert.ok(!advanced.hidden, "a device that syncs has its key's actions");
   Assert.ok(advanced.contains(ui.byId("sval-key")), "the key is in Advanced");
   Assert.ok(!advanced.open, "which starts closed");
   Assert.ok(!ui.byId("sval-backup-save").checkVisibility(), "so it is tucked");
   advanced.querySelector("summary").click();
   Assert.ok(ui.byId("sval-backup-save").checkVisibility(), "until opened");
+
+  // Opened, Advanced is one card: the summary and the key's actions inside
+  // one box, with no card of their own.
+  const outer = advanced.getBoundingClientRect();
+  for (const el of [
+    advanced.querySelector("summary"),
+    ui.byId("sval-backup-save"),
+    ui.byId("sval-set-up-again"),
+  ]) {
+    const inner = el.getBoundingClientRect();
+    Assert.ok(
+      inner.top >= outer.top && inner.bottom <= outer.bottom,
+      `${el.id || "the summary"} sits inside Advanced's card`
+    );
+  }
+  Assert.ok(
+    !advanced.querySelector(".sval-card"),
+    "which holds no card of its own"
+  );
+  Assert.equal(
+    ui.byId("sval-set-up-again").className,
+    ui.byId("sval-backup-save").className,
+    "and both key actions are the same kind of button"
+  );
 });
 
-add_task(async function without_a_folder_the_devices_card_sends_to_sync() {
+/**
+ * With no folder the page offers the ways to choose one and nothing else: no
+ * device can be added before this one syncs, and a link to Add a device
+ * lands on the first way to sync.
+ */
+add_task(async function without_a_folder_the_page_offers_only_a_folder() {
   await panelWithFolder(null);
   const ui = await openSettings("offer");
   await TestUtils.waitForCondition(
     () => !paneOf(ui.page, "svalSync").hidden,
     "the Sync and devices pane is showing"
   );
-  Assert.ok(!ui.byId("sval-pairing-needs-folder").hidden, "it asks for one");
-  Assert.ok(ui.byId("sval-folder").textContent, "and says why");
-  Assert.ok(ui.byId("sval-pairing-start").hidden, "and offers no code yet");
-  Assert.ok(!ui.byId("sval-sync-row").checkVisibility(), "nor a readout");
-  Assert.ok(
-    ui.byId("sval-path-offer-steps").classList.contains("sval-unmet"),
-    "and the steps wait for it"
-  );
-  ui.byId("sval-pairing-go-sync").click();
+  Assert.equal(ui.byId("sval-storage").dataset.state, "no-folder");
+  assertOnlyPageControls(ui, {
+    primary: null,
+    shown: ["sval-location-choices"],
+  });
   await TestUtils.waitForCondition(
     () => ui.page.document.activeElement === ui.byId("sval-storage-choose"),
-    "its button takes the caret to the Sync card's folder"
+    "the caret goes to the first way to sync"
   );
-  Assert.ok(!paneOf(ui.page, "svalSync").hidden, "on the same pane");
 });
 
 add_task(async function agent_access_is_the_pref() {

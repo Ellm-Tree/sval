@@ -139,9 +139,9 @@ export const SvalBackupKey = {
       return {
         verdict: "refuse",
         text:
-          "You can't save the key in your sync folder. Anyone who can open " +
-          "that folder could use the key to read your Workspaces. Choose " +
-          "another place.",
+          "Sval can't save the sync key in the sync folder. Anyone who can " +
+          "open the sync folder could read your Workspaces with the key. " +
+          "Choose another place.",
       };
     }
     const roots = this.providerRoots();
@@ -151,9 +151,10 @@ export const SvalBackupKey = {
       return {
         verdict: "warn",
         text:
-          "Saved. This place is in the same cloud account as your sync " +
-          "folder, so anyone who gets into that account could read your " +
-          "Workspaces. A password manager is a safer place for the key.",
+          "Sval saved the sync key. The file is in the same cloud account " +
+          "as the sync folder. Anyone who gets into the cloud account could " +
+          "read your Workspaces. A password manager is a safer place for " +
+          "the sync key.",
       };
     }
     return { verdict: "ok", text: null };

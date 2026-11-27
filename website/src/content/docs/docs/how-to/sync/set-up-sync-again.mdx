@@ -1,0 +1,95 @@
+---
+title: Set up sync again with a new key
+description: Replace your sync key, so a lost device can no longer read your sync folder.
+---
+
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
+When you set up sync again, Sval makes a new sync key and publishes this
+device's Workspaces under the new key. Sval removes the old files from your
+sync folder, so the old key can't read them anymore.
+
+Your laptop was stolen, and Sval on the laptop was syncing. You want to
+shut the laptop out of your sync folder.
+
+## Steps
+
+<Since v="0.1.0-rc.11">
+
+1. On a device that is syncing, go to Settings › Sync and devices.
+2. Open **Advanced**.
+3. Under Sync key, select **Start over with a new sync key…**.
+4. In the dialog, select **Start over**.
+
+The Sync card says this computer has a new sync key, and Sval offers to back
+up the new key.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
+1. On a device that still syncs, open Settings › Sync and devices.
+2. Open **Advanced**.
+3. Under Sync key, select **Set up sync again**.
+4. In the dialog, select **Set up sync again**.
+
+Under Sync key, Sval says sync is set up on this device, and offers to back
+up the new key.
+
+</Until>
+
+## Give your other devices the new key
+
+Your other devices stop syncing until you give each one a code. On each of
+those devices, the sync indicator at the bottom of the Workspace panel reads
+Sync is off.
+
+<Since v="0.1.0-rc.11">
+
+1. On the computer with the new key, go to Settings › Sync and devices.
+2. Under Devices, select **Add a device…**. Sval shows a code.
+3. On the other device, go to Settings › Sync and devices.
+4. Under Sync, select **Enter code…**.
+5. In **Code**, type the code, then select **Enter code**.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
+1. On this device, select **Show Code…**.
+2. Select **Show code**.
+3. On the other device, open Settings › Sync and devices.
+4. Under Sync, select **Reconnect…**.
+5. Type the code, then select **Join**.
+
+</Until>
+
+See [Sync another device with this one](/docs/how-to/sync/sync-another-device/)
+for the code's details.
+
+## Details
+
+- A backup of the old key no longer opens your sync folder, so
+  [back up the new one](/docs/how-to/sync/back-up-your-sync-key/).
+
+<Since v="0.1.0-rc.11">
+
+- A device that lost the sync key offers **Start over with a new sync
+  key…**. Choose Start over only when no other device is syncing and no
+  backup exists, because every other device then needs adding again.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
+
+- You'll see **Set up sync again** only on a device that syncs. If none of
+  your devices still syncs,
+  [restore your key from your backup](/docs/how-to/sync/back-up-your-sync-key/).
+
+</Until>
+
+## Related pages
+
+- [How sync works](/docs/explanation/sync/)
+- [Sync settings and controls](/docs/reference/sync/)

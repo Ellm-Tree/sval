@@ -3,30 +3,62 @@ title: Sync another device with this one
 description: Give another device the key to your sync folder with a one-time code.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 Your sync folder is encrypted, so a device that joins needs the key. A
 one-time code carries the key to that device through the folder.
 
 You've used Sval on your desktop for a while. You install Sval on your laptop
 and want the same Workspaces there.
 
-First, choose the same sync folder on both devices. On the device that
-already syncs, see [Choose a sync folder](/docs/how-to/sync/choose-a-sync-folder/).
-When you set up a device for the first time, setup asks for the folder
-and the code itself. See
-[Set up Sval on two computers](/docs/tutorials/set-up-sval-on-two-computers/).
+First, [choose the same sync folder](/docs/how-to/sync/choose-a-sync-folder/)
+on both devices. When you set up a device for the first time, setup asks
+for the folder and the code itself, as
+[Set up Sval on two computers](/docs/tutorials/set-up-sval-on-two-computers/)
+shows.
 
 ## Show the code on the device that syncs
+
+<Since v="0.1.0-rc.11">
+
+1. On the device that is syncing, go to Settings › Sync and devices.
+2. Under Devices, select **Add a device…**. Sval shows the code at once.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 1. Open Settings › Sync and devices.
 2. Under Your devices, select **Sync with another device**.
 3. Select **This device shows a code**.
 4. Select **Show code**.
 
-The code has three groups of four characters, and it works for an hour.
-The page shows how long the code has left. Keep the page open until the other
+</Until>
+
+The code has three groups of four characters and works for an hour, and the
+page counts down the time it has left. Keep the page open until the other
 device has joined.
 
 ## Type the code on the other device
+
+<Since v="0.1.0-rc.11">
+
+Once the new device has the sync folder, the new device's Sync card says
+"Waiting for the sync key", or "Sync is off" after losing the key.
+
+1. On the new device, go to Settings › Sync and devices.
+2. Under Sync, select **Enter code…**.
+3. In **Code**, type the code.
+4. Select **Enter code**.
+
+Sval looks for the code in the sync folder. When the code arrives, the dialog
+closes and the new device starts syncing, and the first device says the new
+device used the code.
+
+</Since>
+
+<Until v="0.1.0-rc.11">
 
 1. Open Settings › Sync and devices.
 2. Under Your devices, select **Sync with another device**.
@@ -36,8 +68,10 @@ device has joined.
 6. Select **Join**.
 
 Sval looks for the code in the sync folder. When the code arrives, the line
-under the code reads **Joined. Your devices are syncing.** On the first device,
-the page reads **Code used. Your devices are syncing.**
+under the code says the devices are syncing, and the first device says the
+code was used.
+
+</Until>
 
 ## Details
 
@@ -45,10 +79,16 @@ the page reads **Code used. Your devices are syncing.**
   cloud folder, the code can take a few minutes to arrive.
 - You can type the code in upper or lower case, with or without its dashes.
 - To send the code to yourself, select **Copy**.
-- To take the code back before anyone uses it, select **Cancel code**. On
-  the other device, select **Stop** to stop looking for the code. Then you
-  can type the code again.
+- To take the code back before anyone uses it, select **Cancel code**. To
+  stop the other device looking for the code, select **Stop** there, and
+  you can type the code again later.
+
+<Until v="0.1.0-rc.11">
+
 - Either device can show the code. The other one types it.
+
+</Until>
+
 - Anyone with the code and your sync folder can read and change your
   Workspaces. Don't share the code.
 - If Sval was installed on this computer before, Sval can find your sync
@@ -63,10 +103,23 @@ the page reads **Code used. Your devices are syncing.**
 - **That code didn't work.** Check what you typed, or show a new code on the
   other device.
 - **That code expired. Show a new one.** Select **Show code** again.
+
+<Until v="0.1.0-rc.11">
+
 - **Choose a sync folder first.** This device has no sync folder. Select
   **Go to Sync** and choose the folder the other device uses.
 - **This device isn't syncing right now, so it can't give another device a
   code.** Show the code on a device that syncs.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **No Enter code… on the new device.** The new device has no sync folder
+  yet. Choose the folder the first device uses, and the Sync card then
+  offers **Enter code…**.
+
+</Since>
 
 ## Related pages
 

@@ -193,7 +193,7 @@ const STRINGS = Object.freeze({
     service
       ? `This can take a few minutes. Your other device must also save to ${folder}.`
       : `Your other device must also save to ${folder}.`,
-  useBackup: "Restore with your backup key",
+  useBackup: "Restore from a backup",
   backupLabel: "Backup key",
   adopting: "Opening your tabs and settings…",
   joined: "Your tabs and settings are here.",

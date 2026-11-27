@@ -235,9 +235,11 @@ add_task(async function old_addresses_land_where_their_topic_is() {
         ].some(el => !el.hidden),
       `#${address} shows ${pane}`
     );
+    // With no code to enter in this state, the address it named puts the
+    // caret on the Sync card's way forward.
     if (address === "svalDevices-claim") {
       await TestUtils.waitForCondition(
-        () => !ui.byId("sval-path-claim-steps").hidden,
+        () => ui.byId("sval-storage").contains(ui.page.document.activeElement),
         "with the section it named"
       );
     }

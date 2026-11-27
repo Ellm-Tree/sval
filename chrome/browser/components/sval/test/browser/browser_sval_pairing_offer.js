@@ -76,9 +76,9 @@ add_task(async function an_offer_into_a_folder_without_sval_writes_nothing() {
   await SvalSharedFolder._whenIdle();
   await IOUtils.remove(PathUtils.join(us.root, "sval"), { recursive: true });
   const ui = await openSettingsPage("offer");
-  ui.els.offerStart.click();
+  ui.els.pairingOpen.click();
   await TestUtils.waitForCondition(
-    () => ui.els.offerStatus.dataset.said,
+    () => ui.els.offerStatus.dataset.said?.startsWith("folder-"),
     "the page said something about the offer"
   );
   Assert.equal(
@@ -130,7 +130,8 @@ add_task(async function the_offering_page_says_when_its_code_has_been_used() {
   Assert.equal(ui.settings._countdown, null, "and the countdown stopped");
   Assert.equal(ui.els.offerCode.value, "", "and no code is on screen");
   Assert.ok(
-    !ui.els.offerStart.hidden,
+    BrowserTestUtils.isVisible(ui.els.pairingOpen) &&
+      !ui.els.pairingOpen.disabled,
     "and a new code can be shown, for a third device"
   );
 

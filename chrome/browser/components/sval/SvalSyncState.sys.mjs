@@ -59,6 +59,14 @@ export class SvalSyncState {
   keyState = null;
 
   /**
+   * Whether the last sync key this device tried to save was refused because
+   * the key store cannot open this profile's other secrets
+   * (`SvalSecretStore.LostError`). Cleared once a key is present. Set
+   * through {@link setKeySealed}.
+   */
+  keySealed = false;
+
+  /**
    * Another sync key's directories in the shared folder that are not
    * dismissed (`SvalFolderUpkeep`). Set through {@link setOtherWorkspaces}.
    */
@@ -119,6 +127,23 @@ export class SvalSyncState {
       return;
     }
     this.keyState = state;
+    if (state === SvalIdentity.SYNC_KEY_STATES.present) {
+      this.keySealed = false;
+    }
+    Services.obs.notifyObservers(null, SvalSyncState.CHANGED_TOPIC);
+  }
+
+  /**
+   * Records whether saving a sync key was refused because the key store
+   * cannot open this profile's other secrets, and tells every window.
+   *
+   * @param {boolean} sealed
+   */
+  setKeySealed(sealed) {
+    if (sealed === this.keySealed) {
+      return;
+    }
+    this.keySealed = sealed;
     Services.obs.notifyObservers(null, SvalSyncState.CHANGED_TOPIC);
   }
 

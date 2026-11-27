@@ -513,10 +513,13 @@
         Sync and devices
       </h1>
 
-      <!-- The folder this device syncs through, and the sync readout, which
-           describes that folder. The folder is device-local: it never syncs,
-           because it cannot sync through the thing it configures (spec §5.6).
-           The choice itself belongs to the panel, which owns the engine. -->
+      <!-- This device's sync: its state, the folder it syncs through, and
+           what can be done about either, all drawn from one
+           `SvalPanelModel.syncPage` (messages spec §3). The folder is
+           device-local: it never syncs, because it cannot sync through the
+           thing it configures (spec §5.6). The choice itself belongs to the
+           panel, which owns the engine. Every button carries the
+           `data-command` `SvalSettings.runSyncCommand` runs. -->
       <section
         class="sval-card"
         id="sval-storage"
@@ -524,15 +527,110 @@
       >
         <h2 id="sval-storage-heading">Sync</h2>
 
-        <!-- Not a live region: it is redrawn on every window focus.
-             `#sval-storage-status` reports outcomes and is live. -->
-        <p id="sval-storage-text" class="sval-lead"></p>
+        <!-- The state as one row: the footer's icon for it, its words, and
+             its actions, the one primary first and Stop Syncing last. The
+             same row in every state, so the card keeps its shape as the
+             state moves. Sval never recreates a folder by itself, because
+             it cannot tell one that was deleted from a share that is not
+             mounted (local-copy spec §4.6), so Set up this folder again is
+             offered only when the folder is gone. Stopping keeps every
+             workspace: this device's copy lives in the profile (local-copy
+             spec §4.5). It always confirms. -->
+        <div
+          id="sval-sync-state"
+          class="sval-sync-state"
+          data-state="local"
+          data-icon="moon-off"
+        >
+          <span class="sval-sync-icon" aria-hidden="true"></span>
+          <span class="sval-sync-words">
+            <span
+              id="sval-sync-status"
+              class="sval-sync-label"
+              role="status"
+              aria-live="polite"
+            ></span>
+            <span id="sval-sync-last" class="sval-sync-detail"></span>
+          </span>
+          <span class="sval-sync-row-actions">
+            <span id="sval-sync-buttons" class="sval-actions"></span>
+            <button
+              id="sval-storage-stop"
+              class="sval-button sval-button-danger"
+              data-command="stop"
+              hidden="hidden"
+            ></button>
+          </span>
+        </div>
+
+        <!-- The ways to sync, as the card's whole job while none is chosen;
+             the same three fill the Change dialog once one is. -->
+        <div
+          id="sval-location-choices"
+          class="sval-choices"
+          role="group"
+          aria-labelledby="sval-storage-heading"
+          hidden="hidden"
+        >
+          <button
+            id="sval-storage-choose"
+            class="sval-choice"
+            data-command="chooseLocal"
+            data-tone="primary"
+          >
+            <span class="sval-choice-title">A folder on this computer…</span>
+          </button>
+          <!-- A folder on an SMB server, which Sval signs in to itself
+               (desktop connectors spec §4). -->
+          <button
+            id="sval-storage-smb"
+            class="sval-choice"
+            data-command="chooseSmb"
+          >
+            <span class="sval-choice-title">A folder on an SMB server…</span>
+          </button>
+          <!-- A folder in the user's Dropbox, which Sval signs in to itself
+               (desktop connectors spec §3). -->
+          <button
+            id="sval-storage-dropbox"
+            class="sval-choice"
+            data-command="chooseDropbox"
+          >
+            <span class="sval-choice-title">
+              <img
+                class="sval-button-brand"
+                src="chrome://browser/content/sval/sync-services/dropbox.svg"
+                alt=""
+              />
+              A folder in Dropbox…
+            </span>
+          </button>
+        </div>
 
         <div id="sval-folder-field" class="sval-folder-field" hidden="hidden">
           <span class="sval-icon sval-icon-folder" aria-hidden="true"></span>
           <span class="sval-folder-names">
+            <span id="sval-folder-label" class="sval-folder-label">
+              Sync folder
+            </span>
             <span id="sval-folder-name" class="sval-folder-name"></span>
             <span id="sval-folder-path" class="sval-folder-path"></span>
+          </span>
+          <span class="sval-actions">
+            <button
+              id="sval-folder-reveal"
+              class="sval-button"
+              data-command="reveal"
+              hidden="hidden"
+            ></button>
+            <button
+              id="sval-storage-change"
+              class="sval-button"
+              data-command="changeLocation"
+              hidden="hidden"
+            >
+              Change…
+            </button>
           </span>
         </div>
 
@@ -548,59 +646,32 @@
           <span id="sval-storage-working-text"></span>
         </p>
 
-        <!-- Shown on a machine with no keyring, where the sync key is kept in
-             the profile (key-storage spec, "What each system store does to
-             sval"). -->
-        <p id="sval-storage-keyring" hidden="hidden">
-          This computer has no keyring, so Sval keeps your sync key in your Sval
-          profile.
-        </p>
-
-        <div class="sval-actions">
-          <button id="sval-storage-choose" class="sval-button"></button>
-          <!-- A folder on an SMB server, which Sval signs in to itself
-               (desktop connectors spec §4). -->
-          <button id="sval-storage-smb" class="sval-button"></button>
-          <!-- A folder in the user's Dropbox, which Sval signs in to itself
-               (desktop connectors spec §3). -->
-          <button id="sval-storage-dropbox" class="sval-button">
-            <img
-              class="sval-button-brand"
-              src="chrome://browser/content/sval/sync-services/dropbox.svg"
-              alt=""
-            />
-            <span id="sval-storage-dropbox-label"></span>
-          </button>
-          <button
-            id="sval-folder-reveal"
-            class="sval-button"
-            hidden="hidden"
-          ></button>
-          <!-- Offered only while the chosen folder cannot be reached: Sval
-               never recreates a folder by itself, because it cannot tell one
-               that was deleted from a share that is not mounted (local-copy
-               spec §4.6). -->
-          <button id="sval-storage-reuse" class="sval-button" hidden="hidden">
-            Use this folder again
-          </button>
-          <!-- Stopping keeps every workspace: this device's copy lives in the
-               profile (local-copy spec §4.5). -->
-          <button
-            id="sval-storage-stop"
-            class="sval-button sval-button-danger"
-            hidden="hidden"
-          >
-            Stop syncing
+        <!-- Until a backup is saved (key-storage spec, "Backup and
+             recovery"). -->
+        <div
+          id="sval-backup-missing"
+          class="sval-backup-missing"
+          hidden="hidden"
+        >
+          <p class="sval-meta">You haven't saved a backup of your sync key.</p>
+          <button class="sval-button" data-command="saveBackup">
+            Save a backup…
           </button>
         </div>
 
-        <p
-          id="sval-storage-status"
-          class="sval-status-line"
-          role="status"
-          aria-live="polite"
-        ></p>
-        <div id="sval-storage-result-actions" class="sval-result-actions"></div>
+        <!-- The result of the last act on this card or its Advanced. -->
+        <div class="sval-result">
+          <p
+            id="sval-storage-status"
+            class="sval-status-line"
+            role="status"
+            aria-live="polite"
+          ></p>
+          <div
+            id="sval-storage-result-actions"
+            class="sval-result-actions"
+          ></div>
+        </div>
 
         <!-- Stopping always confirms, as removing an extension does. -->
         <dialog
@@ -609,13 +680,9 @@
           aria-labelledby="sval-stop-dialog-title"
           aria-describedby="sval-stop-dialog-body"
         >
-          <h2 id="sval-stop-dialog-title" class="sval-modal-title">
-            Stop syncing?
-          </h2>
-          <p id="sval-stop-dialog-body" class="sval-modal-body">
-            Your Workspaces and tabs will remain, but this device will no longer
-            sync with your other devices.
-          </p>
+          <!-- Named for the folder in use (`SvalPanelModel.syncPage`). -->
+          <h2 id="sval-stop-dialog-title" class="sval-modal-title"></h2>
+          <p id="sval-stop-dialog-body" class="sval-modal-body"></p>
           <div class="sval-modal-actions">
             <button
               id="sval-stop-dialog-cancel"
@@ -635,8 +702,52 @@
           </div>
         </dialog>
 
+        <!-- Change…: the three ways to sync. The way in use opens filled in
+             with the folder in use. -->
+        <dialog
+          id="sval-location-dialog"
+          class="sval-modal"
+          aria-labelledby="sval-location-dialog-title"
+        >
+          <h2 id="sval-location-dialog-title" class="sval-modal-title">
+            Where should Sval sync?
+          </h2>
+          <div
+            class="sval-choices"
+            role="group"
+            aria-labelledby="sval-location-dialog-title"
+          >
+            <button class="sval-choice" data-command="chooseLocal">
+              <span class="sval-choice-title">A folder on this computer…</span>
+            </button>
+            <button class="sval-choice" data-command="chooseSmb">
+              <span class="sval-choice-title">A folder on an SMB server…</span>
+            </button>
+            <button class="sval-choice" data-command="chooseDropbox">
+              <span class="sval-choice-title">
+                <img
+                  class="sval-button-brand"
+                  src="chrome://browser/content/sval/sync-services/dropbox.svg"
+                  alt=""
+                />
+                A folder in Dropbox…
+              </span>
+            </button>
+          </div>
+          <div class="sval-modal-actions">
+            <button
+              id="sval-location-dialog-cancel"
+              class="sval-button"
+              type="button"
+              autofocus="autofocus"
+            >
+              Cancel
+            </button>
+          </div>
+        </dialog>
+
         <!-- Sval's own folder browser: no system picker sees a Dropbox. The
-             token is kept with the sync key as Use this folder chooses it, so
+             token is kept with the sync key as Choose folder chooses it, so
              a Mac asks for the Keychain then, and the note says so first. -->
         <dialog
           id="sval-dropbox-dialog"
@@ -649,7 +760,7 @@
           <div class="sval-dropbox-browser">
             <div class="sval-dropbox-where">
               <button id="sval-dropbox-up" class="sval-button" type="button">
-                Back
+                Up a folder
               </button>
               <span id="sval-dropbox-place" class="sval-dropbox-place"></span>
             </div>
@@ -680,7 +791,7 @@
               data-tone="primary"
               type="button"
             >
-              Use this folder
+              Choose folder
             </button>
           </div>
         </dialog>
@@ -774,43 +885,13 @@
             </div>
           </form>
         </dialog>
-
-        <!-- The sync readout and the one control that asks for a pass (spec
-             §6.4). The detail and its buttons are the panel's sync
-             indicator's (messages spec §3), so the readout says what the
-             footer does. Withheld while there is no folder, which the lead
-             line already says. -->
-        <div id="sval-sync-row" class="sval-sync-row" hidden="hidden">
-          <div id="sval-sync-state" class="sval-sync-state" data-state="idle">
-            <span class="sval-sync-icon" aria-hidden="true"></span>
-            <span class="sval-sync-words">
-              <span
-                id="sval-sync-status"
-                class="sval-sync-label"
-                role="status"
-                aria-live="polite"
-              ></span>
-              <span
-                id="sval-sync-last"
-                class="sval-sync-detail"
-                role="status"
-                aria-live="polite"
-              ></span>
-              <span id="sval-sync-actions" class="sval-sync-actions"></span>
-            </span>
-          </div>
-          <button id="sval-sync-now" class="sval-button sval-button-primary">
-            Sync now
-          </button>
-        </div>
       </section>
 
       <!--
-        This device's name, and giving another device the key to the folder
-        (spec §6.7) as a guided flow: first which device shows the code, then
-        only that path's steps, one at a time. `data-path` on the wrapper says
-        what is showing: "" the card alone, "choose" its two choices, "offer"
-        or "claim" a path; `data-step` on each step says which one.
+        This device's name, the other devices', and giving another device the
+        key to the folder (spec §6.7) as a guided flow, one step at a time.
+        `data-path` on the wrapper says whether Add a device shows: "" none,
+        "offer" its steps; `data-step` on each step says which one.
       -->
       <div id="sval-devices" class="sval-devices" data-path="">
         <section
@@ -818,12 +899,12 @@
           class="sval-card"
           aria-labelledby="sval-devices-heading"
         >
-          <h2 id="sval-devices-heading">Your devices</h2>
+          <h2 id="sval-devices-heading">Devices</h2>
           <!-- Other devices show the name beside the agent workspaces that
                came from this one. Device-local, and published by this
                device alone. -->
           <label class="sval-step-label" for="sval-device-name">
-            This device's name
+            Device name
           </label>
           <input
             id="sval-device-name"
@@ -836,87 +917,37 @@
             aria-describedby="sval-device-name-detail"
           />
           <p id="sval-device-name-detail" class="sval-meta">
-            Your other devices show this name next to agent Workspaces from this
-            device.
+            Other devices show the device name next to agent Workspaces.
           </p>
 
-          <!-- The flow's one precondition: the key travels through the folder
-               both devices share. -->
-          <div
-            id="sval-pairing-needs-folder"
-            class="sval-card-group"
-            hidden="hidden"
-          >
-            <p
-              id="sval-folder"
-              class="sval-lead"
-              role="status"
-              aria-live="polite"
-            ></p>
-            <div class="sval-actions">
-              <button id="sval-pairing-go-sync" class="sval-button">
-                Go to Sync
-              </button>
-            </div>
+          <!-- The names every device publishes (history-sync spec §3.1). -->
+          <div id="sval-device-others" class="sval-card-group" hidden="hidden">
+            <h3 id="sval-device-others-heading" class="sval-step-label">
+              Other devices
+            </h3>
+            <ul
+              id="sval-device-list"
+              class="sval-device-list"
+              aria-labelledby="sval-device-others-heading"
+            ></ul>
           </div>
-          <div id="sval-pairing-start" class="sval-card-group">
-            <p class="sval-lead">
-              Your sync folder is encrypted. Another device needs a one-time
-              code to read it.
-            </p>
+
+          <!-- Offered on a device that syncs: only it holds a key to give. -->
+          <div id="sval-pairing-start" class="sval-card-group" hidden="hidden">
+            <p id="sval-offer-folder" class="sval-lead"></p>
             <div class="sval-actions">
               <button
                 id="sval-pairing-open"
-                class="sval-button sval-button-primary"
+                class="sval-button"
                 aria-expanded="false"
-                aria-controls="sval-pairing-choose"
+                aria-controls="sval-path-offer-steps"
               >
-                Sync with another device
+                Add a device…
               </button>
             </div>
           </div>
 
-          <div
-            id="sval-pairing-choose"
-            class="sval-card-group sval-flow"
-            role="group"
-            hidden="hidden"
-            aria-labelledby="sval-pairing-choose-heading"
-          >
-            <div class="sval-flow-head">
-              <button id="sval-choose-back" class="sval-back">Back</button>
-            </div>
-            <h3 id="sval-pairing-choose-heading">Sync with another device</h3>
-            <div
-              id="sval-pairing-choices"
-              class="sval-choices"
-              role="group"
-              aria-labelledby="sval-pairing-choose-heading"
-            >
-              <button
-                id="sval-path-offer"
-                class="sval-choice"
-                data-path="offer"
-              >
-                <span class="sval-choice-title">This device shows a code</span>
-                <span class="sval-choice-detail">
-                  You type it on the other device.
-                </span>
-              </button>
-              <button
-                id="sval-path-claim"
-                class="sval-choice"
-                data-path="claim"
-              >
-                <span class="sval-choice-title">
-                  The other device shows a code
-                </span>
-                <span class="sval-choice-detail">You type it here.</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- This device offers its key. -->
+          <!-- This device offers its key: the code, at once. -->
           <div
             id="sval-path-offer-steps"
             class="sval-card-group sval-flow"
@@ -924,36 +955,10 @@
             hidden="hidden"
             aria-labelledby="sval-offer-heading"
           >
-            <div class="sval-flow-head">
-              <button id="sval-offer-back" class="sval-back">Back</button>
-              <p id="sval-offer-progress" class="sval-progress"></p>
-            </div>
-            <h3 id="sval-offer-heading">This device shows a code</h3>
+            <h3 id="sval-offer-heading">Add a device</h3>
 
-            <div class="sval-step" data-step="1">
-              <h4>Use the same sync folder on the other device</h4>
-              <p id="sval-offer-folder" class="sval-lead"></p>
-              <div class="sval-actions">
-                <button
-                  id="sval-offer-start"
-                  class="sval-button sval-button-primary"
-                >
-                  Show code
-                </button>
-              </div>
-            </div>
-
-            <div
-              class="sval-step"
-              data-step="2"
-              id="sval-offer-live"
-              hidden="hidden"
-            >
-              <h4>Type this code on the other device</h4>
-              <p class="sval-lead">
-                In Settings › Sync and devices, choose "Sync with another
-                device", then "The other device shows a code".
-              </p>
+            <div id="sval-offer-live" hidden="hidden">
+              <p id="sval-offer-where" class="sval-lead"></p>
               <div class="sval-code-row">
                 <!-- Read-only rather than static text: focusable, selectable with
                      the keyboard, and read out as a value on request. -->
@@ -977,11 +982,11 @@
                 aria-live="off"
               ></p>
               <p class="sval-meta">
-                The code can take a few minutes to reach the other device. Keep
-                this page open.
+                The code can take a few minutes to reach the new device. Keep
+                Settings open until the new device is syncing.
               </p>
               <p class="sval-warning">
-                Anyone with this code and your sync folder can read and change
+                Anyone with the code and the sync folder can read and change
                 your Workspaces.
               </p>
               <div class="sval-actions">
@@ -990,96 +995,26 @@
                 </button>
               </div>
             </div>
-
-            <p
-              id="sval-offer-status"
-              class="sval-status-line"
-              role="status"
-              aria-live="polite"
-            ></p>
           </div>
-
-          <!-- This device claims a key the other device offered. -->
-          <div
-            id="sval-path-claim-steps"
-            class="sval-card-group sval-flow"
-            role="group"
-            hidden="hidden"
-            aria-labelledby="sval-claim-heading"
-          >
-            <div class="sval-flow-head">
-              <button id="sval-claim-back" class="sval-back">Back</button>
-              <p id="sval-claim-progress" class="sval-progress"></p>
-            </div>
-            <h3 id="sval-claim-heading">The other device shows a code</h3>
-
-            <div class="sval-step" data-step="1">
-              <h4>Show a code on the other device</h4>
-              <p class="sval-lead">
-                In Settings › Sync and devices, choose "Sync with another
-                device", then "This device shows a code".
-              </p>
-              <p id="sval-claim-folder" class="sval-meta"></p>
-              <div class="sval-actions">
-                <button
-                  id="sval-claim-next"
-                  class="sval-button sval-button-primary"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-            <div class="sval-step" data-step="2" hidden="hidden">
-              <form id="sval-claim-form">
-                <label class="sval-step-label" for="sval-claim-code">
-                  Type the code it shows
-                </label>
-                <div class="sval-code-row">
-                  <input
-                    id="sval-claim-code"
-                    class="sval-code"
-                    type="text"
-                    size="14"
-                    spellcheck="false"
-                    autocomplete="off"
-                    placeholder="XXXX-XXXX-XXXX"
-                    aria-describedby="sval-claim-status"
-                  />
-                  <button
-                    id="sval-claim-submit"
-                    class="sval-button sval-button-primary"
-                    type="submit"
-                  >
-                    Join
-                  </button>
-                  <button
-                    id="sval-claim-stop"
-                    class="sval-button sval-button-quiet"
-                    type="button"
-                    hidden="hidden"
-                  >
-                    Stop
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <p
-              id="sval-claim-status"
-              class="sval-status-line"
-              role="status"
-              aria-live="polite"
-            ></p>
-            <div id="sval-claim-actions" class="sval-result-actions"></div>
-          </div>
+          <!-- Outside Add a device's code, so a code that was used, expired
+               or could not be shown is still said once the code is gone. -->
+          <p
+            id="sval-offer-status"
+            class="sval-status-line"
+            role="status"
+            aria-live="polite"
+          ></p>
         </section>
       </div>
 
-      <!-- The category's advanced settings: the sync key's backup, taking
-           it back from one, and setting up sync again (key-storage spec,
-           "Backup and recovery"). Shown once a sync folder is chosen; saving
-           and setting up again only on a device that syncs. -->
-      <details id="sval-sync-advanced" class="sval-advanced" hidden="hidden">
+      <!-- The category's advanced settings: what a sync key that works can
+           do (key-storage spec, "Backup and recovery" and "Starting over
+           with a new sync key"). Shown on a device that syncs. -->
+      <details
+        id="sval-sync-advanced"
+        class="sval-advanced sval-advanced-card"
+        hidden="hidden"
+      >
         <summary class="sval-advanced-summary">
           <span class="sval-advanced-label">Advanced</span>
           <span
@@ -1090,55 +1025,33 @@
         <div class="sval-advanced-body">
           <section
             id="sval-key"
-            class="sval-card"
+            class="sval-card-group"
             aria-labelledby="sval-key-heading"
           >
-            <h2 id="sval-key-heading">Sync key</h2>
-            <div id="sval-key-actions" class="sval-actions" hidden="hidden">
-              <p id="sval-backup-missing" class="sval-meta" hidden="hidden">
-                You haven't saved a backup.
-              </p>
-              <button id="sval-backup-save" class="sval-button">
-                Save a backup
+            <h3 id="sval-key-heading">Sync key</h3>
+            <div class="sval-actions">
+              <button
+                id="sval-backup-save"
+                class="sval-button"
+                data-command="saveBackup"
+              >
+                Save a backup…
               </button>
               <button
                 id="sval-set-up-again"
-                class="sval-button sval-button-quiet"
+                class="sval-button"
+                data-command="startOver"
               >
-                Set up sync again
+                Start over with a new sync key…
               </button>
             </div>
-            <form id="sval-restore-form" class="sval-restore">
-              <label class="sval-step-label" for="sval-restore-code">
-                Restore from a backup
-              </label>
-              <div class="sval-code-row">
-                <input
-                  id="sval-restore-code"
-                  class="sval-code"
-                  type="text"
-                  size="40"
-                  spellcheck="false"
-                  autocomplete="off"
-                  aria-describedby="sval-key-status"
-                />
-                <button
-                  id="sval-restore-submit"
-                  class="sval-button"
-                  type="submit"
-                >
-                  Restore
-                </button>
-              </div>
-            </form>
-
-            <p
-              id="sval-key-status"
-              class="sval-status-line"
-              role="status"
-              aria-live="polite"
-            ></p>
-            <div id="sval-key-result-actions" class="sval-result-actions"></div>
+            <!-- Shown on a machine with no keyring, where the sync key is kept
+                 in the profile (key-storage spec, "What each system store
+                 does to sval"). -->
+            <p id="sval-storage-keyring" class="sval-meta" hidden="hidden">
+              This computer has no keyring. Sval keeps the sync key in the Sval
+              profile.
+            </p>
           </section>
         </div>
       </details>

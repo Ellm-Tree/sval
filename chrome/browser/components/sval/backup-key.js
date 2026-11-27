@@ -67,13 +67,12 @@ const SvalBackupSheet = {
       "Sval sync key\n\n" +
       `${this._code}\n\n` +
       `${this._els.fingerprint.textContent}\n\n` +
-      "This key unlocks your synced Sval Workspaces. Nobody can recover it " +
-      "for you, not even Sval. Keep it as a secure note in your password " +
-      "manager or somewhere else safe. Never keep it in your sync folder. If " +
-      "you lose every device, set up Sval on a new one. Choose " +
-      "\u201cUse my tabs and settings from another device\u201d, then your " +
-      "sync folder. Choose \u201cRestore with your backup key\u201d and " +
-      "paste this code.\n"
+      "The sync key unlocks your synced Sval Workspaces. Only your devices " +
+      "have the sync key. Keep the sync key in a secure note in a password " +
+      "manager. Never keep the sync key in the sync folder. If you lose " +
+      "every device, set up Sval on a new device. Choose \u201cI use Sval " +
+      "on another device\u201d, then the sync folder, then \u201cRestore " +
+      "from a backup\u201d. Paste the code above.\n"
     );
   },
 
@@ -120,7 +119,8 @@ const SvalBackupSheet = {
       SvalLog.warn(`the key's backup was not saved: ${describeError(err)}`);
       this._els.status.dataset.state = "failed";
       this._els.status.textContent =
-        "Sval couldn't save the key there. Choose another place, or copy it.";
+        "Sval couldn't save the sync key in the chosen place. Choose " +
+        "another place, or copy the sync key.";
       return;
     }
     this._args.saved = true;
@@ -145,7 +145,8 @@ const SvalBackupSheet = {
     this._args.saved = true;
     this._els.status.dataset.state = "copied";
     this._els.status.textContent =
-      "Copied. Paste it into a secure note in your password manager.";
+      "Sval copied the sync key. Paste the sync key into a secure note in " +
+      "a password manager.";
   },
 
   print() {
