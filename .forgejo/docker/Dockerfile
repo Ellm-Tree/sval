@@ -70,7 +70,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # BackupService resolves the profile's Documents directory on idle, which
 # throws `PathUtils does not support empty paths` when XDG user dirs do not
 # exist, an uncaught rejection against whichever test is running.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+#
+# The upgrade takes fixes from bookworm-security that the pinned base image
+# predates. Debian publishes them there first, and the Node image is rebuilt
+# on its own schedule.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
       bash ca-certificates curl file findutils git gzip make perl procps \
       python3 python3-dev python3-venv python3-pip \
       tar unzip zip xz-utils zstd bzip2 \
