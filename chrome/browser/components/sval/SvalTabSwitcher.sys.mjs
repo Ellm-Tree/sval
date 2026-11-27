@@ -46,6 +46,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalTabs: "moz-src:///browser/components/sval/SvalTabs.sys.mjs",
   GROUP: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
   SPLIT: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
+  iconURL: "moz-src:///browser/components/sval/SvalIcons.sys.mjs",
   shortcutText: "moz-src:///browser/components/sval/SvalKeys.sys.mjs",
   switcherItemOf: "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs",
   ancestorIds: "moz-src:///browser/components/sval/SvalTree.sys.mjs",
@@ -109,6 +110,8 @@ const WHEEL_PX_PER_CARD = 90;
 const WHEEL_LINE_PX = 30;
 /** How long a still wheel waits before the carousel settles on a card. */
 const SETTLE_MS = 140;
+/** The footer's pictures of the two ways to pan the carousel (`#onWheel`). */
+const PAN_ICONS = ["scroll-wheel", "two-finger-swipe"];
 /**
  * Each tab's last preview, as an object URL of its window, and the document
  * it was drawn from (its inner window id). An address the page changes for
@@ -701,9 +704,10 @@ export class SvalTabSwitcher {
   }
 
   /**
-   * The card's bottom edge: the keys the switcher answers, each with what it
-   * does, spelled as the platform spells keys (`shortcutText`). It repeats
-   * what the keys do for the eye alone; a screen reader meets the list's
+   * The card's bottom edge: the keys the switcher answers and the wheel and
+   * swipe that pan it, each with what it does, keys spelled as the platform
+   * spells them (`shortcutText`). It repeats what the keys do for the eye
+   * alone; a screen reader meets the list's
    * own keys. Once latched, Return picks where letting Ctrl go did, and the
    * close key's label names what the selected card is.
    */
@@ -722,6 +726,7 @@ export class SvalTabSwitcher {
         "Next",
       ],
       [null, lazy.shortcutText({ modifiers: "control", key: "`" }), "Previous"],
+      [null, PAN_ICONS, "Browse"],
       this.#latched
         ? [null, lazy.shortcutText({ keycode: "VK_RETURN" }), "Switch"]
         : ["Release", control, "Switch"],
@@ -734,13 +739,24 @@ export class SvalTabSwitcher {
       if (before) {
         pair.append(before, " ");
       }
-      const cap = doc.createElementNS(HTML_NS, "kbd");
-      cap.className = "sval-keycap";
-      cap.textContent = key;
+      if (Array.isArray(key)) {
+        for (const name of key) {
+          const icon = doc.createElementNS(HTML_NS, "img");
+          icon.className = "sval-switcher-icon";
+          icon.src = lazy.iconURL(name);
+          icon.alt = "";
+          pair.append(icon);
+        }
+      } else {
+        const cap = doc.createElementNS(HTML_NS, "kbd");
+        cap.className = "sval-keycap";
+        cap.textContent = key;
+        pair.append(cap);
+      }
       const label = doc.createElementNS(HTML_NS, "span");
       label.className = "sval-switcher-does";
       label.textContent = does;
-      pair.append(cap, label);
+      pair.append(label);
       return pair;
     });
     this.#footer.replaceChildren(...nodes);

@@ -181,6 +181,8 @@ export const ICONS = Object.freeze({
   browsing: "icons/mouse-pointer-2.svg",
   page: "icons/globe.svg",
   "new-window": "icons/app-window.svg",
+  "scroll-wheel": "icons/mouse.svg",
+  "two-finger-swipe": "sync-icons/two-finger-swipe.svg",
 
   // Generic actions and states.
   add: "icons/plus.svg",

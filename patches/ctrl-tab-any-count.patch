@@ -1,0 +1,36 @@
+Sval: Ctrl+Tab's switcher opens whatever the number of tabs
+
+ctrlTab swapped two tabs without its panel and did nothing for one, so
+holding Ctrl showed the switcher only past a count the user cannot see.
+It opens for any tab, and stays open until its last card goes.
+
+diff --git a/browser/components/tabbrowser/content/browser-ctrlTab.js b/browser/components/tabbrowser/content/browser-ctrlTab.js
+index 067d0e63b8..7fca8298d8 100644
+--- a/browser/components/tabbrowser/content/browser-ctrlTab.js
++++ b/browser/components/tabbrowser/content/browser-ctrlTab.js
+@@ -241,12 +241,10 @@ var ctrlTab = {
+ 
+     document.addEventListener("keyup", this, { mozSystemGroup: true });
+ 
+-    let tabs = this.tabList;
+-    if (tabs.length > 2) {
++    // Sval: the switcher opens whatever the number of tabs, so holding Ctrl
++    // always shows it.
++    if (this.tabCount) {
+       this.open();
+-    } else if (tabs.length == 2) {
+-      let index = tabs[0].selected ? 1 : 0;
+-      gBrowser.selectedTab = tabs[index];
+     }
+   },
+ 
+@@ -277,7 +275,8 @@ var ctrlTab = {
+   },
+ 
+   removeClosingTabFromUI: function ctrlTab_removeClosingTabFromUI(aTab) {
+-    if (this.tabCount == 2) {
++    // Sval: the switcher stays open until its last card goes.
++    if (!this.tabCount) {
+       this.close();
+       return;
+     }

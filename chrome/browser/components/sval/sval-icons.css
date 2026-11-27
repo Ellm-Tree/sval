@@ -153,6 +153,8 @@
   --sval-icon-browsing: url("chrome://browser/content/sval/icons/mouse-pointer-2.svg");
   --sval-icon-page: url("chrome://browser/content/sval/icons/globe.svg");
   --sval-icon-new-window: url("chrome://browser/content/sval/icons/app-window.svg");
+  --sval-icon-scroll-wheel: url("chrome://browser/content/sval/icons/mouse.svg");
+  --sval-icon-two-finger-swipe: url("chrome://browser/content/sval/sync-icons/two-finger-swipe.svg");
   --sval-icon-add: url("chrome://browser/content/sval/icons/plus.svg");
   --sval-icon-check: url("chrome://browser/content/sval/icons/check.svg");
   --sval-icon-close: url("chrome://browser/content/sval/icons/x.svg");

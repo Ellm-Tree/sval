@@ -57,6 +57,29 @@ add_task(async function ctrl_tab_steps_and_letting_go_picks() {
   Assert.notEqual(gBrowser.selectedTab, a, "past the others");
 });
 
+add_task(async function the_switcher_shows_for_one_tab_and_two() {
+  Assert.equal(gBrowser.visibleTabs.length, 1, "the window has one tab");
+  for (const count of [1, 2]) {
+    if (count === 2) {
+      await lettered(1);
+    }
+    const shown = gBrowser.selectedTab;
+    await holdCtrlTab();
+    Assert.equal(
+      switcherOptions().length,
+      count,
+      `the switcher shows ${count} card(s)`
+    );
+    EventUtils.synthesizeKey("KEY_Escape");
+    await TestUtils.waitForCondition(
+      () => !switcherShown(),
+      "the switcher closing"
+    );
+    EventUtils.synthesizeKey("KEY_Control", { type: "keyup" });
+    Assert.equal(gBrowser.selectedTab, shown, "the tab shown stays shown");
+  }
+});
+
 add_task(async function escape_cancels() {
   const [, , c] = await lettered(3);
   await holdCtrlTab();
@@ -185,6 +208,13 @@ add_task(async function only_the_cards_near_the_middle_are_drawn() {
     footer.querySelectorAll(".sval-switcher-pair .sval-keycap").length,
     5,
     "it shows five keys"
+  );
+  Assert.deepEqual(
+    [...footer.querySelectorAll(".sval-switcher-icon")].map(icon =>
+      icon.src.split("/").pop()
+    ),
+    ["mouse.svg", "two-finger-swipe.svg"],
+    "and pictures of a wheel and a swipe"
   );
   const options = switcherOptions();
   Assert.equal(

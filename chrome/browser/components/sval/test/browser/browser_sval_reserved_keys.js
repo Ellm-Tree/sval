@@ -206,8 +206,8 @@ add_task(async function a_key_the_user_gives_stays_reserved() {
 
 /**
  * Firefox keeps recent-tab switching from a page with no `<key>` of Sval's.
- * With two tabs Ctrl+Tab selects the other at once (`ctrlTab.onKeyDown`),
- * which shows the key reached it.
+ * A quick Ctrl+Tab, Ctrl let go at once, selects the tab used before
+ * (`ctrlTab.onKeyDown`), which shows the key reached it.
  */
 add_task(async function ctrl_tab_switches_tabs_over_a_page_that_takes_it() {
   keepPrefs("browser.engagement.ctrlTab.has-used");
@@ -215,6 +215,7 @@ add_task(async function ctrl_tab_switches_tabs_over_a_page_that_takes_it() {
   const tab = await openTaker();
   Assert.equal(gBrowser.visibleTabs.length, 2, "two tabs");
   EventUtils.synthesizeKey("KEY_Tab", { ctrlKey: true });
+  EventUtils.synthesizeKey("KEY_Control", { type: "keyup" });
   await TestUtils.waitForCondition(
     () => gBrowser.selectedTab === other,
     "Ctrl+Tab selects the other tab"

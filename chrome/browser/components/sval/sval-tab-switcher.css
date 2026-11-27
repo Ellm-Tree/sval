@@ -100,6 +100,14 @@
   white-space: nowrap;
 }
 
+/* The wheel and swipe pictures, a key cap's height and in the footer's ink. */
+.sval-switcher-icon {
+  width: 16px;
+  height: 16px;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
 /* The carousel. `--sval-switcher-width`, `-tile-width`, `-tile-height` and
    `-stage-height` are the window's, set on the card (`SvalTabSwitcher`).
    Each card stands in the middle and `SvalTabSwitcher` moves it out to its
