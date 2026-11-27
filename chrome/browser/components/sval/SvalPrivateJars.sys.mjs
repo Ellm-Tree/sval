@@ -307,9 +307,4 @@ export const SvalPrivateJars = {
     }
     await Promise.all([...clearing]);
   },
-
-  /** The jars not yet cleared. For tests. */
-  get _liveForTests() {
-    return [...live.keys()];
-  },
 };

@@ -2514,36 +2514,6 @@ export class SvalEngine extends SvalWorkerClient {
   }
 
   /**
-   * Reads extra document `name` from this device's file in the profile and
-   * writes it back if it changed, touching no other document and not the
-   * shared folder. A module that mirrors a store into a document calls this
-   * once before comparing the two, so it compares against what the profile
-   * holds rather than an empty document.
-   *
-   * @param {string} name A document registered with {@link addDocument}.
-   * @returns {Promise<object>} The pass's report, as `sync` describes it.
-   */
-  async profilePass(name) {
-    return this.#localPass(name, SvalClock.now());
-  }
-
-  /**
-   * Whether the profile holds this device's own file for document `name`.
-   * Reads the profile and writes nothing.
-   *
-   * @param {string} name A document name.
-   * @returns {Promise<boolean>}
-   */
-  async hasLocalCopy(name) {
-    const { prefix, mine } = await this.post("layout", [
-      { workspace: name, keyBytes: this.#localKey, deviceId: this.#deviceId },
-    ]);
-    return IOUtils.exists(
-      PathUtils.join(this.#root, ...prefix.split("/"), mine)
-    );
-  }
-
-  /**
    * Every setting in document `name`, as `{ key: value | null }`. Callers
    * between one change or pass and the next share one answer, so it is read,
    * never changed.
