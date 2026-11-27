@@ -135,6 +135,7 @@ final class AppHarness {
         // ends frees its pages.
         for page in model.browser.pages.values { page.close() }
         model.browser.pages.removeAll()
+        model.stopObserving()
         folder.cutOff()
         try await until("the passes end") { !model.syncing }
         self.model = nil

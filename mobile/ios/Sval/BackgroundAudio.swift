@@ -87,6 +87,12 @@ final class BackgroundAudio {
         ]
     }
 
+    /// Stops answering the app's notifications (`AppModel.stopObserving`).
+    func stopObserving() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+    }
+
     private func mark() {
         let pages = pages?() ?? []
         let playing = pages.filter(\.playing).map(\.view)

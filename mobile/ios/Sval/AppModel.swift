@@ -101,6 +101,7 @@ final class AppModel {
     var message: String?
     /// The live pages. Made at the end of `init`, since it holds this model.
     @ObservationIgnored private(set) var browser: Browser!
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     var syncer: Syncer? {
         didSet { if syncer !== oldValue { marks = ReadMarks() } }
@@ -200,7 +201,7 @@ final class AppModel {
         settingUp = stage == .chooseFolder && !UserDefaults.standard.bool(forKey: Self.offeredSetupKey)
         browser = Browser(model: self, blocker: edges.blocker(), states: PageStates(directory: edges.pageStates))
         KagiPrivacyPass.shared.start()
-        NotificationCenter.default.addObserver(
+        observers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -210,7 +211,7 @@ final class AppModel {
                 // window writes its own as it closes.
                 Task { await self?.writeHeldTitles() }
             }
-        }
+        })
         TitleHold.shared.onDue = { [weak self] id in
             Task { await self?.writeHeldTitles([id]) }
         }
@@ -218,14 +219,14 @@ final class AppModel {
             guard let held = self?.heldVisitTitles.removeValue(forKey: url) else { return }
             Task { try? await self?.syncer?.setVisitTitle(held.id, title: held.title, at: held.at) }
         }
-        NotificationCenter.default.addObserver(
+        observers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.startWatching()
                 self?.updateBlocker(always: true)
             }
-        }
+        })
         if LaunchOption.given("-svalPlaybackSession") {
             do {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
@@ -256,6 +257,17 @@ final class AppModel {
             if PrivacyCheck.requested { await PrivacyCheck.run(self) }
             #endif
         }
+    }
+
+    /// Stops this model and its browser answering the app's notifications,
+    /// as an app that ends does. The model and its browser hold each other,
+    /// so a model dropped without this keeps answering, and in a process
+    /// that makes models one after another, each `didBecomeActive` reaches
+    /// every model made before.
+    func stopObserving() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        browser.stopObserving()
     }
 
     /// The engine, once its load at launch is done; nil when it failed.

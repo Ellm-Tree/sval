@@ -64,6 +64,7 @@ final class Browser {
     /// The files the pages download.
     let downloads = Downloads()
     @ObservationIgnored let audio = BackgroundAudio()
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
     /// When the user left each workspace they have left, by id.
     @ObservationIgnored private var leftAt: [String: Date] = [:]
 
@@ -505,7 +506,7 @@ final class Browser {
         // included, the screen is covered before iOS takes the app
         // switcher's snapshot, which it saves to disk.
         for name in [UIApplication.willResignActiveNotification, UIApplication.didEnterBackgroundNotification] {
-            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.saveLiveStates(on: name == UIApplication.willResignActiveNotification ? "losing focus" : "the background")
                     if let front = self?.currentTabId { self?.takePreview(front) }
@@ -520,9 +521,9 @@ final class Browser {
                         if self?.media.isEmpty == false { self?.startMediaChecks() }
                     }
                 }
-            }
+            })
         }
-        NotificationCenter.default.addObserver(
+        observers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -532,20 +533,27 @@ final class Browser {
                 self?.unmutePrivateMedia()
                 self?.mediaLog("Sval in front again")
             }
-        }
+        })
         watchWindow()
         #if DEBUG
         Diagnostics.log("page states: \(offloaded.countOnDisk()) on disk at launch")
         #endif
-        NotificationCenter.default.addObserver(
+        observers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 Task { await self.offload(self.pages.keys.filter { $0 != self.currentTabId }, why: "memory warning") }
             }
-        }
+        })
         refreshBar()
+    }
+
+    /// Stops answering the app's notifications (`AppModel.stopObserving`).
+    func stopObserving() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        audio.stopObserving()
     }
 
     /// Lets go of the pages of the workspaces the user left three hours ago
