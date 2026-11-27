@@ -189,22 +189,15 @@ add_task(async function a_press_mid_slide_reverses_it() {
   await hideHistory();
 });
 
-add_task(async function the_header_names_the_sidebar_and_offers_no_menu() {
+add_task(async function the_sidebar_shows_no_header() {
   await showHistory();
   Assert.ok(
     document.getElementById("sidebar-switcher-target").hidden,
     "the switcher button is hidden"
   );
-  const title = document.getElementById("sidebar-title");
-  Assert.ok(title.checkVisibility(), "the title shows");
   Assert.ok(
-    !document.getElementById("sidebar-icon").checkVisibility(),
-    "and no icon, which Firefox draws only inside the switcher"
-  );
-  Assert.equal(title.value, SidebarController.title);
-  Assert.ok(
-    document.getElementById("sidebar-close").checkVisibility(),
-    "and the close button"
+    !document.getElementById("sidebar-header").checkVisibility(),
+    "and the header with it, its title and close button included"
   );
   await hideHistory();
 });

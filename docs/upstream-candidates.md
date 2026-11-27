@@ -2086,6 +2086,22 @@ Each entry gives:
   switcher carries the page's state across (`onSwapDocShells`). Dropping a
   dragged tab into another window takes the same path.
 
+### The sidebar switcher shows no icon for an extension's sidebar
+
+- **Patch**: `patches/sidebar-switcher-icon.patch`
+- **Mozilla bug**: none filed.
+- **Defect**: `SidebarController.show` reads `icon` from the sidebar it
+  shows, but `addOrUpdateExtension` stores an extension sidebar's icon as
+  `iconUrl`. The switcher's button never gets
+  `--webextension-menuitem-image`, so it draws an empty space where the
+  extension's icon belongs. Only the classic sidebar (`sidebar.revamp` off)
+  shows the switcher.
+- **Evidence**: with Bitwarden's sidebar open, the switcher's button showed
+  its name and no icon. `browser_sval_extension_compat.js` checks that the
+  icon carries the extension's image.
+- **Upstream**: the patch reads `iconUrl` and wraps it in `url()`, as
+  `_setExtensionAttributes` does for the menu's items.
+
 ## Backports carried until the pin reaches them
 
 Mozilla has fixed these upstream. They stay listed only so the patch or pref is

@@ -1,0 +1,26 @@
+Sval: Show an extension's icon in the sidebar switcher
+
+SidebarController.show reads an "icon" each sidebar no longer carries:
+extension sidebars keep theirs as iconUrl, so the switcher's button drew
+an empty space where the extension's icon belongs.
+
+diff --git a/browser/components/sidebar/browser-sidebar.js b/browser/components/sidebar/browser-sidebar.js
+index 6581b7da3d..9f0df65713 100644
+--- a/browser/components/sidebar/browser-sidebar.js
++++ b/browser/components/sidebar/browser-sidebar.js
+@@ -2035,12 +2035,12 @@ var SidebarController = {
+       this._box.setAttribute("checked", "true");
+       this._state.command = commandID;
+ 
+-      let { icon, url, title, sourceL10nEl, contextMenuId } =
++      let { iconUrl, url, title, sourceL10nEl, contextMenuId } =
+         this.sidebars.get(commandID);
+-      if (icon) {
++      if (iconUrl) {
+         this._switcherTarget.style.setProperty(
+           "--webextension-menuitem-image",
+-          icon
++          `url("${iconUrl}")`
+         );
+       } else {
+         this._switcherTarget.style.removeProperty(

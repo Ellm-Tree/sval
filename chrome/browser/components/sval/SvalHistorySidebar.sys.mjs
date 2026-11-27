@@ -8,12 +8,13 @@
  * to them, the query and the cells through the tree's `svalHistory`, which
  * `history-sidebar-hooks.patch` has the page and `PlacesTreeView` ask:
  *
- * - The sidebar's header names what it shows and closes it. Its switcher
- *   button, whose menu moves the sidebar or picks another one, is hidden with
- *   its icon, and its title stays. The side is the panel's opposite (`SvalPanel`).
- * - While an enabled extension has a sidebar (`sidebar_action`), the switcher
- *   shows, and its menu lists History and the extensions' sidebars alone
- *   (extension-compatibility spec §6).
+ * - The sidebar's header is hidden with its switcher button, whose menu moves
+ *   the sidebar or picks another one (`sval-header.css`). The side is the
+ *   panel's opposite (`SvalPanel`).
+ * - While an enabled extension has a sidebar (`sidebar_action`), the header
+ *   shows with its close button and the switcher, which names the sidebar
+ *   showing by its icon and title, and whose menu lists History and the
+ *   extensions' sidebars alone (extension-compatibility spec §6).
  * - Its search field, buttons and rows are drawn as the panel's ({@link SHEET}).
  * - A site's folder, under "By Site" and "By Date and Site", shows the icon
  *   of that site's most recent page.
@@ -547,8 +548,8 @@ function siteImage(view, row, column, icons, repaint) {
 
 export const SvalHistorySidebar = {
   /**
-   * Takes the switcher out of the sidebar's header, and adds to the History
-   * sidebar each time it shows.
+   * Hides the switcher while no extension has a sidebar, and adds to the
+   * History sidebar each time it shows.
    *
    * @param {Window} win A browser window.
    */
@@ -556,16 +557,14 @@ export const SvalHistorySidebar = {
     const doc = win.document;
     const switcher = doc.getElementById("sidebar-switcher-target");
     if (switcher) {
-      // `SidebarController` keeps writing the title; outside the button it
-      // still shows, and nothing opens the switcher's menu. The icon stays
-      // inside, hidden with it: Firefox draws it only there (`sidebar.css`).
-      switcher.before(doc.getElementById("sidebar-title"));
       switcher.hidden = true;
     }
     const menu = doc.getElementById("sidebarMenu-popup");
     if (switcher && menu) {
       this._switchToExtensions(win, switcher, menu);
     }
+    // Its icon comes from `sval-header.css`, beside the extensions' own.
+    doc.getElementById(HISTORY_ITEM_ID)?.classList.add("menuitem-iconic");
     const undoWindow = doc.getElementById("historyUndoWindowMenu");
     if (undoWindow) {
       const archive = doc.createXULElement("menuitem");
@@ -721,6 +720,16 @@ export const SvalHistorySidebar = {
       doc.defaultView.windowUtils.AUTHOR_SHEET
     );
     thinScrollbar(tree);
+    // The page's `rem` is its own root's font, which differs from the
+    // window's, so the header takes the page's inset as a length.
+    win.document
+      .getElementById("sidebar-header")
+      ?.style.setProperty(
+        "--sval-sidebar-inset",
+        doc.defaultView.getComputedStyle(
+          doc.getElementById("sidebar-search-container")
+        ).paddingInlineStart
+      );
 
     // Beside the title, before the date. Firefox's column and these are
     // labelled although their headers are hidden: more than one column makes

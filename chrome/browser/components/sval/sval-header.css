@@ -2151,6 +2151,30 @@ button.sval-notice-row {
   }
 }
 
+/* ------------------------------------------------------------ sidebar header */
+
+/*
+ * The sidebar's header holds its title, its close button and the switcher
+ * `SvalHistorySidebar` hides while no extension has a sidebar. Without the
+ * switcher, History is the one sidebar, and the header's history button
+ * already names and closes it, so the header gives its row to the list.
+ */
+#sidebar-header:has(> #sidebar-switcher-target[hidden]) {
+  display: none;
+}
+
+/* The switcher and the close button line up with the History page's search
+ * field and View button, at the inset `SvalHistorySidebar` reads from it. */
+#sidebar-header {
+  padding-inline: var(--sval-sidebar-inset, 8px);
+}
+
+/* History's item in the switcher's menu carries the icon the switcher shows
+ * for it (`sidebar.css`), as each extension's item carries its own. */
+#sidebar-switcher-history {
+  --menuitem-icon: url(chrome://browser/skin/history.svg);
+}
+
 /* ---------------------------------------------------------------- panel slide */
 
 /*

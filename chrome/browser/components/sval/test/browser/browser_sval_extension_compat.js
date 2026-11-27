@@ -438,15 +438,65 @@ add_task(async function an_extension_sidebar_shows_the_switcher() {
     manifest: {
       ...gecko("sidebar@sval.invalid"),
       name: "Notes",
-      sidebar_action: { default_panel: "panel.html", open_at_install: false },
+      sidebar_action: {
+        default_panel: "panel.html",
+        default_icon: "notes.svg",
+        open_at_install: false,
+      },
     },
-    files: { "panel.html": "<!doctype html><title>Notes</title>" },
+    files: {
+      "panel.html": "<!doctype html><title>Notes</title>",
+      "notes.svg":
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>',
+    },
   });
   await extension.startup();
   await TestUtils.waitForCondition(
     () => !switcher.hidden,
     "an extension's sidebar shows the switcher"
   );
+  await SidebarController.show("viewHistorySidebar");
+  const header = document.getElementById("sidebar-header");
+  Assert.ok(header.checkVisibility(), "and the header that holds it");
+  Assert.ok(
+    document.getElementById("sidebar-close").checkVisibility(),
+    "with the close button"
+  );
+  Assert.ok(
+    document.getElementById("sidebar-icon").checkVisibility(),
+    "the switcher shows the sidebar's icon"
+  );
+  const title = document.getElementById("sidebar-title");
+  Assert.equal(title.parentElement, switcher, "and its title inside it");
+  Assert.ok(title.checkVisibility(), "where it shows");
+  const page = SidebarController.browser.contentDocument;
+  const pageLeft = SidebarController.browser.getBoundingClientRect().left;
+  const search = page.getElementById("search-box").getBoundingClientRect();
+  const view = page.getElementById("viewButton").getBoundingClientRect();
+  Assert.less(
+    Math.abs(switcher.getBoundingClientRect().left - (pageLeft + search.left)),
+    1,
+    "the switcher lines up with the search field"
+  );
+  Assert.less(
+    Math.abs(
+      document.getElementById("sidebar-close").getBoundingClientRect().right -
+        (pageLeft + view.right)
+    ),
+    1,
+    "and the close button with the View button"
+  );
+
+  const { makeWidgetId } = ChromeUtils.importESModule(
+    "resource://gre/modules/ExtensionCommon.sys.mjs"
+  ).ExtensionCommon;
+  await SidebarController.show(`${makeWidgetId(extension.id)}-sidebar-action`);
+  Assert.stringContains(
+    getComputedStyle(document.getElementById("sidebar-icon")).listStyleImage,
+    "notes.svg",
+    "an extension's sidebar shows its own icon in the switcher"
+  );
+  await SidebarController.show("viewHistorySidebar");
 
   const menu = document.getElementById("sidebarMenu-popup");
   const shown = BrowserTestUtils.waitForPopupEvent(menu, "shown");
@@ -460,6 +510,13 @@ add_task(async function an_extension_sidebar_shows_the_switcher() {
     "it lists History and the extension's sidebar alone"
   );
   Assert.ok(
+    document
+      .getElementById("sidebar-switcher-history")
+      .querySelector(".menu-icon")
+      .checkVisibility(),
+    "History's item shows its icon"
+  );
+  Assert.ok(
     document.getElementById("sidebar-switcher-bookmarks").hidden,
     "sidebar-switcher-bookmarks is not listed"
   );
@@ -471,5 +528,11 @@ add_task(async function an_extension_sidebar_shows_the_switcher() {
   await TestUtils.waitForCondition(
     () => switcher.hidden,
     "the last extension sidebar going hides it again"
+  );
+  Assert.ok(!header.checkVisibility(), "and the header");
+  SidebarController.hide();
+  await TestUtils.waitForCondition(
+    () => !SidebarController.isOpen,
+    "the sidebar closes"
   );
 });
