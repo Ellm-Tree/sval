@@ -67,6 +67,20 @@
   scrollbar-color: var(--sval-scrollbar-thumb) transparent;
 }
 
+.sval-emoji-edge {
+  height: 0;
+}
+
+/* The picker's gap separates the grid from the parts across its edges, so
+ * each shadow starts at the grid's edge. */
+.sval-emoji-tones::after {
+  top: calc(100% + var(--space-small));
+}
+
+.sval-emoji-actions::after {
+  bottom: calc(100% + var(--space-small));
+}
+
 .sval-emoji-group:not([hidden]) {
   display: grid;
   grid-template-columns: repeat(var(--sval-emoji-columns), 1fr);

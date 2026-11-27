@@ -33,6 +33,9 @@ const { SKIN_TONE_LABELS, emojiAtTone, searchEmoji } =
   ChromeUtils.importESModule(
     "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
   );
+const { shadeScrollEdges } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/sval/SvalDom.sys.mjs"
+);
 const { drawableEmojiGroups } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalEmojiPicker.sys.mjs"
 );
@@ -162,6 +165,24 @@ const SvalEmojiPicker = {
       this._stashes.set(section, stash);
       this._els.grid.append(section);
     }
+    // Marks at the grid's two ends. While one is out of view, emoji lie past
+    // that edge, and the part across it casts a shadow over them.
+    const topMarker = this._element("div", {
+      class: "sval-emoji-edge",
+      "aria-hidden": "true",
+    });
+    const bottomMarker = this._element("div", {
+      class: "sval-emoji-edge",
+      "aria-hidden": "true",
+    });
+    this._els.grid.prepend(topMarker);
+    this._els.grid.append(bottomMarker);
+    shadeScrollEdges(this._els.grid, {
+      topMarker,
+      bottomMarker,
+      top: this._els.tones,
+      bottom: this._els.picker.querySelector(".sval-emoji-actions"),
+    });
   },
 
   /**
@@ -224,7 +245,7 @@ const SvalEmojiPicker = {
         shown.add(section);
       }
     }
-    for (const section of this._els.grid.children) {
+    for (const section of this._stashes.keys()) {
       section.hidden = !shown.has(section);
     }
     this._els.empty.hidden = shown.size > 0;

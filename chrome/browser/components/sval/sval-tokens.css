@@ -106,8 +106,8 @@
 /* While content lies past a scroller's edge, the part fixed across that edge
  * casts a shadow over it: `sval-edge-above` on the part above the scroller,
  * `sval-edge-below` on the part below (`SvalDom.shadeScrollEdges`, which
- * sets `sval-over-rows`). The scroller is positioned in both its hosts, so
- * these are too, to paint above it. */
+ * sets `sval-over-rows`). A host may position its scroller, so these are
+ * positioned and raised, to paint above it. */
 .sval-edge-above,
 .sval-edge-below {
   position: relative;
