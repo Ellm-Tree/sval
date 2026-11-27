@@ -164,7 +164,10 @@ add_task(async function the_address_bar_wears_its_workspaces_colours() {
   const searched = UrlbarTestUtils.promiseSearchComplete(window);
   document.getElementById("Browser:OpenLocation").doCommand();
   await within(searched, 10_000, "the float's rows");
-  Assert.ok(SvalLauncher.isFloating(window), "the Launcher floats");
+  Assert.ok(
+    gURLBar.hasAttribute("sval-launcher-floating"),
+    "the Launcher floats"
+  );
   look = urlbarLook();
   Assert.deepEqual(look.card, expectedCard("purple"), "floating, purple's");
   SvalLauncher.close(window, { focusPage: true });

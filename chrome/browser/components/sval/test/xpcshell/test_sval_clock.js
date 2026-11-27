@@ -194,7 +194,7 @@ add_task(async function the_network_coming_back_tries_at_once() {
   run.retry.start();
   await settle();
   await run.fire();
-  Assert.equal(run.retry.nextDelay, FIRST_RETRY_MS * 4);
+  Assert.equal(run.timers.at(-1).ms, FIRST_RETRY_MS * 2, "the delay grew");
   run.retry.nudge();
   await settle();
   Assert.equal(run.polls, 3, "polled without waiting");

@@ -317,11 +317,6 @@ export class ReadingRetry {
     return this.#timer !== null;
   }
 
-  /** The delay the next failed poll waits. */
-  get nextDelay() {
-    return this.#delay;
-  }
-
   /** Starts polling, unless a reading exists. */
   start() {
     this.#stopped = false;

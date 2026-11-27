@@ -604,14 +604,4 @@ export const SvalLauncher = {
     }
     return { id: "launcher-placeholder" };
   },
-
-  /**
-   * Whether `win`'s address bar floats, a close's fade aside.
-   *
-   * @param {Window} win
-   * @returns {boolean}
-   */
-  isFloating(win) {
-    return !!win.gURLBar?.hasAttribute(FLOATING) && !windows.get(win)?.fading;
-  },
 };
