@@ -392,6 +392,15 @@ add_task(async function a_keyword_set_in_settings_works_without_an_at() {
     "Settings › Search and Launcher"
   );
   const doc = tab.linkedBrowser.contentDocument;
+  // Sval's panes go in after the page loads and move Firefox's rows down,
+  // so a click aimed before they are in lands on whatever took the Edit
+  // button's place (`settings-pane.js`).
+  await TestUtils.waitForCondition(
+    () => doc.documentElement?.dataset.svalSettings === "ready",
+    "about:preferences loaded with Sval's panes",
+    100,
+    100
+  );
   const row = await TestUtils.waitForCondition(
     () =>
       [...doc.querySelectorAll("#engineList moz-box-item")].find(
