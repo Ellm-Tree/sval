@@ -188,7 +188,6 @@ cert-overrides-per-jar.patch
 server-socket-exclusive-address.patch
 update-mar-version-names-build.patch
 content-classifier-waits-for-engines.patch
-no-profile-reset.patch
 refresh-tip-needs-reset-support.patch
 safe-mode-refresh-string.patch
 undo-close-tab-key-workspace.patch
@@ -457,6 +456,7 @@ remove-backup.patch
 remove-backup.delete
 remove-selectable-profiles.patch
 remove-selectable-profiles.delete
+no-profile-reset.patch
 remove-gecko-references.patch
 remove-messaging-targeting.patch
 remove-messaging-targeting.delete

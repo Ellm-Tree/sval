@@ -25,6 +25,7 @@ const EXAMPLE_PAGE = `https://example.com/document-builder.sjs?html=${encodeURIC
 )}`;
 
 add_setup(async function () {
+  failOnConsoleErrors();
   await within(SvalPanel.started, 10_000, "the panel's startup");
 });
 
@@ -254,4 +255,35 @@ add_task(async function test_pin_shows_in_its_workspaces() {
     null,
     "unpinning forgets the Workspaces"
   );
+});
+
+add_task(async function test_window_mid_layout_builds_no_button() {
+  await loadExtensions();
+  // Sval's own modules run at `browser-window-before-initial-xul-layout`,
+  // before the window has a tabbrowser; a pass over every window made then
+  // is what this stands in for.
+  let midLayout = null;
+  const opened = {
+    observe(subject) {
+      Services.obs.removeObserver(opened, "domwindowopened");
+      subject.addEventListener(
+        "MozBeforeInitialXULLayout",
+        () => {
+          midLayout = !subject.gBrowser;
+          SvalExtensionWorkspaces.applyToAll();
+        },
+        { once: true }
+      );
+    },
+  };
+  Services.obs.addObserver(opened, "domwindowopened");
+  atTaskEnd(() => {
+    if (midLayout === null) {
+      Services.obs.removeObserver(opened, "domwindowopened");
+    }
+  });
+  await secondWindow();
+  // The console check `failOnConsoleErrors` makes when the file ends reads
+  // the error a button made in a window with no tabbrowser logs.
+  Assert.strictEqual(midLayout, true, "the pass ran before the tabbrowser");
 });

@@ -14,6 +14,7 @@ import { CustomizableUI } from "moz-src:///browser/components/customizableui/Cus
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SvalWindowWorkspace:
     "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
@@ -202,9 +203,15 @@ export const SvalExtensionWorkspaces = {
     }
   },
 
-  /** Applies the scopes to every browser window's toolbar. */
+  /**
+   * Applies the scopes to every browser window's toolbar. A window still
+   * building its toolbars is left to `WORKSPACE_SHOWN_TOPIC`: making its
+   * button reads the window's selected tab (`updateButton` in
+   * ext-browserAction.js), and `BrowserWindowTracker` tracks a window only
+   * once its tabbrowser exists.
+   */
   applyToAll() {
-    for (const win of Services.wm.getEnumerator("navigator:browser")) {
+    for (const win of lazy.BrowserWindowTracker.orderedWindows) {
       this.applyToWindow(win);
     }
   },

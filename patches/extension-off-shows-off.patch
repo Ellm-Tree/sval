@@ -7,7 +7,7 @@ item trigger nothing (isShownForTab), and its tooltip says so. Only a
 web page is on a site: an extension's own page is never held off.
 
 diff --git a/browser/components/extensions/parent/ext-browserAction.js b/browser/components/extensions/parent/ext-browserAction.js
-index b8cd2c219d..f24a62d33c 100644
+index b8cd2c219d..7f4033985d 100644
 --- a/browser/components/extensions/parent/ext-browserAction.js
 +++ b/browser/components/extensions/parent/ext-browserAction.js
 @@ -847,6 +847,13 @@ this.browserAction = class extends ExtensionAPIPersistent {
@@ -16,22 +16,24 @@ index b8cd2c219d..f24a62d33c 100644
  
 +    // Sval: off for the selected tab's page, the button shows off, says so
 +    // and does nothing.
-+    let selectedBrowser = node.documentGlobal.gBrowser.selectedBrowser;
-+    let svalOff = !!this.extension.tabManager.getWrapper(
++    let svalTab = this.extension.tabManager.getWrapper(
 +      node.documentGlobal.gBrowser.selectedTab
-+    )?.svalBlocked;
++    );
++    let svalOff = !!svalTab?.svalBlocked;
 +
      let callback = () => {
        // This is set on the node so that it looks good in the toolbar.
        node.toggleAttribute("attention", attention);
-@@ -857,7 +864,18 @@ this.browserAction = class extends ExtensionAPIPersistent {
+@@ -857,7 +864,20 @@ this.browserAction = class extends ExtensionAPIPersistent {
            ? "origin-controls-toolbar-button-quarantined"
            : "origin-controls-toolbar-button-permission-needed";
        }
 -      node.ownerDocument.l10n.setAttributes(button, msgId, { extensionTitle });
 +      if (svalOff) {
 +        // Sval's own words, while Fluent's attributes are off the button.
-+        let offText = `${this.extension.name} is turned off on ${selectedBrowser.currentURI.host}`;
++        let offText = svalTab.svalWorkspaceBlocked
++          ? `${this.extension.name} isn't available in this Workspace`
++          : `${this.extension.name} is turned off on ${svalTab.svalBlockedHost}`;
 +        button.removeAttribute("data-l10n-id");
 +        button.removeAttribute("data-l10n-args");
 +        button.setAttribute("label", offText);
@@ -44,7 +46,7 @@ index b8cd2c219d..f24a62d33c 100644
  
        button.querySelector(".unified-extensions-item-name").textContent =
          this.extension?.name;
-@@ -886,7 +904,8 @@ this.browserAction = class extends ExtensionAPIPersistent {
+@@ -886,7 +906,8 @@ this.browserAction = class extends ExtensionAPIPersistent {
          button.removeAttribute("badge");
        }
  
@@ -71,10 +73,27 @@ index 958b92ead5..41b9745f89 100644
  
      // If there is a "show" value, return it. Can be due to show(), hide() or empty show_matches.
 diff --git a/toolkit/components/extensions/parent/ext-tabs-base.js b/toolkit/components/extensions/parent/ext-tabs-base.js
-index d0a07a1547..114c439212 100644
+index d0a07a1547..0e6dbe2042 100644
 --- a/toolkit/components/extensions/parent/ext-tabs-base.js
 +++ b/toolkit/components/extensions/parent/ext-tabs-base.js
-@@ -266,13 +266,13 @@ class TabBase {
+@@ -259,20 +259,27 @@ class TabBase {
+    *        @readonly
+    */
+   get svalBlocked() {
+-    if (this.svalWorkspaceBlocked) {
+-      return true;
+-    }
++    return this.svalWorkspaceBlocked || this.svalBlockedHost !== null;
++  }
++
++  /**
++   * @property {string|null} svalBlockedHost
++   *        Sval: the host of the tab's top-level site when the user turned
++   *        the extension off there, else null.
++   *        @readonly
++   */
++  get svalBlockedHost() {
+     // The page's principal names its site where its URL has none, as for an
      // about:blank or blob: page a site made.
      let principal = this.browser.contentPrincipal;
      principal = principal?.precursorPrincipal ?? principal;
@@ -82,14 +101,15 @@ index d0a07a1547..114c439212 100644
 -    try {
 -      host = (principal?.isContentPrincipal ? principal.URI : this._uri).host;
 -    } catch {
+-      return false;
 +    let uri = principal?.isContentPrincipal ? principal.URI : this._uri;
 +    // A site rule names a web site, and the default for every site covers
 +    // web pages alone: never an extension's own page.
 +    if (!uri?.schemeIs("http") && !uri?.schemeIs("https")) {
-       return false;
++      return null;
      }
 -    return this.extension.policy.blockedOnTopSite(host);
-+    return this.extension.policy.blockedOnTopSite(uri.host);
++    return this.extension.policy.blockedOnTopSite(uri.host) ? uri.host : null;
    }
  
    /**
