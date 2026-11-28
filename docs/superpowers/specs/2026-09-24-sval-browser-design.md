@@ -1265,8 +1265,10 @@ this device's file under the new key on the next sync pass — to the profile
 unconditionally, and to the shared folder if one is chosen and reachable.
 Changing a setting never loses a workspace. Its device id does not change.
 The one exception is a joining device's untouched first workspace: unnamed,
-never renamed and holding only the new tab it was made with, it is removed
-before the device first publishes.
+never renamed and holding only tabs on the browser's own `about:` pages, it
+is removed before the device first publishes. A window showing it moves to
+the workspace it lands on with those tabs, so the Settings tab the join ran
+in stays open.
 
 **Threat model, stated plainly.** For the length of the pairing window, the
 document key sealed under twelve characters sits in the user's folder. Anyone

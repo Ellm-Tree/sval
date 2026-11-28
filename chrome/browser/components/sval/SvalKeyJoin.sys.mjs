@@ -40,6 +40,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SvalPairing: "moz-src:///browser/components/sval/SvalPairing.sys.mjs",
   SvalSecretStore: "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
   SvalSyncState: "moz-src:///browser/components/sval/SvalSyncState.sys.mjs",
+  SvalWindowWorkspace:
+    "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs",
 });
 // A namespace, because the module exports functions and no object of its
 // name for `defineESModuleGetters` to find.
@@ -209,6 +211,7 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
 
   const candidate = engine.candidate(keyBytes);
   let published;
+  let joined = null;
   let failure = null;
   let problem = null;
   let reached = false;
@@ -221,6 +224,14 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
       );
       problem = passed?.sharedReason ?? null;
       reached = passed?.shared === "reached";
+      if (leftBehind.length) {
+        // The workspaces a window left behind can go to, which this device's
+        // document holds only once the swap has merged the folder.
+        joined = await candidate.treeJson().then(
+          json => JSON.parse(json).nodes ?? {},
+          () => null
+        );
+      }
     } catch (err) {
       failure = err?.message ?? String(err);
     }
@@ -279,10 +290,18 @@ async function joinOnce(engine, keyBytes, { offerPath, retiring }) {
     }
     // The untouched workspaces the candidate left out go first, in the
     // worker, so no pass under the new key can publish them; any the user
-    // touched during the join are kept.
+    // touched during the join are kept. A window showing one keeps its tabs,
+    // the Settings tab the join runs in among them, in the workspace the
+    // window goes to.
     if (leftBehind.length) {
       await engine
-        .leaveUntouched(leftBehind)
+        .leaveUntouched(leftBehind, {
+          landing: joined
+            ? lazy.SvalWindowWorkspace.landings(joined, leftBehind)
+            : {},
+          keyBytes,
+          workspace: lazy.SvalTree.SYNC_DOCUMENT,
+        })
         .catch(err =>
           lazy.SvalLog.warn(
             `could not leave the untouched workspaces behind: ${lazy.describeError(err)}`

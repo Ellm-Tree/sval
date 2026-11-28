@@ -675,7 +675,7 @@ add_task(function another_devices_agent_workspace_names_the_device() {
 
 /**
  * A joining device leaves behind only workspaces nobody touched: unnamed,
- * with no group and at most one tab still on a fresh window's page.
+ * with no group and no tab off the browser's own pages.
  */
 add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
   const { withoutUntouchedWorkspaces } = SvalTree;
@@ -699,6 +699,11 @@ add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
       twoTabs: ws(),
       first: tab("twoTabs", "about:home"),
       second: tab("twoTabs", "about:blank"),
+      settings: ws(),
+      settingsTab: tab("settings", "about:preferences#svalSync"),
+      settingsHome: tab("settings", "about:home"),
+      file: ws(),
+      fileTab: tab("file", "file:///Users/someone/notes.html"),
       grouped: ws(),
       group: { kind: "group", placement: { parent: "grouped" }, content: {} },
       coloured: { ...ws(), appearance: { color: "blue", emoji: null } },
@@ -709,8 +714,19 @@ add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
   const { json, dropped } = withoutUntouchedWorkspaces(JSON.stringify(doc));
   Assert.deepEqual(
     dropped.sort(),
-    ["empty", "fresh", "freshTab"],
-    "an unnamed workspace with nothing, or one fresh tab, is left behind"
+    [
+      "empty",
+      "first",
+      "fresh",
+      "freshTab",
+      "second",
+      "settings",
+      "settingsHome",
+      "settingsTab",
+      "twoTabs",
+    ],
+    "an unnamed workspace holding nothing but the browser's own pages, " +
+      "Settings among them, is left behind"
   );
   const kept = JSON.parse(json);
   Assert.deepEqual(
@@ -719,17 +735,16 @@ add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
       "browsed",
       "browsedTab",
       "coloured",
-      "first",
+      "file",
+      "fileTab",
       "group",
       "grouped",
       "isolated",
       "named",
       "namedTab",
-      "second",
-      "twoTabs",
       "withEmoji",
     ],
-    "a name, a colour, an emoji, isolation, a visited page, a second tab or " +
+    "a name, a colour, an emoji, isolation, a visited page, a local file or " +
       "a group keeps one"
   );
   Assert.deepEqual(kept.seen, doc.seen, "and the rest of the document stays");
@@ -737,7 +752,7 @@ add_task(function a_joining_device_leaves_only_untouched_workspaces_behind() {
   const { isUntouchedWorkspace } = SvalTree;
   Assert.deepEqual(
     Object.keys(doc.nodes).filter(id => isUntouchedWorkspace(doc.nodes, id)),
-    ["fresh", "empty"],
+    ["fresh", "empty", "twoTabs", "settings"],
     "one workspace at a time gets the same answer, as a closing window asks"
   );
   Assert.ok(

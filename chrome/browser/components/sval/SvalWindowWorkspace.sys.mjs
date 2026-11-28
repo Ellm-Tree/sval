@@ -109,6 +109,35 @@ export class SvalWindowWorkspace {
     return workspace;
   }
 
+  /**
+   * Where each window showing one of `leaving` goes once the document loses
+   * it, as {@link resolve} picks: for each such workspace, the workspace in
+   * `nodes` that window lands on. A workspace no window shows, or whose
+   * window would have nowhere to go, is left out.
+   *
+   * @param {object} nodes The document the windows will draw.
+   * @param {string[]} leaving Ids the document is about to lose.
+   * @returns {object} workspace id to workspace id.
+   */
+  static landings(nodes, leaving) {
+    const gone = new Set(leaving);
+    const landing = {};
+    for (const win of Services.wm.getEnumerator("navigator:browser")) {
+      const shown = windows.get(win);
+      if (!shown || shown.inMemory || shown.closing || win.closed) {
+        continue;
+      }
+      if (!gone.has(shown.id)) {
+        continue;
+      }
+      const to = lazy.currentWorkspace(nodes, null, shown.takenElsewhere());
+      if (to && !gone.has(to)) {
+        landing[shown.id] = to;
+      }
+    }
+    return landing;
+  }
+
   constructor(win) {
     this.#win = win;
   }

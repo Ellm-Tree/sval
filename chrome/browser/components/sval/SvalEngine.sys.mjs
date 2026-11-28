@@ -1276,12 +1276,79 @@ export class SvalEngine extends SvalWorkerClient {
    * device's untouched first workspace behind, and one the user has
    * touched since is theirs to keep.
    *
+   * A workspace a window shows hands its tabs to the workspace `landing`
+   * names, where the window goes once it is gone
+   * (`SvalWindowWorkspace.resolve`), so the Settings tab a join started from
+   * stays open. That workspace is in the folder `keyBytes` names, which is
+   * read and merged in the same step, before the key changes, so no pass
+   * publishes the workspace left behind. A folder that does not read leaves
+   * the workspace behind with its tabs.
+   *
    * @param {string[]} ids What a join's candidate left out
    *   (`withoutUntouchedWorkspaces`).
+   * @param {object} [options]
+   * @param {object} [options.landing] Workspace id to the workspace id its
+   *   tabs move to.
+   * @param {Uint8Array} [options.keyBytes] The joined key.
+   * @param {string} [options.workspace] The tree's document name.
    */
-  async leaveUntouched(ids) {
+  async leaveUntouched(
+    ids,
+    { landing = {}, keyBytes = null, workspace = null } = {}
+  ) {
     this.#changed();
-    return this.post("leaveUntouched", [ids]);
+    if (
+      !keyBytes ||
+      !workspace ||
+      !Object.keys(landing).length ||
+      !this.#sharedRoot
+    ) {
+      return this.post("leaveUntouched", [{ ids }]);
+    }
+    const now = SvalClock.now();
+    const identity = {
+      workspace,
+      keyBytes,
+      deviceId: this.#deviceId,
+    };
+    const layout = await this.post("layout", [identity]);
+    const read = await SvalSharedFolder.readDirs({
+      root: this.#sharedRoot,
+      dirs: [{ path: layout.prefix, suffix: layout.suffix, mine: layout.mine }],
+      requireTop: layout.top,
+      deadline: Date.now() + this.#sharedStepTimeoutMs,
+      consume: async ({ dirs: [listed] }) => ({
+        reachable: true,
+        report: await this.post("leaveUntouched", [
+          {
+            ids,
+            landing,
+            snapshot: {
+              ...identity,
+              now,
+              paths: listed.entries.map(
+                entry => `${layout.prefix}/${entry.name}`
+              ),
+              files: listed.entries.map(entry => entry.file),
+              unreadable: listed.unreadable.map(file => ({
+                path: `${layout.prefix}/${file.name}`,
+                own: file.name === layout.mine,
+                reason: file.reason,
+              })),
+            },
+          },
+        ]),
+      }),
+    }).catch(err => ({ reachable: false, reason: describeError(err) }));
+    if (!read.reachable) {
+      SvalLog.warn(
+        `could not move the tabs of the workspaces left behind, so they close: ${read.reason}`
+      );
+      return this.post("leaveUntouched", [{ ids }]);
+    }
+    this.#heardPeerRemovals(read.report?.removedIds);
+    SvalClock.atLeast(read.report?.ownWatermark ?? 0);
+    return undefined;
   }
 
   /**

@@ -236,19 +236,23 @@ export function descendantIds(nodes, id, byParent = childrenByParent(nodes)) {
   return out;
 }
 
-/** What a fresh window's one tab shows before the user goes anywhere. */
-const UNTOUCHED_URLS = new Set([
-  null,
-  "",
-  "about:blank",
-  "about:home",
-  "about:newtab",
-]);
+/**
+ * Whether a tab on `url` is on one of the browser's own pages, the rule
+ * `SvalTabs`' `opensBrowserPage` applies: an `about:` address, which takes in
+ * the home page, the blank tab and Settings. A tab with no address yet has
+ * gone nowhere either.
+ *
+ * @param {?string} url A tab's address.
+ * @returns {boolean}
+ */
+export function onBrowserPage(url) {
+  return !url || url.startsWith("about:");
+}
 
 /**
  * Whether nobody has touched workspace `id`: it has no name, colour or emoji
  * of the user's (`appearanceOf`), is not isolated (`isIsolated`), and holds
- * no group and at most one tab still on the page a window opens with.
+ * no group and no tab off the browser's own pages (`onBrowserPage`).
  *
  * @param {object} nodes The document's `nodes` map.
  * @param {string} id A node id.
@@ -269,15 +273,11 @@ export function isUntouchedWorkspace(
   if (color || emoji || isIsolated(nodes, id)) {
     return false;
   }
-  const inside = byParent.get(id) ?? [];
-  return (
-    inside.length <= 1 &&
-    inside.every(
-      child =>
-        nodes[child].kind === TAB &&
-        !byParent.has(child) &&
-        UNTOUCHED_URLS.has(nodes[child].content?.url ?? null)
-    )
+  return (byParent.get(id) ?? []).every(
+    child =>
+      nodes[child].kind === TAB &&
+      !byParent.has(child) &&
+      onBrowserPage(nodes[child].content?.url)
   );
 }
 

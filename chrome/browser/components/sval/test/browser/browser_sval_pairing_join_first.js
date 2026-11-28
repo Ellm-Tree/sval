@@ -91,9 +91,12 @@ add_task(async function a_joining_device_with_no_key_reaches_the_folder() {
 });
 
 /**
- * A device that never shared joins without its untouched first workspace:
+ * A device that never shared joins without its untouched first workspaces:
  * an unnamed workspace holding only a fresh tab stays behind and never
- * reaches the other device, while what the user made goes with them.
+ * reaches the other device, while what the user made goes with them. The
+ * workspace the window shows holds only the browser's own pages, Settings
+ * among them, so it stays behind too. The window goes to their workspace,
+ * and the Settings tab the join ran in goes with it, still open.
  */
 add_task(async function joining_leaves_an_untouched_first_workspace_behind() {
   await within(SvalPanel.started, 40_000, "the panel's startup");
@@ -125,9 +128,24 @@ add_task(async function joining_leaves_an_untouched_first_workspace_behind() {
   Assert.ok((await chooseWithoutAKey(root)).reached, "the folder is reached");
   await SvalSharedFolder._whenIdle();
   const { code } = await SvalPairing.offer(root, theirKey);
-  const { ui, outcome } = await joinWithCode(code);
+
+  const ui = await openSettingsPage("claim");
+  const shown = SvalWindowWorkspace.of(window).id;
+  const settingsTab = SvalPanel.observer.nodeIdFor(ui.tab);
+  await SvalPanel.refresh();
+  Assert.equal(
+    SvalPanel.nodes[settingsTab]?.placement.parent,
+    shown,
+    "the Settings tab is in the workspace the window shows"
+  );
+  Assert.ok(
+    SvalTree.isUntouchedWorkspace(SvalPanel.nodes, shown),
+    "which holds only the browser's own pages"
+  );
+  const asked = await codeDialog(ui);
+  submitCode(asked, code);
+  const { outcome } = await lookEnded(ui, asked);
   Assert.equal(outcome, "adopted", "joining worked");
-  BrowserTestUtils.removeTab(ui.tab);
 
   Assert.ok(them.id in SvalPanel.nodes, "this device shows their workspace");
   Assert.ok(made in SvalPanel.nodes, "and keeps the one it made");
@@ -135,10 +153,39 @@ add_task(async function joining_leaves_an_untouched_first_workspace_behind() {
     !(untouched in SvalPanel.nodes) && !(freshTab in SvalPanel.nodes),
     "the untouched one stayed behind"
   );
+  Assert.ok(!(shown in SvalPanel.nodes), "and so did the window's own");
+
+  // Their workspace is the first in their document, and the one this device
+  // made was added after this device's own, so theirs comes first.
+  await TestUtils.waitForCondition(
+    () => SvalWindowWorkspace.of(window).id === them.id,
+    "the window went to their workspace"
+  );
+  await switchDone();
+  Assert.ok(
+    ui.tab.isConnected && !ui.tab.closing,
+    "the Settings tab the join ran in is still open"
+  );
+  Assert.equal(
+    SvalPanel.nodes[settingsTab]?.placement.parent,
+    them.id,
+    "in their workspace"
+  );
+  Assert.ok(
+    SvalPanel.nodes[settingsTab].content.local,
+    "and it stays on this device"
+  );
+  BrowserTestUtils.removeTab(ui.tab);
 
   await SvalSharedFolder._whenIdle();
   await them.engine.sync(SYNC_DOCUMENT, Date.now());
   const theirs = await nodes(them.engine);
   Assert.ok(made in theirs, "the other device has what was made");
   Assert.ok(!(untouched in theirs), "and never saw the untouched one");
+  Assert.deepEqual(
+    SvalTree.workspaceIds(theirs).sort(),
+    [made, them.id].sort(),
+    "nor the workspace the window showed: the folder gained no other"
+  );
+  Assert.ok(!(settingsTab in theirs), "nor the Settings tab");
 });

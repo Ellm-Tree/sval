@@ -17,7 +17,7 @@ at once anyway.
 
 ## Decision
 
-Closing a window deletes the workspace it shows, and that workspace's one tab,
+Closing a window deletes the workspace it shows, and that workspace's tabs,
 when the window created that workspace for itself and the workspace is
 untouched. A workspace the user made with New workspace…, or one the window
 was handed, is kept, however empty: the user asked for it. The window keeps
@@ -25,9 +25,11 @@ which workspace it created with its session, so a window the session brings
 back after Sval stopped without closing it still deletes that workspace.
 
 Untouched is the rule a joining device also uses to leave a workspace
-behind: no name, colour or emoji, not isolated, no group, and at most one
-tab, which shows the home page or a blank page. Setting a colour, an emoji or
-isolation touches a workspace as much as naming it does.
+behind: no name, colour or emoji, not isolated, no group, and no tab off the
+browser's own pages. A tab on an `about:` page, such as the home page, a
+blank page or Settings, does not count as using a workspace, however many
+there are. A local file is a page the user opened, so it does. Setting a
+colour, an emoji or isolation touches a workspace as much as naming it does.
 
 The workspace is kept, whatever it holds, when another window shows it, or
 when it is the document's last workspace, which "Delete workspace" also never

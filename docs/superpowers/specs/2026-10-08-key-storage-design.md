@@ -155,8 +155,10 @@ re-encrypted, because it keeps its own key.
 made its unnamed first workspace already: first run's join hold lives in
 memory, and quitting, Skip setup or a closed window ends it. Before its first
 shared publish, a joining device removes a workspace that is unnamed, has never
-been renamed, and holds nothing but the new tab it was made with. Anything the
-user touched merges like every other workspace.
+been renamed, and holds nothing but tabs on the browser's own `about:` pages,
+such as the new tab it was made with or Settings. A window showing it keeps
+those tabs in the workspace it lands on. Anything the user touched merges like
+every other workspace.
 
 The action sits in Settings, under storage, and in the panel footer's menu while
 the device is local-only.

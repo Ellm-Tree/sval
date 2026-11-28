@@ -539,20 +539,64 @@ class SvalSyncWorker {
    * in it, in one queued step, so nothing posted after it can land in
    * between. See `SvalEngine.leaveUntouched`.
    *
-   * @param {string[]} ids What a join's candidate left out.
+   * A workspace `landing` names keeps its tabs: they move to the end of the
+   * workspace it names, the one the window showing it lands on. That
+   * workspace is in the folder the join read, so `snapshot` is merged first,
+   * with nothing written: the next pass under the joined key publishes.
+   *
+   * @param {object} options
+   * @param {string[]} options.ids What a join's candidate left out.
+   * @param {object} [options.landing] Workspace id to the workspace id its
+   *   tabs move to.
+   * @param {object} [options.snapshot] `{ paths, files, unreadable }`, the
+   *   joined folder as the helper read it, with `workspace`, `keyBytes`,
+   *   `deviceId` and `now` as {@link mergeSnapshot} takes them.
+   * @returns {Promise<object|null>} the merge's report, or null without one.
    */
-  async leaveUntouched(ids) {
-    return this.#enqueue(() => {
+  async leaveUntouched({ ids, landing = {}, snapshot = null }) {
+    return this.#enqueue(async () => {
+      let report = null;
+      if (snapshot) {
+        const { paths, files, unreadable, ...identity } = snapshot;
+        report = await this.#merge({
+          ...identity,
+          snapshot: { paths, files: await readCopies(files), unreadable },
+          shared: true,
+          write: async () => {},
+        });
+      }
       const nodes = JSON.parse(this.#doc.toJson()).nodes ?? {};
       const byParent = childrenByParent(nodes);
       for (const id of ids) {
-        if (isUntouchedWorkspace(nodes, id, byParent)) {
-          for (const child of byParent.get(id) ?? []) {
+        if (!isUntouchedWorkspace(nodes, id, byParent)) {
+          continue;
+        }
+        const to = snapshot ? landing[id] : null;
+        const children = byParent.get(id) ?? [];
+        if (to && nodes[to]) {
+          let last = (byParent.get(to) ?? []).at(-1) ?? null;
+          for (const child of children) {
+            applyOp(
+              this.#doc,
+              {
+                kind: "moveNode",
+                id: child,
+                newParent: to,
+                before: last ?? undefined,
+                deviceId: snapshot.deviceId,
+              },
+              { id: child, now: snapshot.now }
+            );
+            last = child;
+          }
+        } else {
+          for (const child of children) {
             this.#doc.remove(child);
           }
-          this.#doc.remove(id);
         }
+        this.#doc.remove(id);
       }
+      return report;
     });
   }
 
