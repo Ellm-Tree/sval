@@ -240,7 +240,8 @@ add_task(async function the_dialog_starts_with_an_emoji_and_asks_a_name() {
   const name = doc.querySelector(".sval-nw-name");
   Assert.ok(gDialogBox.isOpen, "but whitespace is not a name");
   Assert.equal(doc.activeElement, name, "focus goes back to the name");
-  const acc = await accessibleOf(name);
+  await fieldDrawn(name);
+  const acc = await accessibleOf(fieldInner(name));
   // Lower-cased: the label is drawn upper-case, and Gecko names the field
   // from the text as drawn.
   Assert.equal(
@@ -248,19 +249,21 @@ add_task(async function the_dialog_starts_with_an_emoji_and_asks_a_name() {
     doc.querySelector('label[for="sval-nw-name"]').textContent.toLowerCase(),
     "whose name is its label alone"
   );
-  const reason = doc.getElementById("sval-nw-name-error").textContent;
-  Assert.ok(reason, "a reason shows");
-  Assert.equal(
-    acc.description,
-    reason,
+  const error = name.shadowRoot.getElementById("error");
+  const reason = error.textContent;
+  Assert.ok(reason && error.checkVisibility(), "a reason shows");
+  // The accessible takes its new description on the next refresh.
+  await TestUtils.waitForCondition(
+    () => acc.description === reason,
     "and which is described by why it was refused"
   );
   const state = {};
   acc.getState(state, {});
   Assert.ok(state.value & Ci.nsIAccessibleStates.STATE_INVALID, "as invalid");
   typeName(doc, "Errands");
+  await fieldDrawn(name);
   Assert.equal(
-    (await accessibleOf(name)).description,
+    (await accessibleOf(fieldInner(name))).description,
     "",
     "typing a name clears the reason"
   );
@@ -354,10 +357,12 @@ add_task(async function a_new_workspace_can_be_isolated() {
   const { doc, made } = await openDialog();
   const box = doc.querySelector(".sval-nw-isolated");
   Assert.ok(!box.hidden, "a new workspace offers isolation");
-  const input = box.querySelector("input");
+  const input = box.querySelector("sval-checkbox");
   Assert.ok(!input.checked, "unticked to begin with");
   typeName(doc, "Banking");
-  input.click();
+  // The whole row ticks the box.
+  clickLabel(box.querySelector(".sval-dialog-check-title"));
+  Assert.ok(input.checked, "a click on the row ticks it");
   doc.querySelector(".sval-nw-create").click();
   const node = await made();
   Assert.ok(
@@ -688,24 +693,29 @@ add_task(async function a_rename_writes_what_was_typed() {
     "with the name selected"
   );
 
-  input.value = "  ";
-  input.dispatchEvent(new doc.defaultView.Event("input"));
+  await typeInto(input, "  ");
   EventUtils.synthesizeKey("KEY_Enter", {}, doc.defaultView);
   Assert.ok(gDialogBox.isOpen, "a blank name cannot be submitted");
-  const acc = await accessibleOf(input);
+  await fieldDrawn(input);
+  const acc = await accessibleOf(fieldInner(input));
   // Lower-cased, as Gecko names the field from its label as drawn.
   Assert.equal(
     acc.name.toLowerCase(),
     doc.querySelector(".sval-dialog-label").textContent.toLowerCase(),
     "the field is named by its label alone"
   );
-  const reason = doc.getElementById("sval-dialog-error").textContent;
-  Assert.ok(reason, "a reason shows");
+  const error = input.shadowRoot.getElementById("error");
+  const reason = error.textContent;
+  Assert.ok(reason && error.checkVisibility(), "a reason shows");
   Assert.equal(acc.description, reason, "and the reason is its description");
+  Assert.equal(
+    fieldInner(input).getAttribute("aria-invalid"),
+    "true",
+    "which marks the field invalid"
+  );
   Assert.ok(!rename.disabled, "Rename stays enabled, so it can be reached");
 
-  input.value = "New";
-  input.dispatchEvent(new doc.defaultView.Event("input"));
+  await typeInto(input, "New");
   EventUtils.synthesizeKey("KEY_Enter", {}, doc.defaultView);
   await dialogGone(doc);
   await within(asked, 10_000, "the rename");

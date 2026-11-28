@@ -270,41 +270,38 @@
   opacity: 0.5;
 }
 
+/* The message and the email (`sval-field`), in the panel's wash and ink. */
 .sval-feedback-message,
 .sval-feedback-email {
-  appearance: none;
-  box-sizing: border-box;
-  margin: 0;
-  border: 1px solid var(--sval-pill-border);
-  background: var(--sval-pill-bg);
-  color: var(--sval-tint-field-ink, var(--sval-text));
-  font: 400 15px var(--sval-font);
-
-  &::placeholder {
-    color: var(--sval-muted);
-    opacity: 1;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--sval-focus);
-    outline-offset: -1px;
-  }
+  --sval-field-border: var(--sval-pill-border);
+  --sval-field-fill: var(--sval-pill-bg);
+  --sval-field-ink: var(--sval-tint-field-ink, var(--sval-text));
+  --sval-field-placeholder: var(--sval-muted);
+  --sval-field-font-family: var(--sval-font);
+  --sval-field-font-size: 15px;
+  --sval-field-font-weight: 400;
+  --sval-field-focus-outline: 2px solid var(--sval-focus);
+  --sval-field-focus-outline-offset: -1px;
+  --sval-control-hover-edge: var(--sval-focus);
 }
 
 .sval-feedback-message {
+  --sval-field-height: 160px;
+  --sval-field-padding-inline: 14px;
+  --sval-field-padding-block: 12px;
+  --sval-field-radius: 16px;
+  --sval-field-line-height: 1.45;
+  --sval-field-resize: none;
+
   flex: 1 1 auto;
-  min-height: 160px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  line-height: 1.45;
-  resize: none;
 }
 
 .sval-feedback-email {
+  --sval-field-height: 44px;
+  --sval-field-padding-inline: 18px;
+  --sval-field-radius: 22px;
+
   flex: none;
-  height: 44px;
-  padding: 0 18px;
-  border-radius: 22px;
 }
 
 .sval-feedback-list-head {
@@ -365,39 +362,17 @@
 
 /* The dialog's checkbox (`sval-dialog.css`). */
 .sval-feedback-tick {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  width: 16px;
-  height: 16px;
+  --sval-field-check-size: 16px;
+  --sval-field-check-radius: 5px;
+  --sval-field-check-border: var(--sval-pill-border);
+  --sval-field-check-fill: var(--sval-pill-bg);
+  --sval-field-check-on: var(--sval-action);
+  --sval-field-check-mark: #ffffff;
+  --sval-field-check-focus-outline: 2px solid var(--sval-focus);
+  --sval-field-disabled-opacity: 0.4;
+  --sval-control-hover-edge: var(--sval-focus);
+
   margin: 2px 0 0;
-  border: 1.5px solid var(--sval-pill-border);
-  border-radius: 5px;
-  background: var(--sval-pill-bg);
-
-  &:checked {
-    border-color: var(--sval-action);
-    background: var(--sval-action);
-
-    &::before {
-      content: "";
-      width: 12px;
-      height: 12px;
-      background: var(--sval-icon-dialog-check) center / contain no-repeat;
-      -moz-context-properties: fill;
-      fill: #ffffff;
-    }
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--sval-focus);
-    outline-offset: 2px;
-  }
-
-  &:disabled {
-    opacity: 0.4;
-  }
 }
 
 .sval-feedback-part-text {

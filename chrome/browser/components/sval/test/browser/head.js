@@ -33,7 +33,8 @@ const { makeTempDir, tempPath } = ChromeUtils.importESModule(
             downloadsSetup, drawnRows, fileTab, filedAt, listedAs, pageRuns,
             restoreFixtureFavorites, rgbaOf, runCommandLine, useUpdateChannel,
             viewingAGroupedTab, writesSetup, chooseNewWorkspace, chooseNewGroup,
-            nodeNamed, noOtherBrowsers, keyCopyIn */
+            nodeNamed, noOtherBrowsers, keyCopyIn, fieldInner, typeInto,
+            pickOption, fieldDrawn, clickLabel */
 
 const { SvalWindowWorkspace } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalWindowWorkspace.sys.mjs"
@@ -3232,6 +3233,101 @@ async function accessibleOf(node) {
     "the node's accessible"
   );
   return accessible;
+}
+
+/**
+ * Resolves once one of Sval's form elements (`elements/sval-field.mjs` and
+ * its kin) has drawn its last change, since each draws on a later
+ * microtask.
+ *
+ * @param {Element} el
+ */
+async function fieldDrawn(el) {
+  await within(el.updateComplete, 5_000, `the ${el.localName} drawing`);
+}
+
+/**
+ * The native control a `sval-field`, `sval-select`, `sval-switch` or
+ * `sval-checkbox` draws in its shadow root, where the keys, the focus and
+ * the accessible role are.
+ *
+ * @param {Element} el
+ * @returns {HTMLElement}
+ */
+function fieldInner(el) {
+  return el.shadowRoot.querySelector("#control");
+}
+
+/**
+ * Types `text` into `field` as a person does: focuses it, selects what it
+ * holds so the typing replaces it, and sends each character as key presses,
+ * which fire `input` as each lands. A `sval-field` commits with `change` once
+ * it loses focus or takes Enter, as a native field does, so a caller that
+ * needs the change presses Enter or moves the focus on.
+ *
+ * @param {Element} field A `sval-field`, or a native field.
+ * @param {string} text
+ * @param {object} [options]
+ * @param {boolean} [options.replace] Select what the field holds first.
+ */
+async function typeInto(field, text, { replace = true } = {}) {
+  const win = field.documentGlobal;
+  if (field.updateComplete) {
+    await fieldDrawn(field);
+  }
+  field.focus();
+  if (replace && field.value) {
+    field.select();
+    EventUtils.synthesizeKey("KEY_Backspace", {}, win);
+  } else if (!replace) {
+    // A `sval-field`'s focus() selects its text (decision 2713); typing on
+    // goes after what it holds.
+    const end = field.value.length;
+    field.setSelectionRange(end, end);
+  }
+  if (text) {
+    EventUtils.sendString(text, win);
+  }
+}
+
+/**
+ * Clicks `label`, a label of one of Sval's form elements, as a person does.
+ * A label's click goes on to the element it labels
+ * (`HTMLLabelElement::PostHandleEvent`), here the element itself, whose
+ * native control is in its shadow root. The accessibility checks look for
+ * an interactive accessible at that second click's target and its
+ * ancestors (`AccessibilityUtils.assertCanBeClicked`), never inside a shadow
+ * root, so they are off for the one click; the control itself is checked
+ * wherever a test clicks it.
+ *
+ * @param {Element} label
+ * @param {object} [options] As `EventUtils.synthesizeMouseAtCenter` takes.
+ */
+function clickLabel(label, options = {}) {
+  AccessibilityUtils.setEnv({ mustHaveAccessibleRule: false });
+  EventUtils.synthesizeMouseAtCenter(label, options, label.documentGlobal);
+  AccessibilityUtils.resetEnv();
+}
+
+/**
+ * Chooses `value` in `select` as a person's pick in its dropdown does: the
+ * dropdown sets the native select's choice, and its closing calls
+ * `userFinishedInteracting`, which fires `input` and `change`
+ * (`SelectChild`'s `Forms:DismissedDropDown`). The dropdown itself is a
+ * popup the parent draws, so this starts where it hands back.
+ *
+ * @param {Element} select A `sval-select`.
+ * @param {string} value
+ */
+async function pickOption(select, value) {
+  await fieldDrawn(select);
+  const inner = fieldInner(select);
+  inner.focus();
+  const before = inner.selectedIndex;
+  inner.value = value;
+  Assert.equal(inner.value, value, `the select offers ${value}`);
+  inner.userFinishedInteracting(inner.selectedIndex !== before);
+  await fieldDrawn(select);
 }
 
 /**

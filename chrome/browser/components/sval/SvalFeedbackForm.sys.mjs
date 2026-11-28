@@ -258,8 +258,9 @@ class FeedbackForm {
       attrs: { slot: "body" },
     });
 
-    const message = htmlElement(doc, "textarea", {
+    const message = htmlElement(doc, "sval-field", {
       className: "sval-feedback-message",
+      multiline: true,
     });
     message.placeholder = MESSAGE_PLACEHOLDER;
     message.setAttribute("aria-label", "Message");
@@ -267,7 +268,7 @@ class FeedbackForm {
       this.keep();
       this.drawSend();
     });
-    const email = htmlElement(doc, "input", {
+    const email = htmlElement(doc, "sval-field", {
       className: "sval-feedback-email",
     });
     email.type = "email";
@@ -673,8 +674,9 @@ class FeedbackForm {
         className: "sval-feedback-tick-space",
       });
     } else {
-      tick = htmlElement(doc, "input", { className: "sval-feedback-tick" });
-      tick.type = "checkbox";
+      tick = htmlElement(doc, "sval-checkbox", {
+        className: "sval-feedback-tick",
+      });
       tick.checked = ticked;
       tick.disabled = !!part.tooLarge;
       tick.setAttribute("aria-labelledby", titleId);

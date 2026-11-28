@@ -199,10 +199,47 @@ sval-dialog [hidden] {
   color: var(--sval-dialog-muted);
 }
 
-/* The in-content sheet `SubDialog` gives the frame sizes and dims a text
- * field of its own (`common-shared.css`); this one keeps its own size, and
- * full opacity when disabled, as the frame's buttons do. */
-.sval-dialog-input {
+/* Sval's form elements (`elements/`) take the dialog's look from its roles:
+ * a taller pill whose edge lights when focused, at full opacity when
+ * disabled, as the frame's buttons are. Every page that loads this sheet
+ * draws its fields so, first run's Workspace step among them. The hover
+ * edge is the dialog's focus colour, which a tinted window solves for its
+ * card. */
+:root {
+  --sval-control-hover-edge: var(--sval-dialog-focus);
+  --sval-field-height: 44px;
+  --sval-field-padding-inline: 18px;
+  --sval-field-border: var(--sval-dialog-field-border);
+  --sval-field-fill: var(--sval-dialog-field);
+  --sval-field-ink: var(--sval-dialog-field-text, var(--sval-dialog-text));
+  --sval-field-placeholder: var(--sval-dialog-muted);
+  --sval-field-icon-ink: var(--sval-dialog-muted);
+  --sval-field-clear-hover: var(--sval-dialog-secondary-hover);
+  --sval-field-font-family: var(--sval-font);
+  --sval-field-font-size: 15px;
+  --sval-field-font-weight: 400;
+  --sval-field-focus-outline: none;
+  --sval-field-focus-border: var(--sval-dialog-focus);
+  --sval-field-focus-shadow: 0 0 0 1px var(--sval-dialog-focus);
+  --sval-field-disabled-opacity: 1;
+  --sval-field-error-ink: var(--sval-dialog-error);
+  --sval-field-error-border: var(--sval-dialog-error);
+  --sval-field-error-shadow: 0 0 0 1px var(--sval-dialog-error);
+  --sval-field-select-height: 44px;
+  --sval-field-select-padding-inline: 18px;
+  --sval-field-select-font-size: 15px;
+  --sval-field-select-font-weight: 400;
+  --sval-field-check-border: var(--sval-dialog-field-border);
+  --sval-field-check-fill: var(--sval-dialog-field);
+  --sval-field-check-on: var(--sval-dialog-primary);
+  --sval-field-check-focus-outline: 2px solid var(--sval-dialog-focus);
+}
+
+/* A native field a page of Firefox's draws in the frame. The in-content
+ * sheet `SubDialog` gives the frame sizes and dims a text field of its own
+ * (`common-shared.css`); this one keeps the form elements' size, and full
+ * opacity when disabled, as the frame's buttons do. */
+:is(input, select, textarea).sval-dialog-input {
   appearance: none;
   box-sizing: border-box;
   min-height: 0;
@@ -223,15 +260,6 @@ sval-dialog [hidden] {
 
   &:disabled {
     opacity: 1;
-  }
-}
-
-.sval-dialog-error {
-  font-size: 13px;
-  color: var(--sval-dialog-error);
-
-  &:empty {
-    display: none;
   }
 }
 
@@ -384,7 +412,7 @@ fieldset.sval-dialog-well {
   border-radius: 14px;
   background: var(--sval-dialog-well);
 
-  > input {
+  > :is(input, sval-checkbox) {
     margin-top: 1px;
   }
 }
@@ -691,7 +719,7 @@ fieldset.sval-dialog-well {
     --sval-button-disabled-ink: GrayText;
   }
 
-  .sval-dialog-input {
+  :is(input, select, textarea).sval-dialog-input {
     color: FieldText;
 
     &:focus-visible {

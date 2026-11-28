@@ -111,7 +111,7 @@ const SvalDialogPage = {
       if (!value && submitting && !optional) {
         error = `${String(args.field.label)} can\u2019t be empty.`;
       }
-      this._showError(input, error);
+      input.error = error;
       return (!!value || optional) && !error;
     };
     input?.addEventListener("input", () => validate());
@@ -151,9 +151,18 @@ const SvalDialogPage = {
       return;
     }
     const focused = document.activeElement;
+    // A field's `focus()` selects its text (decision 2713), and the user may
+    // be typing in it, so the caret and selection are put back as they were.
+    const field = focused?.localName === "sval-field" ? focused : null;
+    const range = field && [
+      field.selectionStart,
+      field.selectionEnd,
+      field.selectionDirection,
+    ];
     window.resizeDialog?.();
     if (focused && focused !== document.body) {
       focused.focus();
+      field?.setSelectionRange(...range);
     }
   },
 
@@ -199,23 +208,6 @@ const SvalDialogPage = {
     return input;
   },
 
-  /**
-   * Shows `error` under the field and ties it to the input as its
-   * description, or clears both.
-   *
-   * @param {Element} input
-   * @param {string} error "" for none.
-   */
-  _showError(input, error) {
-    document.getElementById("sval-dialog-error").textContent = error;
-    input.setAttribute("aria-invalid", error ? "true" : "false");
-    if (error) {
-      input.setAttribute("aria-describedby", "sval-dialog-error");
-    } else {
-      input.removeAttribute("aria-describedby");
-    }
-  },
-
   _details(details) {
     const list = document.querySelector(".sval-dialog-details");
     for (const [key, value] of details) {
@@ -233,7 +225,7 @@ const SvalDialogPage = {
     wrap.querySelector(".sval-dialog-check-label").textContent = String(
       label ?? ""
     );
-    const box = wrap.querySelector("input");
+    const box = wrap.querySelector("sval-checkbox");
     box.checked = !!checked;
     wrap.hidden = false;
     return box;

@@ -80,7 +80,7 @@ add_task(async function the_user_decides_whether_the_workspace_is_isolated() {
   let doc = await dialogDocument();
   const pill = () =>
     doc.querySelector(".sval-ap-request .sval-dialog-iso-pill");
-  const override = () => doc.querySelector(".sval-ap-override input");
+  const override = () => doc.querySelector(".sval-ap-override sval-checkbox");
   Assert.equal(
     doc.getElementById("sval-ap-request").dataset.asked,
     "isolated",
@@ -147,12 +147,12 @@ add_task(async function the_alert_follows_its_card_as_it_resizes() {
     dialog._box.getBoundingClientRect().height -
     dialog._frame.getBoundingClientRect().height;
   const before = cardHeight();
-  doc.querySelector(".sval-ap-override input").click();
+  doc.querySelector(".sval-ap-override sval-checkbox").click();
   await TestUtils.waitForCondition(
     () => cardHeight() < before && fits(),
     "the frame and box shrink with the card"
   );
-  doc.querySelector(".sval-ap-override input").click();
+  doc.querySelector(".sval-ap-override sval-checkbox").click();
   await TestUtils.waitForCondition(
     () => cardHeight() === before && fits(),
     "the frame and box grow with the card"

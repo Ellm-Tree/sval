@@ -28,6 +28,9 @@ Services.scriptloader.loadSubScript(
 function typeMessage(form, text) {
   const { message } = formParts(form);
   message.focus();
+  // focus() selects what the message holds (decision 2713), and a person
+  // typing on adds to it.
+  message.setSelectionRange(message.value.length, message.value.length);
   EventUtils.sendString(text, window);
 }
 
@@ -66,6 +69,26 @@ add_task(async function the_button_opens_the_form() {
     12,
     "and a fillet's room past the tab"
   );
+
+  const { email } = formParts(form);
+  for (const [field, multiline] of [
+    [message, true],
+    [email, false],
+  ]) {
+    await fieldDrawn(field);
+    const acc = await accessibleOf(fieldInner(field));
+    Assert.equal(acc.role, Ci.nsIAccessibleRole.ROLE_ENTRY, "a text field");
+    Assert.ok(acc.name, "with a name");
+    const state = {};
+    const extra = {};
+    acc.getState(state, extra);
+    Assert.equal(
+      !!(extra.value & Ci.nsIAccessibleStates.EXT_STATE_MULTI_LINE),
+      multiline,
+      `${multiline ? "taking" : "not taking"} more than one line`
+    );
+  }
+  Assert.equal(fieldInner(email).type, "email", "the email is an email field");
 
   Assert.ok(send.disabled, "an empty message can't be sent");
   typeMessage(form, "123456789");

@@ -25,6 +25,10 @@
     />
     <link
       rel="stylesheet"
+      href="chrome://browser/content/sval/sval-roles.css"
+    />
+    <link
+      rel="stylesheet"
       href="chrome://browser/content/sval/emoji-picker.css"
     />
     <script
@@ -36,14 +40,14 @@
 
   <body>
     <sval-dialog class="sval-emoji-picker" role="dialog" aria-label="Emoji">
-      <input
-        class="sval-dialog-input sval-emoji-search"
+      <sval-field
+        class="sval-emoji-search"
         type="search"
         placeholder="Search emoji"
         aria-label="Search emoji"
         autocomplete="off"
         autofocus="autofocus"
-      />
+      ></sval-field>
       <div
         class="sval-emoji-tones sval-edge-above"
         role="radiogroup"

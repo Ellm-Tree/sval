@@ -259,7 +259,7 @@ add_task(async function edit_address_refuses_a_non_address() {
   const doc = await typeInto("javascript:alert(1)");
   const buttons = doc.querySelectorAll("sval-dialog sval-button");
   await TestUtils.waitForCondition(
-    () => doc.querySelector(".sval-dialog-error").textContent,
+    () => doc.querySelector(".sval-dialog-input").error,
     "a reason shows"
   );
   buttons[buttons.length - 1].click();
@@ -436,7 +436,7 @@ add_task(async function open_all_asks_above_the_limit() {
     doc.querySelector(".sval-dialog-title").textContent.includes("1"),
     "it asks with the count"
   );
-  const box = doc.querySelector(".sval-dialog-check input");
+  const box = doc.querySelector(".sval-dialog-check sval-checkbox");
   Assert.ok(box.checked, "it offers to stop asking, ticked to keep asking");
   const opened = BrowserTestUtils.waitForNewTab(gBrowser, B);
   await confirm(doc);
@@ -464,7 +464,7 @@ add_task(async function open_all_stops_asking_once_told() {
   await chooseInContextMenu(menu, "openAll");
   // One tab at a limit of one asks, as `OpenInTabsUtils` does.
   const doc = await dialog();
-  const box = doc.querySelector(".sval-dialog-check input");
+  const box = doc.querySelector(".sval-dialog-check sval-checkbox");
   box.click();
   const opened = BrowserTestUtils.waitForNewTab(gBrowser, B);
   await confirm(doc);

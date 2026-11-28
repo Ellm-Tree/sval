@@ -1,0 +1,305 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * `sval-field`'s look. Every value a surface may change is a
+ * `--sval-field-*` token, read here with Settings' value as the fallback,
+ * and the fallbacks read the colour roles (`sval-roles.css`). Custom
+ * properties inherit into the shadow root, so a surface sets a token on any
+ * ancestor of the element, or on the element itself. The sheet states every
+ * property `forms.css` gives a field, so the user agent's look decides
+ * nothing.
+ *
+ * Shape and type, at each size S of default, code and compact (the size's
+ * own token wins over the shared one, as --sval-field-code-height over
+ * --sval-field-height):
+ *   --sval-field[-S]-height          least block size (34px; code 44px)
+ *   --sval-field[-S]-padding-inline  (16px; compact 10px)
+ *   --sval-field-padding-inline-start, -end  one side alone
+ *   --sval-field[-S]-radius          (999px)
+ *   --sval-field[-S]-fill            (--sval-sunken)
+ *   --sval-field[-S]-font-size       (15px; code 20px; compact 13px)
+ *   --sval-field[-S]-font-weight     (400; compact 500)
+ *   --sval-field-width               the field's inline size (the element's);
+ *                                    `ch` and `em` in it are the field's own,
+ *                                    so `calc(14 * (1ch + 0.12em) + 34px)`
+ *                                    fits fourteen characters of a code
+ *   --sval-field-border-width        (1px)
+ *   --sval-field-border              the edge's colour (--sval-control-edge)
+ *   --sval-field-ink                 (--sval-ink)
+ *   --sval-field-placeholder         (--sval-ink-muted)
+ *   --sval-field-accent              the caret's and selection's accent, and
+ *                                    every element's (--sval-action)
+ *   --sval-field-font-family         (the surroundings')
+ *   --sval-field-mono                the face of `mono` and code (--sval-mono)
+ *   --sval-field-code-tracking       a code's letter spacing (0.12em)
+ *   --sval-field-code-align          a code's alignment (center)
+ *   --sval-field-text-transform      (none)
+ *   --sval-field-caret               the caret's colour (auto)
+ *   --sval-field-readonly-border     a read-only code's edge (--sval-accent)
+ *   --sval-field-padding-block       a multiline field's (8px)
+ *   --sval-field-line-height         a multiline field's (1.5)
+ *   --sval-field-resize              a multiline field's (vertical)
+ *
+ * Hover: --sval-field-hover-border, the edge under the pointer while the
+ *   field takes typing (--sval-control-hover-edge).
+ * Icons: --sval-field-icon-ink, the ink of a search's magnifier and clear
+ *   button and of a password's reveal button (--sval-ink-muted);
+ *   --sval-field-clear-hover, the clear button's wash under the pointer
+ *   (--sval-hover-tint).
+ * Focus: --sval-field-focus-outline, the ring (2px solid --sval-focus);
+ *   --sval-field-focus-outline-offset (2px); --sval-field-focus-border,
+ *   the edge while focused (the edge's own); --sval-field-focus-shadow (none).
+ * Disabled: --sval-field-disabled-opacity (0.5).
+ * Invalid, under `error`: --sval-field-error-border (--sval-problem), kept
+ *   while focused, with --sval-field-error-shadow in place of the focus
+ *   shadow (the focus shadow).
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+@import url("chrome://browser/content/sval/sval-icons.css");
+
+/* The box the native field and, for a search, its magnifier and clear
+   button share. */
+.box {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#control {
+  --_height: var(--sval-field-default-height, var(--sval-field-height, 34px));
+  --_padding-inline: var(--sval-field-default-padding-inline, var(--sval-field-padding-inline, 16px));
+  --_radius: var(--sval-field-default-radius, var(--sval-field-radius, 999px));
+  --_fill: var(--sval-field-default-fill, var(--sval-field-fill, var(--sval-sunken)));
+  --_font-size: var(--sval-field-default-font-size, var(--sval-field-font-size, 15px));
+  --_font-weight: var(--sval-field-default-font-weight, var(--sval-field-font-weight, 400));
+  --_border: var(--sval-field-border, var(--sval-control-edge));
+
+  appearance: none;
+  box-sizing: border-box;
+  width: var(--sval-field-width, 100%);
+  min-width: 0;
+  min-height: var(--_height);
+  margin: 0;
+  padding-block: 0;
+  padding-inline-start: var(--sval-field-padding-inline-start, var(--_padding-inline));
+  padding-inline-end: var(--sval-field-padding-inline-end, var(--_padding-inline));
+  border: var(--sval-field-border-width, 1px) solid var(--_border);
+  border-radius: var(--_radius);
+  background: var(--_fill);
+  box-shadow: none;
+  color: var(--sval-field-ink, var(--sval-ink));
+  accent-color: var(--sval-field-accent, var(--sval-action));
+  font: inherit;
+  font-family: var(--sval-field-font-family, inherit);
+  font-size: var(--_font-size);
+  font-weight: var(--_font-weight);
+  letter-spacing: normal;
+  text-align: start;
+  text-indent: 0;
+  text-shadow: none;
+  text-transform: var(--sval-field-text-transform, none);
+  caret-color: var(--sval-field-caret, auto);
+  cursor: text;
+  outline: none;
+
+  &::placeholder {
+    color: var(--sval-field-placeholder, var(--sval-ink-muted));
+    opacity: 1;
+  }
+
+  &:hover:not(:disabled, :read-only, [aria-invalid="true"]) {
+    --_border: var(--sval-field-hover-border, var(--sval-control-hover-edge));
+  }
+
+  &:focus-visible {
+    border-color: var(--sval-field-focus-border, var(--_border));
+    box-shadow: var(--sval-field-focus-shadow, none);
+    outline: var(--sval-field-focus-outline, 2px solid var(--sval-focus));
+    outline-offset: var(--sval-field-focus-outline-offset, 2px);
+  }
+
+  &:disabled {
+    opacity: var(--sval-field-disabled-opacity, 0.5);
+    cursor: default;
+  }
+
+  &[aria-invalid="true"] {
+    --_border: var(--sval-field-error-border, var(--sval-problem));
+  }
+
+  /* An invalid field keeps its error edge while focused, so the error stays
+     in sight as the user corrects it. */
+  &[aria-invalid="true"]:focus-visible {
+    border-color: var(--_border);
+    box-shadow: var(--sval-field-error-shadow, var(--sval-field-focus-shadow, none));
+  }
+}
+
+:host([size="code"]) #control {
+  --_height: var(--sval-field-code-height, 44px);
+  --_padding-inline: var(--sval-field-code-padding-inline, var(--sval-field-padding-inline, 16px));
+  --_radius: var(--sval-field-code-radius, var(--sval-field-radius, 999px));
+  --_fill: var(--sval-field-code-fill, var(--sval-field-fill, var(--sval-sunken)));
+  --_font-size: var(--sval-field-code-font-size, 20px);
+  --_font-weight: var(--sval-field-code-font-weight, var(--sval-field-font-weight, 400));
+
+  font-family: var(--sval-field-mono, var(--sval-mono));
+  letter-spacing: var(--sval-field-code-tracking, 0.12em);
+  text-align: var(--sval-field-code-align, center);
+
+  &[readonly] {
+    --_border: var(--sval-field-readonly-border, var(--sval-accent));
+  }
+}
+
+:host([size="compact"]) #control {
+  --_height: var(--sval-field-compact-height, var(--sval-field-height, 34px));
+  --_padding-inline: var(--sval-field-compact-padding-inline, 12px);
+  --_radius: var(--sval-field-compact-radius, var(--sval-field-radius, 999px));
+  --_fill: var(--sval-field-compact-fill, var(--sval-field-fill, var(--sval-sunken)));
+  --_font-size: var(--sval-field-compact-font-size, 13px);
+  --_font-weight: var(--sval-field-compact-font-weight, 500);
+}
+
+:host([mono]) #control {
+  font-family: var(--sval-field-mono, var(--sval-mono));
+}
+
+/* The user agent's own search clear button and number spinner are
+   Firefox's controls (`forms.css`). The field draws its own clear button,
+   and a number steps with the arrow keys. */
+#control::-moz-search-clear-button,
+#control::-moz-number-spin-box {
+  display: none;
+}
+
+/* A password's reveal button, which chrome documents get
+   (`TextControlElement::CreateButton`), in Sval's eye and the field's muted
+   ink. */
+#control::-moz-reveal {
+  width: 16px;
+  height: 16px;
+  margin-inline: 4px 0;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--sval-icon-eye) center / 16px no-repeat;
+  fill: var(--sval-field-icon-ink, var(--sval-ink-muted));
+}
+
+#control:-moz-revealed::-moz-reveal {
+  background-image: var(--sval-icon-hide-element);
+}
+
+/* A search: the magnifier inside the start edge, the clear button inside
+   the end edge, and the text between. */
+:host([type="search"]) #control {
+  padding-inline-start: var(--sval-field-padding-inline-start, calc(var(--_padding-inline) + 22px));
+  padding-inline-end: var(--sval-field-padding-inline-end, calc(var(--_padding-inline) + 22px));
+}
+
+.magnifier,
+#clear {
+  position: absolute;
+  inset-block: 0;
+  margin-block: auto;
+  width: 16px;
+  height: 16px;
+  color: var(--sval-field-icon-ink, var(--sval-ink-muted));
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+.magnifier {
+  inset-inline-start: var(--_padding-inline);
+  background: var(--sval-icon-search) center / contain no-repeat;
+  pointer-events: none;
+}
+
+#clear {
+  inset-inline-end: calc(var(--_padding-inline) - 4px);
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
+  padding: 4px;
+  margin: auto 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sval-icon-close) center / 14px no-repeat;
+  appearance: none;
+  cursor: default;
+
+  &:hover {
+    background-color: var(--sval-field-clear-hover, var(--sval-hover-tint));
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* The search's tokens are the field's own, read where the field sets them. */
+:host([type="search"]) .box {
+  --_padding-inline: var(--sval-field-default-padding-inline, var(--sval-field-padding-inline, 16px));
+}
+
+:host([type="search"][size="compact"]) .box {
+  --_padding-inline: var(--sval-field-compact-padding-inline, 12px);
+}
+
+/* A textarea fills the element's height, as one flexed or sized does. */
+textarea#control {
+  flex: 1 1 auto;
+  height: auto;
+  padding-block: var(--sval-field-padding-block, 8px);
+  line-height: var(--sval-field-line-height, 1.5);
+  resize: var(--sval-field-resize, vertical);
+}
+
+/* Forced colours keep a field's system colours and draw its edge in the
+   field's text colour, so it stays a field without the roles. */
+@media (forced-colors) {
+  #control {
+    --_border: FieldText;
+
+    background: Field;
+    color: FieldText;
+
+    &::placeholder {
+      color: GrayText;
+    }
+
+    &:focus-visible {
+      border-color: Highlight;
+      outline-color: Highlight;
+    }
+
+    &:disabled {
+      --_border: GrayText;
+
+      color: GrayText;
+    }
+
+    &[aria-invalid="true"] {
+      --_border: FieldText;
+
+      border-style: dashed;
+    }
+  }
+
+  :host([size="code"]) #control[readonly] {
+    --_border: Highlight;
+  }
+
+  #control:hover:not(:disabled, :read-only, [aria-invalid="true"]) {
+    --_border: Highlight;
+  }
+
+  .magnifier,
+  #clear {
+    color: FieldText;
+  }
+}

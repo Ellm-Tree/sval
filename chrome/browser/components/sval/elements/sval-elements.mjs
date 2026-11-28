@@ -12,6 +12,10 @@
 const ELEMENTS = [
   ["sval-button", "chrome://browser/content/sval/elements/sval-button.mjs"],
   ["sval-dialog", "chrome://browser/content/sval/elements/sval-dialog.mjs"],
+  ["sval-field", "chrome://browser/content/sval/elements/sval-field.mjs"],
+  ["sval-select", "chrome://browser/content/sval/elements/sval-select.mjs"],
+  ["sval-switch", "chrome://browser/content/sval/elements/sval-switch.mjs"],
+  ["sval-checkbox", "chrome://browser/content/sval/elements/sval-checkbox.mjs"],
 ];
 
 for (const [tag, url] of ELEMENTS) {

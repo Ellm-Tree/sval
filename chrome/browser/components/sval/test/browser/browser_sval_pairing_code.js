@@ -114,8 +114,9 @@ add_task(async function a_malformed_code_is_refused_before_any_argon2_work() {
     "", // nothing at all
   ]) {
     submitCode(asked, typed);
+    await asked.input.updateComplete;
     Assert.equal(
-      asked.input.getAttribute("aria-invalid"),
+      fieldInner(asked.input).getAttribute("aria-invalid"),
       "true",
       `"${typed}" is refused as not looking like a code, never as wrong`
     );

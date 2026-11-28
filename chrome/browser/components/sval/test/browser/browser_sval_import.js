@@ -85,7 +85,7 @@ add_task(async function the_dialog_stays_open_until_done() {
     "a Space keeps its own name"
   );
   Assert.ok(
-    doc.querySelector(".sval-im-source input[type=checkbox]").checked,
+    doc.querySelector(".sval-im-source sval-checkbox").checked,
     "the only browser found is ticked"
   );
   // Import draws the run's first step before the run reads its first file,
@@ -642,4 +642,93 @@ add_task(async function an_arc_favorite_imports_as_a_pin() {
   Assert.ok(pin, "it arrives as a pin");
   Assert.ok(store.isPinned(pin.guid), "in the pins root");
   Assert.ok(!store.isFavorite("https://example.com/fav"), "and no favorite");
+});
+
+/**
+ * The picker's name fields, ticks and archive select are Sval's form
+ * elements in the picker's colours, which no rule of Firefox's sheets in the
+ * page reaches.
+ */
+add_task(async function the_pickers_fields_draw_in_its_colours() {
+  await withFreshPanel();
+  const home = await arcFixture();
+  const { doc } = await openImportPage({ roots: { arc: { home } } });
+  const name = await TestUtils.waitForCondition(
+    () => doc.querySelector(".sval-im-window-name"),
+    "the page lists the Space"
+  );
+  const tick = doc.querySelector(".sval-im-source sval-checkbox");
+  for (const el of [name, tick]) {
+    await fieldDrawn(el);
+  }
+  Assert.equal(name.localName, "sval-field", "a Space's name is a sval-field");
+  // A ticked box fills with the picker's action colour; its edge shows
+  // unticked.
+  tick.checked = false;
+  await fieldDrawn(tick);
+  const colourIn = value => {
+    const probe = doc.createElement("span");
+    probe.style.color = value;
+    doc.querySelector(".sval-im-picker").append(probe);
+    const seen = InspectorUtils.colorToRGBA(
+      doc.defaultView.getComputedStyle(probe).color
+    );
+    probe.remove();
+    return seen;
+  };
+  const at = (el, prop, locks = []) => {
+    const inner = fieldInner(el);
+    locks.forEach(l => InspectorUtils.addPseudoClassLock(inner, l));
+    const seen = InspectorUtils.colorToRGBA(
+      doc.defaultView.getComputedStyle(inner)[prop]
+    );
+    locks.forEach(l => InspectorUtils.removePseudoClassLock(inner, l));
+    return seen;
+  };
+  Assert.deepEqual(
+    at(name, "backgroundColor"),
+    colourIn("var(--surface-glass)"),
+    "the name fills with the picker's field colour"
+  );
+  Assert.deepEqual(
+    at(name, "borderTopColor"),
+    colourIn("var(--border-field)"),
+    "with the picker's edge"
+  );
+  for (const [el, what] of [
+    [name, "the name"],
+    [tick, "a tick"],
+  ]) {
+    Assert.deepEqual(
+      at(el, "borderTopColor", [":hover"]),
+      colourIn("var(--focus-ring)"),
+      `${what}'s edge lights in the picker's focus colour under the pointer`
+    );
+  }
+  const sheets = InspectorUtils.getAllStyleSheets(doc, true).filter(
+    s => s.href && !s.href.startsWith("chrome://browser/content/sval/")
+  );
+  const looks = () =>
+    [name, tick].map(el => {
+      const cs = doc.defaultView.getComputedStyle(fieldInner(el));
+      return [
+        "color",
+        "background-color",
+        "border-top-color",
+        "border-top-left-radius",
+        "font-size",
+        "appearance",
+        "opacity",
+      ].map(p => cs.getPropertyValue(p));
+    });
+  const withSheets = looks();
+  sheets.forEach(s => (s.disabled = true));
+  const without = looks();
+  sheets.forEach(s => (s.disabled = false));
+  Assert.deepEqual(
+    without,
+    withSheets,
+    "no sheet but Sval's reaches the picker's fields"
+  );
+  doc.defaultView.close();
 });

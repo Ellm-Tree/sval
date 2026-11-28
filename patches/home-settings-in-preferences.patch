@@ -40,7 +40,7 @@ index 95ff39830e..69c8746e71 100644
  
  Preferences.addAll([
    { id: "browser.startup.homepage", type: "string" },
-@@ -27,9 +44,817 @@ Preferences.addAll([
+@@ -27,9 +44,820 @@ Preferences.addAll([
    { id: "browser.newtabpage.enabled", type: "bool" },
  ]);
  
@@ -770,7 +770,10 @@ index 95ff39830e..69c8746e71 100644
 +              {
 +                id: "customHomepageAddUrlInput",
 +                l10nId: "home-custom-homepage-address",
-+                control: "moz-input-text",
++                control: "sval-field",
++                // Fluent sets on Sval's elements only the attributes they
++                // name.
++                controlAttrs: { "data-l10n-attrs": "placeholder" },
 +              },
 +              {
 +                id: "customHomepageAddAddressButton",

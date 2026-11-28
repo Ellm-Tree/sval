@@ -970,8 +970,7 @@ const SvalImportPicker = (() => {
       li.toggleAttribute("data-problem", problem);
       li.dataset.source = row.browser.source;
 
-      const box = this._el("input", {
-        type: "checkbox",
+      const box = this._el("sval-checkbox", {
         className: "sval-im-tick",
         checked: row.ticked && !problem,
         disabled: problem,
@@ -1118,8 +1117,7 @@ const SvalImportPicker = (() => {
       if (harvest.file) {
         return details;
       }
-      const historyBox = this._el("input", {
-        type: "checkbox",
+      const historyBox = this._el("sval-checkbox", {
         checked: row.history,
       });
       historyBox.addEventListener("change", () => {
@@ -1147,13 +1145,12 @@ const SvalImportPicker = (() => {
      * @returns {Element}
      */
     _renderAutoArchive(row) {
-      const box = this._el("input", {
-        type: "checkbox",
+      const box = this._el("sval-checkbox", {
         className: "sval-im-archive",
         checked: row.autoArchive.on,
       });
       const browser = Sources.SOURCE_NAMES[row.browser.source];
-      const after = this._el("select", {
+      const after = this._el("sval-select", {
         className: "sval-im-archive-after",
         attrs: { "aria-label": "Archive tabs unused for" },
       });
@@ -1190,12 +1187,11 @@ const SvalImportPicker = (() => {
       const choice = row.windows[i];
       const view = row.views[i];
       const li = this._el("li", { className: "sval-im-window" });
-      const box = this._el("input", {
-        type: "checkbox",
+      const box = this._el("sval-checkbox", {
         checked: choice.import,
       });
-      const name = this._el("input", {
-        type: "text",
+      const name = this._el("sval-field", {
+        size: "compact",
         value: choice.name,
         className: "sval-im-window-name",
         autocomplete: "off",
@@ -1422,8 +1418,8 @@ const SvalImportPicker = (() => {
           : `${browser}'s ${count}`;
       fieldset.append(this._el("legend", {}, `Choose how to import ${whose}:`));
       const group = `sval-im-bm-${this._rows.indexOf(row)}`;
-      const name = this._el("input", {
-        type: "text",
+      const name = this._el("sval-field", {
+        size: "compact",
         value: row.bookmarksName,
         className: "sval-im-bookmarks-name",
         autocomplete: "off",

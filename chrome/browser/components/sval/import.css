@@ -148,7 +148,6 @@ html[data-sized] {
     display: none;
   }
 
-  input[type="checkbox"],
   input[type="radio"] {
     flex: none;
     width: 16px;
@@ -475,22 +474,33 @@ html[data-sized] {
   mask: var(--sval-im-mark) center / contain no-repeat;
 }
 
+/* The picker's checkboxes, fields and select (`elements/`), in its colours:
+   a 16px box, and the compact field at its row's height. */
+.sval-im-picker,
+.sval-ex {
+  --sval-field-check-size: 16px;
+  --sval-field-check-radius: 4px;
+  --sval-field-check-border-width: 1px;
+  --sval-field-check-border: var(--border-field);
+  --sval-field-check-fill: var(--surface-glass);
+  --sval-field-check-on: var(--action-primary);
+  --sval-field-check-focus-outline: 2px solid var(--focus-ring);
+  --sval-control-hover-edge: var(--focus-ring);
+  --sval-field-compact-height: 32px;
+  --sval-field-compact-fill: var(--surface-glass);
+  --sval-field-compact-font-size: 14px;
+  --sval-field-border: var(--border-field);
+  --sval-field-ink: var(--text-strong);
+  --sval-field-font-family: var(--sval-font);
+  --sval-field-focus-outline: 2px solid var(--focus-ring);
+  --sval-field-select-height: 32px;
+  --sval-field-select-fill: var(--surface-glass);
+  --sval-field-select-font-size: 14px;
+}
+
 .sval-im-window-name,
 .sval-im-bookmarks-name {
-  appearance: none;
-  height: 32px;
   min-width: 0;
-  margin: 0;
-  padding: 0 10px;
-  border: 1px solid var(--border-field);
-  border-radius: 8px;
-  background: var(--surface-glass);
-  color: var(--text-strong);
-  font: 500 14px var(--sval-font);
-
-  &:disabled {
-    opacity: 0.5;
-  }
 }
 
 .sval-im-window-name {
@@ -1078,20 +1088,8 @@ html[data-sized] {
     background: Canvas;
   }
 
-  .sval-im-picker input[type="checkbox"],
   .sval-im-picker input[type="radio"] {
     accent-color: auto;
-  }
-
-  .sval-im-window-name,
-  .sval-im-bookmarks-name {
-    color: FieldText;
-
-    &:disabled {
-      opacity: 1;
-      border-color: GrayText;
-      color: GrayText;
-    }
   }
 
   .sval-im-picker .sval-im-group[aria-pressed="true"],

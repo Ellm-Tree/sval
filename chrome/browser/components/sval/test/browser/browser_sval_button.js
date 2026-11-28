@@ -282,6 +282,35 @@ add_task(async function its_label_names_it() {
   );
 });
 
+add_task(async function aria_ids_name_describe_and_point_from_it() {
+  const heading = document.createElementNS(HTML_NS, "span");
+  heading.id = "probe-button-heading";
+  heading.textContent = "Remove example.com";
+  const note = document.createElementNS(HTML_NS, "span");
+  note.id = "probe-button-note";
+  note.textContent = "Its data stays";
+  const panel = document.createElementNS(HTML_NS, "div");
+  panel.id = "probe-button-panel";
+  const el = await button({
+    "aria-labelledby": "probe-button-heading",
+    "aria-describedby": "probe-button-note",
+    "aria-controls": "probe-button-panel",
+  });
+  stage(heading, note, panel, el);
+  await drawn(el);
+  for (const attr of ["aria-labelledby", "aria-describedby", "aria-controls"]) {
+    Assert.ok(!el.hasAttribute(attr), `${attr} moves to the native button`);
+  }
+  Assert.deepEqual(
+    inner(el).ariaControlsElements,
+    [panel],
+    "which points at what it controls"
+  );
+  const acc = await accessibleOf(inner(el));
+  Assert.equal(acc.name, "Remove example.com", "aria-labelledby names it");
+  Assert.equal(acc.description, "Its data stays", "aria-describedby too");
+});
+
 /**
  * A form holding one field and a `submit` button, counting its submits.
  *

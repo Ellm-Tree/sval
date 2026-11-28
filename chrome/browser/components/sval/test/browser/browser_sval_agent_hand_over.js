@@ -46,7 +46,7 @@ async function answerHandOver(ok, checked = false) {
     state: doc.querySelector("sval-dialog").state,
     history: !check.hidden,
   };
-  const box = check.querySelector("input");
+  const box = check.querySelector("sval-checkbox");
   if (!check.hidden && box.checked !== checked) {
     box.click();
   }

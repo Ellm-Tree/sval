@@ -1,0 +1,99 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * What Sval's form elements (`sval-form-control.mjs`) share: the host's box,
+ * the label and description an element draws for itself, and the error
+ * line under its control. Every value a surface may change is a
+ * `--sval-field-*` token, read with the colour roles (`sval-roles.css`) as
+ * the fallback.
+ *
+ *   --sval-field-gap            between the control and its error (6px)
+ *   --sval-field-label-ink      a drawn label's ink (--sval-ink)
+ *   --sval-field-label-size     its size (the surroundings')
+ *   --sval-field-label-weight   its weight (the surroundings')
+ *   --sval-field-description-ink   the line under it (--sval-ink-muted)
+ *   --sval-field-description-size  its size (the surroundings')
+ *   --sval-field-error-ink      the error's ink (--sval-problem)
+ *   --sval-field-error-size     its size (13px)
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:host {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--sval-field-gap, 6px);
+  min-width: 0;
+  vertical-align: middle;
+}
+
+:host([hidden]) {
+  display: none;
+}
+
+.row {
+  display: contents;
+}
+
+/* Drawn with its own label, as `setting-control` renders it, the element
+   takes its row's whole width: the label and its line, then the control. */
+:host(:state(labelled)) {
+  display: flex;
+}
+
+:host(:state(labelled)) .row {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 4px;
+}
+
+.words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+#label {
+  color: var(--sval-field-label-ink, var(--sval-ink));
+  font-size: var(--sval-field-label-size, inherit);
+  font-weight: var(--sval-field-label-weight, inherit);
+}
+
+#description {
+  color: var(--sval-field-description-ink, var(--sval-ink-muted));
+  font-size: var(--sval-field-description-size, inherit);
+}
+
+:host(:is([disabled], :disabled)) .words {
+  opacity: var(--sval-field-disabled-opacity, 0.5);
+}
+
+#error {
+  color: var(--sval-field-error-ink, var(--sval-problem));
+  font-size: var(--sval-field-error-size, 13px);
+  line-height: 1.4;
+
+  &:empty {
+    display: none;
+  }
+}
+
+@media (forced-colors) {
+  #label {
+    color: CanvasText;
+  }
+
+  #description {
+    color: CanvasText;
+  }
+
+  #error {
+    color: CanvasText;
+  }
+
+  :host(:is([disabled], :disabled)) .words {
+    color: GrayText;
+  }
+}

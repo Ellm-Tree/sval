@@ -40,7 +40,7 @@ const SvalWorkspaceForm = (() => {
   return class {
     /**
      * The fields' markup, in the order the dialog lays them out: the name
-     * beside the emoji button, the name's error line, then the colours.
+     * beside the emoji button, then the colours.
      *
      * @param {Document} doc
      * @returns {Element[]}
@@ -61,10 +61,9 @@ const SvalWorkspaceForm = (() => {
               { class: "sval-dialog-label", for: "sval-nw-name" },
               "Name"
             ),
-            make(doc, "input", {
+            make(doc, "sval-field", {
               class: "sval-dialog-input sval-nw-name",
               id: "sval-nw-name",
-              type: "text",
               autocomplete: "off",
             })
           ),
@@ -92,11 +91,6 @@ const SvalWorkspaceForm = (() => {
             )
           )
         ),
-        make(doc, "span", {
-          class: "sval-dialog-error",
-          id: "sval-nw-name-error",
-          "aria-live": "polite",
-        }),
         // Filled by the colour section (`SvalColorPicker`).
         make(doc, "div", { class: "sval-dialog-field sval-nw-color" }),
       ];
@@ -141,7 +135,6 @@ const SvalWorkspaceForm = (() => {
         name: root.querySelector(".sval-nw-name"),
         emoji: root.querySelector(".sval-nw-emoji"),
         emojiValue: root.querySelector(".sval-nw-emoji-value"),
-        nameError: root.querySelector(".sval-dialog-error"),
       };
       this.els.name.value = name;
       /** @type {string} The chosen emoji, or "". */
@@ -219,20 +212,12 @@ const SvalWorkspaceForm = (() => {
     }
 
     /**
-     * Shows why the fields cannot be taken under the name field, tied to it
-     * as its description, or clears both.
+     * Shows why the fields cannot be taken on the name field, or clears it.
      *
      * @param {string} error "" for none.
      */
     showNameError(error) {
-      const { name, nameError } = this.els;
-      nameError.textContent = error;
-      name.setAttribute("aria-invalid", error ? "true" : "false");
-      if (error) {
-        name.setAttribute("aria-describedby", nameError.id);
-      } else {
-        name.removeAttribute("aria-describedby");
-      }
+      this.els.name.error = error;
     }
 
     /**

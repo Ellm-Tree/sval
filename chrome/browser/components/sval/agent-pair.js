@@ -52,7 +52,7 @@ const SvalAgentPair = {
     document.getElementById("sval-ap-override").textContent = asked
       ? "Let it use my sign-ins instead"
       : "Isolate it instead, so it starts signed out";
-    const override = document.querySelector(".sval-ap-override input");
+    const override = document.querySelector(".sval-ap-override sval-checkbox");
     const pill = document.querySelector(
       ".sval-ap-request .sval-dialog-iso-pill"
     );

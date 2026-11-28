@@ -19,19 +19,16 @@
   --sval-dialog-max-width: none;
 }
 
+/* The fields line up at their labels, so the name's error, which the name
+   field draws under itself, leaves the emoji button where it is. */
 .sval-nw-row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 14px;
 }
 
 .sval-nw-name-field {
   flex: 1;
-}
-
-/* Under the name field it belongs to, closer than the gap between fields. */
-#sval-nw-name-error {
-  margin-top: -12px;
 }
 
 /* An error result line (messages spec §9.6): a 16px glyph, a 10px gap, the

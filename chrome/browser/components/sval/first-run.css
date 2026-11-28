@@ -1013,8 +1013,7 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
 }
 
 /* A checkbox drawn to match the radios. */
-.sval-fr-check > input[type="checkbox"],
-.sval-fr .sval-im-picker input[type="checkbox"] {
+.sval-fr-check > input[type="checkbox"] {
   appearance: none;
   flex: none;
   box-sizing: border-box;
@@ -1041,6 +1040,23 @@ section[data-picking] :is(.sval-fr-ws-preview, .sval-fr-ws-form) {
   &:disabled {
     opacity: 0.45;
   }
+}
+
+/* The import picker's checkboxes (`sval-checkbox`) drawn to match the
+   radios. */
+.sval-fr .sval-im-picker {
+  --sval-field-check-size: 18px;
+  --sval-field-check-border-width: 2px;
+  --sval-field-check-border: var(--ink-500);
+  --sval-field-check-radius: 5px;
+  --sval-field-check-fill: transparent;
+  --sval-field-check-on: var(--sval-neon);
+  --sval-field-check-mark: var(--ink-950);
+  --sval-field-check-focus-outline: 2px solid var(--focus-ring);
+}
+
+.sval-fr .sval-im-picker sval-checkbox {
+  --sval-field-disabled-opacity: 0.45;
 }
 
 /* ---------------------------------------------------------------- code */

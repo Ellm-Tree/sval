@@ -1,0 +1,22 @@
+Sval: Draw Settings' search box as a sval-field
+
+Settings is a Sval surface, so a Firefox style on one of Settings'
+controls is a bug. sval-field draws the search box with Sval's roles, and
+findInPage.js and preferences.js get the value, input event, focus() and
+updateComplete they use.
+
+diff --git a/browser/components/preferences/preferences.xhtml b/browser/components/preferences/preferences.xhtml
+index 98af6f0adb..8f4668f23a 100644
+--- a/browser/components/preferences/preferences.xhtml
++++ b/browser/components/preferences/preferences.xhtml
+@@ -211,8 +211,9 @@
+             iconsrc="chrome://global/skin/icons/organizational-unit.svg"
+             data-l10n-id="managed-notice-nav"
+           />
+-          <html:moz-input-search
++          <html:sval-field
+             id="searchInput"
++            type="search"
+             data-l10n-id="search-input-box2"
+             data-l10n-attrs="placeholder"
+           />

@@ -51,11 +51,10 @@
           class="sval-dialog-check sval-dialog-well-check sval-nw-isolated"
           hidden="hidden"
         >
-          <input
-            type="checkbox"
+          <sval-checkbox
             aria-labelledby="sval-nw-isolated-title"
             aria-describedby="sval-nw-isolated-note"
-          />
+          ></sval-checkbox>
           <span class="sval-dialog-check-words">
             <span class="sval-dialog-check-title" id="sval-nw-isolated-title"
               >Isolate this Workspace<span
@@ -73,10 +72,10 @@
           <label class="sval-dialog-label" for="sval-nw-archive-choice"
             >Archive idle tabs</label
           >
-          <select
-            class="sval-dialog-input sval-nw-archive-choice"
+          <sval-select
+            class="sval-nw-archive-choice"
             id="sval-nw-archive-choice"
-          ></select>
+          ></sval-select>
         </div>
         <sval-button slot="actions" class="sval-nw-cancel" data-button="cancel">
           Cancel

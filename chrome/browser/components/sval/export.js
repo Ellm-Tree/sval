@@ -112,8 +112,7 @@ const SvalExportPage = {
 
     const list = $(".sval-ex-workspaces");
     for (const workspace of args.workspaces) {
-      const box = make("input", {
-        type: "checkbox",
+      const box = make("sval-checkbox", {
         className: "sval-ex-workspace",
         value: workspace.id,
         checked: true,

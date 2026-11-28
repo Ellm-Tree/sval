@@ -1,0 +1,121 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * `sval-switch`'s look: a track with a round knob, at the start while off,
+ * at the end while on and halfway under `mixed`. Every value a surface may
+ * change is a `--sval-field-switch-*` token, read with Settings' value as the
+ * fallback, and the fallbacks read the colour roles (`sval-roles.css`).
+ *
+ *   --sval-field-switch-width        (44px)
+ *   --sval-field-switch-height       (26px)
+ *   --sval-field-switch-knob         the knob's radius (9px)
+ *   --sval-field-switch-track        the off track (--sval-control-edge)
+ *   --sval-field-switch-knob-off     the off knob (--sval-switch-knob-off)
+ *   --sval-field-switch-on           the on track (--sval-action)
+ *   --sval-field-switch-knob-on      the on knob (#ffffff)
+ *   --sval-field-switch-mixed        the mixed track (the on track at 55%
+ *                                    over the off one)
+ *   --sval-field-switch-margin-block-start  (0)
+ *   --sval-field-disabled-cursor     the pointer over a disabled one (default)
+ *   --sval-field-focus-outline, --sval-field-focus-outline-offset,
+ *   --sval-field-disabled-opacity: as `sval-field`'s.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* Drawn with its own label, the label and its line take the row and the
+   switch sits at its end. */
+:host(:state(labelled)) .row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+#control {
+  --_knob: var(--sval-field-switch-knob, 9px);
+  --_off: var(--sval-field-switch-track, var(--sval-control-edge));
+  --_on: var(--sval-field-switch-on, var(--sval-action));
+
+  appearance: none;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--sval-field-switch-width, 44px);
+  height: var(--sval-field-switch-height, 26px);
+  margin: var(--sval-field-switch-margin-block-start, 0) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      circle at calc(var(--_knob) + 4px) 50%,
+      var(--sval-field-switch-knob-off, var(--sval-switch-knob-off)) var(--_knob),
+      transparent calc(var(--_knob) + 0.5px)
+    ),
+    var(--_off);
+  color: var(--sval-field-ink, var(--sval-ink));
+  accent-color: var(--sval-field-accent, var(--sval-action));
+  cursor: pointer;
+  outline: none;
+  transition: background-color var(--sval-dur) var(--sval-ease);
+
+  &:checked {
+    background:
+      radial-gradient(
+        circle at calc(100% - var(--_knob) - 4px) 50%,
+        var(--sval-field-switch-knob-on, #ffffff) var(--_knob),
+        transparent calc(var(--_knob) + 0.5px)
+      ),
+      var(--_on);
+  }
+
+  &:indeterminate {
+    background:
+      radial-gradient(circle at 50% 50%, var(--sval-field-switch-knob-on, #ffffff) var(--_knob), transparent calc(var(--_knob) + 0.5px)),
+      var(--sval-field-switch-mixed, color-mix(in srgb, var(--_on) 55%, var(--_off)));
+  }
+
+  &:focus-visible {
+    outline: var(--sval-field-focus-outline, 2px solid var(--sval-focus));
+    outline-offset: var(--sval-field-focus-outline-offset, 2px);
+  }
+
+  &:disabled {
+    opacity: var(--sval-field-disabled-opacity, 0.5);
+    cursor: var(--sval-field-disabled-cursor, default);
+  }
+}
+
+/* Forced colours drop the track's colour and the knob's gradient, which are
+   all a switch is, so it draws them in system colours: an outlined track
+   with the knob in text colour, and filled with the highlight when on. */
+@media (forced-colors) {
+  #control {
+    forced-color-adjust: none;
+    border: 1px solid ButtonText;
+    background: radial-gradient(circle at 12px 50%, ButtonText 8px, transparent 8.5px), ButtonFace;
+
+    &:checked {
+      border-color: Highlight;
+      background: radial-gradient(circle at calc(100% - 12px) 50%, HighlightText 8px, transparent 8.5px), Highlight;
+    }
+
+    &:indeterminate {
+      border-color: Highlight;
+      background: radial-gradient(circle at 50% 50%, Highlight 8px, transparent 8.5px), ButtonFace;
+    }
+
+    &:disabled {
+      border-color: GrayText;
+      background: radial-gradient(circle at 12px 50%, GrayText 8px, transparent 8.5px), ButtonFace;
+    }
+
+    &:checked:disabled {
+      background: radial-gradient(circle at calc(100% - 12px) 50%, GrayText 8px, transparent 8.5px), ButtonFace;
+    }
+
+    &:focus-visible {
+      outline-color: CanvasText;
+    }
+  }
+}

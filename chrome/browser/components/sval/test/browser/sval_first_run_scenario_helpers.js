@@ -34,7 +34,7 @@ async function advance(doc) {
   await settled(doc);
   const section = shownSection(doc);
   if (from === STEPS.import) {
-    for (const box of section.querySelectorAll("input[type=checkbox]")) {
+    for (const box of section.querySelectorAll("sval-checkbox")) {
       if (box.checked) {
         box.click();
       }

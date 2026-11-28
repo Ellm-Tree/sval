@@ -471,6 +471,10 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_feedback_report.js"]
 
+["browser_sval_field.js"]
+
+["browser_sval_fields_in_dialogs.js"]
+
 ["browser_sval_find_bar.js"]
 
 ["browser_sval_fingerprinting.js"]
@@ -484,6 +488,10 @@ run-if = ["os == 'mac'"]
 ["browser_sval_forget_site.js"]
 
 ["browser_sval_forget_site_rules.js"]
+
+["browser_sval_form_looks.js"]
+
+["browser_sval_form_setting_control.js"]
 
 ["browser_sval_fp_audio.js"]
 
@@ -861,6 +869,8 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_secure_dns.js"]
 
+["browser_sval_select.js"]
+
 ["browser_sval_selection_windows.js"]
 
 ["browser_sval_settings.js"]
@@ -876,6 +886,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_settings_kagi.js"]
 
 ["browser_sval_settings_page_stays_put.js"]
+
+["browser_sval_settings_search_field.js"]
 
 ["browser_sval_settings_sval_folder.js"]
 
@@ -950,6 +962,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_status_panel.js"]
 
 ["browser_sval_surrogate_pair_keys.js"]
+
+["browser_sval_switch.js"]
 
 ["browser_sval_switch_lands.js"]
 

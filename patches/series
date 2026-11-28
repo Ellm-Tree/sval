@@ -484,3 +484,4 @@ remove-site-data-list.patch
 remove-site-data-list.delete
 widevine-host-verification.patch
 popup-window-shape.patch
+settings-search-sval-field.patch

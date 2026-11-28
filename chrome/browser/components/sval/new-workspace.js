@@ -90,7 +90,8 @@ const SvalNewWorkspace = {
     }
     if (typeof this._args.isolated === "boolean") {
       this._els.isolated.hidden = false;
-      this._els.isolated.querySelector("input").checked = this._args.isolated;
+      this._els.isolated.querySelector("sval-checkbox").checked =
+        this._args.isolated;
     }
     if (this._args.purpose) {
       this._els.form.dataset.purpose = this._args.purpose;
@@ -193,7 +194,7 @@ const SvalNewWorkspace = {
       emoji: this._form.emoji,
       isolated: this._els.isolated.hidden
         ? undefined
-        : this._els.isolated.querySelector("input").checked,
+        : this._els.isolated.querySelector("sval-checkbox").checked,
       autoArchive: this._els.archive.hidden
         ? undefined
         : this._els.archiveChoice.value,

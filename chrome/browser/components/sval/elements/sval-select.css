@@ -1,0 +1,95 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * `sval-select`'s look: a pill, as `sval-field`'s, without the drop arrow. Every value a surface may change is a
+ * `--sval-field-*` token, read with Settings' value as the fallback, and
+ * the fallbacks read the colour roles (`sval-roles.css`). The sheet states
+ * every property `forms.css` gives a select, so the user agent's look
+ * decides nothing.
+ *
+ *   --sval-field-select-width           inline size (the element's)
+ *   --sval-field-select-height          least block size (34px)
+ *   --sval-field-select-block-size      block size (auto)
+ *   --sval-field-select-padding-inline  (12px)
+ *   --sval-field-select-radius          (--sval-field-radius, then 999px)
+ *   --sval-field-select-fill            (--sval-field-fill, then --sval-sunken)
+ *   --sval-field-select-font-size       (13px)
+ *   --sval-field-select-font-weight     (500)
+ *   --sval-field-select-ink             (--sval-field-ink, then --sval-ink);
+ *                                       a surface sets it per choice with
+ *                                       `:host([data-value="…"])`
+ *   --sval-field-border-width, --sval-field-border, --sval-field-font-family,
+ *   --sval-field-hover-border, --sval-field-focus-*,
+ *   --sval-field-disabled-opacity: as `sval-field`'s.
+ *   --sval-field-disabled-cursor        the pointer over a disabled one
+ *                                       (default)
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+#control {
+  appearance: none;
+  box-sizing: border-box;
+  width: var(--sval-field-select-width, 100%);
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--sval-field-select-height, 34px);
+  height: var(--sval-field-select-block-size, auto);
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--sval-field-select-padding-inline, 12px);
+  border: var(--sval-field-border-width, 1px) solid var(--sval-field-border, var(--sval-control-edge));
+  border-radius: var(--sval-field-select-radius, var(--sval-field-radius, 999px));
+  background: var(--sval-field-select-fill, var(--sval-field-fill, var(--sval-sunken)));
+  box-shadow: none;
+  color: var(--sval-field-select-ink, var(--sval-field-ink, var(--sval-ink)));
+  accent-color: var(--sval-field-accent, var(--sval-action));
+  font: inherit;
+  font-family: var(--sval-field-font-family, inherit);
+  font-size: var(--sval-field-select-font-size, 13px);
+  font-weight: var(--sval-field-select-font-weight, 500);
+  letter-spacing: normal;
+  text-align: start;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  cursor: default;
+  outline: none;
+
+  &:hover:not(:disabled) {
+    border-color: var(--sval-field-hover-border, var(--sval-control-hover-edge));
+  }
+
+  &:focus-visible {
+    border-color: var(--sval-field-focus-border, var(--sval-field-border, var(--sval-control-edge)));
+    box-shadow: var(--sval-field-focus-shadow, none);
+    outline: var(--sval-field-focus-outline, 2px solid var(--sval-focus));
+    outline-offset: var(--sval-field-focus-outline-offset, 2px);
+  }
+
+  &:disabled {
+    opacity: var(--sval-field-disabled-opacity, 0.5);
+    cursor: var(--sval-field-disabled-cursor, default);
+  }
+}
+
+@media (forced-colors) {
+  #control {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      outline-color: Highlight;
+    }
+
+    &:hover:not(:disabled) {
+      border-color: Highlight;
+    }
+
+    &:disabled {
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+}

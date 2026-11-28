@@ -50,21 +50,15 @@
         ></p>
         <div class="sval-dialog-field" hidden="hidden">
           <label class="sval-dialog-label" for="sval-dialog-input"></label>
-          <input
+          <sval-field
             class="sval-dialog-input"
             id="sval-dialog-input"
-            type="text"
             autocomplete="off"
-          />
-          <span
-            class="sval-dialog-error"
-            id="sval-dialog-error"
-            aria-live="polite"
-          ></span>
+          ></sval-field>
         </div>
         <dl class="sval-dialog-details" hidden="hidden"></dl>
         <label class="sval-dialog-check" hidden="hidden">
-          <input type="checkbox" />
+          <sval-checkbox></sval-checkbox>
           <span class="sval-dialog-check-label"></span>
         </label>
       </sval-dialog>

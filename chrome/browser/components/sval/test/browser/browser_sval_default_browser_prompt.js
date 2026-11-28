@@ -109,7 +109,7 @@ add_task(async function the_launch_question_is_svals_dialog() {
 add_task(async function dont_show_again_turns_the_check_off() {
   Services.prefs.setBoolPref("browser.shell.checkDefaultBrowser", true);
   const { answer, doc } = await openPrompt();
-  const box = doc.querySelector(".sval-dialog-check input");
+  const box = doc.querySelector(".sval-dialog-check sval-checkbox");
   Assert.ok(box.checkVisibility(), "the prompt offers not to ask again");
   box.click();
   doc.querySelector('sval-dialog sval-button:not([type="primary"])').click();
@@ -135,7 +135,7 @@ add_task(async function not_now_keeps_the_check() {
 add_task(async function escape_keeps_dont_show_again() {
   Services.prefs.setBoolPref("browser.shell.checkDefaultBrowser", true);
   const { answer, doc } = await openPrompt();
-  doc.querySelector(".sval-dialog-check input").click();
+  doc.querySelector(".sval-dialog-check sval-checkbox").click();
   EventUtils.synthesizeKey("KEY_Escape", {}, doc.defaultView);
   await within(answer, 10_000, "the prompt's answer");
   Assert.ok(

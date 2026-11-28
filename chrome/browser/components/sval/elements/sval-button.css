@@ -68,7 +68,7 @@ button {
   --_shadow: var(--sval-button-secondary-shadow, none);
   --_hover-fill: var(--sval-button-secondary-hover-fill, var(--sval-hover-tint));
   --_hover-ink: var(--sval-button-secondary-hover-ink, var(--_ink));
-  --_hover-border: var(--sval-button-secondary-hover-border, var(--sval-accent));
+  --_hover-border: var(--sval-button-secondary-hover-border, var(--sval-control-hover-edge));
   --_press-fill: var(--sval-button-secondary-press-fill, var(--_hover-fill));
   --_press-idle-fill: var(--sval-button-secondary-press-idle-fill, var(--_fill));
   --_padding-inline: var(--sval-button-secondary-padding-inline, var(--sval-button-padding-inline, 16px));

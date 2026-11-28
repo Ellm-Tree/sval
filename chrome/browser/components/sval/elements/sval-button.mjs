@@ -56,18 +56,12 @@ export class SvalButton extends MozLitElement {
     ariaDisabledAttr: { type: String, attribute: "aria-disabled" },
     ariaExpandedAttr: { type: String, attribute: "aria-expanded" },
     ariaPressedAttr: { type: String, attribute: "aria-pressed" },
+    // `MozLitElement` names a mapped property's attribute itself, from the
+    // property's name: `ariaLabelledBy` maps `aria-labelledby`.
     ariaLabel: { type: String, mapped: true },
-    ariaLabelledBy: {
-      type: String,
-      mapped: true,
-      attribute: "aria-labelledby",
-    },
-    ariaDescribedBy: {
-      type: String,
-      mapped: true,
-      attribute: "aria-describedby",
-    },
-    ariaControls: { type: String, mapped: true, attribute: "aria-controls" },
+    ariaLabelledBy: { type: String, mapped: true },
+    ariaDescribedBy: { type: String, mapped: true },
+    ariaControls: { type: String, mapped: true },
     title: { type: String, mapped: true },
     accessKey: { type: String, mapped: true },
   };
@@ -138,6 +132,7 @@ export class SvalButton extends MozLitElement {
   connectedCallback() {
     super.connectedCallback();
     this.#syncProxy();
+    this.requestUpdate();
   }
 
   /** Presses the inner button, as a click on a native button would. */
@@ -224,7 +219,12 @@ export class SvalButton extends MozLitElement {
     if (!ids) {
       return null;
     }
+    // Ids resolve in the element's own tree, which it has once connected;
+    // `connectedCallback` draws it again then.
     const root = this.getRootNode();
+    if (!root.getElementById) {
+      return null;
+    }
     return ids
       .split(/\s+/)
       .filter(Boolean)

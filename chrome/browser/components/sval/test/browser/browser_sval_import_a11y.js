@@ -138,9 +138,9 @@ add_task(async function each_rows_controls_say_whose_they_are() {
     Assert.equal(group.role, ROLE_GROUPING, `${name}'s details are a group`);
     Assert.equal(group.name, name, "named for its row");
   }
-  const field = await accessibleOf(
-    section.querySelector(".sval-im-window-name")
-  );
+  const nameField = section.querySelector(".sval-im-window-name");
+  await fieldDrawn(nameField);
+  const field = await accessibleOf(fieldInner(nameField));
   Assert.stringContains(
     field.name,
     "Arc Space 1",

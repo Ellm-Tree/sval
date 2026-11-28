@@ -1,0 +1,126 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * `sval-checkbox`'s look: a rounded box, filled with a check while checked
+ * and with a bar under `mixed`. Every value a surface may change is a
+ * `--sval-field-check-*` token, read with the dialog frame's value as the
+ * fallback, and the fallbacks read the colour roles (`sval-roles.css`).
+ *
+ *   --sval-field-check-size          (20px)
+ *   --sval-field-check-radius        (6px)
+ *   --sval-field-check-border-width  (1.5px)
+ *   --sval-field-check-border        (--sval-field-border, then
+ *                                    --sval-control-edge)
+ *   --sval-field-check-fill          (--sval-field-fill, then --sval-card)
+ *   --sval-field-check-on            the checked fill and edge (--sval-action)
+ *   --sval-field-check-mark          the check's colour (--sval-action-text)
+ *   --sval-field-check-icon          the check's image (--sval-icon-dialog-check,
+ *                                    which `sval-icons.css` sets)
+ *   --sval-field-check-margin-block-start  (0)
+ *   --sval-field-check-focus-outline the focus ring (--sval-field-focus-outline)
+ *   --sval-field-focus-outline, --sval-field-focus-outline-offset,
+ *   --sval-field-disabled-opacity: as `sval-field`'s.
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:host {
+  vertical-align: text-bottom;
+}
+
+:host(:state(labelled)) .row {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+#control {
+  --_on: var(--sval-field-check-on, var(--sval-action));
+
+  appearance: none;
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--sval-field-check-size, 20px);
+  height: var(--sval-field-check-size, 20px);
+  margin: var(--sval-field-check-margin-block-start, 0) 0 0;
+  padding: 0;
+  border: var(--sval-field-check-border-width, 1.5px) solid var(--sval-field-check-border, var(--sval-field-border, var(--sval-control-edge)));
+  border-radius: var(--sval-field-check-radius, 6px);
+  background: var(--sval-field-check-fill, var(--sval-field-fill, var(--sval-card)));
+  color: var(--sval-field-ink, var(--sval-ink));
+  accent-color: var(--sval-field-accent, var(--sval-action));
+  cursor: pointer;
+  outline: none;
+
+  &:hover:not(:disabled, :checked, :indeterminate) {
+    border-color: var(--sval-field-hover-border, var(--sval-control-hover-edge));
+  }
+
+  &:is(:checked, :indeterminate) {
+    border-color: var(--_on);
+    background: var(--_on);
+  }
+
+  &:checked::before {
+    content: "";
+    width: 70%;
+    height: 70%;
+    background: var(--sval-field-check-icon, var(--sval-icon-dialog-check)) center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: var(--sval-field-check-mark, var(--sval-action-text));
+  }
+
+  &:indeterminate::before {
+    content: "";
+    width: 50%;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--sval-field-check-mark, var(--sval-action-text));
+  }
+
+  &:focus-visible {
+    outline: var(--sval-field-check-focus-outline, var(--sval-field-focus-outline, 2px solid var(--sval-focus)));
+    outline-offset: var(--sval-field-focus-outline-offset, 2px);
+  }
+
+  &:disabled {
+    opacity: var(--sval-field-disabled-opacity, 0.5);
+    cursor: default;
+  }
+}
+
+@media (forced-colors) {
+  #control {
+    forced-color-adjust: none;
+    border-color: ButtonText;
+    background: ButtonFace;
+
+    &:is(:checked, :indeterminate) {
+      border-color: Highlight;
+      background: Highlight;
+    }
+
+    &:checked::before {
+      fill: HighlightText;
+    }
+
+    &:indeterminate::before {
+      background: HighlightText;
+    }
+
+    &:disabled {
+      border-color: GrayText;
+    }
+
+    &:disabled:is(:checked, :indeterminate) {
+      background: GrayText;
+    }
+
+    &:focus-visible {
+      outline-color: CanvasText;
+    }
+  }
+}

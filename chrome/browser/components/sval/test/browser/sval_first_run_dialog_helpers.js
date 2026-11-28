@@ -88,9 +88,7 @@ async function untickImports(doc) {
     () => !button(doc, "continue").disabled,
     "the import step has read the browsers"
   );
-  for (const box of section.querySelectorAll(
-    ".sval-im-source input[type=checkbox]"
-  )) {
+  for (const box of section.querySelectorAll(".sval-im-source sval-checkbox")) {
     if (box.checked) {
       box.click();
     }

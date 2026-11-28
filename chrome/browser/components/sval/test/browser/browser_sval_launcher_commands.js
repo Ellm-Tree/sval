@@ -267,7 +267,7 @@ add_task(async function rename_opens_the_edit_workspace_sheet() {
     "it is Edit workspace"
   );
   Assert.equal(
-    doc.querySelector("input")?.value,
+    doc.querySelector(".sval-nw-name")?.value,
     "Home",
     "with the workspace's name"
   );

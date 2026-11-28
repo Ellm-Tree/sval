@@ -35,6 +35,9 @@
      card and the page, as a control's boundary must be (WCAG 1.4.11). The
      faint borders are for cards, which are not controls. */
   --sval-control-edge: var(--sval-palette-ink-500);
+  /* The edge of an outlined control under the pointer: a field, a select, a
+     checkbox and a secondary button light alike. */
+  --sval-control-hover-edge: var(--sval-accent);
   --sval-switch-knob-off: #ffffff;
   --sval-shadow: 0 8px 24px rgb(var(--sval-palette-wash-light) / 0.1);
   --sval-hover-tint: rgba(31, 107, 255, 0.1);

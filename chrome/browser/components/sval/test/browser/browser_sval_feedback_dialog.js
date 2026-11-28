@@ -337,3 +337,126 @@ add_task(async function reduced_transparency_keeps_the_card_solid() {
   assertSolid(shown, "reduced transparency");
   formParts(shown.form).cancel.click();
 });
+
+/**
+ * The colour `value` resolves to at `el`.
+ *
+ * @param {Element} el
+ * @param {string} value A colour or `var(--…)`.
+ * @returns {object}
+ */
+function colourAt(el, value) {
+  const probe = el.ownerDocument.createElementNS(
+    "http://www.w3.org/1999/xhtml",
+    "span"
+  );
+  probe.style.color = value;
+  el.append(probe);
+  const seen = rgba(getComputedStyle(probe).color);
+  probe.remove();
+  return seen;
+}
+
+/**
+ * Checks the message, the email and a tick draw in the form's own colours,
+ * and that no rule of Firefox's sheets in the window reaches them.
+ *
+ * @param {Element} form
+ * @param {string} what
+ */
+async function checkFields(form, what) {
+  const { message, email } = formParts(form);
+  const tick = form.querySelector(".sval-feedback-tick");
+  for (const el of [message, email, tick]) {
+    await fieldDrawn(el);
+  }
+  // A ticked box fills with the action colour; its edge shows unticked.
+  tick.checked = false;
+  await fieldDrawn(tick);
+  const at = (el, prop, locks = []) => {
+    const inner = fieldInner(el);
+    locks.forEach(l => InspectorUtils.addPseudoClassLock(inner, l));
+    const seen = rgba(getComputedStyle(inner)[prop]);
+    locks.forEach(l => InspectorUtils.removePseudoClassLock(inner, l));
+    return seen;
+  };
+  for (const [el, name] of [
+    [message, "the message"],
+    [email, "the email"],
+  ]) {
+    Assert.equal(
+      el.localName,
+      "sval-field",
+      `${what}: ${name} is a sval-field`
+    );
+    Assert.deepEqual(
+      at(el, "backgroundColor"),
+      colourAt(form, "var(--sval-pill-bg)"),
+      `${what}: ${name} fills with the form's field colour`
+    );
+    Assert.deepEqual(
+      at(el, "borderTopColor"),
+      colourAt(form, "var(--sval-pill-border)"),
+      `${what}: ${name}'s edge is the form's`
+    );
+    Assert.deepEqual(
+      at(el, "borderTopColor", [":hover"]),
+      colourAt(form, "var(--sval-focus)"),
+      `${what}: and lights in the form's focus colour under the pointer`
+    );
+  }
+  Assert.equal(
+    tick.localName,
+    "sval-checkbox",
+    `${what}: a tick is a sval-checkbox`
+  );
+  Assert.deepEqual(
+    at(tick, "borderTopColor", [":hover"]),
+    colourAt(form, "var(--sval-focus)"),
+    `${what}: whose edge lights alike`
+  );
+
+  const sheets = InspectorUtils.getAllStyleSheets(document, true).filter(s =>
+    /\/(in-content\/common|global)(-shared)?\.css$/.test(s.href ?? "")
+  );
+  Assert.ok(sheets.length, "the window has Firefox's sheets");
+  const looks = () =>
+    [message, email, tick].map(el => {
+      const cs = getComputedStyle(fieldInner(el));
+      return [
+        "color",
+        "background-color",
+        "border-top-color",
+        "border-top-width",
+        "font-size",
+        "font-family",
+        "appearance",
+        "outline-style",
+      ].map(p => cs.getPropertyValue(p));
+    });
+  const withSheets = looks();
+  sheets.forEach(s => (s.disabled = true));
+  const without = looks();
+  sheets.forEach(s => (s.disabled = false));
+  Assert.deepEqual(
+    without,
+    withSheets,
+    `${what}: no rule of Firefox's sheets reaches the fields`
+  );
+}
+
+add_task(async function the_fields_draw_in_the_forms_colours_when_solid() {
+  await tintWindow(0);
+  const { form } = await openForm();
+  Assert.ok(!form.hasAttribute("frosted"), "the popover is solid");
+  await checkFields(form, "tinted");
+  formParts(form).cancel.click();
+});
+
+add_task(async function the_fields_draw_in_the_frosted_colours() {
+  await tintWindow(TRANSPARENCY);
+  const { form } = await openForm();
+  Assert.ok(form.hasAttribute("frosted"), "the popover is frosted");
+  await checkFields(form, "frosted");
+  formParts(form).cancel.click();
+});

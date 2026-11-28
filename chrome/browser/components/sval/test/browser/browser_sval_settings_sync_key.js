@@ -775,8 +775,9 @@ add_task(async function a_restore_says_how_it_went() {
   Assert.equal(asked.doc.activeElement, asked.input, "with the field focused");
 
   submitInDialog(asked, "not a key");
+  await asked.input.updateComplete;
   Assert.equal(
-    asked.input.getAttribute("aria-invalid"),
+    fieldInner(asked.input).getAttribute("aria-invalid"),
     "true",
     "a typing mistake is refused on the field"
   );

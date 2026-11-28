@@ -558,18 +558,20 @@ add_task(async function a_workspace_takes_its_own_choice_in_its_edit_dialog() {
   const field = doc.querySelector(".sval-nw-archive");
   Assert.ok(!field.hidden, "a workspace's dialog offers Archive idle tabs");
   const select = doc.querySelector(".sval-nw-archive-choice");
+  await fieldDrawn(select);
+  const options = [...fieldInner(select).options];
   Assert.deepEqual(
-    [...select.options].map(option => option.value),
+    options.map(option => option.value),
     ["", "12h", "24h", "7d", "30d", "never"],
     "the global choice first, then each time and Never"
   );
-  const sevenDays = [...select.options].find(option => option.value === "7d");
+  const sevenDays = options.find(option => option.value === "7d");
   Assert.ok(
-    select.options[0].textContent.includes(sevenDays.textContent),
+    options[0].textContent.includes(sevenDays.textContent),
     "the default option names the global choice"
   );
   Assert.equal(select.value, "", "following the default");
-  select.value = "30d";
+  await pickOption(select, "30d");
   doc.querySelector(".sval-nw-create").click();
   await within(edited, 10_000, "the edit being saved");
   Assert.equal(
