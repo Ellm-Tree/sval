@@ -198,10 +198,12 @@ html[data-sized] {
   }
 }
 
-/* The one region of the picker that scrolls. */
+/* The one region of the picker that scrolls. Its shrink factor dwarfs the
+ * logins hand-off's, so the list gives up its height first and the
+ * hand-off stays whole until the list is down to its floor. */
 .sval-im-list {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 1000 auto;
+  min-height: 120px;
   margin-block-start: 14px;
   padding: 12px var(--sval-im-pad);
   overflow-y: auto;
