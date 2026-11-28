@@ -796,7 +796,7 @@ pref("browser.sval.webdriver.useWorkspaceCookies", false);
 pref("browser.sval.breachWarnings", true);
 pref(
   "browser.sval.remoteSettings.collections",
-  "cert-revocations,onecrl,intermediates,addons,addons-bloomfilters,gfx,tracking-protection-lists,query-stripping,url-classifier-skip-urls,url-classifier-exceptions,anti-tracking-url-decoration,bounce-tracking-protection-exceptions,fingerprinting-protection-overrides,partitioning-exempt-urls,third-party-cookie-blocking-exempt-urls,cookie-banner-rules-list,webcompat-interventions,hijack-blocklists,translations-models,translations-wasm,mfcdm-origins-list,fxmonitor-breaches@browser.sval.breachWarnings"
+  "cert-revocations,onecrl,intermediates,addons,addons-bloomfilters,gfx,tracking-protection-lists,query-stripping,url-classifier-skip-urls,url-classifier-exceptions,anti-tracking-url-decoration,bounce-tracking-protection-exceptions,fingerprinting-protection-overrides,partitioning-exempt-urls,third-party-cookie-blocking-exempt-urls,cookie-banner-rules-list,webcompat-interventions,hijack-blocklists,translations-models-v2,translations-wasm-v2,mfcdm-origins-list,fxmonitor-breaches@browser.sval.breachWarnings"
 );
 
 // Sval holds a push connection only while some site may notify (spec §10.9),
