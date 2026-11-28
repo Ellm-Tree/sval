@@ -102,21 +102,24 @@ struct BrowserBar: View {
             newTab: newTabButton(size: 24 * k, frame: shape.control),
             workspaceButton: workspaceButton(size: shape.control, scale: k),
             workspaceLabel: workspaceLabel(size: shape.control, named: false, scale: k),
-            otherMedia: frontMedia == nil ? otherMedia.map(otherMediaButton) : nil,
+            otherMedia: frontMedia == nil ? otherMedia.map { otherMediaButton($0, side: shape.tall ? 48 : BarShape.pill.height) } : nil,
             rider: (frontMedia ?? otherMedia).map { media in
                 NowPlayingCapsule(tabId: media, colors: colors) { actions.media(media) }
             },
-            speaker: frontMedia.map(speaker),
+            speaker: frontMedia.map { speaker($0, scale: shape.tall ? 1 : BarShape.pillScale) },
             progress: ProgressLine(line: $line, shown: $lineShown, colors: colors),
             openBar: { browser.fold.openBar() })
             .padding(.bottom, BarShape.foot)
     }
 
     /// Another tab's media beside the folded pill: its site's icon.
-    private func otherMediaButton(_ media: String) -> some View {
+    private func otherMediaButton(_ media: String, side: Double) -> some View {
         Button { actions.media(media) } label: {
-            Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: Tile.row) } }
-                .frame(width: 48, height: 48)
+            Group { if let row = facts.otherMediaRow { SiteTile(row: row, size: side < 48 ? Tile.pane : Tile.row) } }
+                .frame(width: side, height: side)
+                // Beside the pill it is shorter than a touch target, so
+                // its tap reaches past its edge to 44pt.
+                .contentShape(.circle.inset(by: min(0, side - 44) / 2))
         }
         .glassEffect(workspaceGlass(layer), in: .circle)
         .accessibilityLabel("Video and Audio")
@@ -235,8 +238,8 @@ struct BrowserBar: View {
 
     /// The page in front's media in the address capsule, folded or
     /// sideways (6f): the speaker on an accent wash.
-    private func speaker(_ media: String) -> PillSpeaker {
-        PillSpeaker(colors: colors, frame: CGSize(width: 30, height: 36), disc: 28, glyph: 13,
+    private func speaker(_ media: String, scale s: Double = 1) -> PillSpeaker {
+        PillSpeaker(colors: colors, frame: CGSize(width: 30 * s, height: 36 * s), disc: 28 * s, glyph: 13 * s,
                     open: mediaCard == media) { actions.media(media) }
     }
 

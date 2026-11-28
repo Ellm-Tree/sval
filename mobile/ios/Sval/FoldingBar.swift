@@ -78,7 +78,7 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
                         capsule(at[0], id: 0) { nav }
                     }
                     capsule(address, id: 1) {
-                        addressCapsule(address, folded: folded, scale: k)
+                        addressCapsule(address, folded: folded, shape: shape)
                     }
                     if !folded {
                         capsule(at[2], id: 2) { newTab }
@@ -90,7 +90,7 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
                 }
             }
             if scrubbing == .tabs && !folded {
-                lifted(address) { addressCapsule(address, folded: false, scale: k) }
+                lifted(address) { addressCapsule(address, folded: false, shape: shape) }
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.87).combined(with: .opacity))
             }
             if scrubbing == .workspaces && !folded {
@@ -145,34 +145,40 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
     }
 
     /// The address capsule's content. The shield and the address hold their
-    /// place, 36pt tall on the capsule's midline, as it shrinks to the pill;
-    /// Reload shows at its end open, and the Workspace's dot folded. Folded,
-    /// a tap anywhere on it brings the full bar back.
-    private func addressCapsule(_ address: CGRect, folded: Bool, scale k: Double) -> some View {
-        let height = address.height - 12
+    /// place and their size on the capsule's midline as it shrinks to the
+    /// pill; Reload shows at its end open, and the Workspace's dot folded. Folded, a tap anywhere on it brings the
+    /// full bar back.
+    private func addressCapsule(_ address: CGRect, folded: Bool, shape: BarShape) -> some View {
+        let k = shape.scale
+        let tall = shape.tall
+        // The folded pill's marks, smaller with it.
+        let s = folded && !tall ? BarShape.pillScale : 1
         let inset: Double = folded ? 0 : 4
         // With no page there is nothing to reload, and the address takes
         // Reload's room.
         let reloads = facts.reloads
-        let room = address.width - inset - (folded ? (speaker != nil ? 60 : 30) : (reloads ? 40 * k : 8))
+        let room = address.width - inset - (folded ? (speaker != nil ? 60 : 30) * s : (reloads ? 40 * k : 8))
         return ZStack(alignment: .leading) {
             row
-                .frame(width: max(0, room), height: height, alignment: .leading)
+                // Built at the open address's height less its 6pt margins.
+                .frame(width: max(0, room), height: shape.address - 12, alignment: .leading)
                 .padding(.leading, inset)
                 // Folded, the pill is one button.
                 .allowsHitTesting(!folded)
                 .accessibilityHidden(folded)
             if folded {
-                workspaceDot
+                workspaceDot(scale: s)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, 6)
-                Button(action: openBar) { Color.clear.contentShape(.capsule) }
+                    .padding(.trailing, 6 * s)
+                // The pill is shorter than a touch target, so its tap
+                // reaches past its edges to 44pt tall.
+                Button(action: openBar) { Color.clear.contentShape(Capsule().inset(by: min(0, address.height - 44) / 2)) }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Show the toolbar")
                 if let speaker {
                     speaker
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 32)
+                        .padding(.trailing, 32 * s)
                 }
             } else {
                 ReloadButton(reloads: reloads, scale: k).frame(width: 36 * k, height: 44)
@@ -186,12 +192,12 @@ struct FoldingBar<Nav: View, Row: View, NewTab: View, WorkspaceButton: View, Wor
     }
 
     /// The folded pill's dot: the Workspace colour, solid, with its emoji.
-    private var workspaceDot: some View {
+    private func workspaceDot(scale s: Double) -> some View {
         Circle()
             .fill(layer)
-            .frame(width: 24, height: 24)
+            .frame(width: 24 * s, height: 24 * s)
             .overlay {
-                WorkspaceMark(workspace: facts.workspace, isPrivate: facts.isPrivateSession, size: 13)
+                WorkspaceMark(workspace: facts.workspace, isPrivate: facts.isPrivateSession, size: 13 * s)
                     .foregroundStyle(BarColors.ink(on: layer, dark: scheme == .dark))
             }
             .accessibilityHidden(true)

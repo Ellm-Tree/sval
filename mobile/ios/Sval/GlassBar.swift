@@ -9,9 +9,9 @@ import SwiftUI
 /// geometry is round 6's Glass Merging demo, which Design made the
 /// reference: at rest, Back and Forward (80pt), the address, then New Tab
 /// and the Workspace button as 48pt circles, 8pt from the sides and 6pt
-/// apart; folded, all four inside one 200 x 48 pill at the centre, as tall as
-/// the open bar, Back and
-/// the address at its start, New Tab and the Workspace button at its end.
+/// apart; folded, all four inside one smaller pill (`BarShape.pill`) at
+/// the centre, its foot on the open bar's, Back and the address at its
+/// start, New Tab and the Workspace button at its end.
 ///
 /// At the accessibility text sizes the open bar is two rows
 /// ([`BarShape`]): the address across the top, as tall as its text, and
@@ -43,12 +43,13 @@ struct GlassFold<Content: View>: View {
     }
 
     static func folded(width: Double, shape: BarShape = .standard) -> [CGRect] {
-        let pill = shape.tall ? min(width - 16, 300) : 200
-        let tall = shape.tall ? shape.address : 48
+        let pill = shape.tall ? min(width - 16, 300) : BarShape.pill.width
+        let tall = shape.tall ? shape.address : BarShape.pill.height
         let x = (width - pill) / 2
         let y = shape.height - tall
-        return [CGRect(x: x, y: y, width: 48, height: tall), CGRect(x: x, y: y, width: pill, height: tall),
-                CGRect(x: x + pill - 48, y: y, width: 48, height: tall), CGRect(x: x + pill - 48, y: y, width: 48, height: tall)]
+        return [CGRect(x: x, y: y, width: tall, height: tall), CGRect(x: x, y: y, width: pill, height: tall),
+                CGRect(x: x + pill - tall, y: y, width: tall, height: tall),
+                CGRect(x: x + pill - tall, y: y, width: tall, height: tall)]
     }
 
     var body: some View {
@@ -78,6 +79,13 @@ struct BarShape: Equatable {
     /// A line of the address's subheadline text, before Dynamic Type
     /// scales it.
     static let line: CGFloat = 20
+    /// The folded pill at the standard text sizes. At the accessibility
+    /// sizes it keeps the address's height, so its text stays as large.
+    static let pill = CGSize(width: 200 * pillScale, height: 48 * pillScale)
+    /// The folded pill and its marks, as large as a 200 x 48 pill's. The
+    /// shield and the address keep their size in it, so the address fills
+    /// more of it than of the open bar.
+    static let pillScale = 0.78
     /// The gap between capsules side by side.
     static let gap: CGFloat = 6
     /// A mark to the label beside it inside one capsule.
