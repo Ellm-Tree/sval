@@ -480,3 +480,4 @@ sidebar-switcher-icon.patch
 prompt-sval-dialog.patch
 remove-site-data-list.patch
 remove-site-data-list.delete
+widevine-host-verification.patch

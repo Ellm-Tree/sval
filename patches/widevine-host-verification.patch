@@ -1,0 +1,43 @@
+Sval: Widevine checks the browser's files in every build
+
+Gecko calls the Widevine CDM's VerifyCdmHost_0 only under
+MOZILLA_OFFICIAL, which Sval's builds don't set. Without that
+call the CDM never checks the host's VMP signatures, and the license
+server reports PLATFORM_UNVERIFIED on macOS and Windows, which streaming
+services refuse. The call and its helper are built unconditionally, so
+Sval's builds behave as Mozilla's official ones do here.
+
+diff --git a/dom/media/gmp/ChromiumCDMAdapter.cpp b/dom/media/gmp/ChromiumCDMAdapter.cpp
+index 4d5def2d04..173303283f 100644
+--- a/dom/media/gmp/ChromiumCDMAdapter.cpp
++++ b/dom/media/gmp/ChromiumCDMAdapter.cpp
+@@ -68,13 +68,11 @@ void* ChromiumCdmHostCompat(int aHostInterfaceVersion, void* aUserData) {
+   return aUserData;
+ }
+ 
+-#ifdef MOZILLA_OFFICIAL
+ static cdm::HostFile TakeToCDMHostFile(HostFileData& aHostFileData) {
+   return cdm::HostFile(aHostFileData.mBinary.Path().get(),
+                        aHostFileData.mBinary.TakePlatformFile(),
+                        aHostFileData.mSig.TakePlatformFile());
+ }
+-#endif
+ 
+ GMPErr ChromiumCDMAdapter::GMPInit(const GMPPlatformAPI* aPlatformAPI) {
+   GMP_LOG_DEBUG("ChromiumCDMAdapter::GMPInit");
+@@ -84,7 +82,6 @@ GMPErr ChromiumCDMAdapter::GMPInit(const GMPPlatformAPI* aPlatformAPI) {
+     return GMPGenericErr;
+   }
+ 
+-#ifdef MOZILLA_OFFICIAL
+   // Note: we must call the VerifyCdmHost_0 function if it's present before
+   // we call the initialize function.
+   auto verify = reinterpret_cast<decltype(::VerifyCdmHost_0)*>(
+@@ -98,7 +95,6 @@ GMPErr ChromiumCDMAdapter::GMPInit(const GMPPlatformAPI* aPlatformAPI) {
+     GMP_LOG_DEBUG("{} VerifyCdmHost_0 returned {}", __func__, result);
+     MOZ_DIAGNOSTIC_ASSERT(result, "Verification failed!");
+   }
+-#endif
+ 
+   auto init = reinterpret_cast<decltype(::INITIALIZE_CDM_MODULE)*>(
+       PR_FindFunctionSymbol(mLib, MOZ_STRINGIFY(INITIALIZE_CDM_MODULE)));
