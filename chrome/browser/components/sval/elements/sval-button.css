@@ -251,3 +251,9 @@ button:focus-visible {
 button[aria-busy="true"] {
   cursor: default;
 }
+
+/* `accesskey`'s letter in the label. */
+.accesskey {
+  text-decoration: underline;
+  text-decoration-skip-ink: none;
+}

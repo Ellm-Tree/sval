@@ -164,8 +164,8 @@ async function idOn(path, fingerprint) {
 
 /**
  * What a restart reads: the device id, from disk. A restart that asked
- * whether the profile moved fails the task: xpcshell has no window for
- * `Services.prompt` to open, and the failed open is an uncaught rejection.
+ * whether Sval moved here would answer a new device, since xpcshell has no
+ * browser window to ask in, and the id would change.
  * `browser_sval_identity_moved.js` answers that question.
  */
 async function restart() {

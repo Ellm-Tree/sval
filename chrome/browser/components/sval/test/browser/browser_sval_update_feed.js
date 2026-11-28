@@ -41,10 +41,10 @@ add_task(async function release_candidates_read_the_beta_feed() {
   );
 });
 
-add_task(async function a_development_build_stays_off_every_published_feed() {
+add_task(async function a_development_build_reads_the_empty_default_feed() {
   const url = await feedOn("default", true);
   Assert.ok(
     url.startsWith("https://download.sval.app/update/1/default/"),
-    `the unpublished default feed: ${url}`
+    `the default feed: ${url}`
   );
 });

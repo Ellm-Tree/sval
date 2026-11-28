@@ -10,6 +10,20 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 /**
+ * @param {HTMLLinkElement|null} link
+ * @returns {Promise<void>} settled once `link`'s sheet has loaded or failed.
+ */
+function sheetLoaded(link) {
+  if (!link || link.sheet) {
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    link.addEventListener("load", resolve, { once: true });
+    link.addEventListener("error", resolve, { once: true });
+  });
+}
+
+/**
  * Sval's dialog card. The element is the card: its shadow root draws the
  * surface, the head row (an icon tile, the title, body and warning, and a
  * ✕), and the row of answers. `sval-dialog.css` beside this module draws it
@@ -42,9 +56,13 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * - `frosted`: set by `SvalDialogBox` while the box frosts the card, or by
  *   the Send Feedback form while its shape does (`SvalFeedbackForm`); the
  *   card is then clear.
+ * - `fitted`: set once `SubDialog` has measured the page and sized the
+ *   modal box to it, so a page can then hold the card to the box's height,
+ *   which the frame has not got before.
  *
- * Parts: `head`, `icon` and `actions`, for a page that lays its content out
- * edge to edge and for a print sheet.
+ * Parts: `head`, `copy` (the title, body and warning), `icon` and
+ * `actions`, for a page that lays its content out edge to edge, holds the
+ * card to its box, or prints it.
  *
  * The width is `--sval-dialog-width`. In a browser window's modal box
  * (`gDialogBox`) the element fits the box to itself (`fitFrame`) before
@@ -116,19 +134,14 @@ export class SvalDialog extends MozLitElement {
     // own script has filled it.
     doc.mozSubdialogReady = this.#fit();
     // `SubDialog.focus` calls this when the dialog opens, in place of its own
-    // move to the first focusable element.
-    doc.subDialogSetDefaultFocus = () => this.focusDefault();
+    // move to the first focusable element. A page that names its own focus
+    // keeps it.
+    doc.subDialogSetDefaultFocus ??= () => this.focusDefault();
   }
 
   async #fit() {
     await this.updateComplete;
-    const link = this.sheet;
-    if (link && !link.sheet) {
-      await new Promise(resolve => {
-        link.addEventListener("load", resolve, { once: true });
-        link.addEventListener("error", resolve, { once: true });
-      });
-    }
+    await sheetLoaded(this.sheet);
     const win = this.documentGlobal;
     if (this.ownerDocument.readyState !== "complete") {
       await new Promise(resolve =>
@@ -136,12 +149,33 @@ export class SvalDialog extends MozLitElement {
       );
     }
     await this.pending;
+    // Each element in the card draws with a sheet of its own in its shadow
+    // root, which the page's load does not wait for. Measured before those
+    // apply, the card is smaller than it draws, and a box sized to the page
+    // once (`SubDialog`'s `limitheight` for a page's prompt) stays too small
+    // for it.
+    const parts = [...this.querySelectorAll("*")].filter(
+      el => el.shadowRoot && el.updateComplete
+    );
+    await Promise.all(parts.map(el => el.updateComplete));
+    await Promise.all(
+      parts.map(el => sheetLoaded(el.shadowRoot.querySelector("link")))
+    );
     // `SubDialog.resizeHorizontally` sizes the frame from the root's inline
     // min-width when it has one, and otherwise from the page as laid out in
     // the frame's default width, which is narrower than some cards.
     this.ownerDocument.documentElement.style.minWidth = `${Math.ceil(
       this.getBoundingClientRect().width
     )}px`;
+    // `SubDialog.resizeDialog` measures the page and then announces the
+    // dialog open on its overlay.
+    win.frameElement
+      .closest(".dialogOverlay")
+      ?.addEventListener(
+        "dialogopen",
+        () => this.toggleAttribute("fitted", true),
+        { once: true }
+      );
     lazy.fitFrame(this.ownerDocument);
   }
 
@@ -283,7 +317,7 @@ export class SvalDialog extends MozLitElement {
           aria-hidden="true"
           ?hidden=${!this.icon}
         ></span>
-        <div class="copy">
+        <div class="copy" part="copy">
           <slot name="title" @slotchange=${this.#onSlotChange}></slot>
           ${critical ? nothing : words}
         </div>

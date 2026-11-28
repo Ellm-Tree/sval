@@ -4,6 +4,8 @@ description: Give an address like nas.example.com its own protections, video and
 ---
 
 import Screenshot from "../../../../../components/Screenshot.astro";
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
 
 A choice you make for a site can cover one address, like `nas.example.com`,
 or all of `example.com`. For any choice you haven't made for the address
@@ -42,9 +44,23 @@ in place of More. **Add an address…** is then the last item in Choices for.
 - In Settings › Sites, an address with its own choices is listed under its
   site. Selecting **Reset** on that address removes only the address's own
   choices.
+
+<Until v="0.1.0-rc.11">
+
 - On a site's page, use **Choices for** to pick which address you're
   changing. The cards under For all of example.com, such as Permissions and
   Cookies and site data, always cover the whole site.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- On a site's page, **Choices for** picks the address you're changing, and
+  the Permissions and Site data cards under For all of example.com always
+  cover the whole site.
+
+</Since>
+
 - While the menu is set to the whole site, a line names the choices the
   address you're on keeps for itself. For example, the line can say
   "app.example.com keeps its own JavaScript choice." The site's choice doesn't reach that address.

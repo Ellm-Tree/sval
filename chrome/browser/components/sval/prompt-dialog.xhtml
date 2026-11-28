@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+
+<!DOCTYPE html>
+
+<!--
+  Every `Services.prompt` question a modal box shows, in a tab or over a
+  window: a page's `alert`, `confirm` and `prompt`, a site's sign-in, the
+  question before a page is left, and the browser's own questions.
+  `prompt-dialog.js` fills it as toolkit's common dialog is filled, through
+  `CommonDialog`, whose element ids it keeps. The `<dialog>` holds the card
+  as the common dialog's does, and answers for it (`getButton`,
+  `acceptDialog`, `cancelDialog`).
+-->
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome:; object-src 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title></title>
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/sval-dialog.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/sval/prompt-dialog.css"
+    />
+    <link rel="localization" href="branding/brand.ftl" />
+    <link rel="localization" href="toolkit/global/commonDialog.ftl" />
+    <script
+      type="module"
+      src="chrome://browser/content/sval/elements/sval-elements.mjs"
+    ></script>
+    <script src="chrome://browser/content/sval/prompt-dialog.js"></script>
+  </head>
+  <body>
+    <dialog
+      id="commonDialog"
+      open="open"
+      aria-labelledby="titleText infoTitle"
+      aria-describedby="infoBody"
+    >
+      <sval-dialog>
+        <p
+          slot="title"
+          class="sval-prompt-origin"
+          id="titleText"
+          hidden="hidden"
+        ></p>
+        <h1 slot="title" class="sval-dialog-title" id="infoTitle"></h1>
+        <p
+          slot="body"
+          class="sval-dialog-body"
+          id="infoBody"
+          hidden="hidden"
+        ></p>
+        <div class="sval-dialog-field" id="loginContainer" hidden="hidden">
+          <label
+            class="sval-dialog-label"
+            id="loginLabel"
+            for="loginTextbox"
+          ></label>
+          <input
+            class="sval-dialog-input"
+            id="loginTextbox"
+            type="text"
+            dir="ltr"
+            autocomplete="off"
+          />
+        </div>
+        <div class="sval-dialog-field" id="password1Container" hidden="hidden">
+          <label
+            class="sval-dialog-label"
+            id="password1Label"
+            for="password1Textbox"
+          ></label>
+          <input
+            class="sval-dialog-input"
+            id="password1Textbox"
+            type="password"
+            dir="ltr"
+          />
+        </div>
+        <label class="sval-dialog-check" id="checkboxContainer" hidden="hidden">
+          <input type="checkbox" id="checkbox" />
+          <span class="sval-dialog-check-label" id="checkboxLabel"></span>
+        </label>
+        <span id="infoIcon" hidden="hidden"></span>
+        <sval-button
+          slot="extra"
+          id="button3"
+          data-button="extra2"
+          hidden="hidden"
+        ></sval-button>
+        <sval-button
+          slot="extra"
+          id="button2"
+          data-button="extra1"
+          hidden="hidden"
+        ></sval-button>
+        <sval-button
+          slot="actions"
+          id="button1"
+          data-button="cancel"
+        ></sval-button>
+        <sval-button
+          slot="actions"
+          id="button0"
+          data-button="accept"
+          type="primary"
+        ></sval-button>
+      </sval-dialog>
+    </dialog>
+  </body>
+</html>

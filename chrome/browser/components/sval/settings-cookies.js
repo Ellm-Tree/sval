@@ -6,8 +6,10 @@
  * Firefox's `setting-group` like the rest of its settings: which cookies sites
  * may set, then Firefox's own controls for the data they keep, from
  * `config/privacy.mjs`'s `cookiesAndSiteData2` group (`siteDataSize`,
- * `clearSiteDataButton`, `siteDataSettings`, `cookieExceptions`,
- * `deleteOnClose`), so they keep Firefox's behaviour. The cookie choice is
+ * `clearSiteDataButton`, `deleteOnClose`), so they keep Firefox's
+ * behaviour. Firefox's site data list and cookie exceptions are left out:
+ * Sites lists the sites storing data (Storing data), and each site's page
+ * sets that site's cookies. The cookie choice is
  * `SvalTrackingSettings`' `sval-cookies`, written as Sval writes every
  * tracking pref (`settings-tracking.js`).
  *
@@ -116,16 +118,6 @@
                   l10nId: "sitedata-clear2",
                   control: "moz-box-button",
                   iconSrc: "chrome://browser/skin/flame.svg",
-                },
-                {
-                  id: "siteDataSettings",
-                  l10nId: "sitedata-settings3",
-                  control: "moz-box-button",
-                },
-                {
-                  id: "cookieExceptions",
-                  l10nId: "sitedata-cookies-exceptions3",
-                  control: "moz-box-button",
                 },
               ],
             },

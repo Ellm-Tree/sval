@@ -1,0 +1,126 @@
+Sval: remove Firefox's site data list
+
+Settings › Sites lists every site storing data, with its size and Clear
+everywhere (Storing data), so Firefox's Manage data… dialog and the
+setting that opens it are gone. The confirm Firefox's site data manager
+asks before a removal (siteDataRemoveSelected.xhtml) stays, since
+SiteDataManager still opens it.
+
+diff --git a/browser/components/preferences/config/privacy.mjs b/browser/components/preferences/config/privacy.mjs
+index 2fcfdca0a3..4b3a1e9fc6 100644
+--- a/browser/components/preferences/config/privacy.mjs
++++ b/browser/components/preferences/config/privacy.mjs
+@@ -741,21 +741,6 @@ SettingGroupManager.registerGroups({
+             control: "moz-box-item",
+             supportPage: "sitedata-learn-more",
+           },
+-          {
+-            id: "siteDataSettings",
+-            l10nId: "sitedata-settings2",
+-            control: "moz-box-button",
+-            controlAttrs: {
+-              "search-l10n-ids": `
+-                site-data-settings-window.title,
+-                site-data-column-host.label,
+-                site-data-column-cookies.label,
+-                site-data-column-storage.label,
+-                site-data-settings-description,
+-                site-data-remove-all.label,
+-              `,
+-            },
+-          },
+           {
+             id: "cookieExceptions",
+             l10nId: "sitedata-cookies-exceptions2",
+@@ -811,21 +796,6 @@ SettingGroupManager.registerGroups({
+               `,
+             },
+           },
+-          {
+-            id: "siteDataSettings",
+-            l10nId: "sitedata-settings3",
+-            control: "moz-box-button",
+-            controlAttrs: {
+-              "search-l10n-ids": `
+-                site-data-settings-window.title,
+-                site-data-column-host.label,
+-                site-data-column-cookies.label,
+-                site-data-column-storage.label,
+-                site-data-settings-description,
+-                site-data-remove-all.label,
+-              `,
+-            },
+-          },
+           {
+             id: "cookieExceptions",
+             l10nId: "sitedata-cookies-exceptions3",
+@@ -2262,53 +2232,11 @@ Preferences.addSetting(
+     },
+   })
+ );
+-Preferences.addSetting(
+-  /** @type {{ isUpdatingSites: boolean } & SettingConfig} */ ({
+-    id: "siteDataSettings",
+-    isUpdatingSites: false,
+-    setup(emitChange) {
+-      let onSitesUpdated = async () => {
+-        this.isUpdatingSites = false;
+-        emitChange();
+-      };
+-
+-      let onUpdatingSites = () => {
+-        this.isUpdatingSites = true;
+-        emitChange();
+-      };
+-
+-      Services.obs.addObserver(onSitesUpdated, "sitedatamanager:sites-updated");
+-      Services.obs.addObserver(
+-        onUpdatingSites,
+-        "sitedatamanager:updating-sites"
+-      );
+-
+-      return () => {
+-        Services.obs.removeObserver(
+-          onSitesUpdated,
+-          "sitedatamanager:sites-updated"
+-        );
+-        Services.obs.removeObserver(
+-          onUpdatingSites,
+-          "sitedatamanager:updating-sites"
+-        );
+-      };
+-    },
+-    onUserClick() {
+-      gSubDialog.open(
+-        "chrome://browser/content/preferences/dialogs/siteDataSettings.xhtml"
+-      );
+-    },
+-    disabled() {
+-      return this.isUpdatingSites;
+-    },
+-  })
+-);
+ 
+ // Trigger site data calculation the first time the privacy pane or the
+-// search-results pane is shown in this prefs document. siteDataSize,
+-// clearSiteDataButton, and siteDataSettings all consume the resulting
+-// "sitedatamanager:*" notifications.
++// search-results pane is shown in this prefs document. siteDataSize and
++// clearSiteDataButton consume the resulting "sitedatamanager:*"
++// notifications.
+ {
+   let onPaneShown = event => {
+     if (
+diff --git a/browser/components/preferences/dialogs/jar.mn b/browser/components/preferences/dialogs/jar.mn
+index dba4f78e01..728b253f1f 100644
+--- a/browser/components/preferences/dialogs/jar.mn
++++ b/browser/components/preferences/dialogs/jar.mn
+@@ -28,8 +28,6 @@ browser.jar:
+    content/browser/preferences/dialogs/permissions.js
+    content/browser/preferences/dialogs/selectBookmark.xhtml
+    content/browser/preferences/dialogs/selectBookmark.js
+-   content/browser/preferences/dialogs/siteDataSettings.xhtml
+-   content/browser/preferences/dialogs/siteDataSettings.js
+ *  content/browser/preferences/dialogs/siteDataRemoveSelected.xhtml
+    content/browser/preferences/dialogs/siteDataRemoveSelected.js
+    content/browser/preferences/dialogs/syncChooseWhatToSync.xhtml

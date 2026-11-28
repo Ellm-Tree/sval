@@ -25,6 +25,10 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
  * - `submit`: submits the form the element is in, as `type="submit"` does.
  * - `icon`: an image drawn before the label.
  * - `label`: the label, or the element's own text when it has none.
+ * - `accesskey`: the key that presses it with the platform's access key
+ *   modifier, set on the inner button. Where the platform underlines access
+ *   keys (`ui.key.menuAccessKey`, as `moz-label` reads it), its first
+ *   letter in `label` is underlined.
  *
  * `aria-expanded` and `aria-pressed` stay on the element, where code and
  * sheets read them, and the inner button carries them too. `aria-label`,
@@ -65,6 +69,7 @@ export class SvalButton extends MozLitElement {
     },
     ariaControls: { type: String, mapped: true, attribute: "aria-controls" },
     title: { type: String, mapped: true },
+    accessKey: { type: String, mapped: true },
   };
 
   static queries = {
@@ -244,6 +249,29 @@ export class SvalButton extends MozLitElement {
     button.ariaControlsElements = this.#elementsFor(this.ariaControls);
   }
 
+  /**
+   * The label, with its access key's first letter underlined where the
+   * platform underlines access keys.
+   */
+  #labelText() {
+    const { label, accessKey } = this;
+    const underlined =
+      accessKey &&
+      Services.prefs.getIntPref(
+        "ui.key.menuAccessKey",
+        Number(!navigator.platform.includes("Mac"))
+      );
+    const at = underlined
+      ? label.toLowerCase().indexOf(accessKey.toLowerCase())
+      : -1;
+    if (at < 0) {
+      return label;
+    }
+    return html`${label.slice(0, at)}<span class="accesskey"
+        >${label.slice(at, at + accessKey.length)}</span
+      >${label.slice(at + accessKey.length)}`;
+  }
+
   render() {
     let lead = null;
     if (this.busy) {
@@ -265,11 +293,12 @@ export class SvalButton extends MozLitElement {
         aria-busy=${ifDefined(this.busy ? "true" : undefined)}
         aria-label=${ifDefined(this.ariaLabel ?? undefined)}
         title=${ifDefined(this.title ?? undefined)}
+        accesskey=${ifDefined(this.accessKey || undefined)}
         @click=${this.#onClick}
       >
         ${lead}
         ${this.label
-          ? html`<span class="label">${this.label}</span>`
+          ? html`<span class="label">${this.#labelText()}</span>`
           : html`<slot @slotchange=${this.#onSlotChange}></slot>`}
       </button>
     `;

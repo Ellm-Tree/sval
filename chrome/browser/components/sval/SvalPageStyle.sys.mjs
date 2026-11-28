@@ -224,9 +224,10 @@ export function dialogSheetsFor(url) {
 
 /**
  * Dresses a dialog `SubDialog` has loaded in Sval's dialog frame, whichever
- * box it is in: Settings', a window's or a tab's. Every Firefox dialog,
- * the common dialog behind `Services.prompt` among them, comes through
- * here, so one that is not listed anywhere still looks like Sval's.
+ * box it is in: Settings', a window's or a tab's. Every Firefox dialog
+ * comes through here, so one that is not listed anywhere still looks like
+ * Sval's. A `Services.prompt` question in a box is Sval's own prompt page
+ * (`prompt-dialog.xhtml`, prompt-sval-dialog.patch).
  * Called from `SubDialog._onContentLoaded`, where Firefox injects its own
  * sheets, before the box is shown.
  *

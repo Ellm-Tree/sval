@@ -129,16 +129,17 @@
     _describeSites(next = null, take = false) {
       const sync = this._els.sitesSync;
       sync.textContent =
-        "These are your choices for each site, including the ones you made with the protection button in the address bar. They sync to all your devices.";
+        "Your sites lists every site Sval keeps a choice, setting, or data for. Your choices sync to all your devices.";
       if (this._privateWindow) {
         sync.textContent =
           "These are your choices for each site in this window, including the ones you made with the protection button in the address bar. They last until you close this window and never sync.";
       } else if (this.panel && this.panel.syncState.folderState === "none") {
         sync.textContent =
-          "These are your choices for each site, including the ones you made with the protection button in the address bar. Sync is off, so they stay on this device.";
+          "Your sites lists every site Sval keeps a choice, setting, or data for. Sync is off, so your choices stay on this device.";
       }
 
       const rules = this._siteRules();
+      this._storedDrawn = this._storedKey();
       this._keepFocus(
         this._els.sitesBody.closest(".sval-card"),
         () => this._drawSites(rules),
@@ -149,8 +150,9 @@
 
     /**
      * Every site and host the list shows: those holding a choice
-     * (`SvalSiteChoices`). A host's site is listed too, since its row holds
-     * the host's (decision 1980).
+     * (`SvalSiteChoices`), and every site something is stored for on this
+     * device. A host's site is listed too, since its row holds the host's
+     * (decision 1980).
      *
      * @returns {Map<string, object>} What each holds itself, by site or
      *   host, as `SiteChoiceReading.at` answers.
@@ -166,6 +168,13 @@
           if (!all.has(site)) {
             all.set(site, reading.at(site));
           }
+        }
+      }
+      // And every site something is stored for on this device, choice or
+      // none: its cookies, its data, its zoom (`_storedSites`).
+      for (const site of this._storedSites()) {
+        if (!all.has(site)) {
+          all.set(site, reading.at(site));
         }
       }
       return all;
@@ -208,8 +217,10 @@
       if (!rules.size) {
         body.append(
           this._emptyState(
-            "No site choices yet",
-            "Sites appear here when you make a choice for one, such as its protections, JavaScript, or a permission."
+            "No sites yet",
+            this._privateWindow
+              ? "A site is listed once you make a choice for the site in this window."
+              : "A site is listed once you make a choice for the site, or once Sval keeps the site's zoom level, spelling language, upload folder, cookies, or other data on this device."
           )
         );
       } else {
@@ -503,7 +514,9 @@
         ? this._hostLink(name, site, `site-link:${name}`)
         : this._siteLink(name, `site-link:${name}`);
       link.setAttribute("aria-describedby", summaryId);
-      const differs = differences.length || !hosts;
+      // What a site stores is its own; a host's row says only its choices.
+      const stored = site ? [] : this._siteStoredParts(name);
+      const differs = differences.length || stored.length || !hosts;
       const row = this._el(
         "li",
         {
@@ -522,12 +535,12 @@
               id: summaryId,
               dataset: {
                 differs: differences.map(([key]) => key).join(" "),
+                stored: stored.map(([key]) => key).join(" "),
                 ...(differs ? {} : { own: "none" }),
               },
             },
-            differs
-              ? differences.map(([, words]) => words).join(" · ")
-              : `Choices only for addresses on ${name}`
+            this._siteRowWords(differences, stored) ||
+              `Choices only for addresses on ${name}`
           )
         )
       );

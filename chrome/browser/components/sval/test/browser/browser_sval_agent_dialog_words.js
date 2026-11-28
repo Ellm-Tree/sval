@@ -254,7 +254,7 @@ add_task(async function a_dialog_from_a_page_since_replaced_keeps_its_words() {
   const { closedPromise } = win.gBrowser
     .getTabDialogBox(browser)
     .open(
-      "chrome://global/content/commonDialog.xhtml",
+      "chrome://browser/content/sval/prompt-dialog.xhtml",
       { features: "resizable=no", modalType: args.modalType },
       PromptUtils.objectToPropBag(args)
     );

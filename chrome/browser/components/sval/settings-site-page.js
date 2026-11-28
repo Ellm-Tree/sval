@@ -76,8 +76,6 @@
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
     permissionLabel:
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
-    sitesWithPermissions:
-      "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
     PERMISSION_ICONS:
       "moz-src:///browser/components/sval/SvalSitePermissionList.sys.mjs",
   });
@@ -93,6 +91,23 @@
   );
 
   const CATEGORY = "svalSites";
+
+  /**
+   * The content prefs Gecko keeps for a site, by the key the Sites list
+   * names each by: `FullZoom`'s zoom, the spellchecker's language
+   * (`EditorSpellCheck`) and the file picker's last upload folder
+   * (`HTMLInputElement`). `ClearDataService` clears them with the site.
+   */
+  const CONTENT_PREFS = {
+    zoom: "browser.content.full-zoom",
+    spellcheck: "spellcheck.lang",
+    upload: "browser.upload.lastDir",
+  };
+  ChromeUtils.defineLazyGetter(lazy, "contentPrefs", () =>
+    Cc["@mozilla.org/content-pref/service;1"].getService(
+      Ci.nsIContentPrefService2
+    )
+  );
 
   /** The subcategory `gotoPref` hands over for a site's page. */
   const SUBCATEGORY = "site?";
@@ -250,17 +265,6 @@
     /** The timer that says stored data is slow to read, while it runs. */
     _siteDataTimer: null,
 
-    /**
-     * How long the Sites card's search waits after a keystroke before it
-     * reads stored data again. Each read scans every origin's quota usage
-     * (`SiteDataManager.updateSites`), so a query being typed reads once as
-     * it begins and once when the typing pauses.
-     */
-    _siteSearchReadMs: 300,
-
-    /** The timer for the search's next read, while one waits. */
-    _siteSearchTimer: null,
-
     /** The reads of stored data the page asked for that have not ended. */
     _siteDataReading: 0,
 
@@ -287,10 +291,22 @@
     _siteForgetting: false,
 
     /**
-     * The Sites card's search results in the order shown, and the query they
-     * answer, so results found later go after them.
+     * Every site's content prefs (`CONTENT_PREFS`), by site and then by key,
+     * as last read, or null before the first read.
+     *
+     * @type {?Map<string, object>}
      */
-    _siteResultsShown: { q: "", sites: [] },
+    _sitePrefs: null,
+
+    /** What sites store as the Sites list last drew it (`_storedKey`). */
+    _storedDrawn: null,
+
+    /**
+     * Each site's stored parts as `_storedSites` last worked them out.
+     *
+     * @type {?Map<string, Array<[string, string]>>}
+     */
+    _storedParts: null,
 
     /**
      * Wires the page's own controls and follows what its cards read.
@@ -386,7 +402,7 @@
         this._stopSiteDataWait();
         this._redrawSiteCard("data");
         count();
-        this._redrawSiteResults();
+        this._redrawStoredSites();
       });
       const extensionSites = () => {
         this._redrawSiteCard("extensions");
@@ -398,19 +414,24 @@
         this._drawSiteScope();
         count();
       });
-      window.addEventListener("pagehide", () => {
-        this._stopSiteDataWait();
-        clearTimeout(this._siteSearchTimer);
-        this._siteSearchTimer = null;
-      });
+      window.addEventListener("pagehide", () => this._stopSiteDataWait());
+      // A content pref set or forgotten anywhere moves the Sites list's
+      // rows.
+      const changed = {
+        onContentPrefSet: () => this._readSitePrefs(),
+        onContentPrefRemoved: () => this._readSitePrefs(),
+      };
+      for (const name of Object.values(CONTENT_PREFS)) {
+        lazy.contentPrefs.addObserverForName(name, changed);
+        lifetime.add(() =>
+          lazy.contentPrefs.removeObserverForName(name, changed)
+        );
+      }
       // A permission change elsewhere would close a select the person has
       // open, so only the site's own, or the whole list cleared, redraws.
       lifetime.topic(PERM_CHANGED, (subject, topic, data) => {
         if (data === "cleared" || this._isSitePermission(subject)) {
           recount();
-        }
-        if (data === "cleared" || this._isSearchedPermission(subject)) {
-          this._redrawSiteResults();
         }
       });
     },
@@ -429,41 +450,12 @@
     },
 
     /**
-     * @param {?nsISupports} subject A `perm-changed` notification's.
-     * @returns {boolean} Whether its site matches the Sites card's search.
-     */
-    _isSearchedPermission(subject) {
-      const q = this._sitesView.q.trim().toLowerCase();
-      if (!q || !subject) {
-        return false;
-      }
-      const perm = subject.QueryInterface(Ci.nsIPermission);
-      return !!lazy.siteForURI(perm.principal.URI)?.includes(q);
-    },
-
-    /**
-     * The Sites list's search results for the sites it has no row for: those
-     * holding stored data whose name holds the query, after the list (site
-     * page spec §3). A site holding a permission has a row. Shown only with
-     * every kind of site in the filter, since the other kinds are choices
-     * these sites have none of.
+     * The Sites list's count of the rows that match, said only while the
+     * list is narrowed.
      *
      * @param {Map<string, object>} rules The list's sites.
      */
     _placeSiteResults(rules) {
-      const body = this._els.sitesBody;
-      body.querySelector(".sval-sites-results")?.remove();
-      const results = this._siteResults(rules);
-      const resultCount = this._siteResultsShown.sites.length;
-      const nomatch = body.querySelector(".sval-agent-nomatch");
-      if (nomatch) {
-        nomatch.hidden = !!resultCount;
-      }
-      if (results) {
-        body.querySelector(".sval-sites-list, .sval-empty").after(results);
-      }
-
-      // How many rows match, said only while the list is narrowed.
       const view = this._sitesView;
       let found = "";
       if (rules.size && (view.q.trim() || view.filt !== "all")) {
@@ -472,119 +464,108 @@
       this._say(this._els.sitesFound, found);
     },
 
-    /** Redraws the Sites card's search results, when a search is on. */
-    _redrawSiteResults() {
-      if (!this._els || !this._sitesView.q.trim()) {
-        return;
+    /**
+     * Every site something is stored for on this device, choice or none:
+     * cookies and data (`SvalSiteData`) and a zoom, each read once Sites
+     * shows and again as it changes. A private window's list is that
+     * window's choices alone.
+     *
+     * @returns {string[]}
+     */
+    _storedSites() {
+      if (this._privateWindow) {
+        return [];
       }
-      this._keepFocus(
-        this._els.sitesBody.closest(".sval-card"),
-        () => this._placeSiteResults(this._siteRules()),
-        "sites-search"
+      if (this._els.sitesBody?.checkVisibility()) {
+        if (!lazy.SvalSiteData.ready && !this._siteDataReading) {
+          this._readSiteData();
+        }
+        if (!this._sitePrefs) {
+          this._sitePrefs = new Map();
+          this._readSitePrefs();
+        }
+      }
+      const sites = new Set(this._sitePrefs?.keys());
+      if (lazy.SvalSiteData.ready) {
+        for (const site of lazy.SvalSiteData.sitesWithData()) {
+          sites.add(site);
+        }
+      }
+      // Each site's parts are worked out once a read, for its row and for
+      // `_storedKey`: a site's jars take a walk of the panel's Workspaces.
+      const parts = new Map();
+      for (const site of sites) {
+        const found = this._readStoredParts(site);
+        if (found.length) {
+          parts.set(site, found);
+        }
+      }
+      this._storedParts = parts;
+      return [...parts.keys()];
+    },
+
+    /** Reads every site's content prefs, then redraws the Sites list. */
+    async _readSitePrefs() {
+      const prefs = new Map();
+      const read = (key, name) =>
+        new Promise(resolve =>
+          lazy.contentPrefs.getByName(name, null, {
+            handleResult: pref => {
+              const site =
+                pref.domain &&
+                lazy.siteForURI(lazy.siteOrigins(pref.domain, ["https"])[0]);
+              if (site && pref.value) {
+                prefs.set(site, { ...prefs.get(site), [key]: pref.value });
+              }
+            },
+            handleCompletion: resolve,
+            handleError: err => {
+              lazy.SvalLog.warn(
+                `reading site content prefs failed: ${lazy.SvalLog.errorName(err)}`
+              );
+              resolve();
+            },
+          })
+        );
+      await Promise.all(
+        Object.entries(CONTENT_PREFS).map(([key, name]) => read(key, name))
       );
+      this._sitePrefs = prefs;
+      this._redrawStoredSites();
     },
 
     /**
-     * @param {Map<string, object>} rules
-     * @returns {?Element} The results, or null when there are none to show.
+     * Redraws the Sites list as what sites store changes. A read that finds
+     * what the list shows already leaves the rows in place, so a row a
+     * person is on is not drawn again under them.
      */
-    _siteResults(rules) {
-      const view = this._sitesView;
-      const q = view.q.trim().toLowerCase();
-      if (!q || view.filt !== "all") {
-        this._siteResultsShown = { q: "", sites: [] };
-        return null;
+    _redrawStoredSites() {
+      if (!this._els?.sitesBody?.checkVisibility()) {
+        return;
       }
-      const data = lazy.SvalSiteData;
-      if (this._siteResultsShown.q !== q) {
-        this._readSiteDataForSearch();
+      this._storedSites();
+      if (this._storedKey() !== this._storedDrawn) {
+        this._describeSites();
       }
-      const candidates = new Set(lazy.sitesWithPermissions());
-      if (data.ready) {
-        for (const site of data.sitesWithData()) {
-          candidates.add(site);
-        }
-      }
-      const summaries = new Map();
-      for (const site of candidates) {
-        if (site.includes(q) && !rules.has(site)) {
-          const summary = this._siteSummary(site);
-          if (summary) {
-            summaries.set(site, summary);
-          }
-        }
-      }
-      const before =
-        this._siteResultsShown.q === q ? this._siteResultsShown.sites : [];
-      const kept = before.filter(site => summaries.has(site));
-      const sites = [
-        ...kept,
-        ...[...summaries.keys()].filter(site => !kept.includes(site)).sort(),
-      ];
-      this._siteResultsShown = { q, sites };
-      const searching = !data.ready;
-      if (!sites.length && !searching) {
-        return null;
-      }
+    },
 
-      const list = this._el(
-        "ul",
-        { className: "sval-sites-results-list" },
-        ...sites.map(site =>
-          this._el(
-            "li",
-            { className: "sval-sites-result" },
-            this._siteLink(site, `site-result:${site}`),
-            this._el(
-              "span",
-              { className: "sval-sites-result-sub" },
-              summaries.get(site)
-            )
-          )
-        )
-      );
-      const results = this._el(
-        "div",
-        { className: "sval-sites-results" },
-        this._el(
-          "h3",
-          { className: "sval-sites-results-head" },
-          "Only stored data"
-        ),
-        list
-      );
-      if (searching) {
-        results.append(
-          this._el(
-            "p",
-            { className: "sval-sites-results-wait", role: "status" },
-            this._el("span", {
-              className: "sval-site-spinner",
-              ariaHidden: "true",
-            }),
-            "Still searching stored data…"
-          )
-        );
-      }
-      return results;
+    /**
+     * @returns {string} What every site stores, as the list's rows say it,
+     *   so two reads that find the same give the same key.
+     */
+    _storedKey() {
+      return [...(this._storedParts ?? [])]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([site, parts]) => `${site}:${parts.flat().join(",")}`)
+        .join(" ");
     },
 
     /**
      * @param {string} site
-     * @returns {?string} What the site holds, in a phrase: its first
-     *   permission away from its default, else its stored data once read.
+     * @returns {?{total: number}} What the site stores in every Workspace, in
+     *   bytes, once read; null for a site storing nothing.
      */
-    _siteSummary(site) {
-      const SP = lazy.SitePermissions;
-      for (const row of lazy.permissionsFor(site)) {
-        if (row.state === SP.getDefault(row.id)) {
-          continue;
-        }
-        const state = SP.getCurrentStateLabel(row.state, row.id);
-        if (state) {
-          return `${SP.getPermissionLabel(row.id)} ${state.toLowerCase()}`;
-        }
-      }
+    _siteStored(site) {
       if (!lazy.SvalSiteData.ready) {
         return null;
       }
@@ -592,8 +573,80 @@
       if (!jars.length) {
         return null;
       }
-      const total = jars.reduce((sum, jar) => sum + jar.usage, 0);
-      return total ? `${sizeOf(total)} stored` : "Cookies only";
+      return { total: jars.reduce((sum, jar) => sum + jar.usage, 0) };
+    },
+
+    /**
+     * What a site stores on this device, for its row in the Sites list, as
+     * `_storedSites` last worked it out.
+     *
+     * @param {string} site
+     * @returns {Array<[string, string]>} Each part's key and its words.
+     */
+    _siteStoredParts(site) {
+      return this._storedParts?.get(site) ?? [];
+    },
+
+    /**
+     * What a site stores on this device: its zoom, its spellcheck language,
+     * its last upload folder, and its data with its size, or its cookies
+     * alone.
+     *
+     * @param {string} site
+     * @returns {Array<[string, string]>} Each part's key and its words.
+     */
+    _readStoredParts(site) {
+      const parts = [];
+      const prefs = this._sitePrefs?.get(site) ?? {};
+      if (prefs.zoom) {
+        parts.push(["zoom", `zoomed to ${Math.round(prefs.zoom * 100)}%`]);
+      }
+      if (prefs.spellcheck) {
+        const [language] = Services.intl.getLocaleDisplayNames(undefined, [
+          prefs.spellcheck,
+        ]);
+        parts.push(["spellcheck", `spellchecked in ${language}`]);
+      }
+      if (prefs.upload) {
+        parts.push(["upload", "upload folder remembered"]);
+      }
+      const stored = this._siteStored(site);
+      if (stored) {
+        parts.push(
+          stored.total
+            ? ["data", `${sizeOf(stored.total)} stored`]
+            : ["cookies", "cookies stored"]
+        );
+      }
+      return parts;
+    },
+
+    /**
+     * A row's line: its first choice, with how many more, then its zoom and
+     * what it stores, as in "JavaScript blocked and 2 more choices, zoomed to
+     * 120%, with 312 MB stored".
+     *
+     * @param {Array<[string, string]>} differences From `_siteDifferences`.
+     * @param {Array<[string, string]>} stored From `_siteStoredParts`.
+     * @returns {string} "" for a row with nothing to say.
+     */
+    _siteRowWords(differences, stored) {
+      const parts = [];
+      if (differences.length) {
+        const [[, first]] = differences;
+        const more = differences.length - 1;
+        parts.push(
+          more
+            ? `${first} and ${more} more choice${more === 1 ? "" : "s"}`
+            : first
+        );
+      }
+      for (const [key, words] of stored) {
+        const keeps = key === "data" || key === "cookies";
+        parts.push(keeps && parts.length ? `with ${words}` : words);
+      }
+      const line = parts.join(", ");
+      return line && line[0].toUpperCase() + line.slice(1);
     },
 
     /**
@@ -2053,23 +2106,6 @@
     },
 
     /**
-     * Reads stored data for the Sites card's search: at once for a query
-     * just begun, and otherwise once the typing pauses.
-     */
-    _readSiteDataForSearch() {
-      clearTimeout(this._siteSearchTimer);
-      this._siteSearchTimer = null;
-      if (!this._siteResultsShown.q) {
-        this._readSiteData();
-        return;
-      }
-      this._siteSearchTimer = setTimeout(() => {
-        this._siteSearchTimer = null;
-        this._readSiteData();
-      }, this._siteSearchReadMs);
-    },
-
-    /**
      * Ends a read `_readSiteData` began. 8a counts again, since it waits for
      * the read; the read has redrawn the rest already, through
      * `SvalSiteData.TOPIC`.
@@ -2090,9 +2126,9 @@
     },
 
     /**
-     * Cookies and site data: a row per jar holding the site's data, as
-     * `SvalSiteData.jarsFor` lists them, each cleared on its own, and Clear
-     * everywhere. Read-only in a private window.
+     * Site data: the site's total, a row per jar holding the site's data,
+     * as `SvalSiteData.jarsFor` lists them, each cleared on its own, and
+     * Clear everywhere under them. Read-only in a private window.
      *
      * @param {string} site
      * @returns {Element}
@@ -2109,14 +2145,15 @@
         { className: "sval-site-data-head" },
         this._siteCardHead(
           "data",
-          "Cookies and site data",
+          "Site data",
           "",
           total ? sizeOf(total) : "",
           "sc-cookie"
         )
       );
+      let everywhere = null;
       if (live && (!ready || rows.length)) {
-        const everywhere = this._el(
+        everywhere = this._el(
           "sval-button",
           {
             className: "sval-agent-small sval-site-data-everywhere",
@@ -2132,7 +2169,6 @@
             this._askClearEverywhere(site);
           }
         });
-        head.append(everywhere);
       }
 
       const card = this._el(
@@ -2181,45 +2217,12 @@
           card.append(this._siteDataRow(site, row, rows, at))
         );
       }
-
-      if (live) {
-        const link = (words, open) => {
-          const button = this._el(
-            "button",
-            { type: "button", className: "sval-link" },
-            words
-          );
-          button.addEventListener("click", open);
-          return button;
-        };
-        // Opened as the Privacy pane opens them (`siteDataSettings` and
-        // `cookieExceptions` in `preferences/config/privacy.mjs`).
+      if (everywhere) {
         card.append(
-          this._el(
-            "p",
-            { className: "sval-site-data-foot" },
-            this._el("span", {}, "For all sites:"),
-            link("Manage data…", () =>
-              window.gSubDialog.open(
-                "chrome://browser/content/preferences/dialogs/siteDataSettings.xhtml"
-              )
-            ),
-            link("Manage exceptions…", () =>
-              window.gSubDialog.open(
-                "chrome://browser/content/preferences/dialogs/permissions.xhtml",
-                {},
-                {
-                  blockVisible: true,
-                  sessionVisible: true,
-                  allowVisible: true,
-                  prefilledHost: "",
-                  permissionType: "cookie",
-                }
-              )
-            )
-          )
+          this._el("div", { className: "sval-site-data-foot" }, everywhere)
         );
       }
+
       return card;
     },
 
@@ -2237,7 +2240,7 @@
      */
     _siteDataPlace(row) {
       if (row.kind === "shared") {
-        return "your shared Workspaces";
+        return "the shared cookie jar";
       }
       return row.kind === "isolated"
         ? row.name || UNTITLED
@@ -2265,13 +2268,8 @@
       let label;
       let sub = "";
       if (row.kind === "shared") {
-        name = "Shared Workspaces";
+        name = "Shared cookie jar";
         label = name;
-        const names = row.sharedNames.map(n => n || UNTITLED);
-        sub =
-          names.length > 3
-            ? `${names.slice(0, 3).join(", ")}, and ${names.length - 3} more`
-            : listed(names);
       } else if (row.kind === "isolated") {
         name = row.name || UNTITLED;
         label = this._el(
@@ -2402,21 +2400,24 @@
       const els = this._els;
       const rows = lazy.SvalSiteData.jarsFor(site, this._siteNodes());
       const total = rows.reduce((sum, row) => sum + row.usage, 0);
+      // Past three places the card above lists them, so the sentence names
+      // none.
       const places =
-        rows.length > 3
-          ? `${rows.length} Workspaces`
-          : listed(rows.map(row => this._siteDataPlace(row)));
+        rows.length && rows.length <= 3
+          ? ` from ${listed(rows.map(row => this._siteDataPlace(row)))}`
+          : "";
+      const deleted = total
+        ? `${sizeOf(total)} of cookies and site data`
+        : "the site's cookies and site data";
       this._blockingView.clearEverywhere = site;
       els.blockingDialog.setAttribute("role", "alertdialog");
       els.blockingDialog.dataset.confirm = "clear-everywhere";
       els.blockingDialogCard.icon = "cookie";
       els.blockingDialogCard.tone = "danger";
       els.blockingDialogTitle.textContent = `Clear ${site} everywhere?`;
-      els.blockingDialogBody.textContent =
-        `This signs you out of ${site} in every Workspace.` +
-        (rows.length
-          ? ` It deletes ${total ? `${sizeOf(total)} of ` : ""}cookies and site data from ${places}.`
-          : "");
+      els.blockingDialogBody.textContent = rows.length
+        ? `Clearing signs you out of ${site} in every Workspace and deletes ${deleted}${places}.`
+        : `Clearing signs you out of ${site} in every Workspace.`;
       els.blockingDialogConfirm.textContent = "Clear and sign out";
       els.blockingDialogConfirm.type = "danger";
       this._showBlockingDialog(this._siteEls.page);

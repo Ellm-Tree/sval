@@ -859,30 +859,32 @@ add_task(async function a_key_in_icloud_keychain_joins_a_new_mac() {
 });
 
 /**
- * A profile that last ran on another computer is asked with Firefox's plain
- * prompt, and its two buttons answer "moved" and "new device".
- * Dismissing it is "new device".
+ * Sval's data last used on another computer is asked about in Sval's dialog
+ * over the browser window: "Same device" answers moved, and "New device"
+ * and Escape answer a new device.
  */
-add_task(async function a_profile_from_another_computer_is_asked() {
-  const { PromptTestUtils } = ChromeUtils.importESModule(
-    "resource://testing-common/PromptTestUtils.sys.mjs"
-  );
-  for (const [click, moved] of [
-    [0, true],
-    [1, false],
+add_task(async function data_from_another_computer_is_asked_about() {
+  for (const [answer, moved] of [
+    ["ok", true],
+    ["cancel", false],
+    ["escape", false],
   ]) {
-    const shown = PromptTestUtils.waitForPrompt(null, {
-      modalType: Services.prompt.MODAL_TYPE_WINDOW,
-      promptType: "confirmEx",
-    }).then(dialog => {
-      const ui = dialog.ui;
-      Assert.ok(
-        ui.button0.label && ui.button1.label,
-        "the move and a new device each have a button"
-      );
-      return PromptTestUtils.handlePrompt(dialog, { buttonNumClick: click });
-    });
-    Assert.equal(SvalIdentity.askIfMoved(), moved, `button ${click} answers`);
-    await within(shown, 10_000, "the moved-here prompt");
+    const asked = SvalIdentity.askIfMoved();
+    const { doc, dialog } = await openedSvalDialog();
+    Assert.equal(
+      dialog.state,
+      "moved-here",
+      "the dialog asks whether Sval moved here"
+    );
+    if (answer === "escape") {
+      EventUtils.synthesizeKey("KEY_Escape", {}, doc.defaultView);
+    } else {
+      await pressDialogButton(doc, answer);
+    }
+    Assert.equal(
+      await within(asked, 10_000, "the answer"),
+      moved,
+      `${answer} answers ${moved ? "moved" : "a new device"}`
+    );
   }
 });

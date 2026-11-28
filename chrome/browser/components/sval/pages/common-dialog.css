@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
  * Copyright 2026 Ellm Tree, Inc. */
 
-/* Firefox's common dialog (`commonDialog.xhtml`), which every
-   `Services.prompt` question and a page's `alert`, `confirm` and sign-in
-   take, laid out as Sval's dialog frame (`sval-dialog.css`): its width,
+/* Firefox's common dialog (`commonDialog.xhtml`), which a
+   `Services.prompt` question opened straight into a box takes, laid out as
+   Sval's dialog frame (`sval-dialog.css`): its width,
    padding and gaps, its title and body type, and its checkbox. Toolkit's
    `commonDialog.css` gives each of the dialog's items a 4px inline margin
    in a modal box, so the padding here is the frame's less that margin.

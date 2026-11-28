@@ -1,0 +1,67 @@
+/* SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+ * Copyright 2026 Ellm Tree, Inc. */
+
+/*
+ * Sval's prompt page (`prompt-dialog.xhtml`): the parts a prompt adds to the
+ * dialog frame `sval-dialog.css` draws. Who asks heads the card in the
+ * muted ink. A page's message keeps its own line breaks and can be selected
+ * and copied, and a long one scrolls inside the card, as the common
+ * dialog's does (`commonDialog.css`).
+ */
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+/* The `<dialog>` stands for the common dialog's and draws nothing: the card
+   is `sval-dialog`. */
+#commonDialog {
+  display: contents;
+}
+
+sval-dialog {
+  --sval-dialog-width: 440px;
+}
+
+/* The card is the page, and never scrolls: once it has fitted its box
+   (`sval-dialog`'s `fitted`, after `SubDialog` measured the page at the
+   card's full height), it is held to the box's height, and a message too
+   tall for that scrolls alone. Before that the frame has no height of its
+   own to hold the card to. */
+html,
+body {
+  overflow: hidden;
+}
+
+sval-dialog[fitted] {
+  max-height: 100vh;
+
+  &::part(head),
+  &::part(copy) {
+    min-height: 0;
+  }
+
+  &::part(copy) {
+    align-self: stretch;
+  }
+}
+
+.sval-prompt-origin {
+  font: 500 13px/1.4 var(--sval-font);
+  color: var(--sval-dialog-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Who asks stands above a title, and is the heading when there is none. */
+.sval-prompt-origin:has(+ .sval-dialog-title[hidden]) {
+  font: 600 17px/1.3 var(--sval-font);
+  color: var(--sval-dialog-text);
+}
+
+#infoBody {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+  user-select: text;
+  cursor: text;
+}

@@ -9,8 +9,7 @@
 /**
  * The site page's Cookies and site data card (site page spec, Cookies and
  * site data): a row per jar holding the site's data, each cleared on its
- * own, Clear everywhere behind its confirm and the links to Firefox's
- * dialogs. `browser_sval_site_page_always_private.js` covers the read-only
+ * own, and Clear everywhere behind its confirm. `browser_sval_site_page_always_private.js` covers the read-only
  * card of a private-only session.
  */
 
@@ -224,42 +223,16 @@ async function nextSubDialog(page, what) {
   return doc;
 }
 
-add_task(async function the_links_open_firefox_dialogs() {
+add_task(async function the_card_has_no_links_to_firefox_dialogs() {
   await twoJars();
   const { page } = await openAt(PAGE_URL(SITE));
   const ui = await untilSitePage(page, SITE);
   const data = cardOf(ui);
   await until(() => data.rows().length === 2, "both jars listed");
-  const [manageData, manageExceptions] = data
-    .card()
-    .querySelectorAll(".sval-site-data-foot button");
-  ok(manageData && manageExceptions, "the data and exceptions links");
-
-  let opened = nextSubDialog(page, "Manage data opening");
-  manageData.click();
-  let doc = await opened;
-  is(
-    doc.documentURI,
-    "chrome://browser/content/preferences/dialogs/siteDataSettings.xhtml",
-    "Manage data opens Firefox's site data dialog"
-  );
-  const closed = BrowserTestUtils.waitForEvent(page.document, "dialogclose");
-  doc.defaultView.close();
-  await within(closed, 10_000, "the site data dialog closing");
-
-  opened = nextSubDialog(page, "Manage exceptions opening");
-  manageExceptions.click();
-  doc = await opened;
-  is(
-    doc.documentURI,
-    "chrome://browser/content/preferences/dialogs/permissions.xhtml",
-    "Manage exceptions opens Firefox's exceptions dialog"
-  );
-  await until(
-    () =>
-      doc.documentElement.getAttribute("data-l10n-id") ===
-      "permissions-exceptions-cookie-window2",
-    "for cookies, as its Privacy pane opens it"
+  Assert.equal(
+    data.card().querySelectorAll(".sval-link").length,
+    0,
+    "no Manage data or Manage exceptions: Sites lists the sites storing data, and this page sets the site's cookies"
   );
 });
 
@@ -331,19 +304,8 @@ async function storeShared() {
   }
 }
 
-add_task(async function the_shared_row_names_three_and_counts_the_rest() {
+add_task(async function the_shared_jar_has_a_row_of_its_own() {
   atTaskEnd(clearSiteEverywhere);
-  for (const name of ["Personal", "Reading", "", "Travel", "Work"]) {
-    const id = await SvalPanel.engine.mutate({
-      kind: "addWorkspace",
-      name,
-      id: crypto.randomUUID(),
-      now: Date.now(),
-    });
-    atTaskEnd(() => SvalPanel.engine.mutate({ kind: "remove", id }));
-  }
-  atTaskEnd(() => SvalPanel.refresh());
-  await SvalPanel.refresh();
   await storeShared();
   await within(SvalSiteData.update(), 30_000, "the site data reading");
 
@@ -351,32 +313,32 @@ add_task(async function the_shared_row_names_three_and_counts_the_rest() {
   const ui = await untilSitePage(page, SITE);
   const data = cardOf(ui);
   await until(() => data.rows().length === 1, "the shared row");
-  const [row] = SvalSiteData.jarsFor(SITE, SvalPanel.nodes);
-  Assert.greaterOrEqual(row.sharedNames.length, 5, "every shared Workspace");
-  const sub = data.rows()[0].querySelector(".sval-site-row-sub").textContent;
-  const named = row.sharedNames.filter(Boolean);
-  const shown = row.sharedNames.slice(0, 3).filter(Boolean);
-  Assert.deepEqual(
-    named.filter(name =>
-      new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(
-        sub
-      )
-    ),
-    shown,
-    "the first three Workspaces named, and not the rest"
+  const [row] = data.rows();
+  is(row.dataset.jar, "shared", "the shared jar alone has a row");
+  ok(
+    !row.querySelector(".sval-site-row-sub")?.textContent,
+    "with no Workspaces listed under it"
   );
-  Assert.deepEqual(
-    sub.match(/\d+/g),
-    [String(row.sharedNames.length - 3)],
-    "then the rest counted"
-  );
+  ok(row.querySelector(".sval-site-data-clear"), "and a Clear of its own");
   Assert.greater(
-    Number(data.rows()[0].querySelector(".sval-site-data-size").dataset.usage),
+    Number(row.querySelector(".sval-site-data-size").dataset.usage),
     0,
     "the jar's stored data has a size"
   );
   ok(
     data.card().querySelector(".sval-site-card-count"),
     "and the card a total"
+  );
+  const everywhere = data.everywhere();
+  Assert.equal(
+    row.compareDocumentPosition(everywhere) & Node.DOCUMENT_POSITION_FOLLOWING,
+    Node.DOCUMENT_POSITION_FOLLOWING,
+    "Clear everywhere comes after the rows"
+  );
+  ok(
+    !data
+      .card()
+      .querySelector(".sval-site-data-head .sval-site-data-everywhere"),
+    "and is not in the heading"
   );
 });

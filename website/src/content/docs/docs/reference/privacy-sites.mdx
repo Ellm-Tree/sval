@@ -3,6 +3,9 @@ title: Sites
 description: What Settings › Sites shows, from the defaults every site gets to each site's own page.
 ---
 
+import Since from "../../../../components/docs/Since.astro";
+import Until from "../../../../components/docs/Until.astro";
+
 Settings › Sites holds the defaults every site gets. It also lists every
 site you made a choice for.
 
@@ -24,10 +27,26 @@ Every site gets these settings until you make a choice for it.
 
 ## Your sites
 
+<Until v="0.1.0-rc.11">
+
 Your sites lists each site you made a choice for. That includes choices you
 made with the Privacy and Security button. Your choices sync to your other
 devices. In a private window, the list shows that window's choices. Those
 choices last until you close the window, and they never sync.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+Your sites lists each site you made a choice for, including choices you
+made with the Privacy and Security button, and your choices sync to your
+other devices. The list also shows each site that's storing cookies or
+other data on this device, and each site where Sval remembers your zoom
+level, spelling language, or upload folder. In a private
+window, the list shows only the choices made in the private window, which
+last until you close the window and never sync.
+
+</Since>
 
 - **Find a site.** Typing in this field narrows the list.
 - **Show.** This filters the list. The filters are All sites, All
@@ -36,8 +55,22 @@ choices last until you close the window, and they never sync.
   filters are With permissions, With extension switches, and one for each
   Video and audio choice.
 - **Add site.** This opens the page of a site you type.
+
+<Until v="0.1.0-rc.11">
+
 - Each row says how the site differs from the defaults. An address with
   choices of its own is listed under its site.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- Each row says how the site differs from the defaults, then the site's
+  zoom and what the site stores on this device. An address with choices of
+  its own is listed under its site.
+
+</Since>
+
 - **Reset.** The site goes back to the defaults. Cookies and sign-ins stay.
   When the site has removed elements, Sval asks first, because Reset
   deletes their rules. On an address, Reset removes only that address's
@@ -79,12 +112,29 @@ address Choices for shows:
 
 - **Permissions.** This lists the site's permissions. They apply in every
   Workspace.
+
+<Until v="0.1.0-rc.11">
+
 - **Cookies and site data.** This lists each place that holds the site's
   data, with its size and a **Clear** button. **Clear everywhere** asks you
   to confirm, then signs you out of the site in every Workspace.
   **Manage data…** lists the data every site keeps. **Manage exceptions…**
   lists the sites you always allow or block from using cookies, and the
   sites you allow only until you quit.
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- **Site data.** The card gives the total the site stores on this device,
+  and a row with a size and a **Clear** button for each place that holds
+  the site's data. The shared cookie jar holds what every shared Workspace
+  keeps, and each isolated Workspace has a row of its own. **Clear
+  everywhere** asks you to confirm, then signs you out of the site in every
+  Workspace.
+
+</Since>
+
 - **Forget this site.** After you confirm, Sval clears everything it keeps
   for the site, in every Workspace. **Forget…** lists what Sval clears on
   every device and on this device.

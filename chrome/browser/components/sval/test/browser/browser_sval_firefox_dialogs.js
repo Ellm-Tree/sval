@@ -21,10 +21,6 @@ Services.scriptloader.loadSubScript(
   this
 );
 
-const { PromptTestUtils } = ChromeUtils.importESModule(
-  "resource://testing-common/PromptTestUtils.sys.mjs"
-);
-
 const FRAME_SHEETS = [
   "chrome://browser/content/sval/sval-dialog.css",
   "chrome://browser/content/sval/pages/dialog.css",
@@ -34,7 +30,7 @@ const COMMON_DIALOG = "chrome://global/content/commonDialog.xhtml";
 add_task(function each_dialog_takes_the_frame_sheets() {
   Assert.deepEqual(
     dialogSheetsFor(
-      "chrome://browser/content/preferences/dialogs/siteDataSettings.xhtml"
+      "chrome://browser/content/preferences/dialogs/permissions.xhtml"
     ),
     [PAGE_SHEET, ...FRAME_SHEETS],
     "a dialog no list names takes the page sheet, then the frame's"
@@ -52,48 +48,6 @@ add_task(function each_dialog_takes_the_frame_sheets() {
     dialogSheetsFor("chrome://browser/content/sval/sval-dialog.xhtml"),
     [],
     "Sval's own dialog takes none"
-  );
-});
-
-add_task(async function a_page_confirm_wears_the_frame() {
-  const tab = await openPage("https://example.com/");
-  const browser = tab.linkedBrowser;
-  const shown = PromptTestUtils.waitForPrompt(browser, {
-    modalType: Services.prompt.MODAL_TYPE_CONTENT,
-    promptType: "confirm",
-  });
-  await SpecialPowers.spawn(browser, [], () => {
-    content.setTimeout(() => content.confirm("Go on?"), 0);
-  });
-  const dialog = await within(shown, 10_000, "the page's confirm");
-  const doc = dialog.ui.button0.ownerDocument;
-  const win = doc.defaultView;
-  Assert.equal(doc.documentURI, COMMON_DIALOG, "the common dialog");
-
-  const root = win.getComputedStyle(doc.documentElement);
-  Assert.ok(
-    root.getPropertyValue("--sval-dialog-card").trim(),
-    "the dialog has Sval's dialog palette"
-  );
-  Assert.equal(root.borderTopLeftRadius, "20px", "the card's corners");
-  Assert.equal(root.width, "400px", "the frame's width");
-  // The box draws the card's edge around the frame (`SvalDialogBox`), so its
-  // inside follows the card's corners.
-  const box = win.frameElement.documentGlobal.getComputedStyle(
-    win.frameElement.closest(".dialogBox")
-  );
-  Assert.equal(box.borderTopWidth, "1px", "the box draws the card's edge");
-  Assert.equal(box.borderTopLeftRadius, "21px", "around the card's corners");
-  Assert.equal(
-    root.borderTopWidth,
-    "0px",
-    "the card leaves its edge to the box"
-  );
-
-  await within(
-    PromptTestUtils.handlePrompt(dialog),
-    10_000,
-    "the confirm closing once handled"
   );
 });
 

@@ -46,6 +46,7 @@ const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   SvalLog: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
+  openSvalDialog: "moz-src:///browser/components/sval/SvalDialog.sys.mjs",
   describeError: "moz-src:///browser/components/sval/SvalLog.sys.mjs",
   SvalSecretStore: "moz-src:///browser/components/sval/SvalSecretStore.sys.mjs",
   SvalICloudKeychain:
@@ -308,34 +309,36 @@ export const SvalIdentity = {
   },
 
   /**
-   * Asks the user whether a profile that last ran on another computer moved
-   * here or is a new device.
+   * Asks whether Sval's data moved here from the computer it last ran on,
+   * or this computer is a new device beside that one, in Sval's dialog over
+   * the most recent browser window (`openSvalDialog`). The device id is
+   * settled as the first window's panel starts, so that window is the one
+   * asked in.
    *
-   * Dismissing the question answers "new device": a new id costs the old
-   * one's watermarks, while a profile on two computers under one id
-   * overwrites its own file from both.
+   * Dismissing the question answers "new device", as does a process with no
+   * browser window to ask in: a new id costs the old one's watermarks, while
+   * two computers under one id overwrite each other's file.
    *
-   * @returns {boolean} true when the user moved here.
+   * @returns {Promise<boolean>} true when the user moved here.
    */
-  askIfMoved() {
-    const prompts = Services.prompt;
-    const flags =
-      prompts.BUTTON_TITLE_IS_STRING * prompts.BUTTON_POS_0 +
-      prompts.BUTTON_TITLE_IS_STRING * prompts.BUTTON_POS_1 +
-      prompts.BUTTON_POS_1_DEFAULT;
-    const button = prompts.confirmEx(
-      null,
-      "This profile came from another computer",
-      "This profile was last used on another computer. Is this a new " +
-        "device, or did you move here?",
-      flags,
-      "I moved here",
-      "New device",
-      null,
-      null,
-      {}
+  async askIfMoved() {
+    const { ok } = await lazy.openSvalDialog(
+      Services.wm.getMostRecentWindow("navigator:browser"),
+      {
+        icon: "sval",
+        state: "moved-here",
+        focus: "cancel",
+        title: "Did you move Sval to this computer?",
+        body:
+          "Sval was last used on another computer. If you moved Sval to " +
+          "this computer, Sval keeps syncing as the same device. If you'll " +
+          "keep using the other computer too, this computer syncs as a new " +
+          "device.",
+        primary: "Same device",
+        secondary: "New device",
+      }
     );
-    return button === 0;
+    return ok;
   },
 
   _keyWrites: new SvalSerialQueue("sync key writes"),
@@ -551,7 +554,7 @@ export const SvalIdentity = {
       }
       return mine;
     }
-    if (this.askIfMoved()) {
+    if (await this.askIfMoved()) {
       const moved = Object.fromEntries(
         Object.entries(devices).filter(([, id]) => id !== stored.deviceId)
       );

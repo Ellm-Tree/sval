@@ -31,8 +31,8 @@
  * A user's own tab, and a tab the user took from an agent, keep their
  * dialogs: whether a tab is an agent's is the gate's answer (`agentOf`).
  *
- * Every content dialog opens `commonDialog.xhtml`, which notifies
- * `common-dialog-loaded` with its window once it is ready
+ * Every content dialog opens Sval's prompt page (`prompt-dialog.xhtml`),
+ * which notifies `common-dialog-loaded` with its window once it is ready
  * (`CommonDialog.onLoad`), and the window's `args.owningBrowsingContext`
  * is the context the page called from (`PromptParent`). The dialog is
  * answered through its own buttons by `modal.Dialog`, as WebDriver's
@@ -176,7 +176,7 @@ export function createAgentDialogs({ gate }) {
   }
 
   /**
-   * @param {Window} win A `commonDialog.xhtml` window.
+   * @param {Window} win A prompt page's window.
    */
   function handle(win) {
     const args = win.Dialog?.args;

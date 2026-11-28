@@ -81,7 +81,7 @@ fi
 # Gecko compares, for updates and for extensions' minimum Firefox version,
 # stays the ESR version. scripts/build.sh writes both version files when
 # SVAL_RELEASE_VERSION names the release. Every other build is on the default
-# channel, whose feed is never published, so a development build never
+# channel, whose feed is published empty, so a development build never
 # updates itself.
 if test -n "$SVAL_RELEASE_VERSION"; then
   ac_add_options --enable-update-channel=release

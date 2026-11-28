@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-only WITH AdditionRef-sval-app-store
+   - Copyright 2026 Ellm Tree, Inc. -->
+<!-- A page with a button for each of a page's prompts, and a box that makes
+   - leaving the page ask first. -->
+<meta charset="utf-8">
+<title>Prompt test page</title>
+<style>
+  body { font: 16px system-ui; padding: 32px; display: grid; gap: 12px; max-width: 420px; }
+  button { font: inherit; padding: 8px 14px; }
+</style>
+<h1>Prompt test page</h1>
+<button id="alert" onclick="alert('Hello.\nThis is a second line.')">Alert</button>
+<button id="confirm" onclick="document.getElementById('out').textContent = 'confirm: ' + confirm('Keep going?')">Confirm</button>
+<button id="prompt" onclick="document.getElementById('out').textContent = 'prompt: ' + prompt('Your name?', 'Sval')">Prompt</button>
+<button id="long" onclick="alert('A long message. '.repeat(120))">Long alert</button>
+<label><input type="checkbox" id="leave"> Ask before leaving this page</label>
+<p id="out"></p>
+<script>
+  addEventListener("beforeunload", e => {
+    if (document.getElementById("leave").checked) {
+      e.preventDefault();
+    }
+  });
+</script>

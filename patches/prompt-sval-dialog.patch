@@ -1,0 +1,48 @@
+Sval: show a prompt in a modal box as Sval's prompt page
+
+A page's alert, confirm and prompt, a site's sign-in and the question
+before a page is left all open toolkit's common dialog in a tab's or a
+window's modal box. Sval draws every dialog as its own card, so both
+openers load Sval's prompt page there, which drives the common dialog's
+own CommonDialog and answers through the same property bag. A prompt
+with no box keeps the common dialog's window.
+
+diff --git a/browser/actors/PromptParent.sys.mjs b/browser/actors/PromptParent.sys.mjs
+index c9ec2ad810..2fea679179 100644
+--- a/browser/actors/PromptParent.sys.mjs
++++ b/browser/actors/PromptParent.sys.mjs
+@@ -137,7 +137,9 @@ export class PromptParent extends JSWindowActorParent {
+    *         Resolves with the arguments returned from the modal prompt.
+    */
+   async openPromptWithTabDialogBox(args) {
+-    const COMMON_DIALOG = "chrome://global/content/commonDialog.xhtml";
++    // Sval: Sval's prompt page, which drives `CommonDialog` in Sval's dialog
++    // frame.
++    const COMMON_DIALOG = "chrome://browser/content/sval/prompt-dialog.xhtml";
+     const SELECT_DIALOG = "chrome://global/content/selectDialog.xhtml";
+     let uri = args.promptType == "select" ? SELECT_DIALOG : COMMON_DIALOG;
+ 
+diff --git a/toolkit/components/prompts/src/Prompter.sys.mjs b/toolkit/components/prompts/src/Prompter.sys.mjs
+index 195acf5578..a5fc87da04 100644
+--- a/toolkit/components/prompts/src/Prompter.sys.mjs
++++ b/toolkit/components/prompts/src/Prompter.sys.mjs
+@@ -19,6 +19,10 @@ const {
+ } = Ci.nsIPrompt;
+ 
+ const COMMON_DIALOG = "chrome://global/content/commonDialog.xhtml";
++// Sval: a prompt in a modal box is Sval's prompt page, which drives the
++// common dialog's own `CommonDialog` in Sval's dialog frame. A prompt with
++// no box to show in keeps the common dialog's window.
++const SVAL_PROMPT = "chrome://browser/content/sval/prompt-dialog.xhtml";
+ const SELECT_DIALOG = "chrome://global/content/selectDialog.xhtml";
+ 
+ export function Prompter() {}
+@@ -1255,7 +1259,7 @@ class ModalPrompter {
+     }
+     let propBag = PromptUtils.objectToPropBag(args);
+     propBag.setProperty("async", this.async);
+-    let uri = args.promptType == "select" ? SELECT_DIALOG : COMMON_DIALOG;
++    let uri = args.promptType == "select" ? SELECT_DIALOG : SVAL_PROMPT;
+     await parentWindow.gDialogBox.open(uri, propBag);
+     propBag.deleteProperty("async");
+     PromptUtils.propBagToObject(propBag, args);

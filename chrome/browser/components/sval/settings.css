@@ -3992,6 +3992,13 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   gap: 8px 16px;
 }
 
+/* Clear everywhere, under the jars' rows. */
+.sval-site-data-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 12px;
+}
+
 .sval-pane .sval-site-data-everywhere {
   --sval-button-height: 32px;
   --sval-button-soft-disabled-opacity: 0.45;
@@ -4091,16 +4098,6 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
   .sval-site-skeleton {
     display: none;
   }
-}
-
-.sval-site-data-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0 0;
-  color: var(--sval-ink-muted);
-  font-size: 13px;
 }
 
 #sval-blocking-dialog[data-confirm="clear-everywhere"] > sval-dialog {
@@ -4408,59 +4405,6 @@ sval-choice-pill[data-default] > button.sval-choice-pill {
     > .sval-glyph {
       color: var(--sval-accent);
     }
-  }
-}
-
-/* The Sites card's search results for sites with no row. */
-.sval-sites-results {
-  margin-block-start: 12px;
-}
-
-.sval-pane h3.sval-sites-results-head {
-  margin: 0;
-  padding: 8px 0 4px;
-  color: var(--sval-ink-muted);
-  font-size: var(--settings-small-size);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.sval-sites-results-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sval-sites-result {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  border-block-start: 1px solid var(--sval-border-subtle);
-}
-
-.sval-sites-result-sub {
-  overflow: hidden;
-  color: var(--sval-ink-muted);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sval-sites-results-wait {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  margin: 0;
-  border-block-start: 1px solid var(--sval-border-subtle);
-  color: var(--sval-ink-muted);
-  font-size: 13px;
-
-  > .sval-site-spinner {
-    width: 14px;
-    height: 14px;
   }
 }
 

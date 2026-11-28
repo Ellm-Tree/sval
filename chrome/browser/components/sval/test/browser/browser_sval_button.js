@@ -435,3 +435,36 @@ add_task(async function disabled_stops_clicks_that_miss_its_button() {
   pressEveryWay(el);
   Assert.equal(seen.count, 0, "nothing clicks it");
 });
+
+add_task(
+  async function an_access_key_is_underlined_where_the_platform_shows_them() {
+    for (const [menuAccessKey, underlined] of [
+      [18, true],
+      [0, false],
+    ]) {
+      await SpecialPowers.pushPrefEnv({
+        set: [["ui.key.menuAccessKey", menuAccessKey]],
+      });
+      const el = button({ label: "Remove", accesskey: "m" }, "");
+      stage(el);
+      await drawn(el);
+      Assert.ok(!el.hasAttribute("accesskey"), "the key leaves the element");
+      Assert.equal(
+        inner(el).getAttribute("accesskey"),
+        "m",
+        "for its inner button"
+      );
+      Assert.equal(
+        inner(el).querySelector(".accesskey")?.textContent ?? null,
+        underlined ? "m" : null,
+        underlined ? "its letter is underlined" : "and nothing is underlined"
+      );
+      Assert.equal(
+        inner(el).textContent.trim(),
+        "Remove",
+        "the label reads whole"
+      );
+      await SpecialPowers.popPrefEnv();
+    }
+  }
+);

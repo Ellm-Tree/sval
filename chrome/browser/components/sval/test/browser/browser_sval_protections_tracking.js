@@ -205,6 +205,11 @@ add_task(async function the_rest_is_in_privacy_and_protection() {
     "with Firefox's site data settings in one card"
   );
   Assert.ok(
+    !group.querySelector("#cookieExceptions") &&
+      !group.querySelector("#siteDataSettings"),
+    "and no cookie exceptions or site data list: Sites holds both"
+  );
+  Assert.ok(
     !ui.pane.querySelector('setting-group[groupid="cookiesAndSiteData2"]'),
     "and none of Firefox's own group beside it"
   );

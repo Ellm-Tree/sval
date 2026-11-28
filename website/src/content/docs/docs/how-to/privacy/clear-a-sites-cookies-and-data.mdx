@@ -3,6 +3,9 @@ title: Clear a site's cookies and data
 description: Sign out of a site by clearing its cookies and site data, in this tab's Workspace or in every Workspace.
 ---
 
+import Since from "../../../../../components/docs/Since.astro";
+import Until from "../../../../../components/docs/Until.astro";
+
 Clearing a site's cookies and site data signs you out of the site.
 
 A site keeps showing you an old version of your account, and signing out
@@ -20,7 +23,7 @@ The tab reloads, and you're signed out of the site.
 
 1. Open Settings › Sites.
 2. In Your sites, select the site's row.
-3. Under Cookies and site data, select **Clear everywhere**.
+3. On the site's page, select **Clear everywhere**.
 4. Select **Clear and sign out**.
 
 ## Details
@@ -29,12 +32,28 @@ The tab reloads, and you're signed out of the site.
   the place where this tab keeps it. An isolated Workspace keeps its own
   cookies, and so does a private window. Clearing one of them leaves the others as they
   are.
+
+<Until v="0.1.0-rc.11">
+
 - On the site's page, Cookies and site data lists each place that holds
   data for the site, such as Shared Workspaces or an isolated Workspace.
   Each place has its own **Clear** button.
-- Clearing doesn't change the site's protections or your other choices for
-  the site. To clear those too, forget the site. See
-  [Forget a site](/docs/how-to/privacy/forget-a-site/).
+
+</Until>
+
+<Since v="0.1.0-rc.11">
+
+- On the site's page, Site data lists each place that holds data for the
+  site, and each place has a **Clear** button. Every shared Workspace keeps
+  the site's data in the shared cookie jar, and each isolated Workspace gets
+  a separate row.
+
+</Since>
+
+- Clearing leaves the site's protections and your other choices for the
+  site as they are, and
+  [forgetting the site](/docs/how-to/privacy/forget-a-site/) clears those
+  too.
 
 ## If something goes wrong
 

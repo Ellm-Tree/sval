@@ -4,9 +4,10 @@
 "use strict";
 
 /**
- * A profile that last ran on another computer: `SvalIdentity.deviceId` asks
- * the user, through Firefox's window prompt, whether the profile moved here
- * or is a new device, and keeps or replaces the id by the answer.
+ * Sval's data last used on another computer: `SvalIdentity.deviceId` asks
+ * the user, in Sval's dialog over the browser window, whether Sval moved
+ * here or this computer is a new device, and keeps or replaces the id by the
+ * answer.
  *
  * The other computer is the identity file such a computer leaves: its
  * `devices` map names that computer's fingerprint and not this one's.
@@ -63,39 +64,29 @@ function hex(bytes) {
 }
 
 /**
- * Waits for the moved-here question, proves it is a two-button window
- * prompt in front with the button enabled, and clicks button `which`.
+ * Waits for the moved-here question, proves it is Sval's dialog with its two
+ * answers and no third, and presses "Same device" (0) or "New device" (1).
  *
- * @param {number} which 0 for "I moved here", 1 for "New device".
- * @returns {Promise<void>} once the prompt has closed.
+ * @param {number} which 0 for "Same device", 1 for "New device".
+ * @returns {Promise<void>} once the dialog has closed.
  */
 async function answer(which) {
-  const loaded = await within(
-    TestUtils.topicObserved("common-dialog-loaded"),
-    10_000,
-    "the moved-here question"
+  const { doc, dialog } = await openedSvalDialog();
+  Assert.equal(dialog.state, "moved-here", "it asks whether Sval moved here");
+  const answers = [...doc.querySelectorAll("[data-button]")].filter(button =>
+    BrowserTestUtils.isVisible(button)
   );
-  const dialogWin = loaded[0];
-  const { Dialog } = dialogWin;
-  Assert.equal(Dialog.args.promptType, "confirmEx", "it is a question");
-  const buttons = [Dialog.ui.button0, Dialog.ui.button1];
-  for (const button of buttons) {
-    Assert.ok(BrowserTestUtils.isVisible(button), `${button.id} shows`);
-  }
-  Assert.ok(BrowserTestUtils.isHidden(Dialog.ui.button2), "and no third");
-  await within(
-    TestUtils.waitForCondition(
-      () => Services.focus.activeWindow === dialogWin,
-      "the question is in front"
-    ),
-    10_000,
-    "the question in front"
+  Assert.deepEqual(
+    answers.map(button => button.dataset.button).sort(),
+    ["cancel", "ok"],
+    "with its two answers"
   );
-  const target = buttons[which];
-  Assert.ok(!target.disabled, `${target.id} takes the click`);
-  const closed = BrowserTestUtils.windowClosed(dialogWin);
-  EventUtils.synthesizeMouseAtCenter(target, {}, dialogWin);
-  await within(closed, 10_000, "the question closing on the click");
+  const box = gDialogBox.dialog;
+  await pressDialogButton(doc, which ? "cancel" : "ok");
+  await TestUtils.waitForCondition(
+    () => gDialogBox.dialog !== box,
+    "the question closing on the press"
+  );
 }
 
 /** The device id a restart reads, which must not ask. */

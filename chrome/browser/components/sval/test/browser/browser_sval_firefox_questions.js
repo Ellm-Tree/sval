@@ -35,7 +35,7 @@ add_task(async function the_resend_question_is_its_own_title() {
   });
   gBrowser.reload();
   const dialog = await within(shown, 10_000, "the resend question");
-  const title = dialog.ui.button0.ownerDocument.getElementById("titleText");
+  const title = dialog.ui.infoTitle;
   await within(
     TestUtils.waitForCondition(() => title.textContent),
     10_000,

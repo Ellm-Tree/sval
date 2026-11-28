@@ -176,7 +176,7 @@ export const SvalSiteData = {
    *   window's panel is started.
    * @returns {Array<{kind: "shared"|"isolated"|"removed",
    *   userContextIds: number[], workspaceId?: string, name?: string,
-   *   sharedNames?: string[], usage: number}>}
+   *   usage: number}>}
    */
   jarsFor(site, nodes) {
     const jars = this._jarsOf(site);
@@ -200,9 +200,6 @@ export const SvalSiteData = {
         shared = {
           kind: "shared",
           userContextIds: [0],
-          sharedNames: items
-            .filter(item => !lazy.SvalWorkspaceJar.isIsolated(nodes, item.id))
-            .map(item => item.name),
           usage,
         };
         continue;

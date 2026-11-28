@@ -394,11 +394,14 @@ do.
   the page or change the page's contrast, brightness, and saturation. You can
   also force the site's light or dark theme or swap its font. The color wheel
   comes from Zen Browser's Boosts.
-- **Per-site controls.** Settings › Sites lists every site you've made choices
-  for. Each site's page holds its permissions and JavaScript setting along
-  with removals, Colorshift, extensions, and stored data. Forget this site
-  clears everything Sval keeps for the site, and Defaults at the top sets what
-  every other site gets.
+- **Per-site controls.** Settings › Sites lists every site you made a
+  choice for, and every site that's storing cookies or other data on this
+  device. The list also shows each site where Sval remembers your zoom
+  level, spelling language, or upload folder. Each row says how the site
+  differs from the defaults and what the site stores. Each site's page holds
+  its permissions and JavaScript setting along with removals, Colorshift,
+  extensions, and stored data. Forget this site clears everything Sval keeps
+  for the site, and Defaults at the top sets what every other site gets.
 - **Secure DNS** and **Global Privacy Control**, which tells sites not to sell
   or share your data.
 

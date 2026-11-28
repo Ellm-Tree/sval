@@ -66,6 +66,7 @@ support-files = [
   "sval_ctrl_tab_helpers.js",
   "sval_icon_audit_collect.js",
   "sval_pip_video_page.html",
+  "sval_prompts_page.html",
   "sval_reload_cacheable.sjs",
   "sval_restore_counter.sjs",
   "sval_switcher_page.sjs",
@@ -790,6 +791,10 @@ run-if = ["os == 'mac'"]
 
 ["browser_sval_profiler.js"]
 
+["browser_sval_prompt_dialog.js"]
+
+["browser_sval_prompt_page.js"]
+
 ["browser_sval_protection_access.js"]
 
 ["browser_sval_protection_button.js"]
@@ -921,6 +926,8 @@ run-if = ["os == 'mac'"]
 ["browser_sval_sites_extension_switches.js"]
 
 ["browser_sval_sites_hosts.js"]
+
+["browser_sval_sites_stored.js"]
 
 ["browser_sval_split_row.js"]
 

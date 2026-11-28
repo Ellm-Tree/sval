@@ -3203,6 +3203,31 @@ screenshots-buttons {
   }
 }
 
+/* Every modal box stands 16px inside the area it opens over, so no edge of
+ * a box meets the header, the panel or the window's edge: a tab's boxes
+ * inside the page's frame, and a window's below the chrome above the page,
+ * where Firefox lifts it 5px over that chrome (`content-area.css`), and
+ * inside the window's sides. */
+.dialogStack > .dialogOverlay {
+  padding: 16px;
+}
+
+/* A page's prompt takes the page's measured height as its row
+ * (`SubDialog`'s `limitheight`), and the box draws the card's 1px edge
+ * (`SvalDialogBox`) inside that row, so the row holds the edge too, and
+ * the card the full height it was measured at. */
+.content-prompt-dialog > .dialogOverlay {
+  grid-auto-rows: min(90%, calc(var(--doc-height-px) + 2px));
+}
+
+#window-modal-dialog > .dialogOverlay {
+  padding-inline: 16px;
+
+  > .dialogBox:not(.spotlightBox) {
+    margin-top: clamp(16px, var(--chrome-offset, 20px) + 16px, calc(100vh - var(--subdialog-inner-height) - 16px));
+  }
+}
+
 .dialogStack:not(.content-prompt-dialog) > .dialogOverlay[topmost="true"]:has(> .dialogBox[sizeto="available"]) {
   justify-content: center;
   background-color: var(--sval-scrim);

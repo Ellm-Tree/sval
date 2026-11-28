@@ -18,9 +18,6 @@ const { SvalWorkspaceJar } = ChromeUtils.importESModule(
 const { SvalPrivateJars } = ChromeUtils.importESModule(
   "moz-src:///browser/components/sval/SvalPrivateJars.sys.mjs"
 );
-const { switcherItems } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/sval/SvalPanelModel.sys.mjs"
-);
 
 const SITE = "example.com";
 const NAME = "Site data test";
@@ -164,17 +161,6 @@ add_task(async function jars_by_workspace_and_clearing_them() {
     "the shared jar first, then the isolated workspace's"
   );
   Assert.deepEqual(rows[0].userContextIds, [0], "the shared row is jar 0");
-  Assert.deepEqual(
-    rows[0].sharedNames,
-    switcherItems(nodes, null)
-      .filter(item => !SvalWorkspaceJar.isIsolated(nodes, item.id))
-      .map(item => item.name),
-    "the shared row names the shared workspaces"
-  );
-  Assert.ok(
-    !rows[0].sharedNames.includes(NAME),
-    "an isolated workspace is not among the shared ones"
-  );
   Assert.deepEqual(
     [rows[1].userContextIds, rows[1].workspaceId, rows[1].name],
     [[jar], id, NAME],
